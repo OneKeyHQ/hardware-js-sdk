@@ -3,6 +3,15 @@ import { UI_RESPONSE } from '../events/ui-response';
 import type { UiPromise, UiPromiseResponse } from '../events/ui-promise';
 import type { UiResponseEvent } from '../events/ui-response';
 
+export const rejectUiPromises = (
+  uiPromises: UiPromise<UiPromiseResponse['type']>[],
+  error: Error
+) => {
+  for (const uiPromise of uiPromises) {
+    uiPromise.reject(error);
+  }
+};
+
 const isSensitiveUiResponse = (
   response: UiResponseEvent
 ): response is Extract<

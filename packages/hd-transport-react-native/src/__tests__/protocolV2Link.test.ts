@@ -333,7 +333,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       respondOnWriteCount: [1, 2],
     });
 
-    await expect(transport.acquire({ uuid })).resolves.toEqual({
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V1' })).resolves.toEqual({
       uuid,
       protocolType: 'V1',
     });
@@ -355,7 +355,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       isWritableWithResponse: false,
     });
 
-    await transport.acquire({ uuid });
+    await transport.acquire({ uuid, expectedProtocol: 'V1' });
     await expect(transport.call(uuid, 'Initialize', {}, { timeoutMs: 50 })).resolves.toBeDefined();
 
     expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
@@ -367,7 +367,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     const { transport, uuid, writeCharacteristic } = createV1Harness();
     const writeError = new Error('write with response failed');
 
-    await transport.acquire({ uuid });
+    await transport.acquire({ uuid, expectedProtocol: 'V1' });
     writeCharacteristic.writeWithResponse.mockRejectedValueOnce(writeError);
 
     await expect(transport.call(uuid, 'Initialize', {}, { timeoutMs: 50 })).rejects.toMatchObject({
@@ -378,7 +378,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
-  test('keeps the first Core command as the first iOS BLE request for a Protocol V2 device', async () => {
+  test('actively probes Protocol V2 on iOS when only a name-derived hint is available', async () => {
     const { transport, uuid, sentSeqs, writeCharacteristic } = createHarness({
       deviceName: 'Pro2 6E9E',
     });
@@ -387,12 +387,32 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       uuid,
       protocolType: 'V2',
     });
-    expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
 
     await expect(
       transport.call(uuid, 'Ping', { message: 'first-core-command' })
     ).resolves.toBeDefined();
-    expect(sentSeqs).toEqual([1]);
+    expect(sentSeqs).toEqual([1, 2]);
+    await transport.release(uuid, true);
+  });
+
+  test('falls back to the other active probe on iOS when protocol metadata is absent', async () => {
+    const { transport, uuid } = createHarness({ deviceName: 'OneKey' });
+    const probeProtocolV1 = jest
+      .spyOn(transport as any, 'probeProtocolV1')
+      .mockResolvedValue(false);
+    const probeProtocolV2 = jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(true);
+
+    await expect(transport.acquire({ uuid })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+
+    expect(probeProtocolV1).toHaveBeenCalledTimes(1);
+    expect(probeProtocolV2).toHaveBeenCalledTimes(1);
+    expect(probeProtocolV1.mock.invocationCallOrder[0]).toBeLessThan(
+      probeProtocolV2.mock.invocationCallOrder[0]
+    );
     await transport.release(uuid, true);
   });
 
@@ -467,10 +487,10 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     resetProtocolV2BleTuning();
   });
 
-  test('starts the Protocol V2 sequence with the first Core call on iOS', async () => {
+  test('uses the first Protocol V2 sequence for the first Core call when protocol is known', async () => {
     const { transport, uuid, sentSeqs } = createHarness();
 
-    await transport.acquire({ uuid });
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
     await transport.call(uuid, 'Ping', { message: 'first-core-command' });
 
     expect(sentSeqs).toEqual([1]);
@@ -480,7 +500,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   test('rejects the active Protocol V2 reader when the current monitor errors', async () => {
     const harness = createHarness();
     const { transport, uuid, sentSeqs } = harness;
-    await transport.acquire({ uuid });
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
     harness.setShouldRespond(false);
 
     const call = transport.call(uuid, 'Ping', { message: 'wait-for-monitor' }, { timeoutMs: 50 });
@@ -502,10 +522,10 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   test('retains the sequence cursor when a new monitor generation is acquired', async () => {
     const { transport, uuid, sentSeqs } = createHarness();
 
-    await transport.acquire({ uuid });
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
     await transport.call(uuid, 'Ping', { message: 'first-generation' });
     await transport.release(uuid, true);
-    await transport.acquire({ uuid });
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
     await transport.call(uuid, 'Ping', { message: 'second-generation' });
 
     expect(sentSeqs).toEqual([1, 2]);
@@ -515,7 +535,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   test('uses withResponse for consecutive iOS Protocol V2 control calls without releasing', async () => {
     const { transport, uuid, writeCharacteristic } = createHarness();
 
-    await transport.acquire({ uuid });
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
     const releaseNative = jest.spyOn(transport as any, 'releaseNative');
     expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
     expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
@@ -533,7 +553,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   test('keeps iOS Protocol V2 high-volume calls on withoutResponse', async () => {
     const { transport, uuid, writeCharacteristic } = createHarness();
 
-    await transport.acquire({ uuid });
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
 
     await transport.call(uuid, 'FileWrite', {});
     expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
@@ -544,7 +564,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   test('uses withResponse for an iOS Protocol V2 firmware file write when requested', async () => {
     const { transport, uuid, writeCharacteristic } = createHarness();
 
-    await transport.acquire({ uuid });
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
 
     await transport.call(uuid, 'FileWrite', {}, { writeWithResponse: true });
     expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
@@ -557,7 +577,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       isWritableWithResponse: false,
     });
 
-    await transport.acquire({ uuid });
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
     await transport.call(uuid, 'ProtocolInfoRequest', {});
 
     expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
@@ -635,7 +655,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   test('rejects an active Protocol V2 reader when disconnect resets the link', async () => {
     const harness = createHarness();
     const { transport, uuid, sentSeqs } = harness;
-    await transport.acquire({ uuid });
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
     harness.setShouldRespond(false);
 
     const call = transport.call(uuid, 'Ping', { message: 'disconnect' }, { timeoutMs: 50 });
@@ -655,7 +675,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     const disconnectListener = jest.fn();
     harness.emitter.on(TRANSPORT_EVENT.DEVICE_DISCONNECT, disconnectListener);
 
-    await harness.transport.acquire({ uuid: harness.uuid });
+    await harness.transport.acquire({ uuid: harness.uuid, expectedProtocol: 'V2' });
     harness.emitDisconnect();
     await harness.transport.disconnect(harness.uuid);
 

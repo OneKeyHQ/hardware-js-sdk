@@ -1,6 +1,6 @@
 import { createDeferred } from '@onekeyfe/hd-shared';
 
-import { findUiPromiseForResponse } from '../src/core/uiPromiseRegistry';
+import { findUiPromiseForResponse, rejectUiPromises } from '../src/core/uiPromiseRegistry';
 import { UI_RESPONSE } from '../src/events';
 
 import type { UiPromise, UiPromiseResponse } from '../src/events';
@@ -82,5 +82,16 @@ describe('UI response promise correlation', () => {
         deviceId: 'device-a',
       })
     ).toBe(promise);
+  });
+
+  test('rejects every pending UI promise removed during cleanup', async () => {
+    const deviceA = createPinPromise('interaction-a', 'device-a');
+    const deviceB = createPinPromise('interaction-b', 'device-b');
+    const cancellation = new Error('UI request was cancelled');
+
+    rejectUiPromises(asRegistry([deviceA, deviceB]), cancellation);
+
+    await expect(deviceA.promise).rejects.toBe(cancellation);
+    await expect(deviceB.promise).rejects.toBe(cancellation);
   });
 });

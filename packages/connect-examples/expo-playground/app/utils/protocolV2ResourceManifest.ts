@@ -18,7 +18,11 @@ export type ProtocolV2ResourceFileInput = {
 };
 
 function normalizeRelativePath(path: string) {
-  return path.replace(/^\.\//, '').replace(/\\/g, '/');
+  let normalized = path.replace(/\\/g, '/');
+  while (normalized.startsWith('./')) {
+    normalized = normalized.slice(2);
+  }
+  return normalized;
 }
 
 export function parseProtocolV2ResourceManifest(value: unknown): ProtocolV2ResourceManifest {
@@ -34,6 +38,7 @@ export function parseProtocolV2ResourceManifest(value: unknown): ProtocolV2Resou
       typeof entry.device_path !== 'string' ||
       !entry.device_path.startsWith('vol0:/') ||
       entry.device_path.includes('..') ||
+      entry.device_path.includes('\\') ||
       !Number.isSafeInteger(entry.size) ||
       entry.size <= 0 ||
       typeof entry.sha256 !== 'string' ||

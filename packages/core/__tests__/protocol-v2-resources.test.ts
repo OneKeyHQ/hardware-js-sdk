@@ -146,6 +146,21 @@ describe('Pro2 resource configuration', () => {
         },
       })
     ).toThrow('devicePath');
+
+    for (const devicePath of [
+      'vol0:/assets/loaders\\bootloader_crest.bin',
+      'vol0:/assets/loaders\\\\bootloader_crest.bin',
+    ]) {
+      expect(() =>
+        parseProtocolV2Resources({
+          stable: resources,
+          boot: {
+            ...bootResources,
+            files: [{ ...bootResources.files[0], devicePath }],
+          },
+        })
+      ).toThrow('devicePath');
+    }
   });
 
   test('downloads nothing when all resource identities match', () => {

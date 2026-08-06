@@ -1444,21 +1444,14 @@ export default class ReactNativeBleTransport {
     protocolHint?: ProtocolType,
     rebuildTransport?: () => Promise<void>
   ): Promise<ProtocolType> {
-    if (Platform.OS === 'ios') {
-      const protocol = expectedProtocol ?? protocolHint ?? 'V1';
-      let source = 'ios-legacy-default';
-      if (expectedProtocol) {
-        source = 'expected';
-      } else if (protocolHint) {
-        source = 'hint';
-      }
-      this.deviceProtocol.set(uuid, protocol);
+    if (Platform.OS === 'ios' && expectedProtocol) {
+      this.deviceProtocol.set(uuid, expectedProtocol);
       Log?.debug('[ReactNativeBleTransport] protocol selected', {
         deviceId: uuid,
-        protocol,
-        source,
+        protocol: expectedProtocol,
+        source: 'expected',
       });
-      return protocol;
+      return expectedProtocol;
     }
 
     if (expectedProtocol === 'V1') {

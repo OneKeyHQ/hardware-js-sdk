@@ -272,7 +272,7 @@ function validateBootResources(value: unknown): IProtocolV2BootResources {
       typeof file.devicePath !== 'string' ||
       !file.devicePath.startsWith('vol0:/') ||
       file.devicePath.includes('..') ||
-      file.devicePath.includes('\\\\')
+      file.devicePath.includes('\\')
     ) {
       throw new Error(`Invalid Pro2 boot resource devicePath at files[${index}]`);
     }

@@ -54,7 +54,7 @@ import {
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
-import { findUiPromiseForResponse } from './uiPromiseRegistry';
+import { findUiPromiseForResponse, rejectUiPromises } from './uiPromiseRegistry';
 import { registerHardwareUiEventListeners } from './deviceEventRegistration';
 import { getSynchronize } from '../utils/getSynchronize';
 import { runMethodWithUnlockPolicy } from '../protocols/protocol-v2/unlockPolicyRunner';
@@ -1226,7 +1226,12 @@ const shouldCheckPassphraseState = (method: BaseMethod, device: Device) => {
 };
 
 const cleanup = () => {
+  const pendingUiPromises = _uiPromises;
   _uiPromises = [];
+  rejectUiPromises(
+    pendingUiPromises,
+    ERRORS.TypedError(HardwareErrorCode.ActionCancelled, 'UI request was cancelled')
+  );
   Log.debug('Cleanup...');
 };
 
