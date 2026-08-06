@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hardware-cli",
-  "version": "1.2.0-alpha.65",
+  "version": "1.2.0-alpha.67",
   "description": "OneKey hardware wallet CLI for testing device communication",
   "author": "OneKey",
   "license": "Apache-2.0",
@@ -31,10 +31,10 @@
     "test": "jest"
   },
   "dependencies": {
-    "@onekeyfe/hd-common-connect-sdk": "1.2.0-alpha.65",
-    "@onekeyfe/hd-core": "1.2.0-alpha.65",
-    "@onekeyfe/hd-shared": "1.2.0-alpha.65",
-    "@onekeyfe/hd-transport-usb": "1.2.0-alpha.65",
+    "@onekeyfe/hd-common-connect-sdk": "1.2.0-alpha.67",
+    "@onekeyfe/hd-core": "1.2.0-alpha.67",
+    "@onekeyfe/hd-shared": "1.2.0-alpha.67",
+    "@onekeyfe/hd-transport-usb": "1.2.0-alpha.67",
     "@stoprocent/noble": "2.3.16",
     "commander": "^12.0.0"
   }
