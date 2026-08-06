@@ -3,6 +3,19 @@ import { UI_RESPONSE } from '../events/ui-response';
 import type { UiPromise, UiPromiseResponse } from '../events/ui-promise';
 import type { UiResponseEvent } from '../events/ui-response';
 
+const normalizeUiPromiseError = (error: unknown) =>
+  error instanceof Error ? error : new Error(String(error));
+
+export const consumeUiPromise = <T>(
+  promise: Promise<T>,
+  onFulfilled: (value: T) => void,
+  onRejected: (error: Error) => void
+) => {
+  promise.then(onFulfilled, error => {
+    onRejected(normalizeUiPromiseError(error));
+  });
+};
+
 export const rejectUiPromises = (
   uiPromises: UiPromise<UiPromiseResponse['type']>[],
   error: Error

@@ -1,6 +1,10 @@
 import { createDeferred } from '@onekeyfe/hd-shared';
 
-import { findUiPromiseForResponse, rejectUiPromises } from '../src/core/uiPromiseRegistry';
+import {
+  consumeUiPromise,
+  findUiPromiseForResponse,
+  rejectUiPromises,
+} from '../src/core/uiPromiseRegistry';
 import { UI_RESPONSE } from '../src/events';
 
 import type { UiPromise, UiPromiseResponse } from '../src/events';
@@ -17,6 +21,20 @@ const asRegistry = (promises: UiPromise<typeof UI_RESPONSE.RECEIVE_PIN>[]) =>
   promises as UiPromise<UiPromiseResponse['type']>[];
 
 describe('UI response promise correlation', () => {
+  test('consumes a rejected UI promise and normalizes its callback error', async () => {
+    const pending = createDeferred<string>();
+    const onFulfilled = jest.fn();
+    const onRejected = jest.fn();
+
+    consumeUiPromise(pending.promise, onFulfilled, onRejected);
+    pending.reject('cancelled' as unknown as Error);
+    await Promise.resolve();
+
+    expect(onFulfilled).not.toHaveBeenCalled();
+    expect(onRejected).toHaveBeenCalledWith(expect.any(Error));
+    expect(onRejected.mock.calls[0][0].message).toBe('cancelled');
+  });
+
   test('matches a sensitive response by type, interactionId and deviceId', () => {
     const deviceA = createPinPromise('interaction-a', 'device-a');
     const deviceB = createPinPromise('interaction-b', 'device-b');

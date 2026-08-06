@@ -54,7 +54,7 @@ import {
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
-import { findUiPromiseForResponse, rejectUiPromises } from './uiPromiseRegistry';
+import { consumeUiPromise, findUiPromiseForResponse, rejectUiPromises } from './uiPromiseRegistry';
 import { registerHardwareUiEventListeners } from './deviceEventRegistration';
 import { getSynchronize } from '../utils/getSynchronize';
 import { runMethodWithUnlockPolicy } from '../protocols/protocol-v2/unlockPolicyRunner';
@@ -1273,7 +1273,7 @@ const onTransportDeviceDisconnectHandler = (event: TransportDeviceDisconnectEven
   DevicePool.emitter.emit(DEVICE.DISCONNECT, device);
 };
 
-const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin']) => {
+const onDevicePinHandler = (...[device, type, callback]: DeviceEvents['pin']) => {
   Log.log('request Input PIN');
   // create ui promise
   const uiPromise = createUiPromise(UI_RESPONSE.RECEIVE_PIN, device);
@@ -1285,10 +1285,11 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
       responseCorrelation: uiPromise.responseCorrelation,
     })
   );
-  // wait for pin
-  const uiResp = await uiPromise.promise;
-  // callback.apply(null, [null, pin]);
-  callback(null, uiResp.payload);
+  consumeUiPromise(
+    uiPromise.promise,
+    uiResp => callback(null, uiResp.payload),
+    error => callback(error, '')
+  );
 };
 
 export const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
@@ -1316,7 +1317,7 @@ const onDeviceStateHandler = (...[_, stateEvent]: [...DeviceEvents['state']]) =>
   postMessage(createDeviceMessage(DEVICE.STATE, stateEvent));
 };
 
-const onDevicePassphraseHandler = async (
+const onDevicePassphraseHandler = (
   ...[device, requestPayload, callback]: DeviceEvents['passphrase']
 ) => {
   Log.debug('onDevicePassphraseHandler');
@@ -1334,16 +1335,19 @@ const onDevicePassphraseHandler = async (
       responseCorrelation: uiPromise.responseCorrelation,
     })
   );
-  // wait for passphrase
-  const uiResp = await uiPromise.promise;
-  const { value, passphraseOnDevice, save, attachPinOnDevice } = uiResp.payload;
-  // send as PassphrasePromptResponse
-  callback({
-    passphrase: value.normalize('NFKD'),
-    passphraseOnDevice,
-    attachPinOnDevice,
-    cache: save,
-  });
+  consumeUiPromise(
+    uiPromise.promise,
+    uiResp => {
+      const { value, passphraseOnDevice, save, attachPinOnDevice } = uiResp.payload;
+      callback({
+        passphrase: value.normalize('NFKD'),
+        passphraseOnDevice,
+        attachPinOnDevice,
+        cache: save,
+      });
+    },
+    error => callback({}, error)
+  );
 };
 
 const onEmptyPassphraseHandler = (...[_, , callback]: DeviceEvents['passphrase']) => {
@@ -1408,7 +1412,7 @@ const onPinOnDeviceCompleteHandler = (
   postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW, metadata));
 };
 
-const onSelectDeviceInBootloaderForWebDeviceHandler = async (
+const onSelectDeviceInBootloaderForWebDeviceHandler = (
   ...[device, callback]: [...DeviceEvents['select_device_in_bootloader_for_web_device']]
 ) => {
   Log.debug('onSelectDeviceInBootloaderForWebDeviceHandler');
@@ -1418,11 +1422,14 @@ const onSelectDeviceInBootloaderForWebDeviceHandler = async (
       device: device.toMessageObject() as KnownDevice,
     })
   );
-  const uiResp = await uiPromise.promise;
-  callback(null, uiResp.payload.deviceId);
+  consumeUiPromise(
+    uiPromise.promise,
+    uiResp => callback(null, uiResp.payload.deviceId),
+    error => callback(error, '')
+  );
 };
 
-const onSelectDeviceForSwitchFirmwareWebDeviceHandler = async (
+const onSelectDeviceForSwitchFirmwareWebDeviceHandler = (
   ...[device, callback]: [...DeviceEvents['select_device_for_switch_firmware_web_device']]
 ) => {
   Log.debug('onSelectDeviceForSwitchFirmwareWebDeviceHandler');
@@ -1435,8 +1442,11 @@ const onSelectDeviceForSwitchFirmwareWebDeviceHandler = async (
       device: device.toMessageObject() as KnownDevice,
     })
   );
-  const uiResp = await uiPromise.promise;
-  callback(null, uiResp.payload.deviceId);
+  consumeUiPromise(
+    uiPromise.promise,
+    uiResp => callback(null, uiResp.payload.deviceId),
+    error => callback(error, '')
+  );
 };
 
 /**

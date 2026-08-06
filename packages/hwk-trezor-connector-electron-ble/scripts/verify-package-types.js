@@ -12,10 +12,9 @@ const declarationPaths = [
   packageJson.exports?.['./main']?.require?.types,
 ].filter(Boolean);
 
-const missingDeclarations = declarationPaths.filter(declarationPath => {
-  const relativePath = declarationPath.replace(/^\.\//, '');
-  return !fs.existsSync(path.join(packageRoot, relativePath));
-});
+const missingDeclarations = declarationPaths.filter(
+  declarationPath => !fs.existsSync(path.join(packageRoot, declarationPath))
+);
 
 if (missingDeclarations.length > 0) {
   throw new Error(`Missing package declaration files: ${missingDeclarations.join(', ')}`);
