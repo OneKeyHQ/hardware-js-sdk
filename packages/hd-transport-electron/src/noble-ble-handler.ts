@@ -29,7 +29,7 @@ import {
   NOBLE_BLE_TARGETED_SCAN_TIMEOUT_MS,
 } from './noble-ble-timeouts';
 
-import type { IpcMainInvokeEvent, WebContents } from 'electron';
+import type { IpcMain, IpcMainInvokeEvent, WebContents } from 'electron';
 import type { Characteristic, Peripheral, Service } from '@stoprocent/noble';
 import type { NobleBleWriteOptions } from './types/desktop-api';
 import type { CharacteristicPair, DeviceInfo, Logger, NobleModule } from './types/noble-extended';
@@ -350,7 +350,7 @@ interface DeviceCleanupOptions {
 }
 
 // One timer per device: connect/subscribe arm the busy backstop, a logical
-// release arms the 60s idle clock. Lives in the main process so a renderer
+// release arms the idle clock. Lives in the main process so a renderer
 // reload cannot orphan a held link.
 const idleDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -688,7 +688,7 @@ async function transmitHexDataToDevice(
     );
   }
   // Request outstanding: swap the idle clock for the busy backstop. The
-  // renderer's logical release re-arms the 60s idle clock when it is done.
+  // renderer's logical release re-arms the idle clock when it is done.
   armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
 
   const toBuffer = Buffer.from(hexData, 'hex');
@@ -1412,7 +1412,9 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     totalConnected: connectedDevices.size,
   });
 
-  let peripheral = discoveredDevices.get(deviceId);
+  // `enumerate` clears the discovery map, but a kept-alive link outlives it —
+  // fall back to the one we already hold rather than rescanning for it.
+  let peripheral = discoveredDevices.get(deviceId) ?? connectedDevices.get(deviceId);
 
   // If device not discovered, try a targeted scan for this specific device
   if (!peripheral) {
@@ -1762,12 +1764,20 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
 
     // @ts-ignore – electron is only available at runtime
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
-    const { ipcMain } = require('electron');
+    const { ipcMain } = require('electron') as { ipcMain: IpcMain };
+
+    // Electron throws on a duplicate channel, and setup runs again whenever the
+    // renderer soft restarts. Clearing per registration keeps that self-contained:
+    // no channel list to keep in sync, here or in the host.
+    const handle: IpcMain['handle'] = (channel, listener) => {
+      ipcMain.removeHandler(channel);
+      ipcMain.handle(channel, listener);
+    };
 
     safeLog(logger, 'info', 'Setting up Noble BLE IPC handlers');
 
     // Handle enumerate request
-    ipcMain.handle(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE, async () => {
+    handle(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE, async () => {
       try {
         const devices = await enumerateDevices();
         safeLog(logger, 'debug', 'Enumeration completed', {
@@ -1782,18 +1792,18 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     });
 
     // Handle stop scan request
-    ipcMain.handle(EOneKeyBleMessageKeys.NOBLE_BLE_STOP_SCAN, async () => {
+    handle(EOneKeyBleMessageKeys.NOBLE_BLE_STOP_SCAN, async () => {
       await stopScanning();
     });
 
     // Handle get device request
-    ipcMain.handle(
+    handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_GET_DEVICE,
       (_event: IpcMainInvokeEvent, deviceId: string) => getDevice(deviceId)
     );
 
     // Handle connect request
-    ipcMain.handle(
+    handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT,
       async (_event: IpcMainInvokeEvent, deviceId: string) => {
         logger?.info('[NobleBLE] IPC CONNECT request received:', {
@@ -1807,16 +1817,21 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
         // A timer that already fired cannot be cancelled — let its disconnect
         // finish first, or the fast path below would hand back a dying link.
         await awaitIdleDisconnect(deviceId);
-        await connectDevice(deviceId, webContents);
-        // An operation is now in flight: hold the long backstop, NOT the idle
-        // clock — that starts only when the renderer signals logical release.
-        armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
+        try {
+          await connectDevice(deviceId, webContents);
+        } finally {
+          // The timer above is the only thing that ever frees a kept-alive link.
+          // Re-arm on failure too, or a still-connected device is held forever.
+          if (connectedDevices.has(deviceId)) {
+            armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
+          }
+        }
       }
     );
 
     // Handle logical release: the operation is done, so start the idle
     // countdown. The physical link is kept for the next call unless it elapses.
-    ipcMain.handle(
+    handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_RELEASE,
       (_event: IpcMainInvokeEvent, deviceId: string, keepSession?: boolean) => {
         if (!connectedDevices.has(deviceId)) return;
@@ -1831,7 +1846,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     );
 
     // Handle disconnect request
-    ipcMain.handle(
+    handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_DISCONNECT,
       async (_event: IpcMainInvokeEvent, deviceId: string) => {
         await disconnectDevice(deviceId);
@@ -1839,7 +1854,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     );
 
     // Handle write request
-    ipcMain.handle(
+    handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_WRITE,
       async (
         _event: IpcMainInvokeEvent,
@@ -1852,20 +1867,20 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     );
 
     // Handle subscribe request
-    ipcMain.handle(
+    handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_SUBSCRIBE,
       async (_event: IpcMainInvokeEvent, deviceId: string) => {
         await subscribeNotifications(deviceId, (data: string) => {
           // Send data back to renderer process
           webContents.send(EOneKeyBleMessageKeys.NOBLE_BLE_NOTIFICATION, deviceId, data);
         });
-        // Still acquiring (in flight) — busy backstop, not the 60s idle clock.
+        // Still acquiring (in flight) — busy backstop, not the idle clock.
         armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
       }
     );
 
     // Handle unsubscribe request
-    ipcMain.handle(
+    handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_UNSUBSCRIBE,
       async (_event: IpcMainInvokeEvent, deviceId: string) => {
         await unsubscribeNotifications(deviceId);
@@ -1874,7 +1889,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     );
 
     // Handle cancel pairing: cleanup all connected devices
-    ipcMain.handle(EOneKeyBleMessageKeys.NOBLE_BLE_CANCEL_PAIRING, async () => {
+    handle(EOneKeyBleMessageKeys.NOBLE_BLE_CANCEL_PAIRING, async () => {
       const deviceIds = Array.from(connectedDevices.keys());
       logger?.info('[NobleBLE] Cancel pairing invoked', {
         platform: process.platform,
@@ -1895,7 +1910,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     });
 
     // Handle Bluetooth availability check request
-    ipcMain.handle(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK, async () => {
+    handle(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK, async () => {
       try {
         const bluetoothStatus = await checkBluetoothAvailability();
         safeLog(logger, 'info', 'Bluetooth availability check completed:', bluetoothStatus);

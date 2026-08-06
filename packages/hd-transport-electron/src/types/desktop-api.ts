@@ -20,7 +20,9 @@ export interface NobleBleAPI {
    * `keepSession` means the caller is mid-flow (firmware update, batched
    * signing) and will be back — hold the link on the long backstop instead.
    */
-  release: (uuid: string, keepSession?: boolean) => Promise<void>;
+  // Optional: hosts that predate this channel do not bridge it, and the
+  // transport feature-detects rather than assuming it is wired.
+  release?: (uuid: string, keepSession?: boolean) => Promise<void>;
   disconnect: (uuid: string) => Promise<void>;
   subscribe: (uuid: string) => Promise<void>;
   unsubscribe: (uuid: string) => Promise<void>;

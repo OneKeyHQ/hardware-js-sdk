@@ -1005,7 +1005,9 @@ export default class ElectronBleTransport {
           // Tail of a cancelled call's response, arriving after the buffer was
           // reset (keep-alive outlives the call). Appending it would satisfy the
           // `bufferLength === 0` check below and resolve the next call with garbage.
-          return { isComplete: false, error: 'Orphan continuation chunk discarded' };
+          // Not an `error`: the caller rejects the in-flight call on that field.
+          this.Log?.debug('[Electron BLE] Orphan continuation chunk discarded');
+          return { isComplete: false };
         }
         bufferState.buffer = bufferState.buffer.concat([...data]);
       }
