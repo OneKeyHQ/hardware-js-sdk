@@ -589,7 +589,7 @@ describe('Protocol V2 feature adapter', () => {
     } as any);
     const protocolV2 = buildProtocolV2FeaturesPayload({
       deviceInfo: {
-        hw: { serial_no: 'P2-001' },
+        hw: { Device_type: DeviceType.PRO2, serial_no: 'P2-001' },
         coprocessor: { bt_adv_name: 'Pro 2 BLE' },
       },
       deviceStatus: {
@@ -2696,8 +2696,10 @@ describe('Protocol V2 feature adapter', () => {
     ).rejects.toThrow('DeviceInfo not supported');
   });
 
-  test('does not inherit Pro or Pro model fallback ranges for Protocol V2 devices', () => {
-    const features = normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any);
+  test('does not inherit Pro or model_touch ranges for Protocol V2 devices', () => {
+    const features = normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any, {
+      hw: { Device_type: DeviceType.PRO2 },
+    });
     const checkedTypes: string[] = [];
 
     const versionRange = getMethodVersionRange(features, type => {
@@ -2709,11 +2711,13 @@ describe('Protocol V2 feature adapter', () => {
     });
 
     expect(versionRange).toBeUndefined();
-    expect(checkedTypes).toEqual(['pro2']);
+    expect(checkedTypes).toEqual(['pro2', 'model_pro2']);
   });
 
   test('uses firmware-v1 as the Pro2 remote firmware config field', () => {
-    const features = normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any);
+    const features = normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any, {
+      hw: { Device_type: DeviceType.PRO2 },
+    });
 
     expect(
       getFirmwareUpdateField({
@@ -3623,71 +3627,77 @@ describe('API compatibility handling', () => {
     });
   });
 
-  test('allows Pro2 Solana signing methods through Protocol V2 version checks', () => {
-    const features = {
-      deviceType: 'pro2',
-    } as Features;
+  test.each(['pro2', 'neo'] as const)(
+    'allows %s Solana signing methods through Protocol V2 version checks',
+    deviceType => {
+      const features = {
+        deviceType,
+      } as Features;
 
-    const solSignMessageMethod = new SolSignMessage({
-      id: 1,
-      payload: {
-        method: 'solSignMessage',
-        path: "m/44'/501'/0'/0'",
-        messageHex: '48656c6c6f',
-      },
-    });
-    const solSignOffchainMessageMethod = new SolSignOffchainMessage({
-      id: 2,
-      payload: {
-        method: 'solSignOffchainMessage',
-        path: "m/44'/501'/0'/0'",
-        messageHex: '48656c6c6f',
-      },
-    });
-    const solSignTransactionMethod = new SolSignTransaction({
-      id: 3,
-      payload: {
-        method: 'solSignTransaction',
-        path: "m/44'/501'/0'/0'",
-        rawTx: '00',
-      },
-    });
-    const solSignVersionedTransactionMethod = new SolSignTransaction({
-      id: 4,
-      payload: {
-        method: 'solSignTransaction',
-        path: "m/44'/501'/0'/0'",
-        rawTx: '80',
-      },
-    });
+      const solSignMessageMethod = new SolSignMessage({
+        id: 1,
+        payload: {
+          method: 'solSignMessage',
+          path: "m/44'/501'/0'/0'",
+          messageHex: '48656c6c6f',
+        },
+      });
+      const solSignOffchainMessageMethod = new SolSignOffchainMessage({
+        id: 2,
+        payload: {
+          method: 'solSignOffchainMessage',
+          path: "m/44'/501'/0'/0'",
+          messageHex: '48656c6c6f',
+        },
+      });
+      const solSignTransactionMethod = new SolSignTransaction({
+        id: 3,
+        payload: {
+          method: 'solSignTransaction',
+          path: "m/44'/501'/0'/0'",
+          rawTx: '00',
+        },
+      });
+      const solSignVersionedTransactionMethod = new SolSignTransaction({
+        id: 4,
+        payload: {
+          method: 'solSignTransaction',
+          path: "m/44'/501'/0'/0'",
+          rawTx: '80',
+        },
+      });
 
-    solSignTransactionMethod.init();
-    solSignVersionedTransactionMethod.init();
+      solSignTransactionMethod.init();
+      solSignVersionedTransactionMethod.init();
 
-    expect(
-      getMethodVersionRange(features, type => solSignMessageMethod.getVersionRange()[type])
-    ).toEqual({
-      min: '0.0.0',
-    });
-    expect(
-      getMethodVersionRange(features, type => solSignOffchainMessageMethod.getVersionRange()[type])
-    ).toEqual({
-      min: '0.0.0',
-    });
-    expect(
-      getMethodVersionRange(features, type => solSignTransactionMethod.getVersionRange()[type])
-    ).toEqual({
-      min: '0.0.0',
-    });
-    expect(
-      getMethodVersionRange(
-        features,
-        type => solSignVersionedTransactionMethod.getVersionRange()[type]
-      )
-    ).toEqual({
-      min: '0.0.0',
-    });
-  });
+      expect(
+        getMethodVersionRange(features, type => solSignMessageMethod.getVersionRange()[type])
+      ).toEqual({
+        min: '0.0.0',
+      });
+      expect(
+        getMethodVersionRange(
+          features,
+          type => solSignOffchainMessageMethod.getVersionRange()[type]
+        )
+      ).toEqual({
+        min: '0.0.0',
+      });
+      expect(
+        getMethodVersionRange(features, type => solSignTransactionMethod.getVersionRange()[type])
+      ).toEqual({
+        min: '0.0.0',
+      });
+      expect(
+        getMethodVersionRange(
+          features,
+          type => solSignVersionedTransactionMethod.getVersionRange()[type]
+        )
+      ).toEqual({
+        min: '0.0.0',
+      });
+    }
+  );
 
   test('uses chunk transfer for large Sui transactions on Protocol V2', async () => {
     const rawTx = '0x'.concat('ab'.repeat(5000));
@@ -5825,14 +5835,14 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
-  test('treats manual resource bundles as explicit payload without remote firmware auto-fill', async () => {
+  test('treats manual resource files as explicit payload without remote firmware auto-fill', async () => {
     const resourceBundle = new Uint8Array([1, 2, 3]).buffer;
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
         platform: 'web',
-        resourceBundleFiles: [
+        resourceFiles: [
           {
             binary: resourceBundle,
             devicePath: '  VOL0:/resource/images/images.okpkg  ',
@@ -5880,7 +5890,7 @@ describe('Protocol V2 firmware update targets', () => {
       payload: {
         method: 'firmwareUpdateV4',
         platform: 'web',
-        resourceBundleFiles: [
+        resourceFiles: [
           {
             binary: new Uint8Array([1, 2, 3]).buffer,
             devicePath: 'vol2:/resource/images/images.okpkg',
@@ -5899,7 +5909,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).enterProtocolV2BootloaderMode = jest.fn();
     method.postTipMessage = jest.fn();
 
-    await expect(method.run()).rejects.toThrow('resourceBundleFiles[0].devicePath');
+    await expect(method.run()).rejects.toThrow('resourceFiles[0].devicePath');
     expect((method as any).prepareRemoteProtocolV2Binaries).not.toHaveBeenCalled();
     expect((method as any).enterProtocolV2BootloaderMode).not.toHaveBeenCalled();
   });
@@ -5958,6 +5968,7 @@ describe('Protocol V2 firmware update targets', () => {
 
     (method as any).device = stubDevice({
       getCommands: () => ({ typedCall }),
+      getCurrentDeviceType: () => 'pro2',
       toMessageObject: () => ({ connectId: 'firmware-device' }),
     });
     method.postMessage = jest.fn();
@@ -6299,7 +6310,7 @@ describe('Protocol V2 firmware update method', () => {
     expect(typedCall).not.toHaveBeenCalled();
   });
 
-  test.each([0, 2])(
+  test.each([0, 1, 2])(
     'rejects firmware target %s because the Pro2 bootloader cannot install it',
     async targetId => {
       const typedCall = jest.fn();
@@ -6332,8 +6343,8 @@ describe('Protocol V2 firmware update method', () => {
         targets: [
           {
             target_id: undefined,
-            targetId: 1,
-            path: 'vol0:resource.crate.okpkg',
+            targetId: 3,
+            path: 'vol0:bootloader.okpkg',
           },
         ],
       } as any,
@@ -6345,7 +6356,7 @@ describe('Protocol V2 firmware update method', () => {
 
     await method.run();
     expect(typedCall.mock.calls[0][2]).toEqual({
-      targets: [{ target_id: 1, path: 'vol0:resource.crate.okpkg' }],
+      targets: [{ target_id: 3, path: 'vol0:bootloader.okpkg' }],
     });
   });
 
@@ -6561,6 +6572,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
     const typedCall = createResourceFilesystemTypedCall(stable);
     (method as any).device = stubDevice({
       getCommands: () => ({ typedCall }),
+      getCurrentDeviceType: () => 'pro2',
     });
     const resourcesSpy = jest
       .spyOn(DataManager, 'getProtocolV2Resources')
@@ -6590,7 +6602,10 @@ describe('Protocol V2 firmware reconnect identity', () => {
       })
     );
     const typedCall = createResourceFilesystemTypedCall(stable, ['images']);
-    (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+      getCurrentDeviceType: () => 'pro2',
+    });
     const resourcesSpy = jest
       .spyOn(DataManager, 'getProtocolV2Resources')
       .mockReturnValue(stable as any);
@@ -6625,7 +6640,10 @@ describe('Protocol V2 firmware reconnect identity', () => {
       })
     );
     const typedCall = createResourceFilesystemTypedCall(stable, ['images']);
-    (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+      getCurrentDeviceType: () => 'pro2',
+    });
     const resourcesSpy = jest
       .spyOn(DataManager, 'getProtocolV2Resources')
       .mockReturnValue(stable as any);
@@ -6646,34 +6664,6 @@ describe('Protocol V2 firmware reconnect identity', () => {
     resourcesSpy.mockRestore();
   });
 
-  const buildBootResourcesHeader = ({
-    type = 'CRAT',
-    payloadHash = 'ab'.repeat(64),
-    headerHash = 'cd'.repeat(64),
-  }: {
-    type?: string;
-    payloadHash?: string;
-    headerHash?: string;
-  } = {}) => {
-    const header = new Uint8Array(0x52a0);
-    const view = new DataView(header.buffer);
-    'OKPP'.split('').forEach((char, index) => {
-      header[index] = char.charCodeAt(0);
-    });
-    type.split('').forEach((char, index) => {
-      header[0x08 + index] = char.charCodeAt(0);
-    });
-    view.setUint32(0x0c, header.byteLength, true);
-    const writeHex = (offset: number, hex: string) => {
-      for (let index = 0; index < hex.length / 2; index++) {
-        header[offset + index] = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16);
-      }
-    };
-    writeHex(0x200, payloadHash);
-    writeHex(0x240, headerHash);
-    return header;
-  };
-
   test('does not resolve boot resources unless the optional target is selected', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -6689,20 +6679,22 @@ describe('Protocol V2 firmware reconnect identity', () => {
     expect(downloadSpy).not.toHaveBeenCalled();
   });
 
-  test('downloads and maps the selected boot resources CRATE target', async () => {
-    const payloadHash = 'ab'.repeat(64);
-    const headerHash = 'cd'.repeat(64);
-    const bytes = buildBootResourcesHeader({ payloadHash, headerHash });
+  test('downloads and maps selected boot resources as direct RES files', async () => {
+    const bytes = new Uint8Array([1, 2, 3, 4]);
     const binary = bytes.buffer as ArrayBuffer;
     const fileHash = Array.from(sha256(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
     const resource = {
       required: false as const,
-      target: 'CRATE' as const,
-      url: 'https://example.com/boot-resources.crate.okpkg',
-      size: bytes.byteLength,
-      fileHash,
-      payloadHash,
-      headerHash,
+      target: 'RES' as const,
+      files: [
+        {
+          name: 'bootloader_crest.bin',
+          url: 'https://example.com/bootloader_crest.bin',
+          devicePath: 'vol0:/assets/loaders/boot.staging/graphics/bootloader_crest.bin',
+          size: bytes.byteLength,
+          fileHash,
+        },
+      ],
     };
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -6713,30 +6705,39 @@ describe('Protocol V2 firmware reconnect identity', () => {
       },
     });
     method.init();
+    (method as any).device = stubDevice({ getCurrentDeviceType: () => 'pro2' });
     jest.spyOn(DataManager, 'getProtocolV2BootResources').mockReturnValue(resource);
     jest.spyOn(firmwareBinaryApi, 'getSysResourceBinary').mockResolvedValue({ binary });
 
-    await expect((method as any).prepareProtocolV2BootResources()).resolves.toEqual({
-      fileName: 'boot_resources.crate.okpkg',
-      binary,
-      targetId: 1,
-      kind: 'boot_resources',
-    });
+    await expect((method as any).prepareProtocolV2BootResources()).resolves.toEqual([
+      {
+        name: 'bootloader_crest.bin',
+        binary,
+        devicePath: 'vol0:/assets/loaders/boot.staging/graphics/bootloader_crest.bin',
+      },
+    ]);
   });
 
-  test('rejects a non-CRATE manual boot resources package', async () => {
+  test('rejects a manually supplied resource file when its manifest hash does not match', () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
         platform: 'web',
-        bootResourcesBinary: buildBootResourcesHeader({ type: 'RESC' }).buffer,
+        resourceFiles: [
+          {
+            binary: new Uint8Array([1, 2, 3]).buffer,
+            devicePath: 'vol0:/assets/loaders/boot.staging/graphics/bootloader_crest.bin',
+            size: 3,
+            fileHash: '00'.repeat(32),
+          },
+        ],
       },
     });
     method.init();
 
-    await expect((method as any).prepareProtocolV2BootResources()).rejects.toThrow(
-      'Invalid Pro2 boot resources CRATE header'
+    expect(() => (method as any).prepareExplicitProtocolV2ResourceFiles()).toThrow(
+      'SHA-256 mismatch'
     );
   });
 });

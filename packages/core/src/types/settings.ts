@@ -81,19 +81,22 @@ export type IProtocolV2Resource = {
   headerHash: string;
 };
 
-/** Optional Pro2 startup-resource CRATE installed by the bootloader updater. */
+/** A file from the Protocol V2 resource manifest, written directly with FileWrite. */
+export type IProtocolV2ResourceFile = {
+  name?: string;
+  url: string;
+  devicePath: string;
+  size: number;
+  /** SHA-256 of the complete file. */
+  fileHash: string;
+};
+
+/** Optional Protocol V2 boot resources restored as individual files. */
 export type IProtocolV2BootResources = {
   required: false;
-  target: 'CRATE';
-  url: string;
-  /** Complete CRATE file size in bytes. */
-  size: number;
-  /** SHA-256 of the complete CRATE file. */
-  fileHash: string;
-  /** SHA3-512 payload_hash from the signed CRATE header. */
-  payloadHash: string;
-  /** SHA3-512 header_hash from the signed CRATE header. */
-  headerHash: string;
+  target: 'RES';
+  manifestUrl?: string;
+  files: IProtocolV2ResourceFile[];
 };
 
 export type IProtocolV2Resources = {
@@ -166,19 +169,25 @@ export type IBLEFirmwareReleaseInfo = {
 };
 
 type IKnownDevice = Exclude<IDeviceType, 'unknown'>;
+type ILegacyKnownDevice = Exclude<IKnownDevice, 'neo'>;
+
+type IDeviceReleaseInfo = {
+  firmware: IFirmwareReleaseInfo[];
+  /** Protocol V2 payload package set */
+  'firmware-v1'?: IFirmwareReleaseInfo[];
+  'firmware-v2'?: IFirmwareReleaseInfo[];
+  'firmware-v8'?: IFirmwareReleaseInfo[];
+  'firmware-btc-v8'?: IFirmwareReleaseInfo[];
+  ble: IBLEFirmwareReleaseInfo[];
+  /** Independent Protocol V2 resource release configuration. */
+  resources?: IProtocolV2Resources;
+};
 
 export type DeviceTypeMap = {
-  [k in IKnownDevice]: {
-    firmware: IFirmwareReleaseInfo[];
-    /** Pro2 Protocol V2 payload package set */
-    'firmware-v1'?: IFirmwareReleaseInfo[];
-    'firmware-v2'?: IFirmwareReleaseInfo[];
-    'firmware-v8'?: IFirmwareReleaseInfo[];
-    'firmware-btc-v8'?: IFirmwareReleaseInfo[];
-    ble: IBLEFirmwareReleaseInfo[];
-    /** Independent Pro2 resource release configuration. */
-    resources?: IProtocolV2Resources;
-  };
+  [k in ILegacyKnownDevice]: IDeviceReleaseInfo;
+} & {
+  /** Optional until every remote-config producer publishes a Neo entry. */
+  neo?: IDeviceReleaseInfo;
 };
 
 export type AssetsMap = {

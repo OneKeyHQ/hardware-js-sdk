@@ -42,7 +42,7 @@ flowchart TD
 | 协议        | 设备范围                                | 传输方式            | 主要能力                                                    |
 | ----------- | --------------------------------------- | ------------------- | ----------------------------------------------------------- |
 | Protocol V1 | Classic / Mini / Touch / Pro 等现有设备 | USB、BLE、Bridge 等 | 钱包业务能力，`Initialize -> Features` 握手，签名和地址派生 |
-| Protocol V2 | 当前为 Pro2，后续可扩展到 Pro 等机型    | USB、BLE            | 设备信息、钱包 Session、文件系统、设置、固件更新和协议探测  |
+| Protocol V2 | Pro2、Neo，后续可扩展到 Pro 等机型      | USB、BLE            | 设备信息、钱包 Session、文件系统、设置、固件更新和协议探测  |
 
 协议选择是传输层内部职责。外部调用方不需要显式选择 V1 或 V2，也不应该依赖 PID、设备名或 USB descriptor 来判断协议。
 
@@ -158,7 +158,7 @@ flowchart TD
   Download["download changed resource bundles"]
   Mkdir["FilesystemDirMake"]
   Write["FilesystemFileWrite(resource / bootloader / firmware)"]
-  Install{"firmware or CRATE targets?"}
+  Install{"firmware targets?"}
   Update["DeviceFirmwareUpdate(targets)"]
   Done["resource sync complete"]
 
@@ -167,7 +167,7 @@ flowchart TD
   Enter --> Mkdir
   Mkdir --> Write --> Install
   Install -->|yes| Update
-  Install -->|RESC only| Done
+  Install -->|resource files only| Done
 ```
 
 Application 模式只允许宿主访问 `vol1:/wallpapers`、`vol1:/portfolio` 和 `vol1:/nft`，读取
@@ -176,8 +176,9 @@ Application 模式只允许宿主访问 `vol1:/wallpapers`、`vol1:/portfolio` �
 `FilesystemFileRead` 比较资源大小及文件头哈希，最后只下载和写入有差异的资源。设备已经在
 Bootloader 或 Romloader 时复用当前 loader 连接，不重复 reboot。
 
-`DeviceFirmwareUpdate.targets` 必须包含所有需要安装的固件和 CRATE 文件；普通 RESC bundle
-直接同步到最终路径，资源单独更新时不发送空的安装请求。SDK 不假设固件端会隐式扫描已写入路径。
+`DeviceFirmwareUpdate.targets` 只包含需要安装的固件。稳定 RESC bundle 与 boot resource manifest
+中的文件都通过 `FilesystemFileWrite` 直接同步到各自最终路径；资源单独更新时不发送空的安装请求。
+SDK 不假设固件端会隐式扫描已写入路径。
 
 ## 包职责速查
 

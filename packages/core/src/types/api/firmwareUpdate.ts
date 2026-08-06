@@ -83,8 +83,6 @@ export interface FirmwareUpdateV4Params {
   romloaderBinary?: ArrayBuffer;
   /** FW_MGMT_TARGET_BOOTLOADER = 3 */
   bootloaderBinary?: ArrayBuffer;
-  /** FW_MGMT_TARGET_CRATE = 1; optional Pro2 startup resources. */
-  bootResourcesBinary?: ArrayBuffer;
   /** FW_MGMT_TARGET_APPLICATION_P1 = 4 */
   applicationP1Binary?: ArrayBuffer;
   /** FW_MGMT_TARGET_APPLICATION_P2 = 5 */
@@ -98,12 +96,14 @@ export interface FirmwareUpdateV4Params {
   se04Binary?: ArrayBuffer;
   forcedUpdateRes?: boolean;
   /**
-   * RESC bundle okpkg files written directly to devicePath through FilesystemFileWrite.
-   * Manual mode installs them without version comparison.
+   * Arbitrary Protocol V2 resource files written directly with FilesystemFileWrite.
+   * Use this for manifest-driven boot resources and other non-RESC files.
    */
-  resourceBundleFiles?: Array<{
+  resourceFiles?: Array<{
     binary: ArrayBuffer;
     devicePath: string;
+    size?: number;
+    fileHash?: string;
   }>;
 }
 

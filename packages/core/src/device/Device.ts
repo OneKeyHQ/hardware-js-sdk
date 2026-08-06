@@ -696,6 +696,7 @@ export class Device extends EventEmitter {
     // Most-specific model first; must match getMethodVersionRange in deviceInfoUtils,
     // otherwise e.g. Classic1s resolves the looser model_mini range before model_classic1s.
     const modelFallbacks: IDeviceModel[] = [
+      'model_pro2',
       'model_classic1s',
       'model_classic',
       'model_mini',
@@ -715,7 +716,8 @@ export class Device extends EventEmitter {
     if (
       deviceType === EDeviceType.Touch ||
       deviceType === EDeviceType.Pro ||
-      deviceType === EDeviceType.Pro2
+      deviceType === EDeviceType.Pro2 ||
+      deviceType === EDeviceType.Neo
     ) {
       return { support: true };
     }
@@ -732,7 +734,8 @@ export class Device extends EventEmitter {
     if (
       deviceType === EDeviceType.Touch ||
       deviceType === EDeviceType.Pro ||
-      deviceType === EDeviceType.Pro2
+      deviceType === EDeviceType.Pro2 ||
+      deviceType === EDeviceType.Neo
     ) {
       return { support: false };
     }
@@ -1167,10 +1170,14 @@ export class Device extends EventEmitter {
     const protocolV2DeviceType = runtimeDeviceInfo
       ? resolveProtocolV2DeviceIdentity(runtimeDeviceInfo.hw?.Device_type).deviceType
       : this.getCurrentDeviceType();
-    if (runtimeMode === 'romloader' && protocolV2DeviceType !== EDeviceType.Pro2) {
+    if (
+      runtimeMode === 'romloader' &&
+      protocolV2DeviceType !== EDeviceType.Pro2 &&
+      protocolV2DeviceType !== EDeviceType.Neo
+    ) {
       throw ERRORS.TypedError(
         HardwareErrorCode.DeviceInitializeFailed,
-        'Protocol V2 romloader mode is only supported for Pro2.'
+        'Protocol V2 romloader mode is only supported for Pro2 and Neo.'
       );
     }
     const deviceStatusSupported = supportsProtocolV2Message(
@@ -1569,7 +1576,8 @@ export class Device extends EventEmitter {
     if (!this.state) return undefined;
     return (
       this.isProtocolV2() &&
-      this.getCurrentDeviceType() === EDeviceType.Pro2 &&
+      (this.getCurrentDeviceType() === EDeviceType.Pro2 ||
+        this.getCurrentDeviceType() === EDeviceType.Neo) &&
       this.state.status.mode === 'romloader'
     );
   }
@@ -1615,7 +1623,8 @@ export class Device extends EventEmitter {
     const isModeT =
       deviceType === EDeviceType.Touch ||
       deviceType === EDeviceType.Pro ||
-      deviceType === EDeviceType.Pro2;
+      deviceType === EDeviceType.Pro2 ||
+      deviceType === EDeviceType.Neo;
     const unlocked = this.state?.status.unlocked;
     const preCheckTouch = isModeT && unlocked === false;
     const passphraseProtection = this.getCurrentPassphraseProtection();

@@ -4,6 +4,7 @@ import { PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE } from '@onekeyfe/hd-transport';
 import type {
   IProtocolV2BootResources,
   IProtocolV2Resource,
+  IProtocolV2ResourceFile,
   IProtocolV2ResourceType,
   IProtocolV2Resources,
 } from '../../types';
@@ -247,23 +248,53 @@ function validateBootResources(value: unknown): IProtocolV2BootResources {
   if (resource.required !== false) {
     throw new Error('Invalid Pro2 boot resources required flag: expected false');
   }
-  if (resource.target !== 'CRATE') {
-    throw new Error('Invalid Pro2 boot resources target: expected CRATE');
+  if (resource.target !== 'RES') {
+    throw new Error('Invalid Pro2 boot resources target: expected RES');
   }
-  if (typeof resource.url !== 'string' || !resource.url.startsWith('https://')) {
-    throw new Error('Invalid Pro2 boot resources url');
+  if (
+    resource.manifestUrl !== undefined &&
+    (typeof resource.manifestUrl !== 'string' || !resource.manifestUrl.startsWith('https://'))
+  ) {
+    throw new Error('Invalid Pro2 boot resources manifestUrl');
   }
-  if (!Number.isSafeInteger(resource.size) || Number(resource.size) <= 0) {
-    throw new Error('Invalid Pro2 boot resources size');
+  if (!Array.isArray(resource.files) || resource.files.length === 0) {
+    throw new Error('Invalid Pro2 boot resources files');
+  }
+  const files = resource.files.map((value, index): IProtocolV2ResourceFile => {
+    if (!value || typeof value !== 'object') {
+      throw new Error(`Invalid Pro2 boot resource file at files[${index}]`);
+    }
+    const file = value as Partial<IProtocolV2ResourceFile>;
+    if (typeof file.url !== 'string' || !file.url.startsWith('https://')) {
+      throw new Error(`Invalid Pro2 boot resource url at files[${index}]`);
+    }
+    if (
+      typeof file.devicePath !== 'string' ||
+      !file.devicePath.startsWith('vol0:/') ||
+      file.devicePath.includes('..') ||
+      file.devicePath.includes('\\\\')
+    ) {
+      throw new Error(`Invalid Pro2 boot resource devicePath at files[${index}]`);
+    }
+    if (!Number.isSafeInteger(file.size) || Number(file.size) <= 0) {
+      throw new Error(`Invalid Pro2 boot resource size at files[${index}]`);
+    }
+    return {
+      ...(typeof file.name === 'string' && file.name ? { name: file.name } : undefined),
+      url: file.url,
+      devicePath: file.devicePath,
+      size: Number(file.size),
+      fileHash: normalizeHex(file.fileHash, SHA256_HEX_LENGTH, `boot files[${index}].fileHash`),
+    };
+  });
+  if (new Set(files.map(file => file.devicePath)).size !== files.length) {
+    throw new Error('Invalid Pro2 boot resources files: duplicate devicePath');
   }
   return {
     required: false,
-    target: 'CRATE',
-    url: resource.url,
-    size: Number(resource.size),
-    fileHash: normalizeHex(resource.fileHash, SHA256_HEX_LENGTH, 'boot fileHash'),
-    payloadHash: normalizeHex(resource.payloadHash, SHA3_512_HEX_LENGTH, 'boot payloadHash'),
-    headerHash: normalizeHex(resource.headerHash, SHA3_512_HEX_LENGTH, 'boot headerHash'),
+    target: 'RES',
+    ...(resource.manifestUrl ? { manifestUrl: resource.manifestUrl } : undefined),
+    files,
   };
 }
 
@@ -352,7 +383,7 @@ function bytesToHex(bytes: Uint8Array): string {
 /** Verify the complete downloaded file before any device mutation. */
 export function isProtocolV2ResourceFileValid(
   binary: ArrayBuffer,
-  resource: Pick<IProtocolV2Resource, 'size' | 'fileHash'>
+  resource: Pick<IProtocolV2ResourceFile, 'size' | 'fileHash'>
 ): boolean {
   if (binary.byteLength !== resource.size) return false;
   return bytesToHex(sha256(new Uint8Array(binary))) === resource.fileHash.toLowerCase();

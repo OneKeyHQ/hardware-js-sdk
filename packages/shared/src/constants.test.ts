@@ -11,6 +11,7 @@ describe('hardware device identity filters', () => {
   it('accepts known OneKey BLE names', () => {
     expect(isOnekeyDevice('Touch A1B2')).toBe(true);
     expect(isOnekeyDevice('Pro A1B2')).toBe(true);
+    expect(isOnekeyDevice('Neo A1B2')).toBe(true);
     expect(isOnekeyDevice('K1234')).toBe(true);
     expect(isOnekeyDevice('S8')).toBe(true);
   });

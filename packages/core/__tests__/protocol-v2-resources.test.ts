@@ -56,12 +56,17 @@ const resources: IProtocolV2Resource[] = PROTOCOL_V2_RESOURCE_TYPES.map((type, i
 
 const bootResources: IProtocolV2BootResources = {
   required: false,
-  target: 'CRATE',
-  url: 'https://example.com/boot-resources.crate.okpkg',
-  size: 1234,
-  fileHash: 'ab'.repeat(32),
-  payloadHash: 'cd'.repeat(64),
-  headerHash: 'ef'.repeat(64),
+  target: 'RES',
+  manifestUrl: 'https://example.com/manifest.json',
+  files: [
+    {
+      name: 'bootloader_crest.bin',
+      url: 'https://example.com/assets/bootloader_crest.bin',
+      devicePath: 'vol0:/assets/loaders/boot.staging/graphics/bootloader_crest.bin',
+      size: 1234,
+      fileHash: 'ab'.repeat(32),
+    },
+  ],
 };
 
 const createSettings = (configFetcher: ConnectSettings['configFetcher']): ConnectSettings =>
@@ -119,7 +124,7 @@ describe('Pro2 resource configuration', () => {
     ).toThrow('headerHash');
   });
 
-  test('requires boot resources to remain optional and use a CRATE package', () => {
+  test('requires boot resources to remain optional and use RES file entries', () => {
     expect(() =>
       parseProtocolV2Resources({
         stable: resources,
@@ -129,9 +134,18 @@ describe('Pro2 resource configuration', () => {
     expect(() =>
       parseProtocolV2Resources({
         stable: resources,
-        boot: { ...bootResources, target: 'RESC' },
+        boot: { ...bootResources, target: 'INVALID' },
       })
-    ).toThrow('expected CRATE');
+    ).toThrow('expected RES');
+    expect(() =>
+      parseProtocolV2Resources({
+        stable: resources,
+        boot: {
+          ...bootResources,
+          files: [{ ...bootResources.files[0], devicePath: '../outside.bin' }],
+        },
+      })
+    ).toThrow('devicePath');
   });
 
   test('downloads nothing when all resource identities match', () => {

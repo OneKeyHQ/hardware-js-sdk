@@ -46,9 +46,9 @@ import type { TypedResponseMessage } from '../device/DeviceCommands';
 import type {
   Features,
   IFirmwareReleaseInfo,
-  IProtocolV2BootResources,
   IProtocolV2FirmwareComponent,
   IProtocolV2Resource,
+  IProtocolV2ResourceFile,
   IVersionArray,
 } from '../types';
 
@@ -77,7 +77,6 @@ const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
 const PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET = 0x200;
 const PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET = 0x240;
 const PROTOCOL_V2_OKPP_HASH_SIZE = 64;
-const PROTOCOL_V2_BOOT_RESOURCES_FILE_NAME = 'boot_resources.crate.okpkg';
 
 const getProtocolV2DeviceTransferProgress = (
   bytesBeforeChunk: number,
@@ -112,7 +111,7 @@ type ProtocolV2FirmwareUpdateStartResponse = TypedResponseMessage<'Success'>;
 
 type ProtocolV2TargetBinary = { fileName: string; binary: ArrayBuffer; targetId: number };
 type ProtocolV2InstallItem = ProtocolV2TargetBinary & {
-  kind: ProtocolV2RemoteComponentTarget['kind'] | 'boot_resources';
+  kind: ProtocolV2RemoteComponentTarget['kind'];
 };
 type ProtocolV2InstallTarget = ProtocolV2InstallItem & {
   path: string;
@@ -125,7 +124,7 @@ type ProtocolV2FileTransferParams = PROTO.FirmwareUpload & {
   onTransferredBytes?: (transferredBytes: number) => void;
 };
 
-/** RESC bundle okpkg written independently to devicePath through FileWrite. */
+/** Protocol V2 resource file written independently to devicePath through FileWrite. */
 type ProtocolV2ResourceBundleBinary = {
   name: string;
   binary: ArrayBuffer;
@@ -440,7 +439,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'chunkSize', type: 'number' },
       { name: 'forcedUpdateRes', type: 'boolean' },
       { name: 'bootloaderBinary', type: 'buffer' },
-      { name: 'bootResourcesBinary', type: 'buffer' },
       { name: 'romloaderBinary', type: 'buffer' },
       { name: 'applicationP1Binary', type: 'buffer' },
       { name: 'applicationP2Binary', type: 'buffer' },
@@ -452,14 +450,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'firmwareType', type: 'string' },
       { name: 'targetsToUpdate', type: 'array', allowEmpty: true },
       { name: 'platform', type: 'string' },
-      { name: 'resourceBundleFiles', type: 'array', allowEmpty: true },
+      { name: 'resourceFiles', type: 'array', allowEmpty: true },
     ]);
 
     this.params = {
       chunkSize: payload.chunkSize,
       forcedUpdateRes: payload.forcedUpdateRes,
       bootloaderBinary: payload.bootloaderBinary,
-      bootResourcesBinary: payload.bootResourcesBinary,
       romloaderBinary: payload.romloaderBinary,
       applicationP1Binary: payload.applicationP1Binary,
       applicationP2Binary: payload.applicationP2Binary,
@@ -468,7 +465,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       se02Binary: payload.se02Binary,
       se03Binary: payload.se03Binary,
       se04Binary: payload.se04Binary,
-      resourceBundleFiles: payload.resourceBundleFiles,
+      resourceFiles: payload.resourceFiles,
       firmwareType: payload.firmwareType,
       targetsToUpdate: payload.targetsToUpdate,
       platform: payload.platform,
@@ -503,23 +500,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
     const needsRemoteResources =
-      !this.params.resourceBundleFiles?.length &&
-      !!this.params.targetsToUpdate?.includes('resource');
+      !this.params.resourceFiles?.length && !!this.params.targetsToUpdate?.includes('resource');
 
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
-    let bootResourcesInstallItem: ProtocolV2InstallItem | undefined;
     let installItems: ProtocolV2InstallItem[] | undefined;
     let resourceBundles: ProtocolV2ResourceBundleBinary[] | undefined;
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
-      resourceBundles = this.prepareExplicitProtocolV2ResourceBundles();
+      resourceBundles = this.prepareExplicitProtocolV2ResourceFiles();
       fwBinaryMap = this.collectExplicitTargetBinaries();
       bootloaderBinary = this.prepareBootloaderBinary();
       const needsRemoteFirmware = !this.hasExplicitProtocolV2Payload(fwBinaryMap);
-      const needsRemoteBootResources =
-        !this.params.bootResourcesBinary &&
-        !!this.params.targetsToUpdate?.includes('boot_resources');
+      const needsRemoteBootResources = !!this.params.targetsToUpdate?.includes('boot_resources');
       if (needsRemoteFirmware || needsRemoteResources || needsRemoteBootResources) {
         // Remote updates must use a freshly fetched config before any reboot or file write.
         await DataManager.forceReloadData({
@@ -535,12 +528,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         fwBinaryMap = remoteBinaries.fwBinaryMap;
         installItems = remoteBinaries.installItems;
       }
-      bootResourcesInstallItem = await this.prepareProtocolV2BootResources();
-      if (bootResourcesInstallItem) {
-        installItems = [
-          bootResourcesInstallItem,
-          ...(installItems ?? this.buildProtocolV2InstallItems({ bootloaderBinary, fwBinaryMap })),
-        ];
+      const bootResourceFiles = await this.prepareProtocolV2BootResources();
+      if (bootResourceFiles?.length) {
+        resourceBundles = [...(resourceBundles ?? []), ...bootResourceFiles];
       }
       if (!needsRemoteResources) {
         this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
@@ -569,7 +559,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     if (needsRemoteResources) {
       try {
-        resourceBundles = await this.prepareProtocolV2ResourceBundles();
+        const stableResources = await this.prepareProtocolV2ResourceBundles();
+        resourceBundles = [...(resourceBundles ?? []), ...(stableResources ?? [])];
         this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
       } catch (err) {
         if (enteredBootloader) {
@@ -662,9 +653,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private hasExplicitProtocolV2Payload(fwBinaryMap: ProtocolV2TargetBinary[]) {
     return (
-      !!this.params.resourceBundleFiles?.length ||
+      !!this.params.resourceFiles?.length ||
       !!this.params.bootloaderBinary ||
-      !!this.params.bootResourcesBinary ||
       fwBinaryMap.length > 0
     );
   }
@@ -814,68 +804,68 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private validateProtocolV2BootResourcesBinary(
-    binary: ArrayBuffer,
-    resource?: IProtocolV2BootResources
-  ) {
-    if (resource && !isProtocolV2ResourceFileValid(binary, resource)) {
-      throw new Error('Pro2 boot resources file verification failed');
-    }
-    const header = parseProtocolV2OkppHeader(toProtocolV2Bytes(binary));
-    if (!header || header.type !== 'CRAT') {
-      throw new Error('Invalid Pro2 boot resources CRATE header');
-    }
-    if (resource) {
-      const expectedPayloadHash = normalizeProtocolV2Hex(resource.payloadHash);
-      const expectedHeaderHash = normalizeProtocolV2Hex(resource.headerHash);
-      if (header.payloadHash !== expectedPayloadHash) {
-        throw new Error('Pro2 boot resources payload hash mismatch');
-      }
-      if (header.headerHash !== expectedHeaderHash) {
-        throw new Error('Pro2 boot resources header hash mismatch');
-      }
-    }
+  private getProtocolV2DeviceType(): EDeviceType.Pro2 | EDeviceType.Neo {
+    const deviceType = this.device.getCurrentDeviceType();
+    if (deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo) return deviceType;
+    throw new Error(`Unsupported Protocol V2 device type: ${deviceType}`);
   }
 
-  private async prepareProtocolV2BootResources(): Promise<ProtocolV2InstallItem | undefined> {
-    let binary = this.params.bootResourcesBinary;
-    let resource: IProtocolV2BootResources | undefined;
+  private async prepareProtocolV2BootResources(): Promise<
+    ProtocolV2ResourceBundleBinary[] | undefined
+  > {
+    if (!this.params.targetsToUpdate?.includes('boot_resources')) return undefined;
+    const resource = DataManager.getProtocolV2BootResources(this.getProtocolV2DeviceType());
+    if (!resource) throw new Error('Missing Protocol V2 boot resources configuration');
 
-    if (!binary) {
-      if (!this.params.targetsToUpdate?.includes('boot_resources')) {
-        return undefined;
+    const files: ProtocolV2ResourceBundleBinary[] = [];
+    for (const file of resource.files) {
+      Log.log(`[FirmwareUpdateV4] downloading boot resource ${file.devicePath}`);
+      const { binary } = await getSysResourceBinary(file.url);
+      if (!isProtocolV2ResourceFileValid(binary, file)) {
+        throw new Error(`Boot resource file verification failed: ${file.devicePath}`);
       }
-      resource = DataManager.getProtocolV2BootResources();
-      if (!resource) {
-        throw new Error('Missing Pro2 boot resources configuration');
-      }
-      Log.log('[FirmwareUpdateV4] downloading Pro2 boot resources CRATE');
-      ({ binary } = await getSysResourceBinary(resource.url));
+      files.push({
+        name: file.name ?? file.devicePath.split('/').pop() ?? file.devicePath,
+        binary,
+        devicePath: file.devicePath,
+      });
     }
-
-    this.validateProtocolV2BootResourcesBinary(binary, resource);
-    return {
-      fileName: PROTOCOL_V2_BOOT_RESOURCES_FILE_NAME,
-      binary,
-      targetId: ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
-      kind: 'boot_resources',
-    };
+    return files;
   }
 
-  private prepareExplicitProtocolV2ResourceBundles(): ProtocolV2ResourceBundleBinary[] | undefined {
-    if (!this.params.resourceBundleFiles?.length) return undefined;
+  private prepareExplicitProtocolV2ResourceFiles(): ProtocolV2ResourceBundleBinary[] | undefined {
+    const files = this.params.resourceFiles ?? [];
+    if (!files?.length) return undefined;
 
-    return this.params.resourceBundleFiles.map((file, index) => {
+    const prepared = files.map((file, index) => {
       const devicePath = validateProtocolV2FilesystemPath(
         file.devicePath,
-        `resourceBundleFiles[${index}].devicePath`
+        `resourceFiles[${index}].devicePath`
       );
+      const descriptor = file as typeof file &
+        Pick<Partial<IProtocolV2ResourceFile>, 'size' | 'fileHash'>;
+      if (descriptor.size !== undefined && descriptor.size !== file.binary.byteLength) {
+        throw new Error(`resourceFiles[${index}] size mismatch`);
+      }
+      if (
+        descriptor.fileHash &&
+        !isProtocolV2ResourceFileValid(file.binary, {
+          size: file.binary.byteLength,
+          fileHash: descriptor.fileHash,
+        })
+      ) {
+        throw new Error(`resourceFiles[${index}] SHA-256 mismatch`);
+      }
       return {
         name: devicePath.split('/').pop() ?? devicePath,
         binary: file.binary,
         devicePath,
       };
     });
+    if (new Set(prepared.map(file => file.devicePath)).size !== prepared.length) {
+      throw new Error('resourceFiles contain duplicate devicePath values');
+    }
+    return prepared;
   }
 
   private async prepareProtocolV2ResourceBundles(): Promise<
@@ -885,7 +875,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       return undefined;
     }
 
-    const resources = DataManager.getProtocolV2Resources();
+    const resources = DataManager.getProtocolV2Resources(this.getProtocolV2DeviceType());
     if (!resources?.length) {
       throw new Error('Missing Pro2 stable resource configuration');
     }
@@ -905,7 +895,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       forced: this.params.forcedUpdateRes,
     });
     Log.log(
-      `[FirmwareUpdateV4] Pro2 resource plan mode=bootloader-recovery status=${plan.status} count=${plan.resources.length}`
+      `[FirmwareUpdateV4] Protocol V2 resource plan mode=bootloader-recovery status=${plan.status} count=${plan.resources.length}`
     );
 
     const bundles: ProtocolV2ResourceBundleBinary[] = [];
@@ -945,7 +935,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let processedSize = 0;
     for (const bundle of bundles) {
       Log.log(
-        `[FirmwareUpdateV4] syncing RESC bundle ${bundle.name} -> ${bundle.devicePath} bytes=${bundle.binary.byteLength}`
+        `[FirmwareUpdateV4] syncing resource ${bundle.name} -> ${bundle.devicePath} bytes=${bundle.binary.byteLength}`
       );
       processedSize = await this.protocolV2CommonUpdateProcess({
         payload: bundle.binary,
@@ -957,7 +947,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     const elapsedMs = Date.now() - transferStartTime;
     Log.log(
-      `[FirmwareUpdateV4] RESC bundle sync finished transport=${transferTransport} bytes=${totalSize} elapsed=${(
+      `[FirmwareUpdateV4] resource sync finished transport=${transferTransport} bytes=${totalSize} elapsed=${(
         elapsedMs / 1000
       ).toFixed(2)}s speed=${formatProtocolV2TransferSpeed(totalSize, elapsedMs)} KB/s`
     );
@@ -975,7 +965,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private isProtocolV2RomloaderMode() {
-    if (!this.device.isProtocolV2() || this.device.getCurrentDeviceType() !== EDeviceType.Pro2) {
+    const deviceType = this.device.getCurrentDeviceType();
+    if (
+      !this.device.isProtocolV2() ||
+      (deviceType !== EDeviceType.Pro2 && deviceType !== EDeviceType.Neo)
+    ) {
       return false;
     }
     if (typeof this.device.isRomloader === 'function') {
@@ -1131,9 +1125,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       totalSize = resourceTransfer.totalSize;
     }
 
-    // Skip staging and installation when the update contains RESC bundles only.
+    // Skip staging and installation when the update contains resource files only.
     if (orderedInstallItems.length === 0) {
-      Log.log('[FirmwareUpdateV4] no firmware targets to install (RESC bundles only)');
+      Log.log('[FirmwareUpdateV4] no firmware targets to install (resource files only)');
       if (totalSize > 0) {
         this.postProgressMessage(100, 'transferData');
       }

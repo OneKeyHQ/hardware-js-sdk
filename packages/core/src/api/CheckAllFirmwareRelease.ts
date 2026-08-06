@@ -1,4 +1,4 @@
-import { EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 
 import { UI_REQUEST } from '../constants/ui-request';
@@ -326,10 +326,10 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
         ? ['identity', 'versions', 'verification']
         : ['identity', 'versions'],
     });
-    if (state.identity.deviceType !== 'pro2') {
+    if (state.identity.deviceType !== 'pro2' && state.identity.deviceType !== 'neo') {
       throw ERRORS.TypedError(
         HardwareErrorCode.DeviceNotSupportMethod,
-        'checkAllFirmwareRelease requires a Pro2 device for Protocol V2'
+        'checkAllFirmwareRelease requires a Pro2 or Neo device for Protocol V2'
       );
     }
 
@@ -351,7 +351,9 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       firmwareType,
       release,
     });
-    const resources = DataManager.getProtocolV2Resources();
+    const resourceDeviceType =
+      state.identity.deviceType === 'neo' ? EDeviceType.Neo : EDeviceType.Pro2;
+    const resources = DataManager.getProtocolV2Resources(resourceDeviceType);
     let resourceStatus: 'valid' | 'outdated' | 'unknown' = 'unknown';
     if (resources?.length) {
       const loaderMode = state.status.mode === 'bootloader' || state.status.mode === 'romloader';
@@ -400,7 +402,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       },
       features,
       protocol: 'V2',
-      deviceType: 'pro2',
+      deviceType: state.identity.deviceType,
       ...plan,
       resourceStatus,
       hasUpgrade: plan.hasUpgrade || resourceStatus === 'outdated',

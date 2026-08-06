@@ -16,13 +16,13 @@ OneKey 硬件钱包通过一组可复用的密码学原语和链专属协议支�
 
 ### 0.2 技术分类
 
-| 分类             | 椭圆曲线                             | 签名算法 | 路径规则                    | 地址格式      | 代表链            |
-| ---------------- | ------------------------------------ | -------- | --------------------------- | ------------- | ----------------- |
-| **Bitcoin 系**   | secp256k1                            | ECDSA    | m/44'/coin'/0'/change/index | Base58/Bech32 | BTC, LTC, DOGE    |
-| **Ethereum 系**  | secp256k1                            | ECDSA    | m/44'/60'/0'/0/index        | EIP-55 Hex    | ETH, BSC, Polygon |
-| **Ed25519 系**   | ed25519                              | EdDSA    | 全硬化                      | Base58/Bech32 | SOL, ADA, NEAR    |
-| **Substrate 系** | `ed25519-polkadot`（当前 Pro2 实现） | EdDSA    | 全硬化                      | SS58          | DOT, KSM          |
-| **Cosmos 系**    | secp256k1                            | ECDSA    | m/44'/118'/0'/0/index       | Bech32+HRP    | ATOM, OSMO        |
+| 分类             | 椭圆曲线                                   | 签名算法 | 路径规则                    | 地址格式      | 代表链            |
+| ---------------- | ------------------------------------------ | -------- | --------------------------- | ------------- | ----------------- |
+| **Bitcoin 系**   | secp256k1                                  | ECDSA    | m/44'/coin'/0'/change/index | Base58/Bech32 | BTC, LTC, DOGE    |
+| **Ethereum 系**  | secp256k1                                  | ECDSA    | m/44'/60'/0'/0/index        | EIP-55 Hex    | ETH, BSC, Polygon |
+| **Ed25519 系**   | ed25519                                    | EdDSA    | 全硬化                      | Base58/Bech32 | SOL, ADA, NEAR    |
+| **Substrate 系** | `ed25519-polkadot`（当前 Pro2 / Neo 实现） | EdDSA    | 全硬化                      | SS58          | DOT, KSM          |
+| **Cosmos 系**    | secp256k1                                  | ECDSA    | m/44'/118'/0'/0/index       | Bech32+HRP    | ATOM, OSMO        |
 
 ## 1. Bitcoin 系列 (40+币种)
 

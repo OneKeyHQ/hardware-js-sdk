@@ -86,7 +86,7 @@ DeviceInfo
 
 | Protocol V2 字段              | 含义                | SDK 当前处理                           |
 | ----------------------------- | ------------------- | -------------------------------------- |
-| `hw.Device_type`              | 设备型号            | SDK 当前识别为 Pro 2                   |
+| `hw.Device_type`              | 设备型号            | SDK 按协议枚举识别 Pro 2、Neo 等真实型号 |
 | `hw.serial_no`                | 设备序列号          | 转换为 `DeviceState.identity.serialNo` |
 | `hw.hardware_version`         | 可读硬件版本        | 保留在原始 Protocol V2 数据中          |
 | `hw.hardware_version_raw_adc` | 硬件版本 ADC 原始值 | 保留在原始数据中                       |

@@ -69,7 +69,7 @@ function getFirmwareTypeFromField(firmwareField: IFirmwareField): EFirmwareType 
 
 export default class DataManager {
   static deviceMap: DeviceTypeMap & {
-    [k: string]: DeviceTypeMap[keyof DeviceTypeMap] | undefined;
+    [k: string]: NonNullable<DeviceTypeMap[keyof DeviceTypeMap]> | undefined;
   } = {
     [EDeviceType.Classic]: {
       firmware: [],
@@ -92,6 +92,10 @@ export default class DataManager {
       ble: [],
     },
     [EDeviceType.Pro2]: {
+      firmware: [],
+      ble: [],
+    },
+    [EDeviceType.Neo]: {
       firmware: [],
       ble: [],
     },
@@ -359,7 +363,7 @@ export default class DataManager {
 
   private static enrichFirmwareReleaseInfo(
     deviceData: DeviceTypeMap[keyof DeviceTypeMap] | undefined
-  ): DeviceTypeMap[keyof DeviceTypeMap] {
+  ): NonNullable<DeviceTypeMap[keyof DeviceTypeMap]> {
     // Safety check: return default structure if input is undefined/null
     if (!deviceData || typeof deviceData !== 'object') {
       return {
@@ -451,10 +455,14 @@ export default class DataManager {
     // 3. Apply config if available
     if (data) {
       let pro2Resources: IProtocolV2Resources | undefined;
+      let neoResources: IProtocolV2Resources | undefined;
       this.protocolV2ResourcesConfigError = undefined;
       try {
         pro2Resources = parseProtocolV2Resources(
           (data.pro2 as { resources?: unknown } | undefined)?.resources
+        );
+        neoResources = parseProtocolV2Resources(
+          (data.neo as { resources?: unknown } | undefined)?.resources
         );
       } catch (error) {
         // Firmware resource metadata is not required for base communication. If the
@@ -464,7 +472,9 @@ export default class DataManager {
         Log.warn('[DataConfig] Ignoring invalid Pro2 resources config:', error);
       }
       const enrichedPro2Config = this.enrichFirmwareReleaseInfo(data.pro2);
+      const enrichedNeoConfig = this.enrichFirmwareReleaseInfo(data.neo);
       const { resources: _unvalidatedResources, ...pro2Config } = enrichedPro2Config;
+      const { resources: _unvalidatedNeoResources, ...neoConfig } = enrichedNeoConfig;
       Log.log(`[DataConfig] Config loaded successfully via [${fetchMethod}]`);
       this.deviceMap = {
         [EDeviceType.Classic]: this.enrichFirmwareReleaseInfo(data.classic),
@@ -476,6 +486,10 @@ export default class DataManager {
         [EDeviceType.Pro2]: {
           ...pro2Config,
           ...(pro2Resources ? { resources: pro2Resources } : undefined),
+        },
+        [EDeviceType.Neo]: {
+          ...neoConfig,
+          ...(neoResources ? { resources: neoResources } : undefined),
         },
       };
       this.assets = {
@@ -532,12 +546,14 @@ export default class DataManager {
     this.lastCheckTimestamp = getTimeStamp();
   }
 
-  static getProtocolV2Resources() {
-    return this.deviceMap[EDeviceType.Pro2]?.resources?.stable;
+  static getProtocolV2Resources(deviceType: EDeviceType.Pro2 | EDeviceType.Neo = EDeviceType.Pro2) {
+    return this.deviceMap[deviceType]?.resources?.stable;
   }
 
-  static getProtocolV2BootResources() {
-    return this.deviceMap[EDeviceType.Pro2]?.resources?.boot;
+  static getProtocolV2BootResources(
+    deviceType: EDeviceType.Pro2 | EDeviceType.Neo = EDeviceType.Pro2
+  ) {
+    return this.deviceMap[deviceType]?.resources?.boot;
   }
 
   static getProtobufMessages(schema: ProtobufMessageSchema = 'v1CurrentSchema'): JSON {

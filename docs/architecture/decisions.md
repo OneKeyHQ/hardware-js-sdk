@@ -183,6 +183,8 @@ Core 在设备完成 acquire/initialize、协议类型已由真实设备响应�
   `UnknownMessage/UnexpectedMessage` 判断能力。
 - `DeviceFirmwareRange` 只表达方法已受支持时的 `min/max` 固件版本，不表达协议不支持，禁止用
   `0.0.0`、虚构版本或布尔哨兵编码能力状态。
+- Pro2 与 Neo 的共享公链版本范围使用 `model_pro2`；解析时先读取精确的 `pro2` / `neo` 范围，
+  再回退到产品模型。该模型不得用于推导摄像头、NFC、指纹或 Find My 等硬件能力。
 - 参数会改变协议能力时，由方法覆写 `getSupportedProtocols()` 动态判断；例如 BTC Neurai fork
   当前仅允许 Protocol V1，其固件版本范围仍单独维护。
 - Core 主调用管线与 all-network 内部方法分发复用同一个 `BaseMethod` 协议断言。Transport 不维护
@@ -213,8 +215,8 @@ Pro2 acquire 后的初始化、重连和固件升级重连统一读取 `Protocol
 - `Device.isBootloader()` 与 `Device.isRomloader()` 是互斥的精确模式判断。兼容
   `Features.bootloaderMode/bootloader_mode` 仍表示广义 loader 状态，不能用于区分两种 loader；
   新流程必须读取 `DeviceState.status.mode` 或上述精确判断。
-- romloader 语义当前严格限定为 Pro2 + Protocol V2，并由
-  `DeviceInfo.hw.Device_type=PRO2` 与活动 V2 响应共同确认。Pro Protocol V1 的历史
+- romloader 语义当前严格限定为 Pro2/Neo + Protocol V2，并由
+  `DeviceInfo.hw.Device_type=PRO2|NEO` 与活动 V2 响应共同确认。Pro Protocol V1 的历史
   boardloader 是另一套状态，不得映射为 romloader，也不得进入 Pro2 FirmwareUpdateV4 直升流程。
 - fingerprint 无法解析但明确声明支持 `DeviceStatusGet` 时，可读取状态作为旧固件兼容路径；
   fingerprint 与能力均无法确认时必须安全失败，不能向未知阶段试探性发送状态命令。

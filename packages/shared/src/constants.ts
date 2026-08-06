@@ -148,7 +148,8 @@ export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
   if (
     normalizedName.startsWith('touch ') ||
     normalizedName.startsWith('pro ') ||
-    normalizedName.startsWith('pro2 ')
+    normalizedName.startsWith('pro2 ') ||
+    normalizedName.startsWith('neo ')
   ) {
     return true;
   }

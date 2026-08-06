@@ -47,7 +47,7 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
   getVersionRange() {
     if (this.existsVersionedTx()) {
       return {
-        pro2: {
+        model_pro2: {
           min: '0.0.0',
         },
         model_mini: {
@@ -60,7 +60,7 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
     }
 
     return {
-      pro2: {
+      model_pro2: {
         min: '0.0.0',
       },
       classic: {

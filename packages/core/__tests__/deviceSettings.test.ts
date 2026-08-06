@@ -72,6 +72,16 @@ describe('Pro 2 device settings options', () => {
     ]);
   });
 
+  test('uses the shared Protocol V2 settings model for Neo', () => {
+    expect(getLanguageConfig(EDeviceType.Neo)).toEqual(getLanguageConfig(EDeviceType.Pro2));
+    expect(getAutoLockOptions(EDeviceType.Neo, 'V2')).toEqual(
+      getAutoLockOptions(EDeviceType.Pro2, 'V2')
+    );
+    expect(getAutoShutDownOptions(EDeviceType.Neo, 'V2')).toEqual(
+      getAutoShutDownOptions(EDeviceType.Pro2, 'V2')
+    );
+  });
+
   test('keeps the legacy and Protocol V2 never values protocol-specific', () => {
     expect(getAutoLockOptions(EDeviceType.Pro, 'V1').slice(-1)[0]).toEqual({
       label: 'Never',

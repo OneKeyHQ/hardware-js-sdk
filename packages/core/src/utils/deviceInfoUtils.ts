@@ -31,6 +31,7 @@ export const getDeviceTypeByBleName = (name?: string): IDeviceType => {
   if (/^Touch/i.test(name)) return EDeviceType.Touch;
 
   if (/\bPro\s*2\b/i.test(name) || /^Pro2/i.test(name)) return EDeviceType.Pro2;
+  if (/\bNeo\b/i.test(name) || /^Neo/i.test(name)) return EDeviceType.Neo;
   if (/\bPro\b/i.test(name) || /^Pro/i.test(name)) return EDeviceType.Pro;
 
   return EDeviceType.Unknown;
@@ -93,6 +94,7 @@ export const getMethodVersionRange = (
   }
 
   const modelFallbacks: IDeviceModel[] = [
+    'model_pro2',
     'model_classic1s',
     'model_classic',
     'model_mini',

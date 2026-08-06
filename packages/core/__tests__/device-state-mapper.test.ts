@@ -145,6 +145,18 @@ describe('DeviceStateMapper', () => {
     expect(patch.status?.unlocked).toBeUndefined();
   });
 
+  test('maps the Protocol V2 Neo device type without treating it as Pro2', () => {
+    const patch = mapProtocolV2DeviceInfoToState({
+      hw: { Device_type: DeviceType.NEO, serial_no: 'NEO-SERIAL-1' },
+    });
+
+    expect(patch.identity).toMatchObject({
+      deviceType: EDeviceType.Neo,
+      model: 'neo',
+      serialNo: 'NEO-SERIAL-1',
+    });
+  });
+
   test('maps the hardware model independently from Protocol V2', () => {
     const pro = mapProtocolV2DeviceInfoToState({
       protocol_version: 2,

@@ -54,7 +54,7 @@ export type AllFirmwareRelease = {
   bridge?: FirmwareRelease;
   features?: Features;
   protocol?: 'V1' | 'V2';
-  deviceType?: 'pro2';
+  deviceType?: 'pro2' | 'neo';
   firmwareType?: EFirmwareType;
   status?: ProtocolV2FirmwareReleaseStatus;
   hasUpgrade?: boolean;

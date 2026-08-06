@@ -15,6 +15,8 @@
 | OneKey Classic Pure | `classicPure` | 与 Classic 1S 同固件 |
 | OneKey Touch        | `touch`       | 触屏版               |
 | OneKey Pro          | `pro`         | 专业版               |
+| OneKey Pro 2        | `pro2`        | Protocol V2 专业版   |
+| OneKey Neo          | `neo`         | Protocol V2 设备     |
 | OneKey Mini         | `mini`        | 迷你版               |
 
 ---
@@ -124,14 +126,16 @@
 
 其他方法按默认预期执行。
 
-## Pro2
+## Pro2 / Neo
 
-当前兼容性测试插件目录没有 Pro2 插件，因此本文不能据此给出 Pro2 的完整成功/失败矩阵。Pro2 支持情况应由 Protocol V2 真机测试和各方法的 `pro2` 版本/能力限制单独生成；不要把 Pro 的结果直接复制给 Pro2。
+当前兼容性测试插件目录没有 Pro2 / Neo 插件，因此本文不能据此给出二者的完整成功/失败矩阵。二者的公链能力共享 `model_pro2` 版本范围，并由 Protocol V2 真机测试和各方法的能力限制单独验证；需要差异化时仍可使用 `pro2` 或 `neo` 精确覆盖。不要把 OneKey Pro 的结果直接复制给该产品族。
 
 Core 方法以 `BaseMethod.getSupportedProtocols()` 作为协议能力事实源：默认方法仅支持 Protocol
-V1，支持 Pro2 的共享方法必须显式声明 `['V1', 'V2']`，Pro2 专属方法声明 `['V2']`。只有协议
+V1，支持 Pro2 / Neo 的共享方法必须显式声明 `['V1', 'V2']`，Protocol V2 专属方法声明 `['V2']`。只有协议
 检查通过后才读取 `DeviceFirmwareRange` 的 `min/max`；版本范围缺失或 `0.0.0` 不再用于表示
 “不支持”。
+
+`model_pro2` 只表示共享的链/固件方法能力，不表示硬件外设能力。Neo 不具备摄像头、NFC、指纹和 Find My，应用层不得据此开放二维码钱包或这些硬件入口。
 
 ---
 
@@ -154,7 +158,7 @@ packages/connect-examples/expo-example/src/testTools/deviceCompatibility/plugins
 - 最新固件版本：`data.onekey.so/config.json` 对应的 release 配置。
 - 方法最低版本：Core method 的 firmware range 和功能判断。
 - 机型特殊覆盖：上述兼容性测试插件的 `expected` 配置。
-- Pro2：Protocol V2 Schema、Core 方法守卫和真机测试，不能从 OneKey Pro 推断。
+- Pro2 / Neo：Protocol V2 Schema、Core 方法守卫和真机测试，不能从 OneKey Pro 推断。
 
 常见需要单独核验的能力包括 EIP-7702、BTC PSBT、Solana 消息签名与 Versioned Transaction、Tron 消息签名、Cardano Conway、TON、Neo、Alephium 和部分特殊网络。不要在文档中长期复制远端“最新版本”数字；发布变化后它们会迅速失真。
 
@@ -164,4 +168,4 @@ packages/connect-examples/expo-example/src/testTools/deviceCompatibility/plugins
 2. 方法是否声明机型或最低固件版本限制。
 3. 兼容性插件是否存在 `expected=false` 特殊覆盖。
 4. 设备实际固件是否达到版本要求。
-5. 对 Pro2 执行 Protocol V2 真机测试。
+5. 对 Pro2 / Neo 执行 Protocol V2 真机测试。

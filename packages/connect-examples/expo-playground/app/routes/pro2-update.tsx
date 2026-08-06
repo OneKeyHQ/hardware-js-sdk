@@ -1,15 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { DeviceFirmwareTargetType } from '@onekeyfe/hd-transport';
-import {
-  CheckCircle2,
-  FileUp,
-  Loader2,
-  Play,
-  RefreshCw,
-  RotateCcw,
-  Search,
-  X,
-} from 'lucide-react';
+import { CheckCircle2, FileUp, Loader2, Play, RefreshCw, RotateCcw, Search, X } from 'lucide-react';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
@@ -24,6 +15,7 @@ import { useFirmwareProgress } from '../components/providers/SDKProvider';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
 import { isPro2DeviceInfo } from '../utils/pro2Device';
+import { buildBootResourceFiles } from '../utils/protocolV2ResourceManifest';
 import type { DeviceInfo } from '../types/hardware';
 import { PRO2_FIRMWARE_FILE_ACCEPT } from '../constants/firmwareFiles';
 
@@ -215,7 +207,10 @@ function CompactFileSlot({
           <div className="truncate text-sm font-semibold text-foreground" title={label}>
             {label}
           </div>
-          <div className="truncate font-mono text-[10px] leading-4 text-muted-foreground" title={meta}>
+          <div
+            className="truncate font-mono text-[10px] leading-4 text-muted-foreground"
+            title={meta}
+          >
             {meta}
           </div>
         </div>
@@ -233,9 +228,7 @@ function CompactFileSlot({
           }`}
           title={file ? `${file.name} · ${formatBytes(file.size)}` : formatHint}
         >
-          <div className="truncate">
-            {file ? file.name : formatHint}
-          </div>
+          <div className="truncate">{file ? file.name : formatHint}</div>
           {file ? (
             <div className="mt-0.5 text-[10px] leading-3 text-muted-foreground">
               {formatBytes(file.size)}
@@ -287,15 +280,18 @@ export default function Pro2UpdatePage() {
 
   const [files, setFiles] = useState<Partial<Record<TargetParam, File>>>({});
   const [bundleFiles, setBundleFiles] = useState<Partial<Record<string, File>>>({});
+  const [bootResourceDirectory, setBootResourceDirectory] = useState<File[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [isConnectingLocal, setIsConnectingLocal] = useState(false);
   const [logs, setLogs] = useState<UpdateLog[]>([]);
   const [result, setResult] = useState<UpdateVersionsResult | null>(null);
   const logIdRef = useRef(0);
+  const bootResourceInputRef = useRef<HTMLInputElement>(null);
 
   const selectedFields = useMemo(() => TARGET_FIELDS.filter(field => files[field.param]), [files]);
   const selectedBundleCount = BUNDLE_SLOTS.filter(slot => bundleFiles[slot.key]).length;
-  const selectedPayloadCount = selectedFields.length + selectedBundleCount;
+  const selectedPayloadCount =
+    selectedFields.length + selectedBundleCount + (bootResourceDirectory.length > 0 ? 1 : 0);
 
   const addLog = useCallback((level: UpdateLog['level'], message: string) => {
     const nextLog = {
@@ -340,7 +336,7 @@ export default function Pro2UpdatePage() {
       const device = currentDevice ?? (await connectDevice());
 
       const params: Record<string, unknown> = { platform: 'web' };
-      const resourceBundleFiles: Array<{ binary: ArrayBuffer; devicePath: string }> = [];
+      const resourceFiles: Array<{ binary: ArrayBuffer; devicePath: string }> = [];
       for (const slot of BUNDLE_SLOTS) {
         const file = bundleFiles[slot.key];
         if (!file) continue;
@@ -348,7 +344,7 @@ export default function Pro2UpdatePage() {
           'info',
           `Loading RESC bundle ${slot.label}: ${file.name} (${formatBytes(file.size)})`
         );
-        resourceBundleFiles.push({
+        resourceFiles.push({
           binary: await file.arrayBuffer(),
           devicePath: slot.devicePath,
         });
@@ -360,12 +356,23 @@ export default function Pro2UpdatePage() {
         params[field.param] = await file.arrayBuffer();
       }
 
-      if (resourceBundleFiles.length > 0) {
-        params.resourceBundleFiles = resourceBundleFiles;
+      if (resourceFiles.length > 0) {
+        params.resourceFiles = resourceFiles;
         addLog(
           'info',
-          `Prepared resourceBundleFiles: ${resourceBundleFiles.length} bundles, ${formatBytes(
-            resourceBundleFiles.reduce((total, item) => total + item.binary.byteLength, 0)
+          `Prepared resourceFiles: ${resourceFiles.length} stable bundles, ${formatBytes(
+            resourceFiles.reduce((total, item) => total + item.binary.byteLength, 0)
+          )}`
+        );
+      }
+
+      if (bootResourceDirectory.length > 0) {
+        const bootResourceFiles = await buildBootResourceFiles(bootResourceDirectory);
+        params.resourceFiles = [...resourceFiles, ...bootResourceFiles];
+        addLog(
+          'info',
+          `Prepared boot resources: ${bootResourceFiles.length} files, ${formatBytes(
+            bootResourceFiles.reduce((total, item) => total + item.binary.byteLength, 0)
           )}`
         );
       }
@@ -375,6 +382,7 @@ export default function Pro2UpdatePage() {
       } else {
         const targetNames = [
           selectedBundleCount > 0 ? `RESC bundles(${selectedBundleCount})` : null,
+          bootResourceDirectory.length > 0 ? 'Boot resources(manifest)' : null,
           ...selectedFields.map(field => `${field.label}(${field.targetId})`),
         ].filter(Boolean);
         addLog('info', `firmwareUpdateV4 targets: ${targetNames.join(', ')}`);
@@ -403,6 +411,7 @@ export default function Pro2UpdatePage() {
     connectDevice,
     currentDevice,
     bundleFiles,
+    bootResourceDirectory,
     files,
     resetFirmwareProgress,
     selectedBundleCount,
@@ -414,6 +423,7 @@ export default function Pro2UpdatePage() {
   const resetFiles = useCallback(() => {
     setFiles({});
     setBundleFiles({});
+    setBootResourceDirectory([]);
     setResult(null);
   }, []);
 
@@ -424,7 +434,7 @@ export default function Pro2UpdatePage() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Pro2 Update</h1>
+            <h1 className="text-2xl font-semibold text-foreground">Pro2 / Neo Update</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Standard Protocol V2 update via firmwareUpdateV4. Leave files empty to use remote
               firmware-v1 components, or pick local targets for a manual update.
@@ -531,6 +541,63 @@ export default function Pro2UpdatePage() {
               </section>
 
               <section className="space-y-2">
+                <div>
+                  <div className="text-sm font-semibold text-foreground">Boot resources</div>
+                  <div className="text-xs text-muted-foreground">
+                    Select an extracted resource directory. The manifest maps every archive path to
+                    its device path; stable bundles above are excluded from this group.
+                  </div>
+                </div>
+                <input
+                  ref={bootResourceInputRef}
+                  className="sr-only"
+                  type="file"
+                  multiple
+                  disabled={isRunning}
+                  aria-label="Select boot resource directory"
+                  {...({
+                    webkitdirectory: '',
+                    directory: '',
+                  } as React.InputHTMLAttributes<HTMLInputElement>)}
+                  onChange={event => {
+                    setBootResourceDirectory(Array.from(event.currentTarget.files ?? []));
+                  }}
+                />
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-background p-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isRunning}
+                    onClick={() => {
+                      if (!bootResourceInputRef.current) return;
+                      bootResourceInputRef.current.value = '';
+                      bootResourceInputRef.current.click();
+                    }}
+                  >
+                    <FileUp />
+                    {bootResourceDirectory.length > 0 ? 'Replace directory' : 'Choose directory'}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {bootResourceDirectory.length > 0
+                      ? `${bootResourceDirectory.length} selected files (manifest is validated before upload)`
+                      : 'Expected: manifest.json plus its referenced files'}
+                  </span>
+                  {bootResourceDirectory.length > 0 ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={isRunning}
+                      onClick={() => setBootResourceDirectory([])}
+                    >
+                      <X /> Clear
+                    </Button>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <div className="text-sm font-semibold text-foreground">Firmware targets</div>
@@ -549,7 +616,9 @@ export default function Pro2UpdatePage() {
                       <CompactFileSlot
                         key={field.param}
                         label={field.label}
-                        meta={`target ${field.targetId} · ${DeviceFirmwareTargetType[field.targetId]}`}
+                        meta={`target ${field.targetId} · ${
+                          DeviceFirmwareTargetType[field.targetId]
+                        }`}
                         formatHint={field.formatHint}
                         accept={field.accept}
                         file={selectedFile}
@@ -588,13 +657,16 @@ export default function Pro2UpdatePage() {
                 <span className="text-sm text-muted-foreground">
                   {[
                     selectedBundleCount > 0 ? `${selectedBundleCount} RESC bundles` : null,
+                    bootResourceDirectory.length > 0 ? 'Boot resources manifest' : null,
                     ...selectedFields.map(field => field.label),
                   ]
                     .filter(Boolean)
                     .join(' + ')}
                 </span>
               ) : (
-                <span className="text-sm text-muted-foreground">Remote pro2 firmware-v1</span>
+                <span className="text-sm text-muted-foreground">
+                  Remote Protocol V2 firmware-v1
+                </span>
               )}
             </div>
           </CardContent>
