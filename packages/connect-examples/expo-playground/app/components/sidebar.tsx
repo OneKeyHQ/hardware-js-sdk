@@ -10,10 +10,12 @@ import {
   SidebarHeader,
   SidebarFooter,
   SidebarSeparator,
+  useSidebar,
 } from './ui/sidebar';
 import { Badge } from './ui/Badge';
 import { Card, CardContent } from './ui/Card';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
 import { useTransportPersistence } from '../store/persistenceStore';
@@ -93,8 +95,13 @@ export function AppSidebar() {
   const { t } = useTranslation();
   const { currentDevice } = useDeviceStore();
   const navigate = useNavigate();
+  const { isMobile, setOpen } = useSidebar();
 
   const { preferredType: transportType } = useTransportPersistence();
+
+  useEffect(() => {
+    if (isMobile) setOpen(false);
+  }, [isMobile, location.pathname, setOpen]);
 
   const getStatusIcon = () => {
     if (currentDevice) {

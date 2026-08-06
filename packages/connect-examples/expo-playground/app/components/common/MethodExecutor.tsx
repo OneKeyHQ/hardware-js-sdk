@@ -61,9 +61,8 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
 
   // 同步 useMethodParameters 的参数到 hardwareStore
   useEffect(() => {
-    if (Object.keys(methodParams).length > 0) {
-      setMethodParameters(methodParams);
-    }
+    // Write empty parameters too so switching methods cannot reuse the previous request payload.
+    setMethodParameters(methodParams);
   }, [methodParams, setMethodParameters]);
 
   // 处理预设选择

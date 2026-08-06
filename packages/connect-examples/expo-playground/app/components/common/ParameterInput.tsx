@@ -6,7 +6,7 @@ import { Input } from '../ui/Input';
 import { Checkbox } from '../ui/Checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/Select';
 import { ExternalLink } from 'lucide-react';
-import type { ParameterField, UnifiedMethodConfig } from '../../data/types';
+import type { ParameterField, SelectOption, UnifiedMethodConfig } from '../../data/types';
 import { useHardwareStore } from '../../store/hardwareStore';
 import { Alert, AlertDescription } from '../ui/Alert';
 import { parseParameterValue } from '../../utils/parameterUtils';
@@ -172,7 +172,11 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
   // 参数变化处理
   const handleParamChange = (paramName: string, value: unknown) => {
-    if (paramName === 'useEmptyPassphrase' || paramName === 'passphraseState' || paramName === 'deriveCardano') {
+    if (
+      paramName === 'useEmptyPassphrase' ||
+      paramName === 'passphraseState' ||
+      paramName === 'deriveCardano'
+    ) {
       setCommonParameter(paramName as keyof typeof commonParameters, value);
       return;
     }
@@ -345,7 +349,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
       if (field.type === 'textarea' && typeof val === 'object' && val !== null) {
         return JSON.stringify(val, null, 2);
       }
-      return String(val || '');
+      return String(val ?? '');
     };
 
     return (
@@ -369,7 +373,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             <Input
               id={field.name}
               type={type}
-              value={String(value || '')}
+              value={String(value ?? '')}
               onChange={e => {
                 if (!isEditable) return;
                 const newValue =
@@ -403,8 +407,21 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
         <div className="min-w-0 flex-shrink-0 w-32">{renderFieldLabel(field)}</div>
         <div className="flex-1 min-w-0">
           <Select
-            value={String(value || '')}
-            onValueChange={newValue => isEditable && handleParamChange(field.name, newValue)}
+            value={String(value ?? '')}
+            onValueChange={newValue => {
+              if (!isEditable) return;
+              const selectedOption = (
+                field.options as Array<string | SelectOption> | undefined
+              )?.find(option =>
+                typeof option === 'string' ? option === newValue : String(option.value) === newValue
+              );
+              handleParamChange(
+                field.name,
+                selectedOption && typeof selectedOption !== 'string'
+                  ? selectedOption.value
+                  : newValue
+              );
+            }}
             disabled={!isEditable}
           >
             <SelectTrigger
@@ -428,7 +445,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
                   );
                 } else {
                   return (
-                    <SelectItem key={option.value} value={option.value}>
+                    <SelectItem key={option.value} value={String(option.value)}>
                       {String(option.label)}
                     </SelectItem>
                   );
