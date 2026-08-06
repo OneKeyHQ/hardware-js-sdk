@@ -416,7 +416,10 @@ export default class DataManager {
       return true;
     }
     if (manifestMode === 'external-only') {
-      throw new Error('External firmware config snapshot is required');
+      Log.warn(
+        '[DataConfig] External firmware config is unavailable; SDK-managed networking remains disabled'
+      );
+      return false;
     }
     if (manifestMode !== 'sdk-managed') {
       return false;

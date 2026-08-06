@@ -48,14 +48,12 @@ describe('parseConnectSettings', () => {
     expect(DataManager.deviceMap.classic).toEqual({ firmware: [], ble: [] });
   });
 
-  it('fails closed without a preloaded config in external-only mode', async () => {
+  it('keeps the SDK offline and available without an external manifest snapshot', async () => {
     const settings = parseConnectSettings({
       firmwareManifestMode: 'external-only',
     });
 
-    await expect(DataManager.load(settings)).rejects.toThrow(
-      'External firmware config snapshot is required'
-    );
+    await expect(DataManager.load(settings)).resolves.toBe(false);
     expect(mockAxiosGet).not.toHaveBeenCalled();
   });
 });
