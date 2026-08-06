@@ -84,6 +84,7 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
 
   init() {
     this.useDevicePassphraseState = false;
+    this.unlockPolicy = 'unlock-before-run';
     this.skipForceUpdateCheck = true;
     this.params = normalizeParams(this.payload as unknown as Record<string, unknown>);
     this.payload.useEmptyPassphrase = this.params.mode === OpenWalletSessionMode.Standard;

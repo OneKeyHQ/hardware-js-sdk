@@ -3783,7 +3783,7 @@ describe('API compatibility handling', () => {
 
 describe('Protocol V2 firmware update targets', () => {
   const OKPP_HEADER_SIZE = 0x52a0;
-  let forceReloadDataSpy: jest.SpyInstance<Promise<void>, []>;
+  let forceReloadDataSpy: jest.SpyInstance;
 
   beforeEach(() => {
     forceReloadDataSpy = jest.spyOn(DataManager, 'forceReloadData').mockResolvedValue(undefined);
@@ -4054,6 +4054,10 @@ describe('Protocol V2 firmware update targets', () => {
       originalDescriptor: { id: 'usb-id', path: 'usb-path', protocolType: 'V2' },
       features: { bootloader_mode: false, capabilities: [] },
       isBootloader: () => false,
+      probeProtocolV2RuntimeState: jest.fn().mockResolvedValue({
+        mode: 'bootloader',
+        bootloaderMode: true,
+      }),
     });
     (method as any).protocolV2Reboot = jest.fn().mockResolvedValue({
       message: 'Device rebooted successfully',
@@ -4081,6 +4085,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
     (method as any).device.getCommands = () => ({ typedCall });
     (method as any).protocolV2ExpectedSerialNumber = 'PR9999999999';
+    (method as any).protocolV2ExpectedPath = 'usb-path';
     method.postTipMessage = jest.fn();
 
     await (method as any).enterProtocolV2BootloaderMode();
@@ -4239,6 +4244,10 @@ describe('Protocol V2 firmware update targets', () => {
       originalDescriptor: { id: 'usb-id', path: 'app-path', protocolType: 'V2' },
       features: { bootloader_mode: false, capabilities: [] },
       isBootloader: () => false,
+      probeProtocolV2RuntimeState: jest.fn().mockResolvedValue({
+        mode: 'bootloader',
+        bootloaderMode: true,
+      }),
     });
     const typedCall = jest.fn().mockImplementation((requestType: string) => {
       if (requestType === 'DeviceInfoGet') {
@@ -4266,15 +4275,13 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
     (method as any).device.getCommands = () => ({ typedCall });
     (method as any).protocolV2ExpectedSerialNumber = 'PR9999999999';
+    (method as any).protocolV2ExpectedPath = 'app-path';
 
     await (method as any).waitForProtocolV2BootloaderMode(60 * 1000, 0);
 
     expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(3);
-    expect(typedCall).toHaveBeenCalledTimes(2);
-    expect(typedCall.mock.calls.map(call => call[0])).toEqual([
-      'DeviceInfoGet',
-      'ProtocolInfoRequest',
-    ]);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual(['DeviceInfoGet']);
   });
 
   test('does not run generic initialize during Protocol V2 USB firmware reconnect', async () => {
@@ -4311,6 +4318,7 @@ describe('Protocol V2 firmware update targets', () => {
       deviceList: [cachedDevice],
     } as any);
     (method as any).device = device;
+    (method as any).protocolV2ExpectedPath = 'usb-path';
 
     try {
       await (method as any).reconnectProtocolV2Device();
@@ -4361,6 +4369,7 @@ describe('Protocol V2 firmware update targets', () => {
       deviceList: [otherDevice, expectedDevice],
     } as any);
     (method as any).device = device;
+    (method as any).protocolV2ExpectedPath = 'usb-path';
     (method as any).protocolV2ExpectedSerialNumber = 'PRO2-PHYSICAL-B';
 
     try {
@@ -4417,7 +4426,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(updateFromCache).not.toHaveBeenCalled();
   });
 
-  test('allows a single Protocol V2 USB reconnect candidate when its physical serial is unavailable', async () => {
+  test('allows a Protocol V2 USB reconnect candidate without a serial only when its path matches', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -4427,7 +4436,7 @@ describe('Protocol V2 firmware update targets', () => {
     const commands = { disposed: true, mainId: '' };
     const updateFromCache = jest.fn();
     const device = stubDevice({
-      originalDescriptor: { id: 'old-usb-id', path: 'old-usb-path', protocolType: 'V2' },
+      originalDescriptor: { id: 'usb-a', path: 'usb-a', protocolType: 'V2' },
       deviceConnector: {
         enumerate: jest.fn().mockResolvedValue({
           descriptors: [{ id: 'usb-a', path: 'usb-a', protocolType: 'V2' }],
@@ -4450,6 +4459,7 @@ describe('Protocol V2 firmware update targets', () => {
     } as any);
     (method as any).device = device;
     (method as any).protocolV2ExpectedSerialNumber = 'PRO2-PHYSICAL-A';
+    (method as any).protocolV2ExpectedPath = 'usb-a';
 
     try {
       await (method as any).reconnectProtocolV2Device();
@@ -4539,6 +4549,7 @@ describe('Protocol V2 firmware update targets', () => {
       deviceList: [{ getConnectId: () => 'usb-path' }],
     } as any);
     (method as any).device = device;
+    (method as any).protocolV2ExpectedPath = 'usb-path';
 
     try {
       await (method as any).reconnectProtocolV2Device();
@@ -4569,6 +4580,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).protocolV2ExpectedSerialNumber = 'expected-serial';
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
     (method as any).device = stubDevice({
+      originalDescriptor: { id: 'usb-id', path: 'usb-path', protocolType: 'V2' },
       getCommands: () => ({ typedCall }),
       probeProtocolV2RuntimeState: jest.fn().mockResolvedValue({
         deviceId: 'changed-device',
@@ -6465,10 +6477,16 @@ describe('Protocol V2 firmware reconnect identity', () => {
     ).not.toThrow();
   });
 
-  test('allows reconnect when either physical serial is unavailable', () => {
-    expect(() => assertProtocolV2ReconnectIdentity('expected-serial', undefined)).not.toThrow();
-    expect(() => assertProtocolV2ReconnectIdentity(undefined, 'actual-serial')).not.toThrow();
-    expect(() => assertProtocolV2ReconnectIdentity(undefined, undefined)).not.toThrow();
+  test('requires the same descriptor path when either physical serial is unavailable', () => {
+    expect(() =>
+      assertProtocolV2ReconnectIdentity('expected-serial', undefined, 'usb-path', 'usb-path')
+    ).not.toThrow();
+    expect(() =>
+      assertProtocolV2ReconnectIdentity(undefined, 'actual-serial', 'usb-path', 'other-path')
+    ).toThrow('identity unavailable');
+    expect(() => assertProtocolV2ReconnectIdentity(undefined, undefined)).toThrow(
+      'identity unavailable'
+    );
   });
 
   test('captures physical identity from active DeviceInfo instead of wallet deviceId', async () => {
@@ -6486,6 +6504,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
       },
     });
     (method as any).device = stubDevice({
+      originalDescriptor: { id: 'usb-id', path: 'usb-path', protocolType: 'V2' },
       features: { deviceId: 'wallet-derived-id' },
       getCommands: () => ({ typedCall }),
     });
@@ -6511,11 +6530,13 @@ describe('Protocol V2 firmware reconnect identity', () => {
       message: { protocol_version: 1, hw: {} },
     });
     (method as any).device = stubDevice({
+      originalDescriptor: { id: 'usb-id', path: 'usb-path', protocolType: 'V2' },
       getCommands: () => ({ typedCall }),
     });
 
     await expect((method as any).captureProtocolV2PhysicalIdentity()).resolves.toBeUndefined();
     expect((method as any).protocolV2ExpectedSerialNumber).toBeUndefined();
+    expect((method as any).protocolV2ExpectedPath).toBeDefined();
   });
 
   test('uses filesystem reads instead of ResourceInventoryGet for resource comparison', async () => {

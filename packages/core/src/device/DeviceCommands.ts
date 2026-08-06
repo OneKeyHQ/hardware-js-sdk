@@ -54,8 +54,16 @@ const DEVICE_SESSION_CALLS = new Set([
   'DeviceSessionAskPin',
   'DeviceSessionAskPassphrase',
 ]);
-
-const PROTOCOL_V2_ACTION_CANCELLED_SUBCODE = 1;
+const DEVICE_CONTROL_CALLS = new Set([
+  'DeviceReboot',
+  'DeviceSettingsGet',
+  'DeviceSettingsSet',
+  'DeviceSettingsPageShow',
+  'DeviceCertificateWrite',
+  'DeviceCertificateRead',
+  'DeviceCertificateSign',
+  'DeviceMiscUsbMscControl',
+]);
 
 // Older Protocol V2 firmware may omit the cancellation subcode, so retain a
 // narrow message fallback for compatibility.
@@ -501,14 +509,9 @@ export class DeviceCommands {
         const normalizedMessage = message?.trim() ?? '';
         const isProtocolV2ActionCancelledFailure =
           this.device.isProtocolV2() && isProtocolV2ActionCancelledMessage(normalizedMessage);
-        const isProtocolV2ActionCancelledSubcode =
-          this.device.isProtocolV2() && subcode === PROTOCOL_V2_ACTION_CANCELLED_SUBCODE;
-        // DeviceErrorCode currently reuses subcode 1 for Busy. Resolve that
-        // domain-specific exception before applying the common cancellation map.
         const isProtocolV2DeviceBusyFailure =
           this.device.isProtocolV2() &&
-          callType.startsWith('Device') &&
-          !DEVICE_SESSION_CALLS.has(callType) &&
+          DEVICE_CONTROL_CALLS.has(callType) &&
           subcode === DeviceErrorCode.DeviceError_Busy;
         const isLegacyProtocolV2LockedFailure =
           this.device.isProtocolV2() && /^device (?:is )?locked$/i.test(normalizedMessage);
@@ -574,8 +577,8 @@ export class DeviceCommands {
             firmwareMessage: message,
           });
         } else if (
-          subcode === DeviceErrorCode.DeviceError_ActionCancelled ||
-          isProtocolV2ActionCancelledSubcode ||
+          (DEVICE_CONTROL_CALLS.has(callType) &&
+            subcode === DeviceErrorCode.DeviceError_ActionCancelled) ||
           isProtocolV2ActionCancelledFailure
         ) {
           error = ERRORS.TypedError(HardwareErrorCode.ActionCancelled, message, {

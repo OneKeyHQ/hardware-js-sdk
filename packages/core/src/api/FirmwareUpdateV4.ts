@@ -371,19 +371,30 @@ export const isProtocolV2FirmwareFingerprintValid = (
 
 export const assertProtocolV2ReconnectIdentity = (
   expectedSerialNumber?: string,
-  actualSerialNumber?: string
+  actualSerialNumber?: string,
+  expectedPath?: string,
+  actualPath?: string
 ) => {
-  // Some Pro2 loader builds omit serial_no. Reconnect still uses the same BLE
-  // descriptor or requires a uniquely enumerated USB device before this check.
-  if (!expectedSerialNumber || !actualSerialNumber) {
+  if (expectedSerialNumber && actualSerialNumber) {
+    if (actualSerialNumber !== expectedSerialNumber) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.DeviceNotFound,
+        `Protocol V2 reconnect physical identity mismatch: expected ${expectedSerialNumber}, received ${actualSerialNumber}`
+      );
+    }
     return;
   }
-  if (actualSerialNumber !== expectedSerialNumber) {
-    throw ERRORS.TypedError(
-      HardwareErrorCode.DeviceNotFound,
-      `Protocol V2 reconnect physical identity mismatch: expected ${expectedSerialNumber}, received ${actualSerialNumber}`
-    );
+
+  if (expectedPath && actualPath && expectedPath === actualPath) {
+    return;
   }
+
+  throw ERRORS.TypedError(
+    HardwareErrorCode.DeviceNotFound,
+    `Protocol V2 reconnect physical identity unavailable: expected path ${
+      expectedPath ?? 'unknown'
+    }, received ${actualPath ?? 'unknown'}`
+  );
 };
 
 /**
@@ -396,6 +407,8 @@ export const assertProtocolV2ReconnectIdentity = (
  */
 export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareUpdateV4Params> {
   private protocolV2ExpectedSerialNumber?: string;
+
+  private protocolV2ExpectedPath?: string;
 
   getSupportedProtocols() {
     return ['V2'] as const;
@@ -509,7 +522,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         !!this.params.targetsToUpdate?.includes('boot_resources');
       if (needsRemoteFirmware || needsRemoteResources || needsRemoteBootResources) {
         // Remote updates must use a freshly fetched config before any reboot or file write.
-        await DataManager.forceReloadData();
+        await DataManager.forceReloadData({
+          requireResources: needsRemoteResources || needsRemoteBootResources,
+        });
       }
       if (needsRemoteFirmware) {
         const remoteBinaries = await this.prepareRemoteProtocolV2Binaries(
@@ -607,7 +622,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private assertProtocolV2DeviceInfoIdentity(deviceInfo: ProtocolV2DeviceInfo) {
     assertProtocolV2ReconnectIdentity(
       this.protocolV2ExpectedSerialNumber,
-      this.getProtocolV2SerialNumber(deviceInfo)
+      this.getProtocolV2SerialNumber(deviceInfo),
+      this.protocolV2ExpectedPath,
+      this.device.originalDescriptor.path
     );
   }
 
@@ -627,8 +644,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async captureProtocolV2PhysicalIdentity() {
     const deviceInfo = await this.requestProtocolV2PhysicalIdentity();
     const serialNumber = this.getProtocolV2SerialNumber(deviceInfo);
-    assertProtocolV2ReconnectIdentity(serialNumber, serialNumber);
+    const path = this.device.originalDescriptor.path?.trim() || undefined;
+    assertProtocolV2ReconnectIdentity(serialNumber, serialNumber, path, path);
     this.protocolV2ExpectedSerialNumber = serialNumber;
+    this.protocolV2ExpectedPath = path;
   }
 
   private async verifyProtocolV2ReconnectIdentity() {
@@ -1537,9 +1556,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       DataManager.isBrowserWebUsb(DataManager.getSettings('env')) &&
       devicesDescriptor.length === 1
     ) {
+      const descriptor = devicesDescriptor[0];
+      if (!this.protocolV2ExpectedSerialNumber && descriptor.path !== this.protocolV2ExpectedPath) {
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
+      }
       this.device.updateDescriptor(
         {
-          ...devicesDescriptor[0],
+          ...descriptor,
           protocolType: PROTOCOL_V2_CONNECT_PROTOCOL,
         },
         true
@@ -1556,18 +1579,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       connectProtocol: PROTOCOL_V2_CONNECT_PROTOCOL,
     });
     const expectedSerialNumber = this.protocolV2ExpectedSerialNumber?.trim();
-    const identityMatch = expectedSerialNumber
-      ? deviceList.find(
-          candidate => candidate.getCurrentSerialNo?.().trim() === expectedSerialNumber
-        )
-      : undefined;
-    const singleCandidate = deviceList.length === 1 ? deviceList.at(0) : undefined;
-    const singleCandidateSerialNumber = singleCandidate?.getCurrentSerialNo?.().trim();
-    const reconnectDevice =
-      identityMatch ??
-      (singleCandidate && (!expectedSerialNumber || !singleCandidateSerialNumber)
-        ? singleCandidate
-        : undefined);
+    const expectedPath = this.protocolV2ExpectedPath?.trim();
+    const reconnectDevice = deviceList.find(candidate => {
+      const candidateSerialNumber = candidate.getCurrentSerialNo?.().trim();
+      if (expectedSerialNumber && candidateSerialNumber) {
+        return candidateSerialNumber === expectedSerialNumber;
+      }
+      return !!expectedPath && candidate.getConnectId() === expectedPath;
+    });
     if (!reconnectDevice) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
     }

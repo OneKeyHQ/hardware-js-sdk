@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import type { Characteristic, Device, Subscription } from 'react-native-ble-plx';
 
 export default class BleTransport {
@@ -33,6 +35,10 @@ export default class BleTransport {
   }
 
   async writeWithRetry(data: string): Promise<void> {
-    await this.writeCharacteristic.writeWithResponse(data);
+    if (Platform.OS === 'ios' && this.writeCharacteristic.isWritableWithResponse) {
+      await this.writeCharacteristic.writeWithResponse(data);
+      return;
+    }
+    await this.writeCharacteristic.writeWithoutResponse(data);
   }
 }

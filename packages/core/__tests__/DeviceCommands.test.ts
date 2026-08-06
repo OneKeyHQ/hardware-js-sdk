@@ -363,14 +363,9 @@ describe('DeviceCommands failure mapping', () => {
     }
   );
 
-  it.each([
-    ['SignTx', 'Rejected by the user'],
-    ['EthereumSignTypedDataOneKey', ''],
-    ['SolanaSignTx', 'Localized cancellation message'],
-    ['GetAddress', 'Address confirmation rejected'],
-  ] as const)(
-    'maps Protocol V2 cancellation subcode 1 for %s regardless of message',
-    async (callType, message) => {
+  it.each(['SignTx', 'EthereumSignTypedDataOneKey', 'SolanaSignTx', 'GetAddress'] as const)(
+    'does not treat domain-ambiguous Protocol V2 subcode 1 for %s as cancellation',
+    async callType => {
       const commands = createCommands();
 
       await expect(
@@ -380,18 +375,13 @@ describe('DeviceCommands failure mapping', () => {
             message: {
               code: 'Failure_ProcessError',
               subcode: 1,
-              message,
+              message: 'Domain-specific failure',
             },
           } as any,
           callType
         )
       ).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.ActionCancelled,
-        params: {
-          failureCode: 'Failure_ProcessError',
-          subcode: 1,
-          firmwareMessage: message,
-        },
+        errorCode: HardwareErrorCode.RuntimeError,
       });
     }
   );

@@ -451,6 +451,7 @@ export default class DataManager {
     // 3. Apply config if available
     if (data) {
       let pro2Resources: IProtocolV2Resources | undefined;
+      this.protocolV2ResourcesConfigError = undefined;
       try {
         pro2Resources = parseProtocolV2Resources(
           (data.pro2 as { resources?: unknown } | undefined)?.resources
@@ -509,7 +510,9 @@ export default class DataManager {
   }
 
   /** Force a fresh remote config before an update is allowed to mutate the device. */
-  static async forceReloadData(): Promise<void> {
+  static async forceReloadData({
+    requireResources = false,
+  }: { requireResources?: boolean } = {}): Promise<void> {
     if (!this.settings) {
       throw new Error('Remote config settings are not initialized');
     }
@@ -520,9 +523,9 @@ export default class DataManager {
         'Unable to refresh the latest remote config'
       );
     }
-    if (this.protocolV2ResourcesConfigError) {
+    if (requireResources && this.protocolV2ResourcesConfigError) {
       throw ERRORS.TypedError(
-        HardwareErrorCode.NetworkError,
+        HardwareErrorCode.FirmwareUpdateDownloadFailed,
         `Invalid Pro2 resources config: ${this.protocolV2ResourcesConfigError.message}`
       );
     }

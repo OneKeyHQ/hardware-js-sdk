@@ -280,17 +280,18 @@ describe('Pro2 resource configuration', () => {
     expect(DataManager.getProtocolV2BootResources()).toBeUndefined();
   });
 
-  test('still blocks firmware mutation when the refreshed Pro2 resources are invalid', async () => {
+  test('only blocks resource mutation when the refreshed Pro2 resources are invalid', async () => {
     const remoteConfig = createRemoteConfig();
     (remoteConfig.pro2 as { resources?: unknown }).resources = { stable: [] };
     const settings = createSettings(jest.fn().mockResolvedValue(remoteConfig));
     DataManager.settings = settings;
 
-    await expect(DataManager.forceReloadData()).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.NetworkError,
+    await expect(DataManager.forceReloadData()).resolves.toBeUndefined();
+    await expect(DataManager.forceReloadData({ requireResources: true })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.FirmwareUpdateDownloadFailed,
       message: expect.stringContaining('Invalid Pro2 resources config'),
     });
-    expect(DataManager.lastCheckTimestamp).toBe(0);
+    expect(DataManager.lastCheckTimestamp).toBeGreaterThan(0);
   });
 
   test('does not advance the cache timestamp when refresh fails', async () => {

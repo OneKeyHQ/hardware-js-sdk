@@ -1223,7 +1223,7 @@ export default class ReactNativeBleTransport {
           // eslint-disable-next-line no-constant-condition
           while (true) {
             try {
-              await transport.writeCharacteristic.writeWithResponse(data);
+              await transport.writeWithRetry(data);
               return;
             } catch (error) {
               const retryType = getFirmwareUploadWriteRetryType(error);
