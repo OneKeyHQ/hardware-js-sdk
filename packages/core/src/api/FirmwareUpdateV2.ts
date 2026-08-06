@@ -46,7 +46,6 @@ import type { FirmwareUpdatePreparedPlan } from '../types/api/firmwareUpdatePrep
 type Params = {
   binary?: ArrayBuffer;
   artifact?: FirmwareArtifactReference;
-  resourceArtifact?: FirmwareArtifactReference;
   resourceEntries?: Array<{
     entryName: string;
     artifact: FirmwareArtifactReference;
@@ -191,18 +190,13 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     if ('artifact' in payload) {
       const hostBinding = resolveFirmwareUpdateHostBinding(payload.hostBindingGeneration);
       const target = payload.isUpdateBootloader ? 'bootloader' : payload.updateType;
-      const resourceBindings = [
-        ...(payload.resourceArtifact
-          ? [{ target: 'resource' as const, artifact: payload.resourceArtifact }]
-          : []),
-        ...(payload.resourceEntries ?? []).map(
-          (entry: { entryName: string; artifact: FirmwareArtifactReference }) => ({
-            target: 'resource' as const,
-            entryName: entry.entryName,
-            artifact: entry.artifact,
-          })
-        ),
-      ];
+      const resourceBindings = (payload.resourceEntries ?? []).map(
+        (entry: { entryName: string; artifact: FirmwareArtifactReference }) => ({
+          target: 'resource' as const,
+          entryName: entry.entryName,
+          artifact: entry.artifact,
+        })
+      );
       assertFirmwareUpdatePreparedPlanBinding({
         preparedPlan: payload.preparedPlan,
         executor: 'v2',
@@ -214,7 +208,6 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         ...this.params,
         preparedPlan: payload.preparedPlan,
         artifact: payload.artifact,
-        resourceArtifact: payload.resourceArtifact,
         resourceEntries: payload.resourceEntries,
         artifactReader: hostBinding.artifactReader,
       };
@@ -579,32 +572,21 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
               }
               this.postTipMessage('DownloadLatestUiResourceSuccess');
             } else {
-              let resourceBinary: ArrayBuffer | Buffer;
-              if (params.resourceArtifact) {
+              if (
+                params.artifactReader ||
+                DataManager.getSettings('firmwareManifestMode') === 'external-only'
+              ) {
                 throw ERRORS.TypedError(
                   HardwareErrorCode.RuntimeError,
-                  'Firmware resource archive must be materialized into prepared entries',
+                  'Firmware resource must be prepared by the external firmware host',
                   {
                     firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
                     artifactName: 'resource',
                   }
                 );
-              } else {
-                if (
-                  params.artifactReader ||
-                  DataManager.getSettings('firmwareManifestMode') === 'external-only'
-                ) {
-                  throw ERRORS.TypedError(
-                    HardwareErrorCode.RuntimeError,
-                    'Firmware resource must be prepared by the external firmware host',
-                    {
-                      firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
-                      artifactName: 'resource',
-                    }
-                  );
-                }
-                resourceBinary = (await getSysResourceBinary(resourceUrl)).binary;
               }
+              const resourceBinary: ArrayBuffer | Buffer = (await getSysResourceBinary(resourceUrl))
+                .binary;
               this.postTipMessage('DownloadLatestUiResourceSuccess');
               await updateResources(
                 this.device.getCommands().typedCall.bind(this.device.getCommands()),

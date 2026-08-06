@@ -37,7 +37,6 @@ export interface FirmwareUpdateArtifactParams {
   preparedPlan: FirmwareUpdatePreparedPlan;
   hostBindingGeneration: number;
   artifact: FirmwareArtifactReference;
-  resourceArtifact?: FirmwareArtifactReference;
   resourceEntries?: Array<{
     entryName: string;
     artifact: FirmwareArtifactReference;

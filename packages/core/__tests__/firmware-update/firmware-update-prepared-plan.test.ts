@@ -113,6 +113,24 @@ describe('FirmwareUpdatePreparedPlan', () => {
         preparedPlan: prepared,
         executor: 'v2',
         platform: 'native',
+        scopeTargets: ['firmware', 'resource'],
+        bindings: [
+          {
+            target: 'firmware',
+            artifact: artifact('a'.repeat(64), 4),
+          },
+          {
+            target: 'resource',
+            artifact: artifact('b'.repeat(64), 8),
+          },
+        ],
+      })
+    ).toThrow('artifact binding is invalid');
+    expect(() =>
+      assertFirmwareUpdatePreparedPlanBinding({
+        preparedPlan: prepared,
+        executor: 'v2',
+        platform: 'native',
         scopeTargets: ['firmware'],
         bindings: [
           {
