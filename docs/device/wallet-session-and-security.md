@@ -4,7 +4,7 @@
 > 适用读者：Core、App 钱包接入与安全审查人员
 > 内容状态：兼容迁移中
 > 代码范围：`packages/core`、App 钱包 Session 接入
-> 最后代码核验：2026-08-04
+> 最后代码核验：2026-08-06
 > 前置阅读：[SDK 架构概览](../architecture/overview.md)
 
 ## 1. 范围与核心结论
@@ -63,9 +63,10 @@
 - Core 把现有 `deriveCardano` 意图映射为 `DeviceSessionGet.seed_domains`：普通业务请求
   `[Standard]`，Cardano 业务请求 `[Standard, Cardano]`。调用链没有提供派生意图时省略该字段，
   保持固件“派生全部支持域”的兼容行为。
-- `DeviceSessionAskPin` 的类型按目标钱包选择：目标是标准钱包时使用 `Main`，包括当前处于
-  Attach PIN 上下文而需要切回标准钱包的情况；目标是 Attach PIN 绑定的隐藏钱包时才使用
-  `AttachToPin`。`unlockedAttachPin=true` 只描述当前上下文，不决定下一次 Ask 的 PIN 类型。
+- `DeviceSessionAskPin` 的类型按业务意图选择：标准钱包和安全操作使用 `Main`；普通业务调用已携带目标
+  `passphraseState` 时，预解锁使用 `Any`，允许主 PIN 或 Attach PIN 进入，随后仍以返回的
+  `btc_test_address` 校验目标隐藏钱包；用户明确选择 Attach PIN 打开隐藏钱包时使用 `AttachToPin`。
+  `unlockedAttachPin=true` 只描述当前上下文，不决定下一次 Ask 的 PIN 类型。
 - 旧参数形式的 `initSession=true` 只使当前设备上明确指定的旧钱包 Session 失效；
   钱包标识不匹配、设备切换和显式 `clearSessionCache()` 也会按各自范围使缓存失效。
 - Pro2 Session 的容量与淘汰完全由硬件管理。Core Store 只保存

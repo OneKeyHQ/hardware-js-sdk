@@ -97,6 +97,69 @@ describe('Protocol V2 unlock semantics', () => {
     expect(method.run).toHaveBeenCalledTimes(1);
   });
 
+  test('allows either PIN type when pre-unlocking a known hidden wallet', async () => {
+    const features = { unlocked: false };
+    const method = {
+      name: 'btcGetAddress',
+      unlockPolicy: 'none',
+      useDevicePassphraseState: true,
+      payload: { passphraseState: 'expected-hidden-wallet-state' },
+      run: jest.fn().mockResolvedValue({ address: 'bc1qexample' }),
+    };
+    const device = {
+      features,
+      commands: {
+        typedCall: jest.fn().mockResolvedValue({ message: { unlocked: false } }),
+      },
+      isProtocolV2: () => true,
+      isBootloader: () => false,
+      isRomloader: () => false,
+      updateProtocolV2Status: jest.fn(() => features),
+      unlockDevice: jest.fn().mockImplementation(() => {
+        features.unlocked = true;
+        return Promise.resolve(features);
+      }),
+    };
+
+    await expect(runMethodWithUnlockPolicy(method as any, device as any)).resolves.toEqual({
+      address: 'bc1qexample',
+    });
+
+    expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Any, expect.any(Object));
+    expect(method.run).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not let an unrelated control opt into Any with a passphraseState-shaped field', async () => {
+    const features = { unlocked: false };
+    const method = {
+      name: 'securityControl',
+      unlockPolicy: 'unlock-before-run',
+      useDevicePassphraseState: false,
+      payload: { passphraseState: 'untrusted-field' },
+      run: jest.fn().mockResolvedValue({ message: 'ok' }),
+    };
+    const device = {
+      features,
+      commands: {
+        typedCall: jest.fn().mockResolvedValue({ message: { unlocked: false } }),
+      },
+      isProtocolV2: () => true,
+      isBootloader: () => false,
+      isRomloader: () => false,
+      updateProtocolV2Status: jest.fn(() => features),
+      unlockDevice: jest.fn().mockImplementation(() => {
+        features.unlocked = true;
+        return Promise.resolve(features);
+      }),
+    };
+
+    await expect(runMethodWithUnlockPolicy(method as any, device as any)).resolves.toEqual({
+      message: 'ok',
+    });
+
+    expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Main, expect.any(Object));
+  });
+
   test('pre-unlocks a locked standard wallet before wallet-session preparation', async () => {
     const calls: string[] = [];
     const features = {

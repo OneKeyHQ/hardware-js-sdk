@@ -47,6 +47,19 @@ type RunMethodWithUnlockPolicyOptions<T> = {
   run?: () => Promise<T>;
 };
 
+const resolvePreUnlockPinType = (method: RunnableMethod) => {
+  const targetsKnownHiddenWallet =
+    method.useDevicePassphraseState &&
+    method.payload?.useEmptyPassphrase !== true &&
+    typeof method.payload?.passphraseState === 'string' &&
+    method.payload.passphraseState.length > 0;
+
+  // A hidden-wallet call may be unlocked by either its Attach PIN or the main
+  // PIN followed by passphrase selection. Wallet-session verification still
+  // rejects a different hidden wallet after the device is unlocked.
+  return targetsKnownHiddenWallet ? DeviceSessionPinType.Any : DeviceSessionPinType.Main;
+};
+
 export async function runMethodWithUnlockPolicy<T = unknown>(
   method: RunnableMethod,
   device: Device,
@@ -86,7 +99,7 @@ export async function runMethodWithUnlockPolicy<T = unknown>(
         ? uiCoordinator.enterUnlockInteraction(method.name)
         : undefined;
       const unlockedStatus = await device.unlockDevice(
-        DeviceSessionPinType.Main,
+        resolvePreUnlockPinType(method),
         shouldCoordinateUi
           ? { emitUiEvent: false, interaction: unlockInteraction }
           : {
