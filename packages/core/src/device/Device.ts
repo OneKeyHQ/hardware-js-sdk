@@ -538,7 +538,10 @@ export class Device extends EventEmitter {
         }
       }
       try {
-        await this.deviceConnector?.release(this.mainId, false);
+        // BLE releases after every call even when keepSession is set (see the
+        // condition above), so forward the intent — a transport that keeps the
+        // link open needs it to avoid terminating mid-flow.
+        await this.deviceConnector?.release(this.mainId, false, this.keepSession);
         this.updateDescriptor({ session: null } as DeviceDescriptor);
       } catch (err) {
         Log.error('[Device] release error: ', err);

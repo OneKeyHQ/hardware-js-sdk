@@ -16,8 +16,11 @@ export interface NobleBleAPI {
    * Logical end-of-operation (keep-alive). The link stays up; the main process
    * starts its idle countdown. Without this bridge method the device is held
    * for the full busy backstop instead of the short idle window.
+   *
+   * `keepSession` means the caller is mid-flow (firmware update, batched
+   * signing) and will be back — hold the link on the long backstop instead.
    */
-  release: (uuid: string) => Promise<void>;
+  release: (uuid: string, keepSession?: boolean) => Promise<void>;
   disconnect: (uuid: string) => Promise<void>;
   subscribe: (uuid: string) => Promise<void>;
   unsubscribe: (uuid: string) => Promise<void>;

@@ -385,10 +385,10 @@ export default class ElectronBleTransport {
     }
   }
 
-  async release(id: string) {
+  async release(id: string, _onclose?: boolean, keepSession?: boolean) {
     try {
       await this.protocolV2Links.invalidateLink(id, 'Electron BLE transport released');
-      await this.releaseLogical(id);
+      await this.releaseLogical(id, keepSession);
     } catch (error) {
       this.Log?.error('[Electron BLE] release failed:', error);
       this.cleanupDeviceState(id);
@@ -430,7 +430,7 @@ export default class ElectronBleTransport {
    * listeners still go, or the next acquire's fresh listeners would
    * double-process every packet.
    */
-  private async releaseLogical(id: string) {
+  private async releaseLogical(id: string, keepSession?: boolean) {
     try {
       if (!this.connectedDevices.has(id)) return;
       this.cleanupDeviceState(id);
@@ -448,7 +448,7 @@ export default class ElectronBleTransport {
         }
         return;
       }
-      await release(id);
+      await release(id, keepSession);
     } catch (error) {
       this.Log?.error('[Electron BLE] logical release failed:', error);
       this.cleanupDeviceState(id);

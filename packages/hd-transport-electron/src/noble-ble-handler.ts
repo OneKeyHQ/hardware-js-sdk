@@ -1825,8 +1825,15 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     // countdown. The physical link is kept for the next call unless it elapses.
     ipcMain.handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_RELEASE,
-      (_event: IpcMainInvokeEvent, deviceId: string) => {
-        if (connectedDevices.has(deviceId)) armIdleDisconnect(deviceId);
+      (_event: IpcMainInvokeEvent, deviceId: string, keepSession?: boolean) => {
+        if (!connectedDevices.has(deviceId)) return;
+        // keepSession = the caller is mid-flow and will be back. Terminating on
+        // the short idle window would cut a firmware update between its steps.
+        if (keepSession) {
+          armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
+          return;
+        }
+        armIdleDisconnect(deviceId);
       }
     );
 
