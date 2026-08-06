@@ -17,15 +17,6 @@ export type ProtocolV2ResourceFileInput = {
   fileHash: string;
 };
 
-const STABLE_RESOURCE_PATHS = new Set([
-  'vol0:/bundles/images/images.okpkg',
-  'vol0:/bundles/images/animation.okpkg',
-  'vol0:/bundles/images/wallpaper.okpkg',
-  'vol0:/bundles/translations/translations.okpkg',
-  'vol0:/bundles/font/roobert.okpkg',
-  'vol0:/bundles/font/noto.okpkg',
-]);
-
 function normalizeRelativePath(path: string) {
   return path.replace(/^\.\//, '').replace(/\\/g, '/');
 }
@@ -55,7 +46,7 @@ export function parseProtocolV2ResourceManifest(value: unknown): ProtocolV2Resou
   return { schema: 1, files };
 }
 
-export async function buildBootResourceFiles(
+export async function buildResourceFilesFromManifest(
   selectedFiles: readonly File[]
 ): Promise<ProtocolV2ResourceFileInput[]> {
   const manifestFile =
@@ -73,9 +64,8 @@ export async function buildBootResourceFiles(
     if (firstSlash >= 0) filesByPath.set(relativePath.slice(firstSlash + 1), file);
   }
 
-  const bootEntries = manifest.files.filter(entry => !STABLE_RESOURCE_PATHS.has(entry.device_path));
   return Promise.all(
-    bootEntries.map(async entry => {
+    manifest.files.map(async entry => {
       const file = filesByPath.get(normalizeRelativePath(entry.archive_path));
       if (!file) throw new Error(`Missing manifest resource: ${entry.archive_path}`);
       if (file.size !== entry.size) throw new Error(`Size mismatch: ${entry.archive_path}`);

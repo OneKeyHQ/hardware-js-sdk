@@ -15,7 +15,7 @@ import { useFirmwareProgress } from '../components/providers/SDKProvider';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
 import { isPro2DeviceInfo } from '../utils/pro2Device';
-import { buildBootResourceFiles } from '../utils/protocolV2ResourceManifest';
+import { buildResourceFilesFromManifest } from '../utils/protocolV2ResourceManifest';
 import type { DeviceInfo } from '../types/hardware';
 import { PRO2_FIRMWARE_FILE_ACCEPT } from '../constants/firmwareFiles';
 
@@ -280,18 +280,18 @@ export default function Pro2UpdatePage() {
 
   const [files, setFiles] = useState<Partial<Record<TargetParam, File>>>({});
   const [bundleFiles, setBundleFiles] = useState<Partial<Record<string, File>>>({});
-  const [bootResourceDirectory, setBootResourceDirectory] = useState<File[]>([]);
+  const [resourceDirectory, setResourceDirectory] = useState<File[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [isConnectingLocal, setIsConnectingLocal] = useState(false);
   const [logs, setLogs] = useState<UpdateLog[]>([]);
   const [result, setResult] = useState<UpdateVersionsResult | null>(null);
   const logIdRef = useRef(0);
-  const bootResourceInputRef = useRef<HTMLInputElement>(null);
+  const resourceDirectoryInputRef = useRef<HTMLInputElement>(null);
 
   const selectedFields = useMemo(() => TARGET_FIELDS.filter(field => files[field.param]), [files]);
   const selectedBundleCount = BUNDLE_SLOTS.filter(slot => bundleFiles[slot.key]).length;
   const selectedPayloadCount =
-    selectedFields.length + selectedBundleCount + (bootResourceDirectory.length > 0 ? 1 : 0);
+    selectedFields.length + selectedBundleCount + (resourceDirectory.length > 0 ? 1 : 0);
 
   const addLog = useCallback((level: UpdateLog['level'], message: string) => {
     const nextLog = {
@@ -314,7 +314,7 @@ export default function Pro2UpdatePage() {
       }
       const devices = (response.payload as DeviceInfo[]).filter(isPro2DeviceInfo);
       if (!devices.length) {
-        throw new Error('No Pro2 device found');
+        throw new Error('No Pro2 or Neo device found');
       }
       const device = await hydrateConnectedDeviceInfo(devices[0]);
       setConnectedDevices([device, ...devices.slice(1)]);
@@ -366,13 +366,13 @@ export default function Pro2UpdatePage() {
         );
       }
 
-      if (bootResourceDirectory.length > 0) {
-        const bootResourceFiles = await buildBootResourceFiles(bootResourceDirectory);
-        params.resourceFiles = [...resourceFiles, ...bootResourceFiles];
+      if (resourceDirectory.length > 0) {
+        const manifestResourceFiles = await buildResourceFilesFromManifest(resourceDirectory);
+        params.resourceFiles = manifestResourceFiles;
         addLog(
           'info',
-          `Prepared boot resources: ${bootResourceFiles.length} files, ${formatBytes(
-            bootResourceFiles.reduce((total, item) => total + item.binary.byteLength, 0)
+          `Prepared full resources: ${manifestResourceFiles.length} files, ${formatBytes(
+            manifestResourceFiles.reduce((total, item) => total + item.binary.byteLength, 0)
           )}`
         );
       }
@@ -382,7 +382,7 @@ export default function Pro2UpdatePage() {
       } else {
         const targetNames = [
           selectedBundleCount > 0 ? `RESC bundles(${selectedBundleCount})` : null,
-          bootResourceDirectory.length > 0 ? 'Boot resources(manifest)' : null,
+          resourceDirectory.length > 0 ? 'Full resources(manifest)' : null,
           ...selectedFields.map(field => `${field.label}(${field.targetId})`),
         ].filter(Boolean);
         addLog('info', `firmwareUpdateV4 targets: ${targetNames.join(', ')}`);
@@ -411,7 +411,7 @@ export default function Pro2UpdatePage() {
     connectDevice,
     currentDevice,
     bundleFiles,
-    bootResourceDirectory,
+    resourceDirectory,
     files,
     resetFirmwareProgress,
     selectedBundleCount,
@@ -423,7 +423,7 @@ export default function Pro2UpdatePage() {
   const resetFiles = useCallback(() => {
     setFiles({});
     setBundleFiles({});
-    setBootResourceDirectory([]);
+    setResourceDirectory([]);
     setResult(null);
   }, []);
 
@@ -475,8 +475,8 @@ export default function Pro2UpdatePage() {
               <div>
                 <div className="text-base font-semibold text-foreground">Targets</div>
                 <div className="text-sm text-muted-foreground">
-                  Local files are optional. Empty selection uses the Pro2 remote firmware-v1
-                  package.
+                  Local files are optional. Empty selection uses the matching Pro2 or Neo remote
+                  firmware-v1 package.
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -520,7 +520,7 @@ export default function Pro2UpdatePage() {
                         formatHint={slot.formatHint}
                         accept={slot.accept}
                         file={selectedFile}
-                        disabled={isRunning}
+                        disabled={isRunning || resourceDirectory.length > 0}
                         onSelect={nextFile =>
                           setBundleFiles(prev => ({ ...prev, [slot.key]: nextFile }))
                         }
@@ -542,25 +542,30 @@ export default function Pro2UpdatePage() {
 
               <section className="space-y-2">
                 <div>
-                  <div className="text-sm font-semibold text-foreground">Boot resources</div>
+                  <div className="text-sm font-semibold text-foreground">
+                    Full resource manifest
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     Select an extracted resource directory. The manifest maps every archive path to
-                    its device path; stable bundles above are excluded from this group.
+                    its device path, including stable bundles and boot resources. Selecting it
+                    replaces the individual resource bundle choices above.
                   </div>
                 </div>
                 <input
-                  ref={bootResourceInputRef}
+                  ref={resourceDirectoryInputRef}
                   className="sr-only"
                   type="file"
                   multiple
                   disabled={isRunning}
-                  aria-label="Select boot resource directory"
+                  aria-label="Select full resource directory"
                   {...({
                     webkitdirectory: '',
                     directory: '',
                   } as React.InputHTMLAttributes<HTMLInputElement>)}
                   onChange={event => {
-                    setBootResourceDirectory(Array.from(event.currentTarget.files ?? []));
+                    const selectedDirectory = Array.from(event.currentTarget.files ?? []);
+                    setResourceDirectory(selectedDirectory);
+                    if (selectedDirectory.length > 0) setBundleFiles({});
                   }}
                 />
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-background p-3">
@@ -570,26 +575,26 @@ export default function Pro2UpdatePage() {
                     variant="outline"
                     disabled={isRunning}
                     onClick={() => {
-                      if (!bootResourceInputRef.current) return;
-                      bootResourceInputRef.current.value = '';
-                      bootResourceInputRef.current.click();
+                      if (!resourceDirectoryInputRef.current) return;
+                      resourceDirectoryInputRef.current.value = '';
+                      resourceDirectoryInputRef.current.click();
                     }}
                   >
                     <FileUp />
-                    {bootResourceDirectory.length > 0 ? 'Replace directory' : 'Choose directory'}
+                    {resourceDirectory.length > 0 ? 'Replace directory' : 'Choose directory'}
                   </Button>
                   <span className="text-xs text-muted-foreground">
-                    {bootResourceDirectory.length > 0
-                      ? `${bootResourceDirectory.length} selected files (manifest is validated before upload)`
+                    {resourceDirectory.length > 0
+                      ? `${resourceDirectory.length} selected files (all manifest entries are validated before upload)`
                       : 'Expected: manifest.json plus its referenced files'}
                   </span>
-                  {bootResourceDirectory.length > 0 ? (
+                  {resourceDirectory.length > 0 ? (
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
                       disabled={isRunning}
-                      onClick={() => setBootResourceDirectory([])}
+                      onClick={() => setResourceDirectory([])}
                     >
                       <X /> Clear
                     </Button>
@@ -657,7 +662,7 @@ export default function Pro2UpdatePage() {
                 <span className="text-sm text-muted-foreground">
                   {[
                     selectedBundleCount > 0 ? `${selectedBundleCount} RESC bundles` : null,
-                    bootResourceDirectory.length > 0 ? 'Boot resources manifest' : null,
+                    resourceDirectory.length > 0 ? 'Full resource manifest' : null,
                     ...selectedFields.map(field => field.label),
                   ]
                     .filter(Boolean)
