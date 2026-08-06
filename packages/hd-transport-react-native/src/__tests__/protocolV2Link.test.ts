@@ -290,6 +290,19 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     ).toBeNull();
   });
 
+  test.each(['status 143', 'status:143', 'status = 143', 'GATT_CONGESTED'])(
+    'classifies %s as transient GATT congestion',
+    message => {
+      expect(getFirmwareUploadWriteRetryType({ message })).toBe('congested');
+    }
+  );
+
+  test('handles long uncontrolled status messages without a backtracking regular expression', () => {
+    const message = `status${' '.repeat(100_000)}142`;
+
+    expect(getFirmwareUploadWriteRetryType({ message })).toBeNull();
+  });
+
   test('keeps another device reader when releasing a device with an active V1 call', async () => {
     const transport = new ReactNativeBleTransport({ scanTimeout: 1 }) as any;
     const activeV1Call = createDeferred<string>();

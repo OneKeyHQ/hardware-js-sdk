@@ -73,6 +73,33 @@ type ResolvedBleCharacteristics = {
   notifyCharacteristic: Characteristic;
 };
 
+const isAsciiWhitespace = (code: number) =>
+  code === 0x09 ||
+  code === 0x0a ||
+  code === 0x0b ||
+  code === 0x0c ||
+  code === 0x0d ||
+  code === 0x20;
+
+const hasGattCongestedStatus = (text: string) => {
+  let searchFrom = 0;
+  while (searchFrom < text.length) {
+    const statusIndex = text.indexOf('status', searchFrom);
+    if (statusIndex < 0) return false;
+
+    let cursor = statusIndex + 'status'.length;
+    while (cursor < text.length && isAsciiWhitespace(text.charCodeAt(cursor))) cursor += 1;
+    if (text[cursor] === ':' || text[cursor] === '=') {
+      cursor += 1;
+      while (cursor < text.length && isAsciiWhitespace(text.charCodeAt(cursor))) cursor += 1;
+    }
+    if (text.startsWith(String(ANDROID_GATT_CONGESTED_STATUS), cursor)) return true;
+
+    searchFrom = statusIndex + 'status'.length;
+  }
+  return false;
+};
+
 const delay = (ms: number) =>
   new Promise<void>(resolve => {
     setTimeout(resolve, ms);
@@ -101,7 +128,7 @@ export const getFirmwareUploadWriteRetryType = (
   const text = [bleWriteError.reason, bleWriteError.message, bleWriteError.name]
     .filter(value => typeof value === 'string')
     .join(' ');
-  return /GATT_CONGESTED|status\s*[:=]?\s*143/.test(text) ? 'congested' : null;
+  return text.includes('GATT_CONGESTED') || hasGattCongestedStatus(text) ? 'congested' : null;
 };
 
 const resolveFirmwareUploadRetryDelay = (attempt: number, baseDelayMs = 200, maxDelayMs = 1200) =>
