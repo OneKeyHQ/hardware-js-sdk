@@ -395,20 +395,13 @@ export default class ElectronBleTransport {
     }
   }
 
-  /**
-   * `DeviceConnector.disconnect` feature-detects this method — without it the
-   * SDK's REQUIRE_DISCONNECT recovery silently does nothing on this transport,
-   * so keep-alive hands the wedged link to every retry.
-   */
+  // DeviceConnector.disconnect feature-detects this; without it REQUIRE_DISCONNECT
+  // recovery is a no-op and keep-alive hands the wedged link to every retry.
   async disconnect(id: string) {
     return this.releaseNative(id);
   }
 
-  /**
-   * Hard teardown: physically drops the link. For error paths only (link-fatal
-   * V2 errors, response timeouts) — a link presumed dead must not be reused by
-   * the next call, which is exactly what keep-alive would otherwise do.
-   */
+  // Hard teardown, error paths only: a link presumed dead must not be reused.
   private async releaseNative(id: string) {
     try {
       if (this.connectedDevices.has(id)) {
@@ -424,12 +417,8 @@ export default class ElectronBleTransport {
     }
   }
 
-  /**
-   * Logical release (keep-alive): the link and subscription stay up for the
-   * next call and the main process starts its idle countdown. Renderer
-   * listeners still go, or the next acquire's fresh listeners would
-   * double-process every packet.
-   */
+  // Logical release: link and subscription stay up for the next call. Renderer
+  // listeners are still torn down, or fresh ones would double-process packets.
   private async releaseLogical(id: string, keepSession?: boolean) {
     try {
       if (!this.connectedDevices.has(id)) return;
@@ -437,8 +426,7 @@ export default class ElectronBleTransport {
 
       const release = window.desktopApi?.nobleBle?.release;
       if (!release) {
-        // Degraded, not broken: the link falls back to the busy backstop. Say so
-        // once — a silent regression here just looks like a slow device.
+        // Degraded, not broken: say it once, it just looks like a slow device.
         if (!this.warnedMissingRelease) {
           this.warnedMissingRelease = true;
           this.Log?.error(
@@ -1002,10 +990,8 @@ export default class ElectronBleTransport {
         bufferState.buffer = [...data.subarray(3)];
       } else {
         if (bufferState.buffer.length === 0) {
-          // Tail of a cancelled call's response, arriving after the buffer was
-          // reset (keep-alive outlives the call). Appending it would satisfy the
-          // `bufferLength === 0` check below and resolve the next call with garbage.
-          // Not an `error`: the caller rejects the in-flight call on that field.
+          // Tail of a cancelled call, arriving after the buffer was reset. Not an
+          // `error`: the caller rejects the in-flight call on that field.
           this.Log?.debug('[Electron BLE] Orphan continuation chunk discarded');
           return { isComplete: false };
         }

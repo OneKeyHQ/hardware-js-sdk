@@ -90,13 +90,9 @@ const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
 const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
 const BLE_CLEANUP_TIMEOUT = 250;
-// release() from the renderer is logical only, so this timer is what physically
-// frees the device for other hosts (a BLE peripheral serves one central at a
-// time and does not advertise while connected).
+// Renderer release is logical only; this timer physically frees the device.
 const BLE_IDLE_DISCONNECT_MS = 3 * 60_000;
-// Ceiling while an operation is in flight: a slow on-device prompt has no
-// outstanding write, so the idle clock must not run — but a wedged call must
-// not hold the link forever either.
+// Ceiling while a call is in flight: no outstanding write, but not forever.
 const BLE_BUSY_BACKSTOP_MS = 10 * 60_000;
 
 // Write-related constants
@@ -349,16 +345,11 @@ interface DeviceCleanupOptions {
   reason?: string;
 }
 
-// One timer per device: connect/subscribe arm the busy backstop, a logical
-// release arms the idle clock. Lives in the main process so a renderer
-// reload cannot orphan a held link.
+// One timer per device, in the main process so a reload cannot orphan a link.
 const idleDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-// A fired timer cannot be cancelled, and its disconnect takes a few hundred ms.
-// A connect arriving inside that window would see `state === 'connected'`, take
-// the already-connected fast path, and hand back a link that is torn down a
-// moment later — the renderer then probes a dead link (BleTimeoutError 713).
-// Connect awaits this instead.
+// A fired timer cannot be cancelled; connect awaits its disconnect or the fast
+// path hands back a link torn down a moment later (BleTimeoutError 713).
 const idleDisconnectInFlight = new Map<string, Promise<void>>();
 
 function clearIdleDisconnect(deviceId: string): void {
@@ -405,9 +396,7 @@ function armIdleDisconnect(
       const deviceName = peripheral?.advertisement?.localName || 'Unknown Device';
       const pending = disconnectDevice(deviceId)
         .then(() => {
-          // disconnectDevice stays silent (its other caller is the renderer's
-          // own request). On the busy backstop a call IS still in flight and
-          // must reject instead of hanging on a dead link.
+          // A call is still in flight here; it must reject, not hang.
           broadcastToAllWebContents(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, {
             id: deviceId,
             name: deviceName,
@@ -687,8 +676,7 @@ async function transmitHexDataToDevice(
       `Device ${deviceId} not connected or characteristics not available`
     );
   }
-  // Request outstanding: swap the idle clock for the busy backstop. The
-  // renderer's logical release re-arms the idle clock when it is done.
+  // Request outstanding: swap the idle clock for the busy backstop.
   armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
 
   const toBuffer = Buffer.from(hexData, 'hex');
@@ -909,9 +897,7 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
     };
     const checkDevices = () => {
       discoveredDevices.forEach(pushDevice);
-      // A device we hold a link to stops advertising (standard BLE), so the scan
-      // above never rediscovers it — the one device the user is actively using
-      // would vanish from the list. Same fix as the Trezor handler (69699746).
+      // A linked device stops advertising, so the scan never rediscovers it.
       connectedDevices.forEach(pushDevice);
     };
 
@@ -1326,11 +1312,9 @@ async function setupConnectionAndDiscoverServices(
   }
 }
 
-// Time box on connect-by-id: noble/mac silently never resolves for an id
-// CoreBluetooth cannot retrieve, so a hang here would stall every connect.
+// noble/mac never resolves for an id CoreBluetooth cannot retrieve.
 const DIRECT_CONNECT_TIMEOUT_MS = 2000;
-// Floor after a timeout, so a device that cannot be reached this way does not
-// pay the 2s probe on every attempt.
+// Floor after a timeout: do not pay the probe on every attempt.
 const DIRECT_CONNECT_COOLDOWN_MS = 15_000;
 const directConnectCooldownUntil = new Map<string, number>();
 
@@ -1367,9 +1351,7 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
       logger?.info('[NobleBLE] Direct connect-by-id timed out, falling back to scan', {
         deviceId,
       });
-      // Promise.race times out the CALLER only — noble has no abort. A late
-      // success would leave an open GATT link nobody owns, and a linked device
-      // stops advertising, so every later scan would dead-end until restart.
+      // Promise.race times out the caller only; a late success orphans the link.
       directPromise
         .then(late => {
           const latePeripheral = late ?? discoveredDevices.get(deviceId);
@@ -1385,8 +1367,7 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
         .catch(() => undefined);
       return undefined;
     }
-    // Backends emit a `discover` for the peripheral as a side effect, so the
-    // cache may hold it even when connectAsync resolves without a value.
+    // Backends emit `discover` as a side effect, so the cache may hold it.
     const peripheral = raced ?? discoveredDevices.get(deviceId);
     if (!peripheral || peripheral.state !== 'connected') return undefined;
     logger?.info('[NobleBLE] Direct connect-by-id succeeded', { deviceId });
@@ -1412,8 +1393,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     totalConnected: connectedDevices.size,
   });
 
-  // `enumerate` clears the discovery map, but a kept-alive link outlives it —
-  // fall back to the one we already hold rather than rescanning for it.
+  // enumerate clears the discovery map; a kept-alive link outlives it.
   let peripheral = discoveredDevices.get(deviceId) ?? connectedDevices.get(deviceId);
 
   // If device not discovered, try a targeted scan for this specific device
@@ -1429,8 +1409,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
     }
 
-    // Cheaper than a scan when it works, and reaches a bonded device that is
-    // not currently advertising. Falls through to the scan when it doesn't.
+    // Reaches a bonded device that is not advertising; else falls to the scan.
     peripheral = await tryDirectConnectById(deviceId);
     if (peripheral) {
       discoveredDevices.set(deviceId, peripheral);
@@ -1523,9 +1502,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       deviceCharacteristics.set(deviceId, characteristics);
       logger?.info('[NobleBLE] Device ready for communication:', deviceId);
     } catch (setupError) {
-      // The caller cleared the keep-alive timer before this and only re-arms on
-      // success, so leaving the link up would strand it: held by us, invisible
-      // to scans, released by nobody.
+      // The caller re-arms the timer only on success, so a left-up link strands.
       logger?.error('[NobleBLE] Connection setup failed on kept-alive link:', setupError);
       await disconnectDevice(deviceId).catch(() => undefined);
       throw setupError;
@@ -1766,9 +1743,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
     const { ipcMain } = require('electron') as { ipcMain: IpcMain };
 
-    // Electron throws on a duplicate channel, and setup runs again whenever the
-    // renderer soft restarts. Clearing per registration keeps that self-contained:
-    // no channel list to keep in sync, here or in the host.
+    // Electron throws on duplicate channels and setup re-runs on soft restart.
     const handle: IpcMain['handle'] = (channel, listener) => {
       ipcMain.removeHandler(channel);
       ipcMain.handle(channel, listener);
@@ -1812,16 +1787,14 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
           hasCharacteristics: deviceCharacteristics.has(deviceId),
           totalConnectedDevices: connectedDevices.size,
         });
-        // An armed idle timer must not fire mid-connect (pairing can take ~30s).
+        // Must not fire mid-connect (pairing can take ~30s).
         clearIdleDisconnect(deviceId);
-        // A timer that already fired cannot be cancelled — let its disconnect
-        // finish first, or the fast path below would hand back a dying link.
+        // A fired timer must settle first, or the fast path returns a dying link.
         await awaitIdleDisconnect(deviceId);
         try {
           await connectDevice(deviceId, webContents);
         } finally {
-          // The timer above is the only thing that ever frees a kept-alive link.
-          // Re-arm on failure too, or a still-connected device is held forever.
+          // This timer is the only thing that frees a kept-alive link.
           if (connectedDevices.has(deviceId)) {
             armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
           }
@@ -1829,14 +1802,12 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
       }
     );
 
-    // Handle logical release: the operation is done, so start the idle
-    // countdown. The physical link is kept for the next call unless it elapses.
+    // Logical release: start the idle countdown, keep the link for the next call.
     handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_RELEASE,
       (_event: IpcMainInvokeEvent, deviceId: string, keepSession?: boolean) => {
         if (!connectedDevices.has(deviceId)) return;
-        // keepSession = the caller is mid-flow and will be back. Terminating on
-        // the short idle window would cut a firmware update between its steps.
+        // Mid-flow caller will be back; the short window would cut an update.
         if (keepSession) {
           armIdleDisconnect(deviceId, BLE_BUSY_BACKSTOP_MS, 'busy-backstop');
           return;

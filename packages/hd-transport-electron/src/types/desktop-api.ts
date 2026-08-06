@@ -12,16 +12,8 @@ export interface NobleBleAPI {
   enumerate: () => Promise<{ id: string; name: string }[]>;
   getDevice: (uuid: string) => Promise<{ id: string; name: string; mtu?: number } | null>;
   connect: (uuid: string) => Promise<void>;
-  /**
-   * Logical end-of-operation (keep-alive). The link stays up; the main process
-   * starts its idle countdown. Without this bridge method the device is held
-   * for the full busy backstop instead of the short idle window.
-   *
-   * `keepSession` means the caller is mid-flow (firmware update, batched
-   * signing) and will be back — hold the link on the long backstop instead.
-   */
-  // Optional: hosts that predate this channel do not bridge it, and the
-  // transport feature-detects rather than assuming it is wired.
+  // Logical end-of-operation: link stays up, idle countdown starts. Optional —
+  // older hosts do not bridge it, so the transport feature-detects.
   release?: (uuid: string, keepSession?: boolean) => Promise<void>;
   disconnect: (uuid: string) => Promise<void>;
   subscribe: (uuid: string) => Promise<void>;
