@@ -12,15 +12,10 @@ import type DeviceConnector from './DeviceConnector';
 const Log = getLogger(LoggerNames.DevicePool);
 
 /**
- * A device in bootloader mode reports a placeholder USB serial number of all
- * zeros, and the descriptor path is that serial number. Every model reports the
- * same placeholder — and bootloader product ids are shared too (0x53c0 covers
- * Classic, Classic1s and Mini) — so the descriptor holds nothing that tells two
- * of them apart. Only the features read off the device do.
- *
- * Matching a cached device by such a path therefore returns whichever device was
- * seen first: plug in a Mini, then a Classic, and the Classic is still reported
- * as a Mini. Devices carrying a real serial keep using the cache as before.
+ * A bootloader device's descriptor path is an all-zero placeholder serial, and
+ * bootloader product ids are shared across models — so the path identifies
+ * nothing. Matching the cache by it returns whichever device was seen first
+ * (plug in a Mini then a Classic, and the Classic reports as a Mini).
  */
 export const canPathIdentifyDevice = (path?: string) => !!path && !/^0+$/.test(path);
 
