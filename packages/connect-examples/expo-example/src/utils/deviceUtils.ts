@@ -5,7 +5,7 @@ import {
   getDeviceUUID,
 } from '@onekeyfe/hd-core';
 
-import type { Features, OnekeyFeatures } from '@onekeyfe/hd-transport';
+import type { Features, OnekeyFeatures } from '@onekeyfe/hd-core';
 
 export const getReleaseUrl = ({ features }: { features?: Features }) => {
   const deviceType = getDeviceType(features)?.toUpperCase() || 'UNKNOWN';

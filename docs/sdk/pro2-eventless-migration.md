@@ -52,7 +52,8 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
 - `DeviceSessionAskPassphrase` 与 `DeviceSessionAskPin` 完成验证和钱包切换并返回 `Success`；
   前者通过必填 `on_device` 区分设备输入与 Host 输入。Host 输入同时携带非空 `passphrase`；
   设备输入不携带明文。Attach-to-PIN 始终使用 `DeviceSessionAskPin(AttachToPin)`。
-- `DeviceSessionGet(session_id)` 承接原 `Initialize(session_id)` 的 Session 恢复语义，
+- `DeviceSessionGet({ session_id, btc_test_address, seed_domains })` 承接原
+  `Initialize(session_id, passphrase_state, derive_cardano)` 的 Session 恢复与派生语义，
   这不是 `PassphraseAck` 原有能力。
 - `ButtonRequest/ButtonAck` 不改名；它们从 V2 firmware 状态机中删除，设备页面由显式 Ask 命令
   打开，对 App 的阶段提示由 SDK 合成。
@@ -61,7 +62,7 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
 PassphraseAck(passphrase)                -> DeviceSessionAskPassphrase({ on_device: false, passphrase }) -> Success -> DeviceSessionGet()
 PassphraseAck(on_device)                 -> DeviceSessionAskPassphrase({ on_device: true }) -> Success -> DeviceSessionGet()
 PassphraseAck(on_device_attach_pin)      -> DeviceSessionAskPin(AttachToPin) -> Success -> DeviceSessionGet()
-Initialize(session_id)                   -> DeviceSessionGet({ session_id })
+Initialize(session_id, passphrase_state) -> DeviceSessionGet({ session_id, btc_test_address, seed_domains })
 ```
 
 ## 不在删除范围
@@ -231,16 +232,20 @@ requestId/connectId 关联，并在取消、超时、断连和方法结束时清
 
 ```text
 业务请求
-  -> 安全重放白名单：DeviceLocked -> 解锁 -> method.run() 最多重试一次
-  -> 有副作用方法：已知 locked -> 先解锁 -> method.run() 只执行一次
+  -> 钱包业务或显式受保护管理方法：fresh Status -> 校验设备身份 -> 按需解锁
+  -> Wallet Session -> method.run() 一次
+  -> 业务阶段 DeviceLocked：直接失败，不解锁、不重放
 ```
 
 - App 不回传 PIN，也不重发业务请求。
 - Pro2 `REQUEST_PIN` 是非阻塞设备提示。
-- 非幂等方法不得在收到 locked 响应后重放，只能使用 `unlock-before-run`。
-- 同一设备并发调用共享串行解锁任务。
-- `uploadPortfolio` 通过 `protocolV2UiMode='none'` 明确关闭自动解锁提示；缓存状态已知锁定时
-  可以先解锁，但文件写入与应用流程只执行一次，不产生 `REQUEST_PIN/REQUEST_BUTTON`。
+- 钱包业务由 `useDevicePassphraseState=true` 自动进入调用前解锁，不维护方法名白名单；非钱包但
+  固件要求解锁的管理方法显式使用 `unlock-before-run`。不存在 `retry-on-locked`。
+- all-network root 与内部子方法共享一次 Status/Unlock preflight，每个子链仍独立恢复 Wallet Session。
+- bootloader/romloader 跳过 Status/Unlock，Protocol V1 保持原流程。
+- `uploadPortfolio` 关闭钱包 Session 处理、使用 `unlockPolicy='none'`，并通过
+  `protocolV2UiMode='none'` 关闭普通方法交互提示；SDK 不会为该方法主动发送
+  `DeviceSessionAskPin`，文件写入与应用流程只执行一次。
 
 ## 地址、公钥、签名和设备管理
 
@@ -316,7 +321,7 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 - 区分阻塞选择 Event 与非阻塞提示 Event。
 - 设备 Passphrase 必须合成一次 `REQUEST_PASSPHRASE_ON_DEVICE`；Attach PIN 必须合成一次兼容现有
   App 的设备 PIN 阶段提示。
-- 自动解锁只重试一次，并验证方法重试安全契约。
+- 自动解锁只发生在业务发送前；业务 callback 和已开始的多步骤操作都不重放。
 - 保留签名数据握手、进度、Transport 和生命周期事件。
 - 统一 cancel/timeout/disconnect 的 UI Promise 和 Event 清理。
 - `DeviceSessionGet({ session_id })` 后校验 `btc_test_address`，不匹配时禁止继续业务。

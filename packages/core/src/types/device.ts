@@ -210,7 +210,9 @@ export type DeviceStateStatus = {
   recoveryMode: boolean | null;
   passphraseProtection: boolean | null;
   pinProtection: boolean | null;
+  /** `attach_to_pin_enabled`：是否至少存在一个 Attach PIN 绑定。 */
   attachToPinEnabled: boolean | null;
+  /** `unlocked_by_attach_to_pin`：本次解锁是否由 Attach PIN 完成。 */
   unlockedAttachPin: boolean | null;
 };
 
@@ -321,6 +323,7 @@ export type NormalizedFeatures = {
   sdProtection: boolean | null;
   wipeCodeProtection: boolean | null;
   passphraseAlwaysOnDevice: boolean | null;
+  /** `attach_to_pin_enabled`：是否至少存在一个 Attach PIN 绑定。 */
   attachToPinEnabled?: boolean | null;
   safetyChecks: Enum_SafetyCheckLevel | null;
   autoLockDelayMs: number | null;
@@ -371,14 +374,21 @@ export type IDeviceType =
   | EDeviceType.Mini
   | EDeviceType.Touch
   | EDeviceType.Pro
-  | EDeviceType.Pro2;
+  | EDeviceType.Pro2
+  | EDeviceType.Neo;
 
 /**
  * model_classic: 'classic' | 'classic1s' | 'classicpure'
  * model_mini: 'classic' | 'classic1s' | 'classicpure' | 'mini'
  * model_touch: 'touch' | 'pro'
+ * model_pro2: 'pro2' | 'neo'
  */
-export type IDeviceModel = 'model_classic' | 'model_mini' | 'model_touch' | 'model_classic1s';
+export type IDeviceModel =
+  | 'model_classic'
+  | 'model_mini'
+  | 'model_touch'
+  | 'model_classic1s'
+  | 'model_pro2';
 
 export const DeviceModelToTypes: { [deviceModel in IDeviceModel]: IDeviceType[] } = {
   model_mini: [
@@ -388,6 +398,7 @@ export const DeviceModelToTypes: { [deviceModel in IDeviceModel]: IDeviceType[] 
     EDeviceType.Mini,
   ],
   model_touch: [EDeviceType.Touch, EDeviceType.Pro],
+  model_pro2: [EDeviceType.Pro2, EDeviceType.Neo],
   model_classic: [EDeviceType.Classic, EDeviceType.Classic1s, EDeviceType.ClassicPure],
   model_classic1s: [EDeviceType.Classic1s, EDeviceType.ClassicPure],
 };
@@ -399,7 +410,8 @@ export const DeviceTypeToModels: { [deviceType in IDeviceType]: IDeviceModel[] }
   [EDeviceType.Mini]: ['model_mini'],
   [EDeviceType.Touch]: ['model_touch'],
   [EDeviceType.Pro]: ['model_touch'],
-  [EDeviceType.Pro2]: [],
+  [EDeviceType.Pro2]: ['model_pro2'],
+  [EDeviceType.Neo]: ['model_pro2'],
   [EDeviceType.Unknown]: [],
 };
 

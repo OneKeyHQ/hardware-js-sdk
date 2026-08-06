@@ -61,6 +61,49 @@ export type IProtocolV2FirmwareComponent = {
   version?: IVersionArray;
 };
 
+export type IProtocolV2ResourceType =
+  | 'images'
+  | 'animation'
+  | 'wallpaper'
+  | 'translations'
+  | 'roobert'
+  | 'noto';
+
+/** Pro2 RES package descriptor. Hashes identify content without a human-managed version. */
+export type IProtocolV2Resource = {
+  type: IProtocolV2ResourceType;
+  url: string;
+  /** Complete okpkg file size in bytes. */
+  size: number;
+  /** SHA-256 of the complete okpkg file. */
+  fileHash: string;
+  /** SHA3-512 header_hash from the signed okpkg header. */
+  headerHash: string;
+};
+
+/** A file from the Protocol V2 resource manifest, written directly with FileWrite. */
+export type IProtocolV2ResourceFile = {
+  name?: string;
+  url: string;
+  devicePath: string;
+  size: number;
+  /** SHA-256 of the complete file. */
+  fileHash: string;
+};
+
+/** Optional Protocol V2 boot resources restored as individual files. */
+export type IProtocolV2BootResources = {
+  required: false;
+  target: 'RES';
+  manifestUrl?: string;
+  files: IProtocolV2ResourceFile[];
+};
+
+export type IProtocolV2Resources = {
+  stable: IProtocolV2Resource[];
+  boot?: IProtocolV2BootResources;
+};
+
 /** Pro2 RESC bundle okpkg descriptor for incremental FileWrite synchronization. */
 export type IProtocolV2ResourceBundle = {
   /** Bundle name, such as images, animation, translations, or fonts_roobert. */
@@ -126,17 +169,25 @@ export type IBLEFirmwareReleaseInfo = {
 };
 
 type IKnownDevice = Exclude<IDeviceType, 'unknown'>;
+type ILegacyKnownDevice = Exclude<IKnownDevice, 'neo'>;
+
+type IDeviceReleaseInfo = {
+  firmware: IFirmwareReleaseInfo[];
+  /** Protocol V2 payload package set */
+  'firmware-v1'?: IFirmwareReleaseInfo[];
+  'firmware-v2'?: IFirmwareReleaseInfo[];
+  'firmware-v8'?: IFirmwareReleaseInfo[];
+  'firmware-btc-v8'?: IFirmwareReleaseInfo[];
+  ble: IBLEFirmwareReleaseInfo[];
+  /** Independent Protocol V2 resource release configuration. */
+  resources?: IProtocolV2Resources;
+};
 
 export type DeviceTypeMap = {
-  [k in IKnownDevice]: {
-    firmware: IFirmwareReleaseInfo[];
-    /** Pro2 Protocol V2 payload package set */
-    'firmware-v1'?: IFirmwareReleaseInfo[];
-    'firmware-v2'?: IFirmwareReleaseInfo[];
-    'firmware-v8'?: IFirmwareReleaseInfo[];
-    'firmware-btc-v8'?: IFirmwareReleaseInfo[];
-    ble: IBLEFirmwareReleaseInfo[];
-  };
+  [k in ILegacyKnownDevice]: IDeviceReleaseInfo;
+} & {
+  /** Optional until every remote-config producer publishes a Neo entry. */
+  neo?: IDeviceReleaseInfo;
 };
 
 export type AssetsMap = {

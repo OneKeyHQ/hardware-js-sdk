@@ -115,8 +115,8 @@ describe('DeviceSettings protocol routing', () => {
     );
   });
 
-  it('uses DeviceSettingsSet and commits the confirmed patch for Protocol V2', async () => {
-    const { device, typedCall, updateState } = createDevice({ protocol: 'V2' });
+  it('uses DeviceSettingsSet and reloads Protocol V2 status and settings from the device', async () => {
+    const { device, typedCall, updateState, getDeviceState } = createDevice({ protocol: 'V2' });
     const method = new DeviceSettings({
       id: 2,
       payload: {
@@ -141,21 +141,10 @@ describe('DeviceSettings protocol routing', () => {
         haptic_feedback: true,
       },
     });
-    expect(updateState).toHaveBeenCalledWith(
-      {
-        identity: { label: 'Shared Label' },
-        settings: {
-          language: 'ja',
-          bleEnabled: true,
-          autoLockDelayMs: 60_000,
-          hapticFeedback: true,
-        },
-      },
-      'settings-write'
-    );
-    expect(typedCall.mock.calls.map(call => call[0])).not.toEqual(
-      expect.arrayContaining(['DeviceInfoGet', 'DeviceStatusGet', 'DeviceSettingsGet'])
-    );
+    expect(getDeviceState).toHaveBeenCalledWith({
+      refreshSections: ['status', 'settings'],
+    });
+    expect(updateState).not.toHaveBeenCalled();
   });
 
   it('uses the Pro2 passphrase page as a device-side toggle and verifies the target state', async () => {
@@ -183,7 +172,39 @@ describe('DeviceSettings protocol routing', () => {
     });
     expect(typedCall).not.toHaveBeenCalledWith('DeviceSettingsSet', 'Success', expect.anything());
     expect(getDeviceState).toHaveBeenNthCalledWith(1, { refreshSections: ['status'] });
-    expect(getDeviceState).toHaveBeenNthCalledWith(2, { refreshSections: ['status'] });
+    expect(getDeviceState).toHaveBeenNthCalledWith(2, {
+      refreshSections: ['status', 'settings'],
+    });
+  });
+
+  it('reloads Protocol V2 status and settings after changing air-gap mode', async () => {
+    const { device, typedCall, getDeviceState } = createDevice({ protocol: 'V2' });
+    getDeviceState
+      .mockResolvedValueOnce({
+        settings: { airgapMode: false },
+      })
+      .mockResolvedValueOnce({
+        status: { unlocked: true },
+        settings: { airgapMode: true },
+      });
+    const method = new DeviceSettings({
+      id: 4,
+      payload: {
+        method: 'deviceSettings',
+        airgapMode: true,
+      },
+    });
+    method.init();
+    (method as any).device = device;
+
+    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSettingsPageShow', 'Success', {
+      page: DeviceSettingsPage.DeviceAirgap,
+    });
+    expect(getDeviceState).toHaveBeenNthCalledWith(1, { refreshSections: ['settings'] });
+    expect(getDeviceState).toHaveBeenNthCalledWith(2, {
+      refreshSections: ['status', 'settings'],
+    });
   });
 
   it('does not open a Pro2 settings page when the hardware already matches the target', async () => {

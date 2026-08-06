@@ -89,7 +89,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
 
   getVersionRange() {
     return {
-      pro2: {
+      model_pro2: {
         min: '0.0.0',
       },
       model_touch: {

@@ -26,6 +26,9 @@ export const resolveProtocolV2DeviceIdentity = (
     case DeviceType.PRO2:
     case 'PRO2':
       return { deviceType: EDeviceType.Pro2, model: 'pro2' };
+    case DeviceType.NEO:
+    case 'NEO':
+      return { deviceType: EDeviceType.Neo, model: 'neo' };
     default:
       return { deviceType: EDeviceType.Unknown, model: null };
   }

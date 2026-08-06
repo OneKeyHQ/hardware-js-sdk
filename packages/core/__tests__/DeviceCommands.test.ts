@@ -125,6 +125,51 @@ describe('DeviceCommands failure mapping', () => {
     expect(JSON.stringify(log.messages)).not.toContain('secret-wallet-address');
   });
 
+  it('logs the sanitized DeviceFirmwareUpdateStatus response payload', async () => {
+    const commands = createCommands();
+    const log = getLogger(LoggerNames.DeviceCommands);
+    log.messages.length = 0;
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'DeviceFirmwareUpdateStatus',
+          message: {
+            records: [
+              {
+                target_id: 4,
+                status: 2,
+                payload_version: 0x010203,
+                path: 'vol0:/application_p1.bin',
+              },
+            ],
+          },
+        } as any,
+        'DeviceFirmwareUpdateStatusGet'
+      )
+    ).resolves.toMatchObject({ type: 'DeviceFirmwareUpdateStatus' });
+
+    expect(log.messages.at(-1)?.message).toEqual([
+      '_filterCommonTypes: ',
+      {
+        request: 'DeviceFirmwareUpdateStatusGet',
+        response: {
+          type: 'DeviceFirmwareUpdateStatus',
+          message: {
+            records: [
+              {
+                target_id: 4,
+                status: 2,
+                payload_version: 0x010203,
+                path: 'vol0:/application_p1.bin',
+              },
+            ],
+          },
+        },
+      },
+    ]);
+  });
+
   it('maps an invalid DeviceSessionGet resume to WalletSessionInvalid', async () => {
     const commands = createCommands();
 
@@ -318,9 +363,9 @@ describe('DeviceCommands failure mapping', () => {
     }
   );
 
-  it.each(['Cancelled', 'User cancelled typed data signing'])(
-    'maps the Protocol V2 MP engine cancellation response "%s" to ActionCancelled',
-    async message => {
+  it.each(['SignTx', 'EthereumSignTypedDataOneKey', 'SolanaSignTx', 'GetAddress'] as const)(
+    'does not treat domain-ambiguous Protocol V2 subcode 1 for %s as cancellation',
+    async callType => {
       const commands = createCommands();
 
       await expect(
@@ -330,18 +375,13 @@ describe('DeviceCommands failure mapping', () => {
             message: {
               code: 'Failure_ProcessError',
               subcode: 1,
-              message,
+              message: 'Domain-specific failure',
             },
           } as any,
-          'SignTx'
+          callType
         )
       ).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.ActionCancelled,
-        params: {
-          failureCode: 'Failure_ProcessError',
-          subcode: 1,
-          firmwareMessage: message,
-        },
+        errorCode: HardwareErrorCode.RuntimeError,
       });
     }
   );
@@ -356,6 +396,7 @@ describe('DeviceCommands failure mapping', () => {
           type: 'Failure',
           message: {
             code: 'Failure_ProcessError',
+            subcode: 1,
             message: 'Cancelled on device',
           },
         } as any,
@@ -366,7 +407,7 @@ describe('DeviceCommands failure mapping', () => {
     });
   });
 
-  it('keeps an unrecognized Protocol V2 process subcode generic', async () => {
+  it('maps the DeviceError subcode 1 exception to DeviceBusy', async () => {
     const commands = createCommands();
 
     await expect(
@@ -382,7 +423,12 @@ describe('DeviceCommands failure mapping', () => {
         'DeviceSettingsPageShow'
       )
     ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.RuntimeError,
+      errorCode: HardwareErrorCode.DeviceBusy,
+      params: {
+        failureCode: 'Failure_ProcessError',
+        subcode: 1,
+        firmwareMessage: 'Another process error',
+      },
     });
   });
 

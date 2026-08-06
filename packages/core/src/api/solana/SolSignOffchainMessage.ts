@@ -40,7 +40,7 @@ export default class SolSignOffchainMessage extends BaseMethod<HardwareSolSignOf
 
   getVersionRange() {
     return {
-      pro2: {
+      model_pro2: {
         min: '0.0.0',
       },
       pro: {

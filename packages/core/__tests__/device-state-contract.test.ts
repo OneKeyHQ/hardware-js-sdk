@@ -1,4 +1,5 @@
 import { DEVICE } from '../src/events';
+
 import type { DeviceState, DeviceStateEvent } from '../src/types';
 
 describe('DeviceState contract', () => {

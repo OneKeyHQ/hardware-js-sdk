@@ -104,7 +104,7 @@ describe('getLogBlockLabel', () => {
     });
   });
 
-  it.each(['deviceUploadWallpaper', 'uploadPortfolio', 'fileWrite', 'fileRead'])(
+  it.each(['deviceUploadNft', 'deviceUploadWallpaper', 'uploadPortfolio', 'fileWrite', 'fileRead'])(
     'keeps metadata and replaces binary payloads with their size for %s',
     method => {
       const request = { method, path: 'resource.bin', data: new Uint8Array(1024) };

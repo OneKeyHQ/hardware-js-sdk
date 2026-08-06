@@ -23,7 +23,7 @@ const baseVersionRange = {
   model_touch: {
     min: '4.3.0',
   },
-  pro2: {
+  model_pro2: {
     min: '0.0.0',
   },
 };
@@ -36,7 +36,7 @@ const specialVersionRange: Record<string, DeviceFirmwareRange> = {
     model_touch: {
       min: '4.7.0',
     },
-    pro2: {
+    model_pro2: {
       min: '0.0.0',
     },
   },
@@ -47,7 +47,7 @@ const specialVersionRange: Record<string, DeviceFirmwareRange> = {
     model_touch: {
       min: '4.9.0',
     },
-    pro2: {
+    model_pro2: {
       min: '0.0.0',
     },
   },

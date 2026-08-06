@@ -1,6 +1,6 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
-
 import { DeviceType, Enum_SafetyCheckLevel } from '@onekeyfe/hd-transport';
+
 import {
   mapApplySettingsToState,
   mapDeviceSettingsToState,
@@ -143,6 +143,18 @@ describe('DeviceStateMapper', () => {
     });
     expect(patch).toMatchObject({ protocolVersion: 2 });
     expect(patch.status?.unlocked).toBeUndefined();
+  });
+
+  test('maps the Protocol V2 Neo device type without treating it as Pro2', () => {
+    const patch = mapProtocolV2DeviceInfoToState({
+      hw: { Device_type: DeviceType.NEO, serial_no: 'NEO-SERIAL-1' },
+    });
+
+    expect(patch.identity).toMatchObject({
+      deviceType: EDeviceType.Neo,
+      model: 'neo',
+      serialNo: 'NEO-SERIAL-1',
+    });
   });
 
   test('maps the hardware model independently from Protocol V2', () => {

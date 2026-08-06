@@ -170,13 +170,11 @@ function ExecuteView({
       }
       if (disableSecurityCheck) {
         await sdk.deviceSettings(connectId, {
-          // @ts-expect-error
           // 0: Strict, 1: PromptTemporarily, 2: Off
           safetyChecks: 2,
         });
       } else {
         await sdk.deviceSettings(connectId, {
-          // @ts-expect-error
           safetyChecks: 0,
         });
       }

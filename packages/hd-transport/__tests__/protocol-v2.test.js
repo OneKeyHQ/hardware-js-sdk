@@ -1057,7 +1057,7 @@ describe('Protocol V2 framing and session', () => {
     });
 
     await session.call('Ping', { message: 'ping' }, { timeoutMs: 123 });
-    await session.call('FileWrite', {}, { timeoutMs: 456 });
+    await session.call('FileWrite', {}, { timeoutMs: 456, writeWithResponse: true });
     await session.call('Ping', { message: 'default-timeout' });
 
     const normalizeContext = ({ signal, ...context }) => ({
@@ -1076,6 +1076,7 @@ describe('Protocol V2 framing and session', () => {
         messageName: 'FileWrite',
         timeoutMs: 456,
         highVolume: true,
+        writeWithResponse: true,
         generation: 7,
         signalAborted: false,
       },
@@ -1099,6 +1100,7 @@ describe('Protocol V2 framing and session', () => {
         messageName: 'FileWrite',
         timeoutMs: 456,
         highVolume: true,
+        writeWithResponse: true,
         generation: 7,
         signalAborted: false,
       },

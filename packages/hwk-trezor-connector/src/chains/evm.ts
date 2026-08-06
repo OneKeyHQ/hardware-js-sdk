@@ -222,7 +222,7 @@ async function processTxRequest(
   const maxRounds = Math.ceil(remainingData.length / 2) + 64;
   let rounds = 0;
 
-  while (true) {
+  for (;;) {
     rounds += 1;
     if (rounds > maxRounds) {
       throw new Error(

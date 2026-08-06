@@ -3,6 +3,7 @@ const {
   createMessageFromType,
   parseConfigure,
 } = require('../src/serialization/protobuf/messages');
+const { encode } = require('../src/serialization/protobuf/encode');
 const v1Messages = require('../../core/src/data/messages/messages.json');
 const v2Messages = require('../messages-protocol-v2.json');
 const coreV2Messages = require('../../core/src/data/messages/messages-protocol-v2.json');
@@ -121,6 +122,19 @@ describe('messages', () => {
       id: 1,
       type: 'bytes',
     });
+    expect(v2Messages.nested.DeviceSessionGet.fields).toEqual({
+      session_id: { id: 1, type: 'bytes' },
+      btc_test_address: { id: 2, type: 'string' },
+      seed_domains: {
+        id: 3,
+        rule: 'repeated',
+        type: 'DeviceSessionSeedDomain',
+      },
+    });
+    expect(v2Messages.nested.DeviceSessionSeedDomain.values).toEqual({
+      SeedDomain_Standard: 1,
+      SeedDomain_Cardano: 2,
+    });
     expect(v2Messages.nested.DeviceSessionPinType.values).toEqual({
       Any: 1,
       Main: 2,
@@ -173,11 +187,13 @@ describe('messages', () => {
     const messages = parseConfigure(v2Messages);
     const { Message } = createMessageFromName(messages, 'DeviceSessionAskPassphrase');
 
+    const standardWallet = encode(Message, { passphrase: '', on_device: false });
     const onHost = Message.encode(
       Message.create({ passphrase: 'host hidden wallet', on_device: false })
     ).finish();
     const onDevice = Message.encode(Message.create({ on_device: true })).finish();
 
+    expect(standardWallet.toString('hex')).toBe('0a001000');
     expect(Buffer.from(onHost).toString('hex')).toBe(
       '0a12686f73742068696464656e2077616c6c65741000'
     );
@@ -187,6 +203,27 @@ describe('messages', () => {
       on_device: false,
     });
     expect(Message.decode(onDevice)).toMatchObject({ on_device: true });
+  });
+
+  test('Protocol V2 wallet recovery carries the expected wallet and seed domains on wire', () => {
+    const messages = parseConfigure(v2Messages);
+    const { Message } = createMessageFromName(messages, 'DeviceSessionGet');
+    const payload = encode(Message, {
+      btc_test_address: 'tb1qwallet',
+      seed_domains: [
+        generatedTypes.DeviceSessionSeedDomain.SeedDomain_Standard,
+        generatedTypes.DeviceSessionSeedDomain.SeedDomain_Cardano,
+      ],
+    });
+
+    expect(payload.toString('hex')).toBe('120a7462317177616c6c65741a020102');
+    expect(Message.decode(payload.toBuffer())).toMatchObject({
+      btc_test_address: 'tb1qwallet',
+      seed_domains: [
+        generatedTypes.DeviceSessionSeedDomain.SeedDomain_Standard,
+        generatedTypes.DeviceSessionSeedDomain.SeedDomain_Cardano,
+      ],
+    });
   });
 
   test('Protocol V2 onboarding status matches the current firmware-pro2 schema', () => {
@@ -217,6 +254,13 @@ describe('messages', () => {
       wallet_initialized: { id: 5, type: 'bool' },
     });
     expect(v2Messages.nested).not.toHaveProperty('DevOnboardingStatus');
+  });
+
+  test('Protocol V2 NFT update matches the current firmware-pro2 schema', () => {
+    expect(v2Messages.nested.MessageType.values.MessageType_NftUpdate).toBe(61500);
+    expect(v2Messages.nested.NftUpdate.fields).toEqual({
+      file_name_no_ext: { id: 1, type: 'string', rule: 'required' },
+    });
   });
 
   test('Protocol V2 does not restore retired unlock or passphrase ids', () => {

@@ -60,6 +60,8 @@ export const resolveDeviceType = (features?: DeviceFeaturesInput): IDeviceType =
       return EDeviceType.Pro;
     case 'PRO2':
       return EDeviceType.Pro2;
+    case 'NEO':
+      return EDeviceType.Neo;
     case 'PURE':
       return EDeviceType.ClassicPure;
     default:
@@ -68,6 +70,9 @@ export const resolveDeviceType = (features?: DeviceFeaturesInput): IDeviceType =
 
   if (compatible.model?.toString().toLowerCase() === EDeviceType.Pro2) {
     return EDeviceType.Pro2;
+  }
+  if (compatible.model?.toString().toLowerCase() === EDeviceType.Neo) {
+    return EDeviceType.Neo;
   }
 
   const serialNo = resolveDeviceSerialNo(features);

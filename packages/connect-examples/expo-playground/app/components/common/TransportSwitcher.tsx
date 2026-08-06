@@ -2,16 +2,18 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useDeviceStore } from '../../store/deviceStore';
-import { SDKUtils } from '../../utils/hardwareInstance';
 import { useToast } from '../../hooks/use-toast';
 import { useTransportPersistence } from '../../store/persistenceStore';
-import { switchTransport, searchDevices } from '../../services/hardwareService';
+import {
+  getDeviceSearchUserMessage,
+  initializeDevice,
+  searchDevices,
+  switchTransport,
+} from '../../services/hardwareService';
 import type { TransportType } from '../../utils/hardwareInstance';
 import { DeviceInfo } from '../../types/hardware';
 import { Button } from '../ui/Button';
 import { Signal, ExternalLink, Info, Usb, Server } from 'lucide-react';
-import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
-import { UI_RESPONSE } from '@onekeyfe/hd-core';
 
 interface TransportSwitcherProps {
   className?: string;
@@ -19,13 +21,7 @@ interface TransportSwitcherProps {
 
 const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' }) => {
   const { t } = useTranslation();
-  const {
-    setIsConnecting,
-    setConnectedDevices,
-    setCurrentDevice,
-    setDeviceFeatures,
-    sdkInitState,
-  } = useDeviceStore();
+  const { setIsConnecting, setConnectedDevices, setCurrentDevice, sdkInitState } = useDeviceStore();
 
   const { preferredType: transportType, setTransportPreference } = useTransportPersistence();
   const { toast } = useToast();
@@ -37,7 +33,6 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     icon: React.ReactNode;
     disabled?: boolean;
     description?: string;
-    needsBridge?: boolean;
     isEmulator?: boolean;
   }> = [
     {
@@ -46,13 +41,6 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       icon: <Usb className="h-4 w-4" />,
       description: t('transport.webusb.description'),
     },
-    // {
-    //   type: 'jsbridge',
-    //   label: 'JSBridge',
-    //   icon: <Monitor className="h-4 w-4" />,
-    //   description: t('transport.jsbridge.description'),
-    //   needsBridge: true,
-    // },
     {
       type: 'emulator',
       label: t('common.emulator'),
@@ -73,44 +61,8 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
   const handleDeviceConnection = async (devices: DeviceInfo[]) => {
     if (!devices.length) return;
 
-    try {
-      // 自动选择第一个设备进行连接
-      const targetDevice = devices[0];
-
-      // 获取设备特征信息
-      const sdk = await SDKUtils.getInstance();
-      if (targetDevice.connectId && targetDevice.deviceId) {
-        const featuresResult = await sdk.getFeatures(targetDevice.connectId);
-        if (featuresResult.success && featuresResult.payload) {
-          setDeviceFeatures(featuresResult.payload);
-
-          // 获取OneKey特定的features
-          const onekeyFeaturesResult = await sdk.getOnekeyFeatures(targetDevice.connectId);
-          if (onekeyFeaturesResult.success && onekeyFeaturesResult.payload) {
-            // 更新设备信息，包含onekeyFeatures
-            const updatedDevice = {
-              ...targetDevice,
-              features: featuresResult.payload,
-              onekeyFeatures: onekeyFeaturesResult.payload,
-            };
-            setCurrentDevice(updatedDevice);
-          } else {
-            // 即使获取onekeyFeatures失败，也设置基本的设备信息
-            const updatedDevice = {
-              ...targetDevice,
-              features: featuresResult.payload,
-            };
-            setCurrentDevice(updatedDevice);
-          }
-        } else {
-          setCurrentDevice(targetDevice);
-        }
-      } else {
-        setCurrentDevice(targetDevice);
-      }
-    } catch (error) {
-      console.error('Auto connection error:', error);
-    }
+    const connectedDevice = await initializeDevice(devices[0]);
+    setCurrentDevice(connectedDevice);
   };
 
   // Simple WebUSB error handling
@@ -136,31 +88,19 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
   // WebUSB-specific handler that must be called directly in user gesture
   const handleWebUsbConnect = async () => {
     try {
-      // Check WebUSB support and request device
-      if (!navigator.usb) throw new Error(t('transport.webusb.notSupported'));
-
-      const device = await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
-      if (!device) throw new Error(t('transport.webusb.noDeviceSelected'));
-
       // Switch transport
       setTransportPreference('webusb');
       const result = await switchTransport('webusb');
       if (!result.success) {
         return toast({
           title: t('transport.connectionFailed'),
-          description: result.payload?.error || t('transport.switchFailed'),
+          description: getDeviceSearchUserMessage(result),
           variant: 'warning',
         });
       }
 
-      // Notify SDK and search devices
-      const sdkInstance = await SDKUtils.getInstance();
-      sdkInstance.uiResponse({
-        type: UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
-        payload: { deviceId: device.serialNumber ?? '' },
-      });
-
-      const searchResult = await searchDevices();
+      // Prompt and protocol detection are owned by the SDK WebUSB transport.
+      const searchResult = await searchDevices({ promptWebUsbAccess: true });
       if (searchResult.success && searchResult.payload) {
         const devices = searchResult.payload as DeviceInfo[];
         setConnectedDevices(devices);
@@ -173,7 +113,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       } else {
         toast({
           title: t('transport.searchFailed'),
-          description: searchResult.payload?.error || t('transport.searchDeviceFailed'),
+          description: getDeviceSearchUserMessage(searchResult),
           variant: 'warning',
         });
         setConnectedDevices([]);
@@ -218,7 +158,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       const result = await switchTransport(newTransport);
 
       if (!result.success) {
-        const errorMessage = result.payload?.error || t('transport.switchFailed');
+        const errorMessage = getDeviceSearchUserMessage(result);
         toast({
           title: t('transport.connectionFailed'),
           description: errorMessage,
@@ -245,7 +185,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
           });
         }
       } else {
-        const errorMessage = searchResult.payload?.error || t('transport.searchDeviceFailed');
+        const errorMessage = getDeviceSearchUserMessage(searchResult);
         toast({
           title: t('transport.searchFailed'),
           description: errorMessage,
@@ -254,8 +194,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
         setConnectedDevices([]);
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : t('transport.unknownConnectionError');
+      const errorMessage = getDeviceSearchUserMessage(error);
       toast({
         title: t('transport.connectionTip'),
         description: errorMessage,
@@ -273,7 +212,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     if (sdkInitState.error) {
       toast({
         title: t('transport.sdkInitError'),
-        description: sdkInitState.error,
+        description: t('transport.connectionFailed'),
         variant: 'destructive',
       });
     }

@@ -4,6 +4,12 @@ import { EDeviceType } from '@onekeyfe/hd-shared';
 import { getDeviceType } from './deviceInfoUtils';
 import { getDeviceFirmwareVersion } from './deviceVersionUtils';
 import { PRO2_WALLPAPER_HEIGHT, PRO2_WALLPAPER_WIDTH } from './pro2Wallpaper';
+import {
+  PRO2_NFT_IMAGE_HEIGHT,
+  PRO2_NFT_IMAGE_WIDTH,
+  PRO2_NFT_THUMBNAIL_HEIGHT,
+  PRO2_NFT_THUMBNAIL_WIDTH,
+} from './pro2Nft';
 
 import type { Features, IDeviceType } from '../types';
 
@@ -302,6 +308,31 @@ type SizeConfig = {
   radius?: number;
 };
 
+export const getNftSize = ({
+  deviceType,
+  thumbnail,
+}: {
+  deviceType: IDeviceType;
+  thumbnail?: boolean;
+}): SizeConfig | undefined => {
+  const sizes: Partial<Record<IDeviceType, { full: SizeConfig; thumbnail: SizeConfig }>> = {
+    touch: {
+      full: { width: 480, height: 800 },
+      thumbnail: { width: 238, height: 238 },
+    },
+    pro: {
+      full: { width: 480, height: 800 },
+      thumbnail: { width: 226, height: 226, radius: 40 },
+    },
+    pro2: {
+      full: { width: PRO2_NFT_IMAGE_WIDTH, height: PRO2_NFT_IMAGE_HEIGHT },
+      thumbnail: { width: PRO2_NFT_THUMBNAIL_WIDTH, height: PRO2_NFT_THUMBNAIL_HEIGHT },
+    },
+  };
+
+  return sizes[deviceType]?.[thumbnail ? 'thumbnail' : 'full'];
+};
+
 export const getHomeScreenSize = ({
   deviceType,
   homeScreenType,
@@ -312,12 +343,7 @@ export const getHomeScreenSize = ({
   thumbnail?: boolean;
 }) => {
   if (deviceType === EDeviceType.Pro2) {
-    return thumbnail
-      ? undefined
-      : {
-          width: PRO2_WALLPAPER_WIDTH,
-          height: PRO2_WALLPAPER_HEIGHT,
-        };
+    return thumbnail ? undefined : { width: PRO2_WALLPAPER_WIDTH, height: PRO2_WALLPAPER_HEIGHT };
   }
 
   const sizes: Partial<

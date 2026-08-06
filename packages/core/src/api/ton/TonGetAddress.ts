@@ -61,7 +61,7 @@ export default class TonGetAddress extends BaseMethod<HardwareTonGetAddress[]> {
 
   getVersionRange() {
     return {
-      pro2: {
+      model_pro2: {
         min: '0.0.0',
       },
       model_touch: {

@@ -28,12 +28,18 @@ Core / DeviceCommands
 
 V1 与 V2 的判断必须依据连接后的设备响应，不能只依赖 PID、设备名或 USB descriptor。
 
+Protocol V2 的 `ProtocolInfoRequest` 同时承担运行阶段查询和 eventless wallet session 策略协商。
+Core 固定发送 `eventless_wallet_session=true`，同一活动 Link 只在首次使用时协商；并发首次读取合并
+为一个请求，disconnect/reboot/wipe 后重新协商。固件对重复 `true` 请求保持幂等，避免查询能力时
+意外清除钱包 Session。
+
 ## 自动协议探测
 
 Transport 在 `acquire()` 完成物理连接后执行协议探测：
 
-1. 存在已确认的 V2 hint 或连接缓存时，优先发送 V2 `Ping` probe。
-2. 没有 V2 hint 时，默认先验证 V1 `Initialize`。
+1. 搜索和首次连接不传 `connectProtocol`，由活动响应确认协议；显式
+   `forceProtocolDetection=true` 同样绕过已绑定协议。
+2. 初次探测没有内部 hint 时，默认先验证 V1 `Initialize`；未确认的 hint 只能改变本次探测顺序。
 3. WebUSB 的 V1 probe 失败后必须关闭并重新打开连接，再执行 V2 probe，避免未取消的
    `transferIn` 消费 V2 响应。
 4. 两者均失败时，清理本次连接资源；WebUSB 公共调用返回 `DeviceNotFound`，具体 probe
@@ -43,8 +49,12 @@ Transport 在 `acquire()` 完成物理连接后执行协议探测：
 
 - 公共请求中的 `connectProtocol` 映射为严格的 `expectedProtocol`。它用于调用方确实要求某一协议的
   场景，不允许静默回退。
-- descriptor、历史活动探测结果和设备名推导值映射为非严格的 `protocolHint`。它只改变 probe 顺序，
-  首次失败后必须尝试另一协议。
+- 尚未确认的 Transport 内部缓存只能作为非严格 `protocolHint`，只改变首次 probe 顺序，失败后必须
+  尝试另一协议；设备名、PID 或 USB descriptor 不能产生协议结论。
+- 活动响应确认后，Core 把协议记录到设备 descriptor。后续 acquire 将这个已确认值作为严格
+  `expectedProtocol`，不再静默切换协议。
+- App 可通过 `setDeviceConnectProtocol(connectId, protocol)` 恢复持久化结果。绑定按 endpoint 隔离，
+  所有后续公共 SDK 调用都会自动注入；同一物理设备的 USB/BLE connectId 由 App 分别绑定。
 
 严格预期的验证规则：
 
@@ -57,6 +67,9 @@ V2 probe 使用 `Ping { message: 'protocol-v2-probe' }`。探测消息只用于�
 公共设备对象同样使用 `connectProtocol` 字段作为输出，但输出语义是当前连接已经活动探测确认的协议，
 不是原请求值。Core 的方法能力检查只读取该确认结果。设备型号独立来自 V1 `Features` 或 V2
 `DeviceInfo.hw.Device_type`；例如未来 Pro 返回 V2 时仍应识别为 Pro，而不是因为协议为 V2 被改成 Pro2。
+
+普通 disconnect/reconnect 不清除已确认协议；只有调用方显式要求重新探测，或设备身份被清除时，
+才允许回到无固定协议的探测路径。
 
 主要实现：
 

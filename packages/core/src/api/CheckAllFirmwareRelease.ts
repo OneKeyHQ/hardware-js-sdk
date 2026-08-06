@@ -1,4 +1,4 @@
-import { EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 
 import { UI_REQUEST } from '../constants/ui-request';
@@ -11,6 +11,10 @@ import {
 import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
 import { getDeviceFirmwareVersion, getDeviceType, getFirmwareType } from '../utils';
 import { BaseMethod } from './BaseMethod';
+import {
+  buildProtocolV2ResourceUpdatePlan,
+  readProtocolV2ResourceInventory,
+} from '../protocols/protocol-v2/resources';
 
 import type {
   AllFirmwareRelease,
@@ -90,6 +94,7 @@ function buildComponentRelease({
   component,
   currentVersions,
   currentVerification,
+  checkFirmwareHash,
   remotePayloadHash,
   releaseRequired,
 }: {
@@ -97,6 +102,7 @@ function buildComponentRelease({
   component: IProtocolV2FirmwareComponent;
   currentVersions: DeviceStateVersions;
   currentVerification: Partial<DeviceFeaturesVerify>;
+  checkFirmwareHash: boolean;
   remotePayloadHash: string | null | undefined;
   releaseRequired: boolean;
 }): ProtocolV2FirmwareComponentRelease {
@@ -125,7 +131,7 @@ function buildComponentRelease({
       status = 'valid';
     } else {
       const currentHashKey = CURRENT_HASH_BY_COMPONENT_TARGET[componentTarget];
-      if (!currentHashKey) {
+      if (!checkFirmwareHash || !currentHashKey) {
         status = 'valid';
       } else {
         const currentHash = normalizeHex(currentVerification[currentHashKey]);
@@ -164,12 +170,14 @@ type ProtocolV2FirmwareReleasePlan = {
 export function buildProtocolV2FirmwareRelease({
   currentVersions,
   currentVerification = {},
+  checkFirmwareHash = false,
   remotePayloadHashes = {},
   firmwareType,
   release,
 }: {
   currentVersions: DeviceStateVersions;
   currentVerification?: Partial<DeviceFeaturesVerify>;
+  checkFirmwareHash?: boolean;
   remotePayloadHashes?: Readonly<Record<string, string | null>>;
   firmwareType: EFirmwareType;
   release: IFirmwareReleaseInfo | undefined;
@@ -193,6 +201,7 @@ export function buildProtocolV2FirmwareRelease({
       component,
       currentVersions,
       currentVerification,
+      checkFirmwareHash,
       remotePayloadHash: Object.prototype.hasOwnProperty.call(remotePayloadHashes, configKey)
         ? remotePayloadHashes[configKey]
         : normalizeHex(component.payloadHash),
@@ -219,9 +228,6 @@ export function buildProtocolV2FirmwareRelease({
   const targetsToUpdate = components.flatMap(component =>
     component.status === 'outdated' && component.updateTarget ? [component.updateTarget] : []
   );
-  if (targetsToUpdate.length > 0 && release.resourceBundles?.length) {
-    targetsToUpdate.push('resource');
-  }
   const uniqueTargetsToUpdate = Array.from(new Set(targetsToUpdate));
   const hasUpgrade = uniqueTargetsToUpdate.length > 0;
   const required = release.required && hasUpgrade;
@@ -313,13 +319,17 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
   }
 
   private async runProtocolV2(): Promise<AllFirmwareRelease> {
+    const { checkFirmwareHash = false, firmwareType: firmwareTypeParam } = this
+      .payload as CheckAllFirmwareReleaseParams;
     const state = await this.device.getDeviceState({
-      refreshSections: ['identity', 'versions', 'verification'],
+      refreshSections: checkFirmwareHash
+        ? ['identity', 'versions', 'verification']
+        : ['identity', 'versions'],
     });
-    if (state.identity.deviceType !== 'pro2') {
+    if (state.identity.deviceType !== 'pro2' && state.identity.deviceType !== 'neo') {
       throw ERRORS.TypedError(
         HardwareErrorCode.DeviceNotSupportMethod,
-        'checkAllFirmwareRelease requires a Pro2 device for Protocol V2'
+        'checkAllFirmwareRelease requires a Pro2 or Neo device for Protocol V2'
       );
     }
 
@@ -331,16 +341,47 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       );
     }
 
-    const { firmwareType: firmwareTypeParam } = this.payload as CheckAllFirmwareReleaseParams;
     const firmwareType =
       firmwareTypeParam ?? state.identity.firmwareType ?? EFirmwareType.Universal;
     const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
     const plan = buildProtocolV2FirmwareRelease({
       currentVersions: state.versions,
-      currentVerification: state.verification,
+      currentVerification: checkFirmwareHash ? state.verification : undefined,
+      checkFirmwareHash,
       firmwareType,
       release,
     });
+    const resourceDeviceType =
+      state.identity.deviceType === 'neo' ? EDeviceType.Neo : EDeviceType.Pro2;
+    const resources = DataManager.getProtocolV2Resources(resourceDeviceType);
+    let resourceStatus: 'valid' | 'outdated' | 'unknown' = 'unknown';
+    if (resources?.length) {
+      const loaderMode = state.status.mode === 'bootloader' || state.status.mode === 'romloader';
+      // Application mode rejects host access to vol0:/bundles. Resource inventory is
+      // resolved after FirmwareUpdateV4 enters a loader instead of probing here.
+      if (loaderMode) {
+        try {
+          const inventory = await readProtocolV2ResourceInventory({
+            commands: this.device.getCommands(),
+            resources,
+          });
+          resourceStatus = buildProtocolV2ResourceUpdatePlan({
+            resources,
+            inventory,
+            mode: 'bootloader-recovery',
+          }).status;
+        } catch {
+          resourceStatus = buildProtocolV2ResourceUpdatePlan({
+            resources,
+            mode: 'bootloader-recovery',
+          }).status;
+        }
+      }
+    }
+    const targetsToUpdate = [
+      ...plan.targetsToUpdate,
+      ...(resourceStatus === 'outdated' ? (['resource'] as const) : []),
+    ];
     const firmwareStatus = plan.status === 'unavailable' ? 'unknown' : plan.status;
     const emptyRelease = 'none' as const;
 
@@ -361,8 +402,11 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       },
       features,
       protocol: 'V2',
-      deviceType: 'pro2',
+      deviceType: state.identity.deviceType,
       ...plan,
+      resourceStatus,
+      hasUpgrade: plan.hasUpgrade || resourceStatus === 'outdated',
+      targetsToUpdate,
     };
   }
 }

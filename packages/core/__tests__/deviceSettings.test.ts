@@ -1,13 +1,13 @@
 import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import {
+  PROTOCOL_V2_NEVER_TIMEOUT_MS,
   getAutoLockOptions,
   getAutoShutDownOptions,
   getDeviceSettingsCapabilities,
   getLanguageConfig,
   mapLanguageFromProtocolV2,
   mapLanguageToProtocolV2,
-  PROTOCOL_V2_NEVER_TIMEOUT_MS,
 } from '../src/utils/deviceSettings';
 
 describe('Pro 2 device settings options', () => {
@@ -70,6 +70,16 @@ describe('Pro 2 device settings options', () => {
       { label: '30 minutes', valueMs: 1_800_000 },
       { label: 'Never', valueMs: PROTOCOL_V2_NEVER_TIMEOUT_MS },
     ]);
+  });
+
+  test('uses the shared Protocol V2 settings model for Neo', () => {
+    expect(getLanguageConfig(EDeviceType.Neo)).toEqual(getLanguageConfig(EDeviceType.Pro2));
+    expect(getAutoLockOptions(EDeviceType.Neo, 'V2')).toEqual(
+      getAutoLockOptions(EDeviceType.Pro2, 'V2')
+    );
+    expect(getAutoShutDownOptions(EDeviceType.Neo, 'V2')).toEqual(
+      getAutoShutDownOptions(EDeviceType.Pro2, 'V2')
+    );
   });
 
   test('keeps the legacy and Protocol V2 never values protocol-specific', () => {

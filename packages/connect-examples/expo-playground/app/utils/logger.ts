@@ -1,7 +1,13 @@
 import { useDeviceStore } from '../store/deviceStore';
 import type { UnifiedLogEntry, LogType } from '../components/common/UnifiedLogger';
+import { redactSensitiveLogValue } from './logRedaction';
 
 export type logData = Record<string, unknown> | undefined;
+
+const sanitizeLogData = (data?: logData): logData =>
+  data ? (redactSensitiveLogValue(data) as Record<string, unknown>) : undefined;
+
+export { redactSensitiveLogValue } from './logRedaction';
 
 // Create a unified log entry
 export function createUnifiedLogEntry(
@@ -9,24 +15,26 @@ export function createUnifiedLogEntry(
   message: string,
   data?: logData
 ): UnifiedLogEntry {
+  const sanitizedData = sanitizeLogData(data);
   return {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     timestamp: new Date().toISOString(),
     type,
     title: message,
     message,
-    content: data || null,
-    data,
+    content: sanitizedData || null,
+    data: sanitizedData,
   };
 }
 
 // Log information
 export function logInfo(message: string, data?: logData) {
-  console.info(`[INFO] ${message}`, data || '');
+  const sanitizedData = sanitizeLogData(data);
+  console.info(`[INFO] ${message}`, sanitizedData || '');
   // Only add to store if in browser environment
   try {
     const store = useDeviceStore.getState();
-    store.addLog(createUnifiedLogEntry('info', message, data));
+    store.addLog(createUnifiedLogEntry('info', message, sanitizedData));
   } catch (e) {
     console.error('Failed to add log to store:', e);
   }
@@ -34,10 +42,11 @@ export function logInfo(message: string, data?: logData) {
 
 // Log errors
 export function logError(message: string, data?: logData) {
-  console.error(`[ERROR] ${message}`, data || '');
+  const sanitizedData = sanitizeLogData(data);
+  console.error(`[ERROR] ${message}`, sanitizedData || '');
   try {
     const store = useDeviceStore.getState();
-    store.addLog(createUnifiedLogEntry('error', message, data));
+    store.addLog(createUnifiedLogEntry('error', message, sanitizedData));
   } catch (e) {
     console.error('Failed to add log to store:', e);
   }
@@ -45,10 +54,11 @@ export function logError(message: string, data?: logData) {
 
 // Log requests
 export function logRequest(message: string, data?: logData) {
-  console.info(`[REQUEST] ${message}`, data || '');
+  const sanitizedData = sanitizeLogData(data);
+  console.info(`[REQUEST] ${message}`, sanitizedData || '');
   try {
     const store = useDeviceStore.getState();
-    store.addLog(createUnifiedLogEntry('request', message, data));
+    store.addLog(createUnifiedLogEntry('request', message, sanitizedData));
   } catch (e) {
     console.error('Failed to add log to store:', e);
   }
@@ -56,10 +66,11 @@ export function logRequest(message: string, data?: logData) {
 
 // Log responses
 export function logResponse(message: string, data?: logData) {
-  console.info(`[RESPONSE] ${message}`, data || '');
+  const sanitizedData = sanitizeLogData(data);
+  console.info(`[RESPONSE] ${message}`, sanitizedData || '');
   try {
     const store = useDeviceStore.getState();
-    store.addLog(createUnifiedLogEntry('response', message, data));
+    store.addLog(createUnifiedLogEntry('response', message, sanitizedData));
   } catch (e) {
     console.error('Failed to add log to store:', e);
   }
@@ -67,10 +78,11 @@ export function logResponse(message: string, data?: logData) {
 
 // Log hardware-level details (e.g., final params to device)
 export function logHardware(message: string, data?: logData) {
-  console.info(`[HARDWARE] ${message}`, data || '');
+  const sanitizedData = sanitizeLogData(data);
+  console.info(`[HARDWARE] ${message}`, sanitizedData || '');
   try {
     const store = useDeviceStore.getState();
-    store.addLog(createUnifiedLogEntry('hardware', message, data));
+    store.addLog(createUnifiedLogEntry('hardware', message, sanitizedData));
   } catch (e) {
     console.error('Failed to add log to store:', e);
   }

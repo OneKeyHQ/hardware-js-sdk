@@ -1,5 +1,46 @@
 import type { UnifiedMethodConfig, ChainCategory } from '../types';
 
+const TON_SIGN_DATA_COMMON_PARAMETERS = [
+  {
+    name: 'path',
+    type: 'string' as const,
+    required: true,
+    value: "m/44'/607'/0'",
+  },
+  {
+    name: 'appdomain',
+    type: 'string' as const,
+    required: true,
+    value: 'onekey.so',
+  },
+  {
+    name: 'timestamp',
+    type: 'number' as const,
+    required: true,
+    value: Math.floor(Date.now() / 1000),
+  },
+  {
+    name: 'fromAddress',
+    type: 'string' as const,
+    value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+  },
+  { name: 'walletVersion', type: 'number' as const, value: 3 },
+  { name: 'isBounceable', type: 'boolean' as const, value: false },
+  { name: 'isTestnetOnly', type: 'boolean' as const, value: false },
+];
+
+function createTonSignDataParameters(type: 0 | 1 | 2, payload: string, schema?: string) {
+  return [
+    TON_SIGN_DATA_COMMON_PARAMETERS[0],
+    { name: 'type', type: 'number' as const, required: true, value: type },
+    { name: 'payload', type: 'textarea' as const, required: true, value: payload },
+    ...(schema
+      ? [{ name: 'schema', type: 'string' as const, required: true, value: schema }]
+      : []),
+    ...TON_SIGN_DATA_COMMON_PARAMETERS.slice(1),
+  ];
+}
+
 const api: UnifiedMethodConfig[] = [
   {
     method: 'tonGetAddress',
@@ -565,6 +606,28 @@ const api: UnifiedMethodConfig[] = [
             value: false,
           },
         ],
+      },
+    ],
+  },
+  {
+    method: 'tonSignData',
+    description: 'Sign TON Connect signData payloads',
+    presets: [
+      {
+        title: 'Text',
+        parameters: createTonSignDataParameters(0, '48656c6c6f204f6e654b6579'),
+      },
+      {
+        title: 'Binary',
+        parameters: createTonSignDataParameters(1, '00112233445566778899aabbccddeeff'),
+      },
+      {
+        title: 'Cell',
+        parameters: createTonSignDataParameters(
+          2,
+          'b5ee9c7241010101000e000018000000004f6e654b65792043656c6c3cc87b8a',
+          'text_comment#00000000 text:string = InternalMsgBody;'
+        ),
       },
     ],
   },

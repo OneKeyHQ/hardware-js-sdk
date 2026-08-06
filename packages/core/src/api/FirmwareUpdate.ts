@@ -89,7 +89,8 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
             await this.device.deviceConnector?.acquire(
               this.device.originalDescriptor.id,
               null,
-              true
+              true,
+              this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType
             );
             await this.device.initialize();
             if (this.device.isBootloader()) {
@@ -103,7 +104,10 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
         } else {
           const deviceDiff = await this.device.deviceConnector?.enumerate();
           const devicesDescriptor = deviceDiff?.descriptors ?? [];
-          const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
+          const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId, {
+            connectProtocol:
+              this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType,
+          });
 
           if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
             // should update current device from cache

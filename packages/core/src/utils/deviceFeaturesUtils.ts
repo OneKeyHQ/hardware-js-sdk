@@ -74,7 +74,8 @@ export const supportInputPinOnSoftware = (features?: Features): SupportFeatureTy
   if (
     deviceType === EDeviceType.Touch ||
     deviceType === EDeviceType.Pro ||
-    deviceType === EDeviceType.Pro2
+    deviceType === EDeviceType.Pro2 ||
+    deviceType === EDeviceType.Neo
   ) {
     return { support: false };
   }
@@ -90,7 +91,8 @@ export const supportNewPassphrase = (features?: Features): SupportFeatureType =>
   if (
     deviceType === EDeviceType.Touch ||
     deviceType === EDeviceType.Pro ||
-    deviceType === EDeviceType.Pro2
+    deviceType === EDeviceType.Pro2 ||
+    deviceType === EDeviceType.Neo
   ) {
     return { support: true };
   }
@@ -106,6 +108,8 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
     initSession?: boolean;
+    deriveCardano?: boolean;
+    rejectAttachPinForMainWallet?: boolean;
   }
 ) => {
   if (device.isProtocolV2()) {
@@ -121,6 +125,8 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
       initSession: options?.initSession,
       expectedPassphraseState: options?.expectPassphraseState,
       onlyMainPin: options?.onlyMainPin,
+      deriveCardano: options?.deriveCardano,
+      rejectAttachPinForMainWallet: options?.rejectAttachPinForMainWallet,
     });
   }
 
@@ -139,7 +145,8 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
   const isModeT =
     deviceType === EDeviceType.Touch ||
     deviceType === EDeviceType.Pro ||
-    deviceType === EDeviceType.Pro2;
+    deviceType === EDeviceType.Pro2 ||
+    deviceType === EDeviceType.Neo;
 
   // 如果可以获取到 passphraseState，但是设备 features 显示设备未开启 passphrase，需要刷新设备状态
   // if passphraseState can be obtained, but the device features show that the device has not enabled passphrase, the device status needs to be refreshed
@@ -185,6 +192,8 @@ export const getPassphraseState = async (
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
     initSession?: boolean;
+    deriveCardano?: boolean;
+    rejectAttachPinForMainWallet?: boolean;
   }
 ): Promise<{
   passphraseState: string | undefined;
@@ -205,6 +214,8 @@ export const getPassphraseState = async (
       initSession: options?.initSession,
       expectedPassphraseState: options?.expectPassphraseState,
       onlyMainPin: options?.onlyMainPin,
+      deriveCardano: options?.deriveCardano,
+      rejectAttachPinForMainWallet: options?.rejectAttachPinForMainWallet,
     });
   }
 

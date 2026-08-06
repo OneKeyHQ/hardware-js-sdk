@@ -1,6 +1,6 @@
 import axios from 'axios';
 import semver from 'semver';
-import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import MessagesJSON from '../data/messages/messages.json';
 import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
@@ -17,6 +17,7 @@ import {
 } from '../utils';
 import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
+import { parseProtocolV2Resources } from '../protocols/protocol-v2/resources';
 
 import type {
   AssetsMap,
@@ -25,6 +26,7 @@ import type {
   Features,
   IDeviceBLEFirmwareStatus,
   IDeviceFirmwareStatus,
+  IProtocolV2Resources,
   ITransportStatus,
   IVersionArray,
   RemoteConfigResponse,
@@ -67,7 +69,7 @@ function getFirmwareTypeFromField(firmwareField: IFirmwareField): EFirmwareType 
 
 export default class DataManager {
   static deviceMap: DeviceTypeMap & {
-    [k: string]: DeviceTypeMap[keyof DeviceTypeMap] | undefined;
+    [k: string]: NonNullable<DeviceTypeMap[keyof DeviceTypeMap]> | undefined;
   } = {
     [EDeviceType.Classic]: {
       firmware: [],
@@ -93,6 +95,10 @@ export default class DataManager {
       firmware: [],
       ble: [],
     },
+    [EDeviceType.Neo]: {
+      firmware: [],
+      ble: [],
+    },
     [EDeviceType.ClassicPure]: {
       firmware: [],
       ble: [],
@@ -110,6 +116,8 @@ export default class DataManager {
   };
 
   static lastCheckTimestamp = 0;
+
+  static protocolV2ResourcesConfigError: Error | undefined;
 
   static getFirmwareStatus = (
     features: Features,
@@ -355,7 +363,7 @@ export default class DataManager {
 
   private static enrichFirmwareReleaseInfo(
     deviceData: DeviceTypeMap[keyof DeviceTypeMap] | undefined
-  ): DeviceTypeMap[keyof DeviceTypeMap] {
+  ): NonNullable<DeviceTypeMap[keyof DeviceTypeMap]> {
     // Safety check: return default structure if input is undefined/null
     if (!deviceData || typeof deviceData !== 'object') {
       return {
@@ -397,10 +405,11 @@ export default class DataManager {
     return enrichedData;
   }
 
-  static async load(settings: ConnectSettings) {
+  static async load(settings: ConnectSettings): Promise<boolean> {
     this.settings = settings;
+    this.protocolV2ResourcesConfigError = undefined;
     if (!settings.fetchConfig) {
-      return;
+      return false;
     }
 
     const url = settings.preRelease
@@ -445,6 +454,27 @@ export default class DataManager {
 
     // 3. Apply config if available
     if (data) {
+      let pro2Resources: IProtocolV2Resources | undefined;
+      let neoResources: IProtocolV2Resources | undefined;
+      this.protocolV2ResourcesConfigError = undefined;
+      try {
+        pro2Resources = parseProtocolV2Resources(
+          (data.pro2 as { resources?: unknown } | undefined)?.resources
+        );
+        neoResources = parseProtocolV2Resources(
+          (data.neo as { resources?: unknown } | undefined)?.resources
+        );
+      } catch (error) {
+        // Firmware resource metadata is not required for base communication. If the
+        // remote config is temporarily incomplete, disable this resource update only.
+        this.protocolV2ResourcesConfigError =
+          error instanceof Error ? error : new Error(String(error));
+        Log.warn('[DataConfig] Ignoring invalid Pro2 resources config:', error);
+      }
+      const enrichedPro2Config = this.enrichFirmwareReleaseInfo(data.pro2);
+      const enrichedNeoConfig = this.enrichFirmwareReleaseInfo(data.neo);
+      const { resources: _unvalidatedResources, ...pro2Config } = enrichedPro2Config;
+      const { resources: _unvalidatedNeoResources, ...neoConfig } = enrichedNeoConfig;
       Log.log(`[DataConfig] Config loaded successfully via [${fetchMethod}]`);
       this.deviceMap = {
         [EDeviceType.Classic]: this.enrichFirmwareReleaseInfo(data.classic),
@@ -453,14 +483,22 @@ export default class DataManager {
         [EDeviceType.Mini]: this.enrichFirmwareReleaseInfo(data.mini),
         [EDeviceType.Touch]: this.enrichFirmwareReleaseInfo(data.touch),
         [EDeviceType.Pro]: this.enrichFirmwareReleaseInfo(data.pro),
-        [EDeviceType.Pro2]: this.enrichFirmwareReleaseInfo(data.pro2),
+        [EDeviceType.Pro2]: {
+          ...pro2Config,
+          ...(pro2Resources ? { resources: pro2Resources } : undefined),
+        },
+        [EDeviceType.Neo]: {
+          ...neoConfig,
+          ...(neoResources ? { resources: neoResources } : undefined),
+        },
       };
       this.assets = {
         bridge: data.bridge,
       };
-    } else {
-      Log.warn('[DataConfig] All fetch methods failed, using built-in default config');
+      return true;
     }
+    Log.warn('[DataConfig] All fetch methods failed, using built-in default config');
+    return false;
   }
 
   static updateEnv(newEnv: ConnectSettings['env']) {
@@ -478,10 +516,44 @@ export default class DataManager {
 
   static async checkAndReloadData() {
     if (getTimeStamp() - this.lastCheckTimestamp > 1000 * 60 * 60 * 3) {
-      await this.load(this.settings).then(() => {
+      const loaded = await this.load(this.settings);
+      if (loaded) {
         this.lastCheckTimestamp = getTimeStamp();
-      });
+      }
     }
+  }
+
+  /** Force a fresh remote config before an update is allowed to mutate the device. */
+  static async forceReloadData({
+    requireResources = false,
+  }: { requireResources?: boolean } = {}): Promise<void> {
+    if (!this.settings) {
+      throw new Error('Remote config settings are not initialized');
+    }
+    const loaded = await this.load(this.settings);
+    if (!loaded) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.NetworkError,
+        'Unable to refresh the latest remote config'
+      );
+    }
+    if (requireResources && this.protocolV2ResourcesConfigError) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.FirmwareUpdateDownloadFailed,
+        `Invalid Pro2 resources config: ${this.protocolV2ResourcesConfigError.message}`
+      );
+    }
+    this.lastCheckTimestamp = getTimeStamp();
+  }
+
+  static getProtocolV2Resources(deviceType: EDeviceType.Pro2 | EDeviceType.Neo = EDeviceType.Pro2) {
+    return this.deviceMap[deviceType]?.resources?.stable;
+  }
+
+  static getProtocolV2BootResources(
+    deviceType: EDeviceType.Pro2 | EDeviceType.Neo = EDeviceType.Pro2
+  ) {
+    return this.deviceMap[deviceType]?.resources?.boot;
   }
 
   static getProtobufMessages(schema: ProtobufMessageSchema = 'v1CurrentSchema'): JSON {

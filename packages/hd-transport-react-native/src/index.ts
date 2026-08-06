@@ -28,6 +28,7 @@ import {
   HardwareErrorCode,
   createDeferred,
   isOnekeyBluetoothDevice,
+  isPro2FindMyAdvertisementName,
 } from '@onekeyfe/hd-shared';
 
 import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
@@ -60,6 +61,7 @@ const FIRMWARE_UPLOAD_WRITE_BURST_SIZE = Platform.OS === 'ios' ? 4 : 5;
 const FIRMWARE_UPLOAD_WRITE_PAUSE_MS = Platform.OS === 'ios' ? 8 : 10;
 const FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS = Platform.OS === 'ios' ? 24 : 30;
 const FIRMWARE_UPLOAD_WRITE_MAX_RETRIES = 8;
+const IOS_PROTOCOL_V2_CONTROL_WRITE_DELAY_MS = 5;
 const ANDROID_FIRMWARE_UPLOAD_PACKET_LENGTH = 192;
 const FIRMWARE_UPLOAD_WRITE_PACKET_CAPACITY =
   Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_FIRMWARE_UPLOAD_PACKET_LENGTH;
@@ -69,6 +71,33 @@ type FirmwareUploadWriteRetryType = 'congested';
 type ResolvedBleCharacteristics = {
   writeCharacteristic: Characteristic;
   notifyCharacteristic: Characteristic;
+};
+
+const isAsciiWhitespace = (code: number) =>
+  code === 0x09 ||
+  code === 0x0a ||
+  code === 0x0b ||
+  code === 0x0c ||
+  code === 0x0d ||
+  code === 0x20;
+
+const hasGattCongestedStatus = (text: string) => {
+  let searchFrom = 0;
+  while (searchFrom < text.length) {
+    const statusIndex = text.indexOf('status', searchFrom);
+    if (statusIndex < 0) return false;
+
+    let cursor = statusIndex + 'status'.length;
+    while (cursor < text.length && isAsciiWhitespace(text.charCodeAt(cursor))) cursor += 1;
+    if (text[cursor] === ':' || text[cursor] === '=') {
+      cursor += 1;
+      while (cursor < text.length && isAsciiWhitespace(text.charCodeAt(cursor))) cursor += 1;
+    }
+    if (text.startsWith(String(ANDROID_GATT_CONGESTED_STATUS), cursor)) return true;
+
+    searchFrom = statusIndex + 'status'.length;
+  }
+  return false;
 };
 
 const delay = (ms: number) =>
@@ -99,7 +128,7 @@ export const getFirmwareUploadWriteRetryType = (
   const text = [bleWriteError.reason, bleWriteError.message, bleWriteError.name]
     .filter(value => typeof value === 'string')
     .join(' ');
-  return /GATT_CONGESTED|status\s*[:=]?\s*143/.test(text) ? 'congested' : null;
+  return text.includes('GATT_CONGESTED') || hasGattCongestedStatus(text) ? 'congested' : null;
 };
 
 const resolveFirmwareUploadRetryDelay = (attempt: number, baseDelayMs = 200, maxDelayMs = 1200) =>
@@ -580,12 +609,21 @@ export default class ReactNativeBleTransport {
           }
 
           const displayName = getDeviceDisplayName(device);
-          const isOneKey = isOnekeyBluetoothDevice({
-            id: device?.id,
-            name: device?.name,
-            localName: device?.localName,
-            serviceUuids: device?.serviceUUIDs,
-          });
+          // iOS may report a service-only advertisement before the named scan response.
+          // Do not cache that incomplete advertisement as an unknown device.
+          const isUnnamedIOSPeripheral = Platform.OS === 'ios' && !displayName?.trim();
+          const isFindMyPeripheral =
+            isPro2FindMyAdvertisementName(device?.name) ||
+            isPro2FindMyAdvertisementName(device?.localName);
+          const isOneKey =
+            !isUnnamedIOSPeripheral &&
+            !isFindMyPeripheral &&
+            isOnekeyBluetoothDevice({
+              id: device?.id,
+              name: device?.name,
+              localName: device?.localName,
+              serviceUuids: device?.serviceUUIDs,
+            });
           if (isOneKey) {
             addDevice(device as unknown as Device);
           } else if (displayName && /\bpro\s*2\b/i.test(displayName)) {
@@ -606,7 +644,12 @@ export default class ReactNativeBleTransport {
               'localName' in device && typeof device.localName === 'string'
                 ? device.localName
                 : null;
+            const isFindMyPeripheral =
+              isPro2FindMyAdvertisementName(device.name) ||
+              isPro2FindMyAdvertisementName(localName);
+
             if (
+              !isFindMyPeripheral &&
               isOnekeyBluetoothDevice({
                 id: device.id,
                 name: device.name,
@@ -1207,7 +1250,7 @@ export default class ReactNativeBleTransport {
           // eslint-disable-next-line no-constant-condition
           while (true) {
             try {
-              await transport.writeCharacteristic.writeWithoutResponse(data);
+              await transport.writeWithRetry(data);
               return;
             } catch (error) {
               const retryType = getFirmwareUploadWriteRetryType(error);
@@ -1235,7 +1278,13 @@ export default class ReactNativeBleTransport {
         const outData = o.toString('base64');
         // Upload resources on low-end phones may OOM
         try {
-          await transport.writeCharacteristic.writeWithoutResponse(outData);
+          const shouldUseWriteWithResponse =
+            Platform.OS === 'ios' && transport.writeCharacteristic.isWritableWithResponse;
+          if (shouldUseWriteWithResponse) {
+            await transport.writeCharacteristic.writeWithResponse(outData);
+          } else {
+            await transport.writeCharacteristic.writeWithoutResponse(outData);
+          }
         } catch (e) {
           Log?.debug('writeCharacteristic write error: ', e);
           this.runPromise = null;
@@ -1422,6 +1471,16 @@ export default class ReactNativeBleTransport {
     protocolHint?: ProtocolType,
     rebuildTransport?: () => Promise<void>
   ): Promise<ProtocolType> {
+    if (Platform.OS === 'ios' && expectedProtocol) {
+      this.deviceProtocol.set(uuid, expectedProtocol);
+      Log?.debug('[ReactNativeBleTransport] protocol selected', {
+        deviceId: uuid,
+        protocol: expectedProtocol,
+        source: 'expected',
+      });
+      return expectedProtocol;
+    }
+
     if (expectedProtocol === 'V1') {
       if (await this.probeProtocolV1(uuid)) {
         this.deviceProtocol.set(uuid, 'V1');
@@ -1658,6 +1717,9 @@ export default class ReactNativeBleTransport {
     context: ProtocolV2CallContext,
     assertCurrentGeneration: () => void
   ) {
+    const shouldUseWriteWithResponse =
+      transport.writeCharacteristic.isWritableWithResponse &&
+      (context.writeWithResponse === true || (Platform.OS === 'ios' && !context.highVolume));
     let attempt = 0;
     for (;;) {
       assertCurrentGeneration();
@@ -1665,7 +1727,11 @@ export default class ReactNativeBleTransport {
         throw new Error(`Protocol V2 BLE write aborted for ${context.messageName}`);
       }
       try {
-        await transport.writeCharacteristic.writeWithoutResponse(base64);
+        if (shouldUseWriteWithResponse) {
+          await transport.writeCharacteristic.writeWithResponse(base64);
+        } else {
+          await transport.writeCharacteristic.writeWithoutResponse(base64);
+        }
         assertCurrentGeneration();
         return;
       } catch (error) {
@@ -1700,12 +1766,19 @@ export default class ReactNativeBleTransport {
       androidPacketLength: tuning.androidPacketLength,
       mtu: Platform.OS === 'android' ? transport.mtuSize : undefined,
     });
+    // Match Desktop BLE pacing so Pro2 firmware can finish the previous response
+    // before the next single-packet control command is written.
+    const initialDelayMs =
+      Platform.OS === 'ios' && !context.highVolume && frame.length <= packetCapacity
+        ? IOS_PROTOCOL_V2_CONTROL_WRITE_DELAY_MS
+        : 0;
     await writeProtocolV2BleFrame({
       frame,
       packetCapacity,
       assertActive: assertCurrentGeneration,
       signal: context.signal,
       abortMessage: `Protocol V2 BLE write aborted for ${context.messageName}`,
+      initialDelayMs,
       burstSize: FIRMWARE_UPLOAD_WRITE_BURST_SIZE,
       burstPauseMs: FIRMWARE_UPLOAD_WRITE_PAUSE_MS,
       flushDelayMs: FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS,
@@ -1737,7 +1810,7 @@ export default class ReactNativeBleTransport {
       const tuning = getProtocolV2BleTuning();
       Log?.debug('[ReactNativeBleTransport] Protocol V2 high-volume write configured', {
         name,
-        writeMode: 'withoutResponse',
+        writeMode: options?.writeWithResponse ? 'withResponse' : 'withoutResponse',
         packetCapacity: Platform.OS === 'ios' ? tuning.iosPacketLength : tuning.androidPacketLength,
       });
     }

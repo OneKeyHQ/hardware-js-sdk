@@ -59,9 +59,15 @@ let sdkReadyPromise: Promise<typeof HardwareSDK> | null = null;
  *   2. Hidden wallet — enter passphrase via pinentry (secure OS dialog)
  *   3. Hidden wallet — enter passphrase on device screen
  */
-function resolvePassphraseByChoice(choice: '1' | '2' | '3'): Promise<PinentryResult> {
+export function resolvePassphraseByChoice(choice: '1' | '2' | '3' | '4'): Promise<PinentryResult> {
   if (choice === '1') return Promise.resolve({ value: '', passphraseOnDevice: false });
   if (choice === '2') return promptPassphraseViaPinentry();
+  if (choice === '4')
+    return Promise.resolve({
+      value: '',
+      passphraseOnDevice: false,
+      attachPinOnDevice: true,
+    });
   return Promise.resolve({ value: '', passphraseOnDevice: true });
 }
 
@@ -84,18 +90,19 @@ function promptPassphraseMode(): Promise<PinentryResult> {
           '  1. Standard wallet (no passphrase)',
           '  2. Hidden wallet — enter passphrase on this computer (pinentry)',
           '  3. Hidden wallet — enter passphrase on device screen',
+          '  4. Attach PIN wallet — enter Attach PIN on device screen',
           '',
         ].join('\n')
       );
 
       rl.question('Enter selection [1/2/3]: ', answer => {
-        const n = answer.trim() as '1' | '2' | '3';
-        if (n === '1' || n === '2' || n === '3') {
+        const n = answer.trim() as '1' | '2' | '3' | '4';
+        if (n === '1' || n === '2' || n === '3' || n === '4') {
           rl.close();
           resolvePassphraseByChoice(n).then(resolve);
           return;
         }
-        process.stderr.write('Invalid selection. Enter 1, 2, or 3.\n');
+        process.stderr.write('Invalid selection. Enter 1, 2, 3, or 4.\n');
         prompt();
       });
     };
@@ -143,6 +150,7 @@ function registerEventHandlers(sdk: typeof HardwareSDK): void {
             payload: {
               value: result.value,
               passphraseOnDevice: result.passphraseOnDevice,
+              attachPinOnDevice: result.attachPinOnDevice,
               save: false,
             },
           });

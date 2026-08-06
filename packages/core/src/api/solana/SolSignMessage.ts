@@ -34,7 +34,7 @@ export default class SolSignMessage extends BaseMethod<HardwareSolSignUnsafeMess
 
   getVersionRange() {
     return {
-      pro2: {
+      model_pro2: {
         min: '0.0.0',
       },
       pro: {

@@ -85,10 +85,9 @@ module.exports = async function (env, argv) {
     config.devtool = false;
   }
 
-  // 添加或修改 DefinePlugin 来注入 commit SHA 和 CONNECT_SRC
+  // 添加或修改 DefinePlugin 来注入 commit SHA
   const commitSha = process.env.EXPO_PUBLIC_COMMIT_SHA || process.env.COMMIT_SHA || 'dev';
   const buildTime = new Date().toISOString();
-  const connectSrc = process.env.CONNECT_SRC;
 
   // 查找现有的 DefinePlugin
   const definePluginIndex = config.plugins.findIndex(
@@ -97,15 +96,13 @@ module.exports = async function (env, argv) {
 
   if (definePluginIndex !== -1) {
     // 追加新的 DefinePlugin，避免依赖内部字段
-    const defs = {
-      __COMMIT_SHA__: JSON.stringify(commitSha),
-      __BUILD_TIME__: JSON.stringify(buildTime),
-      'process.env.EXPO_PUBLIC_COMMIT_SHA': JSON.stringify(commitSha),
-    };
-    if (connectSrc !== undefined) {
-      defs['process.env.CONNECT_SRC'] = JSON.stringify(connectSrc);
-    }
-    config.plugins.push(new webpack.DefinePlugin(defs));
+    config.plugins.push(
+      new webpack.DefinePlugin({
+        __COMMIT_SHA__: JSON.stringify(commitSha),
+        __BUILD_TIME__: JSON.stringify(buildTime),
+        'process.env.EXPO_PUBLIC_COMMIT_SHA': JSON.stringify(commitSha),
+      })
+    );
   } else {
     // 添加新的 DefinePlugin
     config.plugins.push(
@@ -113,9 +110,6 @@ module.exports = async function (env, argv) {
         __COMMIT_SHA__: JSON.stringify(commitSha),
         __BUILD_TIME__: JSON.stringify(buildTime),
         'process.env.EXPO_PUBLIC_COMMIT_SHA': JSON.stringify(commitSha),
-        ...(connectSrc !== undefined
-          ? { 'process.env.CONNECT_SRC': JSON.stringify(connectSrc) }
-          : {}),
       })
     );
   }

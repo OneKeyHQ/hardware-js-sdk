@@ -3,6 +3,7 @@ export { default as testProtocolV2Ping } from './protocol-v2/Ping';
 export { default as preInitialize } from './device/PreInitialize';
 
 export { default as searchDevices } from './SearchDevices';
+export { default as detectDeviceConnectProtocol } from './DetectDeviceConnectProtocol';
 export { default as getFeatures } from './GetFeatures';
 export { default as getDeviceState } from './GetDeviceState';
 export { default as getOnekeyFeatures } from './GetOnekeyFeatures';
@@ -49,6 +50,7 @@ export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 export { default as deviceReboot } from './protocol-v2/DeviceReboot';
 export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
 export { default as deviceUploadWallpaper } from './protocol-v2/DeviceUploadWallpaper';
+export { default as deviceUploadNft } from './protocol-v2/DeviceUploadNft';
 export { default as uploadPortfolio } from './UploadPortfolio';
 
 export { default as cipherKeyValue } from './CipherKeyValue';

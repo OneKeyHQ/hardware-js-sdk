@@ -1,7 +1,7 @@
 # OneKey `hd-*` SDK 公共事件（SDK → App）
 
 > - 文档状态：Protocol V1 当前契约 + Protocol V2 通用事件边界
-> - 最后代码核验：2026-07-30
+> - 最后代码核验：2026-08-03
 > - 适用范围：`@onekeyfe/hd-core`、`hd-web-sdk`、`hd-common-connect-sdk`
 > - 事实来源：`packages/core/src/events`、`packages/core/src/core/index.ts` 和 SDK 外层消息转发实现
 
@@ -164,12 +164,15 @@ Event 必须在取消、超时、断连和方法结束时清理。
 
 ### PIN 响应
 
-以下 `RECEIVE_PIN` 只适用于 Protocol V1。Protocol V2/Pro2 的 `REQUEST_PIN` 是 SDK 在
-`DeviceLocked` 后合成的非阻塞“请在设备解锁”提示，不接受 PIN 响应。
+以下 `RECEIVE_PIN` 只适用于 Protocol V1。Protocol V2/Pro2 的 `REQUEST_PIN` 是 SDK 在发送
+`DeviceSessionAskPin` 前合成的非阻塞设备操作提示，不接受 PIN 响应。`Main` 映射为
+`ButtonRequest_PinEntry`，`AttachToPin` 映射为 `ButtonRequest_AttachPin`。
 
-该提示由统一交互协调器生成，payload 包含 `source='unlock-coordinator'`、
-`reason='device-locked'`、`deviceOnly=true` 和触发方法名。设备解锁后 SDK 在原调用内最多重试一次，
-App 不重发业务请求。声明 `protocolV2UiMode='none'` 的后台方法不会生成该提示。
+锁定重试提示由统一交互协调器生成，payload 包含 `source='unlock-coordinator'`、
+`reason='device-locked'`、`deviceOnly=true` 和触发方法名；钱包选择提示由钱包 Session 协调器生成。
+设备解锁后 SDK 在原调用内最多重试一次，App 不重发业务请求。
+`protocolV2UiMode='none'` 只抑制普通方法交互提示；如果实际发送了 `DeviceSessionAskPin`，
+SDK 仍必须生成该 PIN 提示。
 
 软件输入：
 
@@ -177,6 +180,7 @@ App 不重发业务请求。声明 `protocolV2UiMode='none'` 的后台方法不�
 HardwareSDK.uiResponse({
   type: UI_RESPONSE.RECEIVE_PIN,
   payload: '1234',
+  ...requestPayload.responseCorrelation,
 });
 ```
 
@@ -186,6 +190,7 @@ HardwareSDK.uiResponse({
 HardwareSDK.uiResponse({
   type: UI_RESPONSE.RECEIVE_PIN,
   payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+  ...requestPayload.responseCorrelation,
 });
 ```
 
@@ -207,6 +212,7 @@ HardwareSDK.uiResponse({
     passphraseOnDevice: false,
     save: false,
   },
+  ...requestPayload.responseCorrelation,
 });
 ```
 
@@ -220,6 +226,7 @@ HardwareSDK.uiResponse({
     passphraseOnDevice: true,
     save: false,
   },
+  ...requestPayload.responseCorrelation,
 });
 ```
 
@@ -233,6 +240,7 @@ HardwareSDK.uiResponse({
     attachPinOnDevice: true,
     save: false,
   },
+  ...requestPayload.responseCorrelation,
 });
 ```
 
@@ -298,10 +306,14 @@ V1 用户选择设备端输入后，设备可能返回 `ButtonRequest_Passphrase
 | `DEVICE_PROGRESS`         | SDK 计算                         | 文件写入、批量地址等方法   | `progress`、字节数、速率、耗时 | 展示通用设备任务进度                       |
 | `PREVIOUS_ADDRESS_RESULT` | SDK 生成                         | 每次地址结果返回后         | `device`、`address`、`path`    | 增量展示地址；当前 OneKey App 跳过该事件   |
 | `FIRMWARE_PROCESSING`     | SDK 固件状态机生成               | 固件升级方法               | 当前处理类型                   | 切换 firmware/ble/bootloader/resource 阶段 |
-| `FIRMWARE_PROGRESS`       | SDK 计算；部分由硬件状态消息转换 | 固件传输或安装状态         | `progress`、`progressType`     | 更新传输或安装进度条                       |
+| `FIRMWARE_PROGRESS`       | SDK 计算；部分由硬件状态消息转换 | 固件传输或安装状态         | `progress`、阶段及可选传输指标 | 更新传输或安装进度条                       |
 | `FIRMWARE_TIP`            | SDK 固件状态机生成               | 下载、重启、确认和安装阶段 | `FirmwareUpdateTipMessage`     | 展示固件升级阶段提示                       |
 
-`FIRMWARE_PROGRESS` 会进行节流，不能依赖每个底层分片都产生一次事件。Protocol V2 安装阶段收到 `DeviceFirmwareUpdateStatus` 时也会发送安装进度。
+`FIRMWARE_PROGRESS` 会进行节流，不能依赖每个底层分片都产生一次事件。Protocol V2 安装阶段收到
+`DeviceFirmwareUpdateStatus` 时也会发送安装进度，但固件只报告 target 状态，不报告 target 内部
+百分比；因此该进度是已完成 target 的粗粒度比例，不能解释为设备真实安装百分比。
+Protocol V2 文件传输阶段还会附带 `transferredBytes`、`totalBytes`、`rateBytesPerSecond` 和
+`elapsedMs`；这些字段在安装阶段及旧协议流程中可能缺省。
 
 ## 固件事件的两条通道
 
@@ -338,8 +350,19 @@ HardwareSDK.on(FIRMWARE_EVENT, message => {
 
 `SUPPORT_FEATURES` 不是硬件主动推送。它是 SDK 根据设备型号和 Features 计算出的业务辅助信息。
 
-`DEVICE.STATE` 是 V1/V2 的统一状态变更通知。它可能来自设备读取、设置成功后的 confirmed patch
-或解锁结果；相同 patch 不会重复发送。新接入只消费完整 `DeviceState`，无需识别底层协议。
+`DEVICE.STATE` 是 V1/V2 的统一状态变更通知。它可能来自设备读取、Protocol V1 设置成功后的
+confirmed patch 或解锁结果；相同 patch 不会重复发送。Protocol V2 设置成功后会强制读回
+`status` 与 `settings`，只发布设备返回的状态。新接入只消费完整 `DeviceState`，无需识别底层协议。
+
+设置调用中的状态刷新会先在 Core 内更新 `DeviceState` 并同步发出 `DEVICE.STATE`，随后 API Promise
+才完成。Protocol V2 的 API Promise 还会等待写后 `status + settings` 读回完成；读回失败时调用失败，
+即使此前的设置命令可能已经被设备接受。App 如果在 listener 中异步落库，必须把“设置调用完成”和
+“该设备的事件落库完成”串行化，再读取本地状态；不能在 Promise 返回后立即读取旧 `Features` 缓存，
+也不能用请求参数乐观覆盖设备状态。
+
+Pro2 的 `status.passphraseProtection` 只在设备已解锁、私有 Status 可验证时具有权威值。关闭
+passphrase 后设备可能主动锁定，此时后续锁定快照允许该字段为 `undefined`；App 应保留最近一次已确认值，
+并在解锁后通过 `getDeviceState({ scope: 'settings' })` 刷新，而不是把锁定快照解释为 `false`。
 
 `DEVICE.FEATURES` 仅用于 Protocol V1 兼容。Protocol V2 不发送该事件，也不支持 `getFeatures()`。
 
@@ -361,26 +384,31 @@ HardwareSDK.on(FIRMWARE_EVENT, message => {
 
 ## 响应匹配和并发边界
 
-当前 Core 使用全局 `_uiPromises` 保存等待项，匹配键只有 `UI_RESPONSE` 类型：
+当前 Core 使用全局 `_uiPromises` 保存等待项。PIN 和 Passphrase 请求的 payload 会携带
+`responseCorrelation = { interactionId, deviceId }`，应用必须把这两个字段原样放回
+`uiResponse()`；Core 使用以下匹配键：
 
 ```text
-RECEIVE_PIN -> 当前 V1 PIN 等待
-RECEIVE_PASSPHRASE -> 当前 Passphrase 等待
+RECEIVE_PIN + interactionId + deviceId -> 对应 V1 PIN 等待
+RECEIVE_PASSPHRASE + interactionId + deviceId -> 对应 Passphrase 等待
 SELECT_DEVICE_* -> 当前对应设备选择等待
 ```
 
-这带来以下约束：
+兼容和安全边界如下：
 
-- 响应中没有 requestId，也不携带 connectId 用于匹配。
-- 同一响应类型不能安全地同时服务两个并发交互。
-- 正常安全边界依赖 Core 请求队列和设备调用串行化。
+- 新接入必须原样回传 correlation；不完整或不匹配的 correlation 会被忽略。
+- 旧接入不带 correlation 时，只在同类型敏感等待项唯一的情况下兼容；存在多个候选时拒绝猜测。
+- `interactionId` 是每个阻塞 UI Promise 的唯一标识，不等同于 V2 页面状态机中跨多个阶段的
+  `interaction.interactionId`。
+- `deviceId` 优先使用公开的钱包生命周期 ID；设备状态尚未提供该 ID 时，Core 使用当前 SDK Device
+  instance ID 作为本次 correlation 的回传值，应用不得自行替换。
 - 没有匹配等待项的 `uiResponse()` 会被忽略。
 - 旧 UI 等待没有独立超时；应用必须确保响应或调用取消路径能够执行。
-- 多设备 UI 可以依据请求 payload 展示正确设备，但不能通过响应 payload 指定要解析哪个等待项。
-- V2 合成阻塞 Event 复用该机制时，必须保持调用串行，或增加 requestId/connectId 关联。
+- 多设备并发的同类型敏感响应只能解析相同 correlation 的等待项。
 - 取消、超时、断连和方法结束必须删除等待项；迟到响应不能解析下一个调用。
 
-因此，应用层不应自行并行启动两个需要相同 Passphrase 响应的硬件流程；V1 PIN 同样受此限制。
+应用仍应避免无业务必要的并发交互，但正确回传 correlation 后，并发本身不会再导致 PIN 或
+Passphrase 命中另一台设备的等待项。
 
 ## `UI_REQUEST` 中并非事件的常量
 

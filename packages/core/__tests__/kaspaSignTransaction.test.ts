@@ -465,7 +465,7 @@ describe('KaspaSignTransaction protocol negotiation', () => {
     expect(mockTypedCall.mock.calls[4][0]).toBe('KaspaTxAckInput');
   });
 
-  describe('previous-transaction id mismatch', () => {
+  describe('streaming error propagation', () => {
     const PREV_ID = 'aa'.repeat(32);
     const withRefTxs = {
       outputs: [{ satoshis: 100000, script: SCRIPT, address: ADDRESS }],
@@ -486,7 +486,7 @@ describe('KaspaSignTransaction protocol negotiation', () => {
         )
         .mockRejectedValueOnce(error);
 
-    it('surfaces the device rejection under its own error code', async () => {
+    it('propagates a previous-transaction id mismatch without retrying', async () => {
       streamThenReject(
         ERRORS.TypedError(
           HardwareErrorCode.RuntimeError,
@@ -495,31 +495,8 @@ describe('KaspaSignTransaction protocol negotiation', () => {
       );
 
       await expect(runMethod(withRefTxs)).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.KaspaPrevTxIdMismatch,
-      });
-      // Never silently re-signs without refTxs.
-      expect(mockTypedCall).toHaveBeenCalledTimes(2);
-    });
-
-    it('leaves an unrelated device error untouched', async () => {
-      streamThenReject(
-        ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          'Failure_ProcessError,some other device error'
-        )
-      );
-
-      await expect(runMethod(withRefTxs)).rejects.toMatchObject({
         errorCode: HardwareErrorCode.RuntimeError,
-      });
-      expect(mockTypedCall).toHaveBeenCalledTimes(2);
-    });
-
-    it('leaves user cancellation untouched', async () => {
-      streamThenReject(ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
-
-      await expect(runMethod(withRefTxs)).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.ActionCancelled,
+        message: expect.stringContaining('Kaspa previous transaction id mismatch'),
       });
       expect(mockTypedCall).toHaveBeenCalledTimes(2);
     });

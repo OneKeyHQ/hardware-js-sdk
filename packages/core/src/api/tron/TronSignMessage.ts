@@ -46,7 +46,7 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
 
   getVersionRange() {
     return {
-      pro2: {
+      model_pro2: {
         min: '0.0.0',
       },
       model_mini: {
@@ -57,7 +57,7 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
 
   getMessageV2VersionRange() {
     return {
-      pro2: {
+      model_pro2: {
         min: '0.0.0',
       },
       pro: {

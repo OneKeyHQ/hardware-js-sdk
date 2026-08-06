@@ -13,7 +13,9 @@ export default class ProtocolInfoRequest extends BaseMethod {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('ProtocolInfoRequest', 'ProtocolInfo', {});
+    const res = await this.device.commands.typedCall('ProtocolInfoRequest', 'ProtocolInfo', {
+      eventless_wallet_session: true,
+    });
     return Promise.resolve(res.message);
   }
 }

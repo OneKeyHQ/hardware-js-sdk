@@ -369,7 +369,7 @@ export const HwkScreen = () => {
     adapterRef.current = adapter;
     setReady(true);
     appendLog('info', 'HWK Trezor BLE adapter initialized.');
-  }, [appendLog, debugLogger]);
+  }, [appendLog, brand, debugLogger]);
 
   const selectDevice = useCallback((device: DeviceInfo, source: SelectableDeviceSource) => {
     const normalizedDevice = normalizeDevice(device);
@@ -676,7 +676,7 @@ export const HwkScreen = () => {
     } finally {
       setBusy(null);
     }
-  }, [appendLog, connectedId, selected?.connectId]);
+  }, [appendLog, brand, connectedId, selected?.connectId]);
 
   const onGetAddress = useCallback(async () => {
     const adapter = adapterRef.current;

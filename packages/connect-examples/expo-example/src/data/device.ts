@@ -104,11 +104,6 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
-    method: 'checkBridgeRelease',
-    description: 'Check bridge release of a device',
-    noDeviceIdReq: true,
-  },
-  {
     method: 'checkBootloaderRelease',
     description: 'Check bootloader release of a device',
     noDeviceIdReq: true,
@@ -169,14 +164,11 @@ const api: PlaygroundProps[] = [
     presupposes: [
       {
         title: 'checkAllFirmwareRelease',
-        value: {
-          checkBridgeRelease: true,
-        },
+        value: {},
       },
       {
         title: 'checkAllFirmwareRelease Bitcoin Only',
         value: {
-          checkBridgeRelease: true,
           firmwareType: 'bitcoinonly',
         },
       },

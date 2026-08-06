@@ -1,11 +1,11 @@
 import { Buffer } from 'buffer';
 import { HardwareErrorCode, createHwkError } from '@onekeyfe/hwk-adapter-core';
 import {
-  type TrezorDebugLogLevel,
-  type TrezorDebugLogger,
   TrezorConnectorBase,
   type TrezorConnectorBaseOptions,
   type TrezorConnectorByteTransport,
+  type TrezorDebugLogLevel,
+  type TrezorDebugLogger,
   filterTrezorDebugLogEntry,
 } from '@onekeyfe/hwk-trezor-connector';
 import {

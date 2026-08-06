@@ -11,12 +11,22 @@ export const UI_RESPONSE = {
     'ui-receive_select-device-for-switch-firmware-web-device',
 } as const;
 
-export interface UiResponsePin {
+export interface UiResponseCorrelation {
+  interactionId: string;
+  deviceId: string;
+}
+
+export interface UiResponseCorrelationFields {
+  interactionId?: string;
+  deviceId?: string;
+}
+
+export interface UiResponsePin extends UiResponseCorrelationFields {
   type: typeof UI_RESPONSE.RECEIVE_PIN;
   payload: string;
 }
 
-export interface UiResponsePassphrase {
+export interface UiResponsePassphrase extends UiResponseCorrelationFields {
   type: typeof UI_RESPONSE.RECEIVE_PASSPHRASE;
   payload: {
     value: string;

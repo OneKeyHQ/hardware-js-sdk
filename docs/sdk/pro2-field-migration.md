@@ -86,7 +86,7 @@ DeviceInfo
 
 | Protocol V2 字段              | 含义                | SDK 当前处理                           |
 | ----------------------------- | ------------------- | -------------------------------------- |
-| `hw.Device_type`              | 设备型号            | SDK 当前识别为 Pro 2                   |
+| `hw.Device_type`              | 设备型号            | SDK 按协议枚举识别 Pro 2、Neo 等真实型号 |
 | `hw.serial_no`                | 设备序列号          | 转换为 `DeviceState.identity.serialNo` |
 | `hw.hardware_version`         | 可读硬件版本        | 保留在原始 Protocol V2 数据中          |
 | `hw.hardware_version_raw_adc` | 硬件版本 ADC 原始值 | 保留在原始数据中                       |
@@ -292,19 +292,21 @@ label、语言、蓝牙开关、自动锁屏和振动反馈都属于用户配置
 
 ```text
 DeviceSessionAskPassphrase -> Success -> DeviceSessionGet -> DeviceSession
-DeviceSessionAskPin(Main/AttachToPin) -> DeviceSession
-DeviceSessionGet({ session_id }) -> DeviceSession
+DeviceSessionAskPin(Main/AttachToPin) -> Success -> DeviceSessionGet -> DeviceSession
+DeviceSessionGet({ session_id, btc_test_address, seed_domains }) -> DeviceSession
 ```
 
 ### 8.1 字段说明
 
-| Protocol V2 字段/消息         | 含义                             | SDK 当前处理                                                         |
-| ----------------------------- | -------------------------------- | -------------------------------------------------------------------- |
-| `DeviceSessionGet.session_id` | 尝试恢复之前的隐藏钱包 Session   | Core 内部传入当前钱包缓存值                                          |
-| `DeviceSessionPinType`        | `Any/Main/AttachToPin` PIN 路由  | 标准钱包固定 `Main`，Attach 选择固定对应类型                         |
-| `DeviceSessionAskPassphrase`  | 创建 Passphrase 隐藏钱包会话     | Host：`{ passphrase, on_device: false }`；设备：`{ on_device: true }` |
-| 响应 `session_id`             | 当前钱包 Session ID              | 保存到当前钱包缓存                                                   |
-| `btc_test_address`            | 用于确认当前钱包上下文的稳定标识 | 映射为内部 `passphraseState`                                         |
+| Protocol V2 字段/消息                 | 含义                             | SDK 当前处理                                                          |
+| ------------------------------------- | -------------------------------- | --------------------------------------------------------------------- |
+| `DeviceSessionGet.session_id`         | 尝试恢复之前的钱包 Session       | Core 内部传入当前钱包缓存值                                           |
+| `DeviceSessionGet.btc_test_address`   | 请求恢复的预期钱包身份           | 从内部 `passphraseState` 映射，和缓存 Session 一起发送                |
+| `DeviceSessionGet.seed_domains`       | 本次需要派生的 Seed 域           | 普通业务为 `[Standard]`，Cardano 为 `[Standard, Cardano]`             |
+| `DeviceSessionPinType`                | `Any/Main/AttachToPin` PIN 路由  | 标准钱包固定 `Main`，Attach 选择固定对应类型                          |
+| `DeviceSessionAskPassphrase`          | 创建 Passphrase 隐藏钱包会话     | Host：`{ passphrase, on_device: false }`；设备：`{ on_device: true }` |
+| 响应 `session_id`                     | 当前钱包 Session ID              | 保存到当前钱包缓存                                                    |
+| 响应 `DeviceSession.btc_test_address` | 用于确认当前钱包上下文的稳定标识 | 映射为内部 `passphraseState`                                          |
 
 这里的 `btc_test_address` 用于确认当前打开的是不是预期钱包，不用于用户资产地址展示。
 
@@ -312,7 +314,7 @@ DeviceSessionGet({ session_id }) -> DeviceSession
 
 ```text
 读取当前隐藏钱包缓存 session_id
-    -> DeviceSessionGet({ session_id })
+    -> DeviceSessionGet({ session_id, btc_test_address, seed_domains })
     -> 返回 DeviceSession
     -> 校验 btc_test_address 是否符合预期钱包
 ```

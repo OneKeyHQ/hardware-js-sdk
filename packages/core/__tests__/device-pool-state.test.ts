@@ -38,6 +38,28 @@ describe('DevicePool state lifecycle', () => {
     expect(getDeviceState).toHaveBeenNthCalledWith(2, { refreshSections: ['settings'] });
   });
 
+  test('actively re-detects a cached device when protocol detection is forced', async () => {
+    const descriptor = { path: 'cached-path', protocolType: 'V1' } as any;
+    const device = Device.fromDescriptor(descriptor);
+    const acquire = jest.spyOn(device, 'acquire').mockImplementation(() => {
+      device.originalDescriptor.protocolType = 'V2';
+      return Promise.resolve(true);
+    });
+    const initialize = jest.spyOn(device, 'initialize').mockResolvedValue(undefined);
+    const release = jest.spyOn(device, 'release').mockResolvedValue(undefined);
+    DevicePool.devicesCache = { 'cached-id': device };
+
+    const result = await DevicePool.getDevices([descriptor], 'cached-id', {
+      forceProtocolDetection: true,
+    });
+
+    expect(acquire).toHaveBeenCalledWith(undefined, { forceProtocolDetection: true });
+    expect(initialize).toHaveBeenCalledWith({ forceProtocolDetection: true });
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(device.originalDescriptor.protocolType).toBe('V2');
+    expect(result.deviceList).toEqual([device]);
+  });
+
   test('keeps a discovered device when its Protocol V2 label cannot be read', async () => {
     const labelError = new Error('settings unavailable');
     const getDeviceState = jest

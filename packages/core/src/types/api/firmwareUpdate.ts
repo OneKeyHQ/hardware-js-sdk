@@ -63,6 +63,7 @@ export interface FirmwareUpdateV3Params {
  */
 export type FirmwareUpdateV4Target =
   | 'boot'
+  | 'boot_resources'
   | 'app_v1'
   | 'app_v2'
   | 'coprocessor'
@@ -95,12 +96,14 @@ export interface FirmwareUpdateV4Params {
   se04Binary?: ArrayBuffer;
   forcedUpdateRes?: boolean;
   /**
-   * RESC bundle okpkg files written directly to devicePath through FilesystemFileWrite.
-   * Manual mode installs them without version comparison.
+   * Arbitrary Protocol V2 resource files written directly with FilesystemFileWrite.
+   * Use this for manifest-driven boot resources and other non-RESC files.
    */
-  resourceBundleFiles?: Array<{
+  resourceFiles?: Array<{
     binary: ArrayBuffer;
     devicePath: string;
+    size?: number;
+    fileHash?: string;
   }>;
 }
 

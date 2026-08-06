@@ -14,6 +14,7 @@ import { findMethod } from '../utils';
 import { DEVICE, IFRAME, createUiMessage } from '../../events';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { onDeviceButtonHandler } from '../../core';
+import { runMethodWithUnlockPolicy } from '../../protocols/protocol-v2/unlockPolicyRunner';
 import {
   completeRequestContext,
   createRequestContext,
@@ -375,16 +376,38 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
       this.device.on(DEVICE.PASSPHRASE, onSignalAbort);
 
       preCheckDeviceSupport(this.device, method);
-      if (this.temporarySafetyCheckPrompted) {
-        method.temporarySafetyCheckPrompted = true;
-      } else {
-        const appliedTemporarySafetyCheck = await method.checkSafetyLevelOnTestNet();
-        if (appliedTemporarySafetyCheck) {
-          this.temporarySafetyCheckPrompted = true;
-        }
-      }
+      const response = await runMethodWithUnlockPolicy<any[]>(method, this.device, {
+        context: this.protocolV2UnlockContext,
+        prepare: async () => {
+          if (this.temporarySafetyCheckPrompted) {
+            method.temporarySafetyCheckPrompted = true;
+          } else {
+            const appliedTemporarySafetyCheck = await method.checkSafetyLevelOnTestNet();
+            if (appliedTemporarySafetyCheck) {
+              this.temporarySafetyCheckPrompted = true;
+            }
+          }
 
-      const response = await method.run();
+          // Protocol V2 hands a wallet session to exactly one blockchain request.
+          // The parent all-network call consumes its first handoff while fetching
+          // the root fingerprint, so each nested chain method must resume the
+          // requested standard or hidden wallet before sending its device command.
+          const useEmptyPassphrase = this.payload.useEmptyPassphrase === true;
+          const deriveCardano = method.name.startsWith('cardano');
+          const shouldResumeWalletSession = useEmptyPassphrase || !!this.payload.passphraseState;
+          if (this.device.isProtocolV2() && shouldResumeWalletSession) {
+            const passphraseStateSafety = await this.device.checkPassphraseStateSafety(
+              this.payload.passphraseState,
+              useEmptyPassphrase,
+              this.payload.skipPassphraseCheck,
+              deriveCardano
+            );
+            if (!passphraseStateSafety) {
+              throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
+            }
+          }
+        },
+      });
 
       if (!Array.isArray(response) || response.length === 0) {
         throw new Error('No response');
@@ -439,7 +462,9 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
       show_display: false,
     });
 
-    this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
+    if (!this.device.isProtocolV2()) {
+      this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
+    }
 
     if (res.message.root_fingerprint == null) {
       throw ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter);

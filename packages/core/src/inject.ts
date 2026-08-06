@@ -1,3 +1,4 @@
+import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type { Unsuccessful } from './types';
 import type { EventEmitter } from 'events';
 import type { CallMethod } from './events';
@@ -39,6 +40,50 @@ export interface InjectApi {
   switchTransport: CoreApi['switchTransport'];
 }
 
+const normalizeConnectId = (connectId: string) => connectId.trim().toLowerCase();
+
+/**
+ * Keeps verified protocols isolated per transport endpoint and injects them at
+ * the single public call boundary, including APIs that do not expose params.
+ */
+export const createProtocolAwareCall = (rawCall: CoreApi['call']) => {
+  const protocolByConnectId = new Map<string, HardwareConnectProtocol>();
+
+  const setDeviceConnectProtocol: CoreApi['setDeviceConnectProtocol'] = (
+    connectId,
+    connectProtocol
+  ) => {
+    const normalizedConnectId = normalizeConnectId(connectId);
+    if (!normalizedConnectId) return;
+    if (connectProtocol) {
+      protocolByConnectId.set(normalizedConnectId, connectProtocol);
+    } else {
+      protocolByConnectId.delete(normalizedConnectId);
+    }
+  };
+
+  const call: CoreApi['call'] = params => {
+    if (!params || typeof params !== 'object') {
+      return rawCall(params);
+    }
+
+    const connectId = typeof params.connectId === 'string' ? params.connectId : undefined;
+    const boundProtocol = connectId
+      ? protocolByConnectId.get(normalizeConnectId(connectId))
+      : undefined;
+    if (
+      boundProtocol &&
+      params.connectProtocol === undefined &&
+      params.forceProtocolDetection !== true
+    ) {
+      return rawCall({ ...params, connectProtocol: boundProtocol });
+    }
+    return rawCall(params);
+  };
+
+  return { call, setDeviceConnectProtocol };
+};
+
 export const inject = ({
   call,
   cancel,
@@ -49,6 +94,7 @@ export const inject = ({
   switchTransport,
   uiResponse,
 }: InjectApi): CoreApi => {
+  const protocolAwareCall = createProtocolAwareCall(call);
   const api: CoreApi = {
     on: <T extends string, P extends (...args: any[]) => any>(type: T, fn: P) => {
       eventEmitter.on(type, fn);
@@ -66,7 +112,9 @@ export const inject = ({
 
     init,
 
-    call,
+    call: protocolAwareCall.call,
+
+    setDeviceConnectProtocol: protocolAwareCall.setDeviceConnectProtocol,
 
     dispose,
 
@@ -78,7 +126,7 @@ export const inject = ({
 
     switchTransport,
 
-    ...createCoreApi(call),
+    ...createCoreApi(protocolAwareCall.call),
   };
   return api;
 };
@@ -93,6 +141,7 @@ export const createCoreApi = (
   | 'removeAllListeners'
   | 'init'
   | 'call'
+  | 'setDeviceConnectProtocol'
   | 'dispose'
   | 'uiResponse'
   | 'cancel'
@@ -105,6 +154,12 @@ export const createCoreApi = (
    * 搜索设备
    */
   searchDevices: params => call({ ...params, method: 'searchDevices' }),
+  detectDeviceConnectProtocol: connectId =>
+    call({
+      connectId,
+      method: 'detectDeviceConnectProtocol',
+      forceProtocolDetection: true,
+    }),
 
   /**
    * 获取设备信息
@@ -162,6 +217,7 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
   deviceUploadWallpaper: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceUploadWallpaper' }),
+  deviceUploadNft: (connectId, params) => call({ ...params, connectId, method: 'deviceUploadNft' }),
   uploadPortfolio: (connectId, params) => call({ ...params, connectId, method: 'uploadPortfolio' }),
   deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
   deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),

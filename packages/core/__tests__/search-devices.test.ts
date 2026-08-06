@@ -42,7 +42,7 @@ describe('SearchDevices', () => {
     mockIsBleConnect.mockReturnValue(false);
   });
 
-  test('单个 USB 描述符无响应时跳过该设备并继续搜索', async () => {
+  test('搜索忽略调用方协议并主动探测，单个无响应设备不阻断后续结果', async () => {
     const unresponsiveDescriptor = {
       path: 'stale-usb-device',
       id: 'stale-usb-device',
@@ -74,6 +74,7 @@ describe('SearchDevices', () => {
       id: 1,
       payload: {
         method: 'searchDevices',
+        connectProtocol: 'V2',
       },
     } as any);
     method.init();
@@ -89,13 +90,21 @@ describe('SearchDevices', () => {
       1,
       [unresponsiveDescriptor],
       unresponsiveDescriptor.path,
-      { connectProtocol: undefined, refreshRuntimeState: true }
+      {
+        connectProtocol: undefined,
+        forceProtocolDetection: true,
+        refreshRuntimeState: true,
+      }
     );
     expect(mockGetDevices).toHaveBeenNthCalledWith(
       2,
       [availableDescriptor],
       availableDescriptor.path,
-      { connectProtocol: undefined, refreshRuntimeState: true }
+      {
+        connectProtocol: undefined,
+        forceProtocolDetection: true,
+        refreshRuntimeState: true,
+      }
     );
   });
 

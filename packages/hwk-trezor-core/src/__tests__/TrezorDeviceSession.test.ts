@@ -1,5 +1,4 @@
 import { randomBytes } from 'node:crypto';
-
 import {
   thp as protocolThp,
   v1 as protocolV1,

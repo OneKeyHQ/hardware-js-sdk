@@ -1,5 +1,6 @@
 import { Buffer } from 'buffer';
 import ByteBuffer from 'bytebuffer';
+import { Enum } from 'protobufjs/light';
 
 import { isPrimitiveField } from '../../utils/protobuf';
 
@@ -49,7 +50,10 @@ export function patch(Message: Type, payload: any) {
     // repeated
     if (field.repeated) {
       const RefMessage = Message.lookupTypeOrEnum(field.type);
-      patched[key] = value.map((v: any) => patch(RefMessage, v));
+      patched[key] =
+        RefMessage instanceof Enum
+          ? value.map((v: any) => transform(field.type, v))
+          : value.map((v: any) => patch(RefMessage, v));
     }
     // message type
     else if (typeof value === 'object' && value !== null) {

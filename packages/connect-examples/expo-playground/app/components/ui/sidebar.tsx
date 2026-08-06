@@ -14,12 +14,14 @@ import { useSidebarState } from '../../store/uiStore';
 const SIDEBAR_WIDTH = '18rem';
 const SIDEBAR_WIDTH_ICON = '3rem';
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
+const MOBILE_BREAKPOINT = 768;
 
 type SidebarContextProps = {
   state: 'expanded' | 'collapsed';
   open: boolean;
   setOpen: (open: boolean) => void;
   toggleSidebar: () => void;
+  isMobile: boolean;
 };
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
@@ -33,6 +35,30 @@ function useSidebar() {
   return context;
 }
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = React.useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`).matches
+  );
+
+  React.useEffect(() => {
+    const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    const handleChange = () => setIsMobile(mediaQuery.matches);
+
+    handleChange();
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
+
+  return isMobile;
+}
+
 const SidebarProvider = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<'div'> & {
@@ -41,38 +67,33 @@ const SidebarProvider = React.forwardRef<
     onOpenChange?: (open: boolean) => void;
   }
 >(({ open: openProp, onOpenChange: setOpenProp, className, style, children, ...props }, ref) => {
-  // 使用项目的 UI 状态存储
-  const {
-    sidebarCollapsed,
-    setSidebarCollapsed,
-    toggleSidebar: toggleSidebarStore,
-  } = useSidebarState();
+  const { sidebarCollapsed, setSidebarCollapsed } = useSidebarState();
+  const isMobile = useIsMobile();
+  const [openMobile, setOpenMobile] = React.useState(false);
+  const isMobileRef = React.useRef(isMobile);
+  const setOpenPropRef = React.useRef(setOpenProp);
+  const setSidebarCollapsedRef = React.useRef(setSidebarCollapsed);
 
-  // 计算当前打开状态（注意：collapsed 和 open 是相反的）
-  const open = openProp ?? !sidebarCollapsed;
+  isMobileRef.current = isMobile;
+  setOpenPropRef.current = setOpenProp;
+  setSidebarCollapsedRef.current = setSidebarCollapsed;
 
-  const setOpen = React.useCallback(
-    (value: boolean | ((value: boolean) => boolean)) => {
-      const openState = typeof value === 'function' ? value(open) : value;
+  const desktopOpen = openProp ?? !sidebarCollapsed;
+  const open = isMobile ? openMobile : desktopOpen;
 
-      if (setOpenProp) {
-        setOpenProp(openState);
-      } else {
-        // 更新存储状态（注意：collapsed 和 open 是相反的）
-        setSidebarCollapsed(!openState);
-      }
-    },
-    [setOpenProp, open, setSidebarCollapsed]
-  );
-
-  // Helper to toggle the sidebar.
-  const toggleSidebar = React.useCallback(() => {
-    if (setOpenProp) {
-      setOpen(!open);
+  const setOpen = React.useCallback((openState: boolean) => {
+    if (isMobileRef.current) {
+      setOpenMobile(openState);
+    } else if (setOpenPropRef.current) {
+      setOpenPropRef.current(openState);
     } else {
-      toggleSidebarStore();
+      setSidebarCollapsedRef.current(!openState);
     }
-  }, [setOpenProp, setOpen, open, toggleSidebarStore]);
+  }, []);
+
+  const toggleSidebar = React.useCallback(() => {
+    setOpen(!open);
+  }, [open, setOpen]);
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
@@ -81,11 +102,14 @@ const SidebarProvider = React.forwardRef<
         event.preventDefault();
         toggleSidebar();
       }
+      if (event.key === 'Escape' && isMobile && open) {
+        setOpen(false);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleSidebar]);
+  }, [isMobile, open, setOpen, toggleSidebar]);
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
@@ -97,8 +121,9 @@ const SidebarProvider = React.forwardRef<
       open,
       setOpen,
       toggleSidebar,
+      isMobile,
     }),
-    [state, open, setOpen, toggleSidebar]
+    [state, open, setOpen, toggleSidebar, isMobile]
   );
 
   return (
@@ -146,7 +171,7 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { state } = useSidebar();
+    const { state, open, setOpen, isMobile } = useSidebar();
 
     if (collapsible === 'none') {
       return (
@@ -160,6 +185,44 @@ const Sidebar = React.forwardRef<
         >
           {children}
         </div>
+      );
+    }
+
+    if (isMobile) {
+      if (!open) return null;
+
+      return (
+        <>
+          <button
+            type="button"
+            aria-label="Close sidebar"
+            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[1px]"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            ref={ref}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation"
+            data-state={state}
+            data-variant={variant}
+            data-side={side}
+            className={cn(
+              'fixed inset-y-0 z-50 flex h-dvh w-[min(18rem,calc(100vw-3rem))]',
+              side === 'left' ? 'left-0' : 'right-0',
+              variant === 'floating' || variant === 'inset' ? 'p-2' : '',
+              className
+            )}
+            {...props}
+          >
+            <div
+              data-sidebar="sidebar"
+              className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl"
+            >
+              {children}
+            </div>
+          </div>
+        </>
       );
     }
 
@@ -214,7 +277,7 @@ const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar();
+  const { open, toggleSidebar } = useSidebar();
 
   // 获取平台信息以显示正确的快捷键
   const isMac = typeof window !== 'undefined' && navigator.platform.includes('Mac');
@@ -226,6 +289,7 @@ const SidebarTrigger = React.forwardRef<
         <Button
           ref={ref}
           data-sidebar="trigger"
+          aria-expanded={open}
           variant="ghost"
           size="icon"
           className={cn('h-7 w-7', className)}
@@ -291,8 +355,8 @@ const SidebarInset = React.forwardRef<HTMLDivElement, React.ComponentProps<'main
       <main
         ref={ref}
         className={cn(
-          'relative flex w-full flex-1 flex-col bg-background',
-          'peer-data-[variant=inset]:m-2 peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 peer-data-[variant=inset]:ml-0 peer-data-[variant=inset]:rounded-xl peer-data-[variant=inset]:shadow',
+          'relative flex min-w-0 w-full flex-1 flex-col bg-background',
+          'md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow',
           className
         )}
         {...props}

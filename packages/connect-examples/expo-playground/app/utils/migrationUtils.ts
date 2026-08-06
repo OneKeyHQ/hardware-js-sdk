@@ -1,5 +1,5 @@
 import { usePersistenceStore } from '../store/persistenceStore';
-import { TransportType } from '../services/hardwareService';
+import type { TransportType } from './hardwareInstance';
 
 // 旧版本 localStorage 键名
 const LEGACY_KEYS = {
@@ -59,7 +59,7 @@ export function migrateLegacyData(): MigrationStats {
     if (transportValue) {
       stats.totalItems++;
       try {
-        if (['webusb', 'jsbridge', 'emulator'].includes(transportValue)) {
+        if (['webusb', 'emulator'].includes(transportValue)) {
           persistenceStore.setTransportPreference(transportValue as TransportType);
           localStorage.removeItem(LEGACY_KEYS.TRANSPORT);
           stats.migratedItems++;

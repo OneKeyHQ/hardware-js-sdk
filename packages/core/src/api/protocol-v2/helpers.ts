@@ -118,6 +118,7 @@ export const isProtocolV2DeviceDisconnectedError = (error: unknown) => {
     message.includes('connection has timed out unexpectedly') ||
     message.includes('connection error has occured') ||
     message.includes('connection error has occurred') ||
+    message.includes('react native ble transport released') ||
     message.includes('multiplatformbleadapter') ||
     message.includes('multipalformebleadapter') ||
     compactMessage.includes('rxerrorerror6') ||
@@ -137,7 +138,6 @@ export function normalizeRebootType(value: RebootTypeInput | undefined): DeviceR
 
 // 与 firmware-pro2 的 proto_target_to_firmware_target 安装白名单保持一致。
 const INSTALLABLE_FIRMWARE_TARGET_IDS = new Set<number>([
-  ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_CRATE,
   ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
   ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1,
   ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2,

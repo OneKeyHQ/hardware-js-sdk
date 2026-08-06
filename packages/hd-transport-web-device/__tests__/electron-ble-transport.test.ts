@@ -506,6 +506,53 @@ describe('ElectronBleTransport protocol detection', () => {
     }
   });
 
+  test('ignores a delayed disconnect event from the previous BLE connection', async () => {
+    const device = { id: 'delayed-disconnect-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
+    const disconnectHandlers: Array<
+      (disconnectedDevice: { id: string; name: string | null }) => void
+    > = [];
+    nobleBle.onNotification.mockImplementation(handler => {
+      notificationHandler = handler;
+      return jest.fn();
+    });
+    nobleBle.onDeviceDisconnected.mockImplementation(handler => {
+      disconnectHandlers.push(handler);
+      return jest.fn();
+    });
+    let responseSeq = 0;
+    nobleBle.write.mockImplementation(() => {
+      responseSeq += 1;
+      const response = ProtocolV2.encodeFrame(
+        schemas,
+        'Success',
+        { message: 'ok' },
+        { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: responseSeq }
+      );
+      setTimeout(() => notificationHandler?.(device.id, bytesToHex(response)), 0);
+      return Promise.resolve();
+    });
+    const bleTransport = configureTransport(nobleBle);
+
+    try {
+      await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+      await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+
+      disconnectHandlers[0]?.(device);
+
+      expect(bleTransport.getProtocolType(device.id)).toBe('V2');
+      await expect(
+        bleTransport.call(device.id, 'Ping', { message: 'after-stale-disconnect' })
+      ).resolves.toEqual({
+        type: 'Success',
+        message: { message: 'ok' },
+      });
+    } finally {
+      await bleTransport.release(device.id);
+    }
+  });
+
   test('preserves the active Protocol V2 link when the same schema is configured again', async () => {
     const device = { id: 'stable-schema-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);

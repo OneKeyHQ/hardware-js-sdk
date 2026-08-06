@@ -9,7 +9,7 @@
 ### 存储分类
 
 1. **传输设置** (`transport`)
-   - 首选传输类型 (webusb/jsbridge/emulator)
+   - 首选传输类型 (webusb/emulator)
    - 最后使用时间
 
 2. **主题设置** (`theme`)
@@ -188,4 +188,4 @@ const { setTransportPreference, preferredType } = useTransportPersistence();
 setTransportPreference('webusb');
 ```
 
-所有相关组件已经更新使用新的持久化系统。 
+所有相关组件已经更新使用新的持久化系统。

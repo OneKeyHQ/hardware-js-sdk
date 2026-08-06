@@ -1,13 +1,13 @@
 # Pro2 设备管理
 
-本文集中说明 Pro2 / Protocol V2 的设备设置、壁纸上传和固件升级。三类能力都依赖 Core 的 Protocol V2 守卫与文件/状态编排，不属于传输层协议。
+本文集中说明 Pro2 / Protocol V2 的设备设置、壁纸与 NFT 上传和固件升级。这些能力都依赖 Core 的 Protocol V2 守卫与文件/状态编排，不属于传输层协议。
 
 ## 设备设置
 
-| Core 内部操作            | protobuf                 | 返回值           | 解锁策略             |
-| ------------------------ | ------------------------ | ---------------- | -------------------- |
-| `deviceSettingsGet`      | `DeviceSettingsGet`      | `DeviceSettings` | 不解锁，直接读取     |
-| `deviceSettingsSet`      | `DeviceSettingsSet`      | `Success`        | 按字段决定是否解锁   |
+| Core 内部操作            | protobuf                 | 返回值           | 解锁策略                     |
+| ------------------------ | ------------------------ | ---------------- | ---------------------------- |
+| `deviceSettingsGet`      | `DeviceSettingsGet`      | `DeviceSettings` | 不解锁，直接读取             |
+| `deviceSettingsSet`      | `DeviceSettingsSet`      | `Success`        | 按字段决定是否解锁           |
 | `deviceSettingsPageShow` | `DeviceSettingsPageShow` | `Success`        | 已知锁定时先解锁，只执行一次 |
 
 这些原始命令不属于公共 `CoreApi`；调用方统一使用 `deviceSettings`，Core 再按 V1/V2 路由。
@@ -15,6 +15,10 @@
 `DeviceSettings` 的公开字段包含设备名称、蓝牙、语言、壁纸路径、亮度、自动锁定、自动关机、动画、轻触唤醒、震动、USB 锁定、随机键盘以及安全模式状态，锁定时也可以读取。`passphrase_enable` 与 `fido_enabled` 是私有字段，仅在设备解锁时返回。字段以当前 protobuf 和生成类型为准。
 
 `deviceSettingsSet` 支持部分更新，但 SDK 会移除 `passphrase_enable` 与 `airgap_mode`。仅包含 `label`、`language`、`brightness`、`haptic_feedback` 时不解锁直接修改；只要包含其他字段，SDK 就会在锁定时先解锁再执行。修改成功提示及 `autolock_delay_ms`、`autoshutdown_delay_ms` 的页面跳转由设备固件实现。
+
+任何 Protocol V2 设置写入成功后，SDK 都会强制刷新 `DeviceStatus` 与 `DeviceSettings`，并只用设备
+读回结果更新统一 `DeviceState`。写入请求参数不作为状态来源；如果写入成功后的读回失败，公共调用会
+返回失败，调用方不得自动重放可能已经生效的设置命令。
 
 `passphrase_enable` 与 `airgap_mode` 必须通过 `deviceSettingsPageShow` 打开设备页面，由用户在设备端确认。
 
@@ -25,9 +29,9 @@
 - `DevicePassphrase`
 - `DeviceAirgap`
 
-读取状态使用 `unlockPolicy='none'`，不会触发自动解锁。统一 `deviceSettings` 根据字段计算
-`none` 或 `unlock-before-run`；设备页面同样使用 `unlock-before-run`。已知设备锁定时先解锁，
-但收到 locked 响应后不重放设置写入或页面操作。
+读取状态关闭钱包 Session 处理并使用 `unlockPolicy='none'`，不会触发自动解锁。统一
+`deviceSettings` 根据字段计算 `none` 或 `unlock-before-run`；设备页面同样使用
+`unlock-before-run`。已知设备锁定时先解锁，但收到 locked 响应后不重放设置写入或页面操作。
 
 页面打开前，SDK 统一发送非阻塞 `REQUEST_BUTTON`，payload 包含
 `source='method-lifecycle'`、`reason='settings-page'`、`completion='operation-completed'` 和具体 `page`。
@@ -75,6 +79,36 @@ App 只展示“请在设备上操作”，不调用 `uiResponse()`。API `Succe
 - `packages/core/src/utils/pro2Wallpaper.ts`
 - `packages/core/src/api/helpers/protocolV2FileWrite.ts`
 
+## NFT 上传
+
+`deviceUploadNft` 仅支持 Pro2 / Protocol V2。调用方先将原图和缩略图分别裁剪为 `540 × 540`
+与 `263 × 263` RGBA；SDK 随后完成以下编排：
+
+1. 从当前 Link 的 `ProtocolInfo.supported_messages` 确认 `FilesystemFileWrite(60805)`、
+   `FilesystemDirList(60808)` 和 `NftUpdate(61500)`，不使用固件版本字符串推断能力。
+2. 将透明区域合成到黑色背景，以 LVGL v9 未压缩 RGB565 编码两张图片；编码与壁纸共用
+   RGB565 抖动实现，但 NFT 不生成 A8 alpha plane。
+3. 以完整原图 `.bin` 的 BLAKE2s 前 8 位和 Unix 毫秒时间生成
+   `nft-<hash8>-<timestamp_ms>` basename。
+4. 写入前使用 `FilesystemDirList("vol1:/nft", depth=1)` 统计完整的 NFT 三文件集合；新 NFT
+   达到 10 个上限时抛出 `NftStorageLimitReached`，不触发固件删除最旧 NFT；同 basename 的
+   幂等重试不受该限制。
+5. 按原图 `.bin`、缩略图 `_m.bin`、元数据 `.json` 顺序串行写入固件预置的 `vol1:/nft`，
+   不额外发送 `FilesystemDirMake`；默认使用 512-byte chunk、20 ms pacing 和 15 秒单次请求超时。
+6. 三个文件全部确认后发送 `NftUpdate`；若响应超时，以同一 basename 重试一次，其他错误不重试；
+   只有最终 `Success` 才返回 `nftUpdated: true`。
+
+`title` 限制为 1 ～ 63 UTF-8 bytes，`subtitle` 限制为 0 ～ 95 UTF-8 bytes。公开参数允许传入固定
+`timestampMs`，便于响应丢失时以同一 basename 幂等重发；Transport 不自动重放带副作用请求。
+NFT 图片与缩略图尺寸通过独立 `getNftSize` API 获取，不复用壁纸的 `homeScreenType` 分支。
+
+主要实现：
+
+- `packages/core/src/api/protocol-v2/DeviceUploadNft.ts`
+- `packages/core/src/utils/pro2Nft.ts`
+- `packages/core/src/utils/pro2Wallpaper.ts`
+- `packages/core/src/api/helpers/protocolV2FileWrite.ts`
+
 ## 固件升级
 
 Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `firmwareUpdateV4`。低阶
@@ -96,13 +130,17 @@ Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `
 5. 必要时重启进入 bootloader，并轮询确认模式。
 6. 将目标文件分片写入 `vol0:/`，再使用 PathInfo 校验大小。
 7. 一次发送包含全部待安装文件的 `DeviceFirmwareUpdateRequest`。
-8. 轮询安装状态，允许安装阶段断连、超时和重连探测。
-9. 回到 normal mode 后显式刷新 `DeviceState` 的 identity/versions。
+8. 轮询 target 安装状态，允许安装阶段断连、超时和重连探测；同一连接可用时复用当前
+   command channel，只在链路失败后重新枚举和校验物理身份。
+9. 确认设备已自动回到 normal mode 时不再重复发送 Normal reboot；随后显式刷新
+   `DeviceState` 的 identity/versions。
 
 可靠性约束：
 
 - BLE 与 WebUSB 使用不同默认 chunk，最小值为 64 字节。
 - 文件传输根据 `processed_byte` 恢复进度，总进度按全部目标字节聚合。
+- 固件未提供 target 内部百分比，安装进度只能表示已完成 target 的比例；接入方如需连续动画，
+  必须将其作为有阶段上限的估算值，不能当成设备真实进度。
 - 安装开始、安装完成和用户交互使用不同超时窗口。
 - Transport 不自动重发安装请求；重试由高层流程依据阶段和幂等性决定。
 - release 配置、SDK target 类型和固件枚举必须同步发布。
@@ -133,7 +171,7 @@ P1 时，P1/P2 按同一 application package set 处理；P1 需要 hotfix 时�
 
 ## 共同维护原则
 
-- 设置、壁纸和升级都属于 Core 业务编排，Transport 只负责单次消息传输。
+- 设置、壁纸、NFT 和升级都属于 Core 业务编排，Transport 只负责单次消息传输。
 - 新增有副作用操作时，必须明确是否允许解锁后重试或断线后重试。
 - 文件路径、chunk 上限和超时策略集中复用 helper，避免各方法自行实现。
 - 公共字段归一化和运行模式判断见 [Pro2 字段迁移](../sdk/pro2-field-migration.md)。

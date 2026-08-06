@@ -7,7 +7,6 @@ import { autoUpdater } from 'electron-updater';
 import { exec } from 'child_process';
 import { initNobleBleSupport } from '@onekeyfe/hd-transport-electron';
 
-import initProcess, { restartBridge } from './process';
 import { ipcMessageKeys } from './config';
 
 // Set log level
@@ -23,21 +22,6 @@ app.name = APP_NAME;
 let mainWindow: BrowserWindow | null;
 
 let isAppReady = false;
-
-(global as any).resourcesPath = isDevelopment
-  ? path.join(__dirname, '../public')
-  : path.join(process.resourcesPath, 'app');
-const staticPath = isDevelopment
-  ? path.join(__dirname, '../public')
-  : path.join((global as any).resourcesPath, 'public');
-
-const sdkConnectSrc = isDevelopment
-  ? `file://${path.join(staticPath, 'js-sdk/')}`
-  : path.join('public', 'js-sdk/');
-
-function initChildProcess() {
-  return initProcess({ isDevelopment });
-}
 
 function showMainWindow() {
   if (!mainWindow) {
@@ -80,13 +64,11 @@ function createMainWindow() {
     height: Math.min(1920 / ratio, dimensions.height),
     webPreferences: {
       spellcheck: false,
-      webviewTag: true,
       webSecurity: !isDevelopment,
       // @ts-expect-error
       nativeWindowOpen: true,
       allowRunningInsecureContent: isDevelopment,
-      // webview injected js needs isolation=false, because property can not be exposeInMainWorld() when isolation enabled.
-      contextIsolation: false,
+      contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
       sandbox: false,
     },
@@ -95,15 +77,6 @@ function createMainWindow() {
   if (isDevelopment) {
     browserWindow.webContents.openDevTools();
   }
-
-  browserWindow.webContents.on('did-finish-load', () => {
-    console.log('browserWindow >>>> did-finish-load');
-    browserWindow.webContents.send(ipcMessageKeys.INJECT_ONEKEY_DESKTOP_GLOBALS, {
-      resourcesPath: (global as any).resourcesPath,
-      staticPath: `file://${staticPath}`,
-      sdkConnectSrc,
-    });
-  });
 
   const src = isDevelopment
     ? 'http://localhost:19006/'
@@ -134,25 +107,9 @@ function createMainWindow() {
     console.log('set isAppReady on browserWindow dom-ready', isAppReady);
   });
 
-  const filter = {
-    urls: ['http://127.0.0.1:21320/*', 'http://localhost:21320/*'],
-  };
-
-  session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
-    const { url } = details;
-    if (url.startsWith('http://127.0.0.1:21320/') || url.startsWith('http://localhost:21320/')) {
-      // resolve onekey bridge CORS error
-      details.requestHeaders.Origin = 'https://jssdk.onekey.so';
-    }
-
-    callback({ cancel: false, requestHeaders: details.requestHeaders });
-  });
-
   // 记录已授权的设备
-  let grantedDeviceThroughPermHandler = null;
-
   browserWindow.webContents.session.setPermissionCheckHandler(
-    (webContents, permission, requestingOrigin, details) => {
+    (_webContents, permission, requestingOrigin, details) => {
       log.debug('WebUSB: 权限检查被调用:', {
         permission,
         requestingOrigin,
@@ -177,7 +134,6 @@ function createMainWindow() {
     // 允许所有 USB 设备请求
     if (details.deviceType === 'usb') {
       log.debug('WebUSB: 记录已授权的设备');
-      grantedDeviceThroughPermHandler = details.device;
       return true;
     }
     return false;
@@ -213,24 +169,6 @@ function createMainWindow() {
   if (!isDevelopment) {
     const PROTOCOL = 'file';
     session.defaultSession.protocol.interceptFileProtocol(PROTOCOL, (request, callback) => {
-      const isJsSdkFile = request.url.indexOf('/public/js-sdk') > -1;
-      const isIFrameHtml = request.url.indexOf('/public/js-sdk/iframe.html') > -1;
-
-      // resolve iframe path
-      if (isJsSdkFile && isIFrameHtml) {
-        callback({
-          path: path.join(__dirname, '..', 'public', 'js-sdk', 'iframe.html'),
-        });
-        return;
-      }
-
-      // resolve jssdk path
-      if (isJsSdkFile) {
-        const url = request.url.substr(PROTOCOL.length + 1);
-        callback(path.join(__dirname, '..', url));
-        return;
-      }
-
       // resolve main app path
       let url = request.url.substr(PROTOCOL.length + 1);
       url = path.join(__dirname, '..', 'web-build', url);
@@ -271,7 +209,7 @@ const singleInstance = app.requestSingleInstanceLock();
 if (!singleInstance && !process.mas) {
   quitOrMinimizeApp();
 } else {
-  app.on('second-instance', (e, argv) => {
+  app.on('second-instance', (_event, _argv) => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       showMainWindow();
@@ -292,7 +230,6 @@ if (!singleInstance && !process.mas) {
       log.error('Failed to initialize Noble BLE support:', e);
     }
 
-    initChildProcess();
     showMainWindow();
     console.log('日志文件位置:', log.transports.file.getFile().path);
   });
@@ -301,10 +238,6 @@ if (!singleInstance && !process.mas) {
 ipcMain.on(ipcMessageKeys.UPDATE_RESTART, () => {
   log.info('App Quit And Install');
   autoUpdater.quitAndInstall();
-});
-
-ipcMain.on(ipcMessageKeys.APP_RELOAD_BRIDGE_PROCESS, () => {
-  restartBridge();
 });
 
 // Simplified Bluetooth System API Implementation

@@ -14,6 +14,7 @@ export type {
 export type { CipheredKeyValue, CipheredKeyValueParams } from './cipherKeyValue';
 
 export type { DeviceChangePinParams } from './deviceChangePin';
+export type { DeviceUnlockParams } from './deviceUnlock';
 export type { DeviceFlagsParams } from './deviceFlags';
 export type { DeviceRecoveryParams } from './deviceRecovery';
 export type { DeviceResetParams } from './deviceReset';
