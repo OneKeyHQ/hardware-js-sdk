@@ -87,9 +87,16 @@ Ping RTT iters: 40 或 100
 
 ```text
 FilesystemFileWrite chunkSize: 1800B
-iOS packetLength: 244B 可作为对照 profile
+iOS/Android packetLength: min(协商 MTU - 3, 244B)
 write mode: writeWithoutResponse
+固定 burst pause: 0ms
+固定 flush pause: 0ms
 ```
+
+当前极限测试配置不再为缺失 MTU 提供兼容分包回退。iOS 连接后通过
+`requestMTU(247)` 刷新 `react-native-ble-plx` 的设备快照；该调用不会要求 iOS 重新协商，
+但会返回由 CoreBluetooth 最大无响应写长度换算出的 MTU。刷新失败时应直接暴露连接错误，
+避免用推测容量掩盖问题。
 
 不建议继续使用：
 

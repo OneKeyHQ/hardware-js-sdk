@@ -6,13 +6,14 @@
 // Noble BLE API interface - core BLE functionality
 export interface NobleBleAPI {
   enumerate: () => Promise<{ id: string; name: string }[]>;
-  getDevice: (uuid: string) => Promise<{ id: string; name: string } | null>;
+  getDevice: (uuid: string) => Promise<{ id: string; name: string; mtu?: number } | null>;
   connect: (uuid: string) => Promise<void>;
   disconnect: (uuid: string) => Promise<void>;
   subscribe: (uuid: string) => Promise<void>;
   unsubscribe: (uuid: string) => Promise<void>;
   write: (uuid: string, data: string) => Promise<void>;
   onNotification: (callback: (deviceId: string, data: string) => void) => () => void;
+  onMtuChanged?: (callback: (device: { id: string; mtu: number }) => void) => () => void;
   onDeviceDisconnected: (callback: (device: { id: string; name: string }) => void) => () => void;
   checkAvailability: () => Promise<{
     available: boolean;

@@ -174,6 +174,7 @@ export function buildProtocolV2FirmwareRelease({
   remotePayloadHashes = {},
   firmwareType,
   release,
+  deviceType,
 }: {
   currentVersions: DeviceStateVersions;
   currentVerification?: Partial<DeviceFeaturesVerify>;
@@ -181,6 +182,7 @@ export function buildProtocolV2FirmwareRelease({
   remotePayloadHashes?: Readonly<Record<string, string | null>>;
   firmwareType: EFirmwareType;
   release: IFirmwareReleaseInfo | undefined;
+  deviceType?: 'pro2' | 'neo';
 }): ProtocolV2FirmwareReleasePlan {
   if (!release) {
     return {
@@ -195,8 +197,8 @@ export function buildProtocolV2FirmwareRelease({
     };
   }
 
-  let components = getOrderedComponentEntries(release).map(([configKey, component]) =>
-    buildComponentRelease({
+  let components = getOrderedComponentEntries(release).map(([configKey, component]) => {
+    const result = buildComponentRelease({
       configKey,
       component,
       currentVersions,
@@ -206,8 +208,20 @@ export function buildProtocolV2FirmwareRelease({
         ? remotePayloadHashes[configKey]
         : normalizeHex(component.payloadHash),
       releaseRequired: release.required,
-    })
-  );
+    });
+    if (
+      deviceType === 'neo' &&
+      (result.componentTarget === 'SE03' || result.componentTarget === 'SE04')
+    ) {
+      return {
+        ...result,
+        updateTarget: null,
+        status: 'unsupported' as const,
+        required: false,
+      };
+    }
+    return result;
+  });
   if (!currentVersions.applicationP2) {
     const applicationP1 = components.find(
       component => component.componentTarget === 'APPLICATION_P1'
@@ -350,6 +364,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       checkFirmwareHash,
       firmwareType,
       release,
+      deviceType: state.identity.deviceType,
     });
     const resourceDeviceType =
       state.identity.deviceType === 'neo' ? EDeviceType.Neo : EDeviceType.Pro2;

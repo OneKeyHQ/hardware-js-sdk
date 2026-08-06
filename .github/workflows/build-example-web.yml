@@ -54,10 +54,10 @@ jobs:
           cp packages/connect-examples/expo-playground/dist/index.html packages/connect-examples/expo-playground/dist/404.html
           cp packages/connect-examples/expo-example/web-build/index.html packages/connect-examples/expo-example/web-build/404.html
 
-      - name: Prepare root static assets
+      - name: Prepare GitHub Pages bundle
         run: |
           rm -rf gh-pages-root
-          mkdir -p gh-pages-root
+          mkdir -p gh-pages-root/expo-example gh-pages-root/expo-playground
           cp .github/templates/404.html gh-pages-root/404.html
           cp .github/templates/404.html gh-pages-root/index.html
           if [ -f "packages/connect-examples/expo-example/web-build/manifest.json" ]; then
@@ -68,30 +68,16 @@ jobs:
             echo "⚠️ expo-example manifest not found, using template"
           fi
           find packages/connect-examples/expo-example/web-build -maxdepth 1 -type f -name "favicon*" -exec cp {} gh-pages-root/ \;
+          cp -R packages/connect-examples/expo-example/web-build/. gh-pages-root/expo-example/
+          cp -R packages/connect-examples/expo-playground/dist/. gh-pages-root/expo-playground/
 
-      - name: Deploy root assets
+      - name: Deploy examples (GitHub Pages)
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./gh-pages-root
           cname: hardware-example.onekeytest.com
           force_orphan: true
-
-      - name: Deploy Expo Example (GitHub Pages)
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: packages/connect-examples/expo-example/web-build
-          destination_dir: expo-example
-          keep_files: true
-
-      - name: Deploy Expo Playground (GitHub Pages)
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: packages/connect-examples/expo-playground/dist
-          destination_dir: expo-playground
-          keep_files: true
 
   build_playground_production:
     runs-on: ubuntu-latest
@@ -116,6 +102,10 @@ jobs:
       - name: Build All Packages
         run: yarn build
 
+      - name: Build Expo Example (production)
+        run: EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn expo export:web
+        working-directory: packages/connect-examples/expo-example
+
       - name: Build Expo Playground (production)
         working-directory: packages/connect-examples/expo-playground
         env:
@@ -123,18 +113,19 @@ jobs:
         run: yarn build
 
       - name: Package production bundle with commit id
-        working-directory: packages/connect-examples/expo-playground
         env:
           COMMIT_FULL_SHA: ${{ env.COMMIT_FULL_SHA }}
           COMMIT_SHORT_SHA: ${{ env.COMMIT_SHORT_SHA }}
         run: |
-          RELEASE_ROOT="release"
+          RELEASE_ROOT="packages/connect-examples/expo-playground/release"
           rm -rf "${RELEASE_ROOT}"
-          mkdir -p "${RELEASE_ROOT}"
-          cp dist/index.html "${RELEASE_ROOT}/index.html"
-          cp dist/404.html "${RELEASE_ROOT}/404.html"
+          mkdir -p "${RELEASE_ROOT}/expo-example"
+          cp packages/connect-examples/expo-playground/dist/index.html "${RELEASE_ROOT}/index.html"
+          cp packages/connect-examples/expo-playground/dist/404.html "${RELEASE_ROOT}/404.html"
           mkdir -p "${RELEASE_ROOT}/${COMMIT_FULL_SHA}"
-          cp -R dist/${COMMIT_FULL_SHA}/. "${RELEASE_ROOT}/${COMMIT_FULL_SHA}/"
+          cp -R packages/connect-examples/expo-playground/dist/${COMMIT_FULL_SHA}/. "${RELEASE_ROOT}/${COMMIT_FULL_SHA}/"
+          cp -R packages/connect-examples/expo-example/web-build/. "${RELEASE_ROOT}/expo-example/"
+          cp "${RELEASE_ROOT}/expo-example/index.html" "${RELEASE_ROOT}/expo-example/404.html"
           cat <<EOF > "${RELEASE_ROOT}/${COMMIT_FULL_SHA}/build-info.json"
           {
             "commit": "${COMMIT_FULL_SHA}",

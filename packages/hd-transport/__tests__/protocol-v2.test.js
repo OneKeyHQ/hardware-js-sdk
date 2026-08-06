@@ -741,6 +741,34 @@ describe('Protocol V2 framing and session', () => {
     expect(logger.debug).not.toHaveBeenCalled();
   });
 
+  test('session reports when the complete request frame has been written', async () => {
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', {
+      message: 'ok',
+    });
+    const events = [];
+    const onWriteCompleted = jest.fn(metrics => events.push(['written', metrics]));
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: frame => {
+        events.push(['write', frame.byteLength]);
+        return Promise.resolve();
+      },
+      readFrame: () => {
+        events.push(['read']);
+        return Promise.resolve(rewriteSeq(response, 1));
+      },
+    });
+
+    await session.call('Ping', { message: 'metrics' }, { onWriteCompleted });
+
+    expect(events.map(event => event[0])).toEqual(['write', 'written', 'read']);
+    expect(onWriteCompleted).toHaveBeenCalledWith({
+      elapsedMs: expect.any(Number),
+      frameBytes: expect.any(Number),
+    });
+  });
+
   test('session skips unrelated terminal frames when expected response types are provided', async () => {
     const stale = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'stale response',

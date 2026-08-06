@@ -17,6 +17,7 @@ export const PROTOCOL_V2_RESOURCE_TYPES = [
   'translations',
   'roobert',
   'noto',
+  'firmware_logo',
 ] as const satisfies readonly IProtocolV2ResourceType[];
 
 export const PROTOCOL_V2_RESOURCE_DEVICE_PATHS: Readonly<Record<IProtocolV2ResourceType, string>> =
@@ -27,6 +28,7 @@ export const PROTOCOL_V2_RESOURCE_DEVICE_PATHS: Readonly<Record<IProtocolV2Resou
     translations: 'vol0:/bundles/translations/translations.okpkg',
     roobert: 'vol0:/bundles/font/roobert.okpkg',
     noto: 'vol0:/bundles/font/noto.okpkg',
+    firmware_logo: 'vol0:/bundles/firmware_logo.okpkg',
   };
 
 const RESOURCE_TYPE_SET = new Set<string>(PROTOCOL_V2_RESOURCE_TYPES);
@@ -313,7 +315,9 @@ export function parseProtocolV2Resources(value: unknown): IProtocolV2Resources |
   const stable = config.stable.map(validateResource);
   const types = new Set(stable.map(resource => resource.type));
   if (stable.length !== PROTOCOL_V2_RESOURCE_TYPES.length || types.size !== stable.length) {
-    throw new Error('Invalid Pro2 resources config: stable must contain six unique resource types');
+    throw new Error(
+      `Invalid Pro2 resources config: stable must contain ${PROTOCOL_V2_RESOURCE_TYPES.length} unique resource types`
+    );
   }
   for (const type of PROTOCOL_V2_RESOURCE_TYPES) {
     if (!types.has(type)) {

@@ -9,7 +9,7 @@ export default class BleTransport {
 
   device: Device;
 
-  mtuSize = 23;
+  mtuSize: number | undefined;
 
   writeCharacteristic: Characteristic;
 

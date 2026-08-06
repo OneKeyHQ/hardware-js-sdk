@@ -36,6 +36,7 @@ export type {
   OneKeyDeviceInfoWithSession,
   MessageFromOneKey,
   TransportCallOptions,
+  TransportWriteMetrics,
   LowlevelTransportSharedPlugin,
   LowLevelDevice,
   OneKeyDeviceInfoBase,

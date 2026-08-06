@@ -15,6 +15,7 @@ import {
   getDeviceBLEFirmwareVersion,
   getDeviceBootloaderVersion,
   getDeviceFirmwareVersion,
+  getDeviceType,
   getFirmwareType,
   getLogger,
 } from '../utils';
@@ -77,6 +78,30 @@ const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
 const PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET = 0x200;
 const PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET = 0x240;
 const PROTOCOL_V2_OKPP_HASH_SIZE = 64;
+
+const PROTOCOL_V2_NEO_UNSUPPORTED_TARGETS = new Set<FirmwareUpdateV4Target>(['se03', 'se04']);
+
+export function assertProtocolV2FirmwareTargetsSupported(
+  deviceType: EDeviceType | string | undefined,
+  params: FirmwareUpdateV4Params
+) {
+  if (deviceType !== EDeviceType.Neo) return;
+
+  const unsupportedTargets = new Set(
+    (params.targetsToUpdate ?? []).filter(target => PROTOCOL_V2_NEO_UNSUPPORTED_TARGETS.has(target))
+  );
+  if (params.se03Binary) unsupportedTargets.add('se03');
+  if (params.se04Binary) unsupportedTargets.add('se04');
+
+  if (unsupportedTargets.size) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      `Neo only supports SE01 and SE02; unsupported firmware targets: ${Array.from(
+        unsupportedTargets
+      ).join(', ')}`
+    );
+  }
+}
 
 const getProtocolV2DeviceTransferProgress = (
   bytesBeforeChunk: number,
@@ -497,6 +522,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async runProtocolV2() {
     await this.captureProtocolV2PhysicalIdentity();
     const deviceFeatures = await this.getProtocolV2DeviceFeatures();
+    const currentDeviceType = this.device.getCurrentDeviceType();
+    const capabilityDeviceType =
+      currentDeviceType === EDeviceType.Pro2 || currentDeviceType === EDeviceType.Neo
+        ? currentDeviceType
+        : getDeviceType(deviceFeatures);
+    assertProtocolV2FirmwareTargetsSupported(capabilityDeviceType, this.params);
     const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
     const needsRemoteResources =
@@ -512,7 +543,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       fwBinaryMap = this.collectExplicitTargetBinaries();
       bootloaderBinary = this.prepareBootloaderBinary();
       const needsRemoteFirmware = !this.hasExplicitProtocolV2Payload(fwBinaryMap);
-      const needsRemoteBootResources = !!this.params.targetsToUpdate?.includes('boot_resources');
+      const needsRemoteBootResources =
+        !!this.params.targetsToUpdate?.includes('resource') ||
+        !!this.params.targetsToUpdate?.includes('boot_resources');
       if (needsRemoteFirmware || needsRemoteResources || needsRemoteBootResources) {
         // Remote updates must use a freshly fetched config before any reboot or file write.
         await DataManager.forceReloadData({
@@ -813,7 +846,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async prepareProtocolV2BootResources(): Promise<
     ProtocolV2ResourceBundleBinary[] | undefined
   > {
-    if (!this.params.targetsToUpdate?.includes('boot_resources')) return undefined;
+    if (
+      !this.params.targetsToUpdate?.includes('resource') &&
+      !this.params.targetsToUpdate?.includes('boot_resources')
+    ) {
+      return undefined;
+    }
     const resource = DataManager.getProtocolV2BootResources(this.getProtocolV2DeviceType());
     if (!resource) throw new Error('Missing Protocol V2 boot resources configuration');
 
@@ -1610,7 +1648,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private isProtocolV2ReconnectIdentityError(error: unknown) {
-    return this.normalizeErrorMessage(error).includes('Protocol V2 reconnect physical identity');
+    // 序列号在 Loader 刚启动时可能暂时不可用，BLE descriptor 也没有稳定的
+    // path。此时应继续轮询，只有明确读到不同序列号时才立即终止更新。
+    return this.normalizeErrorMessage(error).includes(
+      'Protocol V2 reconnect physical identity mismatch'
+    );
   }
 
   private async protocolV2CommonUpdateProcess(params: ProtocolV2FileTransferParams) {
@@ -1661,7 +1703,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         chunkSize,
         overwrite: true,
         append: false,
-        writeWithResponse: true,
+        writeWithResponse: false,
         maxChunkRetries: 0,
         getUiPercentage: ({ offset, chunkLength }) =>
           getProtocolV2DeviceTransferProgress(

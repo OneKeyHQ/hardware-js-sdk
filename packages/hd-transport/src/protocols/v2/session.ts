@@ -10,7 +10,7 @@ import * as check from '../../utils/highlevel-checks';
 import { LogBlockCommand } from '../../utils/logBlockCommand';
 
 import type { Root } from 'protobufjs/light';
-import type { MessageFromOneKey } from '../../types';
+import type { MessageFromOneKey, TransportWriteMetrics } from '../../types';
 
 export * from './errors';
 
@@ -53,6 +53,7 @@ export type ProtocolV2CallOptions = {
   expectedTypes?: string[];
   intermediateTypes?: string[];
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
+  onWriteCompleted?: (metrics: TransportWriteMetrics) => void;
   writeWithResponse?: boolean;
 };
 
@@ -244,7 +245,16 @@ export class ProtocolV2Session {
         );
       }
 
+      const writeStartedAt = Date.now();
       await writeFrame(frame, baseCallContext);
+      try {
+        callOptions.onWriteCompleted?.({
+          elapsedMs: Math.max(Date.now() - writeStartedAt, 0),
+          frameBytes: frame.byteLength,
+        });
+      } catch (error) {
+        logger?.error?.(`${logPrefix} write metrics callback failed: ${String(error)}`);
+      }
 
       // Some Protocol V2 operations emit progress notifications before the
       // terminal response. Consume those frames here so callers still see a
