@@ -13,7 +13,6 @@ import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
 import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
-import { createFirmwareProgressThrottle } from './progressThrottle';
 import { writeFirmwareByteSource } from './FirmwareArtifactSource';
 
 import type {

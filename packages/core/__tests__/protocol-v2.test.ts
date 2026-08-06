@@ -3956,7 +3956,6 @@ describe('Protocol V2 firmware update targets', () => {
       ],
       bootloaderBinary: null,
     });
-    expect(method.postTipMessage).toHaveBeenCalledWith('SwitchFirmwareReconnectDevice');
   });
 
   test('enters Protocol V2 bootloader before reading and downloading remote resources', async () => {

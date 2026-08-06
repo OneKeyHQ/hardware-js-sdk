@@ -34,6 +34,11 @@ describe('FirmwareUpdateV3 reconnect', () => {
     });
     method.isBleReconnect = jest.fn(() => false);
     method.device = {
+      originalDescriptor: {
+        id: 'usb-path',
+        path: 'usb-path',
+        protocolType: 'V1',
+      },
       deviceConnector: {
         enumerate: jest.fn().mockResolvedValue({
           descriptors: [{ path: 'usb-path' }],

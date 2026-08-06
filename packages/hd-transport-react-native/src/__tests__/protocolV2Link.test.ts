@@ -613,6 +613,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
 
     await expect(
       transport.writeProtocolV2Packet(
+        'test-device',
         {
           writeCharacteristic: {
             isWritableWithResponse: true,
@@ -648,6 +649,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
 
     try {
       const call = transport.writeProtocolV2Frame(
+        'test-device',
         bleTransport,
         new Uint8Array(10),
         context,

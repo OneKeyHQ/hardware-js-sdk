@@ -1,6 +1,7 @@
 import { EDeviceType, ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
 import {
   DeviceRebootType,
+  PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE,
   PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
   PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
 } from '@onekeyfe/hd-transport';
@@ -581,13 +582,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private getProtocolV2FirmwareChunkSize() {
+  private getProtocolV2FirmwareChunkSize(direction: 'read' | 'write' = 'write') {
     const payloadChunkSize = Number(this.params?.chunkSize);
     const env = DataManager.getSettings('env');
     const isBle = this.params?.platform === 'native' || (env && DataManager.isBleConnect(env));
     let maxChunkSize = PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
     if (isBle) {
-      maxChunkSize = PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
+      maxChunkSize =
+        direction === 'read'
+          ? PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE
+          : PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
     }
     if (!Number.isFinite(payloadChunkSize) || payloadChunkSize <= 0) {
       return maxChunkSize;
@@ -685,9 +689,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       );
     }
 
-    const enteredBootloader = await this.enterProtocolV2BootloaderMode();
-
     if (needsRemoteResources) {
+      const enteredBootloader = await this.enterProtocolV2BootloaderMode();
       try {
         const stableResources = await this.prepareProtocolV2ResourceBundles();
         resourceBundles = [...(resourceBundles ?? []), ...(stableResources ?? [])];
@@ -1033,7 +1036,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async captureProtocolV2PhysicalIdentity() {
     const deviceInfo = await this.requestProtocolV2PhysicalIdentity();
     const serialNumber = this.getProtocolV2SerialNumber(deviceInfo);
-    const path = this.device.originalDescriptor.path?.trim() || undefined;
+    const path = this.device.originalDescriptor?.path?.trim() || undefined;
     if (this.params?.preparedPlan) {
       assertFirmwareUpdatePreparedPlanDeviceIdentity({
         preparedPlan: this.params.preparedPlan,
@@ -1325,6 +1328,57 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       binary,
       devicePath: PROTOCOL_V2_RESOURCE_DEVICE_PATHS[resource.type],
     };
+  }
+
+  private getProtocolV2ResourceFilePath(path: string) {
+    if (path.startsWith('vol')) return path;
+    if (path.startsWith('/')) return `vol0:${path}`;
+    return `vol0:/${path}`;
+  }
+
+  private async readProtocolV2DeviceFileHeader(path: string) {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const filePath = this.getProtocolV2ResourceFilePath(path);
+    const pathInfoRes = await typedCall('FilesystemPathInfoQuery', 'FilesystemPathInfo', {
+      path: filePath,
+    });
+    const fileSize = toProtocolV2FiniteNumber(pathInfoRes.message?.size);
+    if (
+      !pathInfoRes.message?.exist ||
+      pathInfoRes.message?.directory ||
+      fileSize === undefined ||
+      fileSize < PROTOCOL_V2_OKPP_HEADER_SIZE
+    ) {
+      return null;
+    }
+
+    const chunkSize = this.getProtocolV2FirmwareChunkSize('read');
+    const chunks: Uint8Array[] = [];
+    let offset = 0;
+    while (offset < PROTOCOL_V2_OKPP_HEADER_SIZE) {
+      const readLen = Math.min(chunkSize, PROTOCOL_V2_OKPP_HEADER_SIZE - offset);
+      const res = await typedCall('FilesystemFileRead', 'FilesystemFile', {
+        file: {
+          path: filePath,
+          offset,
+          total_size: 0,
+        },
+        chunk_len: readLen,
+        ui_percentage: undefined,
+      });
+      const data = toProtocolV2Bytes(res.message?.data);
+      if (data.byteLength === 0) return null;
+      chunks.push(data);
+      offset += data.byteLength;
+    }
+
+    const headerBytes = new Uint8Array(offset);
+    let cursor = 0;
+    chunks.forEach(chunk => {
+      headerBytes.set(chunk, cursor);
+      cursor += chunk.byteLength;
+    });
+    return parseProtocolV2OkppHeader(headerBytes);
   }
 
   /** Compare a prepared okpkg header when its manifest supplies version or hash metadata. */
@@ -1707,12 +1761,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let lastError: unknown;
     for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
       try {
+        const transferStartedAt = Date.now();
         await writeFirmwareByteSource({
           source,
           chunkSize: this.getProtocolV2FirmwareChunkSize(),
           write: async ({ data, sourceOffset, length, first }) => {
             const chunkEnd = sourceOffset + length;
-            const progress = getProtocolV2DeviceTransferProgress(
+            const deviceProgress = getProtocolV2DeviceTransferProgress(
               processedSize + sourceOffset,
               processedSize + chunkEnd,
               totalSize
@@ -1723,7 +1778,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
               sourceOffset,
               data,
               first,
-              progress
+              deviceProgress
             );
             const rawProcessedByte = response.message.processed_byte;
             const nextOffset = rawProcessedByte === undefined ? chunkEnd : Number(rawProcessedByte);
@@ -1733,7 +1788,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
                 `invalid processed_byte ${rawProcessedByte} for offset ${sourceOffset}`
               );
             }
-            this.postProgressMessage(progress, 'transferData');
+            const transferredBytes = processedSize + chunkEnd;
+            const elapsedMs = Math.max(Date.now() - transferStartedAt, 0);
+            this.postProgressMessage(
+              Math.min(Math.ceil((transferredBytes / totalSize) * 100), 99),
+              'transferData',
+              {
+                transferredBytes,
+                totalBytes: totalSize,
+                rateBytesPerSecond:
+                  elapsedMs > 0 ? Math.round((chunkEnd / elapsedMs) * 1000) : undefined,
+                elapsedMs,
+              }
+            );
             return length;
           },
         });
@@ -2234,17 +2301,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     progress: number | null
   ): Promise<TypedResponseMessage<'FilesystemFile'>> {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    const writeRes = await typedCall('FilesystemFileWrite', 'FilesystemFile', {
-      file: {
-        path: filePath,
-        offset,
-        total_size: totalFileSize,
-        data: chunk,
+    const writeRes = await typedCall(
+      'FilesystemFileWrite',
+      'FilesystemFile',
+      {
+        file: {
+          path: filePath,
+          offset,
+          total_size: totalFileSize,
+          data: chunk,
+        },
+        overwrite,
+        append: false,
+        ui_percentage: progress ?? undefined,
       },
-      overwrite,
-      append: false,
-      ui_percentage: progress ?? undefined,
-    });
+      { writeWithResponse: true }
+    );
     if (writeRes.type !== 'FilesystemFile') {
       if ((writeRes as any).type === 'CallMethodError') {
         if (((writeRes as any).message.error ?? '').indexOf(SESSION_ERROR) > -1) {
