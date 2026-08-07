@@ -364,6 +364,14 @@ Pro2 的 `status.passphraseProtection` 只在设备已解锁、私有 Status 可
 passphrase 后设备可能主动锁定，此时后续锁定快照允许该字段为 `undefined`；App 应保留最近一次已确认值，
 并在解锁后通过 `getDeviceState({ scope: 'settings' })` 刷新，而不是把锁定快照解释为 `false`。
 
+设置调用中的状态刷新会先在 Core 内更新 `DeviceState` 并同步发出 `DEVICE.STATE`，随后 API Promise
+才完成。App 如果在 listener 中异步落库，必须把“设置调用完成”和“该设备的事件落库完成”串行化，
+再读取本地状态；不能在 Promise 返回后立即读取旧 `Features` 缓存，也不能用请求参数乐观覆盖设备状态。
+
+Pro2 的 `status.passphraseProtection` 只在设备已解锁、私有 Status 可验证时具有权威值。关闭
+passphrase 后设备可能主动锁定，此时后续锁定快照允许该字段为 `undefined`；App 应保留最近一次已确认值，
+并在解锁后通过 `getDeviceState({ scope: 'settings' })` 刷新，而不是把锁定快照解释为 `false`。
+
 `DEVICE.FEATURES` 仅用于 Protocol V1 兼容。Protocol V2 不发送该事件，也不支持 `getFeatures()`。
 
 ## 运行环境和授权通知

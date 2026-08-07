@@ -77,7 +77,6 @@ const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
 const PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET = 0x200;
 const PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET = 0x240;
 const PROTOCOL_V2_OKPP_HASH_SIZE = 64;
-
 const getProtocolV2DeviceTransferProgress = (
   bytesBeforeChunk: number,
   bytesAfterChunk: number,

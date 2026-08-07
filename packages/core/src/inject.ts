@@ -1,8 +1,10 @@
+import { FACTORY_API_METHOD_NAMES, TEST_API_METHOD_NAMES } from './api/extensionMethodNames';
+
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 import type { Unsuccessful } from './types';
 import type { EventEmitter } from 'events';
 import type { CallMethod } from './events';
-import type { CoreApi } from './types/api';
+import type { CoreApi, FactoryApi, TestApi, TestApiMethods } from './types/api';
 import type { AllNetworkAddress } from './types/api/allNetworkGetAddress';
 
 type CallbackFunction = (data?: any, error?: Unsuccessful) => void;
@@ -131,10 +133,7 @@ export const inject = ({
   return api;
 };
 
-export const createCoreApi = (
-  call: CoreApi['call']
-): Omit<
-  CoreApi,
+type ApiControlMethodName =
   | 'on'
   | 'off'
   | 'emit'
@@ -146,8 +145,11 @@ export const createCoreApi = (
   | 'uiResponse'
   | 'cancel'
   | 'updateSettings'
-  | 'switchTransport'
-> => ({
+  | 'switchTransport';
+
+type InjectedApi<TApi> = Omit<TApi, ApiControlMethodName>;
+
+const createAllCoreApi = (call: CoreApi['call']): InjectedApi<TestApi> => ({
   getLogs: () => call({ method: 'getLogs' }),
   clearSessionCache: params => call({ ...params, method: 'clearSessionCache' }),
   /**
@@ -215,6 +217,16 @@ export const createCoreApi = (
   deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
   deviceGetOnboardingStatus: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
+  deviceProvisionFactoryInfo: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceProvisionFactoryInfo' }),
+  deviceReadFactoryInfo: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceReadFactoryInfo' }),
+  deviceWriteFactoryCertificate: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceWriteFactoryCertificate' }),
+  deviceReadFactoryCertificate: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceReadFactoryCertificate' }),
+  deviceSignFactoryChallenge: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSignFactoryChallenge' }),
   deviceUploadWallpaper: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceUploadWallpaper' }),
   deviceUploadNft: (connectId, params) => call({ ...params, connectId, method: 'deviceUploadNft' }),
@@ -285,6 +297,19 @@ export const createCoreApi = (
   evmVerifyMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'evmVerifyMessage' }),
 
+  evmGetAddressTrezor: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'evmGetAddressTrezor' }),
+  evmGetPublicKeyTrezor: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'evmGetPublicKeyTrezor' }),
+  evmSignMessageTrezor: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'evmSignMessageTrezor' }),
+  evmSignTransactionTrezor: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'evmSignTransactionTrezor' }),
+  evmSignTypedDataTrezor: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'evmSignTypedDataTrezor' }),
+  evmVerifyMessageTrezor: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'evmVerifyMessageTrezor' }),
+
   btcGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'btcGetAddress' }),
   btcGetPublicKey: (connectId, deviceId, params) =>
@@ -297,6 +322,25 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'btcSignTransaction' }),
   btcVerifyMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'btcVerifyMessage' }),
+  btcGetOwnershipId: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'btcGetOwnershipId' }),
+  btcGetOwnershipProof: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'btcGetOwnershipProof' }),
+  btcAuthorizeCoinJoin: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'btcAuthorizeCoinJoin' }),
+
+  cryptoBatchGetPublickeys: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cryptoBatchGetPublickeys' }),
+  cryptoCipherKeyValue: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cryptoCipherKeyValue' }),
+  cryptoCosiCommit: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cryptoCosiCommit' }),
+  cryptoCosiSign: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cryptoCosiSign' }),
+  cryptoGetECDHSessionKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cryptoGetECDHSessionKey' }),
+  cryptoSignIdentity: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cryptoSignIdentity' }),
 
   starcoinGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'starcoinGetAddress' }),
@@ -313,6 +357,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'nemGetAddress' }),
   nemSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'nemSignTransaction' }),
+  nemDecryptMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'nemDecryptMessage' }),
 
   solGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'solGetAddress' }),
@@ -478,8 +524,164 @@ export const createCoreApi = (
   benfenSignMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'benfenSignMessage' }),
 
+  /**
+   * Test-only APIs.
+   */
+  tezosGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'tezosGetAddress' }),
+  tezosGetPublicKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'tezosGetPublicKey' }),
+  tezosSignTx: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'tezosSignTx' }),
+
+  binanceGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'binanceGetAddress' }),
+  binanceGetPublicKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'binanceGetPublicKey' }),
+  binanceSignTx: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'binanceSignTx' }),
+
+  moneroGetWatchKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'moneroGetWatchKey' }),
+  moneroGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'moneroGetAddress' }),
+
+  eosGetPublicKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'eosGetPublicKey' }),
+  eosSignTx: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'eosSignTx' }),
+
+  webAuthnAddResidentCredential: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'webAuthnAddResidentCredential' }),
+  webAuthnListResidentCredentials: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'webAuthnListResidentCredentials' }),
+  webAuthnRemoveResidentCredential: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'webAuthnRemoveResidentCredential' }),
+
+  getPublicKeyMultiple: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'getPublicKeyMultiple' }),
+  listResDir: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'listResDir' }),
+  nftWriteData: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'nftWriteData' }),
+  nftWriteInfo: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'nftWriteInfo' }),
+  readSEPublicKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'readSEPublicKey' }),
+  resourceUpdate: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'resourceUpdate' }),
+
+  bixinBackupDevice: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'bixinBackupDevice' }),
+  bixinLoadDevice: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'bixinLoadDevice' }),
+  bixinMessageSE: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'bixinMessageSE' }),
+  bixinVerifyDeviceRequest: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'bixinVerifyDeviceRequest' }),
+
+  deviceSpiFlashWrite: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSpiFlashWrite' }),
+  deviceSpiFlashRead: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSpiFlashRead' }),
+  deviceInfoSettings: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceInfoSettings' }),
+  deviceGetInfo: (connectId, params) => call({ ...params, connectId, method: 'deviceGetInfo' }),
+  deviceReadSEPublicCert: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceReadSEPublicCert' }),
+  deviceWriteSEPrivateKey: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceWriteSEPrivateKey' }),
+  deviceWriteSEPublicCert: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceWriteSEPublicCert' }),
+  deviceSESignMessage: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSESignMessage' }),
+  deviceGetFirmwareHash: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetFirmwareHash' }),
+  deviceUnlockPath: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceUnlockPath' }),
+  devicePing: (connectId, params) => call({ ...params, connectId, method: 'devicePing' }),
+  deviceGetEntropy: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetEntropy' }),
+  deviceSdProtect: (connectId, params) => call({ ...params, connectId, method: 'deviceSdProtect' }),
+  deviceChangeWipeCode: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceChangeWipeCode' }),
+  deviceEndSession: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceEndSession' }),
+  deviceLoad: (connectId, params) => call({ ...params, connectId, method: 'deviceLoad' }),
+  deviceDoPreauthorized: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceDoPreauthorized' }),
+  deviceCancelAuthorization: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceCancelAuthorization' }),
+
+  emmcDirList: (connectId, params) => call({ ...params, connectId, method: 'emmcDirList' }),
+  emmcDirMake: (connectId, params) => call({ ...params, connectId, method: 'emmcDirMake' }),
+  emmcDirRemove: (connectId, params) => call({ ...params, connectId, method: 'emmcDirRemove' }),
+  emmcFileDelete: (connectId, params) => call({ ...params, connectId, method: 'emmcFileDelete' }),
+  emmcFileRead: (connectId, params) => call({ ...params, connectId, method: 'emmcFileRead' }),
+  emmcFileWrite: (connectId, params) => call({ ...params, connectId, method: 'emmcFileWrite' }),
+  emmcFixPermission: (connectId, params) =>
+    call({ ...params, connectId, method: 'emmcFixPermission' }),
+  emmcPathInfo: (connectId, params) => call({ ...params, connectId, method: 'emmcPathInfo' }),
+
+  debugLinkDecision: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkDecision' }),
+  debugLinkEraseSdCard: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkEraseSdCard' }),
+  debugLinkFlashErase: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkFlashErase' }),
+  debugLinkGetState: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkGetState' }),
+  debugLinkMemoryRead: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkMemoryRead' }),
+  debugLinkMemoryWrite: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkMemoryWrite' }),
+  debugLinkRecordScreen: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkRecordScreen' }),
+  debugLinkReseedRandom: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkReseedRandom' }),
+  debugLinkStop: (connectId, params) => call({ ...params, connectId, method: 'debugLinkStop' }),
+  debugLinkWatchLayout: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkWatchLayout' }),
+
+  firmwareEraseEx: (connectId, params) => call({ ...params, connectId, method: 'firmwareEraseEx' }),
+  firmwareErase: (connectId, params) => call({ ...params, connectId, method: 'firmwareErase' }),
+  firmwareUpdateEmmcTest: (connectId, params) =>
+    call({ ...params, connectId, method: 'firmwareUpdateEmmcTest' }),
+  firmwareUploadTest: (connectId, params) =>
+    call({ ...params, connectId, method: 'firmwareUploadTest' }),
+  reboot: (connectId, params) => call({ ...params, connectId, method: 'reboot' }),
+  selfTest: (connectId, params) => call({ ...params, connectId, method: 'selfTest' }),
+
   neoGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'neoGetAddress' }),
   neoSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'neoSignTransaction' }),
 });
+
+const pickApiMethods = <TApi extends object>(
+  api: InjectedApi<TestApi>,
+  methodNames: readonly string[]
+): TApi => {
+  const selected: Record<string, unknown> = {};
+  methodNames.forEach(methodName => {
+    selected[methodName] = api[methodName as keyof typeof api];
+  });
+  return selected as TApi;
+};
+
+export const createCoreApi = (call: CoreApi['call']): InjectedApi<CoreApi> => {
+  const api = createAllCoreApi(call);
+  const extensionMethodNames = new Set<string>([
+    ...TEST_API_METHOD_NAMES,
+    ...FACTORY_API_METHOD_NAMES,
+  ]);
+  return Object.fromEntries(
+    Object.entries(api).filter(([methodName]) => !extensionMethodNames.has(methodName))
+  ) as InjectedApi<CoreApi>;
+};
+
+export const createTestApi = (call: CoreApi['call']): TestApiMethods =>
+  pickApiMethods<TestApiMethods>(createAllCoreApi(call), TEST_API_METHOD_NAMES);
+
+export const createFactoryApi = (call: CoreApi['call']): FactoryApi =>
+  pickApiMethods<FactoryApi>(createAllCoreApi(call), FACTORY_API_METHOD_NAMES);

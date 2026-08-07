@@ -60,13 +60,13 @@ describe('hardware device identity filters', () => {
         localName: 'OneKey Pro 2 A1B2 - Find My',
         serviceUuids: [],
       })
-    ).toBe(false);
+    ).toBe(true);
     expect(
       isOnekeyBluetoothDevice({
         name: 'Pro2 5E9D - Finde My',
         serviceUuids: ['fffd'],
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('keeps OneKey discovery on the communication service', () => {

@@ -189,6 +189,7 @@ SDK 不假设固件端会隐式扫描已写入路径。
 | `packages/hd-transport-web-device`   | WebUSB 和 Electron BLE transport                               |
 | `packages/hd-transport-react-native` | React Native BLE transport                                     |
 | `packages/hd-common-connect-sdk`     | 根据 env 选择 transport，向桌面/Web 示例暴露统一入口           |
+| `packages/hd-test-api`               | 显式组合旧 test/api 与受保护的 Pro2 工厂写入能力               |
 | `submodules/firmware-pro2`           | Pro2 protobuf schema 来源                                      |
 
 ## 设计原则

@@ -49,6 +49,9 @@ export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 // Pro2 business API
 export { default as deviceReboot } from './protocol-v2/DeviceReboot';
 export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
+export { default as deviceReadFactoryInfo } from './protocol-v2/DeviceFactoryInfoGet';
+export { default as deviceReadFactoryCertificate } from './protocol-v2/DeviceFactoryCertificateRead';
+export { default as deviceSignFactoryChallenge } from './protocol-v2/DeviceFactoryChallengeSign';
 export { default as deviceUploadWallpaper } from './protocol-v2/DeviceUploadWallpaper';
 export { default as deviceUploadNft } from './protocol-v2/DeviceUploadNft';
 export { default as uploadPortfolio } from './UploadPortfolio';

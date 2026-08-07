@@ -1,0 +1,18 @@
+import { BaseMethod } from '../BaseMethod';
+
+import type { SdProtect } from '@onekeyfe/hd-transport';
+
+export default class DeviceSdProtect extends BaseMethod<SdProtect> {
+  init() {
+    this.useDevicePassphraseState = false;
+    this.params = {
+      operation: this.payload.operation,
+    };
+  }
+
+  async run() {
+    const res = await this.device.commands.typedCall('SdProtect', 'Success');
+
+    return Promise.resolve(res.message);
+  }
+}

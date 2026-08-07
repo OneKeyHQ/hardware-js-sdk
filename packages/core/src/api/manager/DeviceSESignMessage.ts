@@ -1,0 +1,23 @@
+import { BaseMethod } from '../BaseMethod';
+import { UI_REQUEST } from '../../constants/ui-request';
+
+import type { SESignMessage } from '@onekeyfe/hd-transport';
+
+export default class DeviceSESignMessage extends BaseMethod<SESignMessage> {
+  init() {
+    this.useDevicePassphraseState = false;
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.params = {
+      message: this.payload.message,
+    };
+    this.skipForceUpdateCheck = true;
+  }
+
+  async run() {
+    const res = await this.device.commands.typedCall('SESignMessage', 'SEMessageSignature', {
+      ...this.params,
+    });
+
+    return Promise.resolve(res.message);
+  }
+}

@@ -1,8 +1,10 @@
 import * as publicMethods from '../src/api';
+import { FACTORY_API_METHOD_NAMES } from '../src/api/extensionMethodNames';
+import { factoryApiMethodExtension } from '../src/api/methodExtension';
 import { findMethod } from '../src/api/utils';
-import { createCoreApi } from '../src/inject';
+import { createCoreApi, createFactoryApi } from '../src/inject';
 
-import type { CoreApi } from '../src/types/api';
+import type { CoreApi, TestApi } from '../src/types/api';
 
 jest.mock('../src/data/config', () => ({
   DEFAULT_DOMAIN: 'https://example.com/',
@@ -49,9 +51,16 @@ describe('public Pro2 API boundary', () => {
 
     expect(api.deviceGetOnboardingStatus).toBeInstanceOf(Function);
     expect(api.deviceUploadNft).toBeInstanceOf(Function);
+    expect(api.deviceReadFactoryInfo).toBeInstanceOf(Function);
+    expect(api.deviceReadFactoryCertificate).toBeInstanceOf(Function);
+    expect(api.deviceSignFactoryChallenge).toBeInstanceOf(Function);
     expect(api.uploadPortfolio).toBeInstanceOf(Function);
     expect(api.testProtocolV2Ping).toBeInstanceOf(Function);
     expect(publicMethods.testProtocolV2Ping).toBeInstanceOf(Function);
+    expect(api).not.toHaveProperty('deviceProvisionFactoryInfo');
+    expect(api).not.toHaveProperty('deviceWriteFactoryCertificate');
+    expect(publicMethods).not.toHaveProperty('deviceProvisionFactoryInfo');
+    expect(publicMethods).not.toHaveProperty('deviceWriteFactoryCertificate');
 
     expect(api).not.toHaveProperty('deviceSessionOpen');
     expect(publicMethods).not.toHaveProperty('deviceSessionOpen');
@@ -63,6 +72,93 @@ describe('public Pro2 API boundary', () => {
       expect(api).not.toHaveProperty(name);
       expect(publicMethods).not.toHaveProperty(name);
     });
+  });
+
+  test('routes semantic Pro2 factory APIs without publishing raw message names', async () => {
+    const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
+    const api = {
+      ...createCoreApi(call as CoreApi['call']),
+      ...createFactoryApi(call as CoreApi['call']),
+    } as TestApi;
+    const manufactureTime = {
+      year: 2026,
+      month: 8,
+      day: 1,
+      hour: 10,
+      minute: 20,
+      second: 30,
+    };
+
+    await api.deviceProvisionFactoryInfo('pro2', {
+      version: 1,
+      serial_number: 'P2A00000001',
+      burn_in_completed: true,
+      factory_test_completed: true,
+      manufacture_time: manufactureTime,
+      connectProtocol: 'V2',
+    });
+    await api.deviceReadFactoryInfo('pro2', { connectProtocol: 'V2' });
+    await api.deviceWriteFactoryCertificate('pro2', {
+      certificate: 'aabb',
+      connectProtocol: 'V2',
+    });
+    await api.deviceReadFactoryCertificate('pro2', { connectProtocol: 'V2' });
+    await api.deviceSignFactoryChallenge('pro2', {
+      digest: '22'.repeat(32),
+      connectProtocol: 'V2',
+    });
+
+    expect(call).toHaveBeenNthCalledWith(1, {
+      method: 'deviceProvisionFactoryInfo',
+      connectId: 'pro2',
+      version: 1,
+      serial_number: 'P2A00000001',
+      burn_in_completed: true,
+      factory_test_completed: true,
+      manufacture_time: manufactureTime,
+      connectProtocol: 'V2',
+    });
+    expect(call).toHaveBeenNthCalledWith(2, {
+      method: 'deviceReadFactoryInfo',
+      connectId: 'pro2',
+      connectProtocol: 'V2',
+    });
+    expect(call).toHaveBeenNthCalledWith(3, {
+      method: 'deviceWriteFactoryCertificate',
+      connectId: 'pro2',
+      certificate: 'aabb',
+      connectProtocol: 'V2',
+    });
+    expect(call).toHaveBeenNthCalledWith(4, {
+      method: 'deviceReadFactoryCertificate',
+      connectId: 'pro2',
+      connectProtocol: 'V2',
+    });
+    expect(call).toHaveBeenNthCalledWith(5, {
+      method: 'deviceSignFactoryChallenge',
+      connectId: 'pro2',
+      digest: '22'.repeat(32),
+      connectProtocol: 'V2',
+    });
+  });
+
+  test('requires explicit destructive authorization for Pro2 factory writes', () => {
+    expect(Object.keys(factoryApiMethodExtension.methods)).toEqual(FACTORY_API_METHOD_NAMES);
+    const message = {
+      id: 1,
+      payload: { method: 'deviceProvisionFactoryInfo' },
+    } as any;
+
+    expect(() => findMethod(message)).toThrow('Method deviceProvisionFactoryInfo is not set');
+    expect(() => findMethod(message, { extensions: [factoryApiMethodExtension] })).toThrow(
+      'requires allowDestructiveOperations'
+    );
+    expect(
+      findMethod(message, {
+        extensions: [factoryApiMethodExtension],
+        allowDestructiveOperations: true,
+      }).name
+    ).toBe('deviceProvisionFactoryInfo');
   });
 
   test('routes the diagnostic Protocol V2 Ping without publishing the raw ping command', async () => {

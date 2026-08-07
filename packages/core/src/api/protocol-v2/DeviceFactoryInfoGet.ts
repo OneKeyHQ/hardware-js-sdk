@@ -1,4 +1,5 @@
 import { BaseMethod } from '../BaseMethod';
+import { UI_REQUEST } from '../../constants/ui-request';
 
 export default class DeviceFactoryInfoGet extends BaseMethod {
   getSupportedProtocols() {
@@ -9,6 +10,8 @@ export default class DeviceFactoryInfoGet extends BaseMethod {
     // Protocol V2 (Pro2) only; Core rejects non-V2 devices.
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
+    this.unlockPolicy = 'none';
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
     this.params = undefined;
   }
 

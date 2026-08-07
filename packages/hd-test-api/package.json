@@ -1,0 +1,27 @@
+{
+  "name": "@onekeyfe/hd-test-api",
+  "version": "1.2.0-alpha.61",
+  "description": "Explicit test and factory API extension for OneKey Hardware SDK.",
+  "author": "OneKey",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
+  "license": "ISC",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
+    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@onekeyfe/hd-common-connect-sdk": "1.2.0-alpha.61",
+    "@onekeyfe/hd-core": "1.2.0-alpha.61"
+  }
+}

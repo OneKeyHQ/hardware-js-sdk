@@ -326,14 +326,19 @@ Pro2 接入的强制前置条件。
 正式业务应使用按业务语义组织的公共 API。只读诊断接口可以暂时保留，但会直接改变设备、
 文件系统或安装状态的底层命令必须留在 Core 内部：
 
-| 分类           | 正式业务 API                                             | 保留的只读/诊断 API                                       | Core 内部命令                                                            |
-| -------------- | -------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 状态           | `getDeviceState`                                         | `deviceInfoGet`、`deviceStatusGet`                        | 无                                                                       |
-| 设置           | `deviceSettings`、`deviceChangePin`、`deviceWipe`        | 无                                                        | 无                                                                       |
-| 钱包 Session   | `openWalletSession`、`clearSessionCache`                 | 无                                                        | `deviceSessionOpen`                                                      |
-| 固件           | `firmwareUpdateV4` 等高层流程                            | `deviceGetFirmwareUpdateStatus`                           | `deviceFirmwareUpdate`                                                   |
-| 文件维护       | `uploadPortfolio`、`deviceUploadWallpaper`、高层固件升级 | `fileRead`、`dirList`、`pathInfo`，以及受约束的 `dirMake` | `fileWrite`、`fileDelete`、`dirRemove`、`filesystemFormat/PermissionFix` |
-| 协议与工厂调试 | 无                                                       | `protocolInfoRequest`、`ping`、`deviceFactoryInfoGet`     | `deviceFactoryInfoSet`                                                   |
+| 分类          | 正式业务 API                                             | 保留的只读/诊断 API                                       | Core 内部命令                                                            |
+| ------------- | -------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 状态          | `getDeviceState`                                         | `deviceInfoGet`、`deviceStatusGet`                        | 无                                                                       |
+| 设置          | `deviceSettings`、`deviceChangePin`、`deviceWipe`        | 无                                                        | 无                                                                       |
+| 钱包 Session  | `openWalletSession`、`clearSessionCache`                 | 无                                                        | `deviceSessionOpen`                                                      |
+| 固件          | `firmwareUpdateV4` 等高层流程                            | `deviceGetFirmwareUpdateStatus`                           | `deviceFirmwareUpdate`                                                   |
+| 文件维护      | `uploadPortfolio`、`deviceUploadWallpaper`、高层固件升级 | `fileRead`、`dirList`、`pathInfo`，以及受约束的 `dirMake` | `fileWrite`、`fileDelete`、`dirRemove`、`filesystemFormat/PermissionFix` |
+| Pro2 工厂接口 | 工厂信息/证书读取、挑战签名                              | `protocolInfoRequest`、`ping`                             | 写入能力由 `@onekeyfe/hd-test-api` 显式扩展                              |
+
+生产 `CoreApi` 保留 `deviceReadFactoryInfo`、`deviceReadFactoryCertificate` 和
+`deviceSignFactoryChallenge` 三项 attestation 能力。`deviceProvisionFactoryInfo` 与
+`deviceWriteFactoryCertificate` 只由 `@onekeyfe/hd-test-api` 注册，并要求显式启用
+`allowDestructiveOperations`。旧 `test/api` 方法也只在该扩展包创建的 Core 实例中注册。
 
 `getFeatures`、`getOnekeyFeatures` 仅作为 Protocol V1 兼容入口保留并标记废弃，新接入使用 `getDeviceState`。
 
