@@ -41,10 +41,20 @@ describe('React Native BLE strategy', () => {
     ).toBe(97);
   });
 
-  test('uses the Android 517 MTU payload when fully negotiated', () => {
+  test('keeps the default Android packet length within the validated ceiling', () => {
     expect(
       resolveProtocolV2PacketCapacity({
         platform: 'android',
+        mtu: 517,
+      })
+    ).toBe(244);
+  });
+
+  test('allows an explicit Android packet length override for validated experiments', () => {
+    expect(
+      resolveProtocolV2PacketCapacity({
+        platform: 'android',
+        androidPacketLength: 514,
         mtu: 517,
       })
     ).toBe(514);

@@ -223,7 +223,7 @@ const tryToGetConfiguration = (device: Device) => {
 
 const requestNegotiatedMtu = async (
   device: Device,
-  stage: 'connected' | 'servicesAndNotifyReady',
+  stage: 'connected' | 'servicesAndNotifyReady' | 'highThroughput',
   attempt: number
 ) => {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') return device;
@@ -1865,6 +1865,7 @@ export default class ReactNativeBleTransport {
     const highThroughputWrite = isProtocolV2HighThroughputCall(name);
 
     if (highThroughputWrite) {
+      await this.ensureProtocolV2HighThroughputMtu(uuid);
       const tuning = getProtocolV2BleTuning();
       const currentTransport = this.getCachedTransport(uuid);
       const writeWithResponse = shouldWriteProtocolV2WithResponse({
@@ -1916,6 +1917,23 @@ export default class ReactNativeBleTransport {
       if (highThroughputWrite) {
         this.scheduleAndroidBalancedConnectionPriority(uuid);
       }
+    }
+  }
+
+  private async ensureProtocolV2HighThroughputMtu(uuid: string) {
+    const transport = this.getCachedTransport(uuid);
+    if (!shouldRefreshNegotiatedMtu(transport.mtuSize)) return;
+
+    const refreshedDevice = await requestNegotiatedMtu(transport.device, 'highThroughput', 1);
+    transport.device = refreshedDevice;
+    transport.mtuSize =
+      typeof refreshedDevice.mtu === 'number' ? refreshedDevice.mtu : transport.mtuSize;
+
+    if (shouldRefreshNegotiatedMtu(transport.mtuSize)) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.BleConnectedError,
+        `Protocol V2 high-throughput BLE MTU unavailable: ${String(transport.mtuSize)}`
+      );
     }
   }
 

@@ -11,6 +11,8 @@ const {
 } = require('../src/protocols/v2/session');
 const protocolV2 = require('../src/protocols/v2');
 const {
+  PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE,
+  PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
   PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
   PROTOCOL_V2_FRAME_MAX_BYTES,
 } = require('../src/constants');
@@ -229,6 +231,7 @@ const schemas = {
   protocolV1: protocolV1Messages,
   protocolV2: protocolV2Messages,
 };
+const productionProtocolV2Messages = parseConfigure(require('../messages-protocol-v2.json'));
 
 const rewriteSeq = (frame, seq) => {
   const copy = new Uint8Array(frame);
@@ -357,6 +360,39 @@ describe('Protocol V2 framing and session', () => {
         message: 'x'.repeat(4188),
       })
     ).toThrow('Protocol V2 frame too large: 4201 > 4200');
+  });
+
+  test('keeps optimized BLE firmware chunks inside the transport frame boundary', () => {
+    const productionSchemas = {
+      protocolV1: protocolV1Messages,
+      protocolV2: productionProtocolV2Messages,
+    };
+    const stagingPaths = [
+      'vol0:/bootloader.bin',
+      'vol0:/application_p1.bin',
+      'vol0:/application_p2.bin',
+      'vol0:/coprocessor.bin',
+      'vol0:/se01.bin',
+      'vol0:/se02.bin',
+      'vol0:/se03.bin',
+      'vol0:/se04.bin',
+    ];
+
+    for (const path of stagingPaths) {
+      const frame = ProtocolV2.encodeFrame(productionSchemas, 'FilesystemFileWrite', {
+        file: {
+          path,
+          offset: 0xffffffff,
+          total_size: 0xffffffff,
+          data: new Uint8Array(PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE),
+        },
+        overwrite: true,
+        append: false,
+        ui_percentage: 100,
+      });
+
+      expect(frame.length).toBeLessThanOrEqual(PROTOCOL_V2_BLE_FRAME_MAX_BYTES);
+    }
   });
 
   test('keeps bytes after the first complete frame for the next read', () => {

@@ -2,6 +2,7 @@ import { EDeviceType, ERRORS, HardwareError, HardwareErrorCode, wait } from '@on
 import {
   DeviceRebootType,
   PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
+  PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE,
   PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
 } from '@onekeyfe/hd-transport';
 import { sha256 } from '@noble/hashes/sha256';
@@ -74,6 +75,7 @@ const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
 const PROTOCOL_V2_CONNECT_SINGLE_TIMEOUT = 75 * 1000;
 const PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT = 30 * 1000;
 const PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT = 3;
+const PROTOCOL_V2_PROGRESS_HEARTBEAT_INTERVAL = 1000;
 const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
 const PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET = 0x200;
 const PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET = 0x240;
@@ -147,6 +149,11 @@ type ProtocolV2FileTransferParams = PROTO.FirmwareUpload & {
   onTransferredBytes?: (transferredBytes: number) => void;
 };
 
+type ProtocolV2ProgressReportState = {
+  lastProgress?: number;
+  lastReportedAt?: number;
+};
+
 /** Protocol V2 resource file written independently to devicePath through FileWrite. */
 type ProtocolV2ResourceBundleBinary = {
   name: string;
@@ -215,6 +222,12 @@ const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
     kind: 'firmware',
   },
 };
+
+const PROTOCOL_V2_FIRMWARE_STAGING_PATHS = new Set(
+  Object.values(PROTOCOL_V2_REMOTE_COMPONENT_TARGETS).map(
+    target => `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}${target.fileName}`
+  )
+);
 
 const PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID = new Map<number, FirmwareUpdateV4Target>([
   [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER, 'boot'],
@@ -495,13 +508,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private getProtocolV2FirmwareChunkSize() {
+  private getProtocolV2FirmwareChunkSize(filePath?: string) {
     const payloadChunkSize = Number(this.params?.chunkSize);
     const env = DataManager.getSettings('env');
     const isBle = this.params?.platform === 'native' || (env && DataManager.isBleConnect(env));
     let maxChunkSize = PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
     if (isBle) {
-      maxChunkSize = PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
+      maxChunkSize = PROTOCOL_V2_FIRMWARE_STAGING_PATHS.has(filePath ?? '')
+        ? PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE
+        : PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
     }
     if (!Number.isFinite(payloadChunkSize) || payloadChunkSize <= 0) {
       return maxChunkSize;
@@ -545,7 +560,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       const wantsStableResources = !!this.params.targetsToUpdate?.includes('resource');
       const wantsBootResources = !!this.params.targetsToUpdate?.includes('boot_resources');
       const needsRemoteBootResources =
-        wantsBootResources || (wantsStableResources && !hasExplicitResourceFiles);
+        !hasExplicitResourceFiles && (wantsBootResources || wantsStableResources);
       if (needsRemoteFirmware || needsRemoteResources || needsRemoteBootResources) {
         // Remote updates must use a freshly fetched config before any reboot or file write.
         await DataManager.forceReloadData({
@@ -851,7 +866,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (!wantsStableResources && !wantsBootResources) {
       return undefined;
     }
-    if (wantsStableResources && !wantsBootResources && this.params.resourceFiles?.length) {
+    if (this.params.resourceFiles?.length) {
       return undefined;
     }
     const resource = DataManager.getProtocolV2BootResources(this.getProtocolV2DeviceType());
@@ -1251,7 +1266,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let transferredSize = processedSize;
     const transferStartTime = Date.now();
     const transferTransport = this.getProtocolV2FirmwareTransferTransport();
-    const chunkSize = this.getProtocolV2FirmwareChunkSize();
+    const chunkSize = this.getProtocolV2FirmwareChunkSize(
+      this.getProtocolV2InstallItemStagingPath(orderedInstallItems[0])
+    );
     const onTransferredBytes = (bytes: number) => {
       transferredSize = bytes;
     };
@@ -1734,19 +1751,34 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private async protocolV2CommonUpdateProcess(params: ProtocolV2FileTransferParams) {
     let lastError: unknown;
+    let confirmedFileOffset = 0;
+    const progressReportState: ProtocolV2ProgressReportState = {};
+    const updateConfirmedFileOffset = (offset: number) => {
+      confirmedFileOffset = offset;
+    };
     for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
       try {
-        return await this.protocolV2WriteWholeFile(params);
+        return await this.protocolV2WriteWholeFile(
+          params,
+          confirmedFileOffset,
+          updateConfirmedFileOffset,
+          progressReportState
+        );
       } catch (error) {
         lastError = error;
         Log.error(
-          `Protocol V2 file transfer failed path=${params.filePath} attempt=${attempt}/${PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT}; restarting from offset 0`,
+          `Protocol V2 file transfer failed path=${params.filePath} attempt=${attempt}/${PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT} confirmedOffset=${confirmedFileOffset}`,
           error
         );
         if (attempt === PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT) {
           break;
         }
         await this.recoverProtocolV2FileTransfer();
+        confirmedFileOffset = await this.getProtocolV2ResumeOffset(
+          params.filePath,
+          confirmedFileOffset,
+          params.payload.byteLength
+        );
       }
     }
 
@@ -1756,14 +1788,72 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     );
   }
 
-  private async protocolV2WriteWholeFile({
-    payload,
-    filePath,
-    processedSize,
-    totalSize,
-    onTransferredBytes,
-  }: ProtocolV2FileTransferParams) {
-    const chunkSize = this.getProtocolV2FirmwareChunkSize();
+  private async getProtocolV2ResumeOffset(
+    filePath: string,
+    confirmedFileOffset: number,
+    totalSize: number
+  ) {
+    if (confirmedFileOffset <= 0) {
+      return 0;
+    }
+
+    try {
+      const response = await this.device
+        .getCommands()
+        .typedCall(
+          'FilesystemPathInfoQuery',
+          'FilesystemPathInfo',
+          { path: filePath },
+          { timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT }
+        );
+      const remoteSize = toProtocolV2FiniteNumber(response.message?.size);
+      const canResume =
+        response.message?.exist &&
+        !response.message?.directory &&
+        remoteSize !== undefined &&
+        Number.isSafeInteger(remoteSize) &&
+        remoteSize >= confirmedFileOffset &&
+        remoteSize <= totalSize;
+      if (canResume) {
+        Log.log(
+          `Protocol V2 file transfer resuming path=${filePath} confirmedOffset=${confirmedFileOffset} remoteSize=${remoteSize}`
+        );
+        return confirmedFileOffset;
+      }
+      Log.warn(
+        `Protocol V2 file transfer cannot resume path=${filePath} confirmedOffset=${confirmedFileOffset} remoteSize=${
+          remoteSize ?? 'unknown'
+        } exist=${!!response.message?.exist} directory=${!!response.message
+          ?.directory}; restarting from offset 0`
+      );
+    } catch (error) {
+      Log.warn(
+        `Protocol V2 file transfer staging state query failed path=${filePath}; restarting from offset 0`,
+        error
+      );
+    }
+    return 0;
+  }
+
+  private async protocolV2WriteWholeFile(
+    {
+      payload,
+      filePath,
+      processedSize,
+      totalSize,
+      onTransferredBytes,
+    }: ProtocolV2FileTransferParams,
+    resumeOffset?: number,
+    onConfirmedFileOffset?: (confirmedFileOffset: number) => void,
+    progressReportState?: ProtocolV2ProgressReportState
+  ) {
+    const chunkSize = this.getProtocolV2FirmwareChunkSize(filePath);
+    const reportState = progressReportState ?? {};
+    const normalizedResumeOffset =
+      resumeOffset !== undefined && Number.isSafeInteger(resumeOffset) && resumeOffset > 0
+        ? Math.min(resumeOffset, payload.byteLength)
+        : 0;
+    const remainingPayload = payload.slice(normalizedResumeOffset);
     const getUploadProgress = (fileOffset: number) => {
       if (totalSize !== undefined && processedSize !== undefined) {
         return Math.min(Math.ceil(((processedSize + fileOffset) / totalSize) * 100), 99);
@@ -1775,10 +1865,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       await writeProtocolV2File({
         commands: this.device.getCommands(),
         path: filePath,
-        data: payload,
+        data: remainingPayload,
+        offset: normalizedResumeOffset,
         totalSize: payload.byteLength,
         chunkSize,
-        overwrite: true,
+        chunkSizeLimit: chunkSize,
+        overwrite: normalizedResumeOffset === 0,
         append: false,
         writeWithResponse: false,
         maxChunkRetries: 3,
@@ -1789,14 +1881,27 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             totalSize ?? payload.byteLength
           ),
         onProgress: progress => {
-          const transferredBytes = (processedSize ?? 0) + progress.transferredBytes;
+          const confirmedFileOffset = normalizedResumeOffset + progress.transferredBytes;
+          const transferredBytes = (processedSize ?? 0) + confirmedFileOffset;
+          onConfirmedFileOffset?.(confirmedFileOffset);
           onTransferredBytes?.(transferredBytes);
-          this.postProgressMessage(getUploadProgress(progress.transferredBytes), 'transferData', {
-            transferredBytes,
-            totalBytes: totalSize ?? payload.byteLength,
-            rateBytesPerSecond: progress.rateBytesPerSecond,
-            elapsedMs: progress.elapsedMs,
-          });
+          const uploadProgress = getUploadProgress(confirmedFileOffset);
+          const now = Date.now();
+          const shouldReportProgress =
+            uploadProgress !== reportState.lastProgress ||
+            reportState.lastReportedAt === undefined ||
+            now - reportState.lastReportedAt >= PROTOCOL_V2_PROGRESS_HEARTBEAT_INTERVAL ||
+            confirmedFileOffset >= payload.byteLength;
+          if (shouldReportProgress) {
+            this.postProgressMessage(uploadProgress, 'transferData', {
+              transferredBytes,
+              totalBytes: totalSize ?? payload.byteLength,
+              rateBytesPerSecond: progress.rateBytesPerSecond,
+              elapsedMs: progress.elapsedMs,
+            });
+            reportState.lastProgress = uploadProgress;
+            reportState.lastReportedAt = now;
+          }
         },
       });
     } catch (error) {

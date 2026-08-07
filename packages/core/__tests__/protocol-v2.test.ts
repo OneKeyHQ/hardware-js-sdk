@@ -5888,56 +5888,61 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
-  test('treats manual resource files as explicit payload without remote firmware auto-fill', async () => {
-    const resourceBundle = new Uint8Array([1, 2, 3]).buffer;
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-        platform: 'web',
-        targetsToUpdate: ['resource'],
-        resourceFiles: [
-          {
-            binary: resourceBundle,
-            devicePath: '  VOL0:/resource/images/images.okpkg  ',
-          },
-        ],
-      },
-    });
-    method.init();
-    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+  test.each(['resource', 'boot_resources'] as const)(
+    'treats manual resource files as authoritative payload for %s',
+    async target => {
+      const resourceBundle = new Uint8Array([1, 2, 3]).buffer;
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+          platform: 'web',
+          targetsToUpdate: [target],
+          resourceFiles: [
+            {
+              binary: resourceBundle,
+              devicePath: '  VOL0:/resource/images/images.okpkg  ',
+            },
+          ],
+        },
+      });
+      method.init();
+      (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+      const bootResourcesSpy = jest.spyOn(DataManager, 'getProtocolV2BootResources');
 
-    (method as any).device = stubDevice({
-      originalDescriptor: { protocolType: 'V2' },
-      features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
-    });
-    (method as any).prepareRemoteProtocolV2Binaries = jest.fn();
-    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(true);
-    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
-    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
-    (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
-      bootloaderVersion: '1.0.0',
-      bleVersion: '0.0.0',
-      firmwareVersion: '1.0.0',
-    });
-    method.postTipMessage = jest.fn();
+      (method as any).device = stubDevice({
+        originalDescriptor: { protocolType: 'V2' },
+        features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
+      });
+      (method as any).prepareRemoteProtocolV2Binaries = jest.fn();
+      (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(true);
+      (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
+      (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
+      (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
+        bootloaderVersion: '1.0.0',
+        bleVersion: '0.0.0',
+        firmwareVersion: '1.0.0',
+      });
+      method.postTipMessage = jest.fn();
 
-    await method.run();
+      await method.run();
 
-    expect(forceReloadDataSpy).not.toHaveBeenCalled();
-    expect((method as any).prepareRemoteProtocolV2Binaries).not.toHaveBeenCalled();
-    expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        resourceBundles: [
-          {
-            name: 'images.okpkg',
-            binary: resourceBundle,
-            devicePath: 'vol0:/resource/images/images.okpkg',
-          },
-        ],
-      })
-    );
-  });
+      expect(forceReloadDataSpy).not.toHaveBeenCalled();
+      expect(bootResourcesSpy).not.toHaveBeenCalled();
+      expect((method as any).prepareRemoteProtocolV2Binaries).not.toHaveBeenCalled();
+      expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resourceBundles: [
+            {
+              name: 'images.okpkg',
+              binary: resourceBundle,
+              devicePath: 'vol0:/resource/images/images.okpkg',
+            },
+          ],
+        })
+      );
+    }
+  );
 
   test('rejects manual RESC bundle paths before bootloader entry', async () => {
     const method = new FirmwareUpdateV4({
@@ -6054,7 +6059,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
-  test('restarts the whole file from offset zero after an ambiguous chunk write failure', async () => {
+  test('resumes from the last confirmed offset after an ambiguous chunk write failure', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6062,14 +6067,25 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     const writeOffsets: number[] = [];
+    const overwriteFlags: boolean[] = [];
     let failedSecondChunk = false;
     const typedCall = jest.fn(
       (
-        _name: string,
+        name: string,
         _resType: string,
-        params: { file: { offset: number; data: { byteLength: number } } }
+        params: { file?: { offset: number; data: { byteLength: number } }; overwrite?: boolean }
       ) => {
+        if (name === 'FilesystemPathInfoQuery') {
+          return Promise.resolve({
+            type: 'FilesystemPathInfo',
+            message: { exist: true, directory: false, size: 8000 },
+          });
+        }
+        if (!params.file) {
+          return Promise.reject(new Error(`unexpected call ${name}`));
+        }
         writeOffsets.push(params.file.offset);
+        overwriteFlags.push(params.overwrite ?? false);
         if (params.file.offset === 4000 && !failedSecondChunk) {
           failedSecondChunk = true;
           return Promise.reject(new Error('response lost after device write'));
@@ -6111,10 +6127,58 @@ describe('Protocol V2 firmware update targets', () => {
       setTimeoutSpy.mockRestore();
     }
 
-    expect(writeOffsets).toEqual([0, 4000, 0, 4000, 8000]);
+    expect(writeOffsets).toEqual([0, 4000, 4000, 8000]);
+    expect(overwriteFlags).toEqual([true, false, false, false]);
+    expect(typedCall.mock.calls.filter(call => call[0] === 'FilesystemPathInfoQuery')).toHaveLength(
+      1
+    );
     expect((method as any).reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
     expect((method as any).verifyProtocolV2ReconnectIdentity).toHaveBeenCalledTimes(1);
     expect(initialize).toHaveBeenCalledTimes(1);
+  });
+
+  test('restarts from offset zero when remote staging is behind the confirmed offset', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4' },
+    });
+    const writeOffsets: number[] = [];
+    let failedSecondChunk = false;
+    const typedCall = jest.fn((name: string, _resType: string, params: any) => {
+      if (name === 'FilesystemPathInfoQuery') {
+        return Promise.resolve({
+          type: 'FilesystemPathInfo',
+          message: { exist: true, directory: false, size: 3999 },
+        });
+      }
+      if (name !== 'FilesystemFileWrite') {
+        return Promise.reject(new Error(`unexpected call ${name}`));
+      }
+      writeOffsets.push(params.file.offset);
+      if (params.file.offset === 4000 && !failedSecondChunk) {
+        failedSecondChunk = true;
+        return Promise.reject(new Error('device disconnected before write confirmation'));
+      }
+      return Promise.resolve({
+        type: 'FilesystemFile',
+        message: {
+          processed_byte: Number(params.file.offset) + Number(params.file.data.byteLength),
+        },
+      });
+    });
+    (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
+    (method as any).recoverProtocolV2FileTransfer = jest.fn().mockResolvedValue(undefined);
+    method.postProgressMessage = jest.fn();
+
+    await (method as any).protocolV2CommonUpdateProcess({
+      payload: new Uint8Array(8001).buffer,
+      filePath: 'vol0:/firmware.bin',
+      processedSize: 0,
+      totalSize: 8001,
+    });
+
+    expect(writeOffsets).toEqual([0, 4000, 0, 4000, 8000]);
+    expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(1);
   });
 
   test('retries an idempotent firmware chunk before restarting the whole file', async () => {
@@ -6186,6 +6250,42 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall).toHaveBeenCalledTimes(2);
   });
 
+  test('coalesces public progress events without dropping confirmed-byte callbacks', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4' },
+    });
+    const typedCall = jest.fn((_name: string, _resType: string, params: any) =>
+      Promise.resolve({
+        type: 'FilesystemFile',
+        message: {
+          processed_byte: Number(params.file.offset) + Number(params.file.data.byteLength),
+        },
+      })
+    );
+    const onTransferredBytes = jest.fn();
+    const dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(1000);
+    (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
+    method.postProgressMessage = jest.fn();
+
+    try {
+      await (method as any).protocolV2CommonUpdateProcess({
+        payload: new Uint8Array(1_000_000).buffer,
+        filePath: 'vol1:firmware.bin',
+        processedSize: 0,
+        totalSize: 1_000_000,
+        onTransferredBytes,
+      });
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+
+    expect(typedCall).toHaveBeenCalledTimes(250);
+    expect(onTransferredBytes).toHaveBeenCalledTimes(250);
+    expect(onTransferredBytes).toHaveBeenLastCalledWith(1_000_000);
+    expect(method.postProgressMessage).toHaveBeenCalledTimes(100);
+  });
+
   test('caps native BLE firmware upload chunks below the WebUSB limit', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -6237,6 +6337,48 @@ describe('Protocol V2 firmware update targets', () => {
         onWriteCompleted: expect.any(Function),
       }),
     ]);
+  });
+
+  test('uses the optimized BLE chunk only for fixed firmware staging paths', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn(
+      (
+        _name: string,
+        _resType: string,
+        params: { file: { offset: number; data: { byteLength: number } } }
+      ) =>
+        Promise.resolve({
+          type: 'FilesystemFile',
+          message: {
+            processed_byte: params.file.offset + params.file.data.byteLength,
+          },
+        })
+    );
+
+    (method as any).params = {
+      platform: 'native',
+      chunkSize: 4096,
+    };
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    method.postProgressMessage = jest.fn();
+
+    await (method as any).protocolV2CommonUpdateProcess({
+      payload: new Uint8Array(1961).buffer,
+      filePath: 'vol0:/application_p1.bin',
+      processedSize: 0,
+      totalSize: 1961,
+    });
+
+    const writePayloads = typedCall.mock.calls.map(call => call[2]);
+    expect(writePayloads.map(payload => payload.file.offset)).toEqual([0, 1960]);
+    expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([1960, 1]);
   });
 
   test('ends device confirmation and starts install progress only after Protocol V2 ACK', async () => {

@@ -3,7 +3,7 @@ import { createKnownBleUuidAliases, matchesKnownBleUuid } from '@onekeyfe/hd-sha
 export const IOS_PACKET_LENGTH = 128;
 export const ANDROID_PACKET_LENGTH = 192;
 export const IOS_PROTOCOL_V2_PACKET_LENGTH = 244;
-export const ANDROID_PROTOCOL_V2_PACKET_LENGTH = 514;
+export const ANDROID_PROTOCOL_V2_PACKET_LENGTH = 244;
 
 type BluetoothServices = Record<
   string,

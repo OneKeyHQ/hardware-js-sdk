@@ -517,6 +517,36 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
+  test('refreshes an unavailable MTU before a Protocol V2 high-volume write', async () => {
+    const { transport, uuid, device, writeCharacteristic } = createHarness();
+    device.mtu = undefined;
+
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
+    device.requestMTU.mockImplementationOnce(() => {
+      device.mtu = 247;
+      return Promise.resolve(device);
+    });
+
+    await expect(transport.call(uuid, 'FileWrite', {})).resolves.toBeDefined();
+    expect(device.requestMTU).toHaveBeenCalledTimes(4);
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
+    await transport.release(uuid, true);
+  });
+
+  test('rejects a Protocol V2 high-volume write when MTU remains unavailable', async () => {
+    const { transport, uuid, device, writeCharacteristic } = createHarness();
+    device.mtu = undefined;
+
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
+
+    await expect(transport.call(uuid, 'FileWrite', {})).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleConnectedError,
+    });
+    expect(device.requestMTU).toHaveBeenCalledTimes(4);
+    expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
+    await transport.release(uuid, true);
+  });
+
   test('reconnects before falling back to Protocol V1 after a fatal V2 probe failure', async () => {
     setPlatformOS('android');
     const { transport, uuid, device, notifySubscriptionRemovers, disconnectSubscriptionRemovers } =
