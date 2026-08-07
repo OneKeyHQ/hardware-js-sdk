@@ -3,6 +3,7 @@ import {
   buildEthereumDefinitionsForSignTx,
   fetchEthereumDefinitions,
   getSlip44FromPath,
+  runWithTimeout,
 } from '../utils/ethereumDefinitions';
 import { fetchSolanaTokenDefinition } from '../utils/solanaTokenDefinition';
 
@@ -198,5 +199,25 @@ describe('fetchSolanaTokenDefinition', () => {
 
     expect(encodedToken).toBe('0a0404');
     expect(fetchImpl).toHaveBeenCalledWith('https://proxy.onekey.local/sol-tokens/MintABC.dat');
+  });
+});
+
+describe('runWithTimeout', () => {
+  it('resolves with the value when the work finishes before the deadline', async () => {
+    await expect(runWithTimeout(async () => 'ok', 1_000)).resolves.toBe('ok');
+  });
+
+  it('rejects when the work outlives the deadline (hung host cannot stall signing)', async () => {
+    // A fetch that never settles must not hang the caller forever.
+    const neverSettles = () => new Promise<string>(() => {});
+    await expect(runWithTimeout(neverSettles, 10)).rejects.toThrow(/timed out/);
+  });
+
+  it('propagates the underlying rejection unchanged when it loses the race', async () => {
+    await expect(
+      runWithTimeout(async () => {
+        throw new Error('boom');
+      }, 1_000)
+    ).rejects.toThrow('boom');
   });
 });

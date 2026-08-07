@@ -47,6 +47,9 @@ describe('Electron Noble BLE device discovery', () => {
       handle: jest.fn((channel: string, handler: IpcHandler) => {
         handlers.set(channel, handler);
       }),
+      removeHandler: jest.fn((channel: string) => {
+        handlers.delete(channel);
+      }),
     };
     const noble = new EventEmitter() as EventEmitter & {
       state: string;
@@ -112,6 +115,9 @@ describe('Electron Noble BLE device discovery', () => {
     const ipcMain = {
       handle: jest.fn((channel: string, handler: IpcHandler) => {
         handlers.set(channel, handler);
+      }),
+      removeHandler: jest.fn((channel: string) => {
+        handlers.delete(channel);
       }),
     };
     const noble = new EventEmitter() as EventEmitter & {
@@ -181,6 +187,9 @@ describe('Electron Noble BLE device discovery', () => {
       handle: jest.fn((channel: string, handler: IpcHandler) => {
         handlers.set(channel, handler);
       }),
+      removeHandler: jest.fn((channel: string) => {
+        handlers.delete(channel);
+      }),
     };
     const noble = new EventEmitter() as EventEmitter & {
       state: string;
@@ -249,6 +258,9 @@ describe('Electron Noble BLE device discovery', () => {
       handle: jest.fn((channel: string, handler: IpcHandler) => {
         handlers.set(channel, handler);
       }),
+      removeHandler: jest.fn((channel: string) => {
+        handlers.delete(channel);
+      }),
     };
     const noble = new EventEmitter() as EventEmitter & {
       state: string;
@@ -306,6 +318,9 @@ describe('Electron Noble BLE device discovery', () => {
     const ipcMain = {
       handle: jest.fn((channel: string, handler: IpcHandler) => {
         handlers.set(channel, handler);
+      }),
+      removeHandler: jest.fn((channel: string) => {
+        handlers.delete(channel);
       }),
     };
     const noble = new EventEmitter() as EventEmitter & {

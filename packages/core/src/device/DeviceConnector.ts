@@ -138,9 +138,9 @@ export default class DeviceConnector {
     }
   }
 
-  async release(session: string, onclose: boolean) {
+  async release(session: string, onclose: boolean, keepSession?: boolean) {
     try {
-      const res = await this.getActiveTransport().release(session, onclose);
+      const res = await this.getActiveTransport().release(session, onclose, keepSession);
       return res;
     } catch (error) {
       safeThrowError(error);

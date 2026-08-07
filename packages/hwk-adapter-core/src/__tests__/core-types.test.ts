@@ -104,6 +104,9 @@ describe('HardwareErrorCode contract', () => {
     expect(HardwareErrorCode.BridgeNotFound).toBe(10301);
     expect(HardwareErrorCode.TransportNotAvailable).toBe(10302);
     expect(HardwareErrorCode.DevicePermissionDenied).toBe(10303);
+    expect(HardwareErrorCode.BlePairingTimeout).toBe(10304);
+    expect(HardwareErrorCode.BleConnectFailed).toBe(10309);
+    expect(HardwareErrorCode.BlePairingCancelled).toBe(10310);
   });
 
   it('PIN / passphrase (10400-10499)', () => {
