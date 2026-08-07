@@ -184,8 +184,9 @@ BLE 平台实现包括 Electron、React Native 和 lowlevel 插件。公共约�
 - Protocol V2 完整 frame 统一由 `ProtocolV2BleFrameWriter` 按平台 MTU 或插件上限分包；
   平台 adapter 只提供单包写入、容量、节流参数和平台错误映射。Protocol V1 保持原有分包协议，
   不进入该 writer。
-- React Native 的大 frame 写入使用有界 burst 和 flush pause；只对明确的
-  `GATT_CONGESTED` 做有界退避重试，断连或 generation 变化立即中止，不能跨连接继续写。
+- React Native 的 Protocol V2 大 frame 写入依赖原生 BLE 栈的无响应写背压，不增加固定
+  burst 或 flush pause；只对明确的 `GATT_CONGESTED` 做有界退避重试，断连或 generation
+  变化立即中止，不能跨连接继续写。
 - notification 数据统一进入 `ProtocolV2FrameAssembler`，不能假设一次通知就是一帧。
 - 重连或重新订阅后，旧回调必须通过 generation/token 失效。
 - lowlevel 插件只提供连接、读写和订阅能力，不复制协议状态机。

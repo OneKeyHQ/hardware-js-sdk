@@ -58,11 +58,18 @@ export type AcquireInput = {
 
 export type MessageFromOneKey = { type: string; message: Record<string, any> };
 
+export type TransportWriteMetrics = {
+  elapsedMs: number;
+  frameBytes: number;
+};
+
 export type TransportCallOptions = {
   timeoutMs?: number;
   expectedTypes?: string[];
   intermediateTypes?: string[];
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
+  /** Called after the complete request frame has been submitted to the transport. */
+  onWriteCompleted?: (metrics: TransportWriteMetrics) => void;
   /** Prefer acknowledged BLE characteristic writes for this call when supported. */
   writeWithResponse?: boolean;
 };

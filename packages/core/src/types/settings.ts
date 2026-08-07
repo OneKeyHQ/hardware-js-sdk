@@ -67,7 +67,8 @@ export type IProtocolV2ResourceType =
   | 'wallpaper'
   | 'translations'
   | 'roobert'
-  | 'noto';
+  | 'noto'
+  | 'firmware_logo';
 
 /** Pro2 RES package descriptor. Hashes identify content without a human-managed version. */
 export type IProtocolV2Resource = {

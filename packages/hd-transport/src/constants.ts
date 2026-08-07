@@ -29,6 +29,12 @@ export const PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE = 4000;
 /** FilesystemFileWrite chunk size over BLE. */
 export const PROTOCOL_V2_BLE_FILE_CHUNK_SIZE = 1800;
 
+/**
+ * FirmwareUpdateV4 chunk size for its fixed BLE staging paths.
+ * The longest current path still leaves 28 bytes below the 2048-byte BLE frame limit.
+ */
+export const PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE = 1960;
+
 /** BLE FilesystemFileRead chunk size, limited by the Pro2 1024-byte UART TX buffer. */
 export const PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE = 900;
 

@@ -11,6 +11,7 @@ export interface DeviceInfo extends OneKeyDeviceInfoBase {
   id: string;
   name: string;
   state: string;
+  mtu?: number;
 }
 
 // Characteristic pair interface
