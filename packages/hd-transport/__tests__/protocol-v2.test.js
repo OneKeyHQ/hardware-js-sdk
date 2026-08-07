@@ -6,6 +6,7 @@ const {
   ProtocolV2SequenceCursor,
   ProtocolV2Session,
   hexToBytes,
+  isProtocolV2HighThroughputCall,
   probeProtocolV2,
 } = require('../src/protocols/v2/session');
 const protocolV2 = require('../src/protocols/v2');
@@ -13,6 +14,12 @@ const {
   PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
   PROTOCOL_V2_FRAME_MAX_BYTES,
 } = require('../src/constants');
+
+test('keeps sensitive acknowledgements separate from high-throughput calls', () => {
+  expect(isProtocolV2HighThroughputCall('PassphraseAck')).toBe(false);
+  expect(isProtocolV2HighThroughputCall('PinMatrixAck')).toBe(false);
+  expect(isProtocolV2HighThroughputCall('FilesystemFileWrite')).toBe(true);
+});
 
 const protocolV1Messages = parseConfigure({
   nested: {
@@ -1096,14 +1103,14 @@ describe('Protocol V2 framing and session', () => {
       {
         messageName: 'Ping',
         timeoutMs: 123,
-        highVolume: false,
+        highThroughput: false,
         generation: 7,
         signalAborted: false,
       },
       {
         messageName: 'FileWrite',
         timeoutMs: 456,
-        highVolume: true,
+        highThroughput: true,
         writeWithResponse: true,
         generation: 7,
         signalAborted: false,
@@ -1111,7 +1118,7 @@ describe('Protocol V2 framing and session', () => {
       {
         messageName: 'Ping',
         timeoutMs: PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
-        highVolume: false,
+        highThroughput: false,
         generation: 7,
         signalAborted: false,
       },
@@ -1120,14 +1127,14 @@ describe('Protocol V2 framing and session', () => {
       {
         messageName: 'Ping',
         timeoutMs: 123,
-        highVolume: false,
+        highThroughput: false,
         generation: 7,
         signalAborted: false,
       },
       {
         messageName: 'FileWrite',
         timeoutMs: 456,
-        highVolume: true,
+        highThroughput: true,
         writeWithResponse: true,
         generation: 7,
         signalAborted: false,
@@ -1135,7 +1142,7 @@ describe('Protocol V2 framing and session', () => {
       {
         messageName: 'Ping',
         timeoutMs: PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
-        highVolume: false,
+        highThroughput: false,
         generation: 7,
         signalAborted: false,
       },

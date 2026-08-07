@@ -1,6 +1,7 @@
 import {
   hasWritableCapability,
   resolveProtocolV2PacketCapacity,
+  shouldRefreshNegotiatedMtu,
   shouldWriteProtocolV2WithResponse,
 } from '../bleStrategy';
 
@@ -14,13 +15,20 @@ describe('React Native BLE strategy', () => {
     expect(hasWritableCapability(characteristic)).toBe(true);
   });
 
-  test('rejects Protocol V2 packet sizing when MTU is unavailable', () => {
-    expect(() =>
+  test('uses the conservative ATT payload when MTU is unavailable', () => {
+    expect(
       resolveProtocolV2PacketCapacity({
         platform: 'android',
         mtu: null,
       })
-    ).toThrow('Protocol V2 BLE requires a negotiated MTU');
+    ).toBe(20);
+  });
+
+  test('only refreshes an unavailable or default MTU snapshot', () => {
+    expect(shouldRefreshNegotiatedMtu(undefined)).toBe(true);
+    expect(shouldRefreshNegotiatedMtu(23)).toBe(true);
+    expect(shouldRefreshNegotiatedMtu(185)).toBe(false);
+    expect(shouldRefreshNegotiatedMtu(247)).toBe(false);
   });
 
   test('caps Android packet length by negotiated MTU payload', () => {
@@ -81,7 +89,7 @@ describe('React Native BLE strategy', () => {
     expect(
       shouldWriteProtocolV2WithResponse({
         platform: 'ios',
-        highVolume: true,
+        highThroughput: true,
         requestedWithResponse: false,
         characteristic,
       })
@@ -89,7 +97,7 @@ describe('React Native BLE strategy', () => {
     expect(
       shouldWriteProtocolV2WithResponse({
         platform: 'ios',
-        highVolume: true,
+        highThroughput: true,
         requestedWithResponse: true,
         characteristic,
       })
@@ -100,7 +108,7 @@ describe('React Native BLE strategy', () => {
     expect(
       shouldWriteProtocolV2WithResponse({
         platform: 'ios',
-        highVolume: true,
+        highThroughput: true,
         requestedWithResponse: false,
         characteristic: {
           isWritableWithResponse: true,

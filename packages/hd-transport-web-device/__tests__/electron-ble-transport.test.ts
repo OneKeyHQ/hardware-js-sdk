@@ -198,7 +198,7 @@ describe('ElectronBleTransport protocol detection', () => {
     const context = {
       messageName: 'Ping',
       timeoutMs: 1000,
-      highVolume: false,
+      highThroughput: false,
       generation: 1,
       signal: new AbortController().signal,
     };
@@ -207,6 +207,9 @@ describe('ElectronBleTransport protocol detection', () => {
 
     expect(nobleBle.write).toHaveBeenCalledTimes(2);
     expect(nobleBle.write.mock.calls.map(([, hex]) => hex.length / 2)).toEqual([192, 1]);
+    expect(nobleBle.write.mock.calls.every(([, , options]) => options?.pacingDelayMs === 0)).toBe(
+      true
+    );
   });
 
   test('uses the negotiated Noble MTU for Protocol V2 BLE writes', async () => {
@@ -216,7 +219,7 @@ describe('ElectronBleTransport protocol detection', () => {
     const context = {
       messageName: 'FilesystemFileWrite',
       timeoutMs: 1000,
-      highVolume: true,
+      highThroughput: true,
       generation: 1,
       signal: new AbortController().signal,
     };
@@ -247,7 +250,7 @@ describe('ElectronBleTransport protocol detection', () => {
     const context = {
       messageName: 'FilesystemFileWrite',
       timeoutMs: 1000,
-      highVolume: true,
+      highThroughput: true,
       generation: 1,
       signal: new AbortController().signal,
     };

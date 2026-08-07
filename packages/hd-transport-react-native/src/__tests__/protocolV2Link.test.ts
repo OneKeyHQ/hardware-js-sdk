@@ -490,6 +490,33 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
+  test('accepts a stable low MTU without the delayed refresh loop', async () => {
+    const { transport, uuid, device } = createHarness();
+    device.mtu = 185;
+
+    await expect(transport.acquire({ uuid })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(device.requestMTU).toHaveBeenCalledTimes(1);
+    expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(185);
+    await transport.release(uuid, true);
+  });
+
+  test('continues Protocol V2 probing with a conservative packet size when MTU is unavailable', async () => {
+    const { transport, uuid, device, writeCharacteristic } = createHarness();
+    device.mtu = undefined;
+
+    await expect(transport.acquire({ uuid })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(device.requestMTU).toHaveBeenCalledTimes(3);
+    expect((transport as any).getCachedTransport(uuid).mtuSize).toBeUndefined();
+    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalled();
+    await transport.release(uuid, true);
+  });
+
   test('reconnects before falling back to Protocol V1 after a fatal V2 probe failure', async () => {
     setPlatformOS('android');
     const { transport, uuid, device, notifySubscriptionRemovers, disconnectSubscriptionRemovers } =
@@ -691,7 +718,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     const context = {
       messageName: 'ProtocolInfoRequest',
       timeoutMs: 1000,
-      highVolume: false,
+      highThroughput: false,
       generation: 1,
       signal: new AbortController().signal,
     };
@@ -724,7 +751,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     const context = {
       messageName: 'ProtocolInfoRequest',
       timeoutMs: 1000,
-      highVolume: false,
+      highThroughput: false,
       generation: 1,
       signal: new AbortController().signal,
     };
@@ -790,7 +817,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     const context = {
       messageName: 'Ping',
       timeoutMs: 1000,
-      highVolume: false,
+      highThroughput: false,
       generation: 1,
       signal: new AbortController().signal,
     };
@@ -822,7 +849,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     const context = {
       messageName: 'FileWrite',
       timeoutMs: 1000,
-      highVolume: true,
+      highThroughput: true,
       generation: 1,
       signal: new AbortController().signal,
     };
@@ -844,7 +871,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     const context = {
       messageName: 'FileWrite',
       timeoutMs: 1000,
-      highVolume: true,
+      highThroughput: true,
       generation: 1,
       signal: new AbortController().signal,
     };

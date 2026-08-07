@@ -1,4 +1,4 @@
-import { EDeviceType } from '@onekeyfe/hd-shared';
+import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { ProtocolV2FirmwareTargetType } from '../src/protocols/protocol-v2/firmware';
 import {
@@ -65,5 +65,21 @@ describe('Protocol V2 firmware target contract', () => {
         se04Binary: new ArrayBuffer(1),
       })
     ).not.toThrow();
+  });
+
+  test('fails closed when SE03 or SE04 is requested without a confirmed device type', () => {
+    try {
+      assertProtocolV2FirmwareTargetsSupported(undefined, {
+        platform: 'web',
+        targetsToUpdate: ['se03'],
+      });
+      throw new Error('Expected unsupported target validation to fail');
+    } catch (error) {
+      expect(error).toMatchObject({ errorCode: HardwareErrorCode.DeviceNotSupportMethod });
+      expect(error).toHaveProperty(
+        'message',
+        'Cannot safely update se03 without a confirmed Pro2 device type'
+      );
+    }
   });
 });

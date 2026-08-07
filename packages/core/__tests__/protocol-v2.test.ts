@@ -5895,6 +5895,7 @@ describe('Protocol V2 firmware update targets', () => {
       payload: {
         method: 'firmwareUpdateV4',
         platform: 'web',
+        targetsToUpdate: ['resource'],
         resourceFiles: [
           {
             binary: resourceBundle,
@@ -5923,6 +5924,7 @@ describe('Protocol V2 firmware update targets', () => {
 
     await method.run();
 
+    expect(forceReloadDataSpy).not.toHaveBeenCalled();
     expect((method as any).prepareRemoteProtocolV2Binaries).not.toHaveBeenCalled();
     expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -6113,6 +6115,39 @@ describe('Protocol V2 firmware update targets', () => {
     expect((method as any).reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
     expect((method as any).verifyProtocolV2ReconnectIdentity).toHaveBeenCalledTimes(1);
     expect(initialize).toHaveBeenCalledTimes(1);
+  });
+
+  test('retries an idempotent firmware chunk before restarting the whole file', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4' },
+    });
+    const timeoutError = ERRORS.TypedError(HardwareErrorCode.BleTimeoutError, 'response timeout');
+    const typedCall = jest
+      .fn()
+      .mockRejectedValueOnce(timeoutError)
+      .mockImplementation((_name: string, _response: string, params: any) =>
+        Promise.resolve({
+          type: 'FilesystemFile',
+          message: {
+            processed_byte: Number(params.file.offset) + Number(params.file.data.byteLength),
+          },
+        })
+      );
+    (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
+    (method as any).reconnectProtocolV2Device = jest.fn();
+    method.postProgressMessage = jest.fn();
+
+    await (method as any).protocolV2CommonUpdateProcess({
+      payload: new Uint8Array([1, 2, 3]).buffer,
+      filePath: 'vol0:/firmware.bin',
+      processedSize: 0,
+      totalSize: 3,
+    });
+
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall.mock.calls.map(call => call[2].file.offset)).toEqual([0, 0]);
+    expect((method as any).reconnectProtocolV2Device).not.toHaveBeenCalled();
   });
 
   test('rejects a chunk-relative processed_byte during firmware staging', async () => {
@@ -6736,6 +6771,103 @@ describe('Protocol V2 firmware reconnect identity', () => {
 
     expect(configSpy).not.toHaveBeenCalled();
     expect(downloadSpy).not.toHaveBeenCalled();
+  });
+
+  test('continues a normal resource update when boot resources are not configured', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4', platform: 'web', targetsToUpdate: ['resource'] },
+    });
+    method.init();
+    (method as any).device = stubDevice({ getCurrentDeviceType: () => 'pro2' });
+    jest.spyOn(DataManager, 'getProtocolV2BootResources').mockReturnValue(undefined);
+    const downloadSpy = jest.spyOn(firmwareBinaryApi, 'getSysResourceBinary');
+
+    await expect((method as any).prepareProtocolV2BootResources()).resolves.toBeUndefined();
+    expect(downloadSpy).not.toHaveBeenCalled();
+  });
+
+  test('requires boot configuration for an explicit boot_resources target', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['boot_resources'],
+      },
+    });
+    method.init();
+    (method as any).device = stubDevice({ getCurrentDeviceType: () => 'pro2' });
+    jest.spyOn(DataManager, 'getProtocolV2BootResources').mockReturnValue(undefined);
+
+    await expect((method as any).prepareProtocolV2BootResources()).rejects.toThrow(
+      'Missing Protocol V2 boot resources configuration'
+    );
+  });
+
+  test('skips downloading a boot resource when the installed SHA-256 matches', async () => {
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    const fileHash = Array.from(sha256(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
+    const resource = {
+      required: false as const,
+      target: 'RES' as const,
+      files: [
+        {
+          name: 'bootloader_crest.bin',
+          url: 'https://example.com/bootloader_crest.bin',
+          devicePath: 'vol0:/assets/loaders/boot.staging/graphics/bootloader_crest.bin',
+          size: bytes.byteLength,
+          fileHash,
+        },
+      ],
+    };
+    const typedCall = jest.fn((name: string, _response: string, payload: any) => {
+      if (name === 'FilesystemPathInfoQuery') {
+        return Promise.resolve({
+          message: { exist: true, directory: false, size: bytes.byteLength },
+        });
+      }
+      if (name === 'FilesystemFileRead') {
+        const offset = Number(payload.file.offset);
+        return Promise.resolve({
+          message: { data: bytes.slice(offset, offset + Number(payload.chunk_len)) },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected request: ${name}`));
+    });
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4', platform: 'web', targetsToUpdate: ['resource'] },
+    });
+    method.init();
+    (method as any).device = stubDevice({
+      getCurrentDeviceType: () => 'pro2',
+      getCommands: () => ({ typedCall }),
+    });
+    jest.spyOn(DataManager, 'getProtocolV2BootResources').mockReturnValue(resource);
+    const downloadSpy = jest.spyOn(firmwareBinaryApi, 'getSysResourceBinary');
+
+    await expect((method as any).prepareProtocolV2BootResources()).resolves.toEqual([]);
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual([
+      'FilesystemPathInfoQuery',
+      'FilesystemFileRead',
+    ]);
+    expect(downloadSpy).not.toHaveBeenCalled();
+  });
+
+  test('rejects duplicate device paths across explicit and remote resource sources', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4' },
+    });
+    const devicePath = 'vol0:/assets/shared.bin';
+
+    expect(() =>
+      (method as any).mergeProtocolV2ResourceBundles(
+        [{ name: 'local.bin', binary: new ArrayBuffer(1), devicePath }],
+        [{ name: 'remote.bin', binary: new ArrayBuffer(1), devicePath }]
+      )
+    ).toThrow(`Duplicate Protocol V2 resource devicePath: ${devicePath}`);
   });
 
   test('includes startup resources in the complete resource target', async () => {
