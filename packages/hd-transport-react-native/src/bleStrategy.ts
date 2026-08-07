@@ -1,4 +1,4 @@
-import { ANDROID_DEFAULT_MTU, ANDROID_PACKET_LENGTH, IOS_PACKET_LENGTH } from './constants';
+import { ANDROID_PROTOCOL_V2_PACKET_LENGTH, IOS_PROTOCOL_V2_PACKET_LENGTH } from './constants';
 
 export type BlePlatform = 'ios' | 'android' | string;
 
@@ -13,8 +13,8 @@ export function hasWritableCapability(characteristic: BleWriteCapability) {
 
 export function resolveProtocolV2PacketCapacity({
   platform,
-  iosPacketLength = IOS_PACKET_LENGTH,
-  androidPacketLength = ANDROID_PACKET_LENGTH,
+  iosPacketLength = IOS_PROTOCOL_V2_PACKET_LENGTH,
+  androidPacketLength = ANDROID_PROTOCOL_V2_PACKET_LENGTH,
   mtu,
 }: {
   platform: BlePlatform;
@@ -22,14 +22,27 @@ export function resolveProtocolV2PacketCapacity({
   androidPacketLength?: number;
   mtu?: number | null;
 }) {
-  if (platform === 'ios') {
-    return iosPacketLength;
+  if (typeof mtu !== 'number' || !Number.isFinite(mtu) || mtu <= 3) {
+    throw new Error(`Protocol V2 BLE requires a negotiated MTU, received: ${String(mtu)}`);
   }
 
-  if (platform === 'android') {
-    const payloadLength = Math.max((mtu ?? ANDROID_DEFAULT_MTU) - 3, 1);
-    return Math.min(androidPacketLength, payloadLength);
-  }
+  const payloadLength = Math.floor(mtu) - 3;
+  const configuredPacketLength = platform === 'ios' ? iosPacketLength : androidPacketLength;
+  return Math.min(configuredPacketLength, payloadLength);
+}
 
-  return androidPacketLength;
+export function shouldWriteProtocolV2WithResponse({
+  platform,
+  highVolume,
+  requestedWithResponse,
+  characteristic,
+}: {
+  platform: BlePlatform;
+  highVolume: boolean;
+  requestedWithResponse?: boolean;
+  characteristic: BleWriteCapability;
+}) {
+  if (!characteristic.isWritableWithResponse) return false;
+  if (!characteristic.isWritableWithoutResponse) return true;
+  return requestedWithResponse === true || (platform === 'ios' && !highVolume);
 }

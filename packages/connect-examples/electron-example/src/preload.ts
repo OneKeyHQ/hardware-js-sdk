@@ -86,6 +86,15 @@ const desktopApi = {
         ipcRenderer.removeListener(EOneKeyBleMessageKeys.NOBLE_BLE_NOTIFICATION, subscription);
       };
     },
+    onMtuChanged: (callback: (device: { id: string; mtu: number }) => void) => {
+      const subscription = (_: unknown, device: { id: string; mtu: number }) => {
+        callback(device);
+      };
+      ipcRenderer.on(EOneKeyBleMessageKeys.NOBLE_BLE_MTU_CHANGED, subscription);
+      return () => {
+        ipcRenderer.removeListener(EOneKeyBleMessageKeys.NOBLE_BLE_MTU_CHANGED, subscription);
+      };
+    },
     onDeviceDisconnected: (callback: (device: { id: string; name: string }) => void) => {
       const subscription = (_: unknown, device: { id: string; name: string }) => {
         callback(device);

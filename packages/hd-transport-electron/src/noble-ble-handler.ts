@@ -21,6 +21,7 @@ import {
 } from '@onekeyfe/hd-shared';
 import pRetry from 'p-retry';
 
+import { resolveBlePacketCapacity } from './ble-packet-capacity';
 import { safeLog } from './types/noble-extended';
 import { runBleCallbackOperation, softRefreshSubscription } from './ble-ops';
 import {
@@ -65,6 +66,10 @@ const deviceDisconnectListeners = new Map<
   string,
   { peripheral: Peripheral; listener: () => void }
 >();
+const deviceMtuListeners = new Map<
+  string,
+  { peripheral: Peripheral; listener: (mtu: number) => void }
+>();
 
 // Windows-only response watchdog state moved to utils/windows-ble-recovery
 
@@ -86,8 +91,8 @@ const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
 const BLE_CLEANUP_TIMEOUT = 250;
 
 // Write-related constants
-const BLE_PACKET_SIZE = 192;
-const UNIFIED_WRITE_DELAY = 5;
+const BLE_PACKET_SIZE_FALLBACK = 192;
+const BLE_PACKET_SIZE_MAXIMUM = 244;
 const RETRY_CONFIG = { MAX_ATTEMPTS: 15, WRITE_TIMEOUT: 2000 } as const;
 const IS_WINDOWS = process.platform === 'win32';
 const ABORTABLE_WRITE_ERROR_PATTERNS = [
@@ -364,6 +369,11 @@ function cleanupDevice(
       disconnectEntry.peripheral.removeListener('disconnect', disconnectEntry.listener);
       deviceDisconnectListeners.delete(deviceId);
     }
+    const mtuEntry = deviceMtuListeners.get(deviceId);
+    if (mtuEntry) {
+      mtuEntry.peripheral.removeListener('mtu', mtuEntry.listener);
+      deviceMtuListeners.delete(deviceId);
+    }
     connectedDevices.delete(deviceId);
     deviceCharacteristics.delete(deviceId);
     notificationCallbacks.delete(deviceId);
@@ -423,11 +433,33 @@ function setupDisconnectListener(
   };
   deviceDisconnectListeners.set(deviceId, { peripheral, listener });
   peripheral.on('disconnect', listener);
+  setupMtuListener(peripheral, deviceId, webContents);
+}
+
+function setupMtuListener(
+  peripheral: Peripheral,
+  deviceId: string,
+  webContents: WebContents
+): void {
+  const existing = deviceMtuListeners.get(deviceId);
+  if (existing) {
+    existing.peripheral.removeListener('mtu', existing.listener);
+  }
+
+  const listener = (mtu: number) => {
+    if (!Number.isFinite(mtu) || mtu <= 0) return;
+    webContents.send(EOneKeyBleMessageKeys.NOBLE_BLE_MTU_CHANGED, {
+      id: deviceId,
+      mtu,
+    });
+  };
+  deviceMtuListeners.set(deviceId, { peripheral, listener });
+  peripheral.on('mtu', listener);
 }
 
 // ===== Write helpers (inline) =====
 
-async function writeCharacteristicWithAck(
+async function writeCharacteristicWithoutResponse(
   deviceId: string,
   writeCharacteristic: Characteristic,
   buffer: Buffer
@@ -475,7 +507,7 @@ async function attemptWindowsWriteUntilPaired(
     }
 
     try {
-      await writeCharacteristicWithAck(deviceId, latestWrite, payload);
+      await writeCharacteristicWithoutResponse(deviceId, latestWrite, payload);
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : String(e);
       logger?.error('[BLE-Write] Windows write error', {
@@ -559,6 +591,11 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
 
   const toBuffer = Buffer.from(hexData, 'hex');
   const doGetWriteCharacteristic = () => deviceCharacteristics.get(deviceId)?.write;
+  const packetCapacity = resolveBlePacketCapacity(
+    peripheral.mtu,
+    BLE_PACKET_SIZE_MAXIMUM,
+    BLE_PACKET_SIZE_FALLBACK
+  );
 
   if (!IS_WINDOWS || pairedDevices.has(deviceId)) {
     // macOS / Linux or already paired on Windows: direct write
@@ -569,14 +606,13 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
         `Write characteristic not available for ${deviceId}`
       );
     }
-    if (toBuffer.length <= BLE_PACKET_SIZE) {
-      await wait(UNIFIED_WRITE_DELAY);
-      await writeCharacteristicWithAck(deviceId, writeCharacteristic, toBuffer);
+    if (toBuffer.length <= packetCapacity) {
+      await writeCharacteristicWithoutResponse(deviceId, writeCharacteristic, toBuffer);
       return;
     }
     // chunked
     for (let offset = 0; offset < toBuffer.length; ) {
-      const chunkSize = Math.min(BLE_PACKET_SIZE, toBuffer.length - offset);
+      const chunkSize = Math.min(packetCapacity, toBuffer.length - offset);
       const chunk = toBuffer.subarray(offset, offset + chunkSize);
       offset += chunkSize;
       const latest = doGetWriteCharacteristic();
@@ -586,23 +622,19 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
           `Write characteristic not available for ${deviceId}`
         );
       }
-      await writeCharacteristicWithAck(deviceId, latest, chunk);
-      if (offset < toBuffer.length) {
-        await wait(UNIFIED_WRITE_DELAY);
-      }
+      await writeCharacteristicWithoutResponse(deviceId, latest, chunk);
     }
     return;
   }
 
   // Windows unpaired path: use loop
-  if (toBuffer.length <= BLE_PACKET_SIZE) {
-    await wait(UNIFIED_WRITE_DELAY);
+  if (toBuffer.length <= packetCapacity) {
     await attemptWindowsWriteUntilPaired(deviceId, doGetWriteCharacteristic, toBuffer, 'single');
     return;
   }
   // chunked loop
   for (let offset = 0, idx = 0; offset < toBuffer.length; idx++) {
-    const chunkSize = Math.min(BLE_PACKET_SIZE, toBuffer.length - offset);
+    const chunkSize = Math.min(packetCapacity, toBuffer.length - offset);
     const chunk = toBuffer.subarray(offset, offset + chunkSize);
     offset += chunkSize;
     await attemptWindowsWriteUntilPaired(
@@ -611,9 +643,6 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
       chunk,
       `chunk-${idx + 1}`
     );
-    if (offset < toBuffer.length) {
-      await wait(UNIFIED_WRITE_DELAY);
-    }
   }
 }
 
@@ -835,6 +864,7 @@ function getDevice(deviceId: string): DeviceInfo | null {
       id: peripheral.id,
       name: deviceName,
       state: peripheral.state || 'disconnected',
+      ...(typeof peripheral.mtu === 'number' ? { mtu: peripheral.mtu } : {}),
     };
   }
 
@@ -847,6 +877,7 @@ function getDevice(deviceId: string): DeviceInfo | null {
       id: connectedPeripheral.id,
       name: deviceName,
       state: connectedPeripheral.state || 'connected',
+      ...(typeof connectedPeripheral.mtu === 'number' ? { mtu: connectedPeripheral.mtu } : {}),
     };
   }
 

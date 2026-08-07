@@ -7,6 +7,7 @@ import transportPackage, {
 import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
 import ReactNativeBleTransport, {
+  BLE_WRITE_PACKET_TIMEOUT_MS,
   configureProtocolV2BleTuning,
   getFirmwareUploadWriteRetryType,
   resetProtocolV2BleTuning,
@@ -32,6 +33,7 @@ jest.mock('react-native-ble-plx', () => ({
     CharacteristicNotFound: 404,
   },
   BleManager: jest.fn(),
+  ConnectionPriority: { Balanced: 0, High: 1, LowPower: 2 },
   ScanMode: { LowLatency: 2 },
 }));
 
@@ -157,6 +159,7 @@ const createHarness = ({
     id: uuid,
     name: deviceName,
     localName: deviceName,
+    mtu: 247,
     serviceUUIDs: ['00000001-0000-1000-8000-00805f9b34fb'],
     isConnected: jest.fn(() => Promise.resolve(true)),
     cancelConnection: jest.fn(() => Promise.resolve()),
@@ -164,7 +167,9 @@ const createHarness = ({
       disconnectCallback = callback;
       return { remove: jest.fn() };
     }),
-  };
+  } as any;
+  device.requestMTU = jest.fn(() => Promise.resolve(device));
+  device.requestConnectionPriority = jest.fn(() => Promise.resolve(device));
   const bleManager = {
     devices: jest.fn(() => Promise.resolve([device])),
     connectedDevices: jest.fn(() => Promise.resolve([])),
@@ -172,18 +177,21 @@ const createHarness = ({
   };
   const transport = new ReactNativeBleTransport({ scanTimeout: 1 });
   const emitter = new EventEmitter();
+  const logger = { debug: jest.fn(), error: jest.fn() };
   transport.blePlxManager = bleManager;
   transport.resolveCharacteristics = jest.fn(() =>
     Promise.resolve({ writeCharacteristic, notifyCharacteristic })
   );
-  transport.init({ debug: jest.fn(), error: jest.fn() }, emitter);
+  transport.init(logger, emitter);
   transport.configure(protocolV1Schema);
   transport.configureProtocolV2(protocolV2Schema);
 
   return {
     transport,
     emitter,
+    logger,
     uuid,
+    device,
     sentSeqs,
     writeCharacteristic,
     setShouldRespond(value: boolean) {
@@ -247,6 +255,7 @@ const createV1Harness = ({
     id: uuid,
     name: 'OneKey Classic',
     localName: 'OneKey Classic',
+    mtu: 247,
     serviceUUIDs: ['00000001-0000-1000-8000-00805f9b34fb'],
     isConnected: jest.fn(() => Promise.resolve(true)),
     cancelConnection: jest.fn(() => Promise.resolve()),
@@ -255,7 +264,8 @@ const createV1Harness = ({
       disconnectSubscriptionRemovers.push(remove);
       return { remove };
     }),
-  };
+  } as any;
+  device.requestMTU = jest.fn(() => Promise.resolve(device));
   const transport = new ReactNativeBleTransport({ scanTimeout: 1 });
   const bleManager = {
     devices: jest.fn(() => Promise.resolve([device])),
@@ -392,7 +402,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   });
 
   test('actively probes Protocol V2 on iOS when only a name-derived hint is available', async () => {
-    const { transport, uuid, sentSeqs, writeCharacteristic } = createHarness({
+    const { transport, uuid, device, sentSeqs, writeCharacteristic } = createHarness({
       deviceName: 'Pro2 6E9E',
     });
 
@@ -400,6 +410,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       uuid,
       protocolType: 'V2',
     });
+    expect(device.requestMTU).toHaveBeenCalledWith(247);
     expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
 
     await expect(
@@ -426,6 +437,57 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(probeProtocolV1.mock.invocationCallOrder[0]).toBeLessThan(
       probeProtocolV2.mock.invocationCallOrder[0]
     );
+    await transport.release(uuid, true);
+  });
+
+  test('continues with the current MTU when the connected snapshot refresh fails', async () => {
+    const { transport, uuid, device } = createHarness();
+    const mtuError = new Error('MTU refresh failed');
+    device.requestMTU.mockRejectedValueOnce(mtuError);
+
+    await expect(transport.acquire({ uuid })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(device.requestMTU).toHaveBeenCalledTimes(1);
+    expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(247);
+    await transport.release(uuid, true);
+  });
+
+  test('refreshes a transient bootloader MTU after notifications are ready', async () => {
+    const { transport, uuid, device } = createHarness();
+    device.mtu = 23;
+    device.requestMTU
+      .mockResolvedValueOnce(device)
+      .mockResolvedValueOnce(device)
+      .mockImplementationOnce(() => {
+        device.mtu = 247;
+        return Promise.resolve(device);
+      });
+
+    await expect(transport.acquire({ uuid })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(device.requestMTU).toHaveBeenCalledTimes(3);
+    expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(247);
+    await transport.release(uuid, true);
+  });
+
+  test('continues with a low bootloader MTU when the bounded retry fails', async () => {
+    const { transport, uuid, device } = createHarness();
+    device.mtu = 23;
+    device.requestMTU
+      .mockResolvedValueOnce(device)
+      .mockResolvedValueOnce(device)
+      .mockRejectedValueOnce(new Error('bootloader MTU retry failed'));
+
+    await expect(transport.acquire({ uuid })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(device.requestMTU).toHaveBeenCalledTimes(3);
+    expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(23);
     await transport.release(uuid, true);
   });
 
@@ -564,14 +626,38 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   });
 
   test('keeps iOS Protocol V2 high-volume calls on withoutResponse', async () => {
-    const { transport, uuid, writeCharacteristic } = createHarness();
+    const { transport, uuid, logger, writeCharacteristic } = createHarness();
 
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
 
     await transport.call(uuid, 'FileWrite', {});
-    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
+    await transport.call(uuid, 'FileWrite', {});
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(2);
     expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
+    expect(
+      logger.debug.mock.calls.filter(
+        ([message]) =>
+          message === '[ReactNativeBleTransport] Protocol V2 high-volume write configured'
+      )
+    ).toHaveLength(1);
     await transport.release(uuid, true);
+  });
+
+  test('uses Android 517 MTU and high connection priority during Protocol V2 high-volume calls', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device } = createHarness();
+
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
+    expect(device.requestMTU).toHaveBeenCalledWith(517);
+
+    await transport.call(uuid, 'FileWrite', {});
+    await transport.call(uuid, 'FileWrite', {});
+
+    expect(device.requestConnectionPriority).toHaveBeenCalledTimes(1);
+    expect(device.requestConnectionPriority).toHaveBeenCalledWith(1);
+
+    await transport.release(uuid, true);
+    expect(device.requestConnectionPriority).toHaveBeenLastCalledWith(0);
   });
 
   test('uses withResponse for an iOS Protocol V2 firmware file write when requested', async () => {
@@ -630,7 +716,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(writeWithoutResponse).not.toHaveBeenCalled();
   });
 
-  test('paces a one-packet Protocol V2 control write on iOS', async () => {
+  test('does not pace a one-packet Protocol V2 control write on iOS', async () => {
     const transport = new ReactNativeBleTransport({ scanTimeout: 1 }) as any;
     const writeWithoutResponse = jest.fn().mockResolvedValue(undefined);
     const bleTransport = {
@@ -656,11 +742,10 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
         jest.fn()
       );
 
-      await Promise.resolve();
-      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5);
-      expect(writeWithoutResponse).not.toHaveBeenCalled();
-
       await call;
+      expect(setTimeoutSpy.mock.calls.map(([, timeout]) => timeout)).toEqual([
+        BLE_WRITE_PACKET_TIMEOUT_MS,
+      ]);
       expect(writeWithoutResponse).toHaveBeenCalledTimes(1);
     } finally {
       setTimeoutSpy.mockRestore();
@@ -765,5 +850,41 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       )
     ).rejects.toMatchObject({ errorCode: 205 });
     expect(writeWithoutResponse).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not apply fixed burst or flush pauses to high-volume Protocol V2 writes', async () => {
+    const transport = new ReactNativeBleTransport({ scanTimeout: 1 }) as any;
+    const writeWithoutResponse = jest.fn().mockResolvedValue(undefined);
+    const bleTransport = {
+      mtuSize: 247,
+      writeCharacteristic: { writeWithoutResponse },
+    };
+    const context = {
+      messageName: 'FileWrite',
+      timeoutMs: 1000,
+      highVolume: true,
+      generation: 1,
+      signal: new AbortController().signal,
+    };
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+
+    try {
+      await transport.writeProtocolV2Frame(
+        'test-device',
+        bleTransport,
+        new Uint8Array(600),
+        context,
+        jest.fn()
+      );
+
+      expect(writeWithoutResponse).toHaveBeenCalledTimes(3);
+      expect(setTimeoutSpy.mock.calls.map(([, timeout]) => timeout)).toEqual([
+        BLE_WRITE_PACKET_TIMEOUT_MS,
+        BLE_WRITE_PACKET_TIMEOUT_MS,
+        BLE_WRITE_PACKET_TIMEOUT_MS,
+      ]);
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
   });
 });

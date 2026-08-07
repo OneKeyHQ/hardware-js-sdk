@@ -95,7 +95,7 @@ describe('Pro2 resource configuration', () => {
     DataManager.lastCheckTimestamp = 0;
   });
 
-  test('accepts exactly six resources and normalizes their deterministic order', () => {
+  test('accepts exactly seven resources and normalizes their deterministic order', () => {
     const parsed = parseProtocolV2Resources({
       stable: [...resources].reverse(),
       boot: bootResources,
@@ -106,15 +106,18 @@ describe('Pro2 resource configuration', () => {
     expect(PROTOCOL_V2_RESOURCE_DEVICE_PATHS.translations).toBe(
       'vol0:/bundles/translations/translations.okpkg'
     );
+    expect(PROTOCOL_V2_RESOURCE_DEVICE_PATHS.firmware_logo).toBe(
+      'vol0:/bundles/firmware_logo.okpkg'
+    );
   });
 
   test('rejects incomplete, duplicate, or malformed stable sets', () => {
     expect(() => parseProtocolV2Resources({ stable: resources.slice(1) })).toThrow(
-      'six unique resource types'
+      '7 unique resource types'
     );
     expect(() =>
-      parseProtocolV2Resources({ stable: [...resources.slice(0, 5), resources[0]] })
-    ).toThrow('six unique resource types');
+      parseProtocolV2Resources({ stable: [...resources.slice(0, 6), resources[0]] })
+    ).toThrow('7 unique resource types');
     expect(() =>
       parseProtocolV2Resources({
         stable: resources.map((resource, index) =>
@@ -224,7 +227,7 @@ describe('Pro2 resource configuration', () => {
     );
     expect(typedCall.mock.calls.some(call => call[0] === 'ResourceInventoryGet')).toBe(false);
     expect(typedCall.mock.calls.filter(call => call[0] === 'FilesystemPathInfoQuery')).toHaveLength(
-      6
+      7
     );
     expect(typedCall.mock.calls.some(call => call[0] === 'FilesystemFileRead')).toBe(true);
   });
@@ -255,7 +258,7 @@ describe('Pro2 resource configuration', () => {
     });
     expect(
       buildProtocolV2ResourceUpdatePlan({ resources, mode: 'bootloader-recovery' }).resources
-    ).toHaveLength(6);
+    ).toHaveLength(7);
   });
 
   test('uses a filesystem inventory for incremental recovery mode updates', () => {

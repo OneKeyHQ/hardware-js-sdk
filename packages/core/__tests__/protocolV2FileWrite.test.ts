@@ -131,8 +131,41 @@ describe('writeProtocolV2File', () => {
       'FilesystemFileWrite',
       'FilesystemFile',
       expect.objectContaining({ ui_percentage: 42 }),
-      { writeWithResponse: true }
+      expect.objectContaining({
+        writeWithResponse: true,
+        onWriteCompleted: expect.any(Function),
+      })
     );
+  });
+
+  test('记录主机整帧写入与设备响应等待的分段耗时', async () => {
+    const log = getLogger(LoggerNames.Core);
+    const logSpy = jest.spyOn(log, 'log').mockImplementation(() => undefined);
+    const typedCall = jest.fn().mockImplementation((_type, _resType, _request, options) => {
+      options.onWriteCompleted({ elapsedMs: 25, frameBytes: 128 });
+      return Promise.resolve({ message: { processed_byte: 3 } });
+    });
+    const dateNowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(1_010)
+      .mockReturnValueOnce(1_040)
+      .mockReturnValueOnce(1_050);
+
+    try {
+      await writeProtocolV2File({
+        commands: { typedCall } as any,
+        path: 'vol0:/firmware.bin',
+        data: new Uint8Array([1, 2, 3]),
+      });
+
+      expect(logSpy).toHaveBeenLastCalledWith(
+        '[FileWrite] metrics transport=unknown status=completed path=vol0:/firmware.bin bytes=3/3 elapsed=0.05s speed=0.06 KiB/s hostWriteTotal=0.03s responseWaitTotal=0.03s measuredAttempts=1'
+      );
+    } finally {
+      dateNowSpy.mockRestore();
+      logSpy.mockRestore();
+    }
   });
 
   test('按确认分片的时间窗口记录实时传输速率', async () => {
@@ -175,7 +208,7 @@ describe('writeProtocolV2File', () => {
   });
 
   test('通过 Core Log 每十秒输出一次 BLE 传输关键指标', async () => {
-    const log = getLogger(LoggerNames.Method);
+    const log = getLogger(LoggerNames.Core);
     const logSpy = jest.spyOn(log, 'log').mockImplementation(() => undefined);
     const getSettingsSpy = jest
       .spyOn(DataManager, 'getSettings')
@@ -197,14 +230,18 @@ describe('writeProtocolV2File', () => {
         data,
       });
 
-      expect(logSpy).toHaveBeenCalledTimes(2);
+      expect(logSpy).toHaveBeenCalledTimes(3);
       expect(logSpy).toHaveBeenNthCalledWith(
         1,
-        '[FileWrite] metrics transport=BLE status=progress bytes=3600/5400 elapsed=10.00s speed=0.35 KiB/s'
+        '[FileWrite] started transport=BLE path=vol1:/wallpapers/test.bin bytes=5400 offset=0 chunk=1800'
       );
       expect(logSpy).toHaveBeenNthCalledWith(
         2,
-        '[FileWrite] metrics transport=BLE status=completed bytes=5400/5400 elapsed=14.00s speed=0.44 KiB/s'
+        '[FileWrite] metrics transport=BLE status=progress path=vol1:/wallpapers/test.bin bytes=3600/5400 elapsed=10.00s speed=0.35 KiB/s'
+      );
+      expect(logSpy).toHaveBeenNthCalledWith(
+        3,
+        '[FileWrite] metrics transport=BLE status=completed path=vol1:/wallpapers/test.bin bytes=5400/5400 elapsed=14.00s speed=0.44 KiB/s'
       );
     } finally {
       dateNowSpy.mockRestore();
@@ -215,7 +252,7 @@ describe('writeProtocolV2File', () => {
   });
 
   test('写入失败时通过 Core Log 输出已传输字节和平均速率', async () => {
-    const log = getLogger(LoggerNames.Method);
+    const log = getLogger(LoggerNames.Core);
     const logSpy = jest.spyOn(log, 'log').mockImplementation(() => undefined);
     const typedCall = jest.fn().mockRejectedValue(new Error('write failed'));
     const dateNowSpy = jest
@@ -234,7 +271,11 @@ describe('writeProtocolV2File', () => {
 
       expect(logSpy).toHaveBeenNthCalledWith(
         1,
-        '[FileWrite] metrics transport=unknown status=failed bytes=0/4000 elapsed=1.00s speed=0.00 KiB/s'
+        '[FileWrite] started transport=unknown path=vol1:/wallpapers/test.bin bytes=4000 offset=0 chunk=4000'
+      );
+      expect(logSpy).toHaveBeenNthCalledWith(
+        2,
+        '[FileWrite] metrics transport=unknown status=failed path=vol1:/wallpapers/test.bin bytes=0/4000 elapsed=1.00s speed=0.00 KiB/s'
       );
     } finally {
       dateNowSpy.mockRestore();

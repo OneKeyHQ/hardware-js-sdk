@@ -35,7 +35,10 @@ import ProtocolInfoRequest from '../src/api/protocol-v2/ProtocolInfoRequest';
 import EVMSignTypedData from '../src/api/evm/EVMSignTypedData';
 import EVMSignMessageEIP712 from '../src/api/evm/EVMSignMessageEIP712';
 import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
-import FirmwareUpdateV4, { assertProtocolV2ReconnectIdentity } from '../src/api/FirmwareUpdateV4';
+import FirmwareUpdateV4, {
+  assertProtocolV2FirmwareTargetsSupported,
+  assertProtocolV2ReconnectIdentity,
+} from '../src/api/FirmwareUpdateV4';
 import GetPassphraseState from '../src/api/GetPassphraseState';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
 import { batchGetPublickeys } from '../src/api/helpers/batchGetPublickeys';
@@ -255,7 +258,10 @@ describe('UploadPortfolio', () => {
       'FilesystemFileWrite',
       'FilesystemFile',
       expect.any(Object),
-      { timeoutMs: undefined }
+      expect.objectContaining({
+        timeoutMs: undefined,
+        onWriteCompleted: expect.any(Function),
+      })
     );
     expect(typedCall).toHaveBeenNthCalledWith(2, 'PortfolioUpdate', 'Success', {});
   });
@@ -298,7 +304,10 @@ describe('UploadPortfolio', () => {
         append: false,
         ui_percentage: 100,
       },
-      { timeoutMs: undefined }
+      expect.objectContaining({
+        timeoutMs: undefined,
+        onWriteCompleted: expect.any(Function),
+      })
     );
     expect(typedCall).toHaveBeenNthCalledWith(2, 'PortfolioUpdate', 'Success', {});
     expect(method.postMessage).not.toHaveBeenCalled();
@@ -3989,6 +3998,10 @@ describe('Protocol V2 firmware update targets', () => {
     });
 
     const order: string[] = [];
+    (method as any).prepareProtocolV2BootResources = jest.fn().mockImplementation(() => {
+      order.push('prepare-startup-resources');
+      return Promise.resolve([]);
+    });
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockImplementation(() => {
       order.push('enter-bootloader');
       return Promise.resolve(true);
@@ -4017,7 +4030,12 @@ describe('Protocol V2 firmware update targets', () => {
 
     await method.run();
 
-    expect(order).toEqual(['enter-bootloader', 'prepare-resources', 'execute-update']);
+    expect(order).toEqual([
+      'prepare-startup-resources',
+      'enter-bootloader',
+      'prepare-resources',
+      'execute-update',
+    ]);
   });
 
   test('reboots Protocol V2 normal-mode device to bootloader before transfer', async () => {
@@ -4259,6 +4277,41 @@ describe('Protocol V2 firmware update targets', () => {
     expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(3);
     expect(typedCall).toHaveBeenCalledTimes(1);
     expect(typedCall.mock.calls.map(call => call[0])).toEqual(['DeviceInfoGet']);
+  });
+
+  test('polls again when Protocol V2 bootloader serial is temporarily unavailable', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'DeviceInfo',
+        message: { protocol_version: 1, hw: {} },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceInfo',
+        message: protocolV2BootloaderDeviceInfo,
+      });
+    const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).device = stubDevice({
+      originalDescriptor: { id: 'ble-id', protocolType: 'V2' },
+      getCommands: () => ({ typedCall }),
+      probeProtocolV2RuntimeState: jest.fn().mockResolvedValue({
+        mode: 'bootloader',
+        bootloaderMode: true,
+      }),
+    });
+    (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
+    (method as any).protocolV2ExpectedSerialNumber = 'PR9999999999';
+
+    await (method as any).waitForProtocolV2BootloaderMode(60 * 1000, 0);
+
+    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenCalledTimes(2);
   });
 
   test('does not run generic initialize during Protocol V2 USB firmware reconnect', async () => {
@@ -6374,8 +6427,14 @@ describe('Protocol V2 firmware update targets', () => {
     expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([1800, 1]);
     expect(writePayloads.map(payload => payload.ui_percentage)).toEqual([0, 100]);
     expect(typedCall.mock.calls.map(call => call[3])).toEqual([
-      { writeWithResponse: true },
-      { writeWithResponse: true },
+      expect.objectContaining({
+        writeWithResponse: false,
+        onWriteCompleted: expect.any(Function),
+      }),
+      expect.objectContaining({
+        writeWithResponse: false,
+        onWriteCompleted: expect.any(Function),
+      }),
     ]);
   });
 
@@ -6941,7 +7000,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
     resourcesSpy.mockRestore();
   });
 
-  test('does not resolve boot resources unless the optional target is selected', async () => {
+  test('does not resolve boot resources when no resource target is selected', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: { method: 'firmwareUpdateV4', platform: 'web' },
@@ -6956,7 +7015,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
     expect(downloadSpy).not.toHaveBeenCalled();
   });
 
-  test('downloads and maps selected boot resources as direct RES files', async () => {
+  test('includes startup resources in the complete resource target', async () => {
     const bytes = new Uint8Array([1, 2, 3, 4]);
     const binary = bytes.buffer as ArrayBuffer;
     const fileHash = Array.from(sha256(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
@@ -6978,7 +7037,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
       payload: {
         method: 'firmwareUpdateV4',
         platform: 'web',
-        targetsToUpdate: ['boot_resources'],
+        targetsToUpdate: ['resource'],
       },
     });
     method.init();
@@ -7921,7 +7980,10 @@ describe('Protocol V2 file write method', () => {
         append: false,
         ui_percentage: 100,
       },
-      { timeoutMs: undefined }
+      expect.objectContaining({
+        timeoutMs: undefined,
+        onWriteCompleted: expect.any(Function),
+      })
     );
     expect(method.postMessage).toHaveBeenCalledWith({
       event: 'UI_EVENT',
@@ -7970,7 +8032,10 @@ describe('Protocol V2 file write method', () => {
         append: false,
         ui_percentage: 0,
       },
-      { timeoutMs: undefined }
+      expect.objectContaining({
+        timeoutMs: undefined,
+        onWriteCompleted: expect.any(Function),
+      })
     );
     expect(typedCall).toHaveBeenNthCalledWith(
       2,
@@ -7987,7 +8052,10 @@ describe('Protocol V2 file write method', () => {
         append: false,
         ui_percentage: 100,
       },
-      { timeoutMs: undefined }
+      expect.objectContaining({
+        timeoutMs: undefined,
+        onWriteCompleted: expect.any(Function),
+      })
     );
     expect(result).toMatchObject({
       path: 'vol1:test.bin',

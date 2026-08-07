@@ -15,6 +15,7 @@ import {
   getDeviceBLEFirmwareVersion,
   getDeviceBootloaderVersion,
   getDeviceFirmwareVersion,
+  getDeviceType,
   getFirmwareType,
   getLogger,
 } from '../utils';
@@ -89,6 +90,30 @@ const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
 const PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET = 0x200;
 const PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET = 0x240;
 const PROTOCOL_V2_OKPP_HASH_SIZE = 64;
+
+const PROTOCOL_V2_NEO_UNSUPPORTED_TARGETS = new Set<FirmwareUpdateV4Target>(['se03', 'se04']);
+
+export function assertProtocolV2FirmwareTargetsSupported(
+  deviceType: EDeviceType | string | undefined,
+  params: FirmwareUpdateV4Params
+) {
+  if (deviceType !== EDeviceType.Neo) return;
+
+  const unsupportedTargets = new Set(
+    (params.targetsToUpdate ?? []).filter(target => PROTOCOL_V2_NEO_UNSUPPORTED_TARGETS.has(target))
+  );
+  if (params.se03Binary) unsupportedTargets.add('se03');
+  if (params.se04Binary) unsupportedTargets.add('se04');
+
+  if (unsupportedTargets.size) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      `Neo only supports SE01 and SE02; unsupported firmware targets: ${Array.from(
+        unsupportedTargets
+      ).join(', ')}`
+    );
+  }
+}
 
 const getProtocolV2DeviceTransferProgress = (
   bytesBeforeChunk: number,
@@ -610,6 +635,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async runProtocolV2() {
     await this.captureProtocolV2PhysicalIdentity();
     const deviceFeatures = await this.getProtocolV2DeviceFeatures();
+    const currentDeviceType = this.device.getCurrentDeviceType();
+    const capabilityDeviceType =
+      currentDeviceType === EDeviceType.Pro2 || currentDeviceType === EDeviceType.Neo
+        ? currentDeviceType
+        : getDeviceType(deviceFeatures);
+    assertProtocolV2FirmwareTargetsSupported(capabilityDeviceType, this.params);
     const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
     this.validateExpectedTargetVersions();
@@ -622,7 +653,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
     const needsRemoteResources =
       !this.params.resourceFiles?.length && !!this.params.targetsToUpdate?.includes('resource');
-    const needsRemoteBootResources = !!this.params.targetsToUpdate?.includes('boot_resources');
+    const needsRemoteBootResources =
+      !!this.params.targetsToUpdate?.includes('resource') ||
+      !!this.params.targetsToUpdate?.includes('boot_resources');
 
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
@@ -1223,7 +1256,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async prepareProtocolV2BootResources(): Promise<
     ProtocolV2ResourceBundleBinary[] | undefined
   > {
-    if (!this.params.targetsToUpdate?.includes('boot_resources')) return undefined;
+    if (
+      !this.params.targetsToUpdate?.includes('resource') &&
+      !this.params.targetsToUpdate?.includes('boot_resources')
+    ) {
+      return undefined;
+    }
     const resource = DataManager.getProtocolV2BootResources(this.getProtocolV2DeviceType());
     if (!resource) throw new Error('Missing Protocol V2 boot resources configuration');
 
@@ -2289,7 +2327,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private isProtocolV2ReconnectIdentityError(error: unknown) {
-    return this.normalizeErrorMessage(error).includes('Protocol V2 reconnect physical identity');
+    // A serial can be temporarily unavailable while Loader starts, and BLE has no stable path.
+    // Keep polling unless the device explicitly reports a different serial.
+    return this.normalizeErrorMessage(error).includes(
+      'Protocol V2 reconnect physical identity mismatch'
+    );
   }
 
   private async fileWriteChunk(
@@ -2315,7 +2357,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         append: false,
         ui_percentage: progress ?? undefined,
       },
-      { writeWithResponse: true }
+      {
+        writeWithResponse: false,
+        onWriteCompleted: () => undefined,
+      }
     );
     if (writeRes.type !== 'FilesystemFile') {
       if ((writeRes as any).type === 'CallMethodError') {

@@ -105,6 +105,7 @@ const createNobleBle = (device = { id: 'flaky-pro2-id', name: 'Unknown BLE Devic
   unsubscribe: jest.fn(() => Promise.resolve()),
   write: jest.fn(() => Promise.resolve()),
   onNotification: jest.fn(() => jest.fn()),
+  onMtuChanged: jest.fn(() => jest.fn()),
   onDeviceDisconnected: jest.fn(() => jest.fn()),
   checkAvailability: jest.fn(() =>
     Promise.resolve({
@@ -176,6 +177,9 @@ describe('ElectronBleTransport protocol detection', () => {
     const bleTransport = configureTransport(nobleBle, emitter);
 
     await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    expect(nobleBle.subscribe.mock.invocationCallOrder[0]).toBeLessThan(
+      nobleBle.getDevice.mock.invocationCallOrder[1]
+    );
     disconnectHandler?.(device);
 
     expect(publicConnect).not.toHaveBeenCalled();
@@ -203,6 +207,56 @@ describe('ElectronBleTransport protocol detection', () => {
 
     expect(nobleBle.write).toHaveBeenCalledTimes(2);
     expect(nobleBle.write.mock.calls.map(([, hex]) => hex.length / 2)).toEqual([192, 1]);
+  });
+
+  test('uses the negotiated Noble MTU for Protocol V2 BLE writes', async () => {
+    const device = { id: 'mtu-pro2-id', name: 'OneKey Pro 2', mtu: 247 };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle) as any;
+    const context = {
+      messageName: 'FilesystemFileWrite',
+      timeoutMs: 1000,
+      highVolume: true,
+      generation: 1,
+      signal: new AbortController().signal,
+    };
+
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+    try {
+      await bleTransport.refreshBlePacketCapacity(device.id);
+      await bleTransport.writeProtocolV2Frame(device.id, new Uint8Array(245), context, jest.fn());
+
+      expect(setTimeoutSpy).not.toHaveBeenCalled();
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+
+    expect(nobleBle.write).toHaveBeenCalledTimes(2);
+    expect(nobleBle.write.mock.calls.map(([, hex]) => hex.length / 2)).toEqual([244, 1]);
+  });
+
+  test('updates Protocol V2 packet capacity when Noble reports a new MTU', async () => {
+    const device = { id: 'mtu-event-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    let mtuHandler: ((changedDevice: { id: string; mtu: number }) => void) | undefined;
+    nobleBle.onMtuChanged.mockImplementation(handler => {
+      mtuHandler = handler;
+      return jest.fn();
+    });
+    const bleTransport = configureTransport(nobleBle) as any;
+    const context = {
+      messageName: 'FilesystemFileWrite',
+      timeoutMs: 1000,
+      highVolume: true,
+      generation: 1,
+      signal: new AbortController().signal,
+    };
+
+    bleTransport.createMtuSubscription(device.id);
+    mtuHandler?.({ id: device.id, mtu: 247 });
+    await bleTransport.writeProtocolV2Frame(device.id, new Uint8Array(245), context, jest.fn());
+
+    expect(nobleBle.write.mock.calls.map(([, hex]) => hex.length / 2)).toEqual([244, 1]);
   });
 
   test('detects Protocol V2 after Protocol V1 probe timeout', async () => {

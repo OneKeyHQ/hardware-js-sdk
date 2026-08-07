@@ -15,7 +15,7 @@ import { useFirmwareProgress } from '../components/providers/SDKProvider';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
 import { isPro2DeviceInfo } from '../utils/pro2Device';
-import { buildResourceFilesFromManifest } from '../utils/protocolV2ResourceManifest';
+import { matchPro2ResourcePackageDirectory } from '../utils/pro2ResourcePackageDirectory';
 import type { DeviceInfo } from '../types/hardware';
 import { PRO2_FIRMWARE_FILE_ACCEPT } from '../constants/firmwareFiles';
 
@@ -78,10 +78,19 @@ const TARGET_FIELDS = [
   },
 ] as const;
 
-const BUNDLE_SLOTS = [
+const RESOURCE_PACKAGE_SLOTS = [
+  {
+    key: 'firmware_logo',
+    label: 'Firmware Logo',
+    fileNamePrefix: 'firmware_logo',
+    devicePath: 'vol0:/bundles/firmware_logo.okpkg',
+    accept: '.okpkg',
+    formatHint: 'RESC bundle .okpkg (firmware update crest)',
+  },
   {
     key: 'images',
     label: 'Images',
+    fileNamePrefix: 'images',
     devicePath: 'vol0:/bundles/images/images.okpkg',
     accept: '.okpkg',
     formatHint: 'RESC bundle .okpkg (images)',
@@ -89,6 +98,7 @@ const BUNDLE_SLOTS = [
   {
     key: 'animation',
     label: 'Animation',
+    fileNamePrefix: 'animation',
     devicePath: 'vol0:/bundles/images/animation.okpkg',
     accept: '.okpkg',
     formatHint: 'RESC bundle .okpkg (animation gifs)',
@@ -96,6 +106,7 @@ const BUNDLE_SLOTS = [
   {
     key: 'wallpaper',
     label: 'Wallpaper',
+    fileNamePrefix: 'wallpaper',
     devicePath: 'vol0:/bundles/images/wallpaper.okpkg',
     accept: '.okpkg',
     formatHint: 'RESC bundle .okpkg (wallpapers)',
@@ -103,6 +114,7 @@ const BUNDLE_SLOTS = [
   {
     key: 'translations',
     label: 'Translations',
+    fileNamePrefix: 'translations',
     devicePath: 'vol0:/bundles/translations/translations.okpkg',
     accept: '.okpkg',
     formatHint: 'RESC bundle .okpkg (i18n)',
@@ -110,6 +122,7 @@ const BUNDLE_SLOTS = [
   {
     key: 'fonts_roobert',
     label: 'Fonts Roobert',
+    fileNamePrefix: 'roobert',
     devicePath: 'vol0:/bundles/font/roobert.okpkg',
     accept: '.okpkg',
     formatHint: 'RESC bundle .okpkg (Latin fonts)',
@@ -117,9 +130,26 @@ const BUNDLE_SLOTS = [
   {
     key: 'fonts_noto',
     label: 'Fonts Noto',
+    fileNamePrefix: 'noto',
     devicePath: 'vol0:/bundles/font/noto.okpkg',
     accept: '.okpkg',
     formatHint: 'RESC bundle .okpkg (CJK fonts)',
+  },
+  {
+    key: 'boot_resource',
+    label: 'Boot Resource',
+    fileNamePrefix: 'boot_resource',
+    devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+    accept: '.okpkg',
+    formatHint: 'RESC package .okpkg (boot resources)',
+  },
+  {
+    key: 'params',
+    label: 'Params',
+    fileNamePrefix: 'params',
+    devicePath: 'vol0:/loaders/rom/params.okpkg',
+    accept: '.okpkg',
+    formatHint: 'RESC package .okpkg (ROM parameters)',
   },
 ] as const;
 
@@ -279,8 +309,10 @@ export default function Pro2UpdatePage() {
   const { toast } = useToast();
 
   const [files, setFiles] = useState<Partial<Record<TargetParam, File>>>({});
-  const [bundleFiles, setBundleFiles] = useState<Partial<Record<string, File>>>({});
-  const [resourceDirectory, setResourceDirectory] = useState<File[]>([]);
+  const [resourcePackageFiles, setResourcePackageFiles] = useState<Partial<Record<string, File>>>(
+    {}
+  );
+  const [resourceFolderName, setResourceFolderName] = useState<string>();
   const [isRunning, setIsRunning] = useState(false);
   const [isConnectingLocal, setIsConnectingLocal] = useState(false);
   const [logs, setLogs] = useState<UpdateLog[]>([]);
@@ -288,10 +320,23 @@ export default function Pro2UpdatePage() {
   const logIdRef = useRef(0);
   const resourceDirectoryInputRef = useRef<HTMLInputElement>(null);
 
-  const selectedFields = useMemo(() => TARGET_FIELDS.filter(field => files[field.param]), [files]);
-  const selectedBundleCount = BUNDLE_SLOTS.filter(slot => bundleFiles[slot.key]).length;
-  const selectedPayloadCount =
-    selectedFields.length + selectedBundleCount + (resourceDirectory.length > 0 ? 1 : 0);
+  const targetFields = useMemo(
+    () =>
+      currentDevice?.deviceType === 'neo'
+        ? TARGET_FIELDS.filter(
+            field => field.param !== 'se03Binary' && field.param !== 'se04Binary'
+          )
+        : TARGET_FIELDS,
+    [currentDevice?.deviceType]
+  );
+  const selectedFields = useMemo(
+    () => targetFields.filter(field => files[field.param]),
+    [files, targetFields]
+  );
+  const selectedResourcePackageCount = RESOURCE_PACKAGE_SLOTS.filter(
+    slot => resourcePackageFiles[slot.key]
+  ).length;
+  const selectedPayloadCount = selectedFields.length + selectedResourcePackageCount;
 
   const addLog = useCallback((level: UpdateLog['level'], message: string) => {
     const nextLog = {
@@ -337,12 +382,12 @@ export default function Pro2UpdatePage() {
 
       const params: Record<string, unknown> = { platform: 'web' };
       const resourceFiles: Array<{ binary: ArrayBuffer; devicePath: string }> = [];
-      for (const slot of BUNDLE_SLOTS) {
-        const file = bundleFiles[slot.key];
+      for (const slot of RESOURCE_PACKAGE_SLOTS) {
+        const file = resourcePackageFiles[slot.key];
         if (!file) continue;
         addLog(
           'info',
-          `Loading RESC bundle ${slot.label}: ${file.name} (${formatBytes(file.size)})`
+          `Loading resource package ${slot.label}: ${file.name} (${formatBytes(file.size)})`
         );
         resourceFiles.push({
           binary: await file.arrayBuffer(),
@@ -360,29 +405,22 @@ export default function Pro2UpdatePage() {
         params.resourceFiles = resourceFiles;
         addLog(
           'info',
-          `Prepared resourceFiles: ${resourceFiles.length} stable bundles, ${formatBytes(
+          `Prepared resourceFiles: ${resourceFiles.length} packages, ${formatBytes(
             resourceFiles.reduce((total, item) => total + item.binary.byteLength, 0)
           )}`
         );
       }
 
-      if (resourceDirectory.length > 0) {
-        const manifestResourceFiles = await buildResourceFilesFromManifest(resourceDirectory);
-        params.resourceFiles = manifestResourceFiles;
+      if (selectedPayloadCount === 0) {
         addLog(
           'info',
-          `Prepared full resources: ${manifestResourceFiles.length} files, ${formatBytes(
-            manifestResourceFiles.reduce((total, item) => total + item.binary.byteLength, 0)
-          )}`
+          `firmwareUpdateV4 remote config: ${device.deviceType} firmware-v1 components`
         );
-      }
-
-      if (selectedPayloadCount === 0) {
-        addLog('info', 'firmwareUpdateV4 remote config: pro2 firmware-v1 components');
       } else {
         const targetNames = [
-          selectedBundleCount > 0 ? `RESC bundles(${selectedBundleCount})` : null,
-          resourceDirectory.length > 0 ? 'Full resources(manifest)' : null,
+          selectedResourcePackageCount > 0
+            ? `resource packages(${selectedResourcePackageCount})`
+            : null,
           ...selectedFields.map(field => `${field.label}(${field.targetId})`),
         ].filter(Boolean);
         addLog('info', `firmwareUpdateV4 targets: ${targetNames.join(', ')}`);
@@ -410,11 +448,10 @@ export default function Pro2UpdatePage() {
     addLog,
     connectDevice,
     currentDevice,
-    bundleFiles,
-    resourceDirectory,
+    resourcePackageFiles,
     files,
     resetFirmwareProgress,
-    selectedBundleCount,
+    selectedResourcePackageCount,
     selectedFields,
     selectedPayloadCount,
     toast,
@@ -422,8 +459,8 @@ export default function Pro2UpdatePage() {
 
   const resetFiles = useCallback(() => {
     setFiles({});
-    setBundleFiles({});
-    setResourceDirectory([]);
+    setResourcePackageFiles({});
+    setResourceFolderName(undefined);
     setResult(null);
   }, []);
 
@@ -500,56 +537,14 @@ export default function Pro2UpdatePage() {
               <section className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <div className="text-sm font-semibold text-foreground">Resource bundles</div>
+                    <div className="text-sm font-semibold text-foreground">Resource packages</div>
                     <div className="text-xs text-muted-foreground">
-                      Written directly to the matching device path.
+                      Nine complete packages written directly to their matching device paths.
                     </div>
                   </div>
                   <span className="text-xs tabular-nums text-muted-foreground">
-                    {selectedBundleCount}/{BUNDLE_SLOTS.length}
+                    {selectedResourcePackageCount}/{RESOURCE_PACKAGE_SLOTS.length}
                   </span>
-                </div>
-                <div className="grid gap-px overflow-hidden rounded-lg border border-border/70 bg-border/70 sm:grid-cols-2 xl:grid-cols-3">
-                  {BUNDLE_SLOTS.map(slot => {
-                    const selectedFile = bundleFiles[slot.key];
-                    return (
-                      <CompactFileSlot
-                        key={slot.key}
-                        label={slot.label}
-                        meta={slot.devicePath}
-                        formatHint={slot.formatHint}
-                        accept={slot.accept}
-                        file={selectedFile}
-                        disabled={isRunning || resourceDirectory.length > 0}
-                        onSelect={nextFile =>
-                          setBundleFiles(prev => ({ ...prev, [slot.key]: nextFile }))
-                        }
-                        onClear={() =>
-                          setBundleFiles(prev => {
-                            const next = { ...prev };
-                            delete next[slot.key];
-                            return next;
-                          })
-                        }
-                      />
-                    );
-                  })}
-                </div>
-                <div className="rounded-md bg-muted/35 px-3 py-2 text-xs text-muted-foreground">
-                  SDK skips bundles whose on-device OKPP header already matches.
-                </div>
-              </section>
-
-              <section className="space-y-2">
-                <div>
-                  <div className="text-sm font-semibold text-foreground">
-                    Full resource manifest
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Select an extracted resource directory. The manifest maps every archive path to
-                    its device path, including stable bundles and boot resources. Selecting it
-                    replaces the individual resource bundle choices above.
-                  </div>
                 </div>
                 <input
                   ref={resourceDirectoryInputRef}
@@ -557,15 +552,36 @@ export default function Pro2UpdatePage() {
                   type="file"
                   multiple
                   disabled={isRunning}
-                  aria-label="Select full resource directory"
+                  aria-label="Select Pro2 resource package directory"
                   {...({
                     webkitdirectory: '',
                     directory: '',
                   } as React.InputHTMLAttributes<HTMLInputElement>)}
                   onChange={event => {
-                    const selectedDirectory = Array.from(event.currentTarget.files ?? []);
-                    setResourceDirectory(selectedDirectory);
-                    if (selectedDirectory.length > 0) setBundleFiles({});
+                    const selectedFiles = Array.from(event.currentTarget.files ?? []);
+                    try {
+                      const matchedFiles = matchPro2ResourcePackageDirectory(
+                        selectedFiles,
+                        RESOURCE_PACKAGE_SLOTS
+                      );
+                      const relativePath = selectedFiles[0]?.webkitRelativePath ?? '';
+                      const folderName = relativePath.split('/')[0] || 'Selected folder';
+                      setResourcePackageFiles(matchedFiles);
+                      setResourceFolderName(folderName);
+                      addLog('ok', `Loaded 9 resource packages from ${folderName}`);
+                      toast({
+                        title: 'Resource folder loaded',
+                        description: 'All nine Pro2 resource packages were matched.',
+                      });
+                    } catch (error) {
+                      const message = getErrorMessage(error);
+                      addLog('error', message);
+                      toast({
+                        title: 'Invalid resource folder',
+                        description: message,
+                        variant: 'destructive',
+                      });
+                    }
                   }}
                 />
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-background p-3">
@@ -581,24 +597,44 @@ export default function Pro2UpdatePage() {
                     }}
                   >
                     <FileUp />
-                    {resourceDirectory.length > 0 ? 'Replace directory' : 'Choose directory'}
+                    {resourceFolderName ? 'Replace resource folder' : 'Choose resource folder'}
                   </Button>
                   <span className="text-xs text-muted-foreground">
-                    {resourceDirectory.length > 0
-                      ? `${resourceDirectory.length} selected files (all manifest entries are validated before upload)`
-                      : 'Expected: manifest.json plus its referenced files'}
+                    {resourceFolderName
+                      ? `${resourceFolderName}: all 9 packages matched`
+                      : 'Automatically matches all 9 .okpkg files; manifest.json is not required.'}
                   </span>
-                  {resourceDirectory.length > 0 ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      disabled={isRunning}
-                      onClick={() => setResourceDirectory([])}
-                    >
-                      <X /> Clear
-                    </Button>
-                  ) : null}
+                </div>
+                <div className="grid gap-px overflow-hidden rounded-lg border border-border/70 bg-border/70 sm:grid-cols-2 xl:grid-cols-3">
+                  {RESOURCE_PACKAGE_SLOTS.map(slot => {
+                    const selectedFile = resourcePackageFiles[slot.key];
+                    return (
+                      <CompactFileSlot
+                        key={slot.key}
+                        label={slot.label}
+                        meta={slot.devicePath}
+                        formatHint={slot.formatHint}
+                        accept={slot.accept}
+                        file={selectedFile}
+                        disabled={isRunning}
+                        onSelect={nextFile => {
+                          setResourcePackageFiles(prev => ({ ...prev, [slot.key]: nextFile }));
+                          setResourceFolderName(undefined);
+                        }}
+                        onClear={() => {
+                          setResourceFolderName(undefined);
+                          setResourcePackageFiles(prev => {
+                            const next = { ...prev };
+                            delete next[slot.key];
+                            return next;
+                          });
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="rounded-md bg-muted/35 px-3 py-2 text-xs text-muted-foreground">
+                  SDK skips packages whose on-device OKPP header already matches.
                 </div>
               </section>
 
@@ -611,11 +647,11 @@ export default function Pro2UpdatePage() {
                     </div>
                   </div>
                   <span className="text-xs tabular-nums text-muted-foreground">
-                    {selectedFields.length}/{TARGET_FIELDS.length}
+                    {selectedFields.length}/{targetFields.length}
                   </span>
                 </div>
                 <div className="grid gap-px overflow-hidden rounded-lg border border-border/70 bg-border/70 sm:grid-cols-2 xl:grid-cols-3">
-                  {TARGET_FIELDS.map(field => {
+                  {targetFields.map(field => {
                     const selectedFile = files[field.param];
                     return (
                       <CompactFileSlot
@@ -661,8 +697,9 @@ export default function Pro2UpdatePage() {
               {selectedPayloadCount > 0 ? (
                 <span className="text-sm text-muted-foreground">
                   {[
-                    selectedBundleCount > 0 ? `${selectedBundleCount} RESC bundles` : null,
-                    resourceDirectory.length > 0 ? 'Full resource manifest' : null,
+                    selectedResourcePackageCount > 0
+                      ? `${selectedResourcePackageCount} resource packages`
+                      : null,
                     ...selectedFields.map(field => field.label),
                   ]
                     .filter(Boolean)

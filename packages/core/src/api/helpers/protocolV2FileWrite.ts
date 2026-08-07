@@ -9,7 +9,7 @@ import { LoggerNames, getLogger } from '../../utils/logger';
 
 import type { DeviceCommands } from '../../device/DeviceCommands';
 
-const Log = getLogger(LoggerNames.Method);
+const Log = getLogger(LoggerNames.Core);
 
 export type ProtocolV2FileWriteData = ArrayBuffer | Uint8Array | Blob | string;
 
@@ -69,22 +69,36 @@ function getFileTransferTransport() {
 function logFileTransferMetrics({
   transport,
   status,
+  path,
   transferredBytes,
   totalBytes,
   elapsedMs,
   rateBytesPerSecond,
+  hostWriteElapsedMs,
+  responseWaitElapsedMs,
+  measuredAttempts,
 }: {
   transport: string;
   status: 'progress' | 'completed' | 'failed';
+  path: string;
   transferredBytes: number;
   totalBytes: number;
   elapsedMs: number;
   rateBytesPerSecond: number;
+  hostWriteElapsedMs: number;
+  responseWaitElapsedMs: number;
+  measuredAttempts: number;
 }) {
+  const segmentedMetrics =
+    measuredAttempts > 0
+      ? ` hostWriteTotal=${(hostWriteElapsedMs / 1000).toFixed(2)}s responseWaitTotal=${(
+          responseWaitElapsedMs / 1000
+        ).toFixed(2)}s measuredAttempts=${measuredAttempts}`
+      : '';
   Log.log(
-    `[FileWrite] metrics transport=${transport} status=${status} bytes=${transferredBytes}/${totalBytes} elapsed=${(
+    `[FileWrite] metrics transport=${transport} status=${status} path=${path} bytes=${transferredBytes}/${totalBytes} elapsed=${(
       elapsedMs / 1000
-    ).toFixed(2)}s speed=${formatFileTransferRate(rateBytesPerSecond)} KiB/s`
+    ).toFixed(2)}s speed=${formatFileTransferRate(rateBytesPerSecond)} KiB/s${segmentedMetrics}`
   );
 }
 
@@ -177,7 +191,13 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
   let lastConfirmedAt = startTime;
   let logWindowStartedAt = startTime;
   let logWindowStartedBytes = 0;
+  let hostWriteElapsedMs = 0;
+  let responseWaitElapsedMs = 0;
+  let measuredAttempts = 0;
   const transport = getFileTransferTransport();
+  Log.log(
+    `[FileWrite] started transport=${transport} path=${options.path} bytes=${dataLength} offset=${startOffset} chunk=${chunkSize}`
+  );
 
   try {
     while (written < dataLength) {
@@ -203,13 +223,25 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
       let response;
       let isWritePending = true;
       while (isWritePending) {
+        let currentHostWriteElapsedMs: number | undefined;
+        let responseWaitStartedAt: number | undefined;
         try {
           const callOptions =
             options.writeWithResponse === undefined
-              ? { timeoutMs: options.timeoutMs }
+              ? {
+                  timeoutMs: options.timeoutMs,
+                  onWriteCompleted: ({ elapsedMs }: { elapsedMs: number }) => {
+                    currentHostWriteElapsedMs = elapsedMs;
+                    responseWaitStartedAt = Date.now();
+                  },
+                }
               : {
                   ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
                   writeWithResponse: options.writeWithResponse,
+                  onWriteCompleted: ({ elapsedMs }: { elapsedMs: number }) => {
+                    currentHostWriteElapsedMs = elapsedMs;
+                    responseWaitStartedAt = Date.now();
+                  },
                 };
           response = await options.commands.typedCall(
             'FilesystemFileWrite',
@@ -222,6 +254,12 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
           if (retryCount >= maxChunkRetries || !isProtocolV2ResponseTimeout(error)) throw error;
           retryCount += 1;
           options.throwIfAborted?.();
+        } finally {
+          if (currentHostWriteElapsedMs !== undefined && responseWaitStartedAt !== undefined) {
+            hostWriteElapsedMs += currentHostWriteElapsedMs;
+            responseWaitElapsedMs += Math.max(Date.now() - responseWaitStartedAt, 0);
+            measuredAttempts += 1;
+          }
         }
       }
       if (!response) {
@@ -285,10 +323,14 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
         logFileTransferMetrics({
           transport,
           status: 'progress',
+          path: options.path,
           transferredBytes,
           totalBytes: dataLength,
           elapsedMs,
           rateBytesPerSecond: getAverageFileTransferRate(logWindowBytes, logWindowElapsedMs),
+          hostWriteElapsedMs,
+          responseWaitElapsedMs,
+          measuredAttempts,
         });
         logWindowStartedAt = now;
         logWindowStartedBytes = transferredBytes;
@@ -307,10 +349,14 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
     logFileTransferMetrics({
       transport,
       status: 'failed',
+      path: options.path,
       transferredBytes: written,
       totalBytes: dataLength,
       elapsedMs,
       rateBytesPerSecond: getAverageFileTransferRate(logWindowBytes, logWindowElapsedMs),
+      hostWriteElapsedMs,
+      responseWaitElapsedMs,
+      measuredAttempts,
     });
     throw error;
   }
@@ -321,10 +367,14 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
   logFileTransferMetrics({
     transport,
     status: 'completed',
+    path: options.path,
     transferredBytes: written,
     totalBytes: dataLength,
     elapsedMs,
     rateBytesPerSecond: getAverageFileTransferRate(logWindowBytes, logWindowElapsedMs),
+    hostWriteElapsedMs,
+    responseWaitElapsedMs,
+    measuredAttempts,
   });
 
   return {
