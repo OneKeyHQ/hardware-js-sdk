@@ -3,6 +3,7 @@ import EventEmitter from 'events';
 import { DeviceSessionPinType, TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
 import {
   ERRORS,
+  ERROR_CODES_REQUIRE_DISCONNECT,
   ERROR_CODES_REQUIRE_RELEASE,
   HardwareError,
   HardwareErrorCode,
@@ -933,6 +934,21 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       DevicePool.emitter.emit(DEVICE.CONNECT, device);
     }
   } catch (err) {
+    // Device.run()'s REQUIRE_DISCONNECT handling never sees acquire/initialize
+    // failures, so with keep-alive a wedged link would be reused by every retry
+    // (field case: Initialize timing out at 25s per attempt, forever). Drop it
+    // here so the next retry cold-connects.
+    if (
+      ERROR_CODES_REQUIRE_DISCONNECT.includes(err.errorCode) &&
+      device.mainId &&
+      device.deviceConnector
+    ) {
+      await device.deviceConnector.disconnect(device.mainId).catch(() => undefined);
+      // The connector only drops the link; `deviceAcquired` is reset by
+      // release()/markTransportDisconnected() alone. Leaving it set makes the
+      // next attempt skip acquire and initialize onto the link we just cut.
+      device.markTransportDisconnected();
+    }
     if (
       (err.errorCode === HardwareErrorCode.BleTimeoutError ||
         err.errorCode === HardwareErrorCode.BleConnectedError ||

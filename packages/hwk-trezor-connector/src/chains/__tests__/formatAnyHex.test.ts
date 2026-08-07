@@ -1,5 +1,5 @@
 import { normalizeEvmSignTxHexFields } from '../evm';
-import { formatAnyHex } from '../utils';
+import { assertHexString, formatAnyHex } from '../utils';
 
 import type { EvmSignTxTrezorParams } from '@onekeyfe/hwk-adapter-core';
 
@@ -47,6 +47,29 @@ describe('formatAnyHex', () => {
 });
 
 /**
+ * The guard that turns silent `Buffer.from(v,'hex')` truncation into a loud
+ * InvalidParams. MUST accept every shape valid hex takes (empty, 0x prefix,
+ * odd length, any case) and reject only strings with non-hex characters.
+ */
+describe('assertHexString', () => {
+  it('accepts empty, 0x-prefixed, odd-length and mixed-case hex', () => {
+    expect(() => assertHexString('f', '')).not.toThrow();
+    expect(() => assertHexString('f', '0x')).not.toThrow();
+    expect(() => assertHexString('f', '0X1')).not.toThrow();
+    expect(() => assertHexString('f', '5')).not.toThrow();
+    expect(() => assertHexString('f', 'ABCDEF')).not.toThrow();
+    expect(() => assertHexString('f', '0x16345785d8a0000')).not.toThrow();
+  });
+
+  it('rejects non-hex characters (would otherwise truncate to wrong bytes)', () => {
+    expect(() => assertHexString('value', 'zz')).toThrow(/value must be a hex string/);
+    expect(() => assertHexString('value', '12zz34')).toThrow(/hex string/);
+    expect(() => assertHexString('value', '0xgg')).toThrow(/hex string/);
+    expect(() => assertHexString('value', '12 34')).toThrow(/hex string/);
+  });
+});
+
+/**
  * The single EVM chokepoint. Hex fields get normalized; non-hex fields
  * (path / chainId / paymentRequest / ethereumDefinitions) MUST be preserved
  * verbatim — that is exactly what keeps this safe to call in one place.
@@ -87,6 +110,93 @@ describe('normalizeEvmSignTxHexFields', () => {
         storageKeys: ['01', '00ff'],
       },
     ]);
+  });
+
+  it('rejects invalid hex in an accessList address instead of signing truncated bytes', () => {
+    expect(() =>
+      normalizeEvmSignTxHexFields({
+        path: "m/44'/60'/0'/0/0",
+        maxFeePerGas: '0x3',
+        maxPriorityFeePerGas: '0x1',
+        accessList: [
+          {
+            address: '0xzzcdef0000000000000000000000000000000001',
+            storageKeys: ['0x01'],
+          },
+        ],
+      } as EvmSignTxTrezorParams)
+    ).toThrow(/accessList\[0\]\.address must be a hex string/);
+  });
+
+  it('rejects invalid hex in an accessList storage key instead of signing truncated bytes', () => {
+    expect(() =>
+      normalizeEvmSignTxHexFields({
+        path: "m/44'/60'/0'/0/0",
+        maxFeePerGas: '0x3',
+        maxPriorityFeePerGas: '0x1',
+        accessList: [
+          {
+            address: '0xabcdef0000000000000000000000000000000001',
+            storageKeys: ['0x01', '0xGG'],
+          },
+        ],
+      } as EvmSignTxTrezorParams)
+    ).toThrow(/accessList\[0\]\.storageKeys\[1\] must be a hex string/);
+  });
+
+  it('accepts an empty accessList and an entry carrying no storageKeys', () => {
+    // The per-item hex validation must not turn these into a hard failure:
+    // an empty list is the normal EIP-1559 case, and storageKeys is optional
+    // in practice even though the type declares it.
+    const out = normalizeEvmSignTxHexFields({
+      path: "m/44'/60'/0'/0/0",
+      maxFeePerGas: '0x3',
+      maxPriorityFeePerGas: '0x1',
+      accessList: [],
+    } as unknown as EvmSignTxTrezorParams);
+    expect(out.accessList).toEqual([]);
+
+    const noKeys = normalizeEvmSignTxHexFields({
+      path: "m/44'/60'/0'/0/0",
+      maxFeePerGas: '0x3',
+      maxPriorityFeePerGas: '0x1',
+      accessList: [{ address: '0xabcdef0000000000000000000000000000000001' }],
+    } as unknown as EvmSignTxTrezorParams);
+    expect(noKeys.accessList).toEqual([{ address: 'abcdef0000000000000000000000000000000001' }]);
+  });
+
+  it('rejects invalid hex in amount fields instead of signing truncated bytes', () => {
+    expect(() =>
+      normalizeEvmSignTxHexFields({
+        path: "m/44'/60'/0'/0/0",
+        value: 'zz',
+        chainId: 1,
+      } as EvmSignTxTrezorParams)
+    ).toThrow(/value must be a hex string/);
+  });
+
+  it('pads odd-length data exactly like Trezor Suite (upstream parity)', () => {
+    // Suite's EthereumSignTransaction deep-pads the whole tx, calldata
+    // included. Excluding data from the padding is what once produced
+    // Buffer.from truncation and a fractional data_length here.
+    const out = normalizeEvmSignTxHexFields({
+      path: "m/44'/60'/0'/0/0",
+      value: '0x1',
+      data: '0xabc',
+      chainId: 1,
+    } as EvmSignTxTrezorParams);
+    expect(out.data).toBe('0abc'); // 2 whole bytes, data_length = 2
+  });
+
+  it('rejects invalid hex in the data field', () => {
+    expect(() =>
+      normalizeEvmSignTxHexFields({
+        path: "m/44'/60'/0'/0/0",
+        value: '0x1',
+        data: '0xdead__beef',
+        chainId: 1,
+      } as EvmSignTxTrezorParams)
+    ).toThrow(/data must be a hex string/);
   });
 
   it('leaves non-hex fields untouched (path, chainId, paymentRequest, definitions)', () => {

@@ -108,6 +108,16 @@ export class TrezorElectronBleConnector extends TrezorConnectorBase {
           params: { connectId: device.connectId, originalError: { message: reason } },
         });
       }
+      // cancelPairing abandoned the connect. Reporting that as a connect failure
+      // would tell the user the device is unreachable when they are the one who
+      // stopped it.
+      if (/connect cancelled/i.test(reason)) {
+        throw createHwkError({
+          code: HardwareErrorCode.BlePairingCancelled,
+          message: `Trezor BLE pairing cancelled: ${device.connectId}`,
+          params: { connectId: device.connectId, originalError: { message: reason } },
+        });
+      }
       throw createHwkError({
         code: HardwareErrorCode.BleConnectFailed,
         message: `Trezor BLE connect failed: ${device.connectId} (${reason})`,
@@ -138,6 +148,17 @@ export class TrezorElectronBleConnector extends TrezorConnectorBase {
       model: TREZOR_SAFE_7_MODEL,
       capabilities: { persistentDeviceIdentity: false },
     };
+  }
+
+  override async cancel(sessionId: string): Promise<void> {
+    await super.cancel(sessionId);
+    // Base cancel only settles UI waiters; a connect stuck in the main process
+    // must be abandoned there.
+    try {
+      await this._transport?.cancelPairing();
+    } catch {
+      // Cancel must never throw.
+    }
   }
 
   reset(): void {

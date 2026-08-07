@@ -23,6 +23,29 @@ import type { EvmEthereumDefinitions } from '@onekeyfe/hwk-adapter-core';
 export const DEFAULT_ETHEREUM_DEFINITIONS_BASE_URL =
   'https://data.trezor.io/firmware/eth-definitions';
 
+/** Timeout so a hung host can't stall the signing flow. */
+export const DEFINITIONS_FETCH_TIMEOUT_MS = 20_000;
+
+/** Race a thunk against a deadline. Generic so it works with any FetchLike on
+ * RN/Hermes; a timeout stops awaiting but does not cancel the socket. */
+export async function runWithTimeout<T>(
+  run: () => Promise<T>,
+  timeoutMs: number = DEFINITIONS_FETCH_TIMEOUT_MS
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`definitions fetch timed out after ${timeoutMs}ms`)),
+      timeoutMs
+    );
+  });
+  try {
+    return await Promise.race([run(), deadline]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export type FetchLike = (url: string) => Promise<{
   status: number;
   arrayBuffer(): Promise<ArrayBuffer>;
@@ -133,11 +156,13 @@ export async function buildEthereumDefinitionsForSignTx({
 
 async function fetchDefinitionHex(url: string, fetchImpl: FetchLike): Promise<string | undefined> {
   try {
-    const response = await fetchImpl(url);
-    if (response.status !== 200) {
-      return undefined;
-    }
-    return arrayBufferToHex(await response.arrayBuffer());
+    return await runWithTimeout(async () => {
+      const response = await fetchImpl(url);
+      if (response.status !== 200) {
+        return undefined;
+      }
+      return arrayBufferToHex(await response.arrayBuffer());
+    });
   } catch {
     return undefined;
   }

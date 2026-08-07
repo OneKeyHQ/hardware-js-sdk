@@ -139,6 +139,9 @@ export default class ElectronBleTransport {
     },
   });
 
+  /** One-shot guard so a missing preload `release` bridge is reported once. */
+  private warnedMissingRelease = false;
+
   private notificationCleanups: Map<string, () => void> = new Map();
 
   private mtuCleanups: Map<string, () => void> = new Map();
@@ -382,16 +385,23 @@ export default class ElectronBleTransport {
     }
   }
 
-  async release(id: string) {
+  async release(id: string, _onclose?: boolean, keepSession?: boolean) {
     try {
       await this.protocolV2Links.invalidateLink(id, 'Electron BLE transport released');
-      await this.releaseNative(id);
+      await this.releaseLogical(id, keepSession);
     } catch (error) {
       this.Log?.error('[Electron BLE] release failed:', error);
       this.cleanupDeviceState(id);
     }
   }
 
+  // DeviceConnector.disconnect feature-detects this; without it REQUIRE_DISCONNECT
+  // recovery is a no-op and keep-alive hands the wedged link to every retry.
+  async disconnect(id: string) {
+    return this.releaseNative(id);
+  }
+
+  // Hard teardown, error paths only: a link presumed dead must not be reused.
   private async releaseNative(id: string) {
     try {
       if (this.connectedDevices.has(id)) {
@@ -403,6 +413,32 @@ export default class ElectronBleTransport {
       }
     } catch (error) {
       this.Log?.error('[Electron BLE] release failed:', error);
+      this.cleanupDeviceState(id);
+    }
+  }
+
+  // Logical release: link and subscription stay up for the next call. Renderer
+  // listeners are still torn down, or fresh ones would double-process packets.
+  private async releaseLogical(id: string, keepSession?: boolean) {
+    try {
+      if (!this.connectedDevices.has(id)) return;
+      this.cleanupDeviceState(id);
+
+      const release = window.desktopApi?.nobleBle?.release;
+      if (!release) {
+        // Degraded, not broken: say it once, it just looks like a slow device.
+        if (!this.warnedMissingRelease) {
+          this.warnedMissingRelease = true;
+          this.Log?.error(
+            '[Electron BLE] desktopApi.nobleBle.release is missing from the preload bridge; ' +
+              'keep-alive idle countdown will never start — map NOBLE_BLE_RELEASE in the desktop preload'
+          );
+        }
+        return;
+      }
+      await release(id, keepSession);
+    } catch (error) {
+      this.Log?.error('[Electron BLE] logical release failed:', error);
       this.cleanupDeviceState(id);
     }
   }
@@ -953,6 +989,12 @@ export default class ElectronBleTransport {
         bufferState.bufferLength = dataView.getInt32(5, false);
         bufferState.buffer = [...data.subarray(3)];
       } else {
+        if (bufferState.buffer.length === 0) {
+          // Tail of a cancelled call, arriving after the buffer was reset. Not an
+          // `error`: the caller rejects the in-flight call on that field.
+          this.Log?.debug('[Electron BLE] Orphan continuation chunk discarded');
+          return { isComplete: false };
+        }
         bufferState.buffer = bufferState.buffer.concat([...data]);
       }
 

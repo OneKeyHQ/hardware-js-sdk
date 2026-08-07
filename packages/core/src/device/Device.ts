@@ -543,7 +543,8 @@ export class Device extends EventEmitter {
         }
       }
       try {
-        await this.deviceConnector?.release(this.mainId, false);
+        // BLE releases even when keepSession is set, so forward the intent.
+        await this.deviceConnector?.release(this.mainId, false, this.keepSession);
         this.updateDescriptor({ session: null } as DeviceDescriptor);
       } catch (err) {
         Log.error('[Device] release error: ', err);
