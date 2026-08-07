@@ -1,8 +1,8 @@
 import { EDeviceType, ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
 import {
   DeviceRebootType,
-  PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE,
   PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
+  PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE,
   PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE,
   PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
 } from '@onekeyfe/hd-transport';
@@ -67,6 +67,10 @@ import type { FirmwareByteSource } from './firmware/FirmwareArtifactSource';
 
 const Log = getLogger(LoggerNames.Method);
 
+// Restored after a rebase dropped the declaration while keeping its use in
+// fileWriteChunk; without it that error branch throws ReferenceError instead of
+// the intended typed session error.
+const SESSION_ERROR = 'session not found';
 const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 90 * 1000;
 const PROTOCOL_V2_FINAL_RECONNECT_TIMEOUT = 3 * 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
@@ -612,7 +616,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private getProtocolV2FirmwareChunkSize(direction: 'read' | 'write' = 'write', filePath?: string) {
+  private getProtocolV2FirmwareChunkSize(direction: 'read' | 'write', filePath?: string) {
     const payloadChunkSize = Number(this.params?.chunkSize);
     const env = DataManager.getSettings('env');
     const isBle = this.params?.platform === 'native' || (env && DataManager.isBleConnect(env));
@@ -1325,7 +1329,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       }
 
       const digest = sha256.create();
-      const chunkSize = this.getProtocolV2FirmwareChunkSize();
+      const chunkSize = this.getProtocolV2FirmwareChunkSize('write');
       let offset = 0;
       while (offset < file.size) {
         const response = await commands.typedCall(
@@ -1420,7 +1424,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       : await readProtocolV2ResourceInventory({
           commands: this.device.getCommands(),
           resources,
-          chunkSize: this.getProtocolV2FirmwareChunkSize(),
+          chunkSize: this.getProtocolV2FirmwareChunkSize('write'),
           timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
         });
     const plan = buildProtocolV2ResourceUpdatePlan({
