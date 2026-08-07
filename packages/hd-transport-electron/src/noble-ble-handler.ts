@@ -471,9 +471,11 @@ function cleanupDevice(
     discoveredDevices.delete(deviceId);
   }
 
-  // 3. Send disconnect event (if needed)
-  if (sendDisconnectEvent && webContents) {
-    webContents.send(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, {
+  // 3. Send disconnect event (if needed). Broadcast, not the captured
+  // webContents: a kept-alive link outlives a renderer soft restart, and the
+  // new renderer still needs to hear the device dropped (same as the idle path).
+  if (sendDisconnectEvent) {
+    broadcastToAllWebContents(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, {
       id: deviceId,
       name: deviceName,
     });
@@ -532,6 +534,8 @@ function setupMtuListener(
 
   const listener = (mtu: number) => {
     if (!Number.isFinite(mtu) || mtu <= 0) return;
+    // A kept-alive link can outlive the renderer this closure captured.
+    if (webContents.isDestroyed()) return;
     webContents.send(EOneKeyBleMessageKeys.NOBLE_BLE_MTU_CHANGED, {
       id: deviceId,
       mtu,
@@ -1447,9 +1451,11 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     // If already connected but not in our connected devices map, add it
     if (!connectedDevices.has(deviceId)) {
       connectedDevices.set(deviceId, peripheral);
-      // Set up unified disconnect listener
-      setupDisconnectListener(peripheral, deviceId, webContents);
     }
+    // Re-bind unconditionally (idempotent): on a kept-alive link the disconnect
+    // and MTU listeners may still hold the webContents of a soft-restarted
+    // renderer, and the reuse fast path below returns before any other setup.
+    setupDisconnectListener(peripheral, deviceId, webContents);
 
     // Check if we already have characteristics for this device
     if (deviceCharacteristics.has(deviceId)) {
