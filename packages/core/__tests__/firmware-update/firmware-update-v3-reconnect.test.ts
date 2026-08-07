@@ -1,6 +1,7 @@
 import FirmwareUpdateV3 from '../../src/api/FirmwareUpdateV3';
-import type { Device } from '../../src/device/Device';
 import { DevicePool } from '../../src/device/DevicePool';
+
+import type { Device } from '../../src/device/Device';
 
 jest.mock('../../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),

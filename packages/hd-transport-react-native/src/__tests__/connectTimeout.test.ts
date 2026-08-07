@@ -1,11 +1,10 @@
 import { EventEmitter } from 'events';
 import { BleErrorCode } from 'react-native-ble-plx';
-
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import ReactNativeBleTransport, {
-  BLE_CONNECT_TIMEOUT_MS,
   BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD,
+  BLE_CONNECT_TIMEOUT_MS,
   BLE_GATT_SETUP_TIMEOUT_MS,
 } from '../index';
 import protocolV1Schema from './protocolV1SchemaFixture';

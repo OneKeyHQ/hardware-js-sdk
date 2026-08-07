@@ -2,8 +2,8 @@ import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
 import { buildFirmwareUpdatePlan } from '../../src/api/firmware/FirmwareUpdatePlan';
 import {
-  assertFirmwareUpdatePreparedPlanDeviceIdentity,
   assertFirmwareUpdatePreparedPlanBinding,
+  assertFirmwareUpdatePreparedPlanDeviceIdentity,
   prepareFirmwareUpdatePlan,
   validateFirmwareUpdatePreparedPlan,
 } from '../../src/api/firmware/FirmwareUpdatePreparedPlan';
