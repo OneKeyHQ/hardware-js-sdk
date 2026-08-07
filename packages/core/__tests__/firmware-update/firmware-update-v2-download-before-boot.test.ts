@@ -151,6 +151,33 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
     jest.restoreAllMocks();
   });
 
+  it('rejects mixed binary and prepared artifact inputs during initialization', () => {
+    const method = new FirmwareUpdateV2({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV2',
+        connectId: 'connect-id',
+        platform: 'desktop',
+        updateType: 'firmware',
+        binary: new ArrayBuffer(4),
+        artifact: {
+          artifactRef: `fw:${'a'.repeat(64)}`,
+          size: 4,
+          sha256: 'a'.repeat(64),
+        },
+        preparedPlan: {},
+        hostBindingGeneration: 1,
+      },
+    });
+
+    expect(() => method.init()).toThrow(
+      expect.objectContaining({
+        errorCode: HardwareErrorCode.CallMethodInvalidParameter,
+        message: 'Firmware update binary and artifact are mutually exclusive',
+      })
+    );
+  });
+
   it.each([
     {
       context: 'Classic 1S normal mode',

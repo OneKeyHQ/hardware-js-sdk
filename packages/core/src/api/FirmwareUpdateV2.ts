@@ -159,6 +159,18 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       { name: 'firmwareType', type: 'string' },
     ]);
 
+    if (
+      'binary' in payload &&
+      payload.binary !== undefined &&
+      'artifact' in payload &&
+      payload.artifact !== undefined
+    ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'Firmware update binary and artifact are mutually exclusive'
+      );
+    }
+
     if (!payload.updateType) {
       throw ERRORS.TypedError(
         HardwareErrorCode.CallMethodInvalidParameter,

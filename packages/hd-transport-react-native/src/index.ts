@@ -1850,6 +1850,8 @@ export default class ReactNativeBleTransport {
     this.probingProtocols.clear();
     this.sessionProtocols.clear();
     this.protocolReprobeFailures.clear();
+    this.writeTimeoutCounts.clear();
+    this.connectionSetupTimeoutCounts.clear();
     this.monitorTokens.clear();
     this.protocolV2Assemblers.clear();
     try {

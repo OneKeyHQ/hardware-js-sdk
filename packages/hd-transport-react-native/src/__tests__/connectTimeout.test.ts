@@ -204,6 +204,18 @@ describe('BLE connect timeout', () => {
     expect((transport as unknown as { blePlxManager?: unknown }).blePlxManager).toBeUndefined();
   });
 
+  test('a recreated BLE manager starts with fresh timeout budgets for every device', () => {
+    const { transport, bleManager } = createHarness(() => Promise.resolve());
+    (bleManager as unknown as { destroy: jest.Mock }).destroy = jest.fn();
+    (transport as any).connectionSetupTimeoutCounts.set('setup-device', 1);
+    (transport as any).writeTimeoutCounts.set('write-device', 1);
+
+    (transport as any).resetPlxManager();
+
+    expect((transport as any).connectionSetupTimeoutCounts.size).toBe(0);
+    expect((transport as any).writeTimeoutCounts.size).toBe(0);
+  });
+
   test('native connect timeouts contribute to the same manager reset budget', async () => {
     const { transport, bleManager } = createHarness(() => Promise.resolve());
     const destroy = jest.fn();
