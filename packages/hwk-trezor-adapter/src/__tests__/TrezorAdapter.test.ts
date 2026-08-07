@@ -105,7 +105,9 @@ describe('TrezorAdapter', () => {
       });
       expect(logs.some(log => log.includes('[TrezorAdapter][REQ]'))).toBe(true);
       expect(logs.some(log => log.includes('"method":"btcSignMessage"'))).toBe(true);
-      expect(logs.some(log => log.includes('"message":"hello"'))).toBe(true);
+      // Signing bodies are redacted wholesale (aligned with hd-core logBlockEvent).
+      expect(logs.some(log => log.includes('"message":"hello"'))).toBe(false);
+      expect(logs.some(log => log.includes('"params":"[redacted]"'))).toBe(true);
       expect(logs.some(log => log.includes('[TrezorAdapter][RES]'))).toBe(true);
       expect(logs.some(log => log.includes('"success":false'))).toBe(true);
       expect(logs.some(log => log.includes('[TrezorAdapter][ERROR]'))).toBe(true);
@@ -1425,10 +1427,12 @@ function typeOnlyTrezorEvmSignTxShape(adapter: TrezorAdapter) {
 void typeOnlyTrezorEvmSignTxShape;
 
 describe('TrezorAdapter._sanitizeForLog', () => {
-  const sanitize = (value: unknown) =>
-    (TrezorAdapter as unknown as { _sanitizeForLog(v: unknown): unknown })._sanitizeForLog(
-      value
-    ) as Record<string, unknown>;
+  const sanitize = (value: unknown, methodName?: string) =>
+    (
+      TrezorAdapter as unknown as {
+        _sanitizeForLog(v: unknown, m?: string): unknown;
+      }
+    )._sanitizeForLog(value, methodName) as Record<string, unknown>;
 
   it('redacts secrets: red-line (pin/passphrase/THP keys) + seed-level', () => {
     const out = sanitize({
@@ -1448,6 +1452,32 @@ describe('TrezorAdapter._sanitizeForLog', () => {
     for (const key of Object.keys(out)) {
       expect(out[key]).toBe('[redacted]');
     }
+  });
+
+  it('matches keys after normalization, so snake_case secrets are redacted too', () => {
+    const out = sanitize({
+      private_key: 'pk',
+      chain_code_keep: 'not-sensitive',
+      node: { private_key: 'pk2', public_key: 'pub' },
+    });
+    expect(out.private_key).toBe('[redacted]');
+    expect(out.chain_code_keep).toBe('not-sensitive');
+    expect((out.node as Record<string, unknown>).private_key).toBe('[redacted]');
+    expect((out.node as Record<string, unknown>).public_key).toBe('pub');
+  });
+
+  it('summarizes binary values instead of flattening them into index maps', () => {
+    const out = sanitize({ definitions: new ArrayBuffer(8), raw: new Uint8Array(4) });
+    expect(out.definitions).toBe('[BINARY:8]');
+    expect(out.raw).toBe('[BINARY:4]');
+  });
+
+  it('redacts a signing method body wholesale (aligned with hd-core logBlockEvent)', () => {
+    expect(sanitize({ message: 'hello', address: '0xabc' }, 'evmSignTransaction')).toBe(
+      '[redacted]'
+    );
+    const out = sanitize({ address: '0xabc' }, 'evmGetAddress');
+    expect(out.address).toBe('0xabc');
   });
 
   it('keeps transaction data so a failed sign can still be reproduced', () => {
