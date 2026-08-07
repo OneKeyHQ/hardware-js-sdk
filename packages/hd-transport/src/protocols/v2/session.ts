@@ -22,7 +22,7 @@ export type ProtocolV2Schemas = {
 export type ProtocolV2CallContext = {
   messageName: string;
   timeoutMs?: number;
-  highVolume: boolean;
+  highThroughput: boolean;
   writeWithResponse?: boolean;
   generation: number;
   signal: AbortSignal;
@@ -81,7 +81,7 @@ export function bytesToHex(bytes: Uint8Array): string {
     .join('');
 }
 
-const HIGH_VOLUME_PROTOCOL_V2_CALLS = new Set([
+const REDUCED_DEBUG_PROTOCOL_V2_CALLS = new Set([
   ...LogBlockCommand,
   'FilesystemFileRead',
   'FileRead',
@@ -89,7 +89,22 @@ const HIGH_VOLUME_PROTOCOL_V2_CALLS = new Set([
 ]);
 
 function shouldReduceProtocolV2Debug(name: string) {
-  return HIGH_VOLUME_PROTOCOL_V2_CALLS.has(name);
+  return REDUCED_DEBUG_PROTOCOL_V2_CALLS.has(name);
+}
+
+const HIGH_THROUGHPUT_PROTOCOL_V2_CALLS = new Set([
+  'FilesystemFileWrite',
+  'FileWrite',
+  'EmmcFileWrite',
+  'FirmwareUpload',
+  'ResourceAck',
+  'FilesystemFileRead',
+  'FileRead',
+  'EmmcFileRead',
+]);
+
+export function isProtocolV2HighThroughputCall(name: string) {
+  return HIGH_THROUGHPUT_PROTOCOL_V2_CALLS.has(name);
 }
 
 const COMMON_TERMINAL_RESPONSE_TYPES = new Set([
@@ -222,7 +237,7 @@ export class ProtocolV2Session {
     const baseCallContext: ProtocolV2CallContext = {
       messageName: name,
       timeoutMs,
-      highVolume: shouldReduceDebug,
+      highThroughput: isProtocolV2HighThroughputCall(name),
       ...(callOptions.writeWithResponse === undefined
         ? {}
         : { writeWithResponse: callOptions.writeWithResponse }),

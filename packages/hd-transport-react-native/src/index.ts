@@ -10,7 +10,6 @@ import {
 } from 'react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
 import transport, {
-  LogBlockCommand,
   type OneKeyDeviceInfoBase,
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
   PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
@@ -21,6 +20,7 @@ import transport, {
   ProtocolV2LinkManager,
   TRANSPORT_EVENT,
   type TransportCallOptions,
+  isProtocolV2HighThroughputCall,
   probeProtocolV2 as probeProtocolV2Helper,
   writeProtocolV2BleFrame,
 } from '@onekeyfe/hd-transport';
@@ -36,6 +36,7 @@ import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManag
 import {
   hasWritableCapability,
   resolveProtocolV2PacketCapacity,
+  shouldRefreshNegotiatedMtu,
   shouldWriteProtocolV2WithResponse,
 } from './bleStrategy';
 import { subscribeBleOn } from './subscribeBleOn';
@@ -213,7 +214,6 @@ function getDeviceDisplayName(device?: Device | null) {
 
 const IOS_REQUEST_MTU = 247;
 const ANDROID_REQUEST_MTU = 517;
-const BLE_MTU_REFRESH_THRESHOLD = 247;
 const BLE_MTU_REFRESH_RETRY_DELAY_MS = 200;
 const ANDROID_HIGH_PRIORITY_IDLE_MS = 1000;
 
@@ -279,7 +279,7 @@ const tryToGetConfiguration = (device: Device) => {
 
 const requestNegotiatedMtu = async (
   device: Device,
-  stage: 'connected' | 'servicesAndNotifyReady',
+  stage: 'connected' | 'servicesAndNotifyReady' | 'highThroughput',
   attempt: number
 ) => {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') return device;
@@ -835,7 +835,7 @@ export default class ReactNativeBleTransport {
     let refreshAttempts = 0;
     if (
       (Platform.OS === 'ios' || Platform.OS === 'android') &&
-      (typeof transport.mtuSize !== 'number' || transport.mtuSize < BLE_MTU_REFRESH_THRESHOLD)
+      shouldRefreshNegotiatedMtu(transport.mtuSize)
     ) {
       refreshAttempts += 1;
       let refreshedDevice = await requestNegotiatedMtu(
@@ -847,7 +847,7 @@ export default class ReactNativeBleTransport {
       transport.mtuSize =
         typeof refreshedDevice.mtu === 'number' ? refreshedDevice.mtu : transport.mtuSize;
 
-      if (typeof transport.mtuSize !== 'number' || transport.mtuSize < BLE_MTU_REFRESH_THRESHOLD) {
+      if (shouldRefreshNegotiatedMtu(transport.mtuSize)) {
         await delay(BLE_MTU_REFRESH_RETRY_DELAY_MS);
         refreshAttempts += 1;
         refreshedDevice = await requestNegotiatedMtu(transport.device, 'servicesAndNotifyReady', 2);
@@ -2173,7 +2173,7 @@ export default class ReactNativeBleTransport {
   ) {
     const shouldUseWriteWithResponse = shouldWriteProtocolV2WithResponse({
       platform: Platform.OS,
-      highVolume: context.highVolume,
+      highThroughput: context.highThroughput,
       requestedWithResponse: context.writeWithResponse,
       characteristic: transport.writeCharacteristic,
     });
@@ -2266,14 +2266,15 @@ export default class ReactNativeBleTransport {
     }
 
     const callOptions = options;
-    const highVolumeWrite = LogBlockCommand.has(name);
+    const highThroughputWrite = isProtocolV2HighThroughputCall(name);
 
-    if (highVolumeWrite) {
+    if (highThroughputWrite) {
+      await this.ensureProtocolV2HighThroughputMtu(uuid);
       const tuning = getProtocolV2BleTuning();
       const currentTransport = this.getCachedTransport(uuid);
       const writeWithResponse = shouldWriteProtocolV2WithResponse({
         platform: Platform.OS,
-        highVolume: true,
+        highThroughput: true,
         requestedWithResponse: options?.writeWithResponse,
         characteristic: currentTransport.writeCharacteristic,
       });
@@ -2301,7 +2302,7 @@ export default class ReactNativeBleTransport {
       }
     }
 
-    if (highVolumeWrite) {
+    if (highThroughputWrite) {
       await this.enableAndroidHighConnectionPriority(uuid);
     }
 
@@ -2317,9 +2318,26 @@ export default class ReactNativeBleTransport {
       Log?.error('[ReactNativeBleTransport] Protocol V2 call error:', e);
       throw e;
     } finally {
-      if (highVolumeWrite) {
+      if (highThroughputWrite) {
         this.scheduleAndroidBalancedConnectionPriority(uuid);
       }
+    }
+  }
+
+  private async ensureProtocolV2HighThroughputMtu(uuid: string) {
+    const transport = this.getCachedTransport(uuid);
+    if (!shouldRefreshNegotiatedMtu(transport.mtuSize)) return;
+
+    const refreshedDevice = await requestNegotiatedMtu(transport.device, 'highThroughput', 1);
+    transport.device = refreshedDevice;
+    transport.mtuSize =
+      typeof refreshedDevice.mtu === 'number' ? refreshedDevice.mtu : transport.mtuSize;
+
+    if (shouldRefreshNegotiatedMtu(transport.mtuSize)) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.BleConnectedError,
+        `Protocol V2 high-throughput BLE MTU unavailable: ${String(transport.mtuSize)}`
+      );
     }
   }
 

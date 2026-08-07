@@ -31,6 +31,14 @@ describe('Electron Noble BLE device discovery', () => {
     expect(NOBLE_BLE_CONNECTION_TIMEOUT_MS).toBe(10_000);
   });
 
+  test('keeps safe pacing by default and allows an explicit high-throughput bypass', async () => {
+    const { resolveNobleBleWritePacingDelay } = await import('../noble-ble-handler');
+
+    expect(resolveNobleBleWritePacingDelay()).toBe(5);
+    expect(resolveNobleBleWritePacingDelay({ pacingDelayMs: 0 })).toBe(0);
+    expect(resolveNobleBleWritePacingDelay({ pacingDelayMs: 3.8 })).toBe(3);
+  });
+
   test('waits for Noble to stop scanning before enumeration resolves', async () => {
     jest.useFakeTimers({ doNotFake: ['performance'] });
 

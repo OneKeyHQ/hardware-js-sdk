@@ -35,6 +35,7 @@ export type ProtocolV2FileWriteOptions = {
   totalSize?: number;
   chunkSize?: number;
   chunkLen?: number;
+  chunkSizeLimit?: number;
   overwrite?: boolean;
   append?: boolean;
   uiPercentage?: number;
@@ -177,10 +178,13 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
     );
   }
 
-  const chunkSize = normalizeChunkSize(
-    options.chunkSize ?? options.chunkLen,
-    getProtocolV2FileChunkLimit()
-  );
+  const defaultChunkSizeLimit = getProtocolV2FileChunkLimit();
+  const configuredChunkSizeLimit = Number(options.chunkSizeLimit);
+  const chunkSizeLimit =
+    Number.isFinite(configuredChunkSizeLimit) && configuredChunkSizeLimit > 0
+      ? Math.floor(configuredChunkSizeLimit)
+      : defaultChunkSizeLimit;
+  const chunkSize = normalizeChunkSize(options.chunkSize ?? options.chunkLen, chunkSizeLimit);
   let written = 0;
   let chunks = 0;
   let lastMessage: Record<string, unknown> | undefined;

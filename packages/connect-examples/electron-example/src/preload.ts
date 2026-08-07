@@ -5,7 +5,11 @@ import { EOneKeyBleMessageKeys } from '@onekeyfe/hd-shared';
 
 import { ipcMessageKeys } from './config';
 
-import type { DesktopAPI as BaseDesktopAPI, NobleBleAPI } from '@onekeyfe/hd-transport-electron';
+import type {
+  DesktopAPI as BaseDesktopAPI,
+  NobleBleAPI,
+  NobleBleWriteOptions,
+} from '@onekeyfe/hd-transport-electron';
 
 // Simplified Bluetooth system API - only for opening settings
 export interface BluetoothSystemAPI {
@@ -75,8 +79,8 @@ const desktopApi = {
       ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_SUBSCRIBE, uuid),
     unsubscribe: (uuid: string) =>
       ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_UNSUBSCRIBE, uuid),
-    write: (uuid: string, data: string) =>
-      ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_WRITE, uuid, data),
+    write: (uuid: string, data: string, options?: NobleBleWriteOptions) =>
+      ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_WRITE, uuid, data, options),
     onNotification: (callback: (deviceId: string, data: string) => void) => {
       const subscription = (_: unknown, deviceId: string, data: string) => {
         callback(deviceId, data);

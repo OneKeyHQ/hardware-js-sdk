@@ -191,7 +191,7 @@ describe('LowlevelTransport protocol framing', () => {
     const context = {
       messageName: 'Ping',
       timeoutMs: 1000,
-      highVolume: false,
+      highThroughput: false,
       generation: 1,
       signal: new AbortController().signal,
     };

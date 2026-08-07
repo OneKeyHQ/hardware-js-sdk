@@ -31,6 +31,7 @@ import {
 
 import type { IpcMainInvokeEvent, WebContents } from 'electron';
 import type { Characteristic, Peripheral, Service } from '@stoprocent/noble';
+import type { NobleBleWriteOptions } from './types/desktop-api';
 import type { CharacteristicPair, DeviceInfo, Logger, NobleModule } from './types/noble-extended';
 
 // Noble will be dynamically imported to avoid bundling issues
@@ -93,11 +94,18 @@ const BLE_CLEANUP_TIMEOUT = 250;
 // Write-related constants
 const BLE_PACKET_SIZE_FALLBACK = 192;
 const BLE_PACKET_SIZE_MAXIMUM = 244;
+const DEFAULT_WRITE_PACING_DELAY_MS = 5;
 const RETRY_CONFIG = { MAX_ATTEMPTS: 15, WRITE_TIMEOUT: 2000 } as const;
 const IS_WINDOWS = process.platform === 'win32';
 const ABORTABLE_WRITE_ERROR_PATTERNS = [
   /status:\s*3/i, // Windows pairing cancelled / GATT write failed
 ];
+
+export function resolveNobleBleWritePacingDelay(options?: NobleBleWriteOptions) {
+  return typeof options?.pacingDelayMs === 'number' && Number.isFinite(options.pacingDelayMs)
+    ? Math.min(Math.max(Math.floor(options.pacingDelayMs), 0), 1000)
+    : DEFAULT_WRITE_PACING_DELAY_MS;
+}
 
 function isOneKeyPeripheral(peripheral: Peripheral) {
   const serviceUuids = peripheral.advertisement?.serviceUuids;
@@ -579,7 +587,11 @@ async function attemptWindowsWriteUntilPaired(
   );
 }
 
-async function transmitHexDataToDevice(deviceId: string, hexData: string): Promise<void> {
+async function transmitHexDataToDevice(
+  deviceId: string,
+  hexData: string,
+  options?: NobleBleWriteOptions
+): Promise<void> {
   const characteristics = deviceCharacteristics.get(deviceId);
   const peripheral = connectedDevices.get(deviceId);
   if (!peripheral || !characteristics) {
@@ -596,6 +608,7 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
     BLE_PACKET_SIZE_MAXIMUM,
     BLE_PACKET_SIZE_FALLBACK
   );
+  const pacingDelayMs = resolveNobleBleWritePacingDelay(options);
 
   if (!IS_WINDOWS || pairedDevices.has(deviceId)) {
     // macOS / Linux or already paired on Windows: direct write
@@ -607,6 +620,7 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
       );
     }
     if (toBuffer.length <= packetCapacity) {
+      if (pacingDelayMs > 0) await wait(pacingDelayMs);
       await writeCharacteristicWithoutResponse(deviceId, writeCharacteristic, toBuffer);
       return;
     }
@@ -623,12 +637,16 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
         );
       }
       await writeCharacteristicWithoutResponse(deviceId, latest, chunk);
+      if (offset < toBuffer.length && pacingDelayMs > 0) {
+        await wait(pacingDelayMs);
+      }
     }
     return;
   }
 
   // Windows unpaired path: use loop
   if (toBuffer.length <= packetCapacity) {
+    if (pacingDelayMs > 0) await wait(pacingDelayMs);
     await attemptWindowsWriteUntilPaired(deviceId, doGetWriteCharacteristic, toBuffer, 'single');
     return;
   }
@@ -643,6 +661,9 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
       chunk,
       `chunk-${idx + 1}`
     );
+    if (offset < toBuffer.length && pacingDelayMs > 0) {
+      await wait(pacingDelayMs);
+    }
   }
 }
 
@@ -1611,8 +1632,13 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     // Handle write request
     ipcMain.handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_WRITE,
-      async (_event: IpcMainInvokeEvent, deviceId: string, hexData: string) => {
-        await transmitHexDataToDevice(deviceId, hexData);
+      async (
+        _event: IpcMainInvokeEvent,
+        deviceId: string,
+        hexData: string,
+        options?: NobleBleWriteOptions
+      ) => {
+        await transmitHexDataToDevice(deviceId, hexData, options);
       }
     );
 

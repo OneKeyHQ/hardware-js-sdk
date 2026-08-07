@@ -584,7 +584,7 @@ export default class ElectronBleTransport {
       throw new Error('Noble BLE API not available');
     }
 
-    await nobleBle.write(uuid, hexData);
+    await nobleBle.write(uuid, hexData, { pacingDelayMs: 0 });
   }
 
   private async refreshBlePacketCapacity(uuid: string): Promise<void> {
@@ -623,7 +623,7 @@ export default class ElectronBleTransport {
     assertCurrentGeneration: () => void
   ) {
     const packetCapacity = this.devicePacketCapacities.get(uuid) ?? BLE_PACKET_SIZE_FALLBACK;
-    const shouldPace = !context.highVolume;
+    const shouldPace = !context.highThroughput;
     return writeProtocolV2BleFrame({
       frame,
       packetCapacity,

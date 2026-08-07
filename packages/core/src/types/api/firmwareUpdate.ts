@@ -157,6 +157,7 @@ export interface FirmwareUpdateV4Params {
   /**
    * Arbitrary Protocol V2 resource files written directly with FilesystemFileWrite.
    * Use this for manifest-driven boot resources and other non-RESC files.
+   * When provided, these files are authoritative for resource and boot_resources targets.
    */
   resourceFiles?: Array<{
     binary: ArrayBuffer;
