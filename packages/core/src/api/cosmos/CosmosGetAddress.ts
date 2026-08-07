@@ -1,16 +1,20 @@
-import { CosmosGetAddress as HardwareCosmosGetAddress } from '@onekeyfe/hd-transport';
-
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { CosmosAddress, CosmosGetAddressParams } from '../../types';
+
+import type { CosmosGetAddress as HardwareCosmosGetAddress } from '@onekeyfe/hd-transport';
+import type { CosmosAddress, CosmosGetAddressParams } from '../../types';
 
 export default class CosmosGetAddress extends BaseMethod<HardwareCosmosGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode];
+    this.allowDeviceMode = [...this.allowDeviceMode];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

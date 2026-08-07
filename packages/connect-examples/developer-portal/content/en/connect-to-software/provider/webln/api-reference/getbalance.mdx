@@ -1,0 +1,37 @@
+---
+title: getBalance
+---
+
+# getBalance
+
+Check account balance
+
+### Method
+
+```typescript
+async function getBalance(): BalanceResponse
+```
+
+### Response
+
+```typescript
+interface BalanceResponse {
+    balance: number;
+    currency?: "sats" | "EUR" | "USD"
+}
+```
+
+### Example
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable();
+const balance = await provider.getBalance();
+```
+
+### Demo
+
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/GRzXmqN" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

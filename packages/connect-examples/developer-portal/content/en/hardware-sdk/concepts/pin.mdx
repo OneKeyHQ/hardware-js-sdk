@@ -1,0 +1,52 @@
+---
+title: PIN
+---
+
+# PIN
+
+How to handle PIN entry on OneKey devices with recommended UX.
+
+## Essentials
+
+- Protected calls trigger `UI_REQUEST.REQUEST_PIN` when the device is locked.
+- Pro/Touch require on-device PIN entry; other models allow blind PIN but on-device is preferred.
+- Close the prompt after `ui-close_pin_window` or a success event.
+
+## Support matrix (software blind PIN)
+
+| Device | Software Blind PIN | Device-only Input |
+| --- | --- | --- |
+| OneKey Classic / 1s / 1s Pure / Mini | Supported | No |
+| OneKey Touch | Not supported | Yes |
+| OneKey Pro | Not supported | Yes |
+
+## UI design notes
+
+- Single dialog with two actions: **Enter on device** (default) and **Enter here (blind PIN)**.
+- Blind PIN keypad is a fixed 3x3 layout; never echo real digits.
+
+### Blind PIN mapping example
+
+```ts
+const BLIND_KEYBOARD_MAP = ['7','8','9','4','5','6','1','2','3'];
+// label is 1..9
+HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: BLIND_KEYBOARD_MAP[label - 1],
+});
+```
+
+## Events to responses
+
+```ts
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(UI_EVENT, (msg) => {
+  if (msg.type === UI_REQUEST.REQUEST_PIN) {
+    HardwareSDK.uiResponse({
+      type: UI_RESPONSE.RECEIVE_PIN,
+      payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+    });
+  }
+});
+```

@@ -1,0 +1,72 @@
+---
+title: Signing
+description: Sign messages on TRON using OneKey
+---
+
+import { Callout } from 'nextra/components'
+
+# Signing
+
+Learn how to sign messages on TRON.
+
+---
+
+## Sign Message V1 (Hex)
+
+Sign hex-encoded messages:
+
+```typescript
+const message = tronWeb.toHex('Hello TRON!')
+const signature = await provider.signMessage(message)
+
+console.log('Signature:', signature)
+```
+
+---
+
+## Sign Message V2 (UTF-8)
+
+Sign UTF-8 messages directly:
+
+```typescript
+const message = 'Hello TRON!'
+const signature = await provider.signMessageV2(message)
+
+console.log('Signature:', signature)
+```
+
+---
+
+## Verify Signature
+
+```typescript
+const message = 'Hello TRON!'
+const signature = await provider.signMessageV2(message)
+
+// Verify using TronWeb
+const address = await tronWeb.trx.verifyMessageV2(message, signature)
+console.log('Signer:', address)
+```
+
+---
+
+## Error Handling
+
+```typescript
+try {
+  const result = await provider.request({
+    method: 'tron_requestAccounts'
+  })
+
+  if (result.code !== 200) {
+    throw new Error(result.message)
+  }
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the request')
+  } else {
+    console.error('Error:', error.message)
+  }
+}
+```
+

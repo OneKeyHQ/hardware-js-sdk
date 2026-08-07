@@ -1,0 +1,68 @@
+---
+title: lnurl
+---
+
+# lnurl
+
+请求执行 [LNURL](https://github.com/lnurl/luds) 请求。应用需要传递一个 [LNURL](https://github.com/lnurl/luds/blob/luds/01) 字符串，该字符串应由应用的后端提供。lnurl 函数也可以接受 [LUD-16](https://github.com/lnurl/luds/blob/luds/16) 静态标识符（例如 username@gmail.com）来替代 LNURL 字符串。
+
+该方法返回一个 Promise，在 LNURL 流程完成后解析。它返回来自 LNURL 服务器的最后响应。对于 LNURL-pay 请求，它还包含支付信息（preimage、payment hash），对于 LNURL-auth 请求，它包含认证信息（message、signature）
+
+### 方法
+
+```typescript
+async function lnurl(lnurl: string): LNURLResponse;
+```
+
+### 响应
+
+```typescript
+type LNURLResponse =
+  | {
+      status: "OK";
+      data?: unknown
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+### LNURL-pay 响应
+
+```typescript
+type LNURLPayResponse =
+  | {
+      status: "OK";
+      data: {
+        preimage: string,
+        paymentHash: string,
+        paymentRequest: string
+      }
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+### LNURL-auth 响应
+
+```typescript
+type LNURLAuthResponse =
+  | {
+      status: "OK";
+      data: {
+        message: string,
+        signature: string
+      }
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+### 示例
+
+```typescript
+const lnurl = // 你的 LNURL
+if (!webln.lnurl) { throw new Error('不支持 lnurl 方法'); }
+
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable();
+const result = await provider.lnurl(lnurl); // Promise 在 LNURL 流程完成后解析（例如支付发送或登录完成）
+```
+

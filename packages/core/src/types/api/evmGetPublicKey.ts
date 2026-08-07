@@ -1,4 +1,4 @@
-import { EthereumPublicKey } from '@onekeyfe/hd-transport';
+import type { EthereumPublicKey } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type EVMPublicKey = {
@@ -14,6 +14,7 @@ export type EVMGetPublicKeyParams = {
   path: string | number[];
   showOnOneKey?: boolean;
   chainId?: number;
+  useBatch?: boolean;
 };
 
 export declare function evmGetPublicKey(

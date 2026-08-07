@@ -1,0 +1,84 @@
+---
+title: cardanoGetPublicKey
+---
+
+# cardanoGetPublicKey
+
+## 使用要求
+
+* 固件版本要求
+  * Touch: 4.1.0
+  * Classic/Mini: 3.0.0
+
+## Cardano：获取公钥
+
+获取指定 BIP32-Ed25519 路径派生的扩展公钥。用户需要确认导出。
+
+```typescript
+const result = await HardwareSDK.cardanoGetPublicKey(connectId, deviceId, params);
+```
+
+## 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+### 导出单个公钥
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `1`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `derivationType` - _可选_ `CardanoDerivationType` 枚举。决定使用的派生类型。默认设置为 ICARUS=1
+
+#### 导出批量公钥
+
+* `bundle` - 包含 `path`、`showOnOneKey` 字段的对象 `Array`
+
+### 示例
+
+返回第一个 Cardano 账户的公钥：
+
+```typescript
+HardwareSDK.cardanoGetPublicKey(connectId, deviceId, {
+    path: "m/1852'/1815'/0'/0/0",
+    showOnOneKey: true
+});
+```
+
+返回多个 Cardano 账户的批量公钥：
+
+```typescript
+HardwareSDK.cardanoGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/1852'/1815'/0'/0/0", }, // 账户 1
+        { path: "m/1852'/1815'/1'/0/0", }, // 账户 2
+        { path: "m/1852'/1815'/2'/0/0", }  // 账户 3
+    ]
+});
+```
+
+### 返回结果
+
+只有一个公钥的结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: Array<number>, // 强化路径
+        serializedPath: string,
+        publicKey: string,
+        node: HDPubNode,
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

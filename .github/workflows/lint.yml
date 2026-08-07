@@ -19,7 +19,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x]
+        node-version: [22]
 
     steps:
       - uses: actions/checkout@v3
@@ -40,3 +40,6 @@ jobs:
           yarn bootstrap
           yarn build
           yarn lint
+
+      - name: Run Unit Tests
+        run: yarn test

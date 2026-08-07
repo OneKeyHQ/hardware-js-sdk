@@ -1,0 +1,17 @@
+---
+description: Migration guides for legacy OneKey Hardware SDK integrations
+---
+
+# Legacy Migration Guides
+
+These guides help you migrate from legacy Bridge-based integrations to modern WebUSB connections.
+
+## Available Guides
+
+- [Bridge to WebUSB (hd-common-connect-sdk)](./migrate-bridge-to-common-connect-webusb) - Recommended migration path using `@onekeyfe/hd-common-connect-sdk`
+- [Bridge to WebUSB (hd-web-sdk)](./migrate-bridge-to-webusb) - Migration guide keeping `@onekeyfe/hd-web-sdk`
+
+## Which Guide Should I Use?
+
+- **New projects**: Use `hd-common-connect-sdk` (no iframe dependency)
+- **Existing projects with hd-web-sdk**: Choose based on your preference - either migrate fully to `hd-common-connect-sdk` or keep using `hd-web-sdk` with WebUSB transport

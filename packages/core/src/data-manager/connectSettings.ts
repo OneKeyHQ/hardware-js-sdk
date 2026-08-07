@@ -1,7 +1,8 @@
 /* eslint-disable vars-on-top */
 
-import type { ConnectSettings } from '../types';
 import { DEFAULT_DOMAIN, getSDKVersion } from '../data/config';
+
+import type { ConnectSettings } from '../types';
 
 export const DEFAULT_PRIORITY = 2;
 
@@ -112,6 +113,10 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
 
   if (input.fetchConfig) {
     settings.fetchConfig = input.fetchConfig;
+  }
+
+  if (input.configFetcher) {
+    settings.configFetcher = input.configFetcher;
   }
 
   return settings;

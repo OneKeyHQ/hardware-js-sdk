@@ -5093,6 +5093,18 @@
         "battery_level": {
           "type": "uint32",
           "id": 520
+        },
+        "brightness_prcent": {
+          "type": "uint32",
+          "id": 521
+        },
+        "haptic_feedback": {
+          "type": "bool",
+          "id": 522
+        },
+        "auto_shutdown_delay_ms": {
+          "type": "uint32",
+          "id": 523
         }
       },
       "nested": {

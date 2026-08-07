@@ -1,0 +1,238 @@
+---
+title: btcSignTransaction
+---
+
+# btcSignTransaction
+
+## Bitcoin：签名交易
+
+对预构建交易的指定输入和输出进行签名。用户需要在 OneKey 上确认所有交易详情。
+
+```typescript
+const result = await HardwareSDK.btcSignTransaction(connectId, deviceId, params);
+```
+
+## 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+* `coin` - _必需_ `string` 决定 [bitcoin.json](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/data/coins/bitcoin.json) 文件中指定的网络定义。可以使用币种的 `shortcut`、`name` 或 `label`。
+* `inputs` - _必需_ [TxInputType](https://github.com/OneKeyHQ/hardware-js-sdk/blob/728279dc70c5bde56c5d72d86598815f977b0c7f/packages/hd-transport/src/types/messages.ts#L363) 的 `Array`
+* `outputs` - _必需_ [TxOutputType](https://github.com/OneKeyHQ/hardware-js-sdk/blob/728279dc70c5bde56c5d72d86598815f977b0c7f/packages/hd-transport/src/types/messages.ts#L390) 的 `Array`
+* `refTxs` - _必需_ [RefTransaction](https://github.com/OneKeyHQ/hardware-js-sdk/blob/728279dc70c5bde56c5d72d86598815f977b0c7f/packages/core/src/types/api/btcSignTransaction.ts#L26) 的 `Array`。Zcash 和 Komodo 的 refTxs 还应包含 `expiry`、`version_group_id` 和 `extra_data` 字段。
+* `locktime` - _可选_ `number`
+* `version` - _可选_ `number` 交易版本
+* `expiry` - _可选_ `number`，仅用于 Decred 和 Zcash
+* `versionGroupId` - _可选_ `number` 仅用于 Zcash，当设置 overwintered 时的 nVersionGroupId
+* `overwintered` - _可选_ `boolean` 仅用于 Zcash
+* `timestamp` - _可选_ `number` 仅用于 Capricoin，交易时间戳
+* `branchId` - _可选_ `number`，仅用于 Zcash，当设置 overwintered 时的 BRANCH_ID
+
+## 辅助工具
+
+### 构建输入
+
+```
+private buildHardwareInput = async (
+  input: TxInput,
+  path: string,
+): Promise<Messages.TxInputType> => {
+  const { getHDPath, getScriptType } = await CoreSDKLoader();
+  const addressN = getHDPath(path);
+  const scriptType = getScriptType(addressN);
+  const utxo = input.utxo as UTXO;
+
+  // @ts-expect-error
+  return {
+    prev_index: utxo.vout,
+    prev_hash: utxo.txid,
+    amount: utxo.value.integerValue().toString(),
+    address_n: addressN,
+    script_type: scriptType,
+  };
+};
+```
+
+### 构建输出
+
+```
+private buildHardwareOutput = async (
+  output: TxOutput,
+): Promise<Messages.TxOutputType> => {
+  const { isCharge, bip44Path } = output.payload || {};
+
+  if (isCharge && bip44Path) {
+    const { getHDPath, getOutputScriptType } = await CoreSDKLoader();
+    const addressN = getHDPath(bip44Path);
+    const scriptType = getOutputScriptType(addressN);
+    return {
+      script_type: scriptType,
+      address_n: addressN,
+      amount: output.value.integerValue().toString(),
+    };
+  }
+
+  return {
+    script_type: 'PAYTOADDRESS',
+    address: output.address,
+    amount: output.value.integerValue().toString(),
+  };
+};
+```
+
+### 构建前序交易
+
+```
+import * as BitcoinJS from 'bitcoinjs-lib';
+private buildPrevTx = (rawTx: string): RefTransaction => {
+    const tx = BitcoinJS.Transaction.fromHex(rawTx);
+
+    return {
+      hash: tx.getId(),
+      version: tx.version,
+      inputs: tx.ins.map((i) => ({
+        prev_hash: i.hash.reverse().toString('hex'),
+        prev_index: i.index,
+        script_sig: i.script.toString('hex'),
+        sequence: i.sequence,
+      })),
+      bin_outputs: tx.outs.map((o) => ({
+        amount: o.value,
+        script_pubkey: o.script.toString('hex'),
+      })),
+      lock_time: tx.locktime,
+    };
+  };
+```
+
+## 示例
+
+### PAYTOADDRESS
+
+```typescript
+HardwareSDK.btcSignTransaction(connectId, deviceId, {
+    inputs: [
+        {
+            address_n: [(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (2 | 0x80000000) >>> 0, 1, 0],
+            prev_index: 0,
+            prev_hash: 'b035d89d4543ce5713c553d69431698116a822c57c03ddacf3f04b763d1999ac',
+        }
+    ],
+    outputs: [
+        {
+            address_n: [(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (2 | 0x80000000) >>> 0, 1, 1],
+            amount: '3181747',
+            script_type: 'PAYTOADDRESS',
+        }, {
+            address: '18WL2iZKmpDYWk1oFavJapdLALxwSjcSk2',
+            amount: '200000',
+            script_type: 'PAYTOADDRESS',
+        }
+    ],
+    coin: 'btc'
+});
+```
+
+### SPENDP2SHWITNESS
+
+```typescript
+HardwareSDK.btcSignTransaction({
+    inputs: [
+        {
+            address_n: [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (2 | 0x80000000) >>> 0, 1, 0],
+            prev_index: 0,
+            prev_hash: 'b035d89d4543ce5713c553d69431698116a822c57c03ddacf3f04b763d1999ac',
+            amount: '3382047',
+            script_type: 'SPENDP2SHWITNESS',
+        }
+    ],
+    outputs: [
+        {
+            address_n: [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (2 | 0x80000000) >>> 0, 1, 1],
+            amount: '3181747',
+            script_type: 'PAYTOP2SHWITNESS',
+        }, {
+            address: '18WL2iZKmpDYWk1oFavJapdLALxwSjcSk2',
+            amount: '200000',
+            script_type: 'PAYTOADDRESS',
+        }
+    ],
+    coin: 'btc'
+});
+```
+
+### 带 refTxs 的 PAYTOADDRESS（从自定义后端提供交易数据）
+
+```typescript
+HardwareSDK.btcSignTransaction({
+    inputs: [
+        {
+            address_n: [(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (2 | 0x80000000) >>> 0, 1, 0],
+            prev_index: 0,
+            prev_hash: 'b035d89d4543ce5713c553d69431698116a822c57c03ddacf3f04b763d1999ac',
+        }
+    ],
+    outputs: [
+        {
+            address_n: [(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (2 | 0x80000000) >>> 0, 1, 1],
+            amount: '3181747',
+            script_type: 'PAYTOADDRESS',
+        }, {
+            address: '18WL2iZKmpDYWk1oFavJapdLALxwSjcSk2',
+            amount: '200000',
+            script_type: 'PAYTOADDRESS',
+        }
+    ],
+    refTxs: [
+        {
+            hash: 'b035d89d4543ce5713c553d69431698116a822c57c03ddacf3f04b763d1999ac',
+            inputs: [
+                {
+                    prev_hash: '448946a44f1ef514601ccf9b22cc3e638c69ea3900b67b87517ea673eb0293dc',
+                    prev_index: 0,
+                    script_sig: '47304402202872cb8459eed053dcec0f353c7e293611fe77615862bfadb4d35a5d8807a4cf022015057aa0aaf72ab342b5f8939f86f193ad87b539931911a72e77148a1233e022012103f66bbe3c721f119bb4b8a1e6c1832b98f2cf625d9f59242008411dd92aab8d94',
+                    sequence: 4294967295,
+                }
+            ],
+            bin_outputs: [
+                {
+                    amount: 3431747,
+                    script_pubkey: '76a91441352a84436847a7b660d5e76518f6ebb718dedc88ac',
+                },
+                {
+                    amount: 10000,
+                    script_pubkey: '76a9141403b451c79d34e6a7f6e36806683308085467ac88ac',
+                }
+            ],
+            lock_time: 0,
+            version: 1,
+        },
+    ],
+    coin: 'btc'
+});
+```
+
+### 返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        signatures: Array<string>, // 签名者签名数组
+        serializedTx: string,        // 序列化的交易
+        txid?: string,             // 广播的交易 ID
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

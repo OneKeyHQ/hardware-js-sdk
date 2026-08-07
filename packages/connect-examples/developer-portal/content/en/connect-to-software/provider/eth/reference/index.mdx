@@ -1,0 +1,69 @@
+---
+title: JSON-RPC Reference
+description: Complete reference for Ethereum JSON-RPC methods supported by OneKey
+---
+
+import { Callout } from 'nextra/components'
+
+# JSON-RPC Reference
+
+Complete reference for all Ethereum JSON-RPC methods supported by OneKey wallet.
+
+<Callout type="info">
+All methods are called via `window.$onekey.ethereum.request({ method, params })`.
+</Callout>
+
+---
+
+## Account Methods
+
+| Method | Description |
+|--------|-------------|
+| [eth_requestAccounts](./eth_requestAccounts) | Request user's accounts (triggers connection popup) |
+| [eth_accounts](./eth_accounts) | Get connected accounts (no popup) |
+| [wallet_requestPermissions](./wallet_requestPermissions) | Request specific permissions |
+| [wallet_getPermissions](./wallet_getPermissions) | Get current permissions |
+
+---
+
+## Transaction Methods
+
+| Method | Description |
+|--------|-------------|
+| [eth_sendTransaction](./eth_sendTransaction) | Send a transaction |
+| [eth_call](./eth_call) | Execute a call without creating a transaction |
+| [eth_estimateGas](./eth_estimateGas) | Estimate gas for a transaction |
+| [eth_getTransactionByHash](./eth_getTransactionByHash) | Get transaction by hash |
+| [eth_getTransactionReceipt](./eth_getTransactionReceipt) | Get transaction receipt |
+
+---
+
+## Signing Methods
+
+| Method | Description |
+|--------|-------------|
+| [personal_sign](./personal_sign) | Sign a message (EIP-191) |
+| [eth_signTypedData_v4](./eth_signTypedData_v4) | Sign typed data (EIP-712) |
+
+---
+
+## Network Methods
+
+| Method | Description |
+|--------|-------------|
+| [eth_chainId](./eth_chainId) | Get current chain ID |
+| [wallet_switchEthereumChain](./wallet_switchEthereumChain) | Switch to a different chain |
+| [wallet_addEthereumChain](./wallet_addEthereumChain) | Add a new chain |
+| [wallet_watchAsset](./wallet_watchAsset) | Add a token to wallet |
+
+---
+
+## Standard Ethereum Methods
+
+OneKey also supports all standard Ethereum JSON-RPC methods. See the [Ethereum JSON-RPC specification](https://ethereum.github.io/execution-apis/api-documentation/) for the complete list.
+
+Common methods include:
+- `eth_blockNumber` - Get current block number
+- `eth_getBalance` - Get account balance
+- `eth_getCode` - Get contract code
+- `eth_getLogs` - Get event logs

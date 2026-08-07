@@ -1,15 +1,22 @@
 import axios from 'axios';
 import semver from 'semver';
-import { EDeviceType } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+
 import MessagesJSON from '../data/messages/messages.json';
 import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
+import MessagesProtocolV2JSON from '../data/messages/messages-protocol-v2.json';
 import {
-  getTimeStamp,
+  LoggerNames,
   getDeviceBLEFirmwareVersion,
   getDeviceFirmwareVersion,
   getDeviceType,
+  getFirmwareType,
   getFirmwareUpdateField,
+  getLogger,
+  getTimeStamp,
 } from '../utils';
+import { DeviceModelToTypes } from '../types';
+import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 
 import type {
   AssetsMap,
@@ -22,15 +29,46 @@ import type {
   IVersionArray,
   RemoteConfigResponse,
 } from '../types';
-import { DeviceModelToTypes } from '../types';
-import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 
-export type IFirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v6';
+const Log = getLogger(LoggerNames.Core);
 
-export type MessageVersion = 'latest' | 'v1';
+export const FIRMWARE_FIELDS = [
+  'firmware',
+  'firmware-v1',
+  'firmware-v2',
+  'firmware-v8',
+  'firmware-btc-v8',
+] as const;
+
+export type IFirmwareField = (typeof FIRMWARE_FIELDS)[number];
+
+export type ProtocolV1MessageSchema = 'v1CurrentSchema' | 'v1LegacySchema';
+export type ProtobufMessageSchema = ProtocolV1MessageSchema | 'v2Schema';
+
+const FIRMWARE_FIELD_TYPE_MAP: Readonly<Record<IFirmwareField, EFirmwareType>> = {
+  firmware: EFirmwareType.Universal,
+  'firmware-v1': EFirmwareType.Universal,
+  'firmware-v2': EFirmwareType.Universal,
+  'firmware-v8': EFirmwareType.Universal,
+  'firmware-btc-v8': EFirmwareType.BitcoinOnly,
+} as const;
+
+function getFirmwareTypeFromField(firmwareField: IFirmwareField): EFirmwareType {
+  const firmwareType = FIRMWARE_FIELD_TYPE_MAP[firmwareField];
+
+  // Explicit check for type safety
+  if (firmwareType === undefined) {
+    // Fallback to Universal for safety
+    return EFirmwareType.Universal;
+  }
+
+  return firmwareType;
+}
 
 export default class DataManager {
-  static deviceMap: DeviceTypeMap = {
+  static deviceMap: DeviceTypeMap & {
+    [k: string]: DeviceTypeMap[keyof DeviceTypeMap] | undefined;
+  } = {
     [EDeviceType.Classic]: {
       firmware: [],
       ble: [],
@@ -51,6 +89,10 @@ export default class DataManager {
       firmware: [],
       ble: [],
     },
+    [EDeviceType.Pro2]: {
+      firmware: [],
+      ble: [],
+    },
     [EDeviceType.ClassicPure]: {
       firmware: [],
       ble: [],
@@ -61,29 +103,41 @@ export default class DataManager {
 
   static settings: ConnectSettings;
 
-  static messages: { [version in MessageVersion]: JSON } = {
-    latest: MessagesJSON as unknown as JSON,
-    v1: MessagesLegacyV1JSON as unknown as JSON,
+  static messages: { [schema in ProtobufMessageSchema]: JSON } = {
+    v1CurrentSchema: MessagesJSON as unknown as JSON,
+    v1LegacySchema: MessagesLegacyV1JSON as unknown as JSON,
+    v2Schema: MessagesProtocolV2JSON as unknown as JSON,
   };
 
   static lastCheckTimestamp = 0;
 
-  static getFirmwareStatus = (features: Features): IDeviceFirmwareStatus => {
+  static getFirmwareStatus = (
+    features: Features,
+    firmwareType: EFirmwareType
+  ): IDeviceFirmwareStatus => {
     const deviceType = getDeviceType(features);
     if (deviceType === EDeviceType.Unknown) return 'unknown';
 
+    const deviceFirmwareType = getFirmwareType(features);
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
-    if (features.firmware_present === false) {
+    if (features.firmwarePresent === false) {
       return 'none';
     }
 
-    if (DeviceModelToTypes.model_mini.includes(deviceType) && features.bootloader_mode) {
+    if (DeviceModelToTypes.model_mini.includes(deviceType) && features.bootloaderMode) {
       return 'unknown';
     }
 
-    const firmwareUpdateField = getFirmwareUpdateField({ features, updateType: 'firmware' });
+    const firmwareUpdateField = getFirmwareUpdateField({
+      features,
+      updateType: 'firmware',
+      firmwareType,
+    });
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
-    const currentVersion = deviceFirmwareVersion.join('.');
+    let currentVersion = deviceFirmwareVersion.join('.');
+    if (targetDeviceConfigList.length > 0 && deviceFirmwareType !== firmwareType) {
+      currentVersion = '0.0.0';
+    }
     return getReleaseStatus(targetDeviceConfigList, currentVersion);
   };
 
@@ -91,7 +145,15 @@ export default class DataManager {
    * Touch、Pro System UI Resource Update
    * ** Interval upgrade is not considered **
    */
-  static getSysResourcesLatestRelease = (features: Features, forcedUpdateRes?: boolean) => {
+  static getSysResourcesLatestRelease = ({
+    features,
+    forcedUpdateRes,
+    firmwareType,
+  }: {
+    features: Features;
+    forcedUpdateRes?: boolean;
+    firmwareType: EFirmwareType;
+  }) => {
     const deviceType = getDeviceType(features);
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
 
@@ -100,6 +162,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
+      firmwareType,
     }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const currentVersion = deviceFirmwareVersion.join('.');
@@ -116,7 +179,7 @@ export default class DataManager {
    * Touch、Pro System full UI Resource Update
    * ** Interval upgrade is not considered **
    */
-  static getSysFullResource = (features: Features) => {
+  static getSysFullResource = (features: Features, firmwareType: EFirmwareType) => {
     const deviceType = getDeviceType(features);
     if (deviceType === EDeviceType.Unknown) return undefined;
 
@@ -125,6 +188,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
+      firmwareType,
     }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.fullResource);
@@ -132,7 +196,7 @@ export default class DataManager {
     return findLatestRelease(targetDeviceConfig)?.fullResource;
   };
 
-  static getBootloaderResource = (features: Features) => {
+  static getBootloaderResource = (features: Features, firmwareType: EFirmwareType) => {
     const deviceType = getDeviceType(features);
     if (deviceType === EDeviceType.Unknown) throw new Error('Device type is unknown');
 
@@ -140,6 +204,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
+      firmwareType,
     }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     if (targetDeviceConfigList.length === 0) {
@@ -152,13 +217,17 @@ export default class DataManager {
     return findLatestRelease(targetDeviceConfig)?.bootloaderResource;
   };
 
-  static getBootloaderTargetVersion = (features: Features): IVersionArray | undefined => {
+  static getBootloaderTargetVersion = (
+    features: Features,
+    firmwareType: EFirmwareType
+  ): IVersionArray | undefined => {
     const deviceType = getDeviceType(features);
     if (deviceType === EDeviceType.Unknown) return undefined;
 
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
+      firmwareType,
     }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
@@ -166,7 +235,10 @@ export default class DataManager {
     return targetDeviceConfig?.[0]?.bootloaderVersion ?? undefined;
   };
 
-  static getBootloaderRelatedFirmwareVersion = (features: Features): IVersionArray | undefined => {
+  static getBootloaderRelatedFirmwareVersion = (
+    features: Features,
+    firmwareType: EFirmwareType
+  ): IVersionArray | undefined => {
     const deviceType = getDeviceType(features);
     if (deviceType === EDeviceType.Unknown) return undefined;
 
@@ -174,6 +246,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
+      firmwareType,
     }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(
@@ -183,7 +256,7 @@ export default class DataManager {
     return targetDeviceConfig?.[0]?.bootloaderRelatedFirmwareVersion ?? undefined;
   };
 
-  static getFirmwareChangelog = (features: Features) => {
+  static getFirmwareChangelog = (features: Features, firmwareType: EFirmwareType) => {
     const deviceType = getDeviceType(features);
     if (deviceType === EDeviceType.Unknown) return [];
 
@@ -192,12 +265,13 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
+      firmwareType,
     }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
 
     if (
-      features.firmware_present === false ||
-      (DeviceModelToTypes.model_classic.includes(deviceType) && features.bootloader_mode)
+      features.firmwarePresent === false ||
+      (DeviceModelToTypes.model_classic.includes(deviceType) && features.bootloaderMode)
     ) {
       // Always return least changelog
       return getReleaseChangelog(targetDeviceConfigList, '0.0.0');
@@ -207,13 +281,14 @@ export default class DataManager {
     return getReleaseChangelog(targetDeviceConfigList, currentVersion);
   };
 
-  static getFirmwareLatestRelease = (features: Features) => {
+  static getFirmwareLatestRelease = (features: Features, firmwareType: EFirmwareType) => {
     const deviceType = getDeviceType(features);
     if (deviceType === EDeviceType.Unknown) return undefined;
 
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
+      firmwareType,
     }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
 
@@ -221,7 +296,7 @@ export default class DataManager {
     if (!target) return target;
 
     if (!target.resource) {
-      const resource = this.getSysResourcesLatestRelease(features);
+      const resource = this.getSysResourcesLatestRelease({ features, firmwareType });
       return {
         ...target,
         resource,
@@ -234,15 +309,15 @@ export default class DataManager {
     const deviceType = getDeviceType(features);
     if (deviceType === EDeviceType.Unknown) return 'unknown';
 
-    const deviceBLEFirmwareVersion = getDeviceBLEFirmwareVersion(features);
+    const deviceBleFirmwareVersion = getDeviceBLEFirmwareVersion(features);
 
     /** mini has no device ble_ver */
-    if (!deviceBLEFirmwareVersion) {
+    if (!deviceBleFirmwareVersion) {
       return 'none';
     }
 
     const targetDeviceConfigList = this.deviceMap[deviceType]?.ble ?? [];
-    const currentVersion = deviceBLEFirmwareVersion.join('.');
+    const currentVersion = deviceBleFirmwareVersion.join('.');
     return getReleaseStatus(targetDeviceConfigList, currentVersion);
   };
 
@@ -250,14 +325,14 @@ export default class DataManager {
     const deviceType = getDeviceType(features);
     if (deviceType === EDeviceType.Unknown) return [];
 
-    const deviceBLEFirmwareVersion = getDeviceBLEFirmwareVersion(features);
+    const deviceBleFirmwareVersion = getDeviceBLEFirmwareVersion(features);
 
-    if (!deviceBLEFirmwareVersion) {
+    if (!deviceBleFirmwareVersion) {
       return [];
     }
 
     const targetDeviceConfigList = this.deviceMap[deviceType]?.ble ?? [];
-    const currentVersion = deviceBLEFirmwareVersion.join('.');
+    const currentVersion = deviceBleFirmwareVersion.join('.');
     return getReleaseChangelog(targetDeviceConfigList, currentVersion);
   };
 
@@ -278,36 +353,113 @@ export default class DataManager {
 
   static getBridgeChangelog = () => this.assets?.bridge.changelog;
 
+  private static enrichFirmwareReleaseInfo(
+    deviceData: DeviceTypeMap[keyof DeviceTypeMap] | undefined
+  ): DeviceTypeMap[keyof DeviceTypeMap] {
+    // Safety check: return default structure if input is undefined/null
+    if (!deviceData || typeof deviceData !== 'object') {
+      return {
+        firmware: [],
+        ble: [],
+      };
+    }
+
+    // Create a shallow copy to avoid mutating original data
+    const enrichedData = { ...deviceData };
+
+    FIRMWARE_FIELDS.forEach(field => {
+      const releases = enrichedData[field];
+
+      if (!releases || !Array.isArray(releases) || releases.length === 0) {
+        return; // Skip this field
+      }
+
+      // Add firmwareType to each release in this field
+      try {
+        enrichedData[field] = releases.map(release => {
+          // Safety checks:
+          if (!release || typeof release !== 'object' || !!release.firmwareType) {
+            return release; // Return as-is if invalid or already has firmwareType
+          }
+
+          const firmwareType = getFirmwareTypeFromField(field);
+
+          return {
+            ...release,
+            firmwareType,
+          };
+        });
+      } catch (error) {
+        console.error(`Error enriching firmware field "${field}":`, error);
+      }
+    });
+
+    return enrichedData;
+  }
+
   static async load(settings: ConnectSettings) {
     this.settings = settings;
     if (!settings.fetchConfig) {
       return;
     }
-    try {
-      const url = settings.preRelease
-        ? 'https://data.onekey.so/pre-config.json'
-        : 'https://data.onekey.so/config.json';
 
-      const { data } = await axios.get<RemoteConfigResponse>(
-        `${url}?noCache=${getTimeStamp()}`,
-        // because of iframe timeout is 10000
-        {
-          timeout: 7000,
+    const url = settings.preRelease
+      ? 'https://data.onekey.so/pre-config.json'
+      : 'https://data.onekey.so/config.json';
+
+    const urlWithCache = `${url}?noCache=${getTimeStamp()}`;
+    let data: RemoteConfigResponse | null = null;
+    let fetchMethod: 'configFetcher' | 'axios' | 'none' = 'none';
+
+    // 1. Try custom configFetcher first (client-side IP direct connection support)
+    if (settings.configFetcher) {
+      Log.debug('[DataConfig] Trying configFetcher (client-side fetcher)...');
+      try {
+        data = await settings.configFetcher(urlWithCache);
+        if (data) {
+          fetchMethod = 'configFetcher';
+          Log.log('[DataConfig] ConfigFetcher success');
+        } else {
+          Log.debug('[DataConfig] ConfigFetcher returned null, will fallback to axios');
         }
-      );
+      } catch (e) {
+        Log.warn('[DataConfig] ConfigFetcher error, will fallback to axios:', e);
+      }
+    }
+
+    // 2. Fallback to default axios request
+    if (!data) {
+      Log.debug('[DataConfig] Trying axios (SDK default fetcher)...');
+      try {
+        const response = await axios.get<RemoteConfigResponse>(urlWithCache, {
+          // because of iframe timeout is 10000
+          timeout: 7000,
+        });
+        data = response.data;
+        fetchMethod = 'axios';
+        Log.log('[DataConfig] Axios fetch success');
+      } catch (e) {
+        Log.warn('[DataConfig] Axios fetch error:', e);
+      }
+    }
+
+    // 3. Apply config if available
+    if (data) {
+      Log.log(`[DataConfig] Config loaded successfully via [${fetchMethod}]`);
       this.deviceMap = {
-        [EDeviceType.Classic]: data.classic,
-        [EDeviceType.Classic1s]: data.classic1s,
-        [EDeviceType.ClassicPure]: data.classicpure,
-        [EDeviceType.Mini]: data.mini,
-        [EDeviceType.Touch]: data.touch,
-        [EDeviceType.Pro]: data.pro,
+        [EDeviceType.Classic]: this.enrichFirmwareReleaseInfo(data.classic),
+        [EDeviceType.Classic1s]: this.enrichFirmwareReleaseInfo(data.classic1s),
+        [EDeviceType.ClassicPure]: this.enrichFirmwareReleaseInfo(data.classicpure),
+        [EDeviceType.Mini]: this.enrichFirmwareReleaseInfo(data.mini),
+        [EDeviceType.Touch]: this.enrichFirmwareReleaseInfo(data.touch),
+        [EDeviceType.Pro]: this.enrichFirmwareReleaseInfo(data.pro),
+        [EDeviceType.Pro2]: this.enrichFirmwareReleaseInfo(data.pro2),
       };
       this.assets = {
         bridge: data.bridge,
       };
-    } catch (e) {
-      // ignore
+    } else {
+      Log.warn('[DataConfig] All fetch methods failed, using built-in default config');
     }
   }
 
@@ -332,8 +484,8 @@ export default class DataManager {
     }
   }
 
-  static getProtobufMessages(messageVersion: MessageVersion = 'latest'): JSON {
-    return this.messages[messageVersion];
+  static getProtobufMessages(schema: ProtobufMessageSchema = 'v1CurrentSchema'): JSON {
+    return this.messages[schema];
   }
 
   static getSettings(key?: undefined): ConnectSettings;
@@ -349,7 +501,11 @@ export default class DataManager {
   }
 
   static isBleConnect = (env: ConnectSettings['env']) =>
-    env === 'react-native' || env === 'lowlevel';
+    env === 'react-native' || env === 'lowlevel' || env === 'desktop-web-ble';
 
-  static isWebUsbConnect = (env: ConnectSettings['env']) => env === 'webusb';
+  /** Desktop WebUSB doesn't need browser permission prompt */
+  static isDesktopWebUsb = (env: ConnectSettings['env']) => env === 'desktop-webusb';
+
+  /** Browser WebUSB needs permission prompt */
+  static isBrowserWebUsb = (env: ConnectSettings['env']) => env === 'webusb';
 }

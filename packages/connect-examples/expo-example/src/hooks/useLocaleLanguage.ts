@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ILocaleSymbol } from '../../locale';
+import { useCallback, useEffect, useState } from 'react';
+
 import { getDefaultLocale } from '../provider/AppIntlProvider/getDefaultLocale';
 import { getItem, setItem } from '../utils/storeUtil';
+
+import type { ILocaleSymbol } from '../../locale';
 
 const STORE_LOCALES_KEYS = '@onekey/locale';
 

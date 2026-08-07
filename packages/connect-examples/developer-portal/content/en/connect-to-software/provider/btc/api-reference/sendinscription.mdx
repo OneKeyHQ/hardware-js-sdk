@@ -1,0 +1,45 @@
+---
+title: sendInscription
+---
+
+# sendInscription
+
+Send Inscription
+
+### Method
+
+```typescript
+async function sendInscription(
+    toAddress: string, 
+    inscriptionId: string, 
+    options?: { feeRate: number }
+): string
+```
+
+### Params
+
+* `toAddress` — _required_ `string`  the address to send
+* `inscriptionId` — _required_ `string` the id of Inscription
+* `options` — _optional_&#x20;
+  * `feeRate`  — _required_ `number` the network fee rate
+
+### Response
+
+`txid` — `string`
+
+### Example
+
+```typescript
+const provider = (window.$onekey &#x26;&#x26; window.$onekey.btc) || window.unisat;
+
+const address = "010203"
+const inscription = "010203"
+const txid = async provider.sendInscription(address, inscription);
+
+```
+
+### Demo
+
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/MWLqvVE" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

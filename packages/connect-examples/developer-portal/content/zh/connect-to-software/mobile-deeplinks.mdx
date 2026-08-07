@@ -1,0 +1,84 @@
+---
+title: 移动端 & Deeplinks
+description: 使用 deeplinks 在移动端 Web 应用和 WebViews 中集成 OneKey 钱包
+---
+
+# 移动端 & Deeplinks
+
+使用 deeplinks 和 universal links 在移动端 Web 应用和 WebViews 中集成 OneKey 钱包。
+
+## 概述
+
+在构建移动端 Web 应用或在 WebViews 中集成时，您可以使用 OneKey 的 deeplink 系统直接连接到钱包应用。
+
+## Deeplink 格式
+
+### 自定义 Scheme
+
+```
+onekey-wallet://wc?uri={encodeURIComponent(wcUri)}
+```
+
+### Universal Link（推荐）
+
+```
+https://app.onekey.so/wc/connect/wc?uri={encodeURIComponent(wcUri)}
+```
+
+> **提示：** 推荐使用 Universal links，因为它们在不同移动平台和浏览器中工作更可靠。
+
+## 使用示例
+
+```javascript
+// 从您的 dApp 生成 WalletConnect URI
+const wcUri = 'wc:a281...' // 您的 WalletConnect URI
+
+// 选项 1：自定义 scheme
+const customSchemeLink = `onekey-wallet://wc?uri=${encodeURIComponent(wcUri)}`
+
+// 选项 2：Universal link（推荐）
+const universalLink = `https://app.onekey.so/wc/connect/wc?uri=${encodeURIComponent(wcUri)}`
+
+// 打开链接
+window.location.href = universalLink
+```
+
+## 平台特定说明
+
+### iOS
+
+- 当 OneKey 应用已安装时，Universal links 效果最佳
+- 如果应用未安装，universal link 将重定向到 App Store
+
+### Android
+
+- 自定义 scheme 链接需要已安装 OneKey 应用
+- 如果应用不存在，Universal links 会优雅地回退到网页
+
+## 最佳实践
+
+1. **检测移动环境** - 仅在移动设备上显示 deeplink 选项
+2. **提供回退方案** - 如果 deeplinks 失败，提供替代连接方法
+3. **使用 universal links** - 它们比自定义 schemes 提供更好的用户体验
+4. **处理超时** - 如果用户没有返回您的应用，显示重试选项
+
+```javascript
+// 检测移动环境
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+
+if (isMobile) {
+  // 移动端使用 deeplinks
+  window.location.href = universalLink
+} else {
+  // 桌面端使用常规 WalletConnect 二维码
+  showQRCode(wcUri)
+}
+```
+
+## 相关资源
+
+- [RainbowKit](/zh/connect-to-software/wallet-ui/rainbowkit/) - 自动处理移动端检测
+- [Web3Modal](/zh/connect-to-software/wallet-ui/web3modal/) - 内置移动端支持
+- [Provider API](/zh/connect-to-software/provider/eth/) - 直接 Provider 集成
+
+

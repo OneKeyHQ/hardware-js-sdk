@@ -1,0 +1,184 @@
+---
+description: 使用 wagmi 和注入的 EIP-1193 Provider 从 React 应用连接 OneKey
+---
+
+# React + wagmi
+
+本指南展示了使用 wagmi 从 React 应用连接 OneKey 的最简方式，基于 EIP-1193。核心思路：优先使用 OneKey 的专用注入（`window.$onekey.ethereum`），然后回退到多 Provider 列表或通用的 `window.ethereum`。
+
+## 安装
+
+```bash
+npm i wagmi viem
+```
+
+wagmi v2 基于 viem 构建。本指南使用 Injected 连接器来支持注入式钱包（OneKey / 其他 EIP-1193 Provider）。
+
+## 创建 OneKey 优先的注入连接器
+
+优先使用 OneKey 的专用注入，以避免多钱包环境下的歧义。
+
+```ts
+// onekeyConnector.ts
+import { createConfig, http } from 'wagmi'
+import { mainnet, polygon, arbitrum, base, optimism } from 'wagmi/chains'
+import { injected } from 'wagmi/connectors'
+
+function getOneKeyFirstProvider(): any {
+  // 1) 优先使用 OneKey 的专用注入
+  const onekey = (window as any)?.$onekey?.ethereum
+  if (onekey) return onekey
+
+  // 2) 回退：从多 Provider 列表中查找 OneKey
+  const list = (window as any)?.ethereum?.providers
+  const okFromList = list?.find((p: any) => p?.isOneKey || p?.onekey || (typeof p?.isOneKey === 'function' && p.isOneKey()))
+  if (okFromList) return okFromList
+
+  // 3) 最终回退：单一注入 Provider
+  return (window as any)?.ethereum
+}
+
+export const config = createConfig({
+  chains: [mainnet, polygon, arbitrum, base, optimism],
+  connectors: [
+    injected({
+      target() {
+        return {
+          id: 'onekey',
+          name: 'OneKey',
+          provider: getOneKeyFirstProvider,
+        }
+      },
+      shimDisconnect: true,
+    }),
+  ],
+  transports: {
+    [mainnet.id]: http(),
+    [polygon.id]: http(),
+    [arbitrum.id]: http(),
+    [base.id]: http(),
+    [optimism.id]: http(),
+  },
+})
+```
+
+注意事项
+- 优先使用 `window.$onekey.ethereum` 以在多钱包环境中保持行为确定性。
+- 如果未安装 OneKey，连接器会回退到其他注入的 Provider。
+- 在用户操作时触发 `eth_requestAccounts`，并处理 `4001`（用户拒绝）错误，详见旧版文档。
+
+## 应用设置
+
+```tsx
+// main.tsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { WagmiProvider } from 'wagmi'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { config } from './onekeyConnector'
+import App from './App'
+
+const queryClient = new QueryClient()
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </WagmiProvider>
+  </React.StrictMode>,
+)
+```
+
+## 连接和读取账户
+
+```tsx
+// App.tsx
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
+
+export default function App() {
+  const { address, isConnected } = useAccount()
+  const { connect, connectors, isPending } = useConnect()
+  const { disconnect } = useDisconnect()
+
+  if (isConnected) {
+    return (
+      <div>
+        <p>已连接: {address}</p>
+        <button onClick={() => disconnect()}>断开连接</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {connectors.map((c) => (
+        <button key={c.uid} disabled={isPending} onClick={() => connect({ connector: c })}>
+          使用 {c.name} 连接
+        </button>
+      ))}
+    </div>
+  )
+}
+```
+
+## 签名和发送
+
+```ts
+import { createWalletClient, custom } from 'viem'
+
+const provider = (window as any)?.$onekey?.ethereum
+  || (window as any)?.ethereum?.providers?.find((p: any) => p?.isOneKey || p?.onekey)
+  || (window as any)?.ethereum
+
+const client = createWalletClient({ transport: custom(provider) })
+const [account] = await provider.request({ method: 'eth_requestAccounts' })
+
+// 个人签名
+await provider.request({ method: 'personal_sign', params: ['0x68656c6c6f', account] })
+
+// EIP-1559 交易
+const txHash = await provider.request({
+  method: 'eth_sendTransaction',
+  params: [{ from: account, to: '0x...', value: '0x...' }],
+})
+```
+
+## 事件和网络
+
+- 监听 `accountsChanged` / `chainChanged` 事件并相应更新会话状态。
+- 网络切换/添加：使用 `wallet_switchEthereumChain` 和 `wallet_addEthereumChain`。
+
+## 移动端深度链接
+
+使用 OneKey 深度链接支持移动端 Web/WebView：
+
+- 自定义协议: `onekey-wallet://wc?uri={encodeURIComponent(wcUri)}`
+- 通用链接: `https://app.onekey.so/wc/connect/wc?uri={encodeURIComponent(wcUri)}`
+
+## 故障排除
+
+- 4001：用户拒绝（详见旧版文档示例）
+
+## 可选：EIP-6963（多钱包发现）
+
+如需使用 EIP-6963 来发现已安装的钱包，并在可用时优先选择 OneKey，示例如下：
+
+```ts
+let onekeyProvider: any = null
+const providers: any[] = []
+
+function onAnnounceProvider(event: any) {
+  const { info, provider } = event.detail || {}
+  providers.push({ info, provider })
+  if (info?.name === 'OneKey' || info?.rdns?.includes?.('onekey')) {
+    onekeyProvider = provider
+  }
+}
+
+window.addEventListener('eip6963:announceProvider', onAnnounceProvider)
+window.dispatchEvent(new Event('eip6963:requestProvider'))
+
+// 应用初始化时优先使用 `onekeyProvider`；否则回退到 getOneKeyFirstProvider()
+```

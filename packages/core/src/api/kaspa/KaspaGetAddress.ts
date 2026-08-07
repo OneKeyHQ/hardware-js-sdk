@@ -1,16 +1,21 @@
-import { KaspaGetAddress as HardwareKaspaGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { KaspaGetAddressParams, KaspaAddress } from '../../types';
+
+import type { KaspaGetAddress as HardwareKaspaGetAddress } from '@onekeyfe/hd-transport';
+import type { KaspaAddress, KaspaGetAddressParams } from '../../types';
 
 export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -28,6 +33,7 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
         { name: 'showOnOneKey', type: 'boolean' },
         { name: 'prefix', type: 'string' },
         { name: 'scheme', type: 'string' },
+        { name: 'useTweak', type: 'boolean' },
       ]);
 
       const showOnOneKey = batch.showOnOneKey ?? true;
@@ -37,6 +43,7 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
         show_display: showOnOneKey,
         prefix: batch.prefix,
         scheme: batch.scheme,
+        use_tweak: batch.useTweak,
       });
     });
   }
@@ -52,12 +59,34 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
     };
   }
 
+  getUseTweakVersionRange() {
+    return {
+      pro: {
+        min: '4.14.0',
+      },
+      model_classic1s: {
+        min: '3.12.0',
+      },
+      pro2: {
+        min: '0.0.0',
+      },
+    };
+  }
+
   async run() {
+    this.checkFeatureVersionLimit(
+      // exists use_tweak is false check firmware version
+      () => this.params.some(param => param.use_tweak === false),
+      () => this.getUseTweakVersionRange(),
+      {
+        strictCheckDeviceSupport: true,
+      }
+    );
+
     const responses: KaspaAddress[] = [];
 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
-
       const res = await this.device.commands.typedCall('KaspaGetAddress', 'KaspaAddress', {
         ...param,
       });

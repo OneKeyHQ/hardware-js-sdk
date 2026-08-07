@@ -1,23 +1,24 @@
 import { useMemo, useRef, useState } from 'react';
-
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
-
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Input, Label, Stack, Text, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { get, isEmpty } from 'lodash';
+
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
-import { TestCase, TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
-import { ADDRESS_INDEX_MARK, baseParams, CHANGE_MARK, INDEX_MARK } from './baseParams';
+import { ADDRESS_INDEX_MARK, CHANGE_MARK, INDEX_MARK, baseParams } from './baseParams';
 import { replaceTemplate } from './data/utils';
-import { ItemVerifyState } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
 import mockDevice from '../../utils/mockDevice';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 import { CommonInput } from '../../components/CommonInput';
+
+import type { ItemVerifyState } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
+import type { CoreMessage } from '@onekeyfe/hd-core';
+import type { TestCase, TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 
 type TestCaseDataType = {
   id: string;
@@ -148,6 +149,10 @@ const testCase: MnemonicAddressTestCase = {
       id: 'benfenGetAddress',
       method: 'benfenGetAddress',
     },
+    {
+      id: 'stellarGetAddress',
+      method: 'stellarGetAddress',
+    },
   ],
 };
 
@@ -251,7 +256,7 @@ function ExecuteView() {
   const currentPassphrase = useRef<string | undefined>('');
   const currentPassphraseState = useRef<string | undefined>('');
 
-  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+  const { stopTest, beginTest, retryFailedTasks } = useRunnerTest<TestCaseDataType>({
     initHardwareListener: sdk => {
       if (hardwareUiEventListener) {
         sdk.off(UI_EVENT, hardwareUiEventListener);
@@ -387,16 +392,41 @@ function ExecuteView() {
         params: requestParams,
       });
     },
-    processResponse: (res, item, itemIndex) => {
-      const response = res as {
-        path: string;
-        address: string;
-      };
+    preCheckResponse: (method, requestParams, item, itemIndex, res) => {
+      console.log('preCheckResponse', method, requestParams, item, itemIndex, res);
+
+      if (
+        method === 'alephiumGetAddress' &&
+        !res.success &&
+        (res.payload?.code === 416 ||
+          res.payload?.error?.toLowerCase()?.includes('forbidden key path'))
+      ) {
+        return Promise.resolve({
+          verifyState: 'skip',
+          error: undefined,
+        });
+      }
+
+      if (!res.success) {
+        if (res.payload?.code === 802 || res.payload?.code === 803) {
+          return Promise.resolve({
+            verifyState: 'skip',
+            error: undefined,
+          });
+        }
+        return Promise.resolve({
+          verifyState: 'fail',
+          error: res.payload?.error,
+        });
+      }
 
       const error = '';
+      const response = res.payload as {
+        address: string;
+        trackingKey?: string;
+      };
 
       const responseAddress =
-        // @ts-expect-error
         response.address?.toLowerCase() || response.trackingKey?.toLowerCase();
       if (item.address?.toLowerCase() !== responseAddress) {
         return Promise.resolve({
@@ -408,6 +438,10 @@ function ExecuteView() {
         error,
       });
     },
+    processResponse: () =>
+      Promise.resolve({
+        error: undefined,
+      }),
     removeHardwareListener: sdk => {
       if (hardwareUiEventListener) {
         sdk.off(UI_EVENT, hardwareUiEventListener);
@@ -458,11 +492,15 @@ function ExecuteView() {
           value={showOnOneKey}
           onToggle={setShowOnOneKey}
         />
-        <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
+        <TestRunnerOptionButtons
+          onStop={stopTest}
+          onStart={beginTest}
+          onRetryFailed={retryFailedTasks}
+        />
         <ExportReportView />
       </Stack>
     ),
-    [beginTest, intl, mnemonic, passphraseInputMemo, showOnOneKey, stopTest]
+    [beginTest, intl, mnemonic, passphraseInputMemo, retryFailedTasks, showOnOneKey, stopTest]
   );
 
   return contentMemo;

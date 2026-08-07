@@ -1,15 +1,21 @@
-import { NostrSignSchnorr as SignSchnorr } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 
+import type { NostrSignSchnorr as SignSchnorr } from '@onekeyfe/hd-transport';
+
 export default class NostrSignSchnorr extends BaseMethod<SignSchnorr> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     const { payload } = this;
     validateParams(payload, [

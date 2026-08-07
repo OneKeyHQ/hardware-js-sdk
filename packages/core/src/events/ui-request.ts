@@ -13,11 +13,17 @@ export const UI_REQUEST = {
   REQUEST_PASSPHRASE_ON_DEVICE: 'ui-request_passphrase_on_device',
   REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
     'ui-request_select_device_in_bootloader_for_web_device',
+  REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE:
+    'ui-request_select_device_for_switch_firmware_web_device',
 
   CLOSE_UI_WINDOW: 'ui-close_window',
+  CLOSE_UI_PIN_WINDOW: 'ui-close_pin_window',
   DEVICE_PROGRESS: 'ui-device_progress',
 
   BLUETOOTH_PERMISSION: 'ui-bluetooth_permission',
+  BLUETOOTH_UNSUPPORTED: 'ui-bluetooth_unsupported',
+  BLUETOOTH_POWERED_OFF: 'ui-bluetooth_powered_off',
+
   BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE:
     'ui-bluetooth_characteristic_notify_change_failure',
   LOCATION_PERMISSION: 'ui-location_permission',
@@ -34,7 +40,7 @@ export const UI_REQUEST = {
   BOOTLOADER: 'ui-device_bootloader_mode',
   NOT_IN_BOOTLOADER: 'ui-device_not_in_bootloader_mode',
   REQUIRE_MODE: 'ui-device_require_mode',
-  INITIALIZE: 'ui-device_not_initialized',
+  NOT_INITIALIZE: 'ui-device_not_initialized',
   SEEDLESS: 'ui-device_seedless',
   FIRMWARE_OLD: 'ui-device_firmware_old',
   FIRMWARE_NOT_SUPPORTED: 'ui-device_firmware_unsupported',
@@ -43,10 +49,30 @@ export const UI_REQUEST = {
   NOT_USE_ONEKEY_DEVICE: 'ui-device_please_use_onekey_device',
 } as const;
 
+export type ProtocolV2UiEventSource =
+  | 'unlock-coordinator'
+  | 'wallet-session-coordinator'
+  | 'method-lifecycle';
+
+export type ProtocolV2UiCompletion = 'page-accepted' | 'operation-completed';
+
+export type ProtocolV2UiEventMetadata = {
+  source?: ProtocolV2UiEventSource;
+  reason?: string;
+  deviceOnly?: boolean;
+  completion?: ProtocolV2UiCompletion;
+  method?: string;
+  page?: string | number;
+  operation?: string;
+};
+
 export interface UiRequestWithoutPayload {
   type:
     | typeof UI_REQUEST.CLOSE_UI_WINDOW
+    | typeof UI_REQUEST.CLOSE_UI_PIN_WINDOW
     | typeof UI_REQUEST.BLUETOOTH_PERMISSION
+    | typeof UI_REQUEST.BLUETOOTH_UNSUPPORTED
+    | typeof UI_REQUEST.BLUETOOTH_POWERED_OFF
     | typeof UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE
     | typeof UI_REQUEST.LOCATION_PERMISSION
     | typeof UI_REQUEST.LOCATION_SERVICE_PERMISSION
@@ -64,15 +90,15 @@ export interface UiRequestFirmwareProgressing {
 
 export type UiRequestDeviceAction = {
   type: typeof UI_REQUEST.REQUEST_PIN;
-  payload: {
+  payload: ProtocolV2UiEventMetadata & {
     device: Device;
-    type?: PROTO.PinMatrixRequestType | 'ButtonRequest_PinEntry';
+    type?: PROTO.PinMatrixRequestType | 'ButtonRequest_PinEntry' | 'ButtonRequest_AttachPin';
   };
 };
 
 export interface UiRequestButton {
   type: typeof UI_REQUEST.REQUEST_BUTTON;
-  payload: DeviceButtonRequest['payload'];
+  payload: DeviceButtonRequest['payload'] & ProtocolV2UiEventMetadata;
 }
 
 export interface UiRequestPassphrase {
@@ -80,6 +106,11 @@ export interface UiRequestPassphrase {
   payload: {
     device: Device;
     passphraseState?: string;
+    existsAttachPinUser?: boolean;
+    deviceOnly?: boolean;
+    source?: 'wallet-session-coordinator';
+    reason?: 'open-wallet' | 'session-recovery';
+    expectedPassphraseState?: string;
   };
 }
 
@@ -88,11 +119,20 @@ export interface UiRequestPassphraseOnDevice {
   payload: {
     device: Device;
     passphraseState?: string;
+    source?: 'wallet-session-coordinator';
+    reason?: 'open-wallet' | 'session-recovery';
   };
 }
 
 export interface UiRequestSelectDeviceInBootloaderForWebDevice {
   type: typeof UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE;
+  payload: {
+    device: Device;
+  };
+}
+
+export interface UiRequestSelectDeviceForSwitchFirmwareWebDevice {
+  type: typeof UI_REQUEST.REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE;
   payload: {
     device: Device;
   };
@@ -112,6 +152,10 @@ export interface FirmwareProgress {
     device: Device;
     progress: number;
     progressType: IFirmwareUpdateProgressType;
+    transferredBytes?: number;
+    totalBytes?: number;
+    rateBytesPerSecond?: number;
+    elapsedMs?: number;
   };
 }
 
@@ -127,6 +171,10 @@ export interface DeviceProgress {
   type: typeof UI_REQUEST.DEVICE_PROGRESS;
   payload: {
     progress?: number;
+    transferredBytes?: number;
+    totalBytes?: number;
+    rateBytesPerSecond?: number;
+    elapsedMs?: number;
   };
 }
 
@@ -148,6 +196,7 @@ export type UiEvent =
   | UiRequestPassphraseOnDevice
   | UiRequestPassphrase
   | UiRequestSelectDeviceInBootloaderForWebDevice
+  | UiRequestSelectDeviceForSwitchFirmwareWebDevice
   | FirmwareProcessing
   | UiRequestSelectDeviceInBootloaderForWebDevice
   | FirmwareProgress
@@ -173,6 +222,7 @@ export enum FirmwareUpdateTipMessage {
   AutoRebootToBootloader = 'AutoRebootToBootloader',
   GoToBootloaderSuccess = 'GoToBootloaderSuccess',
   SelectDeviceInBootloaderForWebDevice = 'SelectDeviceInBootloaderForWebDevice',
+  SwitchFirmwareReconnectDevice = 'SwitchFirmwareReconnectDevice',
   ConfirmOnDevice = 'ConfirmOnDevice',
   FirmwareEraseSuccess = 'FirmwareEraseSuccess',
   StartTransferData = 'StartTransferData',

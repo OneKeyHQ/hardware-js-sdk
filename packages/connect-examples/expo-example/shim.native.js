@@ -33,3 +33,22 @@ if (typeof TextDecoder === 'undefined') {
 if (typeof TextEncoder === 'undefined') {
   global.TextEncoder = require('text-encoding').TextEncoder;
 }
+
+// Web API polyfills for React Native
+global.sessionStorage = {
+  getItem: () => null,
+  setItem: () => null,
+  removeItem: () => null,
+  clear: () => null,
+  key: () => null,
+  length: 0,
+};
+
+global.history = {
+  replaceState: () => null,
+  pushState: () => null,
+  back: () => null,
+  forward: () => null,
+  go: () => null,
+  length: 1,
+};

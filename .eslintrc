@@ -44,6 +44,38 @@
     "import/no-extraneous-dependencies": "off",
     "class-methods-use-this": "off",
     "@typescript-eslint/restrict-template-expressions": "off",
-    "import/no-cycle": "off"
+    "import/no-cycle": "off",
+    "@typescript-eslint/consistent-type-imports": [
+      "warn",
+      {
+        "disallowTypeAnnotations": false
+      }
+    ],
+    "sort-imports": [
+      "warn",
+      {
+        "ignoreMemberSort": false,
+        "ignoreDeclarationSort": true,
+      }
+    ],
+    "import/order": [
+      "warn",
+      {
+        "groups": [
+          [
+            "builtin",
+            "external"
+          ],
+          [
+            "internal",
+            "parent",
+            "sibling",
+            "index"
+          ],
+          "type"
+        ],
+        "newlines-between": "always"
+      }
+    ]
   }
 }

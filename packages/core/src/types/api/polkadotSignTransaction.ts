@@ -1,4 +1,4 @@
-import { PolkadotSignedTx as HardwarePolkadotSignedTx } from '@onekeyfe/hd-transport';
+import type { PolkadotSignedTx as HardwarePolkadotSignedTx } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type PolkadotSignedTx = {
@@ -8,6 +8,7 @@ export type PolkadotSignedTx = {
 export type PolkadotSignTransactionParams = {
   path: string | number[];
   network: string;
+  prefix: number;
   rawTx?: string;
 };
 

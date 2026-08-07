@@ -1,8 +1,10 @@
 import { keccak_256 as keccak256 } from '@noble/hashes/sha3';
-import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
 import { bytesToHex } from '@noble/hashes/utils';
 import { getPublicKey } from '@noble/secp256k1';
+
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
+
+import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 // EIP-55
 function toChecksumAddress(address: string) {
@@ -22,6 +24,25 @@ function toChecksumAddress(address: string) {
   return checksumAddress;
 }
 
+/**
+ * 抽离的核心逻辑：从 seed 生成 EVM 地址
+ * 可以被 SLIP39 直接调用，避免助记词转换
+ */
+export function generateEvmAddressFromSeed(seed: Buffer, path: string): string {
+  const keyPair = deriveKeyPairWithPath(seed, path);
+  const { privateKey } = keyPair;
+
+  if (!privateKey) {
+    throw new Error('privateKey is undefined');
+  }
+
+  const publicKey = getPublicKey(privateKey, false);
+  const hash = bytesToHex(keccak256(publicKey.slice(1)));
+  const address = `0x${hash.slice(-40)}`;
+
+  return toChecksumAddress(address);
+}
+
 export default function evmGetAddress(
   connectId: string,
   deviceId: string,
@@ -36,30 +57,20 @@ export default function evmGetAddress(
       path: string;
     }> {
   const { path, mnemonic, passphrase } = params;
-
   const seed = mnemonicToSeed(mnemonic, passphrase);
-  const keyPair = deriveKeyPairWithPath(seed, path);
 
-  const { privateKey } = keyPair;
-
-  if (!privateKey) {
+  try {
+    const address = generateEvmAddressFromSeed(seed, path);
+    return {
+      success: true,
+      payload: { address, path },
+    };
+  } catch (error) {
     return {
       success: false,
       payload: {
-        error: 'privateKey is undefined',
+        error: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
-
-  const publicKey = getPublicKey(privateKey, false);
-  const hash = bytesToHex(keccak256(publicKey.slice(1)));
-  const address = `0x${hash.slice(-40)}`;
-
-  return {
-    success: true,
-    payload: {
-      address: toChecksumAddress(address),
-      path,
-    },
-  };
 }

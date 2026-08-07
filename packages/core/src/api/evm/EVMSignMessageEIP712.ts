@@ -1,14 +1,20 @@
-import { EthereumSignMessageEIP712 } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 
+import type { EthereumSignMessageEIP712 } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange } from '../../types';
+
+/**
+ * @deprecated Use EVMSignTypedData instead.
+ */
 export default class EVMSignMessageEIP712 extends BaseMethod<EthereumSignMessageEIP712> {
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     validateParams(this.payload, [
       { name: 'path', required: true },
@@ -27,15 +33,20 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EthereumSignMessage
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       model_mini: {
         min: '2.1.9',
+      },
+      model_classic1s: {
+        min: '3.14.0',
       },
     };
   }
 
   async run() {
+    this.assertProtocolSupported(this.device.getProtocol(), this.device.getCurrentFirmwareType());
+
     const res = await this.device.commands.typedCall(
       'EthereumSignMessageEIP712',
       'EthereumMessageSignature',

@@ -1,0 +1,121 @@
+---
+title: Cancel Request
+---
+
+# Cancel Request
+
+## Overview
+
+Cancels the currently active SDK method call on a device and fires the `ui-close_window` event. Use this to abort long-running operations (e.g., waiting for user confirmation on the device) or to dismiss pending UI prompts (PIN / Passphrase dialogs).
+
+> **Important:** `cancel()` aborts the in-flight SDK call — it does **not** disconnect the transport (USB or BLE). The device connection remains active and you can issue new calls immediately after cancellation.
+
+## Method
+
+```typescript
+HardwareSDK.cancel(connectId?: string): void;
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `connectId` | `string` | No | The `connectId` of the target device. When omitted, the SDK cancels the active call on whichever device is currently in use. |
+
+### Return Value
+
+`undefined` — The method returns immediately. The pending SDK call will reject with an error (code `801`, "User cancelled the action").
+
+## When to Use
+
+| Scenario | Example |
+|----------|---------|
+| User clicks "Cancel" in your PIN / Passphrase dialog | Abort the pending `uiResponse` wait |
+| Timeout — device confirmation takes too long | Cancel after your own timer fires |
+| Navigation — user leaves the page or closes a modal | Clean up before unmount |
+| Retry — you want to restart a failed call from scratch | Cancel first, then re-issue the call |
+
+## Examples
+
+### Basic cancellation
+
+```typescript
+// Start a long-running call
+const signPromise = HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  transaction: { /* ... */ },
+});
+
+// User clicks "Cancel"
+HardwareSDK.cancel(connectId);
+
+// The promise rejects
+const result = await signPromise;
+// result.success === false
+// result.payload.code === 801
+```
+
+### Cancel on component unmount (React)
+
+```tsx
+import { useEffect, useRef } from 'react';
+
+function SignTransaction({ connectId, deviceId }) {
+  const connectIdRef = useRef(connectId);
+
+  useEffect(() => {
+    connectIdRef.current = connectId;
+    return () => {
+      // Abort any pending device call when the component unmounts
+      HardwareSDK.cancel(connectIdRef.current);
+    };
+  }, [connectId]);
+
+  // ...
+}
+```
+
+### Cancel with timeout
+
+```typescript
+async function signWithTimeout(connectId: string, deviceId: string, params: any, timeoutMs = 60_000) {
+  const timer = setTimeout(() => {
+    HardwareSDK.cancel(connectId);
+  }, timeoutMs);
+
+  try {
+    const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+    clearTimeout(timer);
+    return result;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+```
+
+## Cancel vs. Disconnect
+
+| | `cancel(connectId)` | Physical disconnect (unplug / BLE out of range) |
+|---|---|---|
+| **What happens** | Aborts the pending SDK call; device stays connected | Transport fires `DEVICE.DISCONNECT` event; all pending calls reject |
+| **Connection state** | Active — you can call SDK methods immediately | Disconnected — must re-discover and reconnect |
+| **Use case** | User-initiated abort, timeout, navigation cleanup | Hardware event (cable removed, BLE lost) |
+
+> The SDK does not expose a programmatic "disconnect" method. Transport-level teardown happens automatically when the device is physically disconnected or the page/app is closed. To release a session without disconnecting, simply stop issuing SDK calls — the session will time out and release internally.
+
+## Error Code Reference
+
+When a call is cancelled, the rejected result has this shape:
+
+```typescript
+{
+  success: false,
+  payload: {
+    error: "User cancelled the action",
+    code: 801  // ACTION_CANCELLED
+  }
+}
+```
+
+See [Error Codes](/en/hardware-sdk/core-api-guide#error-codes) for the full list.

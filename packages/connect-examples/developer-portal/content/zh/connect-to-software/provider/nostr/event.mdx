@@ -1,0 +1,37 @@
+---
+title: 事件
+---
+
+# 事件
+
+OneKey 浏览器扩展 Provider 实现了 [Node.js `EventEmitter`](https://nodejs.org/api/events.html) API。
+
+本节详细介绍通过该 API 发出的事件。
+
+网上有大量关于 `EventEmitter` 的指南，你可以像这样监听事件：
+
+## accountsChanged
+
+当切换账户时触发。
+
+```javascript
+window.nostr.on('accountsChanged', (accounts) => {
+    // 处理新账户，或没有账户的情况。
+    // "accounts" 始终是一个数组，但可能为空。
+});
+window.nostr.off('accountsChanged');
+```
+
+## chainChanged **（已弃用）**
+
+当链变更时触发。
+
+```
+window.nostr.on('chainChanged', (chainId) => {
+    // 处理新链。
+    // 正确处理链变更可能比较复杂。
+    // 我们建议重新加载页面，除非你有充分的理由不这样做。
+    window.location.reload();
+});
+window.nostr.off('chainChanged');
+```

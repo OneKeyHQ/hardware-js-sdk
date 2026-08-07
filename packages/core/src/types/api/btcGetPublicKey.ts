@@ -1,4 +1,4 @@
-import { InputScriptType, PublicKey } from '@onekeyfe/hd-transport';
+import type { InputScriptType, PublicKey } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type BTCPublicKey = {

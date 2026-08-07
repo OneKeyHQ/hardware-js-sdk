@@ -1,8 +1,11 @@
 import { useIntl } from 'react-intl';
+
 import { Button } from '../../components/ui/Button';
 import { downloadFile } from '../../utils/downloadUtils';
 import { useDeviceFieldContext } from './DeviceFieldContext';
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
+
+import type { Features } from '@onekeyfe/hd-core';
 
 export const deviceInfoKeys = [
   //   ['device_id', 'label'],
@@ -52,11 +55,20 @@ export function formatCurrentTime(timestamp: number) {
   return formatter.format(timestamp);
 }
 
+export function getDeviceMode(features: Features | undefined) {
+  if (features?.bootloader_mode === true) {
+    return 'label__device_bootloader_statue';
+  }
+  return 'label__device_firmware_status';
+}
+
 export function ExportDeviceInfo() {
   const intl = useIntl();
   const { features, onekeyFeatures } = useDeviceFieldContext();
+  const onekeyFeatureMap = onekeyFeatures as Record<string, unknown> | undefined;
+  const featureMap = features as Record<string, unknown> | undefined;
 
-  const getFieldValue = (field: string) => onekeyFeatures?.[field] ?? features?.[field] ?? '';
+  const getFieldValue = (field: string) => onekeyFeatureMap?.[field] ?? featureMap?.[field] ?? '';
 
   const exportInfo = () => {
     const markdown = [];
@@ -71,10 +83,7 @@ export function ExportDeviceInfo() {
     } = getDeviceBasicInfo(features, onekeyFeatures);
 
     const bootloaderMode = intl.formatMessage({
-      id:
-        features?.bootloader_mode === true
-          ? 'label__device_bootloader_statue'
-          : 'label__device_firmware_status',
+      id: getDeviceMode(features),
     });
 
     markdown.push(`# Device OneKey ${deviceType} Info (${serialNumber})`);

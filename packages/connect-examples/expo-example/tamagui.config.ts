@@ -3,7 +3,7 @@ import { createAnimations } from '@tamagui/animations-react-native';
 import { createMedia } from '@tamagui/react-native-media-driver';
 import { shorthands } from '@tamagui/shorthands';
 import { themes } from '@tamagui/themes';
-import { Variable, createTamagui, createTokens } from 'tamagui';
+import { createTamagui, createTokens } from 'tamagui';
 
 import {
   brand,
@@ -26,6 +26,8 @@ import {
   successDark,
 } from './colors';
 
+import type { Variable } from 'tamagui';
+
 const animations = createAnimations({
   bouncy: {
     type: 'spring',
@@ -42,7 +44,7 @@ const animations = createAnimations({
     type: 'spring',
     damping: 20,
     mass: 1.2,
-    stiffness: 250,
+    stiffness: 150,
   },
 });
 
@@ -363,6 +365,22 @@ const config = createTamagui({
     hoverNone: { hover: 'none' },
     pointerCoarse: { pointer: 'coarse' },
   }),
+
+  defaultProps: {
+    Stack: {
+      // 禁用阴影效果
+      elevation: 0,
+    },
+    Text: {
+      // 禁用文本阴影
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 0,
+    },
+    // 禁用默认动画
+    withStaticProperties: {
+      disableAnimations: true,
+    },
+  },
 });
 
 export type AppConfig = typeof config;

@@ -1,4 +1,4 @@
-import type { CommonParams, Response } from '../params';
+import type { CommonParams, Response, Unsuccessful } from '../params';
 import type { CardanoAddressParameters } from './cardano';
 
 export type INetwork =
@@ -33,7 +33,8 @@ export type INetwork =
   | 'alph'
   | 'nostr'
   | 'benfen'
-  | 'neo';
+  | 'neo'
+  | 'stellar';
 
 export type CommonResponseParams = {
   path: string;
@@ -51,6 +52,7 @@ export type AllNetworkAddressParams = {
 
   includePublicKey?: boolean;
   group?: string;
+  useTweak?: boolean;
 };
 
 type AllNetworkAddressPayload =
@@ -90,10 +92,10 @@ type AllNetworkAddressPayload =
       xpubSegwit: string;
     };
 
-export type AllNetworkAddress = CommonResponseParams & {
+export type AllNetworkAddress = AllNetworkAddressParams & {
   success: boolean;
   payload?:
-    | AllNetworkAddressPayload
+    | (AllNetworkAddressPayload & { rootFingerprint: number })
     | {
         error: string;
         code: number;
@@ -107,8 +109,22 @@ export type AllNetworkGetAddressParams = {
   bundle: AllNetworkAddressParams[];
 };
 
+export type AllNetworkGetAddressParamsByLoop = AllNetworkGetAddressParams & {
+  callbackId?: string;
+  callbackIdFinish?: string;
+  onLoopItemResponse: (data?: AllNetworkAddress) => void;
+  onAllItemsResponse: (data?: AllNetworkAddress[], error?: Unsuccessful) => void;
+};
+
 export declare function allNetworkGetAddress(
   connectId: string,
   deviceId: string,
   params: CommonParams & AllNetworkGetAddressParams
+): Response<AllNetworkAddress[]>;
+
+export declare function allNetworkGetAddressByLoop(
+  connectId: string,
+  deviceId: string,
+  params: CommonParams & AllNetworkGetAddressParamsByLoop
+  // only return empty array
 ): Response<AllNetworkAddress[]>;

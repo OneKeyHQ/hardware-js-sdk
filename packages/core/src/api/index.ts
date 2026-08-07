@@ -1,16 +1,22 @@
 export { default as testInitializeDeviceDuration } from './test/TestInitializeDeviceDuration';
+export { default as testProtocolV2Ping } from './protocol-v2/Ping';
+export { default as preInitialize } from './device/PreInitialize';
 
 export { default as searchDevices } from './SearchDevices';
 export { default as getFeatures } from './GetFeatures';
+export { default as getDeviceState } from './GetDeviceState';
 export { default as getOnekeyFeatures } from './GetOnekeyFeatures';
 export { default as getPassphraseState } from './GetPassphraseState';
+export { default as openWalletSession } from './OpenWalletSession';
 export { default as getLogs } from './GetLogs';
+export { default as clearSessionCache } from './ClearSessionCache';
 export { default as checkFirmwareRelease } from './CheckFirmwareRelease';
 export { default as checkBLEFirmwareRelease } from './CheckBLEFirmwareRelease';
 export { default as checkBridgeStatus } from './CheckBridgeStatus';
 export { default as checkBridgeRelease } from './CheckBridgeRelease';
 export { default as checkBootloaderRelease } from './CheckBootloaderRelease';
 export { default as checkAllFirmwareRelease } from './CheckAllFirmwareRelease';
+export { default as checkFirmwareTypeAvailable } from './CheckFirmwareTypeAvailable';
 export { default as deviceBackup } from './device/DeviceBackup';
 export { default as deviceChangePin } from './device/DeviceChangePin';
 export { default as deviceFlags } from './device/DeviceFlags';
@@ -27,6 +33,7 @@ export { default as deviceWipe } from './device/DeviceWipe';
 export { default as deviceFullyUploadResource } from './device/DeviceFullyUploadResource';
 export { default as deviceUpdateBootloader } from './device/DeviceUpdateBootloader';
 export { default as deviceLock } from './device/DeviceLock';
+export { default as deviceUnlock } from './device/DeviceUnlock';
 export { default as deviceCancel } from './device/DeviceCancel';
 
 export { default as setU2FCounter } from './u2f/SetU2FCounter';
@@ -35,11 +42,24 @@ export { default as getNextU2FCounter } from './u2f/GetNextU2FCounter';
 export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';
 export { default as firmwareUpdateV3 } from './FirmwareUpdateV3';
+export { default as firmwareUpdateV4 } from './FirmwareUpdateV4';
 export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
+
+// Pro2 business API
+export { default as deviceReboot } from './protocol-v2/DeviceReboot';
+export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
+export { default as deviceProvisionFactoryInfo } from './protocol-v2/DeviceFactoryInfoSet';
+export { default as deviceReadFactoryInfo } from './protocol-v2/DeviceFactoryInfoGet';
+export { default as deviceWriteFactoryCertificate } from './protocol-v2/DeviceFactoryCertificateWrite';
+export { default as deviceReadFactoryCertificate } from './protocol-v2/DeviceFactoryCertificateRead';
+export { default as deviceSignFactoryChallenge } from './protocol-v2/DeviceFactoryChallengeSign';
+export { default as deviceUploadWallpaper } from './protocol-v2/DeviceUploadWallpaper';
+export { default as uploadPortfolio } from './UploadPortfolio';
 
 export { default as cipherKeyValue } from './CipherKeyValue';
 
 export { default as allNetworkGetAddress } from './allnetwork/AllNetworkGetAddress';
+export { default as allNetworkGetAddressByLoop } from './allnetwork/AllNetworkGetAddressByLoop';
 
 export { default as btcGetAddress } from './btc/BTCGetAddress';
 export { default as btcGetPublicKey } from './btc/BTCGetPublicKey';
@@ -89,6 +109,7 @@ export { default as aptosGetAddress } from './aptos/AptosGetAddress';
 export { default as aptosGetPublicKey } from './aptos/AptosGetPublicKey';
 export { default as aptosSignTransaction } from './aptos/AptosSignTransaction';
 export { default as aptosSignMessage } from './aptos/AptosSignMessage';
+export { default as aptosSignInMessage } from './aptos/AptosSignInMessage';
 
 export { default as algoGetAddress } from './algo/AlgoGetAddress';
 export { default as algoSignTransaction } from './algo/AlgoSignTransaction';
@@ -139,6 +160,7 @@ export { default as dnxSignTransaction } from './dynex/DnxSignTransaction';
 export { default as tonGetAddress } from './ton/TonGetAddress';
 export { default as tonSignMessage } from './ton/TonSignMessage';
 export { default as tonSignProof } from './ton/TonSignProof';
+export { default as tonSignData } from './ton/TonSignData';
 
 export { default as scdoGetAddress } from './scdo/ScdoGetAddress';
 export { default as scdoSignTransaction } from './scdo/ScdoSignTransaction';

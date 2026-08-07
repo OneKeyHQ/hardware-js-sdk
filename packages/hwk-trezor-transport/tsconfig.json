@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "outDir": "./dist",
+    "rootDir": ".",
+    "useUnknownInCatchVariables": false,
+    "types": ["node", "w3c-web-usb", "sharedworker"],
+    "baseUrl": ".",
+    "paths": {
+      "@trezor/protobuf": ["../hwk-trezor-protobuf/src/index.ts"],
+      "@trezor/protobuf/*": ["../hwk-trezor-protobuf/src/*"],
+      "@trezor/protocol": ["../hwk-trezor-protocol/src/index.ts"],
+      "@trezor/protocol/*": ["../hwk-trezor-protocol/src/*"],
+      "@trezor/schema-utils": ["../hwk-trezor-schema-utils/src/index.ts"],
+      "@trezor/schema-utils/*": ["../hwk-trezor-schema-utils/src/*"],
+      "@trezor/type-utils": ["../hwk-trezor-type-utils/src/index.ts"],
+      "@trezor/type-utils/*": ["../hwk-trezor-type-utils/src/*"],
+      "@trezor/utils": ["../hwk-trezor-utils/src/index.ts"],
+      "@trezor/utils/*": ["../hwk-trezor-utils/src/*"]
+    }
+  },
+  "include": ["src/**/*", "hwk.ts"]
+}

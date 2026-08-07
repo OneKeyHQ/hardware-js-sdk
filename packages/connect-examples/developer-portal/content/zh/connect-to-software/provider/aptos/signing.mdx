@@ -1,0 +1,111 @@
+---
+title: 签名
+description: 使用 OneKey 在 Aptos 上签署消息
+---
+
+import { Callout } from 'nextra/components'
+
+# 签名
+
+了解如何签署消息用于身份验证或验证。
+
+---
+
+## 签署消息
+
+签署任意消息用于身份验证或验证：
+
+```typescript
+const message = '欢迎来到 MyApp！\n\n点击签名登录。\n\nNonce: abc123'
+
+const response = await provider.signMessage({
+  message,
+  nonce: 'abc123',  // 可选的 nonce，用于防重放
+})
+
+console.log({
+  signature: response.signature,   // 十六进制编码的签名
+  fullMessage: response.fullMessage, // 完整的已签名消息
+  prefix: response.prefix,         // 使用的消息前缀
+})
+```
+
+---
+
+## 签署消息选项
+
+```typescript
+const response = await provider.signMessage({
+  message: 'Hello Aptos',
+  nonce: 'unique-nonce',
+  address: true,      // 在消息中包含地址
+  application: true,  // 包含应用信息
+  chainId: true,      // 包含链 ID
+})
+```
+
+---
+
+## 验证消息（链下）
+
+```typescript
+import nacl from 'tweetnacl'
+
+const { signature, fullMessage } = await provider.signMessage({
+  message: 'Hello Aptos',
+  nonce: 'unique-nonce',
+})
+
+const account = await provider.account()
+const pubKeyBytes = Buffer.from(account.publicKey.slice(2), 'hex')
+const signatureBytes = Buffer.from(signature.slice(2), 'hex')
+const messageBytes = Buffer.from(fullMessage)
+
+const isValid = nacl.sign.detached.verify(messageBytes, signatureBytes, pubKeyBytes)
+console.log('签名有效:', isValid)
+```
+
+---
+
+## 登录（AIP 标准）
+
+用于标准化的登录流程：
+
+```typescript
+const signInInput = {
+  // 登录参数
+}
+
+const result = await provider.signIn(signInInput)
+
+console.log({
+  address: result.address,
+  publicKey: result.publicKey,
+  signature: result.signature,
+})
+```
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  await provider.signMessage({ message: 'Hello', nonce: '123' })
+} catch (error) {
+  switch (error.code) {
+    case 4001:
+      console.log('用户拒绝了请求')
+      break
+    case 4100:
+      console.log('未授权 - 钱包已锁定')
+      break
+    case 4200:
+      console.log('不支持的方法')
+      break
+    default:
+      console.error('错误:', error.message)
+  }
+}
+```
+

@@ -1,6 +1,7 @@
 import { useCallback, useContext, useState } from 'react';
-
 import { useIntl } from 'react-intl';
+import { CoreApi } from '@onekeyfe/hd-core';
+
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { useDevice } from '../provider/DeviceProvider';
 import { useCommonParams } from '../provider/CommonParamsProvider';
@@ -41,11 +42,23 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
 
       let requestParams;
       try {
+        const rawParams = await onAcquireParams();
         requestParams = {
           ...commonParams,
           retryCount: 1,
-          ...(await onAcquireParams()),
+          ...rawParams,
         };
+
+        if (method === 'allNetworkGetAddressByLoop') {
+          // @ts-expect-error
+          requestParams.onLoopItemResponse = (data: any) => {
+            onExecute(JSON.stringify({ data }, null, 2));
+          };
+          // @ts-expect-error
+          requestParams.onAllItemsResponse = (data: any, error: any) => {
+            onExecute(JSON.stringify({ data, error }, null, 2));
+          };
+        }
       } catch (error) {
         requestParams = {
           ...commonParams,
@@ -57,16 +70,16 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
 
       let res;
       if (methodPayload.noConnIdReq) {
-        // @ts-expect-error
-        res = await sdk[`${method}` as keyof typeof sdk]();
+        console.info('[REQUEST] call sdk', { method });
+        res = await (sdk as any)[method]();
       } else if (methodPayload.noDeviceIdReq) {
-        if (!selectedDevice) return intl.formatMessage({ id: 'tip__need_connect_device_first' });
-        // @ts-expect-error
-        res = await sdk[`${method}` as keyof typeof sdk](connectId, requestParams);
+        // if (!selectedDevice) return intl.formatMessage({ id: 'tip__need_connect_device_first' });
+        console.info('[REQUEST] call sdk', { method, connectId, params: requestParams });
+        res = await (sdk as any)[method](connectId, requestParams);
       } else {
-        if (!selectedDevice) return intl.formatMessage({ id: 'tip__need_connect_device_first' });
-        // @ts-expect-error
-        res = await sdk[`${method}` as keyof typeof sdk](connectId, deviceId, requestParams);
+        // if (!selectedDevice) return intl.formatMessage({ id: 'tip__need_connect_device_first' });
+        console.info('[REQUEST] call sdk', { method, connectId, deviceId, params: requestParams });
+        res = await (sdk as any)[method](connectId, deviceId, requestParams);
       }
 
       onExecute(JSON.stringify(res, null, 2));

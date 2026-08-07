@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Redirecting… | OneKey Developers</title>
+    <meta http-equiv="refresh" content="0; url=./en/" />
+    <link rel="canonical" href="./en/" />
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+          sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        background-color: #f9fafb;
+        color: #111827;
+      }
+
+      main {
+        text-align: center;
+        padding: 2rem;
+      }
+
+      a {
+        color: #2563eb;
+      }
+    </style>
+    <script>
+      (function redirect() {
+        const target = './en/';
+        if (typeof window !== 'undefined') {
+          window.location.replace(target);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <main>
+      <p>Redirecting to the OneKey developer documentation…</p>
+      <p>
+        If you are not redirected automatically,
+        <a href="./en/">click here</a>.
+      </p>
+    </main>
+  </body>
+</html>
+

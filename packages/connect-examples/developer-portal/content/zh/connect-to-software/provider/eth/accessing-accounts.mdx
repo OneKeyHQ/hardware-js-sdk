@@ -1,0 +1,22 @@
+---
+title: 访问账户
+---
+
+# 访问账户
+
+## 访问账户
+
+用户账户在以太坊中有多种用途，包括作为标识符和用于签署交易。为了请求用户签名或让用户批准交易，必须能够访问用户的账户。以下 `wallet methods` 涉及签名或交易批准，都需要将发送账户作为函数参数。
+
+* `eth_sendTransaction`
+* `eth_sign`（不安全，不建议使用）
+* `eth_personalSign`
+* `eth_signTypedData`
+
+
+
+**连接账户示例：**
+
+
+<iframe src="https://codesandbox.io/embed/ethereum-provider-demo-rwgl5l?fontsize=14&hidenavigation=1&theme=dark" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

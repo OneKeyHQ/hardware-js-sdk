@@ -1,16 +1,22 @@
-import { FilecoinSignTx as HardwareFilecoinSignTx } from '@onekeyfe/hd-transport';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { FilecoinSignTransactionParams } from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
 
+import type { FilecoinSignTransactionParams } from '../../types';
+import type { FilecoinSignTx as HardwareFilecoinSignTx } from '@onekeyfe/hd-transport';
+
 export default class FilecoinSignTransaction extends BaseMethod<HardwareFilecoinSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode];
+    this.allowDeviceMode = [...this.allowDeviceMode];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [

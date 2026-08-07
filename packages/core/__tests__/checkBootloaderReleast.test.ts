@@ -1,5 +1,6 @@
-import { IVersionArray } from '../src';
 import { shouldUpdateBootloaderForClassicAndMini } from '../src/api/firmware/bootloaderHelper';
+
+import type { IVersionArray } from '../src';
 
 // Add mock for config module
 jest.mock('../src/data/config', () => ({

@@ -1,4 +1,4 @@
-import { KaspaAddress as HardwareKaspaAddress } from '@onekeyfe/hd-transport';
+import type { KaspaAddress as HardwareKaspaAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type KaspaAddress = {
@@ -10,6 +10,7 @@ export type KaspaGetAddressParams = {
   prefix?: string;
   scheme?: string;
   showOnOneKey?: boolean;
+  useTweak?: boolean;
 };
 
 export declare function kaspaGetAddress(

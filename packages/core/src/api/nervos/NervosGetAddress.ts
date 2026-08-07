@@ -1,17 +1,17 @@
-import type { NervosGetAddress as HardwareNervosGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 
-import type { NervosGetAddressParams, NervosAddress } from '../../types';
+import type { NervosGetAddress as HardwareNervosGetAddress } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange, NervosAddress, NervosGetAddressParams } from '../../types';
 
 export default class NervosGetAddress extends BaseMethod<HardwareNervosGetAddress[]> {
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -40,7 +40,7 @@ export default class NervosGetAddress extends BaseMethod<HardwareNervosGetAddres
     });
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       model_mini: {
         min: '3.7.0',

@@ -1,0 +1,166 @@
+---
+title: Getting Started
+description: Connect to TRON using OneKey's TronLink-compatible provider
+---
+
+import { Callout } from 'nextra/components'
+
+# Getting Started
+
+Learn how to detect, connect, and interact with TRON using OneKey's provider.
+
+<Callout type="info">
+OneKey's TRON provider is fully compatible with TronLink, including TronWeb and SunWeb instances.
+</Callout>
+
+---
+
+## Provider Detection
+
+```typescript
+// OneKey injects both the provider and TronWeb instances
+const provider = window.$onekey?.tron
+
+// TronWeb is available globally after connection
+const tronWeb = window.tronWeb
+
+if (!provider) {
+  throw new Error('OneKey TRON provider not detected')
+}
+
+// Check if it's TronLink compatible
+console.log('isTronLink:', provider.isTronLink) // true
+```
+
+---
+
+## Request Accounts
+
+```typescript
+// Request connection
+const result = await provider.request({
+  method: 'tron_requestAccounts'
+})
+
+if (result.code === 200) {
+  console.log('Connected!')
+  const address = tronWeb.defaultAddress.base58
+  console.log('Address:', address)
+} else {
+  console.log('Connection rejected:', result.message)
+}
+```
+
+---
+
+## Check Connection Status
+
+```typescript
+// Check if TronWeb is ready
+if (tronWeb && tronWeb.ready) {
+  console.log('Connected:', tronWeb.defaultAddress.base58)
+} else {
+  console.log('Not connected')
+}
+```
+
+---
+
+## Using TronWeb
+
+After connection, TronWeb instance is available globally:
+
+### Get Balance
+
+```typescript
+const balance = await tronWeb.trx.getBalance(tronWeb.defaultAddress.base58)
+console.log('Balance:', tronWeb.fromSun(balance), 'TRX')
+```
+
+### Send TRX
+
+```typescript
+const tx = await tronWeb.trx.sendTransaction(
+  'TRecipientAddress...',
+  tronWeb.toSun(10) // 10 TRX
+)
+
+console.log('Transaction:', tx.txid)
+```
+
+### Send TRC20 Token
+
+```typescript
+const contractAddress = 'TTokenContractAddress...'
+const contract = await tronWeb.contract().at(contractAddress)
+
+// Get decimals
+const decimals = await contract.decimals().call()
+
+// Transfer tokens
+const amount = 100 * (10 ** decimals) // 100 tokens
+const tx = await contract.transfer(
+  'TRecipientAddress...',
+  amount
+).send()
+
+console.log('Transaction:', tx)
+```
+
+---
+
+## Event Handling
+
+### Listen for Account Changes
+
+```typescript
+provider.on('accountsChanged', (accounts) => {
+  if (accounts[0]) {
+    console.log('Account changed:', accounts[0])
+  } else {
+    console.log('Disconnected')
+  }
+})
+```
+
+### Listen for Network Changes
+
+```typescript
+provider.on('chainChanged', (chainId) => {
+  console.log('Network changed:', chainId)
+  // Recommend page reload for network changes
+})
+```
+
+### Window Events (TronLink Compatible)
+
+```typescript
+// Listen for TronLink initialization
+window.addEventListener('tronLink#initialized', () => {
+  console.log('TronLink initialized')
+})
+
+// Listen for messages
+window.addEventListener('message', (event) => {
+  if (event.data.isTronLink) {
+    const { action, data } = event.data.message
+    console.log('TronLink event:', action, data)
+  }
+})
+```
+
+---
+
+## Migration from TronLink
+
+OneKey is TronLink-compatible. Update your detection logic:
+
+```typescript
+// Before (TronLink only)
+const tronWeb = window.tronWeb
+
+// After (OneKey with TronLink fallback)
+const provider = window.$onekey?.tron || window.tronLink
+const tronWeb = window.tronWeb // Both inject this
+```
+

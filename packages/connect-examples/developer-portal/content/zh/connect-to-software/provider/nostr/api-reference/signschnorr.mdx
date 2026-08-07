@@ -1,0 +1,32 @@
+---
+title: signSchnorr
+---
+
+# signSchnorr
+
+### 方法
+
+```typescript
+async function signSchnorr(sigHash: string) : string;
+```
+
+### 参数
+
+* `sigHash` — _必填_ `string` 要签名的哈希
+
+### 响应
+
+使用当前活跃 Nostr 账户的私钥对任意文本进行签名后的签名
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const signature = async provider.signSchnorr("010203")
+```
+
+### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/poGOPXB" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

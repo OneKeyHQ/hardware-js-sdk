@@ -1,0 +1,58 @@
+---
+title: 签名
+description: 使用 OneKey 对 Stellar 交易、Auth Entry 与消息进行签名
+---
+
+# 签名
+
+`window.$onekey.stellar` 的签名示例。
+
+---
+
+## 签名交易（XDR）
+
+```ts
+const { address } = await stellar.getAddress()
+const { networkPassphrase } = await stellar.getNetwork()
+
+const { signedTxXdr, signerAddress } = await stellar.signTransaction(unsignedXdr, {
+  networkPassphrase,
+  address,
+  // submit: false,
+  // submitUrl: 'https://horizon.stellar.org/transactions',
+})
+
+console.log({ signedTxXdr, signerAddress })
+```
+
+---
+
+## 签名 Auth Entry（Soroban / Authorization Entry）
+
+```ts
+const { address } = await stellar.getAddress()
+const { networkPassphrase } = await stellar.getNetwork()
+
+const { signedAuthEntry, signerAddress } = await stellar.signAuthEntry(authEntryXdr, {
+  networkPassphrase,
+  address,
+})
+
+console.log({ signedAuthEntry, signerAddress })
+```
+
+---
+
+## 签名消息
+
+```ts
+const { address } = await stellar.getAddress()
+const { networkPassphrase } = await stellar.getNetwork()
+
+const { signedMessage, signerAddress } = await stellar.signMessage('hello stellar', {
+  networkPassphrase,
+  address,
+})
+
+console.log({ signedMessage, signerAddress })
+```

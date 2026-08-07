@@ -1,0 +1,52 @@
+{
+  "name": "@onekeyfe/hwk-trezor-connector",
+  "version": "1.2.0-alpha.35",
+  "description": "Shared Trezor connector base for Hardware Wallet Kit",
+  "author": "OneKey",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist",
+    "test": "jest"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git",
+    "directory": "packages/hwk-trezor-connector"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@onekeyfe/hwk-adapter-core": "1.2.0-alpha.35",
+    "@onekeyfe/hwk-trezor-core": "1.2.0-alpha.35"
+  },
+  "devDependencies": {
+    "@onekeyfe/hwk-trezor-protobuf": "1.2.0-alpha.35",
+    "@onekeyfe/hwk-trezor-protocol": "1.2.0-alpha.35",
+    "@onekeyfe/hwk-trezor-transport": "1.2.0-alpha.35",
+    "rimraf": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "5.1.6"
+  }
+}

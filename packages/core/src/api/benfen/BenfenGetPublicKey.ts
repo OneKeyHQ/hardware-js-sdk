@@ -2,8 +2,9 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { BenfenPublicKey, BenfenGetPublicKeyParams } from '../../types';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+
+import type { BenfenGetPublicKeyParams, BenfenPublicKey, DeviceFirmwareRange } from '../../types';
 
 export default class BenfenGetPublicKey extends BaseMethod<any> {
   hasBundle = false;
@@ -12,7 +13,7 @@ export default class BenfenGetPublicKey extends BaseMethod<any> {
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -37,7 +38,7 @@ export default class BenfenGetPublicKey extends BaseMethod<any> {
     });
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       pro: {
         min: '4.12.0',
@@ -51,7 +52,7 @@ export default class BenfenGetPublicKey extends BaseMethod<any> {
   async run() {
     const res = await batchGetPublickeys(this.device, this.params, 'ed25519', 728);
 
-    const responses: BenfenPublicKey[] = res.message.public_keys.map(
+    const responses: BenfenPublicKey[] = res.public_keys.map(
       (publicKey: string, index: number) => ({
         path: serializedPath((this.params as any[])[index].address_n),
         pub: publicKey,

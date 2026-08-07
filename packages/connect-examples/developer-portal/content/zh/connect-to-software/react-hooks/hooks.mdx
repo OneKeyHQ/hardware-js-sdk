@@ -1,0 +1,71 @@
+---
+title: React Hooks
+description: 类型安全的 React hooks - 构建你自己的自定义钱包 UI
+---
+
+import { Callout } from 'nextra/components'
+
+# React Hooks
+
+类型安全的 React hooks。构建你自己的自定义钱包连接 UI，完全控制用户体验。
+
+<Callout>
+**最适合自定义 UI。** 当你想要设计自己的钱包连接流程时，使用 React Hooks。
+</Callout>
+
+---
+
+## 可用库
+
+| 库 | 描述 |
+|---------|-------------|
+| [Wagmi](/zh/connect-to-software/react-hooks/wagmi) | 最流行的以太坊 React hooks 库 |
+
+---
+
+## 何时使用
+
+在以下情况使用 React Hooks：
+- 需要完全控制钱包连接 UI
+- 想要类型安全的以太坊交互 hooks
+- 正在构建 React 应用
+- 不需要预构建的钱包选择弹窗
+
+---
+
+## 快速示例
+
+```tsx
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { injected } from 'wagmi/connectors'
+
+function ConnectButton() {
+  const { address, isConnected } = useAccount()
+  const { connect } = useConnect()
+  const { disconnect } = useDisconnect()
+
+  if (isConnected) {
+    return (
+      <div>
+        <p>{address}</p>
+        <button onClick={() => disconnect()}>断开连接</button>
+      </div>
+    )
+  }
+
+  return (
+    <button onClick={() => connect({ connector: injected() })}>
+      连接钱包
+    </button>
+  )
+}
+```
+
+---
+
+## 替代方案：带钱包 UI
+
+如果想要预构建的钱包选择弹窗，可以考虑：
+- [RainbowKit](/zh/connect-to-software/wallet-ui/rainbowkit) - 精美的 React 钱包弹窗
+- [Web3Modal](/zh/connect-to-software/wallet-ui/web3modal) - WalletConnect 官方 UI
+

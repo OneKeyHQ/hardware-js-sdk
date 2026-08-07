@@ -1,6 +1,32 @@
-import { EventEmitter } from 'events';
-import { CallMethod } from './events';
-import { CoreApi } from './types/api';
+import type { Unsuccessful } from './types';
+import type { EventEmitter } from 'events';
+import type { CallMethod } from './events';
+import type { CoreApi } from './types/api';
+import type { AllNetworkAddress } from './types/api/allNetworkGetAddress';
+
+type CallbackFunction = (data?: any, error?: Unsuccessful) => void;
+
+const callbackManager = new Map<string, CallbackFunction>();
+
+const generateCallbackId = () =>
+  `callback_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+const registerCallback = (id: string, callback: CallbackFunction) => {
+  callbackManager.set(id, callback);
+};
+
+const executeCallback = (id: string, ...args: any[]) => {
+  const callback = callbackManager.get(id);
+  if (callback) {
+    callback(...args);
+  }
+};
+
+const cleanupCallback = (id: string) => {
+  callbackManager.delete(id);
+};
+
+export { executeCallback, cleanupCallback };
 
 export interface InjectApi {
   call: CallMethod;
@@ -74,15 +100,20 @@ export const createCoreApi = (
   | 'switchTransport'
 > => ({
   getLogs: () => call({ method: 'getLogs' }),
+  clearSessionCache: params => call({ ...params, method: 'clearSessionCache' }),
   /**
    * 搜索设备
    */
-  searchDevices: () => call({ method: 'searchDevices' }),
+  searchDevices: params => call({ ...params, method: 'searchDevices' }),
 
   /**
    * 获取设备信息
    */
   getFeatures: (connectId, params) => call({ ...params, connectId, method: 'getFeatures' }),
+  getDeviceState: (connectId, params) => {
+    const { refresh: _refresh, includeRaw: _includeRaw, ...commonParams } = (params ?? {}) as any;
+    return call({ ...commonParams, connectId, method: 'getDeviceState' });
+  },
   getOnekeyFeatures: (connectId, params) =>
     call({ ...params, connectId, method: 'getOnekeyFeatures' }),
 
@@ -109,18 +140,39 @@ export const createCoreApi = (
 
   checkAllFirmwareRelease: (connectId, params) =>
     call({ ...params, connectId, method: 'checkAllFirmwareRelease' }),
+  checkFirmwareTypeAvailable: params => call({ ...params, method: 'checkFirmwareTypeAvailable' }),
 
   cipherKeyValue: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'cipherKeyValue' }),
 
   testInitializeDeviceDuration: (connectId, params) =>
     call({ ...params, connectId, method: 'testInitializeDeviceDuration' }),
-
+  testProtocolV2Ping: (connectId, params) =>
+    call({ ...params, connectId, method: 'testProtocolV2Ping' }),
+  preInitialize: (connectId, params) => call({ ...params, connectId, method: 'preInitialize' }),
   deviceBackup: connectId => call({ connectId, method: 'deviceBackup' }),
   deviceChangePin: (connectId, params) => call({ ...params, connectId, method: 'deviceChangePin' }),
   deviceFlags: (connectId, params) => call({ ...params, connectId, method: 'deviceFlags' }),
   deviceRebootToBoardloader: connectId => call({ connectId, method: 'deviceRebootToBoardloader' }),
   deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
+
+  // Pro2 business API
+  deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
+  deviceGetOnboardingStatus: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
+  deviceProvisionFactoryInfo: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceProvisionFactoryInfo' }),
+  deviceReadFactoryInfo: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceReadFactoryInfo' }),
+  deviceWriteFactoryCertificate: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceWriteFactoryCertificate' }),
+  deviceReadFactoryCertificate: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceReadFactoryCertificate' }),
+  deviceSignFactoryChallenge: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSignFactoryChallenge' }),
+  deviceUploadWallpaper: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceUploadWallpaper' }),
+  uploadPortfolio: (connectId, params) => call({ ...params, connectId, method: 'uploadPortfolio' }),
   deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
   deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
   deviceSettings: (connectId, params) => call({ ...params, connectId, method: 'deviceSettings' }),
@@ -136,8 +188,12 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'deviceUpdateBootloader' }),
   getPassphraseState: (connectId, params) =>
     call({ ...params, connectId, method: 'getPassphraseState' }),
+  openWalletSession: (connectId, params) =>
+    call({ ...params, connectId, method: 'openWalletSession' }),
   deviceCancel: (connectId, params) => call({ ...params, connectId, method: 'deviceCancel' }),
   deviceLock: (connectId, params) => call({ ...params, connectId, method: 'deviceLock' }),
+  deviceUnlock: (connectId, params) =>
+    call({ ...params, useEmptyPassphrase: true, connectId, method: 'deviceUnlock' }),
 
   getNextU2FCounter: (connectId, params) =>
     call({ ...params, connectId, method: 'getNextU2FCounter' }),
@@ -145,6 +201,28 @@ export const createCoreApi = (
 
   allNetworkGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'allNetworkGetAddress' }),
+  allNetworkGetAddressByLoop: (connectId, deviceId, params) => {
+    const { onLoopItemResponse, onAllItemsResponse, ...restParams } = params;
+
+    const callbackId = generateCallbackId();
+    registerCallback(callbackId, onLoopItemResponse);
+
+    const callbackIdFinish = generateCallbackId();
+    registerCallback(callbackIdFinish, (data?: AllNetworkAddress[], error?: Unsuccessful) => {
+      onAllItemsResponse?.(data, error);
+      cleanupCallback(callbackIdFinish);
+      cleanupCallback(callbackId);
+    });
+
+    return call({
+      ...restParams,
+      connectId,
+      deviceId,
+      method: 'allNetworkGetAddressByLoop',
+      callbackId,
+      callbackIdFinish,
+    });
+  },
 
   evmGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'evmGetAddress' }),
@@ -209,6 +287,8 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'firmwareUpdateV2' }),
   firmwareUpdateV3: (connectId, params) =>
     call({ ...params, connectId, method: 'firmwareUpdateV3' }),
+  firmwareUpdateV4: (connectId, params) =>
+    call({ ...params, connectId, method: 'firmwareUpdateV4' }),
   promptWebDeviceAccess: params => call({ ...params, method: 'promptWebDeviceAccess' }),
 
   tronGetAddress: (connectId, deviceId, params) =>
@@ -238,6 +318,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'aptosGetPublicKey' }),
   aptosSignMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'aptosSignMessage' }),
+  aptosSignInMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'aptosSignInMessage' }),
   aptosSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'aptosSignTransaction' }),
 
@@ -324,6 +406,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'tonSignMessage' }),
   tonSignProof: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'tonSignProof' }),
+  tonSignData: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'tonSignData' }),
 
   scdoGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'scdoGetAddress' }),

@@ -1,0 +1,143 @@
+---
+title: tronSignTransaction
+---
+
+# tronSignTransaction
+
+### TRON：签名交易
+
+对指定交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+
+```typescript
+const response = await HardwareSDK.tronSignTransaction(connectId, deviceId, params)
+```
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `transaction` - _必需_ `TronTransaction` 类型
+
+#### TronTransaction 类型
+
+```typescript
+type TronTransaction = {
+  refBlockBytes: string;
+  refBlockHash: string;
+  expiration: number;
+  data?: string;
+  contract: TronTransactionContract;
+  timestamp: number;
+  feeLimit?: number;
+};
+
+type TronTransactionContract = {
+  transferContract?: TronTransferContract;
+  triggerSmartContract?: TronTriggerSmartContract;
+};
+
+type TronTransferContract = {
+  toAddress?: string;
+  amount?: UintType;
+};
+
+type TronTriggerSmartContract = {
+  contractAddress?: string;
+  callValue?: number;
+  data?: string;
+  callTokenValue?: number;
+  assetId?: number;
+};
+
+```
+
+### 示例
+
+```typescript
+HardwareSDK.tronSignTransaction(connectId, deviceId, {
+    path: "m/44'/195'/0'/0'/0",
+    transaction: {
+        refBlockBytes: 'ddf1',
+        refBlockHash: 'd04764f22469a0b8',
+        timestamp: 1655692083406,
+        expiration: 1655692140000,
+        contract: {
+            transferContract: {
+                toAddress: 'TXrs7yxQLNzig7J9EbKhoEiUp6kWpdWKnD',
+                amount: 100,
+            },
+        }
+    }
+});
+```
+
+返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        serialized_tx: string;
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```
+
+
+
+### 交易签名和广播
+
+```typescript
+// 通过 TronWeb 创建原始交易
+const tronWeb = new TronWeb({
+    fullHost: 'https://api.trongrid.io'
+});
+const toAddress = 'TXrs7yxQLNzig7J9EbKhoEiUp6kWpdWKnD'
+
+const encodedTx = await tronWeb.transactionBuilder.sendTrx(
+    toAddress,
+    1000000
+);
+
+// 交易 ID
+const txid = encodedTx.txID;
+
+const result = await HardwareSDK.tronSignTransaction(connectId, deviceId, {
+    path: "m/44'/195'/0'/0/0",
+    transaction: {
+        refBlockBytes: encodedTx.raw_data.ref_block_bytes,
+        refBlockHash: encodedTx.raw_data.ref_block_hash,
+        expiration: encodedTx.raw_data.expiration,
+        timestamp: encodedTx.raw_data.timestamp,
+        feeLimit: encodedTx.raw_data.fee_limit,
+        contract: {
+            transferContract: {
+                toAddress: toAddress,
+                amount: 1000000
+            }
+        }
+    }
+});
+
+// 原始交易数据
+const rawTx = JSON.stringify({
+    txID: txid,
+    raw_data: encodedTx.raw_data,
+    raw_data_hex: result.payload.serialized_tx,
+    signature: [result.payload.signature]
+});
+```
+

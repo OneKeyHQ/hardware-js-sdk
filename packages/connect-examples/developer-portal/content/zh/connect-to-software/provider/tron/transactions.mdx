@@ -1,0 +1,95 @@
+---
+title: 交易
+description: 使用 OneKey 在 TRON 上发送交易
+---
+
+import { Callout } from 'nextra/components'
+
+# 交易
+
+了解如何在 TRON 上签署和发送交易。
+
+---
+
+## 签署交易
+
+签署交易但不广播：
+
+```typescript
+// 构建交易
+const tx = await tronWeb.transactionBuilder.sendTrx(
+  'TRecipientAddress...',
+  tronWeb.toSun(10),
+  tronWeb.defaultAddress.base58
+)
+
+// 通过 provider 签名
+const signedTx = await provider.sign(tx)
+
+console.log('已签名的交易:', signedTx)
+
+// 手动广播
+const result = await tronWeb.trx.sendRawTransaction(signedTx)
+```
+
+---
+
+## 智能合约交互
+
+```typescript
+const contract = await tronWeb.contract().at(contractAddress)
+
+// 读取（视图函数）
+const result = await contract.someViewFunction().call()
+
+// 写入（需要签名）
+const tx = await contract.someWriteFunction(param1, param2).send({
+  feeLimit: 100_000_000, // 100 TRX
+  callValue: 0,
+})
+```
+
+---
+
+## 触发智能合约
+
+```typescript
+const tx = await tronWeb.transactionBuilder.triggerSmartContract(
+  contractAddress,
+  'transfer(address,uint256)',
+  { feeLimit: 100_000_000 },
+  [
+    { type: 'address', value: recipientAddress },
+    { type: 'uint256', value: amount }
+  ],
+  tronWeb.defaultAddress.base58
+)
+
+const signedTx = await provider.sign(tx.transaction)
+const result = await tronWeb.trx.sendRawTransaction(signedTx)
+```
+
+---
+
+## 使用 SunWeb
+
+用于 DappChain（侧链）操作：
+
+```typescript
+const sunWeb = window.sunWeb
+
+// 主链到侧链
+await sunWeb.depositTrx(
+  amount,
+  depositFee,
+  feeLimit
+)
+
+// 侧链到主链
+await sunWeb.withdrawTrx(
+  amount,
+  withdrawFee,
+  feeLimit
+)
+```
+

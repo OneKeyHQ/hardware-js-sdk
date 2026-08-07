@@ -1,15 +1,22 @@
-import { ConfluxGetAddress as HardwareConfluxGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { ConfluxAddress, ConfluxGetAddressParams } from '../../types/api/confluxGetAddress';
+
+import type { ConfluxGetAddress as HardwareConfluxGetAddress } from '@onekeyfe/hd-transport';
+import type { ConfluxAddress, ConfluxGetAddressParams } from '../../types/api/confluxGetAddress';
 
 export default class ConfluxGetAddress extends BaseMethod<HardwareConfluxGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
+  checkDeviceId = true;
+
   hasBundle = false;
 
   init() {
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

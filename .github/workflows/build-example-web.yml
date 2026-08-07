@@ -1,43 +1,151 @@
-name: build-deploy-example-web
+name: Build and Deploy Examples
 
 on: workflow_dispatch
 
+env:
+  COMMIT_FULL_SHA: ${{ github.sha }}
+
 jobs:
-  deploy:
+  deploy_preview:
     runs-on: ubuntu-latest
-    env:
-      TEST_ENDPOINT: hardware-example.onekeytest.com
-      PROJECT_PATH: packages/connect-examples/expo-example
     steps:
-      - uses: actions/checkout@v3
-      - name: Setup Environment
-        uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+
+      - name: Get short commit SHA
+        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Install Package
+      - name: Install Dependencies
         run: |
           yarn
           yarn bootstrap
 
-      - name: Build Target
+      - name: Build All Packages
+        run: yarn build
+
+      - name: Build Expo Example
+        run: EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn expo export:web
+        working-directory: packages/connect-examples/expo-example
+
+      - name: Add commit info to Expo Example
         run: |
-          yarn build
+          mkdir -p temp-build
+          cp -r web-build/* temp-build/ 2>/dev/null || true
+          mkdir -p web-build/commits/${{ env.COMMIT_SHORT_SHA }}
+          cp -r temp-build/* web-build/commits/${{ env.COMMIT_SHORT_SHA }}/
+          echo '{"commit": "${{ env.COMMIT_SHORT_SHA }}", "fullCommit": "${{ github.sha }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > web-build/commits/${{ env.COMMIT_SHORT_SHA }}/commit-info.json
+          cp web-build/commits/${{ env.COMMIT_SHORT_SHA }}/index.html web-build/commits/${{ env.COMMIT_SHORT_SHA }}/404.html
+          rm -rf temp-build
+        working-directory: packages/connect-examples/expo-example
 
-      - name: Build Web App
+      - name: Build Expo Playground (testing preview)
+        working-directory: packages/connect-examples/expo-playground
+        env:
+          COMMIT_SHA: ${{ env.COMMIT_SHORT_SHA }}
+        run: yarn build
+
+      - name: Add SPA fallback pages
         run: |
-          yarn expo export:web
-        working-directory: ${{ env.PROJECT_PATH }}
+          cp packages/connect-examples/expo-playground/dist/index.html packages/connect-examples/expo-playground/dist/404.html
+          cp packages/connect-examples/expo-example/web-build/index.html packages/connect-examples/expo-example/web-build/404.html
 
-      - name: Copy index.html to 404.html for Github Pages deployment (client-side routing)
-        run: cp web-build/index.html web-build/404.html
-        working-directory: ${{ env.PROJECT_PATH }}
+      - name: Prepare root static assets
+        run: |
+          rm -rf gh-pages-root
+          mkdir -p gh-pages-root
+          cp .github/templates/404.html gh-pages-root/404.html
+          cp .github/templates/404.html gh-pages-root/index.html
+          if [ -f "packages/connect-examples/expo-example/web-build/manifest.json" ]; then
+            cp packages/connect-examples/expo-example/web-build/manifest.json gh-pages-root/manifest.json
+            echo "✅ Copied manifest.json from expo-example"
+          else
+            cp .github/templates/manifest.json gh-pages-root/manifest.json
+            echo "⚠️ expo-example manifest not found, using template"
+          fi
+          find packages/connect-examples/expo-example/web-build -maxdepth 1 -type f -name "favicon*" -exec cp {} gh-pages-root/ \;
 
-      - name: Deploy Github Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Deploy root assets
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./${{ env.PROJECT_PATH }}/web-build
-          cname: ${{ env.TEST_ENDPOINT }}
+          publish_dir: ./gh-pages-root
+          cname: hardware-example.onekeytest.com
           force_orphan: true
+
+      - name: Deploy Expo Example (GitHub Pages)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: packages/connect-examples/expo-example/web-build
+          destination_dir: expo-example
+          keep_files: true
+
+      - name: Deploy Expo Playground (GitHub Pages)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: packages/connect-examples/expo-playground/dist
+          destination_dir: expo-playground
+          keep_files: true
+
+  build_playground_production:
+    runs-on: ubuntu-latest
+    needs: deploy_preview
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get short commit SHA
+        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install Dependencies
+        run: |
+          yarn
+          yarn bootstrap
+
+      - name: Build All Packages
+        run: yarn build
+
+      - name: Build Expo Playground (production)
+        working-directory: packages/connect-examples/expo-playground
+        env:
+          COMMIT_SHA: ${{ env.COMMIT_FULL_SHA }}
+        run: yarn build
+
+      - name: Package production bundle with commit id
+        working-directory: packages/connect-examples/expo-playground
+        env:
+          COMMIT_FULL_SHA: ${{ env.COMMIT_FULL_SHA }}
+          COMMIT_SHORT_SHA: ${{ env.COMMIT_SHORT_SHA }}
+        run: |
+          RELEASE_ROOT="release"
+          rm -rf "${RELEASE_ROOT}"
+          mkdir -p "${RELEASE_ROOT}"
+          cp dist/index.html "${RELEASE_ROOT}/index.html"
+          cp dist/404.html "${RELEASE_ROOT}/404.html"
+          mkdir -p "${RELEASE_ROOT}/${COMMIT_FULL_SHA}"
+          cp -R dist/${COMMIT_FULL_SHA}/. "${RELEASE_ROOT}/${COMMIT_FULL_SHA}/"
+          cat <<EOF > "${RELEASE_ROOT}/${COMMIT_FULL_SHA}/build-info.json"
+          {
+            "commit": "${COMMIT_FULL_SHA}",
+            "shortCommit": "${COMMIT_SHORT_SHA}",
+            "buildEnv": "production",
+            "buildTime": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Upload Production Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.COMMIT_FULL_SHA }}
+          path: packages/connect-examples/expo-playground/release

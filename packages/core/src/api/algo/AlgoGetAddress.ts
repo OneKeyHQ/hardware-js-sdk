@@ -1,16 +1,20 @@
-import { AlgorandGetAddress as HardwareAlgoGetAddress } from '@onekeyfe/hd-transport';
-
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { AlgoAddress, AlgoGetAddressParams } from '../../types';
+
+import type { AlgorandGetAddress as HardwareAlgoGetAddress } from '@onekeyfe/hd-transport';
+import type { AlgoAddress, AlgoGetAddressParams } from '../../types';
 
 export default class AlgoGetAddress extends BaseMethod<HardwareAlgoGetAddress[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode];
+    this.allowDeviceMode = [...this.allowDeviceMode];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

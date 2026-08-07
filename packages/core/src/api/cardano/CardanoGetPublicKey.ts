@@ -3,14 +3,19 @@ import { PROTO } from '../../constants';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
-import { CardanoPublicKeyParams, CardanoPublicKey } from '../../types/api/cardanoGetPublicKey';
+
+import type { CardanoPublicKey, CardanoPublicKeyParams } from '../../types/api/cardanoGetPublicKey';
 
 export default class CardanoGetPublicKey extends BaseMethod<CardanoPublicKeyParams[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle?: boolean;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

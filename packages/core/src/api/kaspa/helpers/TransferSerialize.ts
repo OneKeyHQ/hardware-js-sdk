@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import {
-  KaspaSignTransactionParams,
-  KaspaSignInputParams,
-  KaspaSignOutputParams,
-} from '../../../types';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { SignatureType } from './SignatureType';
 import { HashWriter } from './HashWriter';
+
+import type { KaspaSignTransactionParams } from '../../../types';
 
 export function zeroHash() {
   return Buffer.alloc(32);
@@ -30,7 +29,7 @@ function isSighashNone(sighashType: number) {
   return (sighashType & 31) === SignatureType.SIGHASH_NONE;
 }
 
-function hashOutpoint(hashWriter: HashWriter, input: KaspaSignInputParams) {
+function hashOutpoint(hashWriter: HashWriter, input: KaspaSignTransactionParams['inputs'][number]) {
   hashWriter.writeHash(Buffer.from(input.prevTxId, 'hex'));
   hashWriter.writeUInt32LE(input.outputIndex);
 }
@@ -72,9 +71,15 @@ function getSigOpCountsHash(transaction: KaspaSignTransactionParams, sighashType
   return hashWriter.finalize();
 }
 
-function hashTxOut(hashWriter: HashWriter, output: KaspaSignOutputParams) {
+function hashTxOut(hashWriter: HashWriter, output: KaspaSignTransactionParams['outputs'][number]) {
   hashWriter.writeUInt64LE(output.satoshis);
   hashWriter.writeUInt16LE(0); // TODO: USE REAL SCRIPT VERSION
+  if (output.script === undefined) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.CallMethodInvalidParameter,
+      'Kaspa legacy sighash requires output.script'
+    );
+  }
   hashWriter.writeVarBytes(Buffer.from(output.script, 'hex'));
 }
 
@@ -125,6 +130,12 @@ export function serialize(transaction: KaspaSignTransactionParams, inputNumber: 
   const input = transaction.inputs[inputNumber];
   hashOutpoint(hashWriter, input);
   hashWriter.writeUInt16LE(0); // TODO: USE REAL SCRIPT VERSION
+  if (input.output.script === undefined) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.CallMethodInvalidParameter,
+      'Kaspa legacy sighash requires input.output.script'
+    );
+  }
   hashWriter.writeVarBytes(Buffer.from(input.output.script, 'hex'));
   hashWriter.writeUInt64LE(input.output.satoshis);
   hashWriter.writeUInt64LE(input.sequenceNumber);

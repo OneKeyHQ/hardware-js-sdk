@@ -1,14 +1,20 @@
-import { SuiSignMessage as HardwareSuiSignMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
 
+import type { SuiSignMessage as HardwareSuiSignMessage } from '@onekeyfe/hd-transport';
+
 export default class SuiSignMessage extends BaseMethod<HardwareSuiSignMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [
@@ -28,6 +34,9 @@ export default class SuiSignMessage extends BaseMethod<HardwareSuiSignMessage> {
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_mini: {
         min: '3.4.0',
       },

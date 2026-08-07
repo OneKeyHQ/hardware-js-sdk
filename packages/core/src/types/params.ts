@@ -1,3 +1,5 @@
+import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
+
 export interface CommonParams {
   keepSession?: boolean;
   /**
@@ -12,6 +14,10 @@ export interface CommonParams {
    * Timeout time for single polling
    */
   timeout?: number;
+  /**
+   * DeviceInfoGet timeout during Protocol V2 initialization.
+   */
+  protocolV2DeviceInfoTimeoutMs?: number;
   /**
    * passphrase state
    */
@@ -37,6 +43,27 @@ export interface CommonParams {
    * Skip web device prompt
    */
   skipWebDevicePrompt?: boolean;
+
+  /**
+   * Skip passphrase check
+   */
+  skipPassphraseCheck?: boolean;
+
+  /**
+   * Only connect device, not initialize device, only ble connect
+   */
+  onlyConnectBleDevice?: boolean;
+
+  /**
+   * Use pre-initialized device state (BLE only)
+   */
+  usePreInitialize?: boolean;
+
+  /**
+   * Strictly expected transport protocol. The SDK actively verifies this value and
+   * rejects a mismatch. If omitted, a cached protocol only influences probe order.
+   */
+  connectProtocol?: HardwareConnectProtocol;
 }
 
 export type Params<T> = CommonParams & T & { bundle?: undefined };

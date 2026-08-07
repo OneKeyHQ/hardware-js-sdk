@@ -1,0 +1,55 @@
+name: Build Developer Portal
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Get SDK Version
+        id: version
+        run: |
+          SDK_VERSION=$(node -p "require('./packages/core/package.json').version")
+          echo "sdk_version=$SDK_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Install Dependencies (Developer Portal)
+        working-directory: packages/connect-examples/developer-portal
+        run: yarn install
+
+      - name: Build Developer Portal
+        working-directory: packages/connect-examples/developer-portal
+        env:
+          NEXT_PUBLIC_SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
+          NEXT_PUBLIC_COMMIT_ID: ${{ github.sha }}
+          NEXT_PUBLIC_COMMIT_SHORT: ${{ github.sha }}
+          NEXT_PUBLIC_BUILD_TIME: ${{ github.event.repository.updated_at }}
+        run: yarn build
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-portal-${{ github.sha }}
+          path: ./packages/connect-examples/developer-portal/out/
+          retention-days: 7
+
+      - name: Summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **SDK Version**: ${{ steps.version.outputs.sdk_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY

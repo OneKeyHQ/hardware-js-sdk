@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'starcoinGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -35,7 +35,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'starcoinGetPublicKey',
-    description: 'Get PublicKey',
+
     presupposes: [
       {
         title: 'Get PublicKey',
@@ -67,7 +67,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'starcoinSignMessage',
-    description: 'Sign Message',
+
     presupposes: [
       {
         title: 'Sign Message',
@@ -96,7 +96,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'starcoinSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Sign Transaction',

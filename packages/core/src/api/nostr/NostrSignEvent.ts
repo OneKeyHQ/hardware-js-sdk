@@ -1,5 +1,5 @@
-import { NostrSignEvent as SignEvent } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -7,12 +7,19 @@ import { validateParams } from '../helpers/paramsValidator';
 import { validateEvent } from './helper';
 import { bytesToHex, hexToBytes } from '../helpers/hexUtils';
 
+import type { NostrSignEvent as SignEvent } from '@onekeyfe/hd-transport';
+
 export default class NostrSignEvent extends BaseMethod<SignEvent> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     const { payload } = this;
     if (!validateEvent(payload.event)) {

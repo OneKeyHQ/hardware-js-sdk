@@ -1,0 +1,57 @@
+---
+title: confluxSignMessageCIP23
+---
+
+# confluxSignMessageCIP23
+
+## 使用要求
+
+* 固件版本要求
+  * Touch: 3.0.0
+  * Classic/Mini: 2.4.0
+
+## Conflux：签名消息 CIP23 <a href="#ethereum-sign-message" id="ethereum-sign-message"></a>
+
+使用指定 BIP32 路径派生的私钥对消息进行签名。此方法遵循 [CIP23](https://github.com/Conflux-Chain/CIPs/blob/master/CIPs/cip-23) 规范实现。
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `messageHash` - _必需_ `string` 要签名的十六进制文本消息
+* `domainHash` - _必需_ `string` CIP-23 域的十六进制编码的 32 字节哈希。
+
+### 示例
+
+```typescript
+HardwareSDK.confluxSignMessageCIP23(connectId, deviceId, {
+    path: "m/44'/503'/0'/0/0",
+    messageHash: "0x07bc1c4f3268fc74b60587e9bb7e01e38a7d8a9a3f51202bf25332aa2c75c64"
+    domainHash: "7c872d109a4e735dc1886c72af47e9b4888a1507557e0f49c85b570019163373"
+});
+```
+
+返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        address: string;
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

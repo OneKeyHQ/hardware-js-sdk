@@ -1,0 +1,102 @@
+---
+title: btcGetAddress
+---
+
+# btcGetAddress
+
+## Bitcoin：获取地址
+
+显示指定 BIP32 路径派生的地址，并返回给调用者。用户需要在 OneKey 上确认导出。
+
+```typescript
+const result = await HardwareSDK.btcGetAddress(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+#### 导出单个地址
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 3。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `coin` - _可选_ `string` 决定 [coins.json](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/data/coins/bitcoin.json) 文件中指定的网络定义。可以使用币种的 `shortcut`、`name` 或 `label`。如果未设置 `coin`，API 将尝试从 `path` 获取网络定义。
+* `multisig` - _可选_ MultisigRedeemScriptType，赎回脚本信息（仅用于多签地址）
+* `scriptType` - _可选_ InputScriptType，地址脚本类型
+
+#### 导出批量地址
+
+* `bundle` - 包含 `path`、`showOnOneKey`、`coin` 字段的对象 `Array`
+
+### 获取不同类型的地址
+
+不同的 BTC 地址类型需要不同的派生路径参数。
+
+| 类型                | 路径            | 示例                                                        |
+| ------------------- | --------------- | ----------------------------------------------------------- |
+| Legacy BIP44        | m/44'/0'/x'/x/x | 以 "1" 开头，由 26 到 35 个字符组成                         |
+| Nested SegWit BIP49 | m/49'/0'/x'/x/x | 以 "3" 开头，由 26 到 35 个字符组成                         |
+| Native SegWit BIP84 | m/84'/0'/x'/x/x | 以 "bc1" 或 "tb1" 开头，由 41 到 62 个字符组成              |
+| Taproot BIP86       | m/86'/0'/x'/x/x | 以 "bc1" 开头，由 41 到 62 个字符组成                       |
+
+## 示例
+
+显示第一个比特币账户的第三个地址：
+
+```typescript
+HardwareSDK.btcGetAddress(connectId, deviceId, {
+    path: "m/49'/0'/0'/0/2",
+    coin: "btc"
+});
+```
+
+返回第一个比特币账户的批量地址，不在设备上显示：
+
+```typescript
+HardwareSDK.btcGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/49'/0'/0'/0/0", showOnOneKey: false }, // 地址 1
+        { path: "m/49'/0'/0'/0/1", showOnOneKey: false }, // 地址 2
+        { path: "m/49'/0'/0'/0/2", showOnOneKey: false }  // 地址 3
+    ]
+});
+```
+
+#### 返回结果
+
+只有一个地址的结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // 显示的地址
+        path: Array<number> // 强化路径
+    }
+}
+```
+
+批量地址的结果
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, path: Array<number> }, // 地址 1
+        { address: string, path: Array<number> }, // 地址 2
+        { address: string, path: Array<number> }, // 地址 3
+    ]
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

@@ -1,0 +1,111 @@
+---
+title: 签名
+description: 使用 OneKey 在 TON 上签署数据
+---
+
+import { Callout } from 'nextra/components'
+
+# 签名
+
+了解如何签署数据用于链下验证。
+
+---
+
+## 签署任意数据
+
+签署数据 cell 用于链下验证：
+
+```typescript
+const result = await provider.send({
+  method: 'signData',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      schema_crc: 0, // 自定义 schema 标识符
+      cell: cellBoc.toString('base64'), // Base64 编码的待签名 cell
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('签名:', result.result.signature) // Base64 签名
+  console.log('时间戳:', result.result.timestamp) // UNIX 时间戳
+}
+```
+
+---
+
+## 签署证明（身份验证）
+
+在连接时请求证明用于身份验证：
+
+```typescript
+const connectEvent = await provider.connect(2, {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    {
+      name: 'ton_proof',
+      payload: 'your-server-generated-challenge' // 用于防重放的 Nonce
+    }
+  ]
+})
+
+if (connectEvent.event === 'connect') {
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  if (proofItem) {
+    // 将证明发送到后端进行验证
+    const proof = proofItem.proof
+    console.log({
+      signature: proof.signature,
+      timestamp: proof.timestamp,
+      domain: proof.domain,
+      payload: proof.payload,
+    })
+  }
+}
+```
+
+---
+
+## 错误处理
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [/* ... */]
+})
+
+if ('error' in result) {
+  switch (result.error.code) {
+    case 300:
+      console.log('用户拒绝了交易')
+      break
+    case 1:
+      console.log('请求错误 - 检查参数')
+      break
+    case 400:
+      console.log('不支持的方法')
+      break
+    default:
+      console.error('错误:', result.error.message)
+  }
+} else {
+  console.log('成功:', result.result)
+}
+```
+
+---
+
+## 错误码
+
+| 错误码 | 描述 |
+|--------|------|
+| 0 | 未知错误 |
+| 1 | 请求错误 |
+| 100 | 未知应用 |
+| 300 | 用户拒绝请求 |
+| 400 | 不支持的方法 |
+

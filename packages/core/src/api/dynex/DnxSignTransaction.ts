@@ -1,19 +1,20 @@
-import type { DnxSignTx, TypedCall } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-
-import type { DnxSignature } from '../../types';
-import { TypedResponseMessage } from '../../device/DeviceCommands';
 import { stripHexPrefix } from '../helpers/hexUtils';
+
+import type { TypedResponseMessage } from '../../device/DeviceCommands';
+import type { DnxSignature } from '../../types';
+import type { DnxSignTx, TypedCall } from '@onekeyfe/hd-transport';
 
 export default class DnxSignTransaction extends BaseMethod<DnxSignTx> {
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     const { payload } = this;
     // init params

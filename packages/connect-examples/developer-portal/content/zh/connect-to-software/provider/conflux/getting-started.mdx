@@ -1,0 +1,154 @@
+---
+title: 快速开始
+description: 使用 OneKey 的 Fluent 兼容 Provider 连接 Conflux
+---
+
+import { Callout } from 'nextra/components'
+
+# 快速开始
+
+了解如何检测、连接和与 Conflux 进行交互。
+
+<Callout type="info">
+OneKey 的 Conflux provider 同时兼容 ConfluxPortal 和 Fluent 钱包接口。
+</Callout>
+
+---
+
+## Provider 检测
+
+```typescript
+// 检测 OneKey Conflux provider
+const provider = window.$onekey?.conflux
+
+if (!provider) {
+  throw new Error('未检测到 OneKey Conflux provider')
+}
+
+// 检查兼容性标志
+console.log('isConfluxPortal:', provider.isConfluxPortal) // true
+console.log('isFluent:', provider.isFluent) // true
+console.log('isOneKey:', provider.isOneKey) // true
+```
+
+---
+
+## 请求账户
+
+```typescript
+const accounts = await provider.request({
+  method: 'cfx_requestAccounts'
+})
+
+console.log('已连接:', accounts[0])
+```
+
+---
+
+## 检查连接
+
+```typescript
+if (provider.isConnected()) {
+  const accounts = await provider.request({ method: 'cfx_accounts' })
+  console.log('账户:', accounts)
+}
+```
+
+---
+
+## 获取链 ID
+
+```typescript
+const chainId = await provider.request({ method: 'cfx_chainId' })
+console.log('链 ID:', chainId) // 例如 '0x405' 表示主网
+```
+
+---
+
+## 获取网络版本
+
+```typescript
+const networkId = await provider.request({ method: 'net_version' })
+console.log('网络 ID:', networkId) // 例如 '1029' 表示主网
+```
+
+---
+
+## 获取余额
+
+```typescript
+const balance = await provider.request({
+  method: 'cfx_getBalance',
+  params: [address, 'latest_state']
+})
+
+console.log('余额:', balance) // 以 Drip 为单位 (1 CFX = 10^18 Drip)
+```
+
+---
+
+## 事件处理
+
+### 监听账户变更
+
+```typescript
+provider.on('accountsChanged', (accounts) => {
+  if (accounts.length === 0) {
+    console.log('已断开连接')
+  } else {
+    console.log('账户已变更:', accounts[0])
+  }
+})
+```
+
+### 监听链变更
+
+```typescript
+provider.on('chainChanged', (chainId) => {
+  console.log('链已变更:', chainId)
+  // 建议重新加载页面
+  window.location.reload()
+})
+```
+
+### 监听连接
+
+```typescript
+provider.on('connect', ({ chainId, networkId }) => {
+  console.log('已连接到:', chainId, networkId)
+})
+
+provider.on('disconnect', () => {
+  console.log('已断开连接')
+})
+```
+
+---
+
+## 地址格式
+
+Conflux 使用 base32 地址 (CIP-37)：
+
+```typescript
+// 主网: cfx:...
+// 测试网: cfxtest:...
+
+// 主网地址示例
+const address = 'cfx:aak2rra2njvd77ezwjvx04kkds9fzagfe6ku8scz91'
+
+// 使用 js-conflux-sdk 在格式之间转换
+import { format } from 'js-conflux-sdk'
+
+const hexAddress = format.hexAddress(address)
+const base32Address = format.address(hexAddress, 1029) // networkId
+```
+
+---
+
+## 网络
+
+| 网络 | 链 ID (十六进制) | 网络 ID |
+|------|-----------------|---------|
+| 主网 | `0x405` | 1029 |
+| 测试网 | `0x1` | 1 |
+

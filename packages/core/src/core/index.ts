@@ -1,58 +1,87 @@
 import semver from 'semver';
 import EventEmitter from 'events';
-import { Features, LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
+import { TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
 import {
+  ERRORS,
+  ERROR_CODES_REQUIRE_RELEASE,
+  HardwareError,
+  HardwareErrorCode,
+  createDefectiveFirmwareError,
   createDeferred,
   createDeprecatedHardwareError,
+  createDeviceNotSupportMethodError,
   createNeedUpgradeFirmwareHardwareError,
   createNewFirmwareForceUpdateHardwareError,
   createNewFirmwareUnReleaseHardwareError,
-  Deferred,
-  ERRORS,
-  HardwareError,
-  HardwareErrorCode,
 } from '@onekeyfe/hd-shared';
+
+import { LoggerNames, enableLog, getLogger, setLoggerPostMessage, wait } from '../utils';
 import {
-  getDeviceFirmwareVersion,
-  enableLog,
-  getLogger,
-  LoggerNames,
-  setLoggerPostMessage,
-  wait,
-  getMethodVersionRange,
-} from '../utils';
-import { supportNewPassphrase } from '../utils/deviceFeaturesUtils';
-import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
+  findDefectiveBatchDevice,
+  getDefectiveDeviceInfo,
+} from '../utils/findDefectiveBatchDevice';
+import {
+  cleanupSdkInstance,
+  completeRequestContext,
+  createRequestContext,
+  createSdkTracingContext,
+  formatRequestContext,
+  getActiveRequestsByDeviceInstance,
+  updateRequestContext,
+} from '../utils/tracing';
+import { Device } from '../device/Device';
+import { checkLiveDeviceId } from '../device/deviceIdentity';
 import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
+import { PollingStateManager } from './PollingStateManager';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
-
 import { UI_REQUEST as UI_REQUEST_CONST } from '../constants/ui-request';
 import {
   CORE_EVENT,
-  CoreMessage,
+  DEVICE,
+  IFRAME,
+  UI_REQUEST,
+  UI_RESPONSE,
   createDeviceMessage,
   createResponseMessage,
   createUiMessage,
-  DEVICE,
-  IFRAME,
-  IFrameCallMessage,
-  UI_REQUEST,
-  UI_RESPONSE,
-  UiPromise,
-  UiPromiseResponse,
+  formatLogMethodLabel,
+  getLogBlockLabel,
+  getSafeLogPayload,
 } from '../events';
-import type { BaseMethod } from '../api/BaseMethod';
-import type { ConnectSettings, KnownDevice } from '../types';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
+import { registerHardwareUiEventListeners } from './deviceEventRegistration';
 import { getSynchronize } from '../utils/getSynchronize';
+import { runMethodWithUnlockRetry } from '../protocols/protocol-v2/unlockRetry';
+import {
+  ProtocolV2UiInteractionCoordinator,
+  isProtocolV2UiEnabled,
+} from '../protocols/protocol-v2/uiInteraction';
+
+import type { ConnectSettings, Features, KnownDevice } from '../types';
+import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } from '../events';
+import type { DeviceEvents, InitOptions, RunOptions } from '../device/Device';
+import type { SdkTracingContext } from '../utils/tracing';
+import type { Deferred } from '@onekeyfe/hd-shared';
+import type {
+  LowlevelTransportSharedPlugin,
+  OneKeyDeviceInfo,
+  TransportDeviceDisconnectEvent,
+} from '@onekeyfe/hd-transport';
+import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
+const PRE_INITIALIZE_TTL_MS = 60 * 1000;
 
-type CoreContext = ReturnType<Core['getCoreContext']>;
+// Dedup/coalesce state for "pre-warm signal" methods (isPreWarmSignal),
+// keyed by getPreWarmKey(): coalesce in-flight, skip if warmed within TTL.
+const preWarmInflight = new Map<string, Promise<any>>();
+const preWarmDoneAt = new Map<string, number>();
+
+export type CoreContext = ReturnType<Core['getCoreContext']>;
 
 function hasDeriveCardano(method: BaseMethod): boolean {
   if (
@@ -70,24 +99,49 @@ function hasDeriveCardano(method: BaseMethod): boolean {
 
 const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   initSession: method?.payload.initSession,
-  passphraseState: method?.payload.passphraseState,
+  passphraseState: method?.payload.useEmptyPassphrase ? undefined : method?.payload.passphraseState,
   deviceId: method?.payload.deviceId,
   deriveCardano: method && hasDeriveCardano(method),
+  connectProtocol: method?.payload.connectProtocol,
+  protocolV2DeviceInfoTimeoutMs: method?.payload.protocolV2DeviceInfoTimeoutMs,
 });
 
-let _core: Core;
+let _core: Core | undefined;
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
 let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
 
 const deviceCacheMap = new Map<string, Device>();
-let pollingId = 1;
-const pollingState: Record<number, boolean> = {};
+const pollingManager = new PollingStateManager();
 
 let preConnectCache: {
   passphraseState: string | undefined;
 } = {
   passphraseState: undefined,
+};
+
+const toError = (error: unknown): Error | undefined => {
+  if (error instanceof Error) return error;
+  if (error == null) return undefined;
+  if (typeof error === 'string') return new Error(error);
+  try {
+    return new Error(JSON.stringify(error));
+  } catch {
+    return new Error(String(error));
+  }
+};
+
+const updateMethodRequestContext = (method: BaseMethod, updates: any) => {
+  if (method.requestContext) {
+    updateRequestContext(method.requestContext.responseID, updates);
+  }
+};
+
+const completeMethodRequestContext = (method: BaseMethod, error?: unknown) => {
+  if (!method.requestContext) {
+    return;
+  }
+  completeRequestContext(method.requestContext.responseID, toError(error));
 };
 
 export const callAPI = async (context: CoreContext, message: CoreMessage) => {
@@ -96,23 +150,37 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   }
 
   // find api method
-  let method: BaseMethod;
+  let method!: BaseMethod;
   try {
     method = findMethod(message as IFrameCallMessage);
     method.connector = _connector;
     method.postMessage = postMessage;
+    method.setContext?.(context);
+
+    method.requestContext = createRequestContext(method.responseID, method.name, {
+      sdkInstanceId: context.sdkInstanceId,
+      connectId: method.connectId,
+    });
+
+    Log.debug(`[${context.sdkInstanceId}] callAPI: ${formatRequestContext(method.requestContext)}`);
+
     method.init();
   } catch (error) {
-    return Promise.reject(error);
+    if (method) {
+      completeMethodRequestContext(method, error);
+      method.dispose();
+    }
+    return createResponseMessage(method?.responseID ?? message.id, false, { error });
   }
 
-  DevicePool.emitter.on(DEVICE.CONNECT, onDeviceConnectHandler);
-
   if (!method.useDevice) {
+    updateMethodRequestContext(method, { status: 'running' });
     try {
       const response = await method.run();
+      completeMethodRequestContext(method);
       return createResponseMessage(method.responseID, true, response);
     } catch (error) {
+      completeMethodRequestContext(method, error);
       return createResponseMessage(method.responseID, false, { error });
     }
   }
@@ -148,14 +216,89 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
     return createResponseMessage(method.responseID, false, { error });
   }
 
+  // only the pre-warm signal (PreInitialize) forks here; normal methods fall
+  // through to onCallDevice below, so the pre-warm dedup/guards never touch them
+  if (method.isPreWarmSignal) {
+    return handlePreWarmSignal(context, message, method);
+  }
+
   return onCallDevice(context, message, method);
 };
 
-const waitForPendingPromise = async (getPrePendingCallPromise: () => Promise<void> | undefined) => {
+// Wrapper for "pre-warm signal" methods: coalesce in-flight same-key pre-warm,
+// skip if warmed within TTL, else run + track. The "hang up so the next real
+// call waits" part lives in onCallDevice (setPrePendingCallPromise).
+const handlePreWarmSignal = async (
+  context: CoreContext,
+  message: CoreMessage,
+  method: BaseMethod
+): Promise<any> => {
+  const createAckResponse = () => {
+    completeMethodRequestContext(method);
+    method.dispose();
+    return createResponseMessage(method.responseID, true, true);
+  };
+
+  // no connectId: can't target a device safely, skip pre-warm (ack only)
+  if (!method.connectId) {
+    return createAckResponse();
+  }
+
+  const key = method.getPreWarmKey();
+
+  const inflight = preWarmInflight.get(key);
+  if (inflight) {
+    // reply with THIS call's responseID (not the other call's response object)
+    try {
+      await inflight;
+    } catch {
+      // pre-warm is best-effort; ignore its failure for the coalesced caller
+    }
+    return createAckResponse();
+  }
+
+  const doneAt = preWarmDoneAt.get(key);
+  if (typeof doneAt === 'number' && Date.now() - doneAt <= method.preWarmTtl) {
+    return createAckResponse();
+  }
+
+  const run = onCallDevice(context, message, method);
+  preWarmInflight.set(key, run);
+  try {
+    const result = await run;
+    // Only remember the warm if it actually succeeded — a failed pre-warm must
+    // not suppress the next pre-warm within the TTL.
+    if (result?.success === true && result?.payload === true) {
+      preWarmDoneAt.set(key, Date.now());
+    }
+    return result;
+  } finally {
+    if (preWarmInflight.get(key) === run) {
+      preWarmInflight.delete(key);
+    }
+  }
+};
+
+const waitWithTimeout = async (promise: Promise<any>, timeout: number) => {
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Request timeout')), timeout);
+  });
+  return Promise.race([promise, timeoutPromise]);
+};
+
+const waitForPendingPromise = async (
+  getPrePendingCallPromise: () => Promise<void> | undefined,
+  removePrePendingCallPromise?: (promise: Promise<void> | undefined) => void
+) => {
   const pendingPromise = getPrePendingCallPromise();
   if (pendingPromise) {
     Log.debug('pre pending call promise before call method, wait for it');
-    await pendingPromise;
+    try {
+      await waitWithTimeout(pendingPromise, 5 * 1000);
+    } catch (error) {
+      // ignore timeout error
+    }
+    removePrePendingCallPromise?.(pendingPromise);
     Log.debug('pre pending call promise before call method done');
   }
 };
@@ -167,9 +310,19 @@ const onCallDevice = async (
 ): Promise<any> => {
   let messageResponse: any;
 
-  const { requestQueue, getPrePendingCallPromise } = context;
+  const { requestQueue, getPrePendingCallPromise, setPrePendingCallPromise } = context;
 
-  const connectStateChange = preConnectCache.passphraseState !== method.payload.passphraseState;
+  updateMethodRequestContext(method, { status: 'running' });
+
+  // Normalize undefined / null / '' to '' — they all mean "main wallet, no
+  // passphrase". Without this, the first call (preConnectCache starts undefined)
+  // or any '' call after a non-'' one is wrongly treated as a passphrase switch
+  // and needlessly clears the device cache -> forces a re-enumeration Initialize.
+  // A real switch ('' <-> 'stateX', or 'stateX' <-> 'stateY') still differs.
+  const normalizePassphraseState = (s?: string | null) => s || '';
+  const connectStateChange =
+    normalizePassphraseState(preConnectCache.passphraseState) !==
+    normalizePassphraseState(method.payload.passphraseState);
 
   preConnectCache = {
     passphraseState: method.payload.passphraseState,
@@ -180,23 +333,43 @@ const onCallDevice = async (
     DevicePool.clearDeviceCache(method.payload.connectId);
   }
 
-  await waitForPendingPromise(getPrePendingCallPromise);
+  // wait for previous callback tasks to complete (ensure device does not call concurrently)
+  if (method.connectId) {
+    await context.waitForCallbackTasks(method.connectId);
+  }
+
+  await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
   const task = requestQueue.createTask(method);
+
+  // Pre-warm holds the device as a per-connectId callback task so a concurrent
+  // real call waits (before ensureConnected) instead of racing its Initialize.
+  // Only covers pre-warm -> real-call ordering; the reverse is fail-closed.
+  let preWarmCallbackTask: Deferred<void> | undefined;
+  if (method.isPreWarmSignal && method.connectId) {
+    preWarmCallbackTask = createDeferred<void>();
+    context.registerCallbackTask(method.connectId, preWarmCallbackTask);
+  }
 
   let device: Device;
   try {
     /**
      * Polling to ensure successful connection
      */
-    if (pollingState[pollingId]) {
-      pollingState[pollingId] = false;
-    }
-    pollingId += 1;
-
-    device = await ensureConnected(context, method, pollingId, task.abortController?.signal);
+    const connectId = method.connectId ?? '';
+    const pollingId = pollingManager.start(connectId);
+    device = await ensureConnected(
+      context,
+      method,
+      connectId,
+      pollingId,
+      task.abortController?.signal
+    );
   } catch (e) {
-    console.log('ensureConnected error: ', e);
+    preWarmCallbackTask?.resolve();
+    Log.debug('ensureConnected error: ', e);
+
+    completeMethodRequestContext(method, e);
 
     if (e.name === 'AbortError' || e.message === 'Request aborted') {
       requestQueue.releaseTask(method.responseID);
@@ -208,69 +381,158 @@ const onCallDevice = async (
     return createResponseMessage(method.responseID, false, { error: e });
   }
 
+  if (method.payload?.onlyConnectBleDevice) {
+    preWarmCallbackTask?.resolve();
+    Log.debug('Call API - only connect ble device: ', device?.mainId);
+    return createResponseMessage(method.responseID, true, null);
+  }
+
   Log.debug('Call API - setDevice: ', device.mainId);
   method.setDevice?.(device);
+  method.context = context;
 
-  device.on(DEVICE.PIN, onDevicePinHandler);
-  device.on(DEVICE.BUTTON, onDeviceButtonHandler);
-  device.on(
-    DEVICE.PASSPHRASE,
-    message.payload.useEmptyPassphrase ? onEmptyPassphraseHandler : onDevicePassphraseHandler
-  );
-  device.on(DEVICE.PASSPHRASE_ON_DEVICE, onEnterPassphraseOnDeviceHandler);
+  updateMethodRequestContext(method, {
+    deviceInstanceId: device.instanceId,
+    commandsInstanceId: device.commands?.instanceId,
+  });
+
+  const activeRequests = getActiveRequestsByDeviceInstance(device.instanceId);
+  if (activeRequests.length > 0) {
+    Log.warn(
+      `[${method.instanceId}] Device ${device.instanceId} has ${activeRequests.length} active requests:`,
+      activeRequests.map(formatRequestContext)
+    );
+  }
+
+  registerHardwareUiEventListeners(device, {
+    pin: onDevicePinHandler,
+    button: onDeviceButtonHandler,
+    passphrase: message.payload.useEmptyPassphrase
+      ? onEmptyPassphraseHandler
+      : onDevicePassphraseHandler,
+    passphraseOnDevice: onEnterPassphraseOnDeviceHandler,
+    attachPinOnDevice: onEnterAttachPinOnDeviceHandler,
+  });
   device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
+  device.on(DEVICE.STATE, onDeviceStateHandler);
   device.on(
     DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
     onSelectDeviceInBootloaderForWebDeviceHandler
   );
 
+  const protocolV2UiCoordinator = new ProtocolV2UiInteractionCoordinator(device, postMessage);
+  device.on(
+    DEVICE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE,
+    onSelectDeviceForSwitchFirmwareWebDeviceHandler
+  );
+
   try {
-    await waitForPendingPromise(getPrePendingCallPromise);
+    // Wait for any pending task except our own (self-wait would deadlock).
+    if (method.connectId) {
+      await context.waitForCallbackTasks(method.connectId, preWarmCallbackTask);
+    }
+
+    await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
     const inner = async (): Promise<void> => {
+      // Protocol is established from an active device response during acquire/initialize.
+      // Reject unsupported methods before any method-specific device command is sent.
+      method.assertProtocolSupported(device.getProtocol(), device.getCurrentFirmwareType());
+
       // check firmware version
-      const versionRange = getMethodVersionRange(
-        device.features,
+      const versionRange = device.getCurrentMethodVersionRange(
         type => method.getVersionRange()[type]
       );
+      const currentFirmwareVersion = device.getCurrentFirmwareVersionString() ?? '0.0.0';
+      const currentBleVersion = device.getCurrentBLEFirmwareVersionString() ?? '0.0.0';
+      const deviceFirmwareType = device.getCurrentFirmwareType();
+      let newVersionStatus: ReturnType<typeof DataManager.getFirmwareStatus> | undefined;
 
-      if (device.features) {
+      // Defective-batch and forced-update gates depend on V1 features/remote config.
+      // Pro2 joins after DataManager supports its profile firmwareStatus.
+      if (device.features && !device.isProtocolV2()) {
         await DataManager.checkAndReloadData();
-        const newVersionStatus = DataManager.getFirmwareStatus(device.features);
+
+        // 检测故障固件设备
+        if (findDefectiveBatchDevice(device.features)) {
+          const defectiveInfo = getDefectiveDeviceInfo(device.features);
+          if (defectiveInfo) {
+            throw createDefectiveFirmwareError(
+              defectiveInfo.serialNo,
+              defectiveInfo.seVersion || 'Unknown',
+              defectiveInfo.deviceType,
+              method.connectId,
+              method.deviceId
+            );
+          }
+        }
+
+        newVersionStatus = DataManager.getFirmwareStatus(device.features, deviceFirmwareType);
         const bleVersionStatus = DataManager.getBLEFirmwareStatus(device.features);
+
         if (
           (newVersionStatus === 'required' || bleVersionStatus === 'required') &&
           method.skipForceUpdateCheck === false
         ) {
-          throw createNewFirmwareForceUpdateHardwareError(method.connectId, method.deviceId);
-        }
+          // Get current version information for error reporting
+          const currentVersions = {
+            firmware: currentFirmwareVersion,
+            ble: currentBleVersion,
+          };
 
-        if (versionRange) {
-          const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
-          if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
-            if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
-              throw createNewFirmwareUnReleaseHardwareError(currentVersion, versionRange.min);
-            }
-
-            return Promise.reject(
-              createNeedUpgradeFirmwareHardwareError(currentVersion, versionRange.min)
-            );
+          // Provide more specific error message based on which version check failed
+          const requiredUpdates: ('firmware' | 'ble')[] = [];
+          if (newVersionStatus === 'required') {
+            requiredUpdates.push('firmware');
           }
-          if (
-            versionRange.max &&
-            semver.valid(versionRange.max) &&
-            semver.gte(currentVersion, versionRange.max)
-          ) {
-            return Promise.reject(createDeprecatedHardwareError(currentVersion, versionRange.max));
+          if (bleVersionStatus === 'required') {
+            requiredUpdates.push('ble');
           }
-        } else if (method.strictCheckDeviceSupport) {
-          throw ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportMethod);
+          throw createNewFirmwareForceUpdateHardwareError(
+            method.connectId,
+            method.deviceId,
+            requiredUpdates,
+            currentVersions
+          );
         }
+      }
+
+      if (versionRange) {
+        if (semver.valid(versionRange.min) && semver.lt(currentFirmwareVersion, versionRange.min)) {
+          if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
+            throw createNewFirmwareUnReleaseHardwareError({
+              currentVersion: currentFirmwareVersion,
+              requireVersion: versionRange.min,
+              methodName: method.name,
+              firmwareType: deviceFirmwareType,
+            });
+          }
+
+          return Promise.reject(
+            createNeedUpgradeFirmwareHardwareError({
+              currentVersion: currentFirmwareVersion,
+              requireVersion: versionRange.min,
+              methodName: method.name,
+              firmwareType: deviceFirmwareType,
+            })
+          );
+        }
+        if (
+          versionRange.max &&
+          semver.valid(versionRange.max) &&
+          semver.gte(currentFirmwareVersion, versionRange.max)
+        ) {
+          return Promise.reject(
+            createDeprecatedHardwareError(currentFirmwareVersion, versionRange.max, method.name)
+          );
+        }
+      } else if (method.strictCheckDeviceSupport) {
+        throw createDeviceNotSupportMethodError(method.name, deviceFirmwareType);
       }
 
       // check call method mode
       const unexpectedMode = device.hasUnexpectedMode(
-        method.notAllowDeviceMode,
+        method.allowDeviceMode,
         method.requireDeviceMode
       );
       if (unexpectedMode) {
@@ -286,7 +548,7 @@ const onCallDevice = async (
       }
 
       if (method.deviceId && method.checkDeviceId) {
-        const isSameDeviceID = device.checkDeviceId(method.deviceId);
+        const isSameDeviceID = await checkLiveDeviceId(device, method.deviceId);
         if (!isSameDeviceID) {
           return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError));
         }
@@ -303,16 +565,16 @@ const onCallDevice = async (
       method.checkDeviceSupportFeature();
 
       // reconfigure messages
-      if (_deviceList) {
+      if (_deviceList && device.features && !device.isProtocolV2()) {
         await TransportManager.reconfigure(device.features);
       }
 
       // Check to see if it is safe to use Passphrase
       checkPassphraseEnableState(method, device.features);
 
-      if (device.hasUsePassphrase() && method.useDevicePassphraseState) {
+      if (shouldCheckPassphraseState(method, device)) {
         // check version
-        const support = supportNewPassphrase(device.features);
+        const support = device.supportNewPassphrase();
         if (!support.support) {
           return Promise.reject(
             ERRORS.TypedError(
@@ -327,7 +589,9 @@ const onCallDevice = async (
 
         // Check Device passphrase State
         const passphraseStateSafety = await device.checkPassphraseStateSafety(
-          method.payload?.passphraseState
+          method.payload?.passphraseState,
+          method.payload?.useEmptyPassphrase,
+          method.payload?.skipPassphraseCheck
         );
 
         // Double check, handles the special case of Touch/Pro
@@ -339,6 +603,9 @@ const onCallDevice = async (
             ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
           );
         }
+
+        // close pin popup window
+        postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
       }
 
       // Automatic check safety_check level for Kovan, Ropsten, Rinkeby, Goerli test networks.
@@ -358,20 +625,36 @@ const onCallDevice = async (
       method.device?.commands?.checkDisposed();
 
       try {
-        const response: object = await method.run();
-        Log.debug('Call API - Inner Method Run: ');
+        const response: object = await runMethodWithUnlockRetry(
+          method,
+          device,
+          protocolV2UiCoordinator
+        );
         messageResponse = createResponseMessage(method.responseID, true, response);
         requestQueue.resolveRequest(method.responseID, messageResponse);
+        completeMethodRequestContext(method);
       } catch (error) {
-        Log.debug('Call API - Inner Method Run Error: ', error);
+        Log.debug(`Call API - Inner Method Run Error`, error);
         messageResponse = createResponseMessage(method.responseID, false, { error });
         requestQueue.resolveRequest(method.responseID, messageResponse);
+        completeMethodRequestContext(method, error);
+
+        // Re-throw errors that need to trigger device release/disconnect in Device._runInner
+        if (
+          error instanceof HardwareError &&
+          ERROR_CODES_REQUIRE_RELEASE.includes(error.errorCode as any)
+        ) {
+          throw error;
+        }
+      } finally {
+        protocolV2UiCoordinator.close();
       }
     };
     Log.debug('Call API - Device Run: ', device.mainId);
 
     const runOptions: RunOptions = {
       keepSession: method.payload.keepSession,
+      skipInitialize: canSkipInitialize(method, device),
       ...parseInitOptions(method),
     };
     const deviceRun = () => device.run(inner, runOptions);
@@ -381,6 +664,7 @@ const onCallDevice = async (
       return await task.callPromise.promise;
     } catch (e) {
       Log.debug('Device Run Error: ', e);
+      completeMethodRequestContext(method, e);
       return createResponseMessage(method.responseID, false, { error: e });
     }
   } catch (error) {
@@ -390,7 +674,11 @@ const onCallDevice = async (
       ERRORS.TypedError(HardwareErrorCode.CallMethodError, error.message)
     );
     Log.debug('Call API - Run Error: ', error);
+    completeMethodRequestContext(method, error);
   } finally {
+    // Release the pre-warm callback task so the next real call can proceed.
+    preWarmCallbackTask?.resolve();
+
     const response = messageResponse;
 
     if (response) {
@@ -413,11 +701,27 @@ const onCallDevice = async (
 
     requestQueue.releaseTask(method.responseID);
 
-    closePopup();
+    if (isProtocolV2UiEnabled(method)) {
+      closePopup();
+    }
 
     cleanup();
 
-    removeDeviceListener(device);
+    if (device) {
+      const stillActive = getActiveRequestsByDeviceInstance(device.instanceId);
+      if (stillActive.length > 1) {
+        Log.warn(
+          `[${method.instanceId}] Removing listeners while ${stillActive.length} requests are active!`,
+          {
+            deviceInstanceId: device.instanceId,
+            activeRequests: stillActive.map(formatRequestContext),
+            pinListeners: device.listenerCount(DEVICE.PIN),
+          }
+        );
+      } else {
+        removeDeviceListener(device);
+      }
+    }
   }
 };
 
@@ -445,17 +749,27 @@ function initDevice(method: BaseMethod) {
   let device: Device | typeof undefined;
   const allDevices = _deviceList.allDevices();
 
-  if (method.payload?.detectBootloaderDevice && allDevices.some(d => d.features?.bootloader_mode)) {
+  if (method.payload?.detectBootloaderDevice && allDevices.some(d => d.isBootloader())) {
     throw ERRORS.TypedError(HardwareErrorCode.DeviceDetectInBootloaderMode);
   }
 
   if (method.connectId) {
     device = _deviceList.getDevice(method.connectId);
+    if (!device && method.name === 'firmwareUpdateV4' && allDevices.length === 1) {
+      const [singleDevice] = allDevices;
+      if (singleDevice.isBootloader()) {
+        Log.debug(
+          'firmwareUpdateV4 uses the only bootloader device when connectId changed after reboot'
+        );
+        device = singleDevice;
+      }
+    }
   } else if (allDevices.length === 1) {
     [device] = allDevices;
   } else if (allDevices.length > 1) {
     throw ERRORS.TypedError(
       [
+        'firmwareUpdateV4',
         'firmwareUpdateV3',
         'firmwareUpdateV2',
         'checkFirmwareRelease',
@@ -469,10 +783,8 @@ function initDevice(method: BaseMethod) {
 
   if (!device) {
     const env = DataManager.getSettings('env');
-    if (DataManager.isWebUsbConnect(env)) {
-      if (!method.payload.skipWebDevicePrompt) {
-        postMessage(createUiMessage(UI_REQUEST.WEB_DEVICE_PROMPT_ACCESS_PERMISSION));
-      }
+    // Browser WebUSB needs permission prompt, desktop WebUSB doesn't
+    if (DataManager.isBrowserWebUsb(env)) {
       throw ERRORS.TypedError(HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission);
     }
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
@@ -497,7 +809,10 @@ function initDeviceForBle(method: BaseMethod) {
   if (deviceCacheMap.has(method.connectId)) {
     device = deviceCacheMap.get(method.connectId) as Device;
   } else {
-    device = Device.fromDescriptor({ id: method.connectId } as OneKeyDeviceInfo);
+    device = Device.fromDescriptor(
+      { id: method.connectId } as OneKeyDeviceInfo,
+      method.sdkInstanceId
+    );
     deviceCacheMap.set(method.connectId, device);
   }
   device.deviceConnector = _connector;
@@ -505,20 +820,84 @@ function initDeviceForBle(method: BaseMethod) {
 }
 
 /**
- * If the Bluetooth connection times out, retry 6 times
+ * Check if we can skip initialize for this method
  */
-let bleTimeoutRetry = 0;
+function canSkipInitialize(method: BaseMethod, device: Device): boolean {
+  const reasons: string[] = [];
+  // only sign-style methods opt in; getAddress/getPublicKey never do
+  if (!method.allowUsePreInitialize) reasons.push('method.disallow');
+  // caller must opt in per call
+  if (!method.payload?.usePreInitialize) reasons.push('payload.usePreInitialize=false');
+  // no connectId: can't pin the target device, never skip
+  if (!method.connectId) reasons.push('connectId.missing');
+  // passphrase state must match the pre-initialize
+  if (!device.isPreInitializeMetaMatch(method.payload)) reasons.push('meta.mismatch');
+  // device must have been initialized before.
+  if (device.isUnacquired()) reasons.push('deviceInfo.missing');
+  // within pre-initialize TTL
+  if (!device.isPreInitializedValid(PRE_INITIALIZE_TTL_MS)) reasons.push('ttl.expired');
 
-async function connectDeviceForBle(method: BaseMethod, device: Device) {
+  if (reasons.length) {
+    Log.debug(`[PRE-INIT][MISS] method=${method.name} ${reasons.join(',')}`);
+    return false;
+  }
+
+  const savedMs = device.getLastInitializeDuration();
+  const saved = typeof savedMs === 'number' ? `saved ${savedMs}ms` : 'within TTL + meta match';
+  Log.debug(`[PRE-INIT][HIT] method=${method.name} skip Initialize (${saved})`);
+
+  return true;
+}
+
+function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return (
+    method.payload.connectProtocol === 'V2' &&
+    message.includes('Device protocol mismatch') &&
+    message.includes('expected V2') &&
+    message.includes('did not respond to expected protocol')
+  );
+}
+
+/**
+ * If the Bluetooth connection times out, retry up to 6 times
+ * @param retryCount - Current retry count (default 0)
+ */
+async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
   try {
-    await device.acquire();
-    await device.initialize(parseInitOptions(method));
+    const shouldAcquire =
+      !device.hasDeviceAcquire() || !device.commands || device.commands.disposed;
+    if (shouldAcquire) {
+      await device.acquire(method.payload.connectProtocol);
+    }
+    if (method.payload?.onlyConnectBleDevice) {
+      if (shouldAcquire) {
+        DevicePool.emitter.emit(DEVICE.CONNECT, device);
+      }
+      return;
+    }
+    // Skip initialize if conditions are met
+    if (!canSkipInitialize(method, device)) {
+      const initOptions = parseInitOptions(method);
+      await device.initialize(initOptions);
+      device.markPreInitialized({
+        passphraseState: initOptions.passphraseState,
+      });
+    }
+    if (shouldAcquire) {
+      DevicePool.emitter.emit(DEVICE.CONNECT, device);
+    }
   } catch (err) {
-    if (err.errorCode === HardwareErrorCode.BleTimeoutError && bleTimeoutRetry <= 5) {
-      bleTimeoutRetry += 1;
-      Log.debug(`Bletooth connect timeout and will retry, retry count: ${bleTimeoutRetry}`);
+    if (
+      (err.errorCode === HardwareErrorCode.BleTimeoutError ||
+        err.errorCode === HardwareErrorCode.BleConnectedError ||
+        isRetryableBleProtocolV2ProbeError(method, err)) &&
+      retryCount < 6
+    ) {
+      const nextRetry = retryCount + 1;
+      Log.debug(`Bluetooth connect timeout and will retry, retry count: ${nextRetry}`);
       await wait(3000);
-      await connectDeviceForBle(method, device);
+      await connectDeviceForBle(method, device, nextRetry);
     } else {
       throw err;
     }
@@ -530,6 +909,7 @@ type IPollFn<T> = (time?: number) => T;
 const ensureConnected = async (
   _context: CoreContext,
   method: BaseMethod,
+  connectId: string,
   pollingId: number,
   abortSignal?: AbortSignal
 ) => {
@@ -539,7 +919,6 @@ const ensureConnected = async (
   const POLL_INTERVAL_TIME = (method.payload && method.payload.pollIntervalTime) || 1000;
   const TIME_OUT = (method.payload && method.payload.timeout) || 10000;
   let timer: ReturnType<typeof setTimeout> | null = null;
-
   Log.debug(
     `EnsureConnected function start, MAX_RETRY_COUNT=${MAX_RETRY_COUNT}, POLL_INTERVAL_TIME=${POLL_INTERVAL_TIME}  `
   );
@@ -552,7 +931,7 @@ const ensureConnected = async (
           if (timer) {
             clearTimeout(timer);
           }
-          reject(ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
+          reject(ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled));
           return true;
         }
         return false;
@@ -562,7 +941,7 @@ const ensureConnected = async (
         return;
       }
 
-      if (!pollingState[pollingId]) {
+      if (!pollingManager.isActive(connectId, pollingId)) {
         Log.debug('EnsureConnected function stop, polling id: ', pollingId);
         reject(ERRORS.TypedError(HardwareErrorCode.PollingStop));
         return;
@@ -583,9 +962,11 @@ const ensureConnected = async (
       } catch (error) {
         Log.debug('device list error: ', error);
         if (
-          [HardwareErrorCode.BridgeNotInstalled, HardwareErrorCode.BridgeTimeoutError].includes(
-            error.errorCode
-          )
+          [
+            HardwareErrorCode.BridgeNotInstalled,
+            HardwareErrorCode.BridgeTimeoutError,
+            HardwareErrorCode.BridgeNeedsPermission,
+          ].includes(error.errorCode)
         ) {
           _deviceList = undefined;
           reject(error);
@@ -618,8 +999,6 @@ const ensureConnected = async (
            * Bluetooth should call initialize here
            */
           if (DataManager.isBleConnect(env)) {
-            bleTimeoutRetry = 0;
-
             if (abort()) {
               return;
             }
@@ -635,6 +1014,8 @@ const ensureConnected = async (
         }
         if (
           [
+            HardwareErrorCode.BlePoweredOff,
+            HardwareErrorCode.BleUnsupported,
             HardwareErrorCode.BlePermissionError,
             HardwareErrorCode.BleLocationError,
             HardwareErrorCode.BleLocationServicesDisabled,
@@ -646,9 +1027,10 @@ const ensureConnected = async (
             HardwareErrorCode.BleWriteCharacteristicError,
             HardwareErrorCode.BleAlreadyConnected,
             HardwareErrorCode.FirmwareUpdateLimitOneDevice,
+            HardwareErrorCode.SelectDevice,
             HardwareErrorCode.DeviceDetectInBootloaderMode,
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
-            HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission,
+            HardwareErrorCode.BridgeNeedsPermission,
           ].includes(error.errorCode)
         ) {
           reject(error);
@@ -661,7 +1043,14 @@ const ensureConnected = async (
           clearTimeout(timer);
         }
         Log.debug('EnsureConnected get to max try count, will return: ', tryCount);
-        reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
+        // Browser WebUSB needs permission prompt, desktop WebUSB doesn't
+        // skipWebDevicePrompt can override this behavior for special cases
+        if (DataManager.isBrowserWebUsb(env) && !method.payload?.skipWebDevicePrompt) {
+          postMessage(createUiMessage(UI_REQUEST.WEB_DEVICE_PROMPT_ACCESS_PERMISSION));
+          reject(ERRORS.TypedError(HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission));
+        } else {
+          reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
+        }
         return;
       }
 
@@ -672,7 +1061,7 @@ const ensureConnected = async (
       // eslint-disable-next-line no-promise-executor-return
       return setTimeout(() => resolve(poll(time * 1.5)), time);
     });
-  pollingState[pollingId] = true;
+  // pollingManager.start(connectId) already registered this pollingId as active
   return poll();
 };
 
@@ -688,6 +1077,10 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       // }
       // setPrePendingCallPromise(device?.interruptionFromUser());
       // requestQueue.abortRequestsByConnectId(connectId);
+
+      // cancel callback tasks
+      requestQueue.cancelCallbackTasks(connectId);
+
       const requestIds = requestQueue.getRequestTasksId();
       Log.debug(
         `Cancel Api connect requestQueues: length:${requestIds.length} requestIds:${requestIds.join(
@@ -706,7 +1099,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
           }
           requestQueue.rejectRequest(
             requestId,
-            ERRORS.TypedError(HardwareErrorCode.ActionCancelled)
+            ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)
           );
         }
       }
@@ -731,7 +1124,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
 
           requestQueue.rejectRequest(
             requestId,
-            ERRORS.TypedError(HardwareErrorCode.ActionCancelled)
+            ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)
           );
         }
       }
@@ -744,7 +1137,10 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       });
 
       requestQueue.getRequestTasksId().forEach(requestId => {
-        requestQueue.rejectRequest(requestId, ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
+        requestQueue.rejectRequest(
+          requestId,
+          ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)
+        );
       });
     }
   }
@@ -756,19 +1152,32 @@ export const cancel = (context: CoreContext, connectId?: string) => {
 const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => {
   if (!method.useDevicePassphraseState) return;
 
-  if (
-    features?.passphrase_protection === true &&
-    (method.payload.passphraseState == null || method.payload.passphraseState === '') &&
-    !method.payload.useEmptyPassphrase
-  ) {
-    DevicePool.clearDeviceCache(method.payload.connectId);
-    throw ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase);
+  const passphraseProtection = method.device
+    ? method.device.getCurrentPassphraseProtection()
+    : features?.passphraseProtection;
+
+  if (passphraseProtection === true) {
+    const hasNoPassphraseState =
+      method.payload.passphraseState == null || method.payload.passphraseState === '';
+    const shouldRequirePassphrase =
+      !method.payload.useEmptyPassphrase && !method.payload.skipPassphraseCheck;
+
+    if (hasNoPassphraseState && shouldRequirePassphrase) {
+      DevicePool.clearDeviceCache(method.payload.connectId);
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase);
+    }
   }
 
-  if (features?.passphrase_protection === false && method.payload.passphraseState) {
+  if (passphraseProtection === false && method.payload.passphraseState) {
     DevicePool.clearDeviceCache(method.payload.connectId);
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
   }
+};
+
+const shouldCheckPassphraseState = (method: BaseMethod, device: Device) => {
+  if (!method.useDevicePassphraseState) return false;
+
+  return device.hasUsePassphrase();
 };
 
 const cleanup = () => {
@@ -778,8 +1187,6 @@ const cleanup = () => {
 
 const removeDeviceListener = (device: Device) => {
   device.removeAllListeners();
-  DevicePool.emitter.removeAllListeners(DEVICE.CONNECT);
-  // DevicePool.emitter.removeListener(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
 };
 
 /**
@@ -790,15 +1197,30 @@ const closePopup = () => {
 };
 
 const onDeviceConnectHandler = (device: Device) => {
-  const env = DataManager.getSettings('env');
-  const deviceObject = DataManager.isBleConnect(env) ? device : device.toMessageObject();
-  postMessage(createDeviceMessage(DEVICE.CONNECT, { device: deviceObject as KnownDevice }));
+  const deviceObject = device.toMessageObject();
+  if (!deviceObject) return;
+  postMessage(createDeviceMessage(DEVICE.CONNECT, { device: deviceObject }));
 };
 
 const onDeviceDisconnectHandler = (device: Device) => {
-  const env = DataManager.getSettings('env');
-  const deviceObject = DataManager.isBleConnect(env) ? device : device.toMessageObject();
-  postMessage(createDeviceMessage(DEVICE.DISCONNECT, { device: deviceObject as KnownDevice }));
+  device.clearPreInitialized();
+  const deviceObject = device.toMessageObject();
+  if (!deviceObject) return;
+  postMessage(createDeviceMessage(DEVICE.DISCONNECT, { device: deviceObject }));
+};
+
+const onTransportDeviceDisconnectHandler = (event: TransportDeviceDisconnectEvent) => {
+  const device =
+    deviceCacheMap.get(event.connectId) ??
+    DevicePool.devicesCache[event.connectId] ??
+    DevicePool.getDeviceByPath(event.connectId);
+  if (!device) {
+    Log.debug('Ignoring transport disconnect for an unknown device:', event.connectId);
+    return;
+  }
+
+  device.markTransportDisconnected();
+  DevicePool.emitter.emit(DEVICE.DISCONNECT, device);
 };
 
 const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin']) => {
@@ -818,15 +1240,15 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
   callback(null, uiResp.payload);
 };
 
-const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
+export const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
   postMessage(createDeviceMessage(DEVICE.BUTTON, { ...request, device: device.toMessageObject() }));
 
-  if (request.code === 'ButtonRequest_PinEntry') {
-    Log.log('request Confirm Input PIN');
+  if (request.code === 'ButtonRequest_PinEntry' || request.code === 'ButtonRequest_AttachPin') {
+    Log.log('request Confirm Input PIN or Attach PIN');
     postMessage(
       createUiMessage(UI_REQUEST.REQUEST_PIN, {
         device: device.toMessageObject() as KnownDevice,
-        type: 'ButtonRequest_PinEntry',
+        type: request.code,
       })
     );
   } else {
@@ -839,39 +1261,66 @@ const onDeviceFeaturesHandler = (...[_, features]: [...DeviceEvents['features']]
   postMessage(createDeviceMessage(DEVICE.FEATURES, { ...features }));
 };
 
-const onDevicePassphraseHandler = async (...[device, callback]: DeviceEvents['passphrase']) => {
+const onDeviceStateHandler = (...[_, stateEvent]: [...DeviceEvents['state']]) => {
+  postMessage(createDeviceMessage(DEVICE.STATE, stateEvent));
+};
+
+const onDevicePassphraseHandler = async (
+  ...[device, requestPayload, callback]: DeviceEvents['passphrase']
+) => {
   Log.debug('onDevicePassphraseHandler');
   const uiPromise = createUiPromise(UI_RESPONSE.RECEIVE_PASSPHRASE, device);
   postMessage(
     createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE, {
       device: device.toMessageObject() as KnownDevice,
       passphraseState: device.passphraseState,
+      existsAttachPinUser: requestPayload.existsAttachPinUser,
+      deviceOnly: requestPayload.deviceOnly,
+      source: requestPayload.source,
+      reason: requestPayload.reason,
+      expectedPassphraseState: requestPayload.expectedPassphraseState,
     })
   );
   // wait for passphrase
   const uiResp = await uiPromise.promise;
-  const { value, passphraseOnDevice, save } = uiResp.payload;
+  const { value, passphraseOnDevice, save, attachPinOnDevice } = uiResp.payload;
   // send as PassphrasePromptResponse
   callback({
     passphrase: value.normalize('NFKD'),
     passphraseOnDevice,
+    attachPinOnDevice,
     cache: save,
   });
 };
 
-const onEmptyPassphraseHandler = (...[_, callback]: DeviceEvents['passphrase']) => {
+const onEmptyPassphraseHandler = (...[_, , callback]: DeviceEvents['passphrase']) => {
   Log.debug('onEmptyPassphraseHandler');
   // send as PassphrasePromptResponse
   callback({ passphrase: '' });
 };
 
 const onEnterPassphraseOnDeviceHandler = (
-  ...[device]: [...DeviceEvents['passphrase_on_device']]
+  ...[device, requestPayload]: [...DeviceEvents['passphrase_on_device']]
 ) => {
   postMessage(
     createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE, {
       device: device.toMessageObject() as KnownDevice,
       passphraseState: device.passphraseState,
+      source: requestPayload?.source,
+      reason: requestPayload?.reason,
+    })
+  );
+};
+
+const onEnterAttachPinOnDeviceHandler = (
+  ...[device, requestPayload]: [...DeviceEvents['attach_pin_on_device']]
+) => {
+  postMessage(
+    createUiMessage(UI_REQUEST.REQUEST_PIN, {
+      device: device.toMessageObject() as KnownDevice,
+      type: 'ButtonRequest_AttachPin',
+      source: requestPayload?.source,
+      reason: requestPayload?.reason,
     })
   );
 };
@@ -890,6 +1339,23 @@ const onSelectDeviceInBootloaderForWebDeviceHandler = async (
   callback(null, uiResp.payload.deviceId);
 };
 
+const onSelectDeviceForSwitchFirmwareWebDeviceHandler = async (
+  ...[device, callback]: [...DeviceEvents['select_device_for_switch_firmware_web_device']]
+) => {
+  Log.debug('onSelectDeviceForSwitchFirmwareWebDeviceHandler');
+  const uiPromise = createUiPromise(
+    UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE,
+    device
+  );
+  postMessage(
+    createUiMessage(UI_REQUEST.REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE, {
+      device: device.toMessageObject() as KnownDevice,
+    })
+  );
+  const uiResp = await uiPromise.promise;
+  callback(null, uiResp.payload.deviceId);
+};
+
 /**
  * Emit message to listener (parent).
  * Clear method reference from _callMethods
@@ -898,6 +1364,9 @@ const onSelectDeviceInBootloaderForWebDeviceHandler = async (
  * @memberof Core
  */
 const postMessage = (message: CoreMessage) => {
+  if (!_core) {
+    return;
+  }
   _core.emit(CORE_EVENT, message);
 };
 
@@ -916,21 +1385,43 @@ const removeUiPromise = (promise: Deferred<any>) => {
 };
 
 export default class Core extends EventEmitter {
+  private tracingContext: SdkTracingContext;
+
+  public readonly sdkInstanceId: string;
+
   private requestQueue = new RequestQueue();
 
-  // 上一个请求的 promise 完成，后续需要清理的工作，需要在下一次请求前完成
+  private disposePromise?: Promise<void>;
+
+  // background task
   private prePendingCallPromise: Promise<void> | undefined;
 
   private methodSynchronize = getSynchronize();
 
+  constructor() {
+    super();
+    this.tracingContext = createSdkTracingContext();
+    this.sdkInstanceId = this.tracingContext.sdkInstanceId;
+    Log.debug(`[Core] Created SDK instance: ${this.sdkInstanceId}`);
+  }
+
   private getCoreContext() {
     return {
+      sdkInstanceId: this.sdkInstanceId,
+      tracingContext: this.tracingContext,
       requestQueue: this.requestQueue,
       methodSynchronize: this.methodSynchronize,
       getPrePendingCallPromise: () => this.prePendingCallPromise,
-      setPrePendingCallPromise: (promise: Promise<void>) => {
+      setPrePendingCallPromise: (promise: Promise<void> | undefined) => {
         this.prePendingCallPromise = promise;
       },
+      // callback 任务管理
+      registerCallbackTask: (connectId: string, callbackPromise: Deferred<any>) => {
+        this.requestQueue.registerPendingCallbackTask(connectId, callbackPromise);
+      },
+      waitForCallbackTasks: (connectId: string, exceptTask?: Deferred<void>) =>
+        this.requestQueue.waitForPendingCallbackTasks(connectId, exceptTask),
+      cancelCallbackTasks: (connectId: string) => this.requestQueue.cancelCallbackTasks(connectId),
     };
   }
 
@@ -938,7 +1429,8 @@ export default class Core extends EventEmitter {
     switch (message.type) {
       case UI_RESPONSE.RECEIVE_PIN:
       case UI_RESPONSE.RECEIVE_PASSPHRASE:
-      case UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE: {
+      case UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
+      case UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE: {
         const uiPromise = findUiPromise(message.type);
         if (uiPromise) {
           Log.log('receive UI Response: ', message.type);
@@ -948,6 +1440,8 @@ export default class Core extends EventEmitter {
         break;
       }
 
+      case UI_REQUEST.BLUETOOTH_UNSUPPORTED:
+      case UI_REQUEST.BLUETOOTH_POWERED_OFF:
       case UI_REQUEST.BLUETOOTH_PERMISSION:
       case UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE:
       case UI_REQUEST.LOCATION_PERMISSION:
@@ -957,10 +1451,17 @@ export default class Core extends EventEmitter {
       }
 
       case IFRAME.CALL: {
-        Log.log('call API: ', message);
+        const logBlockLabel = getLogBlockLabel(message);
+        Log.log(
+          formatLogMethodLabel(`[${Date.now()}][CALL_API]`, logBlockLabel),
+          getSafeLogPayload(message, logBlockLabel)
+        );
         const response = await callAPI(this.getCoreContext(), message);
         const { success, payload } = response;
-        Log.log('call API Response: ', response);
+        Log.log(
+          formatLogMethodLabel(`[${Date.now()}][CALL_API_RESPONSE]`, logBlockLabel),
+          getSafeLogPayload(response, logBlockLabel)
+        );
         if (success) {
           return response;
         }
@@ -979,25 +1480,76 @@ export default class Core extends EventEmitter {
         cancel(this.getCoreContext(), message.payload.connectId);
         break;
       }
+      case IFRAME.CALLBACK: {
+        Log.log('callback message: ', message);
+        postMessage(message);
+        break;
+      }
       default:
         break;
     }
     return Promise.resolve(message);
   }
 
-  dispose() {
-    // empty
+  dispose(): Promise<void> {
+    if (!this.disposePromise) {
+      this.disposePromise = this.disposeResources();
+    }
+    return this.disposePromise;
+  }
+
+  private async disposeResources(): Promise<void> {
+    Log.debug(`[Core] Disposing SDK instance: ${this.sdkInstanceId}`);
+    pollingManager.stopAll();
+    this.requestQueue.abortAllRequests();
+    cleanup();
+
+    _connector?.stop();
+    let transportCleanup: Promise<void>;
+    try {
+      transportCleanup = Promise.resolve(TransportManager.getTransport()?.stop?.()).catch(error => {
+        Log.warn('[Core] Transport cleanup failed:', error);
+      });
+    } catch (error) {
+      Log.warn('[Core] Transport cleanup failed:', error);
+      transportCleanup = Promise.resolve();
+    }
+
+    // Preserve synchronous dispose semantics for in-memory state and listeners.
+    _deviceList = undefined;
+    _connector = undefined;
+    DevicePool.dispose();
+    deviceCacheMap.clear();
+    preWarmInflight.clear();
+    preWarmDoneAt.clear();
+    preConnectCache = { passphraseState: undefined };
+    this.prePendingCallPromise = undefined;
+    this.removeAllListeners();
+    cleanupSdkInstance(this.sdkInstanceId);
+    if (_core === this) _core = undefined;
+
+    // Transports, especially Node USB, may release native handles asynchronously.
+    await transportCleanup;
   }
 }
 
 export const initCore = () => {
-  _core = new Core();
-  return _core;
+  const core = new Core();
+  _core = core;
+  return core;
 };
 
 export const initConnector = () => {
   _connector = new DeviceConnector();
+  DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
+  DevicePool.emitter.removeListener(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
+  DevicePool.emitter.removeListener(
+    TRANSPORT_EVENT.DEVICE_DISCONNECT,
+    onTransportDeviceDisconnectHandler
+  );
+  DevicePool.emitter.on(DEVICE.CONNECT, onDeviceConnectHandler);
   DevicePool.emitter.on(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
+  DevicePool.emitter.on(TRANSPORT_EVENT.DEVICE_DISCONNECT, onTransportDeviceDisconnectHandler);
   return _connector;
 };
 

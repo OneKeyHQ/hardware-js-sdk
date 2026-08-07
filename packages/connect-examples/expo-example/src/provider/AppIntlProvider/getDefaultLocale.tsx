@@ -1,6 +1,8 @@
 import { getLocales } from 'expo-localization';
-import { ILocaleSymbol } from '../../../locale';
+
 import { LOCALES as _LOCALES } from '../../../locale/localeJsonMap';
+
+import type { ILocaleSymbol } from '../../../locale';
 
 export function getDefaultLocale(): ILocaleSymbol {
   const locales = getLocales();

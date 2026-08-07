@@ -1,0 +1,72 @@
+---
+title: 签名
+description: 使用 OneKey 在 TRON 上签署消息
+---
+
+import { Callout } from 'nextra/components'
+
+# 签名
+
+了解如何在 TRON 上签署消息。
+
+---
+
+## 签署消息 V1（十六进制）
+
+签署十六进制编码的消息：
+
+```typescript
+const message = tronWeb.toHex('Hello TRON!')
+const signature = await provider.signMessage(message)
+
+console.log('签名:', signature)
+```
+
+---
+
+## 签署消息 V2（UTF-8）
+
+直接签署 UTF-8 消息：
+
+```typescript
+const message = 'Hello TRON!'
+const signature = await provider.signMessageV2(message)
+
+console.log('签名:', signature)
+```
+
+---
+
+## 验证签名
+
+```typescript
+const message = 'Hello TRON!'
+const signature = await provider.signMessageV2(message)
+
+// 使用 TronWeb 验证
+const address = await tronWeb.trx.verifyMessageV2(message, signature)
+console.log('签名者:', address)
+```
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  const result = await provider.request({
+    method: 'tron_requestAccounts'
+  })
+
+  if (result.code !== 200) {
+    throw new Error(result.message)
+  }
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('用户拒绝了请求')
+  } else {
+    console.error('错误:', error.message)
+  }
+}
+```
+

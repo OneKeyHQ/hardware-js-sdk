@@ -1,17 +1,24 @@
-import { ScdoSignTx as HardwareScdoSignTx, TypedCall, ScdoSignedTx } from '@onekeyfe/hd-transport';
 import { bytesToHex } from '@noble/hashes/utils';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { ScdoSignTransactionParams } from '../../types';
-import type { TypedResponseMessage } from '../../device/DeviceCommands';
 import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
+
+import type { DeviceFirmwareRange, ScdoSignTransactionParams } from '../../types';
+import type {
+  ScdoSignTx as HardwareScdoSignTx,
+  ScdoSignedTx,
+  TypedCall,
+} from '@onekeyfe/hd-transport';
+import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
 export default class ScdoSignTransaction extends BaseMethod<HardwareScdoSignTx> {
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [
@@ -44,7 +51,7 @@ export default class ScdoSignTransaction extends BaseMethod<HardwareScdoSignTx> 
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       model_touch: {
         min: '4.10.0',

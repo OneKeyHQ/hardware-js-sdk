@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'confluxGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -39,7 +39,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'confluxSignMessage',
-    description: 'Sign Message',
+
     presupposes: [
       {
         title: 'Sign Message',
@@ -66,7 +66,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'confluxSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Sign Transaction',

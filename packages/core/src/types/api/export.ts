@@ -20,12 +20,23 @@ export type { DeviceResetParams } from './deviceReset';
 export type { DeviceSettingsParams } from './deviceSettings';
 export type { DeviceVerifyParams, DeviceVerifySignature } from './deviceVerify';
 export type { DeviceSupportFeatures } from './deviceSupportFeatures';
-export type { DeviceUploadResourceParams } from './deviceUploadResource';
+export type {
+  DeviceUploadResourceParams,
+  DeviceUploadResourceResponse,
+} from './deviceUploadResource';
 export type {
   FirmwareUpdateParams,
   FirmwareUpdateBinaryParams,
   FirmwareUpdateV3Params,
+  FirmwareUpdateV4Params,
+  FirmwareUpdateV4Target,
 } from './firmwareUpdate';
+export type { AllFirmwareRelease } from './checkAllFirmwareRelease';
+export type {
+  ProtocolV2FirmwareComponentRelease,
+  ProtocolV2FirmwareComponentReleaseStatus,
+  ProtocolV2FirmwareReleaseStatus,
+} from './checkAllFirmwareRelease';
 
 export type { AllNetworkAddressParams, AllNetworkGetAddressParams } from './allNetworkGetAddress';
 
@@ -36,6 +47,9 @@ export type { EVMSignMessageEIP712Params } from './evmSignMessageEIP712';
 export type {
   EVMTransaction,
   EVMTransactionEIP1559,
+  EVMTransactionEIP7702,
+  EVMAuthorization,
+  EVMAuthorizationSignature,
   EVMSignedTx,
   EVMSignTransactionParams,
   EVMAccessList,
@@ -115,6 +129,7 @@ export type { NearSignTransactionParams } from './nearSignTransaction';
 export type { AptosAddress, AptosGetAddressParams } from './aptosGetAddress';
 export type { AptosPublicKey, AptosGetPublicKeyParams } from './aptosGetPublicKey';
 export type { AptosMessageSignature, AptosSignMessageParams } from './aptosSignMessage';
+export type { AptosSignInMessageSignature, AptosSignInMessageParams } from './aptosSignInMessage';
 export type { AptosSignedTx, AptosSignTransactionParams } from './aptosSignTransaction';
 
 export type { AlgoAddress, AlgoGetAddressParams } from './algoGetAddress';
@@ -134,6 +149,10 @@ export type {
   CardanoAddress,
   CardanoGetAddressParams,
 } from './cardanoGetAddress';
+export type {
+  CardanoSignMessageMethodParams,
+  CardanoSignMessageParams,
+} from './cardanoSignMessage';
 export type { CardanoSignTransaction, CardanoSignedTxData } from './cardano';
 
 export type { FilecoinAddress, FilecoinGetAddressParams } from './filecoinGetAddress';
@@ -148,6 +167,8 @@ export type {
   KaspaSignTransactionParams,
   KaspaSignInputParams,
   KaspaSignOutputParams,
+  KaspaStreamingSignInputParams,
+  KaspaStreamingSignOutputParams,
 } from './kaspaSignTransaction';
 
 export type { NexaAddress, NexaGetAddressParams } from './nexaGetAddress';
@@ -167,6 +188,7 @@ export type { DnxTxKey, DnxSignTransactionParams, DnxSignature } from './dnxSign
 export type { TonAddress, TonGetAddressParams } from './tonGetAddress';
 export type { TonSignMessageParams } from './tonSignMessage';
 export type { TonSignProofParams } from './tonSignProof';
+export type { TonSignDataParams } from './tonSignData';
 
 export type { ScdoAddress, ScdoGetAddressParams } from './scdoGetAddress';
 export type { ScdoSignMessageParams } from './scdoSignMessage';

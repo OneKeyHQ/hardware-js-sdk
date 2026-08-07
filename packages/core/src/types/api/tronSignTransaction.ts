@@ -1,4 +1,4 @@
-import { UintType, TronSignedTx, TronResourceCode } from '@onekeyfe/hd-transport';
+import type { TronResourceCode, TronSignedTx, UintType } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type TronTransferContract = {
@@ -29,6 +29,7 @@ export type TronDelegateResourceContract = {
   balance?: number;
   receiverAddress?: string;
   lock?: boolean;
+  lockPeriod?: number;
 };
 
 export type TronUnDelegateResourceContract = {

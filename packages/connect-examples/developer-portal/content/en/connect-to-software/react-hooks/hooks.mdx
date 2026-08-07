@@ -1,0 +1,71 @@
+---
+title: React Hooks
+description: Type-safe React hooks for Ethereum - build your own custom wallet UI
+---
+
+import { Callout } from 'nextra/components'
+
+# React Hooks
+
+Type-safe React hooks for Ethereum. Build your own custom wallet connection UI with full control over the user experience.
+
+<Callout>
+**Best for custom UIs.** Use React Hooks when you want to design your own wallet connection flow.
+</Callout>
+
+---
+
+## Available Libraries
+
+| Library | Description |
+|---------|-------------|
+| [Wagmi](/en/connect-to-software/react-hooks/wagmi) | The most popular React hooks library for Ethereum |
+
+---
+
+## When to Use
+
+Use React Hooks when you:
+- Need full control over the wallet connection UI
+- Want type-safe hooks for Ethereum interactions
+- Are building a React application
+- Don't need a pre-built wallet selection modal
+
+---
+
+## Quick Example
+
+```tsx
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { injected } from 'wagmi/connectors'
+
+function ConnectButton() {
+  const { address, isConnected } = useAccount()
+  const { connect } = useConnect()
+  const { disconnect } = useDisconnect()
+
+  if (isConnected) {
+    return (
+      <div>
+        <p>{address}</p>
+        <button onClick={() => disconnect()}>Disconnect</button>
+      </div>
+    )
+  }
+
+  return (
+    <button onClick={() => connect({ connector: injected() })}>
+      Connect Wallet
+    </button>
+  )
+}
+```
+
+---
+
+## Alternative: With Wallet UI
+
+If you want a pre-built wallet selection modal, consider:
+- [RainbowKit](/en/connect-to-software/wallet-ui/rainbowkit) - Beautiful React wallet modal
+- [Web3Modal](/en/connect-to-software/wallet-ui/web3modal) - WalletConnect's official UI
+

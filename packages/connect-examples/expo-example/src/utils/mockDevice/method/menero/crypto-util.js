@@ -15,6 +15,7 @@ import { Buffer } from 'buffer';
 import { keccak_256 as keccak } from '@noble/hashes/sha3';
 import { randomBytes } from '@noble/hashes/utils';
 import varint from 'varint';
+
 import { A, ec, fffb1, fffb2, fffb3, fffb4, sqrtm1 } from './crypto-util-data.js';
 import {
   decodeInt,

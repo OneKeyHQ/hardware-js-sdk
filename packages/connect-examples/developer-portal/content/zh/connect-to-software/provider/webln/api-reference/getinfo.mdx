@@ -1,0 +1,43 @@
+---
+title: getInfo
+---
+
+# getInfo
+
+获取节点信息以及支持的方法。
+
+### 方法
+
+```typescript
+async function getInfo(): GetInfoResponse
+```
+
+### 响应
+
+```typescript
+interface GetInfoResponse {
+  node: {
+    alias: string;
+    pubkey: string;
+    color?: string;
+  };
+  // "request.*" 方法并非所有连接器都支持
+  // (详见 webln.request)
+  methods: string[]; // 例如 "makeInvoice", "sendPayment", "request.openchannel", ...
+}
+```
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable();
+const info = await provider.getInfo();
+```
+
+### 演示
+
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/QWYVvya" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

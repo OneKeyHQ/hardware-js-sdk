@@ -1,9 +1,9 @@
-import {
+import type {
   TxInput as OrigTxInput,
   PrevInput,
+  TxInputType,
   TxOutputBinType,
   TxOutputType,
-  TxInputType,
 } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 

@@ -1,0 +1,155 @@
+---
+title: eth_signTypedData_v4
+description: Sign typed structured data (EIP-712)
+---
+
+# eth_signTypedData_v4
+
+Signs typed structured data according to EIP-712. This is the recommended method for signing structured data as it provides better security and user experience.
+
+---
+
+## Parameters
+
+| Index | Type | Description |
+|-------|------|-------------|
+| 0 | `string` | Address to sign with |
+| 1 | `string` | JSON string of typed data |
+
+---
+
+## Returns
+
+`string` - The signature (65-byte hex string)
+
+---
+
+## Typed Data Structure
+
+```typescript
+interface TypedData {
+  types: {
+    EIP712Domain: Array<{ name: string; type: string }>
+    [typeName: string]: Array<{ name: string; type: string }>
+  }
+  primaryType: string
+  domain: {
+    name?: string
+    version?: string
+    chainId?: number
+    verifyingContract?: string
+    salt?: string
+  }
+  message: Record<string, any>
+}
+```
+
+---
+
+## Example
+
+```typescript
+const typedData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' }
+    ],
+    Person: [
+      { name: 'name', type: 'string' },
+      { name: 'wallet', type: 'address' }
+    ],
+    Mail: [
+      { name: 'from', type: 'Person' },
+      { name: 'to', type: 'Person' },
+      { name: 'contents', type: 'string' }
+    ]
+  },
+  primaryType: 'Mail',
+  domain: {
+    name: 'My dApp',
+    version: '1',
+    chainId: 1,
+    verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC'
+  },
+  message: {
+    from: {
+      name: 'Alice',
+      wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826'
+    },
+    to: {
+      name: 'Bob',
+      wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
+    },
+    contents: 'Hello, Bob!'
+  }
+}
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'eth_signTypedData_v4',
+  params: [accounts[0], JSON.stringify(typedData)]
+})
+
+console.log('Signature:', signature)
+```
+
+### Permit Signature (ERC-2612)
+
+```typescript
+const permitData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' }
+    ],
+    Permit: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'nonce', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' }
+    ]
+  },
+  primaryType: 'Permit',
+  domain: {
+    name: 'USD Coin',
+    version: '2',
+    chainId: 1,
+    verifyingContract: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+  },
+  message: {
+    owner: accounts[0],
+    spender: '0xSpenderAddress...',
+    value: '1000000000', // 1000 USDC
+    nonce: 0,
+    deadline: Math.floor(Date.now() / 1000) + 3600
+  }
+}
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'eth_signTypedData_v4',
+  params: [accounts[0], JSON.stringify(permitData)]
+})
+```
+
+---
+
+## Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | User rejected the request | User denied the signature request |
+| -32602 | Invalid params | Invalid typed data structure |
+
+---
+
+## Notes
+
+- The typed data must be a valid JSON string
+- `chainId` in domain should match the connected chain
+- User will see a human-readable representation of the data
+- Specified by [EIP-712](https://eips.ethereum.org/EIPS/eip-712)

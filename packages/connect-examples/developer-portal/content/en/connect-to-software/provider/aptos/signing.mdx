@@ -1,0 +1,111 @@
+---
+title: Signing
+description: Sign messages on Aptos using OneKey
+---
+
+import { Callout } from 'nextra/components'
+
+# Signing
+
+Learn how to sign messages for authentication or verification.
+
+---
+
+## Sign Message
+
+Sign arbitrary messages for authentication or verification:
+
+```typescript
+const message = 'Welcome to MyApp!\n\nClick to sign in.\n\nNonce: abc123'
+
+const response = await provider.signMessage({
+  message,
+  nonce: 'abc123',  // Optional nonce for replay protection
+})
+
+console.log({
+  signature: response.signature,   // Hex-encoded signature
+  fullMessage: response.fullMessage, // Full signed message
+  prefix: response.prefix,         // Message prefix used
+})
+```
+
+---
+
+## Sign Message Options
+
+```typescript
+const response = await provider.signMessage({
+  message: 'Hello Aptos',
+  nonce: 'unique-nonce',
+  address: true,      // Include address in message
+  application: true,  // Include app info
+  chainId: true,      // Include chain ID
+})
+```
+
+---
+
+## Verify Message (Off-chain)
+
+```typescript
+import nacl from 'tweetnacl'
+
+const { signature, fullMessage } = await provider.signMessage({
+  message: 'Hello Aptos',
+  nonce: 'unique-nonce',
+})
+
+const account = await provider.account()
+const pubKeyBytes = Buffer.from(account.publicKey.slice(2), 'hex')
+const signatureBytes = Buffer.from(signature.slice(2), 'hex')
+const messageBytes = Buffer.from(fullMessage)
+
+const isValid = nacl.sign.detached.verify(messageBytes, signatureBytes, pubKeyBytes)
+console.log('Signature valid:', isValid)
+```
+
+---
+
+## Sign In (AIP Standard)
+
+For standardized sign-in flow:
+
+```typescript
+const signInInput = {
+  // Sign-in parameters
+}
+
+const result = await provider.signIn(signInInput)
+
+console.log({
+  address: result.address,
+  publicKey: result.publicKey,
+  signature: result.signature,
+})
+```
+
+---
+
+## Error Handling
+
+```typescript
+try {
+  await provider.signMessage({ message: 'Hello', nonce: '123' })
+} catch (error) {
+  switch (error.code) {
+    case 4001:
+      console.log('User rejected the request')
+      break
+    case 4100:
+      console.log('Unauthorized - wallet is locked')
+      break
+    case 4200:
+      console.log('Unsupported method')
+      break
+    default:
+      console.error('Error:', error.message)
+  }
+}
+```
+

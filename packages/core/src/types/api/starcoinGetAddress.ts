@@ -1,4 +1,4 @@
-import { StarcoinAddress as HardwareStarcoinAddress } from '@onekeyfe/hd-transport';
+import type { StarcoinAddress as HardwareStarcoinAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type StarcoinAddress = {

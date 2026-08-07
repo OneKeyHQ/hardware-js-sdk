@@ -1,0 +1,41 @@
+{
+  "name": "@onekeyfe/hardware-cli",
+  "version": "1.2.0-alpha.35",
+  "description": "OneKey hardware wallet CLI for testing device communication",
+  "author": "OneKey",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
+  },
+  "bin": {
+    "onekey-hw": "./dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"const f='dist/cli.js';const c=require('fs').readFileSync(f,'utf8');if(!c.startsWith('#!'))require('fs').writeFileSync(f,'#!/usr/bin/env node\\n'+c)\"",
+    "prestart": "tsc",
+    "start": "node dist/cli.js",
+    "search": "node dist/cli.js search",
+    "get-features": "node dist/cli.js get-features",
+    "get-state": "node dist/cli.js get-state",
+    "get-address": "node dist/cli.js get-address",
+    "ping": "node dist/cli.js ping",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@onekeyfe/hd-common-connect-sdk": "1.2.0-alpha.35",
+    "@onekeyfe/hd-core": "1.2.0-alpha.35",
+    "@onekeyfe/hd-shared": "1.2.0-alpha.35",
+    "@onekeyfe/hd-transport-usb": "1.2.0-alpha.35",
+    "@stoprocent/noble": "2.3.16",
+    "commander": "^12.0.0"
+  }
+}

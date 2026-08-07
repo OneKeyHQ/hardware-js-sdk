@@ -1,0 +1,109 @@
+---
+title: 签署数据
+---
+
+# 签署数据
+
+由于 OneKey 为每位用户提供了加密密钥，网站可以利用这些签名实现多种用途。以下是一些特定用例的指南：
+
+* [网站身份验证](https://medium.com/hackernoon/writing-for-blockchain-wallet-signature-request-messages-6ede721160d5)
+
+### 使用 OneKey 签署数据
+
+如需查看可运行的签名示例，[可以访问此仓库](https://github.com/danfinlay/js-eth-personal-sign-examples)。
+
+如需了解这些方法的 JavaScript 实现，可以在 npm 包 [eth-sig-util](https://github.com/onekeyhq/eth-sig-util) 中找到。
+
+### 简要历史
+
+OneKey 目前提供六种签名方法，您可能想了解这些方法的发展历程。研究这些方法的历史，对于理解去中心化标准的演进过程很有帮助。我们目前的六种方法是：
+
+* `eth_sign`（**已弃用**，不安全）
+* `personal_sign`
+* `signTypedData`（目前与 `signTypedData_v1` 相同）
+* `signTypedData_v1`
+* `signTypedData_v3`
+* `signTypedData_v4`
+
+随着时间的推移，可能还会出现更多方法。OneKey 最初启动时，Provider API 并非设计用于暴露给不受信任的网站，因此某些安全考虑当时没有得到足够重视。
+
+特别是 `eth_sign` 方法是一种开放式签名方法，允许签署任意哈希，这意味着它可以用于签署交易或任何其他数据，存在严重的钓鱼风险。
+
+因此，我们让此方法向用户显示最严厉的警告信息，并且通常不建议在生产环境中使用。但是，某些应用程序（通常是团队内部的管理面板）出于易用性考虑仍在使用此方法，所以我们继续支持它以避免破坏现有项目的工作流程。
+
+后来，`personal_sign` [规范](https://github.com/ethereum/go-ethereum/pull/2940) 被提出，它在数据前添加了前缀，使其无法冒充交易。我们还使此方法能够在 UTF-8 编码时显示人类可读的文本，使其成为网站登录的流行选择。
+
+然而，文本前缀使这些签名在链上验证时变得昂贵，因此在 [0xProtocol](https://0x.org/) 团队和 [SpankChain](https://spankchain.com/) 的帮助下，[EIP-712](https://eips.ethereum.org/EIPS/eip-712) 规范应运而生。
+
+EIP-712 的特殊之处，也是这个去中心化标准生态系统的特殊之处在于，该提案在保留相同 EIP 编号的情况下多次修改。这意味着我们最初实现的 `signTypedData` 是最早提出的版本，而其他团队在相同的方法名下实现了后来的版本。
+
+为避免客户端之间的兼容性问题，我们建议使用带有明确版本号的方法名 `signTypedData_v1` 和 `signTypedData_v3`。缺失的 `v2` 代表一个中间设计，由 Cipher 浏览器实现，如果开发者有足够的需求，我们有空间实现它。
+
+未来，如果方法名能包含其确切提案的哈希值可能会有所帮助，因为在去中心化生态系统中，没有绝对的真相来源来确定给定名称应该映射到什么。相反，我们被迫发明新的协作模式，在推动创新的同时，避免通过改变词语的含义来创建脆弱的生态系统。
+
+希望这对了解我们签名方法的历史有所帮助！
+
+### Sign Typed Data v1
+
+这个规范的早期版本缺少后来的一些安全改进，通常应该使用 [signTypedData\_v3](#sign-typed-data-v3) 来代替。
+
+`signTypedData` 系列有几个主要的设计考虑：
+
+* 链上验证成本低
+* 仍然具有一定的人类可读性
+* 难以进行签名钓鱼
+
+如果链上验证成本是您的首要考虑因素，您可能需要考虑使用它。
+
+### Sign Typed Data v3
+
+`signTypedData_v3` 方法目前代表 [EIP-712 规范](https://eips.ethereum.org/EIPS/eip-712) 的最新版本，使其成为我们目前拥有的最安全的链上低成本数据验证签名方法。
+
+这并不意味着它是完美的，我们确实已经有一个处于原型阶段的 `v4`（支持递归结构和数组），但我们确实打算保护这个命名空间并保持其向前兼容。
+
+希望很快我们也能有好的示例来解析方法输入为结构体以进行链上验证（这是一个很好的贡献机会！）
+
+### Sign Typed Data v4
+
+`signTypedData_v4` 方法目前代表 [EIP-712 规范](https://eips.ethereum.org/EIPS/eip-712) 的最新版本，增加了对数组的支持，并对结构体编码方式进行了重大修复。
+
+这并不意味着它是完美的，也不意味着我们最终不会有 `v5`，但我们确实打算保护这个命名空间并保持其向前兼容。
+
+希望很快我们也能有好的示例来解析方法输入为结构体以进行链上验证（这是一个很好的贡献机会！）
+
+#### Sign Typed Data 消息参数
+
+`domain`：Domain 或域签名很重要，因为它：
+
+* 只会被特定的网站/合约接受
+* 确保签名仅在预期的地方有效
+* 允许您拥有一个验证地址的唯一合约
+* 这是一组限制签名有效范围的信息
+* 这是有效性的域。可以是合约、URL 等
+* 具体需要放入什么内容取决于 DApp 的要求
+* 确保您的签名不会与其他签名冲突
+
+`chainId`：链 ID 告诉您所在的链，这很重要，因为：
+
+* 它确保在 Rinkeby 上签署的签名在其他链（如以太坊主网）上无效
+
+`name`：这主要用于用户体验目的。
+
+* 例如，作为用户，您正在使用 Ether Mail 应用，但弹出的对话框是 CryptoKitties 交换，这会因为签名上的名称而引起怀疑。
+
+`verifyingContract`：这是一个额外的保障层。即使两个开发者最终创建了同名的应用，他们也永远不会有相同的合约地址。（您可以添加另一个字段 `salt`，但这完全是过度设计且不必要的）
+
+* 如果您不确定名称，这将显示负责消息验证的合约
+* 此字段也可以是 URL
+
+`version`：这告诉您 domain 对象的当前版本。
+
+`message`：结构完全开放，由您自行决定。每个字段都是可选的。
+
+下面是使用 OneKey 签署 typed data 的示例。参考 [这里](https://github.com/danfinlay/js-eth-personal-sign-examples)
+
+#### 示例
+
+
+<iframe src="https://codesandbox.io/embed/ethereum-provider-signdata-demo-67nn3q?autoresize=1&fontsize=14&hidenavigation=1&theme=dark" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

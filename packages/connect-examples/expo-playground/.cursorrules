@@ -1,0 +1,1034 @@
+# OneKey Hardware SDK Demo - Development Guidelines
+
+## 🎨 Design System Overview
+
+### Theme Design Philosophy
+This project implements a sophisticated dark/light theme system inspired by the OneKey app-monorepo interface. The design emphasizes:
+
+**✨ Key Visual Principles:**
+- **Elegant Contrast**: High contrast ratios for excellent readability in both themes
+- **Clear Separation**: Visible borders and dividers create distinct content areas
+- **Layered Surfaces**: Cards and popovers use elevation to show hierarchy
+- **Subtle Glass Effects**: Modern backdrop blur creates depth without distraction
+- **Smooth Transitions**: All theme switches and interactions are animated
+- **OneKey Brand Integration**: Strategic use of OneKey green as accent color only
+
+**🌙 Dark Theme Features:**
+- Deep dark backgrounds (`#1a202c`) for reduced eye strain
+- Elevated card surfaces (`#2d3748`) with clear borders
+- Excellent text contrast (`#f7fafc`) for readability
+- Subtle borders (`#4a5568`) that remain visible in dark mode
+- Darker sidebar (`#171923`) for clear visual separation
+
+**☀️ Light Theme Features:**
+- Clean off-white background (`#fafafa`) for modern feel
+- Pure white cards (`#ffffff`) with soft shadows
+- Dark text (`#2d3748`) for optimal readability
+- Light gray borders (`#e2e8f0`) for subtle separation
+- Slightly different sidebar (`#fcfcfc`) for visual hierarchy
+
+**🎯 OneKey Green Usage Strategy:**
+- Primary buttons and CTAs only
+- Success states and confirmations
+- Active navigation states
+- Focus rings and interactive elements
+- **Never** for large background areas
+
+### Component Enhancement Features
+```tsx
+// Modern card system with elevation
+.onekey-card {
+  backdrop-filter: blur(8px);        // Glass effect
+  transition: all 0.2s ease-in-out;  // Smooth animations
+  shadow-sm hover:shadow-md;          // Interactive shadows
+}
+
+// Clear navigation states
+.onekey-nav-item.active {
+  bg-primary/10 text-primary;         // Subtle OneKey green
+  border-primary/20 shadow-sm;        // Clear active state
+}
+
+// Enhanced status indicators
+.onekey-status-connected {
+  bg-primary/10 text-primary;         // Success with OneKey green
+}
+
+// Modern input styling
+.onekey-input:focus {
+  ring-2 ring-primary;                // OneKey green focus ring
+  shadow-input-focus;                 // Enhanced focus shadow
+}
+```
+
+## Project Overview
+This is a modern React + TypeScript web application demonstrating OneKey hardware wallet SDK functionality. The project showcases a unified component architecture with comprehensive hardware integration capabilities.
+
+## Tech Stack & Core Dependencies
+- **Framework:** React 18+ with TypeScript (strict mode)
+- **Routing:** React Router DOM with file-based routing
+- **Styling:** Tailwind CSS with custom OneKey design system
+- **UI Components:** shadcn/ui with Radix UI primitives
+- **Icons:** Lucide React
+- **Internationalization:** i18next with react-i18next
+- **Hardware SDK:** @onekeyfe/hd-core for hardware wallet integration
+- **State Management:** Zustand with persistence middleware
+- **Build Tool:** Vite with custom webpack configuration
+- **Component Variants:** Class Variance Authority (CVA)
+- **Data Compression:** LZ-string for log storage optimization
+
+## Architecture Overview
+
+### Unified Component Architecture
+The project uses a centralized component architecture pattern:
+
+```
+UnifiedMethodExecutor (Core Implementation)
+├── ParameterInput (Parameter management)
+├── DeviceInteractionArea (Device animation & controls)
+└── ExecutionPanel (Logging & response display)
+```
+
+**Key Architectural Components:**
+- `UnifiedMethodExecutor.tsx` - Central execution engine for all hardware methods
+- `DeviceInteractionArea.tsx` - Device animation and interaction UI with real device images
+- `ExecutionPanel.tsx` - Request/response display with advanced logging
+- `ParameterInput.tsx` - Dynamic parameter input with preset management
+- `UnifiedLogger.tsx` - Centralized logging with compression and filtering
+
+### Route-Based Method Execution
+- **Device Methods**: `/device-methods/:methodName` - Core device operations
+- **Chain Methods**: `/chains/:chainId/:methodName` - Blockchain-specific operations  
+- **Firmware Update**: `/firmware-update/:methodName` - Firmware management operations
+
+### Hardware SDK Integration Patterns
+- **Connection Management**: Multi-transport support (WebUSB, JSBridge, WebBLE)
+- **Cancel Functionality**: Proper SDK cancel method integration across all operations
+- **Device State Management**: Centralized device state with Zustand persistence
+- **Error Handling**: Comprehensive error boundaries with user feedback
+
+## Unified Logging System
+
+### CRITICAL: Use Only UnifiedLogEntry Format
+**The project has been refactored to use a single, unified logging format. DO NOT create or use any other log formats.**
+
+```tsx
+// ✅ CORRECT - Use UnifiedLogEntry from UnifiedLogger
+import { UnifiedLogEntry } from '../components/common/UnifiedLogger';
+
+// ❌ INCORRECT - DO NOT create custom log interfaces
+interface LogEntry { ... } // This format has been removed
+
+// ✅ CORRECT - Use the unified logging utilities
+import { logRequest, logResponse, logError, logInfo } from '../utils/logger';
+```
+
+### UnifiedLogEntry Structure
+```tsx
+interface UnifiedLogEntry {
+  id: string;
+  timestamp: Date | string;
+  level: 'info' | 'warn' | 'error' | 'success';
+  title: string;
+  message?: string;
+  content?: string;
+  data?: any;
+  category?: string;
+  tags?: string[];
+  duration?: number;
+  source?: string;
+}
+```
+
+### Logging Best Practices
+
+#### 1. Use Unified Logging Functions
+```tsx
+// Always use these functions from utils/logger.ts
+logRequest(methodName, params, deviceId);
+logResponse(methodName, response, deviceId, duration);
+logError(methodName, error, deviceId);
+logInfo(title, message, data);
+```
+
+#### 2. Proper Log Categorization
+```tsx
+// Hardware SDK operations
+logRequest('btcGetAddress', { path: "m/44'/0'/0'/0/0" }, deviceId);
+
+// User interactions
+logInfo('Parameter Updated', 'Address derivation path changed', { 
+  path: newPath,
+  source: 'user-input'
+});
+
+// System events
+logInfo('Device Connected', 'Hardware device successfully connected', {
+  deviceId,
+  transportType,
+  category: 'device-management'
+});
+```
+
+#### 3. Global Log Access Pattern
+```tsx
+// ✅ CORRECT - Access logs from global store
+const { logs } = useDeviceStore();
+
+// ❌ INCORRECT - DO NOT create local log state
+const [executionLogs, setExecutionLogs] = useState<LogEntry[]>([]);
+```
+
+#### 4. Log Storage Configuration
+```tsx
+// Configure log storage limits in deviceStore
+logStorageConfig: {
+  maxSizeBytes: 50 * 1024 * 1024, // 50MB
+  maxEntries: 10000,
+  maxAgeHours: 24 * 7, // 1 week
+  compressionThreshold: 1024, // 1KB
+}
+```
+
+### Log Compression & Performance
+- **Automatic Compression**: Entries >1KB are automatically compressed using LZ-string
+- **Storage Optimization**: UI event data is filtered to remove redundant device fields
+- **Memory Management**: Expired logs are automatically cleaned up
+- **Statistics Tracking**: Real-time storage usage statistics available
+
+## OneKey Design System & Brand Guidelines
+
+### Design Philosophy
+The OneKey design system is inspired by the elegant, modern interface of the OneKey app-monorepo. It emphasizes:
+
+- **Clear Visual Hierarchy**: Distinct layers with proper elevation and shadows
+- **Elegant Dark/Light Themes**: Sophisticated color palettes with excellent contrast
+- **Subtle Animations**: Smooth transitions that enhance user experience
+- **Clear Boundaries**: Visible borders and dividers for better organization
+- **Modern Glass Effects**: Subtle backdrop blur and layered surfaces
+
+### Color Usage Guidelines
+**CRITICAL: OneKey Green Color Usage**
+- **OneKey Green (`#82f072`) is a BRAND ACCENT COLOR ONLY**
+- **DO NOT use OneKey green as primary background color for large areas**
+- **DO NOT use OneKey green for extensive UI elements**
+- **Use OneKey green SPARINGLY for:**
+  - Primary action buttons (CTA buttons)
+  - Success states and confirmations
+  - Brand accent elements (logos, highlights)
+  - Connection status indicators
+  - Progress indicators for positive states
+  - Focus rings and active states
+
+**Proper OneKey Green Usage:**
+```tsx
+// ✅ CORRECT - Accent usage
+<Button variant="default">Connect Device</Button> // Uses OneKey green
+<Badge variant="success">Connected</Badge> // Uses OneKey green accent
+<div className="border-l-4 border-primary">Success message</div> // Accent border
+<div className="onekey-nav-item active">Active nav item</div> // Active state
+
+// ❌ INCORRECT - Overuse
+<div className="bg-primary h-screen">...</div> // Too much green
+<Card className="bg-primary">...</Card> // Large area usage
+<div className="bg-primary w-full p-8">...</div> // Large background area
+```
+
+### Comprehensive Color Palette
+
+#### Light Mode Colors
+```css
+/* Background & Surfaces */
+--background: 0 0% 98%;           /* #fafafa - Clean off-white */
+--card: 0 0% 100%;               /* #ffffff - Pure white cards */
+--popover: 0 0% 100%;            /* #ffffff - White elevated surfaces */
+--secondary: 220 14% 96%;        /* #f7fafc - Very light gray */
+--muted: 220 13% 94%;            /* #f1f5f9 - Light gray backgrounds */
+--accent: 220 13% 94%;           /* #f1f5f9 - Light accent */
+
+/* Text Colors */
+--foreground: 220 13% 18%;       /* #2d3748 - Dark text for readability */
+--muted-foreground: 220 9% 46%;  /* #718096 - Muted text */
+--secondary-foreground: 220 13% 28%; /* #4a5568 - Medium dark text */
+
+/* Borders & Inputs */
+--border: 220 13% 91%;           /* #e2e8f0 - Light gray borders */
+--input: 220 13% 91%;            /* #e2e8f0 - Input borders */
+
+/* Sidebar (slightly different for separation) */
+--sidebar-background: 0 0% 99%;   /* #fcfcfc - Slightly different */
+--sidebar-border: 220 13% 88%;    /* #cbd5e0 - Visible borders */
+```
+
+#### Dark Mode Colors
+```css
+/* Background & Surfaces */
+--background: 220 13% 9%;         /* #1a202c - Deep dark background */
+--card: 220 13% 12%;             /* #2d3748 - Elevated dark cards */
+--popover: 220 13% 15%;          /* #374151 - More elevated surfaces */
+--secondary: 220 13% 16%;        /* #4a5568 - Medium dark surfaces */
+--muted: 220 13% 16%;            /* #4a5568 - Muted backgrounds */
+--accent: 220 13% 16%;           /* #4a5568 - Dark accent */
+
+/* Text Colors */
+--foreground: 220 14% 96%;       /* #f7fafc - Light text for contrast */
+--muted-foreground: 220 9% 64%;  /* #a0aec0 - Muted text */
+--secondary-foreground: 220 14% 96%; /* #f7fafc - Light text */
+
+/* Borders & Inputs */
+--border: 220 13% 20%;           /* #4a5568 - Visible borders */
+--input: 220 13% 20%;            /* #4a5568 - Input borders */
+
+/* Sidebar (darker for separation) */
+--sidebar-background: 220 13% 8%; /* #171923 - Darker than main */
+--sidebar-border: 220 13% 20%;    /* #4a5568 - Visible borders */
+```
+
+#### Brand & Status Colors
+```css
+/* OneKey Brand Colors */
+--ok-green: 110 81% 69%;         /* #82f072 - Primary brand */
+--ok-green-secondary: 108 63% 61%; /* #6fd85a - Secondary */
+--ok-green-accent: 105 48% 40%;   /* #4a9635 - Darker accent */
+--ok-green-soft: 110 81% 69% / 0.1; /* Transparent overlay */
+
+/* Status Colors */
+--destructive: 0 84% 60% (light) / 0 63% 31% (dark); /* Red variants */
+--warning: 43 96% 56%;            /* Yellow for warnings */
+--info: 217 91% 60%;             /* Blue for information */
+```
+
+### Component Design Patterns
+
+#### Card System with Elevation
+```tsx
+// ✅ CORRECT - Proper card usage with clear hierarchy
+<Card className="onekey-card">
+  <CardContent className="p-6">
+    {/* Card content with proper spacing */}
+  </CardContent>
+</Card>
+
+// Enhanced card with hover effects
+<Card className="onekey-card hover:shadow-card-hover transition-all duration-200">
+  {/* Interactive card content */}
+</Card>
+
+// Glass effect card for modern look
+<Card className="onekey-card backdrop-blur-md bg-card/80">
+  {/* Semi-transparent card with blur */}
+</Card>
+```
+
+#### Navigation & Interactive Elements
+```tsx
+// ✅ CORRECT - Navigation items with clear states
+<div className="onekey-nav-item">Default state</div>
+<div className="onekey-nav-item active">Active state</div>
+
+// Status indicators
+<Badge className="onekey-status-connected">Connected</Badge>
+<Badge className="onekey-status-disconnected">Disconnected</Badge>
+
+// Enhanced badges with proper variants
+<Badge className="onekey-badge success">Success</Badge>
+<Badge className="onekey-badge warning">Warning</Badge>
+<Badge className="onekey-badge error">Error</Badge>
+```
+
+#### Input & Form Elements
+```tsx
+// ✅ CORRECT - Enhanced inputs with focus states
+<Input className="onekey-input onekey-focus" />
+<Select className="onekey-select onekey-focus">
+  {/* Select options */}
+</Select>
+
+// Form elements with proper spacing and shadows
+<div className="space-y-4">
+  <Input className="shadow-input focus:shadow-input-focus" />
+  <Button className="onekey-btn-primary shadow-sm hover:shadow-md">
+    Submit
+  </Button>
+</div>
+```
+
+### Shadow & Elevation System
+```tsx
+// Card shadows for depth perception
+shadow-card          // Default card shadow
+shadow-card-hover    // Hover state shadow
+shadow-card-active   // Active/pressed state
+
+// Brand shadows with OneKey green
+shadow-onekey        // Subtle green shadow
+shadow-onekey-lg     // Medium green shadow
+shadow-onekey-xl     // Large green shadow
+
+// Elegant neutral shadows
+shadow-elegant       // Subtle neutral shadow
+shadow-elegant-lg    // Medium neutral shadow
+shadow-elegant-xl    // Large neutral shadow
+
+// Modern glass effects
+shadow-glass         // Glass-like shadow
+shadow-glass-lg      // Larger glass shadow
+```
+
+### Animation & Transitions
+```tsx
+// Entrance animations
+animate-fade-in           // Fade in from bottom
+animate-slide-in-from-top // Slide from top
+animate-slide-in-from-left // Slide from left
+animate-scale-in          // Scale in effect
+
+// Interactive animations
+transition-all duration-200 ease-in-out  // Standard transition
+hover:scale-105                          // Subtle hover scale
+active:scale-95                          // Active press effect
+
+// Loading states
+animate-pulse            // Standard pulse
+animate-spin-slow        // Slow spinning
+animate-shimmer          // Shimmer effect
+```
+
+### Typography & Spacing
+- **Font Family:** Inter (primary), system fonts (fallback)
+- **Font Weights:** 300 (light), 400 (normal), 500 (medium), 600 (semibold), 700 (bold)
+- **Spacing Scale:** Tailwind's consistent spacing system (4px base unit)
+- **Border Radius:** Modern rounded corners (`rounded-xl` for cards, `rounded-lg` for buttons)
+- **Line Heights:** Optimized for readability (1.5 for body text, 1.2 for headings)
+
+### Responsive Design Guidelines
+```tsx
+// Mobile-first approach with proper breakpoints
+<div className="p-4 md:p-6 lg:p-8">
+  <Card className="rounded-lg md:rounded-xl">
+    {/* Responsive card with smaller radius on mobile */}
+  </Card>
+</div>
+
+// Responsive grid layouts
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+  {/* Responsive grid items */}
+</div>
+```
+
+## Component Development Guidelines
+
+### React Component Patterns
+```tsx
+// Standard component structure
+interface ComponentProps {
+  // Always define TypeScript interfaces
+  title: string;
+  variant?: 'default' | 'secondary';
+  children?: React.ReactNode;
+}
+
+const Component: React.FC<ComponentProps> = ({ title, variant = 'default', children }) => {
+  // Use functional components with hooks
+  const [state, setState] = useState<string>('');
+  
+  // Use descriptive prop names and JSDoc for complex props
+  return (
+    <div className="bg-card border border-border rounded-xl">
+      {/* Component implementation */}
+    </div>
+  );
+};
+
+// Always use named exports
+export { Component };
+```
+
+### UI Component Library Usage
+
+#### Button Component Variants
+```tsx
+// Available variants with proper OneKey green usage
+<Button variant="default">Primary Action</Button>     // OneKey green
+<Button variant="outline">Secondary Action</Button>   // Gray outline
+<Button variant="ghost">Subtle Action</Button>        // Transparent
+<Button variant="destructive">Delete Action</Button>  // Gray destructive
+<Button variant="success">Success Action</Button>     // Emerald green
+<Button variant="elegant">Elegant Action</Button>     // Card-like
+```
+
+#### Card Component Structure
+```tsx
+<Card className="bg-card border border-border/50 shadow-sm">
+  <CardHeader>
+    <CardTitle>Title</CardTitle>
+    <CardDescription>Description</CardDescription>
+  </CardHeader>
+  <CardContent>
+    {/* Main content */}
+  </CardContent>
+  <CardFooter>
+    {/* Actions */}
+  </CardFooter>
+</Card>
+```
+
+### File Organization & Naming
+```
+app/
+├── components/
+│   ├── ui/              # shadcn/ui base components
+│   ├── common/          # Shared business components
+│   ├── layout/          # Layout components
+│   ├── device/          # Device-specific components
+│   ├── icons/           # Icon components
+│   ├── providers/       # Context providers
+│   └── global/          # Global components
+├── routes/              # File-based routing pages
+├── hooks/               # Custom React hooks
+├── store/               # Zustand state management
+├── services/            # API and hardware services
+├── data/                # Static data and configurations
+├── utils/               # Utility functions
+├── types/               # TypeScript type definitions
+├── i18n/                # Internationalization
+└── assets/              # Static assets
+```
+
+### Naming Conventions
+- **Components:** PascalCase (`UnifiedMethodExecutor`, `DeviceInteractionArea`)
+- **Files:** PascalCase for components, kebab-case for utilities
+- **Variables/Functions:** camelCase (`handleMethodExecution`, `deviceStore`)
+- **Constants:** UPPER_SNAKE_CASE (`DEVICE_TYPES`, `API_ENDPOINTS`)
+- **CSS Classes:** Tailwind utilities, kebab-case for custom classes
+- **Interfaces:** PascalCase with descriptive names (`DeviceConnectionState`)
+
+## Hardware SDK Integration Standards
+
+### Device Connection Patterns
+```tsx
+// Always check device connection and SDK state
+const { currentDevice, sdkInitState, transportType } = useDeviceStore();
+
+if (!currentDevice && !methodConfig.noDeviceIdReq) {
+  return <DeviceNotConnectedState showFullPage={true} />;
+}
+
+if (!sdkInitState.isInitialized) {
+  return <LoadingSpinner message="Initializing SDK..." />;
+}
+```
+
+### Method Execution Pattern
+```tsx
+// Use UnifiedMethodExecutor for all hardware operations
+<UnifiedMethodExecutor
+  methodConfig={selectedMethod}
+  executionHandler={handleMethodExecution}
+  type="standard" // or "firmware" for firmware operations
+  className="h-full"
+/>
+```
+
+### Hardware Method Execution with Unified Logging
+```tsx
+const handleMethodExecution = async (methodName: string, params: any) => {
+  const deviceId = currentDevice?.connectId;
+  
+  try {
+    // Log the request
+    logRequest(methodName, params, deviceId);
+    
+    const startTime = Date.now();
+    const response = await callHardwareAPI(methodName, params, deviceId);
+    const duration = Date.now() - startTime;
+    
+    // Log the response
+    logResponse(methodName, response, deviceId, duration);
+    
+    return response;
+  } catch (error) {
+    // Log the error
+    logError(methodName, error, deviceId);
+    throw error;
+  }
+};
+```
+
+### Cancel Operation Implementation
+```tsx
+const handleCancel = async () => {
+  if (status === 'loading' || status === 'device-interaction') {
+    const connectId = currentDevice?.connectId;
+    const result = await cancelHardwareOperation(connectId);
+    
+    if (result.success) {
+      logInfo('Operation Cancelled', 'Hardware operation cancelled by user', {
+        connectId,
+        category: 'user-action'
+      });
+      toast({ title: '操作已取消', description: '硬件操作已成功取消' });
+    }
+  }
+};
+```
+
+## State Management with Zustand
+
+### Store Structure Pattern
+```tsx
+interface StoreState {
+  // Device management
+  currentDevice: DeviceInfo | null;
+  connectedDevices: DeviceInfo[];
+  
+  // Unified log management
+  logs: UnifiedLogEntry[];
+  logStorageConfig: LogStorageConfig;
+  
+  // Actions
+  addLog: (log: UnifiedLogEntry) => void;
+  clearLogs: () => void;
+  exportLogs: () => Promise<string>;
+  getLogStorageStats: () => LogStorageStats;
+}
+
+export const useDeviceStore = create<StoreState>()(
+  persist(
+    (set, get) => ({
+      logs: [],
+      
+      addLog: (log: UnifiedLogEntry) => {
+        set((state) => {
+          const newLogs = [...state.logs, log];
+          // Apply storage limits and compression
+          return { logs: applyStorageLimits(newLogs, state.logStorageConfig) };
+        });
+      },
+      
+      // Other implementations...
+    }),
+    {
+      name: 'onekey-device-store',
+      version: 2, // Increment version for breaking changes
+      partialize: (state) => ({
+        logs: state.logs.map(compressLogEntry),
+        logStorageConfig: state.logStorageConfig,
+        // Only persist necessary data
+      }),
+    }
+  )
+);
+```
+
+### Log Storage Best Practices
+- **Single Format**: Use only `UnifiedLogEntry` format throughout the application
+- **Compression**: Use LZ-string for entries >1KB to optimize storage
+- **Filtering**: Remove redundant device fields from UI events
+- **Limits**: Respect configured size, count, and expiration limits
+- **Statistics**: Provide real-time storage statistics and metrics
+- **Type Safety**: Handle timestamp compatibility (string vs Date types)
+
+## Routing & Page Layout Standards
+
+### Standard Page Structure
+```tsx
+<PageLayout fixedHeight={true}>
+  <div className="h-full flex flex-col">
+    <div className="flex-1 flex flex-col px-4 py-2 min-h-0">
+      {/* Breadcrumb navigation - fixed height */}
+      <div className="flex-shrink-0 mb-3">
+        <Breadcrumb items={breadcrumbItems} />
+      </div>
+      
+      {/* Main content - fills remaining space */}
+      <div className="flex-1 min-h-0">
+        {/* Content implementation */}
+      </div>
+    </div>
+  </div>
+</PageLayout>
+```
+
+### Route Component Pattern
+```tsx
+const MethodExecutePage: React.FC = () => {
+  const { methodName } = useParams();
+  const { currentDevice } = useDeviceStore();
+  
+  return (
+    <MethodExecuteBoundary
+      methodName={methodName}
+      basePath="/device-methods"
+      baseLabel="Device Methods"
+      baseIcon={Cpu}
+    >
+      {/* Page content */}
+    </MethodExecuteBoundary>
+  );
+};
+```
+
+## Performance & Optimization
+
+### Component Optimization
+- **Lazy Loading:** Use dynamic imports for heavy components
+- **Memoization:** Use React.memo and useMemo appropriately
+- **Virtual Scrolling:** For large log lists and data sets
+- **Debounced Updates:** For real-time statistics and search
+
+### Log Storage Performance
+- **Compression Thresholds:** Only compress data >1KB
+- **Batch Operations:** Process multiple logs efficiently  
+- **Memory Management:** Clean up expired logs automatically
+- **UI Responsiveness:** Avoid blocking UI during compression
+- **Type Compatibility:** Handle mixed timestamp types (string/Date) gracefully
+
+## Development Quality Standards
+
+### Code Quality Requirements
+- **TypeScript:** Strict mode enabled, all types properly defined
+- **ESLint:** Follow all ESLint rules, fix warnings before commits
+- **Error Boundaries:** Implement proper error boundaries for robustness
+- **Testing:** Test hardware SDK integration and component interactions
+- **Documentation:** JSDoc comments for complex functions and interfaces
+
+### Security Considerations
+- **Input Validation:** Validate all user inputs and parameters
+- **Data Sanitization:** Sanitize log data before storage
+- **Sensitive Information:** Handle device information securely
+- **Error Handling:** Avoid information leakage in error messages
+
+## Search Functionality & User Experience
+
+### Command Palette Integration
+The project implements an advanced command palette search system using `kbar` with intelligent sorting and internationalization support.
+
+#### Search Actions Architecture
+```typescript
+// Search actions are organized with priority-based sorting
+interface ActionWithPriority extends Action {
+  priority?: number;
+}
+
+// Import search functionality
+import { 
+  searchActions,        // Default priority-sorted actions
+  getSearchActions,     // Custom sorting modes
+  SortMode,            // Sorting options enum
+  getSearchStats       // Statistics and metrics
+} from './data/searchActions';
+```
+
+#### Search Sorting Modes
+The system provides three intelligent sorting approaches:
+
+**1. Priority-Based Sorting (Default)**
+- High Priority (7-10): Core functions (Home, Device Methods, Chains, Sidebar Toggle)
+- Medium Priority (4-6): Common tools (Emulator, Logs, Theme)
+- Low Priority (1-3): External links and documentation
+
+**2. Alphabetical Sorting**
+- Sorts all actions by name for quick alphabetical lookup
+- Useful for users who prefer predictable ordering
+
+**3. Section-Based Sorting**
+- Groups by functional categories first, then alphabetical within groups
+- Order: Interface Control → Navigation → Documentation → External → Blockchains
+
+#### Usage Patterns
+```typescript
+// Use default priority sorting
+import { searchActions } from './data/searchActions';
+
+// Custom sorting for specific needs
+const alphabeticalActions = getSearchActions(SortMode.ALPHABETICAL);
+const sectionActions = getSearchActions(SortMode.SECTION);
+
+// Get search statistics for analytics
+const stats = getSearchStats();
+// Returns: { totalActions, sections, sectionCounts, sortModes }
+```
+
+#### Search Action Definition Pattern
+```typescript
+// Standard search action structure
+{
+  id: 'unique-identifier',
+  name: t('search.actions.actionName'),           // Internationalized name
+  subtitle: t('search.descriptions.actionName'), // Detailed description
+  section: t('search.sections.sectionName'),     // Category grouping
+  keywords: t('search.keywords.actionName'),     // Search keywords (multilingual)
+  shortcut: ['key'],                             // Keyboard shortcut
+  perform: () => navigateTo('/path'),            // Action handler
+  priority: 8,                                   // Sorting priority
+  icon: '🎯'                                     // Visual indicator
+}
+```
+
+#### Search i18n Integration
+```typescript
+// Translation helper with fallback
+const t = (key: string, options?: Record<string, unknown>): string => {
+  if (typeof window === 'undefined' || !i18n.isInitialized) {
+    return key; // Fallback to key if i18n not ready
+  }
+  const result = i18n.t(key, options);
+  return typeof result === 'string' ? result : key;
+};
+
+// Multilingual keywords for better search matching
+search: {
+  keywords: {
+    sidebar: 'sidebar toggle 侧边栏 切换 显示 隐藏',
+    theme: 'theme light dark 主题 浅色 深色 明亮 暗色',
+    // Mix English and Chinese terms for comprehensive matching
+  }
+}
+```
+
+### Search UX Best Practices
+- **Progressive Disclosure**: Show most relevant actions first with priority sorting
+- **Keyboard Navigation**: Full keyboard support with intuitive shortcuts
+- **Visual Feedback**: Clear icons and descriptions for all actions
+- **Contextual Help**: Detailed subtitles explain what each action does
+- **Performance**: Efficient search algorithms with debounced input
+- **Accessibility**: Screen reader friendly with proper ARIA labels
+
+### Search Extension Guidelines
+```typescript
+// Adding new search actions
+const ACTION_PRIORITIES = {
+  'new-feature': 5,  // Medium priority for new features
+  // Update priority based on expected usage frequency
+};
+
+// Extend search functionality
+export const customSearchConfig = {
+  defaultSortMode: SortMode.PRIORITY,
+  enableAnalytics: true,
+  maxRecentSearches: 10,
+  searchDebounceMs: 150,
+};
+```
+
+## Internationalization (i18n)
+
+### Translation Architecture
+The project uses a structured approach to internationalization with separate language files and comprehensive translation coverage.
+
+#### File Structure
+```
+app/i18n/
+├── config.ts           # i18n configuration
+├── locales/
+│   ├── index.ts        # Export all locales
+│   ├── en.ts          # English translations
+│   └── zh.ts          # Chinese translations
+```
+
+### Translation Usage Patterns
+```tsx
+// Use translation hooks consistently
+const { t } = useTranslation();
+
+// Standard translation usage
+<h1>{t('deviceOperations.status.title')}</h1>
+<p>{t('deviceOperations.status.description')}</p>
+
+// Translation with interpolation
+<span>{t('chains.methodsCount', { count: 5 })}</span>
+
+// Conditional translations based on state
+<Badge>{t(`transport.${transportType}.description`)}</Badge>
+```
+
+### Translation Key Organization
+```typescript
+// Translation namespace structure
+{
+  common: {        // Shared UI elements
+    device: 'Device',
+    connect: 'Connect',
+    // ...
+  },
+  search: {        // Search functionality
+    sections: { /* ... */ },
+    actions: { /* ... */ },
+    keywords: { /* ... */ },
+    sortModes: { /* ... */ }
+  },
+  deviceMethods: { // Feature-specific translations
+    title: 'Device Methods',
+    categories: { /* ... */ }
+  }
+}
+```
+
+#### Translation Key Patterns
+- **Namespace:** Component or feature area (`deviceOperations`, `chainMethods`, `search`)
+- **Section:** Logical grouping (`status`, `actions`, `descriptions`, `keywords`)
+- **Key:** Specific translation (`title`, `description`, `confirmButton`)
+
+### Technical Term Preservation
+**CRITICAL:** Preserve technical and blockchain terms in English across all languages:
+- `Signer` - Always in English (not translated to "签名者")
+- `BTC`, `EVM`, `SOL` - Blockchain identifiers remain unchanged
+- `WebUSB`, `JSBridge`, `WebBluetooth` - Technical transport methods
+- Method names and blockchain terminology should remain in English for clarity
+
+```tsx
+// ✅ CORRECT - Technical terms preserved
+search: {
+  actions: {
+    chains: 'Signer',           // Not translated
+    deviceMethods: 'Device',    // Can be translated
+  }
+}
+
+// ❌ INCORRECT - Over-translation
+search: {
+  actions: {
+    chains: '签名器',            // Should remain "Signer"
+  }
+}
+```
+
+### Search-Specific i18n Guidelines
+```tsx
+// Search translations structure
+search: {
+  sections: {
+    interface: 'Interface Control',
+    navigation: 'Navigation',
+    documentation: 'Documentation',
+    external: 'External',
+    blockchains: 'Blockchains',
+    deviceMethods: 'Device Methods',
+    chainMethods: 'Chain Methods',
+  },
+  actions: {
+    toggleSidebar: 'Toggle Sidebar',
+    lightTheme: 'Light Theme',
+    // ... action names
+  },
+  descriptions: {
+    emulator: 'Start hardware emulator using Docker',
+    logs: 'View operation logs and debug information',
+    // ... detailed descriptions
+  },
+  keywords: {
+    sidebar: 'sidebar toggle display hide',
+    theme: 'theme light dark bright',
+    // ... search keywords (multilingual for better matching)
+  },
+  sortModes: {
+    priority: 'By Priority',
+    alphabetical: 'Alphabetical',
+    section: 'By Section',
+  }
+}
+```
+
+## Build & Deployment
+
+### Development Workflow
+```bash
+# Development server
+yarn dev
+
+# Production build
+yarn build
+yarn preview
+
+# Type checking
+yarn type-check
+
+# Linting (with dist folder ignored)
+yarn lint
+```
+
+### Environment Configuration
+- **Development:** Hot reload, detailed error messages, debug tools
+- **Production:** Optimized builds, error boundaries, performance monitoring
+- **Testing:** Isolated environment for hardware SDK testing
+
+## Recent Feature Additions & Best Practices
+
+### ✨ Search System Enhancement
+- **Command Palette**: Advanced search with intelligent priority-based sorting
+- **Multi-Modal Sorting**: Priority, alphabetical, and section-based organization
+- **Smart i18n Integration**: Multilingual search keywords and descriptions
+- **Performance Optimized**: Debounced search with efficient action matching
+
+### 🌐 Comprehensive i18n Implementation
+- **Structured Translations**: Separate language files with clear organization
+- **Technical Term Preservation**: Blockchain/technical terms remain in English
+- **Complete Coverage**: All user-facing text internationalized
+- **Developer Friendly**: Type-safe translation keys with fallback mechanisms
+
+### 🛠️ Development Workflow Updates
+
+#### Key Implementation Patterns
+```typescript
+// ✅ Use unified search actions
+import { searchActions, getSearchActions, SortMode } from './data/searchActions';
+
+// ✅ Implement proper i18n
+const { t } = useTranslation();
+<h1>{t('page.title')}</h1>
+
+// ✅ Preserve technical terms
+search: {
+  actions: {
+    chains: 'Signer',        // Always English
+    btc: 'BTC',             // Always English
+  }
+}
+
+// ✅ Use priority-based action organization
+const ACTION_PRIORITIES = {
+  'core-feature': 10,       // Highest priority
+  'utility-tool': 5,        // Medium priority
+  'external-link': 1,       // Lowest priority
+};
+```
+
+#### Quality Checklist
+- [ ] All new search actions include priority levels
+- [ ] Technical terms preserved in translations
+- [ ] Search keywords include both languages
+- [ ] Actions have clear descriptions and shortcuts
+- [ ] TypeScript types properly defined
+- [ ] Error handling with graceful fallbacks
+- [ ] Performance considerations implemented
+
+---
+
+**Before developing, please thoroughly read this guide to understand the architecture, design system, and coding standards. Pay special attention to:**
+
+1. **🎨 OneKey Design System**: Proper use of OneKey green as accent color only
+2. **🔍 Search Functionality**: Implement intelligent sorting and comprehensive i18n
+3. **📝 Unified Logging**: Use only UnifiedLogEntry format throughout
+4. **🌐 Internationalization**: Preserve technical terms while translating UI text
+5. **🏗️ Component Architecture**: Follow the unified component patterns
+6. **⚡ Performance**: Optimize for responsive user experience
+
+**The project now features advanced search capabilities with intelligent sorting and comprehensive internationalization support while maintaining technical accuracy for blockchain terminology.** 🚀
+
+# OneKey Hardware SDK Example - Passphrase 设计与参数流转规则
+
+## 1. 参数与状态
+- 只暴露 useEmptyPassphrase（主钱包开关）给开发者，UI 不再显示 usePassphraseState。
+- passphraseState 只做会话级别缓存（内存 store），页面刷新即丢失，不做本地持久化。
+- 与硬件交互时，参数只会有 useEmptyPassphrase 或 passphraseState，且两者互斥。
+
+## 2. 典型开发者场景
+1. useEmptyPassphrase = true：主钱包，直接调用，无弹窗。
+2. useEmptyPassphrase = false 且没有 passphraseState：首次进入隐藏钱包，弹窗输入 passphrase，设备返回 passphraseState，存入会话。
+3. useEmptyPassphrase = false 且有 passphraseState：会话内复用隐藏钱包，直接调用，无弹窗。
+
+## 3. 其他说明
+- "保持可访问"功能已移除，不做任何持久化。
+- 代码注释需明确 passphraseState 只做会话缓存。
+- 仅支持开发者调试和演示，不建议用于生产钱包。

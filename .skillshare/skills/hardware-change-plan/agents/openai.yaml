@@ -1,0 +1,6 @@
+interface:
+  display_name: 'Hardware Change Plan'
+  short_description: 'Create an executable Hardware SDK implementation plan'
+  default_prompt: 'Use $hardware-change-plan to plan a Hardware SDK change.'
+policy:
+  allow_implicit_invocation: true

@@ -2,15 +2,20 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { CosmosAddress, CosmosGetPublicKeyParams } from '../../types';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 
+import type { CosmosAddress, CosmosGetPublicKeyParams } from '../../types';
+
 export default class CosmosGetPublicKey extends BaseMethod<any> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -61,13 +66,11 @@ export default class CosmosGetPublicKey extends BaseMethod<any> {
 
   async run() {
     const res = await batchGetPublickeys(this.device, this.params, this.params[0].curve, 118);
-    const responses: CosmosAddress[] = res.message.public_keys.map(
-      (publicKey: string, index: number) => ({
-        path: serializedPath((this.params as unknown as any[])[index].address_n),
-        pub: publicKey,
-        publicKey,
-      })
-    );
+    const responses: CosmosAddress[] = res.public_keys.map((publicKey: string, index: number) => ({
+      path: serializedPath((this.params as unknown as any[])[index].address_n),
+      pub: publicKey,
+      publicKey,
+    }));
 
     validateResult(responses, ['pub'], {
       expectedLength: this.params.length,

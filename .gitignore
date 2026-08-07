@@ -1,12 +1,15 @@
 node_modules
 .yarn
-
 .DS_Store
+.wrangler
+__pycache__/
+*.py[cod]
 
 .idea
 *.sublime-project
 *.sublime-workspace
 .vscode/**/*
+.vscode
 !.vscode/launch.json
 !.vscode/tasks.json
 !.vscode/settings.json
@@ -25,6 +28,13 @@ logs
 .eslintcache
 *.tsbuildinfo
 
+# automation test reports
+automation-report-*.json
+
+# protobuf build temp files (packages/hd-transport/scripts/protobuf-build.sh)
+messages-tmp.proto
+messages-protocol-v2-tmp.proto
+
 # build outputs
 lib
 libDev
@@ -32,3 +42,53 @@ dist
 coverage
 build
 .history
+
+.claude/settings.local.json
+
+
+# iOS
+Pods
+.expo
+**/.expo
+
+# Xcode user data
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+
+# Android
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+.idea
+
+# Expo / RN example prebuild outputs (ignore generated native folders under examples)
+packages/connect-examples/react-native-demo/android
+packages/connect-examples/react-native-demo/ios
+packages/connect-examples/hwk-demo/android
+packages/connect-examples/hwk-demo/ios
+packages/connect-examples/expo-example/android
+packages/connect-examples/expo-example/ios
+packages/connect-examples/expo-example/web-build
+
+# Metro cache
+.metro-cache
+**/.metro-cache
+
+# Expo web export
+**/web-build
+.vercel
+.env*.local
+.worktrees/

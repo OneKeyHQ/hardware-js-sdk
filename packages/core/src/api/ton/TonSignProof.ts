@@ -1,16 +1,21 @@
-import { TonSignProof as HardwareTonSignProof } from '@onekeyfe/hd-transport';
-
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { TonSignProofParams } from '../../types';
+
+import type { TonSignProof as HardwareTonSignProof } from '@onekeyfe/hd-transport';
+import type { TonSignProofParams } from '../../types';
 
 export default class TonSignProof extends BaseMethod<HardwareTonSignProof> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.strictCheckDeviceSupport = true;
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // init params
     validateParams(this.payload, [
@@ -43,6 +48,9 @@ export default class TonSignProof extends BaseMethod<HardwareTonSignProof> {
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_touch: {
         min: '4.10.0',
       },

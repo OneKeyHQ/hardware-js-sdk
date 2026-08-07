@@ -1,5 +1,6 @@
-import { CoreMessage } from '../events';
-import { createLogMessage, LOG } from '../events/log';
+import { LOG, createLogMessage } from '../events/log';
+
+import type { CoreMessage } from '../events';
 
 type LogMessage = {
   level: string;
@@ -157,6 +158,9 @@ export enum LoggerNames {
   HdTransportHttp = '@onekey/hd-transport-http',
   HdTransportLowLevel = '@onekey/hd-transport-lowlevel',
   HdBleTransport = '@onekey/hd-ble-transport',
+  HdWebBleTransport = '@onekey/hd-web-ble-transport',
+  HdTransportWebUsb = '@onekey/hd-transport-webusb',
+  HdTransportNodeUsb = '@onekey/hd-transport-node-usb',
   Connect = '@onekey/connect',
   Iframe = 'IFrame',
   SendMessage = '[SendMessage]',
@@ -174,7 +178,10 @@ export const LoggerMap = {
   [LoggerNames.HdBleSdk]: initLog(LoggerNames.HdBleSdk),
   [LoggerNames.HdTransportHttp]: initLog(LoggerNames.HdTransportHttp),
   [LoggerNames.HdBleTransport]: initLog(LoggerNames.HdBleTransport),
+  [LoggerNames.HdWebBleTransport]: initLog(LoggerNames.HdWebBleTransport),
   [LoggerNames.HdTransportLowLevel]: initLog(LoggerNames.HdTransportLowLevel),
+  [LoggerNames.HdTransportWebUsb]: initLog(LoggerNames.HdTransportWebUsb),
+  [LoggerNames.HdTransportNodeUsb]: initLog(LoggerNames.HdTransportNodeUsb),
   [LoggerNames.Connect]: initLog(LoggerNames.Connect),
   [LoggerNames.Iframe]: initLog(LoggerNames.Iframe),
   [LoggerNames.SendMessage]: initLog(LoggerNames.SendMessage),

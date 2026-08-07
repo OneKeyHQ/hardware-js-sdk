@@ -1,16 +1,22 @@
-import { AlgorandSignTx as HardwareAlgorandSignTx } from '@onekeyfe/hd-transport';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { SolanaSignTransactionParams } from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
 
+import type { SolanaSignTransactionParams } from '../../types';
+import type { AlgorandSignTx as HardwareAlgorandSignTx } from '@onekeyfe/hd-transport';
+
 export default class AlgoSignTransaction extends BaseMethod<HardwareAlgorandSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode];
+    this.allowDeviceMode = [...this.allowDeviceMode];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [

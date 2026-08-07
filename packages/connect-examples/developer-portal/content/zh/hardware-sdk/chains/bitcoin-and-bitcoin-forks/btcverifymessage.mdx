@@ -1,0 +1,56 @@
+---
+title: btcVerifyMessage
+---
+
+# btcVerifyMessage
+
+## Bitcoin：验证消息
+
+使用签名者地址和签名验证消息。
+
+```typescript
+const result = await HardwareSDK.btcVerifyMessage(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+* `address` - _必需_ `string` 签名者地址
+* `messageHex` - _必需_ `string` 十六进制格式的已签名消息
+* `signature` - _必需_ `string` base64 格式的签名
+* `coin` - _必需_ `string` 决定 coins.json 文件中指定的网络定义。可以使用币种的 `shortcut`、`name` 或 `label`。
+
+### 示例
+
+```typescript
+HardwareSDK.btcVerifyMessage(connectId, deviceId, {
+    address: "3BD8TL6iShVzizQzvo789SuynEKGpLTms9",
+    messageHex: "6578616d706c65206d657373616765"
+    signature: "JO7vL3tOB1qQyfSeIVLvdEw9G1tCvL+lNj78XDAVM4t6UptADs3kXDTO2+2ZeEOLFL4/+wm+BBdSpo3kb3Cnsas=",
+    coin: "btc"
+});
+```
+
+### 返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        message: "Message verified"
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

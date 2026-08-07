@@ -1,0 +1,157 @@
+---
+title: 快速开始
+description: 使用 OneKey 的 Sui Wallet Standard Provider 连接 Sui
+---
+
+import { Callout } from 'nextra/components'
+
+# 快速开始
+
+了解如何检测、连接和与 Sui 进行交互。
+
+<Callout type="info">
+OneKey 实现了 Sui Wallet Standard，确保与所有 Sui dApp 兼容。
+</Callout>
+
+---
+
+## Provider 检测
+
+```typescript
+// 检测 OneKey Sui provider
+const provider = window.$onekey?.sui
+
+if (!provider) {
+  throw new Error('未检测到 OneKey Sui provider')
+}
+```
+
+---
+
+## 检查权限
+
+```typescript
+// 检查是否已连接
+const hasPermission = await provider.hasPermissions()
+
+if (hasPermission) {
+  const accounts = await provider.getAccounts()
+  console.log('已连接的账户:', accounts)
+}
+```
+
+---
+
+## 请求连接
+
+```typescript
+// 请求连接权限
+const result = await provider.requestPermissions()
+
+if (result) {
+  const accounts = await provider.getAccounts()
+  console.log('已连接:', accounts[0].address)
+}
+```
+
+---
+
+## 获取账户
+
+```typescript
+const accounts = await provider.getAccounts()
+
+accounts.forEach(account => {
+  console.log({
+    address: account.address,     // Sui 地址
+    publicKey: account.publicKey, // 公钥（hex 字符串）
+  })
+})
+```
+
+---
+
+## 获取当前链
+
+```typescript
+const chain = await provider.getActiveChain()
+
+console.log('当前链:', chain) // 例如 'sui:testnet'
+```
+
+---
+
+## 检查连接状态
+
+```typescript
+const isConnected = provider.isConnected()
+console.log('已连接:', isConnected)
+```
+
+---
+
+## 断开连接
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## 事件监听
+
+### 监听账户变更
+
+```typescript
+provider.onAccountChange((account) => {
+  if (account) {
+    console.log('账户已变更:', account.address)
+  } else {
+    console.log('已断开连接')
+  }
+})
+```
+
+### 监听网络变更
+
+```typescript
+provider.onNetworkChange((network) => {
+  console.log('网络已变更:', network)
+})
+```
+
+---
+
+## 使用 Sui Wallet Kit
+
+对于 React 应用，使用官方的 Sui Wallet Kit：
+
+```bash
+npm install @mysten/dapp-kit @mysten/sui.js @tanstack/react-query
+```
+
+```tsx
+import { SuiClientProvider, WalletProvider } from '@mysten/dapp-kit'
+import { getFullnodeUrl } from '@mysten/sui.js/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const queryClient = new QueryClient()
+const networks = {
+  mainnet: { url: getFullnodeUrl('mainnet') },
+  testnet: { url: getFullnodeUrl('testnet') },
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SuiClientProvider networks={networks} defaultNetwork="mainnet">
+        <WalletProvider>
+          <YourApp />
+        </WalletProvider>
+      </SuiClientProvider>
+    </QueryClientProvider>
+  )
+}
+```
+
+OneKey 会通过 Sui Wallet Standard 自动被检测。

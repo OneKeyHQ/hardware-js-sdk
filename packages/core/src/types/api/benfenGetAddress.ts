@@ -1,4 +1,4 @@
-import { BenfenAddress as HardwareBenfenAddress } from '@onekeyfe/hd-transport';
+import type { BenfenAddress as HardwareBenfenAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type BenfenAddress = {

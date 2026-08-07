@@ -1,5 +1,6 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { getScriptType, isMultisigPath, fromHardened } from '../../helpers/pathUtils';
+
+import { fromHardened, getScriptType, isMultisigPath } from '../../helpers/pathUtils';
 import bitcoin from '../../../data/coins/bitcoin.json';
 
 export type BitcoinInfo = {

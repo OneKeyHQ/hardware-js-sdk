@@ -1,0 +1,21 @@
+---
+title: 访问账户
+---
+
+# 访问账户
+
+建立钱包连接后，你可以访问与 OneKey 钱包连接的账户。
+
+用户账户在 OneKey 中有多种用途，包括作为标识符和用于签署交易。
+
+```javascript
+const res = await provider.request({
+  method: 'near_accounts',
+});
+const accountId = res?.accounts?.[0]?.accountId || '';
+const publicKey = res?.accounts?.[0]?.publicKey || '';
+
+// 如果用户拒绝钱包连接，res?.accounts 应为 []
+console.log('near_accounts', res?.accounts, accountId, publicKey);
+```
+

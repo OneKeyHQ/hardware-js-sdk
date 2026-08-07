@@ -1,0 +1,56 @@
+---
+title: 钱包 UI 库
+description: 预构建的钱包连接 UI 组件，快速集成
+---
+
+import { Callout } from 'nextra/components'
+
+# 钱包 UI 库
+
+预构建的钱包连接库，提供精美的钱包选择弹窗、移动端支持，并自动处理各种边界情况。
+
+<Callout type="info">
+**推荐大多数项目使用。** 这些库可以节省开发时间，并提供经过实战检验的钱包连接流程。
+</Callout>
+
+---
+
+## 选择你的库
+
+| 库 | 框架支持 | 特性 |
+|---------|-----------|----------|
+| [RainbowKit](/zh/connect-to-software/wallet-ui/rainbowkit) | 仅 React | 精美弹窗、高度可定制、wagmi 集成 |
+| [Web3Modal](/zh/connect-to-software/wallet-ui/web3modal) | React/Vue/JS | WalletConnect 生态、移动端二维码、AppKit |
+| [Web3-Onboard](/zh/connect-to-software/wallet-ui/web3-onboard) | React/Vue/JS | Blocknative、高度可定制 |
+
+---
+
+## 快速对比
+
+| 特性 | RainbowKit | Web3Modal | Web3-Onboard |
+|---------|------------|-----------|--------------|
+| React | ✅ | ✅ | ✅ |
+| Vue | ❌ | ✅ | ✅ |
+| 原生 JS | ❌ | ✅ | ✅ |
+| 移动端二维码 | ✅ | ✅ | ✅ |
+| 主题定制 | 高 | 中等 | 高 |
+| 包体积 | 中等 | 中等 | 中等 |
+
+---
+
+## 何时使用
+
+在以下情况使用钱包 UI 库：
+- 想要开箱即用的精美钱包选择体验
+- 需要移动端钱包支持和二维码
+- 不想自己构建钱包连接 UI
+- 需要 WalletConnect 集成
+
+---
+
+## 替代方案：自定义 UI
+
+如果需要完全控制钱包 UI，可以考虑：
+- [Wagmi](/zh/connect-to-software/react-hooks/wagmi) - 无 UI 的 React hooks
+- [Provider API](/zh/connect-to-software/provider/eth) - 直接访问钱包
+

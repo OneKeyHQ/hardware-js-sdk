@@ -1,0 +1,68 @@
+---
+title: 获取设备特性
+---
+
+# 获取设备特性
+
+## 获取设备特性
+
+获取设备的所有属性。
+
+```typescript
+const response = await HardwareSDK.getFeatures(connectId);
+```
+
+> 如果屏幕正在显示其他内容，您也可以调用此方法返回主页。
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+### 示例
+
+```typescript
+const response = await HardwareSDK.getFeatures(connectId);
+```
+
+### 返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        major_version: number, // 主版本号
+        minor_version: number, // 中间版本号
+        patch_version: number, // 补丁版本号
+        bootloader_mode: null,
+        device_id: string,
+        pin_protection: boolean,
+        passphrase_protection: boolean, // 是否启用密码短语
+        language: string,
+        label: string, // 设备名称
+        initialized: boolean, // 设备初始化状态
+        model: string,
+        safety_checks: string,
+        ble_name: string, // 蓝牙名称
+        ble_ver: string, // 蓝牙固件版本
+        ble_enable: string,
+        se_enable: boolean,
+        se_ver: string,
+        backup_only: boolean,
+        onekey_version: string, // 固件版本
+        onekey_serial: string, // 设备序列号
+        bootloader_version: string, // 引导加载程序版本
+  }
+}
+```
+
+### 错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误消息
+        code: number // 错误码
+    }
+}
+```

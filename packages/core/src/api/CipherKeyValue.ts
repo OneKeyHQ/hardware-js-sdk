@@ -1,17 +1,22 @@
-import { CipherKeyValue as HardwareCipherKeyValue } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../constants/ui-request';
 import { serializedPath, validatePath } from './helpers/pathUtils';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
-import { CipheredKeyValue, CipheredKeyValueParams } from '../types';
 import { formatAnyHex } from './helpers/hexUtils';
 
+import type { CipheredKeyValue, CipheredKeyValueParams } from '../types';
+import type { CipherKeyValue as HardwareCipherKeyValue } from '@onekeyfe/hd-transport';
+
 export default class CipherKeyValue extends BaseMethod<HardwareCipherKeyValue[]> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

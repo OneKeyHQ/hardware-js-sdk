@@ -8,6 +8,11 @@ enum Networks {
   Astar = 'astar',
   JoyStream = 'joystream',
   Manta = 'manta',
+  Hydration = 'hydration',
+  Bifrost = 'bifrost',
+  BifrostKusama = 'bifrost-ksm',
+  PolkadotAssetHub = 'polkadot-assethub',
+  KusamaAssetHub = 'kusama-assethub',
 }
 
 // All polkadot networks are included in no special case
@@ -17,6 +22,9 @@ const baseVersionRange = {
   },
   model_touch: {
     min: '4.3.0',
+  },
+  pro2: {
+    min: '0.0.0',
   },
 };
 
@@ -28,6 +36,9 @@ const specialVersionRange: Record<string, DeviceFirmwareRange> = {
     model_touch: {
       min: '4.7.0',
     },
+    pro2: {
+      min: '0.0.0',
+    },
   },
   [Networks.Manta]: {
     model_mini: {
@@ -35,6 +46,9 @@ const specialVersionRange: Record<string, DeviceFirmwareRange> = {
     },
     model_touch: {
       min: '4.9.0',
+    },
+    pro2: {
+      min: '0.0.0',
     },
   },
 };
@@ -53,4 +67,15 @@ export function getPolkadotVersionRangeWithBundle(networks: string[]) {
     return specialVersionRange[Networks.Manta];
   }
   return baseVersionRange;
+}
+
+export function parseNetwork(network: string) {
+  switch (network) {
+    case Networks.PolkadotAssetHub:
+      return Networks.Polkadot;
+    case Networks.KusamaAssetHub:
+      return Networks.Kusama;
+    default:
+      return network;
+  }
 }

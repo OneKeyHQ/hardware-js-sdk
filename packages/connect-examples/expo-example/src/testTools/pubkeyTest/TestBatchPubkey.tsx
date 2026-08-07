@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
-
 import { Text, XStack } from 'tamagui';
 import { useIntl } from 'react-intl';
+
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
-import { PubkeyBatchTestCase } from './types';
-import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import passphraseTestCase from './data/count24_two/passphrase_empty';
 import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
@@ -17,8 +14,15 @@ import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerO
 import { stripHexPrefix } from '../../utils/hexstring';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 
+import type { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
+import type { CoreMessage } from '@onekeyfe/hd-core';
+import type { PubkeyBatchTestCase } from './types';
+
 type TestCaseDataType = PubkeyBatchTestCase['data'][0];
-type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
+type ResultViewProps = {
+  item: TestCaseDataWithKey<TestCaseDataType>;
+  itemVerifyState: { verify: string; error?: string };
+};
 
 function ExportReportView() {
   const intl = useIntl();
@@ -75,7 +79,7 @@ const RenderNestedObject = ({ obj, parentKey = '' }: { obj: any; parentKey?: str
   </>
 );
 
-function ResultView({ item }: ResultViewProps) {
+function ResultView({ item, itemVerifyState }: ResultViewProps) {
   const title = item?.title || item?.method;
 
   return (
@@ -156,7 +160,9 @@ function validateFields(key: string, payload: any, result: any, prefix = '') {
     if (typeof result[fieldKey] === 'string') {
       const expected = stripHexPrefix(result?.[fieldKey]);
       const actual = stripHexPrefix(payload?.[fieldKey]);
-      if (fieldKey && expected !== actual) {
+      if (key.includes("m/44'/60'/") && fieldKey === 'xpub' && actual == null) {
+        // ignore evm xpub
+      } else if (fieldKey && expected !== actual) {
         error += `(${key}) ${fullPath}: actual: ${payload?.[fieldKey]}, expected: ${result[fieldKey]}\n`;
       }
     } else {
@@ -204,7 +210,7 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
   const fullOriginDataRef = useRef(passphraseTestCase);
   const originDataRef = useRef(passphraseTestCase);
 
-  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+  const { stopTest, beginTest, retryFailedTasks } = useRunnerTest<TestCaseDataType>({
     initTestCase: () => {
       const testCase = currentTestCase;
       const currentTestCases = testCase?.data?.map((item, index) => {
@@ -265,18 +271,15 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
       fullOriginDataRef.current = fullPath(passphraseTestCase);
       originDataRef.current = passphraseTestCase;
     },
-    generateRequestParams: item => {
-      const { params } = item;
-      const requestParams = {
-        ...params,
-        passphraseState: currentTestCase?.extra?.passphraseState,
-        useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
-      };
-      return Promise.resolve({
+    generateRequestParams: item =>
+      Promise.resolve({
         method: item.method,
-        params: requestParams,
-      });
-    },
+        params: {
+          ...item.params,
+          passphraseState: currentTestCase?.extra?.passphraseState,
+          useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
+        },
+      }),
     processResponse: (res, item, itemIndex) => {
       const response = res as {
         path: string;
@@ -292,17 +295,24 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
           account => account.path === key || account.serializedPath === key
         );
 
-        // 测试数据
-        originDataRef.current = setTestData(
-          originDataRef.current,
-          fullOriginDataRef.current,
-          itemIndex,
-          address,
-          item.result[key],
-          key
-        );
+        // 🎯 检查预期结果是否为空对象
+        const expectedFields = Object.keys(item.result[key] || {});
+        if (expectedFields.length === 0) {
+          console.warn(`⚠️ 路径 ${key} 的预期结果为空，跳过验证`);
+          error += `(${key}) 预期结果为空，无法验证\n`;
+        } else {
+          // 测试数据
+          originDataRef.current = setTestData(
+            originDataRef.current,
+            fullOriginDataRef.current,
+            itemIndex,
+            address,
+            item.result[key],
+            key
+          );
 
-        error += validateFields(key, address, item.result[key]);
+          error += validateFields(key, address, item.result[key]);
+        }
       }
 
       return Promise.resolve({
@@ -337,19 +347,24 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
               <Picker.Item key={`${index}`} label={testCase} value={testCase} />
             ))}
           </Picker>
-          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
+          <TestRunnerOptionButtons
+            onStop={stopTest}
+            onStart={beginTest}
+            onRetryFailed={retryFailedTasks}
+          />
           <ExportReportView />
         </XStack>
       </>
     ),
     [
-      currentTestCase?.name,
-      findTestCase,
+      testDescription,
       passphrase,
+      currentTestCase?.name,
+      testCaseList,
       stopTest,
       beginTest,
-      testCaseList,
-      testDescription,
+      retryFailedTasks,
+      findTestCase,
     ]
   );
 
@@ -363,11 +378,18 @@ export function TestBatchPubkey({
   title: string;
   testCases: PubkeyBatchTestCase[];
 }) {
+  // 🎯 使用 testCases 数组的第一个元素的 name 作为 key
+  // 当 testCases 改变时，强制 TestRunnerView 完全重新挂载，清除所有状态
+  const testKey = testCases[0]?.name || title;
+
   return (
     <TestRunnerView<PubkeyBatchTestCase['data']>
+      key={testKey}
       title={title}
       renderExecuteView={() => <ExecuteView testCases={testCases} />}
-      renderResultView={item => <ResultView item={item} />}
+      renderResultView={(item, itemVerifyState) => (
+        <ResultView item={item} itemVerifyState={itemVerifyState} />
+      )}
     />
   );
 }

@@ -1,0 +1,64 @@
+---
+title: benfenGetPublicKey
+---
+
+# benfenGetPublicKey
+
+Benfen：获取公钥
+
+使用 BIP32 路径从设备获取公钥。
+
+
+
+**使用要求**
+
+* 固件版本要求
+  * Pro: 4.12.0
+
+```typescript
+const result = await HardwareSDK.benfenGetPublicKey(connectId, deviceId, {
+  path: "m/44'/728'/0'/0'/0'",
+  showOnOneKey: false
+});
+```
+
+#### 参数
+
+**可选通用参数**
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `showOnOneKey` - _可选_ `boolean` 是否在设备上显示公钥
+
+返回值：
+
+* success: boolean - 成功时为 true
+* payload:
+  * path: string - 使用的 BIP32 路径
+  * pub: string - 十六进制格式的公钥
+
+示例：
+
+```typescript
+const params = {
+  path: "m/44'/728'/0'/0'/0'",
+  showOnOneKey: false
+};
+
+// 单个公钥
+const response = await HardwareSDK.benfenGetPublicKey(connectId, deviceId, params);
+
+// 批量公钥
+const batchParams = {
+  bundle: [
+    {
+      path: "m/44'/728'/0'/0'/0'",
+      showOnOneKey: false
+    },
+    {
+      path: "m/44'/728'/1'/0'/0'",
+      showOnOneKey: false
+    }
+  ]
+};
+const batchResponse = await HardwareSDK.benfenGetPublicKey(connectId, deviceId, batchParams);
+```

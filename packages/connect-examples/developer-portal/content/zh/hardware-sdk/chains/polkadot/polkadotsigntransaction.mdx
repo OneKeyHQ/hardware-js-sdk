@@ -1,0 +1,64 @@
+---
+title: polkadotSignTransaction
+---
+
+# polkadotSignTransaction
+
+### 使用要求
+
+* 固件版本要求
+  * Touch: 4.3.0
+  * Classic/Mini: 3.0.0
+
+## Polkadot：签名交易
+
+使用指定 BIP32 路径派生的私钥对交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+
+```typescript
+const result = await HardwareSDK.polkadotSignTransaction(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `network` - _必需_ `string` 网络名称，默认设置为 `polkadot`
+* `rawTx` - _必需_ `string` 序列化交易字符串。
+
+### 示例
+
+```typescript
+const response = await HardwareSDK.polkadotSignTransaction(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/354'/0'/0'/0'",
+    rawTx: "040300388671dd546ba19495211c8cdc200600f9798cf078fca0fb4749ebbc0579c12a0700e40b5402350128009a24000012000000e143f23803ac50e8f6f8e62695d1ce9e4e1d68aa36c1cd2cfd15340213f3423ee356a704dbe75762aaae87b0f4702aafd09e67eed5d09a3a4b0e7da6c37b6f54"
+  }
+);
+```
+
+返回结果
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: "m/44'/354'/0'/0'/0'",
+    signature: "signed data"
+  }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

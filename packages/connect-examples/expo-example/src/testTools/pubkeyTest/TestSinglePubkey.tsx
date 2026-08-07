@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
-
 import { Stack, Text, XStack } from 'tamagui';
 import { useIntl } from 'react-intl';
+
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
-import { PubkeyTestCase } from './types';
-import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
@@ -16,8 +13,15 @@ import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerO
 import { stripHexPrefix } from '../../utils/hexstring';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 
+import type { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
+import type { CoreMessage } from '@onekeyfe/hd-core';
+import type { PubkeyTestCase } from './types';
+
 type TestCaseDataType = PubkeyTestCase['data'][0];
-type ResultViewProps = { item: TestCaseDataWithKey<PubkeyTestCase['data'][0]> };
+type ResultViewProps = {
+  item: TestCaseDataWithKey<PubkeyTestCase['data'][0]>;
+  itemVerifyState: { verify: string; error?: string };
+};
 
 function ExportReportView() {
   const intl = useIntl();
@@ -76,7 +80,7 @@ const RenderNestedObject = ({ obj, parentKey = '' }: { obj: any; parentKey?: str
   </>
 );
 
-function ResultView({ item }: ResultViewProps) {
+function ResultView({ item, itemVerifyState }: ResultViewProps) {
   const title = item?.title || item?.method;
 
   return (
@@ -134,6 +138,9 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
     });
     setTestCaseList(testCaseList);
     setCurrentTestCase(findTestCase(testCaseList[0]));
+
+    // 🎯 当 testCases 改变时，清除所有测试结果
+    // Note: clearTestResults 不在 useRunnerTest 的返回值中，所以这里不调用
   }, [findTestCase, testCases]);
 
   useEffect(() => {
@@ -146,9 +153,10 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
 
   const currentPassphrase = useRef<string | undefined>('');
 
-  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+  const { stopTest, beginTest, retryFailedTasks } = useRunnerTest<TestCaseDataType>({
     initTestCase: () => {
       const testCase = currentTestCase;
+
       const currentTestCases = testCase?.data?.map((item, index) => {
         const key = `${item.method}-${index}`;
 
@@ -212,6 +220,7 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
         passphraseState: currentTestCase?.extra?.passphraseState,
         useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
       };
+
       return Promise.resolve({
         method: item.method,
         params: requestParams,
@@ -224,12 +233,6 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
         error,
       });
     },
-    removeHardwareListener: sdk => {
-      if (hardwareUiEventListener) {
-        sdk.off(UI_EVENT, hardwareUiEventListener);
-      }
-      return Promise.resolve();
-    },
   });
 
   const contentMemo = useMemo(
@@ -239,6 +242,7 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
           {testDescription}
         </Text>
         {!!passphrase && <Text paddingVertical="$2">Passphrase:「{passphrase}」</Text>}
+
         <Stack flex={1} flexDirection="row" flexWrap="wrap" gap="$2">
           <Picker
             style={{ width: 200 }}
@@ -255,21 +259,27 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
             onToggle={setShowOnOneKey}
             vertical
           />
-          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
+
+          <TestRunnerOptionButtons
+            onStop={stopTest}
+            onStart={beginTest}
+            onRetryFailed={retryFailedTasks}
+          />
           <ExportReportView />
         </Stack>
       </>
     ),
     [
-      beginTest,
-      currentTestCase?.name,
-      findTestCase,
-      intl,
+      testDescription,
       passphrase,
+      currentTestCase?.name,
+      testCaseList,
+      intl,
       showOnOneKey,
       stopTest,
-      testCaseList,
-      testDescription,
+      beginTest,
+      retryFailedTasks,
+      findTestCase,
     ]
   );
 
@@ -283,11 +293,18 @@ export function TestSinglePubkey({
   title: string;
   testCases: PubkeyTestCase[];
 }) {
+  // 🎯 使用 testCases 数组的第一个元素的 name 作为 key
+  // 当 testCases 改变时，强制 TestRunnerView 完全重新挂载，清除所有状态
+  const testKey = testCases[0]?.name || title;
+
   return (
     <TestRunnerView<PubkeyTestCase['data']>
+      key={testKey}
       title={title}
       renderExecuteView={() => <ExecuteView testCases={testCases} />}
-      renderResultView={item => <ResultView item={item} />}
+      renderResultView={(item, itemVerifyState) => (
+        <ResultView item={item} itemVerifyState={itemVerifyState} />
+      )}
     />
   );
 }

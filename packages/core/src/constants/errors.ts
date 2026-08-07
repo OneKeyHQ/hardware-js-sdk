@@ -1,4 +1,4 @@
-import { HardwareError, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 export const safeThrowError = (error: any) => {
   if (error instanceof HardwareError) {
@@ -10,6 +10,8 @@ export const safeThrowError = (error: any) => {
   } else if (error.code === 'ERR_BAD_REQUEST') {
     throw ERRORS.TypedError(HardwareErrorCode.BridgeNetworkError);
   } else {
-    throw ERRORS.TypedError(error);
+    const message = error?.message ?? String(error);
+    const name = error?.name ? `${error.name}: ` : '';
+    throw ERRORS.TypedError(HardwareErrorCode.UnknownError, `${name}${message}`);
   }
 };

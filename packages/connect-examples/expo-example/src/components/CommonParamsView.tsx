@@ -1,5 +1,6 @@
 import { Stack } from 'tamagui';
 import { useIntl } from 'react-intl';
+
 import { useCommonParams } from '../provider/CommonParamsProvider';
 import { CommonInput } from './CommonInput';
 import { SwitchInput } from './SwitchInput';
@@ -16,10 +17,36 @@ export default function CommonParamsView() {
   return (
     <PanelView title={intl.formatMessage({ id: 'title__common_parameters' })}>
       <Stack gap="$4" flexDirection="row" flexWrap="wrap">
+        <CommonInput
+          label="Passphrase State"
+          type="text"
+          value={commonParams.passphraseState ?? ''}
+          onChange={value => handleSetParam('passphraseState', value)}
+        />
+        <SwitchInput
+          label={intl.formatMessage({ id: 'label__use_empty_passphrase' })}
+          value={!!commonParams.useEmptyPassphrase}
+          onToggle={value => handleSetParam('useEmptyPassphrase', value)}
+        />
+        <SwitchInput
+          label="skipPassphraseCheck"
+          value={!!commonParams.skipPassphraseCheck}
+          onToggle={value => handleSetParam('skipPassphraseCheck', value)}
+        />
         <SwitchInput
           label={intl.formatMessage({ id: 'label__keep_session' })}
           value={!!commonParams.keepSession}
           onToggle={value => handleSetParam('keepSession', value)}
+        />
+        <SwitchInput
+          label={intl.formatMessage({ id: 'label__init_session' })}
+          value={!!commonParams.initSession}
+          onToggle={value => handleSetParam('initSession', value)}
+        />
+        <SwitchInput
+          label="usePreInitialize"
+          value={!!commonParams.usePreInitialize}
+          onToggle={value => handleSetParam('usePreInitialize', value)}
         />
         <CommonInput
           label={intl.formatMessage({ id: 'label__retry_count' })}
@@ -38,22 +65,6 @@ export default function CommonParamsView() {
           type="number"
           value={commonParams.timeout?.toString() ?? ''}
           onChange={value => handleSetParam('timeout', parseInt(value))}
-        />
-        <CommonInput
-          label="Passphrase State"
-          type="text"
-          value={commonParams.passphraseState ?? ''}
-          onChange={value => handleSetParam('passphraseState', value)}
-        />
-        <SwitchInput
-          label={intl.formatMessage({ id: 'label__init_session' })}
-          value={!!commonParams.initSession}
-          onToggle={value => handleSetParam('initSession', value)}
-        />
-        <SwitchInput
-          label={intl.formatMessage({ id: 'label__use_empty_passphrase' })}
-          value={!!commonParams.useEmptyPassphrase}
-          onToggle={value => handleSetParam('useEmptyPassphrase', value)}
         />
         <SwitchInput
           label="detectBootloaderDevice"

@@ -1,0 +1,82 @@
+---
+title: API 参考
+description: OneKey TRON provider 完整 API 参考
+---
+
+# API 参考
+
+OneKey TRON provider 方法和类型的完整参考。
+
+---
+
+## Provider 方法
+
+| 方法 | 描述 |
+|------|------|
+| `request({ method, params })` | 通用 JSON-RPC 请求 |
+| `sign(transaction)` | 签署交易 |
+| `signMessage(hexMessage)` | 签署十六进制消息 (V1) |
+| `signMessageV2(message)` | 签署 UTF-8 消息 (V2) |
+| `getNodeInfo(callback)` | 获取节点信息 |
+
+---
+
+## Request 方法
+
+| 方法 | 描述 |
+|------|------|
+| `tron_requestAccounts` | 请求连接 |
+| `tron_getProviderState` | 获取 provider 状态 |
+| `tron_signTransaction` | 签署交易 |
+| `signMessageV1` | 签署消息 V1 |
+| `signMessageV2` | 签署消息 V2 |
+
+---
+
+## 响应码
+
+| 错误码 | 描述 |
+|--------|------|
+| 200 | 成功 |
+| 4000 | 用户拒绝 |
+| 4001 | 请求排队中 |
+
+---
+
+## 事件
+
+| 事件 | 描述 |
+|------|------|
+| `accountsChanged` | 账户已变更 |
+| `chainChanged` | 网络已变更 |
+| `connect` | 已连接 |
+| `disconnect` | 已断开连接 |
+
+---
+
+## TronWeb 方法
+
+连接后，使用 `window.tronWeb`：
+
+| 方法 | 描述 |
+|------|------|
+| `tronWeb.trx.getBalance(address)` | 获取 TRX 余额 |
+| `tronWeb.trx.sendTransaction(to, amount)` | 发送 TRX |
+| `tronWeb.trx.sendRawTransaction(signedTx)` | 广播已签名的交易 |
+| `tronWeb.trx.verifyMessageV2(msg, sig)` | 验证签名 |
+| `tronWeb.contract().at(address)` | 获取合约实例 |
+| `tronWeb.toSun(trx)` | 将 TRX 转换为 Sun |
+| `tronWeb.fromSun(sun)` | 将 Sun 转换为 TRX |
+| `tronWeb.toHex(string)` | 转换为十六进制 |
+
+---
+
+## 属性
+
+| 属性 | 类型 | 描述 |
+|------|------|------|
+| `isTronLink` | `boolean` | TronLink 兼容 |
+| `isOneKey` | `boolean` | OneKey 标识 |
+| `tronWeb.ready` | `boolean` | TronWeb 就绪状态 |
+| `tronWeb.defaultAddress.base58` | `string` | 当前地址 |
+

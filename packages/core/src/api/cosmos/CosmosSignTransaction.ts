@@ -1,16 +1,24 @@
-import { CosmosSignTx as HardwareCosmosSignTx } from '@onekeyfe/hd-transport';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { CosmosSignTransactionParams } from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
 
+import type { CosmosSignTx as HardwareCosmosSignTx } from '@onekeyfe/hd-transport';
+import type { CosmosSignTransactionParams } from '../../types';
+
 export default class CosmosSignTransaction extends BaseMethod<HardwareCosmosSignTx> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode];
+    this.allowDeviceMode = [...this.allowDeviceMode];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [
@@ -40,15 +48,26 @@ export default class CosmosSignTransaction extends BaseMethod<HardwareCosmosSign
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('CosmosSignTx', 'CosmosSignedTx', {
-      ...this.params,
-    });
+    try {
+      const res = await this.device.commands.typedCall('CosmosSignTx', 'CosmosSignedTx', {
+        ...this.params,
+      });
 
-    const { signature } = res.message;
+      const { signature } = res.message;
 
-    return {
-      path: serializedPath(this.params.address_n),
-      signature,
-    };
+      return {
+        path: serializedPath(this.params.address_n),
+        signature,
+      };
+    } catch (error) {
+      const { message } = error;
+      if (
+        message.includes('Failure_DataError,Json parse failed') ||
+        message.includes('Failure_DataError,Invalid message')
+      ) {
+        throw ERRORS.TypedError(HardwareErrorCode.CosmosInvalidJsonMessage, message);
+      }
+      throw error;
+    }
   }
 }

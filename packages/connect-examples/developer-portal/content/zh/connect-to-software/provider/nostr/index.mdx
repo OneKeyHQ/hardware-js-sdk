@@ -1,0 +1,34 @@
+---
+description: 通过 OneKey Provider 集成 Nostr — getPublicKey、signEvent、signSchnorr 等
+slug: /dapp/chains/nostr
+---
+
+# Nostr
+
+使用 OneKey Provider 集成 Nostr 功能。
+
+## 快速链接
+
+- [指南](guide)
+- [API 参考](api-reference)
+- [事件](event)
+
+## 最小示例
+
+```js
+const provider = window?.$onekey?.nostr || window?.nostr
+if (!provider) throw new Error('未检测到 OneKey Nostr Provider')
+
+const pubkey = await provider.getPublicKey()
+// 示例：签名事件（填写你自己的事件字段）
+// const signed = await provider.signEvent(event)
+```
+
+## 事件
+
+- 查看 [事件](event) 了解账户/网络相关更新
+
+## 常见错误
+
+- 4001：用户拒绝
+- 无效参数：需符合 NIP-07 规范

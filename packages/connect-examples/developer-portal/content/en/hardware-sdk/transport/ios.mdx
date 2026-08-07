@@ -1,0 +1,279 @@
+---
+title: "iOS: Connect via Bluetooth (Native)"
+---
+
+# iOS: Connect via Bluetooth (Native)
+
+> **Note:**
+> Demo: Native iOS example (WKWebView + CoreBluetooth) → [native-ios-example](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-ios-example)
+> This guide builds on the [Low-Level Transport Plugin](/en/hardware-sdk/concepts/low-level-plugin) and its 64-byte message protocol—read that first.
+
+
+This page shows how to integrate `@onekeyfe/hd-common-connect-sdk` in a native iOS host via a low-level adapter. The JavaScript bundle runs in WKWebView; transport calls are forwarded to native CoreBluetooth and bridged back to JS.
+
+Key stack:
+- CoreBluetooth (system)
+- WKWebViewJavascriptBridge (CocoaPods) for JS ↔ Native messaging
+
+Info.plist (permissions):
+- `NSBluetoothAlwaysUsageDescription`
+- (Older iOS) `NSBluetoothPeripheralUsageDescription`
+
+OneKey BLE UUIDs:
+- Service: `00000001-0000-1000-8000-00805f9b34fb`
+- Write:   `00000002-0000-1000-8000-00805f9b34fb`
+- Notify:  `00000003-0000-1000-8000-00805f9b34fb`
+
+## Step 1. Pod and web assets
+
+Podfile (add the bridge dependency):
+```ruby
+platform :ios, '13.0'
+use_frameworks!
+
+target 'YourAppTarget' do
+  pod 'WKWebViewJavascriptBridge'
+end
+```
+
+Build the web bundle (already implemented in the demo):
+```bash
+# inside hardware-js-sdk repo
+cd packages/connect-examples/native-ios-example/web
+yarn && yarn build   # emits web/web_dist/
+```
+
+Copy web assets into your app target resources (two options):
+- Option A (keep folder; recommended for clarity):
+  - Copy the entire `web/web_dist/` folder into your Xcode project (e.g., a group named `web/web_dist`) and ensure it is included in "Copy Bundle Resources".
+  - Load path: `web/web_dist/index.html`.
+- Option B (flatten):
+  - Copy all files inside `web/web_dist/` directly into your app bundle root (or a chosen assets folder).
+  - Load the matching path (e.g., `index.html`).
+
+Keep the HTML `<script src="...">` paths consistent with your placement.
+
+## Step 2. State and handler names
+
+```swift
+class ViewController: UIViewController {
+  // Web
+  var webView: WKWebView!
+  var bridge: WKWebViewJavascriptBridge!
+
+  // BLE
+  var manager: CBCentralManager!
+  var peripheral: CBPeripheral?
+  var writeCharacteristic: CBCharacteristic?
+  var notifyCharacteristic: CBCharacteristic?
+
+  // Service UUID
+  let serviceID = "00000001-0000-1000-8000-00805f9b34fb"
+
+  // Bridge callbacks (enumeration etc.)
+  var enumerateCallback: ((Any?) -> Void)?
+}
+```
+
+## Step 3. WKWebView + Bridge + load HTML (initialization order matters)
+
+- Create the WKWebView
+- Create the bridge
+- Register all native handlers (enumerate/connect/disconnect/send/monitorCharacteristic)
+- Load the HTML (from the bundled `web/web_dist/`)
+
+```swift
+import CoreBluetooth
+import WebKit
+import WKWebViewJavascriptBridge
+
+class ViewController: UIViewController {
+  // ... (state omitted for brevity)
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+
+    manager = CBCentralManager(delegate: self, queue: .main)
+
+    webView = WKWebView(frame: view.bounds)
+    view.addSubview(webView)
+
+    bridge = WKWebViewJavascriptBridge(webView: webView)
+    registerBridgeHandlers()
+
+    // Load built HTML bundle (Option A path shown)
+    if let htmlPath = Bundle.main.path(forResource: "index", ofType: "html", inDirectory: "web/web_dist") {
+      webView.load(URLRequest(url: URL(fileURLWithPath: htmlPath)))
+    }
+  }
+}
+```
+
+## Step 4. Bridge handlers (enumerate / connect / disconnect / send)
+
+```swift
+extension ViewController {
+  func registerBridgeHandlers() {
+    // enumerate: scan BLE and return [{ id, name }]
+    bridge.register(handlerName: "enumerate") { [weak self] _, callback in
+      guard let self = self else { return }
+      self.enumerateCallback = callback
+      self.manager.scanForPeripherals(
+        withServices: [CBUUID(string: self.serviceID)], options: nil
+      )
+      // Stop after a short window in production; see demo for accumulation and de-duplication
+    }
+
+    // connect: connect to a specific peripheral UUID
+    bridge.register(handlerName: "connect") { [weak self] params, callback in
+      guard
+        let self = self,
+        let uuid = params?["uuid"] as? String,
+        let id = UUID(uuidString: uuid)
+      else {
+        callback?(["success": false, "error": "Invalid UUID"])
+        return
+      }
+
+      // Try to retrieve a known peripheral first
+      if let found = self.manager.retrievePeripherals(withIdentifiers: [id]).first {
+        self.peripheral = found
+        self.manager.connect(found, options: nil)
+      } else {
+        // Fallback: scan and match during didDiscover
+        self.manager.scanForPeripherals(
+          withServices: [CBUUID(string: self.serviceID)], options: nil
+        )
+      }
+      callback?(["success": true])
+    }
+
+    // disconnect
+    bridge.register(handlerName: "disconnect") { [weak self] _, callback in
+      if let p = self?.peripheral { self?.manager.cancelPeripheralConnection(p) }
+      callback?(["success": true])
+    }
+
+    // send: write hex payload
+    bridge.register(handlerName: "send") { [weak self] params, callback in
+      guard
+        let self = self,
+        let hex = params?["data"] as? String,
+        let ch = self.writeCharacteristic
+      else { callback?(["success": false]); return }
+
+      var bytes = [UInt8]()
+      var index = hex.startIndex
+      while index < hex.endIndex {
+        let next = hex.index(index, offsetBy: 2)
+        if let b = UInt8(hex[index..<next], radix: 16) { bytes.append(b) }
+        index = next
+      }
+      self.peripheral?.writeValue(Data(bytes), for: ch, type: .withoutResponse)
+      callback?(["success": true])
+    }
+  }
+}
+```
+
+## Step 5. CoreBluetooth scanning and notifications
+
+```swift
+extension ViewController: CBCentralManagerDelegate, CBPeripheralDelegate {
+  func centralManagerDidUpdateState(_ central: CBCentralManager) {
+    // Handle .poweredOn / other states; optionally restore a cached device by UUID
+  }
+
+  // Accumulate devices and return to JS
+  func centralManager(
+    _ central: CBCentralManager,
+    didDiscover p: CBPeripheral,
+    advertisementData: [String : Any],
+    rssi RSSI: NSNumber
+  ) {
+    let item: [String: String] = [
+      "id": p.identifier.uuidString,
+      "name": p.name ?? ""
+    ]
+    // Return to JS enumerate callback (store callback during enumerate)
+    enumerateCallback?( [item] )
+    // In production: de-duplicate and stop scan after timeout or enough results
+  }
+
+  func centralManager(_ central: CBCentralManager, didConnect p: CBPeripheral) {
+    p.delegate = self
+    p.discoverServices([CBUUID(string: serviceID)])
+  }
+
+  func peripheral(_ p: CBPeripheral, didDiscoverServices error: Error?) {
+    guard let service = p.services?.first else { return }
+    let writeID = CBUUID(string: "00000002-0000-1000-8000-00805f9b34fb")
+    let notifyID = CBUUID(string: "00000003-0000-1000-8000-00805f9b34fb")
+    p.discoverCharacteristics([writeID, notifyID], for: service)
+  }
+
+  func peripheral(_ p: CBPeripheral, didDiscoverCharacteristicsFor s: CBService, error: Error?) {
+    s.characteristics?.forEach { ch in
+      if ch.uuid == CBUUID(string: "00000002-0000-1000-8000-00805f9b34fb") { writeCharacteristic = ch }
+      if ch.uuid == CBUUID(string: "00000003-0000-1000-8000-00805f9b34fb") {
+        notifyCharacteristic = ch
+        p.setNotifyValue(true, for: ch)
+      }
+    }
+  }
+
+  func peripheral(_ p: CBPeripheral, didUpdateValueFor ch: CBCharacteristic, error: Error?) {
+    guard let data = ch.value else { return }
+    // Forward hex to JS — the web bundle reassembles frames and resolves receive()
+    let hex = data.map { String(format: "%02x", $0) }.joined()
+    bridge.callHandler("monitorCharacteristic", data: hex)
+  }
+}
+```
+
+## Step 6. JavaScript bundle (low-level adapter)
+
+The demo’s web project (under `native-ios-example/web`) already builds a bundle that initializes the SDK with `env: 'lowlevel'` and wires the low-level adapter. You typically do NOT need to write extra JS — just build and include the `web/web_dist/` directory in your app resources so it can be loaded (e.g., `web/web_dist/index.html`).
+
+If you customize the adapter, keep the same pattern: initialize with `env: 'lowlevel'` and forward `enumerate/connect/disconnect/send/receive` to the native bridge.
+
+## Step 7. (Optional) Native UI prompts bridging
+
+If you want to present native PIN/confirmation UI instead of handling dialogs only in JS, expose extra handlers so JS can request native UI and receive results. The demo shows this pattern.
+
+```swift
+// Example: PIN input handler bridging (simplified)
+bridge.register(handlerName: "requestPinInput") { [weak self] _, callback in
+  // Present your native PIN screen.
+  // Return "" (empty) to instruct JS to use device PIN entry,
+  // or return a transformed PIN string (blind keypad sequence) for software entry.
+  // For example, to force on-device input:
+  callback?("")
+}
+
+// Example: confirmation dialog
+bridge.register(handlerName: "requestButtonConfirmation") { _, callback in
+  // Show a native confirm dialog; return "ok" or "cancel" as needed.
+  callback?("ok")
+}
+
+bridge.register(handlerName: "closeUIWindow") { _, callback in
+  // Close any native overlay.
+  callback?("closed")
+}
+```
+
+In JS, you would call these handlers from your adapter to mirror the demo's behavior. Otherwise, you can handle UI entirely in JS using `UI_EVENT` — see [Config Event](/en/hardware-sdk/core-api-guide#events-ui) for event wiring and responses (WebUSB guide includes minimal dialogs).
+
+## Step 8. Checklist
+
+- Register handlers before loading the HTML to avoid race conditions.
+- Scan with service UUID filter and stop within a reasonable time window.
+- Persist `connectId` (peripheral UUID) and fetch `device_id` with `getFeatures(connectId)` after the first connection.
+- Always subscribe to `UI_EVENT` in JS to avoid stalled requests (see [Config Event](/en/hardware-sdk/core-api-guide#events-ui)).
+- Keep `web/web_dist/` in your app bundle and adjust the `load` path accordingly.
+
+## References
+
+- Message Protocol (64‑byte framing): [See Low-Level Transport Plugin](/en/hardware-sdk/concepts/low-level-plugin#message-protocol-part-of-low-level-transport)
+- Low‑level transport plugin contract: [Low-level Transport Plugin](/en/hardware-sdk/concepts/low-level-plugin)

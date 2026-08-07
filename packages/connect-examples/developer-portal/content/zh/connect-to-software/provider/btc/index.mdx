@@ -1,0 +1,31 @@
+---
+description: 通过 OneKey 注入的 BTC Provider 进行 Bitcoin 集成 (window.$onekey.btc / window.unisat)
+slug: /dapp/chains/btc
+---
+
+# BTC
+
+使用 OneKey 注入的 BTC Provider 集成 Bitcoin。优先使用 `window.$onekey.btc`；需要时可回退到 `window.unisat`。
+
+## 快速链接
+
+- [指南](guide)
+- [API 参考](api-reference)
+- [事件](event)
+
+## 最小示例
+
+```js
+const provider = (window as any).$onekey?.btc || (window as any).unisat
+if (!provider) throw new Error('未检测到 OneKey BTC Provider')
+await provider.requestAccounts()
+```
+
+## 事件与网络
+
+- `accountsChanged`, `networkChanged` — 重新同步账户和网络状态
+
+## 常见错误
+
+- 用户拒绝：优雅处理并允许重试
+- 参数无效：确保地址/金额格式正确

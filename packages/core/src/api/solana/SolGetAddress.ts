@@ -1,16 +1,21 @@
-import { SolanaGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { SolanaAddress, SolanaGetAddressParams } from '../../types';
+
+import type { SolanaGetAddress } from '@onekeyfe/hd-transport';
+import type { SolanaAddress, SolanaGetAddressParams } from '../../types';
 
 export default class SolGetAddress extends BaseMethod<SolanaGetAddress[]> {
   hasBundle = false;
 
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -35,6 +40,10 @@ export default class SolGetAddress extends BaseMethod<SolanaGetAddress[]> {
         show_display: showOnOneKey,
       });
     });
+  }
+
+  getVersionRange() {
+    return {};
   }
 
   async run() {

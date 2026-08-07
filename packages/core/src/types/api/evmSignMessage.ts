@@ -1,4 +1,4 @@
-import { EthereumMessageSignature } from '@onekeyfe/hd-transport';
+import type { EthereumMessageSignature } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type EVMSignMessageParams = {

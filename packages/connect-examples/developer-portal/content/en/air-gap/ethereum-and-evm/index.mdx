@@ -1,0 +1,50 @@
+---
+title: Ethereum & EVM
+---
+
+# Ethereum & EVM
+
+Air-Gap signing support for Ethereum and EVM-compatible chains.
+
+## Account Setup
+
+To obtain an ETH account, use the [CryptoHDKey](../basic-api/cryptohdkey) to acquire the extended public key from the device.
+
+## Supported Operations
+
+| Operation | DataType | Description |
+|-----------|----------|-------------|
+| EIP-1559 Transaction | `typedTransaction (4)` | Modern transaction format |
+| Legacy Transaction | `transaction (1)` | Classic transaction format |
+| EIP-712 TypedData | `typedData (2)` | Structured data signing |
+| Personal Message | `personalMessage (3)` | Message signing |
+
+## Flow
+
+1. Build sign request using [EthSignRequest](./ethsignrequest)
+2. Encode as UR and display animated QR
+3. Device scans, verifies, and signs offline
+4. Decode response using [EthSignature](./ethsignature)
+5. Attach signature to transaction and broadcast
+
+## Quick Example
+
+```ts
+import { KeystoneEthereumSDK } from '@keystonehq/keystone-sdk';
+
+const eth = new KeystoneEthereumSDK();
+
+// Generate sign request
+const ur = eth.generateSignRequest({
+  requestId: 'uuid-string',
+  signData: unsignedTxHex,    // hex without 0x
+  dataType: 4,                // EIP-1559
+  path: "m/44'/60'/0'/0/0",
+  xfp: '12345678',
+  chainId: 1,
+  origin: 'your-app',
+});
+
+// Encode and display QR
+```
+

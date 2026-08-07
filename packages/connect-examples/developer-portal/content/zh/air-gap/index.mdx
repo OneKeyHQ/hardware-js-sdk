@@ -1,0 +1,45 @@
+---
+title: Air-Gap（离线二维码签名）
+---
+
+# Air-Gap（离线二维码签名）
+
+使用 UR 编码二维码构建"设备保持离线"的签名流程。
+
+## 工作原理
+
+1. **构建请求**：创建签名请求 UR 数据包，渲染为动画二维码帧
+2. **设备扫描**：设备扫描二维码，在屏幕上验证详情，离线签名
+3. **获取签名**：设备以动画二维码形式显示签名 UR
+4. **广播交易**：应用扫描响应，验证后通过网络广播
+
+## 按链快速开始
+
+| 链 | 请求类型 | 响应类型 |
+|-------|-------------|---------------|
+| [Ethereum & EVM](./ethereum-and-evm) | `eth-sign-request` | `eth-signature` |
+| [Bitcoin (PSBT)](./bitcoin) | `crypto-psbt` | `crypto-psbt` |
+| [Solana](./solana) | `sol-sign-request` | `sol-signature` |
+| [Tron](./tron) | `tron-sign-request` | `tron-signature` |
+
+## API 参考
+
+- [基础 API](./basic-api) – 核心 UR 类型：`CryptoHDKey`、`CryptoCoinInfo`、`CryptoKeypath`
+
+## 依赖包
+
+```bash
+# Keystone SDK 和 UR 注册表
+npm install @keystonehq/keystone-sdk @keystonehq/bc-ur-registry-eth
+
+# UR 基础库
+npm install @ngraveio/bc-ur
+```
+
+## 示例和演示
+
+- **React Native 演示**：[GitHub Air-Gap Demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo/air-gap)
+  - 扫描器：[AirGapScanner.tsx](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/connect-examples/react-native-demo/air-gap/src/components/AirGapScanner.tsx)
+  - 链助手：[sdk/](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo/air-gap/sdk)
+
+> **注意**：Air-Gap 设计为离线使用，没有在线浏览器演示。

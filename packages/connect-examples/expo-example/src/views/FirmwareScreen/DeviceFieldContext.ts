@@ -4,6 +4,7 @@
 // Compare this snippet from packages/connect-examples/expo-example/src/views/FirmwareScreen/DeviceField.tsx:
 
 import { createContext, useContext } from 'react';
+
 import type { Features, OnekeyFeatures } from '@onekeyfe/hd-core';
 
 export const DeviceFieldContext = createContext<{

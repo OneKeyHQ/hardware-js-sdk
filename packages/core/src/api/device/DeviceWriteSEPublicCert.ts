@@ -1,11 +1,12 @@
-import { WriteSEPublicCert } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 import { UI_REQUEST } from '../../constants/ui-request';
+
+import type { WriteSEPublicCert } from '@onekeyfe/hd-transport';
 
 export default class DeviceWriteSEPublicCert extends BaseMethod<WriteSEPublicCert> {
   init() {
     this.useDevicePassphraseState = false;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
     this.params = {
       public_cert: this.payload.public_cert,
     };

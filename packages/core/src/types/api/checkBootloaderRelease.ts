@@ -1,3 +1,4 @@
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { CommonParams, Response } from '../params';
 
 export type CheckBootloaderReleaseResponse = {
@@ -7,9 +8,12 @@ export type CheckBootloaderReleaseResponse = {
   bootloaderMode: boolean;
 } | null;
 
+export type CheckBootloaderReleaseParams = {
+  willUpdateFirmwareVersion?: string;
+  firmwareType?: EFirmwareType;
+};
+
 export declare function checkBootloaderRelease(
   connectId?: string,
-  params?: CommonParams & {
-    willUpdateFirmwareVersion?: string;
-  }
+  params?: CommonParams & CheckBootloaderReleaseParams
 ): Response<CheckBootloaderReleaseResponse>;

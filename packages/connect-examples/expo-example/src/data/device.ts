@@ -71,9 +71,27 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
+    method: 'deviceUnlock',
+    description: 'unlock device',
+    noDeviceIdReq: true,
+  },
+  {
     method: 'deviceSupportFeatures',
     description: 'Check if a device supports a feature',
     noDeviceIdReq: true,
+  },
+  {
+    method: 'preInitialize',
+    description: 'Pre-initialize device (BLE)',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'Pre-initialize',
+        value: {
+          initSession: true,
+        },
+      },
+    ],
   },
   {
     method: 'checkFirmwareRelease',
@@ -112,11 +130,6 @@ const api: PlaygroundProps[] = [
         },
       },
     ],
-  },
-  {
-    method: 'deviceWipe',
-    description: 'Wipe a device',
-    noDeviceIdReq: true,
   },
   {
     method: 'deviceRebootToBoardloader',
@@ -158,6 +171,13 @@ const api: PlaygroundProps[] = [
         title: 'checkAllFirmwareRelease',
         value: {
           checkBridgeRelease: true,
+        },
+      },
+      {
+        title: 'checkAllFirmwareRelease Bitcoin Only',
+        value: {
+          checkBridgeRelease: true,
+          firmwareType: 'bitcoinonly',
         },
       },
     ],

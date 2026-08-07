@@ -2,6 +2,7 @@ import React from 'react';
 import { useIntl } from 'react-intl';
 import { Dialog, Text, Unspaced, YStack } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
+
 import { Button } from './ui/Button';
 
 type IWebUsbAuthorizeProps = {
@@ -24,13 +25,13 @@ export function WebUsbAuthorize({
 
   const handleRequestDevice = async () => {
     try {
-      // Request user permission to access the USB device
       const device = await navigator.usb.requestDevice({ filters });
       onSuccess(device);
       onOpenChange(false);
     } catch (error) {
       // User cancelled the device selection or an error occurred
       console.error('WebUSB request device error:', error);
+      onCancel();
     }
   };
 

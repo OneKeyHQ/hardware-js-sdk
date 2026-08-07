@@ -1,0 +1,162 @@
+---
+title: API 参考
+description: OneKey Cosmos provider 完整 API 参考
+---
+
+# API 参考
+
+OneKey Cosmos provider 方法和类型的完整参考。
+
+---
+
+## 方法
+
+| 方法 | 描述 |
+|------|------|
+| `enable(chainIds)` | 启用链并获取密钥信息 |
+| `disable(chainIds)` | 禁用链 |
+| `disconnect()` | 断开所有链的连接 |
+| `getKey(chainId)` | 获取链的账户密钥 |
+| `signAmino(chainId, signer, signDoc)` | 签署 Amino 编码的交易 |
+| `signDirect(chainId, signer, signDoc)` | 签署 Protobuf 编码的交易 |
+| `sendTx(chainId, tx, mode)` | 广播已签名的交易 |
+| `signArbitrary(chainId, signer, data)` | 签署任意消息 |
+| `verifyArbitrary(chainId, signer, data, signature)` | 验证签名 |
+| `signEthereum(chainId, signer, data, type)` | 签署以太坊数据 |
+| `experimentalSuggestChain(chainInfo)` | 添加自定义链 |
+| `getOfflineSigner(chainId)` | 获取 Direct 离线签名器 |
+| `getOfflineSignerOnlyAmino(chainId)` | 获取仅 Amino 离线签名器 |
+| `getOfflineSignerAuto(chainId)` | 自动检测最佳签名器类型 |
+| `getChainInfosWithoutEndpoints()` | 获取所有链信息 |
+| `getChainInfoWithoutEndpoints(chainId)` | 获取特定链信息 |
+| `ping()` | 检查连接状态 |
+| `babylonConnectWallet()` | 连接 Babylon 钱包 |
+| `babylonGetKey()` | 获取 Babylon 钱包密钥 |
+
+---
+
+## Key 接口
+
+```typescript
+interface Key {
+  name: string              // 可读名称
+  algo: string              // 签名算法
+  pubKey: Uint8Array        // 公钥字节
+  address: Uint8Array       // 地址字节
+  bech32Address: string     // Bech32 格式地址
+  isNanoLedger: boolean     // 是否为硬件钱包
+  isKeystone: boolean       // 是否为 Keystone 硬件
+}
+```
+
+---
+
+## 签名文档类型
+
+### Amino 签名文档
+
+```typescript
+interface StdSignDoc {
+  chain_id: string
+  account_number: string
+  sequence: string
+  fee: {
+    amount: { denom: string; amount: string }[]
+    gas: string
+  }
+  msgs: {
+    type: string
+    value: any
+  }[]
+  memo: string
+}
+```
+
+### Direct 签名文档
+
+```typescript
+interface DirectSignDoc {
+  bodyBytes: Uint8Array | null
+  authInfoBytes: Uint8Array | null
+  chainId: string | null
+  accountNumber: Long | null
+}
+```
+
+---
+
+## 签名响应类型
+
+```typescript
+interface AminoSignResponse {
+  signed: StdSignDoc
+  signature: StdSignature
+}
+
+interface DirectSignResponse {
+  signed: DirectSignDoc
+  signature: StdSignature
+}
+
+interface StdSignature {
+  pub_key: {
+    type: string
+    value: string  // Base64 编码
+  }
+  signature: string  // Base64 编码
+}
+```
+
+---
+
+## 广播模式
+
+| 模式 | 描述 |
+|------|------|
+| `block` | 等待区块确认 |
+| `sync` | 等待 CheckTx |
+| `async` | 立即返回 |
+
+---
+
+## 支持的链
+
+| 链 | Chain ID | 原生支持 |
+|----|----------|----------|
+| Cosmos Hub | `cosmoshub-4` | 是 |
+| Osmosis | `osmosis-1` | 是 |
+| Juno | `juno-1` | 是 |
+| Stargaze | `stargaze-1` | 是 |
+| Akash | `akashnet-2` | 是 |
+| Secret Network | `secret-4` | 是 |
+| Evmos | `evmos_9001-2` | 是 |
+| Injective | `injective-1` | 是 |
+| 自定义 | 任意 | 通过 `experimentalSuggestChain` |
+
+---
+
+## 事件
+
+| 事件 | 描述 |
+|------|------|
+| `keplr_keystorechange` | 账户或密钥已更改 |
+| `connect` | 已连接到链 |
+| `disconnect` | 已断开连接 |
+
+```typescript
+// 监听密钥库变化
+window.addEventListener('keplr_keystorechange', () => {
+  console.log('密钥已更改，刷新账户信息')
+})
+```
+
+---
+
+## 错误码
+
+| 错误码 | 描述 |
+|--------|------|
+| 4001 | 用户拒绝请求 |
+| 4100 | 未授权 |
+| -32603 | 内部错误 |
+

@@ -1,28 +1,83 @@
-import type { Transport, Messages, FailureType } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import {
+  DeviceErrorCode,
+  DeviceSessionErrorCode,
+  type FailureType,
+  type Messages,
+  type Transport,
+  type TransportCallOptions,
+  getSafeTransportLogPayload,
+} from '@onekeyfe/hd-transport';
+
 import TransportManager from '../data-manager/TransportManager';
-import DataManager from '../data-manager/DataManager';
-import { patchFeatures, getLogger, LoggerNames, getDeviceType } from '../utils';
-import type { Device } from './Device';
-import { DEVICE } from '../events';
+import { LoggerNames, getLogger, patchFeatures } from '../utils';
+import { DEVICE, type PassphraseRequestPayload } from '../events';
 import { DeviceModelToTypes } from '../types';
+import {
+  formatRequestContext,
+  generateInstanceId,
+  getActiveRequestsByDeviceInstance,
+} from '../utils/tracing';
+
+import type { Device } from './Device';
 
 export type PassphrasePromptResponse = {
   passphrase?: string;
   passphraseOnDevice?: boolean;
+  attachPinOnDevice?: boolean;
   cache?: boolean;
 };
 
 type MessageType = Messages.MessageType;
-type MessageKey = keyof MessageType;
+type MessageKey = Extract<keyof MessageType, string>;
 export type TypedResponseMessage<T extends MessageKey> = {
   type: T;
   message: MessageType[T];
 };
 type TypedCallResponseMap = {
-  [K in keyof MessageType]: TypedResponseMessage<K>;
+  [K in MessageKey]: TypedResponseMessage<K>;
 };
-export type DefaultMessageResponse = TypedCallResponseMap[keyof MessageType];
+export type DefaultMessageResponse = TypedCallResponseMap[MessageKey];
+
+const HIGH_VOLUME_DEBUG_CALLS = new Set([
+  'FilesystemFileRead',
+  'FilesystemFileWrite',
+  'FileRead',
+  'FileWrite',
+  'EmmcFileRead',
+  'EmmcFileWrite',
+  'FirmwareUpload',
+  'ResourceAck',
+]);
+const DEVICE_SESSION_CALLS = new Set([
+  'DeviceSessionGet',
+  'DeviceSessionAskPin',
+  'DeviceSessionAskPassphrase',
+]);
+
+// Protocol V2 subcodes are domain-scoped, so cross-domain cancellation fallback
+// must use explicit firmware cancellation messages instead of a global number map.
+const isProtocolV2ActionCancelledMessage = (message: string) =>
+  /^(?:cancel(?:led|ed)(?: on device)?|confirm dismissed|user cancel(?:led|ed)(?:\s+.*)?)$/i.test(
+    message
+  );
+
+function shouldReduceDebugForCall(type: string) {
+  return HIGH_VOLUME_DEBUG_CALLS.has(type);
+}
+
+/**
+ * Interactive acknowledgements must not inherit timeoutMs from the original call.
+ * User confirmation and PIN/passphrase entry have unbounded think time. Preserve only
+ * response-related options such as expectedTypes and intermediateTypes.
+ */
+const stripInteractiveAckTimeout = (
+  options?: TransportCallOptions
+): TransportCallOptions | undefined => {
+  if (!options) return options;
+  const { timeoutMs: _timeoutMs, ...rest } = options;
+  return rest;
+};
 
 const assertType = (res: DefaultMessageResponse, resType: string | string[]) => {
   const splitResTypes = Array.isArray(resType) ? resType : resType.split('|');
@@ -113,12 +168,17 @@ export const cancelDeviceWithInitialize = (device: Device) => {
 };
 
 const Log = getLogger(LoggerNames.DeviceCommands);
+const LogCore = getLogger(LoggerNames.Core);
 
 /**
  * The life cycle begins with the acquisition of the device and ends with the disposal device commands
  * acquire device -> create DeviceCommands -> release device -> dispose DeviceCommands
  */
 export class DeviceCommands {
+  instanceId: string;
+
+  currentResponseID?: number;
+
   device: Device;
 
   transport: Transport;
@@ -134,6 +194,9 @@ export class DeviceCommands {
     this.mainId = mainId;
     this.transport = TransportManager.getTransport();
     this.disposed = false;
+    this.instanceId = generateInstanceId('DeviceCommands', device.sdkInstanceId);
+
+    Log.debug(`[DeviceCommands] Created: ${this.instanceId}, device: ${this.device.instanceId}`);
   }
 
   async dispose(_cancelRequest: boolean) {
@@ -188,39 +251,63 @@ export class DeviceCommands {
     if (this.disposed) {
       return;
     }
-    this.dispose(true);
-    if (this.callPromise) {
-      try {
-        await Promise.all([
-          new Promise((_resolve, reject) =>
-            // eslint-disable-next-line no-promise-executor-return
-            setTimeout(() => reject(new Error('cancel timeout')), 10 * 1000)
-          ),
-          await this.callPromise,
-        ]);
-      } catch {
-        // device error
+    const activeCall = this.callPromise;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cancellation = (async () => {
+      await this.dispose(true);
+      await activeCall?.catch(() => undefined);
+    })();
+
+    try {
+      await Promise.race([
+        cancellation,
+        new Promise<void>(resolve => {
+          timer = setTimeout(resolve, 10 * 1000);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+      if (this.callPromise === activeCall) {
         this.callPromise = undefined;
       }
+      // The cancellation work may finish after the bounded wait.
+      cancellation.catch(() => undefined);
     }
   }
 
   // Sends an async message to the opened device.
   async call(
     type: MessageKey,
-    msg: DefaultMessageResponse['message'] = {}
+    msg?: DefaultMessageResponse['message'],
+    options?: TransportCallOptions
   ): Promise<DefaultMessageResponse> {
-    Log.debug('[DeviceCommands] [call] Sending', type);
+    const shouldReduceDebug = shouldReduceDebugForCall(type);
+    if (!shouldReduceDebug) {
+      Log.debug(
+        '[DeviceCommands] [call] Sending',
+        type,
+        getSafeTransportLogPayload(msg ?? {}, type)
+      );
+    }
 
     try {
-      const promise = this.transport.call(this.mainId, type, msg) as any;
+      const promise = this.transport.call(this.mainId, type, msg ?? {}, options) as any;
       this.callPromise = promise;
       const res = await promise;
-      Log.debug('[DeviceCommands] [call] Received', res.type);
-      console.log('[DeviceCommands] [call] Received', res.type);
+      if (!shouldReduceDebug) {
+        LogCore.debug(
+          '[DeviceCommands] [call] Received',
+          res.type,
+          getSafeTransportLogPayload(res.message, res.type)
+        );
+      }
       return res;
     } catch (error) {
-      Log.debug('[DeviceCommands] [call] Received error', error);
+      LogCore.debug('[DeviceCommands] [call] Received error', {
+        request: type,
+        errorCode: error?.errorCode,
+        response: getSafeTransportLogPayload(error?.response?.data, type),
+      });
       if (error.errorCode === HardwareErrorCode.BleDeviceBondError) {
         return {
           type: 'BleDeviceBondError',
@@ -241,9 +328,6 @@ export class DeviceCommands {
         }
       }
 
-      if (responseData) {
-        Log.debug('error response', responseData);
-      }
       if (responseError === 'device disconnected during action') {
         return { type: 'BridgeDeviceDisconnected', message: { error: responseError } } as any;
       }
@@ -264,19 +348,22 @@ export class DeviceCommands {
   typedCall<T extends MessageKey, R extends MessageKey[]>(
     type: T,
     resType: R,
-    msg?: MessageType[T]
+    msg?: MessageType[T],
+    options?: TransportCallOptions
   ): Promise<TypedCallResponseMap[R[number]]>;
 
   typedCall<T extends MessageKey, R extends MessageKey>(
     type: T,
     resType: R,
-    msg?: MessageType[T]
+    msg?: MessageType[T],
+    options?: TransportCallOptions
   ): Promise<TypedResponseMessage<R>>;
 
   async typedCall(
     type: MessageKey,
     resType: MessageKey | MessageKey[],
-    msg?: DefaultMessageResponse['message']
+    msg?: DefaultMessageResponse['message'],
+    options?: TransportCallOptions
   ) {
     if (this.disposed) {
       throw ERRORS.TypedError(
@@ -285,7 +372,11 @@ export class DeviceCommands {
       );
     }
 
-    const response = await this._commonCall(type, msg);
+    const expectedTypes = Array.isArray(resType) ? resType : resType.split('|');
+    const response = await this._commonCall(type, msg, {
+      ...options,
+      expectedTypes: options?.expectedTypes ?? expectedTypes,
+    });
     try {
       assertType(response, resType);
     } catch (error) {
@@ -298,6 +389,11 @@ export class DeviceCommands {
       // throw bridge network error
       if (error instanceof HardwareError) {
         if (error.errorCode === HardwareErrorCode.ResponseUnexpectTypeError) {
+          Log.debug('[DeviceCommands] [typedCall] Unexpected response type', {
+            request: type,
+            expected: resType,
+            received: response.type,
+          });
           // Do not intercept CallMethodError
           // Do not intercept “assertType: Response of unexpected type” error
           // Blocking the above two messages will not know what the specific error message is, and the specific error should be handled by the subsequent business logic.
@@ -311,7 +407,7 @@ export class DeviceCommands {
           if (error.message.indexOf('BridgeDeviceDisconnected') > -1) {
             throw ERRORS.TypedError(HardwareErrorCode.BridgeDeviceDisconnected);
           }
-          throw ERRORS.TypedError(HardwareErrorCode.ResponseUnexpectTypeError);
+          throw error;
         }
       } else {
         // throw error anyway, next call should be resolved properly// throw error anyway, next call should be resolved properly
@@ -321,20 +417,26 @@ export class DeviceCommands {
     return response;
   }
 
-  async _commonCall(type: MessageKey, msg?: DefaultMessageResponse['message']) {
-    const resp = await this.call(type, msg);
-    return this._filterCommonTypes(resp, type);
+  async _commonCall(
+    type: MessageKey,
+    msg?: DefaultMessageResponse['message'],
+    options?: TransportCallOptions
+  ) {
+    const resp = await this.call(type, msg, options);
+    return this._filterCommonTypes(resp, type, options);
   }
 
   _filterCommonTypes(
     res: DefaultMessageResponse,
-    callType: MessageKey
+    callType: MessageKey,
+    options?: TransportCallOptions
   ): Promise<DefaultMessageResponse> {
     try {
-      if (DataManager.getSettings('env') === 'react-native') {
-        Log.debug('_filterCommonTypes: ', JSON.stringify(res));
-      } else {
-        Log.debug('_filterCommonTypes: ', res);
+      if (!shouldReduceDebugForCall(callType)) {
+        Log.debug('_filterCommonTypes: ', {
+          request: callType,
+          response: res.type,
+        });
       }
     } catch (error) {
       // ignore
@@ -342,8 +444,9 @@ export class DeviceCommands {
 
     this.device.clearCancelableAction();
     if (res.type === 'Failure') {
-      const { code, message } = res.message as {
+      const { code, subcode, message } = res.message as {
         code?: string | FailureType;
+        subcode?: number;
         message?: string;
       };
       let error: HardwareError | null = null;
@@ -364,6 +467,10 @@ export class DeviceCommands {
         error = ERRORS.TypedError(HardwareErrorCode.PinCancelled);
       }
 
+      if (code === 'Failure_PinMismatch') {
+        error = ERRORS.TypedError(HardwareErrorCode.PinMismatch, message);
+      }
+
       if (code === 'Failure_DataError') {
         if (message === 'Please confirm the BlindSign enabled') {
           error = ERRORS.TypedError(HardwareErrorCode.BlindSignDisabled);
@@ -374,13 +481,108 @@ export class DeviceCommands {
         if (message?.includes('bytes overflow')) {
           error = ERRORS.TypedError(HardwareErrorCode.DataOverload);
         }
+        if (message?.includes('Too many inputs')) {
+          const detailMatch = message.match(/\((.+?)\)/);
+          error = ERRORS.TypedError(HardwareErrorCode.TooManyInputs, undefined, {
+            count: detailMatch?.[1],
+          });
+        }
+      }
+
+      if (code === 'Failure_ProcessError') {
+        const normalizedMessage = message?.trim() ?? '';
+        const isProtocolV2ActionCancelledFailure =
+          this.device.isProtocolV2() && isProtocolV2ActionCancelledMessage(normalizedMessage);
+        const isLegacyProtocolV2LockedFailure =
+          this.device.isProtocolV2() && /^device (?:is )?locked$/i.test(normalizedMessage);
+        if (
+          DEVICE_SESSION_CALLS.has(callType) &&
+          subcode === DeviceSessionErrorCode.DeviceSessionError_InvalidSession
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
+          DEVICE_SESSION_CALLS.has(callType) &&
+          subcode === DeviceSessionErrorCode.DeviceSessionError_UserCancelled
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.ActionCancelled, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
+          DEVICE_SESSION_CALLS.has(callType) &&
+          subcode === DeviceSessionErrorCode.DeviceSessionError_AttachPinUnavailable
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
+          DEVICE_SESSION_CALLS.has(callType) &&
+          subcode === DeviceSessionErrorCode.DeviceSessionError_PassphraseDisabled
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
+          DEVICE_SESSION_CALLS.has(callType) &&
+          (subcode === DeviceSessionErrorCode.DeviceSessionError_Busy ||
+            /^(?:busy|another flow in progress)$/i.test(normalizedMessage))
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.DeviceBusy, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
+          callType === 'DeviceSessionAskPin' &&
+          /^passphrase disabled$/i.test(normalizedMessage)
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
+          subcode === DeviceErrorCode.DeviceError_ActionCancelled ||
+          isProtocolV2ActionCancelledFailure
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.ActionCancelled, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
+          subcode === DeviceErrorCode.DeviceError_DeviceLocked ||
+          isLegacyProtocolV2LockedFailure
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.DeviceLocked, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
+        } else if (
+          message?.includes('Bootloader file verify failed') ||
+          message?.includes('verify failed')
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.FirmwareVerificationFailed, message);
+        } else if (message?.includes('Firmware downgrade not allowed')) {
+          // Check firmware check failed
+          error = ERRORS.TypedError(HardwareErrorCode.FirmwareDowngradeNotAllowed, message);
+        }
       }
 
       if (code === 'Failure_UnexpectedMessage') {
         if (callType === 'PassphraseAck') {
           error = ERRORS.TypedError(HardwareErrorCode.UnexpectPassphrase);
-        }
-        if (message === 'Not in Signing mode') {
+        } else if (message === 'Not in Signing mode') {
           error = ERRORS.TypedError(HardwareErrorCode.NotInSigningMode);
         }
       }
@@ -393,7 +595,7 @@ export class DeviceCommands {
         ERRORS.TypedError(
           HardwareErrorCode.RuntimeError,
           // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          `${(code as any) || 'Failure_UnknownCode'},${message || 'Failure_UnknownMessage'}`
+          `${(code as any) || 'Failure_UnknownCode'},${message || 'no error message'}`
         )
       );
     }
@@ -403,7 +605,7 @@ export class DeviceCommands {
     }
 
     if (res.type === 'ButtonRequest') {
-      const deviceType = getDeviceType(this.device.features);
+      const deviceType = this.device.getCurrentDeviceType();
       if (DeviceModelToTypes.model_mini.includes(deviceType)) {
         this.device.setCancelableAction(() => this.cancelDeviceOnOneKeyDevice());
       } else {
@@ -414,7 +616,7 @@ export class DeviceCommands {
       } else {
         this.device.emit(DEVICE.BUTTON, this.device, res.message);
       }
-      return this._commonCall('ButtonAck', {});
+      return this._commonCall('ButtonAck', {}, stripInteractiveAckTimeout(options));
     }
 
     if (res.type === 'EntropyRequest') {
@@ -427,22 +629,43 @@ export class DeviceCommands {
           if (pin === '@@ONEKEY_INPUT_PIN_IN_DEVICE') {
             // only classic\1s\mini\pure
             this.device.setCancelableAction(() => this.cancelDeviceOnOneKeyDevice());
-            return this._commonCall('BixinPinInputOnDevice').finally(() => {
+            return this._commonCall(
+              'BixinPinInputOnDevice',
+              {},
+              stripInteractiveAckTimeout(options)
+            ).finally(() => {
               this.device.clearCancelableAction();
             });
           }
-          return this._commonCall('PinMatrixAck', { pin });
+          return this._commonCall('PinMatrixAck', { pin }, stripInteractiveAckTimeout(options));
         },
         error => Promise.reject(error)
       );
     }
 
     if (res.type === 'PassphraseRequest') {
-      return this._promptPassphrase().then(response => {
-        const { passphrase, passphraseOnDevice } = response;
+      const existsAttachPinUser = res.message.exists_attach_pin_user;
+      return this.promptPassphrase({
+        existsAttachPinUser,
+      }).then(response => {
+        const { passphrase, passphraseOnDevice, attachPinOnDevice } = response;
+
+        // Attach PIN on device
+        if (attachPinOnDevice && existsAttachPinUser) {
+          return this._commonCall(
+            'PassphraseAck',
+            { on_device_attach_pin: true },
+            stripInteractiveAckTimeout(options)
+          );
+        }
+
         return !passphraseOnDevice
-          ? this._commonCall('PassphraseAck', { passphrase })
-          : this._commonCall('PassphraseAck', { on_device: true });
+          ? this._commonCall('PassphraseAck', { passphrase }, stripInteractiveAckTimeout(options))
+          : this._commonCall(
+              'PassphraseAck',
+              { on_device: true },
+              stripInteractiveAckTimeout(options)
+            );
       });
     }
 
@@ -464,7 +687,7 @@ export class DeviceCommands {
         cancelDeviceInPrompt(this.device, false)
           .then(onCancel => {
             const error = ERRORS.TypedError(
-              HardwareErrorCode.ActionCancelled,
+              HardwareErrorCode.CallQueueActionCancelled,
               `${DEVICE.PIN} canceled`
             );
             // onCancel not void
@@ -479,7 +702,15 @@ export class DeviceCommands {
             reject(error);
           });
 
-      if (this.device.listenerCount(DEVICE.PIN) > 0) {
+      const listenerCount = this.device.listenerCount(DEVICE.PIN);
+
+      Log.debug(`[${this.instanceId}] _promptPin called`, {
+        responseID: this.currentResponseID,
+        deviceInstanceId: this.device.instanceId,
+        listenerCount,
+      });
+
+      if (listenerCount > 0) {
         this.device.setCancelableAction(cancelAndReject);
         this.device.emit(DEVICE.PIN, this.device, type, (err, pin) => {
           this.device.clearCancelableAction();
@@ -490,24 +721,52 @@ export class DeviceCommands {
           }
         });
       } else {
-        console.warn('[DeviceCommands] [call] PIN callback not configured, cancelling request');
+        const activeRequests = getActiveRequestsByDeviceInstance(this.device.instanceId);
+        const errorInfo = {
+          commandsInstanceId: this.instanceId,
+          deviceInstanceId: this.device.instanceId,
+          currentResponseID: this.currentResponseID,
+          listenerCount,
+          activeRequests: activeRequests.map(formatRequestContext),
+        };
+
+        LogCore.error('[DeviceCommands] [call] PIN callback not configured, cancelling request', {
+          ...errorInfo,
+        });
         reject(
           ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,
-            '_promptPin: PIN callback not configured'
+            `_promptPin: PIN callback not configured: ${JSON.stringify(errorInfo)}`
           )
         );
       }
     });
   }
 
-  _promptPassphrase() {
+  promptPassphrase(
+    options: PassphraseRequestPayload,
+    promptOptions: { cancelDeviceOnReject?: boolean } = {}
+  ) {
     return new Promise<PassphrasePromptResponse>((resolve, reject) => {
-      const cancelAndReject = (_error?: Error) =>
-        cancelDeviceInPrompt(this.device, false)
+      const cancelAndReject = (_error?: Error) => {
+        const rejectWithCancelledError = () => {
+          reject(
+            ERRORS.TypedError(
+              HardwareErrorCode.CallQueueActionCancelled,
+              `${DEVICE.PASSPHRASE} canceled`
+            )
+          );
+        };
+
+        if (promptOptions.cancelDeviceOnReject === false) {
+          rejectWithCancelledError();
+          return Promise.resolve();
+        }
+
+        return cancelDeviceInPrompt(this.device, false)
           .then(onCancel => {
             const error = ERRORS.TypedError(
-              HardwareErrorCode.ActionCancelled,
+              HardwareErrorCode.CallQueueActionCancelled,
               `${DEVICE.PASSPHRASE} canceled`
             );
             // onCancel not void
@@ -521,12 +780,14 @@ export class DeviceCommands {
           .catch(error => {
             reject(error);
           });
+      };
 
       if (this.device.listenerCount(DEVICE.PASSPHRASE) > 0) {
         this.device.setCancelableAction(cancelAndReject);
         this.device.emit(
           DEVICE.PASSPHRASE,
           this.device,
+          options,
           (response: PassphrasePromptResponse, error?: Error) => {
             this.device.clearCancelableAction();
             if (error) {
@@ -537,7 +798,9 @@ export class DeviceCommands {
           }
         );
       } else {
-        Log.error('[DeviceCommands] [call] Passphrase callback not configured, cancelling request');
+        LogCore.error(
+          '[DeviceCommands] [call] Passphrase callback not configured, cancelling request'
+        );
         reject(
           ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,

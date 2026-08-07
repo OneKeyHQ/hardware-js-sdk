@@ -1,0 +1,279 @@
+---
+title: iOS：通过蓝牙连接（原生）
+---
+
+# iOS：通过蓝牙连接（原生）
+
+> **注意：**
+> 演示：原生 iOS 示例（WKWebView + CoreBluetooth）→ [native-ios-example](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-ios-example)
+> 本页基于《[底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin)》与消息协议，建议先阅读接口与 64 字节帧格式。
+
+
+本页面展示如何通过底层适配器在原生 iOS 宿主中集成 `@onekeyfe/hd-common-connect-sdk`。JavaScript 包在 WKWebView 中运行；传输调用被转发到原生 CoreBluetooth 并桥接回 JS。
+
+关键技术栈：
+- CoreBluetooth（系统）
+- WKWebViewJavascriptBridge（CocoaPods）用于 JS ↔ 原生消息传递
+
+Info.plist（权限）：
+- `NSBluetoothAlwaysUsageDescription`
+- （旧版 iOS）`NSBluetoothPeripheralUsageDescription`
+
+OneKey BLE UUID：
+- 服务：`00000001-0000-1000-8000-00805f9b34fb`
+- 写入：`00000002-0000-1000-8000-00805f9b34fb`
+- 通知：`00000003-0000-1000-8000-00805f9b34fb`
+
+## 步骤 1. Pod 和 Web 资源
+
+Podfile（添加桥接依赖）：
+```ruby
+platform :ios, '13.0'
+use_frameworks!
+
+target 'YourAppTarget' do
+  pod 'WKWebViewJavascriptBridge'
+end
+```
+
+构建 Web 包（演示中已实现）：
+```bash
+# 在 hardware-js-sdk 仓库中
+cd packages/connect-examples/native-ios-example/web
+yarn && yarn build   # 输出 web/web_dist/
+```
+
+将 Web 资源复制到您的应用目标资源（两种选项）：
+- 选项 A（保留文件夹；为清晰起见推荐）：
+  - 将整个 `web/web_dist/` 文件夹复制到您的 Xcode 项目（例如，名为 `web/web_dist` 的组）并确保它包含在"Copy Bundle Resources"中。
+  - 加载路径：`web/web_dist/index.html`。
+- 选项 B（扁平化）：
+  - 将 `web/web_dist/` 内的所有文件直接复制到您的应用包根目录（或选择的资源文件夹）。
+  - 加载匹配的路径（例如，`index.html`）。
+
+保持 HTML `<script src="...">` 路径与您的放置方式一致。
+
+## 步骤 2. 状态和处理程序名称
+
+```swift
+class ViewController: UIViewController {
+  // Web
+  var webView: WKWebView!
+  var bridge: WKWebViewJavascriptBridge!
+
+  // BLE
+  var manager: CBCentralManager!
+  var peripheral: CBPeripheral?
+  var writeCharacteristic: CBCharacteristic?
+  var notifyCharacteristic: CBCharacteristic?
+
+  // 服务 UUID
+  let serviceID = "00000001-0000-1000-8000-00805f9b34fb"
+
+  // 桥接回调（枚举等）
+  var enumerateCallback: ((Any?) -> Void)?
+}
+```
+
+## 步骤 3. WKWebView + 桥接 + 加载 HTML（初始化顺序很重要）
+
+- 创建 WKWebView
+- 创建桥接
+- 注册所有原生处理程序（enumerate/connect/disconnect/send/monitorCharacteristic）
+- 加载 HTML（从打包的 `web/web_dist/`）
+
+```swift
+import CoreBluetooth
+import WebKit
+import WKWebViewJavascriptBridge
+
+class ViewController: UIViewController {
+  // ...（状态省略）
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+
+    manager = CBCentralManager(delegate: self, queue: .main)
+
+    webView = WKWebView(frame: view.bounds)
+    view.addSubview(webView)
+
+    bridge = WKWebViewJavascriptBridge(webView: webView)
+    registerBridgeHandlers()
+
+    // 加载构建的 HTML 包（显示选项 A 路径）
+    if let htmlPath = Bundle.main.path(forResource: "index", ofType: "html", inDirectory: "web/web_dist") {
+      webView.load(URLRequest(url: URL(fileURLWithPath: htmlPath)))
+    }
+  }
+}
+```
+
+## 步骤 4. 桥接处理程序（enumerate / connect / disconnect / send）
+
+```swift
+extension ViewController {
+  func registerBridgeHandlers() {
+    // enumerate：扫描 BLE 并返回 [{ id, name }]
+    bridge.register(handlerName: "enumerate") { [weak self] _, callback in
+      guard let self = self else { return }
+      self.enumerateCallback = callback
+      self.manager.scanForPeripherals(
+        withServices: [CBUUID(string: self.serviceID)], options: nil
+      )
+      // 在生产环境中短时间后停止；参见演示了解累积和去重
+    }
+
+    // connect：连接到特定的外设 UUID
+    bridge.register(handlerName: "connect") { [weak self] params, callback in
+      guard
+        let self = self,
+        let uuid = params?["uuid"] as? String,
+        let id = UUID(uuidString: uuid)
+      else {
+        callback?(["success": false, "error": "Invalid UUID"])
+        return
+      }
+
+      // 首先尝试检索已知的外设
+      if let found = self.manager.retrievePeripherals(withIdentifiers: [id]).first {
+        self.peripheral = found
+        self.manager.connect(found, options: nil)
+      } else {
+        // 后备：在 didDiscover 期间扫描并匹配
+        self.manager.scanForPeripherals(
+          withServices: [CBUUID(string: self.serviceID)], options: nil
+        )
+      }
+      callback?(["success": true])
+    }
+
+    // disconnect
+    bridge.register(handlerName: "disconnect") { [weak self] _, callback in
+      if let p = self?.peripheral { self?.manager.cancelPeripheralConnection(p) }
+      callback?(["success": true])
+    }
+
+    // send：写入十六进制负载
+    bridge.register(handlerName: "send") { [weak self] params, callback in
+      guard
+        let self = self,
+        let hex = params?["data"] as? String,
+        let ch = self.writeCharacteristic
+      else { callback?(["success": false]); return }
+
+      var bytes = [UInt8]()
+      var index = hex.startIndex
+      while index < hex.endIndex {
+        let next = hex.index(index, offsetBy: 2)
+        if let b = UInt8(hex[index..<next], radix: 16) { bytes.append(b) }
+        index = next
+      }
+      self.peripheral?.writeValue(Data(bytes), for: ch, type: .withoutResponse)
+      callback?(["success": true])
+    }
+  }
+}
+```
+
+## 步骤 5. CoreBluetooth 扫描和通知
+
+```swift
+extension ViewController: CBCentralManagerDelegate, CBPeripheralDelegate {
+  func centralManagerDidUpdateState(_ central: CBCentralManager) {
+    // 处理 .poweredOn / 其他状态；可选择通过 UUID 恢复缓存的设备
+  }
+
+  // 累积设备并返回给 JS
+  func centralManager(
+    _ central: CBCentralManager,
+    didDiscover p: CBPeripheral,
+    advertisementData: [String : Any],
+    rssi RSSI: NSNumber
+  ) {
+    let item: [String: String] = [
+      "id": p.identifier.uuidString,
+      "name": p.name ?? ""
+    ]
+    // 返回给 JS enumerate 回调（在 enumerate 期间存储回调）
+    enumerateCallback?( [item] )
+    // 在生产环境中：去重并在超时或获得足够结果后停止扫描
+  }
+
+  func centralManager(_ central: CBCentralManager, didConnect p: CBPeripheral) {
+    p.delegate = self
+    p.discoverServices([CBUUID(string: serviceID)])
+  }
+
+  func peripheral(_ p: CBPeripheral, didDiscoverServices error: Error?) {
+    guard let service = p.services?.first else { return }
+    let writeID = CBUUID(string: "00000002-0000-1000-8000-00805f9b34fb")
+    let notifyID = CBUUID(string: "00000003-0000-1000-8000-00805f9b34fb")
+    p.discoverCharacteristics([writeID, notifyID], for: service)
+  }
+
+  func peripheral(_ p: CBPeripheral, didDiscoverCharacteristicsFor s: CBService, error: Error?) {
+    s.characteristics?.forEach { ch in
+      if ch.uuid == CBUUID(string: "00000002-0000-1000-8000-00805f9b34fb") { writeCharacteristic = ch }
+      if ch.uuid == CBUUID(string: "00000003-0000-1000-8000-00805f9b34fb") {
+        notifyCharacteristic = ch
+        p.setNotifyValue(true, for: ch)
+      }
+    }
+  }
+
+  func peripheral(_ p: CBPeripheral, didUpdateValueFor ch: CBCharacteristic, error: Error?) {
+    guard let data = ch.value else { return }
+    // 将十六进制转发给 JS — Web 包重组帧并解析 receive()
+    let hex = data.map { String(format: "%02x", $0) }.joined()
+    bridge.callHandler("monitorCharacteristic", data: hex)
+  }
+}
+```
+
+## 步骤 6. JavaScript 包（底层适配器）
+
+演示的 Web 项目（在 `native-ios-example/web` 下）已经构建了一个使用 `env: 'lowlevel'` 初始化 SDK 并连接底层适配器的包。您通常不需要编写额外的 JS — 只需构建并将 `web/web_dist/` 目录包含在您的应用资源中，以便可以加载（例如，`web/web_dist/index.html`）。
+
+如果您自定义适配器，请保持相同的模式：使用 `env: 'lowlevel'` 初始化并将 `enumerate/connect/disconnect/send/receive` 转发到原生桥接。
+
+## 步骤 7.（可选）原生 UI 提示桥接
+
+如果您想呈现原生 PIN/确认 UI 而不是仅在 JS 中处理对话框，请公开额外的处理程序，以便 JS 可以请求原生 UI 并接收结果。演示展示了这种模式。
+
+```swift
+// 示例：PIN 输入处理程序桥接（简化）
+bridge.register(handlerName: "requestPinInput") { [weak self] _, callback in
+  // 呈现您的原生 PIN 屏幕。
+  // 返回 ""（空）以指示 JS 使用设备 PIN 输入，
+  // 或返回转换后的 PIN 字符串（盲键盘序列）用于软件输入。
+  // 例如，强制设备输入：
+  callback?("")
+}
+
+// 示例：确认对话框
+bridge.register(handlerName: "requestButtonConfirmation") { _, callback in
+  // 显示原生确认对话框；根据需要返回 "ok" 或 "cancel"。
+  callback?("ok")
+}
+
+bridge.register(handlerName: "closeUIWindow") { _, callback in
+  // 关闭任何原生覆盖层。
+  callback?("closed")
+}
+```
+
+在 JS 中，您将从适配器调用这些处理程序以镜像演示的行为。否则，您可以完全在 JS 中使用 `UI_EVENT` 处理 UI — 参见 [事件配置](/zh/hardware-sdk/core-api-guide#events-ui) 了解事件连接和响应（WebUSB 指南包含最小对话框）。
+
+## 步骤 8. 检查清单
+
+- 在加载 HTML 之前注册处理程序以避免竞态条件。
+- 使用服务 UUID 过滤器扫描并在合理的时间窗口内停止。
+- 持久化 `connectId`（外设 UUID）并在首次连接后使用 `getFeatures(connectId)` 获取 `device_id`。
+- 始终在 JS 中订阅 `UI_EVENT` 以避免请求停滞（参见 [事件配置](/zh/hardware-sdk/core-api-guide#events-ui)）。
+- 将 `web/web_dist/` 保留在您的应用包中并相应调整 `load` 路径。
+
+## 参考
+
+- 消息协议（64 字节帧）：[见底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin#消息协议包含在底层传输中)
+- 底层传输插件契约：[底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin)

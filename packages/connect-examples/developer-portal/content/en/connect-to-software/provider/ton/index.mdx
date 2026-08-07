@@ -1,0 +1,494 @@
+---
+title: TON
+description: TON integration via OneKey's TON Connect compatible provider
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# TON
+
+Integrate TON blockchain using OneKey's TON Connect compatible provider. Access via `window.$onekey.tonconnect`.
+
+<Callout type="info">
+OneKey implements the TON Connect 2.0 protocol, ensuring compatibility with all TON dApps.
+</Callout>
+
+---
+
+## Quick Links
+
+- [API Reference](#api-reference)
+- [Connecting](#connecting)
+- [Transactions](#transactions)
+- [Data Signing](#data-signing)
+
+---
+
+## Provider Detection
+
+```typescript
+// Detect OneKey TON provider
+const provider = window.$onekey?.tonconnect
+
+if (!provider) {
+  throw new Error('OneKey TON provider not detected')
+}
+
+// Check device and wallet info
+console.log('Device:', provider.deviceInfo)
+console.log('Wallet:', provider.walletInfo)
+console.log('Protocol Version:', provider.protocolVersion) // 2
+```
+
+---
+
+## Quick Start
+
+### Connect Wallet
+
+```typescript
+// Basic connection
+const connectEvent = await provider.connect()
+
+if (connectEvent.event === 'connect') {
+  const addressItem = connectEvent.payload.items.find(
+    item => item.name === 'ton_addr'
+  )
+  console.log('Connected:', addressItem.address)
+} else {
+  console.error('Connection failed:', connectEvent.payload.message)
+}
+```
+
+### Connect with Manifest
+
+For production apps, provide a manifest URL:
+
+```typescript
+const connectRequest = {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    { name: 'ton_proof', payload: 'your-challenge-string' }
+  ]
+}
+
+const connectEvent = await provider.connect(2, connectRequest)
+
+if (connectEvent.event === 'connect') {
+  const addressItem = connectEvent.payload.items.find(i => i.name === 'ton_addr')
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  console.log('Address:', addressItem.address)
+  console.log('Proof:', proofItem?.proof)
+}
+```
+
+### App Manifest Format
+
+Create `tonconnect-manifest.json` in your app root:
+
+```json
+{
+  "url": "https://yourapp.com",
+  "name": "Your App Name",
+  "iconUrl": "https://yourapp.com/icon.png",
+  "termsOfUseUrl": "https://yourapp.com/terms",
+  "privacyPolicyUrl": "https://yourapp.com/privacy"
+}
+```
+
+### Restore Connection
+
+Restore a previous session:
+
+```typescript
+const connectEvent = await provider.restoreConnection()
+
+if (connectEvent.event === 'connect') {
+  console.log('Session restored')
+}
+```
+
+### Disconnect
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## Transactions
+
+### Send Transaction
+
+Send TON using the `send` method with `sendTransaction`:
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600, // 10 min validity
+      messages: [
+        {
+          address: '0:1234...', // Recipient address (raw format)
+          amount: '1000000000', // Amount in nanotons (1 TON = 10^9 nanotons)
+        }
+      ]
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('Transaction BOC:', result.result)
+} else {
+  console.error('Transaction failed:', result.error.message)
+}
+```
+
+### Send Multiple Messages
+
+TON supports up to 4 messages per transaction:
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:recipient1...',
+          amount: '500000000', // 0.5 TON
+        },
+        {
+          address: '0:recipient2...',
+          amount: '300000000', // 0.3 TON
+        }
+      ]
+    })
+  ]
+})
+```
+
+### Send with Payload
+
+Include a payload for smart contract interactions:
+
+```typescript
+import { beginCell } from '@ton/core'
+
+// Create a comment cell
+const comment = beginCell()
+  .storeUint(0, 32) // comment op code
+  .storeStringTail('Hello from dApp!')
+  .endCell()
+
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:recipient...',
+          amount: '100000000',
+          payload: comment.toBoc().toString('base64'),
+        }
+      ]
+    })
+  ]
+})
+```
+
+### Send with StateInit
+
+Deploy a contract or initialize state:
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:contract...',
+          amount: '50000000',
+          stateInit: stateInitBoc.toString('base64'), // Base64 encoded StateInit
+        }
+      ]
+    })
+  ]
+})
+```
+
+---
+
+## Data Signing
+
+### Sign Arbitrary Data
+
+Sign data cells for off-chain verification:
+
+```typescript
+const result = await provider.send({
+  method: 'signData',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      schema_crc: 0, // Custom schema identifier
+      cell: cellBoc.toString('base64'), // Base64 encoded cell to sign
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('Signature:', result.result.signature) // Base64 signature
+  console.log('Timestamp:', result.result.timestamp) // UNIX timestamp
+}
+```
+
+### Sign Proof (Authentication)
+
+Request proof for authentication during connection:
+
+```typescript
+const connectEvent = await provider.connect(2, {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    {
+      name: 'ton_proof',
+      payload: 'your-server-generated-challenge' // Nonce for replay protection
+    }
+  ]
+})
+
+if (connectEvent.event === 'connect') {
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  if (proofItem) {
+    // Send proof to your backend for verification
+    const proof = proofItem.proof
+    console.log({
+      signature: proof.signature,
+      timestamp: proof.timestamp,
+      domain: proof.domain,
+      payload: proof.payload,
+    })
+  }
+}
+```
+
+---
+
+## Event Handling
+
+### Listen for Events
+
+```typescript
+provider.listen((event) => {
+  console.log('Wallet event:', event)
+})
+
+// Or use specific event listeners
+provider.on('accountChanged', (address) => {
+  if (address) {
+    console.log('Account changed:', address)
+  } else {
+    console.log('Disconnected')
+  }
+})
+
+provider.on('disconnect', () => {
+  console.log('Wallet disconnected')
+})
+```
+
+---
+
+## API Reference
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `connect(version?, request?)` | Connect wallet |
+| `restoreConnection()` | Restore previous session |
+| `disconnect()` | Disconnect wallet |
+| `send(message)` | Send RPC request |
+| `listen(callback)` | Listen for wallet events |
+
+### Send Methods
+
+| Method | Description |
+|--------|-------------|
+| `sendTransaction` | Send TON or interact with contracts |
+| `signData` | Sign arbitrary data cells |
+| `disconnect` | Disconnect via RPC |
+
+### Types
+
+```typescript
+interface AccountInfo {
+  address: string      // Raw address (0:<hex>)
+  network: string      // Network ID (-239 mainnet, -3 testnet)
+  publicKey: string    // Hex public key (no 0x)
+  walletStateInit: string // Base64 encoded state init
+}
+
+interface TransactionRequest {
+  valid_until?: number  // UNIX timestamp for validity
+  network?: string      // Network ID
+  from?: string         // Sender address
+  messages: Message[]   // Up to 4 messages
+}
+
+interface Message {
+  address: string      // Recipient (raw format)
+  amount: string       // Amount in nanotons
+  payload?: string     // Base64 BOC for contract calls
+  stateInit?: string   // Base64 StateInit for deployment
+}
+
+interface SignDataRequest {
+  schema_crc: number   // Schema identifier
+  cell: string         // Base64 encoded cell
+  publicKey?: string   // Optional specific key
+}
+
+interface SignDataResult {
+  signature: string    // Base64 signature
+  timestamp: number    // UNIX timestamp (UTC)
+}
+
+interface DeviceInfo {
+  platform: string     // 'iphone' | 'android' | 'windows' | 'mac' | 'linux'
+  appName: string      // 'onekey'
+  appVersion: string   // Wallet version
+  maxProtocolVersion: number // 2
+  features: string[]   // Supported features
+}
+```
+
+### Error Codes
+
+| Code | Description |
+|------|-------------|
+| 0 | Unknown error |
+| 1 | Bad request |
+| 100 | Unknown app |
+| 300 | User rejected request |
+| 400 | Method not supported |
+
+---
+
+## Using with TON Connect SDK
+
+For React applications, use the official TON Connect SDK:
+
+```bash
+npm install @tonconnect/ui-react
+```
+
+```tsx
+import { TonConnectUIProvider, TonConnectButton } from '@tonconnect/ui-react'
+
+function App() {
+  return (
+    <TonConnectUIProvider manifestUrl="https://yourapp.com/tonconnect-manifest.json">
+      <TonConnectButton />
+      <YourApp />
+    </TonConnectUIProvider>
+  )
+}
+```
+
+OneKey is automatically detected by TON Connect SDK.
+
+### Send Transaction with SDK
+
+```tsx
+import { useTonConnectUI } from '@tonconnect/ui-react'
+
+function SendButton() {
+  const [tonConnectUI] = useTonConnectUI()
+
+  const handleSend = async () => {
+    const result = await tonConnectUI.sendTransaction({
+      validUntil: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: 'EQA...',
+          amount: '1000000000',
+        }
+      ]
+    })
+    console.log('BOC:', result.boc)
+  }
+
+  return <button onClick={handleSend}>Send 1 TON</button>
+}
+```
+
+---
+
+## Address Formats
+
+TON uses different address formats:
+
+```typescript
+import { Address } from '@ton/core'
+
+// Raw format (used in provider)
+const raw = '0:1234567890abcdef...'
+
+// User-friendly format (bounceable)
+const friendly = Address.parse(raw).toString()
+// e.g., 'EQASdf...'
+
+// Non-bounceable format
+const nonBounceable = Address.parse(raw).toString({ bounceable: false })
+// e.g., 'UQASdf...'
+
+// Convert from friendly to raw
+const addr = Address.parse('EQASdf...')
+const rawAddress = `${addr.workChain}:${addr.hash.toString('hex')}`
+```
+
+---
+
+## Error Handling
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [/* ... */]
+})
+
+if ('error' in result) {
+  switch (result.error.code) {
+    case 300:
+      console.log('User rejected the transaction')
+      break
+    case 1:
+      console.log('Bad request - check parameters')
+      break
+    case 400:
+      console.log('Method not supported')
+      break
+    default:
+      console.error('Error:', result.error.message)
+  }
+} else {
+  console.log('Success:', result.result)
+}
+```
+

@@ -1,4 +1,4 @@
-import { NostrEvent } from '../../../types/api/nostrSignEvent';
+import type { NostrEvent } from '../../../types/api/nostrSignEvent';
 
 export function validateEvent(event: NostrEvent): boolean {
   if (!(event instanceof Object)) return false;

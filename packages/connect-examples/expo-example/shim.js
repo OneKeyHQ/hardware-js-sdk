@@ -16,7 +16,16 @@ if (typeof process === 'undefined') {
 }
 
 process.browser = false;
-if (typeof Buffer === 'undefined') global.Buffer = require('buffer').Buffer;
+
+// 修复 Buffer 的导入方式，确保与 webpack fallback 兼容
+if (typeof Buffer === 'undefined') {
+  try {
+    const { Buffer: BufferPolyfill } = require('buffer');
+    global.Buffer = BufferPolyfill;
+  } catch (error) {
+    console.warn('Failed to load Buffer polyfill:', error);
+  }
+}
 
 // global.location = global.location || { port: 80 }
 const isDev = typeof __DEV__ === 'boolean' && __DEV__;

@@ -4,6 +4,7 @@ export type EVMSignedTx = {
   v: string;
   r: string;
   s: string;
+  authorizationSignatures?: EVMAuthorizationSignature[];
 };
 
 export type EVMTransaction = {
@@ -37,9 +38,39 @@ export type EVMTransactionEIP1559 = {
   accessList?: EVMAccessList[];
 };
 
+export type EVMAuthorizationSignature = {
+  yParity: number;
+  r: string;
+  s: string;
+};
+
+export type EVMAuthorization = {
+  chainId: number;
+  address: string;
+  nonce: string;
+  addressN?: number[];
+  yParity?: number;
+  r?: string;
+  s?: string;
+};
+
+export type EVMTransactionEIP7702 = {
+  to: string;
+  value: string;
+  gasLimit: string;
+  gasPrice?: typeof undefined;
+  nonce: string;
+  data?: string;
+  chainId: number;
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+  accessList?: EVMAccessList[];
+  authorizationList: EVMAuthorization[];
+};
+
 export type EVMSignTransactionParams = {
   path: string | number[];
-  transaction: EVMTransaction | EVMTransactionEIP1559;
+  transaction: EVMTransaction | EVMTransactionEIP1559 | EVMTransactionEIP7702;
 };
 
 export declare function evmSignTransaction(

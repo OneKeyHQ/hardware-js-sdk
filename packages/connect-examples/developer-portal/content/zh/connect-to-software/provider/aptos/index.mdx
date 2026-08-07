@@ -1,0 +1,404 @@
+---
+title: Aptos
+description: 通过 OneKey 的 Petra 兼容 Provider 集成 Aptos
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Aptos
+
+使用 OneKey 的 Petra 兼容 Provider 集成 Aptos 区块链。通过 `window.$onekey.aptos` 访问。
+
+<Callout type="info">
+OneKey 的 Aptos Provider 完全兼容 Petra 钱包接口和 Aptos Wallet Standard。
+</Callout>
+
+---
+
+## 快速链接
+
+- [API 参考](#api-参考)
+- [连接钱包](#连接钱包)
+- [交易](#交易)
+- [消息签名](#消息签名)
+
+---
+
+## Provider 检测
+
+```typescript
+// 检测 OneKey Aptos provider
+const provider = window.$onekey?.aptos
+
+if (!provider) {
+  throw new Error('未检测到 OneKey Aptos provider')
+}
+
+// 检查 provider 信息
+console.log('Provider:', provider.isOneKey ? 'OneKey' : '未知')
+```
+
+---
+
+## 快速开始
+
+### 连接钱包
+
+```typescript
+// 连接并获取账户信息
+const response = await provider.connect()
+
+console.log({
+  address: response.address,     // 账户地址
+  publicKey: response.publicKey, // 公钥
+})
+```
+
+### 检查连接状态
+
+```typescript
+const isConnected = await provider.isConnected()
+console.log('已连接:', isConnected)
+```
+
+### 断开连接
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## 账户管理
+
+### 获取当前账户
+
+```typescript
+const account = await provider.account()
+
+console.log({
+  address: account.address,
+  publicKey: account.publicKey,
+})
+```
+
+### 获取网络信息
+
+```typescript
+const network = await provider.network()
+
+console.log({
+  name: network.name,       // 'mainnet', 'testnet', 'devnet'
+  chainId: network.chainId, // 网络链 ID
+  url: network.url,         // RPC URL
+})
+```
+
+### 监听账户变化
+
+```typescript
+provider.onAccountChange((newAccount) => {
+  if (newAccount) {
+    console.log('账户已变更:', newAccount.address)
+  } else {
+    console.log('钱包已断开连接')
+  }
+})
+```
+
+### 监听网络变化
+
+```typescript
+provider.onNetworkChange((network) => {
+  console.log('网络已变更:', network.name)
+})
+```
+
+---
+
+## 交易
+
+### 签名并提交交易
+
+```typescript
+// 简单的 APT 转账
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::aptos_account::transfer',
+  type_arguments: [],
+  arguments: [
+    '0x1234...', // 接收方地址
+    '100000000', // 金额，单位 Octas (1 APT = 100000000 Octas)
+  ],
+}
+
+const response = await provider.signAndSubmitTransaction(payload)
+
+console.log('交易哈希:', response.hash)
+```
+
+### 签名交易（不提交）
+
+```typescript
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::coin::transfer',
+  type_arguments: ['0x1::aptos_coin::AptosCoin'],
+  arguments: ['0x1234...', '100000000'],
+}
+
+const signedTxn = await provider.signTransaction(payload)
+
+// 稍后使用 Aptos SDK 提交
+// const pendingTxn = await client.submitTransaction(signedTxn)
+```
+
+### 签名交易 V2 (BCS 序列化)
+
+用于 BCS 序列化交易的高级用例：
+
+```typescript
+import { BCS } from 'aptos'
+
+const rawTransaction = /* BCS 序列化的原始交易 */
+
+const signedTxn = await provider.signTransactionV2(rawTransaction)
+```
+
+### 交易选项
+
+```typescript
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::aptos_account::transfer',
+  type_arguments: [],
+  arguments: ['0x1234...', '100000000'],
+}
+
+const options = {
+  max_gas_amount: '10000',
+  gas_unit_price: '100',
+  expiration_timestamp_secs: Math.floor(Date.now() / 1000) + 600, // 10 分钟
+}
+
+const response = await provider.signAndSubmitTransaction(payload, options)
+```
+
+---
+
+## 消息签名
+
+### 签名消息
+
+签名任意消息用于身份验证：
+
+```typescript
+const message = 'Welcome to MyApp!\n\nClick to sign in.\n\nNonce: abc123'
+
+const response = await provider.signMessage({
+  message,
+  nonce: 'abc123',  // 可选的 nonce，用于防重放
+})
+
+console.log({
+  signature: response.signature,   // 十六进制编码的签名
+  fullMessage: response.fullMessage, // 完整的已签名消息
+  prefix: response.prefix,         // 使用的消息前缀
+})
+```
+
+### 验证消息（链下）
+
+```typescript
+import nacl from 'tweetnacl'
+
+const { signature, fullMessage } = await provider.signMessage({
+  message: 'Hello Aptos',
+  nonce: 'unique-nonce',
+})
+
+const account = await provider.account()
+const pubKeyBytes = Buffer.from(account.publicKey.slice(2), 'hex')
+const signatureBytes = Buffer.from(signature.slice(2), 'hex')
+const messageBytes = Buffer.from(fullMessage)
+
+const isValid = nacl.sign.detached.verify(messageBytes, signatureBytes, pubKeyBytes)
+console.log('签名有效:', isValid)
+```
+
+---
+
+## 智能合约交互
+
+### 调用 View 函数
+
+```typescript
+// View 函数不需要签名
+const result = await client.view({
+  function: '0x1::coin::balance',
+  type_arguments: ['0x1::aptos_coin::AptosCoin'],
+  arguments: [accountAddress],
+})
+
+console.log('余额:', result[0])
+```
+
+### 调用 Entry 函数
+
+```typescript
+// 铸造 NFT 示例
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x3::token::create_collection_script',
+  type_arguments: [],
+  arguments: [
+    'My Collection',           // 集合名称
+    'Description',             // 描述
+    'https://example.com',     // URI
+    '1000',                    // 最大供应量
+    [false, false, false],     // 可变性配置
+  ],
+}
+
+const response = await provider.signAndSubmitTransaction(payload)
+```
+
+---
+
+## API 参考
+
+### 方法
+
+| 方法 | 说明 |
+|------|------|
+| `connect()` | 连接钱包并获取账户 |
+| `disconnect()` | 断开钱包连接 |
+| `isConnected()` | 检查连接状态 |
+| `account()` | 获取当前账户信息 |
+| `network()` | 获取当前网络信息 |
+| `signMessage(request)` | 签名任意消息 |
+| `signAndSubmitTransaction(payload, options?)` | 签名并提交交易 |
+| `signTransaction(payload, options?)` | 签名交易（不提交） |
+| `signTransactionV2(rawTransaction)` | 签名 BCS 序列化的交易 |
+| `onAccountChange(callback)` | 监听账户变化 |
+| `onNetworkChange(callback)` | 监听网络变化 |
+
+### 类型
+
+```typescript
+interface AptosAccount {
+  address: string    // 带 0x 前缀的十六进制地址
+  publicKey: string  // Ed25519 公钥
+}
+
+interface AptosNetwork {
+  name: string       // 网络名称
+  chainId: string    // 链 ID
+  url: string        // RPC URL
+}
+
+interface SignMessageRequest {
+  message: string    // 要签名的消息
+  nonce?: string     // 可选的 nonce
+  address?: boolean  // 在消息中包含地址
+  application?: boolean // 包含应用信息
+  chainId?: boolean  // 包含链 ID
+}
+
+interface SignMessageResponse {
+  signature: string     // 十六进制签名
+  fullMessage: string   // 完整的已签名消息
+  prefix: string        // APTOS 前缀
+  address?: string      // 签名者地址
+  application?: string  // 应用信息
+  chainId?: number      // 链 ID
+  nonce: string         // 使用的 nonce
+}
+
+interface TransactionPayload {
+  type: 'entry_function_payload' | 'script_payload' | 'module_bundle_payload'
+  function: string       // Module::function 格式
+  type_arguments: string[]
+  arguments: any[]
+}
+```
+
+### 支持的网络
+
+| 网络 | 说明 |
+|------|------|
+| Mainnet | 生产网络 |
+| Testnet | 测试环境 |
+| Devnet | 开发环境 |
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  await provider.connect()
+} catch (error) {
+  switch (error.code) {
+    case 4001:
+      console.log('用户拒绝了请求')
+      break
+    case 4100:
+      console.log('未授权 - 钱包已锁定')
+      break
+    case 4200:
+      console.log('不支持的方法')
+      break
+    default:
+      console.error('错误:', error.message)
+  }
+}
+```
+
+### 常见错误码
+
+| 错误码 | 说明 |
+|--------|------|
+| 4001 | 用户拒绝请求 |
+| 4100 | 未授权 |
+| 4200 | 不支持的方法 |
+| 4201 | 不支持的网络 |
+| -32603 | 内部错误 |
+
+---
+
+## 使用 Aptos Wallet Adapter
+
+对于 React 应用，使用官方的 Aptos Wallet Adapter：
+
+```bash
+npm install @aptos-labs/wallet-adapter-react
+```
+
+```tsx
+import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+
+function App() {
+  return (
+    <AptosWalletAdapterProvider>
+      <YourApp />
+    </AptosWalletAdapterProvider>
+  )
+}
+```
+
+OneKey 会被 Aptos Wallet Adapter 自动检测到。
+
+---
+
+## 从 Petra 迁移
+
+OneKey 的 Aptos provider 兼容 Petra。更新你的 provider 检测代码：
+
+```typescript
+// 之前 (仅 Petra)
+const provider = window.petra
+
+// 之后 (OneKey 优先，Petra 回退)
+const provider = window.$onekey?.aptos || window.petra
+```

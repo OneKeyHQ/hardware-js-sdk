@@ -1,0 +1,370 @@
+---
+title: Polkadot
+description: 通过 OneKey 的 Polkadot.js 兼容 Provider 集成 Polkadot
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Polkadot
+
+使用 OneKey 的 Provider 集成 Polkadot 和基于 Substrate 的链。通过 `window.$onekey.polkadot` 或 Polkadot.js 扩展 API 访问。
+
+<Callout type="info">
+OneKey 实现了 Polkadot.js 扩展接口，确保与所有 Substrate dApp 兼容。
+</Callout>
+
+---
+
+## 快速链接
+
+- [API 参考](#api-参考)
+- [连接钱包](#连接钱包)
+- [签名](#签名)
+- [配合 Polkadot.js 使用](#配合-polkadotjs-使用)
+
+---
+
+## Provider 检测
+
+```typescript
+// OneKey 注册为 Polkadot.js 扩展
+const provider = window.$onekey?.polkadot
+
+// 或使用标准的 web3Enable API
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+```
+
+---
+
+## 快速开始
+
+### 启用扩展
+
+```typescript
+// 直接使用 OneKey provider
+const enabled = await provider.web3Enable('My dApp')
+
+if (enabled) {
+  const accounts = await provider.web3Accounts()
+  console.log('账户:', accounts)
+}
+```
+
+### 使用 Polkadot.js 扩展 API（推荐）
+
+```typescript
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+
+// 启用所有扩展（包括 OneKey）
+const extensions = await web3Enable('My dApp')
+
+if (extensions.length === 0) {
+  throw new Error('未找到扩展')
+}
+
+// 获取所有账户
+const allAccounts = await web3Accounts()
+console.log('账户:', allAccounts)
+```
+
+---
+
+## 账户管理
+
+### 获取账户
+
+```typescript
+const accounts = await provider.web3Accounts()
+
+accounts.forEach(account => {
+  console.log({
+    address: account.address,     // Substrate 地址
+    name: account.name,           // 账户名称
+    type: account.type,           // 'sr25519' | 'ed25519' | 'ecdsa'
+    genesisHash: account.genesisHash, // 可选的链创世块哈希
+  })
+})
+```
+
+### 订阅账户变化
+
+```typescript
+const unsubscribe = provider.web3AccountsSubscribe((accounts) => {
+  console.log('账户已变更:', accounts)
+})
+
+// 稍后取消订阅: unsubscribe()
+```
+
+---
+
+## 签名
+
+### 签名交易 Payload
+
+签名 extrinsic payloads：
+
+```typescript
+import { web3FromAddress } from '@polkadot/extension-dapp'
+
+// 获取特定账户的 injector
+const injector = await web3FromAddress(accountAddress)
+
+// 签名 payload
+const payload = {
+  address: accountAddress,
+  blockHash: '0x...',
+  blockNumber: '0x...',
+  era: '0x...',
+  genesisHash: '0x...',
+  method: '0x...',
+  nonce: '0x...',
+  specVersion: '0x...',
+  tip: '0x...',
+  transactionVersion: '0x...',
+  signedExtensions: [...],
+  version: 4,
+}
+
+const result = await provider.web3SignPayload(payload)
+
+console.log({
+  id: result.id,
+  signature: result.signature, // 十六进制签名
+})
+```
+
+### 签名原始消息
+
+```typescript
+const payload = {
+  address: accountAddress,
+  data: '0x48656c6c6f', // 十六进制编码的消息
+  type: 'bytes',
+}
+
+const result = await provider.web3SignRaw(payload)
+
+console.log({
+  id: result.id,
+  signature: result.signature,
+})
+```
+
+---
+
+## 配合 Polkadot.js API 使用
+
+### 设置
+
+```bash
+npm install @polkadot/api @polkadot/extension-dapp
+```
+
+### 连接并签名交易
+
+```typescript
+import { ApiPromise, WsProvider } from '@polkadot/api'
+import { web3Enable, web3FromAddress, web3Accounts } from '@polkadot/extension-dapp'
+
+// 启用扩展
+await web3Enable('My dApp')
+
+// 获取账户
+const accounts = await web3Accounts()
+const account = accounts[0]
+
+// 连接到链
+const wsProvider = new WsProvider('wss://rpc.polkadot.io')
+const api = await ApiPromise.create({ provider: wsProvider })
+
+// 获取 injector
+const injector = await web3FromAddress(account.address)
+
+// 创建并签名交易
+const tx = api.tx.balances.transfer(
+  recipientAddress,
+  1000000000000 // 1 DOT (10^12 planck)
+)
+
+// 签名并发送
+const hash = await tx.signAndSend(
+  account.address,
+  { signer: injector.signer }
+)
+
+console.log('交易哈希:', hash.toHex())
+```
+
+### 监听交易事件
+
+```typescript
+await tx.signAndSend(
+  account.address,
+  { signer: injector.signer },
+  ({ status, events }) => {
+    if (status.isInBlock) {
+      console.log('已入块:', status.asInBlock.toHex())
+    }
+    if (status.isFinalized) {
+      console.log('已确认:', status.asFinalized.toHex())
+
+      events.forEach(({ event }) => {
+        if (api.events.system.ExtrinsicSuccess.is(event)) {
+          console.log('交易成功')
+        }
+        if (api.events.system.ExtrinsicFailed.is(event)) {
+          console.log('交易失败')
+        }
+      })
+    }
+  }
+)
+```
+
+---
+
+## RPC 方法
+
+### 发送 RPC 请求
+
+```typescript
+const response = await provider.web3RpcSend({
+  method: 'chain_getHeader',
+  params: [],
+})
+
+console.log('最新区块头:', response.result)
+```
+
+### 订阅 RPC 事件
+
+```typescript
+const subscriptionId = await provider.web3RpcSubscribe(
+  {
+    method: 'chain_subscribeNewHeads',
+    params: [],
+  },
+  (response) => {
+    console.log('新区块:', response.result)
+  }
+)
+
+// 稍后取消订阅
+await provider.web3RpcUnSubscribe()
+```
+
+### 列出可用 Provider
+
+```typescript
+const providers = await provider.web3RpcListProviders()
+console.log('可用 providers:', providers)
+```
+
+---
+
+## API 参考
+
+### 方法
+
+| 方法 | 说明 |
+|------|------|
+| `web3Enable(dappName)` | 为 dApp 启用扩展 |
+| `web3Accounts(anyType?)` | 获取所有账户 |
+| `web3AccountsSubscribe(callback)` | 订阅账户变化 |
+| `web3SignPayload(payload)` | 签名交易 payload |
+| `web3SignRaw(payload)` | 签名原始消息 |
+| `web3RpcSend(request)` | 发送 RPC 请求 |
+| `web3RpcSubscribe(request, callback)` | 订阅 RPC 事件 |
+| `web3RpcUnSubscribe()` | 取消所有订阅 |
+| `web3RpcListProviders()` | 列出 RPC providers |
+| `web3RpcStartProvider(key)` | 启动特定 provider |
+
+### 类型
+
+```typescript
+interface InjectedAccount {
+  address: string          // Substrate 地址
+  name?: string            // 账户名称
+  type?: 'sr25519' | 'ed25519' | 'ecdsa'
+  genesisHash?: string     // 可选的链限制
+}
+
+interface SignerPayloadJSON {
+  address: string
+  blockHash: string
+  blockNumber: string
+  era: string
+  genesisHash: string
+  method: string
+  nonce: string
+  specVersion: string
+  tip: string
+  transactionVersion: string
+  signedExtensions: string[]
+  version: number
+}
+
+interface SignerPayloadRaw {
+  address: string
+  data: string             // 十六进制编码的数据
+  type: 'bytes' | 'payload'
+}
+
+interface SignerResult {
+  id: number
+  signature: string        // 十六进制签名
+}
+```
+
+### 支持的链
+
+| 链 | 说明 |
+|----|------|
+| Polkadot | 主中继链 |
+| Kusama | 金丝雀网络 |
+| Acala | DeFi 中心 |
+| Moonbeam | EVM 兼容 |
+| Astar | 智能合约平台 |
+| 任意 Substrate | 自定义链 |
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  const result = await provider.web3SignPayload(payload)
+} catch (error) {
+  if (error.message === 'Cancelled') {
+    console.log('用户取消了签名')
+  } else {
+    console.error('签名失败:', error)
+  }
+}
+```
+
+---
+
+## 配合 React 使用
+
+```tsx
+import { useState, useEffect } from 'react'
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+
+function usePolkadotWallet() {
+  const [accounts, setAccounts] = useState([])
+  const [isConnected, setIsConnected] = useState(false)
+
+  const connect = async () => {
+    const extensions = await web3Enable('My dApp')
+    if (extensions.length > 0) {
+      const allAccounts = await web3Accounts()
+      setAccounts(allAccounts)
+      setIsConnected(true)
+    }
+  }
+
+  return { accounts, isConnected, connect }
+}
+```

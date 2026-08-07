@@ -1,10 +1,15 @@
-import React, { createContext, useState, useContext, ReactNode, useCallback, useMemo } from 'react';
-import { Features, supportInputPinOnSoftware, UI_RESPONSE } from '@onekeyfe/hd-core';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { UI_RESPONSE, supportInputPinOnSoftware } from '@onekeyfe/hd-core';
+
 import { ReceivePin } from '../components/ReceivePin';
+
+import type { Features } from '@onekeyfe/hd-core';
+import type { ReactNode } from 'react';
 
 interface DialogState {
   isOpen: boolean;
   sdk: any;
+  payload?: any;
 }
 
 interface HardwareInputPinDialogContextType {
@@ -32,9 +37,9 @@ export const HardwareInputPinDialogProvider: React.FC<{ children: ReactNode }> =
   }, [dialogState.sdk]);
 
   const openDialog = useCallback(
-    (sdk: any, features: Features) => {
+    (sdk: any, features: Features, payload?: any) => {
       if (supportInputPinOnSoftware(features).support) {
-        setDialogState({ isOpen: true, sdk });
+        setDialogState({ isOpen: true, sdk, payload });
       } else {
         onInputPinOnDeviceCallback();
       }
@@ -70,12 +75,14 @@ export const HardwareInputPinDialogProvider: React.FC<{ children: ReactNode }> =
       {children}
       <ReceivePin
         open={dialogState.isOpen}
+        payload={dialogState.payload}
         onOpenChange={open => {
           setDialogState(prevState => ({ ...prevState, isOpen: open }));
         }}
         onConfirm={val => onConfirmPin(val)}
         onSwitchDevice={onInputPinOnDeviceCallback}
         onCancel={onPinCancelCallback}
+        onTestUnexpectedMessage={() => {}}
       />
     </HardwareInputPinDialogContext.Provider>
   );

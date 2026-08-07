@@ -116,6 +116,7 @@ const TYPE_PATCH = {
   'Features.onekey_se03_state': 'string | null',
   'Features.onekey_se04_state': 'string | null',
   'HDNodePathType.node': 'HDNodeType | string',
+  'FilesystemFile.data': 'Buffer | ArrayBuffer | Uint8Array | string',
   'FirmwareUpload.payload': 'Buffer | ArrayBuffer',
   'EthereumGetAddress.encoded_network': 'ArrayBuffer',
   'EthereumDefinitions.encoded_network': 'ArrayBuffer',
@@ -207,7 +208,9 @@ const TYPE_PATCH = {
   'TonSignMessage.fwd_fee': UINT_TYPE,
   'TonSignMessage.expire_at': UINT_TYPE,
   'TonSignMessage.ext_ton_amount': UINT_TYPE,
+  'TonSignData.timestamp': UINT_TYPE,
   'TonSignProof.expire_at': UINT_TYPE,
+  'TonSignData.timestamp': UINT_TYPE,
 };
 
 const DEFINITION_PATCH = {

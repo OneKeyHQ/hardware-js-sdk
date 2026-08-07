@@ -341,6 +341,23 @@
         }
       }
     },
+    "AptosSignSIWAMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "siwa_payload": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
     "BenfenGetAddress": {
       "fields": {
         "address_n": {
@@ -1980,6 +1997,15 @@
         }
       }
     },
+    "UpgradeFileHeader": {
+      "fields": {
+        "data": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "CardanoDerivationType": {
       "values": {
         "LEDGER": 0,
@@ -2927,6 +2953,10 @@
         "address_type": {
           "type": "CardanoAddressType",
           "id": 5
+        },
+        "protocol_magic": {
+          "type": "uint32",
+          "id": 6
         }
       }
     },
@@ -3021,7 +3051,8 @@
             "ButtonRequest_Success": 17,
             "ButtonRequest_Warning": 18,
             "ButtonRequest_PassphraseEntry": 19,
-            "ButtonRequest_PinEntry": 20
+            "ButtonRequest_PinEntry": 20,
+            "ButtonRequest_AttachPin": 8000
           }
         }
       }
@@ -3045,7 +3076,8 @@
             "PinMatrixRequestType_WipeCodeFirst": 4,
             "PinMatrixRequestType_WipeCodeSecond": 5,
             "PinMatrixRequestType_BackupFirst": 6,
-            "PinMatrixRequestType_BackupSecond": 7
+            "PinMatrixRequestType_BackupSecond": 7,
+            "PinMatrixRequestType_AttachToPin": 8000
           }
         }
       }
@@ -3071,6 +3103,10 @@
           "options": {
             "deprecated": true
           }
+        },
+        "exists_attach_pin_user": {
+          "type": "bool",
+          "id": 8000
         }
       }
     },
@@ -3090,6 +3126,10 @@
         "on_device": {
           "type": "bool",
           "id": 3
+        },
+        "on_device_attach_pin": {
+          "type": "bool",
+          "id": 8000
         }
       }
     },
@@ -5232,6 +5272,20 @@
         }
       }
     },
+    "EthereumAccessListOneKey": {
+      "fields": {
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "storage_keys": {
+          "rule": "repeated",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
     "EthereumSignTxEIP1559OneKey": {
       "fields": {
         "address_n": {
@@ -5296,19 +5350,124 @@
           "type": "EthereumAccessListOneKey",
           "id": 11
         }
+      }
+    },
+    "EthereumAuthorizationSignature": {
+      "fields": {
+        "y_parity": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "r": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "s": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "EthereumSignTxEIP7702OneKey": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "nonce": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "max_gas_fee": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "max_priority_fee": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 4
+        },
+        "gas_limit": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 5
+        },
+        "to": {
+          "rule": "required",
+          "type": "string",
+          "id": 6
+        },
+        "value": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 7
+        },
+        "data_initial_chunk": {
+          "type": "bytes",
+          "id": 8,
+          "options": {
+            "default": ""
+          }
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 9
+        },
+        "chain_id": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 10
+        },
+        "access_list": {
+          "rule": "repeated",
+          "type": "EthereumAccessListOneKey",
+          "id": 11
+        },
+        "authorization_list": {
+          "rule": "repeated",
+          "type": "EthereumAuthorizationOneKey",
+          "id": 12
+        }
       },
       "nested": {
-        "EthereumAccessListOneKey": {
+        "EthereumAuthorizationOneKey": {
           "fields": {
+            "address_n": {
+              "rule": "repeated",
+              "type": "uint32",
+              "id": 1,
+              "options": {
+                "packed": false
+              }
+            },
+            "chain_id": {
+              "rule": "required",
+              "type": "uint64",
+              "id": 2
+            },
             "address": {
               "rule": "required",
               "type": "string",
-              "id": 1
+              "id": 3
             },
-            "storage_keys": {
-              "rule": "repeated",
+            "nonce": {
+              "rule": "required",
               "type": "bytes",
-              "id": 2
+              "id": 4
+            },
+            "signature": {
+              "type": "EthereumAuthorizationSignature",
+              "id": 5
             }
           }
         }
@@ -5331,6 +5490,11 @@
         "signature_s": {
           "type": "bytes",
           "id": 4
+        },
+        "authorization_signatures": {
+          "rule": "repeated",
+          "type": "EthereumAuthorizationSignature",
+          "id": 10
         }
       }
     },
@@ -5888,6 +6052,13 @@
           "options": {
             "default": "schnorr"
           }
+        },
+        "use_tweak": {
+          "type": "bool",
+          "id": 5,
+          "options": {
+            "default": true
+          }
         }
       }
     },
@@ -5911,7 +6082,6 @@
           }
         },
         "raw_message": {
-          "rule": "required",
           "type": "bytes",
           "id": 2
         },
@@ -5934,6 +6104,49 @@
           "id": 5,
           "options": {
             "default": 1
+          }
+        },
+        "use_tweak": {
+          "type": "bool",
+          "id": 6,
+          "options": {
+            "default": true
+          }
+        },
+        "output_count": {
+          "type": "uint32",
+          "id": 7
+        },
+        "version": {
+          "type": "uint32",
+          "id": 8,
+          "options": {
+            "default": 0
+          }
+        },
+        "lock_time": {
+          "type": "uint64",
+          "id": 9,
+          "options": {
+            "default": 0
+          }
+        },
+        "subnetwork_id": {
+          "type": "bytes",
+          "id": 10
+        },
+        "gas": {
+          "type": "uint64",
+          "id": 11,
+          "options": {
+            "default": 0
+          }
+        },
+        "payload_length": {
+          "type": "uint32",
+          "id": 12,
+          "options": {
+            "default": 0
           }
         }
       }
@@ -5965,6 +6178,249 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        }
+      }
+    },
+    "KaspaOutpoint": {
+      "fields": {
+        "tx_id": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "index": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "KaspaInputScriptType": {
+      "values": {
+        "KASPA_SPEND_P2PK_SCHNORR": 0,
+        "KASPA_SPEND_P2PK_ECDSA": 1
+      }
+    },
+    "KaspaOutputScriptType": {
+      "values": {
+        "KASPA_PAYTOADDRESS": 0,
+        "KASPA_PAYTOCHANGE": 1
+      }
+    },
+    "KaspaRequestType": {
+      "values": {
+        "KASPA_TX_INPUT": 0,
+        "KASPA_TX_OUTPUT": 1,
+        "KASPA_TX_PAYLOAD": 2,
+        "KASPA_TX_FINISHED": 3,
+        "KASPA_TX_PREV_META": 4
+      }
+    },
+    "KaspaTxRequestSignature": {
+      "fields": {
+        "signature_index": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "KaspaTxRequest": {
+      "fields": {
+        "request_type": {
+          "rule": "required",
+          "type": "KaspaRequestType",
+          "id": 1
+        },
+        "request_index": {
+          "type": "uint32",
+          "id": 2
+        },
+        "signature": {
+          "type": "KaspaTxRequestSignature",
+          "id": 3
+        },
+        "request_payload_length": {
+          "type": "uint32",
+          "id": 4
+        },
+        "prev_tx_id": {
+          "type": "bytes",
+          "id": 5
+        }
+      }
+    },
+    "KaspaTxAckInput": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "previous_outpoint": {
+          "rule": "required",
+          "type": "KaspaOutpoint",
+          "id": 2
+        },
+        "amount": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 3
+        },
+        "sequence": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 4
+        },
+        "sig_op_count": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 5
+        },
+        "script_type": {
+          "type": "KaspaInputScriptType",
+          "id": 6,
+          "options": {
+            "default": "KASPA_SPEND_P2PK_SCHNORR"
+          }
+        },
+        "use_tweak": {
+          "type": "bool",
+          "id": 9,
+          "options": {
+            "default": true
+          }
+        }
+      }
+    },
+    "KaspaTxAckOutput": {
+      "fields": {
+        "script_type": {
+          "type": "KaspaOutputScriptType",
+          "id": 1,
+          "options": {
+            "default": "KASPA_PAYTOADDRESS"
+          }
+        },
+        "amount": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 2
+        },
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 3,
+          "options": {
+            "packed": false
+          }
+        },
+        "address": {
+          "type": "string",
+          "id": 4
+        },
+        "scheme": {
+          "type": "string",
+          "id": 7,
+          "options": {
+            "default": "schnorr"
+          }
+        },
+        "use_tweak": {
+          "type": "bool",
+          "id": 8,
+          "options": {
+            "default": true
+          }
+        }
+      }
+    },
+    "KaspaTxAckPayloadChunk": {
+      "fields": {
+        "payload_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "KaspaTxAckPrevMeta": {
+      "fields": {
+        "version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "input_count": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "output_count": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "lock_time": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 4
+        },
+        "subnetwork_id": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 5
+        },
+        "gas": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 6
+        },
+        "payload_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 7
+        }
+      }
+    },
+    "KaspaTxAckPrevInput": {
+      "fields": {
+        "previous_outpoint": {
+          "rule": "required",
+          "type": "KaspaOutpoint",
+          "id": 1
+        },
+        "sequence": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 2
+        }
+      }
+    },
+    "KaspaTxAckPrevOutput": {
+      "fields": {
+        "amount": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 1
+        },
+        "script_version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "script_public_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
         }
       }
     },
@@ -6037,6 +6493,14 @@
         "derive_cardano": {
           "type": "bool",
           "id": 3
+        },
+        "passphrase_state": {
+          "type": "string",
+          "id": 8000
+        },
+        "is_contains_attach": {
+          "type": "bool",
+          "id": 8001
         }
       }
     },
@@ -6316,6 +6780,22 @@
           "type": "uint32",
           "id": 520
         },
+        "product": {
+          "type": "string",
+          "id": 521
+        },
+        "brightness_prcent": {
+          "type": "uint32",
+          "id": 522
+        },
+        "haptic_feedback": {
+          "type": "bool",
+          "id": 523
+        },
+        "auto_shutdown_delay_ms": {
+          "type": "uint32",
+          "id": 524
+        },
         "onekey_device_type": {
           "type": "OneKeyDeviceType",
           "id": 600
@@ -6415,6 +6895,14 @@
         "onekey_se04_state": {
           "type": "OneKeySEState",
           "id": 624
+        },
+        "attach_to_pin_user": {
+          "type": "bool",
+          "id": 625
+        },
+        "unlocked_attach_pin": {
+          "type": "bool",
+          "id": 626
         }
       },
       "nested": {
@@ -6439,7 +6927,9 @@
             "Capability_U2F": 14,
             "Capability_Shamir": 15,
             "Capability_ShamirGroups": 16,
-            "Capability_PassphraseEntry": 17
+            "Capability_PassphraseEntry": 17,
+            "Capability_EthereumTypedData": 1000,
+            "Capability_AttachToPin": 8000
           }
         }
       }
@@ -6702,6 +7192,18 @@
         "fastpay_times": {
           "type": "uint32",
           "id": 106
+        },
+        "auto_shutdown_delay_ms": {
+          "type": "uint32",
+          "id": 500
+        },
+        "change_brightness": {
+          "type": "bool",
+          "id": 501
+        },
+        "haptic_feedback": {
+          "type": "bool",
+          "id": 502
         }
       },
       "nested": {
@@ -7360,6 +7862,10 @@
         "file_name_no_ext": {
           "type": "string",
           "id": 6
+        },
+        "blur_data_length": {
+          "type": "uint32",
+          "id": 7
         }
       },
       "nested": {
@@ -7372,6 +7878,19 @@
       }
     },
     "ZoomRequest": {
+      "fields": {
+        "offset": {
+          "type": "uint32",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "BlurRequest": {
       "fields": {
         "offset": {
           "type": "uint32",
@@ -7525,6 +8044,49 @@
           "rule": "required",
           "type": "uint32",
           "id": 1
+        }
+      }
+    },
+    "UnLockDevice": {
+      "fields": {}
+    },
+    "UnLockDeviceResponse": {
+      "fields": {
+        "unlocked": {
+          "type": "bool",
+          "id": 1
+        },
+        "unlocked_attach_pin": {
+          "type": "bool",
+          "id": 2
+        },
+        "passphrase_protection": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
+    "GetPassphraseState": {
+      "fields": {
+        "passphrase_state": {
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "PassphraseState": {
+      "fields": {
+        "passphrase_state": {
+          "type": "string",
+          "id": 1
+        },
+        "session_id": {
+          "type": "bytes",
+          "id": 2
+        },
+        "unlocked_attach_pin": {
+          "type": "bool",
+          "id": 3
         }
       }
     },
@@ -9360,6 +9922,10 @@
           "rule": "required",
           "type": "string",
           "id": 3
+        },
+        "prefix": {
+          "type": "uint32",
+          "id": 4
         }
       }
     },
@@ -9622,6 +10188,39 @@
         }
       }
     },
+    "SolanaTxATADetails": {
+      "fields": {
+        "owner_address": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "program_id": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "mint_address": {
+          "rule": "required",
+          "type": "string",
+          "id": 3
+        },
+        "associated_token_address": {
+          "rule": "required",
+          "type": "string",
+          "id": 4
+        }
+      }
+    },
+    "SolanaTxExtraInfo": {
+      "fields": {
+        "ata_details": {
+          "rule": "repeated",
+          "type": "SolanaTxATADetails",
+          "id": 1
+        }
+      }
+    },
     "SolanaSignTx": {
       "fields": {
         "address_n": {
@@ -9636,6 +10235,10 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        },
+        "extra_info": {
+          "type": "SolanaTxExtraInfo",
+          "id": 3
         }
       }
     },
@@ -9958,6 +10561,13 @@
           "rule": "required",
           "type": "uint32",
           "id": 14
+        },
+        "soroban_data_size": {
+          "type": "uint32",
+          "id": 60,
+          "options": {
+            "default": 0
+          }
         }
       },
       "nested": {
@@ -10347,6 +10957,76 @@
           "rule": "required",
           "type": "uint64",
           "id": 2
+        }
+      }
+    },
+    "StellarInvokeHostFunctionOp": {
+      "fields": {
+        "source_account": {
+          "type": "string",
+          "id": 1
+        },
+        "contract_address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "function_name": {
+          "rule": "required",
+          "type": "string",
+          "id": 3
+        },
+        "call_args_xdr_size": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 4
+        },
+        "call_args_xdr_initial_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 5
+        },
+        "soroban_auth_xdr_size": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 6
+        },
+        "soroban_auth_xdr_initial_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 7
+        }
+      }
+    },
+    "StellarSorobanDataRequest": {
+      "fields": {
+        "type": {
+          "rule": "required",
+          "type": "StellarRequestType",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      },
+      "nested": {
+        "StellarRequestType": {
+          "values": {
+            "CALL": 0,
+            "AUTH": 1,
+            "EXT": 2
+          }
+        }
+      }
+    },
+    "StellarSorobanDataAck": {
+      "fields": {
+        "data_xdr": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
         }
       }
     },
@@ -11176,6 +11856,102 @@
         }
       }
     },
+    "TonSignData": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "type": {
+          "rule": "required",
+          "type": "TonSignDataType",
+          "id": 2
+        },
+        "payload": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "schema": {
+          "type": "string",
+          "id": 4
+        },
+        "appdomain": {
+          "rule": "required",
+          "type": "string",
+          "id": 5
+        },
+        "timestamp": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 6
+        },
+        "from_address": {
+          "type": "string",
+          "id": 7
+        },
+        "wallet_version": {
+          "type": "TonWalletVersion",
+          "id": 8,
+          "options": {
+            "default": "V4R2"
+          }
+        },
+        "wallet_id": {
+          "type": "uint32",
+          "id": 9,
+          "options": {
+            "default": 698983191
+          }
+        },
+        "workchain": {
+          "type": "TonWorkChain",
+          "id": 10,
+          "options": {
+            "default": "BASECHAIN"
+          }
+        },
+        "is_bounceable": {
+          "type": "bool",
+          "id": 11,
+          "options": {
+            "default": false
+          }
+        },
+        "is_testnet_only": {
+          "type": "bool",
+          "id": 12,
+          "options": {
+            "default": false
+          }
+        }
+      },
+      "nested": {
+        "TonSignDataType": {
+          "values": {
+            "TEXT": 0,
+            "BINARY": 1,
+            "CELL": 2
+          }
+        }
+      }
+    },
+    "TonSignedData": {
+      "fields": {
+        "signature": {
+          "type": "bytes",
+          "id": 1
+        },
+        "digest": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
     "TronGetAddress": {
       "fields": {
         "address_n": {
@@ -11436,6 +12212,10 @@
                 "lock": {
                   "type": "bool",
                   "id": 5
+                },
+                "lock_period": {
+                  "type": "uint64",
+                  "id": 6
                 }
               }
             },
@@ -11504,6 +12284,12 @@
         }
       }
     },
+    "TronMessageType": {
+      "values": {
+        "V1": 1,
+        "V2": 2
+      }
+    },
     "TronSignMessage": {
       "fields": {
         "address_n": {
@@ -11518,6 +12304,13 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        },
+        "message_type": {
+          "type": "TronMessageType",
+          "id": 3,
+          "options": {
+            "default": "V1"
+          }
         }
       }
     },
@@ -11837,6 +12630,7 @@
         "MessageType_EthereumSignTypedHashOneKey": 20117,
         "MessageType_EthereumGnosisSafeTxAck": 20118,
         "MessageType_EthereumGnosisSafeTxRequest": 20119,
+        "MessageType_EthereumSignTxEIP7702OneKey": 20120,
         "MessageType_NEMGetAddress": 67,
         "MessageType_NEMAddress": 68,
         "MessageType_NEMSignTx": 69,
@@ -11867,6 +12661,9 @@
         "MessageType_StellarManageBuyOfferOp": 222,
         "MessageType_StellarPathPaymentStrictSendOp": 223,
         "MessageType_StellarSignedTx": 230,
+        "MessageType_StellarInvokeHostFunctionOp": 260,
+        "MessageType_StellarSorobanDataRequest": 261,
+        "MessageType_StellarSorobanDataAck": 262,
         "MessageType_CardanoGetPublicKey": 305,
         "MessageType_CardanoPublicKey": 306,
         "MessageType_CardanoGetAddress": 307,
@@ -11978,6 +12775,7 @@
         "MessageType_AptosSignedTx": 10603,
         "MessageType_AptosSignMessage": 10604,
         "MessageType_AptosMessageSignature": 10605,
+        "MessageType_AptosSignSIWAMessage": 10606,
         "MessageType_WebAuthnListResidentCredentials": 800,
         "MessageType_WebAuthnCredentials": 801,
         "MessageType_WebAuthnAddResidentCredential": 802,
@@ -12048,6 +12846,13 @@
         "MessageType_KaspaSignedTx": 11303,
         "MessageType_KaspaTxInputRequest": 11304,
         "MessageType_KaspaTxInputAck": 11305,
+        "MessageType_KaspaTxRequest": 11306,
+        "MessageType_KaspaTxAckInput": 11307,
+        "MessageType_KaspaTxAckOutput": 11308,
+        "MessageType_KaspaTxAckPayloadChunk": 11309,
+        "MessageType_KaspaTxAckPrevMeta": 11310,
+        "MessageType_KaspaTxAckPrevInput": 11311,
+        "MessageType_KaspaTxAckPrevOutput": 11312,
         "MessageType_NexaGetAddress": 11400,
         "MessageType_NexaAddress": 11401,
         "MessageType_NexaSignTx": 11402,
@@ -12086,6 +12891,8 @@
         "MessageType_TonSignProof": 11905,
         "MessageType_TonSignedProof": 11906,
         "MessageType_TonTxAck": 11907,
+        "MessageType_TonSignData": 11908,
+        "MessageType_TonSignedData": 11909,
         "MessageType_ScdoGetAddress": 12001,
         "MessageType_ScdoAddress": 12002,
         "MessageType_ScdoSignTx": 12003,
@@ -12133,6 +12940,7 @@
         "MessageType_NFTWriteData": 10015,
         "MessageType_ResourceUpload": 10018,
         "MessageType_ZoomRequest": 10019,
+        "MessageType_BlurRequest": 10032,
         "MessageType_ResourceRequest": 10020,
         "MessageType_ResourceAck": 10021,
         "MessageType_ResourceUpdate": 10022,
@@ -12140,7 +12948,12 @@
         "MessageType_FileInfoList": 10024,
         "MessageType_OnekeyGetFeatures": 10025,
         "MessageType_OnekeyFeatures": 10026,
-        "MessageType_WriteSEPrivateKey": 10027
+        "MessageType_WriteSEPrivateKey": 10027,
+        "MessageType_GetPassphraseState": 10028,
+        "MessageType_PassphraseState": 10029,
+        "MessageType_UnLockDevice": 10030,
+        "MessageType_UnLockDeviceResponse": 10031,
+        "MessageType_UpgradeFileHeader": 10050
       }
     },
     "google": {

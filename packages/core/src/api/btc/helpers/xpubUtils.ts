@@ -1,4 +1,5 @@
 import { sha256 } from '@noble/hashes/sha256';
+
 import type { HDNodeType, InputScriptType } from '@onekeyfe/hd-transport';
 
 // 定义版本字节常量
@@ -11,31 +12,54 @@ const VERSION_BYTES = {
   ZPUB: 0x04b24746,
 };
 
-function getVersionBytes(coinName: string, scriptType?: InputScriptType): number {
+export function getVersionBytes(
+  coinName: string,
+  scriptType?: InputScriptType
+): number | undefined {
   if (coinName.toLowerCase() === 'bitcoin') {
     switch (scriptType) {
       case 'SPENDADDRESS':
       case 'SPENDMULTISIG':
+        // 44、48
         return VERSION_BYTES.XPUB;
       case 'SPENDP2SHWITNESS':
+        // 49
         return VERSION_BYTES.YPUB;
       case 'SPENDWITNESS':
+        // 84
         return VERSION_BYTES.ZPUB;
       default:
+        // 86、10025
         return VERSION_BYTES.XPUB;
     }
-  } else if (coinName.toLowerCase() === 'testnet') {
-    return 0x043587cf;
-  } else if (coinName.toLowerCase() === 'regtest') {
-    return 0x043587cf;
   } else if (coinName.toLowerCase() === 'litecoin') {
-    return 0x019da462;
+    switch (scriptType) {
+      case 'SPENDADDRESS':
+      case 'SPENDMULTISIG':
+        // 44、48
+        return 0x019da462;
+      case 'SPENDP2SHWITNESS':
+        // 49
+        return 0x01b26ef6;
+      case 'SPENDWITNESS':
+        // 84
+        return 0x04b24746;
+      default:
+        // not support 86、10025 path
+        return undefined;
+    }
   } else if (coinName.toLowerCase() === 'dogecoin') {
-    return 0x02facafd;
-  } else if (coinName.toLowerCase() === 'dash') {
-    return 0x02fe52cc;
+    if (scriptType === 'SPENDADDRESS') {
+      // 44
+      return 0x02facafd;
+    }
+    if (scriptType === 'SPENDMULTISIG') {
+      // 48
+      return 0x0488b21e;
+    }
+    return undefined;
   }
-  return VERSION_BYTES.XPUB;
+  return undefined;
 }
 
 function base58Check(data: Buffer): string {
@@ -75,6 +99,10 @@ function generateExtendedPublicKey(
   scriptType?: InputScriptType
 ): string {
   const versionBytes = getVersionBytes(coinName, scriptType);
+
+  if (!versionBytes) {
+    throw new Error(`Invalid coinName, not support generate xpub for scriptType: ${scriptType}`);
+  }
 
   const buffer = Buffer.alloc(78);
   buffer.writeUInt32BE(versionBytes, 0);

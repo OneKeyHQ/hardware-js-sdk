@@ -1,0 +1,121 @@
+---
+title: Wallet Skills
+---
+
+# Wallet Skills
+
+[`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) 为 AI coding assistant 提供钱包能力层。用户用自然语言提需求；skills 选择安全路由，在需要时读取实时 schema，并用用户能理解的语言解释结果。
+
+用户不应该手写 CLI 命令。CLI 是 skill pack 背后的实现细节。
+
+## 先安装
+
+| Client | 安装路径 |
+| --- | --- |
+| Claude Code | 先 `/plugin marketplace add OneKeyHQ/onekey-wallet-skills`，再 `/plugin install onekey-wallet-skills` |
+| Codex | 让 Codex 按 `https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md` 执行 |
+| Cursor | 克隆 `https://github.com/OneKeyHQ/onekey-wallet-skills`，并把 Cursor 指向 plugin 目录 |
+| OpenCode / OpenClaw | 按 skills 仓库中的对应安装说明接入 |
+
+安装后先试这些 prompt：
+
+```text
+Show my wallet balance and receiving address.
+```
+
+```text
+What Solana tokens are trending right now?
+```
+
+```text
+Quote 1 ETH to USDC. Do not execute yet.
+```
+
+```text
+Is this token safe before I buy it?
+```
+
+## Skill Router
+
+| Skill | 适用请求 | 示例 prompt |
+| --- | --- | --- |
+| `onekey-wallet` | 登录、活动钱包、余额、收款地址、历史、转账、BTC/SOL 钱包操作、硬件发现 | `Show my wallet balance and receiving address.` |
+| `onekey-swap` | Swap、buy、sell、convert、bridge、swap status、BTC sign-only PSBT | `Swap 1 ETH to USDC, but show me the quote first.` |
+| `onekey-market` | 价格、token 搜索、trending、K 线、流动性、持仓、BTC/SOL 指标、研究 | `What Solana tokens are trending right now?` |
+| `onekey-security` | Token audit、交易模拟、授权风险、硬件安全、secret-safety 检查 | `Is this token safe before I buy it?` |
+
+## Schema 契约
+
+每个 skill 都应该把实时 CLI schema 当作事实来源，而不是硬编码过期示例。
+
+| 检查项 | 预期行为 |
+| --- | --- |
+| 发现能力 | 能力是否支持不确定时，检查命令列表。 |
+| 选择参数 | 选择复杂字段前，检查具体命令 schema。 |
+| 名称映射正确 | 区分 schema 命令名和面向用户的命令族。 |
+| 处理不支持字段 | 当前 schema 没有暴露请求参数时，停止并解释原因。 |
+| 保持结构化输出 | 优先输出 result、risk、route、next step，不把原始终端 dump 给用户。 |
+
+## Wallet
+
+`onekey-wallet` 用于钱包状态、收款地址、转账、BTC 地址类型和硬件会话。
+
+| 自然语言 | Skill 应该做什么 |
+| --- | --- |
+| `Connect my OneKey Agent Wallet.` | 通过 App Transfer 配对，并总结活动钱包。 |
+| `What wallet am I using?` | 展示 login method、wallet kind、address，以及已有 device 状态。 |
+| `Show my balance.` | 自动使用活动钱包，不要求用户粘贴地址。 |
+| `Receive BTC.` | 返回 BTC 收款地址；缺少地址类型时只问地址类型。 |
+| `Send 0.2 SOL to this address.` | 保留 Solana 上下文，校验地址格式，并进入确认。 |
+
+## Swap
+
+`onekey-swap` 用于交易、买入、卖出、兑换、跨链和 BTC sign-only。
+
+| 自然语言 | Skill 应该做什么 |
+| --- | --- |
+| `Swap 1 ETH to USDC.` | 先 quote，展示 route 和 risk，再在执行前请求确认。 |
+| `Buy $200 of PEPE on Ethereum.` | 保留 Ethereum 上下文，审计 token，并进入交易确认。 |
+| `Bridge 500 USDC from Ethereum to Base.` | 先发现 bridge 支持，再报价。 |
+| `Swap 0.01 BTC to USDC using taproot and sign only.` | 保留 taproot，返回 signed 或 preview PSBT，而不是广播。 |
+| `Yes, confirm the swap.` | 只执行已经确认过的订单。 |
+
+## Market
+
+`onekey-market` 用于只读行情和研究。
+
+| 自然语言 | Skill 应该做什么 |
+| --- | --- |
+| `What is the BTC price?` | 先返回价格和 24h change，再给 chart 或 trend follow-up。 |
+| `What tokens are trending right now?` | 返回短 trending 列表，不直接开始交易。 |
+| `Search BONK on Solana.` | 保留 Solana，把标识符当作 SPL token 或 mint。 |
+| `Show ETH liquidity.` | 返回流动性或持仓视图。 |
+| `Give me a quick ETH analysis.` | 提供 bias、catalyst、risk 和一个下一步。 |
+
+Market 回答默认只读。买入或兑换应该进入单独的确认流程。
+
+## Security
+
+`onekey-security` 用于风险检查和操作前保护。
+
+| 自然语言 | Skill 应该做什么 |
+| --- | --- |
+| `Is this token safe?` | 运行 token audit，并报告风险等级和原因。 |
+| `Simulate approving this contract for all my USDC.` | 模拟并提示 unlimited approval 风险。 |
+| `Send SOL to 0x...` | 因 Solana/EVM 地址不匹配停止。 |
+| `Show me the App Transfer payload.` | 拒绝暴露 secret，改为提供活动会话摘要。 |
+| `Is my hardware wallet safe to use?` | 使用 device/auth status 和设备验证；绝不要求助记词。 |
+
+## 回答形态
+
+好的 skill 回答应该结果优先、足够短：
+
+```text
+Route: swap-quote
+Fields: chain=eth, from=ETH, to=USDC, amount=1
+Quote: 1 ETH -> <estimated USDC>
+Risk: <audit or simulation state>
+Next: I can build the transaction and ask for confirmation.
+```
+
+涉及资金移动的回答必须以确认问题结束。只读的 market 和 wallet 回答应给一个有用 follow-up，而不是直接引导交易。

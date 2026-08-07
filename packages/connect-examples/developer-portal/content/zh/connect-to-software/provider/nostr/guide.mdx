@@ -1,0 +1,48 @@
+---
+title: 指南
+---
+
+# 指南
+
+## 概述
+
+本指南帮助用户了解如何使用 OneKey Provider API 轻松构建基于 Nostr 协议的网络应用。
+
+OneKey Provider API 遵循 [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md) 规范。
+
+## 安装
+
+#### 1. 下载 OneKey 钱包
+
+下载 [OneKey 钱包](https://onekey.so/zh_CN/download?client=browserExtension)。安装 OneKey 浏览器扩展。
+
+#### 2. API 注入说明
+
+* OneKey 浏览器扩展会将 `Provider API` 注入到访问的网站中。
+* 提供两种类型的 API：`window.nostr` 和 `window.$onekey.nostr`。
+* 推荐使用 `window.$onekey.nostr`。
+
+> 两种 API 功能相同，只是名称不同。
+
+### 检测 Provider API 支持
+
+在开始使用 Nostr 协议之前，需要检查浏览器是否支持，通过检查 `window.nostr` 变量是否定义：
+
+```javascript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+if (!provider) {
+  alert("Provider 不可用。");
+}
+```
+
+## API
+
+识别所需功能，调用相关接口
+
+**更多接口**：[查看详情](/zh/connect-to-software/provider/nostr/api-reference)
+
+## 事件
+
+* **关键操作**：如账户切换
+* **更多信息**：[查看更多](/zh/connect-to-software/provider/nostr/event)

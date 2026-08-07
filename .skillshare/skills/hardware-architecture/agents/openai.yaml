@@ -1,0 +1,6 @@
+interface:
+  display_name: 'Hardware Architecture'
+  short_description: 'SDK package boundaries and compatibility guidance'
+  default_prompt: 'Use $hardware-architecture to analyze an SDK architecture change.'
+policy:
+  allow_implicit_invocation: true

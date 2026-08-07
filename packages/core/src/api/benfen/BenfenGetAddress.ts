@@ -1,13 +1,21 @@
-import { BenfenGetAddress as HardwareBenfenGetAddress } from '@onekeyfe/hd-transport';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { hex2BfcAddress, publicKeyToAddress } from './normalize';
-import { BenfenAddress, BenfenGetAddressParams } from '../../types';
-import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
-import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+import { batchGetPublickeys, supportBatchPublicKeyByDevice } from '../helpers/batchGetPublickeys';
+
+import type { BenfenAddress, BenfenGetAddressParams, DeviceFirmwareRange } from '../../types';
+import type { BenfenGetAddress as HardwareBenfenGetAddress } from '@onekeyfe/hd-transport';
+
+const requireAddress = (address: string | undefined): string => {
+  if (address == null) {
+    throw ERRORS.TypedError(HardwareErrorCode.CallMethodError, "Field 'address' is null");
+  }
+  return address;
+};
 
 export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddress[]> {
   hasBundle = false;
@@ -18,7 +26,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -47,7 +55,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
     });
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       pro: {
         min: '4.12.0',
@@ -59,14 +67,14 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
   }
 
   async run() {
-    const supportsBatchPublicKey = supportBatchPublicKey(this.device?.features);
+    const supportsBatchPublicKey = supportBatchPublicKeyByDevice(this.device);
     let responses: BenfenAddress[] = [];
 
     if (supportsBatchPublicKey) {
       const publicKeyRes = await batchGetPublickeys(this.device, this.params, 'ed25519', 728);
       for (let i = 0; i < this.params.length; i++) {
         const param = this.params[i];
-        const publicKey = publicKeyRes.message.public_keys[i];
+        const publicKey = publicKeyRes.public_keys[i];
         let address: string;
 
         if (this.shouldConfirm) {
@@ -75,7 +83,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
             'BenfenAddress',
             param
           );
-          address = addressRes.message.address;
+          address = requireAddress(addressRes.message.address);
         } else {
           address = publicKeyToAddress(publicKey);
         }
@@ -103,7 +111,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
           );
           const result = {
             path: serializedPath(param.address_n),
-            address: hex2BfcAddress(res.message.address),
+            address: hex2BfcAddress(requireAddress(res.message.address)),
           };
           if (this.shouldConfirm) {
             this.postPreviousAddressMessage(result);

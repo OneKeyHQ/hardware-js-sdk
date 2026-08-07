@@ -1,15 +1,16 @@
-import { LnurlAuth as ILnurlAuth } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { bytesToHex } from '../helpers/hexUtils';
+
+import type { LnurlAuth as ILnurlAuth } from '@onekeyfe/hd-transport';
 
 export default class LnurlAuth1 extends BaseMethod<ILnurlAuth> {
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     const { payload } = this;
     validateParams(payload, [

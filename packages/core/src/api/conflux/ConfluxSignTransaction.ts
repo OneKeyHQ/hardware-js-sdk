@@ -1,26 +1,34 @@
-import { ConfluxSignTx, ConfluxTxRequest } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import {
-  ConfluxSignedTx,
-  ConfluxSignTransactionParams,
-  ConfluxTransaction,
-} from '../../types/api/confluxSignTransaction';
 
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { SchemaParam, validateParams } from '../helpers/paramsValidator';
-
+import { validateParams } from '../helpers/paramsValidator';
 import { cutString } from '../helpers/stringUtils';
 import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
 
+import type { SchemaParam } from '../helpers/paramsValidator';
+import type {
+  ConfluxSignTransactionParams,
+  ConfluxSignedTx,
+  ConfluxTransaction,
+} from '../../types/api/confluxSignTransaction';
+import type { ConfluxSignTx, ConfluxTxRequest } from '@onekeyfe/hd-transport';
+
 export default class ConfluxSignTransaction extends BaseMethod {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
+  checkDeviceId = true;
+
   addressN: number[] = [];
 
   formattedTx: ConfluxTransaction | undefined;
 
   init() {
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     validateParams(this.payload, [
       { name: 'path', required: true },

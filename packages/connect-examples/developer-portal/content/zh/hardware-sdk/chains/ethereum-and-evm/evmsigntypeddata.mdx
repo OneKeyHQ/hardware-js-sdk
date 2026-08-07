@@ -1,0 +1,114 @@
+---
+title: evmSignTypedData
+---
+
+# evmSignTypedData
+
+### 以太坊：签名类型化数据
+
+使用指定 BIP32 路径派生的私钥对 [EIP-712](https://eips.ethereum.org/EIPS/eip-712) 类型化数据消息进行签名。
+
+用户需要在 OneKey 设备上确认所有签名详情。
+
+* **支持 EIP-712（v3 和 v4）**
+* **使用 `evmSignTypedData` 来签名类型化结构数据**
+* **不适用于 EIP-191 类型化数据签名**
+* **使用** [evmSignMessage](/zh/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) **来签名 EIP-191（personal_sign）**
+
+```typescript
+const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
+* `data` - _必需_ `Object` 类型为 `EthereumSignTypedDataMessage`。JSON Schema 定义可在 EIP-712 规范中找到。
+* `metamaskV4Compat` - _必需_ `boolean` 设置为 `true` 以兼容 [MetaMask 的 signTypedData_v4](https://docs.metamask.io/guide/signing-data.html#sign-typed-data-v4)。
+* `chainId` - _可选_ `number` ETH 中的 ChainId 是特定以太坊网络的唯一标识符，用于区分不同版本的区块链。[参考](https://github.com/ethereum-lists/chains/tree/master/_data/chains)
+
+### 盲签
+
+你也可以使用不同的库自行构建哈希。
+
+* `domainHash` - _必需_ `string` EIP-712 域的十六进制编码 32 字节哈希。
+* `messageHash` - _可选_ `string` EIP-712 消息的十六进制编码 32 字节哈希。对于 `primaryType` 为 `EIP712Domain` 的仅域哈希，此项是可选的。
+
+#### 什么情况下使用盲签
+
+* 使用 Mini 或 Classic 设备。
+* Classic1s / ClassicPure 的自定义类型数量超过 8 个（不含 `primaryType`）。
+* Classic1s / ClassicPure 存在任意 `bytes` 字段，且数据大小大于 1.5KB。
+* 数据中存在嵌套数组。
+* 固件版本低于 4.4.0，且 `message.data` 大小大于 1KB。
+* 固件版本大于或等于 4.4.0，且 `message.data` 大小大于 1.5KB。
+
+### 示例
+
+```typescript
+const eip712Data = {
+    types: {
+        EIP712Domain: [
+            {
+                name: 'name',
+                type: 'string',
+            },
+        ],
+        Message: [
+            {
+                name: "Best Wallet",
+                type: "string"
+            },
+            {
+                name: "Number",
+                type: "uint64"
+            }
+        ]
+    },
+    primaryType: 'Message',
+    domain: {
+        name: 'example.onekey.io',
+    },
+    message: {
+        "Best Wallet": "OneKey Wallet",
+        // 注意 JavaScript 数字：MAX_SAFE_INTEGER 相当低
+        "Number": `${2n ** 55n}`,
+    },
+};
+
+const {domainHash, messageHash} = transformTypedDataPlugin(eip712Data, true);
+
+HardwareSDK.evmSignTypedData(connectId, deviceId, {
+    path: "m/44'/60'/0'",
+    data: eip712Data,
+    metamaskV4Compat: true,
+    domainHash,
+    messageHash,
+    chainId: 1
+});
+```
+
+#### 返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,
+        signature: string, // 带有 "0x" 前缀的十六进制字符串
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

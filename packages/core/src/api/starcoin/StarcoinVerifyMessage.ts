@@ -1,13 +1,18 @@
-import { StarcoinVerifyMessage as HardwareStarcoinVerifyMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 
+import type { StarcoinVerifyMessage as HardwareStarcoinVerifyMessage } from '@onekeyfe/hd-transport';
+
 export default class EVMSignMessage extends BaseMethod<HardwareStarcoinVerifyMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     validateParams(this.payload, [
       { name: 'publicKey', type: 'string', required: true },

@@ -1,13 +1,21 @@
-import { ConfluxSignMessage as HardwareConfluxSignMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 
+import type { ConfluxSignMessage as HardwareConfluxSignMessage } from '@onekeyfe/hd-transport';
+
 export default class ConfluxSignMessage extends BaseMethod<HardwareConfluxSignMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
+  checkDeviceId = true;
+
   init() {
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // check payload
     validateParams(this.payload, [

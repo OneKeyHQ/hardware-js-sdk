@@ -1,15 +1,17 @@
-import { NeoSignTx } from '@onekeyfe/hd-transport';
-
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 
+import type { NeoSignTx } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange } from '../../types';
+
 export default class NeoSignTransaction extends BaseMethod<NeoSignTx> {
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
     this.strictCheckDeviceSupport = true;
 
     validateParams(this.payload, [
@@ -28,7 +30,7 @@ export default class NeoSignTransaction extends BaseMethod<NeoSignTx> {
     };
   }
 
-  getVersionRange() {
+  getVersionRange(): DeviceFirmwareRange {
     return {
       pro: {
         min: '4.12.0',

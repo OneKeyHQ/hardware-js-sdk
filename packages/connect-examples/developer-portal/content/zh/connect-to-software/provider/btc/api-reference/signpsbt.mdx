@@ -1,0 +1,94 @@
+---
+title: signPsbt
+---
+
+# signPsbt
+
+此方法将遍历所有匹配当前地址的输入进行签名。
+
+#### 钱包和地址类型兼容性
+
+| 钱包类型   | 型号           | 支持的地址类型                         |
+| ---------- | -------------- | -------------------------------------- |
+| 软件钱包   | -              | p2wpkh (原生隔离见证), p2tr (Taproot)  |
+| 硬件钱包   | Pro, Classic1S | p2tr (Taproot)                         |
+
+#### 方法
+
+```typescript
+async function signPsbt(
+    psbtHex: string,
+    options?: {
+        autoFinalized?: boolean;
+        toSignInputs?: Array<{
+            index: number;
+            address?: string;
+            publicKey?: string;
+            sighashTypes?: number[];
+            disableTweakSigner?: boolean;
+            useTweakedSigner?: boolean;
+        }>;
+    }
+): Promise<string>
+```
+
+#### 参数
+
+* `psbtHex` — _必填_ `string` 要签名的 PSBT 十六进制字符串
+* `options` — _可选_ `object`
+  * `autoFinalized` — _可选_ `boolean`：签名后是否完成 PSBT，默认为 `true`
+  * `toSignInputs` — _可选_ `Array`：指定要签名的输入
+    * `index` — _必填_ `number`：要签名的输入索引
+    * `address` — _可选_ `string`：（指定 address 或 publicKey 之一）用于签名的对应私钥
+    * `publicKey` — _可选_ `string`：（指定 address 或 publicKey 之一）用于签名的对应私钥
+    * `sighashTypes` — _可选_ `number[]`：输入的可选签名哈希类型
+    * `disableTweakSigner` — _可选_ `boolean`：默认为 false。设置为 true 以在签名 Taproot 输入时使用原始私钥
+    * `useTweakedSigner` — _可选_ `boolean`：强制是否使用 tweaked 签名器。优先级高于 disableTweakSigner
+
+#### 返回值
+
+`Promise<string>` — 签名后的 PSBT 十六进制字符串
+
+#### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+try {
+    // 基础签名
+    const signedBasic = await provider.signPsbt("70736274ff01007d....");
+
+    // 带选项的高级签名
+    const signedAdvanced = await provider.signPsbt(
+        "70736274ff01007d....",
+        {
+            autoFinalized: false,
+            toSignInputs: [
+                {
+                    index: 0,
+                    address: "bc1qxxx...xxx",
+                },
+                {
+                    index: 1,
+                    publicKey: "02xxx...xxx",
+                    sighashTypes: [1]
+                },
+                {
+                    index: 2,
+                    publicKey: "02xxx...xxx",
+                    disableTweakSigner: true
+                }
+            ]
+        }
+    );
+    console.log('签名后的 PSBT:', signedAdvanced);
+} catch (error) {
+    console.error('PSBT 签名失败:', error);
+    // 适当处理签名错误
+}
+```
+
+#### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/GRzXvXJ" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

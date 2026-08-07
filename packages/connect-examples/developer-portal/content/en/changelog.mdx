@@ -1,0 +1,261 @@
+---
+title: Changelog
+theme:
+  layout: full
+  sidebar: false
+  toc: false
+  pagination: false
+  breadcrumb: false
+  copyPage: false
+---
+
+import { Package, GitBranch, Tag, ExternalLink, Cpu, Globe, ChevronRight, Calendar } from 'lucide-react'
+
+export const HardwareSDKReleases = [
+  {
+    version: 'v1.1.21',
+    date: '2024-12-24',
+    type: 'patch',
+    changes: [
+      'Fixed iOS and extension firmware exchange issues',
+      'Improved getFeature retry mechanism during exchange',
+      'Updated firmware switch tips for better UX'
+    ]
+  },
+  {
+    version: 'v1.1.20',
+    date: '2024-12-19',
+    type: 'minor',
+    changes: [
+      'Added configFetcher setting for custom configuration',
+      'Fixed desktop-web transport in Electron',
+      'Optimized error handling and reporting',
+      'Support for connect-only mode'
+    ]
+  },
+  {
+    version: 'v1.1.19',
+    date: '2024-12-01',
+    type: 'minor',
+    changes: [
+      'Added Bitcoin-only firmware support',
+      'New Tron features integration',
+      'WebUSB retry mechanism with 5 attempts',
+      'Fixed skipWebDevicePrompt in web environment',
+      'Improved check update functionality'
+    ]
+  },
+  {
+    version: 'v1.1.18',
+    date: '2024-11-21',
+    type: 'patch',
+    changes: [
+      'Fixed desktop Bluetooth connectivity issues'
+    ]
+  },
+  {
+    version: 'v1.1.17',
+    date: '2024-11-11',
+    type: 'minor',
+    changes: [
+      'Added React Native BLE demo support',
+      'Fixed Classic1s signTypedData for larger data',
+      'Improved bridge status check deletion',
+      'Cleaned up unused BLE SDK logs'
+    ]
+  },
+  {
+    version: 'v1.1.16',
+    date: '2024-10-29',
+    type: 'patch',
+    changes: [
+      'Performance optimizations',
+      'Minor bug fixes'
+    ]
+  }
+]
+
+export const ProviderReleases = [
+  {
+    version: 'v2.2.58',
+    date: '2025-01-12',
+    type: 'minor',
+    changes: [
+      'Added rookie guide method for onboarding'
+    ]
+  },
+  {
+    version: 'v2.2.57',
+    date: '2024-12-31',
+    type: 'patch',
+    changes: [
+      'Fixed provider connection issues'
+    ]
+  },
+  {
+    version: 'v2.2.55',
+    date: '2024-12-16',
+    type: 'minor',
+    changes: [
+      'Added Cardano (ADA) provider support'
+    ]
+  },
+  {
+    version: 'v2.2.54',
+    date: '2024-12-12',
+    type: 'minor',
+    changes: [
+      'Enhanced error handling with httpStatusCode in IErrorInfo'
+    ]
+  },
+  {
+    version: 'v2.2.53',
+    date: '2024-12-05',
+    type: 'patch',
+    changes: [
+      'Maintenance release with stability improvements'
+    ]
+  },
+  {
+    version: 'v2.2.52',
+    date: '2024-12-02',
+    type: 'patch',
+    changes: [
+      'Updated package versions across all packages',
+      'Adjusted dependencies for better compatibility'
+    ]
+  },
+  {
+    version: 'v2.2.7',
+    date: '2024-01-20',
+    type: 'minor',
+    changes: [
+      'Added Babylon Cosmos provider',
+      'Added Solana solSignOffchainMessage support',
+      'Fixed Solana decode VersionedTransaction',
+      'Support for dragging floating icon',
+      'Added Cosmos getChainInfo method'
+    ]
+  }
+]
+
+export const TypeBadge = ({ type }) => {
+  const styles = {
+    major: 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-500/20',
+    minor: 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 border-blue-500/20',
+    patch: 'bg-zinc-500/10 text-zinc-600 dark:bg-zinc-500/20 dark:text-zinc-400 border-zinc-500/20'
+  }
+  const labels = { major: 'Major', minor: 'Feature', patch: 'Patch' }
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded border ${styles[type]}`}>
+      {labels[type]}
+    </span>
+  )
+}
+
+export const ReleaseCard = ({ release, isLatest }) => (
+  <div className={`rounded-xl border transition-all duration-200 ${isLatest ? 'border-emerald-500/30 bg-emerald-500/5 dark:border-emerald-500/20 dark:bg-emerald-500/5' : 'border-zinc-200/80 bg-white dark:border-zinc-800 dark:bg-zinc-900'} hover:border-zinc-300 dark:hover:border-zinc-700`}>
+    <div className="p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Tag className="h-4 w-4 text-zinc-400" strokeWidth={1.5} />
+            <span className="font-mono text-base font-semibold text-zinc-900 dark:text-zinc-100">{release.version}</span>
+          </div>
+          <TypeBadge type={release.type} />
+          {isLatest && (
+            <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded bg-emerald-500 text-white">
+              Latest
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+          <Calendar className="h-3.5 w-3.5" strokeWidth={1.5} />
+          <span>{release.date}</span>
+        </div>
+      </div>
+      <ul className="mt-4 space-y-2">
+        {release.changes.map((change, idx) => (
+          <li key={idx} className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+            <ChevronRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
+            <span>{change}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </div>
+)
+
+export const SDKSection = ({ title, icon: Icon, releases, repoUrl, description }) => (
+  <div className="space-y-6">
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800">
+          <Icon className="h-6 w-6 text-zinc-600 dark:text-zinc-400" strokeWidth={1.5} />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{title}</h2>
+          <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{description}</p>
+        </div>
+      </div>
+      <a
+        href={repoUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-700"
+      >
+        <GitBranch className="h-3.5 w-3.5" strokeWidth={1.5} />
+        View on GitHub
+        <ExternalLink className="h-3 w-3" strokeWidth={1.5} />
+      </a>
+    </div>
+    <div className="relative pl-6">
+      <div className="absolute left-[5px] top-0 bottom-0 w-px bg-gradient-to-b from-zinc-300 via-zinc-200 to-transparent dark:from-zinc-600 dark:via-zinc-700" />
+      <div className="space-y-4">
+        {releases.map((release, idx) => (
+          <div key={release.version} className="relative">
+            <div className="absolute -left-6 top-6 flex items-center justify-center">
+              <div className={`h-2.5 w-2.5 rounded-full ${idx === 0 ? 'bg-emerald-500 ring-4 ring-emerald-500/20' : 'border-2 border-zinc-300 bg-white dark:border-zinc-600 dark:bg-zinc-900'}`} />
+            </div>
+            <ReleaseCard release={release} isLatest={idx === 0} />
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)
+
+<div className="mx-auto max-w-5xl px-6 py-16 md:py-24">
+  {/* Header */}
+  <div className="mb-12">
+    <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 dark:border-zinc-800 dark:bg-zinc-900">
+      <Package className="h-3.5 w-3.5 text-zinc-500" strokeWidth={1.5} />
+      <span className="text-xs font-medium text-zinc-500">Developer Portal</span>
+    </div>
+    <h1 className="mt-6 text-4xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 md:text-5xl">
+      Changelog
+    </h1>
+    <p className="mt-4 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
+      Track the latest updates, features, and improvements across our SDK packages.
+    </p>
+  </div>
+
+  {/* SDK Sections */}
+  <div className="space-y-16">
+    <SDKSection
+      title="Hardware JS SDK"
+      icon={Cpu}
+      releases={HardwareSDKReleases}
+      repoUrl="https://github.com/OneKeyHQ/hardware-js-sdk/releases"
+      description="Connect and communicate with OneKey hardware wallets via WebUSB and Bluetooth."
+    />
+
+    <SDKSection
+      title="Cross Inpage Provider"
+      icon={Globe}
+      releases={ProviderReleases}
+      repoUrl="https://github.com/OneKeyHQ/cross-inpage-provider/releases"
+      description="Multi-chain provider injection for seamless dApp integration."
+    />
+  </div>
+</div>

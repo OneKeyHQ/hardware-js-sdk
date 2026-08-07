@@ -1,8 +1,86 @@
 import * as bitcoin from 'bitcoinjs-lib';
+import { initEccLib } from 'bitcoinjs-lib';
+import * as bchaddr from 'bchaddrjs';
+import { Point, getPublicKey, utils } from '@noble/secp256k1';
 
-import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
 
+import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
+
+// Minimal ECC wrapper for bitcoinjs-lib using @noble/secp256k1
+const ecc = {
+  isPoint: (p: Uint8Array) => {
+    try {
+      Point.fromHex(p);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  isPrivate: (d: Uint8Array) => utils.isValidPrivateKey(d),
+  isXOnlyPoint: (p: Uint8Array) => p.length === 32 && ecc.isPoint(p),
+  pointFromScalar: (sk: Uint8Array, compressed?: boolean) => {
+    try {
+      return getPublicKey(sk, compressed !== false);
+    } catch {
+      return null;
+    }
+  },
+  xOnlyPointAddTweak: (p: Uint8Array, tweak: Uint8Array) => {
+    try {
+      const P = Point.fromHex(p);
+      const t = BigInt(`0x${Buffer.from(tweak).toString('hex')}`);
+      const Q = Point.BASE.multiplyAndAddUnsafe(P, t, 1n);
+      if (!Q) return null;
+      const pubkey = Q.toRawBytes(true);
+      const parity = pubkey[0] % 2 === 1 ? 1 : 0;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      return { parity: parity as 0 | 1, xOnlyPubkey: pubkey.slice(1) };
+    } catch {
+      return null;
+    }
+  },
+  pointAddScalar: (p: Uint8Array, tweak: Uint8Array, compressed?: boolean) => {
+    try {
+      const P = Point.fromHex(p);
+      const t = BigInt(`0x${Buffer.from(tweak).toString('hex')}`);
+      const Q = Point.BASE.multiplyAndAddUnsafe(P, t, 1n);
+      if (!Q) return null;
+      return Q.toRawBytes(compressed !== false);
+    } catch {
+      return null;
+    }
+  },
+};
+
+// Initialize ECC library once
+let eccInitialized = false;
+function ensureEccInitialized() {
+  if (!eccInitialized) {
+    initEccLib(ecc);
+    eccInitialized = true;
+  }
+}
+
+// Simple Taproot address generation
+function generateTaprootAddress(publicKey: Buffer, network: bitcoin.Network): string {
+  ensureEccInitialized();
+
+  // For P2TR, we need x-only public key (32 bytes)
+  const xOnlyPubkey = publicKey.length === 33 ? publicKey.subarray(1) : publicKey;
+
+  // Create Taproot address
+  const { address } = bitcoin.payments.p2tr({
+    internalPubkey: xOnlyPubkey,
+    network,
+  });
+
+  if (!address) {
+    throw new Error('Failed to generate Taproot address');
+  }
+
+  return address;
+}
 /**
  * p2pkh、p2sh-p2wpkh、p2wpkh、taproot
  */
@@ -27,6 +105,17 @@ function getAddressTypeByPath(path: string) {
 const NetworkMap = {
   btc: bitcoin.networks.bitcoin,
   testnet: bitcoin.networks.testnet,
+  bch: {
+    messagePrefix: '\x18Bitcoin Signed Message:\n',
+    bech32: '',
+    bip32: {
+      public: 0x04_88_b2_1e,
+      private: 0x04_88_ad_e4,
+    },
+    pubKeyHash: 0x00,
+    scriptHash: 0x05,
+    wif: 0x80,
+  },
   doge: {
     messagePrefix: '\x19Dogecoin Signed Message:\n',
     bech32: '',
@@ -101,11 +190,9 @@ function getBtcAddress(type: string, publicKey: Buffer, network: bitcoin.network
       network,
     });
   }
-  // taproot
+  // taproot - use our simplified function
   else if (type === 'p2tr') {
-    data = bitcoin.payments.p2tr({
-      internalPubkey: publicKey.slice(1, 33),
-    });
+    return generateTaprootAddress(publicKey, network);
   }
   if (typeof data === 'undefined') {
     return '';
@@ -114,54 +201,80 @@ function getBtcAddress(type: string, publicKey: Buffer, network: bitcoin.network
   return data.address ?? '';
 }
 
-export default function btcGetAddress(
+/**
+ * 抽离的核心逻辑：从 seed 生成 BTC 地址
+ * 可以被 SLIP39 直接调用，避免助记词转换
+ */
+export function generateBtcAddressFromSeed(
+  seed: Buffer,
+  path: string,
+  coin = 'btc'
+): Promise<string> {
+  const network = NetworkMap[coin as keyof typeof NetworkMap];
+  if (!network) {
+    throw new Error(`Unsupported coin: ${coin}`);
+  }
+
+  const keyPair = deriveKeyPairWithPath(seed, path);
+  const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
+
+  if (!publicKeyArray) {
+    throw new Error('Invalid public key');
+  }
+
+  const publicKey = Buffer.from(publicKeyArray);
+  const addressType = getAddressTypeByPath(path);
+
+  if (!addressType) {
+    throw new Error('Invalid path');
+  }
+
+  const address = getBtcAddress(addressType, publicKey, network);
+
+  // Convert BCH addresses to bitcoincash: format
+  if (coin === 'bch') {
+    try {
+      // Convert legacy address to bitcoincash: format
+      return Promise.resolve(bchaddr.toCashAddress(address));
+    } catch (error) {
+      throw new Error(
+        `BCH address conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  return Promise.resolve(address);
+}
+
+export default async function btcGetAddress(
   connectId: string,
   deviceId: string,
   params: any & {
     mnemonic: string;
     passphrase?: string;
   }
-):
+): Promise<
   | Unsuccessful
   | Success<{
       address: string;
       path: string;
-    }> {
+    }>
+> {
   const { path, coin, mnemonic, passphrase } = params;
-
-  const network = NetworkMap[coin as keyof typeof NetworkMap];
   const seed = mnemonicToSeed(mnemonic, passphrase);
 
-  const keyPair = deriveKeyPairWithPath(seed, path);
-  const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
-  if (!publicKeyArray) {
+  try {
+    const address = await generateBtcAddressFromSeed(seed, path, coin);
+    return {
+      success: true,
+      payload: { address, path },
+    };
+  } catch (error) {
     return {
       success: false,
       payload: {
-        code: 801,
-        error: 'Invalid public key',
+        error: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
-  const publicKey = Buffer.from(publicKeyArray);
-
-  const addressType = getAddressTypeByPath(path);
-
-  if (!addressType) {
-    return {
-      success: false,
-      payload: {
-        code: 802,
-        error: 'Invalid path',
-      },
-    };
-  }
-
-  return {
-    success: true,
-    payload: {
-      address: getBtcAddress(addressType, publicKey, network),
-      path,
-    },
-  };
 }

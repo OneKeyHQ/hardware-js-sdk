@@ -1,28 +1,35 @@
-import {
-  TonSignMessage as HardwareTonSignMessage,
-  TonSignedMessage,
-  TonTxAck,
-} from '@onekeyfe/hd-transport';
 import semver from 'semver';
 import BigNumber from 'bignumber.js';
 import { isEmpty } from 'lodash';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { DeviceFirmwareRange, DeviceModelToTypes, TonSignMessageParams } from '../../types';
-import { getDeviceFirmwareVersion, getDeviceType, getMethodVersionRange } from '../../utils';
+import { DeviceModelToTypes } from '../../types';
 import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
-import type { TonSignedMessageResponse } from '../../types/api/tonSignMessage';
 import { cutString } from '../helpers/stringUtils';
 
+import type { DeviceFirmwareRange, TonSignMessageParams } from '../../types';
+import type {
+  TonSignMessage as HardwareTonSignMessage,
+  TonSignedMessage,
+  TonTxAck,
+} from '@onekeyfe/hd-transport';
+import type { TonSignedMessageResponse } from '../../types/api/tonSignMessage';
+
 export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   initState: string | null = null;
 
   init() {
     this.strictCheckDeviceSupport = true;
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+    this.allowUsePreInitialize = true;
 
     // init params
     validateParams(this.payload, [
@@ -82,6 +89,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
 
   getVersionRange() {
     return {
+      pro2: {
+        min: '0.0.0',
+      },
       model_touch: {
         min: '4.10.0',
       },
@@ -103,9 +113,8 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
   }
 
   checkSupportJettonAmountBytes() {
-    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
-    const versionRange = getMethodVersionRange(
-      this.device.features,
+    const firmwareVersion = this.device.getCurrentFirmwareVersionString() ?? '0.0.0';
+    const versionRange = this.device.getCurrentMethodVersionRange(
       type => this.getSupportJettonAmountBytesVersionRange()[type]
     );
 
@@ -163,7 +172,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     data: string
   ): Promise<TonTxAck | TonSignedMessageResponse> => {
     if (!request.init_data_length) {
-      const deviceType = getDeviceType(this.device.features);
+      const deviceType = this.device.getCurrentDeviceType();
       const hasClassic = DeviceModelToTypes.model_classic1s.includes(deviceType);
       // use signing_message_repr sign, not exists signning_message, skip validate
       const hasSigningMessageRepr = request.signning_message == null;
