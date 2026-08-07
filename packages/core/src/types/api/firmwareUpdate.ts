@@ -83,8 +83,6 @@ export interface FirmwareUpdateV4Params {
   romloaderBinary?: ArrayBuffer;
   /** FW_MGMT_TARGET_BOOTLOADER = 3 */
   bootloaderBinary?: ArrayBuffer;
-  /** FW_MGMT_TARGET_CRATE = 1; optional Pro2 startup resources. */
-  bootResourcesBinary?: ArrayBuffer;
   /** FW_MGMT_TARGET_APPLICATION_P1 = 4 */
   applicationP1Binary?: ArrayBuffer;
   /** FW_MGMT_TARGET_APPLICATION_P2 = 5 */

@@ -46,7 +46,6 @@ import type { TypedResponseMessage } from '../device/DeviceCommands';
 import type {
   Features,
   IFirmwareReleaseInfo,
-  IProtocolV2BootResources,
   IProtocolV2FirmwareComponent,
   IProtocolV2Resource,
   IProtocolV2ResourceFile,
@@ -78,8 +77,6 @@ const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
 const PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET = 0x200;
 const PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET = 0x240;
 const PROTOCOL_V2_OKPP_HASH_SIZE = 64;
-const PROTOCOL_V2_BOOT_RESOURCES_FILE_NAME = 'boot_resources.crate.okpkg';
-
 const getProtocolV2DeviceTransferProgress = (
   bytesBeforeChunk: number,
   bytesAfterChunk: number,
@@ -113,7 +110,7 @@ type ProtocolV2FirmwareUpdateStartResponse = TypedResponseMessage<'Success'>;
 
 type ProtocolV2TargetBinary = { fileName: string; binary: ArrayBuffer; targetId: number };
 type ProtocolV2InstallItem = ProtocolV2TargetBinary & {
-  kind: ProtocolV2RemoteComponentTarget['kind'] | 'boot_resources';
+  kind: ProtocolV2RemoteComponentTarget['kind'];
 };
 type ProtocolV2InstallTarget = ProtocolV2InstallItem & {
   path: string;
@@ -441,7 +438,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'chunkSize', type: 'number' },
       { name: 'forcedUpdateRes', type: 'boolean' },
       { name: 'bootloaderBinary', type: 'buffer' },
-      { name: 'bootResourcesBinary', type: 'buffer' },
       { name: 'romloaderBinary', type: 'buffer' },
       { name: 'applicationP1Binary', type: 'buffer' },
       { name: 'applicationP2Binary', type: 'buffer' },
@@ -460,7 +456,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       chunkSize: payload.chunkSize,
       forcedUpdateRes: payload.forcedUpdateRes,
       bootloaderBinary: payload.bootloaderBinary,
-      bootResourcesBinary: payload.bootResourcesBinary,
       romloaderBinary: payload.romloaderBinary,
       applicationP1Binary: payload.applicationP1Binary,
       applicationP2Binary: payload.applicationP2Binary,
@@ -508,7 +503,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
-    let bootResourcesInstallItem: ProtocolV2InstallItem | undefined;
     let installItems: ProtocolV2InstallItem[] | undefined;
     let resourceBundles: ProtocolV2ResourceBundleBinary[] | undefined;
     try {
@@ -660,7 +654,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return (
       !!this.params.resourceFiles?.length ||
       !!this.params.bootloaderBinary ||
-      !!this.params.bootResourcesBinary ||
       fwBinaryMap.length > 0
     );
   }
