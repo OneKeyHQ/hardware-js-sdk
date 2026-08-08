@@ -106,6 +106,27 @@ const applySectionPatch = <T extends object>(
   }
 };
 
+const mergeSecurityElements = (
+  current: StoredDeviceState['securityElements'],
+  patch: NonNullable<DeviceStatePatch['securityElements']>
+) => {
+  const merged = cloneDeviceState(current ?? {});
+
+  for (const key of Object.keys(patch) as Array<keyof typeof patch>) {
+    const elementPatch = patch[key];
+    if (elementPatch !== undefined) {
+      const currentElement = merged[key];
+      merged[key] = {
+        type: elementPatch.type !== undefined ? elementPatch.type : currentElement?.type ?? null,
+        state:
+          elementPatch.state !== undefined ? elementPatch.state : currentElement?.state ?? null,
+      };
+    }
+  }
+
+  return merged;
+};
+
 export class DeviceStateStore {
   private state: StoredDeviceState | undefined;
 
@@ -148,12 +169,15 @@ export class DeviceStateStore {
     if (patch.status) applySectionPatch(next.status, patch.status, 'status', changedKeys);
     if (patch.settings) applySectionPatch(next.settings, patch.settings, 'settings', changedKeys);
     if (patch.versions) applySectionPatch(next.versions, patch.versions, 'versions', changedKeys);
-    if (
-      patch.securityElements !== undefined &&
-      !isEqual(next.securityElements, patch.securityElements)
-    ) {
-      next.securityElements = cloneDeviceState(patch.securityElements);
-      changedKeys.push('securityElements');
+    if (patch.securityElements !== undefined) {
+      const mergedSecurityElements = mergeSecurityElements(
+        next.securityElements,
+        patch.securityElements
+      );
+      if (!isEqual(next.securityElements, mergedSecurityElements)) {
+        next.securityElements = mergedSecurityElements;
+        changedKeys.push('securityElements');
+      }
     }
 
     if (patch.capabilities !== undefined && !isEqual(next.capabilities, patch.capabilities)) {

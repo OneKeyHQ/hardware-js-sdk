@@ -1,6 +1,7 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
 import { DeviceStateStore, createEmptyDeviceState } from '../src/device/DeviceStateStore';
+import { projectFeatures } from '../src/device/DeviceStateProjector';
 
 describe('DeviceStateStore', () => {
   test('merges identity patches and ignores undefined', () => {
@@ -77,6 +78,32 @@ describe('DeviceStateStore', () => {
 
     expect(result.state.raw).toEqual({
       protocolV2DeviceInfo: deviceInfo,
+    });
+  });
+
+  test('merges partial secure-element patches without discarding existing metadata', () => {
+    const store = new DeviceStateStore(createEmptyDeviceState());
+
+    store.update(
+      {
+        securityElements: {
+          se01: { type: 'THD89', state: 'APP' },
+          se02: { type: 'SE608A', state: 'APP' },
+        },
+      },
+      'device-info'
+    );
+    const result = store.update({ securityElements: { se01: { state: 'BOOT' } } }, 'device-status');
+
+    expect(result.state.securityElements).toEqual({
+      se01: { type: 'THD89', state: 'BOOT' },
+      se02: { type: 'SE608A', state: 'APP' },
+    });
+    expect(result.changedKeys).toContain('securityElements');
+    expect(projectFeatures(result.state)).toMatchObject({
+      onekey_se_type: 'THD89',
+      onekey_se01_state: 'BOOT',
+      onekey_se02_state: 'APP',
     });
   });
 });

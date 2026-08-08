@@ -268,6 +268,10 @@ export type DeviceStateSecurityElements = Partial<
   Record<'se01' | 'se02' | 'se03' | 'se04', DeviceStateSecurityElement>
 >;
 
+export type DeviceStateSecurityElementsPatch = Partial<
+  Record<keyof DeviceStateSecurityElements, Partial<DeviceStateSecurityElement>>
+>;
+
 export type DeviceState = {
   schemaVersion: 1;
   revision: number;
@@ -292,7 +296,7 @@ export type DeviceStatePatch = {
   status?: Partial<DeviceStateStatus>;
   settings?: Partial<DeviceStateSettings>;
   versions?: Partial<DeviceStateVersions>;
-  securityElements?: DeviceStateSecurityElements;
+  securityElements?: DeviceStateSecurityElementsPatch;
   capabilities?: Array<number | string>;
   verification?: DeviceFeaturesVerify;
   raw?: DeviceFeaturesRawPatch;
