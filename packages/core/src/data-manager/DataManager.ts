@@ -32,6 +32,8 @@ import type {
   RemoteConfigResponse,
 } from '../types';
 
+const FIRMWARE_UPDATE_CONFIG_FRESHNESS_MS = 5 * 60 * 1000;
+
 const Log = getLogger(LoggerNames.Core);
 
 export const FIRMWARE_FIELDS = [
@@ -507,6 +509,7 @@ export default class DataManager {
     this.assets = {
       bridge: data.bridge,
     };
+    this.lastCheckTimestamp = getTimeStamp();
   }
 
   static updateEnv(newEnv: ConnectSettings['env']) {
@@ -537,6 +540,18 @@ export default class DataManager {
   }: { requireResources?: boolean } = {}): Promise<void> {
     if (!this.settings) {
       throw new Error('Remote config settings are not initialized');
+    }
+    const hasFreshConfig =
+      this.lastCheckTimestamp > 0 &&
+      getTimeStamp() - this.lastCheckTimestamp <= FIRMWARE_UPDATE_CONFIG_FRESHNESS_MS;
+    if (hasFreshConfig) {
+      if (requireResources && this.protocolV2ResourcesConfigError) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.FirmwareUpdateDownloadFailed,
+          `Invalid Pro2 resources config: ${this.protocolV2ResourcesConfigError.message}`
+        );
+      }
+      return;
     }
     const loaded = await this.load(this.settings);
     if (!loaded) {

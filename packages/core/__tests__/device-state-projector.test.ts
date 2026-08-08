@@ -33,6 +33,17 @@ describe('DeviceStateProjector', () => {
       firmware: '5.0.0',
       bootloader: '2.0.0',
       ble: '1.2.3',
+      se01: '3.1.0',
+      se01Boot: '1.0.2',
+    };
+    state.verification = {
+      firmwareBuildId: 'firmware-build',
+      firmwareHash: 'firmware-hash',
+      se01BuildId: 'se01-build',
+      se01Hash: 'se01-hash',
+    };
+    state.securityElements = {
+      se01: { type: 'THD89', state: 'APP' },
     };
 
     const features = projectFeatures(state);
@@ -43,6 +54,15 @@ describe('DeviceStateProjector', () => {
       unlocked: true,
       brightness: 80,
       firmwareVersion: '5.0.0',
+      onekey_firmware_version: '5.0.0',
+      onekey_firmware_build_id: 'firmware-build',
+      onekey_firmware_hash: 'firmware-hash',
+      onekey_se_type: 'THD89',
+      onekey_se01_version: '3.1.0',
+      onekey_se01_build_id: 'se01-build',
+      onekey_se01_hash: 'se01-hash',
+      onekey_se01_state: 'APP',
+      onekey_se01_boot_version: '1.0.2',
     });
   });
 

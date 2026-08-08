@@ -1,7 +1,7 @@
 import { EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from '../src/api/BaseMethod';
-import { findMethod } from '../src/api/utils';
+import { findMethod, getMethodSupportedProtocols } from '../src/api/utils';
 import BTCGetAddress from '../src/api/btc/BTCGetAddress';
 import DeviceReboot from '../src/api/protocol-v2/DeviceReboot';
 import SolGetAddress from '../src/api/solana/SolGetAddress';
@@ -128,5 +128,17 @@ describe('method protocol support', () => {
     expect(neurai.getSupportedProtocols()).toEqual(['V1']);
     expect(bitcoin.getVersionRange().pro2).toBeUndefined();
     expect(neurai.getVersionRange().pro2).toBeUndefined();
+  });
+
+  test('exposes the dispatcher protocol contract for callers that need a preflight', () => {
+    expect(getMethodSupportedProtocols('solGetAddress')).toEqual(['V1', 'V2']);
+    expect(getMethodSupportedProtocols('stellarGetAddress')).toEqual(['V1']);
+    expect(
+      getMethodSupportedProtocols('btcGetAddress', {
+        path: "m/44'/1900'/0'/0/0",
+        coin: 'Neurai',
+        showOnOneKey: false,
+      })
+    ).toEqual(['V1']);
   });
 });

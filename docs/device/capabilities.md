@@ -128,7 +128,7 @@
 
 ## Pro2 / Neo
 
-当前兼容性测试插件目录没有 Pro2 / Neo 插件，因此本文不能据此给出二者的完整成功/失败矩阵。二者的公链能力共享 `model_pro2` 版本范围，并由 Protocol V2 真机测试和各方法的能力限制单独验证；需要差异化时仍可使用 `pro2` 或 `neo` 精确覆盖。不要把 OneKey Pro 的结果直接复制给该产品族。
+兼容性测试插件已分别注册 Pro2 与 Neo。两者的基础方法可用性不维护第二份硬编码清单，而是实时读取 Core 的 `BaseMethod.getSupportedProtocols()` 契约；Protocol V2 不支持的方法在测试执行前标记为跳过。二者的公链能力共享 `model_pro2` 版本范围，需要硬件差异化时仍使用 `pro2` 或 `neo` 插件精确覆盖。不要把 OneKey Pro 的结果直接复制给该产品族。
 
 Core 方法以 `BaseMethod.getSupportedProtocols()` 作为协议能力事实源：默认方法仅支持 Protocol
 V1，支持 Pro2 / Neo 的共享方法必须显式声明 `['V1', 'V2']`，Protocol V2 专属方法声明 `['V2']`。只有协议
@@ -146,7 +146,9 @@ packages/connect-examples/expo-example/src/testTools/deviceCompatibility/plugins
 ├── classic.ts
 ├── classic1s.ts
 ├── classicpure.ts
+├── neo.ts
 ├── pro.ts
+├── pro2.ts
 ├── touch.ts
 └── mini.ts
 ```

@@ -8,6 +8,7 @@ import { useCommonParams } from '../../provider/CommonParamsProvider';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 import { Button } from '../../components/ui/Button';
 import AutoWrapperTextArea from '../../components/ui/AutoWrapperTextArea';
+import { executeProtocolAwareMethod } from '../../utils/protocolAwareMethod';
 import { chainTestData } from './data';
 
 import type { CoreMessage } from '@onekeyfe/hd-core';
@@ -19,7 +20,7 @@ interface TestCase {
   method: string;
   testCaseTitle: string;
   params: any;
-  status: 'pending' | 'running' | 'success' | 'error';
+  status: 'pending' | 'running' | 'success' | 'skipped' | 'error';
   response?: any;
   error?: string;
   duration?: number;
@@ -119,7 +120,7 @@ export default function ChainMethodTest() {
       console.log('Hardware UI Event:', message);
 
       if (message.type === UI_REQUEST.REQUEST_PIN) {
-        openDialog(sdk, message.payload.device.features);
+        openDialog(sdk, message.payload.device.features, message);
       }
 
       if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
@@ -129,6 +130,7 @@ export default function ChainMethodTest() {
             payload: {
               value: currentPassphraseRef.current ?? '',
             },
+            ...(message.payload.responseCorrelation ?? {}),
           });
         }, 200);
       }
@@ -196,20 +198,35 @@ export default function ChainMethodTest() {
         // 设置当前passphrase（如果需要）
         currentPassphraseRef.current = '';
 
-        let response;
         const method = chainTestData
           .find(c => c.name === testCase.chainName)
           ?.data.find(m => m.method === testCase.method);
-
+        let mode: 'no-connection' | 'connection' | 'device' = 'device';
         if (method?.noConnIdReq) {
-          response = await (sdk as any)[testCase.method]();
+          mode = 'no-connection';
         } else if (method?.noDeviceIdReq) {
-          response = await (sdk as any)[testCase.method](connectId, requestParams);
-        } else {
-          response = await (sdk as any)[testCase.method](connectId, deviceId, requestParams);
+          mode = 'connection';
         }
+        const response = await executeProtocolAwareMethod({
+          sdk,
+          method: testCase.method,
+          connectId,
+          deviceId,
+          params: requestParams,
+          protocol: selectedDevice.connectProtocol,
+          mode,
+        });
 
         const duration = Date.now() - startTime;
+
+        if (response?.payload?.code === 415) {
+          return {
+            ...testCase,
+            status: 'skipped',
+            response,
+            duration,
+          };
+        }
 
         return {
           ...testCase,
@@ -356,9 +373,10 @@ export default function ChainMethodTest() {
     const total = testCases.length;
     const success = testCases.filter(tc => tc.status === 'success').length;
     const error = testCases.filter(tc => tc.status === 'error').length;
+    const skipped = testCases.filter(tc => tc.status === 'skipped').length;
     const pending = testCases.filter(tc => tc.status === 'pending').length;
 
-    return { total, success, error, pending };
+    return { total, success, skipped, error, pending };
   }, [testCases]);
 
   // 渲染测试用例表格行
@@ -380,6 +398,11 @@ export default function ChainMethodTest() {
           statusColor = '$green10';
           statusText = 'SUCCESS';
           statusBg = '$green2';
+          break;
+        case 'skipped':
+          statusColor = '$yellow10';
+          statusText = 'SKIPPED';
+          statusBg = '$yellow2';
           break;
         case 'error':
           statusColor = '$red10';
@@ -470,6 +493,7 @@ export default function ChainMethodTest() {
                   if (testCase.status === 'pending' || testCase.status === 'running')
                     return '$gray1';
                   if (testCase.status === 'error') return '$red1';
+                  if (testCase.status === 'skipped') return '$yellow1';
                   return '$green1';
                 })()}
                 padding="$2"
@@ -532,6 +556,14 @@ export default function ChainMethodTest() {
             flexWrap="wrap"
             gap="$2"
           >
+            <View alignItems="center">
+              <Text fontSize={16} fontWeight="bold" color="$yellow10">
+                {statistics.skipped}
+              </Text>
+              <Text fontSize={12} color="$gray11">
+                Skipped
+              </Text>
+            </View>
             <View alignItems="center">
               <Text fontSize={16} fontWeight="bold" color="$gray12">
                 {statistics.total}

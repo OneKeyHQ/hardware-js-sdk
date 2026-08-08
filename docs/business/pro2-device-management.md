@@ -1,6 +1,6 @@
-# Pro2 设备管理
+# Pro2 / Neo 设备管理
 
-本文集中说明 Pro2 / Protocol V2 的设备设置、壁纸与 NFT 上传和固件升级。这些能力都依赖 Core 的 Protocol V2 守卫与文件/状态编排，不属于传输层协议。
+本文集中说明 Pro2、Neo / Protocol V2 的设备设置、壁纸与 NFT 上传和固件升级。这些能力都依赖 Core 的 Protocol V2 守卫与文件/状态编排，不属于传输层协议。
 
 ## 设备设置
 
@@ -81,7 +81,7 @@ App 只展示“请在设备上操作”，不调用 `uiResponse()`。API `Succe
 
 ## NFT 上传
 
-`deviceUploadNft` 仅支持 Pro2 / Protocol V2。调用方先将原图和缩略图分别裁剪为 `540 × 540`
+`deviceUploadNft` 仅支持 Pro2、Neo / Protocol V2。调用方先将原图和缩略图分别裁剪为 `540 × 540`
 与 `263 × 263` RGBA；SDK 随后完成以下编排：
 
 1. 从当前 Link 的 `ProtocolInfo.supported_messages` 确认 `FilesystemFileWrite(60805)`、
@@ -111,14 +111,14 @@ NFT 图片与缩略图尺寸通过独立 `getNftSize` API 获取，不复用壁�
 
 ## 固件升级
 
-Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 使用 `firmwareUpdateV4`。低阶
+Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 与 Neo 使用 `firmwareUpdateV4`。低阶
 `DeviceFirmwareUpdate` 只供 Core 内部升级编排发送安装目标，不属于公共 `CoreApi`。
 
 切换固件类型不新增 `DeviceSettingsPageShow` 页面。`firmwareUpdateV4` 使用
 `unlock-before-run`：已知锁定时先解锁，再发送 `DeviceReboot(Bootloader)`；升级编排一旦开始，
 收到 locked 错误也不会从头重放。确认与重启页面由设备固件处理，SDK 随后负责重连和升级编排。
 
-支持的 Pro2 目标包括 bootloader、application P1/P2、coprocessor、SE01 ～ SE04 和 RESC bundle。`romloaderBinary` 虽仍存在于部分兼容类型中，但当前安装请求不接受 `ROMLOADER`，必须走 loader 专用流程。
+支持的 Pro2 目标包括 bootloader、application P1/P2、coprocessor、SE01 ～ SE04 和 RESC bundle；Neo 使用相同升级链路并支持资源同步，但只提供 SE01 与 SE02。`romloaderBinary` 虽仍存在于部分兼容类型中，但当前安装请求不接受 `ROMLOADER`，必须走 loader 专用流程。
 
 高层升级流程：
 

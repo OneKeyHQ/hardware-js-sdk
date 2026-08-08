@@ -10,6 +10,7 @@ import useExportReport from '../../../components/BaseTestRunner/useExportReport'
 import { Button } from '../../../components/ui/Button';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
+import { getProtocolAwareFeatures } from '../../../utils/protocolAwareFeatures';
 
 import type { CoreMessage, Features } from '@onekeyfe/hd-core';
 import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
@@ -86,7 +87,7 @@ function ExecuteView() {
       hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          openDialog(sdk, message.payload.device.features);
+          openDialog(sdk, message.payload.device.features, message);
         }
         if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
           setTimeout(() => {
@@ -97,6 +98,7 @@ function ExecuteView() {
                 passphraseOnDevice: true,
                 save: false,
               },
+              ...(message.payload.responseCorrelation ?? {}),
             });
           }, 200);
         }
@@ -146,7 +148,7 @@ function ExecuteView() {
         // eslint-disable-next-line no-promise-executor-return
         await new Promise(resolve => setTimeout(resolve, 15 * 1000));
       }
-      const feature = await sdk.getFeatures(connectId);
+      const feature = await getProtocolAwareFeatures(sdk, connectId);
 
       return Promise.resolve({
         payload: feature,

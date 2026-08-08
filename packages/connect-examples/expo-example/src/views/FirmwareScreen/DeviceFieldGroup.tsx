@@ -1,44 +1,57 @@
-import { XStack } from 'tamagui';
+import { H5, Stack, XStack } from 'tamagui';
+import { useIntl } from 'react-intl';
 
 import { DeviceField } from './DeviceField';
-import { deviceInfoKeys, deviceSEInfoKeys } from './ExportDeviceInfo';
+import { useDeviceFieldContext } from './DeviceFieldContext';
+import { buildDeviceAdvancedInfo } from './deviceAdvancedInfo';
+
+import type { DeviceAdvancedInfoGroup } from './deviceAdvancedInfo';
 
 interface DeviceFieldGroupContainerProps {
-  children: React.ReactNode;
+  group: DeviceAdvancedInfoGroup;
 }
 
-function DeviceFieldGroupContainer({ children }: DeviceFieldGroupContainerProps) {
+function DeviceFieldGroupContainer({ group }: DeviceFieldGroupContainerProps) {
+  const intl = useIntl();
+
   return (
-    <XStack
+    <Stack
       flex={1}
       padding="$2"
       backgroundColor="$bgHover"
       gap="$2"
       borderRadius="$2"
-      flexWrap="wrap"
+      minWidth={320}
     >
-      {children}
-    </XStack>
+      <H5>{intl.formatMessage({ id: group.titleId })}</H5>
+      <XStack flexWrap="wrap" gap="$2">
+        {group.fields.map(item => (
+          <DeviceField
+            key={item.key}
+            field={intl.formatMessage({ id: item.labelId })}
+            value={item.value}
+          />
+        ))}
+      </XStack>
+    </Stack>
   );
 }
 
 function DeviceInfoFieldGroup() {
-  return deviceInfoKeys.map((keys, index) => (
-    <DeviceFieldGroupContainer key={index}>
-      {keys.map(key => (
-        <DeviceField key={key} field={key} />
-      ))}
-    </DeviceFieldGroupContainer>
+  const { deviceState } = useDeviceFieldContext();
+  if (!deviceState) return null;
+
+  return buildDeviceAdvancedInfo(deviceState).deviceGroups.map(group => (
+    <DeviceFieldGroupContainer key={group.key} group={group} />
   ));
 }
 
 function DeviceSeFieldGroup() {
-  return deviceSEInfoKeys.map((keys, index) => (
-    <DeviceFieldGroupContainer key={index}>
-      {keys.map(key => (
-        <DeviceField key={key} field={key} />
-      ))}
-    </DeviceFieldGroupContainer>
+  const { deviceState } = useDeviceFieldContext();
+  if (!deviceState) return null;
+
+  return buildDeviceAdvancedInfo(deviceState).securityElementGroups.map(group => (
+    <DeviceFieldGroupContainer key={group.key} group={group} />
   ));
 }
 

@@ -7,6 +7,20 @@ const webpack = require('webpack');
 module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync(env, argv);
 
+  // Resolve workspace package symlinks to their real paths. Expo otherwise keeps
+  // @onekeyfe packages under the ignored node_modules tree, so Rollup rebuilds
+  // are not picked up by the Webpack dev server.
+  config.resolve.symlinks = true;
+
+  // The generated filesystem cache only tracks Expo's default config. Include
+  // this project config so resolver changes invalidate the cache after restart.
+  if (config.cache && typeof config.cache === 'object') {
+    config.cache.buildDependencies = {
+      ...config.cache.buildDependencies,
+      config: [...(config.cache.buildDependencies?.config ?? []), __filename],
+    };
+  }
+
   // 设置 publicPath：
   // - Electron 打包（EXPO_ELECTRON_MODE=true）使用根路径，避免 file:// 协议下以 /expo-example/ 为前缀导致 404
   // - 普通生产环境（例如 GitHub Pages）使用 /expo-example/

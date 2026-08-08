@@ -7,6 +7,7 @@ import { useIntl } from 'react-intl';
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { useCommonParams } from '../provider/CommonParamsProvider';
 import { useDevice } from '../provider/DeviceProvider';
+import { getProtocolAwareFeatures } from '../utils/protocolAwareFeatures';
 import PanelView from './ui/Panel';
 import { Button } from './ui/Button';
 
@@ -32,7 +33,12 @@ export default function ChangeScreenComponent() {
     setIsLoading(true);
     try {
       console.log('Loading wallpapers...');
-      const res = await SDK.getFeatures(selectedDevice.connectId);
+      const res = await getProtocolAwareFeatures(
+        SDK,
+        selectedDevice.connectId,
+        undefined,
+        selectedDevice.connectProtocol
+      );
       if (!res?.payload) {
         alert('Failed to get device features');
         return;

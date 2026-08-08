@@ -299,6 +299,17 @@ describe('Pro2 resource configuration', () => {
     );
     expect(DataManager.getProtocolV2Resources()).toEqual(resources);
     expect(DataManager.getProtocolV2BootResources()).toEqual(bootResources);
+    expect(DataManager.lastCheckTimestamp).toBeGreaterThan(0);
+  });
+
+  test('reuses the configuration fetched during SDK initialization for an immediate update', async () => {
+    const configFetcher = jest.fn().mockResolvedValue(createRemoteConfig());
+    const settings = createSettings(configFetcher);
+
+    await expect(DataManager.load(settings)).resolves.toBe(true);
+    await expect(DataManager.forceReloadData({ requireResources: true })).resolves.toBeUndefined();
+
+    expect(configFetcher).toHaveBeenCalledTimes(1);
   });
 
   test('keeps base SDK initialization available when remote Pro2 resources are invalid', async () => {

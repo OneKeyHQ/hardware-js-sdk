@@ -51,21 +51,36 @@ export function getDeviceBasicInfo(
 ) {
   const deviceType = getDeviceType(features)?.toUpperCase() || 'UNKNOWN';
   const serialNumber = features && getDeviceUUID(features);
+  const formatVersion = (version: string | null | undefined, buildId?: string) =>
+    [version, buildId]
+      .filter(value => value !== undefined && value !== null && value !== '')
+      .join('-');
 
-  const bleBuildId = onekeyFeatures?.onekey_ble_build_id || features?.onekey_ble_build_id;
-  const bleVersion = `${features?.ble_ver}-${bleBuildId}`;
+  const bleBuildId = onekeyFeatures?.onekey_ble_build_id ?? features?.onekey_ble_build_id;
+  const bleVersion = formatVersion(
+    features?.bleVersion ?? features?.onekey_ble_version ?? features?.ble_ver,
+    bleBuildId
+  );
 
-  const bootloaderBuildId = onekeyFeatures?.onekey_boot_build_id || features?.onekey_boot_build_id;
-  const bootloaderVersion =
-    features && `${getDeviceBootloaderVersion(features)?.join('.')}-${bootloaderBuildId}`;
+  const bootloaderBuildId = onekeyFeatures?.onekey_boot_build_id ?? features?.onekey_boot_build_id;
+  const bootloaderVersion = formatVersion(
+    features ? getDeviceBootloaderVersion(features)?.join('.') : undefined,
+    bootloaderBuildId
+  );
 
-  const boardloaderVersion =
-    features && `${features?.onekey_board_version}-${onekeyFeatures?.onekey_board_build_id}`;
+  const boardloaderBuildId =
+    onekeyFeatures?.onekey_board_build_id ?? features?.onekey_board_build_id;
+  const boardloaderVersion = formatVersion(
+    features?.boardVersion ?? features?.onekey_board_version,
+    boardloaderBuildId
+  );
 
   const firmwareBuildId =
-    onekeyFeatures?.onekey_firmware_build_id || features?.onekey_firmware_build_id;
-  const firmwareVersion =
-    features && `${getDeviceFirmwareVersion(features)?.join('.')}-${firmwareBuildId}`;
+    onekeyFeatures?.onekey_firmware_build_id ?? features?.onekey_firmware_build_id;
+  const firmwareVersion = formatVersion(
+    features ? getDeviceFirmwareVersion(features)?.join('.') : undefined,
+    firmwareBuildId
+  );
 
   const {
     onekey_firmware_url: firmwareUrl,

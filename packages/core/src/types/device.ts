@@ -259,6 +259,19 @@ export type DeviceStateVersions = {
   se04Boot?: string | null;
 };
 
+export type DeviceStateSecurityElement = {
+  type: string | null;
+  state: string | null;
+};
+
+export type DeviceStateSecurityElements = Partial<
+  Record<'se01' | 'se02' | 'se03' | 'se04', DeviceStateSecurityElement>
+>;
+
+export type DeviceStateSecurityElementsPatch = Partial<
+  Record<keyof DeviceStateSecurityElements, Partial<DeviceStateSecurityElement>>
+>;
+
 export type DeviceState = {
   schemaVersion: 1;
   revision: number;
@@ -270,6 +283,8 @@ export type DeviceState = {
   status: DeviceStateStatus;
   settings: DeviceStateSettings;
   versions: DeviceStateVersions;
+  /** Secure-element metadata exposed by the unified firmware information read. */
+  securityElements?: DeviceStateSecurityElements;
   capabilities: Array<number | string>;
   verification?: Partial<DeviceFeaturesVerify>;
 };
@@ -281,6 +296,7 @@ export type DeviceStatePatch = {
   status?: Partial<DeviceStateStatus>;
   settings?: Partial<DeviceStateSettings>;
   versions?: Partial<DeviceStateVersions>;
+  securityElements?: DeviceStateSecurityElementsPatch;
   capabilities?: Array<number | string>;
   verification?: DeviceFeaturesVerify;
   raw?: DeviceFeaturesRawPatch;

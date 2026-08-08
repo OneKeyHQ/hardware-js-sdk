@@ -1,5 +1,7 @@
 import { StyleSheet } from 'react-native';
 
+import { executeProtocolAwareMethod } from '../../utils/protocolAwareMethod';
+
 import type { CoreApi } from '@onekeyfe/hd-core';
 
 export type TestChain = 'btc' | 'evm' | 'dot' | 'ada';
@@ -21,29 +23,30 @@ export const requestAddress = async ({
   passphraseState?: string;
   useEmptyPassphrase?: boolean;
 }) => {
+  let method: string;
+  let params: Record<string, unknown>;
+
   if (testChain === 'evm') {
-    const evmAddressRes = await sdk.evmGetAddress(connectId, deviceId, {
+    method = 'evmGetAddress';
+    params = {
       path: "m/44'/60'/0'/0/0",
       showOnOneKey,
       passphraseState,
       useEmptyPassphrase,
-    });
-    return evmAddressRes;
-  }
-  if (testChain === 'dot') {
-    // @ts-expect-error
-    const ethAddressRes = await sdk.polkadotGetAddress(connectId, deviceId, {
+    };
+  } else if (testChain === 'dot') {
+    method = 'polkadotGetAddress';
+    params = {
       path: "m/44'/354'/0'/0'/0'",
       prefix: '0',
       network: 'polkadot',
       showOnOneKey,
       passphraseState,
       useEmptyPassphrase,
-    });
-    return ethAddressRes;
-  }
-  if (testChain === 'ada') {
-    const adaAddressRes = await sdk.cardanoGetAddress(connectId, deviceId, {
+    };
+  } else if (testChain === 'ada') {
+    method = 'cardanoGetAddress';
+    params = {
       addressParameters: {
         addressType: 0,
         path: "m/1852'/1815'/0'/0/0",
@@ -57,17 +60,25 @@ export const requestAddress = async ({
       isCheck: false,
       passphraseState,
       useEmptyPassphrase,
-    });
-    return adaAddressRes;
+    };
+  } else {
+    method = 'btcGetAddress';
+    params = {
+      path: "m/44'/0'/0'/0/0",
+      coin: 'btc',
+      showOnOneKey,
+      passphraseState,
+      useEmptyPassphrase,
+    };
   }
-  const btcAddressRes = await sdk.btcGetAddress(connectId, deviceId, {
-    path: "m/44'/0'/0'/0/0",
-    coin: 'btc',
-    showOnOneKey,
-    passphraseState,
-    useEmptyPassphrase,
+
+  return executeProtocolAwareMethod({
+    sdk,
+    method,
+    connectId,
+    deviceId,
+    params,
   });
-  return btcAddressRes;
 };
 
 export const styles = StyleSheet.create({
