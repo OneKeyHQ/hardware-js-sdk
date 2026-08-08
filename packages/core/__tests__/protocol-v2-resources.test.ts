@@ -4,10 +4,8 @@ import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { DataManager } from '../src/data-manager';
 import {
-  isProtocolV2ResourceFileValid,
   parseProtocolV2ResourceManifest,
   parseProtocolV2Resources,
-  prepareProtocolV2ResourceFiles,
 } from '../src/protocols/protocol-v2/resources';
 
 import type { ConnectSettings, RemoteConfigResponse } from '../src/types';
@@ -149,42 +147,6 @@ describe('Pro2 resource configuration', () => {
         ),
       })
     ).toThrow('archive_path');
-  });
-
-  test('verifies selected manifest files and preserves manifest device paths', () => {
-    const prepared = prepareProtocolV2ResourceFiles({
-      manifest: resourceManifest,
-      files: manifestFiles.map(file => ({
-        archivePath: file.archive_path,
-        binary: file.binary,
-      })),
-      targetsToUpdate: ['resource'],
-    });
-    expect(prepared.map(file => file.devicePath)).toEqual(
-      manifestFiles.map(file => file.device_path)
-    );
-    expect(() =>
-      prepareProtocolV2ResourceFiles({
-        manifest: resourceManifest,
-        files: manifestFiles.map((file, index) => ({
-          archivePath: file.archive_path,
-          binary: index === 0 ? new Uint8Array([0]).buffer : file.binary,
-        })),
-        targetsToUpdate: ['resource'],
-      })
-    ).toThrow('verification failed');
-  });
-
-  test('verifies both full file size and SHA-256 before transfer', () => {
-    const bytes = new Uint8Array([1, 2, 3]);
-    const binary = bytes.buffer;
-    const identity = { size: bytes.byteLength, fileHash: bytesToHex(sha256(bytes)) };
-
-    expect(isProtocolV2ResourceFileValid(binary, identity)).toBe(true);
-    expect(isProtocolV2ResourceFileValid(binary, { ...identity, size: 4 })).toBe(false);
-    expect(isProtocolV2ResourceFileValid(binary, { ...identity, fileHash: '0'.repeat(64) })).toBe(
-      false
-    );
   });
 
   test('applies a validated pre-release config and exposes its archive source', async () => {

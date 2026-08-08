@@ -17,7 +17,7 @@ import type {
   FirmwareUpdatePlanForceTarget,
   FirmwareUpdatePlanTarget,
 } from '../../types/api/firmwareUpdatePlan';
-import type { Features } from '../../types';
+import type { Features, IProtocolV2ResourceSource } from '../../types';
 
 type FirmwareUpdatePlatform = 'native' | 'desktop' | 'ext' | 'web' | 'web-embed';
 
@@ -31,7 +31,6 @@ type ReleaseRecord = {
   version?: unknown;
   components?: unknown;
   installOrder?: unknown;
-  resourceBundles?: unknown;
   fingerprint?: unknown;
   fingerprintWeb?: unknown;
   expectedSize?: unknown;
@@ -444,11 +443,9 @@ const buildProtocolV2Artifacts = (
   release: ReleaseRecord,
   {
     includeComponents = true,
-    includeResources = true,
     componentTargets: selectedComponentTargets,
   }: {
     includeComponents?: boolean;
-    includeResources?: boolean;
     componentTargets?: ReadonlySet<FirmwareUpdatePlanTarget>;
   } = {}
 ): {
@@ -523,43 +520,6 @@ const buildProtocolV2Artifacts = (
     targets.push(target);
   }
 
-  const bundles =
-    includeResources && Array.isArray(release.resourceBundles) ? release.resourceBundles : [];
-  const resourceBundleNames = new Set<string>();
-  for (const value of bundles) {
-    const bundle = asRecord(value);
-    const name = asString(bundle?.name);
-    if (!bundle || !name) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'Protocol V2 resource bundle is invalid',
-        { firmwareUpdateCode: 'FirmwarePlanInvalid' }
-      );
-    }
-    if (resourceBundleNames.has(name)) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        `Protocol V2 resource bundle duplicates name ${name}`,
-        { firmwareUpdateCode: 'FirmwarePlanInvalid' }
-      );
-    }
-    resourceBundleNames.add(name);
-    artifacts.push({
-      artifactId: `resourceBundle:${name}`,
-      role: 'resourceBundle',
-      target: 'resource',
-      url: assertArtifactUrl(bundle.url, `Protocol V2 resource bundle ${name}`),
-      container: 'raw',
-      logicalName: name,
-      ...asIntegrity({
-        size: bundle.expectedSize,
-        sha256: bundle.fingerprint,
-      }),
-    });
-  }
-  if (bundles.length > 0) {
-    targets.push('resource');
-  }
   return { artifacts, targets: [...new Set(targets)] };
 };
 
@@ -679,7 +639,7 @@ export const buildProtocolV2FirmwareUpdatePlan = ({
   release,
   targetsToUpdate,
   forceUpdateTargets,
-  resourceArchiveAvailable,
+  resourceArchive,
 }: {
   features: Features;
   firmwareType: EFirmwareType;
@@ -687,7 +647,7 @@ export const buildProtocolV2FirmwareUpdatePlan = ({
   release: ReleaseRecord | undefined;
   targetsToUpdate: readonly FirmwareUpdateV4Target[];
   forceUpdateTargets?: FirmwareUpdatePlanForceTarget[];
-  resourceArchiveAvailable: boolean;
+  resourceArchive: IProtocolV2ResourceSource | undefined;
 }): FirmwareUpdatePlan => {
   const validatedForceTargets = validateFirmwareUpdatePlanForceTargets(forceUpdateTargets);
   if (validatedForceTargets.some(target => target === 'ble' || target === 'bootloader')) {
@@ -705,9 +665,32 @@ export const buildProtocolV2FirmwareUpdatePlan = ({
   }
   const protocolV2 = buildProtocolV2Artifacts(release ?? {}, {
     includeComponents: requestedComponentTargets.size > 0,
-    includeResources: false,
     componentTargets: requestedComponentTargets,
   });
+  const resourceRequested = targetsToUpdate.includes('resource');
+  if (resourceRequested) {
+    const archive = resourceArchive;
+    if (!archive) {
+      return planError('Protocol V2 resource target has no resource archive');
+    }
+    const integrity = asIntegrity({
+      size: archive.archiveSize,
+      sha256: archive.archiveSha256,
+    });
+    if (integrity.expectedSize === undefined || integrity.expectedSha256 === undefined) {
+      planError('Protocol V2 resource archive integrity metadata is invalid');
+    }
+    protocolV2.artifacts.push({
+      artifactId: 'resource:archive',
+      role: 'resourceBundle',
+      target: 'resource',
+      url: assertArtifactUrl(archive.archiveUrl, 'Protocol V2 resource archive'),
+      container: 'zip',
+      logicalName: 'protocol-v2-resource-archive',
+      ...integrity,
+    });
+    protocolV2.targets.push('resource');
+  }
   const representedTargets = new Set(protocolV2.targets);
   const missingTarget = Array.from(requestedComponentTargets).find(
     target => !representedTargets.has(target)
@@ -718,12 +701,10 @@ export const buildProtocolV2FirmwareUpdatePlan = ({
   if (validatedForceTargets.includes('firmware') && protocolV2.targets.length === 0) {
     planError('Forced firmware update target firmware is not represented by the plan');
   }
-  if (validatedForceTargets.includes('resource') && !resourceArchiveAvailable) {
+  if (validatedForceTargets.includes('resource') && !resourceArchive) {
     planError('Forced firmware update target resource has no Protocol V2 resource archive');
   }
 
-  // Protocol V2 resource archives are materialized by the host into explicit
-  // resourceFiles. The prepared artifact plan therefore binds firmware components only.
   return finalizeFirmwareUpdatePlan({
     features,
     firmwareType,
@@ -781,7 +762,6 @@ export const buildFirmwareUpdatePlan = ({
   if (executor === 'v4' && (shouldUpdateFirmware || shouldUpdateResource)) {
     const protocolV2 = buildProtocolV2Artifacts(firmwareRelease ?? {}, {
       includeComponents: shouldUpdateFirmware,
-      includeResources: shouldUpdateResource,
     });
     artifacts = protocolV2.artifacts;
     targetsToUpdate = protocolV2.targets;

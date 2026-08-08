@@ -23,9 +23,14 @@ export { projectFeatures as projectDeviceStateFeatures } from './device/DeviceSt
 export { getMethodSupportedProtocols } from './api/utils';
 export {
   parseProtocolV2ResourceManifest,
-  prepareProtocolV2ResourceFiles,
   selectProtocolV2ResourceManifestFiles,
 } from './protocols/protocol-v2/resources';
+export { prepareFirmwareUpdateV4MemoryHost } from './api/firmware/FirmwareMemoryHost';
+export type {
+  FirmwareMemoryArtifact,
+  FirmwareMemoryArtifactEntry,
+  FirmwareUpdateV4MemoryHost,
+} from './api/firmware/FirmwareMemoryHost';
 export {
   getFirmwareUpdateHostBindingGeneration,
   registerFirmwareUpdateHostBinding,

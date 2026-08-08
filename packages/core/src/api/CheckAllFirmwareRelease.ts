@@ -439,11 +439,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     );
     let firmwareUpdatePlan: FirmwareUpdatePlan | undefined;
     try {
-      const shouldBuildFirmwareUpdatePlan =
-        componentTargetsToUpdate.length > 0 ||
-        validatedForceUpdateTargets.some(target => target !== 'resource') ||
-        validatedProtocolV2ForceUpdateTargets.some(target => target !== 'resource') ||
-        (forceResourceUpdate && !resourcePreparationRequired);
+      const shouldBuildFirmwareUpdatePlan = targetsToUpdate.length > 0;
       const requestedPlatform = platform ?? 'web';
       const requiresDeviceIdentity =
         requestedPlatform === 'native' || requestedPlatform === 'desktop';
@@ -456,7 +452,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
           release,
           targetsToUpdate,
           forceUpdateTargets: validatedForceUpdateTargets,
-          resourceArchiveAvailable: resourcePreparationRequired,
+          resourceArchive: resourceSource,
         });
         firmwareUpdatePlan = canBindPreparedPlan ? validatedPlan : undefined;
         if (!canBindPreparedPlan) {

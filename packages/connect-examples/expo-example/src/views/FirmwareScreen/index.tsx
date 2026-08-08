@@ -6,6 +6,7 @@ import * as FileSystem from 'expo-file-system';
 import {
   type DeviceState,
   type Features,
+  type FirmwareUpdateV4Target,
   getFirmwareType,
   projectDeviceStateFeatures,
 } from '@onekeyfe/hd-core';
@@ -25,8 +26,14 @@ import { FirmwareUpdateEvent } from './FirmwareUpdateEvent';
 import { DeviceFieldContext } from './DeviceFieldContext';
 import { DeviceInfoFieldGroup, DeviceSeFieldGroup } from './DeviceFieldGroup';
 import { ExportDeviceInfo, formatCurrentTime, getDeviceMode } from './ExportDeviceInfo';
-import { ProtocolV2FirmwareUpdate } from './ProtocolV2FirmwareUpdate';
-import { prepareRemoteProtocolV2ResourceFiles } from './protocolV2ResourceArchive';
+import {
+  ProtocolV2FirmwareUpdate,
+  type ProtocolV2FirmwareUpdateRequest,
+} from './ProtocolV2FirmwareUpdate';
+import {
+  type FirmwarePlanArtifactOverrides,
+  prepareFirmwareUpdatePlanMemoryHost,
+} from './firmwareUpdatePlanHost';
 import { buildDeviceAdvancedInfo } from './deviceAdvancedInfo';
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 import { HardwareInputPinDialogProvider } from '../../provider/HardwareInputPinProvider';
@@ -504,7 +511,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
   );
 
   const firmwareUpdateV4 = useCallback(
-    async (params: Parameters<NonNullable<typeof sdk>['firmwareUpdateV4']>[1]) => {
+    async (params: ProtocolV2FirmwareUpdateRequest) => {
       if (!sdk)
         return { payload: intl.formatMessage({ id: 'tip__sdk_not_ready' }), success: false };
       if (!features) return { payload: 'features is not ready', success: false };
@@ -516,7 +523,56 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
 
       setShowUpdateDialog(true);
       try {
-        const res = await sdk.firmwareUpdateV4(selectDevice.connectId, params);
+        const componentFields = [
+          ['boot', 'bootloaderBinary'],
+          ['app_v1', 'applicationP1Binary'],
+          ['app_v2', 'applicationP2Binary'],
+          ['coprocessor', 'coprocessorBinary'],
+          ['se01', 'se01Binary'],
+          ['se02', 'se02Binary'],
+          ['se03', 'se03Binary'],
+          ['se04', 'se04Binary'],
+        ] as const;
+        const localTargets: FirmwareUpdateV4Target[] = componentFields.flatMap(([target, field]) =>
+          params[field] ? [target] : []
+        );
+        if (params.resourceArchiveBinary) localTargets.push('resource');
+        const releaseResponse = await sdk.checkAllFirmwareRelease(selectDevice.connectId, {
+          platform: params.platform,
+          protocolV2ForceUpdateTargets: params.targetsToUpdate ?? localTargets,
+        });
+        if (!releaseResponse.success) {
+          throw new Error(releaseResponse.payload.error);
+        }
+        const plan = releaseResponse.payload.firmwareUpdatePlan;
+        if (!plan || plan.executor !== 'v4') {
+          throw new Error('Protocol V2 firmware update Plan is unavailable');
+        }
+        const overrides: FirmwarePlanArtifactOverrides = {};
+        for (const [target, field] of componentFields) {
+          const binary = params[field];
+          if (binary) overrides[target] = binary;
+        }
+        if (params.resourceArchiveBinary) overrides.resource = params.resourceArchiveBinary;
+        const memoryHost = await prepareFirmwareUpdatePlanMemoryHost({
+          hardwareSDK: sdk,
+          plan,
+          overrides,
+        });
+        let res;
+        try {
+          res = await sdk.firmwareUpdateV4(selectDevice.connectId, {
+            platform: params.platform,
+            preparedPlan: memoryHost.preparedPlan,
+            hostBindingGeneration: memoryHost.hostBindingGeneration,
+            targetsToUpdate: memoryHost.targetsToUpdate,
+            expectedDeviceId: memoryHost.expectedDeviceId,
+            expectedTargetVersions: memoryHost.expectedTargetVersions,
+            componentArtifacts: memoryHost.componentArtifacts,
+          });
+        } finally {
+          memoryHost.release();
+        }
         return {
           success: res.success,
           payload: res.success ? undefined : res.payload.error,
@@ -553,15 +609,9 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
           };
         }
         const targetsToUpdate = res.payload.targetsToUpdate ?? [];
-        const resourceFiles = await prepareRemoteProtocolV2ResourceFiles({
-          hardwareSDK: sdk,
-          archive: res.payload.resourceArchive,
-          targetsToUpdate,
-        });
         return {
           success: true,
           targetsToUpdate,
-          resourceFiles,
         };
       } catch (error) {
         return {

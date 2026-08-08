@@ -628,10 +628,6 @@ program
   .command('firmware-update-v4')
   .description('Run Protocol V2 firmware update through sdk.firmwareUpdateV4')
   .option('--chunk-size <bytes>', 'Transfer chunk size in bytes')
-  .option(
-    '--resource-file <spec...>',
-    'Resource direct-write spec: <localPath>:<devicePath>, e.g. wallpaper.okpkg:vol0:/bundles/images/wallpaper.okpkg'
-  )
   .option('--romloader <path>', 'FW_MGMT_TARGET_ROMLOADER binary path')
   .option('--bootloader <path>', 'FW_MGMT_TARGET_BOOTLOADER binary path')
   .option('--application-p1 <path>', 'FW_MGMT_TARGET_APPLICATION_P1 binary path')
@@ -1253,27 +1249,8 @@ async function resolveLegacyFirmwareConnectId(
   return connectId;
 }
 
-function parseResourceFileParam(spec: string): { binary: ArrayBuffer; devicePath: string } {
-  const sep = spec.indexOf(':');
-  if (sep <= 0 || sep === spec.length - 1) {
-    throw new Error(`Invalid --resource-file value: "${spec}". Expected <localPath>:<devicePath>`);
-  }
-  const localPath = spec.slice(0, sep);
-  const devicePath = spec.slice(sep + 1);
-  if (!devicePath.startsWith('vol')) {
-    throw new Error(
-      `Invalid --resource-file device path: "${devicePath}". Expected a vol*:/... path`
-    );
-  }
-  return {
-    binary: readBinaryParam(localPath),
-    devicePath,
-  };
-}
-
 function getFirmwareUpdateV4TotalBytes(params: ReturnType<typeof buildFirmwareUpdateV4Params>) {
   return [
-    ...(params.resourceFiles?.map(item => item.binary) ?? []),
     params.bootloaderBinary,
     params.applicationP1Binary,
     params.applicationP2Binary,
@@ -1598,7 +1575,6 @@ export async function runFirmwareUpdateV4WithRetry({
 
 function buildFirmwareUpdateV4Params(opts: {
   chunkSize?: string;
-  resourceFile?: string[];
   romloader?: string;
   bootloader?: string;
   applicationP1?: string;
@@ -1615,7 +1591,6 @@ function buildFirmwareUpdateV4Params(opts: {
     connectProtocol: 'V2' as const,
     chunkSize: opts.chunkSize ? safeParseInt(opts.chunkSize, '--chunk-size') : undefined,
     forcedUpdateRes: opts.forcedUpdateRes,
-    resourceFiles: opts.resourceFile?.map(parseResourceFileParam),
     romloaderBinary: opts.romloader ? readBinaryParam(opts.romloader) : undefined,
     bootloaderBinary: opts.bootloader ? readBinaryParam(opts.bootloader) : undefined,
     applicationP1Binary: opts.applicationP1 ? readBinaryParam(opts.applicationP1) : undefined,
@@ -1628,7 +1603,6 @@ function buildFirmwareUpdateV4Params(opts: {
   };
 
   const hasPayload = [
-    params.resourceFiles,
     params.romloaderBinary,
     params.bootloaderBinary,
     params.applicationP1Binary,

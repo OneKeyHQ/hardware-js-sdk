@@ -243,11 +243,18 @@ Prepared 固件更新将 artifact 获取与设备执行分离，完整性责任�
   reader 契约不匹配，不表示 SDK 已独立认证实际字节内容。
 - “首次设备变异前已完成完整性校验”的保证依赖外部 Host 履行上述契约。设备端固件签名校验是
   独立防线，不能替代 Host 对资源 artifact 的完整性校验。
+- Protocol V2 资源归档必须作为 `role: resourceBundle`、`target: resource`、`container: zip`
+  的 Plan artifact 参与统一下载；Host 在 PreparedPlan 的 `materializedEntries` 中登记
+  `manifest.json` 与资源包，SDK 仅通过 `ArtifactReader` 分块读取，不提供绕过 Plan 的资源
+  二进制输入接口。
+- Web 与示例环境没有持久化 artifact store 时，可以使用内存 Host 适配器，但仍必须保持
+  Plan、PreparedPlan、receipt 和 ArtifactReader 四层契约，不得恢复 SDK 内部联网下载。
 
 主要实现：
 
 - `packages/core/src/api/firmware/FirmwareUpdatePreparedPlan.ts`
 - `packages/core/src/api/firmware/FirmwareArtifactSource.ts`
+- `packages/core/src/api/firmware/FirmwareMemoryHost.ts`
 
 ## 维护规则
 

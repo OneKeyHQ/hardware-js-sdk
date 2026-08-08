@@ -297,12 +297,6 @@ describe('buildFirmwareUpdatePlan', () => {
       forceTarget: 'firmware' as const,
       release: {
         components: {},
-        resourceBundles: [
-          {
-            name: 'images',
-            url: 'https://firmware.onekey.so/pro2/images.okpkg',
-          },
-        ],
       },
     },
     {
@@ -325,41 +319,21 @@ describe('buildFirmwareUpdatePlan', () => {
     }
   );
 
-  test.each([
-    {
-      forceTarget: 'firmware' as const,
-      expectedArtifactIds: ['component:app_v1'],
-      expectedTargets: ['app_v1'],
-    },
-    {
-      forceTarget: 'resource' as const,
-      expectedArtifactIds: ['resourceBundle:images'],
-      expectedTargets: ['resource'],
-    },
-  ])(
-    'limits a Pro2 $forceTarget force to the selected artifact role',
-    ({ forceTarget, expectedArtifactIds, expectedTargets }) => {
-      const plan = buildFirmwareUpdatePlan(
-        createProtocolV2ForceInput([forceTarget], {
-          components: {
-            applicationP1: {
-              target: 'APPLICATION_P1',
-              url: 'https://firmware.onekey.so/pro2/application-p1.bin',
-            },
+  test('limits a Pro2 firmware force to component artifacts', () => {
+    const plan = buildFirmwareUpdatePlan(
+      createProtocolV2ForceInput(['firmware'], {
+        components: {
+          applicationP1: {
+            target: 'APPLICATION_P1',
+            url: 'https://firmware.onekey.so/pro2/application-p1.bin',
           },
-          resourceBundles: [
-            {
-              name: 'images',
-              url: 'https://firmware.onekey.so/pro2/images.okpkg',
-            },
-          ],
-        })
-      );
+        },
+      })
+    );
 
-      expect(plan.artifacts.map(artifact => artifact.artifactId)).toEqual(expectedArtifactIds);
-      expect(plan.targetsToUpdate).toEqual(expectedTargets);
-    }
-  );
+    expect(plan.artifacts.map(artifact => artifact.artifactId)).toEqual(['component:app_v1']);
+    expect(plan.targetsToUpdate).toEqual(['app_v1']);
+  });
 
   test('rejects a prepared native plan without a stable device identity', () => {
     const features = createFeatures({
@@ -384,7 +358,7 @@ describe('buildFirmwareUpdatePlan', () => {
     ).toThrow('requires a stable device identity');
   });
 
-  test('maps the Pro2 component order and resource bundles without downloading them', () => {
+  test('maps the Pro2 component order without downloading artifacts', () => {
     const plan = buildFirmwareUpdatePlan({
       features: createFeatures({ deviceType: EDeviceType.Pro2 }),
       firmwareType: EFirmwareType.Universal,
@@ -409,12 +383,6 @@ describe('buildFirmwareUpdatePlan', () => {
               url: 'https://firmware.onekey.so/pro2/se01.bin',
             },
           },
-          resourceBundles: [
-            {
-              name: 'images',
-              url: 'https://firmware.onekey.so/pro2/images.okpkg',
-            },
-          ],
         },
       },
       ble: noUpdate,
@@ -426,9 +394,8 @@ describe('buildFirmwareUpdatePlan', () => {
       'component:boot',
       'component:app_v1',
       'component:se01',
-      'resourceBundle:images',
     ]);
-    expect(plan.targetsToUpdate).toEqual(['boot', 'app_v1', 'se01', 'resource']);
+    expect(plan.targetsToUpdate).toEqual(['boot', 'app_v1', 'se01']);
     expect(plan.artifacts[1]).toEqual(
       expect.objectContaining({
         expectedSize: 1024,
@@ -476,28 +443,6 @@ describe('buildFirmwareUpdatePlan', () => {
         },
       },
       expectedError: 'duplicates target app_v1',
-    },
-    {
-      label: 'resource bundle name',
-      release: {
-        components: {
-          application: {
-            target: 'APPLICATION_P1',
-            url: 'https://firmware.onekey.so/pro2/application.bin',
-          },
-        },
-        resourceBundles: [
-          {
-            name: 'images',
-            url: 'https://firmware.onekey.so/pro2/images.okpkg',
-          },
-          {
-            name: 'images',
-            url: 'https://firmware.onekey.so/pro2/images-duplicate.okpkg',
-          },
-        ],
-      },
-      expectedError: 'duplicates name images',
     },
   ])('rejects a duplicate Pro2 $label', ({ release, expectedError }) => {
     expect(() =>

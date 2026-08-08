@@ -278,7 +278,14 @@ export const validateFirmwareUpdatePreparedPlan = (value: unknown): FirmwareUpda
     artifactIds.add(artifact.artifactId);
     artifactTargets.add(artifact.target);
     assertFirmwareArtifactReference(artifact.artifact);
-    artifact.materializedEntries?.forEach(assertPreparedEntry);
+    const materializedEntryNames =
+      artifact.materializedEntries?.map(entry => {
+        assertPreparedEntry(entry);
+        return getFirmwareUpdateResourceName(entry.entryName).toLowerCase();
+      }) ?? [];
+    if (new Set(materializedEntryNames).size !== materializedEntryNames.length) {
+      return preparedPlanError('Firmware prepared plan contains duplicate entry names');
+    }
   }
   if (
     preparedPlan.targetsToUpdate.some(target => !FIRMWARE_UPDATE_PLAN_TARGETS.has(target)) ||

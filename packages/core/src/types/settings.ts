@@ -104,24 +104,6 @@ export type IProtocolV2ResourceManifest = {
   files: IProtocolV2ResourceManifestFile[];
 };
 
-/** Pro2 RESC bundle okpkg descriptor for incremental FileWrite synchronization. */
-export type IProtocolV2ResourceBundle = {
-  /** Bundle name, such as images, animation, translations, or fonts_roobert. */
-  name: string;
-  /** Download URL. */
-  url: string;
-  fingerprint?: string;
-  expectedSize?: number;
-  /** Device target path, such as vol0:/bundles/images/images.okpkg. */
-  devicePath: string;
-  /** okpkg payload_version used to skip matching content after FileRead. */
-  version?: IVersionArray;
-  /** okpkg payload_hash used for SHA3-512 comparison after FileRead. */
-  payloadHash?: string;
-  /** okpkg header_hash used for SHA3-512 comparison after FileRead. */
-  headerHash?: string;
-};
-
 /** STM32 firmware config */
 export type IFirmwareReleaseInfo = {
   required: boolean;
@@ -149,8 +131,6 @@ export type IFirmwareReleaseInfo = {
   upgradeType?: 'payload-package-set' | string;
   components?: Record<string, IProtocolV2FirmwareComponent>;
   installOrder?: string[];
-  /** Pro2 RESC bundles for incremental direct FileWrite synchronization. */
-  resourceBundles?: IProtocolV2ResourceBundle[];
   bootloaderChangelog?: {
     [k in ILocale]: string;
   };

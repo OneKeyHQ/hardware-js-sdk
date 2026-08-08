@@ -62,14 +62,6 @@ const release: IFirmwareReleaseInfo = {
       version: [2, 0, 0],
     },
   },
-  resourceBundles: [
-    {
-      name: 'images',
-      url: 'https://example.com/images.okpkg',
-      devicePath: 'vol0:/bundles/images/images.okpkg',
-      version: [1, 0, 0],
-    },
-  ],
 };
 
 const resourceSource = {
@@ -152,7 +144,6 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
   test('detects same-version package hotfixes by P1 and P2 payload hash', () => {
     const packageSet: IFirmwareReleaseInfo = {
       ...release,
-      resourceBundles: undefined,
       installOrder: ['applicationP1', 'applicationP2'],
       components: {
         applicationP1: {
@@ -203,7 +194,6 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     const packageSet: IFirmwareReleaseInfo = {
       ...release,
       required: false,
-      resourceBundles: undefined,
       installOrder: ['applicationP1'],
       components: {
         applicationP1: {
@@ -234,7 +224,6 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     const packageSet: IFirmwareReleaseInfo = {
       ...release,
       required: false,
-      resourceBundles: undefined,
       installOrder: ['applicationP1'],
       components: {
         applicationP1: {
@@ -265,7 +254,6 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
   test('updates both application packages when normal mode only reports P1', () => {
     const packageSet: IFirmwareReleaseInfo = {
       ...release,
-      resourceBundles: undefined,
       installOrder: ['applicationP1', 'applicationP2'],
       components: {
         applicationP1: {
@@ -339,8 +327,14 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         artifacts: [
           { artifactId: 'component:boot', target: 'boot' },
           { artifactId: 'component:app_v1', target: 'app_v1' },
+          {
+            artifactId: 'resource:archive',
+            target: 'resource',
+            role: 'resourceBundle',
+            container: 'zip',
+          },
         ],
-        targetsToUpdate: ['boot', 'app_v1'],
+        targetsToUpdate: ['boot', 'app_v1', 'resource'],
       },
       firmware: {
         status: 'required',
@@ -391,8 +385,9 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
           { artifactId: 'component:app_v1', target: 'app_v1' },
           { artifactId: 'component:se02', target: 'se02' },
           { artifactId: 'component:se03', target: 'se03' },
+          { artifactId: 'resource:archive', target: 'resource', container: 'zip' },
         ],
-        targetsToUpdate: ['boot', 'app_v1', 'se02', 'se03'],
+        targetsToUpdate: ['boot', 'app_v1', 'se02', 'se03', 'resource'],
       },
     });
   });
@@ -449,8 +444,9 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         artifacts: [
           { artifactId: 'component:app_v1', target: 'app_v1' },
           { artifactId: 'component:coprocessor', target: 'coprocessor' },
+          { artifactId: 'resource:archive', target: 'resource', container: 'zip' },
         ],
-        targetsToUpdate: ['app_v1', 'coprocessor'],
+        targetsToUpdate: ['app_v1', 'coprocessor', 'resource'],
       },
     });
   });
@@ -576,7 +572,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         executor: 'v4',
         deviceModel: 'neo',
         platform: 'native',
-        targetsToUpdate: ['se01', 'se02'],
+        targetsToUpdate: ['se01', 'se02', 'resource'],
       },
     });
   });
@@ -611,7 +607,6 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     const packageSet: IFirmwareReleaseInfo = {
       ...release,
       required: false,
-      resourceBundles: undefined,
       installOrder: ['applicationP1'],
       components: {
         applicationP1: {
@@ -730,7 +725,18 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       resourceStatus: 'unknown',
       resourcePreparationRequired: true,
       targetsToUpdate: ['resource'],
-      firmwareUpdatePlan: undefined,
+      firmwareUpdatePlan: {
+        executor: 'v4',
+        artifacts: [
+          {
+            artifactId: 'resource:archive',
+            target: 'resource',
+            role: 'resourceBundle',
+            container: 'zip',
+          },
+        ],
+        targetsToUpdate: ['resource'],
+      },
     });
   });
 

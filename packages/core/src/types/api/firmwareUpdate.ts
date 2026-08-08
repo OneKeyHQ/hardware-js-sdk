@@ -153,25 +153,10 @@ export interface FirmwareUpdateV4Params {
   se03Binary?: ArrayBuffer;
   se04Binary?: ArrayBuffer;
   forcedUpdateRes?: boolean;
-  /**
-   * Arbitrary Protocol V2 resource files written directly with FilesystemFileWrite.
-   * Use this for every file selected from the manifest-driven resource archive.
-   * When provided, these files are authoritative for the resource target.
-   */
-  resourceFiles?: Array<{
-    binary: ArrayBuffer;
-    devicePath: string;
-    size?: number;
-    fileHash?: string;
-  }>;
   artifactReader?: FirmwareArtifactReader;
   componentArtifacts?: Partial<
     Record<Exclude<FirmwareUpdateV4Target, 'resource'>, FirmwareArtifactReference>
   >;
-  resourceBundleArtifacts?: Array<{
-    name: string;
-    artifact: FirmwareArtifactReference;
-  }>;
 }
 
 export declare function registerFirmwareUpdateHostBinding(
