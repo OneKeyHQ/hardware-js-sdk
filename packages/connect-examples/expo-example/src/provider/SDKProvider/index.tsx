@@ -7,17 +7,20 @@ import HardwareSDKContext from '../HardwareSDKContext';
 
 import type { LowLevelCoreApi } from '@onekeyfe/hd-core/dist/lowLevelInject';
 import type { CoreApi } from '@onekeyfe/hd-core';
+import type { ConnectionType } from '../../utils/hardwareInstance';
 
 let isSdkInit = false;
 export default function USB({ children }: { children: React.ReactNode }) {
   const [sdk, createSDK] = useState<CoreApi>();
   const [lowLevelSDK, createLowLevelSDK] = useState<LowLevelCoreApi>();
   const [useLowLevelApi, setUseLowLevelApi] = useState<boolean>(false);
+  const [connectionType, setConnectionType] = useState<ConnectionType>();
   const sdkInit = () => {
     getHardwareSDKInstance().then(res => {
       createSDK(res.HardwareSDK);
       createLowLevelSDK(res.HardwareLowLevelSDK);
       setUseLowLevelApi(res.useLowLevelApi);
+      setConnectionType(res.connectionType);
     });
   };
 
@@ -40,8 +43,9 @@ export default function USB({ children }: { children: React.ReactNode }) {
       sdk,
       lowLevelSDK,
       type: 'USB' as const,
+      connectionType,
     }),
-    [sdk, lowLevelSDK]
+    [connectionType, sdk, lowLevelSDK]
   );
 
   return (
