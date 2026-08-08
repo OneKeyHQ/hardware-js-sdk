@@ -19,6 +19,8 @@ export * from './types';
 export { whitelist, whitelistExtension } from './data/config';
 export { executeCallback, cleanupCallback };
 export { preloadSessionCache } from './device/Device';
+export { projectFeatures as projectDeviceStateFeatures } from './device/DeviceStateProjector';
+export { getMethodSupportedProtocols } from './api/utils';
 
 const HardwareSdk = ({
   init,

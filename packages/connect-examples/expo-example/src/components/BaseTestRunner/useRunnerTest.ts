@@ -6,6 +6,11 @@ import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useDevice } from '../../provider/DeviceProvider';
+import { getProtocolAwareFeatures } from '../../utils/protocolAwareFeatures';
+import {
+  createProtocolUnsupportedResponse,
+  isMethodSupportedOnProtocol,
+} from '../../utils/protocolAwareMethod';
 import { TestRunnerContext } from './Context/TestRunnerProvider';
 import {
   clearItemVerifyStateAtom,
@@ -217,7 +222,12 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
           stableContext.callbacks?.onRunnerStateChange?.('running');
 
           const connectId = selectedDevice?.connectId ?? '';
-          const featuresRes = await SDK.getFeatures(connectId);
+          const featuresRes = await getProtocolAwareFeatures(
+            SDK,
+            connectId,
+            undefined,
+            selectedDevice?.connectProtocol
+          );
           if (!featuresRes.success) {
             endTestRunner();
             return;
@@ -227,13 +237,17 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
           stableContext.setRunningDeviceFeatures?.(featuresRes.payload);
           const deviceFeatures = featuresRes.payload;
 
-          try {
-            const onekeyFeatures = await SDK.getOnekeyFeatures(connectId);
-            stableContext.setRunningOneKeyDeviceFeatures?.(
-              onekeyFeatures.payload as OnekeyFeatures
-            );
-          } catch (error) {
-            // ignore
+          if (featuresRes.payload.protocol === 'V2') {
+            stableContext.setRunningOneKeyDeviceFeatures?.(undefined);
+          } else {
+            try {
+              const onekeyFeatures = await SDK.getOnekeyFeatures(connectId);
+              stableContext.setRunningOneKeyDeviceFeatures?.(
+                onekeyFeatures.payload as OnekeyFeatures
+              );
+            } catch (error) {
+              // ignore
+            }
           }
 
           const context = {
@@ -308,8 +322,19 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
 
               let res: Unsuccessful | Success<any>;
               let skipVerify = false;
+              const featuresProtocol = featuresRes.payload.protocol;
+              const protocol =
+                selectedDevice?.connectProtocol ??
+                (featuresProtocol === 'V1' || featuresProtocol === 'V2'
+                  ? featuresProtocol
+                  : undefined);
+              if (!protocol) {
+                throw new Error('Unable to determine the active device protocol');
+              }
 
-              if (processRequest) {
+              if (!isMethodSupportedOnProtocol(method, protocol, requestParams)) {
+                res = createProtocolUnsupportedResponse(method, protocol);
+              } else if (processRequest) {
                 const response = await processRequest(
                   SDK,
                   method,
@@ -348,7 +373,11 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
                   verifyState = 'fail';
                 }
               } else if (!res.success && !skipVerify) {
-                if (res.payload?.code === 802 || res.payload?.code === 803) {
+                if (
+                  res.payload?.code === 802 ||
+                  res.payload?.code === 803 ||
+                  res.payload?.code === 415
+                ) {
                   verifyState = 'skip';
                 } else {
                   verifyState = 'fail';
@@ -418,6 +447,7 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
       SDK,
       initHardwareListener,
       selectedDevice?.connectId,
+      selectedDevice?.connectProtocol,
       prepareRunner,
       initTestCase,
       store,

@@ -42,6 +42,25 @@ function htmlImageToCanvas({
   return { canvas, ctx };
 }
 
+/** Convert an image source to exact-size RGBA pixels for Protocol V2 image APIs. */
+export async function imageSourceToRgba(source: string, width: number, height: number) {
+  if (typeof document === 'undefined') {
+    throw new Error('Protocol V2 image conversion is currently available in the web example');
+  }
+
+  const image = await buildHtmlImage(source);
+  const { canvas, ctx } = htmlImageToCanvas({ image, width, height });
+  const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
+  const sourceWidth = width / scale;
+  const sourceHeight = height / scale;
+  const sourceX = (image.naturalWidth - sourceWidth) / 2;
+  const sourceY = (image.naturalHeight - sourceHeight) / 2;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+  return new Uint8Array(ctx.getImageData(0, 0, width, height).data);
+}
+
 function stripBase64UriPrefix(base64Uri: string): string {
   return base64Uri.replace(/^data:image\/\w+;base64,/, '');
 }

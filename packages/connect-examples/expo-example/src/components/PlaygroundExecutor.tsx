@@ -5,6 +5,7 @@ import { CoreApi } from '@onekeyfe/hd-core';
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { useDevice } from '../provider/DeviceProvider';
 import { useCommonParams } from '../provider/CommonParamsProvider';
+import { executeProtocolAwareMethod } from '../utils/protocolAwareMethod';
 import { Button } from './ui/Button';
 
 export type MethodPayload = {
@@ -67,19 +68,27 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
 
       console.log('requestParams: ', requestParams);
 
-      let res;
+      console.info('[REQUEST] call sdk', {
+        method,
+        connectId,
+        deviceId,
+        params: requestParams,
+      });
+      let mode: 'no-connection' | 'connection' | 'device' = 'device';
       if (methodPayload.noConnIdReq) {
-        console.info('[REQUEST] call sdk', { method });
-        res = await (sdk as any)[method]();
+        mode = 'no-connection';
       } else if (methodPayload.noDeviceIdReq) {
-        // if (!selectedDevice) return intl.formatMessage({ id: 'tip__need_connect_device_first' });
-        console.info('[REQUEST] call sdk', { method, connectId, params: requestParams });
-        res = await (sdk as any)[method](connectId, requestParams);
-      } else {
-        // if (!selectedDevice) return intl.formatMessage({ id: 'tip__need_connect_device_first' });
-        console.info('[REQUEST] call sdk', { method, connectId, deviceId, params: requestParams });
-        res = await (sdk as any)[method](connectId, deviceId, requestParams);
+        mode = 'connection';
       }
+      const res = await executeProtocolAwareMethod({
+        sdk,
+        method,
+        connectId,
+        deviceId,
+        params: requestParams,
+        protocol: selectedDevice?.connectProtocol,
+        mode,
+      });
 
       onExecute(JSON.stringify(res, null, 2));
     } catch (error: any) {

@@ -1,5 +1,10 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
-import { DeviceType, Enum_SafetyCheckLevel } from '@onekeyfe/hd-transport';
+import {
+  DeviceSEState,
+  DeviceSeType,
+  DeviceType,
+  Enum_SafetyCheckLevel,
+} from '@onekeyfe/hd-transport';
 
 import {
   mapApplySettingsToState,
@@ -119,6 +124,11 @@ describe('DeviceStateMapper', () => {
           bt_adv_name: 'Pro2 1234',
           application: { version: '1.2.3' },
         },
+        se1: {
+          type: DeviceSeType.THD89,
+          state: DeviceSEState.APP,
+          application: { version: '3.0.0', build_id: 'se1-build', hash: [0x05, 0x06] },
+        },
       } as ProtocolV2DeviceInfo,
       'normal'
     );
@@ -140,6 +150,11 @@ describe('DeviceStateMapper', () => {
       applicationP1Hash: '0102',
       applicationP2BuildId: 'p2-build',
       applicationP2Hash: '0304',
+      se01BuildId: 'se1-build',
+      se01Hash: '0506',
+    });
+    expect(patch.securityElements).toMatchObject({
+      se01: { type: 'THD89', state: 'APP' },
     });
     expect(patch).toMatchObject({ protocolVersion: 2 });
     expect(patch.status?.unlocked).toBeUndefined();

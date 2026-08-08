@@ -14,6 +14,7 @@ import data from './data';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
 import { SwitchInput } from '../../../components/SwitchInput';
 import { useDevice } from '../../../provider/DeviceProvider';
+import { getProtocolAwareFeatures } from '../../../utils/protocolAwareFeatures';
 
 import type { CoreMessage } from '@onekeyfe/hd-core';
 import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
@@ -237,12 +238,8 @@ function ExecuteView({
       if (result === 'timeout') {
         // clean up device
         sdk.cancel(connectId);
-        await sdk.getFeatures(connectId, {
-          retryCount: 1,
-        });
-        await sdk.getFeatures(connectId, {
-          retryCount: 1,
-        });
+        await getProtocolAwareFeatures(sdk, connectId, { retryCount: 1 });
+        await getProtocolAwareFeatures(sdk, connectId, { retryCount: 1 });
         return {
           payload: {
             success: false,

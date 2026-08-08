@@ -328,6 +328,10 @@ export const getNftSize = ({
       full: { width: PRO2_NFT_IMAGE_WIDTH, height: PRO2_NFT_IMAGE_HEIGHT },
       thumbnail: { width: PRO2_NFT_THUMBNAIL_WIDTH, height: PRO2_NFT_THUMBNAIL_HEIGHT },
     },
+    neo: {
+      full: { width: PRO2_NFT_IMAGE_WIDTH, height: PRO2_NFT_IMAGE_HEIGHT },
+      thumbnail: { width: PRO2_NFT_THUMBNAIL_WIDTH, height: PRO2_NFT_THUMBNAIL_HEIGHT },
+    },
   };
 
   return sizes[deviceType]?.[thumbnail ? 'thumbnail' : 'full'];
@@ -342,7 +346,7 @@ export const getHomeScreenSize = ({
   homeScreenType: 'WallPaper' | 'Nft';
   thumbnail?: boolean;
 }) => {
-  if (deviceType === EDeviceType.Pro2) {
+  if (deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo) {
     return thumbnail ? undefined : { width: PRO2_WALLPAPER_WIDTH, height: PRO2_WALLPAPER_HEIGHT };
   }
 

@@ -16,6 +16,7 @@ import { baseParams } from '../addressTest/baseParams';
 import { replaceTemplate } from '../addressTest/data/utils';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
+import { executeProtocolAwareMethod } from '../../utils/protocolAwareMethod';
 
 import type { TestChain } from './utils';
 import type { CoreMessage } from '@onekeyfe/hd-core';
@@ -318,8 +319,17 @@ function ExecuteView() {
           useEmptyPassphrase: !item.passphrase,
         };
 
-        // @ts-expect-error
-        const addressRes = await sdk[item.method as keyof typeof sdk](connectId, deviceId, params);
+        const addressRes = await executeProtocolAwareMethod({
+          sdk,
+          method: item.method,
+          connectId,
+          deviceId: deviceId ?? '',
+          params,
+          protocol:
+            context.deviceFeatures.protocol === 'V1' || context.deviceFeatures.protocol === 'V2'
+              ? context.deviceFeatures.protocol
+              : undefined,
+        });
         if (!addressRes.success) {
           return Promise.resolve(undefined);
         }

@@ -22,6 +22,15 @@ describe('getHomeScreenSize', () => {
     ).toBeUndefined();
   });
 
+  it('uses the Protocol V2 wallpaper dimensions for Neo', () => {
+    expect(
+      getHomeScreenSize({
+        deviceType: EDeviceType.Neo,
+        homeScreenType: 'WallPaper',
+      })
+    ).toEqual({ width: 604, height: 1024 });
+  });
+
   it('does not reuse the wallpaper homeScreenType for Pro 2 NFT dimensions', () => {
     expect(
       getHomeScreenSize({
@@ -44,6 +53,14 @@ describe('getNftSize', () => {
   it('returns the Pro 2 NFT image and thumbnail dimensions independently', () => {
     expect(getNftSize({ deviceType: EDeviceType.Pro2 })).toEqual({ width: 540, height: 540 });
     expect(getNftSize({ deviceType: EDeviceType.Pro2, thumbnail: true })).toEqual({
+      width: 263,
+      height: 263,
+    });
+  });
+
+  it('uses the Protocol V2 NFT dimensions for Neo', () => {
+    expect(getNftSize({ deviceType: EDeviceType.Neo })).toEqual({ width: 540, height: 540 });
+    expect(getNftSize({ deviceType: EDeviceType.Neo, thumbnail: true })).toEqual({
       width: 263,
       height: 263,
     });

@@ -11,6 +11,7 @@ import { Button } from '../../../components/ui/Button';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
 import { SwitchInput } from '../../../components/SwitchInput';
+import { getProtocolAwareFeatures } from '../../../utils/protocolAwareFeatures';
 
 import type { CoreMessage, Features } from '@onekeyfe/hd-core';
 import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
@@ -201,7 +202,7 @@ function ExecuteView() {
         });
       }
 
-      const features = await sdk.getFeatures(connectId);
+      const features = await getProtocolAwareFeatures(sdk, connectId);
 
       return Promise.resolve({
         payload: features,

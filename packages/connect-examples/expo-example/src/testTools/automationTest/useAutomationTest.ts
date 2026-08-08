@@ -40,6 +40,8 @@ import {
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useDevice } from '../../provider/DeviceProvider';
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../../utils/mockDevice/helper';
+import { getProtocolAwareFeatures } from '../../utils/protocolAwareFeatures';
+import { executeProtocolAwareMethod } from '../../utils/protocolAwareMethod';
 import { generateAptosPublicKeyFromSeed } from '../../utils/mockDevice/method/aptosGetPublicKey';
 import { generateEvmAddressFromSeed } from '../../utils/mockDevice/method/evmGetAddress';
 import {
@@ -77,6 +79,11 @@ const SUITE_EXECUTION_ORDER: TestSuiteType[] = [
   'chainMethodBatch',
 ];
 const EVM_ADDRESS_PATH = "m/44'/60'/0'/0/0";
+
+const getFeaturesProtocol = (features?: Record<string, unknown>) => {
+  const protocol = features?.protocol;
+  return protocol === 'V1' || protocol === 'V2' ? protocol : undefined;
+};
 const BIP39_CREATE_PUBKEY_PROBES: Array<{
   method: string;
   caseName: string;
@@ -486,7 +493,7 @@ async function fetchDeviceFeatures(
   sdk: CoreApi,
   connectId: string
 ): Promise<Record<string, unknown> | undefined> {
-  const result = await sdk.getFeatures(connectId);
+  const result = await getProtocolAwareFeatures(sdk, connectId);
   return result.success ? result.payload : undefined;
 }
 
@@ -1367,7 +1374,7 @@ export function useAutomationTest() {
   );
 
   const refreshDeviceId = useCallback(async (sdk: CoreApi, connectId: string): Promise<string> => {
-    const featuresResult = await sdk.getFeatures(connectId);
+    const featuresResult = await getProtocolAwareFeatures(sdk, connectId);
     if (!featuresResult.success) {
       throw new Error('Failed to get device features');
     }
@@ -1586,13 +1593,16 @@ export function useAutomationTest() {
             passphraseState != null ? `"${passphraseState}"` : 'undefined'
           } hasPS=${!!params.passphraseState}`
         );
-        const result = (await runWithRetry(`${methodData.method}:${expectedPath}`, () => {
-          const method = (sdk as Record<string, unknown>)[methodData.method];
-          if (typeof method !== 'function') {
-            throw new Error(`SDK method not found: ${methodData.method}`);
-          }
-          return (method as (...args: unknown[]) => Promise<unknown>)(connectId, deviceId, params);
-        })) as { success: boolean; payload?: unknown };
+        const result = (await runWithRetry(`${methodData.method}:${expectedPath}`, () =>
+          executeProtocolAwareMethod({
+            sdk,
+            method: methodData.method,
+            connectId,
+            deviceId,
+            params,
+            protocol: getFeaturesProtocol(deviceFeaturesRef.current),
+          })
+        )) as { success: boolean; payload?: unknown };
 
         if (!result.success) {
           const errorMsg =
@@ -1793,13 +1803,16 @@ export function useAutomationTest() {
         const params = buildSdkParamsForPath(methodCase, expectedPath);
         params.passphraseState = passphraseState;
         params.useEmptyPassphrase = !sdkCase.passphrase;
-        const result = (await runWithRetry(`${methodCase.method}:${expectedPath}`, () => {
-          const method = (sdk as Record<string, unknown>)[methodCase.method];
-          if (typeof method !== 'function') {
-            throw new Error(`SDK method not found: ${methodCase.method}`);
-          }
-          return (method as (...args: unknown[]) => Promise<unknown>)(connectId, deviceId, params);
-        })) as { success: boolean; payload?: unknown };
+        const result = (await runWithRetry(`${methodCase.method}:${expectedPath}`, () =>
+          executeProtocolAwareMethod({
+            sdk,
+            method: methodCase.method,
+            connectId,
+            deviceId,
+            params,
+            protocol: getFeaturesProtocol(deviceFeaturesRef.current),
+          })
+        )) as { success: boolean; payload?: unknown };
 
         if (!result.success) {
           const errorMsg =
@@ -2510,98 +2523,84 @@ export function useAutomationTest() {
 
                       const expected = mockRes?.payload?.address || '';
 
-                      const sdkMethod = (sdk as Record<string, unknown>)[method];
-                      if (typeof sdkMethod !== 'function') {
-                        results.push({
-                          title: caseTitle,
+                      const sdkResult = (await runWithRetry(`${method}:special`, () =>
+                        executeProtocolAwareMethod({
+                          sdk,
                           method,
-                          expected,
-                          passed: false,
-                          error: `SDK method ${method} not found`,
-                          duration: Date.now() - caseStart,
-                        });
-                        notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
-                      } else {
-                        const sdkResult = (await runWithRetry(`${method}:special`, () =>
-                          (sdkMethod as (...args: unknown[]) => Promise<unknown>)(
-                            connectId,
-                            deviceId,
-                            {
-                              path: SPECIAL_PASSPHRASE_METHOD_PATHS[method],
-                              showOnOneKey: false,
-                              passphraseState,
-                              useEmptyPassphrase: false,
-                            }
-                          )
-                        )) as { success: boolean; payload?: { address?: string; error?: string } };
+                          connectId,
+                          deviceId,
+                          params: {
+                            path: SPECIAL_PASSPHRASE_METHOD_PATHS[method],
+                            showOnOneKey: false,
+                            passphraseState,
+                            useEmptyPassphrase: false,
+                          },
+                          protocol: getFeaturesProtocol(deviceFeaturesRef.current),
+                        })
+                      )) as { success: boolean; payload?: { address?: string; error?: string } };
 
-                        if (!sdkResult.success) {
-                          // Check device compatibility
-                          let handledAsExpectedFail = false;
-                          if (deviceFeaturesRef.current) {
-                            const expectedOverride = compatibilityManager.getExpectedOverride(
-                              deviceFeaturesRef.current,
-                              method,
-                              SPECIAL_PASSPHRASE_METHOD_PATHS[method]
+                      if (!sdkResult.success) {
+                        // Check device compatibility
+                        let handledAsExpectedFail = false;
+                        if (deviceFeaturesRef.current) {
+                          const expectedOverride = compatibilityManager.getExpectedOverride(
+                            deviceFeaturesRef.current,
+                            method,
+                            SPECIAL_PASSPHRASE_METHOD_PATHS[method]
+                          );
+                          if (expectedOverride === false) {
+                            addLog(
+                              `[EXPECTED_FAIL] ${method} / 「${passphrase}」 — device does not support this method`
                             );
-                            if (expectedOverride === false) {
-                              addLog(
-                                `[EXPECTED_FAIL] ${method} / 「${passphrase}」 — device does not support this method`
-                              );
-                              results.push({
-                                title: caseTitle,
-                                method,
-                                expected: '(expected failure)',
-                                actual: sdkResult.payload?.error || 'SDK call failed',
-                                passed: true,
-                                duration: Date.now() - caseStart,
-                                metadata: { passphrase, deviceCompat: 'expected failure' },
-                              });
-                              notifyLiveCaseUpdate(
-                                'specialPassphrase',
-                                'Special Passphrase',
-                                results
-                              );
-                              handledAsExpectedFail = true;
-                            }
-                          }
-                          if (!handledAsExpectedFail) {
                             results.push({
                               title: caseTitle,
                               method,
-                              expected,
-                              passed: false,
-                              error: sdkResult.payload?.error || 'SDK call failed',
+                              expected: '(expected failure)',
+                              actual: sdkResult.payload?.error || 'SDK call failed',
+                              passed: true,
                               duration: Date.now() - caseStart,
-                              metadata: { passphrase },
+                              metadata: { passphrase, deviceCompat: 'expected failure' },
                             });
                             notifyLiveCaseUpdate(
                               'specialPassphrase',
                               'Special Passphrase',
                               results
                             );
+                            handledAsExpectedFail = true;
                           }
-                        } else {
-                          const actual = sdkResult.payload?.address || '';
-                          const passed = actual.toLowerCase() === expected.toLowerCase();
-                          if (!passed) {
-                            addLog(`[MISMATCH] ${method} / 「${passphrase}」`);
-                            addLog(`  expected: ${expected}`);
-                            addLog(`  actual:   ${actual}`);
-                          }
-
+                        }
+                        if (!handledAsExpectedFail) {
                           results.push({
                             title: caseTitle,
                             method,
                             expected,
-                            actual,
-                            passed,
+                            passed: false,
+                            error: sdkResult.payload?.error || 'SDK call failed',
                             duration: Date.now() - caseStart,
                             metadata: { passphrase },
                           });
-                        } // end else (!sdkResult.success)
-                      } // end else (typeof sdkMethod !== 'function')
-                    } // end else (typeof mockFn !== 'function')
+                          notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
+                        }
+                      } else {
+                        const actual = sdkResult.payload?.address || '';
+                        const passed = actual.toLowerCase() === expected.toLowerCase();
+                        if (!passed) {
+                          addLog(`[MISMATCH] ${method} / 「${passphrase}」`);
+                          addLog(`  expected: ${expected}`);
+                          addLog(`  actual:   ${actual}`);
+                        }
+
+                        results.push({
+                          title: caseTitle,
+                          method,
+                          expected,
+                          actual,
+                          passed,
+                          duration: Date.now() - caseStart,
+                          metadata: { passphrase },
+                        });
+                      }
+                    }
                   } catch (error) {
                     results.push({
                       title: caseTitle,
@@ -2616,8 +2615,8 @@ export function useAutomationTest() {
                   notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
                   await delay(SDK_CASE_DELAY_MS);
                 }
-              }
-            } // end else (!psResult.success)
+              } // end else (!psResult.success)
+            }
           }
         }
       } catch (error) {
@@ -2838,7 +2837,7 @@ export function useAutomationTest() {
                   ]);
                   if (resultOrTimeout === 'timeout') {
                     sdk.cancel(connectId);
-                    await sdk.getFeatures(connectId, { retryCount: 1 });
+                    await getProtocolAwareFeatures(sdk, connectId, { retryCount: 1 });
                     sdkResult = { success: false, payload: { error: 'timeout after 45s' } };
                   } else {
                     sdkResult = resultOrTimeout as typeof sdkResult;
@@ -3125,7 +3124,7 @@ export function useAutomationTest() {
             ]);
             if (resultOrTimeout === 'timeout') {
               SDK.cancel(ctx.connectId);
-              await SDK.getFeatures(ctx.connectId, { retryCount: 1 });
+              await getProtocolAwareFeatures(SDK, ctx.connectId, { retryCount: 1 });
               sdkResult = { success: false, payload: { error: 'timeout after 45s' } };
             } else {
               sdkResult = resultOrTimeout as { success: boolean; payload?: { error?: string } };

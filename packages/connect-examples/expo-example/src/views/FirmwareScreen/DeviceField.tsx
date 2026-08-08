@@ -10,36 +10,32 @@ interface DeviceFieldProps {
   value?: string | undefined | null;
 }
 
-function isNil(value: string | undefined | null): value is string {
+function isNil(value: string | undefined | null) {
   return value == null || value.trim() === '' || value.trim() === 'unknown';
 }
 
 function DeviceFieldView({ field, value }: DeviceFieldProps) {
   const { features, onekeyFeatures } = useDeviceFieldContext();
   const media = useMedia();
-  const fieldValue =
+  const resolvedContextValue =
     (onekeyFeatures as Record<string, string>)?.[field] ??
     (features as Record<string, any>)?.[field] ??
     (
       getReleaseUrl({
         features,
       }) as Record<string, string>
-    )?.[field] ??
-    value;
+    )?.[field];
+  const fieldValue = value !== undefined ? value : resolvedContextValue;
+  const displayValue = isNil(fieldValue) ? '—' : fieldValue;
 
   const width = media.gtLg ? '49%' : '100%';
   return (
     <XStack flexWrap="wrap" width={width}>
-      <Text
-        minWidth={260}
-        color={isNil(fieldValue) ? '$textCritical' : '$text'}
-        fontSize={18}
-        fontWeight="bold"
-      >
+      <Text minWidth={260} color="$textSubdued" fontSize={18} fontWeight="bold">
         {`${field}: `}
       </Text>
       <Stack flex={1} paddingStart={4}>
-        {fieldValue?.startsWith('http') ? (
+        {displayValue?.startsWith('http') ? (
           <Text
             flex={1}
             flexWrap="wrap"
@@ -49,10 +45,10 @@ function DeviceFieldView({ field, value }: DeviceFieldProps) {
             textDecorationLine="underline"
             cursor="pointer"
             onPress={() => {
-              window.open(fieldValue, '_blank');
+              window.open(displayValue ?? '', '_blank');
             }}
           >
-            {fieldValue}
+            {displayValue}
           </Text>
         ) : (
           <Text
@@ -60,8 +56,8 @@ function DeviceFieldView({ field, value }: DeviceFieldProps) {
             flexWrap="wrap"
             fontSize={18}
             fontWeight="bold"
-            color={isNil(fieldValue) ? '$textCritical' : '$text'}
-          >{`${fieldValue ?? ''}`}</Text>
+            color={isNil(fieldValue) ? '$textSubdued' : '$text'}
+          >{`${displayValue}`}</Text>
         )}
       </Stack>
     </XStack>

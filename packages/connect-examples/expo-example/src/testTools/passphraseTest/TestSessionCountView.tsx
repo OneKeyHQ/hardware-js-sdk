@@ -14,6 +14,7 @@ import { downloadFile } from '../../utils/downloadUtils';
 import { SwitchInput } from '../../components/SwitchInput';
 import { getDeviceInfo } from '../../utils/deviceUtils';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
+import { getProtocolAwareFeatures } from '../../utils/protocolAwareFeatures';
 
 import type { TestChain } from './utils';
 import type { CoreMessage, Features } from '@onekeyfe/hd-core';
@@ -124,17 +125,21 @@ export default function TestSessionCountView() {
 
     // Mirror the recovery used in blindSignature/automationTest timeout
     // handlers: cancel(connectId) rejects pending requests and fires
-    // interruptionFromUser; the awaited getFeatures with retryCount drains any
-    // leftover bytes so the transport returns to a known-clean frame boundary
-    // before the next test starts.
+    // interruptionFromUser; the awaited protocol-aware refresh drains legacy
+    // V1 bytes and refreshes the canonical state on Protocol V2.
     SDK.cancel(connectId);
     try {
-      await SDK.getFeatures(connectId, { retryCount: 1 });
+      await getProtocolAwareFeatures(
+        SDK,
+        connectId,
+        { retryCount: 1 },
+        selectedDevice?.connectProtocol
+      );
     } catch {
-      // defensive: getFeatures normally resolves, but a transport race during
+      // Defensive: the refresh normally resolves, but a transport race during
       // cancel can occasionally surface as a throw
     }
-  }, [SDK, intl, pushRunnerLog, selectedDevice?.connectId]);
+  }, [SDK, intl, pushRunnerLog, selectedDevice?.connectId, selectedDevice?.connectProtocol]);
 
   const testSessionCount = useCallback(async () => {
     if (!SDK) return;
@@ -148,14 +153,19 @@ export default function TestSessionCountView() {
 
     // Defensive resync before each run: if a prior run (possibly on a
     // different chain) was interrupted mid-exchange, the transport may still
-    // hold leftover bytes and the first getFeatures would decode a half-frame
+    // hold leftover bytes and the first state refresh would decode a half-frame
     // and throw "Didn't receive expected header signature.".
     if (connectId) {
       SDK.cancel(connectId);
     }
 
     // refresh device
-    const featuresRes = await SDK.getFeatures(connectId, { retryCount: 1 });
+    const featuresRes = await getProtocolAwareFeatures(
+      SDK,
+      connectId,
+      { retryCount: 1 },
+      selectedDevice?.connectProtocol
+    );
     if (!featuresRes.success) {
       pushRunnerLog([
         intl.formatMessage({ id: 'message__get_features_error' }),
@@ -401,6 +411,7 @@ export default function TestSessionCountView() {
     openDialog,
     pushRunnerLog,
     selectedDevice?.connectId,
+    selectedDevice?.connectProtocol,
     showOnOneKey,
     stopTest,
     testChain,

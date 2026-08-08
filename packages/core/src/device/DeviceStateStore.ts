@@ -148,6 +148,13 @@ export class DeviceStateStore {
     if (patch.status) applySectionPatch(next.status, patch.status, 'status', changedKeys);
     if (patch.settings) applySectionPatch(next.settings, patch.settings, 'settings', changedKeys);
     if (patch.versions) applySectionPatch(next.versions, patch.versions, 'versions', changedKeys);
+    if (
+      patch.securityElements !== undefined &&
+      !isEqual(next.securityElements, patch.securityElements)
+    ) {
+      next.securityElements = cloneDeviceState(patch.securityElements);
+      changedKeys.push('securityElements');
+    }
 
     if (patch.capabilities !== undefined && !isEqual(next.capabilities, patch.capabilities)) {
       next.capabilities = cloneDeviceState(patch.capabilities);
