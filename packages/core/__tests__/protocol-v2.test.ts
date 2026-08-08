@@ -6195,6 +6195,66 @@ describe('Protocol V2 firmware update targets', () => {
     );
   });
 
+  test('combines prepared firmware components with explicit manifest resource files', async () => {
+    const resourceBundle = createProtocolV2OkppBinary();
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+      },
+    });
+    method.init();
+    (method as any).params = {
+      targetsToUpdate: ['app_v1', 'resource'],
+      resourceFiles: [
+        {
+          binary: resourceBundle,
+          devicePath: 'vol0:/bundles/images/images.okpkg',
+        },
+      ],
+    };
+    const firmwareSource = { size: 10 };
+    const resourceSource = { size: resourceBundle.byteLength };
+    (method as any).prepareProtocolV2InstallSources = jest.fn().mockResolvedValue([
+      {
+        fileName: 'application_p1.bin',
+        source: firmwareSource,
+        targetId: 4,
+        kind: 'firmware',
+      },
+    ]);
+    (method as any).prepareProtocolV2ResourceSources = jest.fn();
+    (method as any).openProtocolV2MemorySource = jest.fn().mockResolvedValue(resourceSource);
+    (method as any).executeProtocolV2SourceUpdate = jest.fn().mockResolvedValue(undefined);
+    (method as any).closeProtocolV2PreparedSources = jest.fn().mockResolvedValue(undefined);
+    method.postTipMessage = jest.fn();
+
+    await (method as any).runProtocolV2PreparedArtifacts({ deviceType: 'pro2' }, 'universal');
+
+    expect((method as any).prepareProtocolV2ResourceSources).not.toHaveBeenCalled();
+    expect((method as any).executeProtocolV2SourceUpdate).toHaveBeenCalledWith({
+      installSources: [
+        {
+          fileName: 'application_p1.bin',
+          source: firmwareSource,
+          targetId: 4,
+          kind: 'firmware',
+        },
+      ],
+      resourceSources: [
+        {
+          name: 'images.okpkg',
+          source: resourceSource,
+          devicePath: 'vol0:/bundles/images/images.okpkg',
+          version: [1, 2, 3],
+          payloadHash: '11'.repeat(64),
+          headerHash: '22'.repeat(64),
+        },
+      ],
+    });
+  });
+
   test('rejects manual RESC bundle paths before bootloader entry', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,

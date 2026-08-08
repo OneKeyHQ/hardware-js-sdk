@@ -898,7 +898,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
       const installSources = await this.prepareProtocolV2InstallSources(firmwareType, features);
-      const resourceSources = await this.prepareProtocolV2ResourceSources(firmwareType, features);
+      const explicitResourceBundles = this.prepareExplicitProtocolV2ResourceFiles();
+      const resourceSources = explicitResourceBundles?.length
+        ? await Promise.all(
+            explicitResourceBundles.map(async bundle => ({
+              name: bundle.name,
+              source: await this.openProtocolV2MemorySource(bundle.binary),
+              devicePath: bundle.devicePath,
+              version: bundle.version,
+              payloadHash: bundle.payloadHash,
+              headerHash: bundle.headerHash,
+            }))
+          )
+        : await this.prepareProtocolV2ResourceSources(firmwareType, features);
       if (installSources.length === 0 && resourceSources.length === 0) {
         throw ERRORS.TypedError(
           HardwareErrorCode.FirmwareUpdateDownloadFailed,
