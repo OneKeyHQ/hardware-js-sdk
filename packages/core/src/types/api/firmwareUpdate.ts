@@ -118,7 +118,6 @@ export interface FirmwareUpdateV3Params {
  */
 export type FirmwareUpdateV4Target =
   | 'boot'
-  | 'boot_resources'
   | 'app_v1'
   | 'app_v2'
   | 'coprocessor'
@@ -156,8 +155,8 @@ export interface FirmwareUpdateV4Params {
   forcedUpdateRes?: boolean;
   /**
    * Arbitrary Protocol V2 resource files written directly with FilesystemFileWrite.
-   * Use this for manifest-driven boot resources and other non-RESC files.
-   * When provided, these files are authoritative for resource and boot_resources targets.
+   * Use this for every file selected from the manifest-driven resource archive.
+   * When provided, these files are authoritative for the resource target.
    */
   resourceFiles?: Array<{
     binary: ArrayBuffer;

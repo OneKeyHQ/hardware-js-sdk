@@ -114,6 +114,26 @@ jest.mock('../src/data/config', () => ({
   DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0/',
 }));
 
+const createProtocolV2OkppBinary = ({
+  version = [1, 2, 3],
+  payloadHashByte = 0x11,
+  headerHashByte = 0x22,
+}: {
+  version?: [number, number, number];
+  payloadHashByte?: number;
+  headerHashByte?: number;
+} = {}) => {
+  const bytes = new Uint8Array(0x52a0);
+  bytes.set([0x4f, 0x4b, 0x50, 0x50], 0);
+  bytes.set([0x52, 0x45, 0x53, 0x43], 0x08);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(0x0c, 0x52a0, true);
+  view.setUint32(0x10, version[0] * 0x10000 + version[1] * 0x100 + version[2], true);
+  bytes.fill(payloadHashByte, 0x200, 0x240);
+  bytes.fill(headerHashByte, 0x240, 0x280);
+  return bytes.buffer;
+};
+
 const createWalletSessionTypedCall = (
   implementation = jest.fn(),
   status: Partial<DeviceStatus> = { passphrase_enabled: true }
@@ -5554,6 +5574,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
       .fn()
       .mockResolvedValue(undefined);
+    (method as any).isProtocolV2ResourceBundleUpToDate = jest.fn().mockResolvedValue(false);
 
     await (method as any).executeProtocolV2Update({
       resourceBundles: [
@@ -5561,6 +5582,9 @@ describe('Protocol V2 firmware update targets', () => {
           name: 'images.okpkg',
           binary: new Uint8Array([1, 2]).buffer,
           devicePath: 'vol0:/bundles/images/images.okpkg',
+          version: [1, 2, 3],
+          payloadHash: '11'.repeat(64),
+          headerHash: '22'.repeat(64),
         },
       ],
       bootloaderBinary: null,
@@ -5584,6 +5608,13 @@ describe('Protocol V2 firmware update targets', () => {
     expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ processedSize: 0, totalSize: 1 })
+    );
+    expect((method as any).isProtocolV2ResourceBundleUpToDate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        version: [1, 2, 3],
+        payloadHash: '11'.repeat(64),
+        headerHash: '22'.repeat(64),
+      })
     );
   });
 
@@ -6111,58 +6142,58 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
-  test.each(['resource', 'boot_resources'] as const)(
-    'treats manual resource files as authoritative payload for %s',
-    async target => {
-      const resourceBundle = new Uint8Array([1, 2, 3]).buffer;
-      const method = new FirmwareUpdateV4({
-        id: 1,
-        payload: {
-          method: 'firmwareUpdateV4',
-          platform: 'web',
-          targetsToUpdate: [target],
-          resourceFiles: [
-            {
-              binary: resourceBundle,
-              devicePath: '  VOL0:/resource/images/images.okpkg  ',
-            },
-          ],
-        },
-      });
-      method.init();
-      (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
-      (method as any).device = stubDevice({
-        originalDescriptor: { protocolType: 'V2' },
-        features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
-      });
-      (method as any).prepareRemoteProtocolV2Binaries = jest.fn();
-      (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(true);
-      (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
-      (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
-      (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
-        bootloaderVersion: '1.0.0',
-        bleVersion: '0.0.0',
-        firmwareVersion: '1.0.0',
-      });
-      method.postTipMessage = jest.fn();
+  test('treats manual resource files as authoritative payload for resource', async () => {
+    const resourceBundle = createProtocolV2OkppBinary();
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['resource'],
+        resourceFiles: [
+          {
+            binary: resourceBundle,
+            devicePath: '  VOL0:/resource/images/images.okpkg  ',
+          },
+        ],
+      },
+    });
+    method.init();
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    (method as any).device = stubDevice({
+      originalDescriptor: { protocolType: 'V2' },
+      features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
+    });
+    (method as any).prepareRemoteProtocolV2Binaries = jest.fn();
+    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(true);
+    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
+    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
+    (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
+      bootloaderVersion: '1.0.0',
+      bleVersion: '0.0.0',
+      firmwareVersion: '1.0.0',
+    });
+    method.postTipMessage = jest.fn();
 
-      await method.run();
+    await method.run();
 
-      expect(forceReloadDataSpy).not.toHaveBeenCalled();
-      expect((method as any).prepareRemoteProtocolV2Binaries).not.toHaveBeenCalled();
-      expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          resourceBundles: [
-            {
-              name: 'images.okpkg',
-              binary: resourceBundle,
-              devicePath: 'vol0:/resource/images/images.okpkg',
-            },
-          ],
-        })
-      );
-    }
-  );
+    expect(forceReloadDataSpy).not.toHaveBeenCalled();
+    expect((method as any).prepareRemoteProtocolV2Binaries).not.toHaveBeenCalled();
+    expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resourceBundles: [
+          {
+            name: 'images.okpkg',
+            binary: resourceBundle,
+            devicePath: 'vol0:/resource/images/images.okpkg',
+            version: [1, 2, 3],
+            payloadHash: '11'.repeat(64),
+            headerHash: '22'.repeat(64),
+          },
+        ],
+      })
+    );
+  });
 
   test('rejects manual RESC bundle paths before bootloader entry', async () => {
     const method = new FirmwareUpdateV4({
@@ -7084,6 +7115,61 @@ describe('Protocol V2 firmware reconnect identity', () => {
     await expect((method as any).readProtocolV2DeviceFileHeader('bundle.okpp')).resolves.toBeNull();
     expect(readChunkLengths.length).toBeGreaterThan(1);
     expect(Math.max(...readChunkLengths)).toBe(900);
+  });
+
+  test('skips resource transfer when installed okpkg hashes match the downloaded package', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+      },
+    });
+    method.init();
+    const installedBinary = new Uint8Array(createProtocolV2OkppBinary());
+    const typedCall = jest.fn((requestType: string, _responseType: string, request: any) => {
+      if (requestType === 'FilesystemPathInfoQuery') {
+        return Promise.resolve({
+          message: { exist: true, directory: false, size: installedBinary.byteLength },
+        });
+      }
+      if (requestType === 'FilesystemFileRead') {
+        return Promise.resolve({
+          message: {
+            data: installedBinary.slice(
+              Number(request.file.offset),
+              Number(request.file.offset) + Number(request.chunk_len)
+            ),
+          },
+        });
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
+    });
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    method.postTipMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+    (method as any).protocolV2SourceUpdateProcess = jest.fn();
+
+    await (method as any).executeProtocolV2TransferPhase({
+      installSources: [],
+      resourceSources: [
+        {
+          name: 'images.okpkg',
+          source: { size: installedBinary.byteLength },
+          devicePath: 'vol0:/bundles/images/images.okpkg',
+          version: [1, 2, 3],
+          payloadHash: '11'.repeat(64),
+          headerHash: '22'.repeat(64),
+        },
+      ],
+    });
+
+    expect(typedCall).toHaveBeenCalledWith('FilesystemPathInfoQuery', 'FilesystemPathInfo', {
+      path: 'vol0:/bundles/images/images.okpkg',
+    });
+    expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
   });
 
   test('rejects a manually supplied resource file when its manifest hash does not match', () => {

@@ -146,6 +146,9 @@ type ProtocolV2ResourceBundleBinary = {
   name: string;
   binary: ArrayBuffer;
   devicePath: string;
+  version?: IVersionArray;
+  payloadHash?: string;
+  headerHash?: string;
 };
 
 type ProtocolV2RemoteComponentBinary = ProtocolV2RemoteComponentTarget & {
@@ -668,10 +671,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       return this.runProtocolV2PreparedArtifacts(deviceFeatures, firmwareType);
     }
     const hasExplicitResourceFiles = !!this.params.resourceFiles?.length;
-    const wantsStableResources = !!this.params.targetsToUpdate?.includes('resource');
-    const wantsBootResources = !!this.params.targetsToUpdate?.includes('boot_resources');
-    const needsPreparedResources =
-      !hasExplicitResourceFiles && (wantsStableResources || wantsBootResources);
+    const wantsResources = !!this.params.targetsToUpdate?.includes('resource');
+    const needsPreparedResources = !hasExplicitResourceFiles && wantsResources;
 
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
@@ -1272,10 +1273,18 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       ) {
         throw new Error(`resourceFiles[${index}] SHA-256 mismatch`);
       }
+      const header = parseProtocolV2OkppHeader(toProtocolV2Bytes(file.binary));
       return {
         name: devicePath.split('/').pop() ?? devicePath,
         binary: file.binary,
         devicePath,
+        ...(header
+          ? {
+              version: header.version,
+              payloadHash: header.payloadHash,
+              headerHash: header.headerHash,
+            }
+          : {}),
       };
     });
     if (new Set(prepared.map(file => file.devicePath)).size !== prepared.length) {
@@ -1335,7 +1344,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return parseProtocolV2OkppHeader(headerBytes);
   }
 
-  /** Compare a prepared okpkg header when its manifest supplies version or hash metadata. */
+  /** Compare the downloaded and installed okpkg headers before transferring a resource. */
   private async isProtocolV2ResourceBundleUpToDate(
     bundle: Pick<
       ProtocolV2ResourceBundleSource,
@@ -1343,7 +1352,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     >
   ): Promise<boolean> {
     if (this.params?.forcedUpdateRes) return false;
-    if (!bundle.version && !bundle.payloadHash) return false;
+    if (!bundle.payloadHash || !bundle.headerHash) return false;
 
     try {
       const header = await this.readProtocolV2DeviceFileHeader(bundle.devicePath);
@@ -1353,14 +1362,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         const cmp = compareProtocolV2Versions(header.version, bundle.version);
         if (cmp === undefined || cmp !== 0) return false;
       }
-      if (bundle.payloadHash) {
-        const expected = normalizeProtocolV2Hex(bundle.payloadHash);
-        if (expected && header.payloadHash !== expected) return false;
-      }
-      if (bundle.headerHash) {
-        const expected = normalizeProtocolV2Hex(bundle.headerHash);
-        if (expected && header.headerHash !== expected) return false;
-      }
+      const expectedPayloadHash = normalizeProtocolV2Hex(bundle.payloadHash);
+      const expectedHeaderHash = normalizeProtocolV2Hex(bundle.headerHash);
+      if (!expectedPayloadHash || header.payloadHash !== expectedPayloadHash) return false;
+      if (!expectedHeaderHash || header.headerHash !== expectedHeaderHash) return false;
       return true;
     } catch (error) {
       Log.log(`[FirmwareUpdateV4] RESC bundle ${bundle.name} header check failed: `, error);
@@ -1631,6 +1636,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           name: bundle.name,
           source: await this.openProtocolV2MemorySource(bundle.binary),
           devicePath: bundle.devicePath,
+          version: bundle.version,
+          payloadHash: bundle.payloadHash,
+          headerHash: bundle.headerHash,
         }))
       );
       return await this.executeProtocolV2Phases({

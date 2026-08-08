@@ -194,13 +194,7 @@ export function selectProtocolV2ResourceManifestFiles({
   manifest: IProtocolV2ResourceManifest;
   targetsToUpdate: readonly FirmwareUpdateV4Target[];
 }): IProtocolV2ResourceManifestFile[] {
-  const targets = new Set(targetsToUpdate);
-  return manifest.files.filter(file => {
-    if (file.device_path.startsWith('vol0:/bundles/')) {
-      return targets.has('resource');
-    }
-    return targets.has('boot_resources');
-  });
+  return targetsToUpdate.includes('resource') ? [...manifest.files] : [];
 }
 
 export function resolveProtocolV2ResourceManifestFileUrl({

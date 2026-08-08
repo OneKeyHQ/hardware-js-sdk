@@ -141,12 +141,11 @@ describe('Pro2 resource configuration', () => {
         archivePath: file.archive_path,
         binary: file.binary,
       })),
-      targetsToUpdate: ['boot_resources'],
+      targetsToUpdate: ['resource'],
     });
-    expect(prepared.map(file => file.devicePath)).toEqual([
-      'vol0:/loaders/bootloader/boot_resource.okpkg',
-      'vol0:/loaders/rom/params.okpkg',
-    ]);
+    expect(prepared.map(file => file.devicePath)).toEqual(
+      manifestFiles.map(file => file.device_path)
+    );
     expect(() =>
       prepareProtocolV2ResourceFiles({
         manifest: resourceManifest,
