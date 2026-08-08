@@ -2778,9 +2778,12 @@ describe('Protocol V2 feature adapter', () => {
     expect(checkedTypes).toEqual(['pro2', 'model_pro2']);
   });
 
-  test('uses firmware-v1 as the Pro2 remote firmware config field', () => {
+  test.each([
+    ['Pro2', DeviceType.PRO2],
+    ['Neo', DeviceType.NEO],
+  ] as const)('uses firmware-v1 as the %s remote firmware config field', (_name, deviceType) => {
     const features = normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any, {
-      hw: { Device_type: DeviceType.PRO2 },
+      hw: { Device_type: deviceType },
     });
 
     expect(
