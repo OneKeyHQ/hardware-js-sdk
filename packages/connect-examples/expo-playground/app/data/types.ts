@@ -3,7 +3,7 @@ import type { HardwareApiMethod } from '~/services/hardwareService';
 // 选项类型定义
 export interface SelectOption {
   label: string;
-  value: string;
+  value: string | number;
 }
 
 // 参数字段类型 - 包含值和UI配置
@@ -42,6 +42,11 @@ export type MethodCategory =
   | 'signing'
   | 'device'
   | 'info'
+  | 'security'
+  | 'management'
+  | 'basic'
+  | 'message'
+  | 'advanced'
   | 'firmware'
   | 'other';
 

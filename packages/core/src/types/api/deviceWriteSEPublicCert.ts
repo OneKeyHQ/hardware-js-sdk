@@ -1,4 +1,4 @@
-import { Success, WriteSEPublicCert } from '@onekeyfe/hd-transport';
+import type { Success, WriteSEPublicCert } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export declare function deviceWriteSEPublicCert(

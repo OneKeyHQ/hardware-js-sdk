@@ -7736,15 +7736,6 @@
         }
       }
     },
-    "WriteSEPrivateKey": {
-      "fields": {
-        "private_key": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
     "ReadSEPublicKey": {
       "fields": {}
     },
@@ -12948,7 +12939,6 @@
         "MessageType_FileInfoList": 10024,
         "MessageType_OnekeyGetFeatures": 10025,
         "MessageType_OnekeyFeatures": 10026,
-        "MessageType_WriteSEPrivateKey": 10027,
         "MessageType_GetPassphraseState": 10028,
         "MessageType_PassphraseState": 10029,
         "MessageType_UnLockDevice": 10030,

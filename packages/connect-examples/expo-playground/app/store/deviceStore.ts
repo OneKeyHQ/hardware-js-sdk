@@ -5,7 +5,7 @@ import { DeviceInfo } from '../types/hardware';
 import type { UnifiedLogEntry } from '../components/common/UnifiedLogger';
 
 import { isClassicModelDevice, isTouchModelDevice } from '../utils/deviceTypeUtils';
-import type { IDeviceType, Features } from '@onekeyfe/hd-core';
+import type { DeviceState as HardwareDeviceState, IDeviceType, Features } from '@onekeyfe/hd-core';
 import {
   UiEvent,
   getDeviceFirmwareVersion,
@@ -68,6 +68,7 @@ interface DeviceState {
   // Device management
   connectedDevices: DeviceInfo[];
   currentDevice: DeviceInfo | null;
+  deviceState: HardwareDeviceState | undefined;
   deviceFeatures: Features | undefined;
   isConnecting: boolean;
 
@@ -79,6 +80,7 @@ interface DeviceState {
   // Actions
   setConnectedDevices: (devices: DeviceInfo[]) => void;
   setCurrentDevice: (device: DeviceInfo | null) => void;
+  setDeviceState: (state: HardwareDeviceState | undefined) => void;
   setDeviceFeatures: (features: Features | undefined) => void;
   setIsConnecting: (isConnecting: boolean) => void;
 
@@ -289,6 +291,7 @@ export const useDeviceStore = create<DeviceState>()(
       // Default state
       connectedDevices: [],
       currentDevice: null,
+      deviceState: undefined,
       deviceFeatures: undefined,
       isConnecting: false,
       logs: [],
@@ -305,7 +308,35 @@ export const useDeviceStore = create<DeviceState>()(
 
       // Actions
       setConnectedDevices: (devices: DeviceInfo[]) => set({ connectedDevices: devices }),
-      setCurrentDevice: (device: DeviceInfo | null) => set({ currentDevice: device }),
+      setCurrentDevice: (device: DeviceInfo | null) =>
+        set({
+          currentDevice: device,
+          deviceState: device?.state,
+          deviceFeatures: device?.features,
+        }),
+      setDeviceState: (deviceState: HardwareDeviceState | undefined) =>
+        set(state => ({
+          deviceState,
+          currentDevice:
+            state.currentDevice && deviceState
+              ? {
+                  ...state.currentDevice,
+                  connectProtocol:
+                    deviceState.protocol === 'unknown'
+                      ? state.currentDevice.connectProtocol
+                      : deviceState.protocol,
+                  serialNo: deviceState.identity.serialNo || state.currentDevice.serialNo,
+                  uuid:
+                    deviceState.identity.serialNo ||
+                    state.currentDevice.serialNo ||
+                    state.currentDevice.uuid,
+                  deviceId: deviceState.identity.deviceId,
+                  deviceType: deviceState.identity.deviceType,
+                  label: deviceState.identity.label ?? state.currentDevice.label,
+                  state: deviceState,
+                }
+              : state.currentDevice,
+        })),
       setDeviceFeatures: (features: Features | undefined) => set({ deviceFeatures: features }),
       setIsConnecting: (isConnecting: boolean) => set({ isConnecting }),
 

@@ -7,6 +7,7 @@ import {
   mapLanguageToProtocolV2,
   normalizeSafetyCheckLevel,
 } from '../utils/deviceSettings';
+import { getProtocolV2SeState, getProtocolV2SeType } from '../protocols/protocol-v2/features';
 
 import type {
   ApplySettings,
@@ -159,6 +160,11 @@ const meaningfulVersion = (version?: string | null) => {
   return parts.map(part => (Number.isNaN(Number.parseInt(part, 10)) ? '0' : part)).join('.');
 };
 
+const meaningfulText = (value: unknown): string | null => {
+  if (value === undefined || value === null || value === '') return null;
+  return String(value);
+};
+
 export const mapProtocolV1OnekeyFeaturesToState = (features: OnekeyFeatures): DeviceStatePatch => {
   const verification = definedEntries<DeviceFeaturesVerify>({
     firmwareBuildId: features.onekey_firmware_build_id,
@@ -203,6 +209,24 @@ export const mapProtocolV1OnekeyFeaturesToState = (features: OnekeyFeatures): De
       se04Boot: meaningfulVersion(features.onekey_se04_boot_version),
     }),
     ...(Object.keys(verification).length > 0 ? { verification } : {}),
+    securityElements: {
+      se01: {
+        type: meaningfulText(features.onekey_se_type),
+        state: meaningfulText(features.onekey_se01_state),
+      },
+      se02: {
+        type: null,
+        state: meaningfulText(features.onekey_se02_state),
+      },
+      se03: {
+        type: null,
+        state: meaningfulText(features.onekey_se03_state),
+      },
+      se04: {
+        type: null,
+        state: meaningfulText(features.onekey_se04_state),
+      },
+    },
     raw: { protocolV1OneKeyFeatures: features },
   };
 };
@@ -288,6 +312,24 @@ export const mapProtocolV2DeviceInfoToState = (
       se04BootBuildId: imageBuildId(info.se4?.bootloader),
       se04BootHash: imageHash(info.se4?.bootloader),
     }),
+    securityElements: {
+      se01: {
+        type: getProtocolV2SeType(info.se1),
+        state: getProtocolV2SeState(info.se1),
+      },
+      se02: {
+        type: getProtocolV2SeType(info.se2),
+        state: getProtocolV2SeState(info.se2),
+      },
+      se03: {
+        type: getProtocolV2SeType(info.se3),
+        state: getProtocolV2SeState(info.se3),
+      },
+      se04: {
+        type: getProtocolV2SeType(info.se4),
+        state: getProtocolV2SeState(info.se4),
+      },
+    },
     raw: {
       protocolV2DeviceInfo: info,
       ...(loader ? { protocolV2DeviceStatus: null } : {}),

@@ -102,7 +102,7 @@ function ExecuteView() {
       hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          openDialog(sdk, message.payload.device.features);
+          openDialog(sdk, message.payload.device.features, message);
         }
       };
       sdk.on(UI_EVENT, hardwareUiEventListener);

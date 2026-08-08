@@ -54,9 +54,19 @@ const DEVICE_SESSION_CALLS = new Set([
   'DeviceSessionAskPin',
   'DeviceSessionAskPassphrase',
 ]);
+const DEVICE_CONTROL_CALLS = new Set([
+  'DeviceReboot',
+  'DeviceSettingsGet',
+  'DeviceSettingsSet',
+  'DeviceSettingsPageShow',
+  'DeviceCertificateWrite',
+  'DeviceCertificateRead',
+  'DeviceCertificateSign',
+  'DeviceMiscUsbMscControl',
+]);
 
-// Protocol V2 subcodes are domain-scoped, so cross-domain cancellation fallback
-// must use explicit firmware cancellation messages instead of a global number map.
+// Older Protocol V2 firmware may omit the cancellation subcode, so retain a
+// narrow message fallback for compatibility.
 const isProtocolV2ActionCancelledMessage = (message: string) =>
   /^(?:cancel(?:led|ed)(?: on device)?|confirm dismissed|user cancel(?:led|ed)(?:\s+.*)?)$/i.test(
     message
@@ -435,7 +445,13 @@ export class DeviceCommands {
       if (!shouldReduceDebugForCall(callType)) {
         Log.debug('_filterCommonTypes: ', {
           request: callType,
-          response: res.type,
+          response:
+            callType === 'DeviceFirmwareUpdateStatusGet'
+              ? {
+                  type: res.type,
+                  message: getSafeTransportLogPayload(res.message, res.type),
+                }
+              : res.type,
         });
       }
     } catch (error) {
@@ -493,6 +509,10 @@ export class DeviceCommands {
         const normalizedMessage = message?.trim() ?? '';
         const isProtocolV2ActionCancelledFailure =
           this.device.isProtocolV2() && isProtocolV2ActionCancelledMessage(normalizedMessage);
+        const isProtocolV2DeviceBusyFailure =
+          this.device.isProtocolV2() &&
+          DEVICE_CONTROL_CALLS.has(callType) &&
+          subcode === DeviceErrorCode.DeviceError_Busy;
         const isLegacyProtocolV2LockedFailure =
           this.device.isProtocolV2() && /^device (?:is )?locked$/i.test(normalizedMessage);
         if (
@@ -550,8 +570,15 @@ export class DeviceCommands {
             subcode,
             firmwareMessage: message,
           });
+        } else if (isProtocolV2DeviceBusyFailure) {
+          error = ERRORS.TypedError(HardwareErrorCode.DeviceBusy, message, {
+            failureCode: code,
+            subcode,
+            firmwareMessage: message,
+          });
         } else if (
-          subcode === DeviceErrorCode.DeviceError_ActionCancelled ||
+          (DEVICE_CONTROL_CALLS.has(callType) &&
+            subcode === DeviceErrorCode.DeviceError_ActionCancelled) ||
           isProtocolV2ActionCancelledFailure
         ) {
           error = ERRORS.TypedError(HardwareErrorCode.ActionCancelled, message, {

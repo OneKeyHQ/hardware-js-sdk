@@ -1,319 +1,379 @@
-import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
+  AlertTriangle,
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
   Cpu,
   Download,
+  Search,
   Settings,
-  Zap,
-  ChevronRight,
-  AlertTriangle,
-  ChevronDown,
-  ChevronUp,
   Wrench,
+  Zap,
 } from 'lucide-react';
 
-import { Badge } from '../components/ui/Badge';
-import { Separator } from '../components/ui/Separator';
+import MethodExecutor from '../components/common/MethodExecutor';
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
-import { CollapsibleTrigger, CollapsibleContent } from '../components/ui/Collapsible';
-
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 import { device } from '../data/methods/device';
+import { getDeviceMethodSection } from '../data/methods/deviceCategories';
 import { firmware } from '../data/methods/firmware';
+import { useHardwareMethodExecution } from '../hooks/useHardwareMethodExecution';
+import { useDeviceStore } from '../store/deviceStore';
 import type { UnifiedMethodConfig } from '../data/types';
 
-// 方法分类定义
 interface MethodCategory {
   id: string;
   name: string;
-  description: string;
   icon: React.ComponentType<{ className?: string }>;
-  color: string;
-  bgColor: string;
-  borderColor: string;
   methods: UnifiedMethodConfig[];
 }
 
 const DeviceMethodsIndexPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
-
-  // 折叠状态管理
+  const { currentDevice } = useDeviceStore();
+  const { executeMethod } = useHardwareMethodExecution();
+  const [selectedMethodName, setSelectedMethodName] = useState<string | null>(null);
+  const [methodFilter, setMethodFilter] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
-    basic: true, // 基础操作默认展开
+    basic: true,
   });
 
-  // 切换分类展开状态
-  const toggleCategory = (categoryId: string) => {
-    setExpandedCategories(prev => ({
-      ...prev,
-      [categoryId]: !prev[categoryId],
-    }));
-  };
+  const allMethods = useMemo<UnifiedMethodConfig[]>(() => [...device.api, ...firmware.api], []);
+  const methodQuery = searchParams.get('method')?.trim();
 
-  // 获取所有方法数据
-  const allMethods = useMemo(() => {
-    // 将device方法转换为统一格式
-    const convertedDeviceMethods = device.api.map(method => ({
-      method: method.method,
-      description: method.description,
-      deprecated: method.deprecated || false,
-      noDeviceIdReq: method.noDeviceIdReq,
-      noConnIdReq: method.noConnIdReq,
-      presets: method.presets,
-    }));
-
-    // 将firmware方法转换为统一格式
-    const convertedFirmwareMethods = firmware.api.map(method => ({
-      method: method.method,
-      description: method.description,
-      deprecated: method.deprecated || false,
-      noDeviceIdReq: method.noDeviceIdReq,
-      noConnIdReq: method.noConnIdReq,
-      presets: method.presets,
-    }));
-
-    console.log('Device methods found:', convertedDeviceMethods.length);
-    console.log('Firmware methods found:', convertedFirmwareMethods.length);
-    console.log('Total methods:', convertedDeviceMethods.length + convertedFirmwareMethods.length);
-    console.log(
-      'All method names:',
-      [...convertedDeviceMethods, ...convertedFirmwareMethods].map(m => m.method)
-    );
-
-    return [...convertedDeviceMethods, ...convertedFirmwareMethods];
-  }, []);
-
-  // 智能分类逻辑
   const categories = useMemo((): MethodCategory[] => {
-    const basicMethods: UnifiedMethodConfig[] = [];
-    const deviceMethods: UnifiedMethodConfig[] = [];
-    const firmwareMethods: UnifiedMethodConfig[] = [];
-    const advancedMethods: UnifiedMethodConfig[] = [];
+    const methodsBySection = {
+      basic: [] as UnifiedMethodConfig[],
+      device: [] as UnifiedMethodConfig[],
+      firmware: [] as UnifiedMethodConfig[],
+      advanced: [] as UnifiedMethodConfig[],
+    };
 
     allMethods.forEach(method => {
-      const methodName = method.method.toLowerCase();
-
-      // 基本操作 - 最常用的
-      if (
-        [
-          'searchdevices',
-          'getfeatures',
-          'getonekeyfeatures',
-          'getpassphrasestate',
-          'cancel',
-          'devicesupportfeatures',
-          'getlogs',
-        ].includes(methodName)
-      ) {
-        basicMethods.push(method);
-      }
-      // 固件相关 - 所有固件和检查相关
-      else if (
-        methodName.includes('firmware') ||
-        methodName.includes('bootloader') ||
-        methodName.includes('check') ||
-        methodName.includes('bridge') ||
-        methodName.includes('reboot')
-      ) {
-        firmwareMethods.push(method);
-      }
-      // 设备管理 - 常用设备操作
-      else if (
-        ['devicesettings', 'devicechangepin', 'devicelock', 'devicecancel'].includes(methodName)
-      ) {
-        deviceMethods.push(method);
-      }
-      // 高级功能 - 包括U2F、验证、日志、危险操作等
-      else {
-        advancedMethods.push(method);
-      }
+      methodsBySection[getDeviceMethodSection(method.method)].push(method);
     });
 
     return [
       {
         id: 'basic',
         name: t('deviceMethods.categories.basic.name'),
-        description: t('deviceMethods.categories.basic.description'),
         icon: Zap,
-        color: 'text-foreground',
-        bgColor: 'bg-muted/50',
-        borderColor: 'border-border',
-        methods: basicMethods,
+        methods: methodsBySection.basic,
       },
       {
         id: 'device',
         name: t('deviceMethods.categories.device.name'),
-        description: t('deviceMethods.categories.device.description'),
         icon: Settings,
-        color: 'text-foreground',
-        bgColor: 'bg-muted/50',
-        borderColor: 'border-border',
-        methods: deviceMethods,
+        methods: methodsBySection.device,
       },
       {
         id: 'firmware',
         name: t('deviceMethods.categories.firmware.name'),
-        description: t('deviceMethods.categories.firmware.description'),
         icon: Download,
-        color: 'text-foreground',
-        bgColor: 'bg-muted/50',
-        borderColor: 'border-border',
-        methods: firmwareMethods,
+        methods: methodsBySection.firmware,
       },
       {
         id: 'advanced',
         name: t('deviceMethods.categories.advanced.name'),
-        description: t('deviceMethods.categories.advanced.description'),
         icon: Wrench,
-        color: 'text-foreground',
-        bgColor: 'bg-muted/50',
-        borderColor: 'border-border',
-        methods: advancedMethods,
+        methods: methodsBySection.advanced,
       },
     ].filter(category => category.methods.length > 0);
   }, [allMethods, t]);
 
-  // 统计信息
-  const totalMethods = allMethods.length;
+  const activeMethod = useMemo(() => {
+    if (allMethods.length === 0) return undefined;
+    const targetMethodName = methodQuery || selectedMethodName;
+    return allMethods.find(method => method.method === targetMethodName) || allMethods[0];
+  }, [allMethods, methodQuery, selectedMethodName]);
 
-  // 处理方法选择
-  const handleMethodSelect = (method: UnifiedMethodConfig) => {
-    // 统一导航到设备方法路由
-    navigate(`/device-methods/${method.method}`);
-  };
+  const activeCategoryId = useMemo(() => {
+    if (!activeMethod) return undefined;
+    return categories.find(category =>
+      category.methods.some(method => method.method === activeMethod.method)
+    )?.id;
+  }, [activeMethod, categories]);
 
-  // 渲染方法项 - 卡片式网格布局
-  const renderMethodItem = (method: UnifiedMethodConfig) => {
-    return (
-      <div
-        key={method.method}
-        onClick={() => handleMethodSelect(method)}
-        onKeyDown={e => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleMethodSelect(method);
-          }
-        }}
-        role="button"
-        tabIndex={0}
-        className="onekey-method-item group p-4 bg-muted/30 dark:bg-muted/20 border border-border/50 rounded-lg cursor-pointer hover:border-border hover:bg-muted/50 dark:hover:bg-muted/40 hover:shadow-md transition-all duration-200 flex flex-col gap-3"
-      >
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-bold text-foreground font-mono bg-background/80 dark:bg-background/60 px-3 py-1.5 rounded-md border border-border/50 shadow-sm text-nowrap">
-            {method.method}
-          </div>
+  const normalizedFilter = methodFilter.trim().toLowerCase();
+  const visibleCategories = useMemo(
+    () =>
+      categories
+        .map(category => ({
+          ...category,
+          methods: normalizedFilter
+            ? category.methods.filter(method => {
+                const description = method.description?.startsWith('methodDescriptions.')
+                  ? t(method.description)
+                  : method.description || '';
+                return (
+                  method.method.toLowerCase().includes(normalizedFilter) ||
+                  description.toLowerCase().includes(normalizedFilter)
+                );
+              })
+            : category.methods,
+        }))
+        .filter(category => category.methods.length > 0),
+    [categories, normalizedFilter, t]
+  );
 
-          <div className="flex items-center gap-2">
-            {/* 状态标签 */}
-            {method.deprecated && (
-              <Badge
-                variant="outline"
-                className="text-xs bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800 px-1.5 py-0.5"
-              >
-                <AlertTriangle className="w-3 h-3" />
-              </Badge>
-            )}
+  const activeMethodDescription = useMemo(() => {
+    if (!activeMethod?.description) return '';
+    return activeMethod.description.startsWith('methodDescriptions.')
+      ? t(activeMethod.description)
+      : activeMethod.description;
+  }, [activeMethod?.description, t]);
 
-            <ChevronRight className="w-4 h-4 text-muted-foreground/60 group-hover:text-foreground group-hover:translate-x-0.5 transition-all duration-200 flex-shrink-0" />
-          </div>
-        </div>
+  useEffect(() => {
+    if (!activeMethod) {
+      setSelectedMethodName(null);
+      return;
+    }
+    setSelectedMethodName(activeMethod.method);
+  }, [activeMethod]);
 
-        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
-          {method.description?.startsWith('methodDescriptions.')
-            ? t(method.description)
-            : method.description}
-        </p>
-      </div>
+  useEffect(() => {
+    if (!activeCategoryId) return;
+    setExpandedCategories(previous =>
+      previous[activeCategoryId] ? previous : { ...previous, [activeCategoryId]: true }
     );
-  };
+  }, [activeCategoryId]);
 
-  // 渲染分类卡片 - 简洁优雅版本
-  const renderCategoryCard = (category: MethodCategory) => {
-    const CategoryIcon = category.icon;
-    const isExpanded = expandedCategories[category.id] || false;
+  const handleSelectMethod = useCallback(
+    (methodName: string) => {
+      setSelectedMethodName(methodName);
+      const nextSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.set('method', methodName);
+      setSearchParams(nextSearchParams, { replace: false });
+    },
+    [searchParams, setSearchParams]
+  );
 
-    return (
-      <div
-        key={category.id}
-        className="onekey-category-card bg-card border border-border/60 rounded-lg overflow-hidden transition-all duration-200 hover:border-border"
-      >
-        {/* 分类头部 - 可点击折叠 */}
-        <CollapsibleTrigger
-          onClick={() => toggleCategory(category.id)}
-          className="w-full px-5 py-4 hover:bg-muted/30 transition-colors hover:no-underline"
-        >
-          <div className="flex items-center gap-4">
-            <div className="p-2.5 rounded-lg bg-muted/50 border border-border/50">
-              <CategoryIcon className="w-5 h-5 text-muted-foreground" />
-            </div>
+  const handleMethodExecution = useCallback(
+    async (params: Record<string, unknown>): Promise<Record<string, unknown>> => {
+      if (!activeMethod) throw new Error('Method configuration not found');
+      return executeMethod(params, activeMethod);
+    },
+    [activeMethod, executeMethod]
+  );
 
-            <div className="flex-1 text-left">
-              <h3 className="text-lg font-semibold text-foreground">{category.name}</h3>
-              <p className="text-sm text-muted-foreground mt-1">{category.description}</p>
-            </div>
+  const handleOpenDetails = useCallback(() => {
+    if (activeMethod) navigate(`/device-methods/${activeMethod.method}`);
+  }, [activeMethod, navigate]);
 
-            <div className="flex items-center gap-3">
-              <Badge variant="secondary" className="text-sm font-medium px-2.5 py-1">
-                {category.methods.length}
-              </Badge>
+  const isFirmwareMethod = useMemo(
+    () =>
+      Boolean(activeMethod && firmware.api.some(method => method.method === activeMethod.method)),
+    [activeMethod]
+  );
 
-              {isExpanded ? (
-                <ChevronUp className="w-5 h-5 text-muted-foreground transition-transform duration-200" />
-              ) : (
-                <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform duration-200" />
-              )}
-            </div>
-          </div>
-        </CollapsibleTrigger>
+  const shouldShowConnectionHint = Boolean(
+    activeMethod && !activeMethod.noConnIdReq && !currentDevice
+  );
 
-        {/* 方法列表 - 可折叠内容 */}
-        <CollapsibleContent open={isExpanded}>
-          <div className="border-t border-border/30 bg-muted/10 p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {category.methods.map(method => renderMethodItem(method))}
-            </div>
-          </div>
-        </CollapsibleContent>
-      </div>
-    );
+  const renderMethodDescription = (method: UnifiedMethodConfig) => {
+    if (!method.description) return '';
+    return method.description.startsWith('methodDescriptions.')
+      ? t(method.description)
+      : method.description;
   };
 
   return (
     <PageLayout fixedHeight={true}>
-      <div className="flex-1 flex flex-col px-4 py-3 min-h-0 h-full">
-        {/* 顶部导航和统计 */}
-        <div className="flex-shrink-0 mb-4">
-          <div className="flex items-center justify-between">
+      <div className="flex h-full min-h-0 flex-col px-4 py-3">
+        <div className="mb-3 flex flex-shrink-0 flex-col gap-3">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <Breadcrumb items={[{ label: t('deviceMethods.title') || 'Device', icon: Cpu }]} />
-
-            <div className="text-sm text-muted-foreground">
-              <span className="font-medium">
-                {t('deviceMethods.totalMethods', { count: totalMethods })}
-              </span>
-              <span className="mx-2">•</span>
-              <span>{t('deviceMethods.totalCategories', { count: categories.length })}</span>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="secondary" className="px-2 py-0.5">
+                {t('deviceMethods.totalMethods', { count: allMethods.length })}
+              </Badge>
+              <Badge variant="info" className="px-2 py-0.5">
+                {t('deviceMethods.totalCategories', { count: categories.length })}
+              </Badge>
             </div>
           </div>
+          {shouldShowConnectionHint && <DeviceNotConnectedState />}
         </div>
 
-        {/* 设备连接状态 */}
-        <div className="flex-shrink-0 mb-4">
-          <DeviceNotConnectedState />
-        </div>
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
+          <section className="flex min-h-[320px] min-w-0 flex-col overflow-hidden rounded-lg border border-border/70 bg-card/80">
+            <div className="border-b border-border/70 p-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background">
+                  <Cpu className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h1 className="truncate text-base font-semibold text-foreground">Device</h1>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {allMethods.length} hardware methods
+                  </p>
+                </div>
+              </div>
+              <div className="relative mt-3">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  value={methodFilter}
+                  onChange={event => setMethodFilter(event.target.value)}
+                  placeholder="Filter methods"
+                  aria-label="Filter device methods"
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
+            </div>
 
-        <div className="flex-shrink-0 mb-4">
-          <Separator />
-        </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+              {visibleCategories.length > 0 ? (
+                <div className="space-y-3">
+                  {visibleCategories.map(category => {
+                    const CategoryIcon = category.icon;
+                    const isExpanded = expandedCategories[category.id] ?? false;
+                    return (
+                      <div key={category.id} className="space-y-1.5">
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-left transition-colors hover:border-border/70 hover:bg-muted/40"
+                          aria-expanded={isExpanded}
+                          onClick={() =>
+                            setExpandedCategories(previous => ({
+                              ...previous,
+                              [category.id]: !previous[category.id],
+                            }))
+                          }
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          )}
+                          <CategoryIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
+                            {category.name}
+                          </span>
+                          <span className="rounded-full border border-border/70 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            {category.methods.length}
+                          </span>
+                        </button>
 
-        {/* 分类列表 - 填充剩余空间 */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="space-y-3 pb-4">
-            {/* 方法分类 */}
-            {categories.map(category => renderCategoryCard(category))}
-          </div>
+                        {isExpanded && (
+                          <div className="space-y-1">
+                            {category.methods.map(method => {
+                              const isActive = activeMethod?.method === method.method;
+                              return (
+                                <button
+                                  key={method.method}
+                                  type="button"
+                                  aria-current={isActive ? 'page' : undefined}
+                                  className={`w-full rounded-md border px-3 py-2.5 text-left transition-colors ${
+                                    isActive
+                                      ? 'border-primary/50 bg-primary/10 text-foreground'
+                                      : 'border-transparent text-muted-foreground hover:border-border/70 hover:bg-muted/40 hover:text-foreground'
+                                  }`}
+                                  onClick={() => handleSelectMethod(method.method)}
+                                >
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <span className="block min-w-0 flex-1 truncate font-mono text-xs font-semibold">
+                                      {method.method}
+                                    </span>
+                                    {method.deprecated && (
+                                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
+                                    )}
+                                  </div>
+                                  <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                                    {renderMethodDescription(method)}
+                                  </p>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="px-3 py-10 text-center text-xs text-muted-foreground">
+                  No methods match “{methodFilter}”.
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="min-h-[440px] min-w-0 overflow-hidden rounded-lg border border-border/70 bg-card/80">
+            {activeMethod ? (
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="border-b border-border/70 p-4">
+                  <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="min-w-0 space-y-2">
+                      <h2 className="break-words font-mono text-lg font-semibold text-foreground">
+                        {activeMethod.method}
+                      </h2>
+                      {activeMethodDescription && (
+                        <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+                          {activeMethodDescription}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant={activeMethod.noConnIdReq ? 'outline' : 'secondary'}>
+                          {activeMethod.noConnIdReq ? 'No connection required' : 'Device required'}
+                        </Badge>
+                        {activeMethod.tags?.map(tag => (
+                          <Badge key={tag} variant="info">
+                            {tag}
+                          </Badge>
+                        ))}
+                        {activeMethod.deprecated && (
+                          <Badge variant="warning">
+                            <AlertTriangle className="h-3 w-3" />
+                            Deprecated
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={handleOpenDetails}
+                    >
+                      Details
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                  <MethodExecutor
+                    key={activeMethod.method}
+                    className="min-h-0"
+                    methodConfig={activeMethod}
+                    executionHandler={handleMethodExecution}
+                    type={isFirmwareMethod ? 'firmware' : 'standard'}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex h-full min-h-[440px] items-center justify-center px-4 text-center">
+                <div>
+                  <Cpu className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold text-foreground">No method selected</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Select a device method from the list to execute it here.
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
         </div>
       </div>
     </PageLayout>

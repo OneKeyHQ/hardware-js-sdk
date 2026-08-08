@@ -44,7 +44,7 @@ describe('TronSignMessage legacy message validation', () => {
     }
   );
 
-  test('allows Protocol V2 message signing on Pro2', async () => {
+  test('allows Protocol V2 message signing on the Pro2 product family', async () => {
     const method = new TronSignMessage({
       id: 1,
       payload: {
@@ -60,7 +60,7 @@ describe('TronSignMessage legacy message validation', () => {
     method.device = {
       commands: { typedCall },
       getCurrentFirmwareVersionString: jest.fn(() => '0.0.0'),
-      getCurrentMethodVersionRange: jest.fn(selector => selector('pro2')),
+      getCurrentMethodVersionRange: jest.fn(selector => selector('model_pro2')),
       getCurrentFirmwareType: jest.fn(() => EFirmwareType.Universal),
     } as unknown as Device;
 

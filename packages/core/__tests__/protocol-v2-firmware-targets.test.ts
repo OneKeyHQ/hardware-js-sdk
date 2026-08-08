@@ -1,5 +1,10 @@
+import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { ProtocolV2FirmwareTargetType } from '../src/protocols/protocol-v2/firmware';
-import { isProtocolV2FirmwareFingerprintValid } from '../src/api/FirmwareUpdateV4';
+import {
+  assertProtocolV2FirmwareTargetsSupported,
+  isProtocolV2FirmwareFingerprintValid,
+} from '../src/api/FirmwareUpdateV4';
 
 jest.mock('../src/data/config', () => ({
   DEFAULT_DOMAIN: 'https://example.com/',
@@ -33,5 +38,48 @@ describe('Protocol V2 firmware target contract', () => {
       )
     ).toBe(true);
     expect(isProtocolV2FirmwareFingerprintValid(binary, '00'.repeat(32))).toBe(false);
+  });
+
+  test('allows only SE01 and SE02 firmware targets on Neo', () => {
+    expect(() =>
+      assertProtocolV2FirmwareTargetsSupported(EDeviceType.Neo, {
+        platform: 'web',
+        targetsToUpdate: ['se01', 'se02'],
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      assertProtocolV2FirmwareTargetsSupported(EDeviceType.Neo, {
+        platform: 'web',
+        targetsToUpdate: ['se03'],
+        se04Binary: new ArrayBuffer(1),
+      })
+    ).toThrow('Neo only supports SE01 and SE02; unsupported firmware targets: se03, se04');
+  });
+
+  test('keeps all four SE firmware targets available on Pro2', () => {
+    expect(() =>
+      assertProtocolV2FirmwareTargetsSupported(EDeviceType.Pro2, {
+        platform: 'web',
+        targetsToUpdate: ['se03'],
+        se04Binary: new ArrayBuffer(1),
+      })
+    ).not.toThrow();
+  });
+
+  test('fails closed when SE03 or SE04 is requested without a confirmed device type', () => {
+    try {
+      assertProtocolV2FirmwareTargetsSupported(undefined, {
+        platform: 'web',
+        targetsToUpdate: ['se03'],
+      });
+      throw new Error('Expected unsupported target validation to fail');
+    } catch (error) {
+      expect(error).toMatchObject({ errorCode: HardwareErrorCode.DeviceNotSupportMethod });
+      expect(error).toHaveProperty(
+        'message',
+        'Cannot safely update se03 without a confirmed Pro2 device type'
+      );
+    }
   });
 });

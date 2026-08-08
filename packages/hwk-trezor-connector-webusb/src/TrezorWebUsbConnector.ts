@@ -7,10 +7,10 @@ import {
 } from '@onekeyfe/hwk-adapter-core';
 import {
   TrezorConnectorBase,
-  type TrezorDebugLogLevel,
-  type TrezorDebugLogger,
   type TrezorConnectorBaseOptions,
   type TrezorConnectorByteTransport,
+  type TrezorDebugLogLevel,
+  type TrezorDebugLogger,
   filterTrezorDebugLogEntry,
 } from '@onekeyfe/hwk-trezor-connector';
 

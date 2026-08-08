@@ -134,21 +134,23 @@ function AttachToPinTest() {
   const { openDialog: openPassphraseDialog } = useHardwarePassphraseDialog();
 
   useEffect(() => {
+    if (!sdk) return undefined;
+
     const hardwareUiEventListener = (message: CoreMessage) => {
       if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
         setTimeout(() => {
-          openPassphraseDialog(sdk, { existsAttachPinUser: message.payload.existsAttachPinUser });
+          openPassphraseDialog(sdk, message.payload);
         }, 100);
       } else if (message.type === UI_REQUEST.REQUEST_PIN) {
         setTimeout(() => {
-          openPinDialog(sdk, message.payload.device.features);
+          openPinDialog(sdk, message.payload.device.features, message);
         }, 100);
       }
     };
-    sdk?.on(UI_EVENT, hardwareUiEventListener);
+    sdk.on(UI_EVENT, hardwareUiEventListener);
 
     return () => {
-      sdk?.off(UI_EVENT, hardwareUiEventListener);
+      sdk.off(UI_EVENT, hardwareUiEventListener);
     };
   }, [openPassphraseDialog, openPinDialog, sdk]);
 

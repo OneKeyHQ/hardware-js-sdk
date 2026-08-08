@@ -12,6 +12,7 @@ import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
+import { isPassphraseProtectionEnabled } from '../../utils/protocolAwareFeatures';
 
 import type { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import type { CoreMessage } from '@onekeyfe/hd-core';
@@ -145,7 +146,7 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
         hardwareUiEventListener = (message: CoreMessage) => {
           console.log('TopLEVEL EVENT ===>>>>: ', message);
           if (message.type === UI_REQUEST.REQUEST_PIN) {
-            openDialog(sdk, message.payload.device.features);
+            openDialog(sdk, message.payload.device.features, message);
           }
           if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
             setTimeout(() => {
@@ -154,6 +155,7 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
                 payload: {
                   value: currentPassphrase.current ?? '',
                 },
+                ...(message.payload.responseCorrelation ?? {}),
               });
             }, 200);
           }
@@ -164,12 +166,12 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
       prepareRunner: async (connectId, _deviceId, features, sdk) => {
         const testCase = currentTestCase;
 
-        if (features?.passphrase_protection === true && testCase?.extra?.passphrase == null) {
+        if (isPassphraseProtectionEnabled(features) && testCase?.extra?.passphrase == null) {
           await sdk.deviceSettings(connectId, {
             usePassphrase: false,
           });
         }
-        if (!features?.passphrase_protection && testCase?.extra?.passphrase != null) {
+        if (!isPassphraseProtectionEnabled(features) && testCase?.extra?.passphrase != null) {
           await sdk.deviceSettings(connectId, {
             usePassphrase: true,
           });

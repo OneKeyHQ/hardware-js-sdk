@@ -5,7 +5,7 @@ import { logInfo, logError } from './logger';
 
 let initialized = false;
 
-export type TransportType = 'webusb' | 'jsbridge' | 'emulator';
+export type TransportType = 'webusb' | 'emulator';
 
 export interface SDKInitResult {
   HardwareSDK: CoreApi;
@@ -15,8 +15,6 @@ export interface SDKInitResult {
 // 根据transport类型获取SDK环境配置
 function getSDKEnv(transport: TransportType): ConnectSettings['env'] {
   switch (transport) {
-    case 'jsbridge':
-      return 'web';
     case 'emulator':
       return 'emulator';
     case 'webusb':

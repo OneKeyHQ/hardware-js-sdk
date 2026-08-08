@@ -1,8 +1,9 @@
 import semver from 'semver';
 import EventEmitter from 'events';
-import { TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
+import { DeviceSessionPinType, TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
 import {
   ERRORS,
+  ERROR_CODES_REQUIRE_DISCONNECT,
   ERROR_CODES_REQUIRE_RELEASE,
   HardwareError,
   HardwareErrorCode,
@@ -26,6 +27,7 @@ import {
   createRequestContext,
   createSdkTracingContext,
   formatRequestContext,
+  generateInstanceId,
   getActiveRequestsByDeviceInstance,
   updateRequestContext,
 } from '../utils/tracing';
@@ -53,13 +55,15 @@ import {
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
+import { consumeUiPromise, findUiPromiseForResponse, rejectUiPromises } from './uiPromiseRegistry';
 import { registerHardwareUiEventListeners } from './deviceEventRegistration';
 import { getSynchronize } from '../utils/getSynchronize';
-import { runMethodWithUnlockRetry } from '../protocols/protocol-v2/unlockRetry';
+import { runMethodWithUnlockPolicy } from '../protocols/protocol-v2/unlockPolicyRunner';
 import {
   ProtocolV2UiInteractionCoordinator,
   isProtocolV2UiEnabled,
 } from '../protocols/protocol-v2/uiInteraction';
+import { createUiProgressMessageFilter } from '../utils/uiProgressThrottle';
 
 import type { ConnectSettings, Features, KnownDevice } from '../types';
 import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } from '../events';
@@ -103,6 +107,7 @@ const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   deviceId: method?.payload.deviceId,
   deriveCardano: method && hasDeriveCardano(method),
   connectProtocol: method?.payload.connectProtocol,
+  forceProtocolDetection: method?.payload.forceProtocolDetection,
   protocolV2DeviceInfoTimeoutMs: method?.payload.protocolV2DeviceInfoTimeoutMs,
 });
 
@@ -154,7 +159,12 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   try {
     method = findMethod(message as IFrameCallMessage);
     method.connector = _connector;
-    method.postMessage = postMessage;
+    const shouldPostMessage = createUiProgressMessageFilter();
+    method.postMessage = event => {
+      if (shouldPostMessage(event)) {
+        postMessage(event);
+      }
+    };
     method.setContext?.(context);
 
     method.requestContext = createRequestContext(method.responseID, method.name, {
@@ -406,6 +416,8 @@ const onCallDevice = async (
 
   registerHardwareUiEventListeners(device, {
     pin: onDevicePinHandler,
+    pinOnDevice: onEnterPinOnDeviceHandler,
+    pinOnDeviceComplete: onPinOnDeviceCompleteHandler,
     button: onDeviceButtonHandler,
     passphrase: message.payload.useEmptyPassphrase
       ? onEmptyPassphraseHandler
@@ -421,6 +433,9 @@ const onCallDevice = async (
   );
 
   const protocolV2UiCoordinator = new ProtocolV2UiInteractionCoordinator(device, postMessage);
+  let protocolV2Operation = false;
+  let protocolV2CloseEmitted = false;
+  device.beginProtocolV2UiInteraction();
   device.on(
     DEVICE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE,
     onSelectDeviceForSwitchFirmwareWebDeviceHandler
@@ -438,6 +453,7 @@ const onCallDevice = async (
       // Protocol is established from an active device response during acquire/initialize.
       // Reject unsupported methods before any method-specific device command is sent.
       method.assertProtocolSupported(device.getProtocol(), device.getCurrentFirmwareType());
+      protocolV2Operation = device.isProtocolV2();
 
       // check firmware version
       const versionRange = device.getCurrentMethodVersionRange(
@@ -547,93 +563,102 @@ const onCallDevice = async (
         );
       }
 
-      if (method.deviceId && method.checkDeviceId) {
-        const isSameDeviceID = await checkLiveDeviceId(device, method.deviceId);
-        if (!isSameDeviceID) {
-          return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError));
-        }
-      }
-
-      /**
-       * check firmware release info
-       */
-      method.checkFirmwareRelease();
-
-      /**
-       * check additional supported feature
-       */
-      method.checkDeviceSupportFeature();
-
-      // reconfigure messages
-      if (_deviceList && device.features && !device.isProtocolV2()) {
-        await TransportManager.reconfigure(device.features);
-      }
-
-      // Check to see if it is safe to use Passphrase
-      checkPassphraseEnableState(method, device.features);
-
-      if (shouldCheckPassphraseState(method, device)) {
-        // check version
-        const support = device.supportNewPassphrase();
-        if (!support.support) {
-          return Promise.reject(
-            ERRORS.TypedError(
-              HardwareErrorCode.DeviceNotSupportPassphrase,
-              `Device not support passphrase, please update to ${support.require}`,
-              {
-                require: support.require,
+      try {
+        let deviceIdCheckedDuringUnlockPreflight = false;
+        const response = await runMethodWithUnlockPolicy<object>(method, device, {
+          uiCoordinator: protocolV2UiCoordinator,
+          afterStatusBeforeUnlock: () => {
+            if (method.deviceId && method.checkDeviceId) {
+              if (!device.checkDeviceId(method.deviceId)) {
+                throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
               }
-            )
-          );
-        }
+              deviceIdCheckedDuringUnlockPreflight = true;
+            }
+          },
+          prepare: async () => {
+            if (method.deviceId && method.checkDeviceId && !deviceIdCheckedDuringUnlockPreflight) {
+              const isSameDeviceID = await checkLiveDeviceId(device, method.deviceId);
+              if (!isSameDeviceID) {
+                throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+              }
+            }
 
-        // Check Device passphrase State
-        const passphraseStateSafety = await device.checkPassphraseStateSafety(
-          method.payload?.passphraseState,
-          method.payload?.useEmptyPassphrase,
-          method.payload?.skipPassphraseCheck
-        );
+            /**
+             * check firmware release info
+             */
+            method.checkFirmwareRelease();
 
-        // Double check, handles the special case of Touch/Pro
-        checkPassphraseEnableState(method, device.features);
+            /**
+             * check additional supported feature
+             */
+            method.checkDeviceSupportFeature();
 
-        if (!passphraseStateSafety) {
-          DevicePool.clearDeviceCache(method.payload.connectId);
-          return Promise.reject(
-            ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
-          );
-        }
+            // reconfigure messages
+            if (_deviceList && device.features && !device.isProtocolV2()) {
+              await TransportManager.reconfigure(device.features);
+            }
 
-        // close pin popup window
-        postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
-      }
+            // Check to see if it is safe to use Passphrase
+            checkPassphraseEnableState(method, device.features);
 
-      // Automatic check safety_check level for Kovan, Ropsten, Rinkeby, Goerli test networks.
-      try {
-        await method.checkSafetyLevelOnTestNet();
-      } catch (e) {
-        const error =
-          e instanceof HardwareError
-            ? e
-            : ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'open safety check failed.');
-        // messageResponse = createResponseMessage(method.responseID, false, { error });
-        // requestQueue.resolveRequest(method.responseID, messageResponse);
-        // return;
-        throw error;
-      }
+            if (shouldCheckPassphraseState(method, device)) {
+              // check version
+              const support = device.supportNewPassphrase();
+              if (!support.support) {
+                throw ERRORS.TypedError(
+                  HardwareErrorCode.DeviceNotSupportPassphrase,
+                  `Device not support passphrase, please update to ${support.require}`,
+                  {
+                    require: support.require,
+                  }
+                );
+              }
 
-      method.device?.commands?.checkDisposed();
+              // Check Device passphrase State after the Protocol V2 pre-unlock gate.
+              const passphraseStateSafety = await device.checkPassphraseStateSafety(
+                method.payload?.passphraseState,
+                method.payload?.useEmptyPassphrase,
+                method.payload?.skipPassphraseCheck,
+                hasDeriveCardano(method)
+              );
 
-      try {
-        const response: object = await runMethodWithUnlockRetry(
-          method,
-          device,
-          protocolV2UiCoordinator
-        );
+              // Double check, handles the special case of Touch/Pro
+              checkPassphraseEnableState(method, device.features);
+
+              if (!passphraseStateSafety) {
+                DevicePool.clearDeviceCache(method.payload.connectId);
+                throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
+              }
+
+              // Protocol V2 emits the PIN phase completion from DeviceSessionAskPin.
+              // Keep the legacy compatibility close for Protocol V1 only.
+              if (!device.isProtocolV2()) {
+                postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
+              }
+            }
+
+            // Automatic check safety_check level for Kovan, Ropsten, Rinkeby, Goerli test networks.
+            try {
+              await method.checkSafetyLevelOnTestNet();
+            } catch (e) {
+              throw e instanceof HardwareError
+                ? e
+                : ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'open safety check failed.');
+            }
+
+            method.device?.commands?.checkDisposed();
+          },
+        });
         messageResponse = createResponseMessage(method.responseID, true, response);
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method);
       } catch (error) {
+        // Device.run may release the request before transport callbacks finish after a timeout.
+        // Ignore the stale callback because the caller already received the connection error.
+        if (!requestQueue.getTask(method.responseID)) {
+          Log.debug(`Call API - Ignore late inner method result`, error);
+          return;
+        }
         Log.debug(`Call API - Inner Method Run Error`, error);
         messageResponse = createResponseMessage(method.responseID, false, { error });
         requestQueue.resolveRequest(method.responseID, messageResponse);
@@ -647,7 +672,12 @@ const onCallDevice = async (
           throw error;
         }
       } finally {
-        protocolV2UiCoordinator.close();
+        if (isProtocolV2UiEnabled(method)) {
+          protocolV2CloseEmitted = protocolV2UiCoordinator.close({
+            ensureOperationClose: protocolV2Operation,
+            protocolV2Operation,
+          });
+        }
       }
     };
     Log.debug('Call API - Device Run: ', device.mainId);
@@ -702,7 +732,15 @@ const onCallDevice = async (
     requestQueue.releaseTask(method.responseID);
 
     if (isProtocolV2UiEnabled(method)) {
-      closePopup();
+      if (!protocolV2CloseEmitted && protocolV2Operation) {
+        protocolV2CloseEmitted = protocolV2UiCoordinator.close({
+          ensureOperationClose: true,
+          protocolV2Operation: true,
+        });
+      }
+      if (!protocolV2CloseEmitted) {
+        closePopup();
+      }
     }
 
     cleanup();
@@ -865,10 +903,18 @@ function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) 
  */
 async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
   try {
+    if (method.payload.forceProtocolDetection && device.hasDeviceAcquire()) {
+      await device.release();
+    }
     const shouldAcquire =
-      !device.hasDeviceAcquire() || !device.commands || device.commands.disposed;
+      method.payload.forceProtocolDetection ||
+      !device.hasDeviceAcquire() ||
+      !device.commands ||
+      device.commands.disposed;
     if (shouldAcquire) {
-      await device.acquire(method.payload.connectProtocol);
+      await device.acquire(method.payload.connectProtocol, {
+        forceProtocolDetection: method.payload.forceProtocolDetection,
+      });
     }
     if (method.payload?.onlyConnectBleDevice) {
       if (shouldAcquire) {
@@ -888,6 +934,21 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       DevicePool.emitter.emit(DEVICE.CONNECT, device);
     }
   } catch (err) {
+    // Device.run()'s REQUIRE_DISCONNECT handling never sees acquire/initialize
+    // failures, so with keep-alive a wedged link would be reused by every retry
+    // (field case: Initialize timing out at 25s per attempt, forever). Drop it
+    // here so the next retry cold-connects.
+    if (
+      ERROR_CODES_REQUIRE_DISCONNECT.includes(err.errorCode) &&
+      device.mainId &&
+      device.deviceConnector
+    ) {
+      await device.deviceConnector.disconnect(device.mainId).catch(() => undefined);
+      // The connector only drops the link; `deviceAcquired` is reset by
+      // release()/markTransportDisconnected() alone. Leaving it set makes the
+      // next attempt skip acquire and initialize onto the link we just cut.
+      device.markTransportDisconnected();
+    }
     if (
       (err.errorCode === HardwareErrorCode.BleTimeoutError ||
         err.errorCode === HardwareErrorCode.BleConnectedError ||
@@ -1181,7 +1242,12 @@ const shouldCheckPassphraseState = (method: BaseMethod, device: Device) => {
 };
 
 const cleanup = () => {
+  const pendingUiPromises = _uiPromises;
   _uiPromises = [];
+  rejectUiPromises(
+    pendingUiPromises,
+    ERRORS.TypedError(HardwareErrorCode.ActionCancelled, 'UI request was cancelled')
+  );
   Log.debug('Cleanup...');
 };
 
@@ -1223,7 +1289,7 @@ const onTransportDeviceDisconnectHandler = (event: TransportDeviceDisconnectEven
   DevicePool.emitter.emit(DEVICE.DISCONNECT, device);
 };
 
-const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin']) => {
+const onDevicePinHandler = (...[device, type, callback]: DeviceEvents['pin']) => {
   Log.log('request Input PIN');
   // create ui promise
   const uiPromise = createUiPromise(UI_RESPONSE.RECEIVE_PIN, device);
@@ -1232,12 +1298,14 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
     createUiMessage(UI_REQUEST.REQUEST_PIN, {
       device: device.toMessageObject() as unknown as KnownDevice,
       type,
+      responseCorrelation: uiPromise.responseCorrelation,
     })
   );
-  // wait for pin
-  const uiResp = await uiPromise.promise;
-  // callback.apply(null, [null, pin]);
-  callback(null, uiResp.payload);
+  consumeUiPromise(
+    uiPromise.promise,
+    uiResp => callback(null, uiResp.payload),
+    error => callback(error, '')
+  );
 };
 
 export const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
@@ -1265,7 +1333,7 @@ const onDeviceStateHandler = (...[_, stateEvent]: [...DeviceEvents['state']]) =>
   postMessage(createDeviceMessage(DEVICE.STATE, stateEvent));
 };
 
-const onDevicePassphraseHandler = async (
+const onDevicePassphraseHandler = (
   ...[device, requestPayload, callback]: DeviceEvents['passphrase']
 ) => {
   Log.debug('onDevicePassphraseHandler');
@@ -1279,18 +1347,23 @@ const onDevicePassphraseHandler = async (
       source: requestPayload.source,
       reason: requestPayload.reason,
       expectedPassphraseState: requestPayload.expectedPassphraseState,
+      ...(requestPayload.interaction ? { interaction: requestPayload.interaction } : {}),
+      responseCorrelation: uiPromise.responseCorrelation,
     })
   );
-  // wait for passphrase
-  const uiResp = await uiPromise.promise;
-  const { value, passphraseOnDevice, save, attachPinOnDevice } = uiResp.payload;
-  // send as PassphrasePromptResponse
-  callback({
-    passphrase: value.normalize('NFKD'),
-    passphraseOnDevice,
-    attachPinOnDevice,
-    cache: save,
-  });
+  consumeUiPromise(
+    uiPromise.promise,
+    uiResp => {
+      const { value, passphraseOnDevice, save, attachPinOnDevice } = uiResp.payload;
+      callback({
+        passphrase: value.normalize('NFKD'),
+        passphraseOnDevice,
+        attachPinOnDevice,
+        cache: save,
+      });
+    },
+    error => callback({}, error)
+  );
 };
 
 const onEmptyPassphraseHandler = (...[_, , callback]: DeviceEvents['passphrase']) => {
@@ -1308,6 +1381,7 @@ const onEnterPassphraseOnDeviceHandler = (
       passphraseState: device.passphraseState,
       source: requestPayload?.source,
       reason: requestPayload?.reason,
+      ...(requestPayload?.interaction ? { interaction: requestPayload.interaction } : {}),
     })
   );
 };
@@ -1321,11 +1395,40 @@ const onEnterAttachPinOnDeviceHandler = (
       type: 'ButtonRequest_AttachPin',
       source: requestPayload?.source,
       reason: requestPayload?.reason,
+      ...(requestPayload?.interaction ? { interaction: requestPayload.interaction } : {}),
     })
   );
 };
 
-const onSelectDeviceInBootloaderForWebDeviceHandler = async (
+const onEnterPinOnDeviceHandler = (
+  ...[device, pinType, metadata]: [...DeviceEvents['pin_on_device']]
+) => {
+  postMessage(
+    createUiMessage(UI_REQUEST.REQUEST_PIN, {
+      device: device.toMessageObject() as KnownDevice,
+      type:
+        pinType === DeviceSessionPinType.AttachToPin
+          ? 'ButtonRequest_AttachPin'
+          : 'ButtonRequest_PinEntry',
+      source: metadata?.source,
+      reason: metadata?.reason,
+      deviceOnly: metadata?.deviceOnly ?? true,
+      completion: metadata?.completion,
+      method: metadata?.method,
+      page: metadata?.page,
+      operation: metadata?.operation,
+      ...(metadata?.interaction ? { interaction: metadata.interaction } : {}),
+    })
+  );
+};
+
+const onPinOnDeviceCompleteHandler = (
+  ...[_, metadata]: [...DeviceEvents['pin_on_device_complete']]
+) => {
+  postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW, metadata));
+};
+
+const onSelectDeviceInBootloaderForWebDeviceHandler = (
   ...[device, callback]: [...DeviceEvents['select_device_in_bootloader_for_web_device']]
 ) => {
   Log.debug('onSelectDeviceInBootloaderForWebDeviceHandler');
@@ -1335,11 +1438,14 @@ const onSelectDeviceInBootloaderForWebDeviceHandler = async (
       device: device.toMessageObject() as KnownDevice,
     })
   );
-  const uiResp = await uiPromise.promise;
-  callback(null, uiResp.payload.deviceId);
+  consumeUiPromise(
+    uiPromise.promise,
+    uiResp => callback(null, uiResp.payload.deviceId),
+    error => callback(error, '')
+  );
 };
 
-const onSelectDeviceForSwitchFirmwareWebDeviceHandler = async (
+const onSelectDeviceForSwitchFirmwareWebDeviceHandler = (
   ...[device, callback]: [...DeviceEvents['select_device_for_switch_firmware_web_device']]
 ) => {
   Log.debug('onSelectDeviceForSwitchFirmwareWebDeviceHandler');
@@ -1352,8 +1458,11 @@ const onSelectDeviceForSwitchFirmwareWebDeviceHandler = async (
       device: device.toMessageObject() as KnownDevice,
     })
   );
-  const uiResp = await uiPromise.promise;
-  callback(null, uiResp.payload.deviceId);
+  consumeUiPromise(
+    uiPromise.promise,
+    uiResp => callback(null, uiResp.payload.deviceId),
+    error => callback(error, '')
+  );
 };
 
 /**
@@ -1372,13 +1481,20 @@ const postMessage = (message: CoreMessage) => {
 
 const createUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T, device?: Device) => {
   const uiPromise: UiPromise<T> = createDeferred(promiseEvent, device);
+  if (
+    device &&
+    (promiseEvent === UI_RESPONSE.RECEIVE_PIN || promiseEvent === UI_RESPONSE.RECEIVE_PASSPHRASE)
+  ) {
+    const publicDeviceId = device.toMessageObject()?.deviceId;
+    uiPromise.responseCorrelation = {
+      interactionId: generateInstanceId('UiResponse', device.sdkInstanceId),
+      deviceId: publicDeviceId || device.instanceId,
+    };
+  }
   _uiPromises.push(uiPromise as any);
 
   return uiPromise;
 };
-
-const findUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T) =>
-  _uiPromises.find(p => p.id === promiseEvent);
 
 const removeUiPromise = (promise: Deferred<any>) => {
   _uiPromises = _uiPromises.filter(p => p !== promise);
@@ -1431,11 +1547,16 @@ export default class Core extends EventEmitter {
       case UI_RESPONSE.RECEIVE_PASSPHRASE:
       case UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
       case UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE: {
-        const uiPromise = findUiPromise(message.type);
+        const uiPromise = findUiPromiseForResponse(_uiPromises, message);
         if (uiPromise) {
           Log.log('receive UI Response: ', message.type);
           uiPromise.resolve(message);
           removeUiPromise(uiPromise);
+        } else if (
+          message.type === UI_RESPONSE.RECEIVE_PIN ||
+          message.type === UI_RESPONSE.RECEIVE_PASSPHRASE
+        ) {
+          Log.warn('Ignored unmatched or ambiguous sensitive UI response:', message.type);
         }
         break;
       }
@@ -1563,12 +1684,8 @@ export const init = async (
   plugin?: LowlevelTransportSharedPlugin
 ) => {
   try {
-    try {
-      await DataManager.load(settings);
-      initTransport(Transport, plugin);
-    } catch {
-      Log.error('DataManager.load error');
-    }
+    await DataManager.load(settings);
+    initTransport(Transport, plugin);
     enableLog(DataManager.getSettings('debug'));
     if (DataManager.getSettings('env') !== 'react-native') {
       setLoggerPostMessage(postMessage);
@@ -1579,6 +1696,7 @@ export const init = async (
     return _core;
   } catch (error) {
     Log.error('core init', error);
+    throw error;
   }
 };
 

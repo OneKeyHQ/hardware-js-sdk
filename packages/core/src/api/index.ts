@@ -3,6 +3,7 @@ export { default as testProtocolV2Ping } from './protocol-v2/Ping';
 export { default as preInitialize } from './device/PreInitialize';
 
 export { default as searchDevices } from './SearchDevices';
+export { default as detectDeviceConnectProtocol } from './DetectDeviceConnectProtocol';
 export { default as getFeatures } from './GetFeatures';
 export { default as getDeviceState } from './GetDeviceState';
 export { default as getOnekeyFeatures } from './GetOnekeyFeatures';
@@ -35,6 +36,12 @@ export { default as deviceUpdateBootloader } from './device/DeviceUpdateBootload
 export { default as deviceLock } from './device/DeviceLock';
 export { default as deviceUnlock } from './device/DeviceUnlock';
 export { default as deviceCancel } from './device/DeviceCancel';
+export { default as deviceGetInfo } from './device/GetDeviceInfoSettings';
+export { default as deviceInfoSettings } from './device/DeviceInfoSettings';
+export { default as deviceReadSEPublicCert } from './device/DeviceReadSEPublicCert';
+export { default as deviceWriteSEPrivateKey } from './device/DeviceWriteSEPrivateKey';
+export { default as deviceWriteSEPublicCert } from './device/DeviceWriteSEPublicCert';
+export { default as deviceSESignMessage } from './device/DeviceSESignMessage';
 
 export { default as setU2FCounter } from './u2f/SetU2FCounter';
 export { default as getNextU2FCounter } from './u2f/GetNextU2FCounter';
@@ -54,6 +61,7 @@ export { default as deviceWriteFactoryCertificate } from './protocol-v2/DeviceFa
 export { default as deviceReadFactoryCertificate } from './protocol-v2/DeviceFactoryCertificateRead';
 export { default as deviceSignFactoryChallenge } from './protocol-v2/DeviceFactoryChallengeSign';
 export { default as deviceUploadWallpaper } from './protocol-v2/DeviceUploadWallpaper';
+export { default as deviceUploadNft } from './protocol-v2/DeviceUploadNft';
 export { default as uploadPortfolio } from './UploadPortfolio';
 
 export { default as cipherKeyValue } from './CipherKeyValue';
@@ -177,10 +185,3 @@ export { default as benfenSignTransaction } from './benfen/BenfenSignTransaction
 
 export { default as neoGetAddress } from './neo/NeoGetAddress';
 export { default as neoSignTransaction } from './neo/NeoSignTransaction';
-
-export { default as deviceGetInfo } from './device/GetDeviceInfoSettings';
-export { default as deviceInfoSettings } from './device/DeviceInfoSettings';
-export { default as deviceReadSEPublicCert } from './device/DeviceReadSEPublicCert';
-export { default as deviceWriteSEPrivateKey } from './device/DeviceWriteSEPrivateKey';
-export { default as deviceWriteSEPublicCert } from './device/DeviceWriteSEPublicCert';
-export { default as deviceSESignMessage } from './device/DeviceSESignMessage';

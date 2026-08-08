@@ -28,12 +28,12 @@ V2 不支持传统 `GetFeatures`。Core 在初始化时发送默认范围的 `De
 Device 内唯一的 `DeviceState`。只有 application 且 `supported_messages` 声明支持时才读取
 `DeviceStatus`。外部无需理解 `DeviceProfile` 或 V2 原始消息。
 
-| 调用                                    | 语义                                                                     |
-| --------------------------------------- | ------------------------------------------------------------------------ |
+| 调用                                    | 语义                                                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------- |
 | 初始化 adapter                          | 请求基础设备信息与协议运行阶段；按能力读取实时状态，并更新唯一 DeviceState 缓存 |
-| `getDeviceState()`                      | 默认刷新运行状态并返回 V1/V2 统一的完整 `DeviceState` 快照               |
-| `getDeviceState({ scope: 'settings' })` | 刷新运行状态和设置                                                       |
-| `getDeviceState({ scope: 'firmware' })` | 刷新运行状态、身份、完整版本与校验信息                                   |
+| `getDeviceState()`                      | 默认刷新运行状态并返回 V1/V2 统一的完整 `DeviceState` 快照                      |
+| `getDeviceState({ scope: 'settings' })` | 刷新运行状态和设置                                                              |
+| `getDeviceState({ scope: 'firmware' })` | 刷新运行状态、身份、完整版本与校验信息                                          |
 
 `scope` 是可选参数；省略时等价于 `scope: 'runtime'`。这里的 scope 只决定本次读取需要主动刷新的数据分区，不裁剪返回值：三种 scope 最终都会返回完整的公共 `DeviceState` 快照。`runtime` 在 Protocol V1 刷新 `GetFeatures`，在 Protocol V2 normal 模式刷新 `DeviceStatusGet`；bootloader / romloader 模式会跳过不支持的状态命令并返回当前可用快照。
 
@@ -90,7 +90,10 @@ selector。
   boardloader 保持原有流程，不与 romloader 互转。
 - 公共 `DeviceState` 与 `DEVICE.STATE` 不包含协议 raw 数据或钱包 `session_id`；两者只在 Core 内部用于 V1 兼容和会话恢复。
 - V2 PIN 解锁使用 `DeviceSessionAskPin -> Success`，随后刷新 `DeviceStatus`；需要钱包 Session 时再调用 `DeviceSessionGet`。
-- 受保护方法是否允许单次解锁后重试，由方法显式声明；Transport 不重放业务请求。
+- 需要钱包 Session 的方法由 `useDevicePassphraseState` 自动进入调用前解锁；非钱包管理方法可显式
+  使用 `unlock-before-run`。两者都在 Wallet Session、Safety Check 和业务 I/O 前读取 fresh
+  Status，先校验目标设备身份再按需解锁；业务阶段的 `DeviceLocked` 直接失败，Core 与 Transport
+  都不重放业务请求。
 
 ## 统一设置与 DeviceState 更新
 
@@ -118,11 +121,12 @@ Protocol V2 的自动锁屏和自动关机使用 `0x10000000` 表示“永不”
 
 每次实际状态变化都会发送 `DEVICE.STATE`。宿主应用应监听该事件并持久化完整状态，
 不需要为 label、language、auto-lock 等字段分别维护手工数据库 patch。Protocol V1 额外发送
-兼容事件 `DEVICE.FEATURES`；Protocol V2 不发送该事件。设置读取与写入事件分别使用
-`settings-read` 和 `settings-write` 来源。App 应只在设备设置页面进入或重新聚焦时显式调用
-`getDeviceState({ scope: 'settings' })`；普通 SDK 业务调用不会隐式刷新设置。
+兼容事件 `DEVICE.FEATURES`；Protocol V2 不发送该事件。Protocol V2 设置写入成功后会强制刷新
+`status` 与 `settings`，状态只以设备读回结果为准，对应事件来源为 `device-status` 和
+`settings-read`；不会再用请求参数生成 `settings-write` patch。App 在设置页进入或重新聚焦时仍可
+显式调用 `getDeviceState({ scope: 'settings' })`，用于发现设备端或其他客户端产生的外部变化。
 
-详见 [钱包 Session 与设备安全](../device/wallet-session-and-security.md) 和 [SDK 关键架构决策](../architecture/decisions.md#受保护方法的单次解锁重试)。
+详见 [钱包 Session 与设备安全](../device/wallet-session-and-security.md) 和 [SDK 关键架构决策](../architecture/decisions.md#受保护方法的调用前解锁)。
 
 ## 钱包 Session
 
@@ -267,13 +271,13 @@ App 不应按型号或 PID 自行选择协议，也不应直接发送
 `DeviceSessionAskPin/DeviceSessionAskPassphrase/DeviceSessionGet`。Core 会在完成设备响应探测后
 自动分流：
 
-| App 意图              | Pro V1 固件流程                         | Pro2 Protocol V2 固件流程                                           |
-| --------------------- | --------------------------------------- | ------------------------------------------------------------------- |
-| 标准钱包              | 空 Passphrase 兼容流程                  | AskPin(Main) -> Success -> Get()，或 Get(标准 Session)              |
-| Host Passphrase 钱包  | `GetPassphraseState -> PassphraseState` | AskPassphrase({ on_device: false, passphrase }) -> Success -> Get() |
+| App 意图               | Pro V1 固件流程                         | Pro2 Protocol V2 固件流程                                           |
+| ---------------------- | --------------------------------------- | ------------------------------------------------------------------- |
+| 标准钱包               | 空 Passphrase 兼容流程                  | AskPin(Main) -> Success -> Get()，或 Get(标准 Session)              |
+| Host Passphrase 钱包   | `GetPassphraseState -> PassphraseState` | AskPassphrase({ on_device: false, passphrase }) -> Success -> Get() |
 | 设备端 Passphrase 钱包 | `GetPassphraseState -> PassphraseState` | AskPassphrase({ on_device: true }) -> Success -> Get()              |
-| Attach-to-PIN         | `GetPassphraseState -> PassphraseState` | AskPin(AttachToPin) -> Success -> Get()                             |
-| 恢复已选隐藏钱包      | Core 管理 V1 Session 复用               | `DeviceSessionGet({ session_id })`                                  |
+| Attach-to-PIN          | `GetPassphraseState -> PassphraseState` | AskPin(AttachToPin) -> Success -> Get()                             |
+| 恢复已选隐藏钱包       | Core 管理 V1 Session 复用               | `DeviceSessionGet({ session_id })`                                  |
 
 Pro2 Protocol V2 的 `DeviceSessionAskPassphrase.on_device` 是必填字段。Host 输入必须同时携带
 非空 `passphrase` 和 `on_device: false`；设备输入只携带 `on_device: true`。Attach-to-PIN 不复用
@@ -329,11 +333,13 @@ Pro2 接入的强制前置条件。
 | 钱包 Session   | `openWalletSession`、`clearSessionCache`                 | 无                                                        | `deviceSessionOpen`                                                      |
 | 固件           | `firmwareUpdateV4` 等高层流程                            | `deviceGetFirmwareUpdateStatus`                           | `deviceFirmwareUpdate`                                                   |
 | 文件维护       | `uploadPortfolio`、`deviceUploadWallpaper`、高层固件升级 | `fileRead`、`dirList`、`pathInfo`，以及受约束的 `dirMake` | `fileWrite`、`fileDelete`、`dirRemove`、`filesystemFormat/PermissionFix` |
-| Pro2 工厂接口  | 见下方语义 API                                           | `protocolInfoRequest`、`ping`                             | 原始 `DeviceFactoryInfo*`、`DeviceCertificate*` 命令                     |
+| Pro/Neo 工厂接口 | 见下方语义 API                                         | `protocolInfoRequest`、`ping`                             | 原始 `DeviceFactoryInfo*`、`DeviceCertificate*` 命令                     |
 
-Pro2 工厂语义 API 包括 `deviceReadFactoryInfo`、`deviceProvisionFactoryInfo`、
+Neo/Pro2（Protocol V2）工厂语义 API 包括 `deviceReadFactoryInfo`、`deviceProvisionFactoryInfo`、
 `deviceReadFactoryCertificate`、`deviceWriteFactoryCertificate` 和
-`deviceSignFactoryChallenge`。
+`deviceSignFactoryChallenge`。Pro（Protocol V1）保留 `deviceInfoSettings`、`deviceGetInfo`、
+`deviceReadSEPublicCert`、`deviceWriteSEPrivateKey`、`deviceWriteSEPublicCert` 和
+`deviceSESignMessage`，两组接口不会跨协议回退。
 
 `getFeatures`、`getOnekeyFeatures` 仅作为 Protocol V1 兼容入口保留并标记废弃，新接入使用 `getDeviceState`。
 

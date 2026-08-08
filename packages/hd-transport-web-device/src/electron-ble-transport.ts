@@ -19,6 +19,7 @@ import {
 } from '@onekeyfe/hd-shared';
 
 import { createTransportCallLog, shouldSuppressHighVolumeCallLog } from './transportLog';
+import { resolveBlePacketCapacity } from './ble-packet-capacity';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
 import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
@@ -68,7 +69,8 @@ const toBleDescriptor = (
     ...(protocolType ? { protocolType } : {}),
   } as OneKeyDeviceInfo);
 
-const BLE_PACKET_SIZE = 192;
+const BLE_PACKET_SIZE_FALLBACK = 192;
+const BLE_PACKET_SIZE_MAXIMUM = 244;
 const BLE_WRITE_DELAY_MS = 5;
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
@@ -104,6 +106,10 @@ export default class ElectronBleTransport {
 
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
 
+  private deviceMtus: Map<string, number> = new Map();
+
+  private devicePacketCapacities: Map<string, number> = new Map();
+
   private v1Buffers: Map<string, { buffer: number[]; bufferLength: number }> = new Map();
 
   private v2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
@@ -133,7 +139,12 @@ export default class ElectronBleTransport {
     },
   });
 
+  /** One-shot guard so a missing preload `release` bridge is reported once. */
+  private warnedMissingRelease = false;
+
   private notificationCleanups: Map<string, () => void> = new Map();
+
+  private mtuCleanups: Map<string, () => void> = new Map();
 
   private disconnectCleanups: Map<string, () => void> = new Map();
 
@@ -178,6 +189,8 @@ export default class ElectronBleTransport {
       .catch(error => this.Log?.debug('[Electron BLE] link cleanup failed:', error));
     this.connectedDevices.delete(deviceId);
     this.deviceProtocol.delete(deviceId);
+    this.deviceMtus.delete(deviceId);
+    this.devicePacketCapacities.delete(deviceId);
     // Keep deviceProtocolHints — it's inferred from device name (e.g. "Pro 2" → V2)
     // and doesn't depend on connection state. Preserving it avoids redundant V1 probe on reconnect.
     this.v1Buffers.delete(deviceId);
@@ -194,6 +207,12 @@ export default class ElectronBleTransport {
     if (notifyCleanup) {
       notifyCleanup();
       this.notificationCleanups.delete(deviceId);
+    }
+
+    const mtuCleanup = this.mtuCleanups.get(deviceId);
+    if (mtuCleanup) {
+      mtuCleanup();
+      this.mtuCleanups.delete(deviceId);
     }
 
     const disconnectCleanup = this.disconnectCleanups.get(deviceId);
@@ -306,19 +325,36 @@ export default class ElectronBleTransport {
         this.handleBluetoothError(error);
       }
 
+      const mtuCleanup = this.createMtuSubscription(uuid);
+      if (mtuCleanup) {
+        this.mtuCleanups.set(uuid, mtuCleanup);
+      }
+
       this.v1Buffers.set(uuid, { buffer: [], bufferLength: 0 });
       this.v2Assemblers.set(uuid, new ProtocolV2FrameAssembler(PROTOCOL_V2_BLE_FRAME_MAX_BYTES));
 
       await window.desktopApi.nobleBle.subscribe(uuid);
+      await this.refreshBlePacketCapacity(uuid);
 
       const cleanup = this.createNotificationSubscription(uuid);
       this.notificationCleanups.set(uuid, cleanup);
+      const connectionToken = this.notificationTokens.get(uuid);
 
       const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint);
+      if (protocolType === 'V2') {
+        this.Log?.debug('[Electron BLE] Protocol V2 write configured', {
+          writeMode: 'withoutResponse',
+          negotiatedMtu: this.deviceMtus.get(uuid),
+          packetCapacity: this.devicePacketCapacities.get(uuid) ?? BLE_PACKET_SIZE_FALLBACK,
+        });
+      }
 
       const disconnectCleanup = window.desktopApi.nobleBle.onDeviceDisconnected(
         (disconnectedDevice: any) => {
-          if (disconnectedDevice.id === uuid) {
+          if (
+            disconnectedDevice.id === uuid &&
+            this.notificationTokens.get(uuid) === connectionToken
+          ) {
             this.cleanupDeviceState(uuid);
             this.emitter?.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, {
               name: disconnectedDevice.name,
@@ -349,16 +385,23 @@ export default class ElectronBleTransport {
     }
   }
 
-  async release(id: string) {
+  async release(id: string, _onclose?: boolean, keepSession?: boolean) {
     try {
       await this.protocolV2Links.invalidateLink(id, 'Electron BLE transport released');
-      await this.releaseNative(id);
+      await this.releaseLogical(id, keepSession);
     } catch (error) {
       this.Log?.error('[Electron BLE] release failed:', error);
       this.cleanupDeviceState(id);
     }
   }
 
+  // DeviceConnector.disconnect feature-detects this; without it REQUIRE_DISCONNECT
+  // recovery is a no-op and keep-alive hands the wedged link to every retry.
+  async disconnect(id: string) {
+    return this.releaseNative(id);
+  }
+
+  // Hard teardown, error paths only: a link presumed dead must not be reused.
   private async releaseNative(id: string) {
     try {
       if (this.connectedDevices.has(id)) {
@@ -370,6 +413,32 @@ export default class ElectronBleTransport {
       }
     } catch (error) {
       this.Log?.error('[Electron BLE] release failed:', error);
+      this.cleanupDeviceState(id);
+    }
+  }
+
+  // Logical release: link and subscription stay up for the next call. Renderer
+  // listeners are still torn down, or fresh ones would double-process packets.
+  private async releaseLogical(id: string, keepSession?: boolean) {
+    try {
+      if (!this.connectedDevices.has(id)) return;
+      this.cleanupDeviceState(id);
+
+      const release = window.desktopApi?.nobleBle?.release;
+      if (!release) {
+        // Degraded, not broken: say it once, it just looks like a slow device.
+        if (!this.warnedMissingRelease) {
+          this.warnedMissingRelease = true;
+          this.Log?.error(
+            '[Electron BLE] desktopApi.nobleBle.release is missing from the preload bridge; ' +
+              'keep-alive idle countdown will never start — map NOBLE_BLE_RELEASE in the desktop preload'
+          );
+        }
+        return;
+      }
+      await release(id, keepSession);
+    } catch (error) {
+      this.Log?.error('[Electron BLE] logical release failed:', error);
       this.cleanupDeviceState(id);
     }
   }
@@ -494,6 +563,7 @@ export default class ElectronBleTransport {
       await window.desktopApi?.nobleBle?.connect(uuid);
       this.connectedDevices.add(uuid);
       await window.desktopApi?.nobleBle?.subscribe(uuid);
+      await this.refreshBlePacketCapacity(uuid);
     } catch (error) {
       this.Log?.debug(`[Electron BLE] reconnect after Protocol ${protocol} probe failed:`, error);
       throw error;
@@ -550,7 +620,36 @@ export default class ElectronBleTransport {
       throw new Error('Noble BLE API not available');
     }
 
-    await nobleBle.write(uuid, hexData);
+    await nobleBle.write(uuid, hexData, { pacingDelayMs: 0 });
+  }
+
+  private async refreshBlePacketCapacity(uuid: string): Promise<void> {
+    const device = await window.desktopApi?.nobleBle?.getDevice(uuid);
+    this.updateBlePacketCapacity(uuid, device?.mtu);
+  }
+
+  private updateBlePacketCapacity(uuid: string, mtu?: number): void {
+    const packetCapacity = resolveBlePacketCapacity(
+      mtu,
+      BLE_PACKET_SIZE_MAXIMUM,
+      BLE_PACKET_SIZE_FALLBACK
+    );
+    if (typeof mtu === 'number') {
+      this.deviceMtus.set(uuid, mtu);
+    } else {
+      this.deviceMtus.delete(uuid);
+    }
+    this.devicePacketCapacities.set(uuid, packetCapacity);
+  }
+
+  private createMtuSubscription(uuid: string): (() => void) | undefined {
+    const onMtuChanged = window.desktopApi?.nobleBle?.onMtuChanged;
+    if (!onMtuChanged) return undefined;
+    return onMtuChanged(device => {
+      if (device.id === uuid) {
+        this.updateBlePacketCapacity(uuid, device.mtu);
+      }
+    });
   }
 
   private writeProtocolV2Frame(
@@ -559,15 +658,17 @@ export default class ElectronBleTransport {
     context: ProtocolV2CallContext,
     assertCurrentGeneration: () => void
   ) {
+    const packetCapacity = this.devicePacketCapacities.get(uuid) ?? BLE_PACKET_SIZE_FALLBACK;
+    const shouldPace = !context.highThroughput;
     return writeProtocolV2BleFrame({
       frame,
-      packetCapacity: BLE_PACKET_SIZE,
+      packetCapacity,
       assertActive: assertCurrentGeneration,
       signal: context.signal,
       abortMessage: `Protocol V2 BLE write aborted for ${context.messageName}`,
-      initialDelayMs: frame.length <= BLE_PACKET_SIZE ? BLE_WRITE_DELAY_MS : 0,
-      burstSize: 1,
-      burstPauseMs: BLE_WRITE_DELAY_MS,
+      initialDelayMs: shouldPace && frame.length <= packetCapacity ? BLE_WRITE_DELAY_MS : 0,
+      burstSize: shouldPace ? 1 : undefined,
+      burstPauseMs: shouldPace ? BLE_WRITE_DELAY_MS : 0,
       writePacket: packet => this.writeOnce(uuid, bytesToHex(packet)),
     });
   }
@@ -888,6 +989,12 @@ export default class ElectronBleTransport {
         bufferState.bufferLength = dataView.getInt32(5, false);
         bufferState.buffer = [...data.subarray(3)];
       } else {
+        if (bufferState.buffer.length === 0) {
+          // Tail of a cancelled call, arriving after the buffer was reset. Not an
+          // `error`: the caller rejects the in-flight call on that field.
+          this.Log?.debug('[Electron BLE] Orphan continuation chunk discarded');
+          return { isComplete: false };
+        }
         bufferState.buffer = bufferState.buffer.concat([...data]);
       }
 

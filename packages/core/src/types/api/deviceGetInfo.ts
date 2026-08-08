@@ -1,4 +1,4 @@
-import { DeviceInfo } from '@onekeyfe/hd-transport';
+import type { DeviceInfo } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export declare function deviceGetInfo(

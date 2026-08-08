@@ -481,7 +481,19 @@ function inputToTrezor(input: BtcTxInput): Record<string, unknown> {
   return result;
 }
 
-function outputToTrezor(output: BtcTxOutput): Record<string, unknown> {
+export function outputToTrezor(output: BtcTxOutput): Record<string, unknown> {
+  // Reject conflicting targets instead of silently picking one by priority
+  // (parity with hd-core / Trezor Suite `Cannot use address and address_n`).
+  const targetCount = [
+    output.opReturnData !== undefined,
+    Boolean(output.address),
+    Boolean(output.path),
+  ].filter(Boolean).length;
+  if (targetCount > 1) {
+    throw createInvalidParamsError(
+      'btcSignTransaction output must specify exactly one of opReturnData, address, or path'
+    );
+  }
   const withOutputMetadata = (result: Record<string, unknown>): Record<string, unknown> => {
     if (output.paymentReqIndex !== undefined) {
       result.payment_req_index = output.paymentReqIndex;

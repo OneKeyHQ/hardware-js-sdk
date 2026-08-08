@@ -6,7 +6,7 @@ jest.mock('../src/data/config', () => ({
   DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0/',
 }));
 
-describe('Kaspa Pro2 useTweak capability', () => {
+describe('Kaspa Pro2 product-family useTweak capability', () => {
   test.each([
     ['get address', KaspaGetAddress],
     ['sign transaction', KaspaSignTransaction],
@@ -14,7 +14,7 @@ describe('Kaspa Pro2 useTweak capability', () => {
     const method = new Method({ id: 1, payload: {} } as never);
 
     expect(method.getUseTweakVersionRange()).toMatchObject({
-      pro2: { min: '0.0.0' },
+      model_pro2: { min: '0.0.0' },
     });
   });
 });

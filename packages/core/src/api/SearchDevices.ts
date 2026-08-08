@@ -59,7 +59,9 @@ export default class SearchDevices extends BaseMethod {
         // Discovery is best effort. Browsers may retain WebUSB grants for devices that
         // are offline, busy, or not ready, so one descriptor must not abort the scan.
         const result = await DevicePool.getDevices([descriptor], descriptor.path, {
-          connectProtocol: this.payload.connectProtocol,
+          // Discovery must actively identify the protocol instead of trusting a caller hint.
+          connectProtocol: undefined,
+          forceProtocolDetection: true,
           refreshRuntimeState: true,
         });
         deviceList.push(...result.deviceList);

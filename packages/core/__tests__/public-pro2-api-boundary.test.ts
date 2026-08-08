@@ -43,7 +43,7 @@ const unpublishedFilesystemAliases = [
   'filesystemPathInfoQuery',
 ] as const;
 
-describe('public Pro2 API boundary', () => {
+describe('public factory and Protocol V2 API boundary', () => {
   test('exposes business APIs without raw device or filesystem commands', () => {
     const api = createCoreApi(jest.fn() as CoreApi['call']) as Record<string, unknown>;
 
@@ -53,6 +53,13 @@ describe('public Pro2 API boundary', () => {
     expect(api.deviceWriteFactoryCertificate).toBeInstanceOf(Function);
     expect(api.deviceReadFactoryCertificate).toBeInstanceOf(Function);
     expect(api.deviceSignFactoryChallenge).toBeInstanceOf(Function);
+    expect(api.deviceInfoSettings).toBeInstanceOf(Function);
+    expect(api.deviceGetInfo).toBeInstanceOf(Function);
+    expect(api.deviceWriteSEPrivateKey).toBeInstanceOf(Function);
+    expect(api.deviceReadSEPublicCert).toBeInstanceOf(Function);
+    expect(api.deviceWriteSEPublicCert).toBeInstanceOf(Function);
+    expect(api.deviceSESignMessage).toBeInstanceOf(Function);
+    expect(api.deviceUploadNft).toBeInstanceOf(Function);
     expect(api.uploadPortfolio).toBeInstanceOf(Function);
     expect(api.testProtocolV2Ping).toBeInstanceOf(Function);
     expect(publicMethods.testProtocolV2Ping).toBeInstanceOf(Function);
@@ -69,7 +76,7 @@ describe('public Pro2 API boundary', () => {
     });
   });
 
-  test('routes semantic Pro2 factory APIs without publishing raw message names', async () => {
+  test('routes semantic Protocol V2 factory APIs', async () => {
     const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
     const api = createCoreApi(call as CoreApi['call']) as CoreApi;
     const manufactureTime = {
@@ -81,31 +88,30 @@ describe('public Pro2 API boundary', () => {
       second: 30,
     };
 
-    await api.deviceProvisionFactoryInfo('pro2', {
+    await api.deviceProvisionFactoryInfo('neo', {
       version: 1,
-      serial_number: 'P2A00000001',
+      serial_number: 'NEO00000001',
       burn_in_completed: true,
       factory_test_completed: true,
       manufacture_time: manufactureTime,
       connectProtocol: 'V2',
     });
-    await api.deviceReadFactoryInfo('pro2', { connectProtocol: 'V2' });
-    await api.deviceWriteFactoryCertificate('pro2', {
+    await api.deviceReadFactoryInfo('neo', { connectProtocol: 'V2' });
+    await api.deviceWriteFactoryCertificate('neo', {
       certificate: 'aabb',
-      privateKey: '11'.repeat(32),
       connectProtocol: 'V2',
     });
-    await api.deviceReadFactoryCertificate('pro2', { connectProtocol: 'V2' });
-    await api.deviceSignFactoryChallenge('pro2', {
+    await api.deviceReadFactoryCertificate('neo', { connectProtocol: 'V2' });
+    await api.deviceSignFactoryChallenge('neo', {
       digest: '22'.repeat(32),
       connectProtocol: 'V2',
     });
 
     expect(call).toHaveBeenNthCalledWith(1, {
       method: 'deviceProvisionFactoryInfo',
-      connectId: 'pro2',
+      connectId: 'neo',
       version: 1,
-      serial_number: 'P2A00000001',
+      serial_number: 'NEO00000001',
       burn_in_completed: true,
       factory_test_completed: true,
       manufacture_time: manufactureTime,
@@ -113,26 +119,63 @@ describe('public Pro2 API boundary', () => {
     });
     expect(call).toHaveBeenNthCalledWith(2, {
       method: 'deviceReadFactoryInfo',
-      connectId: 'pro2',
+      connectId: 'neo',
       connectProtocol: 'V2',
     });
     expect(call).toHaveBeenNthCalledWith(3, {
       method: 'deviceWriteFactoryCertificate',
-      connectId: 'pro2',
+      connectId: 'neo',
       certificate: 'aabb',
-      privateKey: '11'.repeat(32),
       connectProtocol: 'V2',
     });
     expect(call).toHaveBeenNthCalledWith(4, {
       method: 'deviceReadFactoryCertificate',
-      connectId: 'pro2',
+      connectId: 'neo',
       connectProtocol: 'V2',
     });
     expect(call).toHaveBeenNthCalledWith(5, {
       method: 'deviceSignFactoryChallenge',
-      connectId: 'pro2',
+      connectId: 'neo',
       digest: '22'.repeat(32),
       connectProtocol: 'V2',
+    });
+  });
+
+  test('routes Pro Protocol V1 factory APIs', async () => {
+    const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
+    const api = createCoreApi(call as CoreApi['call']) as CoreApi;
+
+    await api.deviceInfoSettings('pro', {
+      serial_no: 'PRO00000001',
+      cpu_info: 'cpu',
+      pre_firmware: 'factory',
+      connectProtocol: 'V1',
+    });
+    await api.deviceGetInfo('pro', { connectProtocol: 'V1' });
+    await api.deviceReadSEPublicCert('pro', { connectProtocol: 'V1' });
+    await api.deviceWriteSEPrivateKey('pro', {
+      private_key: '',
+      connectProtocol: 'V1',
+    });
+    await api.deviceWriteSEPublicCert('pro', {
+      public_cert: 'test-certificate',
+      connectProtocol: 'V1',
+    });
+    await api.deviceSESignMessage('pro', {
+      message: 'test-challenge',
+      connectProtocol: 'V1',
+    });
+
+    expect(call.mock.calls.map(([payload]) => payload.method)).toEqual([
+      'deviceInfoSettings',
+      'deviceGetInfo',
+      'deviceReadSEPublicCert',
+      'deviceWriteSEPrivateKey',
+      'deviceWriteSEPublicCert',
+      'deviceSESignMessage',
+    ]);
+    call.mock.calls.forEach(([payload]) => {
+      expect(payload).toMatchObject({ connectId: 'pro', connectProtocol: 'V1' });
     });
   });
 

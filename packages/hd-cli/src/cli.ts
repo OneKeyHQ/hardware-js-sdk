@@ -629,8 +629,8 @@ program
   .description('Run Protocol V2 firmware update through sdk.firmwareUpdateV4')
   .option('--chunk-size <bytes>', 'Transfer chunk size in bytes')
   .option(
-    '--resource-bundle <spec...>',
-    'RESC bundle direct-write spec: <localPath>:<devicePath>, e.g. wallpaper.okpkg:vol0:/bundles/images/wallpaper.okpkg'
+    '--resource-file <spec...>',
+    'Resource direct-write spec: <localPath>:<devicePath>, e.g. wallpaper.okpkg:vol0:/bundles/images/wallpaper.okpkg'
   )
   .option('--romloader <path>', 'FW_MGMT_TARGET_ROMLOADER binary path')
   .option('--bootloader <path>', 'FW_MGMT_TARGET_BOOTLOADER binary path')
@@ -1253,18 +1253,16 @@ async function resolveLegacyFirmwareConnectId(
   return connectId;
 }
 
-function parseResourceBundleParam(spec: string): { binary: ArrayBuffer; devicePath: string } {
+function parseResourceFileParam(spec: string): { binary: ArrayBuffer; devicePath: string } {
   const sep = spec.indexOf(':');
   if (sep <= 0 || sep === spec.length - 1) {
-    throw new Error(
-      `Invalid --resource-bundle value: "${spec}". Expected <localPath>:<devicePath>`
-    );
+    throw new Error(`Invalid --resource-file value: "${spec}". Expected <localPath>:<devicePath>`);
   }
   const localPath = spec.slice(0, sep);
   const devicePath = spec.slice(sep + 1);
   if (!devicePath.startsWith('vol')) {
     throw new Error(
-      `Invalid --resource-bundle device path: "${devicePath}". Expected a vol*:/... path`
+      `Invalid --resource-file device path: "${devicePath}". Expected a vol*:/... path`
     );
   }
   return {
@@ -1275,7 +1273,7 @@ function parseResourceBundleParam(spec: string): { binary: ArrayBuffer; devicePa
 
 function getFirmwareUpdateV4TotalBytes(params: ReturnType<typeof buildFirmwareUpdateV4Params>) {
   return [
-    ...(params.resourceBundleFiles?.map(item => item.binary) ?? []),
+    ...(params.resourceFiles?.map(item => item.binary) ?? []),
     params.bootloaderBinary,
     params.applicationP1Binary,
     params.applicationP2Binary,
@@ -1600,7 +1598,7 @@ export async function runFirmwareUpdateV4WithRetry({
 
 function buildFirmwareUpdateV4Params(opts: {
   chunkSize?: string;
-  resourceBundle?: string[];
+  resourceFile?: string[];
   romloader?: string;
   bootloader?: string;
   applicationP1?: string;
@@ -1617,7 +1615,7 @@ function buildFirmwareUpdateV4Params(opts: {
     connectProtocol: 'V2' as const,
     chunkSize: opts.chunkSize ? safeParseInt(opts.chunkSize, '--chunk-size') : undefined,
     forcedUpdateRes: opts.forcedUpdateRes,
-    resourceBundleFiles: opts.resourceBundle?.map(parseResourceBundleParam),
+    resourceFiles: opts.resourceFile?.map(parseResourceFileParam),
     romloaderBinary: opts.romloader ? readBinaryParam(opts.romloader) : undefined,
     bootloaderBinary: opts.bootloader ? readBinaryParam(opts.bootloader) : undefined,
     applicationP1Binary: opts.applicationP1 ? readBinaryParam(opts.applicationP1) : undefined,
@@ -1630,7 +1628,7 @@ function buildFirmwareUpdateV4Params(opts: {
   };
 
   const hasPayload = [
-    params.resourceBundleFiles,
+    params.resourceFiles,
     params.romloaderBinary,
     params.bootloaderBinary,
     params.applicationP1Binary,

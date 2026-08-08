@@ -1,20 +1,27 @@
-import type { IDeviceType, Features, OnekeyFeatures } from '@onekeyfe/hd-core';
+import type { DeviceState, Features, IDeviceType, OnekeyFeatures } from '@onekeyfe/hd-core';
+import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
 export interface DeviceInfo {
-  connectId: string;
-  deviceId: string;
+  connectId: string | null;
+  connectProtocol?: HardwareConnectProtocol;
+  serialNo?: string | null;
+  deviceId: string | null;
   uuid: string;
   deviceType: IDeviceType;
   name: string;
   label?: string;
   path?: string;
+  state?: DeviceState;
+  protocolVersion?: number | null;
   features?: Features;
   onekeyFeatures?: OnekeyFeatures;
 }
 
 export interface SearchDeviceInfo {
-  connectId: string;
-  deviceId: string;
+  connectId: string | null;
+  connectProtocol?: HardwareConnectProtocol;
+  serialNo?: string | null;
+  deviceId: string | null;
   uuid: string;
   deviceType: IDeviceType;
   name: string;

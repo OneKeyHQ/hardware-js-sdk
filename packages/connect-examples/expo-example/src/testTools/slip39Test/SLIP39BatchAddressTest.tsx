@@ -13,6 +13,7 @@ import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvid
 import { type Slip39StateManager, slip39StateInstances } from './slip39StateManager';
 import { convertToBundleFormat } from './utils';
 import { batchAddressTests } from './addressData';
+import { isPassphraseProtectionEnabled } from '../../utils/protocolAwareFeatures';
 
 import type { CoreMessage } from '@onekeyfe/hd-core';
 import type { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
@@ -361,7 +362,7 @@ function ExecuteView({
       hardwareUiEventListener = (message: CoreMessage) => {
         // Only log errors and PIN/passphrase requests
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          openDialog(sdk, message.payload.device.features);
+          openDialog(sdk, message.payload.device.features, message);
         }
         if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
           setTimeout(() => {
@@ -370,6 +371,7 @@ function ExecuteView({
               payload: {
                 value: currentPassphrase.current ?? '',
               },
+              ...(message.payload.responseCorrelation ?? {}),
             });
           }, 200);
         }
@@ -386,12 +388,12 @@ function ExecuteView({
 
       // Handle passphrase protection following addressTest pattern
       const deviceFeatures = features as any;
-      if (deviceFeatures?.passphrase_protection === true && testCase?.extra?.passphrase == null) {
+      if (isPassphraseProtectionEnabled(deviceFeatures) && testCase?.extra?.passphrase == null) {
         await sdk.deviceSettings(connectId, {
           usePassphrase: false,
         });
       }
-      if (!deviceFeatures?.passphrase_protection && testCase?.extra?.passphrase != null) {
+      if (!isPassphraseProtectionEnabled(deviceFeatures) && testCase?.extra?.passphrase != null) {
         await sdk.deviceSettings(connectId, {
           usePassphrase: true,
         });

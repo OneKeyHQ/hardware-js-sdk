@@ -1,4 +1,4 @@
-import { SESignMessage, SEMessageSignature } from '@onekeyfe/hd-transport';
+import type { SEMessageSignature, SESignMessage } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export declare function deviceSESignMessage(

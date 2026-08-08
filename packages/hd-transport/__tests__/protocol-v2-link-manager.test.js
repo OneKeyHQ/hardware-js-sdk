@@ -117,7 +117,7 @@ describe('ProtocolV2LinkManager', () => {
       expect.objectContaining({
         messageName: 'Ping',
         timeoutMs: 123,
-        highVolume: false,
+        highThroughput: false,
         generation: 1,
         signal: expect.any(AbortSignal),
       })

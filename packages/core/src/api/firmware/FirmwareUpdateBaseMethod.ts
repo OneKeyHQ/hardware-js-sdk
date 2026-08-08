@@ -13,9 +13,10 @@ import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
 import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
-import { createFirmwareProgressThrottle } from './progressThrottle';
+import { writeFirmwareByteSource } from './FirmwareArtifactSource';
 
 import type {
+  FirmwareProgress,
   IFirmwareUpdateProgressType,
   IFirmwareUpdateTipMessage,
 } from '../../events/ui-request';
@@ -24,10 +25,26 @@ import type { RebootType } from '@onekeyfe/hd-transport';
 import type { Deferred } from '@onekeyfe/hd-shared';
 import type { KnownDevice } from '../../types';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
+import type { FirmwareByteSource } from './FirmwareArtifactSource';
 
 const Log = getLogger(LoggerNames.Method);
 const SESSION_ERROR = 'session not found';
 const FIRMWARE_UPDATE_CONFIRM = 'Firmware install confirmed';
+
+/**
+ * Response timeout for each Initialize probe while polling a rebooting device over BLE.
+ * Overlap safety comes from the poll's in-flight guard, not from this value. Keep it
+ * well below the 30s reboot budget so several attempts fit: a probe written into the
+ * dying pre-reboot connection is never answered, and its timeout tears that stale link
+ * down so the next tick reconnects fresh. Raise it only if a device model is proven to
+ * answer bootloader Initialize slower than this on a fresh connection.
+ */
+export const BOOTLOADER_POLL_INITIALIZE_TIMEOUT_MS = 5000;
+
+type FirmwareTransferMetrics = Pick<
+  FirmwareProgress['payload'],
+  'transferredBytes' | 'totalBytes' | 'rateBytesPerSecond' | 'elapsedMs'
+>;
 
 const isDeviceDisconnectedError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error ?? '');
@@ -40,8 +57,6 @@ const isDeviceDisconnectedError = (error: unknown) => {
 
 export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
-
-  private shouldPostFirmwareProgress = createFirmwareProgressThrottle();
 
   init(): void {}
 
@@ -85,16 +100,17 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
    * @description Post the progress message
    * @param progress Post the percentage of the progress
    */
-  postProgressMessage = (progress: number, progressType: IFirmwareUpdateProgressType) => {
-    if (!this.shouldPostFirmwareProgress(progress, progressType)) {
-      return;
-    }
-
+  postProgressMessage = (
+    progress: number,
+    progressType: IFirmwareUpdateProgressType,
+    metrics?: FirmwareTransferMetrics
+  ) => {
     this.postMessage(
       createUiMessage(UI_REQUEST.FIRMWARE_PROGRESS, {
         device: this.device.toMessageObject() as KnownDevice,
         progress,
         progressType,
+        ...metrics,
       })
     );
   };
@@ -139,6 +155,10 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     this.checkPromise = createDeferred();
     const env = DataManager.getSettings('env');
     const isBleReconnect = connectId && DataManager.isBleConnect(env);
+    // Tracks the in-flight BLE probe so interval ticks never overlap: a superseded
+    // Initialize left pending on the V1 transport is exactly what later times out
+    // and used to tear down the connection mid-firmware-upload.
+    let bleProbeInFlight = false;
 
     Log.log('FirmwareUpdateBaseMethod [checkDeviceToBootloader] isBleReconnect: ', isBleReconnect);
 
@@ -194,13 +214,19 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         }
 
         if (isBleReconnect) {
+          if (bleProbeInFlight) return;
+          bleProbeInFlight = true;
           try {
             await this.device.deviceConnector?.acquire(
               this.device.originalDescriptor.id,
               null,
-              true
+              true,
+              this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType
             );
-            await this.device.initialize();
+            // Bound each probe so a request the rebooting device never received
+            // frees the slot for the next tick instead of hanging into the
+            // 30s reboot budget.
+            await this.device.initialize({ timeoutMs: BOOTLOADER_POLL_INITIALIZE_TIMEOUT_MS });
             if (this.device.isBootloader()) {
               clearInterval(intervalTimer);
               this.checkPromise?.resolve(true);
@@ -208,6 +234,8 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
           } catch (e) {
             // ignore error because of device is not connected
             Log.log('catch Bluetooth error when device is restarting: ', e);
+          } finally {
+            bleProbeInFlight = false;
           }
         } else {
           await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
@@ -232,7 +260,9 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   ) {
     const deviceDiff = await this.device.deviceConnector?.enumerate();
     const devicesDescriptor = deviceDiff?.descriptors ?? [];
-    const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
+    const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId, {
+      connectProtocol: this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType,
+    });
 
     if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
       // should update current device from cache
@@ -387,6 +417,54 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     return totalSize !== undefined ? (processedSize ?? 0) + payload.byteLength : 0;
   }
 
+  async emmcCommonUpdateProcessFromSource({
+    source,
+    filePath,
+    processedSize,
+    totalSize,
+  }: {
+    source: FirmwareByteSource;
+    filePath: string;
+    processedSize?: number;
+    totalSize?: number;
+  }) {
+    if (!filePath.startsWith('0:')) {
+      throw new Error('filePath must start with 0:');
+    }
+    const env = DataManager.getSettings('env');
+    const chunkSize = 1024 * (DataManager.isBleConnect(env) ? 16 : 128);
+
+    await writeFirmwareByteSource({
+      source,
+      chunkSize,
+      write: async ({ data, sourceOffset, length, first }) => {
+        const progress =
+          totalSize !== undefined && processedSize !== undefined
+            ? Math.min(Math.ceil(((processedSize + sourceOffset + length) / totalSize) * 100), 99)
+            : Math.min(Math.ceil(((sourceOffset + length) / source.size) * 100), 99);
+        const writeRes = await this.emmcFileWriteWithRetry(
+          filePath,
+          length,
+          sourceOffset,
+          data,
+          first,
+          progress
+        );
+        if (!writeRes) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.EmmcFileWriteFirmwareError,
+            'transfer data error'
+          );
+        }
+        const processedBytes = Number(writeRes.message.processed_byte);
+        this.postProgressMessage(progress, 'transferData');
+        return Number.isFinite(processedBytes) ? processedBytes : length;
+      },
+    });
+
+    return totalSize !== undefined ? (processedSize ?? 0) + source.size : 0;
+  }
+
   async emmcFileWriteWithRetry(
     filePath: string,
     chunkLength: number,
@@ -441,7 +519,12 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         const env = DataManager.getSettings('env');
         if (DataManager.isBleConnect(env)) {
           await wait(3000);
-          await this.device.deviceConnector?.acquire(this.device.originalDescriptor.id, null, true);
+          await this.device.deviceConnector?.acquire(
+            this.device.originalDescriptor.id,
+            null,
+            true,
+            this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType
+          );
           await this.device.initialize();
         } else if (
           error?.message?.indexOf(SESSION_ERROR) > -1 ||
@@ -449,7 +532,10 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         ) {
           const deviceDiff = await this.device.deviceConnector?.enumerate();
           const devicesDescriptor = deviceDiff?.descriptors ?? [];
-          const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined);
+          const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined, {
+            connectProtocol:
+              this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType,
+          });
           if (deviceList.length === 1 && deviceList[0]?.isBootloader()) {
             this.device.updateFromCache(deviceList[0]);
             await this.device.acquire();

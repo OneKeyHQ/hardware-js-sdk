@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 import { getDeviceType as getDeviceTypeFromSDK } from '@onekeyfe/hd-core';
 
 import { useDevice } from '../../provider/DeviceProvider';
+import { isMethodSupportedOnProtocol } from '../../utils/protocolAwareMethod';
 
 import type { EDeviceType } from '@onekeyfe/hd-shared';
 
@@ -94,6 +95,21 @@ export class DeviceCompatibilityManager {
     });
   }
 
+  private getProtocolUnsupportedReason(context: DeviceCompatibilityRuleContext) {
+    const protocol = context.features?.protocol;
+    if (protocol !== 'V1' && protocol !== 'V2') return undefined;
+
+    try {
+      if (!isMethodSupportedOnProtocol(context.method, protocol, context.params)) {
+        return `${context.method} is not available on Protocol ${protocol}`;
+      }
+    } catch {
+      // Non-Core helper methods are handled by their existing compatibility rules.
+    }
+
+    return undefined;
+  }
+
   // 检查方法是否需要跳过（支持路径级别与参数级别）
   checkMethod(
     features: any,
@@ -108,6 +124,14 @@ export class DeviceCompatibilityManager {
       features,
       deviceType,
     };
+
+    const protocolUnsupportedReason = this.getProtocolUnsupportedReason(context);
+    if (protocolUnsupportedReason) {
+      return {
+        shouldSkip: true,
+        reason: protocolUnsupportedReason,
+      };
+    }
 
     const matchedRule = this.findMatchedOverride(context, rule => typeof rule.skip === 'string');
     if (matchedRule?.skip) {
@@ -135,6 +159,9 @@ export class DeviceCompatibilityManager {
       features,
       deviceType,
     };
+    if (this.getProtocolUnsupportedReason(context)) {
+      return false;
+    }
     const matchedRule = this.findMatchedOverride(
       context,
       rule => typeof rule.expected === 'boolean'

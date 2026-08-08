@@ -58,11 +58,20 @@ export type AcquireInput = {
 
 export type MessageFromOneKey = { type: string; message: Record<string, any> };
 
+export type TransportWriteMetrics = {
+  elapsedMs: number;
+  frameBytes: number;
+};
+
 export type TransportCallOptions = {
   timeoutMs?: number;
   expectedTypes?: string[];
   intermediateTypes?: string[];
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
+  /** Called after the complete request frame has been submitted to the transport. */
+  onWriteCompleted?: (metrics: TransportWriteMetrics) => void;
+  /** Prefer acknowledged BLE characteristic writes for this call when supported. */
+  writeWithResponse?: boolean;
 };
 
 type ITransportInitFn = (
@@ -75,7 +84,12 @@ export type Transport = {
   enumerate(): Promise<Array<OneKeyDeviceInfo>>;
   listen(old?: Array<OneKeyDeviceInfo>): Promise<Array<OneKeyDeviceInfo>>;
   acquire(input: AcquireInput): Promise<string>;
-  release(session: string, onclose: boolean): Promise<void>;
+  /**
+   * `keepSession` tells a transport that the caller intends to keep using this
+   * device across calls (firmware update, batched signing). Transports that
+   * hold the link open may use it to pick a longer idle window; the rest ignore it.
+   */
+  release(session: string, onclose: boolean, keepSession?: boolean): Promise<void>;
   configure(signedData: JSON | string): Promise<void>;
   configureProtocolV2?: (signedData: JSON | string) => Promise<void> | void;
   call(

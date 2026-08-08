@@ -33,6 +33,10 @@ import ChainMethodsIndexPage from './routes/chains.$chainId._index';
 import ChainMethodExecutePage from './routes/chains.$chainId.$methodName';
 import DeviceMethodsIndexPage from './routes/device-methods._index';
 import DeviceMethodExecutePage from './routes/device-methods.$methodName';
+import MethodBatchTestPage from './routes/method-batch-test';
+import MultisigTestPage from './routes/multisig-test';
+import Pro2UpdatePage from './routes/pro2-update';
+import WalletSessionTestPage from './routes/wallet-session-test';
 
 // Import styles
 import './tailwind.css';
@@ -118,6 +122,22 @@ const router = createHashRouter(
         {
           path: 'device-info',
           element: <DeviceInfoPage />,
+        },
+        {
+          path: 'pro2-update',
+          element: <Pro2UpdatePage />,
+        },
+        {
+          path: 'method-batch-test',
+          element: <MethodBatchTestPage />,
+        },
+        {
+          path: 'multisig-test',
+          element: <MultisigTestPage />,
+        },
+        {
+          path: 'wallet-session-test',
+          element: <WalletSessionTestPage />,
         },
 
         {

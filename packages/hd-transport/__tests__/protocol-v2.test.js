@@ -6,13 +6,22 @@ const {
   ProtocolV2SequenceCursor,
   ProtocolV2Session,
   hexToBytes,
+  isProtocolV2HighThroughputCall,
   probeProtocolV2,
 } = require('../src/protocols/v2/session');
 const protocolV2 = require('../src/protocols/v2');
 const {
+  PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE,
+  PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
   PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
   PROTOCOL_V2_FRAME_MAX_BYTES,
 } = require('../src/constants');
+
+test('keeps sensitive acknowledgements separate from high-throughput calls', () => {
+  expect(isProtocolV2HighThroughputCall('PassphraseAck')).toBe(false);
+  expect(isProtocolV2HighThroughputCall('PinMatrixAck')).toBe(false);
+  expect(isProtocolV2HighThroughputCall('FilesystemFileWrite')).toBe(true);
+});
 
 const protocolV1Messages = parseConfigure({
   nested: {
@@ -222,6 +231,7 @@ const schemas = {
   protocolV1: protocolV1Messages,
   protocolV2: protocolV2Messages,
 };
+const productionProtocolV2Messages = parseConfigure(require('../messages-protocol-v2.json'));
 
 const rewriteSeq = (frame, seq) => {
   const copy = new Uint8Array(frame);
@@ -350,6 +360,39 @@ describe('Protocol V2 framing and session', () => {
         message: 'x'.repeat(4188),
       })
     ).toThrow('Protocol V2 frame too large: 4201 > 4200');
+  });
+
+  test('keeps optimized BLE firmware chunks inside the transport frame boundary', () => {
+    const productionSchemas = {
+      protocolV1: protocolV1Messages,
+      protocolV2: productionProtocolV2Messages,
+    };
+    const stagingPaths = [
+      'vol0:/bootloader.bin',
+      'vol0:/application_p1.bin',
+      'vol0:/application_p2.bin',
+      'vol0:/coprocessor.bin',
+      'vol0:/se01.bin',
+      'vol0:/se02.bin',
+      'vol0:/se03.bin',
+      'vol0:/se04.bin',
+    ];
+
+    for (const path of stagingPaths) {
+      const frame = ProtocolV2.encodeFrame(productionSchemas, 'FilesystemFileWrite', {
+        file: {
+          path,
+          offset: 0xffffffff,
+          total_size: 0xffffffff,
+          data: new Uint8Array(PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE),
+        },
+        overwrite: true,
+        append: false,
+        ui_percentage: 100,
+      });
+
+      expect(frame.length).toBeLessThanOrEqual(PROTOCOL_V2_BLE_FRAME_MAX_BYTES);
+    }
   });
 
   test('keeps bytes after the first complete frame for the next read', () => {
@@ -741,6 +784,34 @@ describe('Protocol V2 framing and session', () => {
     expect(logger.debug).not.toHaveBeenCalled();
   });
 
+  test('session reports when the complete request frame has been written', async () => {
+    const response = ProtocolV2.encodeFrame(schemas, 'Success', {
+      message: 'ok',
+    });
+    const events = [];
+    const onWriteCompleted = jest.fn(metrics => events.push(['written', metrics]));
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      writeFrame: frame => {
+        events.push(['write', frame.byteLength]);
+        return Promise.resolve();
+      },
+      readFrame: () => {
+        events.push(['read']);
+        return Promise.resolve(rewriteSeq(response, 1));
+      },
+    });
+
+    await session.call('Ping', { message: 'metrics' }, { onWriteCompleted });
+
+    expect(events.map(event => event[0])).toEqual(['write', 'written', 'read']);
+    expect(onWriteCompleted).toHaveBeenCalledWith({
+      elapsedMs: expect.any(Number),
+      frameBytes: expect.any(Number),
+    });
+  });
+
   test('session skips unrelated terminal frames when expected response types are provided', async () => {
     const stale = ProtocolV2.encodeFrame(schemas, 'Success', {
       message: 'stale response',
@@ -1057,7 +1128,7 @@ describe('Protocol V2 framing and session', () => {
     });
 
     await session.call('Ping', { message: 'ping' }, { timeoutMs: 123 });
-    await session.call('FileWrite', {}, { timeoutMs: 456 });
+    await session.call('FileWrite', {}, { timeoutMs: 456, writeWithResponse: true });
     await session.call('Ping', { message: 'default-timeout' });
 
     const normalizeContext = ({ signal, ...context }) => ({
@@ -1068,21 +1139,22 @@ describe('Protocol V2 framing and session', () => {
       {
         messageName: 'Ping',
         timeoutMs: 123,
-        highVolume: false,
+        highThroughput: false,
         generation: 7,
         signalAborted: false,
       },
       {
         messageName: 'FileWrite',
         timeoutMs: 456,
-        highVolume: true,
+        highThroughput: true,
+        writeWithResponse: true,
         generation: 7,
         signalAborted: false,
       },
       {
         messageName: 'Ping',
         timeoutMs: PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
-        highVolume: false,
+        highThroughput: false,
         generation: 7,
         signalAborted: false,
       },
@@ -1091,21 +1163,22 @@ describe('Protocol V2 framing and session', () => {
       {
         messageName: 'Ping',
         timeoutMs: 123,
-        highVolume: false,
+        highThroughput: false,
         generation: 7,
         signalAborted: false,
       },
       {
         messageName: 'FileWrite',
         timeoutMs: 456,
-        highVolume: true,
+        highThroughput: true,
+        writeWithResponse: true,
         generation: 7,
         signalAborted: false,
       },
       {
         messageName: 'Ping',
         timeoutMs: PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
-        highVolume: false,
+        highThroughput: false,
         generation: 7,
         signalAborted: false,
       },

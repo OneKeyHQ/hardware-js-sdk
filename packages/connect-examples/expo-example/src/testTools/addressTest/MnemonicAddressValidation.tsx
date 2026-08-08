@@ -15,6 +15,7 @@ import mockDevice from '../../utils/mockDevice';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 import { CommonInput } from '../../components/CommonInput';
+import { isPassphraseProtectionEnabled } from '../../utils/protocolAwareFeatures';
 
 import type { ItemVerifyState } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
 import type { CoreMessage } from '@onekeyfe/hd-core';
@@ -264,7 +265,7 @@ function ExecuteView() {
       hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          openDialog(sdk, message.payload.device.features);
+          openDialog(sdk, message.payload.device.features, message);
         }
         if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
           setTimeout(() => {
@@ -273,6 +274,7 @@ function ExecuteView() {
               payload: {
                 value: currentPassphrase.current ?? '',
               },
+              ...(message.payload.responseCorrelation ?? {}),
             });
           }, 200);
         }
@@ -289,13 +291,13 @@ function ExecuteView() {
       }
 
       if (isEmpty(currentPassphrase.current)) {
-        if (features?.passphrase_protection) {
+        if (isPassphraseProtectionEnabled(features)) {
           await sdk.deviceSettings(connectId, {
             usePassphrase: false,
           });
         }
       } else {
-        if (!features?.passphrase_protection) {
+        if (!isPassphraseProtectionEnabled(features)) {
           await sdk.deviceSettings(connectId, {
             usePassphrase: true,
           });

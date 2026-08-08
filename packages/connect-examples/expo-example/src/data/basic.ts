@@ -28,17 +28,6 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
-    method: 'checkBridgeStatus',
-    description: 'Check bridge status of a device',
-    noConnIdReq: true,
-    noDeviceIdReq: true,
-  },
-  {
-    method: 'checkBridgeRelease',
-    description: 'Check bridge release of a device',
-    noDeviceIdReq: true,
-  },
-  {
     method: 'getLogs',
     description: 'get logs',
     noDeviceIdReq: true,

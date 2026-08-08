@@ -210,7 +210,9 @@ export type DeviceStateStatus = {
   recoveryMode: boolean | null;
   passphraseProtection: boolean | null;
   pinProtection: boolean | null;
+  /** `attach_to_pin_enabled`：是否至少存在一个 Attach PIN 绑定。 */
   attachToPinEnabled: boolean | null;
+  /** `unlocked_by_attach_to_pin`：本次解锁是否由 Attach PIN 完成。 */
   unlockedAttachPin: boolean | null;
 };
 
@@ -257,6 +259,19 @@ export type DeviceStateVersions = {
   se04Boot?: string | null;
 };
 
+export type DeviceStateSecurityElement = {
+  type: string | null;
+  state: string | null;
+};
+
+export type DeviceStateSecurityElements = Partial<
+  Record<'se01' | 'se02' | 'se03' | 'se04', DeviceStateSecurityElement>
+>;
+
+export type DeviceStateSecurityElementsPatch = Partial<
+  Record<keyof DeviceStateSecurityElements, Partial<DeviceStateSecurityElement>>
+>;
+
 export type DeviceState = {
   schemaVersion: 1;
   revision: number;
@@ -268,6 +283,8 @@ export type DeviceState = {
   status: DeviceStateStatus;
   settings: DeviceStateSettings;
   versions: DeviceStateVersions;
+  /** Secure-element metadata exposed by the unified firmware information read. */
+  securityElements?: DeviceStateSecurityElements;
   capabilities: Array<number | string>;
   verification?: Partial<DeviceFeaturesVerify>;
 };
@@ -279,6 +296,7 @@ export type DeviceStatePatch = {
   status?: Partial<DeviceStateStatus>;
   settings?: Partial<DeviceStateSettings>;
   versions?: Partial<DeviceStateVersions>;
+  securityElements?: DeviceStateSecurityElementsPatch;
   capabilities?: Array<number | string>;
   verification?: DeviceFeaturesVerify;
   raw?: DeviceFeaturesRawPatch;
@@ -321,6 +339,7 @@ export type NormalizedFeatures = {
   sdProtection: boolean | null;
   wipeCodeProtection: boolean | null;
   passphraseAlwaysOnDevice: boolean | null;
+  /** `attach_to_pin_enabled`：是否至少存在一个 Attach PIN 绑定。 */
   attachToPinEnabled?: boolean | null;
   safetyChecks: Enum_SafetyCheckLevel | null;
   autoLockDelayMs: number | null;
@@ -371,14 +390,21 @@ export type IDeviceType =
   | EDeviceType.Mini
   | EDeviceType.Touch
   | EDeviceType.Pro
-  | EDeviceType.Pro2;
+  | EDeviceType.Pro2
+  | EDeviceType.Neo;
 
 /**
  * model_classic: 'classic' | 'classic1s' | 'classicpure'
  * model_mini: 'classic' | 'classic1s' | 'classicpure' | 'mini'
  * model_touch: 'touch' | 'pro'
+ * model_pro2: 'pro2' | 'neo'
  */
-export type IDeviceModel = 'model_classic' | 'model_mini' | 'model_touch' | 'model_classic1s';
+export type IDeviceModel =
+  | 'model_classic'
+  | 'model_mini'
+  | 'model_touch'
+  | 'model_classic1s'
+  | 'model_pro2';
 
 export const DeviceModelToTypes: { [deviceModel in IDeviceModel]: IDeviceType[] } = {
   model_mini: [
@@ -388,6 +414,7 @@ export const DeviceModelToTypes: { [deviceModel in IDeviceModel]: IDeviceType[] 
     EDeviceType.Mini,
   ],
   model_touch: [EDeviceType.Touch, EDeviceType.Pro],
+  model_pro2: [EDeviceType.Pro2, EDeviceType.Neo],
   model_classic: [EDeviceType.Classic, EDeviceType.Classic1s, EDeviceType.ClassicPure],
   model_classic1s: [EDeviceType.Classic1s, EDeviceType.ClassicPure],
 };
@@ -399,7 +426,8 @@ export const DeviceTypeToModels: { [deviceType in IDeviceType]: IDeviceModel[] }
   [EDeviceType.Mini]: ['model_mini'],
   [EDeviceType.Touch]: ['model_touch'],
   [EDeviceType.Pro]: ['model_touch'],
-  [EDeviceType.Pro2]: [],
+  [EDeviceType.Pro2]: ['model_pro2'],
+  [EDeviceType.Neo]: ['model_pro2'],
   [EDeviceType.Unknown]: [],
 };
 

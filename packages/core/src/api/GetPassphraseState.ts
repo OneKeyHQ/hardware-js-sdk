@@ -1,4 +1,5 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import { UI_REQUEST } from '../constants/ui-request';
 import { refreshProtocolV2DeviceStatus } from '../protocols/protocol-v2/walletSession';
@@ -24,7 +25,12 @@ export default class GetPassphraseState extends BaseMethod {
     if (isProtocolV2 && this.payload.useEmptyPassphrase !== true) {
       const features = await refreshProtocolV2DeviceStatus(this.device);
       if (features.unlocked === false) {
-        await this.device.unlockDevice();
+        await this.device.unlockDevice(DeviceSessionPinType.Main, {
+          source: 'unlock-coordinator',
+          reason: 'device-locked',
+          deviceOnly: true,
+          method: 'getPassphraseState',
+        });
       }
     }
     const { passphraseState } = await getPassphraseStateWithRefreshDeviceInfo(

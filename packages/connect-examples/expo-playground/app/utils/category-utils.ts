@@ -27,6 +27,8 @@ export const CATEGORY_COLORS: Record<MethodCategory, string> = {
   basic: 'text-gray-600 bg-gray-50 border-gray-200',
   message: 'text-purple-600 bg-purple-50 border-purple-200',
   advanced: 'text-pink-600 bg-pink-50 border-pink-200',
+  firmware: 'text-amber-600 bg-amber-50 border-amber-200',
+  other: 'text-gray-600 bg-gray-50 border-gray-200',
 };
 /**
  * 获取分类的图标组件

@@ -7,6 +7,20 @@ const webpack = require('webpack');
 module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync(env, argv);
 
+  // Resolve workspace package symlinks to their real paths. Expo otherwise keeps
+  // @onekeyfe packages under the ignored node_modules tree, so Rollup rebuilds
+  // are not picked up by the Webpack dev server.
+  config.resolve.symlinks = true;
+
+  // The generated filesystem cache only tracks Expo's default config. Include
+  // this project config so resolver changes invalidate the cache after restart.
+  if (config.cache && typeof config.cache === 'object') {
+    config.cache.buildDependencies = {
+      ...config.cache.buildDependencies,
+      config: [...(config.cache.buildDependencies?.config ?? []), __filename],
+    };
+  }
+
   // 设置 publicPath：
   // - Electron 打包（EXPO_ELECTRON_MODE=true）使用根路径，避免 file:// 协议下以 /expo-example/ 为前缀导致 404
   // - 普通生产环境（例如 GitHub Pages）使用 /expo-example/
@@ -85,10 +99,9 @@ module.exports = async function (env, argv) {
     config.devtool = false;
   }
 
-  // 添加或修改 DefinePlugin 来注入 commit SHA 和 CONNECT_SRC
+  // 添加或修改 DefinePlugin 来注入 commit SHA
   const commitSha = process.env.EXPO_PUBLIC_COMMIT_SHA || process.env.COMMIT_SHA || 'dev';
   const buildTime = new Date().toISOString();
-  const connectSrc = process.env.CONNECT_SRC;
 
   // 查找现有的 DefinePlugin
   const definePluginIndex = config.plugins.findIndex(
@@ -97,15 +110,13 @@ module.exports = async function (env, argv) {
 
   if (definePluginIndex !== -1) {
     // 追加新的 DefinePlugin，避免依赖内部字段
-    const defs = {
-      __COMMIT_SHA__: JSON.stringify(commitSha),
-      __BUILD_TIME__: JSON.stringify(buildTime),
-      'process.env.EXPO_PUBLIC_COMMIT_SHA': JSON.stringify(commitSha),
-    };
-    if (connectSrc !== undefined) {
-      defs['process.env.CONNECT_SRC'] = JSON.stringify(connectSrc);
-    }
-    config.plugins.push(new webpack.DefinePlugin(defs));
+    config.plugins.push(
+      new webpack.DefinePlugin({
+        __COMMIT_SHA__: JSON.stringify(commitSha),
+        __BUILD_TIME__: JSON.stringify(buildTime),
+        'process.env.EXPO_PUBLIC_COMMIT_SHA': JSON.stringify(commitSha),
+      })
+    );
   } else {
     // 添加新的 DefinePlugin
     config.plugins.push(
@@ -113,9 +124,6 @@ module.exports = async function (env, argv) {
         __COMMIT_SHA__: JSON.stringify(commitSha),
         __BUILD_TIME__: JSON.stringify(buildTime),
         'process.env.EXPO_PUBLIC_COMMIT_SHA': JSON.stringify(commitSha),
-        ...(connectSrc !== undefined
-          ? { 'process.env.CONNECT_SRC': JSON.stringify(connectSrc) }
-          : {}),
       })
     );
   }

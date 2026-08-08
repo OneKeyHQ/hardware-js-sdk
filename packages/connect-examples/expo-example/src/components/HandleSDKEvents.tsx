@@ -17,22 +17,28 @@ import { WebUsbAuthorize } from './WebUsbAuthorize';
 import { BluetoothPermission } from './BluetoothPermission';
 
 import type { BluetoothErrorType } from './BluetoothPermission';
-import type { CoreMessage } from '@onekeyfe/hd-core';
+import type {
+  CoreMessage,
+  UiRequestDeviceAction,
+  UiRequestPassphrase,
+  UiResponseCorrelation,
+} from '@onekeyfe/hd-core';
 
 // Type declaration for desktopApi matches the one in BluetoothPermission
 declare global {
   interface Window {
     desktopApi?: {
-      bluetoothSystem?: {
-        requestPermission: () => Promise<boolean>;
-        openBluetoothSettings: () => void;
-        openSystemSettings: () => void;
-        getSystemState: () => Promise<{
-          isSupported: boolean;
-          isPoweredOn: boolean;
-          hasPermission: boolean;
-          isScanning: boolean;
+      nobleBle?: {
+        checkAvailability: () => Promise<{
+          available: boolean;
+          state: string;
+          unsupported: boolean;
+          initialized: boolean;
         }>;
+      };
+      bluetoothSystem?: {
+        openBluetoothSettings: () => void;
+        openPrivacySettings: () => void;
       };
     };
   }
@@ -41,7 +47,7 @@ declare global {
 let registerListener = false;
 
 export default function HandleSDKEvents() {
-  const { sdk: SDK, lowLevelSDK: HardwareLowLevelSDK, type } = useContext(HardwareSDKContext);
+  const { sdk: SDK, lowLevelSDK: HardwareLowLevelSDK } = useContext(HardwareSDKContext);
   const [showPinInput, setShowPinInput] = useState(false);
   const [showWebUsbAuthorize, setShowWebUsbAuthorize] = useState(false);
   const [webUsbResponseType, setWebUsbResponseType] = useState<
@@ -50,32 +56,45 @@ export default function HandleSDKEvents() {
   >(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE);
   const [showBluetoothPermission, setShowBluetoothPermission] = useState(false);
   const [bluetoothErrorType, setBluetoothErrorType] = useState<BluetoothErrorType>('permission');
+  const [pinResponseCorrelation, setPinResponseCorrelation] = useState<UiResponseCorrelation>();
 
   // 输入 pin 码的确认回调
   const onConfirmPin = useCallback(
     (payload: string) => {
-      SDK?.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload });
+      if (!pinResponseCorrelation) return;
+      SDK?.uiResponse({
+        type: UI_RESPONSE.RECEIVE_PIN,
+        payload,
+        ...pinResponseCorrelation,
+      });
+      setPinResponseCorrelation(undefined);
       setShowPinInput(false);
     },
-    [SDK]
+    [SDK, pinResponseCorrelation]
   );
 
   // 取消输入 pin 码
   const onPinCancelCallback = useCallback(() => {
     SDK?.cancel('pin-cancelled');
+    setPinResponseCorrelation(undefined);
+    setShowPinInput(false);
   }, [SDK]);
 
   // input pin on device
   const onInputPinOnDeviceCallback = useCallback(() => {
+    if (!pinResponseCorrelation) return;
     SDK?.uiResponse({
       type: UI_RESPONSE.RECEIVE_PIN,
       payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+      ...pinResponseCorrelation,
     });
-  }, [SDK]);
+    setPinResponseCorrelation(undefined);
+    setShowPinInput(false);
+  }, [SDK, pinResponseCorrelation]);
 
   const onWebUsbSuccess = useCallback(
     (device: USBDevice) => {
-      console.log('webUsbSuccess: ', device);
+      console.log('[connect-example] WebUSB device selected');
       SDK?.uiResponse({
         type: webUsbResponseType,
         payload: {
@@ -94,16 +113,15 @@ export default function HandleSDKEvents() {
   const onBluetoothRequestPermission = useCallback(async () => {
     console.log('Requesting Bluetooth permission...');
 
-    if (typeof window !== 'undefined' && window.desktopApi?.bluetoothSystem) {
+    if (typeof window !== 'undefined' && window.desktopApi?.nobleBle) {
       try {
-        const granted = await window.desktopApi.bluetoothSystem.requestPermission();
-        if (granted) {
+        const status = await window.desktopApi.nobleBle.checkAvailability();
+        if (status.available) {
           console.log('Bluetooth permission granted');
           setShowBluetoothPermission(false);
-          // 可以在这里触发重新连接
         } else {
-          console.log('Bluetooth permission denied');
-          // 保持对话框打开，让用户选择其他操作
+          console.log('Bluetooth is unavailable; opening system privacy settings');
+          window.desktopApi.bluetoothSystem?.openPrivacySettings();
         }
       } catch (error) {
         console.error('Failed to request Bluetooth permission:', error);
@@ -138,15 +156,42 @@ export default function HandleSDKEvents() {
       });
 
       const uiEventCallback = (message: CoreMessage) => {
-        console.log('TopLEVEL EVENT (Api Payload)===>>>>: ', message);
+        console.log(`[connect-example] UI event: ${message.type}`);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          if (supportInputPinOnSoftware(message.payload.device.features).support) {
-            setShowPinInput(true);
-          } else {
-            onInputPinOnDeviceCallback();
+          const requestPayload: UiRequestDeviceAction['payload'] = message.payload;
+          const isProtocolV2 =
+            requestPayload.device.connectProtocol === 'V2' ||
+            requestPayload.interaction?.protocol === 'V2';
+
+          if (isProtocolV2) {
+            // Protocol V2 PIN events are non-blocking prompts for device-side input.
+            setPinResponseCorrelation(undefined);
+            setShowPinInput(false);
+          } else if (requestPayload.responseCorrelation) {
+            setPinResponseCorrelation(requestPayload.responseCorrelation);
+            if (supportInputPinOnSoftware(requestPayload.device.features).support) {
+              setShowPinInput(true);
+            } else {
+              setTimeout(() => {
+                SDK.uiResponse({
+                  type: UI_RESPONSE.RECEIVE_PIN,
+                  payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+                  ...requestPayload.responseCorrelation,
+                });
+                setPinResponseCorrelation(undefined);
+              }, 0);
+            }
           }
         }
+        if (
+          message.type === UI_REQUEST.CLOSE_UI_PIN_WINDOW ||
+          message.type === UI_REQUEST.CLOSE_UI_WINDOW
+        ) {
+          setPinResponseCorrelation(undefined);
+          setShowPinInput(false);
+        }
         if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
+          const { responseCorrelation }: UiRequestPassphrase['payload'] = message.payload;
           setTimeout(() => {
             SDK.uiResponse({
               type: UI_RESPONSE.RECEIVE_PASSPHRASE,
@@ -155,6 +200,7 @@ export default function HandleSDKEvents() {
                 passphraseOnDevice: true,
                 save: false,
               },
+              ...responseCorrelation,
             });
           }, 2000);
         }
@@ -215,7 +261,7 @@ export default function HandleSDKEvents() {
         SDK.off(UI_EVENT, uiEventCallback);
         registerListener = false;
       };
-    }, [HardwareLowLevelSDK, SDK, onInputPinOnDeviceCallback])
+    }, [HardwareLowLevelSDK, SDK])
   );
 
   const onTestUnexpectedMessage = useCallback(() => {

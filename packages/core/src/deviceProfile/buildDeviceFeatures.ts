@@ -1,4 +1,4 @@
-import { EFirmwareType } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
 import {
   resolveDeviceBleFirmwareVersion,
@@ -386,7 +386,7 @@ export const buildProtocolV2FeaturesPayload = ({
     device_id: deviceId ?? undefined,
     session_id: cached?.sessionId ?? undefined,
     ble_name: bleName ?? undefined,
-    onekey_device_type: 'PRO2',
+    onekey_device_type: deviceType === EDeviceType.Unknown ? undefined : deviceType.toUpperCase(),
     passphrase_protection: passphraseProtection ?? undefined,
     bootloader_mode: bootloaderMode,
     passphraseState: cached?.passphraseState,

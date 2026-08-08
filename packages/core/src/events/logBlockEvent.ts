@@ -10,6 +10,7 @@ export const LogBlockEvent: Set<string> = new Set([
 
 const LogLabelMethod: Set<string> = new Set([
   'openWalletSession',
+  'deviceUploadNft',
   'deviceUploadWallpaper',
   'uploadPortfolio',
   'fileWrite',

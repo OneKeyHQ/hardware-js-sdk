@@ -37,6 +37,12 @@ export const resolveDeviceSerialNo = (features?: DeviceFeaturesInput): string =>
   );
 };
 
+export const resolveDeviceBootloaderMode = (features?: DeviceFeaturesInput): boolean => {
+  if (!features) return false;
+  const compatible = asCompatibleFeatures(features);
+  return (compatible.bootloaderMode ?? compatible.bootloader_mode) === true;
+};
+
 export const resolveDeviceType = (features?: DeviceFeaturesInput): IDeviceType => {
   if (!features || typeof features !== 'object') {
     return EDeviceType.Unknown;
@@ -60,6 +66,8 @@ export const resolveDeviceType = (features?: DeviceFeaturesInput): IDeviceType =
       return EDeviceType.Pro;
     case 'PRO2':
       return EDeviceType.Pro2;
+    case 'NEO':
+      return EDeviceType.Neo;
     case 'PURE':
       return EDeviceType.ClassicPure;
     default:
@@ -68,6 +76,9 @@ export const resolveDeviceType = (features?: DeviceFeaturesInput): IDeviceType =
 
   if (compatible.model?.toString().toLowerCase() === EDeviceType.Pro2) {
     return EDeviceType.Pro2;
+  }
+  if (compatible.model?.toString().toLowerCase() === EDeviceType.Neo) {
+    return EDeviceType.Neo;
   }
 
   const serialNo = resolveDeviceSerialNo(features);

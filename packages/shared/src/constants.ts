@@ -86,11 +86,15 @@ export enum EOneKeyBleMessageKeys {
   NOBLE_BLE_STOP_SCAN = '$onekey-noble-ble-stop-scan',
   NOBLE_BLE_GET_DEVICE = '$onekey-noble-ble-get-device',
   NOBLE_BLE_CONNECT = '$onekey-noble-ble-connect',
+  // Logical end-of-operation from the renderer (keep-alive): the physical link
+  // stays up but the main process starts its idle-disconnect countdown.
+  NOBLE_BLE_RELEASE = '$onekey-noble-ble-release',
   NOBLE_BLE_DISCONNECT = '$onekey-noble-ble-disconnect',
   NOBLE_BLE_WRITE = '$onekey-noble-ble-write',
   NOBLE_BLE_SUBSCRIBE = '$onekey-noble-ble-subscribe',
   NOBLE_BLE_UNSUBSCRIBE = '$onekey-noble-ble-unsubscribe',
   NOBLE_BLE_NOTIFICATION = '$onekey-noble-ble-notification',
+  NOBLE_BLE_MTU_CHANGED = '$onekey-noble-ble-mtu-changed',
   NOBLE_BLE_CANCEL_PAIRING = '$onekey-noble-ble-cancel-pairing',
 }
 
@@ -148,7 +152,8 @@ export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
   if (
     normalizedName.startsWith('touch ') ||
     normalizedName.startsWith('pro ') ||
-    normalizedName.startsWith('pro2 ')
+    normalizedName.startsWith('pro2 ') ||
+    normalizedName.startsWith('neo ')
   ) {
     return true;
   }
@@ -191,8 +196,10 @@ export const matchesKnownBleUuid = (
 const ONEKEY_COMMUNICATION_SERVICE_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
 const FIDO_SERVICE_ALIASES = createKnownBleUuidAliases('0000fffd-0000-1000-8000-00805f9b34fb');
 
-const isFindMyAdvertisementName = (value?: string | null) =>
-  /\bfinde?\s+my\b/.test(value?.trim().toLowerCase() ?? '');
+export const isPro2FindMyAdvertisementName = (value?: string | null) => {
+  const normalizedName = value?.trim().toLowerCase() ?? '';
+  return /\bpro\s*2\b/.test(normalizedName) && /\bfinde?\s+my\b/.test(normalizedName);
+};
 
 export const hasOnekeyCommunicationService = (
   serviceUuids: Array<string | null | undefined> | null | undefined
@@ -208,12 +215,14 @@ export const isOnekeyBluetoothDevice = ({
   serviceUuids,
 }: BluetoothDeviceIdentity): boolean => {
   const advertisedServiceUuids = serviceUuids ?? [];
-  if (isFindMyAdvertisementName(name) || isFindMyAdvertisementName(localName)) {
-    return false;
-  }
-
   if (hasOnekeyCommunicationService(advertisedServiceUuids)) {
     return true;
+  }
+
+  // Android can return a connected Find My peripheral without its advertised
+  // services. Do not let the Pro2-looking name fall through to name discovery.
+  if (isPro2FindMyAdvertisementName(name) || isPro2FindMyAdvertisementName(localName)) {
+    return false;
   }
 
   if (advertisedServiceUuids.some(uuid => matchesKnownBleUuid(uuid, FIDO_SERVICE_ALIASES))) {

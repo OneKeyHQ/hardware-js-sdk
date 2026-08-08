@@ -485,11 +485,6 @@ export const HardwareErrorCode = {
   PinMismatch: 828,
 
   /**
-   * Device refused to sign: refTxs don't match the spent input's outpoint
-   */
-  KaspaPrevTxIdMismatch: 829,
-
-  /**
    * Protocol V2 device must be unlocked before the requested operation.
    * @params: { failureCode?: string; subcode?: number; firmwareMessage?: string }
    */
@@ -500,6 +495,12 @@ export const HardwareErrorCode = {
    * @params: { failureCode?: string; subcode?: number; firmwareMessage?: string }
    */
   WalletSessionInvalid: 831,
+
+  /**
+   * Pro2 NFT storage has reached its item limit.
+   * @params: { count: number; limit: number }
+   */
+  NftStorageLimitReached: 832,
 
   /**
    * Lowlevel transport connect error
@@ -653,8 +654,9 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.TooManyInputs]: 'Too many inputs',
   [HardwareErrorCode.PinMismatch]: 'PIN mismatch',
   [HardwareErrorCode.DeviceLocked]: 'Device locked',
-  [HardwareErrorCode.KaspaPrevTxIdMismatch]: 'Kaspa previous transaction id mismatch',
   [HardwareErrorCode.WalletSessionInvalid]: 'Wallet session is invalid or expired',
+  [HardwareErrorCode.NftStorageLimitReached]:
+    'NFT storage limit reached. Remove an NFT from the device and try again.',
 
   /**
    * Lowlevel transport

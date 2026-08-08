@@ -2,8 +2,11 @@ import { EventEmitter } from 'events';
 import { TREZOR_BLE_UUIDS } from '@onekeyfe/hwk-trezor-adapter';
 
 import { NobleBleHandler } from '../NobleBleHandler';
+import { TrezorElectronBleTransport } from '../TrezorElectronBleTransport';
 import { initTrezorBleSupport } from '../main';
 import { TREZOR_BLE_CHANNELS } from '../constants';
+
+import type { TrezorBleApi } from '../types/desktop-api';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -95,8 +98,12 @@ describe('NobleBleHandler', () => {
     expect(devices).toEqual([
       expect.objectContaining({ id: 'id-1', name: 'Trezor Safe 7', rssi: -55 }),
     ]);
-    // Continuous scan uses allowDuplicates=true to keep liveness fresh.
-    expect(noble.startScanningAsync).toHaveBeenCalledWith([TREZOR_BLE_UUIDS.service], true);
+    // Scan is UNFILTERED. noble's Windows backend applies a service-UUID filter
+    // per received packet, and a Safe 7's ADV packet carries only its name (the
+    // UUID is in the scan response), so a filtered scan drops every ADV packet
+    // and the device looks undiscoverable while it is plainly on air.
+    // allowDuplicates=true keeps liveness fresh.
+    expect(noble.startScanningAsync).toHaveBeenCalledWith([], true);
 
     // A second poll reuses the running scan rather than restarting it.
     await handler.scan({ durationMs: 0 });
@@ -105,6 +112,163 @@ describe('NobleBleHandler', () => {
     // Clear the idle-stop timer so it doesn't outlive the test.
     await handler.stopScan();
   });
+
+  test('scan is unfiltered, so non-Trezor devices are filtered out here', async () => {
+    // The unfiltered scan sees every BLE device in range; only Trezors may reach
+    // the caller. Guards the JS-side filter that replaces the noble one.
+    const trezor = new FakePeripheral('id-trezor', { localName: 'Trezor Safe 7 (8S9)' });
+    const other = new FakePeripheral('id-other', { localName: 'Some Headphones' });
+    const noble = new FakeNoble([trezor, other]);
+    const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
+
+    const devices = await handler.scan({ durationMs: 0 });
+    expect(devices.map(d => d.id)).toEqual(['id-trezor']);
+
+    await handler.stopScan();
+  });
+
+  test('a connected device that stopped advertising still appears in scan results', async () => {
+    // Field-verified behavior: a Safe 7 stops advertising while it holds a
+    // link (bonding alone does not silence it). With keep-alive holding the
+    // link for up to minutes, the scan cache ages the device out — so the one
+    // device the user is actively using would vanish from the device list
+    // unless connected devices are merged into the snapshot.
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    const noble = new FakeNoble([peripheral]);
+    const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
+
+    await handler.scan({ durationMs: 0 });
+    await handler.connect('id-1');
+
+    // The link is up: the device no longer advertises...
+    (noble as any).peripherals.length = 0;
+    // ...and the discovery cache from the earlier scan is gone.
+    await handler.stopScan();
+
+    const devices = await handler.scan({ durationMs: 0 });
+    expect(devices.map(d => ({ id: d.id, state: d.state }))).toEqual([
+      { id: 'id-1', state: 'connected' },
+    ]);
+
+    await handler.disconnect('id-1');
+    await handler.stopScan();
+  });
+
+  test('an explicitly passed serviceUuids filter is ignored, not forwarded to noble', async () => {
+    // serviceUuids survives on the IPC options only so an older renderer stays
+    // compatible; honouring it would reintroduce the Windows ADV-drop bug, so
+    // the handler must discard it rather than pass it to startScanningAsync.
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    const noble = new FakeNoble([peripheral]);
+    const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
+
+    const devices = await handler.scan({
+      serviceUuids: [TREZOR_BLE_UUIDS.service],
+      durationMs: 0,
+    });
+
+    expect(devices.map(d => d.id)).toEqual(['id-1']);
+    expect(noble.startScanningAsync).toHaveBeenCalledWith([], true);
+
+    await handler.stopScan();
+  });
+
+  test('connect falls back to connect-by-id when the device is not discoverable', async () => {
+    // The regression this guards: a bonded Safe 7 STOPS ADVERTISING (it holds
+    // the link and waits for the host), so after OS pairing it can never be
+    // rediscovered by scanning. Connect must still reach it by id — noble's
+    // native backends materialize the peripheral without any `discover`.
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    // Empty: the device is NOT advertising, so no scan will ever surface it.
+    const noble = new FakeNoble([]);
+    (noble as any).connectAsync = jest.fn(async (id: string) => {
+      expect(id).toBe('id-1');
+      return peripheral;
+    });
+    const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
+
+    const result = await handler.connect('id-1');
+
+    expect(result).toEqual({ id: 'id-1', name: 'Trezor Safe 7' });
+    expect((noble as any).connectAsync).toHaveBeenCalledWith('id-1');
+    expect(peripheral.discoverSomeServicesAndCharacteristicsAsync).toHaveBeenCalled();
+
+    await handler.disconnect('id-1');
+    // The fallback only fires after the scan window has elapsed (see
+    // _connectInner: scanning first is what keeps macOS from hanging).
+  }, 15_000);
+
+  test('cancelPairing ends a connect still waiting on the OS pairing window', async () => {
+    // Pairing happens inside connectAsync, so the device is not in _connected
+    // yet. Before cancelPairing could abandon the attempt, cancelling left the
+    // caller waiting out the full connect timeout — sized to the OS pairing
+    // window, so on Windows it read as a hang.
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    peripheral.connectAsync = jest.fn(
+      () =>
+        new Promise<void>(() => {
+          // Never settles: the OS pairing dialog is still open.
+        })
+    );
+    const noble = new FakeNoble([peripheral]);
+    const handler = new NobleBleHandler({
+      nobleFactory: () => noble as any,
+      connectTimeoutMs: 60_000,
+    });
+    await handler.scan({ durationMs: 0 });
+
+    const pending = handler.connect('id-1');
+    const settled = pending.then(
+      () => 'resolved',
+      (error: Error) => error.message
+    );
+    // Let _connectInner get past its settle delay and into connectAsync.
+    await new Promise(resolve => {
+      setTimeout(resolve, 350);
+    });
+
+    await handler.cancelPairing();
+
+    await expect(settled).resolves.toMatch(/connect cancelled/);
+  });
+
+  test('a connect that outlives its timeout is torn down, not committed', async () => {
+    // Promise.race only rejects the caller; noble's connectAsync keeps running.
+    // If its late success were committed to _connected, the handler would hold
+    // a GATT link nobody owns — and a linked Safe 7 stops advertising, so every
+    // retry would dead-end until app restart.
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    peripheral.connectAsync = jest.fn(async () => {
+      // Resolves well after the caller's timeout below.
+      await new Promise(resolve => {
+        setTimeout(resolve, 400);
+      });
+      peripheral.state = 'connected';
+    });
+    const noble = new FakeNoble([peripheral]);
+    const handler = new NobleBleHandler({
+      nobleFactory: () => noble as any,
+      // Fires while connectAsync is in flight: _connectInner spends 300ms in
+      // the settle delay first, and connectAsync itself takes 400ms more.
+      connectTimeoutMs: 400,
+    });
+    await handler.scan({ durationMs: 0 }); // put the peripheral in the cache
+
+    await expect(handler.connect('id-1')).rejects.toThrow(/timed out/);
+
+    // Let the late connectAsync success and the abandoned-path teardown settle.
+    await new Promise(resolve => {
+      setTimeout(resolve, 700);
+    });
+
+    // The late success must NOT have been committed…
+    await expect(handler.subscribe('id-1')).rejects.toThrow(/not connected/i);
+    // …and the link it opened must have been torn down again.
+    expect(peripheral.disconnectAsync).toHaveBeenCalled();
+    expect(peripheral.state).toBe('disconnected');
+
+    await handler.stopScan();
+  }, 10_000);
 
   test('connect discovers chars and write splits into chunks', async () => {
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
@@ -218,5 +382,53 @@ describe('initTrezorBleSupport', () => {
 
     await handle.dispose();
     expect(ipcMain.handlers.size).toBe(0);
+  });
+
+  test('renderer transport → IPC → handler scan stays unfiltered end to end', async () => {
+    // The regression this guards: the renderer transport used to send a
+    // service-UUID filter over IPC, and the handler forwarded it to
+    // noble.startScanningAsync. On Windows noble applies that filter per
+    // received packet, and a Safe 7's ADV packet carries only its name — so
+    // the JS-side Trezor filter never even saw the device. The full production
+    // path must reach noble with NO native filter.
+    const safe7 = new FakePeripheral('id-safe7', { localName: 'Trezor Safe 7' });
+    const noble = new FakeNoble([safe7]);
+    const ipcMain = new FakeIpcMain();
+    const webContents = { send: () => undefined };
+
+    const handle = initTrezorBleSupport(webContents, {
+      ipcMain,
+      nobleFactory: () => noble as any,
+    });
+
+    // Renderer-side bridge exactly as a preload would wire it: every call goes
+    // through the IPC channel, nothing shortcuts to the handler.
+    const invoke = (channel: string, ...args: any[]) => ipcMain.invoke(channel, ...args);
+    const bridge = {
+      scan: (options?: unknown) => invoke(TREZOR_BLE_CHANNELS.scan, options),
+      stopScan: () => invoke(TREZOR_BLE_CHANNELS.stopScan),
+      connect: (id: string) => invoke(TREZOR_BLE_CHANNELS.connect, id),
+      disconnect: (id: string) => invoke(TREZOR_BLE_CHANNELS.disconnect, id),
+      subscribe: (id: string) => invoke(TREZOR_BLE_CHANNELS.subscribe, id),
+      unsubscribe: (id: string) => invoke(TREZOR_BLE_CHANNELS.unsubscribe, id),
+      write: (id: string, hexData: string) => invoke(TREZOR_BLE_CHANNELS.write, id, hexData),
+      checkAvailability: () => invoke(TREZOR_BLE_CHANNELS.availability),
+      getDevice: (id: string) => invoke(TREZOR_BLE_CHANNELS.getDevice, id),
+      readRssi: (id: string) => invoke(TREZOR_BLE_CHANNELS.readRssi, id),
+      cancelPairing: () => invoke(TREZOR_BLE_CHANNELS.cancelPairing),
+      onNotification: () => () => undefined,
+      onDeviceDisconnected: () => () => undefined,
+    } as unknown as TrezorBleApi;
+
+    const transport = new TrezorElectronBleTransport({ bridge });
+    const devices = await transport.scan(0);
+
+    // The Safe 7 advertises no service UUID (name only), so it survives the
+    // trip iff the native scan really ran unfiltered.
+    expect(devices.map(d => d.id)).toEqual(['id-safe7']);
+    expect(noble.startScanningAsync).toHaveBeenCalledWith([], true);
+
+    await transport.stopScan();
+    await handle.dispose();
   });
 });

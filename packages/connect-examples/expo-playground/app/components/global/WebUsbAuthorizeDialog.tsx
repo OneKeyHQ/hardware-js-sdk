@@ -10,6 +10,7 @@ export type WebUsbAuthorizeDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: (device: USBDevice) => void;
+  onCancel?: () => void;
 };
 
 /**
@@ -21,6 +22,7 @@ const WebUsbAuthorizeDialog: React.FC<WebUsbAuthorizeDialogProps> = ({
   open,
   onOpenChange,
   onSuccess,
+  onCancel,
 }) => {
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
@@ -80,6 +82,7 @@ const WebUsbAuthorizeDialog: React.FC<WebUsbAuthorizeDialogProps> = ({
                 onOpenChange(false);
               } catch (e) {
                 // Keep dialog open; user can close with X or try again
+                onCancel?.();
               } finally {
                 setLoading(false);
               }

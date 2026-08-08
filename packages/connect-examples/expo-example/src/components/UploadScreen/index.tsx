@@ -3,7 +3,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import { bytesToHex } from '@noble/hashes/utils';
 import * as ImagePicker from 'expo-image-picker';
 import { SaveFormat, manipulateAsync } from 'expo-image-manipulator';
-import { getDeviceType, getHomeScreenSize } from '@onekeyfe/hd-core';
+import { getDeviceType, getHomeScreenSize, getNftSize } from '@onekeyfe/hd-core';
 import { ResourceType } from '@onekeyfe/hd-transport';
 import { Image as ImageView, Label, Stack, View, XStack } from 'tamagui';
 import { Platform } from 'react-native';
@@ -13,17 +13,19 @@ import {
   formatBytes,
   generateUploadNFTParams,
   getImageSize,
+  imageSourceToRgba,
   imageToBase64,
   processImageBlur,
 } from './nftUtils';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useCommonParams } from '../../provider/CommonParamsProvider';
 import { useDevice } from '../../provider/DeviceProvider';
+import { getProtocolAwareFeatures } from '../../utils/protocolAwareFeatures';
 import PanelView from '../ui/Panel';
 import { Button } from '../ui/Button';
 import { CommonInput } from '../CommonInput';
 
-import type { DeviceUploadResourceParams } from '@onekeyfe/hd-core';
+import type { CoreApi, DeviceUploadResourceParams } from '@onekeyfe/hd-core';
 import type { Action } from 'expo-image-manipulator';
 
 interface UploadResourceParams {
@@ -34,6 +36,8 @@ interface UploadResourceParams {
   blurRadius?: number;
   blurOverlayOpacity?: string;
 }
+
+type ProtocolV2NftParams = Parameters<CoreApi['deviceUploadNft']>[1];
 
 function getUrlExtension(url: string) {
   if (Platform.OS === 'web') {
@@ -183,6 +187,14 @@ function UploadScreenComponent() {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [uploadResParams, setUploadResParams] = useState<DeviceUploadResourceParams | undefined>();
+  const [protocolV2NftParams, setProtocolV2NftParams] = useState<ProtocolV2NftParams | undefined>();
+  const [preparedNftProtocol, setPreparedNftProtocol] = useState<'V1' | 'V2'>();
+
+  useEffect(() => {
+    setUploadResParams(undefined);
+    setProtocolV2NftParams(undefined);
+    setPreparedNftProtocol(undefined);
+  }, [selectedDevice?.connectId]);
 
   const loadNftData = async () => {
     if (!nftUrl) {
@@ -196,9 +208,17 @@ function UploadScreenComponent() {
     }
 
     setIsLoading(true);
+    setUploadResParams(undefined);
+    setProtocolV2NftParams(undefined);
+    setPreparedNftProtocol(undefined);
     try {
       console.log('Loading NFT data...');
-      const res = await SDK.getFeatures();
+      const res = await getProtocolAwareFeatures(
+        SDK,
+        selectedDevice?.connectId,
+        undefined,
+        selectedDevice?.connectProtocol
+      );
       if (!res) {
         alert('Failed to get device features');
         return;
@@ -209,6 +229,8 @@ function UploadScreenComponent() {
       }
 
       const deviceType = getDeviceType(res.payload);
+      const isProtocolV2 =
+        selectedDevice?.connectProtocol === 'V2' || res.payload.protocol === 'V2';
       const screenType = uploadScreenParams?.resType?.toString() === '0' ? 'WallPaper' : 'Nft';
       const HomeScreenSize = getHomeScreenSize({
         deviceType,
@@ -228,6 +250,32 @@ function UploadScreenComponent() {
       const base64 = await imageToBase64(nftUrl);
 
       try {
+        if (isProtocolV2) {
+          const imageSize = getNftSize({ deviceType });
+          const thumbnailSize = getNftSize({ deviceType, thumbnail: true });
+          if (!imageSize || !thumbnailSize) {
+            throw new Error(`NFT dimensions are not configured for ${deviceType}`);
+          }
+
+          const [rgba, thumbnailRgba] = await Promise.all([
+            imageSourceToRgba(base64, imageSize.width, imageSize.height),
+            imageSourceToRgba(base64, thumbnailSize.width, thumbnailSize.height),
+          ]);
+          setProtocolV2NftParams({
+            ...commonParams,
+            image: { ...imageSize, rgba },
+            thumbnail: { ...thumbnailSize, rgba: thumbnailRgba },
+            title: uploadScreenParams.fileNameNoExt || 'OneKey NFT',
+            subtitle: uploadScreenParams.nftMetaData || '',
+          });
+          setUploadResParams(undefined);
+          setPreparedNftProtocol('V2');
+          setImage({ uri: base64 } as ImagePicker.ImageInfo);
+          setPreviewData(base64);
+          alert('Protocol V2 NFT data loaded successfully');
+          return;
+        }
+
         const params = await generateUploadNFTParams({
           uri: base64,
           width,
@@ -243,6 +291,8 @@ function UploadScreenComponent() {
         });
 
         setUploadResParams(params);
+        setProtocolV2NftParams(undefined);
+        setPreparedNftProtocol('V1');
         alert('NFT data loaded successfully');
       } catch (e) {
         console.log('image operate error: ', e);
@@ -265,7 +315,14 @@ function UploadScreenComponent() {
           return;
         }
 
-        const res = await SDK?.getFeatures();
+        const res = SDK
+          ? await getProtocolAwareFeatures(
+              SDK,
+              selectedDevice?.connectId,
+              undefined,
+              selectedDevice?.connectProtocol
+            )
+          : undefined;
         if (!res) {
           alert('Failed to get device features');
           return;
@@ -276,6 +333,8 @@ function UploadScreenComponent() {
         }
 
         const deviceType = getDeviceType(res.payload);
+        const isProtocolV2 =
+          selectedDevice?.connectProtocol === 'V2' || res.payload.protocol === 'V2';
         const HomeScreenSize = getHomeScreenSize({
           deviceType,
           homeScreenType: screenType,
@@ -288,6 +347,30 @@ function UploadScreenComponent() {
 
         console.log('HomeScreenSize WallPaper: ', HomeScreenSize);
         console.log('HomeScreenThumbnailSize WallPaper: ', HomeScreenThumbnailSize);
+
+        if (isProtocolV2) {
+          if (!HomeScreenSize) {
+            throw new Error(`Wallpaper dimensions are not configured for ${deviceType}`);
+          }
+          const rgba = await imageSourceToRgba(
+            image.uri,
+            HomeScreenSize.width,
+            HomeScreenSize.height
+          );
+          const response = await SDK?.deviceUploadWallpaper(selectedDevice?.connectId ?? '', {
+            ...commonParams,
+            width: HomeScreenSize.width,
+            height: HomeScreenSize.height,
+            rgba,
+            fileName: uploadScreenParams.fileNameNoExt,
+          });
+          if (!response?.success) {
+            throw new Error(response?.payload?.error || 'Protocol V2 wallpaper upload failed');
+          }
+          console.log('Protocol V2 wallpaper upload response: ', response);
+          alert('Wallpaper uploaded successfully');
+          return;
+        }
 
         let params: DeviceUploadResourceParams | undefined;
         try {
@@ -322,9 +405,32 @@ function UploadScreenComponent() {
           alert('Wallpaper uploaded successfully');
         }
       } else {
-        if (!uploadResParams) {
+        if (!uploadResParams && !protocolV2NftParams) {
           alert('Please load NFT data first');
           return;
+        }
+
+        if (preparedNftProtocol === 'V2') {
+          if (!protocolV2NftParams) {
+            throw new Error('Please reload NFT data for the selected Protocol V2 device');
+          }
+          if (!selectedDevice?.connectId) {
+            throw new Error('Please connect the selected Protocol V2 device again');
+          }
+          const response = await SDK?.deviceUploadNft(
+            selectedDevice.connectId,
+            protocolV2NftParams
+          );
+          if (!response?.success) {
+            throw new Error(response?.payload?.error || 'Protocol V2 NFT upload failed');
+          }
+          console.log('Protocol V2 NFT upload response: ', response);
+          alert('NFT uploaded successfully');
+          return;
+        }
+
+        if (preparedNftProtocol !== 'V1' || !uploadResParams) {
+          throw new Error('Please reload NFT data for the selected Protocol V1 device');
         }
 
         const response = await SDK?.deviceUploadResource(
@@ -504,7 +610,10 @@ function UploadScreenComponent() {
         <Button onPress={loadNftData} disabled={isLoading || !nftUrl} marginRight="$2">
           {isLoading ? 'Loading...' : 'Load NFT Data'}
         </Button>
-        <Button onPress={() => handleScreenUpdate('Nft')} disabled={isLoading || !uploadResParams}>
+        <Button
+          onPress={() => handleScreenUpdate('Nft')}
+          disabled={isLoading || (!uploadResParams && !protocolV2NftParams)}
+        >
           {isLoading ? 'Uploading...' : intl.formatMessage({ id: 'action__upload' })}
         </Button>
       </XStack>

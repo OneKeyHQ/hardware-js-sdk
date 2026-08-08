@@ -35,9 +35,6 @@ const initializeSDKCore = useCallback(async (): Promise<CoreApi> => {
 // 根据transport类型配置SDK环境
 let sdkEnv: ConnectSettings['env'];
 switch (preferredTransport) {
-  case 'jsbridge':
-    sdkEnv = 'web';
-    break;
   case 'emulator':
     sdkEnv = 'emulator';
     break;
@@ -115,4 +112,4 @@ graph TD
 - SDK初始化是异步的，组件需要检查 `sdkInitState.isInitialized`
 - Transport切换会触发SDK重新初始化
 - 持久化的transport设置会在应用启动时自动应用
-- 如果持久化存储中没有transport设置，会使用默认的 'webusb' 
+- 如果持久化存储中没有transport设置，会使用默认的 'webusb'

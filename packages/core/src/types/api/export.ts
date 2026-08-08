@@ -14,6 +14,7 @@ export type {
 export type { CipheredKeyValue, CipheredKeyValueParams } from './cipherKeyValue';
 
 export type { DeviceChangePinParams } from './deviceChangePin';
+export type { DeviceUnlockParams } from './deviceUnlock';
 export type { DeviceFlagsParams } from './deviceFlags';
 export type { DeviceRecoveryParams } from './deviceRecovery';
 export type { DeviceResetParams } from './deviceReset';
@@ -25,12 +26,30 @@ export type {
   DeviceUploadResourceResponse,
 } from './deviceUploadResource';
 export type {
+  FirmwareArtifactReader,
+  FirmwareArtifactReference,
+  FirmwareUpdateHostBinding,
+  FirmwareUpdateArtifactParams,
   FirmwareUpdateParams,
   FirmwareUpdateBinaryParams,
   FirmwareUpdateV3Params,
   FirmwareUpdateV4Params,
   FirmwareUpdateV4Target,
 } from './firmwareUpdate';
+export type {
+  FirmwareUpdatePlan,
+  FirmwareUpdatePlanArtifact,
+  FirmwareUpdatePlanArtifactRole,
+  FirmwareUpdatePlanForceTarget,
+  FirmwareUpdatePlanTarget,
+} from './firmwareUpdatePlan';
+export type {
+  FirmwareUpdatePreparedArtifact,
+  FirmwareUpdatePreparedArtifactInput,
+  FirmwareUpdatePreparedEntry,
+  FirmwareUpdatePreparedPlan,
+} from './firmwareUpdatePreparedPlan';
+export type { FirmwareUpdateCapabilities } from './firmwareUpdateCapabilities';
 export type { AllFirmwareRelease } from './checkAllFirmwareRelease';
 export type {
   ProtocolV2FirmwareComponentRelease,

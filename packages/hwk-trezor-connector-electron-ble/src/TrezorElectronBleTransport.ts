@@ -1,6 +1,5 @@
 import { Buffer } from 'buffer';
 import { HardwareErrorCode, createHwkError } from '@onekeyfe/hwk-adapter-core';
-import { TREZOR_BLE_UUIDS } from '@onekeyfe/hwk-trezor-adapter';
 import {
   type TrezorDebugLogLevel,
   type TrezorDebugLogger,
@@ -72,13 +71,13 @@ export class TrezorElectronBleTransport {
   }
 
   async scan(durationMs?: number): Promise<TrezorBleDeviceInfo[]> {
-    // We always pass the Trezor service UUID explicitly so this transport
-    // works against a generic bridge that doesn't default to Trezor — the
-    // bridge may be wired for multiple vendors and shouldn't have to guess
-    // ours from no filter.
+    // No serviceUuids filter: a native service-UUID scan filter drops a
+    // Safe 7's ADV packets on Windows (its UUID travels in the scan response,
+    // not the ADV packet), so the handler scans unfiltered and does the Trezor
+    // matching itself in JS. Passing a filter here would at best be ignored by
+    // a current handler and at worst re-break discovery on an older one.
     try {
       return await this._bridge.scan({
-        serviceUuids: [TREZOR_BLE_UUIDS.service],
         durationMs,
       });
     } catch (error) {
@@ -91,6 +90,11 @@ export class TrezorElectronBleTransport {
 
   async stopScan(): Promise<void> {
     await this._bridge.stopScan();
+  }
+
+  /** Abandon the in-flight connect/pairing in the main process. */
+  async cancelPairing(): Promise<void> {
+    await this._bridge.cancelPairing();
   }
 
   async connect(connectId: string): Promise<void> {

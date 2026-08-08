@@ -127,6 +127,7 @@ export const getLanguageConfig = (deviceType: IDeviceType): Record<string, strin
       keys = Object.keys(LANGUAGE_LABELS) as LanguageKey[];
       break;
     case EDeviceType.Pro2:
+    case EDeviceType.Neo:
       return PRO2_LANGUAGE_OPTIONS.map(option => ({ ...option }));
     default:
       keys = [];
@@ -176,6 +177,7 @@ export const getAutoLockOptions = (
     case EDeviceType.Touch:
     case EDeviceType.Pro:
     case EDeviceType.Pro2:
+    case EDeviceType.Neo:
       return withNever([30_000, 60_000, 120_000, 300_000, 600_000, 1_800_000], protocol);
     default:
       return [];
@@ -197,6 +199,7 @@ export const getAutoShutDownOptions = (
     case EDeviceType.Pro:
       return withNever([60_000, 120_000, 300_000, 600_000], protocol);
     case EDeviceType.Pro2:
+    case EDeviceType.Neo:
       return withNever([60_000, 120_000, 300_000, 600_000, 1_800_000], protocol);
     default:
       return [];

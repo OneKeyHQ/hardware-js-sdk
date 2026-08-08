@@ -1,4 +1,4 @@
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { DeviceType } from '@onekeyfe/hd-transport';
 
 import { Device } from '../src/device/Device';
@@ -43,6 +43,70 @@ const getProtocolV2LoaderInfo = (mode: 'bootloader' | 'romloader') => ({
 });
 
 describe('getDeviceState', () => {
+  test('coalesces concurrent Protocol V2 runtime-context negotiation', async () => {
+    let resolveProtocolInfo:
+      | ((value: { message: typeof protocolV2ApplicationInfo }) => void)
+      | undefined;
+    const typedCall = jest.fn(
+      () =>
+        new Promise<{ message: typeof protocolV2ApplicationInfo }>(resolve => {
+          resolveProtocolInfo = resolve;
+        })
+    );
+    const device = createV2Device(typedCall);
+
+    const first = device.ensureProtocolV2RuntimeContext();
+    const second = device.ensureProtocolV2RuntimeContext();
+    resolveProtocolInfo?.({ message: protocolV2ApplicationInfo });
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      protocolV2ApplicationInfo,
+      protocolV2ApplicationInfo,
+    ]);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
+      eventless_wallet_session: true,
+    });
+  });
+
+  test('renegotiates Protocol V2 runtime context after transport disconnect', async () => {
+    const typedCall = jest.fn().mockResolvedValue({ message: protocolV2ApplicationInfo });
+    const device = createV2Device(typedCall);
+
+    await device.ensureProtocolV2RuntimeContext();
+    await device.ensureProtocolV2RuntimeContext();
+    device.markTransportDisconnected();
+    await device.ensureProtocolV2RuntimeContext();
+
+    expect(typedCall).toHaveBeenCalledTimes(2);
+  });
+
+  test('rejects every waiter when runtime-context negotiation is invalidated', async () => {
+    let resolveProtocolInfo:
+      | ((value: { message: typeof protocolV2ApplicationInfo }) => void)
+      | undefined;
+    const typedCall = jest.fn(
+      () =>
+        new Promise<{ message: typeof protocolV2ApplicationInfo }>(resolve => {
+          resolveProtocolInfo = resolve;
+        })
+    );
+    const device = createV2Device(typedCall);
+
+    const first = device.ensureProtocolV2RuntimeContext();
+    const second = device.ensureProtocolV2RuntimeContext();
+    const firstExpectation = expect(first).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInitializeFailed,
+    });
+    const secondExpectation = expect(second).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInitializeFailed,
+    });
+    device.markTransportDisconnected();
+    resolveProtocolInfo?.({ message: protocolV2ApplicationInfo });
+
+    await Promise.all([firstExpectation, secondExpectation]);
+  });
+
   test('does not expose the internal wallet session', async () => {
     const device = createV2Device(jest.fn());
     device.updateState({ protocol: 'V2' }, 'initialize');
@@ -159,15 +223,20 @@ describe('getDeviceState', () => {
         throw new Error(`Unexpected request: ${requestType}`);
       });
       const device = createV2Device(typedCall);
-      device.updateState({ protocol: 'V2', status: { mode } }, 'initialize');
+      device.updateState(
+        {
+          protocol: 'V2',
+          identity: { deviceType: EDeviceType.Pro2 },
+          status: { mode },
+          raw: { protocolV2ProtocolInfo: getProtocolV2LoaderInfo(mode) },
+        },
+        'initialize'
+      );
 
       const state = await device.getDeviceState({ refreshSections: ['status'] });
 
       expect(state.status.mode).toBe(mode);
-      expect(typedCall.mock.calls.map(call => call[0])).toEqual([
-        'DeviceInfoGet',
-        'ProtocolInfoRequest',
-      ]);
+      expect(typedCall).not.toHaveBeenCalled();
     }
   );
 
@@ -187,7 +256,14 @@ describe('getDeviceState', () => {
       return { message: { init_states: true, unlocked: true, device_id: 'device-1' } };
     });
     const device = createV2Device(typedCall);
-    device.updateState({ protocol: 'V2', status: { mode: 'normal' } }, 'initialize');
+    device.updateState(
+      {
+        protocol: 'V2',
+        status: { mode: 'normal' },
+        raw: { protocolV2ProtocolInfo: protocolV2ApplicationInfo },
+      },
+      'initialize'
+    );
 
     const state = await device.getDeviceState({ refreshSections: ['status'] });
 
@@ -205,7 +281,14 @@ describe('getDeviceState', () => {
       },
     });
     const device = createV2Device(typedCall);
-    device.updateState({ protocol: 'V2', status: { mode: 'normal' } }, 'initialize');
+    device.updateState(
+      {
+        protocol: 'V2',
+        status: { mode: 'normal' },
+        raw: { protocolV2ProtocolInfo: protocolV2ApplicationInfo },
+      },
+      'initialize'
+    );
     const onState = jest.fn();
     device.on(DEVICE.STATE, onState);
 
@@ -250,13 +333,18 @@ describe('getDeviceState', () => {
       throw new Error(`Unexpected request: ${requestType}`);
     });
     const device = createV2Device(typedCall);
-    device.updateState({ protocol: 'V2', status: { mode: 'normal' } }, 'initialize');
+    device.updateState(
+      {
+        protocol: 'V2',
+        status: { mode: 'normal' },
+        raw: { protocolV2ProtocolInfo: protocolV2ApplicationInfo },
+      },
+      'initialize'
+    );
 
     const state = await device.getDeviceState({ refreshSections: ['status', 'settings'] });
 
     expect(typedCall.mock.calls.map(call => call[0])).toEqual([
-      'DeviceInfoGet',
-      'ProtocolInfoRequest',
       'DeviceStatusGet',
       'DeviceSettingsGet',
     ]);
@@ -288,7 +376,11 @@ describe('getDeviceState', () => {
     });
     const device = createV2Device(typedCall);
     device.updateState(
-      { protocol: 'V2', status: { mode: 'normal', unlocked: true } },
+      {
+        protocol: 'V2',
+        status: { mode: 'normal', unlocked: true },
+        raw: { protocolV2ProtocolInfo: protocolV2ApplicationInfo },
+      },
       'initialize'
     );
 
@@ -371,6 +463,34 @@ describe('getDeviceState', () => {
     });
     expect(state.raw?.protocolV1OneKeyFeatures).toMatchObject({
       onekey_board_build_id: 'board-build',
+    });
+  });
+
+  test.each([
+    EDeviceType.Classic,
+    EDeviceType.Classic1s,
+    EDeviceType.ClassicPure,
+    EDeviceType.Mini,
+  ])('keeps the GetFeatures-only firmware path for %s', async deviceType => {
+    const typedCall = jest.fn().mockResolvedValue({
+      message: {
+        onekey_device_type: deviceType.toUpperCase(),
+        initialized: true,
+        onekey_firmware_version: '3.5.0',
+        se_ver: '1.1.0.2',
+      },
+    });
+    const device = createV1Device(typedCall);
+
+    const state = await device.getDeviceState({
+      refreshSections: ['identity', 'versions', 'verification'],
+    });
+
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual(['GetFeatures']);
+    expect(state.versions).toMatchObject({
+      firmware: '3.5.0',
+      se: '1.1.0.2',
+      se01: '1.1.0.2',
     });
   });
 

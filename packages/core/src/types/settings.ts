@@ -31,6 +31,8 @@ export type ConnectSettings = {
   timestamp: number;
   isFrame?: boolean;
   preRelease?: boolean;
+  firmwareManifestMode?: 'sdk-managed' | 'external-only';
+  preloadedConfig?: RemoteConfigResponse;
   fetchConfig?: boolean;
   extension?: string;
   configFetcher?: (url: string) => Promise<RemoteConfigResponse | null>;
@@ -58,7 +60,52 @@ export type IProtocolV2FirmwareComponent = {
   fingerprint?: string;
   /** OKPP payload hash, used to detect same-version package changes. */
   payloadHash?: string;
+  expectedSize?: number;
   version?: IVersionArray;
+};
+
+export type IProtocolV2ResourceType =
+  | 'images'
+  | 'animation'
+  | 'wallpaper'
+  | 'translations'
+  | 'roobert'
+  | 'noto'
+  | 'firmware_logo';
+
+/** Pro2 RES package descriptor. Hashes identify content without a human-managed version. */
+export type IProtocolV2Resource = {
+  type: IProtocolV2ResourceType;
+  url: string;
+  /** Complete okpkg file size in bytes. */
+  size: number;
+  /** SHA-256 of the complete okpkg file. */
+  fileHash: string;
+  /** SHA3-512 header_hash from the signed okpkg header. */
+  headerHash: string;
+};
+
+/** A file from the Protocol V2 resource manifest, written directly with FileWrite. */
+export type IProtocolV2ResourceFile = {
+  name?: string;
+  url: string;
+  devicePath: string;
+  size: number;
+  /** SHA-256 of the complete file. */
+  fileHash: string;
+};
+
+/** Optional Protocol V2 boot resources restored as individual files. */
+export type IProtocolV2BootResources = {
+  required: false;
+  target: 'RES';
+  manifestUrl?: string;
+  files: IProtocolV2ResourceFile[];
+};
+
+export type IProtocolV2Resources = {
+  stable: IProtocolV2Resource[];
+  boot?: IProtocolV2BootResources;
 };
 
 /** Pro2 RESC bundle okpkg descriptor for incremental FileWrite synchronization. */
@@ -67,6 +114,8 @@ export type IProtocolV2ResourceBundle = {
   name: string;
   /** Download URL. */
   url: string;
+  fingerprint?: string;
+  expectedSize?: number;
   /** Device target path, such as vol0:/bundles/images/images.okpkg. */
   devicePath: string;
   /** okpkg payload_version used to skip matching content after FileRead. */
@@ -88,10 +137,16 @@ export type IFirmwareReleaseInfo = {
   firmwareType?: EFirmwareType;
   /** Firmware UI resource */
   resource?: string;
+  resourceFingerprint?: string;
+  resourceExpectedSize?: number;
   /** Firmware full UI resource */
   fullResource?: string;
+  fullResourceFingerprint?: string;
+  fullResourceExpectedSize?: number;
   fullResourceRange?: string[];
   bootloaderResource?: string;
+  bootloaderFingerprint?: string;
+  bootloaderExpectedSize?: number;
   bootloaderVersion?: IVersionArray;
   displayBootloaderVersion?: IVersionArray;
   bootloaderRelatedFirmwareVersion?: IVersionArray;
@@ -104,6 +159,7 @@ export type IFirmwareReleaseInfo = {
     [k in ILocale]: string;
   };
   fingerprint: string;
+  expectedSize?: number;
   version: IVersionArray;
   changelog: {
     [k in ILocale]: string;
@@ -119,6 +175,7 @@ export type IBLEFirmwareReleaseInfo = {
   webUpdate: string;
   fingerprint: string;
   fingerprintWeb: string;
+  expectedSize?: number;
   version: IVersionArray;
   changelog: {
     [k in ILocale]: string;
@@ -126,17 +183,25 @@ export type IBLEFirmwareReleaseInfo = {
 };
 
 type IKnownDevice = Exclude<IDeviceType, 'unknown'>;
+type ILegacyKnownDevice = Exclude<IKnownDevice, 'neo'>;
+
+type IDeviceReleaseInfo = {
+  firmware: IFirmwareReleaseInfo[];
+  /** Protocol V2 payload package set */
+  'firmware-v1'?: IFirmwareReleaseInfo[];
+  'firmware-v2'?: IFirmwareReleaseInfo[];
+  'firmware-v8'?: IFirmwareReleaseInfo[];
+  'firmware-btc-v8'?: IFirmwareReleaseInfo[];
+  ble: IBLEFirmwareReleaseInfo[];
+  /** Independent Protocol V2 resource release configuration. */
+  resources?: IProtocolV2Resources;
+};
 
 export type DeviceTypeMap = {
-  [k in IKnownDevice]: {
-    firmware: IFirmwareReleaseInfo[];
-    /** Pro2 Protocol V2 payload package set */
-    'firmware-v1'?: IFirmwareReleaseInfo[];
-    'firmware-v2'?: IFirmwareReleaseInfo[];
-    'firmware-v8'?: IFirmwareReleaseInfo[];
-    'firmware-btc-v8'?: IFirmwareReleaseInfo[];
-    ble: IBLEFirmwareReleaseInfo[];
-  };
+  [k in ILegacyKnownDevice]: IDeviceReleaseInfo;
+} & {
+  /** Optional until every remote-config producer publishes a Neo entry. */
+  neo?: IDeviceReleaseInfo;
 };
 
 export type AssetsMap = {

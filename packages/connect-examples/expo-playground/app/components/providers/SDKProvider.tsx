@@ -1,23 +1,44 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CoreApi, UiEvent, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import {
+  CoreApi,
+  DEVICE,
+  DEVICE_EVENT,
+  UiEvent,
+  UI_REQUEST,
+  UI_RESPONSE,
+  supportInputPinOnSoftware,
+} from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useHardwareStore } from '../../store/hardwareStore';
 
 import { submitPin, submitPassphrase } from '../../services/hardwareService';
-import { EDeviceType } from '@onekeyfe/hd-shared';
 import GlobalDialogManager from '../global/GlobalDialogManager';
 import WebUsbAuthorizeDialog from '../global/WebUsbAuthorizeDialog';
-import { logData, logInfo, logError } from '../../utils/logger';
+import { logInfo, logError } from '../../utils/logger';
 import { SDKUtils } from '../../utils/hardwareInstance';
 import { create } from 'zustand';
+import {
+  createHardwareUiState,
+  getUiResponseCorrelation,
+  HardwareUiEventQueue,
+  isProtocolV2UiEvent,
+  reduceHardwareUiEvent,
+} from '../../utils/hardwareUiStateMachine';
+import type {
+  DeviceEventMessage,
+  UiRequestDeviceAction,
+  UiResponseCorrelation,
+} from '@onekeyfe/hd-core';
 
 // 声明全局弹窗管理器类型
 declare global {
   interface Window {
     globalDialogManager?: {
-      showPinDialog: () => void;
-      showPassphraseDialog: () => void;
+      showPinDialog: (responseCorrelation?: UiResponseCorrelation) => void;
+      showPassphraseDialog: (responseCorrelation?: UiResponseCorrelation) => void;
+      closePinDialog: () => void;
+      closePassphraseDialog: () => void;
       closeAllDialogs: () => void;
     };
   }
@@ -31,6 +52,10 @@ interface SDKProviderProps {
 export interface FirmwareProgressData {
   progress: number;
   progressType: 'transferData' | 'installingFirmware';
+  transferredBytes?: number;
+  totalBytes?: number;
+  rateBytesPerSecond?: number;
+  elapsedMs?: number;
 }
 
 export const useFirmwareProgressStore = create<{
@@ -50,7 +75,13 @@ export const useFirmwareProgress = () => {
 
 export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
   const { t } = useTranslation();
-  const { setDeviceAction, clearDeviceAction, updateSdkInitState } = useDeviceStore();
+  const {
+    setCurrentDevice,
+    setDeviceAction,
+    setDeviceState,
+    clearDeviceAction,
+    updateSdkInitState,
+  } = useDeviceStore();
   const initializationRef = useRef<boolean>(false);
   const [webUsbModalOpen, setWebUsbModalOpen] = React.useState(false);
   const [webUsbResponseType, setWebUsbResponseType] = React.useState<
@@ -58,101 +89,187 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
     | typeof UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE
   >(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE);
   const lastSdkRef = useRef<CoreApi | null>(null);
+  const hardwareUiQueueRef = useRef(new HardwareUiEventQueue());
+  const hardwareUiStateRef = useRef(createHardwareUiState());
 
   const setupSDKEventListeners = useCallback(
     (sdkInstance: CoreApi) => {
+      hardwareUiQueueRef.current.reset();
+      hardwareUiStateRef.current = createHardwareUiState();
+
       // 监听SDK UI事件
       sdkInstance.on('UI_EVENT', (message: UiEvent) => {
-        const latestCurrentDevice = useDeviceStore.getState().currentDevice;
-        logInfo(`收到UI事件: ${message.type}`, message.payload as logData);
+        void hardwareUiQueueRef.current
+          .enqueue(message, async queuedMessage => {
+            const payload =
+              queuedMessage.payload && typeof queuedMessage.payload === 'object'
+                ? (queuedMessage.payload as {
+                    device?: { connectId?: string | null; connectProtocol?: string };
+                    interaction?: { protocol?: string };
+                  })
+                : undefined;
+            logInfo(`收到UI事件: ${queuedMessage.type}`, {
+              connectId: payload?.device?.connectId,
+              protocol: payload?.device?.connectProtocol ?? payload?.interaction?.protocol,
+            });
 
-        // 处理设备动作状态
-        if (message.type === UI_REQUEST.CLOSE_UI_WINDOW) {
-          clearDeviceAction();
-          // 重置固件进度状态
-          useFirmwareProgressStore.getState().reset();
-        } else if (message.type) {
-          setDeviceAction({
-            isActive: true,
-            actionType: message.type,
-            deviceInfo: message.payload as Record<string, unknown>,
-            startTime: Date.now(),
+            const previousState = hardwareUiStateRef.current;
+            const nextState = reduceHardwareUiEvent(previousState, queuedMessage);
+            hardwareUiStateRef.current = nextState;
+
+            if (nextState.isOpen && nextState.actionType) {
+              setDeviceAction({
+                isActive: true,
+                actionType: nextState.actionType,
+                deviceInfo: queuedMessage.payload as Record<string, unknown>,
+                startTime: Date.now(),
+              });
+            } else if (queuedMessage.type === UI_REQUEST.CLOSE_UI_WINDOW) {
+              clearDeviceAction();
+            } else if (nextState === previousState && queuedMessage.type) {
+              setDeviceAction({
+                isActive: true,
+                actionType: queuedMessage.type,
+                deviceInfo: queuedMessage.payload as Record<string, unknown>,
+                startTime: Date.now(),
+              });
+            }
+
+            if (queuedMessage.type === UI_REQUEST.CLOSE_UI_WINDOW) {
+              useFirmwareProgressStore.getState().reset();
+              window.globalDialogManager?.closeAllDialogs();
+              hardwareUiQueueRef.current.reset();
+              return;
+            }
+
+            switch (queuedMessage.type) {
+              case UI_REQUEST.REQUEST_PIN: {
+                const requestPayload = queuedMessage.payload as UiRequestDeviceAction['payload'];
+                const isProtocolV2 = isProtocolV2UiEvent(queuedMessage);
+                const responseCorrelation = getUiResponseCorrelation(queuedMessage);
+
+                if (isProtocolV2) {
+                  // Protocol V2 PIN is entered on the device and has no host UI response.
+                  window.globalDialogManager?.closePinDialog();
+                } else if (supportInputPinOnSoftware(requestPayload.device.features).support) {
+                  window.globalDialogManager?.showPinDialog(responseCorrelation);
+                } else {
+                  await submitPin('@@ONEKEY_INPUT_PIN_IN_DEVICE', responseCorrelation);
+                }
+                break;
+              }
+
+              case UI_REQUEST.REQUEST_PASSPHRASE: {
+                const responseCorrelation = getUiResponseCorrelation(queuedMessage);
+                const hardwareState = useHardwareStore.getState();
+                const shouldAutoSubmit = hardwareState.commonParameters.useEmptyPassphrase;
+
+                if (shouldAutoSubmit) {
+                  await submitPassphrase('', false, false, responseCorrelation);
+                } else {
+                  window.globalDialogManager?.showPassphraseDialog(responseCorrelation);
+                }
+                break;
+              }
+
+              case UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE:
+                // This event is informational; the device already owns the input flow.
+                window.globalDialogManager?.closePassphraseDialog();
+                break;
+
+              case UI_REQUEST.CLOSE_UI_PIN_WINDOW:
+                window.globalDialogManager?.closePinDialog();
+                break;
+
+              case UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
+                setWebUsbResponseType(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE);
+                setWebUsbModalOpen(true);
+                break;
+
+              case UI_REQUEST.REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE:
+                setWebUsbResponseType(UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE);
+                setWebUsbModalOpen(true);
+                break;
+
+                  case UI_REQUEST.FIRMWARE_PROGRESS:
+                  case UI_REQUEST.DEVICE_PROGRESS:
+                    if (queuedMessage.payload && typeof queuedMessage.payload === 'object') {
+                      const payload = queuedMessage.payload as {
+                        progress?: number;
+                        progressType?: string;
+                        transferredBytes?: number;
+                        totalBytes?: number;
+                        rateBytesPerSecond?: number;
+                        elapsedMs?: number;
+                      };
+                      if (typeof payload.progress === 'number') {
+                        useFirmwareProgressStore.getState().setProgressData({
+                          progress: payload.progress,
+                          progressType:
+                            queuedMessage.type === UI_REQUEST.DEVICE_PROGRESS
+                              ? 'transferData'
+                              : (payload.progressType as
+                                  | 'transferData'
+                                  | 'installingFirmware') || 'transferData',
+                          transferredBytes: payload.transferredBytes,
+                          totalBytes: payload.totalBytes,
+                          rateBytesPerSecond: payload.rateBytesPerSecond,
+                          elapsedMs: payload.elapsedMs,
+                        });
+                      }
+                    }
+                break;
+
+              default:
+                break;
+            }
+          })
+          .catch(error => {
+            logError('硬件 UI 事件处理失败', { error });
           });
+      });
+
+      sdkInstance.on(DEVICE_EVENT, (message: DeviceEventMessage) => {
+        if (message.type === DEVICE.STATE) {
+          const currentDevice = useDeviceStore.getState().currentDevice;
+          if (
+            !currentDevice?.connectId ||
+            !message.payload.connectId ||
+            currentDevice.connectId === message.payload.connectId
+          ) {
+            setDeviceState(message.payload.state);
+          }
+          return;
         }
 
-        // 处理UI事件
-        switch (message.type) {
-          case 'ui-request_pin':
-            if (
-              latestCurrentDevice &&
-              (latestCurrentDevice.deviceType === EDeviceType.Pro ||
-                latestCurrentDevice.deviceType === EDeviceType.Touch)
-            ) {
-              submitPin('@@ONEKEY_INPUT_PIN_IN_DEVICE').catch(console.error);
-            } else {
-              window.globalDialogManager?.showPinDialog();
-            }
-            break;
-
-          case 'ui-request_passphrase': {
-            const hardwareState = useHardwareStore.getState();
-            const shouldAutoSubmit = hardwareState.commonParameters.useEmptyPassphrase;
-
-            if (shouldAutoSubmit) {
-              submitPassphrase('', false, false).catch(console.error);
-            } else {
-              window.globalDialogManager?.showPassphraseDialog();
-            }
-            break;
-          }
-
-          case 'ui-close_window':
+        if (message.type === DEVICE.DISCONNECT) {
+          const currentDevice = useDeviceStore.getState().currentDevice;
+          const disconnectedConnectId = message.payload.device.connectId;
+          if (!currentDevice || currentDevice.connectId === disconnectedConnectId) {
+            setCurrentDevice(null);
+            clearDeviceAction();
             window.globalDialogManager?.closeAllDialogs();
-            break;
-
-          case UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE: {
-            // Open modal; actual requestDevice() will be called in button onClick handler to satisfy user gesture
-            setWebUsbResponseType(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE);
-            setWebUsbModalOpen(true);
-            break;
+            hardwareUiQueueRef.current.reset();
           }
-          case UI_REQUEST.REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE: {
-            setWebUsbResponseType(UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE);
-            setWebUsbModalOpen(true);
-            break;
-          }
-
-          case 'ui-firmware-progress':
-            if (message.payload && typeof message.payload === 'object') {
-              const payload = message.payload as {
-                progress?: number;
-                progressType?: string;
-                [key: string]: unknown;
-              };
-              if (typeof payload.progress === 'number' && payload.progressType) {
-                useFirmwareProgressStore.getState().setProgressData({
-                  progress: payload.progress,
-                  progressType: payload.progressType as 'transferData' | 'installingFirmware',
-                });
-              }
-            }
-            break;
-
-          default:
-            break;
         }
       });
 
       // 监听设备连接/断开事件
       sdkInstance.on('device-connect', device => {
-        logInfo('device-connect', device);
+        logInfo('device-connect', {
+          connectId: device?.connectId,
+          protocol: device?.connectProtocol,
+        });
       });
 
       sdkInstance.on('device-disconnect', device => {
-        logInfo('device-disconnect', device);
+        logInfo('device-disconnect', {
+          connectId: device?.connectId,
+          protocol: device?.connectProtocol,
+        });
       });
     },
-    [setDeviceAction, clearDeviceAction]
+    [setCurrentDevice, setDeviceAction, setDeviceState, clearDeviceAction]
   );
 
   // 初始化SDK

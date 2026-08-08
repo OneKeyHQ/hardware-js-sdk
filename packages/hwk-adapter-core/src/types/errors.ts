@@ -116,6 +116,14 @@ export enum HardwareErrorCode {
    * and BlePairingTimeout (the SMP bonding window).
    */
   BleConnectFailed = 10309,
+  /**
+   * The user cancelled BLE pairing from the app while the connect was still
+   * waiting on the OS pairing window. Not a failure to report — the flow ends
+   * because they asked it to. Distinct from UserAborted (generic in-app cancel)
+   * so the pairing UI can close quietly instead of surfacing a connect error,
+   * and from BlePairingTimeout (the SMP window elapsed on its own).
+   */
+  BlePairingCancelled = 10310,
 
   // --- 10400s PIN / Passphrase ---
   PinInvalid = 10400,
@@ -200,6 +208,7 @@ export const ORPHAN_ELIGIBLE_ERROR_CODES: number[] = [
   HardwareErrorCode.ThpPairingRequired,
   HardwareErrorCode.BleBondInvalid,
   HardwareErrorCode.BleConnectFailed,
+  HardwareErrorCode.BlePairingCancelled,
 ];
 
 // ---------------------------------------------------------------------------

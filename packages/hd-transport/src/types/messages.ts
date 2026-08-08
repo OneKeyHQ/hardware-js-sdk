@@ -4980,9 +4980,16 @@ export enum DeviceSessionErrorCode {
   DeviceSessionError_Busy = 5,
 }
 
+export enum DeviceSessionSeedDomain {
+  SeedDomain_Standard = 1,
+  SeedDomain_Cardano = 2,
+}
+
 // DeviceSessionGet
 export type DeviceSessionGet = {
   session_id?: string;
+  btc_test_address?: string;
+  seed_domains: DeviceSessionSeedDomain[];
 };
 
 // DeviceSession
@@ -5116,6 +5123,11 @@ export type InternalMyAddressRequest = {
   chain_id: number;
   account_index: number;
   derive_type: number;
+};
+
+// NftUpdate
+export type NftUpdate = {
+  file_name_no_ext: string;
 };
 
 export enum OnboardingStep {
@@ -5908,6 +5920,7 @@ export type MessageType = {
   FilesystemDirRemove: FilesystemDirRemove;
   FilesystemFormat: FilesystemFormat;
   InternalMyAddressRequest: InternalMyAddressRequest;
+  NftUpdate: NftUpdate;
   OnboardingSetupStatus: OnboardingSetupStatus;
   OnboardingStatusGet: OnboardingStatusGet;
   OnboardingStatus: OnboardingStatus;

@@ -8,6 +8,7 @@ import {
 } from './eip712';
 import {
   type TrezorChainContext,
+  assertHexString,
   createInvalidParamsError,
   createMethodNotSupportedError,
   formatAnyHex,
@@ -72,16 +73,34 @@ export async function evmGetAddress(ctx: TrezorChainContext, params: unknown): P
  * are non-hex and left untouched. Add future EVM param massaging HERE.
  */
 export function normalizeEvmSignTxHexFields(tx: EvmSignTxTrezorParams): EvmSignTxTrezorParams {
-  const hex = (value: string | undefined): string | undefined =>
-    value === undefined ? undefined : (formatAnyHex(value) as string);
+  const hex = (name: string, value: string | undefined): string | undefined => {
+    if (value === undefined) return undefined;
+    assertHexString(name, value);
+    return formatAnyHex(value) as string;
+  };
+  // accessList is nested, so the top-level field whitelist above cannot see
+  // its hex values; without per-item validation an invalid character would
+  // survive until protobuf's Buffer.from(value, 'hex') silently truncates it
+  // and the device signs a different access list than the caller sent.
+  tx.accessList?.forEach((entry, i) => {
+    assertHexString(`accessList[${i}].address`, entry.address);
+    entry.storageKeys?.forEach((key, j) => {
+      assertHexString(`accessList[${i}].storageKeys[${j}]`, key);
+    });
+  });
   return {
     ...tx,
-    value: hex(tx.value),
-    nonce: hex(tx.nonce),
-    gasLimit: hex(tx.gasLimit),
-    gasPrice: hex(tx.gasPrice),
-    maxFeePerGas: hex(tx.maxFeePerGas),
-    maxPriorityFeePerGas: hex(tx.maxPriorityFeePerGas),
+    // data included on purpose: Trezor Suite's EthereumSignTransaction runs its
+    // deepTransform strip/pad over the WHOLE tx, calldata too — special-casing
+    // data out of the padding here is what created truncation + fractional
+    // data_length on odd input. Byte-for-byte parity with upstream.
+    data: hex('data', tx.data),
+    value: hex('value', tx.value),
+    nonce: hex('nonce', tx.nonce),
+    gasLimit: hex('gasLimit', tx.gasLimit),
+    gasPrice: hex('gasPrice', tx.gasPrice),
+    maxFeePerGas: hex('maxFeePerGas', tx.maxFeePerGas),
+    maxPriorityFeePerGas: hex('maxPriorityFeePerGas', tx.maxPriorityFeePerGas),
     accessList: tx.accessList
       ? (formatAnyHex(tx.accessList) as EvmSignTxTrezorParams['accessList'])
       : tx.accessList,
@@ -222,7 +241,7 @@ async function processTxRequest(
   const maxRounds = Math.ceil(remainingData.length / 2) + 64;
   let rounds = 0;
 
-  while (true) {
+  for (;;) {
     rounds += 1;
     if (rounds > maxRounds) {
       throw new Error(

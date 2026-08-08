@@ -120,6 +120,69 @@ describe('ProtocolV2UiInteractionCoordinator', () => {
     ]);
   });
 
+  test('emits a routable close for a progress-only Protocol V2 operation', () => {
+    const postMessage = jest.fn();
+    const interaction = {
+      interactionId: 'interaction-progress',
+      phaseId: 'interaction-progress:phase-1',
+      sequence: 1,
+      phase: 'processing',
+      transition: 'finish',
+      outcome: 'succeeded',
+      protocol: 'V2',
+    } as const;
+    const device = {
+      ...createDevice(),
+      finishProtocolV2UiInteraction: jest.fn(() => interaction),
+    };
+    const coordinator = new ProtocolV2UiInteractionCoordinator(device as any, postMessage);
+
+    const emitted = coordinator.close({ ensureOperationClose: true });
+
+    expect(emitted).toBe(true);
+    expect(postMessage).toHaveBeenCalledWith({
+      event: 'UI_EVENT',
+      type: UI_REQUEST.CLOSE_UI_WINDOW,
+      payload: {
+        ...interaction,
+        device: { connectId: 'pro2-test', deviceType: 'pro2' },
+      },
+    });
+  });
+
+  test('closes a known Protocol V2 operation after transport state is released', () => {
+    const postMessage = jest.fn();
+    const interaction = {
+      interactionId: 'interaction-released',
+      phaseId: 'interaction-released:phase-1',
+      sequence: 2,
+      phase: 'processing',
+      transition: 'finish',
+      outcome: 'succeeded',
+      protocol: 'V2',
+    } as const;
+    const device = {
+      ...createDevice(false),
+      finishProtocolV2UiInteraction: jest.fn(() => interaction),
+    };
+    const coordinator = new ProtocolV2UiInteractionCoordinator(device as any, postMessage);
+
+    const emitted = coordinator.close({
+      ensureOperationClose: true,
+      protocolV2Operation: true,
+    });
+
+    expect(emitted).toBe(true);
+    expect(postMessage).toHaveBeenCalledWith({
+      event: 'UI_EVENT',
+      type: UI_REQUEST.CLOSE_UI_WINDOW,
+      payload: {
+        ...interaction,
+        device: { connectId: 'pro2-test', deviceType: 'pro2' },
+      },
+    });
+  });
+
   test('does not emit interaction events for methods without metadata such as Portfolio', () => {
     const postMessage = jest.fn();
     const coordinator = new ProtocolV2UiInteractionCoordinator(createDevice() as any, postMessage);

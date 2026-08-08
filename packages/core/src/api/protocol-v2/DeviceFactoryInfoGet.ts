@@ -7,7 +7,7 @@ export default class DeviceFactoryInfoGet extends BaseMethod {
   }
 
   init() {
-    // Protocol V2 (Pro2) only; Core rejects non-V2 devices.
+    // Protocol V2 (Neo/Pro2) only; Core rejects non-V2 devices.
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.unlockPolicy = 'none';

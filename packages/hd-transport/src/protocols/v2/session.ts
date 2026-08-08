@@ -10,7 +10,7 @@ import * as check from '../../utils/highlevel-checks';
 import { LogBlockCommand } from '../../utils/logBlockCommand';
 
 import type { Root } from 'protobufjs/light';
-import type { MessageFromOneKey } from '../../types';
+import type { MessageFromOneKey, TransportWriteMetrics } from '../../types';
 
 export * from './errors';
 
@@ -22,7 +22,8 @@ export type ProtocolV2Schemas = {
 export type ProtocolV2CallContext = {
   messageName: string;
   timeoutMs?: number;
-  highVolume: boolean;
+  highThroughput: boolean;
+  writeWithResponse?: boolean;
   generation: number;
   signal: AbortSignal;
 };
@@ -52,6 +53,8 @@ export type ProtocolV2CallOptions = {
   expectedTypes?: string[];
   intermediateTypes?: string[];
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
+  onWriteCompleted?: (metrics: TransportWriteMetrics) => void;
+  writeWithResponse?: boolean;
 };
 
 export { concatUint8Arrays, ProtocolV2FrameAssembler };
@@ -78,7 +81,7 @@ export function bytesToHex(bytes: Uint8Array): string {
     .join('');
 }
 
-const HIGH_VOLUME_PROTOCOL_V2_CALLS = new Set([
+const REDUCED_DEBUG_PROTOCOL_V2_CALLS = new Set([
   ...LogBlockCommand,
   'FilesystemFileRead',
   'FileRead',
@@ -86,7 +89,22 @@ const HIGH_VOLUME_PROTOCOL_V2_CALLS = new Set([
 ]);
 
 function shouldReduceProtocolV2Debug(name: string) {
-  return HIGH_VOLUME_PROTOCOL_V2_CALLS.has(name);
+  return REDUCED_DEBUG_PROTOCOL_V2_CALLS.has(name);
+}
+
+const HIGH_THROUGHPUT_PROTOCOL_V2_CALLS = new Set([
+  'FilesystemFileWrite',
+  'FileWrite',
+  'EmmcFileWrite',
+  'FirmwareUpload',
+  'ResourceAck',
+  'FilesystemFileRead',
+  'FileRead',
+  'EmmcFileRead',
+]);
+
+export function isProtocolV2HighThroughputCall(name: string) {
+  return HIGH_THROUGHPUT_PROTOCOL_V2_CALLS.has(name);
 }
 
 const COMMON_TERMINAL_RESPONSE_TYPES = new Set([
@@ -219,7 +237,10 @@ export class ProtocolV2Session {
     const baseCallContext: ProtocolV2CallContext = {
       messageName: name,
       timeoutMs,
-      highVolume: shouldReduceDebug,
+      highThroughput: isProtocolV2HighThroughputCall(name),
+      ...(callOptions.writeWithResponse === undefined
+        ? {}
+        : { writeWithResponse: callOptions.writeWithResponse }),
       generation,
       signal: abortController.signal,
     };
@@ -239,7 +260,16 @@ export class ProtocolV2Session {
         );
       }
 
+      const writeStartedAt = Date.now();
       await writeFrame(frame, baseCallContext);
+      try {
+        callOptions.onWriteCompleted?.({
+          elapsedMs: Math.max(Date.now() - writeStartedAt, 0),
+          frameBytes: frame.byteLength,
+        });
+      } catch (error) {
+        logger?.error?.(`${logPrefix} write metrics callback failed: ${String(error)}`);
+      }
 
       // Some Protocol V2 operations emit progress notifications before the
       // terminal response. Consume those frames here so callers still see a

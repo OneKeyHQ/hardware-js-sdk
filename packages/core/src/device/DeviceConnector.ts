@@ -14,7 +14,7 @@ import type { OneKeyDeviceInfo as DeviceDescriptor, Transport } from '@onekeyfe/
 const Log = getLogger(LoggerNames.DeviceConnector);
 
 export default class DeviceConnector {
-  transport: Transport;
+  transport?: Transport;
 
   listenTimestamp = 0;
 
@@ -30,9 +30,21 @@ export default class DeviceConnector {
     DevicePool.setConnector(this);
   }
 
+  private getActiveTransport(): Transport {
+    const transport = this.transport ?? TransportManager.getTransport();
+    if (!transport) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.TransportNotConfigured,
+        'Device connector was created before transport initialization'
+      );
+    }
+    this.transport = transport;
+    return transport;
+  }
+
   async enumerate() {
     try {
-      const descriptors = await this.transport.enumerate();
+      const descriptors = await this.getActiveTransport().enumerate();
       this.upcoming = descriptors;
       this._reportDevicesChange();
       return { descriptors } as DeviceDescriptorDiff;
@@ -50,11 +62,10 @@ export default class DeviceConnector {
     let descriptors: DeviceDescriptor[];
 
     try {
+      const transport = this.getActiveTransport();
       Log.debug('Start listening', current);
       this.listenTimestamp = new Date().getTime();
-      descriptors = waitForEvent
-        ? await this.transport.listen(current)
-        : await this.transport.enumerate();
+      descriptors = waitForEvent ? await transport.listen(current) : await transport.enumerate();
       if (!this.listening) return; // do not continue if stop() was called
 
       this.upcoming = descriptors;
@@ -88,16 +99,17 @@ export default class DeviceConnector {
     Log.debug('acquire', path, session, expectedProtocol, protocolHint);
     const env = DataManager.getSettings('env');
     try {
+      const transport = this.getActiveTransport();
       let res;
       if (DataManager.isBleConnect(env)) {
-        res = await this.transport.acquire({
+        res = await transport.acquire({
           uuid: path,
           forceCleanRunPromise,
           expectedProtocol,
           protocolHint,
         });
       } else {
-        res = await this.transport.acquire({
+        res = await transport.acquire({
           path,
           previous: session ?? null,
           expectedProtocol,
@@ -105,7 +117,13 @@ export default class DeviceConnector {
         });
       }
       if (expectedProtocol) {
-        const detectedProtocol = this.transport.getProtocolType(path);
+        // The acquire response is the stable snapshot from this active probe. A delayed
+        // disconnect from an older generation may clear caches, so do not rely on cache alone.
+        const acquiredProtocol =
+          typeof res === 'object' && res !== null
+            ? (res as DeviceDescriptor).protocolType
+            : undefined;
+        const detectedProtocol = acquiredProtocol ?? transport.getProtocolType(path);
         if (detectedProtocol !== expectedProtocol) {
           throw ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,
@@ -120,9 +138,9 @@ export default class DeviceConnector {
     }
   }
 
-  async release(session: string, onclose: boolean) {
+  async release(session: string, onclose: boolean, keepSession?: boolean) {
     try {
-      const res = await this.transport.release(session, onclose);
+      const res = await this.getActiveTransport().release(session, onclose, keepSession);
       return res;
     } catch (error) {
       safeThrowError(error);
@@ -131,8 +149,9 @@ export default class DeviceConnector {
 
   async disconnect(session: string | undefined | null) {
     try {
-      if (this.transport.disconnect && !!session) {
-        await this.transport.disconnect(session);
+      const transport = this.getActiveTransport();
+      if (transport.disconnect && !!session) {
+        await transport.disconnect(session);
       }
     } catch (error) {
       safeThrowError(error);
@@ -140,10 +159,11 @@ export default class DeviceConnector {
   }
 
   promptDeviceAccess(): Promise<USBDevice | BluetoothDevice | null> {
-    if (!this.transport.promptDeviceAccess) {
+    const transport = this.getActiveTransport();
+    if (!transport.promptDeviceAccess) {
       return Promise.resolve(null);
     }
-    return this.transport.promptDeviceAccess();
+    return transport.promptDeviceAccess();
   }
 
   _reportDevicesChange() {

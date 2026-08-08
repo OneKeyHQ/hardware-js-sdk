@@ -422,7 +422,7 @@ SDK 支持 Resource Update V1 时走新协议，否则走现有 `firmwareUpdateV
 - `resourceBundles[].version`
 - `resourceBundles[].payloadHash`
 - `resourceBundles[].headerHash`
-- `resourceBundleFiles[].devicePath`
+- `resourceFiles[].devicePath`
 
 新协议稳定后标记 deprecated，阻止新 Pro 2 固件使用旧模式，并在下一个 SDK 主版本评估移除公共类型。
 

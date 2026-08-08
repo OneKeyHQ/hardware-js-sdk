@@ -144,7 +144,8 @@ export function SearchTrigger() {
   return (
     <button
       onClick={handleClick}
-      className="group flex items-center gap-2 px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary/50 dark:hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 active:bg-gray-100 dark:active:bg-gray-600"
+      aria-label={t('search.placeholder')}
+      className="group flex h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-md border border-gray-200 bg-white p-0 text-sm transition-all duration-200 hover:border-primary/50 hover:bg-gray-50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 active:bg-gray-100 sm:h-9 sm:w-auto sm:justify-start sm:px-3 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-primary/50 dark:hover:bg-gray-700 dark:active:bg-gray-600"
     >
       <svg
         className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-primary transition-colors"
@@ -159,10 +160,10 @@ export function SearchTrigger() {
           d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
         />
       </svg>
-      <span className="text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors">
+      <span className="hidden text-gray-500 transition-colors group-hover:text-gray-700 sm:inline dark:text-gray-400 dark:group-hover:text-gray-300">
         {t('search.placeholder')}
       </span>
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto hidden items-center gap-1 lg:flex">
         <kbd className="text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 transition-colors">
           {shortcutKeys.CmdOrCtrl.replace('+', '')}
         </kbd>
@@ -197,8 +198,8 @@ export function CommandPalette({ children }: { children: React.ReactNode }) {
       }}
     >
       <KBarPortal>
-        <KBarPositioner className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm p-4">
-          <KBarAnimator className="max-w-xl w-full bg-white dark:bg-gray-900 rounded-lg shadow-2xl mx-auto mt-12 overflow-hidden border border-gray-200 dark:border-gray-700">
+        <KBarPositioner className="fixed inset-0 z-[70] bg-black/20 p-2 backdrop-blur-sm sm:p-4">
+          <KBarAnimator className="mx-auto mt-3 w-full max-w-xl overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl sm:mt-12 dark:border-gray-700 dark:bg-gray-900">
             {/* 搜索输入框 */}
             <div className="border-b border-gray-100 dark:border-gray-800">
               <KBarSearch
@@ -208,12 +209,12 @@ export function CommandPalette({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* 结果列表 */}
-            <div className="max-h-96 overflow-y-auto">
+            <div className="max-h-[min(24rem,calc(100dvh-10rem))] overflow-y-auto">
               <RenderResults />
             </div>
 
             {/* 底部提示 */}
-            <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+            <div className="hidden items-center justify-between border-t border-gray-100 bg-gray-50 px-4 py-2 text-xs text-gray-500 sm:flex dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400">
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1">
                   <kbd className="bg-white dark:bg-gray-700 px-1 py-0.5 rounded text-xs border border-gray-200 dark:border-gray-600">

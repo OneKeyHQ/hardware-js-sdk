@@ -74,7 +74,9 @@ import type { DeviceStateReadOptions } from '../types/api/getDeviceState';
 import type {
   DeviceButtonRequestPayload,
   DeviceFeaturesPayload,
+  HardwareUiInteractionMeta,
   PassphraseRequestPayload,
+  ProtocolV2UiEventMetadata,
 } from '../events';
 import type { PassphrasePromptResponse } from './DeviceCommands';
 import type { Deferred, HardwareConnectProtocol } from '@onekeyfe/hd-shared';
@@ -93,9 +95,15 @@ export type InitOptions = {
   passphraseState?: string;
   deriveCardano?: boolean;
   connectProtocol?: HardwareConnectProtocol;
+  forceProtocolDetection?: boolean;
   protocolV2DeviceInfoTimeoutMs?: number;
   /** Refresh Protocol V2 runtime state before returning discovery results. */
   refreshRuntimeState?: boolean;
+  /**
+   * Protocol V1 Initialize response timeout override. Reboot-wait polling passes a
+   * short value so an unanswered probe settles before the next poll tick.
+   */
+  timeoutMs?: number;
 };
 
 export type RunOptions = {
@@ -132,6 +140,8 @@ const isProtocolV2DeviceStatusUnsupportedError = (error: unknown) => {
 
 export interface DeviceEvents {
   [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];
+  [DEVICE.PIN_ON_DEVICE]: [Device, DeviceSessionPinType, ProtocolV2UiEventMetadata?];
+  [DEVICE.PIN_ON_DEVICE_COMPLETE]: [Device, HardwareUiInteractionMeta];
   [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, PassphraseRequestPayload?];
   [DEVICE.ATTACH_PIN_ON_DEVICE]: [Device, PassphraseRequestPayload?];
   [DEVICE.BUTTON]: [Device, DeviceButtonRequestPayload];
@@ -229,6 +239,24 @@ export class Device extends EventEmitter {
 
   /** Force the next initialization to reload DeviceInfo after reconnect or reboot. */
   private protocolV2StateNeedsReload = false;
+
+  /** Runtime context negotiated once per active Protocol V2 link. */
+  private protocolV2RuntimeContext?: ProtocolInfo;
+
+  /** Coalesces concurrent first-use runtime negotiation on the same active link. */
+  private protocolV2RuntimeContextPromise?: Promise<ProtocolInfo>;
+
+  /** Invalidates an in-flight runtime-context response without adding a transport epoch. */
+  private protocolV2RuntimeContextRequestToken?: object;
+
+  private protocolV2UiInteraction?: {
+    interactionId: string;
+    phaseCounter: number;
+    sequence: number;
+    opened: boolean;
+  };
+
+  private protocolV2UiInteractionCounter = 0;
 
   get state() {
     return this.stateStore.getState();
@@ -337,7 +365,7 @@ export class Device extends EventEmitter {
       deviceId,
       path: this.originalDescriptor?.path,
       bleName,
-      name: displayName || bleName || `OneKey ${deviceType?.toUpperCase()}`,
+      name: bleName || displayName || `OneKey ${deviceType?.toUpperCase()}`,
       // Keep the legacy top-level field string-compatible while preserving
       // the canonical nullable value at state.identity.label.
       label: displayName ?? '',
@@ -355,7 +383,10 @@ export class Device extends EventEmitter {
    * Device connect
    * @returns {Promise<boolean>}
    */
-  connect(connectProtocol?: HardwareConnectProtocol) {
+  connect(
+    connectProtocol?: HardwareConnectProtocol,
+    options?: { forceProtocolDetection?: boolean }
+  ) {
     const env = DataManager.getSettings('env');
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<boolean>(async (resolve, reject) => {
@@ -365,7 +396,7 @@ export class Device extends EventEmitter {
           return;
         }
         try {
-          await this.acquire(connectProtocol);
+          await this.acquire(connectProtocol, options);
           resolve(true);
         } catch (error) {
           reject(error);
@@ -375,7 +406,7 @@ export class Device extends EventEmitter {
       // 不存在 Session ID 或存在 Session ID 但设备在别处使用，都需要 acquire 获取最新 sessionID
       if (!this.mainId || (!this.isUsedHere() && this.originalDescriptor)) {
         try {
-          await this.acquire(connectProtocol);
+          await this.acquire(connectProtocol, options);
           resolve(true);
         } catch (error) {
           reject(error);
@@ -392,11 +423,16 @@ export class Device extends EventEmitter {
 
   async acquire(
     expectedProtocol?: HardwareConnectProtocol,
-    options?: { throwOnRunPromiseError?: boolean }
+    options?: { throwOnRunPromiseError?: boolean; forceProtocolDetection?: boolean }
   ) {
     const env = DataManager.getSettings('env');
     const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
-    const protocolHint = expectedProtocol ? undefined : this.originalDescriptor.protocolType;
+    const previousProtocol = this.originalDescriptor.protocolType;
+    // A protocol stored after a successful probe is authoritative. Only the explicit
+    // first-connection/recovery path may bypass it and probe both protocols again.
+    const strictProtocol = options?.forceProtocolDetection
+      ? undefined
+      : expectedProtocol ?? this.originalDescriptor.protocolType;
     try {
       let acquireResult: unknown;
       if (DataManager.isBleConnect(env)) {
@@ -408,8 +444,8 @@ export class Device extends EventEmitter {
           this.originalDescriptor.id,
           undefined,
           true,
-          expectedProtocol,
-          protocolHint
+          strictProtocol,
+          undefined
         );
         this.mainId = (acquireResult as any)?.uuid ?? '';
         Log.debug('Expected uuid:', this.mainId);
@@ -418,24 +454,31 @@ export class Device extends EventEmitter {
           this.originalDescriptor.path,
           this.originalDescriptor.session,
           undefined,
-          expectedProtocol,
-          protocolHint
+          strictProtocol,
+          undefined
         );
         this.mainId = acquireResult as string | undefined;
         Log.debug('Expected session id:', this.mainId);
       }
-      this.deviceAcquired = true;
-      this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
-
       // Propagate protocol version detected during acquire.
       const detectedProtocol =
         (acquireResult as { protocolType?: HardwareConnectProtocol } | undefined)?.protocolType ??
         TransportManager.transport?.getProtocolType?.(
           DataManager.isBleConnect(env) ? this.originalDescriptor.id : this.originalDescriptor.path
         );
+      if (options?.forceProtocolDetection && !detectedProtocol) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `Active protocol detection returned no protocol for ${
+            this.originalDescriptor.path || this.originalDescriptor.id
+          }`
+        );
+      }
       if (detectedProtocol) {
         this.originalDescriptor.protocolType = detectedProtocol;
       }
+      this.deviceAcquired = true;
+      this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
 
       if (this.commands) {
         await this.commands.dispose(false);
@@ -443,6 +486,22 @@ export class Device extends EventEmitter {
 
       this.commands = new DeviceCommands(this, this.mainId ?? '');
     } catch (error) {
+      if (options?.forceProtocolDetection) {
+        this.originalDescriptor.protocolType = previousProtocol;
+        const failedSession = this.mainId;
+        this.deviceAcquired = false;
+        if (failedSession) {
+          try {
+            await this.deviceConnector?.release?.(failedSession, false);
+          } catch (releaseError) {
+            Log.debug('Failed to release an unsuccessful protocol probe', releaseError);
+          }
+        }
+        if (!DataManager.isBleConnect(env)) {
+          this.mainId = null;
+          this.updateDescriptor({ session: null } as DeviceDescriptor);
+        }
+      }
       if (options?.throwOnRunPromiseError) {
         throw error;
       }
@@ -484,7 +543,8 @@ export class Device extends EventEmitter {
         }
       }
       try {
-        await this.deviceConnector?.release(this.mainId, false);
+        // BLE releases even when keepSession is set, so forward the intent.
+        await this.deviceConnector?.release(this.mainId, false, this.keepSession);
         this.updateDescriptor({ session: null } as DeviceDescriptor);
       } catch (err) {
         Log.error('[Device] release error: ', err);
@@ -642,6 +702,7 @@ export class Device extends EventEmitter {
     // Most-specific model first; must match getMethodVersionRange in deviceInfoUtils,
     // otherwise e.g. Classic1s resolves the looser model_mini range before model_classic1s.
     const modelFallbacks: IDeviceModel[] = [
+      'model_pro2',
       'model_classic1s',
       'model_classic',
       'model_mini',
@@ -661,7 +722,8 @@ export class Device extends EventEmitter {
     if (
       deviceType === EDeviceType.Touch ||
       deviceType === EDeviceType.Pro ||
-      deviceType === EDeviceType.Pro2
+      deviceType === EDeviceType.Pro2 ||
+      deviceType === EDeviceType.Neo
     ) {
       return { support: true };
     }
@@ -678,7 +740,8 @@ export class Device extends EventEmitter {
     if (
       deviceType === EDeviceType.Touch ||
       deviceType === EDeviceType.Pro ||
-      deviceType === EDeviceType.Pro2
+      deviceType === EDeviceType.Pro2 ||
+      deviceType === EDeviceType.Neo
     ) {
       return { support: false };
     }
@@ -851,7 +914,7 @@ export class Device extends EventEmitter {
         const initStartAt = Date.now();
         const { message } = await this.commands.typedCall('Initialize', 'Features', payload, {
           // iOS BLE bound devices can need close to 20 seconds.
-          timeoutMs: 25 * 1000,
+          timeoutMs: options?.timeoutMs ?? 25 * 1000,
         });
         this.setLastInitializeDuration(Date.now() - initStartAt);
         this._updateFeatures(message, initSession);
@@ -964,7 +1027,10 @@ export class Device extends EventEmitter {
       await this.getFeatures();
     }
 
-    if (!this.isProtocolV2() && refresh.has('verification')) {
+    const supportsProtocolV1OnekeyFeatures =
+      this.getCurrentDeviceType() === EDeviceType.Touch ||
+      this.getCurrentDeviceType() === EDeviceType.Pro;
+    if (!this.isProtocolV2() && refresh.has('verification') && supportsProtocolV1OnekeyFeatures) {
       const { message } = await this.commands.typedCall('OnekeyGetFeatures', 'OnekeyFeatures');
       this.updateState(mapProtocolV1OnekeyFeaturesToState(message), 'device-info');
     }
@@ -987,13 +1053,7 @@ export class Device extends EventEmitter {
       }
 
       if (refresh.has('status') && !initializedWithDeviceInfo) {
-        const deviceInfo =
-          refreshedDeviceInfo ??
-          (await requestProtocolV2DeviceInfo({
-            commands: this.commands,
-            request: getProtocolV2DeviceInfoRequest(),
-          }));
-        await this.probeProtocolV2RuntimeState(deviceInfo);
+        await this.probeProtocolV2RuntimeState(refreshedDeviceInfo);
       }
 
       if (refresh.has('settings') && this.state?.status.mode === 'normal') {
@@ -1064,19 +1124,66 @@ export class Device extends EventEmitter {
     return this.features;
   }
 
-  async probeProtocolV2RuntimeState(deviceInfo: ProtocolV2DeviceInfo, timeoutMs?: number) {
-    const protocolInfo = await requestProtocolV2ProtocolInfo({
-      commands: this.commands,
-      timeoutMs,
-    });
+  async ensureProtocolV2RuntimeContext(timeoutMs?: number): Promise<ProtocolInfo> {
+    const cachedProtocolInfo =
+      this.protocolV2RuntimeContext ??
+      (!this.protocolV2StateNeedsReload
+        ? this.state?.raw?.protocolV2ProtocolInfo ?? undefined
+        : undefined);
+    if (cachedProtocolInfo) {
+      this.protocolV2RuntimeContext = cachedProtocolInfo;
+      return cachedProtocolInfo;
+    }
+
+    if (this.protocolV2RuntimeContextPromise) {
+      return this.protocolV2RuntimeContextPromise;
+    }
+
+    const requestToken = {};
+    const pendingRequest = (async () => {
+      const protocolInfo = await requestProtocolV2ProtocolInfo({
+        commands: this.commands,
+        timeoutMs,
+      });
+      if (this.protocolV2RuntimeContextRequestToken !== requestToken) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.DeviceInitializeFailed,
+          'Protocol V2 runtime context was invalidated while loading.'
+        );
+      }
+      this.protocolV2RuntimeContext = protocolInfo;
+      return protocolInfo;
+    })();
+    this.protocolV2RuntimeContextRequestToken = requestToken;
+    this.protocolV2RuntimeContextPromise = pendingRequest;
+
+    try {
+      return await pendingRequest;
+    } finally {
+      if (this.protocolV2RuntimeContextPromise === pendingRequest) {
+        this.protocolV2RuntimeContextPromise = undefined;
+      }
+      if (this.protocolV2RuntimeContextRequestToken === requestToken) {
+        this.protocolV2RuntimeContextRequestToken = undefined;
+      }
+    }
+  }
+
+  async probeProtocolV2RuntimeState(deviceInfo?: ProtocolV2DeviceInfo, timeoutMs?: number) {
+    const protocolInfo = await this.ensureProtocolV2RuntimeContext(timeoutMs);
     const runtimeMode = getProtocolV2RuntimeMode(protocolInfo);
-    const protocolV2DeviceType = resolveProtocolV2DeviceIdentity(
-      deviceInfo.hw?.Device_type
-    ).deviceType;
-    if (runtimeMode === 'romloader' && protocolV2DeviceType !== EDeviceType.Pro2) {
+    const runtimeDeviceInfo = deviceInfo ?? this.state?.raw?.protocolV2DeviceInfo;
+    const protocolV2DeviceType = runtimeDeviceInfo
+      ? resolveProtocolV2DeviceIdentity(runtimeDeviceInfo.hw?.Device_type).deviceType
+      : this.getCurrentDeviceType();
+    if (
+      runtimeMode === 'romloader' &&
+      protocolV2DeviceType !== EDeviceType.Pro2 &&
+      protocolV2DeviceType !== EDeviceType.Neo
+    ) {
       throw ERRORS.TypedError(
         HardwareErrorCode.DeviceInitializeFailed,
-        'Protocol V2 romloader mode is only supported for Pro2.'
+        'Protocol V2 romloader mode is only supported for Pro2 and Neo.'
       );
     }
     const deviceStatusSupported = supportsProtocolV2Message(
@@ -1147,6 +1254,9 @@ export class Device extends EventEmitter {
     this.deviceAcquired = false;
     if (!this.isProtocolV2()) return;
     this.protocolV2StateNeedsReload = true;
+    this.protocolV2RuntimeContext = undefined;
+    this.protocolV2RuntimeContextPromise = undefined;
+    this.protocolV2RuntimeContextRequestToken = undefined;
     this.clearPreInitialized();
   }
 
@@ -1155,9 +1265,14 @@ export class Device extends EventEmitter {
     if (deviceId) {
       deviceWalletSessionStore.deleteDevice(deviceId);
     }
-    if (this.isProtocolV2() && this.originalDescriptor.path !== deviceId) {
-      deviceWalletSessionStore.deleteDevice(this.originalDescriptor.path);
+    if (this.isProtocolV2()) {
+      if (this.originalDescriptor.path !== deviceId) {
+        deviceWalletSessionStore.deleteDevice(this.originalDescriptor.path);
+      }
       this.protocolV2StateNeedsReload = true;
+      this.protocolV2RuntimeContext = undefined;
+      this.protocolV2RuntimeContextPromise = undefined;
+      this.protocolV2RuntimeContextRequestToken = undefined;
     }
 
     this.passphraseState = undefined;
@@ -1170,6 +1285,9 @@ export class Device extends EventEmitter {
     if (!this.isProtocolV2()) return;
 
     this.protocolV2StateNeedsReload = true;
+    this.protocolV2RuntimeContext = undefined;
+    this.protocolV2RuntimeContextPromise = undefined;
+    this.protocolV2RuntimeContextRequestToken = undefined;
     this.clearPreInitialized();
     let loaderMode: 'bootloader' | 'romloader' | undefined;
     if (rebootType === DeviceRebootType.Bootloader) {
@@ -1276,11 +1394,17 @@ export class Device extends EventEmitter {
       }
     };
 
-    if (!this.isUsedHere() || this.commands.disposed) {
-      const env = DataManager.getSettings('env');
+    const env = DataManager.getSettings('env');
+    if (options.forceProtocolDetection && env !== 'react-native' && this.isUsedHere()) {
+      await this.release();
+    }
+
+    if (options.forceProtocolDetection || !this.isUsedHere() || this.commands.disposed) {
       if (env !== 'react-native') {
         try {
-          await this.acquire(options.connectProtocol);
+          await this.acquire(options.connectProtocol, {
+            forceProtocolDetection: options.forceProtocolDetection,
+          });
         } catch (error) {
           clearRunPromise();
           runPromise.reject(error);
@@ -1458,7 +1582,8 @@ export class Device extends EventEmitter {
     if (!this.state) return undefined;
     return (
       this.isProtocolV2() &&
-      this.getCurrentDeviceType() === EDeviceType.Pro2 &&
+      (this.getCurrentDeviceType() === EDeviceType.Pro2 ||
+        this.getCurrentDeviceType() === EDeviceType.Neo) &&
       this.state.status.mode === 'romloader'
     );
   }
@@ -1504,7 +1629,8 @@ export class Device extends EventEmitter {
     const isModeT =
       deviceType === EDeviceType.Touch ||
       deviceType === EDeviceType.Pro ||
-      deviceType === EDeviceType.Pro2;
+      deviceType === EDeviceType.Pro2 ||
+      deviceType === EDeviceType.Neo;
     const unlocked = this.state?.status.unlocked;
     const preCheckTouch = isModeT && unlocked === false;
     const passphraseProtection = this.getCurrentPassphraseProtection();
@@ -1522,6 +1648,85 @@ export class Device extends EventEmitter {
     return res.message;
   }
 
+  beginProtocolV2UiInteraction() {
+    if (!this.isProtocolV2()) return;
+    this.protocolV2UiInteraction = {
+      interactionId: `${this.instanceId}:${Date.now()}:${++this.protocolV2UiInteractionCounter}`,
+      phaseCounter: 0,
+      sequence: 0,
+      opened: false,
+    };
+  }
+
+  createProtocolV2UiPhaseMetadata(
+    phase: HardwareUiInteractionMeta['phase'],
+    transition: HardwareUiInteractionMeta['transition'],
+    options?: {
+      phaseId?: string;
+      outcome?: HardwareUiInteractionMeta['outcome'];
+    }
+  ): HardwareUiInteractionMeta | undefined {
+    if (!this.isProtocolV2()) return undefined;
+    if (!this.protocolV2UiInteraction) this.beginProtocolV2UiInteraction();
+
+    const interaction = this.protocolV2UiInteraction;
+    if (!interaction) return undefined;
+    const phaseId =
+      options?.phaseId ?? `${interaction.interactionId}:phase-${++interaction.phaseCounter}`;
+    interaction.opened = true;
+    interaction.sequence += 1;
+
+    return {
+      interactionId: interaction.interactionId,
+      phaseId,
+      sequence: interaction.sequence,
+      phase,
+      transition,
+      ...(options?.outcome ? { outcome: options.outcome } : {}),
+      protocol: 'V2',
+    };
+  }
+
+  completeProtocolV2UiPhase(
+    phase: HardwareUiInteractionMeta,
+    outcome: HardwareUiInteractionMeta['outcome'] = 'succeeded'
+  ) {
+    return this.createProtocolV2UiPhaseMetadata(phase.phase, 'complete', {
+      phaseId: phase.phaseId,
+      outcome,
+    });
+  }
+
+  finishProtocolV2UiInteraction(
+    outcome?: HardwareUiInteractionMeta['outcome'],
+    options?: { ensureMetadata?: boolean }
+  ) {
+    const interaction = this.protocolV2UiInteraction;
+    if (!interaction || (!interaction.opened && !options?.ensureMetadata)) {
+      this.protocolV2UiInteraction = undefined;
+      return undefined;
+    }
+
+    const phaseId = `${interaction.interactionId}:phase-${Math.max(interaction.phaseCounter, 1)}`;
+    interaction.opened = true;
+    interaction.sequence += 1;
+    const metadata: HardwareUiInteractionMeta = {
+      interactionId: interaction.interactionId,
+      phaseId,
+      sequence: interaction.sequence,
+      phase: 'processing',
+      transition: 'finish',
+      outcome: outcome ?? 'succeeded',
+      protocol: 'V2',
+    };
+    this.protocolV2UiInteraction = undefined;
+    return metadata;
+  }
+
+  hasOpenProtocolV2UiInteraction() {
+    return this.protocolV2UiInteraction?.opened === true;
+  }
+
   supportUnlockVersionRange(): DeviceFirmwareRange {
     // This range applies to Protocol V1 Pro devices; Pro2 has a dedicated unlock flow.
     return {
@@ -1531,10 +1736,33 @@ export class Device extends EventEmitter {
     };
   }
 
-  async unlockDevice(pinType: DeviceSessionPinType = DeviceSessionPinType.Main) {
+  async unlockDevice(
+    pinType?: DeviceSessionPinType,
+    options?: ProtocolV2UiEventMetadata & { emitUiEvent?: boolean }
+  ) {
     if (this.isProtocolV2()) {
+      const requestedPinType = pinType ?? DeviceSessionPinType.Main;
+      const interaction =
+        options?.interaction ??
+        (options?.emitUiEvent === false
+          ? undefined
+          : this.createProtocolV2UiPhaseMetadata('pin', 'start'));
+      if (options?.emitUiEvent !== false) {
+        this.emit(DEVICE.PIN_ON_DEVICE, this, requestedPinType, {
+          source: options?.source ?? 'unlock-coordinator',
+          reason: options?.reason ?? 'device-unlock',
+          deviceOnly: options?.deviceOnly ?? true,
+          completion: options?.completion,
+          method: options?.method,
+          page: options?.page,
+          operation: options?.operation,
+          interaction: options?.interaction ?? interaction,
+        });
+      }
       try {
-        await this.commands.typedCall('DeviceSessionAskPin', 'Success', { type: pinType });
+        await this.commands.typedCall('DeviceSessionAskPin', 'Success', {
+          type: requestedPinType,
+        });
       } catch (error) {
         const errorText =
           error instanceof Error
@@ -1544,6 +1772,11 @@ export class Device extends EventEmitter {
           throw createDeviceNotSupportMethodError('deviceUnlock', this.getCurrentFirmwareType());
         }
         throw error;
+      }
+
+      const completion = interaction ? this.completeProtocolV2UiPhase(interaction) : undefined;
+      if (completion) {
+        this.emit(DEVICE.PIN_ON_DEVICE_COMPLETE, this, completion);
       }
 
       const status = await requestProtocolV2DeviceStatus({ commands: this.commands });
@@ -1607,7 +1840,8 @@ export class Device extends EventEmitter {
   async checkPassphraseStateSafety(
     passphraseState?: string,
     useEmptyPassphrase?: boolean,
-    skipPassphraseCheck?: boolean
+    skipPassphraseCheck?: boolean,
+    deriveCardano?: boolean
   ) {
     if (this.isUnacquired()) return false;
 
@@ -1616,6 +1850,8 @@ export class Device extends EventEmitter {
       await getPassphraseStateWithRefreshDeviceInfo(this, {
         expectPassphraseState: expectedPassphraseState,
         onlyMainPin: useEmptyPassphrase,
+        deriveCardano,
+        rejectAttachPinForMainWallet: useEmptyPassphrase === true,
       });
 
     // Main wallet and unlock Attach Pin, throw safe error

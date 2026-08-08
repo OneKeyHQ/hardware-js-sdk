@@ -11,6 +11,7 @@ describe('hardware device identity filters', () => {
   it('accepts known OneKey BLE names', () => {
     expect(isOnekeyDevice('Touch A1B2')).toBe(true);
     expect(isOnekeyDevice('Pro A1B2')).toBe(true);
+    expect(isOnekeyDevice('Neo A1B2')).toBe(true);
     expect(isOnekeyDevice('K1234')).toBe(true);
     expect(isOnekeyDevice('S8')).toBe(true);
   });
@@ -20,14 +21,14 @@ describe('hardware device identity filters', () => {
     expect(isOnekeyDevice('Ledger Nano X')).toBe(false);
   });
 
-  it('does not identify an unnamed FFFD or Find My advertisement as OneKey', () => {
+  it('does not identify an FFFD-only advertisement as OneKey', () => {
     expect(isOnekeyBluetoothDevice({ name: 'Find My', serviceUuids: ['fffd'] })).toBe(false);
     expect(
       isOnekeyBluetoothDevice({ serviceUuids: ['0000fffd-0000-1000-8000-00805f9b34fb'] })
     ).toBe(false);
   });
 
-  it('keeps Pro2 communication advertisements and rejects its Find My advertisement', () => {
+  it('identifies Pro2 communication advertisements independently of their display name', () => {
     expect(
       isOnekeyBluetoothDevice({
         name: 'Pro2 A1B2',
@@ -37,13 +38,33 @@ describe('hardware device identity filters', () => {
     expect(
       isOnekeyBluetoothDevice({
         localName: 'Pro2 A1B2 - Find My',
-        serviceUuids: ['fffd'],
+        serviceUuids: ['0001', 'fffd'],
+      })
+    ).toBe(true);
+    expect(
+      isOnekeyBluetoothDevice({
+        name: 'Pro2 5E9D - Finde My',
+        serviceUuids: ['0001', 'fffd'],
+      })
+    ).toBe(true);
+  });
+
+  it('rejects Pro2 Find My entries when the communication service is absent', () => {
+    expect(
+      isOnekeyBluetoothDevice({
+        name: 'Pro2 A1B2 - Find My',
+      })
+    ).toBe(false);
+    expect(
+      isOnekeyBluetoothDevice({
+        localName: 'OneKey Pro 2 A1B2 - Find My',
+        serviceUuids: [],
       })
     ).toBe(false);
     expect(
       isOnekeyBluetoothDevice({
         name: 'Pro2 5E9D - Finde My',
-        serviceUuids: ['0001', 'fffd'],
+        serviceUuids: ['fffd'],
       })
     ).toBe(false);
   });

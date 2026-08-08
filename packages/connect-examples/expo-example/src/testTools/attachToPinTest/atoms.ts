@@ -3,6 +3,7 @@ import { atomWithStorage } from 'jotai/utils';
 import { getDeviceType } from '@onekeyfe/hd-core';
 
 import { selectDeviceAtom } from '../../atoms/deviceAtoms';
+import { executeProtocolAwareMethod } from '../../utils/protocolAwareMethod';
 
 import type { CoreApi } from '@onekeyfe/hd-core';
 
@@ -163,11 +164,18 @@ export const addWalletAtom = atom(
     const deviceId = device?.features?.device_id ?? '';
     set(requestStatusAtom, { state: 'loading' });
 
-    const res1 = await sdk.evmGetAddress(deviceConnectId, deviceId, {
-      path: "m/44'/60'/0'/0/0",
-      showOnOneKey: false,
-      useEmptyPassphrase: mainWallet,
-      passphraseState,
+    const res1 = await executeProtocolAwareMethod({
+      sdk,
+      method: 'evmGetAddress',
+      connectId: deviceConnectId,
+      deviceId,
+      protocol: device?.connectProtocol,
+      params: {
+        path: "m/44'/60'/0'/0/0",
+        showOnOneKey: false,
+        useEmptyPassphrase: mainWallet,
+        passphraseState,
+      },
     });
     if (!res1.success) {
       console.log('get evm address failed', res1);
@@ -178,11 +186,18 @@ export const addWalletAtom = atom(
       return;
     }
 
-    const res2 = await sdk.btcGetAddress(deviceConnectId, deviceId, {
-      path: "m/44'/0'/0'/0/0",
-      showOnOneKey: false,
-      useEmptyPassphrase: mainWallet,
-      passphraseState,
+    const res2 = await executeProtocolAwareMethod({
+      sdk,
+      method: 'btcGetAddress',
+      connectId: deviceConnectId,
+      deviceId,
+      protocol: device?.connectProtocol,
+      params: {
+        path: "m/44'/0'/0'/0/0",
+        showOnOneKey: false,
+        useEmptyPassphrase: mainWallet,
+        passphraseState,
+      },
     });
     if (!res2.success) {
       set(requestStatusAtom, {

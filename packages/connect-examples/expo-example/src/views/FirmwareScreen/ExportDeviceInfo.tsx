@@ -3,43 +3,10 @@ import { useIntl } from 'react-intl';
 import { Button } from '../../components/ui/Button';
 import { downloadFile } from '../../utils/downloadUtils';
 import { useDeviceFieldContext } from './DeviceFieldContext';
+import { buildDeviceAdvancedInfo } from './deviceAdvancedInfo';
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 
 import type { Features } from '@onekeyfe/hd-core';
-
-export const deviceInfoKeys = [
-  //   ['device_id', 'label'],
-  ['onekey_device_type', 'onekey_serial_no', 'onekey_se_type'],
-  ['onekey_board_version', 'onekey_board_hash', 'onekey_board_build_id'],
-  ['onekey_boot_version', 'onekey_boot_hash', 'onekey_boot_build_id', 'onekey_boot_url'],
-  [
-    'onekey_firmware_version',
-    'onekey_firmware_hash',
-    'onekey_firmware_build_id',
-    'onekey_firmware_url',
-  ],
-  [
-    'onekey_ble_version',
-    'onekey_ble_hash',
-    'onekey_ble_build_id',
-    'onekey_ble_name',
-    'onekey_ble_url',
-  ],
-];
-
-export const deviceSEInfoKeys = [
-  ['onekey_se01_version', 'onekey_se01_hash', 'onekey_se01_build_id', 'onekey_se01_state'],
-  ['onekey_se01_boot_version', 'onekey_se01_boot_hash', 'onekey_se01_boot_build_id'],
-
-  ['onekey_se02_version', 'onekey_se02_hash', 'onekey_se02_build_id', 'onekey_se02_state'],
-  ['onekey_se02_boot_version', 'onekey_se02_boot_hash', 'onekey_se02_boot_build_id'],
-
-  ['onekey_se03_version', 'onekey_se03_hash', 'onekey_se03_build_id', 'onekey_se03_state'],
-  ['onekey_se03_boot_version', 'onekey_se03_boot_hash', 'onekey_se03_boot_build_id'],
-
-  ['onekey_se04_version', 'onekey_se04_hash', 'onekey_se04_build_id', 'onekey_se04_state'],
-  ['onekey_se04_boot_version', 'onekey_se04_boot_hash', 'onekey_se04_boot_build_id'],
-];
 
 export function formatCurrentTime(timestamp: number) {
   const formatter = new Intl.DateTimeFormat('zh-CN', {
@@ -64,13 +31,11 @@ export function getDeviceMode(features: Features | undefined) {
 
 export function ExportDeviceInfo() {
   const intl = useIntl();
-  const { features, onekeyFeatures } = useDeviceFieldContext();
-  const onekeyFeatureMap = onekeyFeatures as Record<string, unknown> | undefined;
-  const featureMap = features as Record<string, unknown> | undefined;
-
-  const getFieldValue = (field: string) => onekeyFeatureMap?.[field] ?? featureMap?.[field] ?? '';
+  const { deviceState, features, onekeyFeatures } = useDeviceFieldContext();
 
   const exportInfo = () => {
+    if (!deviceState) return;
+
     const markdown = [];
 
     const {
@@ -108,32 +73,27 @@ export function ExportDeviceInfo() {
       `${intl.formatMessage({ id: 'label__device_bluetooth_version' })}:    ${bleVersion}`
     );
 
-    markdown.push(``);
-    markdown.push(``);
-    markdown.push(`## Device Info`);
-    // markdown.push(`| Key | Value |`);
-    // markdown.push(`| --- | --- |`);
-    deviceInfoKeys.forEach(keys => {
-      keys.forEach(key => {
-        const value = getFieldValue(key);
-        markdown.push(`${key}:    ${value}`);
+    const advancedInfo = buildDeviceAdvancedInfo(deviceState);
+    const appendGroups = (title: string, groups: typeof advancedInfo.deviceGroups) => {
+      if (groups.length === 0) return;
+      markdown.push('', `## ${title}`, '');
+      groups.forEach(group => {
+        markdown.push(`### ${intl.formatMessage({ id: group.titleId })}`);
+        group.fields.forEach(item => {
+          markdown.push(`${intl.formatMessage({ id: item.labelId })}:    ${item.value ?? '—'}`);
+        });
+        markdown.push('');
       });
-      markdown.push(``);
-    });
+    };
 
-    markdown.push(``);
-    markdown.push(``);
-    markdown.push(`## Device SE Info`);
-    // markdown.push(`| Key | Value |`);
-    // markdown.push(`| --- | --- |`);
-    deviceSEInfoKeys.forEach(keys => {
-      keys.forEach(key => {
-        const value = getFieldValue(key);
-        markdown.push(`${key}:    ${value}`);
-      });
-      markdown.push(``);
-    });
-    markdown.push(``);
+    appendGroups(
+      intl.formatMessage({ id: 'title__device_advanced_info' }),
+      advancedInfo.deviceGroups
+    );
+    appendGroups(
+      intl.formatMessage({ id: 'label__device_se_info' }),
+      advancedInfo.securityElementGroups
+    );
 
     const formatTime = formatCurrentTime(Date.now())
       ?.replace(/:/g, '')
@@ -148,7 +108,7 @@ export function ExportDeviceInfo() {
   };
 
   return (
-    <Button variant="primary" size="medium" onPress={exportInfo}>
+    <Button variant="primary" size="medium" disabled={!deviceState} onPress={exportInfo}>
       {intl.formatMessage({ id: 'label__device_info_export' })}
     </Button>
   );

@@ -8,8 +8,9 @@ export type SwitchInputProps = {
   onToggle: (value: boolean) => void;
   label: string;
   vertical?: boolean;
+  disabled?: boolean;
 };
-export const SwitchInput = ({ value, onToggle, label, vertical }: SwitchInputProps) => {
+export const SwitchInput = ({ value, onToggle, label, vertical, disabled }: SwitchInputProps) => {
   const idRef = useRef(`switch-${random(100, 10000)}`);
   return (
     <Stack
@@ -27,6 +28,7 @@ export const SwitchInput = ({ value, onToggle, label, vertical }: SwitchInputPro
         checked={value}
         onCheckedChange={onToggle}
         defaultChecked={false}
+        disabled={disabled}
       >
         <Checkbox.Indicator>
           <CheckIcon />

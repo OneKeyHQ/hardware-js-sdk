@@ -3,19 +3,21 @@ import { UI_RESPONSE } from '@onekeyfe/hd-core';
 
 import { EnterPhase } from '../components/EnterPhase';
 
+import type { CoreApi, UiRequestPassphrase, UiResponseCorrelation } from '@onekeyfe/hd-core';
 import type { ReactNode } from 'react';
+
+type PassphraseRequestPayload = UiRequestPassphrase['payload'];
 
 interface DialogState {
   isOpen: boolean;
-  sdk: any;
-  requestPayload?: {
-    existsAttachPinUser?: boolean;
-  };
+  sdk?: CoreApi;
+  requestPayload?: PassphraseRequestPayload;
+  responseCorrelation?: UiResponseCorrelation;
 }
 
 interface HardwarePassphraseDialogContextType {
   dialogState: DialogState;
-  openDialog: (sdk: any, requestPayload?: { existsAttachPinUser?: boolean }) => void;
+  openDialog: (sdk: CoreApi, requestPayload?: PassphraseRequestPayload) => void;
   closeDialog: () => void;
 }
 
@@ -29,13 +31,16 @@ export const HardwarePassphraseDialogProvider: React.FC<{ children: ReactNode }>
   const [dialogState, setDialogState] = useState<DialogState>({
     isOpen: false,
     sdk: undefined,
-    requestPayload: {
-      existsAttachPinUser: undefined,
-    },
+    requestPayload: undefined,
   });
 
-  const openDialog = useCallback((sdk: any, requestPayload?: { existsAttachPinUser?: boolean }) => {
-    setDialogState({ isOpen: true, sdk, requestPayload });
+  const openDialog = useCallback((sdk: CoreApi, requestPayload?: PassphraseRequestPayload) => {
+    setDialogState({
+      isOpen: true,
+      sdk,
+      requestPayload,
+      responseCorrelation: requestPayload?.responseCorrelation,
+    });
   }, []);
 
   const closeDialog = useCallback(() => {
@@ -52,10 +57,11 @@ export const HardwarePassphraseDialogProvider: React.FC<{ children: ReactNode }>
           passphraseOnDevice: false,
           attachPinOnDevice: false,
         },
+        ...(dialogState.responseCorrelation ?? {}),
       });
       closeDialog();
     },
-    [closeDialog, dialogState.sdk]
+    [closeDialog, dialogState.responseCorrelation, dialogState.sdk]
   );
 
   // 在设备上输入 passphrase
@@ -67,9 +73,10 @@ export const HardwarePassphraseDialogProvider: React.FC<{ children: ReactNode }>
         passphraseOnDevice: true,
         attachPinOnDevice: false,
       },
+      ...(dialogState.responseCorrelation ?? {}),
     });
     closeDialog();
-  }, [closeDialog, dialogState.sdk]);
+  }, [closeDialog, dialogState.responseCorrelation, dialogState.sdk]);
 
   // 在设备上输入 passphrase 并 attach pin
   const onInputPassphraseOnDeviceAttachPinCallback = useCallback(() => {
@@ -80,9 +87,10 @@ export const HardwarePassphraseDialogProvider: React.FC<{ children: ReactNode }>
         passphraseOnDevice: false,
         attachPinOnDevice: true,
       },
+      ...(dialogState.responseCorrelation ?? {}),
     });
     closeDialog();
-  }, [closeDialog, dialogState.sdk]);
+  }, [closeDialog, dialogState.responseCorrelation, dialogState.sdk]);
 
   // 取消输入 passphrase
   const onPassphraseCancelCallback = useCallback(() => {

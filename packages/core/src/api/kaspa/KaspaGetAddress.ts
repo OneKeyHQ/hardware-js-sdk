@@ -67,7 +67,7 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
       model_classic1s: {
         min: '3.12.0',
       },
-      pro2: {
+      model_pro2: {
         min: '0.0.0',
       },
     };

@@ -1,4 +1,3 @@
-import type { deviceInfoSettings } from './deviceInfoSettings';
 import type {
   deviceGetOnboardingStatus,
   deviceProvisionFactoryInfo,
@@ -6,6 +5,7 @@ import type {
   deviceReadFactoryInfo,
   deviceReboot,
   deviceSignFactoryChallenge,
+  deviceUploadNft,
   deviceUploadWallpaper,
   deviceWriteFactoryCertificate,
   testProtocolV2Ping,
@@ -24,6 +24,7 @@ import type { checkBootloaderRelease } from './checkBootloaderRelease';
 import type { checkAllFirmwareRelease } from './checkAllFirmwareRelease';
 import type { checkFirmwareTypeAvailable } from './checkFirmwareTypeAvailable';
 import type { searchDevices } from './searchDevices';
+import type { detectDeviceConnectProtocol } from './detectDeviceConnectProtocol';
 import type { getFeatures } from './getFeatures';
 import type { getDeviceState } from './getDeviceState';
 import type { getOnekeyFeatures } from './getOnekeyFeatures';
@@ -36,7 +37,15 @@ import type {
   firmwareUpdateV2,
   firmwareUpdateV3,
   firmwareUpdateV4,
+  getFirmwareUpdateHostBindingGeneration,
+  registerFirmwareUpdateHostBinding,
+  unregisterFirmwareUpdateHostBinding,
 } from './firmwareUpdate';
+import type { getFirmwareUpdateCapabilities } from './firmwareUpdateCapabilities';
+import type {
+  prepareFirmwareUpdatePlan,
+  validateFirmwareUpdatePreparedPlan,
+} from './firmwareUpdatePreparedPlan';
 import type { promptWebDeviceAccess } from './promptWebDeviceAccess';
 import type { deviceReset } from './deviceReset';
 import type { deviceRecovery } from './deviceRecovery';
@@ -149,12 +158,14 @@ import type { benfenSignTransaction } from './benfenSignTransaction';
 import type { benfenSignMessage } from './benfenSignMessage';
 import type { neoGetAddress } from './neoGetAddress';
 import type { neoSignTransaction } from './neoSignTransaction';
-import type { ConnectSettings } from '../settings';
+import type { deviceInfoSettings } from './deviceInfoSettings';
 import type { deviceGetInfo } from './deviceGetInfo';
 import type { deviceWriteSEPrivateKey } from './deviceWriteSEPrivateKey';
 import type { deviceReadSEPublicCert } from './deviceReadSEPublicCert';
 import type { deviceWriteSEPublicCert } from './deviceWriteSEPublicCert';
 import type { deviceSESignMessage } from './deviceSESignMessage';
+import type { ConnectSettings } from '../settings';
+import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
 export * from './export';
 export type { DeviceStateScope, GetDeviceStateParams } from './getDeviceState';
@@ -184,6 +195,14 @@ export type CoreApi = {
   removeAllListeners: typeof removeAllListeners;
   dispose: () => void | Promise<void>;
   call: (params: any) => Promise<any>;
+  /**
+   * Bind a protocol that has already been verified for one transport endpoint.
+   * Every later SDK call for the same connectId uses it as a strict expectation.
+   */
+  setDeviceConnectProtocol: (
+    connectId: string,
+    connectProtocol: HardwareConnectProtocol | undefined
+  ) => void;
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;
   updateSettings: typeof updateSettings;
@@ -211,6 +230,7 @@ export type CoreApi = {
    * Device function
    */
   searchDevices: typeof searchDevices;
+  detectDeviceConnectProtocol: typeof detectDeviceConnectProtocol;
   promptWebDeviceAccess: typeof promptWebDeviceAccess;
   getFeatures: typeof getFeatures;
   getDeviceState: typeof getDeviceState;
@@ -243,6 +263,12 @@ export type CoreApi = {
   firmwareUpdateV2: typeof firmwareUpdateV2;
   firmwareUpdateV3: typeof firmwareUpdateV3;
   firmwareUpdateV4: typeof firmwareUpdateV4;
+  registerFirmwareUpdateHostBinding: typeof registerFirmwareUpdateHostBinding;
+  unregisterFirmwareUpdateHostBinding: typeof unregisterFirmwareUpdateHostBinding;
+  getFirmwareUpdateHostBindingGeneration: typeof getFirmwareUpdateHostBindingGeneration;
+  getFirmwareUpdateCapabilities: typeof getFirmwareUpdateCapabilities;
+  prepareFirmwareUpdatePlan: typeof prepareFirmwareUpdatePlan;
+  validateFirmwareUpdatePreparedPlan: typeof validateFirmwareUpdatePreparedPlan;
   cipherKeyValue: typeof cipherKeyValue;
 
   /**
@@ -255,6 +281,7 @@ export type CoreApi = {
   deviceWriteFactoryCertificate: typeof deviceWriteFactoryCertificate;
   deviceReadFactoryCertificate: typeof deviceReadFactoryCertificate;
   deviceSignFactoryChallenge: typeof deviceSignFactoryChallenge;
+  deviceUploadNft: typeof deviceUploadNft;
   deviceUploadWallpaper: typeof deviceUploadWallpaper;
   uploadPortfolio: typeof uploadPortfolio;
 
@@ -465,6 +492,7 @@ export type CoreApi = {
   neoGetAddress: typeof neoGetAddress;
   neoSignTransaction: typeof neoSignTransaction;
 
+  /** Pro Protocol V1 factory API. */
   deviceInfoSettings: typeof deviceInfoSettings;
   deviceGetInfo: typeof deviceGetInfo;
   deviceWriteSEPrivateKey: typeof deviceWriteSEPrivateKey;

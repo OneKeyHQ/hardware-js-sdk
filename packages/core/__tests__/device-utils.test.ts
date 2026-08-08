@@ -1,10 +1,13 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+import { DeviceType } from '@onekeyfe/hd-transport';
 
 import {
   getDeviceSerialNo,
   getDeviceType,
+  getDeviceTypeByBleName,
   getDeviceUUID,
   getFirmwareType,
+  getMethodVersionRange,
 } from '../src/utils/deviceInfoUtils';
 import {
   getDeviceBLEFirmwareVersion,
@@ -85,7 +88,7 @@ describe('device feature selectors', () => {
   test('reads normalized Protocol V2 features through the same public selectors', () => {
     const features = buildProtocolV2FeaturesPayload({
       deviceInfo: {
-        hw: { serial_no: 'P2-001' },
+        hw: { Device_type: DeviceType.PRO2, serial_no: 'P2-001' },
         fw: {
           application: { version: '5.0.0' },
           bootloader: { version: '2.0.0' },
@@ -103,5 +106,49 @@ describe('device feature selectors', () => {
     expect(getDeviceBootloaderVersion(features)).toEqual([2, 0, 0]);
     expect(getDeviceBoardloaderVersion(features)).toEqual([1, 0, 0]);
     expect(getDeviceBLEFirmwareVersion(features)).toEqual([3, 0, 0]);
+  });
+
+  test('preserves the real Neo type in Protocol V2 compatibility features', () => {
+    const features = buildProtocolV2FeaturesPayload({
+      deviceInfo: {
+        hw: { Device_type: DeviceType.NEO, serial_no: 'NEO-001' },
+      },
+    });
+
+    expect(features.deviceType).toBe(EDeviceType.Neo);
+    expect(features.onekey_device_type).toBe('NEO');
+    expect(getDeviceType(features)).toBe(EDeviceType.Neo);
+  });
+
+  test('recognizes Neo discovery names before initialization', () => {
+    expect(getDeviceTypeByBleName('OneKey Neo 1234')).toBe(EDeviceType.Neo);
+    expect(getDeviceTypeByBleName('Neo 1234')).toBe(EDeviceType.Neo);
+  });
+
+  test.each([EDeviceType.Pro2, EDeviceType.Neo])(
+    'uses the Pro2 product model as the chain capability fallback for %s',
+    deviceType => {
+      const checkedTypes: string[] = [];
+      const versionRange = getMethodVersionRange({ deviceType } as PROTO.Features, type => {
+        checkedTypes.push(type);
+        return type === 'model_pro2' ? { min: '1.0.0' } : undefined;
+      });
+
+      expect(versionRange).toEqual({ min: '1.0.0' });
+      expect(checkedTypes).toEqual([deviceType, 'model_pro2']);
+    }
+  );
+
+  test('prefers a Neo-specific chain range over the shared Pro2 product model', () => {
+    const versionRange = getMethodVersionRange(
+      { deviceType: EDeviceType.Neo } as PROTO.Features,
+      type => {
+        if (type === EDeviceType.Neo) return { min: '2.0.0' };
+        if (type === 'model_pro2') return { min: '1.0.0' };
+        return undefined;
+      }
+    );
+
+    expect(versionRange).toEqual({ min: '2.0.0' });
   });
 });

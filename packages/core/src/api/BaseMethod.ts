@@ -16,16 +16,14 @@ import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/re
 import { LoggerNames, getLogger } from '../utils';
 import { generateInstanceId } from '../utils/tracing';
 import { DeviceModelToTypes } from '../types';
-import {
-  type UnlockPolicy,
-  getProtocolV2UnlockPolicy,
-} from '../protocols/protocol-v2/unlockPolicy';
 
 import type { Device } from '../device/Device';
 import type DeviceConnector from '../device/DeviceConnector';
 import type { DeviceFirmwareRange, KnownDevice } from '../types';
 import type { CoreMessage } from '../events';
+import type { UnlockPolicy } from '../protocols/protocol-v2/unlockPolicy';
 import type { ProtocolV2InteractionDescriptor } from '../protocols/protocol-v2/uiInteraction';
+import type { ProtocolV2UnlockContext } from '../protocols/protocol-v2/unlockPolicyRunner';
 import type { RequestContext } from '../utils/tracing';
 import type { CoreContext } from '../core';
 
@@ -128,9 +126,7 @@ export abstract class BaseMethod<Params = undefined> {
    */
   checkDeviceId = false;
 
-  /**
-   * 该方法是否需要校验 passphrase state
-   */
+  /** Whether the method requires wallet-session selection and Protocol V2 pre-unlock. */
   useDevicePassphraseState = true;
 
   /**
@@ -168,8 +164,11 @@ export abstract class BaseMethod<Params = undefined> {
    */
   strictCheckDeviceSupport = false;
 
-  /** Core unlocks and retries only explicitly replay-safe Protocol V2 methods. */
+  /** Non-wallet methods may explicitly require Protocol V2 pre-unlock. */
   unlockPolicy: UnlockPolicy = 'none';
+
+  /** Shared by composite methods so nested calls do not repeat the root preflight. */
+  protocolV2UnlockContext?: ProtocolV2UnlockContext;
 
   getSupportedProtocols(): readonly ProtocolType[] {
     return ['V1'];
@@ -188,7 +187,7 @@ export abstract class BaseMethod<Params = undefined> {
   /** Non-blocking Protocol V2 interaction synthesized by the SDK. */
   protocolV2UiInteraction?: ProtocolV2InteractionDescriptor;
 
-  /** Special background methods may suppress all synthesized Protocol V2 UI events. */
+  /** Special background methods may suppress method-level Protocol V2 UI events. */
   protocolV2UiMode: ProtocolV2UiMode = 'auto';
 
   protected throwIfAborted() {
@@ -217,7 +216,6 @@ export abstract class BaseMethod<Params = undefined> {
     this.useDevice = true;
     this.allowDeviceMode = [UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
-    this.unlockPolicy = getProtocolV2UnlockPolicy(this.name);
   }
 
   abstract init(): void;

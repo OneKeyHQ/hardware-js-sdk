@@ -86,15 +86,27 @@ Ping RTT iters: 40 或 100
 用于 SDK 层 `firmwareUpdateV4` 调试：
 
 ```text
-FilesystemFileWrite chunkSize: 1800B
-iOS packetLength: 244B 可作为对照 profile
+普通 FilesystemFileWrite chunkSize: 1800B
+FirmwareUpdateV4 固定 staging 路径 chunkSize: 1960B
+iOS packetLength: min(协商 MTU - 3, 244B)
+Android packetLength: min(协商 MTU - 3, 244B)
 write mode: writeWithoutResponse
+固定 burst pause: 0ms
+固定 flush pause: 0ms
 ```
+
+当前极限测试配置不再为缺失 MTU 提供兼容分包回退。iOS 连接后通过
+`requestMTU(247)` 刷新 `react-native-ble-plx` 的设备快照；该调用不会要求 iOS 重新协商，
+但会返回由 CoreBluetooth 最大无响应写长度换算出的 MTU。刷新失败时应直接暴露连接错误，
+避免用推测容量掩盖问题。
+
+Android 默认同样使用经过验证的 `244B` 上限。更大的包长只能通过显式 BLE tuning 配置用于
+特定手机、固件和设备组合的真机实验，不能作为生产默认值。
 
 不建议继续使用：
 
 ```text
-requestMTU: 512
+iOS raw requestMTU: 512
 raw chunk: 509B
 raw chunk: 253B
 writeWithResponse 作为提速方案
@@ -104,11 +116,28 @@ writeWithResponse 作为提速方案
 
 目前更值得关注的是协议层 ACK 粒度，而不是继续微调 pacing。
 
-如果要继续提升 `firmwareUpdateV4` 的 BLE 升级速率，应先在当前 BLE V2 完整帧上限 `2048B` 内测量 protobuf 和帧头开销，再判断 `1800B` 是否还有小幅上调空间。不能直接测试 `2400B`、`3072B` 或 `4096B`：这些数据块加上 protobuf 和 V2 帧开销后必然超过当前 Transport 的 `2048B` 限制。
+`FirmwareUpdateV4` 的固定 staging 路径已按生产 Protocol V2 schema 测量 protobuf 和帧头开销。最长路径 `vol0:/application_p1.bin` 在 uint32 最大 offset/total_size 下最多容纳 `1988B` 数据且完整帧正好为 `2048B`；SDK 使用 `1960B`，保留 `28B` 余量。普通 FileWrite 和资源路径仍保持 `1800B`，因为允许的路径最长可达 `127B`。
+
+不能直接测试 `2400B`、`3072B` 或 `4096B`：这些数据块加上 protobuf 和 V2 帧开销后必然超过当前 Transport 的 `2048B` 限制。
 
 如果未来要显著增大单次文件块，必须由固件接收缓冲、Protocol V2 BLE 最大帧和各 BLE Transport 的限制共同升级；只修改 `chunkSize` 不会绕过帧上限。
 
 如果 raw write 维持在 `34 KB/s` 左右，即使放大 `FilesystemFileWrite` chunk，RN BLE 链路上限也会限制最终速度，很难接近 WebUSB 或 desktop BLE 的量级。
+
+## SDK 可靠性与事件开销
+
+`FirmwareUpdateV4` 在连接恢复后不再无条件从文件偏移 `0` 重传。SDK 只记录设备通过
+`processed_byte` 明确确认的文件偏移；重连、物理设备身份校验和初始化完成后，再通过
+`FilesystemPathInfoQuery` 检查 staging 文件。只有远端文件存在、不是目录，且文件大小位于
+“本地确认偏移到目标文件总大小”之间时才续传。
+
+远端大小大于本地确认偏移时，SDK 仍从本地确认偏移重写相同数据，不会跳过响应丢失后未确认的
+字节。远端文件缺失、大小落后、超过目标大小或状态查询失败时，安全回退到偏移 `0` 并重新覆盖。
+这项优化减少了 BLE 断连后的重复传输，同时不把副作用命令的自动重放下沉到 Transport。
+
+文件写入的内部确认回调仍在每个 ACK 后触发，用于保存续传水位和记录真实吞吐；App 可见的
+`FIRMWARE_PROGRESS` 则只在整数百分比变化、超过 `1s` 心跳间隔或单文件完成时发送。这样可减少
+RN bridge 和 Desktop renderer 的高频事件开销，不影响确认偏移的精度。
 
 ## 判断方法
 

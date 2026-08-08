@@ -1,4 +1,5 @@
-import { createCoreApi } from './inject';
+import { createCoreApi, createProtocolAwareCall } from './inject';
+import { unregisterFirmwareUpdateHostBinding } from './api/firmware/FirmwareHostBinding';
 
 import type { EventEmitter } from 'events';
 import type { CallMethod, CoreMessage } from './events';
@@ -33,6 +34,7 @@ export const lowLevelInject = ({
   switchTransport,
   addHardwareGlobalEventListener,
 }: LowLevelInjectApi): LowLevelCoreApi => {
+  const protocolAwareCall = createProtocolAwareCall(call);
   const api: LowLevelCoreApi = {
     addHardwareGlobalEventListener,
     removeAllListeners: type => {
@@ -41,9 +43,14 @@ export const lowLevelInject = ({
 
     init,
 
-    call,
+    call: protocolAwareCall.call,
 
-    dispose,
+    setDeviceConnectProtocol: protocolAwareCall.setDeviceConnectProtocol,
+
+    dispose: async () => {
+      unregisterFirmwareUpdateHostBinding();
+      await dispose();
+    },
 
     uiResponse,
 
@@ -55,7 +62,7 @@ export const lowLevelInject = ({
 
     emit: () => {},
 
-    ...createCoreApi(call),
+    ...createCoreApi(protocolAwareCall.call),
   };
   return api;
 };

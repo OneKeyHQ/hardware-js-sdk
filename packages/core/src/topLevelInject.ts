@@ -1,6 +1,7 @@
 import EventEmitter from 'events';
 
-import { createCoreApi } from './inject';
+import { createCoreApi, createProtocolAwareCall } from './inject';
+import { unregisterFirmwareUpdateHostBinding } from './api/firmware/FirmwareHostBinding';
 
 import type { ConnectSettings } from './types/settings';
 import type { CoreApi } from './types/api';
@@ -19,6 +20,7 @@ export const topLevelInject = () => {
     if (!lowLevelApi) return Promise.resolve(undefined);
     return lowLevelApi.call(params);
   };
+  const protocolAwareCall = createProtocolAwareCall(call);
   const api: CoreApi = {
     on: <T extends string, P extends (...args: any[]) => any>(type: T, fn: P) => {
       eventEmitter.on(type, fn);
@@ -37,16 +39,21 @@ export const topLevelInject = () => {
       return lowLevelApi?.init(settings) ?? Promise.resolve(false);
     },
 
-    call,
+    call: protocolAwareCall.call,
 
-    ...createCoreApi(call),
+    setDeviceConnectProtocol: protocolAwareCall.setDeviceConnectProtocol,
+
+    ...createCoreApi(protocolAwareCall.call),
 
     removeAllListeners: type => {
       eventEmitter.removeAllListeners(type);
       lowLevelApi?.removeAllListeners(type);
     },
 
-    dispose: () => lowLevelApi?.dispose(),
+    dispose: async () => {
+      unregisterFirmwareUpdateHostBinding();
+      await lowLevelApi?.dispose();
+    },
 
     uiResponse: response => lowLevelApi?.uiResponse(response),
 

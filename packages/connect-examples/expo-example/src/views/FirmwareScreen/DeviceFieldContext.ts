@@ -5,14 +5,16 @@
 
 import { createContext, useContext } from 'react';
 
-import type { Features, OnekeyFeatures } from '@onekeyfe/hd-core';
+import type { DeviceState, Features, OnekeyFeatures } from '@onekeyfe/hd-core';
 
 export const DeviceFieldContext = createContext<{
   features?: Features;
   onekeyFeatures?: OnekeyFeatures;
+  deviceState?: DeviceState;
 }>({
   features: undefined,
   onekeyFeatures: undefined,
+  deviceState: undefined,
 });
 
 export function useDeviceFieldContext() {

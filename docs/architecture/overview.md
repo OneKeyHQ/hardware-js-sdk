@@ -42,7 +42,7 @@ flowchart TD
 | 协议        | 设备范围                                | 传输方式            | 主要能力                                                    |
 | ----------- | --------------------------------------- | ------------------- | ----------------------------------------------------------- |
 | Protocol V1 | Classic / Mini / Touch / Pro 等现有设备 | USB、BLE、Bridge 等 | 钱包业务能力，`Initialize -> Features` 握手，签名和地址派生 |
-| Protocol V2 | 当前为 Pro2，后续可扩展到 Pro 等机型    | USB、BLE            | 设备信息、钱包 Session、文件系统、设置、固件更新和协议探测  |
+| Protocol V2 | Pro2、Neo，后续可扩展到 Pro 等机型      | USB、BLE            | 设备信息、钱包 Session、文件系统、设置、固件更新和协议探测  |
 
 协议选择是传输层内部职责。外部调用方不需要显式选择 V1 或 V2，也不应该依赖 PID、设备名或 USB descriptor 来判断协议。
 
@@ -54,9 +54,10 @@ flowchart TD
 - `ProtocolV2SequenceCursor`：让普通断开和重连后的帧序号继续递增，Transport dispose 时再清除。
 - `probeProtocolV2()`：公共 V2 probe helper，发送 `Ping { message: 'protocol-v2-probe' }` 并执行失败清理钩子。
 
-各 transport 的 `detectProtocol()` 根据 hint 和连接缓存选择 V1/V2 probe 顺序。调用方显式传入的
-`connectProtocol` 是严格预期，必须通过对应协议的活动响应验证；descriptor 或历史连接中的协议只作为
-`protocolHint`，首次 probe 失败后必须清理旧探测状态并尝试另一协议。
+各 transport 的 `detectProtocol()` 根据尚未确认的内部 hint 选择首次 V1/V2 probe 顺序。调用方显式传入的
+`connectProtocol` 是严格预期，必须通过对应协议的活动响应验证；初次活动探测确认后，descriptor 和 App
+持久化结果都作为后续连接的严格预期，不再回退到另一协议。只有显式 `forceProtocolDetection` 会让单次
+调用忽略绑定并重新探测。
 
 WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物理连接、读写、订阅/桥接和平台错误映射，不再各自复制 V2 协议会话逻辑。
 
@@ -66,12 +67,13 @@ WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物�
 
 `DeviceStateStore` 是设备身份、版本、设置和运行状态的唯一状态源。V1/V2 Mapper 只负责把协议响应转换为统一 patch；旧版 `Features` 仅由统一状态即时投影：
 
-| 协议 | 数据来源                       | 标准输出      | 兼容输出                      |
-| ---- | ------------------------------ | ------------- | ----------------------------- |
-| V1   | `Initialize -> Features`       | `DeviceState` | `getFeatures()` 投影（仅 V1） |
-| V2   | `Ping` probe + `DeviceInfoGet` | `DeviceState` | 不支持 `getFeatures()`        |
+| 协议 | 数据来源                                                 | 标准输出      | 兼容输出                      |
+| ---- | -------------------------------------------------------- | ------------- | ----------------------------- |
+| V1   | `Initialize -> Features`                                 | `DeviceState` | `getFeatures()` 投影（仅 V1） |
+| V2   | `Ping` probe + `DeviceInfoGet/ProtocolInfo/DeviceStatus` | `DeviceState` | 不支持 `getFeatures()`        |
 
-`getDeviceState()` 和 `DEVICE.STATE` 共享同一份完整快照。normal 模式下每次公共读取都会刷新 `DeviceStatus`；bootloader/romloader 模式自动跳过该命令。
+`getDeviceState()` 和 `DEVICE.STATE` 共享同一份完整快照。normal 模式下只有明确请求 runtime/status
+刷新时才读取 `DeviceStatus`；bootloader/romloader 模式自动跳过该命令。
 
 公共刷新范围按业务语义定义，调用方不需要理解底层协议命令：
 
@@ -138,7 +140,9 @@ V1 设备仍可在 `Initialize` 后通过 `TransportManager.reconfigure(features
 唯一协议结果。后续 `Device.initialize()` 基于该字段选择初始化路径：
 
 - V1：发送 `Initialize`，使用真实 `Features`
-- V2：Transport acquire 已用 `Ping` probe 确认链路；初始化再用不含 status target 的 `DeviceInfoGet` 建立 `DeviceState`
+- V2：Transport acquire 已用 `Ping` probe 确认链路；初始化依次读取不含 status target 的
+  `DeviceInfoGet`、固定启用 eventless wallet session 的 `ProtocolInfoRequest`，并仅在 normal
+  模式且能力已声明时读取 `DeviceStatusGet`
 
 Protocol V2 没有传统 `GetFeatures`。公共调用方统一读取 `getDeviceState()`；原始 `DeviceInfoGet`、`DeviceStatusGet` 和 `DeviceSettingsGet` 只保留在 SDK 内部。设备身份以 `serialNo/deviceId` 的语义区分为准。
 
@@ -148,15 +152,33 @@ Protocol V2 固件更新使用系统消息：
 
 ```mermaid
 flowchart TD
-  Prepare["prepare binaries"]
+  Prepare["refresh config + prepare firmware binaries"]
+  Enter["normal -> reboot Bootloader / loader -> reuse connection"]
+  Inventory["loader only: resource size + header hash"]
+  Download["download changed resource bundles"]
   Mkdir["FilesystemDirMake"]
   Write["FilesystemFileWrite(resource / bootloader / firmware)"]
+  Install{"firmware targets?"}
   Update["DeviceFirmwareUpdate(targets)"]
+  Done["resource sync complete"]
 
-  Prepare --> Mkdir --> Write --> Update
+  Prepare --> Enter
+  Enter --> Inventory --> Download --> Mkdir
+  Enter --> Mkdir
+  Mkdir --> Write --> Install
+  Install -->|yes| Update
+  Install -->|resource files only| Done
 ```
 
-`DeviceFirmwareUpdate.targets` 必须包含所有需要安装的文件，包括 resource、bootloader 和 firmware。SDK 不假设固件端会隐式扫描已写入路径。
+Application 模式只允许宿主访问 `vol1:/wallpapers`、`vol1:/portfolio` 和 `vol1:/nft`，读取
+`vol0:/bundles/**` 会返回 `Path not allowed`。因此普通模式下的版本检查把资源状态保留为
+`unknown`；`FirmwareUpdateV4` 先切换到 Bootloader，再通过 `FilesystemPathInfoQuery` 和
+`FilesystemFileRead` 比较资源大小及文件头哈希，最后只下载和写入有差异的资源。设备已经在
+Bootloader 或 Romloader 时复用当前 loader 连接，不重复 reboot。
+
+`DeviceFirmwareUpdate.targets` 只包含需要安装的固件。稳定 RESC bundle 与 boot resource manifest
+中的文件都通过 `FilesystemFileWrite` 直接同步到各自最终路径；资源单独更新时不发送空的安装请求。
+SDK 不假设固件端会隐式扫描已写入路径。
 
 ## 包职责速查
 
