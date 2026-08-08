@@ -81,7 +81,7 @@ export const PROTOCOL_V2_RESOURCE_SLOTS: readonly ProtocolV2ResourceSlot[] = [
     key: 'boot_resource',
     label: 'Boot Resource',
     fileNamePrefix: 'boot_resource',
-    devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg.staging',
+    devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
   },
   {
     key: 'params',
