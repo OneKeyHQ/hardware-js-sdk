@@ -1,5 +1,3 @@
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-
 import { BaseMethod } from './BaseMethod';
 import { UI_REQUEST } from '../constants/ui-request';
 import { getBootloaderReleaseInfo } from './firmware/releaseHelper';
@@ -26,12 +24,7 @@ export default class CheckBootloaderRelease extends BaseMethod {
   }
 
   async run() {
-    if (!this.device.features) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'checkBootloaderRelease requires initialized device features'
-      );
-    }
+    if (!this.device.features) return null;
     const { features } = this.device;
     const payload = this.payload as CheckBootloaderReleaseParams;
 

@@ -9,4 +9,4 @@ export type CheckFirmwareReleaseParams = {
 export declare function checkFirmwareRelease(
   connectId?: string,
   params?: CheckFirmwareReleaseParams
-): Response<FirmwareReleaseCheckResult>;
+): Response<FirmwareReleaseCheckResult | null>;

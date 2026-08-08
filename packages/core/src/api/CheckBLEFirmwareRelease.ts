@@ -1,5 +1,3 @@
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-
 import { BaseMethod } from './BaseMethod';
 import { UI_REQUEST } from '../constants/ui-request';
 import { getBleFirmwareReleaseInfo } from './firmware/releaseHelper';
@@ -28,6 +26,8 @@ export default class CheckBLEFirmwareRelease extends BaseMethod {
   }
 
   async run() {
+    if (!this.device.features) return null;
+
     if (this.device.isProtocolV2()) {
       const { state, firmwareType, release } = await loadProtocolV2FirmwareReleaseContext({
         device: this.device,
@@ -49,13 +49,7 @@ export default class CheckBLEFirmwareRelease extends BaseMethod {
       });
     }
 
-    if (this.device.features) {
-      const releaseInfo = getBleFirmwareReleaseInfo(this.device.features);
-      return releaseInfo;
-    }
-    throw ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      'checkBLEFirmwareRelease requires initialized device features'
-    );
+    const releaseInfo = getBleFirmwareReleaseInfo(this.device.features);
+    return releaseInfo;
   }
 }

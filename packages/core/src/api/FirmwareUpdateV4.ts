@@ -683,7 +683,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       resourceBundles = this.prepareExplicitProtocolV2ResourceFiles();
       fwBinaryMap = this.collectExplicitTargetBinaries();
       bootloaderBinary = this.prepareBootloaderBinary();
-      const needsRemoteFirmware = !this.hasExplicitProtocolV2Payload(fwBinaryMap);
+      const explicitInstallItems = this.buildProtocolV2InstallItems({
+        bootloaderBinary,
+        fwBinaryMap,
+      });
+      const missingFirmwareTargets = this.getMissingProtocolV2FirmwareTargets(explicitInstallItems);
+      const needsRemoteFirmware = this.params.targetsToUpdate?.length
+        ? missingFirmwareTargets.length > 0
+        : !this.hasExplicitProtocolV2Payload(explicitInstallItems);
       if (needsPreparedResources) {
         throw ERRORS.TypedError(
           HardwareErrorCode.RuntimeError,
@@ -713,7 +720,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       if (needsRemoteFirmware) {
         const remoteBinaries = await this.prepareRemoteProtocolV2Binaries(
           firmwareType,
-          deviceFeatures
+          deviceFeatures,
+          explicitInstallItems
         );
         bootloaderBinary = remoteBinaries.bootloaderBinary;
         fwBinaryMap = remoteBinaries.fwBinaryMap;
@@ -1110,11 +1118,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return this.params.bootloaderBinary ?? null;
   }
 
-  private hasExplicitProtocolV2Payload(fwBinaryMap: ProtocolV2TargetBinary[]) {
-    return (
-      !!this.params.resourceFiles?.length ||
-      !!this.params.bootloaderBinary ||
-      fwBinaryMap.length > 0
+  private hasExplicitProtocolV2Payload(installItems: ProtocolV2InstallItem[]) {
+    return !!this.params.resourceFiles?.length || installItems.length > 0;
+  }
+
+  private getMissingProtocolV2FirmwareTargets(installItems: ProtocolV2InstallItem[]) {
+    const preparedTargets = new Set(
+      installItems.flatMap(item => {
+        const target = PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID.get(item.targetId);
+        return target ? [target] : [];
+      })
+    );
+    return (this.params.targetsToUpdate ?? []).filter(
+      target => target !== 'resource' && !preparedTargets.has(target)
     );
   }
 
@@ -1210,7 +1226,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private async prepareRemoteProtocolV2Binaries(firmwareType: EFirmwareType, features: Features) {
+  private async prepareRemoteProtocolV2Binaries(
+    firmwareType: EFirmwareType,
+    features: Features,
+    explicitInstallItems: ProtocolV2InstallItem[] = []
+  ) {
     const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
 
     let bootloaderBinary: ArrayBuffer | null = null;
@@ -1218,6 +1238,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const installItems: ProtocolV2InstallItem[] = [];
 
     if (!release) {
+      const missingFirmwareTargets = this.getMissingProtocolV2FirmwareTargets(explicitInstallItems);
+      if (missingFirmwareTargets.length > 0) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `Protocol V2 firmware release is unavailable for requested targets: ${missingFirmwareTargets.join(
+            ', '
+          )}`
+        );
+      }
       return {
         bootloaderBinary,
         fwBinaryMap,
@@ -1227,6 +1256,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     const entries = this.getRemoteComponentEntries(release);
     const targetsToUpdate = new Set(this.params.targetsToUpdate ?? []);
+    const explicitInstallItemByTargetId = new Map(
+      explicitInstallItems.map(item => [item.targetId, item] as const)
+    );
+    const preparedTargets = new Set<FirmwareUpdateV4Target>();
 
     for (const [key, component] of entries) {
       const targetName = component.target?.toUpperCase();
@@ -1235,25 +1268,32 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         ? PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID.get(target.targetId)
         : undefined;
       if (updateTarget && targetsToUpdate.has(updateTarget)) {
-        const remoteBinary = await this.downloadRemoteProtocolV2Component(key, component);
-        if (remoteBinary.kind === 'bootloader') {
-          bootloaderBinary = remoteBinary.binary;
-          installItems.push({
-            fileName: remoteBinary.fileName,
-            binary: remoteBinary.binary,
-            targetId: remoteBinary.targetId,
-            kind: remoteBinary.kind,
-          });
+        const explicitInstallItem = explicitInstallItemByTargetId.get(target.targetId);
+        const installItem =
+          explicitInstallItem ?? (await this.downloadRemoteProtocolV2Component(key, component));
+        if (installItem.kind === 'bootloader') {
+          bootloaderBinary = installItem.binary;
         } else {
           const binaryEntry = {
-            fileName: remoteBinary.fileName,
-            binary: remoteBinary.binary,
-            targetId: remoteBinary.targetId,
+            fileName: installItem.fileName,
+            binary: installItem.binary,
+            targetId: installItem.targetId,
           };
           fwBinaryMap.push(binaryEntry);
-          installItems.push({ ...binaryEntry, kind: remoteBinary.kind });
         }
+        installItems.push({ ...installItem });
+        preparedTargets.add(updateTarget);
       }
+    }
+
+    const missingTarget = Array.from(targetsToUpdate).find(
+      target => target !== 'resource' && !preparedTargets.has(target)
+    );
+    if (missingTarget) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        `Protocol V2 release does not contain requested target ${missingTarget}`
+      );
     }
 
     return {

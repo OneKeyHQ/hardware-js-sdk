@@ -5860,6 +5860,80 @@ describe('Protocol V2 firmware update targets', () => {
     getFirmwareLatestReleaseSpy.mockRestore();
   });
 
+  test('downloads only firmware targets that are missing from an explicit mixed payload', async () => {
+    const explicitApplicationBinary = new Uint8Array([1]).buffer;
+    const remoteCoprocessorBinary = new Uint8Array([2]).buffer;
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['app_v1', 'coprocessor'],
+      },
+    });
+    method.init();
+
+    const getSysResourceBinarySpy = jest
+      .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
+      .mockResolvedValue({ binary: remoteCoprocessorBinary });
+    const getFirmwareLatestReleaseSpy = jest
+      .spyOn(DataManager, 'getFirmwareLatestRelease')
+      .mockReturnValue({
+        required: false,
+        version: [1, 0, 0],
+        url: 'https://example.com/applicationP1.pp.bin',
+        installOrder: ['applicationP1', 'coprocessor'],
+        components: {
+          applicationP1: {
+            target: 'APPLICATION_P1',
+            url: 'https://example.com/applicationP1.pp.bin',
+          },
+          coprocessor: {
+            target: 'COPROCESSOR',
+            url: 'https://example.com/coprocessor.pp.bin',
+          },
+        },
+        fingerprint: '',
+        changelog: {
+          'zh-CN': '',
+          'en-US': '',
+        },
+      });
+
+    const remoteBinaries = await (method as any).prepareRemoteProtocolV2Binaries(
+      'universal',
+      { deviceType: 'pro2', firmwareVersion: '0.0.0' },
+      [
+        {
+          fileName: 'application_p1.bin',
+          binary: explicitApplicationBinary,
+          targetId: 4,
+          kind: 'firmware',
+        },
+      ]
+    );
+
+    expect(getSysResourceBinarySpy).toHaveBeenCalledTimes(1);
+    expect(getSysResourceBinarySpy).toHaveBeenCalledWith('https://example.com/coprocessor.pp.bin');
+    expect(remoteBinaries.installItems).toEqual([
+      {
+        fileName: 'application_p1.bin',
+        binary: explicitApplicationBinary,
+        targetId: 4,
+        kind: 'firmware',
+      },
+      {
+        fileName: 'coprocessor.bin',
+        binary: remoteCoprocessorBinary,
+        targetId: 6,
+        kind: 'firmware',
+      },
+    ]);
+
+    getSysResourceBinarySpy.mockRestore();
+    getFirmwareLatestReleaseSpy.mockRestore();
+  });
+
   test('ignores an unsupported remote ROMLOADER component when installing selected targets', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -6193,6 +6267,108 @@ describe('Protocol V2 firmware update targets', () => {
         ],
       })
     );
+  });
+
+  test('downloads every missing firmware target when manifest resources are already prepared', async () => {
+    const resourceBundle = createProtocolV2OkppBinary();
+    const applicationBinary = new Uint8Array([7]).buffer;
+    const remoteBinaries = {
+      bootloaderBinary: null,
+      fwBinaryMap: [
+        {
+          fileName: 'application_p1.bin',
+          binary: applicationBinary,
+          targetId: 4,
+        },
+      ],
+      installItems: [
+        {
+          fileName: 'application_p1.bin',
+          binary: applicationBinary,
+          targetId: 4,
+          kind: 'firmware',
+        },
+      ],
+    };
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['app_v1', 'resource'],
+        resourceFiles: [
+          {
+            binary: resourceBundle,
+            devicePath: 'vol0:/bundles/images/images.okpkg',
+          },
+        ],
+      },
+    });
+    method.init();
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    (method as any).device = stubDevice({
+      originalDescriptor: { protocolType: 'V2' },
+      features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
+    });
+    (method as any).prepareRemoteProtocolV2Binaries = jest.fn().mockResolvedValue(remoteBinaries);
+    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
+    method.postTipMessage = jest.fn();
+
+    await method.run();
+
+    expect(forceReloadDataSpy).toHaveBeenCalledTimes(1);
+    expect((method as any).prepareRemoteProtocolV2Binaries).toHaveBeenCalledWith(
+      'universal',
+      expect.objectContaining({ deviceType: 'pro2' }),
+      []
+    );
+    expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
+      bootloaderBinary: null,
+      fwBinaryMap: remoteBinaries.fwBinaryMap,
+      installItems: remoteBinaries.installItems,
+      resourceBundles: [
+        {
+          name: 'images.okpkg',
+          binary: resourceBundle,
+          devicePath: 'vol0:/bundles/images/images.okpkg',
+          version: [1, 2, 3],
+          payloadHash: '11'.repeat(64),
+          headerHash: '22'.repeat(64),
+        },
+      ],
+    });
+  });
+
+  test('rejects a mixed resource plan when the requested firmware release is unavailable', async () => {
+    const resourceBundle = createProtocolV2OkppBinary();
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['app_v1', 'resource'],
+        resourceFiles: [
+          {
+            binary: resourceBundle,
+            devicePath: 'vol0:/bundles/images/images.okpkg',
+          },
+        ],
+      },
+    });
+    method.init();
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    (method as any).device = stubDevice({
+      originalDescriptor: { protocolType: 'V2' },
+      features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
+    });
+    jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(undefined);
+    (method as any).executeProtocolV2Update = jest.fn();
+    method.postTipMessage = jest.fn();
+
+    await expect(method.run()).rejects.toThrow(
+      'Protocol V2 firmware release is unavailable for requested targets: app_v1'
+    );
+    expect((method as any).executeProtocolV2Update).not.toHaveBeenCalled();
   });
 
   test('combines prepared firmware components with explicit manifest resource files', async () => {

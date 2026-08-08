@@ -162,3 +162,33 @@ describe.each(['pro2', 'neo'] as const)('Protocol V2 release checks for %s', dev
     expect(allMethod.getSupportedProtocols()).toEqual(['V1', 'V2']);
   });
 });
+
+test('returns null from optional release probes when device features are unavailable', async () => {
+  const deviceWithoutFeatures = {
+    isProtocolV2: jest.fn(() => true),
+    features: undefined,
+    getDeviceState: jest.fn(),
+  };
+  const firmwareMethod = new CheckFirmwareRelease({
+    id: 1,
+    payload: { method: 'checkFirmwareRelease' },
+  });
+  const bleMethod = new CheckBLEFirmwareRelease({
+    id: 2,
+    payload: { method: 'checkBLEFirmwareRelease' },
+  });
+  const bootloaderMethod = new CheckBootloaderRelease({
+    id: 3,
+    payload: { method: 'checkBootloaderRelease' },
+  });
+
+  firmwareMethod.device = deviceWithoutFeatures as unknown as CheckFirmwareRelease['device'];
+  bleMethod.device = deviceWithoutFeatures as unknown as CheckBLEFirmwareRelease['device'];
+  bootloaderMethod.device = deviceWithoutFeatures as unknown as CheckBootloaderRelease['device'];
+
+  await expect(firmwareMethod.run()).resolves.toBeNull();
+  await expect(bleMethod.run()).resolves.toBeNull();
+  await expect(bootloaderMethod.run()).resolves.toBeNull();
+  expect(deviceWithoutFeatures.isProtocolV2).not.toHaveBeenCalled();
+  expect(deviceWithoutFeatures.getDeviceState).not.toHaveBeenCalled();
+});

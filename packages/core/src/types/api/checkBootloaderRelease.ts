@@ -2,7 +2,7 @@ import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { CommonParams, Response } from '../params';
 import type { FirmwareReleaseCheckResult } from './checkAllFirmwareRelease';
 
-export type CheckBootloaderReleaseResponse = FirmwareReleaseCheckResult;
+export type CheckBootloaderReleaseResponse = FirmwareReleaseCheckResult | null;
 
 export type CheckBootloaderReleaseParams = {
   willUpdateFirmwareVersion?: string;

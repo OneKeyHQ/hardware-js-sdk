@@ -1,5 +1,3 @@
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-
 import { BaseMethod } from './BaseMethod';
 import { UI_REQUEST } from '../constants/ui-request';
 import { getFirmwareReleaseInfo } from './firmware/releaseHelper';
@@ -31,6 +29,8 @@ export default class CheckFirmwareRelease extends BaseMethod {
   async run() {
     const payload = this.payload as CheckFirmwareReleaseParams;
 
+    if (!this.device.features) return null;
+
     if (this.device.isProtocolV2()) {
       const { state, firmwareType, release } = await loadProtocolV2FirmwareReleaseContext({
         device: this.device,
@@ -49,16 +49,10 @@ export default class CheckFirmwareRelease extends BaseMethod {
       return toProtocolV2FirmwareReleaseInfo({ plan, state, release });
     }
 
-    if (this.device.features) {
-      const deviceFirmwareType = this.device.getCurrentFirmwareType();
-      const firmwareType = payload.firmwareType ?? deviceFirmwareType;
+    const deviceFirmwareType = this.device.getCurrentFirmwareType();
+    const firmwareType = payload.firmwareType ?? deviceFirmwareType;
 
-      const releaseInfo = getFirmwareReleaseInfo(this.device.features, firmwareType);
-      return releaseInfo;
-    }
-    throw ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      'checkFirmwareRelease requires initialized device features'
-    );
+    const releaseInfo = getFirmwareReleaseInfo(this.device.features, firmwareType);
+    return releaseInfo;
   }
 }

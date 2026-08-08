@@ -3,4 +3,4 @@ import type { FirmwareReleaseCheckResult } from './checkAllFirmwareRelease';
 
 export declare function checkBLEFirmwareRelease(
   connectId?: string
-): Response<FirmwareReleaseCheckResult>;
+): Response<FirmwareReleaseCheckResult | null>;
