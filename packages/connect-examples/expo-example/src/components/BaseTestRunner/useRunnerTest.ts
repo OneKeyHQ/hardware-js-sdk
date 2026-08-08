@@ -9,6 +9,7 @@ import { useDevice } from '../../provider/DeviceProvider';
 import { getProtocolAwareFeatures } from '../../utils/protocolAwareFeatures';
 import {
   createProtocolUnsupportedResponse,
+  executeProtocolAwareMethod,
   isMethodSupportedOnProtocol,
 } from '../../utils/protocolAwareMethod';
 import { TestRunnerContext } from './Context/TestRunnerProvider';
@@ -346,12 +347,14 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
                 res = response.payload;
                 skipVerify = response.skipVerify ?? false;
               } else {
-                // @ts-ignore
-                res = await SDK[`${method}` as keyof typeof sdk](
+                res = await executeProtocolAwareMethod({
+                  sdk: SDK,
+                  method,
                   connectId,
                   deviceId,
-                  requestParams
-                );
+                  params: requestParams,
+                  protocol,
+                });
               }
 
               if (!running.current) return;

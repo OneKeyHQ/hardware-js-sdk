@@ -230,6 +230,25 @@ Pro2 acquire 后的初始化、重连和固件升级重连统一读取 `Protocol
 - `packages/core/src/device/Device.ts`
 - `packages/core/src/api/FirmwareUpdateV4.ts`
 
+## Prepared 固件 Artifact 完整性边界
+
+Prepared 固件更新将 artifact 获取与设备执行分离，完整性责任按以下边界划分：
+
+- 外部固件 Host（例如 App 的 native/desktop artifact store）负责从可信发布元数据取得预期大小和
+  SHA-256，对实际下载字节完成校验，并在首次设备变异前生成 receipt。
+- `artifactRef` 必须引用已经校验的内容寻址对象；Host 必须在 lease 和 reader 生命周期内保持对象
+  不可变，并在对象缺失或损坏时让 `open` 失败。
+- SDK 负责校验 Plan、PreparedPlan 和 receipt 的元数据绑定、artifact 大小、读取范围与 EOF，
+  但不在执行期重新计算 artifact 内容的 SHA-256。`FirmwareArtifactReceiptMismatch` 表示绑定或
+  reader 契约不匹配，不表示 SDK 已独立认证实际字节内容。
+- “首次设备变异前已完成完整性校验”的保证依赖外部 Host 履行上述契约。设备端固件签名校验是
+  独立防线，不能替代 Host 对资源 artifact 的完整性校验。
+
+主要实现：
+
+- `packages/core/src/api/firmware/FirmwareUpdatePreparedPlan.ts`
+- `packages/core/src/api/firmware/FirmwareArtifactSource.ts`
+
 ## 维护规则
 
 - 只有持续影响多个模块、不能仅从代码局部理解的规则才进入本文。

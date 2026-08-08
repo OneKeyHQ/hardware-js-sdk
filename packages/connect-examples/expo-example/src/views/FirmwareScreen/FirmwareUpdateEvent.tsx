@@ -55,7 +55,7 @@ function FirmwareUpdateEventView({
       const uiEventCallback = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT (Firmware Update)===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          openDialog(SDK, message.payload.device.features);
+          openDialog(SDK, message.payload.device.features, message);
         }
         if (message.type === UI_REQUEST.FIRMWARE_TIP) {
           const tip = message.payload.data.message as IFirmwareUpdateTipMessage;

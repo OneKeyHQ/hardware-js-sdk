@@ -304,6 +304,20 @@ describe('TrezorElectronBleConnector', () => {
     });
   });
 
+  // The user stopping the flow is not a connect failure: cancelPairing abandons
+  // the in-flight connect, and that must not read as an unreachable device.
+  test('a cancelled pairing reports BlePairingCancelled', async () => {
+    const bridge = new FakeBridge();
+    bridge.scan.mockResolvedValueOnce([]);
+    bridge.connect.mockRejectedValueOnce(new Error('connect cancelled: BLE-1'));
+    const transport = new TrezorElectronBleTransport({ bridge });
+    const connector = new TrezorElectronBleConnector({ transport });
+
+    await expect(connector.connect('BLE-1')).rejects.toMatchObject({
+      code: HardwareErrorCode.BlePairingCancelled,
+    });
+  });
+
   // noble drops the real CoreBluetooth reason, so a GATT "connection failed"
   // and a connect timeout both collapse to one generic BleConnectFailed.
   test('connect "connection failed" reports BleConnectFailed', async () => {

@@ -249,26 +249,60 @@ export class TrezorAdapter implements IHardwareWallet {
     };
   }
 
-  private static _sanitizeForLog(value: unknown): unknown {
-    if (!value || typeof value !== 'object') return value;
-    if (Array.isArray(value)) {
-      return value.map(item => TrezorAdapter._sanitizeForLog(item));
+  // Keys are matched after normalizeLogKey, so snake_case/camelCase both hit.
+  private static readonly _sensitiveLogKeys = new Set([
+    'credential',
+    'credentials',
+    'entropy',
+    'hoststatickey',
+    'mnemonic',
+    'mnemonics',
+    'passphrase',
+    'passphrasestate',
+    'password',
+    'pin',
+    'privatekey',
+    'seed',
+    'session',
+    'sessionid',
+    'trezorstaticpublickey',
+    'word',
+    'words',
+    'xprv',
+  ]);
+
+  private static _normalizeLogKey(key: string): string {
+    return key.replace(/[_-]/g, '').toLowerCase();
+  }
+
+  // Mirrors hd-core's logBlockEvent: a signing method's body is the user's
+  // transaction, so it is dropped wholesale; other methods redact by key.
+  private static _sanitizeForLog(value: unknown, methodName?: string): unknown {
+    if (methodName && /sign/i.test(methodName)) return '[redacted]';
+    return TrezorAdapter._redactForLog(value, new WeakSet());
+  }
+
+  private static _redactForLog(value: unknown, seen: WeakSet<object>): unknown {
+    if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) {
+      return `[BINARY:${value.byteLength}]`;
     }
-    const sensitiveKeys = new Set([
-      'credential',
-      'credentials',
-      'host_static_key',
-      'passphrase',
-      'passphraseState',
-      'pin',
-      'trezor_static_public_key',
-    ]);
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
-        key,
-        sensitiveKeys.has(key) ? '[redacted]' : TrezorAdapter._sanitizeForLog(item),
-      ])
-    );
+    if (!value || typeof value !== 'object') return value;
+    if (seen.has(value)) return '[CIRCULAR]';
+    seen.add(value);
+    const out = Array.isArray(value)
+      ? value.map(item => TrezorAdapter._redactForLog(item, seen))
+      : Object.fromEntries(
+          Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+            key,
+            TrezorAdapter._sensitiveLogKeys.has(TrezorAdapter._normalizeLogKey(key)) &&
+            item !== null &&
+            item !== undefined
+              ? '[redacted]'
+              : TrezorAdapter._redactForLog(item, seen),
+          ])
+        );
+    seen.delete(value);
+    return out;
   }
 
   private static _errorForLog(error: unknown): unknown {
@@ -732,14 +766,13 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   /**
-   * Returns a stable per-seed identifier suitable for device-match verification.
-   *
-   * Trezor exposes `device_id` in Features — a server-generated UUID written
-   * during `wipe_device` and stable for the life of the seed. Unlike Ledger
-   * (no native id, so a per-chain address is hashed), Trezor's id is global
-   * across chains, so the `chain` argument is accepted for API parity but
-   * ignored. For unsupported chains we still surface the id (since it would
-   * be the same value anyway).
+   * Returns the Trezor `device_id` from Features — a random 12-byte value the
+   * device stores and regenerates on `wipe_device`. It identifies the PHYSICAL
+   * DEVICE, not a seed/wallet: it is shared across passphrase wallets and
+   * changes after wipe/restore, so it suits device-match checks but must NOT be
+   * used as a wallet fingerprint (use `passphraseState` for wallet identity).
+   * Unlike Ledger (which hashes a per-chain address), it is chain-global, so
+   * `chain` is accepted for API parity but ignored.
    */
   async getChainFingerprint(
     connectId: string,
@@ -1045,7 +1078,7 @@ export class TrezorAdapter implements IHardwareWallet {
       method: methodName,
       connectId: call.connectId || '(empty)',
       deviceId: deviceId || undefined,
-      params: TrezorAdapter._sanitizeForLog(call.params),
+      params: TrezorAdapter._sanitizeForLog(call.params, methodName),
     });
     try {
       const response = await this._jobQueue.enqueue(
@@ -1068,7 +1101,7 @@ export class TrezorAdapter implements IHardwareWallet {
       debugLog('[TrezorAdapter][RES]', {
         method: methodName,
         success: response.success,
-        payload: TrezorAdapter._sanitizeForLog(response.payload),
+        payload: TrezorAdapter._sanitizeForLog(response.payload, methodName),
       });
       return response;
     } catch (error) {
@@ -1079,7 +1112,7 @@ export class TrezorAdapter implements IHardwareWallet {
       debugLog('[TrezorAdapter][RES]', {
         method: methodName,
         success: false,
-        payload: TrezorAdapter._sanitizeForLog(response.payload),
+        payload: TrezorAdapter._sanitizeForLog(response.payload, methodName),
       });
       return response;
     }

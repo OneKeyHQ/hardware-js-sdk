@@ -14,7 +14,10 @@ import { downloadFile } from '../../utils/downloadUtils';
 import { SwitchInput } from '../../components/SwitchInput';
 import { getDeviceInfo } from '../../utils/deviceUtils';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
-import { getProtocolAwareFeatures } from '../../utils/protocolAwareFeatures';
+import {
+  getProtocolAwareFeatures,
+  isPassphraseProtectionEnabled,
+} from '../../utils/protocolAwareFeatures';
 
 import type { TestChain } from './utils';
 import type { CoreMessage, Features } from '@onekeyfe/hd-core';
@@ -186,7 +189,7 @@ export default function TestSessionCountView() {
     hardwareUiEventListener = (message: CoreMessage) => {
       console.log('TopLEVEL EVENT ===>>>>: ', message);
       if (message.type === UI_REQUEST.REQUEST_PIN) {
-        openDialog(SDK, message.payload.device.features);
+        openDialog(SDK, message.payload.device.features, message);
       }
       if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
         if (!allowInputPassphrase.current) {
@@ -217,6 +220,7 @@ export default function TestSessionCountView() {
             SDK.uiResponse({
               type: UI_RESPONSE.RECEIVE_PASSPHRASE,
               payload: { value: '' },
+              ...(message.payload.responseCorrelation ?? {}),
             });
           }, 200);
           return;
@@ -228,13 +232,14 @@ export default function TestSessionCountView() {
             payload: {
               value: generatePassphrase(passphraseStateList.current),
             },
+            ...(message.payload.responseCorrelation ?? {}),
           });
         }, 200);
       }
     };
     SDK.on(UI_EVENT, hardwareUiEventListener);
 
-    if (!featuresRes.payload.passphrase_protection) {
+    if (!isPassphraseProtectionEnabled(featuresRes.payload)) {
       await SDK.deviceSettings(connectId, {
         usePassphrase: true,
       });

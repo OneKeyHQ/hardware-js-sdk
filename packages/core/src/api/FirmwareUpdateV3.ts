@@ -9,18 +9,31 @@ import {
   getDeviceBLEFirmwareVersion,
   getDeviceBootloaderVersion,
   getDeviceFirmwareVersion,
+  getDeviceUUID,
   getLogger,
 } from '../utils';
 import { getBinary, getSysResourceBinary } from './firmware/getBinary';
+import { normalizeFirmwarePreparationError } from './firmware/FirmwarePreparationError';
 import { DataManager } from '../data-manager';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
 import { DEVICE } from '../events';
 import { buildProtocolV1FeaturesPayload } from '../deviceProfile';
+import { openFirmwareByteSource } from './firmware/FirmwareArtifactSource';
+import { resolveFirmwareUpdateHostBinding } from './firmware/FirmwareHostBinding';
+import {
+  assertFirmwareUpdatePreparedPlanBinding,
+  assertFirmwareUpdatePreparedPlanDeviceIdentity,
+  getFirmwareUpdateResourceName,
+} from './firmware/FirmwareUpdatePreparedPlan';
 
-import type { FirmwareUpdateV3Params } from '../types/api/firmwareUpdate';
+import type {
+  FirmwareArtifactReference,
+  FirmwareUpdateV3Params,
+} from '../types/api/firmwareUpdate';
 import type { Deferred, EFirmwareType } from '@onekeyfe/hd-shared';
 import type { TypedResponseMessage } from '../device/DeviceCommands';
+import type { FirmwareByteSource } from './firmware/FirmwareArtifactSource';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -42,6 +55,8 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private isSwitchFirmware = false;
 
+  private artifactSources: FirmwareByteSource[] = [];
+
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
@@ -62,8 +77,54 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'firmwareType', type: 'string' },
       { name: 'platform', type: 'string' },
     ]);
+    const hostBinding =
+      payload.artifacts || payload.preparedPlan
+        ? resolveFirmwareUpdateHostBinding(payload.hostBindingGeneration)
+        : undefined;
+    if (hostBinding) {
+      assertFirmwareUpdatePreparedPlanBinding({
+        preparedPlan: payload.preparedPlan,
+        executor: 'v3',
+        platform: payload.platform,
+        scopeTargets: ['bootloader', 'firmware', 'resource', 'ble'],
+        bindings: [
+          ...(payload.artifacts?.bootloader
+            ? [
+                {
+                  target: 'bootloader' as const,
+                  artifact: payload.artifacts.bootloader,
+                },
+              ]
+            : []),
+          ...(payload.artifacts?.firmware
+            ? [
+                {
+                  target: 'firmware' as const,
+                  artifact: payload.artifacts.firmware,
+                },
+              ]
+            : []),
+          ...(payload.artifacts?.ble
+            ? [
+                {
+                  target: 'ble' as const,
+                  artifact: payload.artifacts.ble,
+                },
+              ]
+            : []),
+          ...(payload.artifacts?.resourceEntries ?? []).map(
+            (entry: { entryName: string; artifact: FirmwareArtifactReference }) => ({
+              target: 'resource' as const,
+              entryName: entry.entryName,
+              artifact: entry.artifact,
+            })
+          ),
+        ],
+      });
+    }
 
     this.params = {
+      preparedPlan: payload.preparedPlan,
       bleBinary: payload.bleBinary,
       firmwareBinary: payload.firmwareBinary,
       forcedUpdateRes: payload.forcedUpdateRes,
@@ -74,6 +135,8 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       resourceBinary: payload.resourceBinary,
       firmwareType: payload.firmwareType,
       platform: payload.platform,
+      artifactReader: hostBinding?.artifactReader ?? payload.artifactReader,
+      artifacts: payload.artifacts,
     };
   }
 
@@ -97,39 +160,53 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     if (!features) {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
     }
+    if (this.params.preparedPlan) {
+      assertFirmwareUpdatePreparedPlanDeviceIdentity({
+        preparedPlan: this.params.preparedPlan,
+        deviceIdentity: getDeviceUUID(features) || undefined,
+      });
+    }
 
     const deviceFirmwareType = device.getCurrentFirmwareType();
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
     this.isSwitchFirmware = firmwareType !== deviceFirmwareType;
 
     let resourceBinary: ArrayBuffer | null = null;
-    let fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
-    let bootloaderBinary: ArrayBuffer | null = null;
+    let resourceEntries: Array<{ entryName: string; source: FirmwareByteSource }> = [];
+    let fwSources: Array<{ fileName: string; source: FirmwareByteSource }> = [];
+    let bootloaderSource: FirmwareByteSource | null = null;
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
-      resourceBinary = await this.prepareResourceBinary(firmwareType);
-      fwBinaryMap = await this.prepareFirmwareAndBleBinary(firmwareType);
-      bootloaderBinary = await this.prepareBootloaderBinary(firmwareType);
+      const resourceInput = await this.prepareResourceInput(firmwareType);
+      resourceBinary = resourceInput.resourceBinary;
+      resourceEntries = resourceInput.resourceEntries;
+      fwSources = await this.prepareFirmwareAndBleSources(firmwareType);
+      bootloaderSource = await this.prepareBootloaderSource(firmwareType);
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
-      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
+      await this.closeArtifactSources();
+      throw normalizeFirmwarePreparationError(err);
     }
 
-    if (!bootloaderBinary && fwBinaryMap.length === 0) {
+    if (!bootloaderSource && fwSources.length === 0) {
+      await this.closeArtifactSources();
       throw ERRORS.TypedError(
         HardwareErrorCode.FirmwareUpdateDownloadFailed,
         'No firmware to update'
       );
     }
 
-    await this.enterBootloaderMode();
-
-    const updateResult = await this.executeUpdate({
-      resourceBinary,
-      fwBinaryMap,
-      bootloaderBinary,
-    });
-    return updateResult;
+    try {
+      await this.enterBootloaderMode();
+      return await this.executeUpdate({
+        resourceBinary,
+        resourceEntries,
+        fwSources,
+        bootloaderSource,
+      });
+    } finally {
+      await this.closeArtifactSources();
+    }
   }
 
   private validateDeviceAndVersion(deviceType: EDeviceType, bootloaderVersion: string) {
@@ -149,12 +226,81 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
   }
 
-  private async prepareResourceBinary(firmwareType: EFirmwareType) {
+  private async openArtifactSource(
+    binary: ArrayBuffer | undefined,
+    artifact: FirmwareArtifactReference | undefined
+  ) {
+    const source = await openFirmwareByteSource({
+      binary,
+      artifact,
+      reader: this.params.artifactReader,
+    });
+    if (source) {
+      this.artifactSources.push(source);
+    }
+    return source;
+  }
+
+  private async closeArtifactSources() {
+    const sources = this.artifactSources.splice(0);
+    await Promise.all(sources.map(source => source.close().catch(() => undefined)));
+  }
+
+  private assertSdkDownloadAllowed(artifactName: string) {
+    if (
+      this.params.artifactReader ||
+      DataManager.getSettings('firmwareManifestMode') === 'external-only'
+    ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        `${artifactName} must be prepared by the external firmware host`,
+        {
+          firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
+          artifactName,
+        }
+      );
+    }
+  }
+
+  private async prepareResourceInput(firmwareType: EFirmwareType) {
+    const preparedEntries = this.params.artifacts?.resourceEntries;
+    if (preparedEntries?.length && this.params.resourceBinary) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Firmware resource input must not contain both archive binary and prepared entries'
+      );
+    }
+    if (preparedEntries?.length) {
+      const resourceEntries: Array<{ entryName: string; source: FirmwareByteSource }> = [];
+      for (const entry of preparedEntries) {
+        const resourceName = getFirmwareUpdateResourceName(entry.entryName);
+        const source = await this.openArtifactSource(undefined, entry.artifact);
+        if (!source) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            `Firmware resource entry ${entry.entryName} is not prepared`
+          );
+        }
+        resourceEntries.push({ entryName: resourceName, source });
+      }
+      return {
+        resourceBinary: null,
+        resourceEntries,
+      };
+    }
     if (this.params.resourceBinary) {
-      return this.params.resourceBinary;
+      return {
+        resourceBinary: this.params.resourceBinary,
+        resourceEntries: [],
+      };
     }
     const { features } = this.device;
-    if (!features) return null;
+    if (!features) {
+      return {
+        resourceBinary: null,
+        resourceEntries: [],
+      };
+    }
     const resourceUrl = DataManager.getSysResourcesLatestRelease({
       features,
       forcedUpdateRes: this.params.forcedUpdateRes,
@@ -162,16 +308,27 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     });
 
     if (resourceUrl) {
-      const resource = (await getSysResourceBinary(resourceUrl)).binary;
-      return resource;
+      this.assertSdkDownloadAllowed('resource');
+      return {
+        resourceBinary: (await getSysResourceBinary(resourceUrl)).binary,
+        resourceEntries: [],
+      };
     }
     Log.warn('No resource url found');
-    return null;
+    return {
+      resourceBinary: null,
+      resourceEntries: [],
+    };
   }
 
-  private async prepareBootloaderBinary(firmwareType: EFirmwareType): Promise<ArrayBuffer | null> {
-    if (this.params.bootloaderBinary) {
-      return this.params.bootloaderBinary;
+  private async prepareBootloaderSource(
+    firmwareType: EFirmwareType
+  ): Promise<FirmwareByteSource | null> {
+    if (this.params.bootloaderBinary || this.params.artifacts?.bootloader) {
+      return this.openArtifactSource(
+        this.params.bootloaderBinary,
+        this.params.artifacts?.bootloader
+      );
     }
     const { features } = this.device;
     if (!features) return null;
@@ -179,23 +336,35 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     if (this.params.bootloaderVersion) {
       const bootResourceUrl = DataManager.getBootloaderResource(features, firmwareType);
       if (bootResourceUrl) {
+        this.assertSdkDownloadAllowed('bootloader');
         const bootBinary = (await getSysResourceBinary(bootResourceUrl)).binary;
-        return bootBinary;
+        return this.openArtifactSource(bootBinary, undefined);
       }
     }
     return null;
   }
 
-  private async prepareFirmwareAndBleBinary(firmwareType: EFirmwareType) {
-    const fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
-    if (this.params.firmwareBinary) {
-      fwBinaryMap.push({
+  private async prepareFirmwareAndBleSources(firmwareType: EFirmwareType) {
+    const fwSources: Array<{ fileName: string; source: FirmwareByteSource }> = [];
+    if (this.params.firmwareBinary || this.params.artifacts?.firmware) {
+      const source = await this.openArtifactSource(
+        this.params.firmwareBinary,
+        this.params.artifacts?.firmware
+      );
+      if (!source) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          'Firmware artifact is not prepared'
+        );
+      }
+      fwSources.push({
         fileName: 'firmware.bin',
-        binary: this.params.firmwareBinary,
+        source,
       });
     } else if (this.params.firmwareVersion) {
       const { features } = this.device;
       if (features) {
+        this.assertSdkDownloadAllowed('firmware');
         const firmwareBinary = (
           await getBinary({
             features,
@@ -205,44 +374,65 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
             firmwareType,
           })
         ).binary;
-        fwBinaryMap.push({
+        const source = await this.openArtifactSource(firmwareBinary, undefined);
+        if (!source) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'Firmware binary is not prepared'
+          );
+        }
+        fwSources.push({
           fileName: 'firmware.bin',
-          binary: firmwareBinary,
+          source,
         });
       }
     }
 
-    if (this.params.bleBinary) {
-      fwBinaryMap.push({
+    if (this.params.bleBinary || this.params.artifacts?.ble) {
+      const source = await this.openArtifactSource(
+        this.params.bleBinary,
+        this.params.artifacts?.ble
+      );
+      if (!source) {
+        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'BLE artifact is not prepared');
+      }
+      fwSources.push({
         fileName: 'ble-firmware.bin',
-        binary: this.params.bleBinary,
+        source,
       });
     } else if (this.params.bleVersion) {
       const { features } = this.device;
       if (features) {
+        this.assertSdkDownloadAllowed('ble');
         const bleBinary = await getBinary({
           features,
           version: this.params.bleVersion,
           updateType: 'ble',
           firmwareType,
         });
-        fwBinaryMap.push({
+        const source = await this.openArtifactSource(bleBinary.binary, undefined);
+        if (!source) {
+          throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'BLE binary is not prepared');
+        }
+        fwSources.push({
           fileName: 'ble-firmware.bin',
-          binary: bleBinary.binary,
+          source,
         });
       }
     }
-    return fwBinaryMap;
+    return fwSources;
   }
 
   private async executeUpdate({
     resourceBinary,
-    fwBinaryMap,
-    bootloaderBinary,
+    resourceEntries,
+    fwSources,
+    bootloaderSource,
   }: {
     resourceBinary: ArrayBuffer | null;
-    fwBinaryMap: { fileName: string; binary: ArrayBuffer }[];
-    bootloaderBinary: ArrayBuffer | null;
+    resourceEntries: Array<{ entryName: string; source: FirmwareByteSource }>;
+    fwSources: Array<{ fileName: string; source: FirmwareByteSource }>;
+    bootloaderSource: FirmwareByteSource | null;
   }) {
     let totalSize = 0;
     let processedSize = 0;
@@ -250,11 +440,14 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     if (resourceBinary) {
       totalSize += resourceBinary.byteLength;
     }
-    for (const fwbinary of fwBinaryMap) {
-      totalSize += fwbinary.binary.byteLength;
+    for (const entry of resourceEntries) {
+      totalSize += entry.source.size;
     }
-    if (bootloaderBinary) {
-      totalSize += bootloaderBinary.byteLength;
+    for (const firmware of fwSources) {
+      totalSize += firmware.source.size;
+    }
+    if (bootloaderSource) {
+      totalSize += bootloaderSource.size;
     }
 
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
@@ -277,9 +470,18 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       }
     }
 
-    if (bootloaderBinary) {
-      processedSize = await this.emmcCommonUpdateProcess({
-        payload: bootloaderBinary,
+    for (const entry of resourceEntries) {
+      processedSize = await this.emmcCommonUpdateProcessFromSource({
+        source: entry.source,
+        filePath: `0:res/${entry.entryName}`,
+        processedSize,
+        totalSize,
+      });
+    }
+
+    if (bootloaderSource) {
+      processedSize = await this.emmcCommonUpdateProcessFromSource({
+        source: bootloaderSource,
         filePath: `0:boot/bootloader.bin`,
         processedSize,
         totalSize,
@@ -288,11 +490,11 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
     await this.createUpdatesFolderIfNotExists(`0:updates/`);
 
-    for (const fwbinary of fwBinaryMap) {
-      if (fwbinary) {
-        processedSize = await this.emmcCommonUpdateProcess({
-          payload: fwbinary.binary,
-          filePath: `0:updates/${fwbinary.fileName}`,
+    for (const firmware of fwSources) {
+      if (firmware) {
+        processedSize = await this.emmcCommonUpdateProcessFromSource({
+          source: firmware.source,
+          filePath: `0:updates/${firmware.fileName}`,
           processedSize,
           totalSize,
         });
@@ -423,7 +625,8 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
            * 2. While including bootloader upgrade
            */
           const reconnectTimeout =
-            this.isBleReconnect() && (this.params.bleBinary || this.params.bleVersion)
+            this.isBleReconnect() &&
+            (this.params.bleBinary || this.params.bleVersion || this.params.artifacts?.ble)
               ? 3 * 60 * 1000 // 3 minutes for BLE reconnect
               : 60 * 1000; // 1 minute for normal reconnect
 
@@ -548,7 +751,11 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
           if (deviceList.length === 1) {
             this.device.updateFromCache(deviceList[0]);
-            await this.device.acquire();
+            // Reconnect failures are expected while installation still owns USB.
+            // Keep them in this polling loop instead of rejecting the active firmware run.
+            await this.device.acquire(undefined, {
+              throwOnRunPromiseError: true,
+            });
             this.device.commands.disposed = false;
             this.device.getCommands().mainId = this.device.mainId ?? '';
             return;

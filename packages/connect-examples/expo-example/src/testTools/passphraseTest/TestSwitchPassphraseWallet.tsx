@@ -17,6 +17,7 @@ import { replaceTemplate } from '../addressTest/data/utils';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 import { executeProtocolAwareMethod } from '../../utils/protocolAwareMethod';
+import { isPassphraseProtectionEnabled } from '../../utils/protocolAwareFeatures';
 
 import type { TestChain } from './utils';
 import type { CoreMessage } from '@onekeyfe/hd-core';
@@ -220,7 +221,7 @@ function ExecuteView() {
       hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          openDialog(sdk, message.payload.device.features);
+          openDialog(sdk, message.payload.device.features, message);
         }
         if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
           setTimeout(() => {
@@ -229,6 +230,7 @@ function ExecuteView() {
               payload: {
                 value: currentPassphrase.current ?? '',
               },
+              ...(message.payload.responseCorrelation ?? {}),
             });
           }, 200);
         }
@@ -237,7 +239,7 @@ function ExecuteView() {
       return Promise.resolve();
     },
     prepareRunner: async (connectId, deviceId, features, sdk) => {
-      if (!features?.passphrase_protection) {
+      if (!isPassphraseProtectionEnabled(features)) {
         await sdk.deviceSettings(connectId, {
           usePassphrase: true,
         });

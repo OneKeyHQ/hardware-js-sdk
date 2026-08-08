@@ -92,3 +92,6 @@ packages/connect-examples/expo-example/web-build
 .vercel
 .env*.local
 .worktrees/
+
+# bitcoin.test.ts writes its refTx next to itself; never commit the artifact
+packages/connect-examples/expo-example/src/data/output.json

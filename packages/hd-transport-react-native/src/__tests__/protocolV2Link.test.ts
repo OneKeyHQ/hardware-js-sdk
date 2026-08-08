@@ -7,6 +7,7 @@ import transportPackage, {
 import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
 import ReactNativeBleTransport, {
+  BLE_WRITE_PACKET_TIMEOUT_MS,
   configureProtocolV2BleTuning,
   getFirmwareUploadWriteRetryType,
   resetProtocolV2BleTuning,
@@ -755,6 +756,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
 
     await expect(
       transport.writeProtocolV2Packet(
+        'test-device',
         {
           writeCharacteristic: {
             isWritableWithResponse: true,
@@ -789,9 +791,19 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
 
     try {
-      await transport.writeProtocolV2Frame(bleTransport, new Uint8Array(10), context, jest.fn());
+      const call = transport.writeProtocolV2Frame(
+        'test-device',
+        bleTransport,
+        new Uint8Array(10),
+        context,
+        jest.fn()
+      );
 
-      expect(setTimeoutSpy).not.toHaveBeenCalled();
+      await call;
+      // The only scheduled timer is the per-packet BLE write watchdog: no pacing delay.
+      expect(setTimeoutSpy.mock.calls.map(([, timeout]) => timeout)).toEqual([
+        BLE_WRITE_PACKET_TIMEOUT_MS,
+      ]);
       expect(writeWithoutResponse).toHaveBeenCalledTimes(1);
     } finally {
       setTimeoutSpy.mockRestore();
@@ -855,6 +867,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     configureProtocolV2BleTuning({ iosPacketLength: 20 });
 
     await transport.writeProtocolV2Frame(
+      'device-uuid',
       bleTransport,
       new Uint8Array(30),
       context,
@@ -886,7 +899,13 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     configureProtocolV2BleTuning({ iosPacketLength: 20 });
 
     await expect(
-      transport.writeProtocolV2Frame(bleTransport, new Uint8Array(30), context, jest.fn())
+      transport.writeProtocolV2Frame(
+        'device-uuid',
+        bleTransport,
+        new Uint8Array(30),
+        context,
+        jest.fn()
+      )
     ).rejects.toMatchObject({ errorCode: 205 });
     expect(writeWithoutResponse).toHaveBeenCalledTimes(1);
   });
@@ -908,10 +927,21 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
 
     try {
-      await transport.writeProtocolV2Frame(bleTransport, new Uint8Array(600), context, jest.fn());
+      await transport.writeProtocolV2Frame(
+        'test-device',
+        bleTransport,
+        new Uint8Array(600),
+        context,
+        jest.fn()
+      );
 
       expect(writeWithoutResponse).toHaveBeenCalledTimes(3);
-      expect(setTimeoutSpy).not.toHaveBeenCalled();
+      // One BLE write watchdog per packet and nothing else: no burst or flush pauses.
+      expect(setTimeoutSpy.mock.calls.map(([, timeout]) => timeout)).toEqual([
+        BLE_WRITE_PACKET_TIMEOUT_MS,
+        BLE_WRITE_PACKET_TIMEOUT_MS,
+        BLE_WRITE_PACKET_TIMEOUT_MS,
+      ]);
     } finally {
       setTimeoutSpy.mockRestore();
     }

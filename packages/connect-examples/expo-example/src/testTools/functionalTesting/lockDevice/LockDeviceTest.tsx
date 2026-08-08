@@ -11,7 +11,10 @@ import { Button } from '../../../components/ui/Button';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
 import { SwitchInput } from '../../../components/SwitchInput';
-import { getProtocolAwareFeatures } from '../../../utils/protocolAwareFeatures';
+import {
+  getProtocolAwareFeatures,
+  isPassphraseProtectionEnabled,
+} from '../../../utils/protocolAwareFeatures';
 
 import type { CoreMessage, Features } from '@onekeyfe/hd-core';
 import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
@@ -91,7 +94,7 @@ function ExecuteView() {
       hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          openDialog(sdk, message.payload.device.features);
+          openDialog(sdk, message.payload.device.features, message);
         }
         if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
           setTimeout(() => {
@@ -102,6 +105,7 @@ function ExecuteView() {
                 passphraseOnDevice: true,
                 save: false,
               },
+              ...(message.payload.responseCorrelation ?? {}),
             });
           }, 200);
         }
@@ -249,15 +253,15 @@ function ExecuteView() {
           });
         }
       } else if (item.type === 'passphraseOpened') {
-        if (payload.passphrase_protection !== true) {
+        if (!isPassphraseProtectionEnabled(payload)) {
           return Promise.resolve({
-            error: `actual: ${payload.passphrase_protection}, 预期: Passphrase 启用`,
+            error: 'actual: Passphrase 未启用，预期: Passphrase 启用',
           });
         }
       } else if (item.type === 'passphraseClosed') {
-        if (payload.passphrase_protection !== false) {
+        if (isPassphraseProtectionEnabled(payload)) {
           return Promise.resolve({
-            error: `actual: ${payload.passphrase_protection}, 预期: Passphrase 未启用`,
+            error: 'actual: Passphrase 已启用，预期: Passphrase 未启用',
           });
         }
       }

@@ -1,4 +1,5 @@
 import { createCoreApi, createProtocolAwareCall } from './inject';
+import { unregisterFirmwareUpdateHostBinding } from './api/firmware/FirmwareHostBinding';
 
 import type { EventEmitter } from 'events';
 import type { CallMethod, CoreMessage } from './events';
@@ -46,7 +47,10 @@ export const lowLevelInject = ({
 
     setDeviceConnectProtocol: protocolAwareCall.setDeviceConnectProtocol,
 
-    dispose,
+    dispose: async () => {
+      unregisterFirmwareUpdateHostBinding();
+      await dispose();
+    },
 
     uiResponse,
 

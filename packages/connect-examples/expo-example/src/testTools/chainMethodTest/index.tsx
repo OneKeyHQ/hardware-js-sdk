@@ -120,7 +120,7 @@ export default function ChainMethodTest() {
       console.log('Hardware UI Event:', message);
 
       if (message.type === UI_REQUEST.REQUEST_PIN) {
-        openDialog(sdk, message.payload.device.features);
+        openDialog(sdk, message.payload.device.features, message);
       }
 
       if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
@@ -130,6 +130,7 @@ export default function ChainMethodTest() {
             payload: {
               value: currentPassphraseRef.current ?? '',
             },
+            ...(message.payload.responseCorrelation ?? {}),
           });
         }, 200);
       }

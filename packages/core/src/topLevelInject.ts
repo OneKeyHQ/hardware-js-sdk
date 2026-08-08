@@ -1,6 +1,7 @@
 import EventEmitter from 'events';
 
 import { createCoreApi, createProtocolAwareCall } from './inject';
+import { unregisterFirmwareUpdateHostBinding } from './api/firmware/FirmwareHostBinding';
 
 import type { ConnectSettings } from './types/settings';
 import type { CoreApi } from './types/api';
@@ -49,7 +50,10 @@ export const topLevelInject = () => {
       lowLevelApi?.removeAllListeners(type);
     },
 
-    dispose: () => lowLevelApi?.dispose(),
+    dispose: async () => {
+      unregisterFirmwareUpdateHostBinding();
+      await lowLevelApi?.dispose();
+    },
 
     uiResponse: response => lowLevelApi?.uiResponse(response),
 

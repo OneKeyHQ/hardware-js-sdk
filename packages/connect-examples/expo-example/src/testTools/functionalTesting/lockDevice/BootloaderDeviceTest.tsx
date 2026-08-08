@@ -87,7 +87,7 @@ function ExecuteView() {
       hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          openDialog(sdk, message.payload.device.features);
+          openDialog(sdk, message.payload.device.features, message);
         }
         if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
           setTimeout(() => {
@@ -98,6 +98,7 @@ function ExecuteView() {
                 passphraseOnDevice: true,
                 save: false,
               },
+              ...(message.payload.responseCorrelation ?? {}),
             });
           }, 200);
         }

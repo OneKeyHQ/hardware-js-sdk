@@ -38,8 +38,8 @@ describe('BleTransport side-effecting writes', () => {
     });
     const writeCharacteristic = {
       isWritableWithResponse: true,
-      writeWithResponse: jest.fn(() => Promise.reject(error)),
-      writeWithoutResponse: jest.fn(() => Promise.resolve()),
+      writeWithResponse: jest.fn(() => Promise.resolve()),
+      writeWithoutResponse: jest.fn(() => Promise.reject(error)),
     };
     const device = {
       id: 'classic-id',
@@ -50,8 +50,29 @@ describe('BleTransport side-effecting writes', () => {
 
     await expect(transport.writeWithRetry('payload')).rejects.toBe(error);
 
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
     expect(device.connect).not.toHaveBeenCalled();
+  });
+
+  test('keeps iOS bulk transfer on writeWithoutResponse even when the characteristic supports responses', async () => {
+    // writeWithResponse serialises every packet into its own connection-interval
+    // round trip. On a ~1.7MB firmware (~13.5k packets) that stalled the upload past
+    // the 600s app-level timeout, so bulk transfer must never opt into it.
+    const writeCharacteristic = {
+      isWritableWithResponse: true,
+      writeWithResponse: jest.fn(() => Promise.resolve()),
+      writeWithoutResponse: jest.fn(() => Promise.resolve()),
+    };
+    const transport = new BleTransport(
+      { id: 'classic-id' } as any,
+      writeCharacteristic as any,
+      {} as any
+    );
+
+    await transport.writeWithRetry('payload');
+
+    expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledWith('payload');
   });
 
   test('keeps Android Protocol V1 writes on writeWithoutResponse', async () => {

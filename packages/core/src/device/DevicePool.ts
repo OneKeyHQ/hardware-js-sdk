@@ -11,6 +11,14 @@ import type DeviceConnector from './DeviceConnector';
 
 const Log = getLogger(LoggerNames.DevicePool);
 
+/**
+ * A bootloader device's descriptor path is an all-zero placeholder serial, and
+ * bootloader product ids are shared across models — so the path identifies
+ * nothing. Matching the cache by it returns whichever device was seen first
+ * (plug in a Mini then a Classic, and the Classic reports as a Mini).
+ */
+export const canPathIdentifyDevice = (path?: string) => !!path && !/^0+$/.test(path);
+
 export type DeviceDescriptorDiff = {
   didUpdate: boolean;
   connected: DeviceDescriptor[];
@@ -102,7 +110,10 @@ export class DevicePool extends EventEmitter {
     if (connectId) {
       const device = this.devicesCache[connectId];
       if (device) {
-        const exist = descriptorList.find(d => d.path === device.originalDescriptor.path);
+        const cachedPath = device.originalDescriptor.path;
+        const exist = canPathIdentifyDevice(cachedPath)
+          ? descriptorList.find(d => d.path === cachedPath)
+          : undefined;
         if (exist && !initOptions?.forceProtocolDetection) {
           // Log.debug('find existed Device: ', connectId);
           device.updateDescriptor(exist, true);
@@ -283,6 +294,9 @@ export class DevicePool extends EventEmitter {
   }
 
   static getDeviceByPath(path: string) {
+    // A path that cannot identify a device would match an arbitrary cache entry,
+    // so report a miss and let the caller read the device instead.
+    if (!canPathIdentifyDevice(path)) return undefined;
     return Object.values(this.devicesCache).find(d => d.originalDescriptor.path === path);
   }
 

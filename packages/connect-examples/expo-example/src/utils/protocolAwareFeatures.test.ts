@@ -1,6 +1,7 @@
 import {
   getProtocolAwareFeatures,
   getProtocolAwareFirmwareFeatures,
+  isPassphraseProtectionEnabled,
 } from './protocolAwareFeatures';
 
 import type { CoreApi } from '@onekeyfe/hd-core';
@@ -21,6 +22,18 @@ const createSdk = () =>
   } as unknown as CoreApi);
 
 describe('getProtocolAwareFeatures', () => {
+  test('统一识别 V1 与 V2 的 Passphrase 状态字段', () => {
+    expect(isPassphraseProtectionEnabled({ passphrase_protection: true })).toBe(true);
+    expect(isPassphraseProtectionEnabled({ passphraseProtection: true })).toBe(true);
+    expect(
+      isPassphraseProtectionEnabled({
+        passphraseProtection: false,
+        passphrase_protection: true,
+      })
+    ).toBe(false);
+    expect(isPassphraseProtectionEnabled(undefined)).toBe(false);
+  });
+
   test('keeps Protocol V1 on the legacy getFeatures API', async () => {
     const sdk = createSdk();
     const expected = { success: true, payload: { deviceId: 'legacy-device' } };

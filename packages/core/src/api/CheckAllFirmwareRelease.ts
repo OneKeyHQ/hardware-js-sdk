@@ -1,6 +1,13 @@
-import { EDeviceType, EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import {
+  EDeviceType,
+  EFirmwareType,
+  ERRORS,
+  HardwareError,
+  HardwareErrorCode,
+} from '@onekeyfe/hd-shared';
 import semver from 'semver';
 
+import { BaseMethod } from './BaseMethod';
 import { UI_REQUEST } from '../constants/ui-request';
 import { DataManager } from '../data-manager';
 import {
@@ -8,13 +15,22 @@ import {
   getBootloaderReleaseInfo,
   getFirmwareReleaseInfo,
 } from './firmware/releaseHelper';
+import {
+  buildFirmwareUpdatePlan,
+  validateFirmwareUpdatePlanForceTargets,
+} from './firmware/FirmwareUpdatePlan';
 import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
-import { getDeviceFirmwareVersion, getDeviceType, getFirmwareType } from '../utils';
-import { BaseMethod } from './BaseMethod';
 import {
   buildProtocolV2ResourceUpdatePlan,
   readProtocolV2ResourceInventory,
 } from '../protocols/protocol-v2/resources';
+import {
+  LoggerNames,
+  getDeviceFirmwareVersion,
+  getDeviceType,
+  getFirmwareType,
+  getLogger,
+} from '../utils';
 
 import type {
   AllFirmwareRelease,
@@ -30,6 +46,7 @@ import type {
   IProtocolV2FirmwareComponent,
   IProtocolV2FirmwareComponentTarget,
 } from '../types';
+import type { FirmwareUpdatePlan } from '../types/api/firmwareUpdatePlan';
 
 const UPDATE_TARGET_BY_COMPONENT_TARGET: Readonly<
   Partial<Record<IProtocolV2FirmwareComponentTarget, FirmwareUpdateV4Target>>
@@ -266,6 +283,8 @@ export function buildProtocolV2FirmwareRelease({
   };
 }
 
+const Log = getLogger(LoggerNames.Method);
+
 export default class CheckAllFirmwareRelease extends BaseMethod {
   getSupportedProtocols() {
     return ['V1', 'V2'] as const;
@@ -283,8 +302,13 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     }
 
     const { features } = this.device;
-    const { checkBridgeRelease, firmwareType: firmwareTypeParams } = this
-      .payload as CheckAllFirmwareReleaseParams;
+    const {
+      checkBridgeRelease,
+      firmwareType: firmwareTypeParams,
+      platform,
+      forceUpdateTargets,
+    } = this.payload as CheckAllFirmwareReleaseParams;
+    const validatedForceUpdateTargets = validateFirmwareUpdatePlanForceTargets(forceUpdateTargets);
 
     if (!features) {
       return Promise.resolve(null);
@@ -315,6 +339,32 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       firmwareType,
     });
     const bleFirmwareReleaseInfo = getBleFirmwareReleaseInfo(features);
+    let firmwareUpdatePlan: FirmwareUpdatePlan | undefined;
+    try {
+      firmwareUpdatePlan = buildFirmwareUpdatePlan({
+        features,
+        firmwareType,
+        platform: platform ?? 'web',
+        firmware: firmwareRelease,
+        ble: bleFirmwareReleaseInfo,
+        bootloader: bootloaderRelease,
+        forceUpdateTargets: validatedForceUpdateTargets,
+      });
+    } catch (error) {
+      if (
+        validatedForceUpdateTargets.length > 0 ||
+        !(error instanceof HardwareError) ||
+        error.params?.firmwareUpdateCode !== 'FirmwarePlanInvalid'
+      ) {
+        throw error;
+      }
+      // A Plan is an optional external-host capability. Release checks remain
+      // available for legacy and recovery flows when a Plan cannot be built.
+      Log.warn(
+        '[CheckAllFirmwareRelease] Optional firmware Plan is unavailable; using the legacy release result'
+      );
+      firmwareUpdatePlan = undefined;
+    }
 
     return {
       firmware: firmwareRelease,
@@ -329,7 +379,8 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
           }
         : undefined,
       features,
-    } as AllFirmwareRelease;
+      firmwareUpdatePlan,
+    } as unknown as AllFirmwareRelease;
   }
 
   private async runProtocolV2(): Promise<AllFirmwareRelease> {

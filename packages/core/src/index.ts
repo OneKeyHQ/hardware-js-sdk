@@ -21,6 +21,11 @@ export { executeCallback, cleanupCallback };
 export { preloadSessionCache } from './device/Device';
 export { projectFeatures as projectDeviceStateFeatures } from './device/DeviceStateProjector';
 export { getMethodSupportedProtocols } from './api/utils';
+export {
+  getFirmwareUpdateHostBindingGeneration,
+  registerFirmwareUpdateHostBinding,
+  unregisterFirmwareUpdateHostBinding,
+} from './api/firmware/FirmwareHostBinding';
 
 const HardwareSdk = ({
   init,

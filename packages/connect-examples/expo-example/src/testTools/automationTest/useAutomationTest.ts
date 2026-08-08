@@ -40,7 +40,10 @@ import {
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useDevice } from '../../provider/DeviceProvider';
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../../utils/mockDevice/helper';
-import { getProtocolAwareFeatures } from '../../utils/protocolAwareFeatures';
+import {
+  getProtocolAwareFeatures,
+  isPassphraseProtectionEnabled,
+} from '../../utils/protocolAwareFeatures';
 import { executeProtocolAwareMethod } from '../../utils/protocolAwareMethod';
 import { generateAptosPublicKeyFromSeed } from '../../utils/mockDevice/method/aptosGetPublicKey';
 import { generateEvmAddressFromSeed } from '../../utils/mockDevice/method/evmGetAddress';
@@ -1409,11 +1412,11 @@ export function useAutomationTest() {
       label: string
     ): Promise<string | undefined> => {
       // Step 1: Toggle passphrase_protection — exact same logic as SLIP39BatchAddressTest
-      if (features?.passphrase_protection === true && passphrase == null) {
+      if (isPassphraseProtectionEnabled(features) && passphrase == null) {
         addLog(`[${label}] Disabling passphrase_protection for normal wallet`);
         await sdk.deviceSettings(connectId, { usePassphrase: false });
       }
-      if (!features?.passphrase_protection && passphrase != null) {
+      if (!isPassphraseProtectionEnabled(features) && passphrase != null) {
         addLog(`[${label}] Enabling passphrase_protection for passphrase wallet`);
         await sdk.deviceSettings(connectId, { usePassphrase: true });
       }
@@ -1494,13 +1497,13 @@ export function useAutomationTest() {
       const featuresBefore = await fetchDeviceFeatures(sdk, connectId);
       let featuresAfter = featuresBefore;
 
-      if (featuresBefore?.passphrase_protection) {
+      if (isPassphraseProtectionEnabled(featuresBefore)) {
         addLog(`[${suiteLabel}] Disabling passphrase_protection`);
         await sdk.deviceSettings(connectId, { usePassphrase: false });
         featuresAfter = await fetchDeviceFeatures(sdk, connectId);
       }
 
-      const forceUseEmptyPassphrase = featuresAfter?.passphrase_protection === true;
+      const forceUseEmptyPassphrase = isPassphraseProtectionEnabled(featuresAfter);
       if (forceUseEmptyPassphrase) {
         addLog(
           `[${suiteLabel}] passphrase_protection is still enabled; forcing useEmptyPassphrase for main-wallet SDK calls`
@@ -1539,10 +1542,17 @@ export function useAutomationTest() {
   const getCurrentDeviceEvmAddress = useCallback(
     async (sdk: CoreApi, connectId: string, deviceId: string): Promise<string> => {
       const result = await runWithRetry('evmGetAddress:current-wallet', () =>
-        sdk.evmGetAddress(connectId, deviceId, {
-          path: EVM_ADDRESS_PATH,
-          showOnOneKey: false,
-          useEmptyPassphrase: true,
+        executeProtocolAwareMethod({
+          sdk,
+          method: 'evmGetAddress',
+          connectId,
+          deviceId,
+          protocol: selectedDevice?.connectProtocol,
+          params: {
+            path: EVM_ADDRESS_PATH,
+            showOnOneKey: false,
+            useEmptyPassphrase: true,
+          },
         })
       );
 
@@ -1555,7 +1565,7 @@ export function useAutomationTest() {
 
       return extractComparisonValue(result.payload, 'address', 'evmGetAddress');
     },
-    [runWithRetry]
+    [runWithRetry, selectedDevice?.connectProtocol]
   );
 
   const runSdkMethodCase = useCallback(
@@ -2067,17 +2077,16 @@ export function useAutomationTest() {
                     useEmptyPassphrase: !passphraseLiteral,
                   };
 
-                  const result = (await runWithRetry(`${probe.method}:${probe.path}`, () => {
-                    const method = (sdk as Record<string, unknown>)[probe.method];
-                    if (typeof method !== 'function') {
-                      throw new Error(`SDK method not found: ${probe.method}`);
-                    }
-                    return (method as (...args: unknown[]) => Promise<unknown>)(
+                  const result = (await runWithRetry(`${probe.method}:${probe.path}`, () =>
+                    executeProtocolAwareMethod({
+                      sdk,
+                      method: probe.method,
                       connectId,
                       deviceId,
-                      sdkParams
-                    );
-                  })) as { success: boolean; payload?: unknown };
+                      params: sdkParams,
+                      protocol: selectedDevice?.connectProtocol,
+                    })
+                  )) as { success: boolean; payload?: unknown };
 
                   if (!result.success) {
                     results.push({
@@ -2161,6 +2170,7 @@ export function useAutomationTest() {
       updateSuiteProgress,
       incrementCompletedTests,
       notifyLiveCaseUpdate,
+      selectedDevice?.connectProtocol,
     ]
   );
 
@@ -2319,17 +2329,15 @@ export function useAutomationTest() {
 
                     const sdkResult = (await runWithRetry(
                       `${methodData.method}:${expectedPath}`,
-                      () => {
-                        const method = (sdk as Record<string, unknown>)[methodData.method];
-                        if (typeof method !== 'function') {
-                          throw new Error(`SDK method not found: ${methodData.method}`);
-                        }
-                        return (method as (...args: unknown[]) => Promise<unknown>)(
+                      () =>
+                        executeProtocolAwareMethod({
+                          sdk,
+                          method: methodData.method,
                           connectId,
                           deviceId,
-                          sdkMethodParams
-                        );
-                      }
+                          params: sdkMethodParams,
+                          protocol: selectedDevice?.connectProtocol,
+                        })
                     )) as { success: boolean; payload?: unknown };
 
                     if (!sdkResult.success) {
@@ -2419,6 +2427,7 @@ export function useAutomationTest() {
       updateSuiteProgress,
       incrementCompletedTests,
       notifyLiveCaseUpdate,
+      selectedDevice?.connectProtocol,
     ]
   );
 
@@ -2467,7 +2476,7 @@ export function useAutomationTest() {
 
         // Ensure passphrase_protection is enabled before running special passphrase tests
         const spFeatures = await fetchDeviceFeatures(sdk, connectId);
-        if (!spFeatures?.passphrase_protection) {
+        if (!isPassphraseProtectionEnabled(spFeatures)) {
           addLog('[SpecialPassphrase] Enabling passphrase_protection');
           await sdk.deviceSettings(connectId, { usePassphrase: true });
         }
@@ -2785,9 +2794,13 @@ export function useAutomationTest() {
           connectId,
           'SecurityCheck'
         );
-        setPendingUiActions('deviceSettings', 'disable safety checks', ['confirm']);
-        await sdk.deviceSettings(connectId, { safetyChecks: 0 });
-        addLog('[SecurityCheck] safetyChecks set to strict (0)');
+        if (selectedDevice?.connectProtocol === 'V2') {
+          addLog('[SecurityCheck] Protocol V2 safety checks are managed on the device');
+        } else {
+          setPendingUiActions('deviceSettings', 'disable safety checks', ['confirm']);
+          await sdk.deviceSettings(connectId, { safetyChecks: 0 });
+          addLog('[SecurityCheck] safetyChecks set to strict (0)');
+        }
 
         const testCases = convertTestData(securityCheckData).data;
         addLog(`[SecurityCheck] Running ${testCases.length} test cases`);
@@ -2824,11 +2837,14 @@ export function useAutomationTest() {
                 let sdkResult: { success: boolean; payload?: { error?: string } };
                 try {
                   const resultOrTimeout = await Promise.race([
-                    (sdkMethod as (...args: unknown[]) => Promise<unknown>)(
+                    executeProtocolAwareMethod({
+                      sdk,
+                      method,
                       connectId,
                       deviceId,
-                      withMainWalletCommonParams(params, forceUseEmptyPassphrase)
-                    ),
+                      params: withMainWalletCommonParams(params, forceUseEmptyPassphrase),
+                      protocol: selectedDevice?.connectProtocol,
+                    }),
                     new Promise<'timeout'>(resolve => {
                       setTimeout(() => {
                         resolve('timeout');
@@ -2920,6 +2936,7 @@ export function useAutomationTest() {
       incrementCompletedTests,
       notifyLiveCaseUpdate,
       prepareStandaloneMainWallet,
+      selectedDevice?.connectProtocol,
       setPendingUiActions,
       setupUIListener,
     ]
@@ -2966,15 +2983,14 @@ export function useAutomationTest() {
                     incrementCompletedTests();
                     notifyLiveCaseUpdate('chainMethodBatch', 'Chain Method Batch', results);
                   } else {
-                    const sdkResult = await (
-                      sdkMethod as (
-                        ...args: unknown[]
-                      ) => Promise<{ success: boolean; payload?: { error?: string } }>
-                    )(
+                    const sdkResult = await executeProtocolAwareMethod({
+                      sdk,
+                      method: entry.method,
                       connectId,
                       deviceId,
-                      withMainWalletCommonParams(presuppose.value, forceUseEmptyPassphrase)
-                    );
+                      params: withMainWalletCommonParams(presuppose.value, forceUseEmptyPassphrase),
+                      protocol: selectedDevice?.connectProtocol,
+                    });
 
                     if (sdkResult.success) {
                       results.push({
@@ -3038,6 +3054,7 @@ export function useAutomationTest() {
       incrementCompletedTests,
       notifyLiveCaseUpdate,
       prepareStandaloneMainWallet,
+      selectedDevice?.connectProtocol,
       setPendingUiActions,
       setupUIListener,
     ]
@@ -3064,7 +3081,7 @@ export function useAutomationTest() {
         if (canReusePreparation) {
           addLog('[SecurityCheck] Reusing existing single-case device preparation');
           const featuresAfterPreparation = await fetchDeviceFeatures(SDK, ctx.connectId);
-          forceUseEmptyPassphrase = featuresAfterPreparation?.passphrase_protection === true;
+          forceUseEmptyPassphrase = isPassphraseProtectionEnabled(featuresAfterPreparation);
           if (forceUseEmptyPassphrase) {
             addLog(
               '[SecurityCheck] passphrase_protection remains enabled; forcing useEmptyPassphrase for this case'
@@ -3078,9 +3095,13 @@ export function useAutomationTest() {
           );
           forceUseEmptyPassphrase = preparation.forceUseEmptyPassphrase;
 
-          setPendingUiActions('deviceSettings', 'disable safety checks', ['confirm']);
-          await SDK.deviceSettings(ctx.connectId, { safetyChecks: 0 });
-          addLog('[SecurityCheck] safetyChecks set to strict (0)');
+          if (selectedDevice?.connectProtocol === 'V2') {
+            addLog('[SecurityCheck] Protocol V2 safety checks are managed on the device');
+          } else {
+            setPendingUiActions('deviceSettings', 'disable safety checks', ['confirm']);
+            await SDK.deviceSettings(ctx.connectId, { safetyChecks: 0 });
+            addLog('[SecurityCheck] safetyChecks set to strict (0)');
+          }
           singleSecurityCheckPreparedRef.current = {
             connectId: ctx.connectId,
             deviceId: ctx.deviceId,
@@ -3111,11 +3132,14 @@ export function useAutomationTest() {
           let sdkResult: { success: boolean; payload?: { error?: string } };
           try {
             const resultOrTimeout = await Promise.race([
-              (sdkMethod as (...args: unknown[]) => Promise<unknown>)(
-                ctx.connectId,
-                ctx.deviceId,
-                withMainWalletCommonParams(testCase.params, forceUseEmptyPassphrase)
-              ),
+              executeProtocolAwareMethod({
+                sdk: SDK,
+                method: testCase.method,
+                connectId: ctx.connectId,
+                deviceId: ctx.deviceId,
+                params: withMainWalletCommonParams(testCase.params, forceUseEmptyPassphrase),
+                protocol: selectedDevice?.connectProtocol,
+              }),
               new Promise<'timeout'>(resolve => {
                 setTimeout(() => {
                   resolve('timeout');
@@ -3189,6 +3213,7 @@ export function useAutomationTest() {
       finalizeSingleSdkRun,
       prepareStandaloneMainWallet,
       prepareSingleSdkRun,
+      selectedDevice?.connectProtocol,
       setPendingUiActions,
       setupUIListener,
     ]
@@ -3226,15 +3251,14 @@ export function useAutomationTest() {
             duration: Date.now() - startTime,
           });
         } else {
-          const sdkResult = await (
-            sdkMethod as (
-              ...args: unknown[]
-            ) => Promise<{ success: boolean; payload?: { error?: string } }>
-          )(
-            ctx.connectId,
-            ctx.deviceId,
-            withMainWalletCommonParams(testCase.params, forceUseEmptyPassphrase)
-          );
+          const sdkResult = await executeProtocolAwareMethod({
+            sdk: SDK,
+            method: testCase.method,
+            connectId: ctx.connectId,
+            deviceId: ctx.deviceId,
+            params: withMainWalletCommonParams(testCase.params, forceUseEmptyPassphrase),
+            protocol: selectedDevice?.connectProtocol,
+          });
 
           results.push({
             title: testCase.title,
@@ -3273,6 +3297,7 @@ export function useAutomationTest() {
       finalizeSingleSdkRun,
       prepareStandaloneMainWallet,
       prepareSingleSdkRun,
+      selectedDevice?.connectProtocol,
       setPendingUiActions,
       setupUIListener,
     ]

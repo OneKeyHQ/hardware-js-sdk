@@ -39,7 +39,11 @@ export interface TrezorBleAvailability {
 }
 
 export interface TrezorBleScanOptions {
-  /** Service UUIDs advertised by target devices. Omit for default (Trezor). */
+  /**
+   * DEPRECATED and ignored by the handler: a native service-UUID filter drops
+   * Safe 7 ADV packets on Windows, so the scan is always unfiltered and Trezor
+   * matching happens in JS. Kept only so older renderers remain IPC-compatible.
+   */
   serviceUuids?: string[];
   durationMs?: number;
 }

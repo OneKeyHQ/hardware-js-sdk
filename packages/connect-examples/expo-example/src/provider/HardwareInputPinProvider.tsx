@@ -2,19 +2,26 @@ import React, { createContext, useCallback, useContext, useMemo, useState } from
 import { UI_RESPONSE, supportInputPinOnSoftware } from '@onekeyfe/hd-core';
 
 import { ReceivePin } from '../components/ReceivePin';
+import { isProtocolV2PinRequest } from '../utils/protocolAwareUi';
 
-import type { Features } from '@onekeyfe/hd-core';
+import type {
+  CoreApi,
+  Features,
+  UiRequestDeviceAction,
+  UiResponseCorrelation,
+} from '@onekeyfe/hd-core';
 import type { ReactNode } from 'react';
 
 interface DialogState {
   isOpen: boolean;
-  sdk: any;
+  sdk?: CoreApi;
   payload?: any;
+  responseCorrelation?: UiResponseCorrelation;
 }
 
 interface HardwareInputPinDialogContextType {
   dialogState: DialogState;
-  openDialog: (sdk: any, features: Features) => void;
+  openDialog: (sdk: CoreApi, features: Features, request?: UiRequestDeviceAction) => void;
   closeDialog: () => void;
 }
 
@@ -33,18 +40,35 @@ export const HardwareInputPinDialogProvider: React.FC<{ children: ReactNode }> =
     dialogState.sdk?.uiResponse({
       type: UI_RESPONSE.RECEIVE_PIN,
       payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+      ...(dialogState.responseCorrelation ?? {}),
     });
-  }, [dialogState.sdk]);
+  }, [dialogState.responseCorrelation, dialogState.sdk]);
 
   const openDialog = useCallback(
-    (sdk: any, features: Features, payload?: any) => {
+    (sdk: CoreApi, features: Features, request?: UiRequestDeviceAction) => {
+      if (request && isProtocolV2PinRequest(request)) {
+        // Protocol V2 PIN 在设备端输入，事件只用于展示状态，不等待 uiResponse。
+        setDialogState({ isOpen: false });
+        return;
+      }
+
+      const responseCorrelation = request?.payload.responseCorrelation;
       if (supportInputPinOnSoftware(features).support) {
-        setDialogState({ isOpen: true, sdk, payload });
+        setDialogState({
+          isOpen: true,
+          sdk,
+          payload: request?.payload,
+          responseCorrelation,
+        });
       } else {
-        onInputPinOnDeviceCallback();
+        sdk.uiResponse({
+          type: UI_RESPONSE.RECEIVE_PIN,
+          payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+          ...(responseCorrelation ?? {}),
+        });
       }
     },
-    [onInputPinOnDeviceCallback]
+    []
   );
 
   const closeDialog = useCallback(() => {
@@ -54,10 +78,14 @@ export const HardwareInputPinDialogProvider: React.FC<{ children: ReactNode }> =
   // 输入 pin 码的确认回调
   const onConfirmPin = useCallback(
     (payload: string) => {
-      dialogState.sdk?.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload });
+      dialogState.sdk?.uiResponse({
+        type: UI_RESPONSE.RECEIVE_PIN,
+        payload,
+        ...(dialogState.responseCorrelation ?? {}),
+      });
       closeDialog();
     },
-    [closeDialog, dialogState.sdk]
+    [closeDialog, dialogState.responseCorrelation, dialogState.sdk]
   );
 
   // 取消输入 pin 码

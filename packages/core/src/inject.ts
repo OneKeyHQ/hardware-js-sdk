@@ -1,7 +1,18 @@
+import { getFirmwareUpdateCapabilities } from './api/firmware/FirmwareUpdateCapabilities';
+import {
+  prepareFirmwareUpdatePlan,
+  validateFirmwareUpdatePreparedPlan,
+} from './api/firmware/FirmwareUpdatePreparedPlan';
+import {
+  getFirmwareUpdateHostBindingGeneration,
+  registerFirmwareUpdateHostBinding,
+  unregisterFirmwareUpdateHostBinding,
+} from './api/firmware/FirmwareHostBinding';
+
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
-import type { Unsuccessful } from './types';
 import type { EventEmitter } from 'events';
 import type { CallMethod } from './events';
+import type { Unsuccessful } from './types';
 import type { CoreApi } from './types/api';
 import type { AllNetworkAddress } from './types/api/allNetworkGetAddress';
 
@@ -116,7 +127,10 @@ export const inject = ({
 
     setDeviceConnectProtocol: protocolAwareCall.setDeviceConnectProtocol,
 
-    dispose,
+    dispose: async () => {
+      unregisterFirmwareUpdateHostBinding();
+      await dispose();
+    },
 
     uiResponse,
 
@@ -148,6 +162,12 @@ export const createCoreApi = (
   | 'updateSettings'
   | 'switchTransport'
 > => ({
+  getFirmwareUpdateCapabilities,
+  registerFirmwareUpdateHostBinding,
+  unregisterFirmwareUpdateHostBinding,
+  getFirmwareUpdateHostBindingGeneration,
+  prepareFirmwareUpdatePlan,
+  validateFirmwareUpdatePreparedPlan,
   getLogs: () => call({ method: 'getLogs' }),
   clearSessionCache: params => call({ ...params, method: 'clearSessionCache' }),
   /**

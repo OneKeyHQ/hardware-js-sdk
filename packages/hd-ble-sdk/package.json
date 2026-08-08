@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-ble-sdk",
-  "version": "1.2.0-alpha.69",
+  "version": "1.2.0-alpha.77",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "ISC",
@@ -20,8 +20,8 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-core": "1.2.0-alpha.69",
-    "@onekeyfe/hd-shared": "1.2.0-alpha.69",
-    "@onekeyfe/hd-transport-react-native": "1.2.0-alpha.69"
+    "@onekeyfe/hd-core": "1.2.0-alpha.77",
+    "@onekeyfe/hd-shared": "1.2.0-alpha.77",
+    "@onekeyfe/hd-transport-react-native": "1.2.0-alpha.77"
   }
 }

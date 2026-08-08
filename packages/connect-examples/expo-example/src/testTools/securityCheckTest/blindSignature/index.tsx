@@ -14,7 +14,11 @@ import data from './data';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
 import { SwitchInput } from '../../../components/SwitchInput';
 import { useDevice } from '../../../provider/DeviceProvider';
-import { getProtocolAwareFeatures } from '../../../utils/protocolAwareFeatures';
+import {
+  getProtocolAwareFeatures,
+  isPassphraseProtectionEnabled,
+} from '../../../utils/protocolAwareFeatures';
+import { executeProtocolAwareMethod } from '../../../utils/protocolAwareMethod';
 
 import type { CoreMessage } from '@onekeyfe/hd-core';
 import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
@@ -67,9 +71,16 @@ function ResultView({
 }: ResultViewProps & { disableSecurityCheck: boolean }) {
   const intl = useIntl();
   const { selectedDevice } = useDevice();
+  const protocol =
+    selectedDevice?.connectProtocol ??
+    (selectedDevice?.features?.protocol === 'V1' || selectedDevice?.features?.protocol === 'V2'
+      ? selectedDevice.features.protocol
+      : undefined);
+  const canConfigureSafetyChecks = protocol !== 'V2';
+  const effectiveDisableSecurityCheck = canConfigureSafetyChecks && disableSecurityCheck;
   const title = `${item?.method} ${item.path}`;
   const verifyExt = itemVerifyState.ext;
-  const securityChecksDisabled = verifyExt?.securityChecksDisabled ?? disableSecurityCheck;
+  const securityChecksDisabled = verifyExt?.securityChecksDisabled ?? effectiveDisableSecurityCheck;
 
   const coinType = extractCoinTypeFromPath(item.path);
   const expected = getDeviceExpected(
@@ -144,6 +155,13 @@ function ExecuteView({
   const intl = useIntl();
   const { openDialog } = useHardwareInputPinDialog();
   const { selectedDevice } = useDevice();
+  const protocol =
+    selectedDevice?.connectProtocol ??
+    (selectedDevice?.features?.protocol === 'V1' || selectedDevice?.features?.protocol === 'V2'
+      ? selectedDevice.features.protocol
+      : undefined);
+  const canConfigureSafetyChecks = protocol !== 'V2';
+  const effectiveDisableSecurityCheck = canConfigureSafetyChecks && disableSecurityCheck;
 
   const { stopTest, beginTest } = useRunnerTest<TestCaseDataType, BlindSignatureVerifyExt>({
     initHardwareListener: sdk => {
@@ -153,7 +171,7 @@ function ExecuteView({
       hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          openDialog(sdk, message.payload.device.features);
+          openDialog(sdk, message.payload.device.features, message);
           // sdk.uiResponse({
           //   type: UI_RESPONSE.RECEIVE_PIN,
           //   payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
@@ -164,12 +182,15 @@ function ExecuteView({
       return Promise.resolve();
     },
     prepareRunner: async (connectId, deviceId, features, sdk) => {
-      if (features?.passphrase_protection) {
+      if (isPassphraseProtectionEnabled(features)) {
         await sdk.deviceSettings(connectId, {
           usePassphrase: false,
         });
       }
-      if (disableSecurityCheck) {
+      if (features.protocol === 'V2') {
+        return;
+      }
+      if (effectiveDisableSecurityCheck) {
         await sdk.deviceSettings(connectId, {
           // 0: Strict, 1: PromptTemporarily, 2: Off
           safetyChecks: 2,
@@ -211,12 +232,14 @@ function ExecuteView({
     processRequest: async (sdk, method, connectId, deviceId, requestParams, item) => {
       const sdkPromise = async () => {
         try {
-          // @ts-expect-error
-          const res = await sdk[`${method}` as keyof typeof sdk](
+          const res = await executeProtocolAwareMethod({
+            sdk,
+            method,
             connectId,
             deviceId,
-            requestParams
-          );
+            params: requestParams,
+            protocol,
+          });
           return { payload: res, skipVerify: true };
         } catch (error) {
           console.log('=====>>>>> processRequest error: ', error);
@@ -256,7 +279,7 @@ function ExecuteView({
     },
     processResponse: (_, item, __, res) => {
       const baseExt: BlindSignatureVerifyExt = {
-        securityChecksDisabled: disableSecurityCheck,
+        securityChecksDisabled: effectiveDisableSecurityCheck,
       };
 
       const error = '';
@@ -274,7 +297,7 @@ function ExecuteView({
         coinType,
         item.expect,
         {
-          securityChecksDisabled: disableSecurityCheck,
+          securityChecksDisabled: effectiveDisableSecurityCheck,
         }
       );
 
@@ -331,16 +354,26 @@ function ExecuteView({
 
         <XStack flexWrap="wrap">
           <SwitchInput
-            label={intl.formatMessage({ id: 'label__turn_off_security_check' })}
-            value={disableSecurityCheck}
+            label={`${intl.formatMessage({
+              id: 'label__turn_off_security_check',
+            })}${canConfigureSafetyChecks ? '' : '（Protocol V2 需在设备端管理）'}`}
+            value={effectiveDisableSecurityCheck}
             onToggle={setDisableSecurityCheck}
+            disabled={!canConfigureSafetyChecks}
           />
           <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
           <ExportReportView />
         </XStack>
       </YStack>
     ),
-    [beginTest, disableSecurityCheck, intl, setDisableSecurityCheck, stopTest]
+    [
+      beginTest,
+      canConfigureSafetyChecks,
+      effectiveDisableSecurityCheck,
+      intl,
+      setDisableSecurityCheck,
+      stopTest,
+    ]
   );
 
   return contentMemo;
