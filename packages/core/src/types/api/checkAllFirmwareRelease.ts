@@ -1,28 +1,40 @@
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { CommonParams, Response } from '../params';
-import type {
-  DeviceStateVersions,
-  Features,
-  IDeviceBLEFirmwareStatus,
-  IDeviceFirmwareStatus,
-} from '../device';
+import type { DeviceStateVersions, Features, IDeviceFirmwareStatus } from '../device';
 import type {
   IBLEFirmwareReleaseInfo,
   IFirmwareReleaseInfo,
+  IProtocolV2FirmwareComponent,
   IProtocolV2FirmwareComponentTarget,
 } from '../settings';
 import type { FirmwareUpdateV4Target } from './firmwareUpdate';
 import type { FirmwareUpdatePlan, FirmwareUpdatePlanForceTarget } from './firmwareUpdatePlan';
 
-export type FirmwareRelease = {
+export type ProtocolV2ComponentReleaseInfo = IProtocolV2FirmwareComponent & {
+  protocol: 'V2';
+  configKey: string;
+  componentTarget: IProtocolV2FirmwareComponentTarget;
+  required: boolean;
+  changelog: IFirmwareReleaseInfo['changelog'];
+};
+
+export type FirmwareReleaseCheckResult = {
   shouldUpdate?: boolean;
   status: IDeviceFirmwareStatus;
   changelog?: {
     'zh-CN': string;
     'en-US': string;
   }[];
-  release: IDeviceBLEFirmwareStatus | IBLEFirmwareReleaseInfo | IFirmwareReleaseInfo;
+  release:
+    | IBLEFirmwareReleaseInfo
+    | IFirmwareReleaseInfo
+    | ProtocolV2ComponentReleaseInfo
+    | undefined;
   bootloaderMode?: boolean;
+};
+
+export type BridgeReleaseCheckResult = Omit<FirmwareReleaseCheckResult, 'release'> & {
+  release: string | undefined;
 };
 
 export type ProtocolV2FirmwareComponentReleaseStatus =
@@ -49,10 +61,10 @@ export type ProtocolV2FirmwareComponentRelease = {
 };
 
 export type AllFirmwareRelease = {
-  firmware: FirmwareRelease;
-  ble: FirmwareRelease;
-  bootloader?: FirmwareRelease;
-  bridge?: FirmwareRelease;
+  firmware: FirmwareReleaseCheckResult;
+  ble: FirmwareReleaseCheckResult;
+  bootloader?: FirmwareReleaseCheckResult;
+  bridge?: BridgeReleaseCheckResult;
   features?: Features;
   protocol?: 'V1' | 'V2';
   deviceType?: 'pro2' | 'neo';
@@ -62,6 +74,7 @@ export type AllFirmwareRelease = {
   required?: boolean;
   resourceStatus?: 'valid' | 'outdated' | 'unknown';
   resourceManifestUrl?: string;
+  resourcePreparationRequired?: boolean;
   currentVersions?: DeviceStateVersions;
   components?: ProtocolV2FirmwareComponentRelease[];
   targetsToUpdate?: FirmwareUpdateV4Target[];

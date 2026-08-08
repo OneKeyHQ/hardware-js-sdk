@@ -329,7 +329,8 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       status: 'required',
       resourceStatus: 'unknown',
       resourceManifestUrl: resourceSource.manifestUrl,
-      targetsToUpdate: ['boot', 'app_v1'],
+      resourcePreparationRequired: true,
+      targetsToUpdate: ['boot', 'app_v1', 'resource'],
       firmware: {
         status: 'required',
       },
@@ -418,11 +419,54 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         protocol: 'V2',
         resourceStatus: 'unknown',
         resourceManifestUrl: resourceSource.manifestUrl,
-        targetsToUpdate: ['boot', 'app_v1'],
+        resourcePreparationRequired: true,
+        targetsToUpdate: ['boot', 'app_v1', 'resource'],
       });
       expect(typedCall).not.toHaveBeenCalled();
     }
   );
+
+  test('requires manifest preparation when only Protocol V2 resources may have changed', async () => {
+    const currentRelease: IFirmwareReleaseInfo = {
+      ...release,
+      required: false,
+      installOrder: ['applicationP1'],
+      components: {
+        applicationP1: {
+          target: 'APPLICATION_P1',
+          url: 'https://example.com/application-p1.okpkg',
+          version: [1, 0, 0],
+        },
+      },
+    };
+    const method = new CheckAllFirmwareRelease({
+      id: 1,
+      payload: {
+        method: 'checkAllFirmwareRelease',
+        firmwareType: EFirmwareType.Universal,
+      },
+    });
+    method.init();
+    method.device = {
+      isProtocolV2: () => true,
+      features: { deviceType: 'pro2', firmwareVersion: '1.0.0' },
+      getDeviceState: jest.fn().mockResolvedValue({
+        identity: { deviceType: 'pro2', firmwareType: EFirmwareType.Universal },
+        status: { mode: 'normal' },
+        versions: { ...currentVersions, applicationP1: '1.0.0' },
+      }),
+    } as unknown as CheckAllFirmwareRelease['device'];
+    jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(currentRelease);
+    jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
+
+    await expect(method.run()).resolves.toMatchObject({
+      status: 'unknown',
+      hasUpgrade: true,
+      resourceStatus: 'unknown',
+      resourcePreparationRequired: true,
+      targetsToUpdate: ['resource'],
+    });
+  });
 
   test('continues forwarding the existing public method', async () => {
     const call = jest.fn().mockResolvedValue({ success: true, payload: {} });

@@ -1,10 +1,4 @@
-import {
-  EDeviceType,
-  EFirmwareType,
-  ERRORS,
-  HardwareError,
-  HardwareErrorCode,
-} from '@onekeyfe/hd-shared';
+import { EDeviceType, HardwareError } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 
 import { BaseMethod } from './BaseMethod';
@@ -19,6 +13,15 @@ import {
   buildFirmwareUpdatePlan,
   validateFirmwareUpdatePlanForceTargets,
 } from './firmware/FirmwareUpdatePlan';
+import {
+  PROTOCOL_V2_BLE_TARGETS,
+  PROTOCOL_V2_BOOTLOADER_TARGETS,
+  PROTOCOL_V2_MAIN_FIRMWARE_TARGETS,
+  getProtocolV2ComponentReleaseInfo,
+  loadProtocolV2FirmwareReleaseContext,
+  summarizeProtocolV2FirmwareRelease,
+  toProtocolV2FirmwareReleaseInfo,
+} from './firmware/protocolV2Release';
 import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
 import {
   LoggerNames,
@@ -28,6 +31,7 @@ import {
   getLogger,
 } from '../utils';
 
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type {
   AllFirmwareRelease,
   CheckAllFirmwareReleaseParams,
@@ -169,7 +173,7 @@ function buildComponentRelease({
   };
 }
 
-type ProtocolV2FirmwareReleasePlan = {
+export type ProtocolV2FirmwareReleasePlan = {
   firmwareType: EFirmwareType;
   status: ProtocolV2FirmwareReleaseStatus;
   hasUpgrade: boolean;
@@ -382,29 +386,12 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
   private async runProtocolV2(): Promise<AllFirmwareRelease> {
     const { checkFirmwareHash = false, firmwareType: firmwareTypeParam } = this
       .payload as CheckAllFirmwareReleaseParams;
-    const state = await this.device.getDeviceState({
-      refreshSections: checkFirmwareHash
-        ? ['identity', 'versions', 'verification']
-        : ['identity', 'versions'],
+    const { state, features, firmwareType, release } = await loadProtocolV2FirmwareReleaseContext({
+      device: this.device,
+      firmwareType: firmwareTypeParam,
+      checkFirmwareHash,
+      methodName: 'checkAllFirmwareRelease',
     });
-    if (state.identity.deviceType !== 'pro2' && state.identity.deviceType !== 'neo') {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.DeviceNotSupportMethod,
-        'checkAllFirmwareRelease requires a Pro2 or Neo device for Protocol V2'
-      );
-    }
-
-    const { features } = this.device;
-    if (!features) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'checkAllFirmwareRelease requires initialized device features'
-      );
-    }
-
-    const firmwareType =
-      firmwareTypeParam ?? state.identity.firmwareType ?? EFirmwareType.Universal;
-    const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
     const plan = buildProtocolV2FirmwareRelease({
       currentVersions: state.versions,
       currentVerification: checkFirmwareHash ? state.verification : undefined,
@@ -417,32 +404,45 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       state.identity.deviceType === 'neo' ? EDeviceType.Neo : EDeviceType.Pro2;
     const resourceSource = DataManager.getProtocolV2ResourceSource(resourceDeviceType);
     const resourceStatus = 'unknown' as const;
-    const targetsToUpdate = [...plan.targetsToUpdate];
-    const firmwareStatus = plan.status === 'unavailable' ? 'unknown' : plan.status;
-    const emptyRelease = 'none' as const;
+    const resourcePreparationRequired = !!resourceSource;
+    const targetsToUpdate = Array.from(
+      new Set([
+        ...plan.targetsToUpdate,
+        ...(resourcePreparationRequired ? (['resource'] as const) : []),
+      ])
+    );
+    const firmwarePlan = summarizeProtocolV2FirmwareRelease(
+      plan,
+      PROTOCOL_V2_MAIN_FIRMWARE_TARGETS
+    );
+    const blePlan = summarizeProtocolV2FirmwareRelease(plan, PROTOCOL_V2_BLE_TARGETS);
+    const bootloaderPlan = summarizeProtocolV2FirmwareRelease(plan, PROTOCOL_V2_BOOTLOADER_TARGETS);
+    const status =
+      resourcePreparationRequired && (plan.status === 'valid' || plan.status === 'unavailable')
+        ? 'unknown'
+        : plan.status;
 
     return {
-      firmware: {
-        status: firmwareStatus,
-        changelog: release ? [release.changelog] : [],
-        release: release ?? emptyRelease,
-        bootloaderMode: state.status.mode === 'bootloader' || state.status.mode === 'romloader',
-      },
-      ble: {
-        status: 'valid',
-        release: emptyRelease,
-      },
-      bootloader: {
-        status: 'valid',
-        release: emptyRelease,
-      },
+      firmware: toProtocolV2FirmwareReleaseInfo({ plan: firmwarePlan, state, release }),
+      ble: toProtocolV2FirmwareReleaseInfo({
+        plan: blePlan,
+        state,
+        release: getProtocolV2ComponentReleaseInfo(plan, 'COPROCESSOR'),
+      }),
+      bootloader: toProtocolV2FirmwareReleaseInfo({
+        plan: bootloaderPlan,
+        state,
+        release: getProtocolV2ComponentReleaseInfo(plan, 'BOOTLOADER'),
+      }),
       features,
       protocol: 'V2',
       deviceType: state.identity.deviceType,
       ...plan,
+      status,
       resourceStatus,
       resourceManifestUrl: resourceSource?.manifestUrl,
-      hasUpgrade: plan.hasUpgrade,
+      resourcePreparationRequired,
+      hasUpgrade: plan.hasUpgrade || resourcePreparationRequired,
       targetsToUpdate,
     };
   }
