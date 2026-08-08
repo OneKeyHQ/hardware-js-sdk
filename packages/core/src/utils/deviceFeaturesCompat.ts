@@ -37,6 +37,12 @@ export const resolveDeviceSerialNo = (features?: DeviceFeaturesInput): string =>
   );
 };
 
+export const resolveDeviceBootloaderMode = (features?: DeviceFeaturesInput): boolean => {
+  if (!features) return false;
+  const compatible = asCompatibleFeatures(features);
+  return (compatible.bootloaderMode ?? compatible.bootloader_mode) === true;
+};
+
 export const resolveDeviceType = (features?: DeviceFeaturesInput): IDeviceType => {
   if (!features || typeof features !== 'object') {
     return EDeviceType.Unknown;

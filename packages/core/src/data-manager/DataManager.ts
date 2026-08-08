@@ -408,7 +408,20 @@ export default class DataManager {
   static async load(settings: ConnectSettings): Promise<boolean> {
     this.settings = settings;
     this.protocolV2ResourcesConfigError = undefined;
-    if (!settings.fetchConfig) {
+    const manifestMode =
+      settings.firmwareManifestMode ?? (settings.fetchConfig ? 'sdk-managed' : undefined);
+    if (settings.preloadedConfig) {
+      this.applyRemoteConfig(settings.preloadedConfig);
+      Log.log('[DataConfig] Preloaded firmware config loaded');
+      return true;
+    }
+    if (manifestMode === 'external-only') {
+      Log.warn(
+        '[DataConfig] External firmware config is unavailable; SDK-managed networking remains disabled'
+      );
+      return false;
+    }
+    if (manifestMode !== 'sdk-managed') {
       return false;
     }
 
@@ -419,26 +432,19 @@ export default class DataManager {
     const urlWithCache = `${url}?noCache=${getTimeStamp()}`;
     let data: RemoteConfigResponse | null = null;
     let fetchMethod: 'configFetcher' | 'axios' | 'none' = 'none';
-
-    // 1. Try custom configFetcher first (client-side IP direct connection support)
     if (settings.configFetcher) {
-      Log.debug('[DataConfig] Trying configFetcher (client-side fetcher)...');
+      Log.debug('[DataConfig] Trying client configFetcher...');
       try {
         data = await settings.configFetcher(urlWithCache);
         if (data) {
           fetchMethod = 'configFetcher';
-          Log.log('[DataConfig] ConfigFetcher success');
-        } else {
-          Log.debug('[DataConfig] ConfigFetcher returned null, will fallback to axios');
         }
       } catch (e) {
-        Log.warn('[DataConfig] ConfigFetcher error, will fallback to axios:', e);
+        Log.warn('[DataConfig] Client configFetcher failed:', e);
       }
     }
-
-    // 2. Fallback to default axios request
     if (!data) {
-      Log.debug('[DataConfig] Trying axios (SDK default fetcher)...');
+      Log.debug('[DataConfig] Trying SDK-managed config request...');
       try {
         const response = await axios.get<RemoteConfigResponse>(urlWithCache, {
           // because of iframe timeout is 10000
@@ -446,59 +452,61 @@ export default class DataManager {
         });
         data = response.data;
         fetchMethod = 'axios';
-        Log.log('[DataConfig] Axios fetch success');
+        Log.log('[DataConfig] SDK-managed config request succeeded');
       } catch (e) {
-        Log.warn('[DataConfig] Axios fetch error:', e);
+        Log.warn('[DataConfig] SDK-managed config request failed:', e);
       }
     }
 
-    // 3. Apply config if available
     if (data) {
-      let pro2Resources: IProtocolV2Resources | undefined;
-      let neoResources: IProtocolV2Resources | undefined;
-      this.protocolV2ResourcesConfigError = undefined;
-      try {
-        pro2Resources = parseProtocolV2Resources(
-          (data.pro2 as { resources?: unknown } | undefined)?.resources
-        );
-        neoResources = parseProtocolV2Resources(
-          (data.neo as { resources?: unknown } | undefined)?.resources
-        );
-      } catch (error) {
-        // Firmware resource metadata is not required for base communication. If the
-        // remote config is temporarily incomplete, disable this resource update only.
-        this.protocolV2ResourcesConfigError =
-          error instanceof Error ? error : new Error(String(error));
-        Log.warn('[DataConfig] Ignoring invalid Pro2 resources config:', error);
-      }
-      const enrichedPro2Config = this.enrichFirmwareReleaseInfo(data.pro2);
-      const enrichedNeoConfig = this.enrichFirmwareReleaseInfo(data.neo);
-      const { resources: _unvalidatedResources, ...pro2Config } = enrichedPro2Config;
-      const { resources: _unvalidatedNeoResources, ...neoConfig } = enrichedNeoConfig;
+      this.applyRemoteConfig(data);
       Log.log(`[DataConfig] Config loaded successfully via [${fetchMethod}]`);
-      this.deviceMap = {
-        [EDeviceType.Classic]: this.enrichFirmwareReleaseInfo(data.classic),
-        [EDeviceType.Classic1s]: this.enrichFirmwareReleaseInfo(data.classic1s),
-        [EDeviceType.ClassicPure]: this.enrichFirmwareReleaseInfo(data.classicpure),
-        [EDeviceType.Mini]: this.enrichFirmwareReleaseInfo(data.mini),
-        [EDeviceType.Touch]: this.enrichFirmwareReleaseInfo(data.touch),
-        [EDeviceType.Pro]: this.enrichFirmwareReleaseInfo(data.pro),
-        [EDeviceType.Pro2]: {
-          ...pro2Config,
-          ...(pro2Resources ? { resources: pro2Resources } : undefined),
-        },
-        [EDeviceType.Neo]: {
-          ...neoConfig,
-          ...(neoResources ? { resources: neoResources } : undefined),
-        },
-      };
-      this.assets = {
-        bridge: data.bridge,
-      };
       return true;
     }
     Log.warn('[DataConfig] All fetch methods failed, using built-in default config');
     return false;
+  }
+
+  private static applyRemoteConfig(data: RemoteConfigResponse) {
+    let pro2Resources: IProtocolV2Resources | undefined;
+    let neoResources: IProtocolV2Resources | undefined;
+    try {
+      pro2Resources = parseProtocolV2Resources(
+        (data.pro2 as { resources?: unknown } | undefined)?.resources
+      );
+      neoResources = parseProtocolV2Resources(
+        (data.neo as { resources?: unknown } | undefined)?.resources
+      );
+    } catch (error) {
+      // Firmware resource metadata is not required for base communication. If the
+      // remote config is temporarily incomplete, disable this resource update only.
+      this.protocolV2ResourcesConfigError =
+        error instanceof Error ? error : new Error(String(error));
+      Log.warn('[DataConfig] Ignoring invalid Protocol V2 resources config:', error);
+    }
+    const enrichedPro2Config = this.enrichFirmwareReleaseInfo(data.pro2);
+    const enrichedNeoConfig = this.enrichFirmwareReleaseInfo(data.neo);
+    const { resources: _unvalidatedResources, ...pro2Config } = enrichedPro2Config;
+    const { resources: _unvalidatedNeoResources, ...neoConfig } = enrichedNeoConfig;
+    this.deviceMap = {
+      [EDeviceType.Classic]: this.enrichFirmwareReleaseInfo(data.classic),
+      [EDeviceType.Classic1s]: this.enrichFirmwareReleaseInfo(data.classic1s),
+      [EDeviceType.ClassicPure]: this.enrichFirmwareReleaseInfo(data.classicpure),
+      [EDeviceType.Mini]: this.enrichFirmwareReleaseInfo(data.mini),
+      [EDeviceType.Touch]: this.enrichFirmwareReleaseInfo(data.touch),
+      [EDeviceType.Pro]: this.enrichFirmwareReleaseInfo(data.pro),
+      [EDeviceType.Pro2]: {
+        ...pro2Config,
+        ...(pro2Resources ? { resources: pro2Resources } : undefined),
+      },
+      [EDeviceType.Neo]: {
+        ...neoConfig,
+        ...(neoResources ? { resources: neoResources } : undefined),
+      },
+    };
+    this.assets = {
+      bridge: data.bridge,
+    };
   }
 
   static updateEnv(newEnv: ConnectSettings['env']) {

@@ -26,12 +26,30 @@ export type {
   DeviceUploadResourceResponse,
 } from './deviceUploadResource';
 export type {
+  FirmwareArtifactReader,
+  FirmwareArtifactReference,
+  FirmwareUpdateHostBinding,
+  FirmwareUpdateArtifactParams,
   FirmwareUpdateParams,
   FirmwareUpdateBinaryParams,
   FirmwareUpdateV3Params,
   FirmwareUpdateV4Params,
   FirmwareUpdateV4Target,
 } from './firmwareUpdate';
+export type {
+  FirmwareUpdatePlan,
+  FirmwareUpdatePlanArtifact,
+  FirmwareUpdatePlanArtifactRole,
+  FirmwareUpdatePlanForceTarget,
+  FirmwareUpdatePlanTarget,
+} from './firmwareUpdatePlan';
+export type {
+  FirmwareUpdatePreparedArtifact,
+  FirmwareUpdatePreparedArtifactInput,
+  FirmwareUpdatePreparedEntry,
+  FirmwareUpdatePreparedPlan,
+} from './firmwareUpdatePreparedPlan';
+export type { FirmwareUpdateCapabilities } from './firmwareUpdateCapabilities';
 export type { AllFirmwareRelease } from './checkAllFirmwareRelease';
 export type {
   ProtocolV2FirmwareComponentRelease,

@@ -31,6 +31,8 @@ export type ConnectSettings = {
   timestamp: number;
   isFrame?: boolean;
   preRelease?: boolean;
+  firmwareManifestMode?: 'sdk-managed' | 'external-only';
+  preloadedConfig?: RemoteConfigResponse;
   fetchConfig?: boolean;
   extension?: string;
   configFetcher?: (url: string) => Promise<RemoteConfigResponse | null>;
@@ -58,6 +60,7 @@ export type IProtocolV2FirmwareComponent = {
   fingerprint?: string;
   /** OKPP payload hash, used to detect same-version package changes. */
   payloadHash?: string;
+  expectedSize?: number;
   version?: IVersionArray;
 };
 
@@ -111,6 +114,8 @@ export type IProtocolV2ResourceBundle = {
   name: string;
   /** Download URL. */
   url: string;
+  fingerprint?: string;
+  expectedSize?: number;
   /** Device target path, such as vol0:/bundles/images/images.okpkg. */
   devicePath: string;
   /** okpkg payload_version used to skip matching content after FileRead. */
@@ -132,10 +137,16 @@ export type IFirmwareReleaseInfo = {
   firmwareType?: EFirmwareType;
   /** Firmware UI resource */
   resource?: string;
+  resourceFingerprint?: string;
+  resourceExpectedSize?: number;
   /** Firmware full UI resource */
   fullResource?: string;
+  fullResourceFingerprint?: string;
+  fullResourceExpectedSize?: number;
   fullResourceRange?: string[];
   bootloaderResource?: string;
+  bootloaderFingerprint?: string;
+  bootloaderExpectedSize?: number;
   bootloaderVersion?: IVersionArray;
   displayBootloaderVersion?: IVersionArray;
   bootloaderRelatedFirmwareVersion?: IVersionArray;
@@ -148,6 +159,7 @@ export type IFirmwareReleaseInfo = {
     [k in ILocale]: string;
   };
   fingerprint: string;
+  expectedSize?: number;
   version: IVersionArray;
   changelog: {
     [k in ILocale]: string;
@@ -163,6 +175,7 @@ export type IBLEFirmwareReleaseInfo = {
   webUpdate: string;
   fingerprint: string;
   fingerprintWeb: string;
+  expectedSize?: number;
   version: IVersionArray;
   changelog: {
     [k in ILocale]: string;

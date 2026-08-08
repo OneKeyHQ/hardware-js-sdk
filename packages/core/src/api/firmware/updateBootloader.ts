@@ -8,6 +8,7 @@ import { shouldUpdateBootloaderForClassicAndMini } from './bootloaderHelper';
 
 import type { Features } from '../../types';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
+import type { FirmwareByteSource } from './FirmwareArtifactSource';
 
 export function checkNeedUpdateBootForTouch(features: Features, firmwareType: EFirmwareType) {
   const deviceType = getDeviceType(features);
@@ -62,8 +63,7 @@ export function checkNeedUpdateBootForClassicAndMini({
 }
 
 const INIT_DATA_CHUNK_SIZE = 16 * 1024;
-export function checkBootloaderLength(data: ArrayBuffer) {
-  const chunk = new Uint8Array(data.slice(0, Math.min(INIT_DATA_CHUNK_SIZE, data.byteLength)));
+const readBootloaderLength = (chunk: Uint8Array) => {
   const buffer = ByteBuffer.wrap(chunk, undefined, undefined, true);
   buffer.LE();
   // byte 'O', 'K', 'T', 'B'
@@ -77,6 +77,21 @@ export function checkBootloaderLength(data: ArrayBuffer) {
   buffer.readUint32();
   // codelen
   const codelen = buffer.readUint32();
-  const bootloaderLength = hdrlen + codelen;
-  return bootloaderLength === data.byteLength;
+  return hdrlen + codelen;
+};
+
+export function checkBootloaderLength(data: ArrayBuffer) {
+  if (data.byteLength < 16) {
+    return false;
+  }
+  const chunk = new Uint8Array(data.slice(0, Math.min(INIT_DATA_CHUNK_SIZE, data.byteLength)));
+  return readBootloaderLength(chunk) === data.byteLength;
 }
+
+export const checkBootloaderSourceLength = async (source: FirmwareByteSource) => {
+  if (source.size < 16) {
+    return false;
+  }
+  const chunk = new Uint8Array(await source.readAt(0, Math.min(INIT_DATA_CHUNK_SIZE, source.size)));
+  return readBootloaderLength(chunk) === source.size;
+};

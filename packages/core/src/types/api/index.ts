@@ -32,7 +32,15 @@ import type {
   firmwareUpdateV2,
   firmwareUpdateV3,
   firmwareUpdateV4,
+  getFirmwareUpdateHostBindingGeneration,
+  registerFirmwareUpdateHostBinding,
+  unregisterFirmwareUpdateHostBinding,
 } from './firmwareUpdate';
+import type { getFirmwareUpdateCapabilities } from './firmwareUpdateCapabilities';
+import type {
+  prepareFirmwareUpdatePlan,
+  validateFirmwareUpdatePreparedPlan,
+} from './firmwareUpdatePreparedPlan';
 import type { promptWebDeviceAccess } from './promptWebDeviceAccess';
 import type { deviceReset } from './deviceReset';
 import type { deviceRecovery } from './deviceRecovery';
@@ -239,6 +247,12 @@ export type CoreApi = {
   firmwareUpdateV2: typeof firmwareUpdateV2;
   firmwareUpdateV3: typeof firmwareUpdateV3;
   firmwareUpdateV4: typeof firmwareUpdateV4;
+  registerFirmwareUpdateHostBinding: typeof registerFirmwareUpdateHostBinding;
+  unregisterFirmwareUpdateHostBinding: typeof unregisterFirmwareUpdateHostBinding;
+  getFirmwareUpdateHostBindingGeneration: typeof getFirmwareUpdateHostBindingGeneration;
+  getFirmwareUpdateCapabilities: typeof getFirmwareUpdateCapabilities;
+  prepareFirmwareUpdatePlan: typeof prepareFirmwareUpdatePlan;
+  validateFirmwareUpdatePreparedPlan: typeof validateFirmwareUpdatePreparedPlan;
   cipherKeyValue: typeof cipherKeyValue;
 
   /**

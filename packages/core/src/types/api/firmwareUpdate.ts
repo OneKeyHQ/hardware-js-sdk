@@ -1,12 +1,50 @@
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { PROTO } from '../../constants';
 import type { Params, Response } from '../params';
+import type { FirmwareUpdatePreparedPlan } from './firmwareUpdatePreparedPlan';
 
 type IUpdateType = 'firmware' | 'ble';
+
+export interface FirmwareArtifactReference {
+  artifactRef: string;
+  size: number;
+  sha256: string;
+}
+
+export interface FirmwareArtifactReader {
+  open(input: { artifactRef: string }): Promise<{
+    readerId: string;
+    size: number;
+  }>;
+  read(input: { readerId: string; offset: number; length: number }): Promise<{
+    data: ArrayBuffer;
+    bytesRead: number;
+    eof: boolean;
+  }>;
+  close(input: { readerId: string }): Promise<void>;
+}
+
+export interface FirmwareUpdateHostBinding {
+  artifactReader: FirmwareArtifactReader;
+}
 
 export interface FirmwareUpdateBinaryParams {
   binary: ArrayBuffer;
   updateType: IUpdateType;
+}
+
+export interface FirmwareUpdateArtifactParams {
+  preparedPlan: FirmwareUpdatePreparedPlan;
+  hostBindingGeneration: number;
+  artifact: FirmwareArtifactReference;
+  resourceEntries?: Array<{
+    entryName: string;
+    artifact: FirmwareArtifactReference;
+  }>;
+  updateType: IUpdateType;
+  forcedUpdateRes?: boolean;
+  isUpdateBootloader?: boolean;
+  firmwareType?: EFirmwareType;
 }
 
 export interface FirmwareUpdateParams {
@@ -37,8 +75,14 @@ export declare function firmwareUpdateV2(
   connectId: string | undefined,
   params: Params<FirmwareUpdateBinaryParams & Platform>
 ): Response<PROTO.Success>;
+export declare function firmwareUpdateV2(
+  connectId: string | undefined,
+  params: Params<FirmwareUpdateArtifactParams & Platform>
+): Response<PROTO.Success>;
 
 export interface FirmwareUpdateV3Params {
+  preparedPlan?: FirmwareUpdatePreparedPlan;
+  hostBindingGeneration?: number;
   bleVersion?: number[];
   bleBinary?: ArrayBuffer;
   chunkSize?: number;
@@ -55,6 +99,17 @@ export interface FirmwareUpdateV3Params {
   firmwareType?: EFirmwareType;
 
   platform: IPlatform;
+
+  artifactReader?: FirmwareArtifactReader;
+  artifacts?: {
+    ble?: FirmwareArtifactReference;
+    firmware?: FirmwareArtifactReference;
+    bootloader?: FirmwareArtifactReference;
+    resourceEntries?: Array<{
+      entryName: string;
+      artifact: FirmwareArtifactReference;
+    }>;
+  };
 }
 
 /**
@@ -74,10 +129,14 @@ export type FirmwareUpdateV4Target =
   | 'se04';
 
 export interface FirmwareUpdateV4Params {
+  preparedPlan?: FirmwareUpdatePreparedPlan;
+  hostBindingGeneration?: number;
   platform: IPlatform;
+  expectedDeviceId?: string;
   chunkSize?: number;
   firmwareType?: EFirmwareType;
   targetsToUpdate?: FirmwareUpdateV4Target[];
+  expectedTargetVersions?: Partial<Record<FirmwareUpdateV4Target, string>>;
 
   /** FW_MGMT_TARGET_ROMLOADER = 2; Pro2 cannot install it through firmwareUpdateV4. */
   romloaderBinary?: ArrayBuffer;
@@ -106,7 +165,23 @@ export interface FirmwareUpdateV4Params {
     size?: number;
     fileHash?: string;
   }>;
+  artifactReader?: FirmwareArtifactReader;
+  componentArtifacts?: Partial<
+    Record<Exclude<FirmwareUpdateV4Target, 'resource'>, FirmwareArtifactReference>
+  >;
+  resourceBundleArtifacts?: Array<{
+    name: string;
+    artifact: FirmwareArtifactReference;
+  }>;
 }
+
+export declare function registerFirmwareUpdateHostBinding(
+  binding: FirmwareUpdateHostBinding
+): number;
+
+export declare function unregisterFirmwareUpdateHostBinding(generation?: number): boolean;
+
+export declare function getFirmwareUpdateHostBindingGeneration(): number;
 
 export declare function firmwareUpdateV3(
   connectId: string | undefined,

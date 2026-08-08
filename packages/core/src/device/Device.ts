@@ -99,6 +99,11 @@ export type InitOptions = {
   protocolV2DeviceInfoTimeoutMs?: number;
   /** Refresh Protocol V2 runtime state before returning discovery results. */
   refreshRuntimeState?: boolean;
+  /**
+   * Protocol V1 Initialize response timeout override. Reboot-wait polling passes a
+   * short value so an unanswered probe settles before the next poll tick.
+   */
+  timeoutMs?: number;
 };
 
 export type RunOptions = {
@@ -909,7 +914,7 @@ export class Device extends EventEmitter {
         const initStartAt = Date.now();
         const { message } = await this.commands.typedCall('Initialize', 'Features', payload, {
           // iOS BLE bound devices can need close to 20 seconds.
-          timeoutMs: 25 * 1000,
+          timeoutMs: options?.timeoutMs ?? 25 * 1000,
         });
         this.setLastInitializeDuration(Date.now() - initStartAt);
         this._updateFeatures(message, initSession);
