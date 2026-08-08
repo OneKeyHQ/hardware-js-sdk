@@ -13,6 +13,7 @@ import {
   buildFirmwareUpdatePlan,
   buildProtocolV2FirmwareUpdatePlan,
   validateFirmwareUpdatePlanForceTargets,
+  validateProtocolV2FirmwareUpdateTargets,
 } from './firmware/FirmwareUpdatePlan';
 import {
   PROTOCOL_V2_BLE_TARGETS,
@@ -27,6 +28,7 @@ import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
 import {
   LoggerNames,
   getDeviceFirmwareVersion,
+  getDeviceSerialNo,
   getDeviceType,
   getFirmwareType,
   getLogger,
@@ -390,8 +392,12 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       firmwareType: firmwareTypeParam,
       platform,
       forceUpdateTargets,
+      protocolV2ForceUpdateTargets,
     } = this.payload as CheckAllFirmwareReleaseParams;
     const validatedForceUpdateTargets = validateFirmwareUpdatePlanForceTargets(forceUpdateTargets);
+    const validatedProtocolV2ForceUpdateTargets = validateProtocolV2FirmwareUpdateTargets(
+      protocolV2ForceUpdateTargets
+    );
     const { state, features, firmwareType, release } = await loadProtocolV2FirmwareReleaseContext({
       device: this.device,
       firmwareType: firmwareTypeParam,
@@ -411,31 +417,60 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     const resourceSource = DataManager.getProtocolV2ResourceSource(resourceDeviceType);
     const resourceStatus = 'unknown' as const;
     const resourcePreparationRequired = !!resourceSource;
-    const componentTargetsToUpdate = validatedForceUpdateTargets.includes('firmware')
+    const detectedComponentTargets = validatedForceUpdateTargets.includes('firmware')
       ? plan.components.flatMap(component =>
           component.updateTarget ? [component.updateTarget] : []
         )
       : plan.targetsToUpdate;
+    const componentTargetsToUpdate = Array.from(
+      new Set([
+        ...detectedComponentTargets,
+        ...validatedProtocolV2ForceUpdateTargets.filter(target => target !== 'resource'),
+      ])
+    );
+    const forceResourceUpdate =
+      validatedForceUpdateTargets.includes('resource') ||
+      validatedProtocolV2ForceUpdateTargets.includes('resource');
     const targetsToUpdate = Array.from(
       new Set([
         ...componentTargetsToUpdate,
-        ...(resourcePreparationRequired ? (['resource'] as const) : []),
+        ...(resourcePreparationRequired || forceResourceUpdate ? (['resource'] as const) : []),
       ])
     );
     let firmwareUpdatePlan: FirmwareUpdatePlan | undefined;
     try {
-      firmwareUpdatePlan = buildProtocolV2FirmwareUpdatePlan({
-        features,
-        firmwareType,
-        platform: platform ?? 'web',
-        release,
-        targetsToUpdate,
-        forceUpdateTargets: validatedForceUpdateTargets,
-        resourceArchiveAvailable: resourcePreparationRequired,
-      });
+      const shouldBuildFirmwareUpdatePlan =
+        componentTargetsToUpdate.length > 0 ||
+        validatedForceUpdateTargets.some(target => target !== 'resource') ||
+        validatedProtocolV2ForceUpdateTargets.some(target => target !== 'resource') ||
+        (forceResourceUpdate && !resourcePreparationRequired);
+      const requestedPlatform = platform ?? 'web';
+      const requiresDeviceIdentity =
+        requestedPlatform === 'native' || requestedPlatform === 'desktop';
+      const canBindPreparedPlan = !requiresDeviceIdentity || !!getDeviceSerialNo(features);
+      if (shouldBuildFirmwareUpdatePlan) {
+        const validatedPlan = buildProtocolV2FirmwareUpdatePlan({
+          features,
+          firmwareType,
+          platform: canBindPreparedPlan ? requestedPlatform : 'web',
+          release,
+          targetsToUpdate,
+          forceUpdateTargets: validatedForceUpdateTargets,
+          resourceArchiveAvailable: resourcePreparationRequired,
+        });
+        firmwareUpdatePlan = canBindPreparedPlan ? validatedPlan : undefined;
+        if (!canBindPreparedPlan) {
+          Log.warn(
+            '[CheckAllFirmwareRelease] Protocol V2 device identity is unavailable; using the release result without a prepared Plan'
+          );
+        }
+      } else {
+        firmwareUpdatePlan = undefined;
+      }
     } catch (error) {
       if (
         validatedForceUpdateTargets.length > 0 ||
+        validatedProtocolV2ForceUpdateTargets.length > 0 ||
         !(error instanceof HardwareError) ||
         error.params?.firmwareUpdateCode !== 'FirmwarePlanInvalid'
       ) {

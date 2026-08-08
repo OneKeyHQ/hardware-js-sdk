@@ -63,6 +63,11 @@ const PROTOCOL_V2_TARGETS: Readonly<
   SE04: 'se04',
 };
 
+const PROTOCOL_V2_FIRMWARE_UPDATE_TARGETS = new Set<FirmwareUpdateV4Target>([
+  ...Object.values(PROTOCOL_V2_TARGETS),
+  'resource',
+]);
+
 const asRecord = (value: unknown): Record<string, unknown> | undefined =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -190,6 +195,23 @@ export const validateFirmwareUpdatePlanForceTargets = (
     return planError('Firmware update force targets are invalid');
   }
   return [...value] as FirmwareUpdatePlanForceTarget[];
+};
+
+export const validateProtocolV2FirmwareUpdateTargets = (
+  value: unknown
+): FirmwareUpdateV4Target[] => {
+  if (value === undefined) {
+    return [];
+  }
+  if (
+    !Array.isArray(value) ||
+    value.length > PROTOCOL_V2_FIRMWARE_UPDATE_TARGETS.size ||
+    value.some(target => !PROTOCOL_V2_FIRMWARE_UPDATE_TARGETS.has(target)) ||
+    new Set(value).size !== value.length
+  ) {
+    return planError('Protocol V2 firmware update targets are invalid');
+  }
+  return [...value] as FirmwareUpdateV4Target[];
 };
 
 const assertExactKeys = (
@@ -675,6 +697,12 @@ export const buildProtocolV2FirmwareUpdatePlan = ({
   const requestedComponentTargets = new Set<FirmwareUpdatePlanTarget>(
     targetsToUpdate.filter(target => target !== 'resource')
   );
+  if (
+    getDeviceType(features) === EDeviceType.Neo &&
+    (requestedComponentTargets.has('se03') || requestedComponentTargets.has('se04'))
+  ) {
+    planError('Neo does not support Protocol V2 targets se03 or se04');
+  }
   const protocolV2 = buildProtocolV2Artifacts(release ?? {}, {
     includeComponents: requestedComponentTargets.size > 0,
     includeResources: false,

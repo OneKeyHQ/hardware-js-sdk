@@ -89,6 +89,7 @@ export type CheckAllFirmwareReleaseParams = {
   firmwareType?: EFirmwareType;
   platform?: 'native' | 'desktop' | 'ext' | 'web' | 'web-embed';
   forceUpdateTargets?: FirmwareUpdatePlanForceTarget[];
+  protocolV2ForceUpdateTargets?: FirmwareUpdateV4Target[];
 };
 
 export declare function checkAllFirmwareRelease(
