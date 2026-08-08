@@ -6,6 +6,7 @@ import type {
   IFirmwareReleaseInfo,
   IProtocolV2FirmwareComponent,
   IProtocolV2FirmwareComponentTarget,
+  IProtocolV2ResourceSource,
 } from '../settings';
 import type { FirmwareUpdateV4Target } from './firmwareUpdate';
 import type { FirmwareUpdatePlan, FirmwareUpdatePlanForceTarget } from './firmwareUpdatePlan';
@@ -73,7 +74,7 @@ export type AllFirmwareRelease = {
   hasUpgrade?: boolean;
   required?: boolean;
   resourceStatus?: 'valid' | 'outdated' | 'unknown';
-  resourceManifestUrl?: string;
+  resourceArchive?: IProtocolV2ResourceSource;
   resourcePreparationRequired?: boolean;
   currentVersions?: DeviceStateVersions;
   components?: ProtocolV2FirmwareComponentRelease[];

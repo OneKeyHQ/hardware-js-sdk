@@ -22,7 +22,9 @@ const bytesToHex = (bytes: Uint8Array) =>
   Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 
 const resourceSource = {
-  manifestUrl: 'https://example.com/resource/manifest.json',
+  archiveUrl: 'https://example.com/resource/pro2-resource.zip',
+  archiveSha256: 'a'.repeat(64),
+  archiveSize: 16_815_479,
 };
 
 const manifestFiles = [
@@ -122,8 +124,23 @@ describe('Pro2 resource configuration', () => {
   test('rejects missing source and malformed manifest paths', () => {
     expect(() => parseProtocolV2Resources({})).toThrow('source is required');
     expect(() =>
-      parseProtocolV2Resources({ source: { manifestUrl: 'http://example.com/manifest.json' } })
+      parseProtocolV2Resources({
+        source: {
+          ...resourceSource,
+          archiveUrl: 'http://example.com/pro2-resource.zip',
+        },
+      })
     ).toThrow('must use HTTPS');
+    expect(() =>
+      parseProtocolV2Resources({
+        source: { ...resourceSource, archiveSha256: 'invalid' },
+      })
+    ).toThrow('SHA-256');
+    expect(() =>
+      parseProtocolV2Resources({
+        source: { ...resourceSource, archiveSize: 0 },
+      })
+    ).toThrow('positive integer');
     expect(() =>
       parseProtocolV2ResourceManifest({
         ...resourceManifest,
@@ -170,7 +187,7 @@ describe('Pro2 resource configuration', () => {
     );
   });
 
-  test('applies a validated pre-release config and exposes its manifest source', async () => {
+  test('applies a validated pre-release config and exposes its archive source', async () => {
     const configFetcher = jest.fn().mockResolvedValue(createRemoteConfig());
 
     await expect(DataManager.load(createSettings(configFetcher))).resolves.toBe(true);

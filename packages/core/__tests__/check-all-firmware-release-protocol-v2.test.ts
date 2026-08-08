@@ -73,7 +73,9 @@ const release: IFirmwareReleaseInfo = {
 };
 
 const resourceSource = {
-  manifestUrl: 'https://example.com/pro2-resource/manifest.json',
+  archiveUrl: 'https://example.com/pro2-resource/pro2-resource.zip',
+  archiveSha256: 'a'.repeat(64),
+  archiveSize: 16_815_479,
 };
 
 describe('checkAllFirmwareRelease Protocol V2 support', () => {
@@ -328,7 +330,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       deviceType: 'pro2',
       status: 'required',
       resourceStatus: 'unknown',
-      resourceManifestUrl: resourceSource.manifestUrl,
+      resourceArchive: resourceSource,
       resourcePreparationRequired: true,
       targetsToUpdate: ['boot', 'app_v1', 'resource'],
       firmware: {
@@ -418,7 +420,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       await expect(method.run()).resolves.toMatchObject({
         protocol: 'V2',
         resourceStatus: 'unknown',
-        resourceManifestUrl: resourceSource.manifestUrl,
+        resourceArchive: resourceSource,
         resourcePreparationRequired: true,
         targetsToUpdate: ['boot', 'app_v1', 'resource'],
       });

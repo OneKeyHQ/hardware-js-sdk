@@ -37,12 +37,26 @@ export function parseProtocolV2Resources(value: unknown): IProtocolV2Resources |
   if (!source || typeof source !== 'object') {
     throw new Error('Invalid Pro2 resources config: source is required');
   }
-  const { manifestUrl } = source as { manifestUrl?: unknown };
-  if (typeof manifestUrl !== 'string' || !manifestUrl.startsWith('https://')) {
-    throw new Error('Invalid Pro2 resources config: source.manifestUrl must use HTTPS');
+  const { archiveUrl, archiveSha256, archiveSize } = source as {
+    archiveUrl?: unknown;
+    archiveSha256?: unknown;
+    archiveSize?: unknown;
+  };
+  if (typeof archiveUrl !== 'string' || !archiveUrl.startsWith('https://')) {
+    throw new Error('Invalid Pro2 resources config: source.archiveUrl must use HTTPS');
+  }
+  if (typeof archiveSha256 !== 'string' || !/^[0-9a-fA-F]{64}$/.test(archiveSha256)) {
+    throw new Error('Invalid Pro2 resources config: source.archiveSha256 must be a SHA-256 digest');
+  }
+  if (!Number.isSafeInteger(archiveSize) || (archiveSize as number) <= 0) {
+    throw new Error('Invalid Pro2 resources config: source.archiveSize must be a positive integer');
   }
   return {
-    source: { manifestUrl },
+    source: {
+      archiveUrl,
+      archiveSha256: archiveSha256.toLowerCase(),
+      archiveSize: archiveSize as number,
+    },
   };
 }
 
@@ -195,20 +209,6 @@ export function selectProtocolV2ResourceManifestFiles({
   targetsToUpdate: readonly FirmwareUpdateV4Target[];
 }): IProtocolV2ResourceManifestFile[] {
   return targetsToUpdate.includes('resource') ? [...manifest.files] : [];
-}
-
-export function resolveProtocolV2ResourceManifestFileUrl({
-  manifestUrl,
-  archivePath,
-}: {
-  manifestUrl: string;
-  archivePath: string;
-}): string {
-  const url = new URL(assertManifestRelativePath(archivePath, 'archive_path'), manifestUrl);
-  if (url.protocol !== 'https:') {
-    throw new Error('Invalid Pro2 resource manifest file URL');
-  }
-  return url.toString();
 }
 
 export function prepareProtocolV2ResourceFiles({

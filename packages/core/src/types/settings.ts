@@ -65,7 +65,9 @@ export type IProtocolV2FirmwareComponent = {
 };
 
 export type IProtocolV2ResourceSource = {
-  manifestUrl: string;
+  archiveUrl: string;
+  archiveSha256: string;
+  archiveSize: number;
 };
 
 export type IProtocolV2Resources = {

@@ -24,7 +24,6 @@ export { getMethodSupportedProtocols } from './api/utils';
 export {
   parseProtocolV2ResourceManifest,
   prepareProtocolV2ResourceFiles,
-  resolveProtocolV2ResourceManifestFileUrl,
   selectProtocolV2ResourceManifestFiles,
 } from './protocols/protocol-v2/resources';
 export {

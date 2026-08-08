@@ -440,7 +440,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       ...plan,
       status,
       resourceStatus,
-      resourceManifestUrl: resourceSource?.manifestUrl,
+      resourceArchive: resourceSource,
       resourcePreparationRequired,
       hasUpgrade: plan.hasUpgrade || resourcePreparationRequired,
       targetsToUpdate,

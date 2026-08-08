@@ -72,7 +72,9 @@ describe.each(['pro2', 'neo'] as const)('Protocol V2 release checks for %s', dev
   test('supports firmware, BLE, bootloader, and aggregate release checks', async () => {
     jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(release);
     jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue({
-      manifestUrl: `https://example.com/${deviceType}/resource-manifest.json`,
+      archiveUrl: `https://example.com/${deviceType}/pro2-resource.zip`,
+      archiveSha256: 'a'.repeat(64),
+      archiveSize: 16_815_479,
     });
 
     const firmwareMethod = new CheckFirmwareRelease({
