@@ -532,6 +532,34 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     [features, intl, sdk, selectDevice]
   );
 
+  const checkProtocolV2FirmwareUpdates = useCallback(
+    async (platform: 'web' | 'native') => {
+      if (!sdk)
+        return { payload: intl.formatMessage({ id: 'tip__sdk_not_ready' }), success: false };
+      if (!features) return { payload: 'features is not ready', success: false };
+      if (!selectDevice)
+        return {
+          payload: intl.formatMessage({ id: 'tip__need_connect_device_first' }),
+          success: false,
+        };
+
+      try {
+        const res = await sdk.checkAllFirmwareRelease(selectDevice.connectId, { platform });
+        return {
+          success: res.success,
+          payload: res.success ? undefined : res.payload.error,
+          targetsToUpdate: res.success ? res.payload.targetsToUpdate ?? [] : undefined,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          payload: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+    [features, intl, sdk, selectDevice]
+  );
+
   const updateFirmware = useCallback(
     async ({
       type,
@@ -790,6 +818,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
                 <ProtocolV2FirmwareUpdate
                   deviceType={selectedDeviceType}
                   onUpdate={firmwareUpdateV4}
+                  onCheckUpdates={checkProtocolV2FirmwareUpdates}
                 />
               ) : (
                 <XStack flexWrap="wrap" gap="$2">

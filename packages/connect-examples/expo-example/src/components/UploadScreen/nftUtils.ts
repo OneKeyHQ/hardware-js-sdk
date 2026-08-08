@@ -1,9 +1,12 @@
-import { Image as ImageView } from 'react-native';
+import { Buffer } from 'buffer';
+import { Image as ImageView, Platform } from 'react-native';
 import { SaveFormat, manipulateAsync } from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system';
 import { bytesToHex } from '@noble/hashes/utils';
 import { ResourceType } from '@onekeyfe/hd-transport';
 import { canvasRGBA as blurCanvasRGBA } from 'stackblur-canvas';
 import axios from 'axios';
+import { decode as decodeJpeg } from 'jpeg-js';
 
 import type { DeviceUploadResourceParams } from '@onekeyfe/hd-core';
 import type { Action } from 'expo-image-manipulator';
@@ -42,10 +45,104 @@ function htmlImageToCanvas({
   return { canvas, ctx };
 }
 
+export function calculateCoverResize(
+  sourceWidth: number,
+  sourceHeight: number,
+  targetWidth: number,
+  targetHeight: number
+) {
+  const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight);
+  const width = Math.max(targetWidth, Math.ceil(sourceWidth * scale));
+  const height = Math.max(targetHeight, Math.ceil(sourceHeight * scale));
+  return {
+    width,
+    height,
+    originX: Math.max(0, Math.floor((width - targetWidth) / 2)),
+    originY: Math.max(0, Math.floor((height - targetHeight) / 2)),
+  };
+}
+
+function readImageSize(imageUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    ImageView.getSize(
+      imageUrl,
+      (width: number, height: number) => resolve({ width, height }),
+      (error: unknown) => reject(error)
+    );
+  });
+}
+
+async function materializeNativeImageSource(source: string) {
+  if (!source.startsWith('data:') && !/^https?:\/\//i.test(source)) {
+    return { uri: source };
+  }
+
+  const { cacheDirectory } = FileSystem;
+  if (!cacheDirectory) throw new Error('Image cache directory is unavailable');
+  const cacheUri = `${cacheDirectory}onekey-v2-image-${Date.now()}-${Math.random()
+    .toString(16)
+    .slice(2)}.img`;
+
+  if (/^https?:\/\//i.test(source)) {
+    const result = await FileSystem.downloadAsync(source, cacheUri);
+    return { uri: result.uri, cleanupUri: result.uri };
+  }
+
+  const base64 = source.replace(/^data:image\/[^;,]+;base64,/, '');
+  await FileSystem.writeAsStringAsync(cacheUri, base64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  return { uri: cacheUri, cleanupUri: cacheUri };
+}
+
+async function nativeImageSourceToRgba(source: string, width: number, height: number) {
+  const materialized = await materializeNativeImageSource(source);
+  let transformedUri: string | undefined;
+  try {
+    const sourceSize = await readImageSize(materialized.uri);
+    const cover = calculateCoverResize(sourceSize.width, sourceSize.height, width, height);
+    const result = await manipulateAsync(
+      materialized.uri,
+      [
+        { resize: { width: cover.width, height: cover.height } },
+        {
+          crop: {
+            originX: cover.originX,
+            originY: cover.originY,
+            width,
+            height,
+          },
+        },
+      ],
+      { compress: 1, format: SaveFormat.JPEG, base64: true }
+    );
+    transformedUri = result.uri;
+    if (!result.base64) throw new Error('Image conversion did not return JPEG data');
+
+    const decoded = decodeJpeg(Buffer.from(result.base64, 'base64'), {
+      useTArray: true,
+      formatAsRGBA: true,
+    });
+    if (decoded.width !== width || decoded.height !== height) {
+      throw new Error(
+        `Image conversion returned ${decoded.width}x${decoded.height}; expected ${width}x${height}`
+      );
+    }
+    return new Uint8Array(decoded.data);
+  } finally {
+    const cleanupUris = [materialized.cleanupUri, transformedUri].filter((uri): uri is string =>
+      Boolean(uri && uri !== source)
+    );
+    await Promise.all(
+      cleanupUris.map(uri => FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {}))
+    );
+  }
+}
+
 /** Convert an image source to exact-size RGBA pixels for Protocol V2 image APIs. */
 export async function imageSourceToRgba(source: string, width: number, height: number) {
-  if (typeof document === 'undefined') {
-    throw new Error('Protocol V2 image conversion is currently available in the web example');
+  if (Platform.OS !== 'web') {
+    return nativeImageSourceToRgba(source, width, height);
   }
 
   const image = await buildHtmlImage(source);
@@ -140,18 +237,7 @@ export function formatBytes(bytes: number, decimals = 2) {
   return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`;
 }
 
-export const getImageSize: (
-  imageUrl: string
-) => Promise<{ width: number; height: number }> = imageUrl =>
-  new Promise((resolve, reject) => {
-    ImageView.getSize(
-      imageUrl,
-      (width: number, height: number) => {
-        resolve({ width, height });
-      },
-      (error: any) => reject(error)
-    );
-  });
+export const getImageSize = readImageSize;
 
 /**
  *	use axios to convert image url to base64

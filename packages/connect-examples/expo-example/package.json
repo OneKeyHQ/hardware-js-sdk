@@ -58,6 +58,7 @@
     "expo-splash-screen": "~0.26.5",
     "expo-status-bar": "~1.11.1",
     "jotai": "^2.5.2",
+    "jpeg-js": "^0.4.4",
     "levelup": "^5.1.1",
     "lodash": "^4.17.21",
     "memoizee": "^0.4.15",

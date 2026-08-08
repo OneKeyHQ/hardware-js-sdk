@@ -188,6 +188,13 @@ function UploadScreenComponent() {
   const [isLoading, setIsLoading] = useState(false);
   const [uploadResParams, setUploadResParams] = useState<DeviceUploadResourceParams | undefined>();
   const [protocolV2NftParams, setProtocolV2NftParams] = useState<ProtocolV2NftParams | undefined>();
+  const [preparedNftProtocol, setPreparedNftProtocol] = useState<'V1' | 'V2'>();
+
+  useEffect(() => {
+    setUploadResParams(undefined);
+    setProtocolV2NftParams(undefined);
+    setPreparedNftProtocol(undefined);
+  }, [selectedDevice?.connectId]);
 
   const loadNftData = async () => {
     if (!nftUrl) {
@@ -201,6 +208,9 @@ function UploadScreenComponent() {
     }
 
     setIsLoading(true);
+    setUploadResParams(undefined);
+    setProtocolV2NftParams(undefined);
+    setPreparedNftProtocol(undefined);
     try {
       console.log('Loading NFT data...');
       const res = await getProtocolAwareFeatures(
@@ -259,6 +269,7 @@ function UploadScreenComponent() {
             subtitle: uploadScreenParams.nftMetaData || '',
           });
           setUploadResParams(undefined);
+          setPreparedNftProtocol('V2');
           setImage({ uri: base64 } as ImagePicker.ImageInfo);
           setPreviewData(base64);
           alert('Protocol V2 NFT data loaded successfully');
@@ -281,6 +292,7 @@ function UploadScreenComponent() {
 
         setUploadResParams(params);
         setProtocolV2NftParams(undefined);
+        setPreparedNftProtocol('V1');
         alert('NFT data loaded successfully');
       } catch (e) {
         console.log('image operate error: ', e);
@@ -398,9 +410,12 @@ function UploadScreenComponent() {
           return;
         }
 
-        if (selectedDevice?.connectProtocol === 'V2') {
+        if (preparedNftProtocol === 'V2') {
           if (!protocolV2NftParams) {
             throw new Error('Please reload NFT data for the selected Protocol V2 device');
+          }
+          if (!selectedDevice?.connectId) {
+            throw new Error('Please connect the selected Protocol V2 device again');
           }
           const response = await SDK?.deviceUploadNft(
             selectedDevice.connectId,
@@ -414,7 +429,7 @@ function UploadScreenComponent() {
           return;
         }
 
-        if (!uploadResParams) {
+        if (preparedNftProtocol !== 'V1' || !uploadResParams) {
           throw new Error('Please reload NFT data for the selected Protocol V1 device');
         }
 

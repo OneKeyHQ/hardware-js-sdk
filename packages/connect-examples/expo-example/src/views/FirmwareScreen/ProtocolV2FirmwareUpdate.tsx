@@ -17,7 +17,7 @@ import {
   isDirectoryPickerCancelled,
 } from './protocolV2DirectoryPicker';
 
-import type { FirmwareUpdateV4Params } from '@onekeyfe/hd-core';
+import type { FirmwareUpdateV4Params, FirmwareUpdateV4Target } from '@onekeyfe/hd-core';
 import type { DocumentPickerAsset } from 'expo-document-picker';
 import type { ProtocolV2BinaryField } from './protocolV2FirmwareFiles';
 import type { InputHTMLAttributes } from 'react';
@@ -27,9 +27,20 @@ type UpdateState = {
   payload?: string;
 };
 
+type RuntimeFirmwarePlatform = Extract<
+  NonNullable<FirmwareUpdateV4Params['platform']>,
+  'web' | 'native'
+>;
+
 type ProtocolV2FirmwareUpdateProps = {
   deviceType: string;
   onUpdate: (params: FirmwareUpdateV4Params) => Promise<UpdateState | undefined>;
+  onCheckUpdates: (platform: RuntimeFirmwarePlatform) => Promise<
+    | (UpdateState & {
+        targetsToUpdate?: FirmwareUpdateV4Target[];
+      })
+    | undefined
+  >;
 };
 
 async function readDocumentAsset(asset: DocumentPickerAsset) {
@@ -49,7 +60,11 @@ const formatFileSize = (size?: number) => {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 };
 
-export function ProtocolV2FirmwareUpdate({ deviceType, onUpdate }: ProtocolV2FirmwareUpdateProps) {
+export function ProtocolV2FirmwareUpdate({
+  deviceType,
+  onUpdate,
+  onCheckUpdates,
+}: ProtocolV2FirmwareUpdateProps) {
   const intl = useIntl();
   const resourceDirectoryInputRef = useRef<HTMLInputElement>(null);
   const [targetFiles, setTargetFiles] = useState<
@@ -149,11 +164,33 @@ export function ProtocolV2FirmwareUpdate({ deviceType, onUpdate }: ProtocolV2Fir
     setIsUpdating(true);
     setUpdateState(undefined);
     try {
+      const platform = Platform.OS === 'web' ? 'web' : 'native';
       const params: FirmwareUpdateV4Params = {
-        platform: Platform.OS === 'web' ? 'web' : 'native',
+        platform,
       };
 
-      if (!useRemoteConfig) {
+      if (useRemoteConfig) {
+        const checkResult = await onCheckUpdates(platform);
+        if (!checkResult?.success) {
+          setUpdateState(
+            checkResult ?? {
+              success: false,
+              payload: intl.formatMessage({ id: 'tip__protocol_v2_remote_config_unavailable' }),
+            }
+          );
+          return;
+        }
+
+        const targetsToUpdate = checkResult.targetsToUpdate ?? [];
+        if (targetsToUpdate.length === 0) {
+          setUpdateState({
+            success: true,
+            payload: intl.formatMessage({ id: 'tip__protocol_v2_already_current' }),
+          });
+          return;
+        }
+        params.targetsToUpdate = targetsToUpdate;
+      } else {
         for (const target of firmwareTargets) {
           const asset = targetFiles[target.param];
           if (asset) params[target.param] = await readDocumentAsset(asset);

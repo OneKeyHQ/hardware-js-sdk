@@ -191,6 +191,7 @@
   "tip__protocol_v2_resource_folder_selected": "{folder}：已识别 {count} 个资源包，请检查下方缺失项",
   "tip__protocol_v2_resource_folder_incomplete": "资源文件夹不完整。缺失：{missing}；重复：{duplicates}；无法识别：{unknown}",
   "tip__protocol_v2_remote_config_unavailable": "无法获取最新远端配置。设备尚未进入升级或写入阶段；请检查网络后重试，或使用下方本地签名文件。",
+  "tip__protocol_v2_already_current": "所有固件组件均已是最新版本。",
   "tip__updating": "更新中",
 
   "label__wallet_count": "测试钱包数量",

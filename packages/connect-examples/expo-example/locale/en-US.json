@@ -191,6 +191,7 @@
   "tip__protocol_v2_resource_folder_selected": "{folder}: {count} resource packages found; review the missing items below",
   "tip__protocol_v2_resource_folder_incomplete": "The resource folder is incomplete. Missing: {missing}; duplicates: {duplicates}; unrecognized: {unknown}",
   "tip__protocol_v2_remote_config_unavailable": "Unable to fetch the latest remote configuration. No update or write has started; check the network and retry, or use the local signed files below.",
+  "tip__protocol_v2_already_current": "All firmware components are already up to date.",
 
   "label__wallet_count": "Wallet Count",
   "label__wallet_change_count": "Wallet Change Count",
