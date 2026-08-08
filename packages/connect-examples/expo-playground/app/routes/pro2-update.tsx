@@ -16,8 +16,12 @@ import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
 import { isPro2DeviceInfo } from '../utils/pro2Device';
 import { matchPro2ResourcePackageDirectory } from '../utils/pro2ResourcePackageDirectory';
+import { prepareRemoteProtocolV2ResourceFiles } from '../utils/protocolV2ResourceArchive';
+import { SDKUtils } from '../utils/hardwareInstance';
 import type { DeviceInfo } from '../types/hardware';
 import { PRO2_FIRMWARE_FILE_ACCEPT } from '../constants/firmwareFiles';
+
+import type { AllFirmwareRelease, FirmwareUpdateV4Target } from '@onekeyfe/hd-core';
 
 const TARGET_FIELDS = [
   {
@@ -412,9 +416,44 @@ export default function Pro2UpdatePage() {
       }
 
       if (selectedPayloadCount === 0) {
+        addLog('info', `Checking ${device.deviceType} firmware and resource releases`);
+        const checkResponse = await callHardwareAPI('checkAllFirmwareRelease', {
+          connectId: device.connectId,
+          platform: 'web',
+        });
+        if (!checkResponse.success) {
+          throw new Error(
+            getApiError(checkResponse.payload, 'checkAllFirmwareRelease failed')
+          );
+        }
+        const release = checkResponse.payload as AllFirmwareRelease;
+        const targetsToUpdate = (release.targetsToUpdate ?? []) as FirmwareUpdateV4Target[];
+        if (targetsToUpdate.length === 0) {
+          addLog('ok', 'Firmware and resources are already current');
+          toast({
+            title: 'Already current',
+            description: 'No Protocol V2 firmware or resource update is required.',
+          });
+          return;
+        }
+        params.targetsToUpdate = targetsToUpdate;
+
+        const hardwareSDK = await SDKUtils.getInstance();
+        const remoteResourceFiles = await prepareRemoteProtocolV2ResourceFiles({
+          hardwareSDK,
+          archive: release.resourceArchive,
+          targetsToUpdate,
+        });
+        if (remoteResourceFiles?.length) {
+          params.resourceFiles = remoteResourceFiles;
+          addLog(
+            'info',
+            `Prepared remote resource archive: ${remoteResourceFiles.length} verified packages`
+          );
+        }
         addLog(
           'info',
-          `firmwareUpdateV4 remote config: ${device.deviceType} firmware-v1 components`
+          `firmwareUpdateV4 remote targets: ${targetsToUpdate.join(', ')}`
         );
       } else {
         const targetNames = [

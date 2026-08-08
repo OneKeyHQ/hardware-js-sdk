@@ -26,6 +26,7 @@ import { DeviceFieldContext } from './DeviceFieldContext';
 import { DeviceInfoFieldGroup, DeviceSeFieldGroup } from './DeviceFieldGroup';
 import { ExportDeviceInfo, formatCurrentTime, getDeviceMode } from './ExportDeviceInfo';
 import { ProtocolV2FirmwareUpdate } from './ProtocolV2FirmwareUpdate';
+import { prepareRemoteProtocolV2ResourceFiles } from './protocolV2ResourceArchive';
 import { buildDeviceAdvancedInfo } from './deviceAdvancedInfo';
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 import { HardwareInputPinDialogProvider } from '../../provider/HardwareInputPinProvider';
@@ -545,10 +546,22 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
 
       try {
         const res = await sdk.checkAllFirmwareRelease(selectDevice.connectId, { platform });
+        if (!res.success) {
+          return {
+            success: false,
+            payload: res.payload.error,
+          };
+        }
+        const targetsToUpdate = res.payload.targetsToUpdate ?? [];
+        const resourceFiles = await prepareRemoteProtocolV2ResourceFiles({
+          hardwareSDK: sdk,
+          archive: res.payload.resourceArchive,
+          targetsToUpdate,
+        });
         return {
-          success: res.success,
-          payload: res.success ? undefined : res.payload.error,
-          targetsToUpdate: res.success ? res.payload.targetsToUpdate ?? [] : undefined,
+          success: true,
+          targetsToUpdate,
+          resourceFiles,
         };
       } catch (error) {
         return {
