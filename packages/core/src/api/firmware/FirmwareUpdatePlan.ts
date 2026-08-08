@@ -10,6 +10,7 @@ import {
   getDeviceFirmwareVersion,
 } from '../../utils/deviceVersionUtils';
 
+import type { FirmwareUpdateV4Target } from '../../types/api/firmwareUpdate';
 import type {
   FirmwareUpdatePlan,
   FirmwareUpdatePlanArtifact,
@@ -405,7 +406,7 @@ const selectResourceUrl = ({
 
 const getExecutor = (features: Features): FirmwareUpdatePlan['executor'] => {
   const deviceType = getDeviceType(features);
-  if (deviceType === EDeviceType.Pro2) {
+  if (deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo) {
     return 'v4';
   }
   if (
@@ -422,9 +423,11 @@ const buildProtocolV2Artifacts = (
   {
     includeComponents = true,
     includeResources = true,
+    componentTargets: selectedComponentTargets,
   }: {
     includeComponents?: boolean;
     includeResources?: boolean;
+    componentTargets?: ReadonlySet<FirmwareUpdatePlanTarget>;
   } = {}
 ): {
   artifacts: FirmwareUpdatePlanArtifact[];
@@ -445,12 +448,21 @@ const buildProtocolV2Artifacts = (
     includeComponents && components
       ? [...installOrder, ...Object.keys(components).filter(key => !installOrder.includes(key))]
       : [];
+  const selectedComponentKeys = selectedComponentTargets
+    ? componentKeys.filter(key => {
+        const component = asRecord(components?.[key]);
+        const targetName = asString(component?.target)?.toUpperCase();
+        const target = targetName ? PROTOCOL_V2_TARGETS[targetName] : undefined;
+        return !!target && selectedComponentTargets.has(target);
+      })
+    : componentKeys;
   const artifacts: FirmwareUpdatePlanArtifact[] = [];
   const targets: FirmwareUpdatePlanTarget[] = [];
-  const componentTargets = new Set<FirmwareUpdatePlanTarget>();
-  for (const key of componentKeys) {
+  const componentTargetSet = new Set<FirmwareUpdatePlanTarget>();
+  for (const key of selectedComponentKeys) {
     const component = asRecord(components?.[key]);
     const targetName = asString(component?.target)?.toUpperCase();
+    const target = targetName ? PROTOCOL_V2_TARGETS[targetName] : undefined;
     if (targetName === 'ROMLOADER') {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
@@ -458,7 +470,6 @@ const buildProtocolV2Artifacts = (
         { firmwareUpdateCode: 'FirmwarePlanInvalid' }
       );
     }
-    const target = targetName ? PROTOCOL_V2_TARGETS[targetName] : undefined;
     if (!component || !target) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
@@ -466,14 +477,14 @@ const buildProtocolV2Artifacts = (
         { firmwareUpdateCode: 'FirmwarePlanInvalid' }
       );
     }
-    if (componentTargets.has(target)) {
+    if (componentTargetSet.has(target)) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
         `Protocol V2 component ${key} duplicates target ${target}`,
         { firmwareUpdateCode: 'FirmwarePlanInvalid' }
       );
     }
-    componentTargets.add(target);
+    componentTargetSet.add(target);
     artifacts.push({
       artifactId: `component:${target}`,
       role: 'component',
@@ -585,6 +596,113 @@ const assertForcedTargetsRepresented = ({
       planError(`Forced firmware update target ${forcedTarget} is not represented by the plan`);
     }
   }
+};
+
+const finalizeFirmwareUpdatePlan = ({
+  features,
+  firmwareType,
+  platform,
+  artifacts,
+  targetsToUpdate,
+}: {
+  features: Features;
+  firmwareType: EFirmwareType;
+  platform: FirmwareUpdatePlatform;
+  artifacts: FirmwareUpdatePlanArtifact[];
+  targetsToUpdate: FirmwareUpdatePlanTarget[];
+}): FirmwareUpdatePlan => {
+  const executor = getExecutor(features);
+  const bootloaderMode = resolveDeviceBootloaderMode(features);
+  // 'unavailable' is the reserved degraded-identity sentinel; a device-reported
+  // serial must never be able to collide with it.
+  const reportedIdentity = getDeviceUUID(features);
+  const deviceIdentity = reportedIdentity === 'unavailable' ? '' : reportedIdentity;
+  // Bootloader-mode classic-family devices (executor v2, e.g. classic1s) cannot report
+  // a serial number, so their recovery plans fall back to the degraded 'unavailable'
+  // identity. Binding is then enforced against the live device at install time instead
+  // (assertFirmwareUpdatePreparedPlanDeviceIdentity), and plan integrity by the digest.
+  // Pro (v3), Pro2, and Neo (v4) report a serial even in loader mode and stay strict.
+  if (
+    artifacts.length > 0 &&
+    (platform === 'native' || platform === 'desktop') &&
+    !deviceIdentity &&
+    !(bootloaderMode && executor === 'v2')
+  ) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      'Prepared firmware update requires a stable device identity',
+      { firmwareUpdateCode: 'FirmwarePlanInvalid' }
+    );
+  }
+  const planWithoutDigest: Omit<FirmwareUpdatePlan, 'planDigest'> = {
+    schemaVersion: 2,
+    executor,
+    deviceIdentity: deviceIdentity || 'unavailable',
+    deviceModel: String(getDeviceType(features)),
+    firmwareType,
+    platform,
+    artifacts,
+    targetsToUpdate,
+  };
+  return assertFirmwareUpdatePlan({
+    ...planWithoutDigest,
+    planDigest: digestFirmwareUpdatePlan(planWithoutDigest),
+  });
+};
+
+export const buildProtocolV2FirmwareUpdatePlan = ({
+  features,
+  firmwareType,
+  platform,
+  release,
+  targetsToUpdate,
+  forceUpdateTargets,
+  resourceArchiveAvailable,
+}: {
+  features: Features;
+  firmwareType: EFirmwareType;
+  platform: FirmwareUpdatePlatform;
+  release: ReleaseRecord | undefined;
+  targetsToUpdate: readonly FirmwareUpdateV4Target[];
+  forceUpdateTargets?: FirmwareUpdatePlanForceTarget[];
+  resourceArchiveAvailable: boolean;
+}): FirmwareUpdatePlan => {
+  const validatedForceTargets = validateFirmwareUpdatePlanForceTargets(forceUpdateTargets);
+  if (validatedForceTargets.some(target => target === 'ble' || target === 'bootloader')) {
+    planError('Protocol V2 does not support forced BLE or legacy bootloader targets');
+  }
+
+  const requestedComponentTargets = new Set<FirmwareUpdatePlanTarget>(
+    targetsToUpdate.filter(target => target !== 'resource')
+  );
+  const protocolV2 = buildProtocolV2Artifacts(release ?? {}, {
+    includeComponents: requestedComponentTargets.size > 0,
+    includeResources: false,
+    componentTargets: requestedComponentTargets,
+  });
+  const representedTargets = new Set(protocolV2.targets);
+  const missingTarget = Array.from(requestedComponentTargets).find(
+    target => !representedTargets.has(target)
+  );
+  if (missingTarget) {
+    planError(`Protocol V2 release does not contain requested target ${missingTarget}`);
+  }
+  if (validatedForceTargets.includes('firmware') && protocolV2.targets.length === 0) {
+    planError('Forced firmware update target firmware is not represented by the plan');
+  }
+  if (validatedForceTargets.includes('resource') && !resourceArchiveAvailable) {
+    planError('Forced firmware update target resource has no Protocol V2 resource archive');
+  }
+
+  // Protocol V2 resource archives are materialized by the host into explicit
+  // resourceFiles. The prepared artifact plan therefore binds firmware components only.
+  return finalizeFirmwareUpdatePlan({
+    features,
+    firmwareType,
+    platform,
+    artifacts: protocolV2.artifacts,
+    targetsToUpdate: protocolV2.targets,
+  });
 };
 
 export const buildFirmwareUpdatePlan = ({
@@ -733,40 +851,11 @@ export const buildFirmwareUpdatePlan = ({
     artifacts,
     targetsToUpdate,
   });
-
-  // 'unavailable' is the reserved degraded-identity sentinel; a device-reported
-  // serial must never be able to collide with it.
-  const reportedIdentity = getDeviceUUID(features);
-  const deviceIdentity = reportedIdentity === 'unavailable' ? '' : reportedIdentity;
-  // Bootloader-mode classic-family devices (executor v2, e.g. classic1s) cannot report
-  // a serial number, so their recovery plans fall back to the degraded 'unavailable'
-  // identity. Binding is then enforced against the live device at install time instead
-  // (assertFirmwareUpdatePreparedPlanDeviceIdentity), and plan integrity by the digest.
-  // Pro (v3) and Pro2 (v4) report a serial even in bootloader mode and stay strict.
-  if (
-    artifacts.length > 0 &&
-    (platform === 'native' || platform === 'desktop') &&
-    !deviceIdentity &&
-    !(bootloaderMode && executor === 'v2')
-  ) {
-    throw ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      'Prepared firmware update requires a stable device identity',
-      { firmwareUpdateCode: 'FirmwarePlanInvalid' }
-    );
-  }
-  const planWithoutDigest: Omit<FirmwareUpdatePlan, 'planDigest'> = {
-    schemaVersion: 2,
-    executor,
-    deviceIdentity: deviceIdentity || 'unavailable',
-    deviceModel: String(getDeviceType(features)),
+  return finalizeFirmwareUpdatePlan({
+    features,
     firmwareType,
     platform,
     artifacts,
     targetsToUpdate,
-  };
-  return assertFirmwareUpdatePlan({
-    ...planWithoutDigest,
-    planDigest: digestFirmwareUpdatePlan(planWithoutDigest),
   });
 };

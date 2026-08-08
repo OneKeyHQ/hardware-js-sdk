@@ -135,6 +135,8 @@ export function toProtocolV2FirmwareReleaseInfo({
   return {
     shouldUpdate: plan.hasUpgrade,
     status: plan.status === 'unavailable' ? 'unknown' : plan.status,
+    // Protocol V2 components share package-set release notes. The optional
+    // bootloaderChangelog field belongs to the legacy Protocol V1 release model.
     changelog: plan.release ? [plan.release.changelog] : [],
     release,
     bootloaderMode: state.status.mode === 'bootloader' || state.status.mode === 'romloader',

@@ -22,6 +22,10 @@ const release: IFirmwareReleaseInfo = {
     'zh-CN': '更新',
     'en-US': 'Update',
   },
+  bootloaderChangelog: {
+    'zh-CN': '旧版 Bootloader 更新',
+    'en-US': 'Legacy bootloader update',
+  },
   installOrder: ['bootloader', 'applicationP1', 'coprocessor'],
   components: {
     bootloader: {
@@ -127,6 +131,7 @@ describe.each(['pro2', 'neo'] as const)('Protocol V2 release checks for %s', dev
     await expect(bootloaderMethod.run()).resolves.toMatchObject({
       status: 'outdated',
       shouldUpdate: true,
+      changelog: [release.changelog],
       release: {
         protocol: 'V2',
         configKey: 'bootloader',
@@ -134,6 +139,7 @@ describe.each(['pro2', 'neo'] as const)('Protocol V2 release checks for %s', dev
         target: 'BOOTLOADER',
         url: 'https://example.com/bootloader.okpkg',
         version: [2, 0, 0],
+        changelog: release.changelog,
       },
     });
     await expect(allMethod.run()).resolves.toMatchObject({

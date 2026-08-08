@@ -11,6 +11,7 @@ import {
 } from './firmware/releaseHelper';
 import {
   buildFirmwareUpdatePlan,
+  buildProtocolV2FirmwareUpdatePlan,
   validateFirmwareUpdatePlanForceTargets,
 } from './firmware/FirmwareUpdatePlan';
 import {
@@ -384,8 +385,13 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
   }
 
   private async runProtocolV2(): Promise<AllFirmwareRelease> {
-    const { checkFirmwareHash = false, firmwareType: firmwareTypeParam } = this
-      .payload as CheckAllFirmwareReleaseParams;
+    const {
+      checkFirmwareHash = false,
+      firmwareType: firmwareTypeParam,
+      platform,
+      forceUpdateTargets,
+    } = this.payload as CheckAllFirmwareReleaseParams;
+    const validatedForceUpdateTargets = validateFirmwareUpdatePlanForceTargets(forceUpdateTargets);
     const { state, features, firmwareType, release } = await loadProtocolV2FirmwareReleaseContext({
       device: this.device,
       firmwareType: firmwareTypeParam,
@@ -405,12 +411,41 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     const resourceSource = DataManager.getProtocolV2ResourceSource(resourceDeviceType);
     const resourceStatus = 'unknown' as const;
     const resourcePreparationRequired = !!resourceSource;
+    const componentTargetsToUpdate = validatedForceUpdateTargets.includes('firmware')
+      ? plan.components.flatMap(component =>
+          component.updateTarget ? [component.updateTarget] : []
+        )
+      : plan.targetsToUpdate;
     const targetsToUpdate = Array.from(
       new Set([
-        ...plan.targetsToUpdate,
+        ...componentTargetsToUpdate,
         ...(resourcePreparationRequired ? (['resource'] as const) : []),
       ])
     );
+    let firmwareUpdatePlan: FirmwareUpdatePlan | undefined;
+    try {
+      firmwareUpdatePlan = buildProtocolV2FirmwareUpdatePlan({
+        features,
+        firmwareType,
+        platform: platform ?? 'web',
+        release,
+        targetsToUpdate,
+        forceUpdateTargets: validatedForceUpdateTargets,
+        resourceArchiveAvailable: resourcePreparationRequired,
+      });
+    } catch (error) {
+      if (
+        validatedForceUpdateTargets.length > 0 ||
+        !(error instanceof HardwareError) ||
+        error.params?.firmwareUpdateCode !== 'FirmwarePlanInvalid'
+      ) {
+        throw error;
+      }
+      Log.warn(
+        '[CheckAllFirmwareRelease] Optional Protocol V2 firmware Plan is unavailable; using the release result'
+      );
+      firmwareUpdatePlan = undefined;
+    }
     const firmwarePlan = summarizeProtocolV2FirmwareRelease(
       plan,
       PROTOCOL_V2_MAIN_FIRMWARE_TARGETS
@@ -442,8 +477,9 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       resourceStatus,
       resourceArchive: resourceSource,
       resourcePreparationRequired,
-      hasUpgrade: plan.hasUpgrade || resourcePreparationRequired,
+      hasUpgrade: targetsToUpdate.length > 0,
       targetsToUpdate,
+      firmwareUpdatePlan,
     };
   }
 }
