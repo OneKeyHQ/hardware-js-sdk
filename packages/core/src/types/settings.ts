@@ -159,22 +159,20 @@ export type IBLEFirmwareReleaseInfo = {
 };
 
 type IKnownDevice = Exclude<IDeviceType, 'unknown'>;
-type ILegacyKnownDevice = Exclude<IKnownDevice, 'neo'>;
-
 type IDeviceReleaseInfo = {
-  firmware: IFirmwareReleaseInfo[];
+  firmware?: IFirmwareReleaseInfo[];
   /** Protocol V2 payload package set */
   'firmware-v1'?: IFirmwareReleaseInfo[];
   'firmware-v2'?: IFirmwareReleaseInfo[];
   'firmware-v8'?: IFirmwareReleaseInfo[];
   'firmware-btc-v8'?: IFirmwareReleaseInfo[];
-  ble: IBLEFirmwareReleaseInfo[];
+  ble?: IBLEFirmwareReleaseInfo[];
   /** Independent Protocol V2 resource release configuration. */
   resources?: IProtocolV2Resources;
 };
 
 export type DeviceTypeMap = {
-  [k in ILegacyKnownDevice]: IDeviceReleaseInfo;
+  [k in Exclude<IKnownDevice, 'neo'>]: IDeviceReleaseInfo;
 } & {
   /** Optional until every remote-config producer publishes a Neo entry. */
   neo?: IDeviceReleaseInfo;

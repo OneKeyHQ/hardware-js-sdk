@@ -416,7 +416,6 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       state.identity.deviceType === 'neo' ? EDeviceType.Neo : EDeviceType.Pro2;
     const resourceSource = DataManager.getProtocolV2ResourceSource(resourceDeviceType);
     const resourceStatus = 'unknown' as const;
-    const resourcePreparationRequired = !!resourceSource;
     const detectedComponentTargets = validatedForceUpdateTargets.includes('firmware')
       ? plan.components.flatMap(component =>
           component.updateTarget ? [component.updateTarget] : []
@@ -434,7 +433,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     const targetsToUpdate = Array.from(
       new Set([
         ...componentTargetsToUpdate,
-        ...(resourcePreparationRequired || forceResourceUpdate ? (['resource'] as const) : []),
+        ...(forceResourceUpdate ? (['resource'] as const) : []),
       ])
     );
     let firmwareUpdatePlan: FirmwareUpdatePlan | undefined;
@@ -483,10 +482,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     );
     const blePlan = summarizeProtocolV2FirmwareRelease(plan, PROTOCOL_V2_BLE_TARGETS);
     const bootloaderPlan = summarizeProtocolV2FirmwareRelease(plan, PROTOCOL_V2_BOOTLOADER_TARGETS);
-    const status =
-      resourcePreparationRequired && (plan.status === 'valid' || plan.status === 'unavailable')
-        ? 'unknown'
-        : plan.status;
+    const { status } = plan;
 
     return {
       firmware: toProtocolV2FirmwareReleaseInfo({ plan: firmwarePlan, state, release }),
@@ -507,7 +503,6 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       status,
       resourceStatus,
       resourceArchive: resourceSource,
-      resourcePreparationRequired,
       hasUpgrade: targetsToUpdate.length > 0,
       targetsToUpdate,
       firmwareUpdatePlan,

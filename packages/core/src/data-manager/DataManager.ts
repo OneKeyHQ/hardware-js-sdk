@@ -94,12 +94,10 @@ export default class DataManager {
       ble: [],
     },
     [EDeviceType.Pro2]: {
-      firmware: [],
-      ble: [],
+      'firmware-v1': [],
     },
     [EDeviceType.Neo]: {
-      firmware: [],
-      ble: [],
+      'firmware-v1': [],
     },
     [EDeviceType.ClassicPure]: {
       firmware: [],
