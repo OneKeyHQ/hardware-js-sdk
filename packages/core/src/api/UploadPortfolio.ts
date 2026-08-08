@@ -1,3 +1,6 @@
+import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
+
+import { supportsProtocolV2Message } from '../protocols/protocol-v2/features';
 import FileWrite from './FileWrite';
 
 export type UploadPortfolioParams = {
@@ -7,6 +10,8 @@ export type UploadPortfolioParams = {
 
 const PORTFOLIO_PENDING_PATH = 'vol1:/portfolio/portfolio.okpkg.pending';
 const PORTFOLIO_CHUNK_SIZE = 2048;
+const FILESYSTEM_FILE_WRITE_MESSAGE_TYPE = 60805;
+const PORTFOLIO_UPDATE_MESSAGE_TYPE = 61400;
 
 export default class UploadPortfolio extends FileWrite {
   init() {
@@ -29,6 +34,19 @@ export default class UploadPortfolio extends FileWrite {
   }
 
   async run() {
+    const protocolInfo = await this.device.ensureProtocolV2RuntimeContext();
+    const hasFileWrite = supportsProtocolV2Message(
+      protocolInfo,
+      FILESYSTEM_FILE_WRITE_MESSAGE_TYPE
+    );
+    const hasPortfolioUpdate = supportsProtocolV2Message(
+      protocolInfo,
+      PORTFOLIO_UPDATE_MESSAGE_TYPE
+    );
+    if (!hasFileWrite || !hasPortfolioUpdate) {
+      throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
+    }
+
     const stagedFile = await super.run();
     this.throwIfAborted();
     await this.device.commands.typedCall('PortfolioUpdate', 'Success', {});

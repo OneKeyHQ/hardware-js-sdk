@@ -46,6 +46,7 @@ import type {
   prepareFirmwareUpdatePlan,
   validateFirmwareUpdatePreparedPlan,
 } from './firmwareUpdatePreparedPlan';
+import type { prepareProtocolV2ResourceFiles } from './protocolV2ResourceManifest';
 import type { promptWebDeviceAccess } from './promptWebDeviceAccess';
 import type { deviceReset } from './deviceReset';
 import type { deviceRecovery } from './deviceRecovery';
@@ -269,6 +270,7 @@ export type CoreApi = {
   getFirmwareUpdateCapabilities: typeof getFirmwareUpdateCapabilities;
   prepareFirmwareUpdatePlan: typeof prepareFirmwareUpdatePlan;
   validateFirmwareUpdatePreparedPlan: typeof validateFirmwareUpdatePreparedPlan;
+  prepareProtocolV2ResourceFiles: typeof prepareProtocolV2ResourceFiles;
   cipherKeyValue: typeof cipherKeyValue;
 
   /**

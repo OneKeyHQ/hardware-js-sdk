@@ -569,14 +569,10 @@ export default class DataManager {
     this.lastCheckTimestamp = getTimeStamp();
   }
 
-  static getProtocolV2Resources(deviceType: EDeviceType.Pro2 | EDeviceType.Neo = EDeviceType.Pro2) {
-    return this.deviceMap[deviceType]?.resources?.stable;
-  }
-
-  static getProtocolV2BootResources(
+  static getProtocolV2ResourceSource(
     deviceType: EDeviceType.Pro2 | EDeviceType.Neo = EDeviceType.Pro2
   ) {
-    return this.deviceMap[deviceType]?.resources?.boot;
+    return this.deviceMap[deviceType]?.resources?.source;
   }
 
   static getProtobufMessages(schema: ProtobufMessageSchema = 'v1CurrentSchema'): JSON {

@@ -12,6 +12,7 @@ import {
   executeProtocolAwareMethod,
   isMethodSupportedOnProtocol,
 } from '../../utils/protocolAwareMethod';
+import { classifyRunnerFailure } from './runnerResultUtils';
 import { TestRunnerContext } from './Context/TestRunnerProvider';
 import {
   clearItemVerifyStateAtom,
@@ -23,6 +24,7 @@ import {
 
 import type { createTestRunnerAtoms } from './Context/TestRunnerVerifyProvider';
 import type { TestCaseDataWithKey, VerifyState } from './types';
+import type { MethodCallMode } from '../../utils/protocolAwareMethod';
 import type { CoreApi, Features, OnekeyFeatures, Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 // 自定义状态管理器类型
@@ -39,6 +41,16 @@ type RunnerContext = {
   deviceId: string | undefined;
   connectId: string;
   printLog: (log: string) => void;
+};
+
+type RunnerRequestContext<T> = {
+  sdk: CoreApi;
+  method: string;
+  connectId: string;
+  deviceId: string;
+  requestParams: any;
+  item: TestCaseDataWithKey<T>;
+  execute: () => Promise<Unsuccessful | Success<any>>;
 };
 
 type RunnerConfig<T, TExt = unknown> = {
@@ -71,15 +83,9 @@ type RunnerConfig<T, TExt = unknown> = {
   generateRequestParams: (item: TestCaseDataWithKey<T>) => Promise<{
     method: string;
     params: any;
+    mode?: MethodCallMode;
   }>;
-  processRequest?: (
-    sdk: CoreApi,
-    method: string,
-    connectId: string,
-    deviceId: string,
-    requestParams: any,
-    item: TestCaseDataWithKey<T>
-  ) => Promise<{
+  processRequest?: (context: RunnerRequestContext<T>) => Promise<{
     payload: Unsuccessful | Success<any>;
     skipVerify?: boolean;
   }>;
@@ -308,7 +314,7 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
                 setTimeout(() => resolve(true), 200);
               });
 
-              const { method, params } = await generateRequestParams(item);
+              const { method, params, mode } = await generateRequestParams(item);
               const requestParams = {
                 retryCount: 1,
                 ...params,
@@ -333,28 +339,33 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
                 throw new Error('Unable to determine the active device protocol');
               }
 
-              if (!isMethodSupportedOnProtocol(method, protocol, requestParams)) {
-                res = createProtocolUnsupportedResponse(method, protocol);
-              } else if (processRequest) {
-                const response = await processRequest(
-                  SDK,
-                  method,
-                  connectId,
-                  deviceId,
-                  requestParams,
-                  item
-                );
-                res = response.payload;
-                skipVerify = response.skipVerify ?? false;
-              } else {
-                res = await executeProtocolAwareMethod({
+              const executeRequest = () =>
+                executeProtocolAwareMethod({
                   sdk: SDK,
                   method,
                   connectId,
                   deviceId,
                   params: requestParams,
                   protocol,
+                  mode,
                 });
+
+              if (!isMethodSupportedOnProtocol(method, protocol, requestParams)) {
+                res = createProtocolUnsupportedResponse(method, protocol);
+              } else if (processRequest) {
+                const response = await processRequest({
+                  sdk: SDK,
+                  method,
+                  connectId,
+                  deviceId,
+                  requestParams,
+                  item,
+                  execute: executeRequest,
+                });
+                res = response.payload;
+                skipVerify = response.skipVerify ?? false;
+              } else {
+                res = await executeRequest();
               }
 
               if (!running.current) return;
@@ -376,14 +387,8 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
                   verifyState = 'fail';
                 }
               } else if (!res.success && !skipVerify) {
-                if (
-                  res.payload?.code === 802 ||
-                  res.payload?.code === 803 ||
-                  res.payload?.code === 415
-                ) {
-                  verifyState = 'skip';
-                } else {
-                  verifyState = 'fail';
+                verifyState = classifyRunnerFailure(res.payload?.code);
+                if (verifyState !== 'skip') {
                   error = res.payload?.error;
                 }
               } else {

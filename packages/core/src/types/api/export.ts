@@ -49,8 +49,17 @@ export type {
   FirmwareUpdatePreparedEntry,
   FirmwareUpdatePreparedPlan,
 } from './firmwareUpdatePreparedPlan';
+export type {
+  ProtocolV2PreparedResourceFile,
+  ProtocolV2ResourceManifestBinary,
+} from './protocolV2ResourceManifest';
 export type { FirmwareUpdateCapabilities } from './firmwareUpdateCapabilities';
-export type { AllFirmwareRelease } from './checkAllFirmwareRelease';
+export type {
+  AllFirmwareRelease,
+  BridgeReleaseCheckResult,
+  FirmwareReleaseCheckResult,
+  ProtocolV2ComponentReleaseInfo,
+} from './checkAllFirmwareRelease';
 export type {
   ProtocolV2FirmwareComponentRelease,
   ProtocolV2FirmwareComponentReleaseStatus,

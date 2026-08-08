@@ -328,7 +328,7 @@ export const getFirmwareUpdateField = ({
   if (deviceType === EDeviceType.Pro) {
     return latestFirmwareField;
   }
-  if (deviceType === EDeviceType.Pro2) {
+  if (deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo) {
     return 'firmware-v1';
   }
   return 'firmware';
@@ -374,7 +374,7 @@ export const getFirmwareUpdateFieldArray = (
     return ['firmware-v8'];
   }
 
-  if (deviceType === 'pro2') {
+  if (deviceType === 'pro2' || deviceType === 'neo') {
     return ['firmware-v1'];
   }
 

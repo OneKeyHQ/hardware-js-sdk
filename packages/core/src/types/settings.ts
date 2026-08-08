@@ -64,48 +64,44 @@ export type IProtocolV2FirmwareComponent = {
   version?: IVersionArray;
 };
 
-export type IProtocolV2ResourceType =
-  | 'images'
-  | 'animation'
-  | 'wallpaper'
-  | 'translations'
-  | 'roobert'
-  | 'noto'
-  | 'firmware_logo';
-
-/** Pro2 RES package descriptor. Hashes identify content without a human-managed version. */
-export type IProtocolV2Resource = {
-  type: IProtocolV2ResourceType;
-  url: string;
-  /** Complete okpkg file size in bytes. */
-  size: number;
-  /** SHA-256 of the complete okpkg file. */
-  fileHash: string;
-  /** SHA3-512 header_hash from the signed okpkg header. */
-  headerHash: string;
-};
-
-/** A file from the Protocol V2 resource manifest, written directly with FileWrite. */
-export type IProtocolV2ResourceFile = {
-  name?: string;
-  url: string;
-  devicePath: string;
-  size: number;
-  /** SHA-256 of the complete file. */
-  fileHash: string;
-};
-
-/** Optional Protocol V2 boot resources restored as individual files. */
-export type IProtocolV2BootResources = {
-  required: false;
-  target: 'RES';
-  manifestUrl?: string;
-  files: IProtocolV2ResourceFile[];
+export type IProtocolV2ResourceSource = {
+  archiveUrl: string;
+  archiveSha256: string;
+  archiveSize: number;
 };
 
 export type IProtocolV2Resources = {
-  stable: IProtocolV2Resource[];
-  boot?: IProtocolV2BootResources;
+  source: IProtocolV2ResourceSource;
+};
+
+export type IProtocolV2ResourceManifestFile = {
+  archive_path: string;
+  original_name: string;
+  device_path: string;
+  size: number;
+  sha256: string;
+  signed: true;
+  sig_algo: 'ed25519' | 'mldsa65';
+  payload_version: string | null;
+};
+
+export type IProtocolV2ResourceManifest = {
+  schema: 1;
+  artifact_name: string;
+  release_name: string;
+  variant: 'resource';
+  commit: string;
+  short_sha: string;
+  timestamp_utc: string;
+  core_version: string;
+  key_set: string;
+  device_root: 'vol0:';
+  restore_mode: 'bootloader_update';
+  trees: Array<{
+    path: string;
+    device: string;
+  }>;
+  files: IProtocolV2ResourceManifestFile[];
 };
 
 /** Pro2 RESC bundle okpkg descriptor for incremental FileWrite synchronization. */

@@ -177,8 +177,9 @@ Application 模式只允许宿主访问 `vol1:/wallpapers`、`vol1:/portfolio` �
 Bootloader 或 Romloader 时复用当前 loader 连接，不重复 reboot。
 
 `DeviceFirmwareUpdate.targets` 只包含需要安装的固件。稳定 RESC bundle 与 boot resource manifest
-中的文件都通过 `FilesystemFileWrite` 直接同步到各自最终路径；资源单独更新时不发送空的安装请求。
-SDK 不假设固件端会隐式扫描已写入路径。
+中的文件都通过 `FilesystemFileWrite` 同步；普通资源写入最终路径，但 bootloader 当前挂载的
+`boot_resource.okpkg` 必须写入 `.staging` 路径，由下次启动在挂载前完成替换，避免 FatFs 因文件已打开而拒绝覆盖。
+资源单独更新时不发送空的安装请求。SDK 不假设固件端会隐式扫描其他已写入路径。
 
 ## 包职责速查
 

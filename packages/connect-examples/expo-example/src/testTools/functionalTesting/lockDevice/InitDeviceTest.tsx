@@ -132,20 +132,7 @@ function ExecuteView() {
       return Promise.resolve({
         method: item.method,
         params: requestParams,
-      });
-    },
-    processRequest: async (sdk, method, connectId, deviceId, requestParams, item) => {
-      let res: any;
-      if (method.startsWith('device')) {
-        // @ts-ignore
-        res = await sdk[`${method}`](connectId, requestParams);
-      } else {
-        // @ts-ignore
-        res = await sdk[`${method}`](connectId, deviceId, requestParams);
-      }
-
-      return Promise.resolve({
-        payload: res,
+        mode: 'connection',
       });
     },
     processResponse: (_, item, __, res) => {
@@ -163,7 +150,7 @@ function ExecuteView() {
 
       if (payload.unlocked !== true) {
         return Promise.resolve({
-          error: `actual: ${payload.unlocked}, 预期: 设备未解锁`,
+          error: `actual: ${payload.unlocked}, 预期: 设备已解锁`,
         });
       }
       if (isPassphraseProtectionEnabled(payload)) {

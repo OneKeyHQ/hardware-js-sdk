@@ -7,6 +7,7 @@ import { get, isEmpty } from 'lodash';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
+import { classifyRunnerFailure } from '../../components/BaseTestRunner/runnerResultUtils';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
 import { ADDRESS_INDEX_MARK, CHANGE_MARK, INDEX_MARK, baseParams } from './baseParams';
@@ -410,15 +411,10 @@ function ExecuteView() {
       }
 
       if (!res.success) {
-        if (res.payload?.code === 802 || res.payload?.code === 803) {
-          return Promise.resolve({
-            verifyState: 'skip',
-            error: undefined,
-          });
-        }
+        const verifyState = classifyRunnerFailure(res.payload?.code);
         return Promise.resolve({
-          verifyState: 'fail',
-          error: res.payload?.error,
+          verifyState,
+          error: verifyState === 'skip' ? undefined : res.payload?.error,
         });
       }
 

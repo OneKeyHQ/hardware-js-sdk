@@ -4,20 +4,13 @@ import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { DataManager } from '../src/data-manager';
 import {
-  PROTOCOL_V2_RESOURCE_DEVICE_PATHS,
-  PROTOCOL_V2_RESOURCE_TYPES,
-  buildProtocolV2ResourceUpdatePlan,
   isProtocolV2ResourceFileValid,
+  parseProtocolV2ResourceManifest,
   parseProtocolV2Resources,
-  readProtocolV2ResourceInventory,
+  prepareProtocolV2ResourceFiles,
 } from '../src/protocols/protocol-v2/resources';
 
-import type {
-  ConnectSettings,
-  IProtocolV2BootResources,
-  IProtocolV2Resource,
-  RemoteConfigResponse,
-} from '../src/types';
+import type { ConnectSettings, RemoteConfigResponse } from '../src/types';
 
 jest.mock('axios');
 jest.mock('../src/data/config', () => ({
@@ -28,45 +21,71 @@ jest.mock('../src/data/config', () => ({
 const bytesToHex = (bytes: Uint8Array) =>
   Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 
-const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
-
-const createResourceHeader = (headerHash: string) => {
-  const header = new Uint8Array(PROTOCOL_V2_OKPP_HEADER_SIZE);
-  const view = new DataView(header.buffer);
-  'OKPP'.split('').forEach((char, index) => {
-    header[index] = char.charCodeAt(0);
-  });
-  'RESC'.split('').forEach((char, index) => {
-    header[0x08 + index] = char.charCodeAt(0);
-  });
-  view.setUint32(0x0c, header.byteLength, true);
-  for (let index = 0; index < headerHash.length / 2; index++) {
-    header[0x240 + index] = Number.parseInt(headerHash.slice(index * 2, index * 2 + 2), 16);
-  }
-  return header;
+const resourceSource = {
+  archiveUrl: 'https://example.com/resource/pro2-resource.zip',
+  archiveSha256: 'a'.repeat(64),
+  archiveSize: 16_815_479,
 };
 
-const resources: IProtocolV2Resource[] = PROTOCOL_V2_RESOURCE_TYPES.map((type, index) => ({
-  type,
-  url: `https://example.com/${type}.okpkg`,
-  size: index + 100,
-  fileHash: index.toString(16).padStart(64, '0'),
-  headerHash: index.toString(16).padStart(128, '0'),
-}));
-
-const bootResources: IProtocolV2BootResources = {
-  required: false,
-  target: 'RES',
-  manifestUrl: 'https://example.com/manifest.json',
-  files: [
-    {
-      name: 'bootloader_crest.bin',
-      url: 'https://example.com/assets/bootloader_crest.bin',
-      devicePath: 'vol0:/assets/loaders/boot.staging/graphics/bootloader_crest.bin',
-      size: 1234,
-      fileHash: 'ab'.repeat(32),
-    },
+const manifestFiles = [
+  ['bundles/firmware_logo-build.okpkg', 'firmware_logo.okpkg', 'vol0:/bundles/firmware_logo.okpkg'],
+  ['bundles/font/noto-build.okpkg', 'noto.okpkg', 'vol0:/bundles/font/noto.okpkg'],
+  ['bundles/font/roobert-build.okpkg', 'roobert.okpkg', 'vol0:/bundles/font/roobert.okpkg'],
+  [
+    'bundles/images/animation-build.okpkg',
+    'animation.okpkg',
+    'vol0:/bundles/images/animation.okpkg',
   ],
+  ['bundles/images/images-build.okpkg', 'images.okpkg', 'vol0:/bundles/images/images.okpkg'],
+  [
+    'bundles/images/wallpaper-build.okpkg',
+    'wallpaper.okpkg',
+    'vol0:/bundles/images/wallpaper.okpkg',
+  ],
+  [
+    'bundles/translations/translations-build.okpkg',
+    'translations.okpkg',
+    'vol0:/bundles/translations/translations.okpkg',
+  ],
+  [
+    'loaders/bootloader/boot_resource-build.okpkg',
+    'boot_resource.okpkg',
+    'vol0:/loaders/bootloader/boot_resource.okpkg',
+  ],
+  ['loaders/rom/params-build.okpkg', 'params.okpkg', 'vol0:/loaders/rom/params.okpkg'],
+].map(([archive_path, original_name, device_path], index) => {
+  const binary = new Uint8Array([index + 1]).buffer;
+  return {
+    archive_path,
+    original_name,
+    device_path,
+    size: 1,
+    sha256: bytesToHex(sha256(new Uint8Array(binary))),
+    signed: true,
+    sig_algo: device_path.startsWith('vol0:/bundles/') ? 'ed25519' : 'mldsa65',
+    payload_version: '1.0.0',
+    binary,
+  };
+});
+
+const resourceManifest = {
+  schema: 1,
+  artifact_name: 'pro2-resource-build',
+  release_name: 'resource-build',
+  variant: 'resource',
+  commit: 'a'.repeat(40),
+  short_sha: 'aaaaaaa',
+  timestamp_utc: '20260807_091424',
+  core_version: '1.0.0',
+  key_set: 'dev',
+  device_root: 'vol0:',
+  restore_mode: 'bootloader_update',
+  trees: [
+    { path: 'bundles', device: 'vol0:/bundles' },
+    { path: 'loaders/bootloader', device: 'vol0:/loaders/bootloader' },
+    { path: 'loaders/rom', device: 'vol0:/loaders/rom' },
+  ],
+  files: manifestFiles.map(({ binary: _binary, ...file }) => file),
 };
 
 const createSettings = (configFetcher: ConnectSettings['configFetcher']): ConnectSettings =>
@@ -85,7 +104,7 @@ const createRemoteConfig = (): RemoteConfigResponse =>
     mini: { firmware: [], ble: [] },
     touch: { firmware: [], ble: [] },
     pro: { firmware: [], ble: [] },
-    pro2: { firmware: [], ble: [], resources: { stable: resources, boot: bootResources } },
+    pro2: { firmware: [], ble: [], resources: { source: resourceSource } },
     bridge: {},
   } as unknown as RemoteConfigResponse);
 
@@ -95,186 +114,65 @@ describe('Pro2 resource configuration', () => {
     DataManager.lastCheckTimestamp = 0;
   });
 
-  test('accepts exactly seven resources and normalizes their deterministic order', () => {
-    const parsed = parseProtocolV2Resources({
-      stable: [...resources].reverse(),
-      boot: bootResources,
+  test('accepts the manifest source and the CI schema 1 file set', () => {
+    expect(parseProtocolV2Resources({ source: resourceSource })).toEqual({
+      source: resourceSource,
     });
-
-    expect(parsed?.stable.map(item => item.type)).toEqual(PROTOCOL_V2_RESOURCE_TYPES);
-    expect(parsed?.boot).toEqual(bootResources);
-    expect(PROTOCOL_V2_RESOURCE_DEVICE_PATHS.translations).toBe(
-      'vol0:/bundles/translations/translations.okpkg'
-    );
-    expect(PROTOCOL_V2_RESOURCE_DEVICE_PATHS.firmware_logo).toBe(
-      'vol0:/bundles/firmware_logo.okpkg'
-    );
+    expect(parseProtocolV2ResourceManifest(resourceManifest).files).toHaveLength(9);
   });
 
-  test('rejects incomplete, duplicate, or malformed stable sets', () => {
-    expect(() => parseProtocolV2Resources({ stable: resources.slice(1) })).toThrow(
-      '7 unique resource types'
-    );
-    expect(() =>
-      parseProtocolV2Resources({ stable: [...resources.slice(0, 6), resources[0]] })
-    ).toThrow('7 unique resource types');
+  test('rejects missing source and malformed manifest paths', () => {
+    expect(() => parseProtocolV2Resources({})).toThrow('source is required');
     expect(() =>
       parseProtocolV2Resources({
-        stable: resources.map((resource, index) =>
-          index === 0 ? { ...resource, headerHash: 'bad' } : resource
-        ),
-      })
-    ).toThrow('headerHash');
-  });
-
-  test('requires boot resources to remain optional and use RES file entries', () => {
-    expect(() =>
-      parseProtocolV2Resources({
-        stable: resources,
-        boot: { ...bootResources, required: true },
-      })
-    ).toThrow('required flag');
-    expect(() =>
-      parseProtocolV2Resources({
-        stable: resources,
-        boot: { ...bootResources, target: 'INVALID' },
-      })
-    ).toThrow('expected RES');
-    expect(() =>
-      parseProtocolV2Resources({
-        stable: resources,
-        boot: {
-          ...bootResources,
-          files: [{ ...bootResources.files[0], devicePath: '../outside.bin' }],
+        source: {
+          ...resourceSource,
+          archiveUrl: 'http://example.com/pro2-resource.zip',
         },
       })
-    ).toThrow('devicePath');
-
-    for (const devicePath of [
-      'vol0:/assets/loaders\\bootloader_crest.bin',
-      'vol0:/assets/loaders\\\\bootloader_crest.bin',
-    ]) {
-      expect(() =>
-        parseProtocolV2Resources({
-          stable: resources,
-          boot: {
-            ...bootResources,
-            files: [{ ...bootResources.files[0], devicePath }],
-          },
-        })
-      ).toThrow('devicePath');
-    }
-  });
-
-  test('downloads nothing when all resource identities match', () => {
-    const inventory = resources.map(({ type, size, headerHash }) => ({ type, size, headerHash }));
-
-    expect(
-      buildProtocolV2ResourceUpdatePlan({ resources, inventory, mode: 'application' })
-    ).toEqual({ status: 'valid', resources: [] });
-  });
-
-  test('builds inventory from existing filesystem calls without ResourceInventoryGet', async () => {
-    const installedResources = resources.map((resource, index) => ({
-      ...resource,
-      size: PROTOCOL_V2_OKPP_HEADER_SIZE + index + 1,
-    }));
-    const resourceByPath = new Map(
-      installedResources.map(resource => [
-        PROTOCOL_V2_RESOURCE_DEVICE_PATHS[resource.type],
-        resource,
-      ])
-    );
-    const typedCall = jest.fn(
-      (requestType: string, _responseType: string, payload: Record<string, any>) => {
-        if (requestType === 'ResourceInventoryGet') {
-          throw new Error('ResourceInventoryGet is unavailable on released firmware');
-        }
-        if (requestType === 'FilesystemPathInfoQuery') {
-          const resource = resourceByPath.get(payload.path);
-          return {
-            message: {
-              exist: Boolean(resource),
-              directory: false,
-              size: resource?.size ?? 0,
-            },
-          };
-        }
-        if (requestType === 'FilesystemFileRead') {
-          const resource = resourceByPath.get(payload.file.path);
-          if (!resource) throw new Error('missing resource');
-          const header = createResourceHeader(resource.headerHash);
-          const offset = Number(payload.file.offset);
-          const chunkLength = Number(payload.chunk_len);
-          return {
-            message: {
-              data: header.slice(offset, offset + chunkLength),
-            },
-          };
-        }
-        throw new Error(`Unexpected request: ${requestType}`);
-      }
-    );
-
-    await expect(
-      readProtocolV2ResourceInventory({
-        commands: { typedCall },
-        resources: installedResources,
-        chunkSize: 4000,
+    ).toThrow('must use HTTPS');
+    expect(() =>
+      parseProtocolV2Resources({
+        source: { ...resourceSource, archiveSha256: 'invalid' },
       })
-    ).resolves.toEqual(
-      installedResources.map(({ type, size, headerHash }) => ({ type, size, headerHash }))
-    );
-    expect(typedCall.mock.calls.some(call => call[0] === 'ResourceInventoryGet')).toBe(false);
-    expect(typedCall.mock.calls.filter(call => call[0] === 'FilesystemPathInfoQuery')).toHaveLength(
-      7
-    );
-    expect(typedCall.mock.calls.some(call => call[0] === 'FilesystemFileRead')).toBe(true);
+    ).toThrow('SHA-256');
+    expect(() =>
+      parseProtocolV2Resources({
+        source: { ...resourceSource, archiveSize: 0 },
+      })
+    ).toThrow('positive integer');
+    expect(() =>
+      parseProtocolV2ResourceManifest({
+        ...resourceManifest,
+        files: resourceManifest.files.map((file, index) =>
+          index === 0 ? { ...file, archive_path: '../outside.okpkg' } : file
+        ),
+      })
+    ).toThrow('archive_path');
   });
 
-  test('selects only the changed or missing resource in application mode', () => {
-    const inventory = resources
-      .filter(resource => resource.type !== 'noto')
-      .map(({ type, size, headerHash }) => ({
-        type,
-        size: type === 'images' ? size + 1 : size,
-        headerHash,
-      }));
-
-    const result = buildProtocolV2ResourceUpdatePlan({
-      resources,
-      inventory,
-      mode: 'application',
+  test('verifies selected manifest files and preserves manifest device paths', () => {
+    const prepared = prepareProtocolV2ResourceFiles({
+      manifest: resourceManifest,
+      files: manifestFiles.map(file => ({
+        archivePath: file.archive_path,
+        binary: file.binary,
+      })),
+      targetsToUpdate: ['resource'],
     });
-
-    expect(result.status).toBe('outdated');
-    expect(result.resources.map(resource => resource.type)).toEqual(['images', 'noto']);
-  });
-
-  test('reports unknown without an application inventory and selects all in recovery mode', () => {
-    expect(buildProtocolV2ResourceUpdatePlan({ resources, mode: 'application' })).toEqual({
-      status: 'unknown',
-      resources: [],
-    });
-    expect(
-      buildProtocolV2ResourceUpdatePlan({ resources, mode: 'bootloader-recovery' }).resources
-    ).toHaveLength(7);
-  });
-
-  test('uses a filesystem inventory for incremental recovery mode updates', () => {
-    const inventory = resources.slice(1).map(({ type, size, headerHash }) => ({
-      type,
-      size,
-      headerHash,
-    }));
-
-    expect(
-      buildProtocolV2ResourceUpdatePlan({
-        resources,
-        inventory,
-        mode: 'bootloader-recovery',
-      }).resources.map(resource => resource.type)
-    ).toEqual(['images']);
+    expect(prepared.map(file => file.devicePath)).toEqual(
+      manifestFiles.map(file => file.device_path)
+    );
+    expect(() =>
+      prepareProtocolV2ResourceFiles({
+        manifest: resourceManifest,
+        files: manifestFiles.map((file, index) => ({
+          archivePath: file.archive_path,
+          binary: index === 0 ? new Uint8Array([0]).buffer : file.binary,
+        })),
+        targetsToUpdate: ['resource'],
+      })
+    ).toThrow('verification failed');
   });
 
   test('verifies both full file size and SHA-256 before transfer', () => {
@@ -289,7 +187,7 @@ describe('Pro2 resource configuration', () => {
     );
   });
 
-  test('applies a validated pre-release config and exposes the stable resource set', async () => {
+  test('applies a validated pre-release config and exposes its archive source', async () => {
     const configFetcher = jest.fn().mockResolvedValue(createRemoteConfig());
 
     await expect(DataManager.load(createSettings(configFetcher))).resolves.toBe(true);
@@ -297,8 +195,7 @@ describe('Pro2 resource configuration', () => {
     expect(configFetcher).toHaveBeenCalledWith(
       expect.stringMatching(/^https:\/\/data\.onekey\.so\/pre-config\.json\?noCache=/)
     );
-    expect(DataManager.getProtocolV2Resources()).toEqual(resources);
-    expect(DataManager.getProtocolV2BootResources()).toEqual(bootResources);
+    expect(DataManager.getProtocolV2ResourceSource()).toEqual(resourceSource);
     expect(DataManager.lastCheckTimestamp).toBeGreaterThan(0);
   });
 
@@ -314,18 +211,17 @@ describe('Pro2 resource configuration', () => {
 
   test('keeps base SDK initialization available when remote Pro2 resources are invalid', async () => {
     const remoteConfig = createRemoteConfig();
-    (remoteConfig.pro2 as { resources?: unknown }).resources = { stable: [] };
+    (remoteConfig.pro2 as { resources?: unknown }).resources = { source: {} };
     const configFetcher = jest.fn().mockResolvedValue(remoteConfig);
 
     await expect(DataManager.load(createSettings(configFetcher))).resolves.toBe(true);
 
-    expect(DataManager.getProtocolV2Resources()).toBeUndefined();
-    expect(DataManager.getProtocolV2BootResources()).toBeUndefined();
+    expect(DataManager.getProtocolV2ResourceSource()).toBeUndefined();
   });
 
   test('only blocks resource mutation when the refreshed Pro2 resources are invalid', async () => {
     const remoteConfig = createRemoteConfig();
-    (remoteConfig.pro2 as { resources?: unknown }).resources = { stable: [] };
+    (remoteConfig.pro2 as { resources?: unknown }).resources = { source: {} };
     const settings = createSettings(jest.fn().mockResolvedValue(remoteConfig));
     DataManager.settings = settings;
 

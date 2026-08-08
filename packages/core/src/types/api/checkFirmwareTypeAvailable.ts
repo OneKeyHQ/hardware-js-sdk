@@ -1,6 +1,6 @@
 import type { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 import type { Response } from '../params';
-import type { FirmwareRelease } from './checkAllFirmwareRelease';
+import type { FirmwareReleaseCheckResult } from './checkAllFirmwareRelease';
 
 export type CheckFirmwareTypeAvailableParams = {
   deviceType: EDeviceType;
@@ -9,4 +9,4 @@ export type CheckFirmwareTypeAvailableParams = {
 
 export declare function checkFirmwareTypeAvailable(
   params: CheckFirmwareTypeAvailableParams
-): Response<FirmwareRelease | undefined>;
+): Response<FirmwareReleaseCheckResult | undefined>;

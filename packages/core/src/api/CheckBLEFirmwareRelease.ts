@@ -1,8 +1,20 @@
 import { BaseMethod } from './BaseMethod';
 import { UI_REQUEST } from '../constants/ui-request';
 import { getBleFirmwareReleaseInfo } from './firmware/releaseHelper';
+import {
+  PROTOCOL_V2_BLE_TARGETS,
+  getProtocolV2ComponentReleaseInfo,
+  loadProtocolV2FirmwareReleaseContext,
+  summarizeProtocolV2FirmwareRelease,
+  toProtocolV2FirmwareReleaseInfo,
+} from './firmware/protocolV2Release';
+import { buildProtocolV2FirmwareRelease } from './CheckAllFirmwareRelease';
 
 export default class CheckBLEFirmwareRelease extends BaseMethod {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
     this.allowDeviceMode = [
       ...this.allowDeviceMode,
@@ -13,11 +25,31 @@ export default class CheckBLEFirmwareRelease extends BaseMethod {
     this.skipForceUpdateCheck = true;
   }
 
-  run() {
-    if (this.device.features) {
-      const releaseInfo = getBleFirmwareReleaseInfo(this.device.features);
-      return Promise.resolve(releaseInfo);
+  async run() {
+    if (!this.device.features) return null;
+
+    if (this.device.isProtocolV2()) {
+      const { state, firmwareType, release } = await loadProtocolV2FirmwareReleaseContext({
+        device: this.device,
+        methodName: 'checkBLEFirmwareRelease',
+      });
+      const plan = summarizeProtocolV2FirmwareRelease(
+        buildProtocolV2FirmwareRelease({
+          currentVersions: state.versions,
+          firmwareType,
+          release,
+          deviceType: state.identity.deviceType,
+        }),
+        PROTOCOL_V2_BLE_TARGETS
+      );
+      return toProtocolV2FirmwareReleaseInfo({
+        plan,
+        state,
+        release: getProtocolV2ComponentReleaseInfo(plan, 'COPROCESSOR'),
+      });
     }
-    return Promise.resolve(null);
+
+    const releaseInfo = getBleFirmwareReleaseInfo(this.device.features);
+    return releaseInfo;
   }
 }

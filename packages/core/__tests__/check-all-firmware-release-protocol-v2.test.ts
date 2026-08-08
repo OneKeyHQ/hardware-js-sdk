@@ -5,7 +5,6 @@ import CheckAllFirmwareRelease, {
 } from '../src/api/CheckAllFirmwareRelease';
 import { DataManager } from '../src/data-manager';
 import { createCoreApi } from '../src/inject';
-import { PROTOCOL_V2_RESOURCE_DEVICE_PATHS } from '../src/protocols/protocol-v2/resources';
 
 import type { CoreApi } from '../src/types/api';
 import type { DeviceStateVersions, IFirmwareReleaseInfo } from '../src/types';
@@ -73,67 +72,10 @@ const release: IFirmwareReleaseInfo = {
   ],
 };
 
-const stableResources = ['images', 'animation', 'wallpaper', 'translations', 'roobert', 'noto'].map(
-  (type, index) => ({
-    type,
-    url: `https://example.com/${type}.okpkg`,
-    size: 0x52a0 + index + 1,
-    fileHash: 'a'.repeat(64),
-    headerHash: index.toString(16).padStart(128, '0'),
-  })
-);
-
-const createFilesystemTypedCall = (missingAll = false) => {
-  const resourceByPath = new Map(
-    stableResources.map(resource => [
-      PROTOCOL_V2_RESOURCE_DEVICE_PATHS[
-        resource.type as keyof typeof PROTOCOL_V2_RESOURCE_DEVICE_PATHS
-      ],
-      resource,
-    ])
-  );
-  return jest.fn((requestType: string, _responseType: string, payload: Record<string, any>) => {
-    if (requestType === 'ResourceInventoryGet') {
-      throw new Error('ResourceInventoryGet is unavailable on released firmware');
-    }
-    if (requestType === 'FilesystemPathInfoQuery') {
-      const resource = resourceByPath.get(payload.path);
-      return {
-        message: {
-          exist: Boolean(resource) && !missingAll,
-          directory: false,
-          size: missingAll ? 0 : resource?.size,
-        },
-      };
-    }
-    if (requestType === 'FilesystemFileRead') {
-      const resource = resourceByPath.get(payload.file.path);
-      if (!resource || missingAll) throw new Error('missing resource');
-      const header = new Uint8Array(0x52a0);
-      const view = new DataView(header.buffer);
-      'OKPP'.split('').forEach((char, index) => {
-        header[index] = char.charCodeAt(0);
-      });
-      'RESC'.split('').forEach((char, index) => {
-        header[0x08 + index] = char.charCodeAt(0);
-      });
-      view.setUint32(0x0c, header.byteLength, true);
-      for (let index = 0; index < resource.headerHash.length / 2; index++) {
-        header[0x240 + index] = Number.parseInt(
-          resource.headerHash.slice(index * 2, index * 2 + 2),
-          16
-        );
-      }
-      const offset = Number(payload.file.offset);
-      const chunkLength = Number(payload.chunk_len);
-      return {
-        message: {
-          data: header.slice(offset, offset + chunkLength),
-        },
-      };
-    }
-    throw new Error(`Unexpected request: ${requestType}`);
-  });
+const resourceSource = {
+  archiveUrl: 'https://example.com/pro2-resource/pro2-resource.zip',
+  archiveSha256: 'a'.repeat(64),
+  archiveSize: 16_815_479,
 };
 
 describe('checkAllFirmwareRelease Protocol V2 support', () => {
@@ -370,7 +312,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       status: { mode: 'normal' },
       versions: currentVersions,
     });
-    const typedCall = createFilesystemTypedCall(true);
+    const typedCall = jest.fn();
     method.device = {
       isProtocolV2: () => true,
       features: {
@@ -381,14 +323,25 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       getCommands: () => ({ typedCall }),
     } as unknown as CheckAllFirmwareRelease['device'];
     jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(release);
-    jest.spyOn(DataManager, 'getProtocolV2Resources').mockReturnValue(stableResources as any);
+    jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
 
     await expect(method.run()).resolves.toMatchObject({
       protocol: 'V2',
       deviceType: 'pro2',
       status: 'required',
       resourceStatus: 'unknown',
-      targetsToUpdate: ['boot', 'app_v1'],
+      resourceArchive: resourceSource,
+      resourcePreparationRequired: true,
+      targetsToUpdate: ['boot', 'app_v1', 'resource'],
+      firmwareUpdatePlan: {
+        executor: 'v4',
+        platform: 'web',
+        artifacts: [
+          { artifactId: 'component:boot', target: 'boot' },
+          { artifactId: 'component:app_v1', target: 'app_v1' },
+        ],
+        targetsToUpdate: ['boot', 'app_v1'],
+      },
       firmware: {
         status: 'required',
       },
@@ -398,6 +351,260 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       refreshSections: ['identity', 'versions'],
     });
     expect(method.getSupportedProtocols()).toEqual(['V1', 'V2']);
+  });
+
+  test('preserves platform and forced firmware targets in the Protocol V2 prepared plan', async () => {
+    const method = new CheckAllFirmwareRelease({
+      id: 1,
+      payload: {
+        method: 'checkAllFirmwareRelease',
+        firmwareType: EFirmwareType.Universal,
+        platform: 'native',
+        forceUpdateTargets: ['firmware'],
+      },
+    });
+    method.init();
+    method.device = {
+      isProtocolV2: () => true,
+      features: {
+        deviceType: 'pro2',
+        serialNo: 'pro2-device-id',
+        firmwareVersion: '1.0.0',
+      },
+      getDeviceState: jest.fn().mockResolvedValue({
+        identity: { deviceType: 'pro2', firmwareType: EFirmwareType.Universal },
+        status: { mode: 'normal' },
+        versions: currentVersions,
+      }),
+    } as unknown as CheckAllFirmwareRelease['device'];
+    jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(release);
+    jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
+
+    await expect(method.run()).resolves.toMatchObject({
+      targetsToUpdate: ['boot', 'app_v1', 'se02', 'se03', 'resource'],
+      firmwareUpdatePlan: {
+        executor: 'v4',
+        deviceIdentity: 'pro2-device-id',
+        platform: 'native',
+        artifacts: [
+          { artifactId: 'component:boot', target: 'boot' },
+          { artifactId: 'component:app_v1', target: 'app_v1' },
+          { artifactId: 'component:se02', target: 'se02' },
+          { artifactId: 'component:se03', target: 'se03' },
+        ],
+        targetsToUpdate: ['boot', 'app_v1', 'se02', 'se03'],
+      },
+    });
+  });
+
+  test('includes exact Protocol V2 developer force targets in the prepared plan', async () => {
+    const currentRelease: IFirmwareReleaseInfo = {
+      ...release,
+      required: false,
+      version: [1, 0, 0],
+      installOrder: ['applicationP1', 'coprocessor'],
+      components: {
+        applicationP1: {
+          target: 'APPLICATION_P1',
+          url: 'https://example.com/application-p1.okpkg',
+          version: [1, 0, 0],
+        },
+        coprocessor: {
+          target: 'COPROCESSOR',
+          url: 'https://example.com/coprocessor.okpkg',
+          version: [1, 0, 0],
+        },
+      },
+    };
+    const method = new CheckAllFirmwareRelease({
+      id: 1,
+      payload: {
+        method: 'checkAllFirmwareRelease',
+        platform: 'desktop',
+        protocolV2ForceUpdateTargets: ['app_v1', 'coprocessor'],
+      },
+    });
+    method.init();
+    method.device = {
+      isProtocolV2: () => true,
+      features: {
+        deviceType: 'pro2',
+        serialNo: 'pro2-device-id',
+        firmwareVersion: '1.0.0',
+      },
+      getDeviceState: jest.fn().mockResolvedValue({
+        identity: { deviceType: 'pro2', firmwareType: EFirmwareType.Universal },
+        status: { mode: 'normal' },
+        versions: { ...currentVersions, applicationP1: '1.0.0' },
+      }),
+    } as unknown as CheckAllFirmwareRelease['device'];
+    jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(currentRelease);
+    jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
+
+    await expect(method.run()).resolves.toMatchObject({
+      targetsToUpdate: ['app_v1', 'coprocessor', 'resource'],
+      firmwareUpdatePlan: {
+        executor: 'v4',
+        platform: 'desktop',
+        artifacts: [
+          { artifactId: 'component:app_v1', target: 'app_v1' },
+          { artifactId: 'component:coprocessor', target: 'coprocessor' },
+        ],
+        targetsToUpdate: ['app_v1', 'coprocessor'],
+      },
+    });
+  });
+
+  test('keeps exact force targets but omits a Desktop Plan without device identity', async () => {
+    const currentRelease: IFirmwareReleaseInfo = {
+      ...release,
+      required: false,
+      version: [1, 0, 0],
+      installOrder: ['applicationP1'],
+      components: {
+        applicationP1: {
+          target: 'APPLICATION_P1',
+          url: 'https://example.com/application-p1.okpkg',
+          version: [1, 0, 0],
+        },
+      },
+    };
+    const method = new CheckAllFirmwareRelease({
+      id: 1,
+      payload: {
+        method: 'checkAllFirmwareRelease',
+        platform: 'desktop',
+        protocolV2ForceUpdateTargets: ['app_v1'],
+      },
+    });
+    method.init();
+    method.device = {
+      isProtocolV2: () => true,
+      features: { deviceType: 'pro2', firmwareVersion: '1.0.0' },
+      getDeviceState: jest.fn().mockResolvedValue({
+        identity: { deviceType: 'pro2', firmwareType: EFirmwareType.Universal },
+        status: { mode: 'normal' },
+        versions: { ...currentVersions, applicationP1: '1.0.0' },
+      }),
+    } as unknown as CheckAllFirmwareRelease['device'];
+    jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(currentRelease);
+    jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
+
+    await expect(method.run()).resolves.toMatchObject({
+      targetsToUpdate: ['app_v1', 'resource'],
+      firmwareUpdatePlan: undefined,
+    });
+  });
+
+  test('rejects Neo-only unsupported exact secure-element targets', async () => {
+    const neoRelease: IFirmwareReleaseInfo = {
+      ...release,
+      required: false,
+      installOrder: ['se03'],
+      components: {
+        se03: {
+          target: 'SE03',
+          url: 'https://example.com/se03.okpkg',
+          version: [1, 0, 0],
+        },
+      },
+    };
+    const method = new CheckAllFirmwareRelease({
+      id: 1,
+      payload: {
+        method: 'checkAllFirmwareRelease',
+        protocolV2ForceUpdateTargets: ['se03'],
+      },
+    });
+    method.init();
+    method.device = {
+      isProtocolV2: () => true,
+      features: { deviceType: 'neo', firmwareVersion: '1.0.0' },
+      getDeviceState: jest.fn().mockResolvedValue({
+        identity: { deviceType: 'neo', firmwareType: EFirmwareType.Universal },
+        status: { mode: 'normal' },
+        versions: currentVersions,
+      }),
+    } as unknown as CheckAllFirmwareRelease['device'];
+    jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(neoRelease);
+    jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
+
+    await expect(method.run()).rejects.toMatchObject({
+      params: { firmwareUpdateCode: 'FirmwarePlanInvalid' },
+    });
+  });
+
+  test('builds a V4 plan for Neo and excludes unsupported secure elements when forced', async () => {
+    const neoRelease: IFirmwareReleaseInfo = {
+      ...release,
+      installOrder: ['se01', 'se02', 'se03', 'se04'],
+      components: {
+        se01: { target: 'SE01', url: 'https://example.com/se01.bin', version: [1, 0, 0] },
+        se02: { target: 'SE02', url: 'https://example.com/se02.bin', version: [2, 0, 0] },
+        se03: { target: 'SE03', url: 'https://example.com/se03.bin', version: [1, 0, 0] },
+        se04: { target: 'SE04', url: 'https://example.com/se04.bin', version: [1, 0, 0] },
+      },
+    };
+    const method = new CheckAllFirmwareRelease({
+      id: 1,
+      payload: {
+        method: 'checkAllFirmwareRelease',
+        platform: 'native',
+        forceUpdateTargets: ['firmware'],
+      },
+    });
+    method.init();
+    method.device = {
+      isProtocolV2: () => true,
+      features: {
+        deviceType: 'neo',
+        serialNo: 'neo-device-id',
+        firmwareVersion: '1.0.0',
+      },
+      getDeviceState: jest.fn().mockResolvedValue({
+        identity: { deviceType: 'neo', firmwareType: EFirmwareType.Universal },
+        status: { mode: 'normal' },
+        versions: currentVersions,
+      }),
+    } as unknown as CheckAllFirmwareRelease['device'];
+    jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(neoRelease);
+    jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
+
+    await expect(method.run()).resolves.toMatchObject({
+      targetsToUpdate: ['se01', 'se02', 'resource'],
+      firmwareUpdatePlan: {
+        executor: 'v4',
+        deviceModel: 'neo',
+        platform: 'native',
+        targetsToUpdate: ['se01', 'se02'],
+      },
+    });
+  });
+
+  test('rejects a forced Protocol V2 resource target without a configured archive', async () => {
+    const method = new CheckAllFirmwareRelease({
+      id: 1,
+      payload: {
+        method: 'checkAllFirmwareRelease',
+        forceUpdateTargets: ['resource'],
+      },
+    });
+    method.init();
+    method.device = {
+      isProtocolV2: () => true,
+      features: { deviceType: 'pro2', firmwareVersion: '1.0.0' },
+      getDeviceState: jest.fn().mockResolvedValue({
+        identity: { deviceType: 'pro2', firmwareType: EFirmwareType.Universal },
+        status: { mode: 'normal' },
+        versions: currentVersions,
+      }),
+    } as unknown as CheckAllFirmwareRelease['device'];
+    jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(release);
+    jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(undefined);
+
+    await expect(method.run()).rejects.toMatchObject({
+      params: { firmwareUpdateCode: 'FirmwarePlanInvalid' },
+    });
   });
 
   test('requests and compares firmware hashes only when explicitly enabled', async () => {
@@ -437,7 +644,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       getCommands: () => ({ typedCall: jest.fn() }),
     } as unknown as CheckAllFirmwareRelease['device'];
     jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(packageSet);
-    jest.spyOn(DataManager, 'getProtocolV2Resources').mockReturnValue(undefined);
+    jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(undefined);
 
     await expect(method.run()).resolves.toMatchObject({
       status: 'outdated',
@@ -449,7 +656,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
   });
 
   test.each(['bootloader', 'romloader'] as const)(
-    'uses filesystem inventory in %s mode instead of forcing all resources',
+    'does not read vol0 resource inventory in %s mode',
     async mode => {
       const method = new CheckAllFirmwareRelease({
         id: 1,
@@ -459,7 +666,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         },
       });
       method.init();
-      const typedCall = createFilesystemTypedCall();
+      const typedCall = jest.fn();
       method.device = {
         isProtocolV2: () => true,
         features: { deviceType: 'pro2', firmwareVersion: '1.0.0' },
@@ -471,17 +678,61 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         getCommands: () => ({ typedCall }),
       } as unknown as CheckAllFirmwareRelease['device'];
       jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(release);
-      jest.spyOn(DataManager, 'getProtocolV2Resources').mockReturnValue(stableResources as any);
+      jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
 
       await expect(method.run()).resolves.toMatchObject({
         protocol: 'V2',
-        resourceStatus: 'valid',
-        targetsToUpdate: ['boot', 'app_v1'],
+        resourceStatus: 'unknown',
+        resourceArchive: resourceSource,
+        resourcePreparationRequired: true,
+        targetsToUpdate: ['boot', 'app_v1', 'resource'],
       });
-      expect(typedCall.mock.calls.some(call => call[0] === 'ResourceInventoryGet')).toBe(false);
-      expect(typedCall.mock.calls.some(call => call[0] === 'FilesystemFileRead')).toBe(true);
+      expect(typedCall).not.toHaveBeenCalled();
     }
   );
+
+  test('requires manifest preparation when only Protocol V2 resources may have changed', async () => {
+    const currentRelease: IFirmwareReleaseInfo = {
+      ...release,
+      required: false,
+      installOrder: ['applicationP1'],
+      components: {
+        applicationP1: {
+          target: 'APPLICATION_P1',
+          url: 'https://example.com/application-p1.okpkg',
+          version: [1, 0, 0],
+        },
+      },
+    };
+    const method = new CheckAllFirmwareRelease({
+      id: 1,
+      payload: {
+        method: 'checkAllFirmwareRelease',
+        firmwareType: EFirmwareType.Universal,
+      },
+    });
+    method.init();
+    method.device = {
+      isProtocolV2: () => true,
+      features: { deviceType: 'pro2', firmwareVersion: '1.0.0' },
+      getDeviceState: jest.fn().mockResolvedValue({
+        identity: { deviceType: 'pro2', firmwareType: EFirmwareType.Universal },
+        status: { mode: 'normal' },
+        versions: { ...currentVersions, applicationP1: '1.0.0' },
+      }),
+    } as unknown as CheckAllFirmwareRelease['device'];
+    jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(currentRelease);
+    jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
+
+    await expect(method.run()).resolves.toMatchObject({
+      status: 'unknown',
+      hasUpgrade: true,
+      resourceStatus: 'unknown',
+      resourcePreparationRequired: true,
+      targetsToUpdate: ['resource'],
+      firmwareUpdatePlan: undefined,
+    });
+  });
 
   test('continues forwarding the existing public method', async () => {
     const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
@@ -490,6 +741,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     await api.checkAllFirmwareRelease('pro2-connect-id', {
       checkFirmwareHash: true,
       firmwareType: EFirmwareType.Universal,
+      protocolV2ForceUpdateTargets: ['app_v1'],
       retryCount: 0,
     });
 
@@ -497,6 +749,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       connectId: 'pro2-connect-id',
       checkFirmwareHash: true,
       firmwareType: EFirmwareType.Universal,
+      protocolV2ForceUpdateTargets: ['app_v1'],
       retryCount: 0,
       method: 'checkAllFirmwareRelease',
     });

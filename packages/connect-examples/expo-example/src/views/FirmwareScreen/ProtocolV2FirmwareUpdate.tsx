@@ -17,7 +17,11 @@ import {
   isDirectoryPickerCancelled,
 } from './protocolV2DirectoryPicker';
 
-import type { FirmwareUpdateV4Params, FirmwareUpdateV4Target } from '@onekeyfe/hd-core';
+import type {
+  FirmwareUpdateV4Params,
+  FirmwareUpdateV4Target,
+  ProtocolV2PreparedResourceFile,
+} from '@onekeyfe/hd-core';
 import type { DocumentPickerAsset } from 'expo-document-picker';
 import type { ProtocolV2BinaryField } from './protocolV2FirmwareFiles';
 import type { InputHTMLAttributes } from 'react';
@@ -38,6 +42,7 @@ type ProtocolV2FirmwareUpdateProps = {
   onCheckUpdates: (platform: RuntimeFirmwarePlatform) => Promise<
     | (UpdateState & {
         targetsToUpdate?: FirmwareUpdateV4Target[];
+        resourceFiles?: ProtocolV2PreparedResourceFile[];
       })
     | undefined
   >;
@@ -190,6 +195,7 @@ export function ProtocolV2FirmwareUpdate({
           return;
         }
         params.targetsToUpdate = targetsToUpdate;
+        params.resourceFiles = checkResult.resourceFiles;
       } else {
         for (const target of firmwareTargets) {
           const asset = targetFiles[target.param];
