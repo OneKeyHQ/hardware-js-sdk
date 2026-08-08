@@ -110,7 +110,12 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'deviceUpdateReboot',
-    description: 'Update and reboot a device',
+    description: '[Protocol V1 Legacy] Update and reboot a device',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'deviceRebootToBootloader',
+    description: 'Reboot a Protocol V1/V2 device to bootloader mode',
     noDeviceIdReq: true,
   },
   {

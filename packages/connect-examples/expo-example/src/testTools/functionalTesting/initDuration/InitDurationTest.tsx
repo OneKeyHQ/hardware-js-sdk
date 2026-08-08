@@ -11,6 +11,7 @@ import { Button } from '../../../components/ui/Button';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
 import { CommonInput } from '../../../components/CommonInput';
+import { useDevice } from '../../../provider/DeviceProvider';
 
 import type { CoreMessage } from '@onekeyfe/hd-core';
 import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
@@ -90,6 +91,13 @@ let hardwareUiEventListener: any | undefined;
 function ExecuteView() {
   const intl = useIntl();
   const { openDialog } = useHardwareInputPinDialog();
+  const { selectedDevice } = useDevice();
+  const protocol =
+    selectedDevice?.connectProtocol ??
+    (selectedDevice?.features?.protocol === 'V1' || selectedDevice?.features?.protocol === 'V2'
+      ? selectedDevice.features.protocol
+      : undefined);
+  const isProtocolV1 = protocol === 'V1';
 
   const [intervalTime, setIntervalTime] = useState(1000);
   const [testCount, setTestCount] = useState(10);
@@ -134,14 +142,15 @@ function ExecuteView() {
       return Promise.resolve({
         method: item.method,
         params: requestParams,
+        mode: 'connection',
       });
     },
-    processRequest: async (sdk, _method, connectId, deviceId, requestParams, item) => {
+    processRequest: async ({ execute }) => {
       // eslint-disable-next-line no-promise-executor-return
       await new Promise(resolve => setTimeout(resolve, intervalTime));
       const sdkPromise = async () => {
         try {
-          const res = await sdk.testInitializeDeviceDuration(connectId, requestParams);
+          const res = await execute();
           return { payload: res, skipVerify: true };
         } catch (error) {
           console.log('=====>>>>> processRequest error: ', error);
@@ -188,7 +197,12 @@ function ExecuteView() {
     () => (
       <YStack flexWrap="wrap" gap="$2">
         <YStack>
-          <Text fontSize={14}>测试初始化设备耗时</Text>
+          <Text fontSize={14}>测试初始化设备耗时（仅支持 Protocol V1）</Text>
+          {protocol === 'V2' ? (
+            <Text fontSize={14} color="$orange10">
+              当前设备使用 Protocol V2，该 Legacy 测试不会执行。
+            </Text>
+          ) : null}
         </YStack>
 
         <Stack flexDirection="row" flexWrap="wrap" gap="$2">
@@ -210,13 +224,14 @@ function ExecuteView() {
               onStop={stopTest}
               onStart={beginTest}
               onRetryFailed={retryFailedTasks}
+              disabled={!isProtocolV1}
             />
             <ExportReportView />
           </XStack>
         </Stack>
       </YStack>
     ),
-    [beginTest, intervalTime, intl, retryFailedTasks, stopTest, testCount]
+    [beginTest, intervalTime, intl, isProtocolV1, protocol, retryFailedTasks, stopTest, testCount]
   );
 
   return contentMemo;

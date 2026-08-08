@@ -10,7 +10,7 @@ import useExportReport from '../../../components/BaseTestRunner/useExportReport'
 import { Button } from '../../../components/ui/Button';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
-import { getProtocolAwareFeatures } from '../../../utils/protocolAwareFeatures';
+import { createBootloaderDeviceTestCase, waitForBootloaderFeatures } from './deviceStateTestUtils';
 
 import type { CoreMessage, Features } from '@onekeyfe/hd-core';
 import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
@@ -106,17 +106,10 @@ function ExecuteView() {
       sdk.on(UI_EVENT, hardwareUiEventListener);
       return Promise.resolve();
     },
-    initTestCase: async (context, sdk) => {
-      const currentTestCases: TestCaseDataWithKey<TestCaseDataType>[] = [];
-      currentTestCases.push({
-        $key: 'test-lock',
-        id: 'test-lock',
-        title: '检测 Boot Device Info',
-        method: 'deviceUpdateReboot',
-        params: {},
-        type: 'lock',
-        expect: true,
-      });
+    initTestCase: async context => {
+      const currentTestCases: TestCaseDataWithKey<TestCaseDataType>[] = [
+        createBootloaderDeviceTestCase(context.deviceFeatures),
+      ];
 
       return Promise.resolve({
         title: 'testDevice',
@@ -132,27 +125,27 @@ function ExecuteView() {
       return Promise.resolve({
         method: item.method,
         params: requestParams,
+        mode: 'connection',
       });
     },
-    processRequest: async (sdk, method, connectId, deviceId, requestParams, item) => {
-      let res: any;
-      if (method.startsWith('device')) {
-        // @ts-ignore
-        res = await sdk[`${method}`](connectId, requestParams);
-      } else {
-        // @ts-ignore
-        res = await sdk[`${method}`](connectId, deviceId, requestParams);
+    processRequest: async ({ sdk, connectId, requestParams, execute }) => {
+      const rebootResponse = await execute();
+      if (!rebootResponse.success) {
+        return {
+          payload: rebootResponse,
+        };
       }
 
-      if (res.success) {
-        // eslint-disable-next-line no-promise-executor-return
-        await new Promise(resolve => setTimeout(resolve, 15 * 1000));
-      }
-      const feature = await getProtocolAwareFeatures(sdk, connectId);
-
-      return Promise.resolve({
-        payload: feature,
+      const feature = await waitForBootloaderFeatures({
+        sdk,
+        connectId,
+        expectedSerialNo: requestParams.expectedSerialNo,
+        protocolHint: requestParams.protocolHint,
       });
+
+      return {
+        payload: feature,
+      };
     },
     processResponse: (_, item, __, res) => {
       const error = '';

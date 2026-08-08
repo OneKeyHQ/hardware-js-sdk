@@ -188,17 +188,11 @@ function ExecuteView() {
       return Promise.resolve({
         method: item.method,
         params: requestParams,
+        mode: item.type === 'unlock' ? 'device' : 'connection',
       });
     },
-    processRequest: async (sdk, method, connectId, deviceId, requestParams, item) => {
-      let res: any;
-      if (method.startsWith('device')) {
-        // @ts-ignore
-        res = await sdk[`${method}`](connectId, requestParams);
-      } else {
-        // @ts-ignore
-        res = await sdk[`${method}`](connectId, deviceId, requestParams);
-      }
+    processRequest: async ({ sdk, connectId, execute }) => {
+      const res = await execute();
 
       if (!res.success) {
         return Promise.resolve({
@@ -234,7 +228,7 @@ function ExecuteView() {
       } else if (item.type === 'unlock') {
         if (payload.unlocked !== true) {
           return Promise.resolve({
-            error: `actual: ${payload.unlocked}, 预期: 设备未解锁`,
+            error: `actual: ${payload.unlocked}, 预期: 设备已解锁`,
           });
         }
         if (payload.pin_protection === false) {
@@ -247,7 +241,7 @@ function ExecuteView() {
             error: `actual: ${payload.initialized}, 预期: 设备已初始化`,
           });
         }
-        if (payload.bootloader_mode === false) {
+        if (payload.bootloader_mode === true) {
           return Promise.resolve({
             error: `actual: ${payload.bootloader_mode}, 预期: 非 bootloader 模式`,
           });
