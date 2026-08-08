@@ -30,12 +30,7 @@ import {
   ProtocolV2FirmwareTargetType,
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
-import {
-  PROTOCOL_V2_RESOURCE_DEVICE_PATHS,
-  buildProtocolV2ResourceUpdatePlan,
-  isProtocolV2ResourceFileValid,
-  readProtocolV2ResourceInventory,
-} from '../protocols/protocol-v2/resources';
+import { isProtocolV2ResourceFileValid } from '../protocols/protocol-v2/resources';
 import {
   getProtocolV2UnknownErrorText,
   isProtocolV2DeviceDisconnectedError,
@@ -59,8 +54,6 @@ import type {
   Features,
   IFirmwareReleaseInfo,
   IProtocolV2FirmwareComponent,
-  IProtocolV2Resource,
-  IProtocolV2ResourceFile,
   IVersionArray,
 } from '../types';
 import type { FirmwareByteSource } from './firmware/FirmwareArtifactSource';
@@ -251,6 +244,16 @@ const PROTOCOL_V2_FIRMWARE_STAGING_PATHS = new Set(
     target => `${PROTOCOL_V2_FIRMWARE_STAGING_VOLUME}${target.fileName}`
   )
 );
+
+const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH = 'vol0:/loaders/bootloader/boot_resource.okpkg';
+const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH = `${PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH}.staging`;
+
+const resolveProtocolV2ResourceWritePath = (devicePath: string) => {
+  const normalizedPath = devicePath.replace(/^vol0:(?!\/)/i, 'vol0:/').toLowerCase();
+  return normalizedPath === PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH
+    ? PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH
+    : devicePath;
+};
 
 const PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID = new Map<number, FirmwareUpdateV4Target>([
   [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER, 'boot'],
@@ -667,9 +670,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const hasExplicitResourceFiles = !!this.params.resourceFiles?.length;
     const wantsStableResources = !!this.params.targetsToUpdate?.includes('resource');
     const wantsBootResources = !!this.params.targetsToUpdate?.includes('boot_resources');
-    const needsRemoteResources = !hasExplicitResourceFiles && wantsStableResources;
-    const needsRemoteBootResources =
-      !hasExplicitResourceFiles && (wantsBootResources || wantsStableResources);
+    const needsPreparedResources =
+      !hasExplicitResourceFiles && (wantsStableResources || wantsBootResources);
 
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
@@ -681,8 +683,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       fwBinaryMap = this.collectExplicitTargetBinaries();
       bootloaderBinary = this.prepareBootloaderBinary();
       const needsRemoteFirmware = !this.hasExplicitProtocolV2Payload(fwBinaryMap);
+      if (needsPreparedResources) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          'Protocol V2 resource manifest must be prepared by the external firmware host',
+          {
+            firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
+          }
+        );
+      }
       if (
-        (needsRemoteFirmware || needsRemoteResources || needsRemoteBootResources) &&
+        needsRemoteFirmware &&
         (this.params.artifactReader ||
           DataManager.getSettings('firmwareManifestMode') === 'external-only')
       ) {
@@ -694,11 +705,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           }
         );
       }
-      if (needsRemoteFirmware || needsRemoteResources || needsRemoteBootResources) {
+      if (needsRemoteFirmware) {
         // Remote updates must use a freshly fetched config before any reboot or file write.
-        await DataManager.forceReloadData({
-          requireResources: needsRemoteResources || needsRemoteBootResources,
-        });
+        await DataManager.forceReloadData();
       }
       if (needsRemoteFirmware) {
         const remoteBinaries = await this.prepareRemoteProtocolV2Binaries(
@@ -709,14 +718,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         fwBinaryMap = remoteBinaries.fwBinaryMap;
         installItems = remoteBinaries.installItems;
       }
-      const bootResourceFiles = await this.prepareProtocolV2BootResources();
-      if (bootResourceFiles?.length) {
-        resourceBundles = this.mergeProtocolV2ResourceBundles(resourceBundles, bootResourceFiles);
-      }
-      if (!needsRemoteResources) {
-        this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
-      }
+      this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        'params' in err &&
+        (err as HardwareError).params?.firmwareUpdateCode === 'FirmwareArtifactsNotPrepared'
+      ) {
+        throw err;
+      }
       if (err instanceof HardwareError && err.errorCode === HardwareErrorCode.NetworkError) {
         throw err;
       }
@@ -727,34 +738,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       !bootloaderBinary &&
       fwBinaryMap.length === 0 &&
       !installItems?.length &&
-      !resourceBundles?.length &&
-      !needsRemoteResources
+      !resourceBundles?.length
     ) {
       throw ERRORS.TypedError(
         HardwareErrorCode.FirmwareUpdateDownloadFailed,
         'No firmware to update'
       );
-    }
-
-    if (needsRemoteResources) {
-      const enteredBootloader = await this.enterProtocolV2BootloaderMode();
-      try {
-        const stableResources = await this.prepareProtocolV2ResourceBundles();
-        resourceBundles = this.mergeProtocolV2ResourceBundles(resourceBundles, stableResources);
-        this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
-      } catch (err) {
-        if (enteredBootloader) {
-          try {
-            await this.exitProtocolV2BootloaderToNormal();
-          } catch (restoreError) {
-            Log.warn(
-              '[FirmwareUpdateV4] failed to restore App mode after resource preparation error:',
-              restoreError
-            );
-          }
-        }
-        throw normalizeFirmwarePreparationError(err);
-      }
     }
 
     return this.executeProtocolV2Update({
@@ -1261,117 +1250,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private getProtocolV2DeviceType(): EDeviceType.Pro2 | EDeviceType.Neo {
-    const deviceType = this.device.getCurrentDeviceType();
-    if (deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo) return deviceType;
-    throw new Error(`Unsupported Protocol V2 device type: ${deviceType}`);
-  }
-
-  private async prepareProtocolV2BootResources(): Promise<
-    ProtocolV2ResourceBundleBinary[] | undefined
-  > {
-    const wantsStableResources = !!this.params.targetsToUpdate?.includes('resource');
-    const wantsBootResources = !!this.params.targetsToUpdate?.includes('boot_resources');
-    if (!wantsStableResources && !wantsBootResources) {
-      return undefined;
-    }
-    if (this.params.resourceFiles?.length) {
-      return undefined;
-    }
-    const resource = DataManager.getProtocolV2BootResources(this.getProtocolV2DeviceType());
-    if (!resource) {
-      if (wantsBootResources) {
-        throw new Error('Missing Protocol V2 boot resources configuration');
-      }
-      Log.debug('[FirmwareUpdateV4] no boot resources configured; continue with stable resources');
-      return undefined;
-    }
-
-    const files: ProtocolV2ResourceBundleBinary[] = [];
-    for (const file of resource.files) {
-      const isCurrent =
-        !this.params.forcedUpdateRes && (await this.isProtocolV2BootResourceCurrent(file));
-      if (isCurrent) {
-        Log.log(`[FirmwareUpdateV4] boot resource unchanged, skipping ${file.devicePath}`);
-      } else {
-        Log.log(`[FirmwareUpdateV4] downloading boot resource ${file.devicePath}`);
-        const { binary } = await getSysResourceBinary(file.url);
-        if (!isProtocolV2ResourceFileValid(binary, file)) {
-          throw new Error(`Boot resource file verification failed: ${file.devicePath}`);
-        }
-        files.push({
-          name: file.name ?? file.devicePath.split('/').pop() ?? file.devicePath,
-          binary,
-          devicePath: file.devicePath,
-        });
-      }
-    }
-    return files;
-  }
-
-  private async isProtocolV2BootResourceCurrent(file: IProtocolV2ResourceFile) {
-    try {
-      const commands = this.device.getCommands();
-      const pathInfo = await commands.typedCall(
-        'FilesystemPathInfoQuery',
-        'FilesystemPathInfo',
-        { path: file.devicePath },
-        { timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT }
-      );
-      const size = toProtocolV2FiniteNumber(pathInfo.message?.size);
-      if (
-        !pathInfo.message?.exist ||
-        pathInfo.message?.directory ||
-        !Number.isSafeInteger(size) ||
-        size !== file.size
-      ) {
-        return false;
-      }
-
-      const digest = sha256.create();
-      const chunkSize = this.getProtocolV2FirmwareChunkSize('write');
-      let offset = 0;
-      while (offset < file.size) {
-        const response = await commands.typedCall(
-          'FilesystemFileRead',
-          'FilesystemFile',
-          {
-            file: { path: file.devicePath, offset, total_size: 0 },
-            chunk_len: Math.min(chunkSize, file.size - offset),
-          },
-          { timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT }
-        );
-        const data = toProtocolV2Bytes(response.message?.data);
-        if (data.byteLength === 0) return false;
-        const consumed = data.subarray(0, Math.min(data.byteLength, file.size - offset));
-        digest.update(consumed);
-        offset += consumed.byteLength;
-      }
-      return bytesToHex(digest.digest()) === normalizeProtocolV2Hex(file.fileHash);
-    } catch (error) {
-      Log.debug(
-        `[FirmwareUpdateV4] unable to compare boot resource ${file.devicePath}; scheduling rewrite`,
-        error
-      );
-      return false;
-    }
-  }
-
-  private mergeProtocolV2ResourceBundles(
-    ...groups: Array<ProtocolV2ResourceBundleBinary[] | undefined>
-  ): ProtocolV2ResourceBundleBinary[] | undefined {
-    const merged = groups.flatMap(group => group ?? []);
-    if (!merged.length) return undefined;
-    const seenPaths = new Set<string>();
-    for (const bundle of merged) {
-      if (seenPaths.has(bundle.devicePath)) {
-        throw new Error(`Duplicate Protocol V2 resource devicePath: ${bundle.devicePath}`);
-      }
-      seenPaths.add(bundle.devicePath);
-    }
-    return merged;
-  }
-
   private prepareExplicitProtocolV2ResourceFiles(): ProtocolV2ResourceBundleBinary[] | undefined {
     const files = this.params.resourceFiles ?? [];
     if (!files?.length) return undefined;
@@ -1381,8 +1259,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         file.devicePath,
         `resourceFiles[${index}].devicePath`
       );
-      const descriptor = file as typeof file &
-        Pick<Partial<IProtocolV2ResourceFile>, 'size' | 'fileHash'>;
+      const descriptor = file as typeof file & Partial<{ size: number; fileHash: string }>;
       if (descriptor.size !== undefined && descriptor.size !== file.binary.byteLength) {
         throw new Error(`resourceFiles[${index}] size mismatch`);
       }
@@ -1405,58 +1282,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       throw new Error('resourceFiles contain duplicate devicePath values');
     }
     return prepared;
-  }
-
-  private async prepareProtocolV2ResourceBundles(): Promise<
-    ProtocolV2ResourceBundleBinary[] | undefined
-  > {
-    if (!this.params.targetsToUpdate?.includes('resource')) {
-      return undefined;
-    }
-
-    const resources = DataManager.getProtocolV2Resources(this.getProtocolV2DeviceType());
-    if (!resources?.length) {
-      throw new Error('Missing Pro2 stable resource configuration');
-    }
-
-    const inventory = this.params.forcedUpdateRes
-      ? undefined
-      : await readProtocolV2ResourceInventory({
-          commands: this.device.getCommands(),
-          resources,
-          chunkSize: this.getProtocolV2FirmwareChunkSize('write'),
-          timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
-        });
-    const plan = buildProtocolV2ResourceUpdatePlan({
-      resources,
-      inventory,
-      mode: 'bootloader-recovery',
-      forced: this.params.forcedUpdateRes,
-    });
-    Log.log(
-      `[FirmwareUpdateV4] Protocol V2 resource plan mode=bootloader-recovery status=${plan.status} count=${plan.resources.length}`
-    );
-
-    const bundles: ProtocolV2ResourceBundleBinary[] = [];
-    for (const resource of plan.resources) {
-      bundles.push(await this.downloadProtocolV2Resource(resource));
-    }
-    return bundles;
-  }
-
-  private async downloadProtocolV2Resource(
-    resource: IProtocolV2Resource
-  ): Promise<ProtocolV2ResourceBundleBinary> {
-    Log.log(`[FirmwareUpdateV4] downloading Pro2 resource ${resource.type}`);
-    const { binary } = await getSysResourceBinary(resource.url);
-    if (!isProtocolV2ResourceFileValid(binary, resource)) {
-      throw new Error(`Pro2 resource file verification failed: ${resource.type}`);
-    }
-    return {
-      name: `${resource.type}.okpkg`,
-      binary,
-      devicePath: PROTOCOL_V2_RESOURCE_DEVICE_PATHS[resource.type],
-    };
   }
 
   private getProtocolV2ResourceFilePath(path: string) {
@@ -1691,13 +1516,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     resourceSources: ProtocolV2ResourceBundleSource[];
   }): ProtocolV2ExecutionPhase[] {
     const phases: ProtocolV2ExecutionPhase[] = [];
-    if (resourceSources.length > 0) {
-      phases.push({
-        kind: 'resource-sync',
-        installSources: [],
-        resourceSources,
-      });
-    }
     const bootloaderSources = installSources.filter(source => source.kind === 'bootloader');
     if (bootloaderSources.length > 0) {
       phases.push(
@@ -1712,6 +1530,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           resourceSources: [],
         }
       );
+    }
+    if (resourceSources.length > 0) {
+      phases.push({
+        kind: 'resource-sync',
+        installSources: [],
+        resourceSources,
+      });
     }
     const componentSources = installSources.filter(source => source.kind !== 'bootloader');
     if (componentSources.length > 0) {
@@ -1835,13 +1660,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
     let processedSize = 0;
     for (const resource of resourcesToSync) {
+      // The bootloader keeps its live resource package mounted. FatFs rejects
+      // replacing an open file, so early boot promotes this staging file before mounting it.
+      const writePath = resolveProtocolV2ResourceWritePath(resource.devicePath);
       processedSize = await this.protocolV2SourceUpdateProcess({
         source: resource.source,
-        filePath: resource.devicePath,
+        filePath: writePath,
         processedSize,
         totalSize,
       });
-      await this.verifyProtocolV2StagedFile(resource.devicePath, resource.source.size);
+      await this.verifyProtocolV2StagedFile(writePath, resource.source.size);
     }
 
     const stagedInstallTargets: Array<{ targetId: number; path: string }> = [];

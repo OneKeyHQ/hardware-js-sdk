@@ -61,6 +61,7 @@ export type AllFirmwareRelease = {
   hasUpgrade?: boolean;
   required?: boolean;
   resourceStatus?: 'valid' | 'outdated' | 'unknown';
+  resourceManifestUrl?: string;
   currentVersions?: DeviceStateVersions;
   components?: ProtocolV2FirmwareComponentRelease[];
   targetsToUpdate?: FirmwareUpdateV4Target[];

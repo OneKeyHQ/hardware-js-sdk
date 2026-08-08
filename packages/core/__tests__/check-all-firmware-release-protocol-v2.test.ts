@@ -5,7 +5,6 @@ import CheckAllFirmwareRelease, {
 } from '../src/api/CheckAllFirmwareRelease';
 import { DataManager } from '../src/data-manager';
 import { createCoreApi } from '../src/inject';
-import { PROTOCOL_V2_RESOURCE_DEVICE_PATHS } from '../src/protocols/protocol-v2/resources';
 
 import type { CoreApi } from '../src/types/api';
 import type { DeviceStateVersions, IFirmwareReleaseInfo } from '../src/types';
@@ -73,67 +72,8 @@ const release: IFirmwareReleaseInfo = {
   ],
 };
 
-const stableResources = ['images', 'animation', 'wallpaper', 'translations', 'roobert', 'noto'].map(
-  (type, index) => ({
-    type,
-    url: `https://example.com/${type}.okpkg`,
-    size: 0x52a0 + index + 1,
-    fileHash: 'a'.repeat(64),
-    headerHash: index.toString(16).padStart(128, '0'),
-  })
-);
-
-const createFilesystemTypedCall = (missingAll = false) => {
-  const resourceByPath = new Map(
-    stableResources.map(resource => [
-      PROTOCOL_V2_RESOURCE_DEVICE_PATHS[
-        resource.type as keyof typeof PROTOCOL_V2_RESOURCE_DEVICE_PATHS
-      ],
-      resource,
-    ])
-  );
-  return jest.fn((requestType: string, _responseType: string, payload: Record<string, any>) => {
-    if (requestType === 'ResourceInventoryGet') {
-      throw new Error('ResourceInventoryGet is unavailable on released firmware');
-    }
-    if (requestType === 'FilesystemPathInfoQuery') {
-      const resource = resourceByPath.get(payload.path);
-      return {
-        message: {
-          exist: Boolean(resource) && !missingAll,
-          directory: false,
-          size: missingAll ? 0 : resource?.size,
-        },
-      };
-    }
-    if (requestType === 'FilesystemFileRead') {
-      const resource = resourceByPath.get(payload.file.path);
-      if (!resource || missingAll) throw new Error('missing resource');
-      const header = new Uint8Array(0x52a0);
-      const view = new DataView(header.buffer);
-      'OKPP'.split('').forEach((char, index) => {
-        header[index] = char.charCodeAt(0);
-      });
-      'RESC'.split('').forEach((char, index) => {
-        header[0x08 + index] = char.charCodeAt(0);
-      });
-      view.setUint32(0x0c, header.byteLength, true);
-      for (let index = 0; index < resource.headerHash.length / 2; index++) {
-        header[0x240 + index] = Number.parseInt(
-          resource.headerHash.slice(index * 2, index * 2 + 2),
-          16
-        );
-      }
-      const offset = Number(payload.file.offset);
-      const chunkLength = Number(payload.chunk_len);
-      return {
-        message: {
-          data: header.slice(offset, offset + chunkLength),
-        },
-      };
-    }
-    throw new Error(`Unexpected request: ${requestType}`);
-  });
+const resourceSource = {
+  manifestUrl: 'https://example.com/pro2-resource/manifest.json',
 };
 
 describe('checkAllFirmwareRelease Protocol V2 support', () => {
@@ -370,7 +310,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       status: { mode: 'normal' },
       versions: currentVersions,
     });
-    const typedCall = createFilesystemTypedCall(true);
+    const typedCall = jest.fn();
     method.device = {
       isProtocolV2: () => true,
       features: {
@@ -381,13 +321,14 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       getCommands: () => ({ typedCall }),
     } as unknown as CheckAllFirmwareRelease['device'];
     jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(release);
-    jest.spyOn(DataManager, 'getProtocolV2Resources').mockReturnValue(stableResources as any);
+    jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
 
     await expect(method.run()).resolves.toMatchObject({
       protocol: 'V2',
       deviceType: 'pro2',
       status: 'required',
       resourceStatus: 'unknown',
+      resourceManifestUrl: resourceSource.manifestUrl,
       targetsToUpdate: ['boot', 'app_v1'],
       firmware: {
         status: 'required',
@@ -437,7 +378,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       getCommands: () => ({ typedCall: jest.fn() }),
     } as unknown as CheckAllFirmwareRelease['device'];
     jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(packageSet);
-    jest.spyOn(DataManager, 'getProtocolV2Resources').mockReturnValue(undefined);
+    jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(undefined);
 
     await expect(method.run()).resolves.toMatchObject({
       status: 'outdated',
@@ -449,7 +390,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
   });
 
   test.each(['bootloader', 'romloader'] as const)(
-    'uses filesystem inventory in %s mode instead of forcing all resources',
+    'does not read vol0 resource inventory in %s mode',
     async mode => {
       const method = new CheckAllFirmwareRelease({
         id: 1,
@@ -459,7 +400,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         },
       });
       method.init();
-      const typedCall = createFilesystemTypedCall();
+      const typedCall = jest.fn();
       method.device = {
         isProtocolV2: () => true,
         features: { deviceType: 'pro2', firmwareVersion: '1.0.0' },
@@ -471,15 +412,15 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         getCommands: () => ({ typedCall }),
       } as unknown as CheckAllFirmwareRelease['device'];
       jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(release);
-      jest.spyOn(DataManager, 'getProtocolV2Resources').mockReturnValue(stableResources as any);
+      jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
 
       await expect(method.run()).resolves.toMatchObject({
         protocol: 'V2',
-        resourceStatus: 'valid',
+        resourceStatus: 'unknown',
+        resourceManifestUrl: resourceSource.manifestUrl,
         targetsToUpdate: ['boot', 'app_v1'],
       });
-      expect(typedCall.mock.calls.some(call => call[0] === 'ResourceInventoryGet')).toBe(false);
-      expect(typedCall.mock.calls.some(call => call[0] === 'FilesystemFileRead')).toBe(true);
+      expect(typedCall).not.toHaveBeenCalled();
     }
   );
 

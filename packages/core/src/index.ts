@@ -22,6 +22,12 @@ export { preloadSessionCache } from './device/Device';
 export { projectFeatures as projectDeviceStateFeatures } from './device/DeviceStateProjector';
 export { getMethodSupportedProtocols } from './api/utils';
 export {
+  parseProtocolV2ResourceManifest,
+  prepareProtocolV2ResourceFiles,
+  resolveProtocolV2ResourceManifestFileUrl,
+  selectProtocolV2ResourceManifestFiles,
+} from './protocols/protocol-v2/resources';
+export {
   getFirmwareUpdateHostBindingGeneration,
   registerFirmwareUpdateHostBinding,
   unregisterFirmwareUpdateHostBinding,

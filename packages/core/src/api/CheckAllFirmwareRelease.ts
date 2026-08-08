@@ -21,10 +21,6 @@ import {
 } from './firmware/FirmwareUpdatePlan';
 import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
 import {
-  buildProtocolV2ResourceUpdatePlan,
-  readProtocolV2ResourceInventory,
-} from '../protocols/protocol-v2/resources';
-import {
   LoggerNames,
   getDeviceFirmwareVersion,
   getDeviceType,
@@ -419,35 +415,9 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     });
     const resourceDeviceType =
       state.identity.deviceType === 'neo' ? EDeviceType.Neo : EDeviceType.Pro2;
-    const resources = DataManager.getProtocolV2Resources(resourceDeviceType);
-    let resourceStatus: 'valid' | 'outdated' | 'unknown' = 'unknown';
-    if (resources?.length) {
-      const loaderMode = state.status.mode === 'bootloader' || state.status.mode === 'romloader';
-      // Application mode rejects host access to vol0:/bundles. Resource inventory is
-      // resolved after FirmwareUpdateV4 enters a loader instead of probing here.
-      if (loaderMode) {
-        try {
-          const inventory = await readProtocolV2ResourceInventory({
-            commands: this.device.getCommands(),
-            resources,
-          });
-          resourceStatus = buildProtocolV2ResourceUpdatePlan({
-            resources,
-            inventory,
-            mode: 'bootloader-recovery',
-          }).status;
-        } catch {
-          resourceStatus = buildProtocolV2ResourceUpdatePlan({
-            resources,
-            mode: 'bootloader-recovery',
-          }).status;
-        }
-      }
-    }
-    const targetsToUpdate = [
-      ...plan.targetsToUpdate,
-      ...(resourceStatus === 'outdated' ? (['resource'] as const) : []),
-    ];
+    const resourceSource = DataManager.getProtocolV2ResourceSource(resourceDeviceType);
+    const resourceStatus = 'unknown' as const;
+    const targetsToUpdate = [...plan.targetsToUpdate];
     const firmwareStatus = plan.status === 'unavailable' ? 'unknown' : plan.status;
     const emptyRelease = 'none' as const;
 
@@ -471,7 +441,8 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       deviceType: state.identity.deviceType,
       ...plan,
       resourceStatus,
-      hasUpgrade: plan.hasUpgrade || resourceStatus === 'outdated',
+      resourceManifestUrl: resourceSource?.manifestUrl,
+      hasUpgrade: plan.hasUpgrade,
       targetsToUpdate,
     };
   }

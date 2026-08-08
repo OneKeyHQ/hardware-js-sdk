@@ -3,6 +3,7 @@ import {
   prepareFirmwareUpdatePlan,
   validateFirmwareUpdatePreparedPlan,
 } from './api/firmware/FirmwareUpdatePreparedPlan';
+import { prepareProtocolV2ResourceFiles } from './protocols/protocol-v2/resources';
 import {
   getFirmwareUpdateHostBindingGeneration,
   registerFirmwareUpdateHostBinding,
@@ -168,6 +169,7 @@ export const createCoreApi = (
   getFirmwareUpdateHostBindingGeneration,
   prepareFirmwareUpdatePlan,
   validateFirmwareUpdatePreparedPlan,
+  prepareProtocolV2ResourceFiles,
   getLogs: () => call({ method: 'getLogs' }),
   clearSessionCache: params => call({ ...params, method: 'clearSessionCache' }),
   /**
