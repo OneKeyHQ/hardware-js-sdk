@@ -9,6 +9,7 @@ import type { FirmwareUpdateV4Target } from '../../types/api/firmwareUpdate';
 
 export const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH =
   'vol0:/loaders/bootloader/boot_resource.okpkg';
+export const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH = `${PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH}.staging`;
 export const PROTOCOL_V2_ROM_PARAMS_PACKAGE_PATH = 'vol0:/loaders/rom/params.okpkg';
 
 const SHA256_HEX_LENGTH = 64;

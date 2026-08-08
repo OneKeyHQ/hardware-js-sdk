@@ -30,10 +30,7 @@ import {
   ProtocolV2FirmwareTargetType,
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
-import {
-  PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH,
-  isProtocolV2ResourceFileValid,
-} from '../protocols/protocol-v2/resources';
+import { isProtocolV2ResourceFileValid } from '../protocols/protocol-v2/resources';
 import {
   getProtocolV2UnknownErrorText,
   isProtocolV2DeviceDisconnectedError,
@@ -251,7 +248,15 @@ const PROTOCOL_V2_FIRMWARE_STAGING_PATHS = new Set(
   )
 );
 
+const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH = 'vol0:/loaders/bootloader/boot_resource.okpkg';
 const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH = `${PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH}.staging`;
+
+const resolveProtocolV2ResourceWritePath = (devicePath: string) => {
+  const normalizedPath = devicePath.replace(/^vol0:(?!\/)/i, 'vol0:/').toLowerCase();
+  return normalizedPath === PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH
+    ? PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH
+    : devicePath;
+};
 
 const PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID = new Map<number, FirmwareUpdateV4Target>([
   [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER, 'boot'],
@@ -1255,11 +1260,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         file.devicePath,
         `resourceFiles[${index}].devicePath`
       );
-      if (devicePath.toLowerCase() === PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH) {
-        throw new Error(
-          `resourceFiles[${index}].devicePath must use ${PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH}`
-        );
-      }
       const descriptor = file as typeof file & Partial<{ size: number; fileHash: string }>;
       if (descriptor.size !== undefined && descriptor.size !== file.binary.byteLength) {
         throw new Error(`resourceFiles[${index}] size mismatch`);
@@ -1668,13 +1668,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
     let processedSize = 0;
     for (const resource of resourcesToSync) {
+      // The bootloader keeps its live resource package mounted. FatFs rejects
+      // replacing an open file, so early boot promotes this staging file before mounting it.
+      const writePath = resolveProtocolV2ResourceWritePath(resource.devicePath);
       processedSize = await this.protocolV2SourceUpdateProcess({
         source: resource.source,
-        filePath: resource.devicePath,
+        filePath: writePath,
         processedSize,
         totalSize,
       });
-      await this.verifyProtocolV2StagedFile(resource.devicePath, resource.source.size);
+      await this.verifyProtocolV2StagedFile(writePath, resource.source.size);
     }
 
     const stagedInstallTargets: Array<{ targetId: number; path: string }> = [];

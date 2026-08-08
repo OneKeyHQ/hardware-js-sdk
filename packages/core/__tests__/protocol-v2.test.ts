@@ -6266,7 +6266,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect((method as any).waitForProtocolV2FirmwareUpdateComplete).not.toHaveBeenCalled();
   });
 
-  test('writes the boot resource package to its fixed path after entering bootloader', async () => {
+  test('writes the mounted boot resource package through its staging path', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6276,10 +6276,8 @@ describe('Protocol V2 firmware update targets', () => {
 
     method.postTipMessage = jest.fn();
     method.postProgressMessage = jest.fn();
-    const writeResource = jest.fn().mockResolvedValue(3);
-    const enterBootloader = jest.fn().mockResolvedValue(undefined);
-    (method as any).protocolV2SourceUpdateProcess = writeResource;
-    (method as any).enterProtocolV2BootloaderMode = enterBootloader;
+    (method as any).protocolV2SourceUpdateProcess = jest.fn().mockResolvedValue(3);
+    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
     (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
     (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
 
@@ -6295,49 +6293,11 @@ describe('Protocol V2 firmware update targets', () => {
       fwBinaryMap: [],
     });
 
+    const stagingPath = 'vol0:/loaders/bootloader/boot_resource.okpkg.staging';
     expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledWith(
-      expect.objectContaining({
-        filePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
-      })
+      expect.objectContaining({ filePath: stagingPath })
     );
-    expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledWith(
-      'vol0:/loaders/bootloader/boot_resource.okpkg',
-      3
-    );
-    expect(enterBootloader).toHaveBeenCalledTimes(1);
-    expect(enterBootloader.mock.invocationCallOrder[0]).toBeLessThan(
-      writeResource.mock.invocationCallOrder[0]
-    );
-  });
-
-  test('rejects the obsolete boot resource staging path before bootloader entry', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-        platform: 'web',
-        targetsToUpdate: ['resource'],
-        resourceFiles: [
-          {
-            binary: new Uint8Array([1, 2, 3]).buffer,
-            devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg.staging',
-          },
-        ],
-      },
-    });
-    method.init();
-    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
-    (method as any).device = stubDevice({
-      originalDescriptor: { protocolType: 'V2' },
-      features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
-    });
-    (method as any).enterProtocolV2BootloaderMode = jest.fn();
-    method.postTipMessage = jest.fn();
-
-    await expect(method.run()).rejects.toThrow(
-      'devicePath must use vol0:/loaders/bootloader/boot_resource.okpkg'
-    );
-    expect((method as any).enterProtocolV2BootloaderMode).not.toHaveBeenCalled();
+    expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledWith(stagingPath, 3);
   });
 
   test('uses absolute processed_byte offsets and disables append for firmware file writes', async () => {
