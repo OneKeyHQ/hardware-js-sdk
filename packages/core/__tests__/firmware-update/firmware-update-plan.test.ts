@@ -1,6 +1,9 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
-import { buildFirmwareUpdatePlan } from '../../src/api/firmware/FirmwareUpdatePlan';
+import {
+  buildFirmwareUpdatePlan,
+  validateProtocolV2FirmwareUpdateTargets,
+} from '../../src/api/firmware/FirmwareUpdatePlan';
 import {
   assertFirmwareUpdatePreparedPlanDeviceIdentity,
   prepareFirmwareUpdatePlan,
@@ -86,6 +89,18 @@ const createProtocolV2ForceInput = (
   ble: noUpdate,
   bootloader: noUpdate,
   forceUpdateTargets: forceUpdateTargets as BuildPlanInput['forceUpdateTargets'],
+});
+
+describe('validateProtocolV2FirmwareUpdateTargets', () => {
+  test('normalizes the deprecated boot_resources alias to resource', () => {
+    expect(validateProtocolV2FirmwareUpdateTargets(['boot_resources'])).toEqual(['resource']);
+  });
+
+  test('rejects duplicate semantic targets after alias normalization', () => {
+    expectFirmwarePlanInvalid(() =>
+      validateProtocolV2FirmwareUpdateTargets(['boot_resources', 'resource'])
+    );
+  });
 });
 
 describe('buildFirmwareUpdatePlan', () => {

@@ -216,15 +216,20 @@ export const validateProtocolV2FirmwareUpdateTargets = (
   if (value === undefined) {
     return [];
   }
+  if (!Array.isArray(value)) {
+    return planError('Protocol V2 firmware update targets are invalid');
+  }
+  const normalizedTargets = value.map(target =>
+    target === 'boot_resources' ? 'resource' : target
+  );
   if (
-    !Array.isArray(value) ||
-    value.length > PROTOCOL_V2_FIRMWARE_UPDATE_TARGETS.size ||
-    value.some(target => !PROTOCOL_V2_FIRMWARE_UPDATE_TARGETS.has(target)) ||
-    new Set(value).size !== value.length
+    normalizedTargets.length > PROTOCOL_V2_FIRMWARE_UPDATE_TARGETS.size ||
+    normalizedTargets.some(target => !PROTOCOL_V2_FIRMWARE_UPDATE_TARGETS.has(target)) ||
+    new Set(normalizedTargets).size !== normalizedTargets.length
   ) {
     return planError('Protocol V2 firmware update targets are invalid');
   }
-  return [...value] as FirmwareUpdateV4Target[];
+  return normalizedTargets as FirmwareUpdateV4Target[];
 };
 
 const assertExactKeys = (

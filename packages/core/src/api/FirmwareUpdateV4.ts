@@ -1191,7 +1191,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
       );
     }
-    const zip = await JSZip.loadAsync(binary);
+    let zip: JSZip;
+    try {
+      zip = await JSZip.loadAsync(binary);
+    } catch {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 resource ZIP cannot be parsed',
+        { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
+      );
+    }
     const zipEntries = Object.values(zip.files);
     if (
       zipEntries.some(entry => entry.unsafeOriginalName && entry.unsafeOriginalName !== entry.name)

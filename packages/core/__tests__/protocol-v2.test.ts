@@ -6904,6 +6904,30 @@ describe('Protocol V2 firmware update targets', () => {
     );
   });
 
+  test('maps malformed resource ZIPs to a typed firmware preparation error', async () => {
+    const loadSpy = jest.spyOn(JSZip, 'loadAsync').mockRejectedValue(new Error('corrupt ZIP'));
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['resource'],
+      },
+    });
+    method.init();
+
+    try {
+      await expect(
+        (method as any).prepareProtocolV2LocalResourceArchive(new Uint8Array([1]).buffer)
+      ).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.RuntimeError,
+        params: { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' },
+      });
+    } finally {
+      loadSpy.mockRestore();
+    }
+  });
+
   test('rejects an oversized ZIP entry before allocating its decompressed bytes', async () => {
     const extractEntry = jest.fn();
     const loadSpy = jest.spyOn(JSZip, 'loadAsync').mockResolvedValue({
