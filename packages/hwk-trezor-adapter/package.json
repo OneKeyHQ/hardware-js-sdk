@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-trezor-adapter",
-  "version": "1.2.0-alpha.78",
+  "version": "1.2.0-alpha.97",
   "description": "Trezor hardware wallet adapter primitives for OneKey",
   "author": "OneKey",
   "license": "MIT",
@@ -43,8 +43,8 @@
     "crypto"
   ],
   "dependencies": {
-    "@onekeyfe/hwk-adapter-core": "1.2.0-alpha.78",
-    "@onekeyfe/hwk-trezor-core": "1.2.0-alpha.78",
+    "@onekeyfe/hwk-adapter-core": "1.2.0-alpha.97",
+    "@onekeyfe/hwk-trezor-core": "1.2.0-alpha.97",
     "tslib": "^2.6.2"
   },
   "devDependencies": {
