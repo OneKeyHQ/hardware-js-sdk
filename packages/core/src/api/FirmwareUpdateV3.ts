@@ -25,6 +25,7 @@ import {
   assertFirmwareUpdatePreparedPlanBinding,
   assertFirmwareUpdatePreparedPlanDeviceIdentity,
   getFirmwareUpdateResourceName,
+  validateFirmwareUpdatePreparedPlan,
 } from './firmware/FirmwareUpdatePreparedPlan';
 
 import type {
@@ -77,13 +78,19 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'firmwareType', type: 'string' },
       { name: 'platform', type: 'string' },
     ]);
-    const hostBinding =
+    const preparedPlan =
       payload.artifacts || payload.preparedPlan
-        ? resolveFirmwareUpdateHostBinding(payload.hostBindingGeneration)
+        ? validateFirmwareUpdatePreparedPlan(payload.preparedPlan)
         : undefined;
+    const hostBinding = preparedPlan
+      ? resolveFirmwareUpdateHostBinding(
+          payload.hostBindingGeneration,
+          preparedPlan.preparedPlanDigest
+        )
+      : undefined;
     if (hostBinding) {
       assertFirmwareUpdatePreparedPlanBinding({
-        preparedPlan: payload.preparedPlan,
+        preparedPlan,
         executor: 'v3',
         platform: payload.platform,
         scopeTargets: ['bootloader', 'firmware', 'resource', 'ble'],
@@ -124,7 +131,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     this.params = {
-      preparedPlan: payload.preparedPlan,
+      preparedPlan,
       bleBinary: payload.bleBinary,
       firmwareBinary: payload.firmwareBinary,
       forcedUpdateRes: payload.forcedUpdateRes,

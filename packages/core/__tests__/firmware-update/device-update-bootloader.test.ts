@@ -9,6 +9,7 @@ import {
 jest.mock('../../src/api/firmware/FirmwareUpdatePreparedPlan', () => ({
   assertFirmwareUpdatePreparedPlanBinding: jest.fn(),
   assertFirmwareUpdatePreparedPlanDeviceIdentity: jest.fn(),
+  validateFirmwareUpdatePreparedPlan: jest.fn((preparedPlan: unknown) => preparedPlan),
 }));
 
 jest.mock('../../src/data-manager', () => ({
@@ -46,7 +47,7 @@ const createMethod = () => {
       method: 'deviceUpdateBootloader',
       artifact,
       hostBindingGeneration,
-      preparedPlan: {},
+      preparedPlan: { preparedPlanDigest: 'a'.repeat(64) },
     },
   });
   (method as any).device = {

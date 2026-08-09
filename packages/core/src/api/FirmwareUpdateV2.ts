@@ -33,6 +33,7 @@ import {
   assertFirmwareUpdatePreparedPlanBinding,
   assertFirmwareUpdatePreparedPlanDeviceIdentity,
   getFirmwareUpdateResourceName,
+  validateFirmwareUpdatePreparedPlan,
 } from './firmware/FirmwareUpdatePreparedPlan';
 
 import type { Features, KnownDevice } from '../types';
@@ -200,7 +201,11 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     }
 
     if ('artifact' in payload) {
-      const hostBinding = resolveFirmwareUpdateHostBinding(payload.hostBindingGeneration);
+      const preparedPlan = validateFirmwareUpdatePreparedPlan(payload.preparedPlan);
+      const hostBinding = resolveFirmwareUpdateHostBinding(
+        payload.hostBindingGeneration,
+        preparedPlan.preparedPlanDigest
+      );
       const target = payload.isUpdateBootloader ? 'bootloader' : payload.updateType;
       const resourceBindings = (payload.resourceEntries ?? []).map(
         (entry: { entryName: string; artifact: FirmwareArtifactReference }) => ({
@@ -210,7 +215,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         })
       );
       assertFirmwareUpdatePreparedPlanBinding({
-        preparedPlan: payload.preparedPlan,
+        preparedPlan,
         executor: 'v2',
         platform: payload.platform,
         scopeTargets: [target, ...(target === 'firmware' ? (['resource'] as const) : [])],
@@ -218,7 +223,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       });
       this.params = {
         ...this.params,
-        preparedPlan: payload.preparedPlan,
+        preparedPlan,
         artifact: payload.artifact,
         resourceEntries: payload.resourceEntries,
         artifactReader: hostBinding.artifactReader,

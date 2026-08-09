@@ -14,6 +14,7 @@ import { resolveFirmwareUpdateHostBinding } from '../firmware/FirmwareHostBindin
 import {
   assertFirmwareUpdatePreparedPlanBinding,
   assertFirmwareUpdatePreparedPlanDeviceIdentity,
+  validateFirmwareUpdatePreparedPlan,
 } from '../firmware/FirmwareUpdatePreparedPlan';
 import { getDeviceType, getDeviceUUID } from '../../utils';
 import { resolveDeviceBootloaderMode } from '../../utils/deviceFeaturesCompat';
@@ -157,8 +158,14 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
     const { features } = device;
 
     const payload = this.payload as DeviceUpdateBootloaderParams;
-    const hostBinding = payload.artifact
-      ? resolveFirmwareUpdateHostBinding(payload.hostBindingGeneration)
+    const preparedPlan = payload.artifact
+      ? validateFirmwareUpdatePreparedPlan(payload.preparedPlan)
+      : undefined;
+    const hostBinding = preparedPlan
+      ? resolveFirmwareUpdateHostBinding(
+          payload.hostBindingGeneration,
+          preparedPlan.preparedPlanDigest
+        )
       : undefined;
     const executionParams = {
       ...payload,
@@ -166,13 +173,13 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
     };
     if (payload.artifact) {
       assertFirmwareUpdatePreparedPlanDeviceIdentity({
-        preparedPlan: payload.preparedPlan,
+        preparedPlan,
         deviceIdentity: getDeviceUUID(features) || undefined,
         bootloaderMode: resolveDeviceBootloaderMode(features),
         deviceModel: String(getDeviceType(features)),
       });
       assertFirmwareUpdatePreparedPlanBinding({
-        preparedPlan: payload.preparedPlan,
+        preparedPlan,
         executor: 'v2',
         scopeTargets: ['bootloader'],
         bindings: [
