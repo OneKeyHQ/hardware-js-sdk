@@ -158,13 +158,6 @@ export interface FirmwareUpdateV4Params {
   se04Binary?: ArrayBuffer;
   /** Complete Protocol V2 resource ZIP for local development; Core converts it to a local PreparedPlan. */
   resourceArchiveBinary?: ArrayBuffer;
-  /** @deprecated Package the complete signed resource set as a ZIP and use resourceArchiveBinary. */
-  resourceFiles?: Array<{
-    binary: ArrayBuffer;
-    devicePath: string;
-    size?: number;
-    fileHash?: string;
-  }>;
   forcedUpdateRes?: boolean;
   artifactReader?: FirmwareArtifactReader;
   componentArtifacts?: Partial<
@@ -173,11 +166,6 @@ export interface FirmwareUpdateV4Params {
       FirmwareArtifactReference
     >
   >;
-  /** @deprecated Use a ZIP artifact in preparedPlan instead. */
-  resourceBundleArtifacts?: Array<{
-    name: string;
-    artifact: FirmwareArtifactReference;
-  }>;
 }
 
 export declare function registerFirmwareUpdateHostBinding(

@@ -189,6 +189,8 @@ Bootloader 或 Romloader 时复用当前 loader 连接，不重复 reboot。
 完整资源 ZIP 通过 `resourceArchiveBinary` 传入。Core 会把本地组件和资源 ZIP 转换成本地 Plan、PreparedPlan、
 receipt 与内存 `ArtifactReader`；该路径不读取或匹配远程配置，但仍会在修改设备前校验 ZIP 声明展开大小、
 manifest 合约、允许写入路径、条目集合、文件大小和 SHA-256；设备端继续负责签名包的最终验证与启用。
+旧的 `resourceFiles` 与 `resourceBundleArtifacts` 裸文件参数已从公共类型中移除；调用方必须迁移到
+`resourceArchiveBinary` 或完整 `PreparedPlan`，旧的 JavaScript 调用会收到带迁移说明的参数错误。
 不得把本地文件作为远程 Plan 的 override 来绕过远程收据校验。
 
 ## 包职责速查

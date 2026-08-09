@@ -706,6 +706,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       }
       return result;
     }, {});
+    const localTargetsToUpdate = payload.targetsToUpdate?.map((target: FirmwareUpdateV4Target) =>
+      target === 'boot_resources' ? 'resource' : target
+    );
+    if (
+      payload.resourceArchiveBinary &&
+      localTargetsToUpdate &&
+      !localTargetsToUpdate.includes('resource')
+    ) {
+      localTargetsToUpdate.push('resource');
+    }
+    // 本地 ZIP 本身就是明确的资源升级请求，不要求调用方重复声明 target。
+    const resolvedLocalTargetsToUpdate =
+      localTargetsToUpdate ?? (payload.resourceArchiveBinary ? ['resource'] : undefined);
 
     this.params = {
       preparedPlan,
@@ -724,9 +737,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       firmwareType: preparedPlan?.firmwareType ?? payload.firmwareType,
       targetsToUpdate: preparedPlan
         ? ([...preparedPlan.targetsToUpdate] as FirmwareUpdateV4Target[])
-        : payload.targetsToUpdate?.map((target: FirmwareUpdateV4Target) =>
-            target === 'boot_resources' ? 'resource' : target
-          ),
+        : resolvedLocalTargetsToUpdate,
       expectedTargetVersions: preparedPlan
         ? preparedExpectedTargetVersions
         : payload.expectedTargetVersions,

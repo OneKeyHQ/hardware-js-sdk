@@ -6609,12 +6609,13 @@ describe('Protocol V2 firmware update targets', () => {
       payload: {
         method: 'firmwareUpdateV4',
         platform: 'web',
-        targetsToUpdate: ['app_v1', 'resource'],
+        targetsToUpdate: ['app_v1'],
         applicationP1Binary,
         resourceArchiveBinary,
       },
     });
     method.init();
+    expect((method as any).params.targetsToUpdate).toEqual(['app_v1', 'resource']);
     (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
     (method as any).postTipMessage = jest.fn();
     (method as any).device = stubDevice({

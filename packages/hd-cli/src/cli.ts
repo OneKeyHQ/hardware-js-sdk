@@ -637,6 +637,7 @@ program
   .option('--se02 <path>', 'FW_MGMT_TARGET_SE02 binary path')
   .option('--se03 <path>', 'FW_MGMT_TARGET_SE03 binary path')
   .option('--se04 <path>', 'FW_MGMT_TARGET_SE04 binary path')
+  .option('--resource-archive <path>', 'Complete signed Protocol V2 resource ZIP path')
   .option('--forced-update-res', 'Force resource update')
   .option('--retries <count>', 'Retry count for transient Protocol V2 USB probe failures')
   .action(opts =>
@@ -1584,6 +1585,7 @@ function buildFirmwareUpdateV4Params(opts: {
   se02?: string;
   se03?: string;
   se04?: string;
+  resourceArchive?: string;
   forcedUpdateRes?: boolean;
 }) {
   const params = {
@@ -1600,6 +1602,7 @@ function buildFirmwareUpdateV4Params(opts: {
     se02Binary: opts.se02 ? readBinaryParam(opts.se02) : undefined,
     se03Binary: opts.se03 ? readBinaryParam(opts.se03) : undefined,
     se04Binary: opts.se04 ? readBinaryParam(opts.se04) : undefined,
+    resourceArchiveBinary: opts.resourceArchive ? readBinaryParam(opts.resourceArchive) : undefined,
   };
 
   const hasPayload = [
@@ -1612,10 +1615,13 @@ function buildFirmwareUpdateV4Params(opts: {
     params.se02Binary,
     params.se03Binary,
     params.se04Binary,
+    params.resourceArchiveBinary,
   ].some(Boolean);
 
   if (!hasPayload) {
-    const err = new Error('firmware-update-v4 requires at least one binary path');
+    const err = new Error(
+      'firmware-update-v4 requires at least one firmware binary or resource archive path'
+    );
     (err as Error & { code?: string }).code = 'MISSING_FIRMWARE_BINARY';
     throw err;
   }

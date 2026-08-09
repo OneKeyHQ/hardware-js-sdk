@@ -85,4 +85,32 @@ describe('prepareFirmwareUpdatePlanMemoryHost', () => {
       })
     ).rejects.toThrow('Firmware artifact SHA-256 mismatch: resource:archive');
   });
+
+  test('rejects an oversized ZIP entry before allocating its contents', async () => {
+    const binary = new Uint8Array([1]).buffer;
+    const extractEntry = jest.fn();
+    jest.spyOn(JSZip, 'loadAsync').mockResolvedValueOnce({
+      files: {
+        'oversized.okpkg': {
+          name: 'oversized.okpkg',
+          unsafeOriginalName: 'oversized.okpkg',
+          dir: false,
+          _data: {
+            compressedSize: 1,
+            uncompressedSize: 256 * 1024 * 1024 + 1,
+          },
+          async: extractEntry,
+        },
+      },
+    } as never);
+
+    await expect(
+      prepareFirmwareUpdatePlanMemoryHost({
+        hardwareSDK: {} as CoreApi,
+        plan: createResourcePlan(binary),
+        overrides: { resource: binary },
+      })
+    ).rejects.toThrow('Firmware ZIP declared size exceeds the allowed limit');
+    expect(extractEntry).not.toHaveBeenCalled();
+  });
 });

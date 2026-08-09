@@ -36,6 +36,7 @@ describe('firmware-update-v4 CLI command', () => {
     expect(command?.description()).toBe(
       'Run Protocol V2 firmware update through sdk.firmwareUpdateV4'
     );
+    expect(command?.options.some(option => option.long === '--resource-archive')).toBe(true);
   });
 
   test('does not expose the pre-release firmware-update-v4-debug command', () => {

@@ -23,6 +23,58 @@ export type FirmwarePlanArtifactOverrides = Partial<Record<FirmwareUpdateV4Targe
 const bytesToHex = (bytes: Uint8Array) =>
   Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 
+const MAX_ZIP_ENTRY_COUNT = 512;
+const MAX_ZIP_ENTRY_BYTES = 256 * 1024 * 1024;
+const MAX_ZIP_TOTAL_BYTES = 256 * 1024 * 1024;
+
+type JSZipSizedEntry = JSZip.JSZipObject & {
+  _data?: { compressedSize?: unknown; uncompressedSize?: unknown };
+};
+
+async function materializeZipEntries(zip: JSZip, archiveSize: number) {
+  const zipEntries = Object.values(zip.files);
+  if (
+    zipEntries.some(entry => entry.unsafeOriginalName && entry.unsafeOriginalName !== entry.name)
+  ) {
+    throw new Error('Firmware ZIP contains an unsafe entry path');
+  }
+  const entries = zipEntries.filter(entry => !entry.dir);
+  if (entries.length === 0 || entries.length > MAX_ZIP_ENTRY_COUNT) {
+    throw new Error('Firmware ZIP entry set is invalid');
+  }
+  let totalCompressedBytes = 0;
+  let totalUncompressedBytes = 0;
+  for (const entry of entries) {
+    const { compressedSize, uncompressedSize } = (entry as JSZipSizedEntry)._data ?? {};
+    if (
+      !Number.isSafeInteger(compressedSize) ||
+      Number(compressedSize) < 0 ||
+      !Number.isSafeInteger(uncompressedSize) ||
+      Number(uncompressedSize) <= 0
+    ) {
+      throw new Error(`Firmware ZIP entry size is invalid: ${entry.name}`);
+    }
+    totalCompressedBytes += Number(compressedSize);
+    totalUncompressedBytes += Number(uncompressedSize);
+    if (
+      Number(uncompressedSize) > MAX_ZIP_ENTRY_BYTES ||
+      totalCompressedBytes > archiveSize ||
+      totalUncompressedBytes > MAX_ZIP_TOTAL_BYTES
+    ) {
+      throw new Error('Firmware ZIP declared size exceeds the allowed limit');
+    }
+  }
+  const materializedEntries: Array<{ entryName: string; binary: ArrayBuffer }> = [];
+  for (const entry of entries) {
+    const binary = await entry.async('arraybuffer');
+    if (binary.byteLength !== Number((entry as JSZipSizedEntry)._data?.uncompressedSize)) {
+      throw new Error(`Firmware ZIP entry size mismatch: ${entry.name}`);
+    }
+    materializedEntries.push({ entryName: entry.name, binary });
+  }
+  return materializedEntries;
+}
+
 async function loadPlanArtifact({
   artifact,
   override,
@@ -53,19 +105,10 @@ async function loadPlanArtifact({
     return { artifactId: artifact.artifactId, binary };
   }
   const zip = await JSZip.loadAsync(binary);
-  const entries = Object.values(zip.files).filter(entry => !entry.dir);
-  if (entries.length === 0 || entries.length > 512) {
-    throw new Error('Firmware ZIP entry set is invalid');
-  }
   return {
     artifactId: artifact.artifactId,
     binary,
-    materializedEntries: await Promise.all(
-      entries.map(async entry => ({
-        entryName: entry.name,
-        binary: await entry.async('arraybuffer'),
-      }))
-    ),
+    materializedEntries: await materializeZipEntries(zip, binary.byteLength),
   };
 }
 export async function prepareFirmwareUpdatePlanMemoryHost({
