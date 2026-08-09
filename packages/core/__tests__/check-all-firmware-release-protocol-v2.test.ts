@@ -328,15 +328,16 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       status: 'required',
       resourceStatus: 'unknown',
       resourceArchive: resourceSource,
-      targetsToUpdate: ['boot', 'app_v1'],
+      targetsToUpdate: ['boot', 'app_v1', 'resource'],
       firmwareUpdatePlan: {
         executor: 'v4',
         platform: 'web',
         artifacts: [
           { artifactId: 'component:boot', target: 'boot' },
           { artifactId: 'component:app_v1', target: 'app_v1' },
+          { artifactId: 'resource:archive', target: 'resource' },
         ],
-        targetsToUpdate: ['boot', 'app_v1'],
+        targetsToUpdate: ['boot', 'app_v1', 'resource'],
       },
       firmware: {
         status: 'required',
@@ -377,7 +378,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
 
     await expect(method.run()).resolves.toMatchObject({
-      targetsToUpdate: ['boot', 'app_v1', 'se02', 'se03'],
+      targetsToUpdate: ['boot', 'app_v1', 'se02', 'se03', 'resource'],
       firmwareUpdatePlan: {
         executor: 'v4',
         deviceIdentity: 'pro2-device-id',
@@ -387,8 +388,9 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
           { artifactId: 'component:app_v1', target: 'app_v1' },
           { artifactId: 'component:se02', target: 'se02' },
           { artifactId: 'component:se03', target: 'se03' },
+          { artifactId: 'resource:archive', target: 'resource' },
         ],
-        targetsToUpdate: ['boot', 'app_v1', 'se02', 'se03'],
+        targetsToUpdate: ['boot', 'app_v1', 'se02', 'se03', 'resource'],
       },
     });
   });
@@ -582,12 +584,12 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
 
     await expect(method.run()).resolves.toMatchObject({
-      targetsToUpdate: ['se01', 'se02'],
+      targetsToUpdate: ['se01', 'se02', 'resource'],
       firmwareUpdatePlan: {
         executor: 'v4',
         deviceModel: 'neo',
         platform: 'native',
-        targetsToUpdate: ['se01', 'se02'],
+        targetsToUpdate: ['se01', 'se02', 'resource'],
       },
     });
   });
@@ -618,7 +620,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     });
   });
 
-  test('adds a Protocol V2 resource target only when explicitly forced', async () => {
+  test('allows an explicitly forced Protocol V2 resource-only target', async () => {
     const currentRelease: IFirmwareReleaseInfo = {
       ...release,
       required: false,
@@ -752,7 +754,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         protocol: 'V2',
         resourceStatus: 'unknown',
         resourceArchive: resourceSource,
-        targetsToUpdate: ['boot', 'app_v1'],
+        targetsToUpdate: ['boot', 'app_v1', 'resource'],
       });
       expect(typedCall).not.toHaveBeenCalled();
     }

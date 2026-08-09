@@ -1,5 +1,7 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
+import { clearFirmwareUpdatePreparedPlanDeviceIdentityPin } from './FirmwareUpdatePreparedPlan';
+
 import type { FirmwareUpdateHostBinding } from '../../types/api/firmwareUpdate';
 
 const bindingError = (message: string): never => {
@@ -24,8 +26,12 @@ class FirmwareHostBindingRegistry {
     ) {
       return bindingError('Firmware host binding is invalid');
     }
+    const replacedPreparedPlanDigest = this.binding?.preparedPlanDigest;
     this.generation += 1;
     this.binding = binding;
+    if (replacedPreparedPlanDigest) {
+      clearFirmwareUpdatePreparedPlanDeviceIdentityPin(replacedPreparedPlanDigest);
+    }
     return this.generation;
   }
 
@@ -33,8 +39,12 @@ class FirmwareHostBindingRegistry {
     if (generation !== undefined && generation !== this.generation) {
       return false;
     }
+    const releasedPreparedPlanDigest = this.binding?.preparedPlanDigest;
     this.generation += 1;
     this.binding = undefined;
+    if (releasedPreparedPlanDigest) {
+      clearFirmwareUpdatePreparedPlanDeviceIdentityPin(releasedPreparedPlanDigest);
+    }
     return true;
   }
 

@@ -597,10 +597,10 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
         };
 
       try {
-        // App mode cannot inspect vol0 resources, so request a loader-side comparison.
+        // Core attaches the configured resource archive only when it also detects
+        // a component update, avoiding an ordinary resource-only update.
         const res = await sdk.checkAllFirmwareRelease(selectDevice.connectId, {
           platform,
-          protocolV2ForceUpdateTargets: ['resource'],
         });
         if (!res.success) {
           return {

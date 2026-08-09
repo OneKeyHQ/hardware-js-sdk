@@ -147,7 +147,7 @@ describe.each(['pro2', 'neo'] as const)('Protocol V2 release checks for %s', dev
       deviceType,
       status: 'outdated',
       hasUpgrade: true,
-      targetsToUpdate: ['boot', 'app_v1', 'coprocessor'],
+      targetsToUpdate: ['boot', 'app_v1', 'coprocessor', 'resource'],
       firmware: { status: 'outdated', shouldUpdate: true },
       ble: {
         status: 'outdated',

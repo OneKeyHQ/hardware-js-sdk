@@ -68,12 +68,13 @@ export function prepareFirmwareUpdateV4MemoryHost({
     );
     binaries.set(artifact.artifactRef, artifactBinary);
     const materializedEntries = input.materializedEntries?.map((entry, entryIndex) => {
-      const entryBinary = new Uint8Array(entry.binary).slice();
       const entryArtifact = createReference(
-        entryBinary.buffer as ArrayBuffer,
+        entry.binary,
         `${hostId}:entry:${artifactIndex}:${entryIndex}`
       );
-      binaries.set(entryArtifact.artifactRef, entryBinary);
+      // Entry references are compact receipts for bytes that will be re-derived
+      // from the verified archive. Retaining another readable copy here doubles
+      // resource memory without adding an execution trust boundary.
       return {
         entryName: entry.entryName,
         artifact: entryArtifact,

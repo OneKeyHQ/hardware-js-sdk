@@ -93,18 +93,32 @@ describe('prepareFirmwareUpdateV4MemoryHost', () => {
     const componentArtifact = host.preparedPlan.artifacts.find(
       artifact => artifact.target === 'boot'
     )?.artifact;
+    const resourceEntryArtifact = host.preparedPlan.artifacts.find(
+      artifact => artifact.target === 'resource'
+    )?.materializedEntries?.[0]?.artifact;
     expect(componentArtifact?.size).toBe(componentBinary.byteLength);
+    expect(resourceEntryArtifact?.size).toBe(manifestBinary.byteLength);
+    if (!artifactReader || !componentArtifact || !resourceEntryArtifact) {
+      throw new Error('Firmware memory host test setup is incomplete');
+    }
     new Uint8Array(componentBinary).fill(9);
-    const opened = await artifactReader!.open({
-      artifactRef: componentArtifact!.artifactRef,
+    const opened = await artifactReader.open({
+      artifactRef: componentArtifact.artifactRef,
     });
-    const chunk = await artifactReader!.read({
+    const chunk = await artifactReader.read({
       readerId: opened.readerId,
       offset: 1,
       length: 2,
     });
     expect(Array.from(new Uint8Array(chunk.data))).toEqual([2, 3]);
-    await artifactReader!.close({ readerId: opened.readerId });
+    await artifactReader.close({ readerId: opened.readerId });
+
+    // Materialized ZIP entries are receipts only. Execution opens the approved
+    // archive and re-derives these bytes, so the memory host must not retain a
+    // second readable copy of every expanded resource file.
+    expect(() => artifactReader.open({ artifactRef: resourceEntryArtifact.artifactRef })).toThrow(
+      'Firmware memory artifact is unavailable'
+    );
 
     host.release();
     expect(unregisterFirmwareUpdateHostBinding).toHaveBeenCalledWith(7);

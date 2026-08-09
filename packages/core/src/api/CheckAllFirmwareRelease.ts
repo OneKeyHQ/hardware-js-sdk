@@ -429,10 +429,15 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     const forceResourceUpdate =
       validatedForceUpdateTargets.includes('resource') ||
       validatedProtocolV2ForceUpdateTargets.includes('resource');
+    // A configured resource archive accompanies a real remote component update,
+    // but its mere availability must not turn an otherwise current device into a
+    // resource-only update. Explicit developer resource forcing remains supported.
+    const includeResourceUpdate =
+      forceResourceUpdate || (resourceSource !== undefined && detectedComponentTargets.length > 0);
     const targetsToUpdate = Array.from(
       new Set([
         ...componentTargetsToUpdate,
-        ...(forceResourceUpdate ? (['resource'] as const) : []),
+        ...(includeResourceUpdate ? (['resource'] as const) : []),
       ])
     );
     let firmwareUpdatePlan: FirmwareUpdatePlan | undefined;

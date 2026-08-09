@@ -316,6 +316,51 @@ describe('buildFirmwareUpdatePlan', () => {
     expectFirmwarePlanInvalid(() => buildFirmwareUpdatePlan(createLegacyForceInput(['resource'])));
   });
 
+  test.each([
+    {
+      executor: 'V2',
+      deviceType: EDeviceType.Classic1s,
+      bootloaderVersion: '2.1.2',
+    },
+    {
+      executor: 'V3',
+      deviceType: EDeviceType.Pro,
+      bootloaderVersion: '2.8.4',
+    },
+  ])(
+    'rejects a resource-only prepared plan that the $executor executor cannot run',
+    ({ deviceType, bootloaderVersion }) => {
+      expectFirmwarePlanInvalid(
+        () =>
+          buildFirmwareUpdatePlan({
+            features: createFeatures({
+              deviceType,
+              firmwareVersion: '4.21.0',
+              bootloaderVersion,
+            }),
+            firmwareType: EFirmwareType.Universal,
+            platform: 'desktop',
+            firmware: {
+              status: 'valid',
+              release: {
+                url: 'https://firmware.onekey.so/legacy/firmware.bin',
+                version: [4, 21, 0],
+                expectedSize: 1024,
+                fingerprint: '1'.repeat(64),
+                resource: 'https://firmware.onekey.so/legacy/resource.zip',
+                resourceExpectedSize: 4096,
+                resourceFingerprint: '2'.repeat(64),
+              },
+            },
+            ble: noUpdate,
+            bootloader: noUpdate,
+            forceUpdateTargets: ['resource'],
+          }),
+        'Legacy resource updates require a firmware target'
+      );
+    }
+  );
+
   test('rejects a legacy resource archive without complete integrity metadata', () => {
     expectFirmwarePlanInvalid(
       () =>

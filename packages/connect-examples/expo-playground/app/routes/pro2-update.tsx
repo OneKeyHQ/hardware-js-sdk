@@ -343,11 +343,11 @@ export default function Pro2UpdatePage() {
         });
       } else {
         addLog('info', `Checking ${device.deviceType} firmware and resource releases`);
-        // App mode cannot inspect vol0 resources. A remote update must compare them in loader mode.
+        // Core attaches the configured resource archive only when it also detects
+        // a component update, avoiding an ordinary resource-only update.
         const checkResponse = await callHardwareAPI('checkAllFirmwareRelease', {
           connectId: device.connectId,
           platform: 'web',
-          protocolV2ForceUpdateTargets: ['resource'],
         });
         if (!checkResponse.success) {
           throw new Error(getApiError(checkResponse.payload, 'checkAllFirmwareRelease failed'));

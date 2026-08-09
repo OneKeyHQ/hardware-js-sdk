@@ -916,6 +916,14 @@ export const buildFirmwareUpdatePlan = ({
     targetsToUpdate = [...new Set(artifacts.map(artifact => artifact.target))];
   }
 
+  if (
+    executor !== 'v4' &&
+    targetsToUpdate.includes('resource') &&
+    !targetsToUpdate.includes('firmware')
+  ) {
+    planError('Legacy resource updates require a firmware target');
+  }
+
   assertForcedTargetsRepresented({
     executor,
     forcedTargets: validatedForceTargets,

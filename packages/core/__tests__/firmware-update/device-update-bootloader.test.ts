@@ -9,6 +9,7 @@ import {
 jest.mock('../../src/api/firmware/FirmwareUpdatePreparedPlan', () => ({
   assertFirmwareUpdatePreparedPlanBinding: jest.fn(),
   assertFirmwareUpdatePreparedPlanDeviceIdentity: jest.fn(),
+  clearFirmwareUpdatePreparedPlanDeviceIdentityPin: jest.fn(),
   getFirmwareUpdatePreparedRawArtifact: jest.fn(
     ({ preparedPlan }: { preparedPlan: { artifacts: unknown[] } }) => preparedPlan.artifacts[0]
   ),

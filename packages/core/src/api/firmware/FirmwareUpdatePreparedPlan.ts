@@ -321,23 +321,34 @@ export const getFirmwareUpdatePreparedRawArtifact = ({
 
 /**
  * Identity observed on the live device while a degraded recovery plan runs, keyed by
- * the plan's opaque lease. Bootloader recovery starts with no serial and the device
- * reports one only after the firmware phase reboots it, so the later phases of the
- * SAME workflow must be allowed to continue — but only for the device that first
- * answered, never for a second one that appears mid-recovery.
+ * the approved prepared-plan digest. Bootloader recovery starts with no serial and
+ * the device reports one only after the firmware phase reboots it, so the later
+ * phases of the SAME workflow must be allowed to continue — but only for the device
+ * that first answered, never for a second one that appears mid-recovery.
  */
 const degradedPlanIdentityPins = new Map<string, string>();
 /** Keep the pin map from growing without bound across many workflows. */
 const DEGRADED_PLAN_IDENTITY_PIN_LIMIT = 32;
 
-const pinDegradedPlanIdentity = (leaseRef: string, deviceIdentity: string) => {
-  if (degradedPlanIdentityPins.size >= DEGRADED_PLAN_IDENTITY_PIN_LIMIT) {
+const pinDegradedPlanIdentity = (preparedPlanDigest: string, deviceIdentity: string) => {
+  const key = preparedPlanDigest.toLowerCase();
+  if (
+    !degradedPlanIdentityPins.has(key) &&
+    degradedPlanIdentityPins.size >= DEGRADED_PLAN_IDENTITY_PIN_LIMIT
+  ) {
     const oldest = degradedPlanIdentityPins.keys().next();
     if (!oldest.done) {
       degradedPlanIdentityPins.delete(oldest.value);
     }
   }
-  degradedPlanIdentityPins.set(leaseRef, deviceIdentity);
+  degradedPlanIdentityPins.set(key, deviceIdentity);
+};
+
+/** Release recovery identity state when its digest-bound host workflow ends. */
+export const clearFirmwareUpdatePreparedPlanDeviceIdentityPin = (
+  preparedPlanDigest: string
+): void => {
+  degradedPlanIdentityPins.delete(preparedPlanDigest.toLowerCase());
 };
 
 export const assertFirmwareUpdatePreparedPlanDeviceIdentity = ({
@@ -364,7 +375,9 @@ export const assertFirmwareUpdatePreparedPlanDeviceIdentity = ({
     if (deviceModel === undefined || preparedPlan.deviceModel !== deviceModel) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
     }
-    const pinnedIdentity = degradedPlanIdentityPins.get(preparedPlan.leaseRef);
+    const pinnedIdentity = degradedPlanIdentityPins.get(
+      preparedPlan.preparedPlanDigest.toLowerCase()
+    );
     if (!deviceIdentity) {
       // V4 设备可能尚未写入序列号；V2 则只允许 bootloader 恢复流程缺少身份。
       if (preparedPlan.executor !== 'v4' && bootloaderMode !== true) {
@@ -375,7 +388,7 @@ export const assertFirmwareUpdatePreparedPlanDeviceIdentity = ({
     // The recovered device now reports a serial: bind this recovery to it, and hold
     // every later phase to the same one.
     if (!pinnedIdentity) {
-      pinDegradedPlanIdentity(preparedPlan.leaseRef, deviceIdentity);
+      pinDegradedPlanIdentity(preparedPlan.preparedPlanDigest, deviceIdentity);
       return preparedPlan;
     }
     if (pinnedIdentity !== deviceIdentity) {

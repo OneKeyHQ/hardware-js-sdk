@@ -286,84 +286,142 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     // check device goto bootloader mode
     let isFirstCheck = true;
     let checkCount = 0;
-    // eslint-disable-next-line prefer-const
+    let hasPromptedWebDevice = false;
+    let isPromptingWebDevice = false;
+    let isFinished = false;
+    let intervalTimer: ReturnType<typeof setInterval> | undefined;
     let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
 
     const deviceType = this.device?.getCurrentDeviceType();
     const isTouchOrProDevice = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
 
-    const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
-      async () => {
-        checkCount += 1;
-        Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
-        if (isTouchOrProDevice && isFirstCheck) {
-          isFirstCheck = false;
-          Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] wait 3000ms');
-          await wait(3000);
-        }
-
-        if (
-          checkCount > 4 &&
-          DataManager.isBrowserWebUsb(DataManager.getSettings('env')) &&
-          !this.payload.skipWebDevicePrompt
-        ) {
-          clearInterval(intervalTimer);
-          clearTimeout(timeoutTimer);
-
-          try {
-            this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
-            const confirmed = await this._promptDeviceInBootloaderForWebDevice();
-            if (confirmed) {
-              await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
-            }
-          } catch (e) {
-            Log.log(
-              'FirmwareUpdateV2 [checkDeviceToBootloader] promptDeviceInBootloaderForWebDevice failed: ',
-              e
-            );
-            this.checkPromise?.reject(e);
-          }
-          return;
-        }
-
-        if (isBleReconnect) {
-          if (bleProbeInFlight) return;
-          bleProbeInFlight = true;
-          try {
-            await this.device.deviceConnector?.acquire(
-              this.device.originalDescriptor.id,
-              null,
-              true,
-              this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType
-            );
-            // Bound each probe so a request the rebooting device never received
-            // frees the slot for the next tick instead of hanging into the
-            // 30s reboot budget.
-            await this.device.initialize({ timeoutMs: BOOTLOADER_POLL_INITIALIZE_TIMEOUT_MS });
-            if (this.device.isBootloader()) {
-              clearInterval(intervalTimer);
-              this.checkPromise?.resolve(true);
-            }
-          } catch (e) {
-            // ignore error because of device is not connected
-            Log.log('catch Bluetooth error when device is restarting: ', e);
-          } finally {
-            bleProbeInFlight = false;
-          }
-        } else {
-          await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
-        }
-      },
-      isBleReconnect ? 3000 : 2000
-    );
-
-    // check goto bootloader mode timeout and throw error
-    timeoutTimer = setTimeout(() => {
-      if (this.checkPromise) {
+    const clearPollingTimers = () => {
+      if (intervalTimer !== undefined) {
         clearInterval(intervalTimer);
-        this.checkPromise.reject(new Error());
+        intervalTimer = undefined;
       }
-    }, 30000);
+      if (timeoutTimer !== undefined) {
+        clearTimeout(timeoutTimer);
+        timeoutTimer = undefined;
+      }
+    };
+
+    const checkForBootloader = async (clearActiveTimers: boolean) => {
+      const found = await this._checkDeviceInBootloaderMode(
+        connectId,
+        clearActiveTimers ? intervalTimer : undefined,
+        clearActiveTimers ? timeoutTimer : undefined
+      );
+      if (found) {
+        isFinished = true;
+        clearPollingTimers();
+      }
+      return found;
+    };
+
+    let startPolling: () => void = () => undefined;
+    const pollForBootloader = async () => {
+      if (isFinished || isPromptingWebDevice) return;
+      checkCount += 1;
+      Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
+      if (isTouchOrProDevice && isFirstCheck) {
+        isFirstCheck = false;
+        Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] wait 3000ms');
+        await wait(3000);
+      }
+
+      if (
+        checkCount > 4 &&
+        DataManager.isBrowserWebUsb(DataManager.getSettings('env')) &&
+        !this.payload.skipWebDevicePrompt &&
+        !hasPromptedWebDevice &&
+        !isPromptingWebDevice
+      ) {
+        clearPollingTimers();
+        isPromptingWebDevice = true;
+        try {
+          this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
+          const confirmed = await this._promptDeviceInBootloaderForWebDevice();
+          hasPromptedWebDevice = true;
+          if (confirmed) {
+            await checkForBootloader(false);
+          }
+          // WebUSB enumeration can still be empty immediately after the chooser
+          // resolves. Resume a fresh bounded polling window instead of leaving the
+          // deferred check pending forever after the original timers were paused.
+          if (!isFinished) {
+            startPolling();
+          }
+        } catch (e) {
+          isFinished = true;
+          clearPollingTimers();
+          Log.log(
+            'FirmwareUpdateV2 [checkDeviceToBootloader] promptDeviceInBootloaderForWebDevice failed: ',
+            e
+          );
+          this.checkPromise?.reject(e);
+        } finally {
+          isPromptingWebDevice = false;
+        }
+        return;
+      }
+
+      if (isBleReconnect) {
+        if (bleProbeInFlight) return;
+        bleProbeInFlight = true;
+        try {
+          await this.device.deviceConnector?.acquire(
+            this.device.originalDescriptor.id,
+            null,
+            true,
+            this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType
+          );
+          // Bound each probe so a request the rebooting device never received
+          // frees the slot for the next tick instead of hanging into the
+          // 30s reboot budget.
+          await this.device.initialize({ timeoutMs: BOOTLOADER_POLL_INITIALIZE_TIMEOUT_MS });
+          if (this.device.isBootloader()) {
+            isFinished = true;
+            clearPollingTimers();
+            this.checkPromise?.resolve(true);
+          }
+        } catch (e) {
+          // ignore error because of device is not connected
+          Log.log('catch Bluetooth error when device is restarting: ', e);
+        } finally {
+          bleProbeInFlight = false;
+        }
+      } else {
+        await checkForBootloader(true);
+      }
+    };
+
+    startPolling = () => {
+      if (isFinished) return;
+      clearPollingTimers();
+      intervalTimer = setInterval(
+        () => {
+          pollForBootloader().catch(error => {
+            if (isFinished) return;
+            isFinished = true;
+            clearPollingTimers();
+            this.checkPromise?.reject(error);
+          });
+        },
+        isBleReconnect ? 3000 : 2000
+      );
+      // Each automatic polling phase is bounded. Time spent in the browser's
+      // permission chooser is intentionally excluded from this deadline.
+      timeoutTimer = setTimeout(() => {
+        if (!isFinished && this.checkPromise) {
+          isFinished = true;
+          clearPollingTimers();
+          this.checkPromise.reject(new Error());
+        }
+      }, 30000);
+    };
+
+    startPolling();
   }
 
   private async _checkDeviceInBootloaderMode(
