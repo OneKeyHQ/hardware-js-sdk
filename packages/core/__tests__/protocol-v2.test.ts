@@ -6329,6 +6329,41 @@ describe('Protocol V2 firmware update targets', () => {
     }
   });
 
+  test('keeps the legacy componentArtifacts and artifactReader path without a prepared Plan', async () => {
+    const artifactReader = {
+      open: jest.fn(),
+      read: jest.fn(),
+      close: jest.fn(),
+    };
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['boot'],
+        artifactReader,
+        componentArtifacts: {
+          boot: {
+            artifactRef: 'legacy-bootloader',
+            size: 3,
+            sha256: 'a'.repeat(64),
+          },
+        },
+      },
+    });
+
+    expect(() => method.init()).not.toThrow();
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    (method as any).device = stubDevice({
+      originalDescriptor: { protocolType: 'V2' },
+      features: { deviceType: 'pro2', firmwareVersion: '1.0.0', capabilities: [] },
+    });
+    (method as any).runProtocolV2PreparedArtifacts = jest.fn().mockResolvedValue('legacy-result');
+
+    await expect(method.run()).resolves.toBe('legacy-result');
+    expect((method as any).runProtocolV2PreparedArtifacts).toHaveBeenCalledTimes(1);
+  });
+
   test('stops a remote update before reboot when the latest config cannot be refreshed', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,

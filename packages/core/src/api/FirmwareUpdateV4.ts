@@ -559,18 +559,18 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       ? validateFirmwareUpdatePreparedPlan(payload.preparedPlan)
       : undefined;
     const hostBinding =
-      preparedPlan || payload.componentArtifacts
+      payload.hostBindingGeneration !== undefined
         ? resolveFirmwareUpdateHostBinding(
             payload.hostBindingGeneration,
             preparedPlan?.preparedPlanDigest
           )
         : undefined;
-    if (hostBinding) {
+    if (preparedPlan) {
       const componentArtifacts = (payload.componentArtifacts ?? {}) as NonNullable<
         FirmwareUpdateV4Params['componentArtifacts']
       >;
       assertFirmwareUpdatePreparedPlanBinding({
-        preparedPlan: preparedPlan ?? payload.preparedPlan,
+        preparedPlan,
         executor: 'v4',
         platform: payload.platform,
         scopeTargets: ['boot', 'app_v1', 'app_v2', 'coprocessor', 'se01', 'se02', 'se03', 'se04'],
@@ -654,7 +654,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
     this.validateExpectedTargetVersions();
 
-    if (this.params.preparedPlan) {
+    const hasPreparedComponentArtifacts = Object.values(this.params.componentArtifacts ?? {}).some(
+      Boolean
+    );
+    if (this.params.preparedPlan || hasPreparedComponentArtifacts) {
       return this.runProtocolV2PreparedArtifacts(deviceFeatures, firmwareType);
     }
     const wantsResources = !!this.params.targetsToUpdate?.includes('resource');
