@@ -138,13 +138,19 @@ const getProtocolV2ZipEntrySizes = (entry: JSZip.JSZipObject) => {
 
 export function assertProtocolV2FirmwareTargetsSupported(
   deviceType: EDeviceType | string | undefined,
-  params: FirmwareUpdateV4Params
+  params: FirmwareUpdateV4Params,
+  hasExplicitTargetSelection = false
 ) {
+  const requestedTargets = new Set(params.targetsToUpdate ?? []);
   const unsupportedTargets = new Set(
-    (params.targetsToUpdate ?? []).filter(target => PROTOCOL_V2_NEO_UNSUPPORTED_TARGETS.has(target))
+    Array.from(requestedTargets).filter(target => PROTOCOL_V2_NEO_UNSUPPORTED_TARGETS.has(target))
   );
-  if (params.se03Binary) unsupportedTargets.add('se03');
-  if (params.se04Binary) unsupportedTargets.add('se04');
+  if (params.se03Binary && (!hasExplicitTargetSelection || requestedTargets.has('se03'))) {
+    unsupportedTargets.add('se03');
+  }
+  if (params.se04Binary && (!hasExplicitTargetSelection || requestedTargets.has('se04'))) {
+    unsupportedTargets.add('se04');
+  }
 
   if (!unsupportedTargets.size || deviceType === EDeviceType.Pro2) return;
 
@@ -559,6 +565,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private protocolV2ExpectedPath?: string;
 
+  private protocolV2HasExplicitTargetSelection = false;
+
   getSupportedProtocols() {
     return ['V2'] as const;
   }
@@ -583,6 +591,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.skipForceUpdateCheck = true;
 
     const { payload } = this;
+
+    this.protocolV2HasExplicitTargetSelection = payload.targetsToUpdate !== undefined;
 
     if (typeof payload.retryCount !== 'number') {
       payload.retryCount = PROTOCOL_V2_CONNECT_RETRY_COUNT;
@@ -782,7 +792,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       currentDeviceType === EDeviceType.Pro2 || currentDeviceType === EDeviceType.Neo
         ? currentDeviceType
         : getDeviceType(deviceFeatures);
-    assertProtocolV2FirmwareTargetsSupported(capabilityDeviceType, this.params);
+    assertProtocolV2FirmwareTargetsSupported(
+      capabilityDeviceType,
+      this.params,
+      this.protocolV2HasExplicitTargetSelection
+    );
     const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
     this.validateExpectedTargetVersions();
@@ -861,6 +875,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         bootloaderBinary = remoteBinaries.bootloaderBinary;
         fwBinaryMap = remoteBinaries.fwBinaryMap;
         installItems = remoteBinaries.installItems;
+      } else {
+        const selectedInstallItems = this.filterProtocolV2LocalInstallItems(explicitInstallItems);
+        bootloaderBinary =
+          selectedInstallItems.find(item => item.kind === 'bootloader')?.binary ?? null;
+        fwBinaryMap = selectedInstallItems
+          .filter(item => item.kind === 'firmware')
+          .map(item => ({
+            fileName: item.fileName,
+            binary: item.binary,
+            targetId: item.targetId,
+          }));
       }
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
@@ -1035,7 +1060,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     features: Features;
     firmwareType: EFirmwareType;
   }): Promise<FirmwareUpdateV4MemoryHost> {
-    const installItems = this.buildProtocolV2InstallItems({
+    const availableInstallItems = this.buildProtocolV2InstallItems({
       bootloaderBinary: this.prepareBootloaderBinary(),
       fwBinaryMap: this.collectExplicitTargetBinaries(),
     });
@@ -1046,7 +1071,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       )
     );
     const localComponentTargets = new Set(
-      installItems.flatMap(item => {
+      availableInstallItems.flatMap(item => {
         const target = PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID.get(item.targetId);
         return target ? [target] : [];
       })
@@ -1064,6 +1089,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         }
       );
     }
+    const installItems = this.filterProtocolV2LocalInstallItems(availableInstallItems);
 
     const planArtifacts: Parameters<typeof buildProtocolV2LocalFirmwareUpdatePlan>[0]['artifacts'] =
       [];
@@ -1696,6 +1722,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           target !== 'resource' && target !== 'boot_resources'
       )
       .filter(target => !preparedTargets.has(target));
+  }
+
+  private filterProtocolV2LocalInstallItems(installItems: ProtocolV2InstallItem[]) {
+    if (!this.protocolV2HasExplicitTargetSelection) {
+      return installItems;
+    }
+    const requestedTargets = new Set(this.params.targetsToUpdate ?? []);
+    return installItems.filter(item => {
+      const target = PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID.get(item.targetId);
+      return target !== undefined && requestedTargets.has(target);
+    });
   }
 
   private buildProtocolV2InstallItems({

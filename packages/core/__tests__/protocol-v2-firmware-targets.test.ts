@@ -57,6 +57,22 @@ describe('Protocol V2 firmware target contract', () => {
     ).toThrow('Neo only supports SE01 and SE02; unsupported firmware targets: se03, se04');
   });
 
+  test('ignores unselected SE binaries when the caller supplied a target subset', () => {
+    const params = {
+      platform: 'web' as const,
+      targetsToUpdate: ['app_v1'] as Array<'app_v1'>,
+      se03Binary: new ArrayBuffer(1),
+      se04Binary: new ArrayBuffer(1),
+    };
+
+    expect(() =>
+      assertProtocolV2FirmwareTargetsSupported(EDeviceType.Neo, params, true)
+    ).not.toThrow();
+    expect(() => assertProtocolV2FirmwareTargetsSupported(EDeviceType.Neo, params)).toThrow(
+      'Neo only supports SE01 and SE02; unsupported firmware targets: se03, se04'
+    );
+  });
+
   test('keeps all four SE firmware targets available on Pro2', () => {
     expect(() =>
       assertProtocolV2FirmwareTargetsSupported(EDeviceType.Pro2, {

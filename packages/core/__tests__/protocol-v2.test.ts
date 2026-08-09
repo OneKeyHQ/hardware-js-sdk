@@ -4033,6 +4033,71 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
+  test('filters unrequested binaries from a direct local Protocol V2 update', async () => {
+    const applicationP1Binary = new Uint8Array([1, 2, 3]).buffer;
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['app_v1'],
+        applicationP1Binary,
+        bootloaderBinary: new Uint8Array([4, 5, 6]).buffer,
+      },
+    });
+    method.init();
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    (method as any).device = stubDevice({
+      originalDescriptor: { protocolType: 'V2' },
+      features: {
+        deviceType: 'pro2',
+        firmwareVersion: '1.0.0',
+        capabilities: [],
+      },
+      getCurrentDeviceType: () => 'pro2',
+    });
+    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue('local-result');
+    method.postTipMessage = jest.fn();
+
+    await expect(method.run()).resolves.toBe('local-result');
+    expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
+      bootloaderBinary: null,
+      fwBinaryMap: [
+        {
+          fileName: 'application_p1.bin',
+          binary: applicationP1Binary,
+          targetId: 4,
+        },
+      ],
+    });
+  });
+
+  test('keeps all local binaries when no target list was supplied', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        applicationP1Binary: new Uint8Array([1]).buffer,
+        bootloaderBinary: new Uint8Array([2]).buffer,
+        resourceArchiveBinary: new Uint8Array([3]).buffer,
+      },
+    });
+    method.init();
+
+    const availableInstallItems = (method as any).buildProtocolV2InstallItems({
+      bootloaderBinary: (method as any).prepareBootloaderBinary(),
+      fwBinaryMap: (method as any).collectExplicitTargetBinaries(),
+    });
+
+    expect((method as any).params.targetsToUpdate).toEqual(['resource']);
+    expect(
+      (method as any)
+        .filterProtocolV2LocalInstallItems(availableInstallItems)
+        .map((item: { targetId: number }) => item.targetId)
+    ).toEqual([3, 4]);
+  });
+
   test('requires the external host to prepare manifest resources before bootloader entry', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -6702,6 +6767,7 @@ describe('Protocol V2 firmware update targets', () => {
     zip.file('loaders/bootloader/boot_resource.okpkg', bootResourceBinary);
     const resourceArchiveBinary = await zip.generateAsync({ type: 'arraybuffer' });
     const applicationP1Binary = new Uint8Array([7, 8, 9]).buffer;
+    const bootloaderBinary = new Uint8Array([10, 11, 12]).buffer;
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6709,6 +6775,7 @@ describe('Protocol V2 firmware update targets', () => {
         platform: 'web',
         targetsToUpdate: ['app_v1'],
         applicationP1Binary,
+        bootloaderBinary,
         resourceArchiveBinary,
       },
     });
@@ -6742,6 +6809,11 @@ describe('Protocol V2 firmware update targets', () => {
         executor: 'v4',
         targetsToUpdate: ['app_v1', 'resource'],
       });
+      expect(
+        (method as any).params.preparedPlan.artifacts.some(
+          (artifact: { target: string }) => artifact.target === 'boot'
+        )
+      ).toBe(false);
       expect((method as any).executeProtocolV2SourceUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           installSources: [
