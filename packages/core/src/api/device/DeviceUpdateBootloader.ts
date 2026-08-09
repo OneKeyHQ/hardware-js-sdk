@@ -158,18 +158,32 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
     const { features } = device;
 
     const payload = this.payload as DeviceUpdateBootloaderParams;
-    const preparedPlan = payload.artifact
+    const hasPreparedPlan = payload.preparedPlan !== undefined;
+    const hasPreparedArtifact = payload.artifact !== undefined;
+    if (hasPreparedPlan !== hasPreparedArtifact) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'Prepared bootloader plans require exactly one prepared artifact'
+      );
+    }
+    if (payload.binary !== undefined && hasPreparedArtifact) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'Bootloader binary and prepared artifact are mutually exclusive'
+      );
+    }
+    const preparedPlan = hasPreparedArtifact
       ? validateFirmwareUpdatePreparedPlan(payload.preparedPlan)
       : undefined;
-    const hostBinding = preparedPlan
+    const artifactReader = preparedPlan
       ? resolveFirmwareUpdateHostBinding(
           payload.hostBindingGeneration,
           preparedPlan.preparedPlanDigest
-        )
-      : undefined;
+        ).artifactReader
+      : payload.artifactReader;
     const executionParams = {
       ...payload,
-      artifactReader: hostBinding?.artifactReader ?? payload.artifactReader,
+      artifactReader,
     };
     if (payload.artifact) {
       assertFirmwareUpdatePreparedPlanDeviceIdentity({

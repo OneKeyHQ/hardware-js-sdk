@@ -82,13 +82,13 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       payload.artifacts || payload.preparedPlan
         ? validateFirmwareUpdatePreparedPlan(payload.preparedPlan)
         : undefined;
-    const hostBinding = preparedPlan
+    const artifactReader = preparedPlan
       ? resolveFirmwareUpdateHostBinding(
           payload.hostBindingGeneration,
           preparedPlan.preparedPlanDigest
-        )
-      : undefined;
-    if (hostBinding) {
+        ).artifactReader
+      : payload.artifactReader;
+    if (preparedPlan) {
       assertFirmwareUpdatePreparedPlanBinding({
         preparedPlan,
         executor: 'v3',
@@ -142,7 +142,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       resourceBinary: payload.resourceBinary,
       firmwareType: payload.firmwareType,
       platform: payload.platform,
-      artifactReader: hostBinding?.artifactReader ?? payload.artifactReader,
+      artifactReader,
       artifacts: payload.artifacts,
     };
   }

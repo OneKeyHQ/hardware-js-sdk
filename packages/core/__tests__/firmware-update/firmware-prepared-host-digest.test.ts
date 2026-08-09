@@ -2,6 +2,7 @@ import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
 import FirmwareUpdateV2 from '../../src/api/FirmwareUpdateV2';
 import FirmwareUpdateV3 from '../../src/api/FirmwareUpdateV3';
+import FirmwareUpdateV4 from '../../src/api/FirmwareUpdateV4';
 import DeviceUpdateBootloader from '../../src/api/device/DeviceUpdateBootloader';
 import {
   registerFirmwareUpdateHostBinding,
@@ -95,6 +96,47 @@ const registerMismatchedHost = () => {
   return { artifactReader, hostBindingGeneration };
 };
 
+const createPreparedV4Plan = () => {
+  const sha256 = 'c'.repeat(64);
+  const artifact: FirmwareArtifactReference = {
+    artifactRef: `fw:${sha256}`,
+    size: 4,
+    sha256,
+  };
+  const plan = buildFirmwareUpdatePlan({
+    features: {
+      deviceType: EDeviceType.Pro2,
+      serialNo: 'pro2-device-id',
+      firmwareVersion: '1.0.0',
+      bootloaderVersion: '1.0.0',
+    } as Features,
+    firmwareType: EFirmwareType.Universal,
+    platform: 'desktop',
+    firmware: {
+      status: 'outdated',
+      release: {
+        components: {
+          applicationP1: {
+            target: 'APPLICATION_P1',
+            url: 'https://firmware.onekey.so/pro2/application-p1.bin',
+            expectedSize: artifact.size,
+            fingerprint: artifact.sha256,
+          },
+        },
+      },
+    },
+    ble: noUpdate,
+    bootloader: noUpdate,
+  });
+  expect(plan.executor).toBe('v4');
+  const preparedPlan = prepareFirmwareUpdatePlan({
+    plan,
+    leaseRef: 'fwlease:v4:app_v1',
+    artifacts: [{ artifactId: 'component:app_v1', artifact }],
+  });
+  return { artifact, preparedPlan };
+};
+
 describe('prepared firmware host digest binding', () => {
   afterEach(() => {
     unregisterFirmwareUpdateHostBinding();
@@ -123,6 +165,51 @@ describe('prepared firmware host digest binding', () => {
     expect(artifactReader.open).not.toHaveBeenCalled();
   });
 
+  test('FirmwareUpdateV2 rejects a direct reader when the prepared host generation is missing', () => {
+    const { artifact, preparedPlan } = createPreparedPlan({
+      executor: 'v2',
+      target: 'firmware',
+    });
+    const directArtifactReader = {
+      open: jest.fn(),
+      read: jest.fn(),
+      close: jest.fn(),
+    };
+    const method = new FirmwareUpdateV2({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV2',
+        platform: 'desktop',
+        updateType: 'firmware',
+        artifact,
+        preparedPlan,
+        artifactReader: directArtifactReader,
+      },
+    });
+
+    expect(() => method.init()).toThrow('host binding generation NaN is stale');
+    expect(directArtifactReader.open).not.toHaveBeenCalled();
+  });
+
+  test('FirmwareUpdateV2 does not treat a binary call carrying a prepared plan as legacy', () => {
+    const { preparedPlan } = createPreparedPlan({
+      executor: 'v2',
+      target: 'firmware',
+    });
+    const method = new FirmwareUpdateV2({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV2',
+        platform: 'desktop',
+        updateType: 'firmware',
+        binary: new ArrayBuffer(4),
+        preparedPlan,
+      },
+    });
+
+    expect(() => method.init()).toThrow('Prepared firmware plans require a prepared artifact');
+  });
+
   test('FirmwareUpdateV3 rejects a host registered for another prepared plan', () => {
     const { artifact, preparedPlan } = createPreparedPlan({
       executor: 'v3',
@@ -142,6 +229,31 @@ describe('prepared firmware host digest binding', () => {
 
     expect(() => method.init()).toThrow('does not match the prepared plan');
     expect(artifactReader.open).not.toHaveBeenCalled();
+  });
+
+  test('FirmwareUpdateV3 rejects a direct reader when the prepared host generation is missing', () => {
+    const { artifact, preparedPlan } = createPreparedPlan({
+      executor: 'v3',
+      target: 'firmware',
+    });
+    const directArtifactReader = {
+      open: jest.fn(),
+      read: jest.fn(),
+      close: jest.fn(),
+    };
+    const method = new FirmwareUpdateV3({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV3',
+        platform: 'desktop',
+        artifacts: { firmware: artifact },
+        preparedPlan,
+        artifactReader: directArtifactReader,
+      },
+    });
+
+    expect(() => method.init()).toThrow('host binding generation NaN is stale');
+    expect(directArtifactReader.open).not.toHaveBeenCalled();
   });
 
   test('DeviceUpdateBootloader rejects a host registered for another prepared plan', async () => {
@@ -168,6 +280,133 @@ describe('prepared firmware host digest binding', () => {
 
     await expect(method.run()).rejects.toThrow('does not match the prepared plan');
     expect(artifactReader.open).not.toHaveBeenCalled();
+  });
+
+  test('DeviceUpdateBootloader rejects a direct reader when the prepared host generation is missing', async () => {
+    const { artifact, preparedPlan } = createPreparedPlan({
+      executor: 'v2',
+      target: 'bootloader',
+    });
+    const directArtifactReader = {
+      open: jest.fn(),
+      read: jest.fn(),
+      close: jest.fn(),
+    };
+    const method = new DeviceUpdateBootloader({
+      id: 1,
+      payload: {
+        method: 'deviceUpdateBootloader',
+        artifact,
+        preparedPlan,
+        artifactReader: directArtifactReader,
+      },
+    });
+    method.device = {
+      features: {
+        deviceType: EDeviceType.Classic1s,
+        serialNo: 'classic-device-id',
+      },
+    } as any;
+
+    await expect(method.run()).rejects.toThrow('host binding generation NaN is stale');
+    expect(directArtifactReader.open).not.toHaveBeenCalled();
+  });
+
+  test('DeviceUpdateBootloader does not treat a binary call carrying a prepared plan as legacy', async () => {
+    const { preparedPlan } = createPreparedPlan({
+      executor: 'v2',
+      target: 'bootloader',
+    });
+    const method = new DeviceUpdateBootloader({
+      id: 1,
+      payload: {
+        method: 'deviceUpdateBootloader',
+        binary: new ArrayBuffer(4),
+        preparedPlan,
+      },
+    });
+    method.device = { features: undefined } as any;
+
+    await expect(method.run()).rejects.toThrow(
+      'Prepared bootloader plans require exactly one prepared artifact'
+    );
+  });
+
+  test('FirmwareUpdateV4 rejects a prepared plan without a host binding generation', () => {
+    const { preparedPlan } = createPreparedV4Plan();
+    const directArtifactReader = {
+      open: jest.fn(),
+      read: jest.fn(),
+      close: jest.fn(),
+    };
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'desktop',
+        preparedPlan,
+        artifactReader: directArtifactReader,
+      },
+    });
+
+    expect(() => method.init()).toThrow('host binding generation NaN is stale');
+    expect(directArtifactReader.open).not.toHaveBeenCalled();
+  });
+
+  test('FirmwareUpdateV4 rejects a host registered for another prepared plan', () => {
+    const { preparedPlan } = createPreparedV4Plan();
+    const { artifactReader, hostBindingGeneration } = registerMismatchedHost();
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'desktop',
+        preparedPlan,
+        hostBindingGeneration,
+      },
+    });
+
+    expect(() => method.init()).toThrow('does not match the prepared plan');
+    expect(artifactReader.open).not.toHaveBeenCalled();
+  });
+
+  test('FirmwareUpdateV4 obtains the prepared reader only from the digest-bound host', async () => {
+    const { artifact, preparedPlan } = createPreparedV4Plan();
+    const directArtifactReader = {
+      open: jest.fn(),
+      read: jest.fn(),
+      close: jest.fn(),
+    };
+    const boundArtifactReader = {
+      open: jest.fn().mockResolvedValue({ readerId: 'bound-reader', size: artifact.size }),
+      read: jest.fn(),
+      close: jest.fn(),
+    };
+    const hostBindingGeneration = registerFirmwareUpdateHostBinding({
+      preparedPlanDigest: preparedPlan.preparedPlanDigest,
+      artifactReader: boundArtifactReader,
+    });
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'desktop',
+        preparedPlan,
+        hostBindingGeneration,
+        artifactReader: directArtifactReader,
+      },
+    });
+
+    method.init();
+    const executionReader = (
+      method as unknown as {
+        params: { artifactReader: typeof boundArtifactReader };
+      }
+    ).params.artifactReader;
+    await executionReader.open({ artifactRef: artifact.artifactRef });
+
+    expect(boundArtifactReader.open).toHaveBeenCalledWith({ artifactRef: artifact.artifactRef });
+    expect(directArtifactReader.open).not.toHaveBeenCalled();
   });
 
   test('keeps non-prepared direct binary calls on the legacy paths', async () => {

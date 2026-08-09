@@ -640,13 +640,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         'Prepared firmware plans cannot be combined with legacy or local firmware inputs'
       );
     }
-    const hostBinding =
-      payload.hostBindingGeneration !== undefined
-        ? resolveFirmwareUpdateHostBinding(
-            payload.hostBindingGeneration,
-            preparedPlan?.preparedPlanDigest
-          )
-        : undefined;
+    let { artifactReader } = payload;
+    if (preparedPlan) {
+      artifactReader = resolveFirmwareUpdateHostBinding(
+        payload.hostBindingGeneration,
+        preparedPlan.preparedPlanDigest
+      ).artifactReader;
+    } else if (payload.hostBindingGeneration !== undefined) {
+      artifactReader = resolveFirmwareUpdateHostBinding(
+        payload.hostBindingGeneration
+      ).artifactReader;
+    }
     if (preparedPlan) {
       assertFirmwareUpdatePreparedPlanBinding({
         preparedPlan,
@@ -731,7 +735,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         : payload.expectedTargetVersions,
       platform: payload.platform,
       expectedDeviceId: payload.expectedDeviceId,
-      artifactReader: hostBinding?.artifactReader ?? payload.artifactReader,
+      artifactReader,
       componentArtifacts: preparedPlan ? undefined : payload.componentArtifacts,
     };
   }

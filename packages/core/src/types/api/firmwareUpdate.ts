@@ -133,6 +133,7 @@ export type FirmwareUpdateV4Target =
 
 export interface FirmwareUpdateV4Params {
   preparedPlan?: FirmwareUpdatePreparedPlan;
+  /** Required whenever preparedPlan is present; Core resolves the reader from this digest-bound host. */
   hostBindingGeneration?: number;
   platform: IPlatform;
   expectedDeviceId?: string;

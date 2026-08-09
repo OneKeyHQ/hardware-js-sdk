@@ -47,6 +47,7 @@ import type { FirmwareUpdatePreparedPlan } from '../types/api/firmwareUpdatePrep
 type Params = {
   binary?: ArrayBuffer;
   artifact?: FirmwareArtifactReference;
+  hostBindingGeneration?: number;
   resourceEntries?: Array<{
     entryName: string;
     artifact: FirmwareArtifactReference;
@@ -169,6 +170,12 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       throw ERRORS.TypedError(
         HardwareErrorCode.CallMethodInvalidParameter,
         'Firmware update binary and artifact are mutually exclusive'
+      );
+    }
+    if (payload.preparedPlan !== undefined && payload.artifact === undefined) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'Prepared firmware plans require a prepared artifact'
       );
     }
 
