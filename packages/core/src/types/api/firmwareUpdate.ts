@@ -26,6 +26,8 @@ export interface FirmwareArtifactReader {
 
 export interface FirmwareUpdateHostBinding {
   artifactReader: FirmwareArtifactReader;
+  /** 将读取器 generation 绑定到包含 ZIP 条目的完整 PreparedPlan。 */
+  preparedPlanDigest: string;
 }
 
 export interface FirmwareUpdateBinaryParams {

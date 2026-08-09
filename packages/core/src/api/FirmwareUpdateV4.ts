@@ -555,17 +555,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         'Protocol V2 expected device identity is invalid'
       );
     }
+    const preparedPlan = payload.preparedPlan
+      ? validateFirmwareUpdatePreparedPlan(payload.preparedPlan)
+      : undefined;
     const hostBinding =
-      payload.preparedPlan || payload.componentArtifacts
-        ? resolveFirmwareUpdateHostBinding(payload.hostBindingGeneration)
+      preparedPlan || payload.componentArtifacts
+        ? resolveFirmwareUpdateHostBinding(
+            payload.hostBindingGeneration,
+            preparedPlan?.preparedPlanDigest
+          )
         : undefined;
     if (hostBinding) {
       const componentArtifacts = (payload.componentArtifacts ?? {}) as NonNullable<
         FirmwareUpdateV4Params['componentArtifacts']
       >;
-      const preparedPlan = validateFirmwareUpdatePreparedPlan(payload.preparedPlan);
       assertFirmwareUpdatePreparedPlanBinding({
-        preparedPlan,
+        preparedPlan: preparedPlan ?? payload.preparedPlan,
         executor: 'v4',
         platform: payload.platform,
         scopeTargets: ['boot', 'app_v1', 'app_v2', 'coprocessor', 'se01', 'se02', 'se03', 'se04'],
@@ -585,9 +590,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     this.params = {
-      preparedPlan: payload.preparedPlan
-        ? validateFirmwareUpdatePreparedPlan(payload.preparedPlan)
-        : undefined,
+      preparedPlan,
       chunkSize: payload.chunkSize,
       forcedUpdateRes: payload.forcedUpdateRes,
       bootloaderBinary: payload.bootloaderBinary,

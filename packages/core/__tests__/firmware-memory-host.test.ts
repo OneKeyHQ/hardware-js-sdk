@@ -87,6 +87,9 @@ describe('prepareFirmwareUpdateV4MemoryHost', () => {
     });
 
     expect(host.hostBindingGeneration).toBe(7);
+    expect(sdk.registerFirmwareUpdateHostBinding).toHaveBeenCalledWith(
+      expect.objectContaining({ preparedPlanDigest: host.preparedPlan.preparedPlanDigest })
+    );
     expect(host.componentArtifacts.boot?.size).toBe(componentBinary.byteLength);
     const opened = await artifactReader!.open({
       artifactRef: host.componentArtifacts.boot!.artifactRef,

@@ -6231,7 +6231,7 @@ describe('Protocol V2 firmware update targets', () => {
     await Promise.all(sources.map(source => source.source.close()));
   });
 
-  test('accepts a prepared resource archive host binding', () => {
+  test('binds a prepared resource archive to the selected host generation', () => {
     const planWithoutDigest = {
       schemaVersion: 2 as const,
       executor: 'v4' as const,
@@ -6279,7 +6279,32 @@ describe('Protocol V2 firmware update targets', () => {
         },
       ],
     });
+    const mismatchedHostBindingGeneration = registerFirmwareUpdateHostBinding({
+      preparedPlanDigest: 'c'.repeat(64),
+      artifactReader: {
+        open: jest.fn(),
+        read: jest.fn(),
+        close: jest.fn(),
+      },
+    });
+    try {
+      const mismatchedMethod = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+          platform: 'web',
+          targetsToUpdate: ['resource'],
+          preparedPlan,
+          hostBindingGeneration: mismatchedHostBindingGeneration,
+        },
+      });
+
+      expect(() => mismatchedMethod.init()).toThrow('does not match the prepared plan');
+    } finally {
+      unregisterFirmwareUpdateHostBinding(mismatchedHostBindingGeneration);
+    }
     const hostBindingGeneration = registerFirmwareUpdateHostBinding({
+      preparedPlanDigest: preparedPlan.preparedPlanDigest,
       artifactReader: {
         open: jest.fn(),
         read: jest.fn(),

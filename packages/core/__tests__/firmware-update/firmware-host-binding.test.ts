@@ -6,6 +6,7 @@ import {
 } from '../../src/api/firmware/FirmwareHostBinding';
 
 const createBinding = () => ({
+  preparedPlanDigest: 'a'.repeat(64),
   artifactReader: {
     open: jest.fn(() => Promise.resolve({ readerId: 'reader-1', size: 4 })),
     read: jest.fn(() =>
@@ -66,5 +67,13 @@ describe('firmware host binding generation', () => {
     expect(binding.artifactReader.close).toHaveBeenCalledWith({
       readerId: 'stale-reader',
     });
+  });
+
+  test('rejects a prepared plan from another host generation before opening artifacts', () => {
+    const generation = registerFirmwareUpdateHostBinding(createBinding());
+
+    expect(() => resolveFirmwareUpdateHostBinding(generation, 'b'.repeat(64))).toThrow(
+      'does not match the prepared plan'
+    );
   });
 });

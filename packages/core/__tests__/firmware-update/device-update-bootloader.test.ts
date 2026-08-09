@@ -36,7 +36,10 @@ const createMethod = () => {
     read: jest.fn(),
     close,
   };
-  const hostBindingGeneration = registerFirmwareUpdateHostBinding({ artifactReader });
+  const hostBindingGeneration = registerFirmwareUpdateHostBinding({
+    artifactReader,
+    preparedPlanDigest: 'a'.repeat(64),
+  });
   const method = new DeviceUpdateBootloader({
     id: 1,
     payload: {

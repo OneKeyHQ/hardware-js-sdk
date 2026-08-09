@@ -144,7 +144,10 @@ export function prepareFirmwareUpdateV4MemoryHost({
       return Promise.resolve();
     },
   };
-  const hostBindingGeneration = sdk.registerFirmwareUpdateHostBinding({ artifactReader });
+  const hostBindingGeneration = sdk.registerFirmwareUpdateHostBinding({
+    artifactReader,
+    preparedPlanDigest: preparedPlan.preparedPlanDigest,
+  });
   const componentArtifacts: FirmwareUpdateV4MemoryHost['componentArtifacts'] = {};
   const expectedTargetVersions: FirmwareUpdateV4MemoryHost['expectedTargetVersions'] = {};
   for (const artifact of preparedPlan.artifacts) {
