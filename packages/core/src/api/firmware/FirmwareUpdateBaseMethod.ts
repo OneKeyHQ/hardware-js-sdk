@@ -191,6 +191,8 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
           !hasPromptedWebDevice &&
           !isPromptingWebDevice
         ) {
+          clearInterval(intervalTimer);
+          clearTimeout(timeoutTimer);
           isPromptingWebDevice = true;
           try {
             this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
