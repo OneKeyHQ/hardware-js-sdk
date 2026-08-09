@@ -245,8 +245,9 @@ Prepared 固件更新将 artifact 获取与设备执行分离，完整性责任�
   独立防线，不能替代 Host 对资源 artifact 的完整性校验。
 - Protocol V2 资源归档必须作为 `role: resourceBundle`、`target: resource`、`container: zip`
   的 Plan artifact 参与统一下载；Host 在 PreparedPlan 的 `materializedEntries` 中登记
-  `manifest.json` 与资源包，SDK 仅通过 `ArtifactReader` 分块读取，不提供绕过 Plan 的资源
-  二进制输入接口。
+  `manifest.json` 与资源包，SDK 仅通过 `ArtifactReader` 分块读取。公共
+  `resourceArchiveBinary` 是本地开发便利入口，Core 必须先将它转换成本地 Plan、PreparedPlan、
+  receipt 和内存 `ArtifactReader`，不得直接进入设备写入流程。
 - Web 与示例环境没有持久化 artifact store 时，可以使用内存 Host 适配器，但仍必须保持
   Plan、PreparedPlan、receipt 和 ArtifactReader 四层契约，不得恢复 SDK 内部联网下载。
 

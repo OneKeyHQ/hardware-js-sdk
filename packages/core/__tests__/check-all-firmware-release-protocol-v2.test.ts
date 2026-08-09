@@ -25,6 +25,11 @@ const currentVersions: DeviceStateVersions = {
   se04: '1.0.0',
 };
 
+const validComponentIntegrity = {
+  expectedSize: 1024,
+  fingerprint: '1'.repeat(64),
+};
+
 const release: IFirmwareReleaseInfo = {
   required: true,
   version: [2, 0, 0],
@@ -40,21 +45,25 @@ const release: IFirmwareReleaseInfo = {
       target: 'BOOTLOADER',
       url: 'https://example.com/bootloader.bin',
       version: [1, 1, 0],
+      ...validComponentIntegrity,
     },
     applicationP1: {
       target: 'APPLICATION_P1',
       url: 'https://example.com/application-p1.bin',
       version: [2, 0, 0],
+      ...validComponentIntegrity,
     },
     se02: {
       target: 'SE02',
       url: 'https://example.com/se02.bin',
       version: [2, 0, 0],
+      ...validComponentIntegrity,
     },
     se03: {
       target: 'SE03',
       url: 'https://example.com/se03.bin',
       version: [1, 0, 0],
+      ...validComponentIntegrity,
     },
     romloader: {
       target: 'ROMLOADER',
@@ -395,11 +404,13 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
           target: 'APPLICATION_P1',
           url: 'https://example.com/application-p1.okpkg',
           version: [1, 0, 0],
+          ...validComponentIntegrity,
         },
         coprocessor: {
           target: 'COPROCESSOR',
           url: 'https://example.com/coprocessor.okpkg',
           version: [1, 0, 0],
+          ...validComponentIntegrity,
         },
       },
     };
@@ -453,6 +464,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
           target: 'APPLICATION_P1',
           url: 'https://example.com/application-p1.okpkg',
           version: [1, 0, 0],
+          ...validComponentIntegrity,
         },
       },
     };
@@ -526,8 +538,18 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       ...release,
       installOrder: ['se01', 'se02', 'se03', 'se04'],
       components: {
-        se01: { target: 'SE01', url: 'https://example.com/se01.bin', version: [1, 0, 0] },
-        se02: { target: 'SE02', url: 'https://example.com/se02.bin', version: [2, 0, 0] },
+        se01: {
+          target: 'SE01',
+          url: 'https://example.com/se01.bin',
+          version: [1, 0, 0],
+          ...validComponentIntegrity,
+        },
+        se02: {
+          target: 'SE02',
+          url: 'https://example.com/se02.bin',
+          version: [2, 0, 0],
+          ...validComponentIntegrity,
+        },
         se03: { target: 'SE03', url: 'https://example.com/se03.bin', version: [1, 0, 0] },
         se04: { target: 'SE04', url: 'https://example.com/se04.bin', version: [1, 0, 0] },
       },

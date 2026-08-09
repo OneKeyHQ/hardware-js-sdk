@@ -186,9 +186,10 @@ Bootloader 或 Romloader 时复用当前 loader 连接，不重复 reboot。
 组件引用、升级目标和预期版本不需要调用方重复传入，也不重新依赖可能已变化的在线 release 记录。
 
 本地开发升级与远程 Plan 严格分离：组件可以继续通过 `firmwareUpdateV4` 的各组件 `ArrayBuffer` 字段传入；
-完整资源 ZIP 通过 `resourceArchiveBinary` 传入。该路径不读取或匹配远程配置，但 Core 仍会在修改设备前
-校验 ZIP 的 manifest 合约、允许写入路径、条目集合、文件大小和 SHA-256；设备端继续负责签名包的最终
-验证与启用。不得把本地文件作为远程 Plan 的 override 来绕过远程收据校验。
+完整资源 ZIP 通过 `resourceArchiveBinary` 传入。Core 会把本地组件和资源 ZIP 转换成本地 Plan、PreparedPlan、
+receipt 与内存 `ArtifactReader`；该路径不读取或匹配远程配置，但仍会在修改设备前校验 ZIP 声明展开大小、
+manifest 合约、允许写入路径、条目集合、文件大小和 SHA-256；设备端继续负责签名包的最终验证与启用。
+不得把本地文件作为远程 Plan 的 override 来绕过远程收据校验。
 
 ## 包职责速查
 

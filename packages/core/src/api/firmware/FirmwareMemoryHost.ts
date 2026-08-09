@@ -61,14 +61,19 @@ export function prepareFirmwareUpdateV4MemoryHost({
   const hostId = `${Date.now()}:${memoryHostSequence}`;
   const binaries = new Map<string, Uint8Array>();
   const inputs = artifacts.map((input, artifactIndex) => {
-    const artifact = createReference(input.binary, `${hostId}:artifact:${artifactIndex}`);
-    binaries.set(artifact.artifactRef, new Uint8Array(input.binary));
+    const artifactBinary = new Uint8Array(input.binary).slice();
+    const artifact = createReference(
+      artifactBinary.buffer as ArrayBuffer,
+      `${hostId}:artifact:${artifactIndex}`
+    );
+    binaries.set(artifact.artifactRef, artifactBinary);
     const materializedEntries = input.materializedEntries?.map((entry, entryIndex) => {
+      const entryBinary = new Uint8Array(entry.binary).slice();
       const entryArtifact = createReference(
-        entry.binary,
+        entryBinary.buffer as ArrayBuffer,
         `${hostId}:entry:${artifactIndex}:${entryIndex}`
       );
-      binaries.set(entryArtifact.artifactRef, new Uint8Array(entry.binary));
+      binaries.set(entryArtifact.artifactRef, entryBinary);
       return {
         entryName: entry.entryName,
         artifact: entryArtifact,

@@ -504,6 +504,13 @@ const buildProtocolV2Artifacts = (
       );
     }
     componentTargetSet.add(target);
+    const integrity = asIntegrity({
+      size: component.expectedSize,
+      sha256: component.fingerprint,
+    });
+    if (integrity.expectedSize === undefined || integrity.expectedSha256 === undefined) {
+      planError(`Protocol V2 component ${key} integrity metadata is invalid`);
+    }
     artifacts.push({
       artifactId: `component:${target}`,
       role: 'component',
@@ -511,10 +518,7 @@ const buildProtocolV2Artifacts = (
       url: assertArtifactUrl(component.url, `Protocol V2 component ${key}`),
       container: 'raw',
       logicalName: key,
-      ...asIntegrity({
-        size: component.expectedSize,
-        sha256: component.fingerprint,
-      }),
+      ...integrity,
       ...(asVersion(component.version) ? { targetVersion: asVersion(component.version) } : {}),
     });
     targets.push(target);
@@ -630,6 +634,47 @@ const finalizeFirmwareUpdatePlan = ({
     ...planWithoutDigest,
     planDigest: digestFirmwareUpdatePlan(planWithoutDigest),
   });
+};
+
+export type ProtocolV2LocalFirmwareUpdatePlanArtifact = {
+  artifactId: string;
+  target: Exclude<FirmwareUpdateV4Target, 'boot_resources'>;
+  container: 'raw' | 'zip';
+  logicalName: string;
+  expectedSize: number;
+  expectedSha256: string;
+  targetVersion?: string;
+};
+
+export const buildProtocolV2LocalFirmwareUpdatePlan = ({
+  features,
+  firmwareType,
+  platform,
+  artifacts,
+}: {
+  features: Features;
+  firmwareType: EFirmwareType;
+  platform: FirmwareUpdatePlatform;
+  artifacts: ProtocolV2LocalFirmwareUpdatePlanArtifact[];
+}): FirmwareUpdatePlan => {
+  if (artifacts.length === 0) {
+    return planError('Protocol V2 local firmware plan has no artifacts');
+  }
+  const plan = finalizeFirmwareUpdatePlan({
+    features,
+    firmwareType,
+    platform,
+    artifacts: artifacts.map(artifact => ({
+      ...artifact,
+      role: artifact.target === 'resource' ? 'resourceBundle' : 'component',
+      url: `https://local-firmware.invalid/${encodeURIComponent(artifact.artifactId)}`,
+    })),
+    targetsToUpdate: artifacts.map(artifact => artifact.target),
+  });
+  if (plan.executor !== 'v4') {
+    return planError('Protocol V2 local firmware plan requires executor v4');
+  }
+  return plan;
 };
 
 export const buildProtocolV2FirmwareUpdatePlan = ({

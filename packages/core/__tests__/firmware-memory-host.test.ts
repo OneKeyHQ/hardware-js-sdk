@@ -94,6 +94,7 @@ describe('prepareFirmwareUpdateV4MemoryHost', () => {
       artifact => artifact.target === 'boot'
     )?.artifact;
     expect(componentArtifact?.size).toBe(componentBinary.byteLength);
+    new Uint8Array(componentBinary).fill(9);
     const opened = await artifactReader!.open({
       artifactRef: componentArtifact!.artifactRef,
     });

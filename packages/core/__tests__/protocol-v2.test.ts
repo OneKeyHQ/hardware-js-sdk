@@ -5799,6 +5799,14 @@ describe('Protocol V2 firmware update targets', () => {
           binary: binaries.get(url) ?? new Uint8Array([0]).buffer,
         })
       );
+    const componentIntegrity = (url: string) => {
+      const binary = binaries.get(url);
+      if (!binary) throw new Error(`Missing test firmware binary: ${url}`);
+      return {
+        expectedSize: binary.byteLength,
+        fingerprint: bytesToHex(sha256(new Uint8Array(binary))),
+      };
+    };
     const getFirmwareLatestReleaseSpy = jest
       .spyOn(DataManager, 'getFirmwareLatestRelease')
       .mockReturnValue({
@@ -5823,23 +5831,43 @@ describe('Protocol V2 firmware update targets', () => {
           bootloader: {
             target: 'BOOTLOADER',
             url: 'https://example.com/bootloader.pp.bin',
+            ...componentIntegrity('https://example.com/bootloader.pp.bin'),
           },
           applicationP1: {
             target: 'APPLICATION_P1',
             url: 'https://example.com/applicationP1.pp.bin',
+            ...componentIntegrity('https://example.com/applicationP1.pp.bin'),
           },
           applicationP2: {
             target: 'APPLICATION_P2',
             url: 'https://example.com/applicationP2.pp.bin',
+            ...componentIntegrity('https://example.com/applicationP2.pp.bin'),
           },
           coprocessor: {
             target: 'COPROCESSOR',
             url: 'https://example.com/coprocessor.pp.bin',
+            ...componentIntegrity('https://example.com/coprocessor.pp.bin'),
           },
-          se01: { target: 'SE01', url: 'https://example.com/se01.pp.bin' },
-          se02: { target: 'SE02', url: 'https://example.com/se02.pp.bin' },
-          se03: { target: 'SE03', url: 'https://example.com/se03.pp.bin' },
-          se04: { target: 'SE04', url: 'https://example.com/se04.pp.bin' },
+          se01: {
+            target: 'SE01',
+            url: 'https://example.com/se01.pp.bin',
+            ...componentIntegrity('https://example.com/se01.pp.bin'),
+          },
+          se02: {
+            target: 'SE02',
+            url: 'https://example.com/se02.pp.bin',
+            ...componentIntegrity('https://example.com/se02.pp.bin'),
+          },
+          se03: {
+            target: 'SE03',
+            url: 'https://example.com/se03.pp.bin',
+            ...componentIntegrity('https://example.com/se03.pp.bin'),
+          },
+          se04: {
+            target: 'SE04',
+            url: 'https://example.com/se04.pp.bin',
+            ...componentIntegrity('https://example.com/se04.pp.bin'),
+          },
         },
         fingerprint: '',
         changelog: {
@@ -5907,10 +5935,14 @@ describe('Protocol V2 firmware update targets', () => {
           applicationP1: {
             target: 'APPLICATION_P1',
             url: 'https://example.com/applicationP1.pp.bin',
+            expectedSize: explicitApplicationBinary.byteLength,
+            fingerprint: bytesToHex(sha256(new Uint8Array(explicitApplicationBinary))),
           },
           coprocessor: {
             target: 'COPROCESSOR',
             url: 'https://example.com/coprocessor.pp.bin',
+            expectedSize: remoteCoprocessorBinary.byteLength,
+            fingerprint: bytesToHex(sha256(new Uint8Array(remoteCoprocessorBinary))),
           },
         },
         fingerprint: '',
@@ -6527,7 +6559,7 @@ describe('Protocol V2 firmware update targets', () => {
     }
   });
 
-  test('executes a local resource ZIP without creating or matching a remote Plan', async () => {
+  test('converts a local resource ZIP into a local PreparedPlan without matching a remote release', async () => {
     const imagesBinary = new Uint8Array([1, 2, 3]).buffer;
     const bootResourceBinary = new Uint8Array([4, 5, 6]).buffer;
     const manifest = {
@@ -6571,12 +6603,14 @@ describe('Protocol V2 firmware update targets', () => {
     zip.file('bundles/images/images.okpkg', imagesBinary);
     zip.file('loaders/bootloader/boot_resource.okpkg', bootResourceBinary);
     const resourceArchiveBinary = await zip.generateAsync({ type: 'arraybuffer' });
+    const applicationP1Binary = new Uint8Array([7, 8, 9]).buffer;
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
         platform: 'web',
-        targetsToUpdate: ['resource'],
+        targetsToUpdate: ['app_v1', 'resource'],
+        applicationP1Binary,
         resourceArchiveBinary,
       },
     });
@@ -6585,10 +6619,18 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).postTipMessage = jest.fn();
     (method as any).device = stubDevice({
       originalDescriptor: { protocolType: 'V2' },
-      features: { deviceType: 'pro2', firmwareVersion: '1.0.0', capabilities: [] },
+      features: {
+        deviceType: 'pro2',
+        serialNo: 'pro2-device-id',
+        firmwareVersion: '1.0.0',
+        capabilities: [],
+      },
       getCurrentDeviceType: () => 'pro2',
     });
-    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue('local-resource-result');
+    (method as any).protocolV2ExpectedSerialNumber = 'pro2-device-id';
+    (method as any).executeProtocolV2SourceUpdate = jest
+      .fn()
+      .mockResolvedValue('local-resource-result');
     const releaseSpy = jest.spyOn(DataManager, 'getFirmwareLatestRelease');
     const reloadSpy = jest.spyOn(DataManager, 'forceReloadData');
 
@@ -6596,17 +6638,26 @@ describe('Protocol V2 firmware update targets', () => {
       await expect(method.run()).resolves.toBe('local-resource-result');
       expect(releaseSpy).not.toHaveBeenCalled();
       expect(reloadSpy).not.toHaveBeenCalled();
-      expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith(
+      expect((method as any).params.preparedPlan).toMatchObject({
+        networkPolicy: 'forbid',
+        executor: 'v4',
+        targetsToUpdate: ['app_v1', 'resource'],
+      });
+      expect((method as any).executeProtocolV2SourceUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          resourceBundles: [
+          installSources: [
+            expect.objectContaining({
+              fileName: 'application_p1.bin',
+              targetId: 4,
+            }),
+          ],
+          resourceSources: [
             expect.objectContaining({
               name: 'images.okpkg',
-              binary: imagesBinary,
               devicePath: 'vol0:/bundles/images/images.okpkg',
             }),
             expect.objectContaining({
               name: 'boot_resource.okpkg',
-              binary: bootResourceBinary,
               devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
             }),
           ],
@@ -6680,6 +6731,90 @@ describe('Protocol V2 firmware update targets', () => {
     ).rejects.toThrow(
       'Protocol V2 local resource file does not match manifest: bundles/images/images.okpkg'
     );
+  });
+
+  test('rejects an oversized ZIP entry before allocating its decompressed bytes', async () => {
+    const extractEntry = jest.fn();
+    const loadSpy = jest.spyOn(JSZip, 'loadAsync').mockResolvedValue({
+      files: {
+        'manifest.json': {
+          name: 'manifest.json',
+          dir: false,
+          _data: {
+            compressedSize: 1,
+            uncompressedSize: 2 * 1024 * 1024,
+          },
+          async: extractEntry,
+        },
+      },
+    } as unknown as JSZip);
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['resource'],
+      },
+    });
+    method.init();
+
+    try {
+      await expect(
+        (method as any).prepareProtocolV2LocalResourceArchive(new Uint8Array([1]).buffer)
+      ).rejects.toThrow('declared size exceeds the allowed limit');
+      expect(extractEntry).not.toHaveBeenCalled();
+    } finally {
+      loadSpy.mockRestore();
+    }
+  });
+
+  test('normalizes the deprecated boot_resources target to resource', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['boot_resources'],
+      },
+    });
+
+    method.init();
+    expect((method as any).params.targetsToUpdate).toEqual(['resource']);
+  });
+
+  test.each([
+    {
+      resourceFiles: [
+        {
+          binary: new Uint8Array([1]).buffer,
+          devicePath: 'vol0:/bundles/images/images.okpkg',
+        },
+      ],
+    },
+    {
+      resourceBundleArtifacts: [
+        {
+          name: 'images.okpkg',
+          artifact: {
+            artifactRef: 'legacy-resource',
+            size: 1,
+            sha256: '1'.repeat(64),
+          },
+        },
+      ],
+    },
+  ])('returns an explicit migration error for legacy resource inputs', legacyInput => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['resource'],
+        ...legacyInput,
+      },
+    });
+
+    expect(() => method.init()).toThrow('provide a complete signed resource ZIP');
   });
 
   test('keeps the legacy componentArtifacts and artifactReader path without a prepared Plan', async () => {

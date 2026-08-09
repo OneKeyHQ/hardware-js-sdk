@@ -120,6 +120,8 @@ export interface FirmwareUpdateV3Params {
  */
 export type FirmwareUpdateV4Target =
   | 'boot'
+  /** @deprecated Use resource with resourceArchiveBinary. */
+  | 'boot_resources'
   | 'app_v1'
   | 'app_v2'
   | 'coprocessor'
@@ -154,13 +156,28 @@ export interface FirmwareUpdateV4Params {
   se02Binary?: ArrayBuffer;
   se03Binary?: ArrayBuffer;
   se04Binary?: ArrayBuffer;
-  /** Complete Protocol V2 resource ZIP for local development; never bound to a remote Plan. */
+  /** Complete Protocol V2 resource ZIP for local development; Core converts it to a local PreparedPlan. */
   resourceArchiveBinary?: ArrayBuffer;
+  /** @deprecated Package the complete signed resource set as a ZIP and use resourceArchiveBinary. */
+  resourceFiles?: Array<{
+    binary: ArrayBuffer;
+    devicePath: string;
+    size?: number;
+    fileHash?: string;
+  }>;
   forcedUpdateRes?: boolean;
   artifactReader?: FirmwareArtifactReader;
   componentArtifacts?: Partial<
-    Record<Exclude<FirmwareUpdateV4Target, 'resource'>, FirmwareArtifactReference>
+    Record<
+      Exclude<FirmwareUpdateV4Target, 'resource' | 'boot_resources'>,
+      FirmwareArtifactReference
+    >
   >;
+  /** @deprecated Use a ZIP artifact in preparedPlan instead. */
+  resourceBundleArtifacts?: Array<{
+    name: string;
+    artifact: FirmwareArtifactReference;
+  }>;
 }
 
 export declare function registerFirmwareUpdateHostBinding(

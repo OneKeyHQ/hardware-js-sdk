@@ -306,6 +306,8 @@ describe('buildFirmwareUpdatePlan', () => {
           applicationP1: {
             target: 'APPLICATION_P1',
             url: 'https://firmware.onekey.so/pro2/application-p1.bin',
+            expectedSize: 1024,
+            fingerprint: '1111111111111111111111111111111111111111111111111111111111111111',
           },
         },
       },
@@ -326,6 +328,8 @@ describe('buildFirmwareUpdatePlan', () => {
           applicationP1: {
             target: 'APPLICATION_P1',
             url: 'https://firmware.onekey.so/pro2/application-p1.bin',
+            expectedSize: 1024,
+            fingerprint: '1111111111111111111111111111111111111111111111111111111111111111',
           },
         },
       })
@@ -377,10 +381,14 @@ describe('buildFirmwareUpdatePlan', () => {
             bootloader: {
               target: 'BOOTLOADER',
               url: 'https://firmware.onekey.so/pro2/bootloader.bin',
+              expectedSize: 2048,
+              fingerprint: '2222222222222222222222222222222222222222222222222222222222222222',
             },
             se01: {
               target: 'SE01',
               url: 'https://firmware.onekey.so/pro2/se01.bin',
+              expectedSize: 512,
+              fingerprint: '3333333333333333333333333333333333333333333333333333333333333333',
             },
           },
         },
@@ -401,6 +409,41 @@ describe('buildFirmwareUpdatePlan', () => {
         expectedSize: 1024,
         expectedSha256: '1111111111111111111111111111111111111111111111111111111111111111',
       })
+    );
+  });
+
+  test.each([
+    {
+      expectedSize: undefined,
+      fingerprint: '1'.repeat(64),
+    },
+    {
+      expectedSize: 1024,
+      fingerprint: undefined,
+    },
+  ])('rejects a remote Pro2 component without complete integrity metadata', integrity => {
+    expectFirmwarePlanInvalid(
+      () =>
+        buildFirmwareUpdatePlan({
+          features: createFeatures({ deviceType: EDeviceType.Pro2 }),
+          firmwareType: EFirmwareType.Universal,
+          platform: 'desktop',
+          firmware: {
+            status: 'required',
+            release: {
+              components: {
+                applicationP1: {
+                  target: 'APPLICATION_P1',
+                  url: 'https://firmware.onekey.so/pro2/application-p1.bin',
+                  ...integrity,
+                },
+              },
+            },
+          },
+          ble: noUpdate,
+          bootloader: noUpdate,
+        }),
+      'integrity metadata is invalid'
     );
   });
 
@@ -435,10 +478,14 @@ describe('buildFirmwareUpdatePlan', () => {
           application: {
             target: 'APPLICATION_P1',
             url: 'https://firmware.onekey.so/pro2/application.bin',
+            expectedSize: 1024,
+            fingerprint: '1111111111111111111111111111111111111111111111111111111111111111',
           },
           applicationDuplicate: {
             target: 'APPLICATION_P1',
             url: 'https://firmware.onekey.so/pro2/application-duplicate.bin',
+            expectedSize: 1024,
+            fingerprint: '2222222222222222222222222222222222222222222222222222222222222222',
           },
         },
       },
