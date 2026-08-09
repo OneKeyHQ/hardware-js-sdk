@@ -28,7 +28,6 @@ import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
 import {
   LoggerNames,
   getDeviceFirmwareVersion,
-  getDeviceSerialNo,
   getDeviceType,
   getFirmwareType,
   getLogger,
@@ -437,33 +436,29 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       ])
     );
     let firmwareUpdatePlan: FirmwareUpdatePlan | undefined;
+    const shouldBuildFirmwareUpdatePlan = targetsToUpdate.length > 0;
+    const requestedPlatform = platform ?? 'web';
+    const requiresPreparedPlan =
+      shouldBuildFirmwareUpdatePlan &&
+      (requestedPlatform === 'native' || requestedPlatform === 'desktop');
     try {
-      const shouldBuildFirmwareUpdatePlan = targetsToUpdate.length > 0;
-      const requestedPlatform = platform ?? 'web';
-      const requiresDeviceIdentity =
-        requestedPlatform === 'native' || requestedPlatform === 'desktop';
-      const canBindPreparedPlan = !requiresDeviceIdentity || !!getDeviceSerialNo(features);
       if (shouldBuildFirmwareUpdatePlan) {
         const validatedPlan = buildProtocolV2FirmwareUpdatePlan({
           features,
           firmwareType,
-          platform: canBindPreparedPlan ? requestedPlatform : 'web',
+          platform: requestedPlatform,
           release,
           targetsToUpdate,
           forceUpdateTargets: validatedForceUpdateTargets,
           resourceArchive: resourceSource,
         });
-        firmwareUpdatePlan = canBindPreparedPlan ? validatedPlan : undefined;
-        if (!canBindPreparedPlan) {
-          Log.warn(
-            '[CheckAllFirmwareRelease] Protocol V2 device identity is unavailable; using the release result without a prepared Plan'
-          );
-        }
+        firmwareUpdatePlan = validatedPlan;
       } else {
         firmwareUpdatePlan = undefined;
       }
     } catch (error) {
       if (
+        requiresPreparedPlan ||
         validatedForceUpdateTargets.length > 0 ||
         validatedProtocolV2ForceUpdateTargets.length > 0 ||
         !(error instanceof HardwareError) ||

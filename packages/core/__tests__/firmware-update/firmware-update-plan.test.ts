@@ -1,6 +1,10 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
 import { buildFirmwareUpdatePlan } from '../../src/api/firmware/FirmwareUpdatePlan';
+import {
+  assertFirmwareUpdatePreparedPlanDeviceIdentity,
+  prepareFirmwareUpdatePlan,
+} from '../../src/api/firmware/FirmwareUpdatePreparedPlan';
 
 import type { Features } from '../../src/types';
 
@@ -360,6 +364,71 @@ describe('buildFirmwareUpdatePlan', () => {
         bootloader: noUpdate,
       })
     ).toThrow('requires a stable device identity');
+  });
+
+  test('allows an identity-less Protocol V2 device while retaining the model binding', () => {
+    const features = createFeatures({
+      deviceType: EDeviceType.Pro2,
+    });
+    delete (features as Partial<Features>).serialNo;
+
+    const plan = buildFirmwareUpdatePlan({
+      features,
+      firmwareType: EFirmwareType.Universal,
+      platform: 'desktop',
+      firmware: {
+        status: 'outdated',
+        release: {
+          components: {
+            applicationP1: {
+              target: 'APPLICATION_P1',
+              url: 'https://firmware.onekey.so/pro2/application-p1.bin',
+              expectedSize: 1024,
+              fingerprint: '1111111111111111111111111111111111111111111111111111111111111111',
+            },
+          },
+        },
+      },
+      ble: noUpdate,
+      bootloader: noUpdate,
+    });
+
+    expect(plan).toMatchObject({
+      executor: 'v4',
+      deviceIdentity: 'unavailable',
+      deviceModel: String(EDeviceType.Pro2),
+    });
+
+    const preparedPlan = prepareFirmwareUpdatePlan({
+      plan,
+      leaseRef: 'fwlease:00000000-0000-4000-8000-000000000004',
+      artifacts: [
+        {
+          artifactId: 'component:app_v1',
+          artifact: {
+            artifactRef: `fw:${'1'.repeat(64)}`,
+            size: 1024,
+            sha256: '1'.repeat(64),
+          },
+        },
+      ],
+    });
+    expect(() =>
+      assertFirmwareUpdatePreparedPlanDeviceIdentity({
+        preparedPlan,
+        deviceIdentity: undefined,
+        bootloaderMode: false,
+        deviceModel: String(EDeviceType.Pro2),
+      })
+    ).not.toThrow();
+    expect(() =>
+      assertFirmwareUpdatePreparedPlanDeviceIdentity({
+        preparedPlan,
+        deviceIdentity: undefined,
+        bootloaderMode: false,
+        deviceModel: String(EDeviceType.Neo),
+      })
+    ).toThrow();
   });
 
   test('maps the Pro2 component order without downloading artifacts', () => {

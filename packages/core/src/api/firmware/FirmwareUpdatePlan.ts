@@ -373,13 +373,11 @@ export const assertFirmwareUpdatePlan = (value: unknown): FirmwareUpdatePlan => 
       plan.targetsToUpdate.some(target =>
         legacyOnlyTargets.has(target as FirmwareUpdatePlanTarget)
       )) ||
-    // Only executor v2 services identity-less bootloader recovery (classic family);
-    // Pro (v3) and Pro2 (v4) report a serial even in bootloader mode, so their plans
-    // must always carry a real identity. Degraded v2 plans are bound to the live
-    // device at install time instead.
+    // V2 仅在 bootloader 恢复时允许缺少身份；V4 设备在尚未写入序列号时也可升级。
+    // 这类 Plan 仍通过设备型号、目标、工件摘要与 preparedPlanDigest 进行约束。
     (plan.artifacts.length > 0 &&
       (plan.platform === 'native' || plan.platform === 'desktop') &&
-      plan.executor !== 'v2' &&
+      plan.executor === 'v3' &&
       plan.deviceIdentity === 'unavailable')
   ) {
     return planError('Firmware update plan executor contract is invalid');
@@ -603,16 +601,14 @@ const finalizeFirmwareUpdatePlan = ({
   // serial must never be able to collide with it.
   const reportedIdentity = getDeviceUUID(features);
   const deviceIdentity = reportedIdentity === 'unavailable' ? '' : reportedIdentity;
-  // Bootloader-mode classic-family devices (executor v2, e.g. classic1s) cannot report
-  // a serial number, so their recovery plans fall back to the degraded 'unavailable'
-  // identity. Binding is then enforced against the live device at install time instead
-  // (assertFirmwareUpdatePreparedPlanDeviceIdentity), and plan integrity by the digest.
-  // Pro (v3), Pro2, and Neo (v4) report a serial even in loader mode and stay strict.
+  // Classic 系列仅在 bootloader 恢复时允许缺少身份；部分尚未完成产线写号的
+  // Pro2/Neo（V4）在正常模式下也可能没有序列号，因此允许使用降级身份。
+  const allowsUnavailableIdentity = (bootloaderMode && executor === 'v2') || executor === 'v4';
   if (
     artifacts.length > 0 &&
     (platform === 'native' || platform === 'desktop') &&
     !deviceIdentity &&
-    !(bootloaderMode && executor === 'v2')
+    !allowsUnavailableIdentity
   ) {
     throw ERRORS.TypedError(
       HardwareErrorCode.RuntimeError,

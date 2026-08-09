@@ -453,7 +453,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     });
   });
 
-  test('keeps exact force targets but omits a Desktop Plan without device identity', async () => {
+  test('builds a Desktop V4 prepared update without device identity', async () => {
     const currentRelease: IFirmwareReleaseInfo = {
       ...release,
       required: false,
@@ -490,8 +490,10 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
 
     await expect(method.run()).resolves.toMatchObject({
-      targetsToUpdate: ['app_v1'],
-      firmwareUpdatePlan: undefined,
+      firmwareUpdatePlan: {
+        executor: 'v4',
+        deviceIdentity: 'unavailable',
+      },
     });
   });
 

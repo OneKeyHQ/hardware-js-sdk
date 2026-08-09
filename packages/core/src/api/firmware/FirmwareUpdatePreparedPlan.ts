@@ -349,8 +349,8 @@ export const assertFirmwareUpdatePreparedPlanDeviceIdentity = ({
     }
     const pinnedIdentity = degradedPlanIdentityPins.get(preparedPlan.leaseRef);
     if (!deviceIdentity) {
-      // Still identity-less: only legitimate while the device sits in bootloader.
-      if (bootloaderMode !== true) {
+      // V4 设备可能尚未写入序列号；V2 则只允许 bootloader 恢复流程缺少身份。
+      if (preparedPlan.executor !== 'v4' && bootloaderMode !== true) {
         throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
       }
       return preparedPlan;
