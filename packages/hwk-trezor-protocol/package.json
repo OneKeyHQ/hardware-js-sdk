@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-trezor-protocol",
-  "version": "1.2.0-alpha.96",
+  "version": "1.2.0-alpha.98",
   "private": true,
   "description": "Trezor transport protocol helpers vendored from Trezor Suite MIT sources",
   "author": "OneKey",
