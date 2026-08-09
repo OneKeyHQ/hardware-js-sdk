@@ -6783,39 +6783,86 @@ describe('Protocol V2 firmware update targets', () => {
     expect((method as any).params.targetsToUpdate).toEqual(['resource']);
   });
 
-  test.each([
-    {
-      resourceFiles: [
-        {
-          binary: new Uint8Array([1]).buffer,
-          devicePath: 'vol0:/bundles/images/images.okpkg',
-        },
-      ],
-    },
-    {
-      resourceBundleArtifacts: [
-        {
-          name: 'images.okpkg',
-          artifact: {
-            artifactRef: 'legacy-resource',
-            size: 1,
-            sha256: '1'.repeat(64),
-          },
-        },
-      ],
-    },
-  ])('returns an explicit migration error for legacy resource inputs', legacyInput => {
+  test('keeps the deprecated resourceFiles path as a validated local compatibility flow', () => {
+    const binary = new Uint8Array([1]).buffer;
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
         platform: 'web',
-        targetsToUpdate: ['resource'],
-        ...legacyInput,
+        resourceFiles: [
+          {
+            binary,
+            devicePath: 'vol0:/bundles/images/images.okpkg',
+            size: binary.byteLength,
+            fileHash: bytesToHex(sha256(new Uint8Array(binary))),
+          },
+        ],
       },
     });
 
-    expect(() => method.init()).toThrow('provide a complete signed resource ZIP');
+    expect(() => method.init()).not.toThrow();
+    expect((method as any).params.targetsToUpdate).toEqual(['resource']);
+    expect((method as any).prepareLegacyProtocolV2ResourceFiles()).toEqual([
+      {
+        name: 'images.okpkg',
+        binary,
+        devicePath: 'vol0:/bundles/images/images.okpkg',
+      },
+    ]);
+  });
+
+  test('keeps resourceBundleArtifacts for genuinely non-prepared legacy calls', async () => {
+    const artifact = {
+      artifactRef: 'legacy-resource',
+      size: 1,
+      sha256: '1'.repeat(64),
+    };
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        resourceBundleArtifacts: [
+          {
+            name: 'images',
+            artifact,
+          },
+        ],
+      },
+    });
+    method.init();
+    const source = { size: 1 };
+    (method as any).openProtocolV2PreparedSource = jest.fn().mockResolvedValue(source);
+    const releaseSpy = jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue({
+      resourceBundles: [
+        {
+          name: 'images',
+          devicePath: 'vol0:/bundles/images/images.okpkg',
+          version: '1.0.0',
+          payloadHash: '2'.repeat(128),
+          headerHash: '3'.repeat(128),
+        },
+      ],
+    } as any);
+
+    try {
+      await expect(
+        (method as any).prepareLegacyProtocolV2ResourceBundleSources(
+          EFirmwareType.Universal,
+          {} as Features
+        )
+      ).resolves.toEqual([
+        expect.objectContaining({
+          name: 'images',
+          source,
+          devicePath: 'vol0:/bundles/images/images.okpkg',
+        }),
+      ]);
+      expect((method as any).params.targetsToUpdate).toEqual(['resource']);
+    } finally {
+      releaseSpy.mockRestore();
+    }
   });
 
   test('keeps the legacy componentArtifacts and artifactReader path without a prepared Plan', async () => {
@@ -7769,7 +7816,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
     );
   });
 
-  test('rejects firmware update startup when DeviceInfo has no physical serial', async () => {
+  test('uses the connection route when DeviceInfo has no physical serial', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: { method: 'firmwareUpdateV4' },
@@ -7779,12 +7826,14 @@ describe('Protocol V2 firmware reconnect identity', () => {
       message: { protocol_version: 1, hw: {} },
     });
     (method as any).device = stubDevice({
+      originalDescriptor: { path: '' },
+      getConnectId: () => '000000000000',
       getCommands: () => ({ typedCall }),
     });
 
-    await expect((method as any).captureProtocolV2PhysicalIdentity()).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.DeviceNotFound,
-    });
+    await expect((method as any).captureProtocolV2PhysicalIdentity()).resolves.toBeUndefined();
+    expect((method as any).protocolV2ExpectedSerialNumber).toBeUndefined();
+    expect((method as any).protocolV2ExpectedPath).toBe('000000000000');
   });
 
   test('uses the BLE read limit when reading an existing firmware bundle header', async () => {

@@ -74,6 +74,18 @@ export type IProtocolV2Resources = {
   source: IProtocolV2ResourceSource;
 };
 
+/** @deprecated Legacy per-bundle resource descriptor retained for published V4 callers. */
+export type IProtocolV2ResourceBundle = {
+  name: string;
+  url: string;
+  fingerprint?: string;
+  expectedSize?: number;
+  devicePath: string;
+  version?: IVersionArray;
+  payloadHash?: string;
+  headerHash?: string;
+};
+
 export type IProtocolV2ResourceManifestFile = {
   archive_path: string;
   original_name: string;
@@ -131,6 +143,8 @@ export type IFirmwareReleaseInfo = {
   upgradeType?: 'payload-package-set' | string;
   components?: Record<string, IProtocolV2FirmwareComponent>;
   installOrder?: string[];
+  /** @deprecated New Protocol V2 releases use the independent signed resource ZIP. */
+  resourceBundles?: IProtocolV2ResourceBundle[];
   bootloaderChangelog?: {
     [k in ILocale]: string;
   };
