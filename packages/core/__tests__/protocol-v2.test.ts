@@ -6159,8 +6159,8 @@ describe('Protocol V2 firmware update targets', () => {
     });
     const imagesBinary = createProtocolV2OkppBinary();
     const bootBinary = createProtocolV2OkppBinary({ payloadHashByte: 0x33 });
-    const imagesSha256 = '1'.repeat(64);
-    const bootSha256 = '2'.repeat(64);
+    const imagesSha256 = bytesToHex(sha256(new Uint8Array(imagesBinary)));
+    const bootSha256 = bytesToHex(sha256(new Uint8Array(bootBinary)));
     const manifest = {
       schema: 1,
       artifact_name: 'pro2-resource',
@@ -6198,11 +6198,38 @@ describe('Protocol V2 firmware update targets', () => {
       ],
     };
     const manifestBinary = new TextEncoder().encode(JSON.stringify(manifest)).buffer;
-    const artifacts = new Map([
-      ['manifest', manifestBinary],
-      ['images', imagesBinary],
-      ['boot', bootBinary],
-    ]);
+    const zip = new JSZip();
+    zip.file('manifest.json', manifestBinary);
+    zip.file('bundles/images/images.okpkg', imagesBinary);
+    zip.file('loaders/bootloader/boot_resource.okpkg', bootBinary);
+    const archiveBinary = await zip.generateAsync({ type: 'arraybuffer' });
+    const preparedEntries = [
+      {
+        entryName: 'manifest.json',
+        artifact: {
+          artifactRef: 'manifest',
+          size: manifestBinary.byteLength,
+          sha256: bytesToHex(sha256(new Uint8Array(manifestBinary))),
+        },
+      },
+      {
+        entryName: 'bundles/images/images.okpkg',
+        artifact: {
+          artifactRef: 'images',
+          size: imagesBinary.byteLength,
+          sha256: imagesSha256,
+        },
+      },
+      {
+        entryName: 'loaders/bootloader/boot_resource.okpkg',
+        artifact: {
+          artifactRef: 'boot',
+          size: bootBinary.byteLength,
+          sha256: bootSha256,
+        },
+      },
+    ];
+    const artifacts = new Map([['archive', archiveBinary]]);
     (method as any).params = {
       targetsToUpdate: ['resource'],
       preparedPlan: {
@@ -6212,32 +6239,12 @@ describe('Protocol V2 firmware update targets', () => {
             role: 'resourceBundle',
             target: 'resource',
             container: 'zip',
-            materializedEntries: [
-              {
-                entryName: 'manifest.json',
-                artifact: {
-                  artifactRef: 'manifest',
-                  size: manifestBinary.byteLength,
-                  sha256: '0'.repeat(64),
-                },
-              },
-              {
-                entryName: 'bundles/images/images.okpkg',
-                artifact: {
-                  artifactRef: 'images',
-                  size: imagesBinary.byteLength,
-                  sha256: imagesSha256,
-                },
-              },
-              {
-                entryName: 'loaders/bootloader/boot_resource.okpkg',
-                artifact: {
-                  artifactRef: 'boot',
-                  size: bootBinary.byteLength,
-                  sha256: bootSha256,
-                },
-              },
-            ],
+            artifact: {
+              artifactRef: 'archive',
+              size: archiveBinary.byteLength,
+              sha256: bytesToHex(sha256(new Uint8Array(archiveBinary))),
+            },
+            materializedEntries: preparedEntries,
           },
         ],
       },
@@ -6264,6 +6271,11 @@ describe('Protocol V2 firmware update targets', () => {
       }),
     ]);
     await Promise.all(sources.map(source => source.source.close()));
+
+    preparedEntries[1].artifact.sha256 = 'f'.repeat(64);
+    await expect((method as any).prepareProtocolV2ResourceArchiveSources()).rejects.toThrow(
+      'entries do not match the approved archive'
+    );
   });
 
   test('binds a prepared resource archive to the selected host generation', () => {
@@ -7752,6 +7764,88 @@ describe('Protocol V2 firmware reconnect identity', () => {
     await expect((method as any).captureProtocolV2PhysicalIdentity()).resolves.toBeUndefined();
     expect((method as any).protocolV2ExpectedSerialNumber).toBeUndefined();
     expect((method as any).protocolV2ExpectedPath).toBe('000000000000');
+  });
+
+  test('executes a serial-less Pro2 prepared plan when the live model matches', async () => {
+    const planWithoutDigest = {
+      schemaVersion: 2 as const,
+      executor: 'v4' as const,
+      deviceIdentity: 'unavailable',
+      deviceModel: 'pro2',
+      firmwareType: EFirmwareType.Universal,
+      platform: 'web' as const,
+      targetsToUpdate: ['boot' as const],
+      artifacts: [
+        {
+          artifactId: 'component:boot',
+          role: 'component' as const,
+          target: 'boot' as const,
+          url: 'https://example.com/bootloader.bin',
+          container: 'raw' as const,
+          logicalName: 'bootloader',
+        },
+      ],
+    };
+    const preparedPlan = prepareFirmwareUpdatePlan({
+      plan: {
+        ...planWithoutDigest,
+        planDigest: digestFirmwareUpdateContract(planWithoutDigest),
+      },
+      leaseRef: 'serial-less-v4-executor-test',
+      artifacts: [
+        {
+          artifactId: 'component:boot',
+          artifact: {
+            artifactRef: 'serial-less-bootloader',
+            size: 1,
+            sha256: 'a'.repeat(64),
+          },
+        },
+      ],
+    });
+    const hostBindingGeneration = registerFirmwareUpdateHostBinding({
+      preparedPlanDigest: preparedPlan.preparedPlanDigest,
+      artifactReader: {
+        open: jest.fn(),
+        read: jest.fn(),
+        close: jest.fn(),
+      },
+    });
+    try {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+          platform: 'web',
+          preparedPlan,
+          hostBindingGeneration,
+        },
+      });
+      method.init();
+      const typedCall = jest.fn().mockResolvedValue({
+        type: 'DeviceInfo',
+        message: { protocol_version: 1, hw: {} },
+      });
+      (method as any).device = stubDevice({
+        originalDescriptor: { protocolType: 'V2', path: 'serial-less-pro2' },
+        features: {
+          deviceType: 'pro2',
+          firmwareVersion: '1.0.0',
+          capabilities: [],
+        },
+        getCommands: () => ({ typedCall }),
+      });
+      (method as any).runProtocolV2PreparedArtifacts = jest
+        .fn()
+        .mockResolvedValue('serial-less-result');
+
+      await expect(method.run()).resolves.toBe('serial-less-result');
+      expect((method as any).runProtocolV2PreparedArtifacts).toHaveBeenCalled();
+      expect((method as any).protocolV2ExpectedSerialNumber).toBeUndefined();
+      expect((method as any).protocolV2ExpectedPath).toBe('serial-less-pro2');
+    } finally {
+      unregisterFirmwareUpdateHostBinding(hostBindingGeneration);
+    }
   });
 
   test('uses the BLE read limit when reading an existing firmware bundle header', async () => {

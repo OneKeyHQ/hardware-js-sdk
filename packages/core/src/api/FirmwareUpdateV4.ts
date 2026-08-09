@@ -1129,6 +1129,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       assertFirmwareUpdatePreparedPlanDeviceIdentity({
         preparedPlan,
         deviceIdentity: this.protocolV2ExpectedSerialNumber,
+        deviceModel: this.getProtocolV2PreparedPlanDeviceModel(features),
       });
       const hostBinding = resolveFirmwareUpdateHostBinding(
         memoryHost.hostBindingGeneration,
@@ -1320,13 +1321,59 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       );
     }
 
-    const entries = archiveArtifacts[0].materializedEntries ?? [];
-    const manifestEntry = entries.find(entry => entry.entryName === 'manifest.json');
+    const archiveArtifact = archiveArtifacts[0];
+    const archiveSource = await this.openProtocolV2PreparedSource(archiveArtifact.artifact);
+    if (archiveSource.size > PROTOCOL_V2_RESOURCE_TOTAL_MAX_BYTES) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 prepared resource archive exceeds the total size limit',
+        { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
+      );
+    }
+
+    let archiveBinary: ArrayBuffer;
+    try {
+      archiveBinary = await readFirmwareByteSourceFully(archiveSource);
+    } finally {
+      await archiveSource.close();
+    }
+    const archiveDigest = bytesToHex(sha256(new Uint8Array(archiveBinary)));
+    if (archiveDigest !== archiveArtifact.artifact.sha256.toLowerCase()) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 prepared resource archive does not match its approved receipt',
+        { firmwareUpdateCode: 'FirmwareArtifactReceiptMismatch' }
+      );
+    }
+
+    // materializedEntries 由宿主生成，只有与获批 ZIP 的规范字节完全一致后才能使用。
+    const verifiedArchive = await this.prepareProtocolV2LocalResourceArchive(archiveBinary);
+    const entries = archiveArtifact.materializedEntries ?? [];
+    const entriesByName = new Map(entries.map(entry => [entry.entryName, entry] as const));
     if (
-      !manifestEntry ||
-      manifestEntry.artifact.size <= 0 ||
-      manifestEntry.artifact.size > PROTOCOL_V2_RESOURCE_MANIFEST_MAX_BYTES
+      entries.length !== verifiedArchive.materializedEntries.length ||
+      verifiedArchive.materializedEntries.some(entry => {
+        const preparedEntry = entriesByName.get(entry.entryName);
+        const digest = bytesToHex(sha256(new Uint8Array(entry.binary)));
+        return (
+          !preparedEntry ||
+          preparedEntry.artifact.size !== entry.binary.byteLength ||
+          preparedEntry.artifact.sha256.toLowerCase() !== digest
+        );
+      })
     ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 prepared resource entries do not match the approved archive',
+        { firmwareUpdateCode: 'FirmwareArtifactReceiptMismatch' }
+      );
+    }
+
+    const verifiedEntriesByName = new Map(
+      verifiedArchive.materializedEntries.map(entry => [entry.entryName, entry.binary] as const)
+    );
+    const manifestBinary = verifiedEntriesByName.get('manifest.json');
+    if (!manifestBinary) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
         'Protocol V2 prepared resource archive has no valid manifest.json',
@@ -1334,12 +1381,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       );
     }
 
-    const manifestSource = await this.openProtocolV2PreparedSource(manifestEntry.artifact);
     let manifestValue: unknown;
     try {
-      manifestValue = JSON.parse(
-        new TextDecoder().decode(await readFirmwareByteSourceFully(manifestSource))
-      );
+      manifestValue = JSON.parse(new TextDecoder().decode(manifestBinary));
     } catch (error) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
@@ -1360,35 +1404,18 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       );
     }
 
-    const entriesByName = new Map(entries.map(entry => [entry.entryName, entry] as const));
-    const expectedEntryNames = new Set([
-      'manifest.json',
-      ...selectedFiles.map(file => file.archive_path),
-    ]);
-    if (entries.some(entry => !expectedEntryNames.has(entry.entryName))) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'Protocol V2 prepared resource archive contains an unexpected entry',
-        { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
-      );
-    }
-
     let totalSize = 0;
     const sources: ProtocolV2ResourceBundleSource[] = [];
     for (const [index, file] of selectedFiles.entries()) {
-      const entry = entriesByName.get(file.archive_path);
-      if (
-        !entry ||
-        entry.artifact.size !== file.size ||
-        entry.artifact.sha256.toLowerCase() !== file.sha256.toLowerCase()
-      ) {
+      const binary = verifiedEntriesByName.get(file.archive_path);
+      if (!binary || binary.byteLength !== file.size) {
         throw ERRORS.TypedError(
           HardwareErrorCode.RuntimeError,
           `Protocol V2 prepared resource file does not match manifest: ${file.archive_path}`,
           { firmwareUpdateCode: 'FirmwareArtifactReceiptMismatch' }
         );
       }
-      totalSize += entry.artifact.size;
+      totalSize += binary.byteLength;
       if (totalSize > PROTOCOL_V2_RESOURCE_TOTAL_MAX_BYTES) {
         throw ERRORS.TypedError(
           HardwareErrorCode.RuntimeError,
@@ -1396,7 +1423,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
         );
       }
-      const source = await this.openProtocolV2PreparedSource(entry.artifact);
+      // 使用从获批 ZIP 中提取的规范字节，避免宿主在校验后替换 entry reader 内容。
+      const source = await this.openProtocolV2MemorySource(binary);
       const header =
         source.size >= PROTOCOL_V2_OKPP_HEADER_SIZE
           ? parseProtocolV2OkppHeader(
@@ -1573,6 +1601,18 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return serialNumber || undefined;
   }
 
+  private getProtocolV2PreparedPlanDeviceModel(features?: Features) {
+    const currentDeviceType = this.device.getCurrentDeviceType();
+    const featureDeviceType = features ? getDeviceType(features) : undefined;
+    const deviceType =
+      currentDeviceType === EDeviceType.Pro2 || currentDeviceType === EDeviceType.Neo
+        ? currentDeviceType
+        : featureDeviceType;
+    return deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo
+      ? String(deviceType)
+      : undefined;
+  }
+
   private getProtocolV2ConnectionRoute() {
     const descriptor = this.device.originalDescriptor;
     return (
@@ -1613,6 +1653,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       assertFirmwareUpdatePreparedPlanDeviceIdentity({
         preparedPlan: this.params.preparedPlan,
         deviceIdentity: serialNumber,
+        deviceModel: this.getProtocolV2PreparedPlanDeviceModel(this.device.features),
       });
     } else if (this.params?.expectedDeviceId) {
       assertProtocolV2ReconnectIdentity(this.params?.expectedDeviceId, serialNumber);
