@@ -9,6 +9,9 @@ import {
 jest.mock('../../src/api/firmware/FirmwareUpdatePreparedPlan', () => ({
   assertFirmwareUpdatePreparedPlanBinding: jest.fn(),
   assertFirmwareUpdatePreparedPlanDeviceIdentity: jest.fn(),
+  getFirmwareUpdatePreparedRawArtifact: jest.fn(
+    ({ preparedPlan }: { preparedPlan: { artifacts: unknown[] } }) => preparedPlan.artifacts[0]
+  ),
   validateFirmwareUpdatePreparedPlan: jest.fn((preparedPlan: unknown) => preparedPlan),
 }));
 
@@ -47,7 +50,11 @@ const createMethod = () => {
       method: 'deviceUpdateBootloader',
       artifact,
       hostBindingGeneration,
-      preparedPlan: { preparedPlanDigest: 'a'.repeat(64) },
+      preparedPlan: {
+        preparedPlanDigest: 'a'.repeat(64),
+        firmwareType: EFirmwareType.Universal,
+        artifacts: [{ artifact }],
+      },
     },
   });
   (method as any).device = {

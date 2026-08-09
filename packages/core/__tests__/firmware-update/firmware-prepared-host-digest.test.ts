@@ -207,7 +207,40 @@ describe('prepared firmware host digest binding', () => {
       },
     });
 
-    expect(() => method.init()).toThrow('Prepared firmware plans require a prepared artifact');
+    expect(() => method.init()).toThrow(
+      'Prepared firmware plans cannot be combined with legacy firmware inputs'
+    );
+  });
+
+  test('FirmwareUpdateV2 derives its component artifact from the digest-bound plan', () => {
+    const { artifact, preparedPlan } = createPreparedPlan({
+      executor: 'v2',
+      target: 'firmware',
+    });
+    const artifactReader = {
+      open: jest.fn(),
+      read: jest.fn(),
+      close: jest.fn(),
+    };
+    const hostBindingGeneration = registerFirmwareUpdateHostBinding({
+      preparedPlanDigest: preparedPlan.preparedPlanDigest,
+      artifactReader,
+    });
+    const method = new FirmwareUpdateV2({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV2',
+        platform: 'desktop',
+        updateType: 'firmware',
+        preparedPlan,
+        hostBindingGeneration,
+      },
+    });
+
+    expect(() => method.init()).not.toThrow();
+    expect((method as unknown as { params: { artifact: unknown } }).params.artifact).toEqual(
+      artifact
+    );
   });
 
   test('FirmwareUpdateV3 rejects a host registered for another prepared plan', () => {
@@ -275,6 +308,37 @@ describe('prepared firmware host digest binding', () => {
     expect(() => method.init()).toThrow(
       'Prepared firmware plans cannot be combined with legacy firmware inputs'
     );
+  });
+
+  test('FirmwareUpdateV3 derives its component artifacts from the digest-bound plan', () => {
+    const { artifact, preparedPlan } = createPreparedPlan({
+      executor: 'v3',
+      target: 'firmware',
+    });
+    const artifactReader = {
+      open: jest.fn(),
+      read: jest.fn(),
+      close: jest.fn(),
+    };
+    const hostBindingGeneration = registerFirmwareUpdateHostBinding({
+      preparedPlanDigest: preparedPlan.preparedPlanDigest,
+      artifactReader,
+    });
+    const method = new FirmwareUpdateV3({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV3',
+        platform: 'desktop',
+        preparedPlan,
+        hostBindingGeneration,
+      },
+    });
+
+    expect(() => method.init()).not.toThrow();
+    expect(
+      (method as unknown as { params: { artifacts: { firmware: unknown } } }).params.artifacts
+        .firmware
+    ).toEqual(artifact);
   });
 
   test('DeviceUpdateBootloader rejects a host registered for another prepared plan', async () => {
@@ -349,7 +413,47 @@ describe('prepared firmware host digest binding', () => {
     method.device = { features: undefined } as any;
 
     await expect(method.run()).rejects.toThrow(
-      'Prepared bootloader plans require exactly one prepared artifact'
+      'Prepared bootloader plans cannot be combined with a legacy binary'
+    );
+  });
+
+  test('DeviceUpdateBootloader derives its artifact from the digest-bound plan', async () => {
+    const { artifact, preparedPlan } = createPreparedPlan({
+      executor: 'v2',
+      target: 'bootloader',
+    });
+    const artifactReader = {
+      open: jest.fn().mockResolvedValue({ readerId: 'bootloader-reader', size: artifact.size }),
+      read: jest.fn(),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const hostBindingGeneration = registerFirmwareUpdateHostBinding({
+      preparedPlanDigest: preparedPlan.preparedPlanDigest,
+      artifactReader,
+    });
+    const method = new DeviceUpdateBootloader({
+      id: 1,
+      payload: {
+        method: 'deviceUpdateBootloader',
+        preparedPlan,
+        hostBindingGeneration,
+      },
+    });
+    method.device = {
+      features: {
+        deviceType: EDeviceType.Classic1s,
+        serialNo: 'classic-device-id',
+      },
+      getCurrentDeviceType: () => EDeviceType.Touch,
+    } as any;
+    const updateTouchBootloader = jest
+      .spyOn(method, 'updateTouchBootloader')
+      .mockResolvedValue(true);
+
+    await expect(method.run()).resolves.toBe(true);
+    expect(artifactReader.open).toHaveBeenCalledWith({ artifactRef: artifact.artifactRef });
+    expect(updateTouchBootloader).toHaveBeenCalledWith(
+      expect.objectContaining({ firmwareType: preparedPlan.firmwareType })
     );
   });
 

@@ -299,12 +299,15 @@ const PROTOCOL_V2_FIRMWARE_STAGING_PATHS = new Set(
 const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH = 'vol0:/loaders/bootloader/boot_resource.okpkg';
 const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH = `${PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH}.staging`;
 
-const resolveProtocolV2ResourceWritePath = (devicePath: string) => {
-  const normalizedPath = devicePath.replace(/^vol0:(?!\/)/i, 'vol0:/').toLowerCase();
-  return normalizedPath === PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH
+const isProtocolV2BootResourcePackagePath = (devicePath: string) =>
+  typeof devicePath === 'string' &&
+  devicePath.replace(/^vol0:(?!\/)/i, 'vol0:/').toLowerCase() ===
+    PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH;
+
+const resolveProtocolV2ResourceWritePath = (devicePath: string) =>
+  isProtocolV2BootResourcePackagePath(devicePath)
     ? PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH
     : devicePath;
-};
 
 const PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID = new Map<
   number,
@@ -563,6 +566,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private protocolV2PreparedSources: FirmwareByteSource[] = [];
 
   private protocolV2ExecutionInLoader = false;
+
+  private protocolV2BootResourceStagingSafe = false;
 
   private protocolV2CompletedTargetVersions = new Map<number, number>();
 
@@ -2114,6 +2119,21 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     resourceSources: ProtocolV2ResourceBundleSource[];
   }): ProtocolV2ExecutionPhase[] {
     const phases: ProtocolV2ExecutionPhase[] = [];
+    const bootResourceSources = resourceSources.filter(source =>
+      isProtocolV2BootResourcePackagePath(source.devicePath)
+    );
+    const remainingResourceSources = resourceSources.filter(
+      source => !isProtocolV2BootResourcePackagePath(source.devicePath)
+    );
+    // A previous interrupted run may have left a promotable staging file. Replace
+    // it with the current approved package before any firmware-triggered reboot.
+    if (bootResourceSources.length > 0) {
+      phases.push({
+        kind: 'resource-sync',
+        installSources: [],
+        resourceSources: bootResourceSources,
+      });
+    }
     const bootloaderSources = installSources.filter(source => source.kind === 'bootloader');
     if (bootloaderSources.length > 0) {
       phases.push(
@@ -2129,11 +2149,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         }
       );
     }
-    if (resourceSources.length > 0) {
+    if (remainingResourceSources.length > 0) {
       phases.push({
         kind: 'resource-sync',
         installSources: [],
-        resourceSources,
+        resourceSources: remainingResourceSources,
       });
     }
     const componentSources = installSources.filter(source => source.kind !== 'bootloader');
@@ -2159,6 +2179,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     installSources: ProtocolV2InstallSource[];
     resourceSources: ProtocolV2ResourceBundleSource[];
   }) {
+    this.protocolV2BootResourceStagingSafe = false;
     const phases = this.buildProtocolV2ExecutionPhases({
       installSources,
       resourceSources,
@@ -2169,9 +2190,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       }
       if (phase.kind === 'resource-sync') {
         await this.enterProtocolV2BootloaderMode();
+        if (
+          !phase.resourceSources.some(source =>
+            isProtocolV2BootResourcePackagePath(source.devicePath)
+          )
+        ) {
+          await this.ensureProtocolV2BootResourceStagingIsEmpty();
+        }
         await this.executeProtocolV2TransferPhase(phase);
       } else if (phase.kind === 'bootloader-install' || phase.kind === 'component-install') {
         await this.enterProtocolV2BootloaderMode();
+        await this.ensureProtocolV2BootResourceStagingIsEmpty();
         await this.executeProtocolV2TransferPhase(phase);
         await this.exitProtocolV2BootloaderToNormal();
       } else if (phase.kind === 'bootloader-verify') {
@@ -2183,6 +2212,35 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       HardwareErrorCode.RuntimeError,
       'Protocol V2 execution has no final verification phase'
     );
+  }
+
+  private async ensureProtocolV2BootResourceStagingIsEmpty() {
+    if (this.protocolV2BootResourceStagingSafe) return;
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const query = () =>
+      typedCall('FilesystemPathInfoQuery', 'FilesystemPathInfo', {
+        path: PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH,
+      });
+    const current = await query();
+    if (current.message?.exist) {
+      if (current.message.directory) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.EmmcFileWriteFirmwareError,
+          'Protocol V2 boot resource staging path is not a file'
+        );
+      }
+      await typedCall('FilesystemFileDelete', 'Success', {
+        path: PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH,
+      });
+      const remaining = await query();
+      if (remaining.message?.exist) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.EmmcFileWriteFirmwareError,
+          'Protocol V2 stale boot resource staging file could not be removed'
+        );
+      }
+    }
+    this.protocolV2BootResourceStagingSafe = true;
   }
 
   private async executeProtocolV2SourceUpdate({
@@ -2238,7 +2296,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let totalSize = installSources.reduce((total, item) => total + item.source.size, 0);
     const resourcesToSync: ProtocolV2ResourceBundleSource[] = [];
     for (const resource of resourceSources) {
-      if (await this.isProtocolV2ResourceBundleUpToDate(resource)) {
+      // Early boot promotes this mounted package's staging file. Always replace any
+      // stale staging bytes with the artifact approved by the current PreparedPlan,
+      // even when the mounted final file itself is already current.
+      const requiresFreshStaging = isProtocolV2BootResourcePackagePath(resource.devicePath);
+      if (!requiresFreshStaging && (await this.isProtocolV2ResourceBundleUpToDate(resource))) {
         Log.log(`[FirmwareUpdateV4] skip RESC bundle ${resource.name}; already up to date`);
       } else {
         resourcesToSync.push(resource);
@@ -2259,6 +2321,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         totalSize,
       });
       await this.verifyProtocolV2StagedFile(writePath, resource.source.size);
+      if (isProtocolV2BootResourcePackagePath(resource.devicePath)) {
+        this.protocolV2BootResourceStagingSafe = true;
+      }
     }
 
     const stagedInstallTargets: Array<{ targetId: number; path: string }> = [];

@@ -5506,6 +5506,9 @@ describe('Protocol V2 firmware update targets', () => {
       return Number(params.processedSize ?? 0) + Number(params.source.size);
     });
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
+    (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest
+      .fn()
+      .mockResolvedValue(undefined);
     (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
     (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({});
     (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
@@ -5579,6 +5582,9 @@ describe('Protocol V2 firmware update targets', () => {
         Promise.resolve(Number(params.processedSize ?? 0) + Number(params.source.size))
       );
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
+    (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest
+      .fn()
+      .mockResolvedValue(undefined);
     (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
     (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
     (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
@@ -5657,6 +5663,74 @@ describe('Protocol V2 firmware update targets', () => {
     ]);
   });
 
+  test('stages the mounted boot resource before any firmware install phase', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4' },
+    });
+    const bootResource = {
+      devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+    };
+    const phases = (method as any).buildProtocolV2ExecutionPhases({
+      installSources: [{ kind: 'bootloader' }, { kind: 'component' }],
+      resourceSources: [bootResource, { devicePath: 'vol0:/resource/images/images.okpkg' }],
+    });
+
+    expect(phases.map((phase: { kind: string }) => phase.kind)).toEqual([
+      'resource-sync',
+      'bootloader-install',
+      'bootloader-verify',
+      'resource-sync',
+      'component-install',
+      'final-verify',
+    ]);
+    expect(phases[0].resourceSources).toEqual([bootResource]);
+  });
+
+  test('removes stale boot resource staging before a component-only reboot', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4' },
+    });
+    const events: string[] = [];
+    let stagingExists = true;
+    const typedCall = jest.fn((requestType: string) => {
+      if (requestType === 'FilesystemPathInfoQuery') {
+        return Promise.resolve({
+          type: 'FilesystemPathInfo',
+          message: { exist: stagingExists, directory: false, size: stagingExists ? 3 : 0 },
+        });
+      }
+      if (requestType === 'FilesystemFileDelete') {
+        events.push('delete-stale-staging');
+        stagingExists = false;
+        return Promise.resolve({ type: 'Success', message: {} });
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
+    });
+    (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
+    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
+    (method as any).executeProtocolV2TransferPhase = jest.fn().mockImplementation(() => {
+      events.push('transfer-component');
+      return Promise.resolve();
+    });
+    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockImplementation(() => {
+      events.push('reboot-normal');
+      return Promise.resolve();
+    });
+    (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
+
+    await (method as any).executeProtocolV2SourceUpdate({
+      installSources: [{ kind: 'firmware' }],
+      resourceSources: [],
+    });
+
+    expect(events).toEqual(['delete-stale-staging', 'transfer-component', 'reboot-normal']);
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'FilesystemFileDelete', 'Success', {
+      path: 'vol0:/loaders/bootloader/boot_resource.okpkg.staging',
+    });
+  });
+
   test('does not request installation when the staged file size does not match', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -5669,6 +5743,9 @@ describe('Protocol V2 firmware update targets', () => {
     method.postProgressMessage = jest.fn();
     (method as any).protocolV2SourceUpdateProcess = jest.fn().mockResolvedValue(3);
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
+    (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest
+      .fn()
+      .mockResolvedValue(undefined);
     (method as any).device = stubDevice({
       getCommands: () => ({
         typedCall: jest.fn().mockResolvedValue({
@@ -5720,6 +5797,9 @@ describe('Protocol V2 firmware update targets', () => {
         Promise.resolve(Number(params.processedSize ?? 0) + Number(params.source.size))
       );
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
+    (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest
+      .fn()
+      .mockResolvedValue(undefined);
     (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
     (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
     (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
@@ -6295,6 +6375,8 @@ describe('Protocol V2 firmware update targets', () => {
           url: 'https://example.com/resource.zip',
           container: 'zip' as const,
           logicalName: 'protocol-v2-resource-archive',
+          expectedSize: 3,
+          expectedSha256: 'a'.repeat(64),
         },
       ],
     };
@@ -6399,6 +6481,8 @@ describe('Protocol V2 firmware update targets', () => {
           url: 'https://example.com/bootloader.bin',
           container: 'raw' as const,
           logicalName: 'bootloader',
+          expectedSize: componentArtifact.size,
+          expectedSha256: componentArtifact.sha256,
           targetVersion: '1.2.3',
         },
       ],
@@ -6494,6 +6578,8 @@ describe('Protocol V2 firmware update targets', () => {
           url: 'https://example.com/resource.zip',
           container: 'zip' as const,
           logicalName: 'protocol-v2-resource-archive',
+          expectedSize: 3,
+          expectedSha256: 'a'.repeat(64),
         },
       ],
     };
@@ -6908,6 +6994,9 @@ describe('Protocol V2 firmware update targets', () => {
     method.postProgressMessage = jest.fn();
     (method as any).protocolV2SourceUpdateProcess = jest.fn().mockResolvedValue(3);
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
+    (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest
+      .fn()
+      .mockResolvedValue(undefined);
     (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
     (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
     (method as any).protocolV2StartFirmwareUpdate = jest.fn();
@@ -6973,6 +7062,46 @@ describe('Protocol V2 firmware update targets', () => {
     const stagingPath = 'vol0:/loaders/bootloader/boot_resource.okpkg.staging';
     expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledWith(
       expect.objectContaining({ filePath: stagingPath })
+    );
+    expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledWith(stagingPath, 3);
+  });
+
+  test('rewrites the mounted boot resource staging file even when the final file is current', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+
+    method.postTipMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+    (method as any).isProtocolV2ResourceBundleUpToDate = jest.fn().mockResolvedValue(true);
+    (method as any).protocolV2SourceUpdateProcess = jest.fn().mockResolvedValue(3);
+    (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
+
+    const resource = {
+      name: 'boot_resource.okpkg',
+      source: {
+        size: 3,
+        readAt: jest.fn(),
+        close: jest.fn(),
+      },
+      devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+      version: [1, 0, 0],
+      payloadHash: '11'.repeat(64),
+      headerHash: '22'.repeat(64),
+    };
+
+    await (method as any).executeProtocolV2TransferPhase({
+      installSources: [],
+      resourceSources: [resource],
+    });
+
+    const stagingPath = 'vol0:/loaders/bootloader/boot_resource.okpkg.staging';
+    expect((method as any).isProtocolV2ResourceBundleUpToDate).not.toHaveBeenCalled();
+    expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledWith(
+      expect.objectContaining({ source: resource.source, filePath: stagingPath, totalSize: 3 })
     );
     expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledWith(stagingPath, 3);
   });
@@ -7783,6 +7912,8 @@ describe('Protocol V2 firmware reconnect identity', () => {
           url: 'https://example.com/bootloader.bin',
           container: 'raw' as const,
           logicalName: 'bootloader',
+          expectedSize: 1,
+          expectedSha256: 'a'.repeat(64),
         },
       ],
     };

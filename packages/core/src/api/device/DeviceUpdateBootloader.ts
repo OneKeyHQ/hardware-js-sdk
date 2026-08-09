@@ -14,6 +14,7 @@ import { resolveFirmwareUpdateHostBinding } from '../firmware/FirmwareHostBindin
 import {
   assertFirmwareUpdatePreparedPlanBinding,
   assertFirmwareUpdatePreparedPlanDeviceIdentity,
+  getFirmwareUpdatePreparedRawArtifact,
   validateFirmwareUpdatePreparedPlan,
 } from '../firmware/FirmwareUpdatePreparedPlan';
 import { getDeviceType, getDeviceUUID } from '../../utils';
@@ -159,21 +160,27 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
 
     const payload = this.payload as DeviceUpdateBootloaderParams;
     const hasPreparedPlan = payload.preparedPlan !== undefined;
-    const hasPreparedArtifact = payload.artifact !== undefined;
-    if (hasPreparedPlan !== hasPreparedArtifact) {
+    if (hasPreparedPlan && payload.binary !== undefined) {
       throw ERRORS.TypedError(
         HardwareErrorCode.CallMethodInvalidParameter,
-        'Prepared bootloader plans require exactly one prepared artifact'
+        'Prepared bootloader plans cannot be combined with a legacy binary'
       );
     }
-    if (payload.binary !== undefined && hasPreparedArtifact) {
+    if (!hasPreparedPlan && payload.artifact !== undefined) {
       throw ERRORS.TypedError(
         HardwareErrorCode.CallMethodInvalidParameter,
-        'Bootloader binary and prepared artifact are mutually exclusive'
+        'Bootloader artifacts require a prepared plan'
       );
     }
-    const preparedPlan = hasPreparedArtifact
+    const preparedPlan = hasPreparedPlan
       ? validateFirmwareUpdatePreparedPlan(payload.preparedPlan)
+      : undefined;
+    const plannedArtifact = preparedPlan
+      ? getFirmwareUpdatePreparedRawArtifact({
+          preparedPlan,
+          target: 'bootloader',
+          role: 'bootloader',
+        }).artifact
       : undefined;
     const artifactReader = preparedPlan
       ? resolveFirmwareUpdateHostBinding(
@@ -185,7 +192,7 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
       ...payload,
       artifactReader,
     };
-    if (payload.artifact) {
+    if (preparedPlan && plannedArtifact) {
       assertFirmwareUpdatePreparedPlanDeviceIdentity({
         preparedPlan,
         deviceIdentity: getDeviceUUID(features) || undefined,
@@ -199,12 +206,12 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
         bindings: [
           {
             target: 'bootloader',
-            artifact: payload.artifact,
+            artifact: payload.artifact ?? plannedArtifact,
           },
         ],
       });
       const source = await openFirmwareByteSource({
-        artifact: payload.artifact,
+        artifact: plannedArtifact,
         reader: executionParams.artifactReader,
       });
       if (!source) {
@@ -215,13 +222,11 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
       }
       try {
         const deviceType = device.getCurrentDeviceType();
-        const deviceFirmwareType = device.getCurrentFirmwareType();
-        const firmwareType = payload.firmwareType ?? deviceFirmwareType;
         if (DeviceModelToTypes.model_touch.includes(deviceType)) {
           return await this.updateTouchBootloader({
             device,
             features,
-            firmwareType,
+            firmwareType: preparedPlan.firmwareType,
             source,
           });
         }

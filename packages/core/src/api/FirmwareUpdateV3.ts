@@ -21,10 +21,11 @@ import { DEVICE } from '../events';
 import { buildProtocolV1FeaturesPayload } from '../deviceProfile';
 import { openFirmwareByteSource } from './firmware/FirmwareArtifactSource';
 import { resolveFirmwareUpdateHostBinding } from './firmware/FirmwareHostBinding';
+import { readVerifiedPreparedResourceArchive } from './firmware/FirmwarePreparedResourceArchive';
 import {
   assertFirmwareUpdatePreparedPlanBinding,
   assertFirmwareUpdatePreparedPlanDeviceIdentity,
-  getFirmwareUpdateResourceName,
+  getFirmwareUpdatePreparedRawArtifact,
   validateFirmwareUpdatePreparedPlan,
 } from './firmware/FirmwareUpdatePreparedPlan';
 
@@ -78,10 +79,16 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'firmwareType', type: 'string' },
       { name: 'platform', type: 'string' },
     ]);
-    const preparedPlan =
-      payload.artifacts || payload.preparedPlan
-        ? validateFirmwareUpdatePreparedPlan(payload.preparedPlan)
-        : undefined;
+    const hasPreparedPlan = payload.preparedPlan !== undefined;
+    if (!hasPreparedPlan && payload.artifacts !== undefined) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'Firmware artifacts require a prepared plan'
+      );
+    }
+    const preparedPlan = hasPreparedPlan
+      ? validateFirmwareUpdatePreparedPlan(payload.preparedPlan)
+      : undefined;
     const hasLegacyInputs = [
       payload.bleVersion,
       payload.bleBinary,
@@ -103,44 +110,60 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           preparedPlan.preparedPlanDigest
         ).artifactReader
       : payload.artifactReader;
+    const preparedArtifacts: NonNullable<FirmwareUpdateV3Params['artifacts']> = {};
     if (preparedPlan) {
+      const componentTargets = ['bootloader', 'firmware', 'ble'] as const;
+      const supportedTargets = new Set<string>([...componentTargets, 'resource']);
+      const unsupportedTarget = preparedPlan.targetsToUpdate.find(
+        target => !supportedTargets.has(target)
+      );
+      if (unsupportedTarget) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `Firmware prepared plan target ${unsupportedTarget} is not supported by V3`,
+          { firmwareUpdateCode: 'FirmwarePreparedPlanInvalid' }
+        );
+      }
+      for (const target of componentTargets) {
+        if (preparedPlan.targetsToUpdate.includes(target)) {
+          preparedArtifacts[target] = getFirmwareUpdatePreparedRawArtifact({
+            preparedPlan,
+            target,
+            role: target,
+          }).artifact;
+        }
+      }
+      const resourceBindings = (payload.artifacts?.resourceEntries ?? []).map(
+        (entry: { entryName: string; artifact: FirmwareArtifactReference }) => ({
+          target: 'resource' as const,
+          entryName: entry.entryName,
+          artifact: entry.artifact,
+        })
+      );
       assertFirmwareUpdatePreparedPlanBinding({
         preparedPlan,
         executor: 'v3',
         platform: payload.platform,
-        scopeTargets: ['bootloader', 'firmware', 'resource', 'ble'],
+        scopeTargets: [
+          'bootloader',
+          'firmware',
+          'ble',
+          ...(resourceBindings.length ? (['resource'] as const) : []),
+        ],
         bindings: [
-          ...(payload.artifacts?.bootloader
-            ? [
-                {
-                  target: 'bootloader' as const,
-                  artifact: payload.artifacts.bootloader,
-                },
-              ]
-            : []),
-          ...(payload.artifacts?.firmware
-            ? [
-                {
-                  target: 'firmware' as const,
-                  artifact: payload.artifacts.firmware,
-                },
-              ]
-            : []),
-          ...(payload.artifacts?.ble
-            ? [
-                {
-                  target: 'ble' as const,
-                  artifact: payload.artifacts.ble,
-                },
-              ]
-            : []),
-          ...(payload.artifacts?.resourceEntries ?? []).map(
-            (entry: { entryName: string; artifact: FirmwareArtifactReference }) => ({
-              target: 'resource' as const,
-              entryName: entry.entryName,
-              artifact: entry.artifact,
-            })
-          ),
+          ...componentTargets.flatMap(target => {
+            const plannedArtifact = preparedArtifacts[target];
+            const suppliedArtifact = payload.artifacts?.[target];
+            return plannedArtifact || suppliedArtifact
+              ? [
+                  {
+                    target,
+                    artifact: suppliedArtifact ?? (plannedArtifact as FirmwareArtifactReference),
+                  },
+                ]
+              : [];
+          }),
+          ...resourceBindings,
         ],
       });
     }
@@ -158,7 +181,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       firmwareType: preparedPlan?.firmwareType ?? payload.firmwareType,
       platform: payload.platform,
       artifactReader,
-      artifacts: payload.artifacts,
+      artifacts: preparedPlan ? preparedArtifacts : undefined,
     };
   }
 
@@ -285,25 +308,25 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private async prepareResourceInput(firmwareType: EFirmwareType) {
-    const preparedEntries = this.params.artifacts?.resourceEntries;
-    if (preparedEntries?.length && this.params.resourceBinary) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'Firmware resource input must not contain both archive binary and prepared entries'
-      );
-    }
-    if (preparedEntries?.length) {
+    if (this.params.preparedPlan?.targetsToUpdate.includes('resource')) {
+      const verifiedEntries = await readVerifiedPreparedResourceArchive({
+        preparedPlan: this.params.preparedPlan,
+        reader: this.params.artifactReader,
+      });
       const resourceEntries: Array<{ entryName: string; source: FirmwareByteSource }> = [];
-      for (const entry of preparedEntries) {
-        const resourceName = getFirmwareUpdateResourceName(entry.entryName);
-        const source = await this.openArtifactSource(undefined, entry.artifact);
+      for (const entry of verifiedEntries) {
+        const source = await this.openArtifactSource(entry.binary, undefined);
         if (!source) {
           throw ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,
-            `Firmware resource entry ${entry.entryName} is not prepared`
+            `Firmware resource entry ${entry.entryName} is empty`,
+            {
+              firmwareUpdateCode: 'FirmwareArtifactReceiptMismatch',
+              artifactName: 'resource',
+            }
           );
         }
-        resourceEntries.push({ entryName: resourceName, source });
+        resourceEntries.push({ entryName: entry.entryName, source });
       }
       return {
         resourceBinary: null,

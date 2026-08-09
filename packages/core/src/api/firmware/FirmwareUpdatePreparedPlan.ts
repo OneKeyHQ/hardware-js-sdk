@@ -302,6 +302,23 @@ export const validateFirmwareUpdatePreparedPlan = (value: unknown): FirmwareUpda
   return preparedPlan;
 };
 
+export const getFirmwareUpdatePreparedRawArtifact = ({
+  preparedPlan: value,
+  target,
+  role,
+}: {
+  preparedPlan: unknown;
+  target: FirmwareUpdatePreparedArtifact['target'];
+  role: FirmwareUpdatePreparedArtifact['role'];
+}): FirmwareUpdatePreparedArtifact => {
+  const preparedPlan = validateFirmwareUpdatePreparedPlan(value);
+  const artifacts = preparedPlan.artifacts.filter(artifact => artifact.target === target);
+  if (artifacts.length !== 1 || artifacts[0].role !== role || artifacts[0].container !== 'raw') {
+    return preparedPlanError(`Firmware prepared plan ${target} artifact is invalid`);
+  }
+  return artifacts[0];
+};
+
 /**
  * Identity observed on the live device while a degraded recovery plan runs, keyed by
  * the plan's opaque lease. Bootloader recovery starts with no serial and the device

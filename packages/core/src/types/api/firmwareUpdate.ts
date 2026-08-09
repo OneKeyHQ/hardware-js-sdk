@@ -38,7 +38,8 @@ export interface FirmwareUpdateBinaryParams {
 export interface FirmwareUpdateArtifactParams {
   preparedPlan: FirmwareUpdatePreparedPlan;
   hostBindingGeneration: number;
-  artifact: FirmwareArtifactReference;
+  /** @deprecated Core derives the component artifact from preparedPlan. */
+  artifact?: FirmwareArtifactReference;
   resourceEntries?: Array<{
     entryName: string;
     artifact: FirmwareArtifactReference;
