@@ -7347,6 +7347,41 @@ describe('Protocol V2 firmware reconnect identity', () => {
     });
     expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
   });
+
+  test('updates a resource when the installed file size differs despite matching headers', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+      },
+    });
+    method.init();
+    const installedBinary = new Uint8Array(createProtocolV2OkppBinary());
+    const typedCall = jest.fn((requestType: string) => {
+      if (requestType === 'FilesystemPathInfoQuery') {
+        return Promise.resolve({
+          message: { exist: true, directory: false, size: installedBinary.byteLength + 1 },
+        });
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
+    });
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+
+    await expect(
+      (method as any).isProtocolV2ResourceBundleUpToDate({
+        name: 'images.okpkg',
+        source: { size: installedBinary.byteLength },
+        devicePath: 'vol0:/bundles/images/images.okpkg',
+        version: [1, 2, 3],
+        payloadHash: '11'.repeat(64),
+        headerHash: '22'.repeat(64),
+      })
+    ).resolves.toBe(false);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('Protocol V2 explicit USB device selection', () => {

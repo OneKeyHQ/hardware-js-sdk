@@ -601,7 +601,11 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
         };
 
       try {
-        const res = await sdk.checkAllFirmwareRelease(selectDevice.connectId, { platform });
+        // App mode cannot inspect vol0 resources, so request a loader-side comparison.
+        const res = await sdk.checkAllFirmwareRelease(selectDevice.connectId, {
+          platform,
+          protocolV2ForceUpdateTargets: ['resource'],
+        });
         if (!res.success) {
           return {
             success: false,

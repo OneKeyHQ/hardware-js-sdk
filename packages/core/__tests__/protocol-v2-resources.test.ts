@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { sha256 } from '@noble/hashes/sha256';
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { DataManager } from '../src/data-manager';
 import {
@@ -23,6 +23,12 @@ const resourceSource = {
   archiveUrl: 'https://example.com/resource/pro2-resource.zip',
   archiveSha256: 'a'.repeat(64),
   archiveSize: 16_815_479,
+};
+
+const neoResourceSource = {
+  archiveUrl: 'https://example.com/resource/neo-resource.zip',
+  archiveSha256: 'b'.repeat(64),
+  archiveSize: 12_345_678,
 };
 
 const manifestFiles = [
@@ -103,6 +109,7 @@ const createRemoteConfig = (): RemoteConfigResponse =>
     touch: { firmware: [], ble: [] },
     pro: { firmware: [], ble: [] },
     pro2: { firmware: [], ble: [], resources: { source: resourceSource } },
+    neo: { firmware: [], ble: [], resources: { source: neoResourceSource } },
     bridge: {},
   } as unknown as RemoteConfigResponse);
 
@@ -179,6 +186,34 @@ describe('Pro2 resource configuration', () => {
     await expect(DataManager.load(createSettings(configFetcher))).resolves.toBe(true);
 
     expect(DataManager.getProtocolV2ResourceSource()).toBeUndefined();
+    expect(DataManager.protocolV2ResourcesConfigError).toBeInstanceOf(Error);
+    expect(DataManager.getProtocolV2ResourceSource(EDeviceType.Neo)).toEqual(neoResourceSource);
+  });
+
+  test('keeps Pro2 resources available when remote Neo resources are invalid', async () => {
+    const remoteConfig = createRemoteConfig();
+    (remoteConfig.neo as { resources?: unknown }).resources = { source: {} };
+    const configFetcher = jest.fn().mockResolvedValue(remoteConfig);
+
+    await expect(DataManager.load(createSettings(configFetcher))).resolves.toBe(true);
+
+    expect(DataManager.getProtocolV2ResourceSource(EDeviceType.Pro2)).toEqual(resourceSource);
+    expect(DataManager.getProtocolV2ResourceSource(EDeviceType.Neo)).toBeUndefined();
+    await expect(
+      DataManager.forceReloadData({
+        requireResources: true,
+        resourceDeviceType: EDeviceType.Pro2,
+      })
+    ).resolves.toBeUndefined();
+    await expect(
+      DataManager.forceReloadData({
+        requireResources: true,
+        resourceDeviceType: EDeviceType.Neo,
+      })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.FirmwareUpdateDownloadFailed,
+      message: expect.stringContaining('Invalid Neo resources config'),
+    });
   });
 
   test('only blocks resource mutation when the refreshed Pro2 resources are invalid', async () => {
@@ -193,6 +228,29 @@ describe('Pro2 resource configuration', () => {
       message: expect.stringContaining('Invalid Pro2 resources config'),
     });
     expect(DataManager.lastCheckTimestamp).toBeGreaterThan(0);
+  });
+
+  test('checks resource configuration errors for the requested device only', async () => {
+    const remoteConfig = createRemoteConfig();
+    (remoteConfig.pro2 as { resources?: unknown }).resources = { source: {} };
+    const settings = createSettings(jest.fn().mockResolvedValue(remoteConfig));
+    DataManager.settings = settings;
+
+    await expect(
+      DataManager.forceReloadData({
+        requireResources: true,
+        resourceDeviceType: EDeviceType.Neo,
+      })
+    ).resolves.toBeUndefined();
+    await expect(
+      DataManager.forceReloadData({
+        requireResources: true,
+        resourceDeviceType: EDeviceType.Pro2,
+      })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.FirmwareUpdateDownloadFailed,
+      message: expect.stringContaining('Invalid Pro2 resources config'),
+    });
   });
 
   test('does not advance the cache timestamp when refresh fails', async () => {

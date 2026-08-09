@@ -337,10 +337,13 @@ export default function Pro2UpdatePage() {
         field => TARGET_BY_PARAM[field.param]
       );
       if (resourceArchiveFile) forcedTargets.push('resource');
+      // App mode cannot inspect vol0 resources. A remote update must compare them in loader mode.
+      const requestedTargets: FirmwareUpdateV4Target[] =
+        forcedTargets.length > 0 ? forcedTargets : ['resource'];
       const checkResponse = await callHardwareAPI('checkAllFirmwareRelease', {
         connectId: device.connectId,
         platform: 'web',
-        ...(forcedTargets.length ? { protocolV2ForceUpdateTargets: forcedTargets } : {}),
+        protocolV2ForceUpdateTargets: requestedTargets,
       });
       if (!checkResponse.success) {
         throw new Error(getApiError(checkResponse.payload, 'checkAllFirmwareRelease failed'));

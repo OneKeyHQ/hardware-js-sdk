@@ -1355,7 +1355,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return `vol0:/${path}`;
   }
 
-  private async readProtocolV2DeviceFileHeader(path: string) {
+  private async readProtocolV2DeviceFileHeader(path: string, expectedSize?: number) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     const filePath = this.getProtocolV2ResourceFilePath(path);
     const pathInfoRes = await typedCall('FilesystemPathInfoQuery', 'FilesystemPathInfo', {
@@ -1366,7 +1366,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       !pathInfoRes.message?.exist ||
       pathInfoRes.message?.directory ||
       fileSize === undefined ||
-      fileSize < PROTOCOL_V2_OKPP_HEADER_SIZE
+      fileSize < PROTOCOL_V2_OKPP_HEADER_SIZE ||
+      (expectedSize !== undefined && fileSize !== expectedSize)
     ) {
       return null;
     }
@@ -1404,14 +1405,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async isProtocolV2ResourceBundleUpToDate(
     bundle: Pick<
       ProtocolV2ResourceBundleSource,
-      'name' | 'devicePath' | 'version' | 'payloadHash' | 'headerHash'
+      'name' | 'source' | 'devicePath' | 'version' | 'payloadHash' | 'headerHash'
     >
   ): Promise<boolean> {
     if (this.params?.forcedUpdateRes) return false;
     if (!bundle.payloadHash || !bundle.headerHash) return false;
 
     try {
-      const header = await this.readProtocolV2DeviceFileHeader(bundle.devicePath);
+      const header = await this.readProtocolV2DeviceFileHeader(
+        bundle.devicePath,
+        bundle.source.size
+      );
       if (!header) return false;
 
       if (bundle.version) {
