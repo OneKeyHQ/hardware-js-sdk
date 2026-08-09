@@ -1,4 +1,5 @@
 import { EDeviceType, ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
+import JSZip from 'jszip';
 import {
   DeviceRebootType,
   PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
@@ -178,6 +179,10 @@ type ProtocolV2ResourceBundleSource = {
   headerHash?: string;
 };
 
+type ProtocolV2ResourceBundleBinary = Omit<ProtocolV2ResourceBundleSource, 'source'> & {
+  binary: ArrayBuffer;
+};
+
 type ProtocolV2ExecutionPhaseKind =
   | 'resource-sync'
   | 'bootloader-install'
@@ -269,6 +274,19 @@ const PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID = new Map<number, FirmwareUpdateV4T
   [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE03, 'se03'],
   [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE04, 'se04'],
 ]);
+
+const PROTOCOL_V2_INSTALL_TARGET_BY_UPDATE_TARGET = new Map<
+  Exclude<FirmwareUpdateV4Target, 'resource'>,
+  ProtocolV2RemoteComponentTarget
+>(
+  Object.values(PROTOCOL_V2_REMOTE_COMPONENT_TARGETS).map(target => [
+    PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID.get(target.targetId) as Exclude<
+      FirmwareUpdateV4Target,
+      'resource'
+    >,
+    target,
+  ])
+);
 
 const PROTOCOL_V2_ROMLOADER_UNSUPPORTED_MESSAGE =
   'FW_MGMT_TARGET_ROMLOADER is not accepted by the current Pro2 bootloader update request. Flash romloader with the loader-specific flow instead of firmwareUpdateV4.';
@@ -541,6 +559,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'se02Binary', type: 'buffer' },
       { name: 'se03Binary', type: 'buffer' },
       { name: 'se04Binary', type: 'buffer' },
+      { name: 'resourceArchiveBinary', type: 'buffer' },
       { name: 'firmwareType', type: 'string' },
       { name: 'targetsToUpdate', type: 'array', allowEmpty: true },
       { name: 'platform', type: 'string' },
@@ -558,6 +577,24 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const preparedPlan = payload.preparedPlan
       ? validateFirmwareUpdatePreparedPlan(payload.preparedPlan)
       : undefined;
+    const hasLocalArtifacts = [
+      payload.bootloaderBinary,
+      payload.romloaderBinary,
+      payload.applicationP1Binary,
+      payload.applicationP2Binary,
+      payload.coprocessorBinary,
+      payload.se01Binary,
+      payload.se02Binary,
+      payload.se03Binary,
+      payload.se04Binary,
+      payload.resourceArchiveBinary,
+    ].some(Boolean);
+    if (preparedPlan && hasLocalArtifacts) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'Prepared firmware plans cannot be combined with local firmware or resource binaries'
+      );
+    }
     const hostBinding =
       payload.hostBindingGeneration !== undefined
         ? resolveFirmwareUpdateHostBinding(
@@ -566,28 +603,52 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           )
         : undefined;
     if (preparedPlan) {
-      const componentArtifacts = (payload.componentArtifacts ?? {}) as NonNullable<
-        FirmwareUpdateV4Params['componentArtifacts']
-      >;
       assertFirmwareUpdatePreparedPlanBinding({
         preparedPlan,
         executor: 'v4',
         platform: payload.platform,
-        scopeTargets: ['boot', 'app_v1', 'app_v2', 'coprocessor', 'se01', 'se02', 'se03', 'se04'],
-        bindings: [
-          ...Object.entries(componentArtifacts).flatMap(([target, artifact]) =>
-            artifact
-              ? [
-                  {
-                    target: target as Exclude<FirmwareUpdateV4Target, 'resource'>,
-                    artifact,
-                  },
-                ]
-              : []
-          ),
-        ],
+        scopeTargets: [],
+        bindings: [],
       });
+      if (payload.componentArtifacts) {
+        const componentBindings: Array<{
+          target: Exclude<FirmwareUpdateV4Target, 'resource'>;
+          artifact: FirmwareArtifactReference;
+        }> = Object.entries(payload.componentArtifacts).flatMap(([target, artifact]) =>
+          artifact
+            ? [
+                {
+                  target: target as Exclude<FirmwareUpdateV4Target, 'resource'>,
+                  artifact: artifact as FirmwareArtifactReference,
+                },
+              ]
+            : []
+        );
+        assertFirmwareUpdatePreparedPlanBinding({
+          preparedPlan,
+          executor: 'v4',
+          platform: payload.platform,
+          scopeTargets: componentBindings.map(binding => binding.target),
+          bindings: componentBindings,
+        });
+      }
     }
+
+    const preparedExpectedTargetVersions = preparedPlan?.artifacts.reduce<
+      NonNullable<FirmwareUpdateV4Params['expectedTargetVersions']>
+    >((result, artifact) => {
+      if (
+        artifact.role === 'component' &&
+        artifact.target !== 'resource' &&
+        artifact.targetVersion &&
+        PROTOCOL_V2_INSTALL_TARGET_BY_UPDATE_TARGET.has(
+          artifact.target as Exclude<FirmwareUpdateV4Target, 'resource'>
+        )
+      ) {
+        result[artifact.target as FirmwareUpdateV4Target] = artifact.targetVersion;
+      }
+      return result;
+    }, {});
 
     this.params = {
       preparedPlan,
@@ -602,13 +663,18 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       se02Binary: payload.se02Binary,
       se03Binary: payload.se03Binary,
       se04Binary: payload.se04Binary,
-      firmwareType: payload.firmwareType,
-      targetsToUpdate: payload.targetsToUpdate,
-      expectedTargetVersions: payload.expectedTargetVersions,
+      resourceArchiveBinary: payload.resourceArchiveBinary,
+      firmwareType: preparedPlan?.firmwareType ?? payload.firmwareType,
+      targetsToUpdate: preparedPlan
+        ? ([...preparedPlan.targetsToUpdate] as FirmwareUpdateV4Target[])
+        : payload.targetsToUpdate,
+      expectedTargetVersions: preparedPlan
+        ? preparedExpectedTargetVersions
+        : payload.expectedTargetVersions,
       platform: payload.platform,
       expectedDeviceId: payload.expectedDeviceId,
       artifactReader: hostBinding?.artifactReader ?? payload.artifactReader,
-      componentArtifacts: payload.componentArtifacts,
+      componentArtifacts: preparedPlan ? undefined : payload.componentArtifacts,
     };
   }
 
@@ -665,6 +731,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
     let installItems: ProtocolV2InstallItem[] | undefined;
+    let resourceBundles: ProtocolV2ResourceBundleBinary[] = [];
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
       fwBinaryMap = this.collectExplicitTargetBinaries();
@@ -678,12 +745,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         ? missingFirmwareTargets.length > 0
         : explicitInstallItems.length === 0;
       if (wantsResources) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          'Protocol V2 resource manifest must be prepared by the external firmware host',
-          {
-            firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
-          }
+        if (!this.params.resourceArchiveBinary) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'Protocol V2 resource archive must be provided for a local resource update',
+            {
+              firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
+            }
+          );
+        }
+        resourceBundles = await this.prepareProtocolV2LocalResourceArchive(
+          this.params.resourceArchiveBinary
         );
       }
       if (
@@ -729,7 +801,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       throw normalizeFirmwarePreparationError(err);
     }
 
-    if (!bootloaderBinary && fwBinaryMap.length === 0 && !installItems?.length) {
+    if (
+      !bootloaderBinary &&
+      fwBinaryMap.length === 0 &&
+      !installItems?.length &&
+      resourceBundles.length === 0
+    ) {
       throw ERRORS.TypedError(
         HardwareErrorCode.FirmwareUpdateDownloadFailed,
         'No firmware to update'
@@ -740,6 +817,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       fwBinaryMap,
       bootloaderBinary,
       ...(installItems ? { installItems } : undefined),
+      ...(resourceBundles.length > 0 ? { resourceBundles } : undefined),
     });
   }
 
@@ -782,6 +860,54 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     firmwareType: EFirmwareType,
     features: Features
   ): Promise<ProtocolV2InstallSource[]> {
+    if (this.params.preparedPlan) {
+      const requestedTargets = new Set(
+        this.params.preparedPlan.targetsToUpdate.filter(
+          (target): target is Exclude<FirmwareUpdateV4Target, 'resource'> => target !== 'resource'
+        )
+      );
+      const installSources: ProtocolV2InstallSource[] = [];
+      const preparedTargets = new Set<Exclude<FirmwareUpdateV4Target, 'resource'>>();
+      for (const artifact of this.params.preparedPlan.artifacts) {
+        if (artifact.target !== 'resource') {
+          const target = artifact.target as Exclude<FirmwareUpdateV4Target, 'resource'>;
+          const installTarget = PROTOCOL_V2_INSTALL_TARGET_BY_UPDATE_TARGET.get(target);
+          if (
+            !requestedTargets.has(target) ||
+            artifact.role !== 'component' ||
+            artifact.container !== 'raw' ||
+            !installTarget ||
+            preparedTargets.has(target)
+          ) {
+            throw ERRORS.TypedError(
+              HardwareErrorCode.RuntimeError,
+              `Protocol V2 prepared component artifact is invalid: ${artifact.artifactId}`,
+              { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
+            );
+          }
+          installSources.push({
+            ...installTarget,
+            source: await this.openProtocolV2PreparedSource(artifact.artifact),
+          });
+          preparedTargets.add(target);
+        }
+      }
+      const missingTarget = Array.from(requestedTargets).find(
+        target => !preparedTargets.has(target)
+      );
+      if (missingTarget) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `Protocol V2 ${missingTarget} artifact is not prepared`,
+          {
+            firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
+            artifactName: missingTarget,
+          }
+        );
+      }
+      return installSources;
+    }
+
     const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
     if (!release) {
       throw ERRORS.TypedError(
@@ -829,6 +955,116 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       );
     }
     return installSources;
+  }
+
+  private async prepareProtocolV2LocalResourceArchive(
+    binary: ArrayBuffer
+  ): Promise<ProtocolV2ResourceBundleBinary[]> {
+    const zip = await JSZip.loadAsync(binary);
+    const entries = Object.values(zip.files).filter(entry => !entry.dir);
+    if (entries.length === 0 || entries.length > PROTOCOL_V2_RESOURCE_FILE_MAX_COUNT + 1) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 local resource ZIP entry set is invalid',
+        { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
+      );
+    }
+    const manifestEntry = zip.file('manifest.json');
+    if (!manifestEntry) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 local resource ZIP has no manifest.json',
+        { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
+      );
+    }
+    const manifestBinary = await manifestEntry.async('arraybuffer');
+    if (
+      manifestBinary.byteLength <= 0 ||
+      manifestBinary.byteLength > PROTOCOL_V2_RESOURCE_MANIFEST_MAX_BYTES
+    ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 local resource manifest size is invalid',
+        { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
+      );
+    }
+
+    let manifestValue: unknown;
+    try {
+      manifestValue = JSON.parse(new TextDecoder().decode(manifestBinary));
+    } catch (error) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        `Protocol V2 local resource manifest is invalid: ${String(error)}`,
+        { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
+      );
+    }
+    const manifest = parseProtocolV2ResourceManifest(manifestValue);
+    const selectedFiles = selectProtocolV2ResourceManifestFiles({
+      manifest,
+      targetsToUpdate: this.params.targetsToUpdate ?? [],
+    });
+    const expectedEntryNames = new Set([
+      'manifest.json',
+      ...selectedFiles.map(file => file.archive_path),
+    ]);
+    if (
+      entries.length !== expectedEntryNames.size ||
+      entries.some(entry => !expectedEntryNames.has(entry.name))
+    ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 local resource ZIP contains an unexpected entry',
+        { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
+      );
+    }
+
+    let totalSize = 0;
+    const resourceBundles: ProtocolV2ResourceBundleBinary[] = [];
+    for (const [index, file] of selectedFiles.entries()) {
+      const entry = zip.file(file.archive_path);
+      if (!entry) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `Protocol V2 local resource ZIP is missing ${file.archive_path}`,
+          { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
+        );
+      }
+      const fileBinary = await entry.async('arraybuffer');
+      const digest = bytesToHex(sha256(new Uint8Array(fileBinary)));
+      if (fileBinary.byteLength !== file.size || digest !== file.sha256.toLowerCase()) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `Protocol V2 local resource file does not match manifest: ${file.archive_path}`,
+          { firmwareUpdateCode: 'FirmwareArtifactReceiptMismatch' }
+        );
+      }
+      totalSize += fileBinary.byteLength;
+      if (totalSize > PROTOCOL_V2_RESOURCE_TOTAL_MAX_BYTES) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          'Protocol V2 local resource ZIP exceeds the total size limit',
+          { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
+        );
+      }
+      const header =
+        fileBinary.byteLength >= PROTOCOL_V2_OKPP_HEADER_SIZE
+          ? parseProtocolV2OkppHeader(new Uint8Array(fileBinary))
+          : null;
+      resourceBundles.push({
+        name: file.original_name || `resource-${index}`,
+        binary: fileBinary,
+        devicePath: file.device_path,
+        ...(header
+          ? {
+              version: header.version,
+              payloadHash: header.payloadHash,
+              headerHash: header.headerHash,
+            }
+          : {}),
+      });
+    }
+    return resourceBundles;
   }
 
   private async prepareProtocolV2ResourceSources(): Promise<ProtocolV2ResourceBundleSource[]> {
@@ -1672,10 +1908,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     fwBinaryMap,
     bootloaderBinary,
     installItems,
+    resourceBundles = [],
   }: {
     fwBinaryMap?: ProtocolV2TargetBinary[];
     bootloaderBinary?: ArrayBuffer | null;
     installItems?: ProtocolV2InstallItem[];
+    resourceBundles?: ProtocolV2ResourceBundleBinary[];
   }) {
     const memoryInstallItems =
       installItems ??
@@ -1692,9 +1930,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           kind: item.kind,
         }))
       );
+      const resourceSources = await Promise.all(
+        resourceBundles.map(async resource => ({
+          name: resource.name,
+          source: await this.openProtocolV2MemorySource(resource.binary),
+          devicePath: resource.devicePath,
+          ...(resource.version ? { version: resource.version } : {}),
+          ...(resource.payloadHash ? { payloadHash: resource.payloadHash } : {}),
+          ...(resource.headerHash ? { headerHash: resource.headerHash } : {}),
+        }))
+      );
       return await this.executeProtocolV2Phases({
         installSources,
-        resourceSources: [],
+        resourceSources,
       });
     } finally {
       await this.closeProtocolV2PreparedSources();

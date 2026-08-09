@@ -6,7 +6,6 @@ import type { CoreApi } from '../../types/api';
 import type {
   FirmwareArtifactReader,
   FirmwareArtifactReference,
-  FirmwareUpdateV4Target,
 } from '../../types/api/firmwareUpdate';
 import type { FirmwareUpdatePlan } from '../../types/api/firmwareUpdatePlan';
 
@@ -24,32 +23,10 @@ export type FirmwareMemoryArtifact = {
 export type FirmwareUpdateV4MemoryHost = {
   preparedPlan: ReturnType<CoreApi['prepareFirmwareUpdatePlan']>;
   hostBindingGeneration: number;
-  targetsToUpdate: FirmwareUpdateV4Target[];
-  expectedDeviceId: string;
-  expectedTargetVersions: Partial<Record<FirmwareUpdateV4Target, string>>;
-  componentArtifacts: Partial<
-    Record<Exclude<FirmwareUpdateV4Target, 'resource'>, FirmwareArtifactReference>
-  >;
   release: () => void;
 };
 
 let memoryHostSequence = 0;
-
-const FIRMWARE_UPDATE_V4_COMPONENT_TARGETS = new Set<Exclude<FirmwareUpdateV4Target, 'resource'>>([
-  'boot',
-  'app_v1',
-  'app_v2',
-  'coprocessor',
-  'se01',
-  'se02',
-  'se03',
-  'se04',
-]);
-
-const isFirmwareUpdateV4ComponentTarget = (
-  target: string
-): target is Exclude<FirmwareUpdateV4Target, 'resource'> =>
-  FIRMWARE_UPDATE_V4_COMPONENT_TARGETS.has(target as Exclude<FirmwareUpdateV4Target, 'resource'>);
 
 const createReference = (binary: ArrayBuffer, prefix: string): FirmwareArtifactReference => {
   const digest = bytesToHex(sha256(new Uint8Array(binary)));
@@ -148,23 +125,9 @@ export function prepareFirmwareUpdateV4MemoryHost({
     artifactReader,
     preparedPlanDigest: preparedPlan.preparedPlanDigest,
   });
-  const componentArtifacts: FirmwareUpdateV4MemoryHost['componentArtifacts'] = {};
-  const expectedTargetVersions: FirmwareUpdateV4MemoryHost['expectedTargetVersions'] = {};
-  for (const artifact of preparedPlan.artifacts) {
-    if (artifact.role === 'component' && isFirmwareUpdateV4ComponentTarget(artifact.target)) {
-      componentArtifacts[artifact.target] = artifact.artifact;
-    }
-    if (artifact.targetVersion) {
-      expectedTargetVersions[artifact.target as FirmwareUpdateV4Target] = artifact.targetVersion;
-    }
-  }
   return {
     preparedPlan,
     hostBindingGeneration,
-    targetsToUpdate: [...preparedPlan.targetsToUpdate] as FirmwareUpdateV4Target[],
-    expectedDeviceId: preparedPlan.deviceIdentity,
-    expectedTargetVersions,
-    componentArtifacts,
     release: () => {
       sdk.unregisterFirmwareUpdateHostBinding(hostBindingGeneration);
       readers.clear();

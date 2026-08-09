@@ -181,6 +181,15 @@ Bootloader 或 Romloader 时复用当前 loader 连接，不重复 reboot。
 `boot_resource.okpkg` 必须写入 `.staging` 路径，由下次启动在挂载前完成替换，避免 FatFs 因文件已打开而拒绝覆盖。
 资源单独更新时不发送空的安装请求。SDK 不假设固件端会隐式扫描其他已写入路径。
 
+远程正式升级必须先通过最新配置生成 `FirmwareUpdatePlan`，宿主下载后再生成带完整收据的
+`PreparedPlan`；文件大小和 SHA-256 必须与远程 Plan 完全一致。执行阶段以 `PreparedPlan` 为唯一事实源，
+组件引用、升级目标和预期版本不需要调用方重复传入，也不重新依赖可能已变化的在线 release 记录。
+
+本地开发升级与远程 Plan 严格分离：组件可以继续通过 `firmwareUpdateV4` 的各组件 `ArrayBuffer` 字段传入；
+完整资源 ZIP 通过 `resourceArchiveBinary` 传入。该路径不读取或匹配远程配置，但 Core 仍会在修改设备前
+校验 ZIP 的 manifest 合约、允许写入路径、条目集合、文件大小和 SHA-256；设备端继续负责签名包的最终
+验证与启用。不得把本地文件作为远程 Plan 的 override 来绕过远程收据校验。
+
 ## 包职责速查
 
 | 包                                   | 职责                                                           |

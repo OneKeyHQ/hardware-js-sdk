@@ -154,6 +154,8 @@ export interface FirmwareUpdateV4Params {
   se02Binary?: ArrayBuffer;
   se03Binary?: ArrayBuffer;
   se04Binary?: ArrayBuffer;
+  /** Complete Protocol V2 resource ZIP for local development; never bound to a remote Plan. */
+  resourceArchiveBinary?: ArrayBuffer;
   forcedUpdateRes?: boolean;
   artifactReader?: FirmwareArtifactReader;
   componentArtifacts?: Partial<

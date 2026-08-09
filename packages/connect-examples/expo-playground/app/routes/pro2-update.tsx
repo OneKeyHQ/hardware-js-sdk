@@ -15,10 +15,7 @@ import { useFirmwareProgress } from '../components/providers/SDKProvider';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
 import { isPro2DeviceInfo } from '../utils/pro2Device';
-import {
-  prepareFirmwareUpdatePlanMemoryHost,
-  type FirmwarePlanArtifactOverrides,
-} from '../utils/firmwareUpdatePlanHost';
+import { prepareFirmwareUpdatePlanMemoryHost } from '../utils/firmwareUpdatePlanHost';
 import { SDKUtils } from '../utils/hardwareInstance';
 import type { DeviceInfo } from '../types/hardware';
 import { PRO2_FIRMWARE_FILE_ACCEPT } from '../constants/firmwareFiles';
@@ -315,12 +312,14 @@ export default function Pro2UpdatePage() {
     try {
       const device = currentDevice ?? (await connectDevice());
 
-      const overrides: FirmwarePlanArtifactOverrides = {};
+      const localParams: Record<string, ArrayBuffer> = {};
+      const localTargets: FirmwareUpdateV4Target[] = [];
       for (const field of selectedFields) {
         const file = files[field.param];
         if (!file) continue;
         addLog('info', `Loading ${field.label}: ${file.name} (${formatBytes(file.size)})`);
-        overrides[TARGET_BY_PARAM[field.param]] = await file.arrayBuffer();
+        localParams[field.param] = await file.arrayBuffer();
+        localTargets.push(TARGET_BY_PARAM[field.param]);
       }
       if (resourceArchiveFile) {
         addLog(
@@ -329,58 +328,57 @@ export default function Pro2UpdatePage() {
             resourceArchiveFile.size
           )})`
         );
-        overrides.resource = await resourceArchiveFile.arrayBuffer();
+        localParams.resourceArchiveBinary = await resourceArchiveFile.arrayBuffer();
+        localTargets.push('resource');
       }
 
-      addLog('info', `Checking ${device.deviceType} firmware and resource releases`);
-      const forcedTargets: FirmwareUpdateV4Target[] = selectedFields.map(
-        field => TARGET_BY_PARAM[field.param]
-      );
-      if (resourceArchiveFile) forcedTargets.push('resource');
-      // App mode cannot inspect vol0 resources. A remote update must compare them in loader mode.
-      const requestedTargets: FirmwareUpdateV4Target[] =
-        forcedTargets.length > 0 ? forcedTargets : ['resource'];
-      const checkResponse = await callHardwareAPI('checkAllFirmwareRelease', {
-        connectId: device.connectId,
-        platform: 'web',
-        protocolV2ForceUpdateTargets: requestedTargets,
-      });
-      if (!checkResponse.success) {
-        throw new Error(getApiError(checkResponse.payload, 'checkAllFirmwareRelease failed'));
-      }
-      const release = checkResponse.payload as AllFirmwareRelease;
-      const plan = release.firmwareUpdatePlan;
-      if (!plan || plan.executor !== 'v4') {
-        if ((release.targetsToUpdate ?? []).length === 0) {
-          addLog('ok', 'Firmware and resources are already current');
-          toast({
-            title: 'Already current',
-            description: 'No Protocol V2 firmware or resource update is required.',
-          });
-          return;
-        }
-        throw new Error('Protocol V2 firmware update Plan is unavailable');
-      }
       const hardwareSDK = await SDKUtils.getInstance();
-      const memoryHost = await prepareFirmwareUpdatePlanMemoryHost({
-        hardwareSDK,
-        plan,
-        overrides,
-      });
-      addLog('info', `firmwareUpdateV4 Plan targets: ${memoryHost.targetsToUpdate.join(', ')}`);
       let response;
-      try {
+      if (localTargets.length > 0) {
+        addLog('info', `Local firmwareUpdateV4 targets: ${localTargets.join(', ')}`);
         response = await hardwareSDK.firmwareUpdateV4(device.connectId ?? undefined, {
           platform: 'web',
-          preparedPlan: memoryHost.preparedPlan,
-          hostBindingGeneration: memoryHost.hostBindingGeneration,
-          targetsToUpdate: memoryHost.targetsToUpdate,
-          expectedDeviceId: memoryHost.expectedDeviceId,
-          expectedTargetVersions: memoryHost.expectedTargetVersions,
-          componentArtifacts: memoryHost.componentArtifacts,
+          targetsToUpdate: [...new Set(localTargets)],
+          ...localParams,
         });
-      } finally {
-        memoryHost.release();
+      } else {
+        addLog('info', `Checking ${device.deviceType} firmware and resource releases`);
+        // App mode cannot inspect vol0 resources. A remote update must compare them in loader mode.
+        const checkResponse = await callHardwareAPI('checkAllFirmwareRelease', {
+          connectId: device.connectId,
+          platform: 'web',
+          protocolV2ForceUpdateTargets: ['resource'],
+        });
+        if (!checkResponse.success) {
+          throw new Error(getApiError(checkResponse.payload, 'checkAllFirmwareRelease failed'));
+        }
+        const release = checkResponse.payload as AllFirmwareRelease;
+        const plan = release.firmwareUpdatePlan;
+        if (!plan || plan.executor !== 'v4') {
+          if ((release.targetsToUpdate ?? []).length === 0) {
+            addLog('ok', 'Firmware and resources are already current');
+            toast({
+              title: 'Already current',
+              description: 'No Protocol V2 firmware or resource update is required.',
+            });
+            return;
+          }
+          throw new Error('Protocol V2 firmware update Plan is unavailable');
+        }
+        const memoryHost = await prepareFirmwareUpdatePlanMemoryHost({
+          hardwareSDK,
+          plan,
+        });
+        addLog('info', `firmwareUpdateV4 Plan targets: ${plan.targetsToUpdate.join(', ')}`);
+        try {
+          response = await hardwareSDK.firmwareUpdateV4(device.connectId ?? undefined, {
+            platform: 'web',
+            preparedPlan: memoryHost.preparedPlan,
+            hostBindingGeneration: memoryHost.hostBindingGeneration,
+          });
+        } finally {
+          memoryHost.release();
+        }
       }
       if (!response.success) {
         throw new Error(getApiError(response.payload, 'firmwareUpdateV4 failed'));

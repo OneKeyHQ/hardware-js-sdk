@@ -30,10 +30,7 @@ import {
   ProtocolV2FirmwareUpdate,
   type ProtocolV2FirmwareUpdateRequest,
 } from './ProtocolV2FirmwareUpdate';
-import {
-  type FirmwarePlanArtifactOverrides,
-  prepareFirmwareUpdatePlanMemoryHost,
-} from './firmwareUpdatePlanHost';
+import { prepareFirmwareUpdatePlanMemoryHost } from './firmwareUpdatePlanHost';
 import { buildDeviceAdvancedInfo } from './deviceAdvancedInfo';
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 import { HardwareInputPinDialogProvider } from '../../provider/HardwareInputPinProvider';
@@ -537,9 +534,19 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
           params[field] ? [target] : []
         );
         if (params.resourceArchiveBinary) localTargets.push('resource');
+        if (localTargets.length > 0) {
+          const localResponse = await sdk.firmwareUpdateV4(selectDevice.connectId, {
+            ...params,
+            targetsToUpdate: [...new Set(localTargets)],
+          });
+          return {
+            success: localResponse.success,
+            payload: localResponse.success ? undefined : localResponse.payload.error,
+          };
+        }
         const releaseResponse = await sdk.checkAllFirmwareRelease(selectDevice.connectId, {
           platform: params.platform,
-          protocolV2ForceUpdateTargets: params.targetsToUpdate ?? localTargets,
+          protocolV2ForceUpdateTargets: params.targetsToUpdate,
         });
         if (!releaseResponse.success) {
           throw new Error(releaseResponse.payload.error);
@@ -548,16 +555,9 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
         if (!plan || plan.executor !== 'v4') {
           throw new Error('Protocol V2 firmware update Plan is unavailable');
         }
-        const overrides: FirmwarePlanArtifactOverrides = {};
-        for (const [target, field] of componentFields) {
-          const binary = params[field];
-          if (binary) overrides[target] = binary;
-        }
-        if (params.resourceArchiveBinary) overrides.resource = params.resourceArchiveBinary;
         const memoryHost = await prepareFirmwareUpdatePlanMemoryHost({
           hardwareSDK: sdk,
           plan,
-          overrides,
         });
         let res;
         try {
@@ -565,10 +565,6 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
             platform: params.platform,
             preparedPlan: memoryHost.preparedPlan,
             hostBindingGeneration: memoryHost.hostBindingGeneration,
-            targetsToUpdate: memoryHost.targetsToUpdate,
-            expectedDeviceId: memoryHost.expectedDeviceId,
-            expectedTargetVersions: memoryHost.expectedTargetVersions,
-            componentArtifacts: memoryHost.componentArtifacts,
           });
         } finally {
           memoryHost.release();
