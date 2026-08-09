@@ -256,6 +256,27 @@ describe('prepared firmware host digest binding', () => {
     expect(directArtifactReader.open).not.toHaveBeenCalled();
   });
 
+  test('FirmwareUpdateV3 does not execute legacy inputs outside the prepared plan', () => {
+    const { artifact, preparedPlan } = createPreparedPlan({
+      executor: 'v3',
+      target: 'firmware',
+    });
+    const method = new FirmwareUpdateV3({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV3',
+        platform: 'desktop',
+        artifacts: { firmware: artifact },
+        preparedPlan,
+        bleBinary: new ArrayBuffer(4),
+      },
+    });
+
+    expect(() => method.init()).toThrow(
+      'Prepared firmware plans cannot be combined with legacy firmware inputs'
+    );
+  });
+
   test('DeviceUpdateBootloader rejects a host registered for another prepared plan', async () => {
     const { artifact, preparedPlan } = createPreparedPlan({
       executor: 'v2',

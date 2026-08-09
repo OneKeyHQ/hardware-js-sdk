@@ -82,6 +82,21 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       payload.artifacts || payload.preparedPlan
         ? validateFirmwareUpdatePreparedPlan(payload.preparedPlan)
         : undefined;
+    const hasLegacyInputs = [
+      payload.bleVersion,
+      payload.bleBinary,
+      payload.firmwareVersion,
+      payload.firmwareBinary,
+      payload.resourceBinary,
+      payload.bootloaderVersion,
+      payload.bootloaderBinary,
+    ].some(input => input !== undefined);
+    if (preparedPlan && hasLegacyInputs) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'Prepared firmware plans cannot be combined with legacy firmware inputs'
+      );
+    }
     const artifactReader = preparedPlan
       ? resolveFirmwareUpdateHostBinding(
           payload.hostBindingGeneration,
@@ -140,7 +155,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       bootloaderBinary: payload.bootloaderBinary,
       firmwareVersion: payload.firmwareVersion,
       resourceBinary: payload.resourceBinary,
-      firmwareType: payload.firmwareType,
+      firmwareType: preparedPlan?.firmwareType ?? payload.firmwareType,
       platform: payload.platform,
       artifactReader,
       artifacts: payload.artifacts,
