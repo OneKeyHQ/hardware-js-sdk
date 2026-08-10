@@ -1,7 +1,6 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import * as ApiMethods from './index';
-import { decodeBridgeBinaryPayload } from '../utils/bridgeBinaryPayload';
 
 import type { BaseMethod } from './BaseMethod';
 import type { IFrameCallMessage } from '../events';
@@ -12,16 +11,14 @@ type MethodConstructor = new (message: IFrameCallMessage & { id?: number }) => B
 const publicMethodRegistry = ApiMethods as unknown as Record<string, MethodConstructor>;
 
 export function findMethod(message: IFrameCallMessage & { id?: number }): BaseMethod<any> {
-  const payload = decodeBridgeBinaryPayload(message.payload) as IFrameCallMessage['payload'];
-  const normalizedMessage = payload === message.payload ? message : { ...message, payload };
-  const { method } = payload;
+  const { method } = message.payload;
   if (typeof method !== 'string') {
     throw ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter, 'Method is not set');
   }
 
   const MethodConstructor = publicMethodRegistry[method];
   if (MethodConstructor) {
-    return new MethodConstructor(normalizedMessage);
+    return new MethodConstructor(message);
   }
 
   throw ERRORS.TypedError(

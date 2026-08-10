@@ -2,7 +2,6 @@ import EventEmitter from 'events';
 
 import { createCoreApi, createProtocolAwareCall } from './inject';
 import { unregisterFirmwareUpdateHostBinding } from './api/firmware/FirmwareHostBinding';
-import { encodeBridgeBinaryPayload } from './utils/bridgeBinaryPayload';
 
 import type { ConnectSettings } from './types/settings';
 import type { CoreApi } from './types/api';
@@ -17,10 +16,9 @@ const eventEmitter = new EventEmitter();
 
 export const topLevelInject = () => {
   let lowLevelApi: LowLevelCoreApi | undefined;
-  const call = async (params: any) => {
+  const call = (params: any) => {
     if (!lowLevelApi) return Promise.resolve(undefined);
-    const encodedParams = await encodeBridgeBinaryPayload(params);
-    return lowLevelApi.call(encodedParams as any);
+    return lowLevelApi.call(params);
   };
   const protocolAwareCall = createProtocolAwareCall(call);
   const api: CoreApi = {

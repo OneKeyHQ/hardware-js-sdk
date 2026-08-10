@@ -1,3 +1,16 @@
+import { Buffer } from 'buffer';
+
+const normalizeBase64File = (value: unknown): unknown => {
+  if (typeof value === 'string') return value;
+  if (value instanceof ArrayBuffer) {
+    return Buffer.from(value).toString('base64');
+  }
+  if (ArrayBuffer.isView(value)) {
+    return Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('base64');
+  }
+  return value;
+};
+
 export const normalizeProtocolAwareParams = (
   method: string,
   params: Record<string, unknown>
@@ -13,27 +26,17 @@ export const normalizeProtocolAwareParams = (
     }
   }
 
+  if (method === 'deviceUploadWallpaper') {
+    normalized.jpegBase64 = normalizeBase64File(normalized.jpegBase64);
+  }
+
   if (method === 'deviceUploadNft') {
-    normalized.image = {
-      width: normalized.imageWidth,
-      height: normalized.imageHeight,
-      rgba: normalized.imageRgba,
-    };
-    normalized.thumbnail = {
-      width: normalized.thumbnailWidth,
-      height: normalized.thumbnailHeight,
-      rgba: normalized.thumbnailRgba,
-    };
-    for (const field of [
-      'imageWidth',
-      'imageHeight',
-      'imageRgba',
-      'thumbnailWidth',
-      'thumbnailHeight',
-      'thumbnailRgba',
-    ]) {
-      delete normalized[field];
-    }
+    normalized.imageJpegBase64 = normalizeBase64File(normalized.imageJpegBase64);
+    normalized.thumbnailJpegBase64 = normalizeBase64File(normalized.thumbnailJpegBase64);
+  }
+
+  if (method === 'uploadPortfolio') {
+    normalized.packageBase64 = normalizeBase64File(normalized.packageBase64);
   }
 
   return normalized;

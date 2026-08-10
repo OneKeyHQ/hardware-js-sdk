@@ -1,7 +1,10 @@
+import { Buffer } from 'buffer';
+
 import { EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import JSZip from 'jszip';
+import { encode as encodeJpeg } from 'jpeg-js';
 import {
   DeviceRebootType,
   DeviceSessionPinType,
@@ -123,6 +126,18 @@ jest.mock('../src/data/config', () => ({
   DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0/',
 }));
 
+const jpegBase64Cache = new Map<string, string>();
+
+const createJpegBase64 = (width: number, height: number) => {
+  const key = `${width}x${height}`;
+  const cached = jpegBase64Cache.get(key);
+  if (cached) return cached;
+  const rgba = new Uint8Array(width * height * 4).fill(0xff);
+  const value = encodeJpeg({ width, height, data: rgba }, 80).data.toString('base64');
+  jpegBase64Cache.set(key, value);
+  return value;
+};
+
 const createProtocolV2OkppBinary = ({
   version = [1, 2, 3],
   payloadHashByte = 0x11,
@@ -160,8 +175,18 @@ const createWalletSessionTypedCall = (
   });
 
 describe('DeviceUploadWallpaper', () => {
+  const wallpaperProtocolInfo = {
+    version: 2,
+    supported_messages: [60412, 60805, 60809],
+  };
+
+  const stubWallpaperDevice = <T extends Record<string, any>>(device: T) =>
+    stubDevice({
+      ...device,
+      ensureProtocolV2RuntimeContext: jest.fn().mockResolvedValue(wallpaperProtocolInfo),
+    });
+
   test('encodes, uploads and applies a Pro2 wallpaper', async () => {
-    const rgba = new Uint8Array(604 * 1024 * 4).fill(255);
     const typedCall = jest.fn().mockImplementation((request, _response, params) => {
       if (request === 'FilesystemDirMake') return { message: { message: 'directory ready' } };
       if (request === 'FilesystemFileWrite') {
@@ -175,9 +200,12 @@ describe('DeviceUploadWallpaper', () => {
     });
     const method = new DeviceUploadWallpaper({
       id: 1,
-      payload: { method: 'deviceUploadWallpaper', width: 604, height: 1024, rgba },
+      payload: {
+        method: 'deviceUploadWallpaper',
+        jpegBase64: createJpegBase64(604, 1024),
+      },
     });
-    (method as any).device = stubDevice({ commands: { typedCall } });
+    (method as any).device = stubWallpaperDevice({ commands: { typedCall } });
     method.postMessage = jest.fn();
 
     method.init();
@@ -225,12 +253,10 @@ describe('DeviceUploadWallpaper', () => {
       id: 1,
       payload: {
         method: 'deviceUploadWallpaper',
-        width: 604,
-        height: 1024,
-        rgba: new Uint8Array(604 * 1024 * 4),
+        jpegBase64: createJpegBase64(604, 1024),
       },
     });
-    (method as any).device = stubDevice({ commands: { typedCall } });
+    (method as any).device = stubWallpaperDevice({ commands: { typedCall } });
     method.init();
 
     await expect(method.run()).rejects.toThrow('write failed');
@@ -242,14 +268,36 @@ describe('DeviceUploadWallpaper', () => {
       id: 1,
       payload: {
         method: 'deviceUploadWallpaper',
-        width: 604,
-        height: 1024,
-        rgba: new Uint8Array(604 * 1024 * 4),
+        jpegBase64: createJpegBase64(604, 1024),
         fileName: '../wallpaper.bin',
       },
     });
 
     expect(() => method.init()).toThrow('fileName');
+  });
+
+  test('rejects unsupported firmware before creating or writing files', async () => {
+    const typedCall = jest.fn();
+    const method = new DeviceUploadWallpaper({
+      id: 1,
+      payload: {
+        method: 'deviceUploadWallpaper',
+        jpegBase64: createJpegBase64(604, 1024),
+      },
+    });
+    (method as any).device = stubDevice({
+      commands: { typedCall },
+      ensureProtocolV2RuntimeContext: jest.fn().mockResolvedValue({
+        version: 2,
+        supported_messages: [60805, 60809],
+      }),
+    });
+    method.init();
+
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceNotSupportMethod,
+    });
+    expect(typedCall).not.toHaveBeenCalled();
   });
 });
 
@@ -266,7 +314,6 @@ describe('UploadPortfolio', () => {
     });
 
   test('writes and applies the portfolio while the device is locked without unlocking', async () => {
-    const packageBytes = new Uint8Array([1, 2, 3]);
     const typedCall = jest
       .fn()
       .mockResolvedValueOnce({ message: { processed_byte: 3 } })
@@ -282,7 +329,7 @@ describe('UploadPortfolio', () => {
       id: 1,
       payload: {
         method: 'uploadPortfolio',
-        packageBytes,
+        packageBase64: 'AQID',
       },
     });
     (method as any).device = device;
@@ -314,7 +361,7 @@ describe('UploadPortfolio', () => {
       id: 1,
       payload: {
         method: 'uploadPortfolio',
-        packageBytes,
+        packageBase64: 'AQID',
       },
     });
     (method as any).device = stubPortfolioDevice({ commands: { typedCall } });
@@ -362,7 +409,7 @@ describe('UploadPortfolio', () => {
       id: 1,
       payload: {
         method: 'uploadPortfolio',
-        packageBytes: new Uint8Array([1]),
+        packageBase64: 'AQ==',
       },
     });
     (method as any).device = stubPortfolioDevice({ commands: { typedCall } });
@@ -384,7 +431,7 @@ describe('UploadPortfolio', () => {
       id: 1,
       payload: {
         method: 'uploadPortfolio',
-        packageBytes,
+        packageBase64: Buffer.from(packageBytes).toString('base64'),
       },
     });
     method.abortSignal = abortController.signal;
@@ -405,7 +452,7 @@ describe('UploadPortfolio', () => {
       id: 1,
       payload: {
         method: 'uploadPortfolio',
-        packageBytes: new Uint8Array([1]),
+        packageBase64: 'AQ==',
       },
     });
     (method as any).device = stubDevice({
@@ -422,6 +469,18 @@ describe('UploadPortfolio', () => {
       errorCode: HardwareErrorCode.DeviceNotSupportMethod,
     });
     expect(typedCall).not.toHaveBeenCalled();
+  });
+
+  test('rejects non-canonical Base64 before device communication', () => {
+    const method = new UploadPortfolio({
+      id: 1,
+      payload: {
+        method: 'uploadPortfolio',
+        packageBase64: 'data:application/octet-stream;base64,AQID',
+      },
+    });
+
+    expect(() => method.init()).toThrow('canonical Base64');
   });
 });
 

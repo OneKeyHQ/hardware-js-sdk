@@ -68,7 +68,7 @@ export declare function deviceUploadNft(
 export declare function uploadPortfolio(
   connectId: string,
   params: {
-    packageBytes: ArrayBuffer | Uint8Array | Blob;
+    packageBase64: string;
     timeoutMs?: number | string;
   }
 ): Response<FileInfo & { portfolioUpdated: true }>;

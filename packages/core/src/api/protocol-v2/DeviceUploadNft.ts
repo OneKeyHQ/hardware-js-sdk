@@ -7,21 +7,26 @@ import {
   PRO2_NFT_DEFAULT_PACE_MS,
   PRO2_NFT_DEFAULT_TIMEOUT_MS,
   PRO2_NFT_DIRECTORY,
+  PRO2_NFT_IMAGE_HEIGHT,
+  PRO2_NFT_IMAGE_WIDTH,
   PRO2_NFT_MAX_CHUNK_SIZE,
   PRO2_NFT_MAX_ITEMS,
   PRO2_NFT_MIN_CHUNK_SIZE,
+  PRO2_NFT_THUMBNAIL_HEIGHT,
+  PRO2_NFT_THUMBNAIL_WIDTH,
   type Pro2NftBundle,
-  type Pro2NftImage,
-  buildPro2NftBundle,
+  buildPro2NftBundleFromEncodedImages,
   getCompletePro2NftBasenames,
 } from '../../utils/pro2Nft';
+import { encodePro2Image } from '../../utils/pro2Wallpaper';
 import { BaseMethod } from '../BaseMethod';
+import { decodeJpegBase64ToRgba } from '../helpers/base64Data';
 import { invalidParameter } from '../helpers/filesystemValidation';
 import { writeProtocolV2File } from '../helpers/protocolV2FileWrite';
 
 export type DeviceUploadNftParams = {
-  image: Pro2NftImage;
-  thumbnail: Pro2NftImage;
+  imageJpegBase64: string;
+  thumbnailJpegBase64: string;
   title: string;
   subtitle: string;
   timestampMs?: number;
@@ -54,8 +59,8 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
 
   init() {
     const {
-      image,
-      thumbnail,
+      imageJpegBase64,
+      thumbnailJpegBase64,
       title,
       subtitle,
       timestampMs = Date.now(),
@@ -79,8 +84,51 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
       throw invalidParameter('Parameter [timeoutMs] must be a positive integer.');
     }
 
-    this.bundle = buildPro2NftBundle({ image, thumbnail, title, subtitle, timestampMs });
-    this.params = { image, thumbnail, title, subtitle, timestampMs, chunkSize, paceMs, timeoutMs };
+    const encodedImage = (() => {
+      const decoded = decodeJpegBase64ToRgba({
+        jpegBase64: imageJpegBase64,
+        parameterName: 'imageJpegBase64',
+        expectedWidth: PRO2_NFT_IMAGE_WIDTH,
+        expectedHeight: PRO2_NFT_IMAGE_HEIGHT,
+      });
+      return encodePro2Image({
+        width: PRO2_NFT_IMAGE_WIDTH,
+        height: PRO2_NFT_IMAGE_HEIGHT,
+        rgba: decoded.data,
+        alphaMode: 'black-background',
+      }).data;
+    })();
+    const encodedThumbnail = (() => {
+      const decoded = decodeJpegBase64ToRgba({
+        jpegBase64: thumbnailJpegBase64,
+        parameterName: 'thumbnailJpegBase64',
+        expectedWidth: PRO2_NFT_THUMBNAIL_WIDTH,
+        expectedHeight: PRO2_NFT_THUMBNAIL_HEIGHT,
+      });
+      return encodePro2Image({
+        width: PRO2_NFT_THUMBNAIL_WIDTH,
+        height: PRO2_NFT_THUMBNAIL_HEIGHT,
+        rgba: decoded.data,
+        alphaMode: 'black-background',
+      }).data;
+    })();
+    this.bundle = buildPro2NftBundleFromEncodedImages({
+      image: encodedImage,
+      thumbnail: encodedThumbnail,
+      title,
+      subtitle,
+      timestampMs,
+    });
+    this.params = {
+      imageJpegBase64,
+      thumbnailJpegBase64,
+      title,
+      subtitle,
+      timestampMs,
+      chunkSize,
+      paceMs,
+      timeoutMs,
+    };
     this.unlockPolicy = 'none';
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;

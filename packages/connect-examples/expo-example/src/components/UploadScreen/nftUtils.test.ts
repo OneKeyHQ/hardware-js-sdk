@@ -1,8 +1,7 @@
 import { Image, Platform } from 'react-native';
 import { manipulateAsync } from 'expo-image-manipulator';
-import { decode as decodeJpeg } from 'jpeg-js';
 
-import { calculateCoverResize, imageSourceToRgba } from './nftUtils';
+import { calculateCoverResize, imageSourceToJpegBase64 } from './nftUtils';
 
 jest.mock('react-native', () => ({
   Image: { getSize: jest.fn() },
@@ -22,10 +21,6 @@ jest.mock('expo-file-system', () => ({
   writeAsStringAsync: jest.fn(),
 }));
 
-jest.mock('jpeg-js', () => ({
-  decode: jest.fn(),
-}));
-
 describe('Protocol V2 原生图片转换', () => {
   const originalPlatform = Platform.OS;
 
@@ -43,7 +38,7 @@ describe('Protocol V2 原生图片转换', () => {
     });
   });
 
-  test('React Native 使用 ImageManipulator 和 JPEG 解码生成精确 RGBA', async () => {
+  test('React Native 使用 ImageManipulator 生成精确尺寸 JPEG Base64', async () => {
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
     jest.spyOn(Image, 'getSize').mockImplementation((_uri, success) => success(8, 4));
     (manipulateAsync as jest.Mock).mockResolvedValue({
@@ -52,10 +47,7 @@ describe('Protocol V2 原生图片转换', () => {
       height: 3,
       base64: 'AA==',
     });
-    const rgba = new Uint8Array(2 * 3 * 4).fill(255);
-    (decodeJpeg as jest.Mock).mockReturnValue({ width: 2, height: 3, data: rgba });
-
-    await expect(imageSourceToRgba('file:///source.png', 2, 3)).resolves.toEqual(rgba);
+    await expect(imageSourceToJpegBase64('file:///source.png', 2, 3)).resolves.toBe('AA==');
     expect(manipulateAsync).toHaveBeenCalledWith(
       'file:///source.png',
       [
