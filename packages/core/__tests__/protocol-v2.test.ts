@@ -1,5 +1,4 @@
 import { Buffer } from 'buffer';
-
 import { EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
@@ -2756,19 +2755,35 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('syncs Protocol V2 cached features without cached profile', () => {
+  test('syncs Protocol V2 cached features and renegotiates the adopted command channel', async () => {
+    const typedCall = jest.fn().mockResolvedValue({ message: protocolV2ApplicationInfo });
     const cached = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
     (cached as any).features = {
       ...normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any),
       deviceId: null,
       serialNo: 'CACHED-SERIAL',
     };
+    (cached as any).commands = { typedCall };
 
     const current = Device.fromDescriptor({ ...descriptor, protocolType: 'V2' } as any);
+    current.updateState(
+      {
+        raw: { protocolV2ProtocolInfo: protocolV2BootloaderInfo },
+        status: { mode: 'bootloader' },
+      },
+      'initialize'
+    );
     current.updateFromCache(cached);
+
+    await expect(current.ensureProtocolV2RuntimeContext()).resolves.toEqual(
+      protocolV2ApplicationInfo
+    );
 
     expect(current.getCurrentDeviceId()).toBeUndefined();
     expect(current.getCurrentSerialNo()).toBe('CACHED-SERIAL');
+    expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
+      eventless_wallet_session: true,
+    });
     expect(current.toMessageObject()).toMatchObject({
       serialNo: 'CACHED-SERIAL',
       uuid: 'CACHED-SERIAL',

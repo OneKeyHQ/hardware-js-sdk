@@ -252,56 +252,6 @@ describe('getDeviceState', () => {
     }
   );
 
-  test.each([
-    [EDeviceType.Pro2, DeviceType.PRO2],
-    [EDeviceType.Neo, DeviceType.NEO],
-  ] as const)('invalidates cached loader state when %s is cancelled', async (deviceType, type) => {
-    const typedCall = jest.fn().mockImplementation((requestType: string) => {
-      if (requestType === 'DeviceInfoGet') {
-        return {
-          message: {
-            protocol_version: 2,
-            hw: { Device_type: type, serial_no: 'SERIAL-1' },
-            fw: { application: { version: '5.0.0' } },
-          },
-        };
-      }
-      if (requestType === 'ProtocolInfoRequest') {
-        return { message: protocolV2ApplicationInfo };
-      }
-      if (requestType === 'DeviceStatusGet') {
-        return {
-          message: { init_states: true, unlocked: true, device_id: 'wallet-1' },
-        };
-      }
-      throw new Error(`Unexpected request: ${requestType}`);
-    });
-    const cancel = jest.fn().mockResolvedValue(undefined);
-    const device = createV2Device(typedCall);
-    (device as any).commands = { cancel, typedCall };
-    device.updateState(
-      {
-        protocol: 'V2',
-        identity: { deviceType },
-        status: { mode: 'bootloader' },
-        raw: { protocolV2ProtocolInfo: getProtocolV2LoaderInfo('bootloader') },
-      },
-      'initialize'
-    );
-
-    await device.interruptionFromUser();
-    await device.initialize();
-
-    expect(cancel).toHaveBeenCalledTimes(1);
-    expect(device.state?.status.mode).toBe('normal');
-    expect(device.state?.identity.deviceId).toBe('wallet-1');
-    expect(typedCall.mock.calls.map(call => call[0])).toEqual([
-      'DeviceInfoGet',
-      'ProtocolInfoRequest',
-      'DeviceStatusGet',
-    ]);
-  });
-
   test.each(['bootloader', 'romloader'] as const)(
     'keeps live %s mode after refreshing cached loader state',
     async mode => {

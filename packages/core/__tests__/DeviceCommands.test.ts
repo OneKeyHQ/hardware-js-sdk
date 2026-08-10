@@ -561,17 +561,22 @@ describe('DeviceCommands failure mapping', () => {
 });
 
 describe('DeviceCommands Protocol V2 interactive response compatibility', () => {
-  it('still auto-acks ButtonRequest when no hardware UI listener is registered', async () => {
+  it('auto-acks Pro2 ButtonRequest and registers Cancel instead of Initialize', async () => {
     const commands = createCommands();
     const emit = jest.fn();
+    const cancelDevice = jest.spyOn(commands, 'cancelDevice').mockResolvedValue(undefined);
+    const cancelDeviceOnOneKeyDevice = jest
+      .spyOn(commands, 'cancelDeviceOnOneKeyDevice')
+      .mockResolvedValue(undefined);
     const commonCall = jest.fn().mockResolvedValue({
       type: 'Success',
       message: {},
     });
+    const setCancelableAction = jest.fn();
     commands.device = {
       ...commands.device,
       getCurrentDeviceType: jest.fn(() => 'pro2'),
-      setCancelableAction: jest.fn(),
+      setCancelableAction,
       emit,
       listenerCount: jest.fn(() => 0),
     } as any;
@@ -593,6 +598,9 @@ describe('DeviceCommands Protocol V2 interactive response compatibility', () => 
       expect.objectContaining({ code: 'ButtonRequest_PinEntry' })
     );
     expect(commonCall).toHaveBeenCalledWith('ButtonAck', {}, undefined);
+    await setCancelableAction.mock.calls[0][0]();
+    expect(cancelDevice).toHaveBeenCalledTimes(1);
+    expect(cancelDeviceOnOneKeyDevice).not.toHaveBeenCalled();
   });
 
   it('rejects PassphraseRequest when the Pro2 UI listener is not registered', async () => {

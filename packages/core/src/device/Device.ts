@@ -488,6 +488,10 @@ export class Device extends EventEmitter {
       }
 
       this.commands = new DeviceCommands(this, this.mainId ?? '');
+      // Protocol V2 runtime metadata belongs to one active transport link. A
+      // successful acquire creates a fresh link/session, so never carry cached
+      // ProtocolInfo or pre-initialize state across that boundary.
+      this.invalidateProtocolV2RuntimeState();
     } catch (error) {
       if (options?.forceProtocolDetection) {
         this.originalDescriptor.protocolType = previousProtocol;
@@ -1304,14 +1308,18 @@ export class Device extends EventEmitter {
     });
   }
 
-  markTransportDisconnected() {
-    this.deviceAcquired = false;
+  private invalidateProtocolV2RuntimeState() {
     if (!this.isProtocolV2()) return;
     this.protocolV2StateNeedsReload = true;
     this.protocolV2RuntimeContext = undefined;
     this.protocolV2RuntimeContextPromise = undefined;
     this.protocolV2RuntimeContextRequestToken = undefined;
     this.clearPreInitialized();
+  }
+
+  markTransportDisconnected() {
+    this.deviceAcquired = false;
+    this.invalidateProtocolV2RuntimeState();
   }
 
   invalidateAfterWipe() {
@@ -1323,10 +1331,7 @@ export class Device extends EventEmitter {
       if (this.originalDescriptor.path !== deviceId) {
         deviceWalletSessionStore.deleteDevice(this.originalDescriptor.path);
       }
-      this.protocolV2StateNeedsReload = true;
-      this.protocolV2RuntimeContext = undefined;
-      this.protocolV2RuntimeContextPromise = undefined;
-      this.protocolV2RuntimeContextRequestToken = undefined;
+      this.invalidateProtocolV2RuntimeState();
     }
 
     this.passphraseState = undefined;
@@ -1338,11 +1343,7 @@ export class Device extends EventEmitter {
   markProtocolV2Reboot(rebootType: DeviceRebootType) {
     if (!this.isProtocolV2()) return;
 
-    this.protocolV2StateNeedsReload = true;
-    this.protocolV2RuntimeContext = undefined;
-    this.protocolV2RuntimeContextPromise = undefined;
-    this.protocolV2RuntimeContextRequestToken = undefined;
-    this.clearPreInitialized();
+    this.invalidateProtocolV2RuntimeState();
     let loaderMode: 'bootloader' | 'romloader' | undefined;
     if (rebootType === DeviceRebootType.Bootloader) {
       loaderMode = 'bootloader';
@@ -1416,6 +1417,10 @@ export class Device extends EventEmitter {
     if (device.features) {
       this._updateFeatures(device.features);
     }
+    // Adopting another Device instance's command channel also crosses an active
+    // link boundary. Renegotiate runtime metadata on that channel instead of
+    // retaining ProtocolInfo from the previous instance/session.
+    this.invalidateProtocolV2RuntimeState();
   }
 
   async run(fn?: () => Promise<void>, options?: RunOptions) {
@@ -1545,10 +1550,6 @@ export class Device extends EventEmitter {
 
   async interruptionFromUser() {
     const error = ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
-    // Cancellation often ends the transport session, especially during firmware
-    // update reboot or exit. Invalidate V2 state before awaiting asynchronous
-    // cancellation callbacks so the next request cannot reuse a stale runtime mode.
-    this.markTransportDisconnected();
     await this.cancelableAction?.(error);
     await this.commands?.cancel();
 
