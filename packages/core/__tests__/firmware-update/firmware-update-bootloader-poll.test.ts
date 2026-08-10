@@ -1,8 +1,11 @@
+import { EDeviceType } from '@onekeyfe/hd-shared';
+
 import FirmwareUpdate from '../../src/api/FirmwareUpdate';
 import FirmwareUpdateV2 from '../../src/api/FirmwareUpdateV2';
 import FirmwareUpdateV3 from '../../src/api/FirmwareUpdateV3';
 import { BOOTLOADER_POLL_INITIALIZE_TIMEOUT_MS } from '../../src/api/firmware/FirmwareUpdateBaseMethod';
 import { DataManager } from '../../src/data-manager';
+import { DevicePool } from '../../src/device/DevicePool';
 
 import type { Device } from '../../src/device/Device';
 
@@ -12,6 +15,7 @@ jest.mock('../../src/data/config', () => ({
 }));
 
 const BLE_ID = 'ble-device';
+const WEBUSB_ID = 'webusb-device';
 
 const flush = () =>
   new Promise(resolve => {
@@ -196,5 +200,176 @@ describe.each([
     // While the first probe hangs inside acquire, interval ticks must be skipped —
     // overlapping probes are the exact mechanism from the incident.
     expect(maxActiveProbes).toBe(1);
+  });
+});
+
+describe.each([
+  [
+    'FirmwareUpdateV2',
+    () =>
+      new FirmwareUpdateV2({
+        id: 1,
+        payload: { method: 'firmwareUpdateV2', connectId: WEBUSB_ID },
+      }),
+  ],
+  [
+    'FirmwareUpdateV3 (base method)',
+    () =>
+      new FirmwareUpdateV3({
+        id: 1,
+        payload: { method: 'firmwareUpdateV3', connectId: WEBUSB_ID },
+      }),
+  ],
+])('%s WebUSB bootloader authorization', (_name, buildMethod) => {
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['setImmediate', 'performance'] });
+  });
+
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  test('resumes bounded polling after browser authorization returns an empty enumeration', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('webusb' as never);
+    jest.spyOn(DataManager, 'isBleConnect').mockReturnValue(false);
+    jest.spyOn(DataManager, 'isBrowserWebUsb').mockReturnValue(true);
+
+    const method = buildMethod();
+    let permissionGranted = false;
+    const bootloaderDevice = {
+      isBootloader: jest.fn(() => true),
+    } as unknown as Device;
+    jest.spyOn(DevicePool, 'getDevices').mockImplementation(() =>
+      Promise.resolve({
+        devices: {},
+        deviceList: permissionGranted ? [bootloaderDevice] : [],
+      })
+    );
+
+    const commands = { disposed: true };
+    const updateFromCache = jest.fn();
+    method.device = {
+      originalDescriptor: {
+        id: WEBUSB_ID,
+        path: WEBUSB_ID,
+        protocolType: 'V1',
+      },
+      deviceConnector: {
+        enumerate: jest.fn(() =>
+          Promise.resolve({
+            descriptors: permissionGranted ? [{ path: 'bootloader-device' }] : [],
+          })
+        ),
+      },
+      commands,
+      updateFromCache,
+      getCurrentDeviceType: jest.fn(() => EDeviceType.Pro),
+    } as unknown as Device;
+    method.postTipMessage = jest.fn();
+
+    let resolvePrompt: (deviceId: string) => void = () => undefined;
+    const promptPromise = new Promise<string>(resolve => {
+      resolvePrompt = resolve;
+    });
+    const prompt = jest
+      .spyOn(method as any, '_promptDeviceInBootloaderForWebDevice')
+      .mockReturnValue(promptPromise);
+
+    method.checkDeviceToBootloader(WEBUSB_ID);
+    const resolved = jest.fn();
+    const rejected = jest.fn();
+    method.checkPromise?.promise.then(resolved, rejected);
+
+    for (let elapsed = 0; elapsed < 15000; elapsed += 500) {
+      jest.advanceTimersByTime(500);
+      // eslint-disable-next-line no-await-in-loop
+      await flush();
+      if (prompt.mock.calls.length) break;
+    }
+
+    expect(prompt).toHaveBeenCalledTimes(1);
+
+    // Browser permission depends on a user gesture and must not consume the
+    // automatic reboot detection deadline.
+    for (let elapsed = 0; elapsed < 35000; elapsed += 500) {
+      jest.advanceTimersByTime(500);
+      // eslint-disable-next-line no-await-in-loop
+      await flush();
+    }
+    expect(rejected).not.toHaveBeenCalled();
+
+    resolvePrompt('bootloader-device');
+    await flush();
+    await flush();
+
+    // The chooser may resolve before the newly authorized device appears in the
+    // next WebUSB enumeration. That transient empty result must not strand the
+    // deferred check after its original interval and timeout were cleared.
+    expect(resolved).not.toHaveBeenCalled();
+    expect(rejected).not.toHaveBeenCalled();
+
+    permissionGranted = true;
+    for (let elapsed = 0; elapsed < 5000; elapsed += 500) {
+      jest.advanceTimersByTime(500);
+      // eslint-disable-next-line no-await-in-loop
+      await flush();
+      if (resolved.mock.calls.length) break;
+    }
+
+    expect(resolved).toHaveBeenCalledWith(true);
+    expect(updateFromCache).toHaveBeenCalledWith(bootloaderDevice);
+    expect(commands.disposed).toBe(false);
+  });
+
+  test('rejects after the fresh deadline when the authorized device never appears', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('webusb' as never);
+    jest.spyOn(DataManager, 'isBleConnect').mockReturnValue(false);
+    jest.spyOn(DataManager, 'isBrowserWebUsb').mockReturnValue(true);
+    jest.spyOn(DevicePool, 'getDevices').mockResolvedValue({ devices: {}, deviceList: [] });
+
+    const method = buildMethod();
+    method.device = {
+      originalDescriptor: {
+        id: WEBUSB_ID,
+        path: WEBUSB_ID,
+        protocolType: 'V1',
+      },
+      deviceConnector: {
+        enumerate: jest.fn().mockResolvedValue({ descriptors: [] }),
+      },
+      commands: { disposed: true },
+      updateFromCache: jest.fn(),
+      getCurrentDeviceType: jest.fn(() => EDeviceType.Pro),
+    } as unknown as Device;
+    method.postTipMessage = jest.fn();
+    const prompt = jest
+      .spyOn(method as any, '_promptDeviceInBootloaderForWebDevice')
+      .mockResolvedValue('bootloader-device');
+
+    method.checkDeviceToBootloader(WEBUSB_ID);
+    const resolved = jest.fn();
+    const rejected = jest.fn();
+    method.checkPromise?.promise.then(resolved, rejected);
+
+    for (let elapsed = 0; elapsed < 15000; elapsed += 500) {
+      jest.advanceTimersByTime(500);
+      // eslint-disable-next-line no-await-in-loop
+      await flush();
+      if (prompt.mock.calls.length) break;
+    }
+    expect(prompt).toHaveBeenCalledTimes(1);
+
+    for (let elapsed = 0; elapsed < 31000; elapsed += 500) {
+      jest.advanceTimersByTime(500);
+      // eslint-disable-next-line no-await-in-loop
+      await flush();
+      if (rejected.mock.calls.length) break;
+    }
+
+    expect(resolved).not.toHaveBeenCalled();
+    expect(rejected).toHaveBeenCalledTimes(1);
+    expect(prompt).toHaveBeenCalledTimes(1);
   });
 });

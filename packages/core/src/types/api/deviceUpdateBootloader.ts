@@ -8,6 +8,7 @@ export type DeviceUpdateBootloaderParams = {
   preparedPlan?: FirmwareUpdatePreparedPlan;
   hostBindingGeneration?: number;
   binary?: ArrayBuffer;
+  /** @deprecated Core derives the bootloader artifact from preparedPlan. */
   artifact?: FirmwareArtifactReference;
   artifactReader?: FirmwareArtifactReader;
   firmwareType?: EFirmwareType;

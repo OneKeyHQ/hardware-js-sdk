@@ -1,6 +1,9 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
-import { buildFirmwareUpdatePlan } from '../../src/api/firmware/FirmwareUpdatePlan';
+import {
+  buildFirmwareUpdatePlan,
+  digestFirmwareUpdateContract,
+} from '../../src/api/firmware/FirmwareUpdatePlan';
 import {
   assertFirmwareUpdatePreparedPlanBinding,
   assertFirmwareUpdatePreparedPlanDeviceIdentity,
@@ -207,6 +210,55 @@ describe('FirmwareUpdatePreparedPlan', () => {
         artifacts: buildArtifacts(['../index.bin']),
       })
     ).toThrow('entry name is invalid');
+  });
+
+  test('rejects duplicate materialized entry names during standalone validation', () => {
+    const plan = buildPlan();
+    const prepared = prepareFirmwareUpdatePlan({
+      plan,
+      leaseRef: 'fwlease:00000000-0000-4000-8000-000000000001',
+      artifacts: [
+        {
+          artifactId: 'firmware',
+          artifact: artifact('a'.repeat(64), 4),
+        },
+        {
+          artifactId: 'resource',
+          artifact: artifact('b'.repeat(64), 8),
+          materializedEntries: [
+            {
+              entryName: 'resource/index.bin',
+              artifact: artifact('c'.repeat(64), 2),
+            },
+          ],
+        },
+      ],
+    });
+    const resourceArtifact = prepared.artifacts.find(item => item.target === 'resource')!;
+    const tamperedWithoutDigest = {
+      ...prepared,
+      artifacts: prepared.artifacts.map(item =>
+        item === resourceArtifact
+          ? {
+              ...item,
+              materializedEntries: [
+                ...resourceArtifact.materializedEntries!,
+                {
+                  entryName: 'other/index.bin',
+                  artifact: artifact('d'.repeat(64), 2),
+                },
+              ],
+            }
+          : item
+      ),
+    };
+    const { preparedPlanDigest: _preparedPlanDigest, ...digestInput } = tamperedWithoutDigest;
+    const tampered = {
+      ...tamperedWithoutDigest,
+      preparedPlanDigest: digestFirmwareUpdateContract(digestInput),
+    };
+
+    expect(() => validateFirmwareUpdatePreparedPlan(tampered)).toThrow('duplicate entry names');
   });
 
   test('rejects unknown fields even when a caller presents a plan-shaped object', () => {

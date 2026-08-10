@@ -1,6 +1,13 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
-import { buildFirmwareUpdatePlan } from '../../src/api/firmware/FirmwareUpdatePlan';
+import {
+  buildFirmwareUpdatePlan,
+  validateProtocolV2FirmwareUpdateTargets,
+} from '../../src/api/firmware/FirmwareUpdatePlan';
+import {
+  assertFirmwareUpdatePreparedPlanDeviceIdentity,
+  prepareFirmwareUpdatePlan,
+} from '../../src/api/firmware/FirmwareUpdatePreparedPlan';
 
 import type { Features } from '../../src/types';
 
@@ -50,6 +57,8 @@ const createLegacyForceInput = (
   release: Record<string, unknown> = {
     url: 'https://firmware.onekey.so/pro/firmware.bin',
     version: [4, 21, 0],
+    expectedSize: 1024,
+    fingerprint: '1'.repeat(64),
   }
 ): BuildPlanInput => ({
   features: createFeatures({
@@ -80,6 +89,18 @@ const createProtocolV2ForceInput = (
   ble: noUpdate,
   bootloader: noUpdate,
   forceUpdateTargets: forceUpdateTargets as BuildPlanInput['forceUpdateTargets'],
+});
+
+describe('validateProtocolV2FirmwareUpdateTargets', () => {
+  test('normalizes the deprecated boot_resources alias to resource', () => {
+    expect(validateProtocolV2FirmwareUpdateTargets(['boot_resources'])).toEqual(['resource']);
+  });
+
+  test('rejects duplicate semantic targets after alias normalization', () => {
+    expectFirmwarePlanInvalid(() =>
+      validateProtocolV2FirmwareUpdateTargets(['boot_resources', 'resource'])
+    );
+  });
 });
 
 describe('buildFirmwareUpdatePlan', () => {
@@ -168,6 +189,8 @@ describe('buildFirmwareUpdatePlan', () => {
         release: {
           url: 'https://firmware.onekey.so/pro/firmware.bin',
           version: [4, 0, 0],
+          expectedSize: 1024,
+          fingerprint: '1'.repeat(64),
         },
       },
       ble: noUpdate,
@@ -193,7 +216,11 @@ describe('buildFirmwareUpdatePlan', () => {
         release: {
           url: 'https://firmware.onekey.so/pro/firmware.bin',
           version: [4, 21, 0],
+          expectedSize: 1024,
+          fingerprint: '1'.repeat(64),
           resource: 'https://firmware.onekey.so/pro/resource.zip',
+          resourceExpectedSize: 4096,
+          resourceFingerprint: '1'.repeat(64),
         },
       },
       ble: {
@@ -201,6 +228,8 @@ describe('buildFirmwareUpdatePlan', () => {
         release: {
           webUpdate: 'https://firmware.onekey.so/pro/ble.bin',
           version: [2, 3, 7],
+          expectedSize: 512,
+          fingerprintWeb: '2'.repeat(64),
         },
       },
       bootloader: {
@@ -208,6 +237,8 @@ describe('buildFirmwareUpdatePlan', () => {
         release: {
           bootloaderResource: 'https://firmware.onekey.so/pro/bootloader.bin',
           bootloaderVersion: [2, 8, 4],
+          bootloaderExpectedSize: 768,
+          bootloaderFingerprint: '3'.repeat(64),
         },
       },
       forceUpdateTargets: ['firmware', 'resource', 'ble', 'bootloader'],
@@ -237,12 +268,40 @@ describe('buildFirmwareUpdatePlan', () => {
         release: {
           url: 'https://firmware.onekey.so/pro/firmware.bin',
           version: [4, 21, 0],
+          expectedSize: 1024,
+          fingerprint: '1'.repeat(64),
           resource: 'https://firmware.onekey.so/pro/resource.zip',
         },
       },
       ble: noUpdate,
       bootloader: noUpdate,
       forceUpdateTargets: ['firmware'],
+    });
+
+    expect(plan.artifacts.map(artifact => artifact.artifactId)).toEqual(['firmware']);
+    expect(plan.targetsToUpdate).toEqual(['firmware']);
+  });
+
+  test('does not approve an unexecutable V2 resource during bootloader recovery', () => {
+    const features = createFeatures({ deviceType: EDeviceType.Classic1s });
+    features.bootloaderMode = true;
+    const plan = buildFirmwareUpdatePlan({
+      features,
+      firmwareType: EFirmwareType.Universal,
+      platform: 'desktop',
+      firmware: {
+        status: 'none',
+        release: {
+          url: 'https://firmware.onekey.so/classic/firmware.bin',
+          expectedSize: 1024,
+          fingerprint: '1'.repeat(64),
+          resource: 'https://firmware.onekey.so/classic/resource.zip',
+          resourceExpectedSize: 4096,
+          resourceFingerprint: '2'.repeat(64),
+        },
+      },
+      ble: noUpdate,
+      bootloader: noUpdate,
     });
 
     expect(plan.artifacts.map(artifact => artifact.artifactId)).toEqual(['firmware']);
@@ -272,6 +331,110 @@ describe('buildFirmwareUpdatePlan', () => {
     expectFirmwarePlanInvalid(() => buildFirmwareUpdatePlan(createLegacyForceInput(['resource'])));
   });
 
+  test.each([
+    {
+      executor: 'V2',
+      deviceType: EDeviceType.Classic1s,
+      bootloaderVersion: '2.1.2',
+    },
+    {
+      executor: 'V3',
+      deviceType: EDeviceType.Pro,
+      bootloaderVersion: '2.8.4',
+    },
+  ])(
+    'rejects a resource-only prepared plan that the $executor executor cannot run',
+    ({ deviceType, bootloaderVersion }) => {
+      expectFirmwarePlanInvalid(
+        () =>
+          buildFirmwareUpdatePlan({
+            features: createFeatures({
+              deviceType,
+              firmwareVersion: '4.21.0',
+              bootloaderVersion,
+            }),
+            firmwareType: EFirmwareType.Universal,
+            platform: 'desktop',
+            firmware: {
+              status: 'valid',
+              release: {
+                url: 'https://firmware.onekey.so/legacy/firmware.bin',
+                version: [4, 21, 0],
+                expectedSize: 1024,
+                fingerprint: '1'.repeat(64),
+                resource: 'https://firmware.onekey.so/legacy/resource.zip',
+                resourceExpectedSize: 4096,
+                resourceFingerprint: '2'.repeat(64),
+              },
+            },
+            ble: noUpdate,
+            bootloader: noUpdate,
+            forceUpdateTargets: ['resource'],
+          }),
+        'Legacy resource updates require a firmware target'
+      );
+    }
+  );
+
+  test('rejects a legacy resource archive without complete integrity metadata', () => {
+    expectFirmwarePlanInvalid(
+      () =>
+        buildFirmwareUpdatePlan(
+          createLegacyForceInput(['resource'], {
+            url: 'https://firmware.onekey.so/pro/firmware.bin',
+            resource: 'https://firmware.onekey.so/pro/resource.zip',
+            resourceExpectedSize: 4096,
+          })
+        ),
+      'integrity metadata is invalid'
+    );
+  });
+
+  test.each(['firmware', 'ble', 'bootloader'] as const)(
+    'rejects a remote legacy %s artifact without complete integrity metadata',
+    target => {
+      expectFirmwarePlanInvalid(
+        () =>
+          buildFirmwareUpdatePlan({
+            features: createFeatures({ deviceType: EDeviceType.Classic1s }),
+            firmwareType: EFirmwareType.Universal,
+            platform: 'desktop',
+            firmware:
+              target === 'firmware'
+                ? {
+                    status: 'outdated',
+                    release: {
+                      url: 'https://firmware.onekey.so/classic/firmware.bin',
+                      expectedSize: 1024,
+                    },
+                  }
+                : noUpdate,
+            ble:
+              target === 'ble'
+                ? {
+                    status: 'outdated',
+                    release: {
+                      webUpdate: 'https://firmware.onekey.so/classic/ble.bin',
+                      expectedSize: 512,
+                    },
+                  }
+                : noUpdate,
+            bootloader:
+              target === 'bootloader'
+                ? {
+                    status: 'outdated',
+                    release: {
+                      bootloaderResource: 'https://firmware.onekey.so/classic/bootloader.bin',
+                      bootloaderExpectedSize: 768,
+                    },
+                  }
+                : noUpdate,
+          }),
+        'integrity metadata is invalid'
+      );
+    }
+  );
+
   test.each(['ble', 'bootloader'] as const)(
     'rejects the unsupported Pro2 %s force target',
     forceTarget => {
@@ -297,12 +460,6 @@ describe('buildFirmwareUpdatePlan', () => {
       forceTarget: 'firmware' as const,
       release: {
         components: {},
-        resourceBundles: [
-          {
-            name: 'images',
-            url: 'https://firmware.onekey.so/pro2/images.okpkg',
-          },
-        ],
       },
     },
     {
@@ -312,6 +469,8 @@ describe('buildFirmwareUpdatePlan', () => {
           applicationP1: {
             target: 'APPLICATION_P1',
             url: 'https://firmware.onekey.so/pro2/application-p1.bin',
+            expectedSize: 1024,
+            fingerprint: '1111111111111111111111111111111111111111111111111111111111111111',
           },
         },
       },
@@ -325,41 +484,23 @@ describe('buildFirmwareUpdatePlan', () => {
     }
   );
 
-  test.each([
-    {
-      forceTarget: 'firmware' as const,
-      expectedArtifactIds: ['component:app_v1'],
-      expectedTargets: ['app_v1'],
-    },
-    {
-      forceTarget: 'resource' as const,
-      expectedArtifactIds: ['resourceBundle:images'],
-      expectedTargets: ['resource'],
-    },
-  ])(
-    'limits a Pro2 $forceTarget force to the selected artifact role',
-    ({ forceTarget, expectedArtifactIds, expectedTargets }) => {
-      const plan = buildFirmwareUpdatePlan(
-        createProtocolV2ForceInput([forceTarget], {
-          components: {
-            applicationP1: {
-              target: 'APPLICATION_P1',
-              url: 'https://firmware.onekey.so/pro2/application-p1.bin',
-            },
+  test('limits a Pro2 firmware force to component artifacts', () => {
+    const plan = buildFirmwareUpdatePlan(
+      createProtocolV2ForceInput(['firmware'], {
+        components: {
+          applicationP1: {
+            target: 'APPLICATION_P1',
+            url: 'https://firmware.onekey.so/pro2/application-p1.bin',
+            expectedSize: 1024,
+            fingerprint: '1111111111111111111111111111111111111111111111111111111111111111',
           },
-          resourceBundles: [
-            {
-              name: 'images',
-              url: 'https://firmware.onekey.so/pro2/images.okpkg',
-            },
-          ],
-        })
-      );
+        },
+      })
+    );
 
-      expect(plan.artifacts.map(artifact => artifact.artifactId)).toEqual(expectedArtifactIds);
-      expect(plan.targetsToUpdate).toEqual(expectedTargets);
-    }
-  );
+    expect(plan.artifacts.map(artifact => artifact.artifactId)).toEqual(['component:app_v1']);
+    expect(plan.targetsToUpdate).toEqual(['app_v1']);
+  });
 
   test('rejects a prepared native plan without a stable device identity', () => {
     const features = createFeatures({
@@ -376,6 +517,8 @@ describe('buildFirmwareUpdatePlan', () => {
           status: 'outdated',
           release: {
             url: 'https://firmware.onekey.so/classic/firmware.bin',
+            expectedSize: 1024,
+            fingerprint: '1'.repeat(64),
           },
         },
         ble: noUpdate,
@@ -384,7 +527,72 @@ describe('buildFirmwareUpdatePlan', () => {
     ).toThrow('requires a stable device identity');
   });
 
-  test('maps the Pro2 component order and resource bundles without downloading them', () => {
+  test('allows an identity-less Protocol V2 device while retaining the model binding', () => {
+    const features = createFeatures({
+      deviceType: EDeviceType.Pro2,
+    });
+    delete (features as Partial<Features>).serialNo;
+
+    const plan = buildFirmwareUpdatePlan({
+      features,
+      firmwareType: EFirmwareType.Universal,
+      platform: 'desktop',
+      firmware: {
+        status: 'outdated',
+        release: {
+          components: {
+            applicationP1: {
+              target: 'APPLICATION_P1',
+              url: 'https://firmware.onekey.so/pro2/application-p1.bin',
+              expectedSize: 1024,
+              fingerprint: '1111111111111111111111111111111111111111111111111111111111111111',
+            },
+          },
+        },
+      },
+      ble: noUpdate,
+      bootloader: noUpdate,
+    });
+
+    expect(plan).toMatchObject({
+      executor: 'v4',
+      deviceIdentity: 'unavailable',
+      deviceModel: String(EDeviceType.Pro2),
+    });
+
+    const preparedPlan = prepareFirmwareUpdatePlan({
+      plan,
+      leaseRef: 'fwlease:00000000-0000-4000-8000-000000000004',
+      artifacts: [
+        {
+          artifactId: 'component:app_v1',
+          artifact: {
+            artifactRef: `fw:${'1'.repeat(64)}`,
+            size: 1024,
+            sha256: '1'.repeat(64),
+          },
+        },
+      ],
+    });
+    expect(() =>
+      assertFirmwareUpdatePreparedPlanDeviceIdentity({
+        preparedPlan,
+        deviceIdentity: undefined,
+        bootloaderMode: false,
+        deviceModel: String(EDeviceType.Pro2),
+      })
+    ).not.toThrow();
+    expect(() =>
+      assertFirmwareUpdatePreparedPlanDeviceIdentity({
+        preparedPlan,
+        deviceIdentity: undefined,
+        bootloaderMode: false,
+        deviceModel: String(EDeviceType.Neo),
+      })
+    ).toThrow();
+  });
+
+  test('maps the Pro2 component order without downloading artifacts', () => {
     const plan = buildFirmwareUpdatePlan({
       features: createFeatures({ deviceType: EDeviceType.Pro2 }),
       firmwareType: EFirmwareType.Universal,
@@ -403,18 +611,16 @@ describe('buildFirmwareUpdatePlan', () => {
             bootloader: {
               target: 'BOOTLOADER',
               url: 'https://firmware.onekey.so/pro2/bootloader.bin',
+              expectedSize: 2048,
+              fingerprint: '2222222222222222222222222222222222222222222222222222222222222222',
             },
             se01: {
               target: 'SE01',
               url: 'https://firmware.onekey.so/pro2/se01.bin',
+              expectedSize: 512,
+              fingerprint: '3333333333333333333333333333333333333333333333333333333333333333',
             },
           },
-          resourceBundles: [
-            {
-              name: 'images',
-              url: 'https://firmware.onekey.so/pro2/images.okpkg',
-            },
-          ],
         },
       },
       ble: noUpdate,
@@ -426,14 +632,48 @@ describe('buildFirmwareUpdatePlan', () => {
       'component:boot',
       'component:app_v1',
       'component:se01',
-      'resourceBundle:images',
     ]);
-    expect(plan.targetsToUpdate).toEqual(['boot', 'app_v1', 'se01', 'resource']);
+    expect(plan.targetsToUpdate).toEqual(['boot', 'app_v1', 'se01']);
     expect(plan.artifacts[1]).toEqual(
       expect.objectContaining({
         expectedSize: 1024,
         expectedSha256: '1111111111111111111111111111111111111111111111111111111111111111',
       })
+    );
+  });
+
+  test.each([
+    {
+      expectedSize: undefined,
+      fingerprint: '1'.repeat(64),
+    },
+    {
+      expectedSize: 1024,
+      fingerprint: undefined,
+    },
+  ])('rejects a remote Pro2 component without complete integrity metadata', integrity => {
+    expectFirmwarePlanInvalid(
+      () =>
+        buildFirmwareUpdatePlan({
+          features: createFeatures({ deviceType: EDeviceType.Pro2 }),
+          firmwareType: EFirmwareType.Universal,
+          platform: 'desktop',
+          firmware: {
+            status: 'required',
+            release: {
+              components: {
+                applicationP1: {
+                  target: 'APPLICATION_P1',
+                  url: 'https://firmware.onekey.so/pro2/application-p1.bin',
+                  ...integrity,
+                },
+              },
+            },
+          },
+          ble: noUpdate,
+          bootloader: noUpdate,
+        }),
+      'integrity metadata is invalid'
     );
   });
 
@@ -468,36 +708,18 @@ describe('buildFirmwareUpdatePlan', () => {
           application: {
             target: 'APPLICATION_P1',
             url: 'https://firmware.onekey.so/pro2/application.bin',
+            expectedSize: 1024,
+            fingerprint: '1111111111111111111111111111111111111111111111111111111111111111',
           },
           applicationDuplicate: {
             target: 'APPLICATION_P1',
             url: 'https://firmware.onekey.so/pro2/application-duplicate.bin',
+            expectedSize: 1024,
+            fingerprint: '2222222222222222222222222222222222222222222222222222222222222222',
           },
         },
       },
       expectedError: 'duplicates target app_v1',
-    },
-    {
-      label: 'resource bundle name',
-      release: {
-        components: {
-          application: {
-            target: 'APPLICATION_P1',
-            url: 'https://firmware.onekey.so/pro2/application.bin',
-          },
-        },
-        resourceBundles: [
-          {
-            name: 'images',
-            url: 'https://firmware.onekey.so/pro2/images.okpkg',
-          },
-          {
-            name: 'images',
-            url: 'https://firmware.onekey.so/pro2/images-duplicate.okpkg',
-          },
-        ],
-      },
-      expectedError: 'duplicates name images',
     },
   ])('rejects a duplicate Pro2 $label', ({ release, expectedError }) => {
     expect(() =>

@@ -15,8 +15,7 @@ import { useFirmwareProgress } from '../components/providers/SDKProvider';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
 import { isPro2DeviceInfo } from '../utils/pro2Device';
-import { matchPro2ResourcePackageDirectory } from '../utils/pro2ResourcePackageDirectory';
-import { prepareRemoteProtocolV2ResourceFiles } from '../utils/protocolV2ResourceArchive';
+import { prepareFirmwareUpdatePlanMemoryHost } from '../utils/firmwareUpdatePlanHost';
 import { SDKUtils } from '../utils/hardwareInstance';
 import type { DeviceInfo } from '../types/hardware';
 import { PRO2_FIRMWARE_FILE_ACCEPT } from '../constants/firmwareFiles';
@@ -82,82 +81,18 @@ const TARGET_FIELDS = [
   },
 ] as const;
 
-const RESOURCE_PACKAGE_SLOTS = [
-  {
-    key: 'firmware_logo',
-    label: 'Firmware Logo',
-    fileNamePrefix: 'firmware_logo',
-    devicePath: 'vol0:/bundles/firmware_logo.okpkg',
-    accept: '.okpkg',
-    formatHint: 'RESC bundle .okpkg (firmware update crest)',
-  },
-  {
-    key: 'images',
-    label: 'Images',
-    fileNamePrefix: 'images',
-    devicePath: 'vol0:/bundles/images/images.okpkg',
-    accept: '.okpkg',
-    formatHint: 'RESC bundle .okpkg (images)',
-  },
-  {
-    key: 'animation',
-    label: 'Animation',
-    fileNamePrefix: 'animation',
-    devicePath: 'vol0:/bundles/images/animation.okpkg',
-    accept: '.okpkg',
-    formatHint: 'RESC bundle .okpkg (animation gifs)',
-  },
-  {
-    key: 'wallpaper',
-    label: 'Wallpaper',
-    fileNamePrefix: 'wallpaper',
-    devicePath: 'vol0:/bundles/images/wallpaper.okpkg',
-    accept: '.okpkg',
-    formatHint: 'RESC bundle .okpkg (wallpapers)',
-  },
-  {
-    key: 'translations',
-    label: 'Translations',
-    fileNamePrefix: 'translations',
-    devicePath: 'vol0:/bundles/translations/translations.okpkg',
-    accept: '.okpkg',
-    formatHint: 'RESC bundle .okpkg (i18n)',
-  },
-  {
-    key: 'fonts_roobert',
-    label: 'Fonts Roobert',
-    fileNamePrefix: 'roobert',
-    devicePath: 'vol0:/bundles/font/roobert.okpkg',
-    accept: '.okpkg',
-    formatHint: 'RESC bundle .okpkg (Latin fonts)',
-  },
-  {
-    key: 'fonts_noto',
-    label: 'Fonts Noto',
-    fileNamePrefix: 'noto',
-    devicePath: 'vol0:/bundles/font/noto.okpkg',
-    accept: '.okpkg',
-    formatHint: 'RESC bundle .okpkg (CJK fonts)',
-  },
-  {
-    key: 'boot_resource',
-    label: 'Boot Resource',
-    fileNamePrefix: 'boot_resource',
-    devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
-    accept: '.okpkg',
-    formatHint: 'RESC package .okpkg (boot resources)',
-  },
-  {
-    key: 'params',
-    label: 'Params',
-    fileNamePrefix: 'params',
-    devicePath: 'vol0:/loaders/rom/params.okpkg',
-    accept: '.okpkg',
-    formatHint: 'RESC package .okpkg (ROM parameters)',
-  },
-] as const;
-
 type TargetParam = (typeof TARGET_FIELDS)[number]['param'];
+
+const TARGET_BY_PARAM: Record<TargetParam, Exclude<FirmwareUpdateV4Target, 'resource'>> = {
+  bootloaderBinary: 'boot',
+  applicationP1Binary: 'app_v1',
+  applicationP2Binary: 'app_v2',
+  coprocessorBinary: 'coprocessor',
+  se01Binary: 'se01',
+  se02Binary: 'se02',
+  se03Binary: 'se03',
+  se04Binary: 'se04',
+};
 
 type UpdateLog = {
   id: number;
@@ -313,16 +248,12 @@ export default function Pro2UpdatePage() {
   const { toast } = useToast();
 
   const [files, setFiles] = useState<Partial<Record<TargetParam, File>>>({});
-  const [resourcePackageFiles, setResourcePackageFiles] = useState<Partial<Record<string, File>>>(
-    {}
-  );
-  const [resourceFolderName, setResourceFolderName] = useState<string>();
+  const [resourceArchiveFile, setResourceArchiveFile] = useState<File>();
   const [isRunning, setIsRunning] = useState(false);
   const [isConnectingLocal, setIsConnectingLocal] = useState(false);
   const [logs, setLogs] = useState<UpdateLog[]>([]);
   const [result, setResult] = useState<UpdateVersionsResult | null>(null);
   const logIdRef = useRef(0);
-  const resourceDirectoryInputRef = useRef<HTMLInputElement>(null);
 
   const targetFields = useMemo(
     () =>
@@ -337,10 +268,7 @@ export default function Pro2UpdatePage() {
     () => targetFields.filter(field => files[field.param]),
     [files, targetFields]
   );
-  const selectedResourcePackageCount = RESOURCE_PACKAGE_SLOTS.filter(
-    slot => resourcePackageFiles[slot.key]
-  ).length;
-  const selectedPayloadCount = selectedFields.length + selectedResourcePackageCount;
+  const selectedPayloadCount = selectedFields.length + (resourceArchiveFile ? 1 : 0);
 
   const addLog = useCallback((level: UpdateLog['level'], message: string) => {
     const nextLog = {
@@ -384,90 +312,74 @@ export default function Pro2UpdatePage() {
     try {
       const device = currentDevice ?? (await connectDevice());
 
-      const params: Record<string, unknown> = { platform: 'web' };
-      const resourceFiles: Array<{ binary: ArrayBuffer; devicePath: string }> = [];
-      for (const slot of RESOURCE_PACKAGE_SLOTS) {
-        const file = resourcePackageFiles[slot.key];
-        if (!file) continue;
-        addLog(
-          'info',
-          `Loading resource package ${slot.label}: ${file.name} (${formatBytes(file.size)})`
-        );
-        resourceFiles.push({
-          binary: await file.arrayBuffer(),
-          devicePath: slot.devicePath,
-        });
-      }
+      const localParams: Record<string, ArrayBuffer> = {};
+      const localTargets: FirmwareUpdateV4Target[] = [];
       for (const field of selectedFields) {
         const file = files[field.param];
         if (!file) continue;
         addLog('info', `Loading ${field.label}: ${file.name} (${formatBytes(file.size)})`);
-        params[field.param] = await file.arrayBuffer();
+        localParams[field.param] = await file.arrayBuffer();
+        localTargets.push(TARGET_BY_PARAM[field.param]);
       }
-
-      if (resourceFiles.length > 0) {
-        params.resourceFiles = resourceFiles;
+      if (resourceArchiveFile) {
         addLog(
           'info',
-          `Prepared resourceFiles: ${resourceFiles.length} packages, ${formatBytes(
-            resourceFiles.reduce((total, item) => total + item.binary.byteLength, 0)
-          )}`
+          `Loading resource archive: ${resourceArchiveFile.name} (${formatBytes(
+            resourceArchiveFile.size
+          )})`
         );
+        localParams.resourceArchiveBinary = await resourceArchiveFile.arrayBuffer();
+        localTargets.push('resource');
       }
 
-      if (selectedPayloadCount === 0) {
+      const hardwareSDK = await SDKUtils.getInstance();
+      let response;
+      if (localTargets.length > 0) {
+        addLog('info', `Local firmwareUpdateV4 targets: ${localTargets.join(', ')}`);
+        response = await hardwareSDK.firmwareUpdateV4(device.connectId ?? undefined, {
+          platform: 'web',
+          targetsToUpdate: [...new Set(localTargets)],
+          ...localParams,
+        });
+      } else {
         addLog('info', `Checking ${device.deviceType} firmware and resource releases`);
+        // Core attaches the configured resource archive only when it also detects
+        // a component update, avoiding an ordinary resource-only update.
         const checkResponse = await callHardwareAPI('checkAllFirmwareRelease', {
           connectId: device.connectId,
           platform: 'web',
         });
         if (!checkResponse.success) {
-          throw new Error(
-            getApiError(checkResponse.payload, 'checkAllFirmwareRelease failed')
-          );
+          throw new Error(getApiError(checkResponse.payload, 'checkAllFirmwareRelease failed'));
         }
         const release = checkResponse.payload as AllFirmwareRelease;
-        const targetsToUpdate = (release.targetsToUpdate ?? []) as FirmwareUpdateV4Target[];
-        if (targetsToUpdate.length === 0) {
-          addLog('ok', 'Firmware and resources are already current');
-          toast({
-            title: 'Already current',
-            description: 'No Protocol V2 firmware or resource update is required.',
-          });
-          return;
+        const plan = release.firmwareUpdatePlan;
+        if (!plan || plan.executor !== 'v4') {
+          if ((release.targetsToUpdate ?? []).length === 0) {
+            addLog('ok', 'Firmware and resources are already current');
+            toast({
+              title: 'Already current',
+              description: 'No Protocol V2 firmware or resource update is required.',
+            });
+            return;
+          }
+          throw new Error('Protocol V2 firmware update Plan is unavailable');
         }
-        params.targetsToUpdate = targetsToUpdate;
-
-        const hardwareSDK = await SDKUtils.getInstance();
-        const remoteResourceFiles = await prepareRemoteProtocolV2ResourceFiles({
+        const memoryHost = await prepareFirmwareUpdatePlanMemoryHost({
           hardwareSDK,
-          archive: release.resourceArchive,
-          targetsToUpdate,
+          plan,
         });
-        if (remoteResourceFiles?.length) {
-          params.resourceFiles = remoteResourceFiles;
-          addLog(
-            'info',
-            `Prepared remote resource archive: ${remoteResourceFiles.length} verified packages`
-          );
+        addLog('info', `firmwareUpdateV4 Plan targets: ${plan.targetsToUpdate.join(', ')}`);
+        try {
+          response = await hardwareSDK.firmwareUpdateV4(device.connectId ?? undefined, {
+            platform: 'web',
+            preparedPlan: memoryHost.preparedPlan,
+            hostBindingGeneration: memoryHost.hostBindingGeneration,
+          });
+        } finally {
+          memoryHost.release();
         }
-        addLog(
-          'info',
-          `firmwareUpdateV4 remote targets: ${targetsToUpdate.join(', ')}`
-        );
-      } else {
-        const targetNames = [
-          selectedResourcePackageCount > 0
-            ? `resource packages(${selectedResourcePackageCount})`
-            : null,
-          ...selectedFields.map(field => `${field.label}(${field.targetId})`),
-        ].filter(Boolean);
-        addLog('info', `firmwareUpdateV4 targets: ${targetNames.join(', ')}`);
       }
-      const response = await callHardwareAPI('firmwareUpdateV4', {
-        connectId: device.connectId,
-        ...params,
-      });
       if (!response.success) {
         throw new Error(getApiError(response.payload, 'firmwareUpdateV4 failed'));
       }
@@ -487,19 +399,16 @@ export default function Pro2UpdatePage() {
     addLog,
     connectDevice,
     currentDevice,
-    resourcePackageFiles,
     files,
+    resourceArchiveFile,
     resetFirmwareProgress,
-    selectedResourcePackageCount,
     selectedFields,
-    selectedPayloadCount,
     toast,
   ]);
 
   const resetFiles = useCallback(() => {
     setFiles({});
-    setResourcePackageFiles({});
-    setResourceFolderName(undefined);
+    setResourceArchiveFile(undefined);
     setResult(null);
   }, []);
 
@@ -574,106 +483,23 @@ export default function Pro2UpdatePage() {
 
             <div className="space-y-4">
               <section className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-semibold text-foreground">Resource packages</div>
-                    <div className="text-xs text-muted-foreground">
-                      Nine complete packages written directly to their matching device paths.
-                    </div>
+                <div>
+                  <div className="text-sm font-semibold text-foreground">Resource archive</div>
+                  <div className="text-xs text-muted-foreground">
+                    Complete CI-generated ZIP matching the resource artifact in the current Plan.
                   </div>
-                  <span className="text-xs tabular-nums text-muted-foreground">
-                    {selectedResourcePackageCount}/{RESOURCE_PACKAGE_SLOTS.length}
-                  </span>
                 </div>
-                <input
-                  ref={resourceDirectoryInputRef}
-                  className="sr-only"
-                  type="file"
-                  multiple
-                  disabled={isRunning}
-                  aria-label="Select Pro2 resource package directory"
-                  {...({
-                    webkitdirectory: '',
-                    directory: '',
-                  } as React.InputHTMLAttributes<HTMLInputElement>)}
-                  onChange={event => {
-                    const selectedFiles = Array.from(event.currentTarget.files ?? []);
-                    try {
-                      const matchedFiles = matchPro2ResourcePackageDirectory(
-                        selectedFiles,
-                        RESOURCE_PACKAGE_SLOTS
-                      );
-                      const relativePath = selectedFiles[0]?.webkitRelativePath ?? '';
-                      const folderName = relativePath.split('/')[0] || 'Selected folder';
-                      setResourcePackageFiles(matchedFiles);
-                      setResourceFolderName(folderName);
-                      addLog('ok', `Loaded 9 resource packages from ${folderName}`);
-                      toast({
-                        title: 'Resource folder loaded',
-                        description: 'All nine Pro2 resource packages were matched.',
-                      });
-                    } catch (error) {
-                      const message = getErrorMessage(error);
-                      addLog('error', message);
-                      toast({
-                        title: 'Invalid resource folder',
-                        description: message,
-                        variant: 'destructive',
-                      });
-                    }
-                  }}
-                />
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-background p-3">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
+                <div className="grid gap-px overflow-hidden rounded-lg border border-border/70 bg-border/70">
+                  <CompactFileSlot
+                    label="Protocol V2 resource ZIP"
+                    meta="target resource · ZIP with manifest.json"
+                    formatHint="complete signed resource archive .zip"
+                    accept=".zip,application/zip"
+                    file={resourceArchiveFile}
                     disabled={isRunning}
-                    onClick={() => {
-                      if (!resourceDirectoryInputRef.current) return;
-                      resourceDirectoryInputRef.current.value = '';
-                      resourceDirectoryInputRef.current.click();
-                    }}
-                  >
-                    <FileUp />
-                    {resourceFolderName ? 'Replace resource folder' : 'Choose resource folder'}
-                  </Button>
-                  <span className="text-xs text-muted-foreground">
-                    {resourceFolderName
-                      ? `${resourceFolderName}: all 9 packages matched`
-                      : 'Automatically matches all 9 .okpkg files; manifest.json is not required.'}
-                  </span>
-                </div>
-                <div className="grid gap-px overflow-hidden rounded-lg border border-border/70 bg-border/70 sm:grid-cols-2 xl:grid-cols-3">
-                  {RESOURCE_PACKAGE_SLOTS.map(slot => {
-                    const selectedFile = resourcePackageFiles[slot.key];
-                    return (
-                      <CompactFileSlot
-                        key={slot.key}
-                        label={slot.label}
-                        meta={slot.devicePath}
-                        formatHint={slot.formatHint}
-                        accept={slot.accept}
-                        file={selectedFile}
-                        disabled={isRunning}
-                        onSelect={nextFile => {
-                          setResourcePackageFiles(prev => ({ ...prev, [slot.key]: nextFile }));
-                          setResourceFolderName(undefined);
-                        }}
-                        onClear={() => {
-                          setResourceFolderName(undefined);
-                          setResourcePackageFiles(prev => {
-                            const next = { ...prev };
-                            delete next[slot.key];
-                            return next;
-                          });
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-                <div className="rounded-md bg-muted/35 px-3 py-2 text-xs text-muted-foreground">
-                  SDK skips packages whose on-device OKPP header already matches.
+                    onSelect={setResourceArchiveFile}
+                    onClear={() => setResourceArchiveFile(undefined)}
+                  />
                 </div>
               </section>
 
@@ -736,9 +562,7 @@ export default function Pro2UpdatePage() {
               {selectedPayloadCount > 0 ? (
                 <span className="text-sm text-muted-foreground">
                   {[
-                    selectedResourcePackageCount > 0
-                      ? `${selectedResourcePackageCount} resource packages`
-                      : null,
+                    resourceArchiveFile ? 'Resource ZIP' : null,
                     ...selectedFields.map(field => field.label),
                   ]
                     .filter(Boolean)

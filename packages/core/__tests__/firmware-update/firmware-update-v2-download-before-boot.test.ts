@@ -151,7 +151,7 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
     jest.restoreAllMocks();
   });
 
-  it('rejects mixed binary and prepared artifact inputs during initialization', () => {
+  it('rejects a prepared plan combined with legacy inputs during initialization', () => {
     const method = new FirmwareUpdateV2({
       id: 1,
       payload: {
@@ -173,7 +173,7 @@ describe('FirmwareUpdateV2 download-before-reboot safety', () => {
     expect(() => method.init()).toThrow(
       expect.objectContaining({
         errorCode: HardwareErrorCode.CallMethodInvalidParameter,
-        message: 'Firmware update binary and artifact are mutually exclusive',
+        message: 'Prepared firmware plans cannot be combined with legacy firmware inputs',
       })
     );
   });

@@ -124,7 +124,8 @@ Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 与 Neo 
 
 1. 调用 `checkAllFirmwareRelease` 获取组件版本、建议升级目标和远端 release 配置。
 2. 将返回的 `targetsToUpdate` 传给 `firmwareUpdateV4`；SDK 在重启前下载、校验所有远端
-   firmware 与 RESC binary；空文件直接终止升级。
+   firmware 与 RESC binary；每个远端组件必须提供正整数大小和完整 SHA-256，缺失或不匹配时在
+   修改设备前终止升级。
 3. 比较版本和 fingerprint；`forceTargets` 只跳过指定目标的版本判断。
 4. 对 RESC bundle 比较设备 header、版本和 hash。
 5. 必要时重启进入 bootloader，并轮询确认模式。

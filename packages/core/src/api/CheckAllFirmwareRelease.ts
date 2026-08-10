@@ -28,7 +28,6 @@ import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
 import {
   LoggerNames,
   getDeviceFirmwareVersion,
-  getDeviceSerialNo,
   getDeviceType,
   getFirmwareType,
   getLogger,
@@ -416,7 +415,6 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       state.identity.deviceType === 'neo' ? EDeviceType.Neo : EDeviceType.Pro2;
     const resourceSource = DataManager.getProtocolV2ResourceSource(resourceDeviceType);
     const resourceStatus = 'unknown' as const;
-    const resourcePreparationRequired = !!resourceSource;
     const detectedComponentTargets = validatedForceUpdateTargets.includes('firmware')
       ? plan.components.flatMap(component =>
           component.updateTarget ? [component.updateTarget] : []
@@ -431,44 +429,41 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     const forceResourceUpdate =
       validatedForceUpdateTargets.includes('resource') ||
       validatedProtocolV2ForceUpdateTargets.includes('resource');
+    // A configured resource archive accompanies a real remote component update,
+    // but its mere availability must not turn an otherwise current device into a
+    // resource-only update. Explicit developer resource forcing remains supported.
+    const includeResourceUpdate =
+      forceResourceUpdate || (resourceSource !== undefined && detectedComponentTargets.length > 0);
     const targetsToUpdate = Array.from(
       new Set([
         ...componentTargetsToUpdate,
-        ...(resourcePreparationRequired || forceResourceUpdate ? (['resource'] as const) : []),
+        ...(includeResourceUpdate ? (['resource'] as const) : []),
       ])
     );
     let firmwareUpdatePlan: FirmwareUpdatePlan | undefined;
+    const shouldBuildFirmwareUpdatePlan = targetsToUpdate.length > 0;
+    const requestedPlatform = platform ?? 'web';
+    const requiresPreparedPlan =
+      shouldBuildFirmwareUpdatePlan &&
+      (requestedPlatform === 'native' || requestedPlatform === 'desktop');
     try {
-      const shouldBuildFirmwareUpdatePlan =
-        componentTargetsToUpdate.length > 0 ||
-        validatedForceUpdateTargets.some(target => target !== 'resource') ||
-        validatedProtocolV2ForceUpdateTargets.some(target => target !== 'resource') ||
-        (forceResourceUpdate && !resourcePreparationRequired);
-      const requestedPlatform = platform ?? 'web';
-      const requiresDeviceIdentity =
-        requestedPlatform === 'native' || requestedPlatform === 'desktop';
-      const canBindPreparedPlan = !requiresDeviceIdentity || !!getDeviceSerialNo(features);
       if (shouldBuildFirmwareUpdatePlan) {
         const validatedPlan = buildProtocolV2FirmwareUpdatePlan({
           features,
           firmwareType,
-          platform: canBindPreparedPlan ? requestedPlatform : 'web',
+          platform: requestedPlatform,
           release,
           targetsToUpdate,
           forceUpdateTargets: validatedForceUpdateTargets,
-          resourceArchiveAvailable: resourcePreparationRequired,
+          resourceArchive: resourceSource,
         });
-        firmwareUpdatePlan = canBindPreparedPlan ? validatedPlan : undefined;
-        if (!canBindPreparedPlan) {
-          Log.warn(
-            '[CheckAllFirmwareRelease] Protocol V2 device identity is unavailable; using the release result without a prepared Plan'
-          );
-        }
+        firmwareUpdatePlan = validatedPlan;
       } else {
         firmwareUpdatePlan = undefined;
       }
     } catch (error) {
       if (
+        requiresPreparedPlan ||
         validatedForceUpdateTargets.length > 0 ||
         validatedProtocolV2ForceUpdateTargets.length > 0 ||
         !(error instanceof HardwareError) ||
@@ -487,10 +482,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     );
     const blePlan = summarizeProtocolV2FirmwareRelease(plan, PROTOCOL_V2_BLE_TARGETS);
     const bootloaderPlan = summarizeProtocolV2FirmwareRelease(plan, PROTOCOL_V2_BOOTLOADER_TARGETS);
-    const status =
-      resourcePreparationRequired && (plan.status === 'valid' || plan.status === 'unavailable')
-        ? 'unknown'
-        : plan.status;
+    const { status } = plan;
 
     return {
       firmware: toProtocolV2FirmwareReleaseInfo({ plan: firmwarePlan, state, release }),
@@ -511,7 +503,6 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       status,
       resourceStatus,
       resourceArchive: resourceSource,
-      resourcePreparationRequired,
       hasUpgrade: targetsToUpdate.length > 0,
       targetsToUpdate,
       firmwareUpdatePlan,

@@ -1,5 +1,3 @@
-import { sha256 } from '@noble/hashes/sha256';
-
 import type {
   IProtocolV2ResourceManifest,
   IProtocolV2ResourceManifestFile,
@@ -209,49 +207,4 @@ export function selectProtocolV2ResourceManifestFiles({
   targetsToUpdate: readonly FirmwareUpdateV4Target[];
 }): IProtocolV2ResourceManifestFile[] {
   return targetsToUpdate.includes('resource') ? [...manifest.files] : [];
-}
-
-export function prepareProtocolV2ResourceFiles({
-  manifest: value,
-  files,
-  targetsToUpdate,
-}: {
-  manifest: unknown;
-  files: Array<{ archivePath: string; binary: ArrayBuffer }>;
-  targetsToUpdate: readonly FirmwareUpdateV4Target[];
-}): Array<{ binary: ArrayBuffer; devicePath: string; size: number; fileHash: string }> {
-  const manifest = parseProtocolV2ResourceManifest(value);
-  const selected = selectProtocolV2ResourceManifestFiles({ manifest, targetsToUpdate });
-  const binaries = new Map(files.map(file => [file.archivePath, file.binary] as const));
-  return selected.map(file => {
-    const binary = binaries.get(file.archive_path);
-    if (
-      !binary ||
-      !isProtocolV2ResourceFileValid(binary, {
-        size: file.size,
-        fileHash: file.sha256,
-      })
-    ) {
-      throw new Error(`Pro2 resource manifest file verification failed: ${file.archive_path}`);
-    }
-    return {
-      binary,
-      devicePath: file.device_path,
-      size: file.size,
-      fileHash: file.sha256,
-    };
-  });
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
-/** Verify the complete downloaded file before any device mutation. */
-export function isProtocolV2ResourceFileValid(
-  binary: ArrayBuffer,
-  resource: { size: number; fileHash: string }
-): boolean {
-  if (binary.byteLength !== resource.size) return false;
-  return bytesToHex(sha256(new Uint8Array(binary))) === resource.fileHash.toLowerCase();
 }

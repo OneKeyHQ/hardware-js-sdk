@@ -26,8 +26,6 @@ export default class CheckBLEFirmwareRelease extends BaseMethod {
   }
 
   async run() {
-    if (!this.device.features) return null;
-
     if (this.device.isProtocolV2()) {
       const { state, firmwareType, release } = await loadProtocolV2FirmwareReleaseContext({
         device: this.device,
@@ -48,6 +46,8 @@ export default class CheckBLEFirmwareRelease extends BaseMethod {
         release: getProtocolV2ComponentReleaseInfo(plan, 'COPROCESSOR'),
       });
     }
+
+    if (!this.device.features) return null;
 
     const releaseInfo = getBleFirmwareReleaseInfo(this.device.features);
     return releaseInfo;

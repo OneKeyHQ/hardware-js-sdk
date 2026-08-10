@@ -24,8 +24,6 @@ export default class CheckBootloaderRelease extends BaseMethod {
   }
 
   async run() {
-    if (!this.device.features) return null;
-    const { features } = this.device;
     const payload = this.payload as CheckBootloaderReleaseParams;
 
     if (this.device.isProtocolV2()) {
@@ -49,6 +47,9 @@ export default class CheckBootloaderRelease extends BaseMethod {
         release: getProtocolV2ComponentReleaseInfo(plan, 'BOOTLOADER'),
       });
     }
+
+    const { features } = this.device;
+    if (!features) return null;
 
     const deviceFirmwareType = this.device.getCurrentFirmwareType();
     const firmwareType = payload.firmwareType ?? deviceFirmwareType;

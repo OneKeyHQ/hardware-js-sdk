@@ -29,10 +29,12 @@ import { DataManager } from '../data-manager';
 import { DEVICE } from '../events';
 import { type FirmwareByteSource, openFirmwareByteSource } from './firmware/FirmwareArtifactSource';
 import { resolveFirmwareUpdateHostBinding } from './firmware/FirmwareHostBinding';
+import { readVerifiedPreparedResourceArchive } from './firmware/FirmwarePreparedResourceArchive';
 import {
   assertFirmwareUpdatePreparedPlanBinding,
   assertFirmwareUpdatePreparedPlanDeviceIdentity,
-  getFirmwareUpdateResourceName,
+  getFirmwareUpdatePreparedRawArtifact,
+  validateFirmwareUpdatePreparedPlan,
 } from './firmware/FirmwareUpdatePreparedPlan';
 
 import type { Features, KnownDevice } from '../types';
@@ -46,6 +48,7 @@ import type { FirmwareUpdatePreparedPlan } from '../types/api/firmwareUpdatePrep
 type Params = {
   binary?: ArrayBuffer;
   artifact?: FirmwareArtifactReference;
+  hostBindingGeneration?: number;
   resourceEntries?: Array<{
     entryName: string;
     artifact: FirmwareArtifactReference;
@@ -159,15 +162,17 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       { name: 'firmwareType', type: 'string' },
     ]);
 
-    if (
-      'binary' in payload &&
-      payload.binary !== undefined &&
-      'artifact' in payload &&
-      payload.artifact !== undefined
-    ) {
+    const hasPreparedPlan = payload.preparedPlan !== undefined;
+    if (hasPreparedPlan && (payload.binary !== undefined || payload.version !== undefined)) {
       throw ERRORS.TypedError(
         HardwareErrorCode.CallMethodInvalidParameter,
-        'Firmware update binary and artifact are mutually exclusive'
+        'Prepared firmware plans cannot be combined with legacy firmware inputs'
+      );
+    }
+    if (!hasPreparedPlan && payload.artifact !== undefined) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'Firmware artifacts require a prepared plan'
       );
     }
 
@@ -184,7 +189,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       isUpdateBootloader: payload.isUpdateBootloader,
     };
 
-    if ('version' in payload) {
+    if (!hasPreparedPlan && 'version' in payload) {
       this.params = {
         ...this.params,
         version: payload.version,
@@ -192,16 +197,25 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       };
     }
 
-    if ('binary' in payload) {
+    if (!hasPreparedPlan && 'binary' in payload) {
       this.params = {
         ...this.params,
         binary: payload.binary,
       };
     }
 
-    if ('artifact' in payload) {
-      const hostBinding = resolveFirmwareUpdateHostBinding(payload.hostBindingGeneration);
+    if (hasPreparedPlan) {
+      const preparedPlan = validateFirmwareUpdatePreparedPlan(payload.preparedPlan);
+      const hostBinding = resolveFirmwareUpdateHostBinding(
+        payload.hostBindingGeneration,
+        preparedPlan.preparedPlanDigest
+      );
       const target = payload.isUpdateBootloader ? 'bootloader' : payload.updateType;
+      const plannedArtifact = getFirmwareUpdatePreparedRawArtifact({
+        preparedPlan,
+        target,
+        role: target,
+      }).artifact;
       const resourceBindings = (payload.resourceEntries ?? []).map(
         (entry: { entryName: string; artifact: FirmwareArtifactReference }) => ({
           target: 'resource' as const,
@@ -210,18 +224,21 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         })
       );
       assertFirmwareUpdatePreparedPlanBinding({
-        preparedPlan: payload.preparedPlan,
+        preparedPlan,
         executor: 'v2',
         platform: payload.platform,
-        scopeTargets: [target, ...(target === 'firmware' ? (['resource'] as const) : [])],
-        bindings: [{ target, artifact: payload.artifact }, ...resourceBindings],
+        scopeTargets: [
+          target,
+          ...(target === 'firmware' && resourceBindings.length ? (['resource'] as const) : []),
+        ],
+        bindings: [{ target, artifact: payload.artifact ?? plannedArtifact }, ...resourceBindings],
       });
       this.params = {
         ...this.params,
-        preparedPlan: payload.preparedPlan,
-        artifact: payload.artifact,
-        resourceEntries: payload.resourceEntries,
+        preparedPlan,
+        artifact: plannedArtifact,
         artifactReader: hostBinding.artifactReader,
+        firmwareType: preparedPlan.firmwareType,
       };
     }
   }
@@ -269,84 +286,142 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     // check device goto bootloader mode
     let isFirstCheck = true;
     let checkCount = 0;
-    // eslint-disable-next-line prefer-const
+    let hasPromptedWebDevice = false;
+    let isPromptingWebDevice = false;
+    let isFinished = false;
+    let intervalTimer: ReturnType<typeof setInterval> | undefined;
     let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
 
     const deviceType = this.device?.getCurrentDeviceType();
     const isTouchOrProDevice = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
 
-    const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
-      async () => {
-        checkCount += 1;
-        Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
-        if (isTouchOrProDevice && isFirstCheck) {
-          isFirstCheck = false;
-          Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] wait 3000ms');
-          await wait(3000);
-        }
-
-        if (
-          checkCount > 4 &&
-          DataManager.isBrowserWebUsb(DataManager.getSettings('env')) &&
-          !this.payload.skipWebDevicePrompt
-        ) {
-          clearInterval(intervalTimer);
-          clearTimeout(timeoutTimer);
-
-          try {
-            this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
-            const confirmed = await this._promptDeviceInBootloaderForWebDevice();
-            if (confirmed) {
-              await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
-            }
-          } catch (e) {
-            Log.log(
-              'FirmwareUpdateV2 [checkDeviceToBootloader] promptDeviceInBootloaderForWebDevice failed: ',
-              e
-            );
-            this.checkPromise?.reject(e);
-          }
-          return;
-        }
-
-        if (isBleReconnect) {
-          if (bleProbeInFlight) return;
-          bleProbeInFlight = true;
-          try {
-            await this.device.deviceConnector?.acquire(
-              this.device.originalDescriptor.id,
-              null,
-              true,
-              this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType
-            );
-            // Bound each probe so a request the rebooting device never received
-            // frees the slot for the next tick instead of hanging into the
-            // 30s reboot budget.
-            await this.device.initialize({ timeoutMs: BOOTLOADER_POLL_INITIALIZE_TIMEOUT_MS });
-            if (this.device.isBootloader()) {
-              clearInterval(intervalTimer);
-              this.checkPromise?.resolve(true);
-            }
-          } catch (e) {
-            // ignore error because of device is not connected
-            Log.log('catch Bluetooth error when device is restarting: ', e);
-          } finally {
-            bleProbeInFlight = false;
-          }
-        } else {
-          await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
-        }
-      },
-      isBleReconnect ? 3000 : 2000
-    );
-
-    // check goto bootloader mode timeout and throw error
-    timeoutTimer = setTimeout(() => {
-      if (this.checkPromise) {
+    const clearPollingTimers = () => {
+      if (intervalTimer !== undefined) {
         clearInterval(intervalTimer);
-        this.checkPromise.reject(new Error());
+        intervalTimer = undefined;
       }
-    }, 30000);
+      if (timeoutTimer !== undefined) {
+        clearTimeout(timeoutTimer);
+        timeoutTimer = undefined;
+      }
+    };
+
+    const checkForBootloader = async (clearActiveTimers: boolean) => {
+      const found = await this._checkDeviceInBootloaderMode(
+        connectId,
+        clearActiveTimers ? intervalTimer : undefined,
+        clearActiveTimers ? timeoutTimer : undefined
+      );
+      if (found) {
+        isFinished = true;
+        clearPollingTimers();
+      }
+      return found;
+    };
+
+    let startPolling: () => void = () => undefined;
+    const pollForBootloader = async () => {
+      if (isFinished || isPromptingWebDevice) return;
+      checkCount += 1;
+      Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
+      if (isTouchOrProDevice && isFirstCheck) {
+        isFirstCheck = false;
+        Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] wait 3000ms');
+        await wait(3000);
+      }
+
+      if (
+        checkCount > 4 &&
+        DataManager.isBrowserWebUsb(DataManager.getSettings('env')) &&
+        !this.payload.skipWebDevicePrompt &&
+        !hasPromptedWebDevice &&
+        !isPromptingWebDevice
+      ) {
+        clearPollingTimers();
+        isPromptingWebDevice = true;
+        try {
+          this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
+          const confirmed = await this._promptDeviceInBootloaderForWebDevice();
+          hasPromptedWebDevice = true;
+          if (confirmed) {
+            await checkForBootloader(false);
+          }
+          // WebUSB enumeration can still be empty immediately after the chooser
+          // resolves. Resume a fresh bounded polling window instead of leaving the
+          // deferred check pending forever after the original timers were paused.
+          if (!isFinished) {
+            startPolling();
+          }
+        } catch (e) {
+          isFinished = true;
+          clearPollingTimers();
+          Log.log(
+            'FirmwareUpdateV2 [checkDeviceToBootloader] promptDeviceInBootloaderForWebDevice failed: ',
+            e
+          );
+          this.checkPromise?.reject(e);
+        } finally {
+          isPromptingWebDevice = false;
+        }
+        return;
+      }
+
+      if (isBleReconnect) {
+        if (bleProbeInFlight) return;
+        bleProbeInFlight = true;
+        try {
+          await this.device.deviceConnector?.acquire(
+            this.device.originalDescriptor.id,
+            null,
+            true,
+            this.payload.connectProtocol ?? this.device.originalDescriptor.protocolType
+          );
+          // Bound each probe so a request the rebooting device never received
+          // frees the slot for the next tick instead of hanging into the
+          // 30s reboot budget.
+          await this.device.initialize({ timeoutMs: BOOTLOADER_POLL_INITIALIZE_TIMEOUT_MS });
+          if (this.device.isBootloader()) {
+            isFinished = true;
+            clearPollingTimers();
+            this.checkPromise?.resolve(true);
+          }
+        } catch (e) {
+          // ignore error because of device is not connected
+          Log.log('catch Bluetooth error when device is restarting: ', e);
+        } finally {
+          bleProbeInFlight = false;
+        }
+      } else {
+        await checkForBootloader(true);
+      }
+    };
+
+    startPolling = () => {
+      if (isFinished) return;
+      clearPollingTimers();
+      intervalTimer = setInterval(
+        () => {
+          pollForBootloader().catch(error => {
+            if (isFinished) return;
+            isFinished = true;
+            clearPollingTimers();
+            this.checkPromise?.reject(error);
+          });
+        },
+        isBleReconnect ? 3000 : 2000
+      );
+      // Each automatic polling phase is bounded. Time spent in the browser's
+      // permission chooser is intentionally excluded from this deadline.
+      timeoutTimer = setTimeout(() => {
+        if (!isFinished && this.checkPromise) {
+          isFinished = true;
+          clearPollingTimers();
+          this.checkPromise.reject(new Error());
+        }
+      }, 30000);
+    };
+
+    startPolling();
   }
 
   private async _checkDeviceInBootloaderMode(
@@ -531,6 +606,18 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         }
       };
 
+      const preparedResourceRequested =
+        !params.isUpdateBootloader &&
+        params.updateType === 'firmware' &&
+        (params.preparedPlan?.targetsToUpdate.includes('resource') ?? false);
+      if (preparedResourceRequested && device.isBootloader()) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          'Prepared firmware resources require the device application mode',
+          { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared', artifactName: 'resource' }
+        );
+      }
+
       if (!device.isBootloader() && features) {
         const serialNo = device.getCurrentSerialNo();
         // should go to bootloader mode manually
@@ -541,8 +628,48 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         // All network-backed input must be ready before the first device mutation.
         await acquireFirmwareSource();
 
-        // check & upgrade firmware resource
-        if (this.isSupportResourceUpdate(params.updateType)) {
+        // PreparedPlan 资源只依赖获批 ZIP；live release 仅保留给非 prepared 旧流程。
+        if (preparedResourceRequested) {
+          if (!this.isSupportResourceUpdate(params.updateType)) {
+            throw ERRORS.TypedError(
+              HardwareErrorCode.RuntimeError,
+              'Prepared firmware resources are not supported by this device',
+              { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared', artifactName: 'resource' }
+            );
+          }
+          this.postTipMessage('CheckLatestUiResource');
+          this.postTipMessage('DownloadLatestUiResource');
+          const verifiedEntries = await readVerifiedPreparedResourceArchive({
+            preparedPlan: params.preparedPlan as FirmwareUpdatePreparedPlan,
+            reader: params.artifactReader,
+          });
+          const sources: Array<{ entryName: string; source: FirmwareByteSource }> = [];
+          try {
+            for (const entry of verifiedEntries) {
+              const source = await openFirmwareByteSource({ binary: entry.binary });
+              if (!source) {
+                throw ERRORS.TypedError(
+                  HardwareErrorCode.RuntimeError,
+                  `Firmware resource entry ${entry.entryName} is empty`,
+                  {
+                    firmwareUpdateCode: 'FirmwareArtifactReceiptMismatch',
+                    artifactName: 'resource',
+                  }
+                );
+              }
+              sources.push({ entryName: entry.entryName, source });
+            }
+            await updateResourcesFromSources(
+              this.device.getCommands().typedCall.bind(this.device.getCommands()),
+              this.postMessage,
+              device,
+              sources
+            );
+          } finally {
+            await Promise.all(sources.map(entry => entry.source.close().catch(() => undefined)));
+          }
+          this.postTipMessage('DownloadLatestUiResourceSuccess');
+        } else if (this.isSupportResourceUpdate(params.updateType)) {
           this.postTipMessage('CheckLatestUiResource');
           const resourceUrl = DataManager.getSysResourcesLatestRelease({
             features,
@@ -551,62 +678,28 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           });
           if (resourceUrl) {
             this.postTipMessage('DownloadLatestUiResource');
-            if (params.resourceEntries?.length) {
-              const sources: Array<{
-                entryName: string;
-                source: FirmwareByteSource;
-              }> = [];
-              try {
-                for (const entry of params.resourceEntries) {
-                  const resourceName = getFirmwareUpdateResourceName(entry.entryName);
-                  const source = await openFirmwareByteSource({
-                    artifact: entry.artifact,
-                    reader: params.artifactReader,
-                  });
-                  if (!source) {
-                    throw new Error('Firmware resource entry is not prepared');
-                  }
-                  sources.push({ entryName: resourceName, source });
+            if (
+              params.artifactReader ||
+              DataManager.getSettings('firmwareManifestMode') === 'external-only'
+            ) {
+              throw ERRORS.TypedError(
+                HardwareErrorCode.RuntimeError,
+                'Firmware resource must be prepared by the external firmware host',
+                {
+                  firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
+                  artifactName: 'resource',
                 }
-                await updateResourcesFromSources(
-                  this.device.getCommands().typedCall.bind(this.device.getCommands()),
-                  this.postMessage,
-                  device,
-                  sources.map(entry => ({
-                    entryName: entry.entryName,
-                    source: entry.source,
-                  }))
-                );
-              } finally {
-                await Promise.all(
-                  sources.map(entry => entry.source.close().catch(() => undefined))
-                );
-              }
-              this.postTipMessage('DownloadLatestUiResourceSuccess');
-            } else {
-              if (
-                params.artifactReader ||
-                DataManager.getSettings('firmwareManifestMode') === 'external-only'
-              ) {
-                throw ERRORS.TypedError(
-                  HardwareErrorCode.RuntimeError,
-                  'Firmware resource must be prepared by the external firmware host',
-                  {
-                    firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
-                    artifactName: 'resource',
-                  }
-                );
-              }
-              const resourceBinary: ArrayBuffer | Buffer = (await getSysResourceBinary(resourceUrl))
-                .binary;
-              this.postTipMessage('DownloadLatestUiResourceSuccess');
-              await updateResources(
-                this.device.getCommands().typedCall.bind(this.device.getCommands()),
-                this.postMessage,
-                device,
-                resourceBinary
               );
             }
+            const resourceBinary: ArrayBuffer | Buffer = (await getSysResourceBinary(resourceUrl))
+              .binary;
+            this.postTipMessage('DownloadLatestUiResourceSuccess');
+            await updateResources(
+              this.device.getCommands().typedCall.bind(this.device.getCommands()),
+              this.postMessage,
+              device,
+              resourceBinary
+            );
           }
         }
 

@@ -26,6 +26,8 @@ export interface FirmwareArtifactReader {
 
 export interface FirmwareUpdateHostBinding {
   artifactReader: FirmwareArtifactReader;
+  /** 将读取器 generation 绑定到包含 ZIP 条目的完整 PreparedPlan。 */
+  preparedPlanDigest: string;
 }
 
 export interface FirmwareUpdateBinaryParams {
@@ -36,7 +38,8 @@ export interface FirmwareUpdateBinaryParams {
 export interface FirmwareUpdateArtifactParams {
   preparedPlan: FirmwareUpdatePreparedPlan;
   hostBindingGeneration: number;
-  artifact: FirmwareArtifactReference;
+  /** @deprecated Core derives the component artifact from preparedPlan. */
+  artifact?: FirmwareArtifactReference;
   resourceEntries?: Array<{
     entryName: string;
     artifact: FirmwareArtifactReference;
@@ -118,6 +121,8 @@ export interface FirmwareUpdateV3Params {
  */
 export type FirmwareUpdateV4Target =
   | 'boot'
+  /** @deprecated Use resource with resourceArchiveBinary. */
+  | 'boot_resources'
   | 'app_v1'
   | 'app_v2'
   | 'coprocessor'
@@ -129,6 +134,7 @@ export type FirmwareUpdateV4Target =
 
 export interface FirmwareUpdateV4Params {
   preparedPlan?: FirmwareUpdatePreparedPlan;
+  /** Required whenever preparedPlan is present; Core resolves the reader from this digest-bound host. */
   hostBindingGeneration?: number;
   platform: IPlatform;
   expectedDeviceId?: string;
@@ -152,26 +158,16 @@ export interface FirmwareUpdateV4Params {
   se02Binary?: ArrayBuffer;
   se03Binary?: ArrayBuffer;
   se04Binary?: ArrayBuffer;
+  /** Complete Protocol V2 resource ZIP for local development; Core converts it to a local PreparedPlan. */
+  resourceArchiveBinary?: ArrayBuffer;
   forcedUpdateRes?: boolean;
-  /**
-   * Arbitrary Protocol V2 resource files written directly with FilesystemFileWrite.
-   * Use this for every file selected from the manifest-driven resource archive.
-   * When provided, these files are authoritative for the resource target.
-   */
-  resourceFiles?: Array<{
-    binary: ArrayBuffer;
-    devicePath: string;
-    size?: number;
-    fileHash?: string;
-  }>;
   artifactReader?: FirmwareArtifactReader;
   componentArtifacts?: Partial<
-    Record<Exclude<FirmwareUpdateV4Target, 'resource'>, FirmwareArtifactReference>
+    Record<
+      Exclude<FirmwareUpdateV4Target, 'resource' | 'boot_resources'>,
+      FirmwareArtifactReference
+    >
   >;
-  resourceBundleArtifacts?: Array<{
-    name: string;
-    artifact: FirmwareArtifactReference;
-  }>;
 }
 
 export declare function registerFirmwareUpdateHostBinding(
