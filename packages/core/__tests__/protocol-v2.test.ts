@@ -3089,6 +3089,68 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
+  test('recognizes a legacy bootloader whose ProtocolInfo omits runtime metadata', async () => {
+    const device = Device.fromDescriptor({
+      path: 'usb-path',
+      protocolType: 'V2',
+    } as any);
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'ProtocolInfo',
+      message: {
+        version: 1,
+        build_fingerprint: null,
+        supported_messages: [],
+      },
+    });
+    (device as any).commands = { typedCall };
+
+    await device.probeProtocolV2RuntimeState({
+      hw: { Device_type: DeviceType.PRO2, serial_no: null },
+      fw: { bootloader: { version: '1.0.0' } },
+    });
+
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(device.features).toMatchObject({
+      mode: 'bootloader',
+      bootloaderMode: true,
+      initialized: null,
+    });
+  });
+
+  test('probes DeviceStatus for a legacy application whose ProtocolInfo omits metadata', async () => {
+    const device = Device.fromDescriptor({
+      path: 'usb-path',
+      protocolType: 'V2',
+    } as any);
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'ProtocolInfo',
+        message: {
+          version: 1,
+          build_fingerprint: null,
+          supported_messages: [],
+        },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceStatus',
+        message: { init_states: true, unlocked: true },
+      });
+    (device as any).commands = { typedCall };
+
+    await device.probeProtocolV2RuntimeState({
+      hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
+      fw: { application: { version: '1.0.0' } },
+    });
+
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceStatusGet', 'DeviceStatus', {});
+    expect(device.features).toMatchObject({
+      mode: 'normal',
+      initialized: true,
+      unlocked: true,
+    });
+  });
+
   test('uses advertised DeviceStatusGet as compatibility fallback for an unknown fingerprint', async () => {
     const device = Device.fromDescriptor({
       path: 'usb-path',

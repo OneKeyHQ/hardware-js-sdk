@@ -87,11 +87,19 @@ export const parseProtocolV2BuildFingerprint = (
 };
 
 export const getProtocolV2RuntimeMode = (
-  protocolInfo: ProtocolInfo
+  protocolInfo: ProtocolInfo,
+  deviceInfo?: ProtocolV2DeviceInfo
 ): ProtocolV2RuntimeMode | undefined => {
   const binary = parseProtocolV2BuildFingerprint(protocolInfo.build_fingerprint)?.binary;
   if (binary === 'application') return 'normal';
-  return binary;
+  if (binary) return binary;
+
+  // 早期 loader 不返回 build_fingerprint；仅在没有 application 时按镜像信息判定。
+  if (!protocolInfo.build_fingerprint && !deviceInfo?.fw?.application) {
+    if (deviceInfo?.fw?.romloader) return 'romloader';
+    if (deviceInfo?.fw?.bootloader) return 'bootloader';
+  }
+  return undefined;
 };
 
 // MessageType_DeviceStatusGet in the Protocol V2 protobuf registry.

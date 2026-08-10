@@ -1171,8 +1171,8 @@ export class Device extends EventEmitter {
 
   async probeProtocolV2RuntimeState(deviceInfo?: ProtocolV2DeviceInfo, timeoutMs?: number) {
     const protocolInfo = await this.ensureProtocolV2RuntimeContext(timeoutMs);
-    const runtimeMode = getProtocolV2RuntimeMode(protocolInfo);
     const runtimeDeviceInfo = deviceInfo ?? this.state?.raw?.protocolV2DeviceInfo;
+    const runtimeMode = getProtocolV2RuntimeMode(protocolInfo, runtimeDeviceInfo);
     const protocolV2DeviceType = runtimeDeviceInfo
       ? resolveProtocolV2DeviceIdentity(runtimeDeviceInfo.hw?.Device_type).deviceType
       : this.getCurrentDeviceType();
@@ -1186,10 +1186,9 @@ export class Device extends EventEmitter {
         'Protocol V2 romloader mode is only supported for Pro2 and Neo.'
       );
     }
-    const deviceStatusSupported = supportsProtocolV2Message(
-      protocolInfo,
-      PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE
-    );
+    const deviceStatusSupported =
+      supportsProtocolV2Message(protocolInfo, PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE) ||
+      (!protocolInfo.build_fingerprint && runtimeMode === undefined);
 
     if (runtimeMode === 'bootloader' || runtimeMode === 'romloader') {
       return this.updateProtocolV2Features(deviceInfo, null, runtimeMode, protocolInfo);

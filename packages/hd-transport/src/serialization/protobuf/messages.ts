@@ -1,11 +1,28 @@
 import * as protobuf from 'protobufjs/light';
 
+const allowLegacyProtocolInfo = (root: protobuf.Root) => {
+  const protocolInfo = root.lookup('ProtocolInfo');
+  if (!(protocolInfo instanceof protobuf.Type)) return;
+
+  const { version, build_fingerprint: buildFingerprint } = protocolInfo.fields;
+  if (version?.id !== 1 || buildFingerprint?.id !== 2 || !buildFingerprint.required) return;
+
+  // 早期 Protocol V2 bootloader 只返回 version，主机端需兼容缺失的构建指纹。
+  buildFingerprint.rule = undefined;
+  buildFingerprint.required = false;
+  buildFingerprint.optional = true;
+};
+
 export function parseConfigure(data: protobuf.INamespace) {
+  let root: protobuf.Root;
   // @ts-ignore [compatiblity]: connect is sending stringified json
   if (typeof data === 'string') {
-    return protobuf.Root.fromJSON(JSON.parse(data));
+    root = protobuf.Root.fromJSON(JSON.parse(data));
+  } else {
+    root = protobuf.Root.fromJSON(data);
   }
-  return protobuf.Root.fromJSON(data);
+  allowLegacyProtocolInfo(root);
+  return root;
 }
 
 export const createMessageFromName = (messages: protobuf.Root, name: string) => {

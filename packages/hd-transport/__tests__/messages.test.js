@@ -1,8 +1,11 @@
+const ByteBuffer = require('bytebuffer');
+
 const {
   createMessageFromName,
   createMessageFromType,
   parseConfigure,
 } = require('../src/serialization/protobuf/messages');
+const { decode } = require('../src/serialization/protobuf/decode');
 const { encode } = require('../src/serialization/protobuf/encode');
 const v1Messages = require('../../core/src/data/messages/messages.json');
 const v2Messages = require('../messages-protocol-v2.json');
@@ -181,6 +184,18 @@ describe('messages', () => {
     expect(v2Messages.nested.MessageType.values).not.toHaveProperty(
       'MessageType_DeviceSessionOpen'
     );
+  });
+
+  test('Protocol V2 runtime schema accepts legacy ProtocolInfo with only version', () => {
+    const runtimeMessages = parseConfigure(v2Messages);
+    const protocolInfo = runtimeMessages.lookupType('ProtocolInfo');
+
+    expect(protocolInfo.fields.build_fingerprint.required).toBe(false);
+    expect(decode(protocolInfo, ByteBuffer.wrap(Uint8Array.from([0x08, 0x01])))).toEqual({
+      version: 1,
+      build_fingerprint: null,
+      supported_messages: [],
+    });
   });
 
   test('Protocol V2 passphrase selection explicitly selects host or device input on wire', () => {
