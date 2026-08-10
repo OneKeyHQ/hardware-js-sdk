@@ -5104,16 +5104,22 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     const targets = [{ target_id: 4, path: 'vol0:/application_p1.bin' }];
-    const typedCall = jest
+    const appTypedCall = jest
       .fn()
-      .mockRejectedValueOnce(new Error('Failure_InvalidMessage,Handler not registered'))
+      .mockRejectedValueOnce(new Error('Failure_InvalidMessage,Handler not registered'));
+    const bootloaderTypedCall = jest
+      .fn()
       .mockResolvedValueOnce({ type: 'Success', message: { message: '' } });
+    let activeCommands = { typedCall: appTypedCall };
 
     (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall }),
+      getCommands: () => activeCommands,
     });
     (method as any).protocolV2LegacyDirectUpdate = true;
-    (method as any).rebootProtocolV2ToBootloader = jest.fn().mockResolvedValue(true);
+    (method as any).rebootProtocolV2ToBootloader = jest.fn().mockImplementation(async () => {
+      activeCommands = { typedCall: bootloaderTypedCall };
+      return true;
+    });
     method.postTipMessage = jest.fn();
     method.postProgressMessage = jest.fn();
 
@@ -5122,16 +5128,15 @@ describe('Protocol V2 firmware update targets', () => {
       message: { message: '' },
     });
 
-    expect(typedCall).toHaveBeenCalledTimes(2);
-    expect(typedCall).toHaveBeenNthCalledWith(
-      1,
+    expect(appTypedCall).toHaveBeenCalledTimes(1);
+    expect(appTypedCall).toHaveBeenCalledWith(
       'DeviceFirmwareUpdateRequest',
       'Success',
       { targets },
       { timeoutMs: 180000 }
     );
-    expect(typedCall).toHaveBeenNthCalledWith(
-      2,
+    expect(bootloaderTypedCall).toHaveBeenCalledTimes(1);
+    expect(bootloaderTypedCall).toHaveBeenCalledWith(
       'DeviceFirmwareUpdateRequest',
       'Success',
       { targets },

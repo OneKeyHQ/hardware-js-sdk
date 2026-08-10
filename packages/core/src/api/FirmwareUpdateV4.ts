@@ -3068,14 +3068,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }: {
     targets: Array<{ target_id: number; path: string }>;
   }) {
-    const commands = this.device.getCommands();
     const startUpdate = () =>
-      commands.typedCall(
-        'DeviceFirmwareUpdateRequest',
-        'Success',
-        { targets },
-        { timeoutMs: PROTOCOL_V2_START_UPDATE_TIMEOUT }
-      );
+      this.device
+        .getCommands()
+        .typedCall(
+          'DeviceFirmwareUpdateRequest',
+          'Success',
+          { targets },
+          { timeoutMs: PROTOCOL_V2_START_UPDATE_TIMEOUT }
+        );
     let response: ProtocolV2FirmwareUpdateStartResponse;
     try {
       response = await startUpdate();
