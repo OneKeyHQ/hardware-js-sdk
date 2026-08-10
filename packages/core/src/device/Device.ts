@@ -100,7 +100,7 @@ export type InitOptions = {
   protocolV2DeviceInfoTimeoutMs?: number;
   /** Refresh Protocol V2 runtime state before returning discovery results. */
   refreshRuntimeState?: boolean;
-  /** Recovery-only compatibility used by discovery and Protocol V2 firmware updates. */
+  /** Entry-point-scoped compatibility used by discovery, firmware, and factory flows. */
   allowLegacyProtocolV2ProtocolInfo?: boolean;
   /**
    * Protocol V1 Initialize response timeout override. Reboot-wait polling passes a
@@ -1162,7 +1162,7 @@ export class Device extends EventEmitter {
       ) {
         throw ERRORS.TypedError(
           HardwareErrorCode.DeviceInitializeFailed,
-          'Legacy Protocol V2 ProtocolInfo is supported only during device discovery and firmware update.'
+          'Legacy Protocol V2 ProtocolInfo is supported only during device discovery, firmware update, and factory provisioning.'
         );
       }
       return protocolInfo;

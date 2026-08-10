@@ -60,7 +60,7 @@ const decodeLegacyProtocolV2ProtocolInfo = (pbPayload: Uint8Array) => {
     version: legacy.version,
     build_fingerprint: '',
     supported_messages: legacy.supported_messages ?? [],
-    // Presence of this legacy field lets Core keep the fallback recovery-only.
+    // Presence of this legacy field lets Core keep the fallback entry-point scoped.
     protobuf_definition: null,
   };
 };

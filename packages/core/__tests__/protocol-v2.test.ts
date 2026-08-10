@@ -3089,7 +3089,7 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('recognizes a legacy bootloader whose ProtocolInfo omits runtime metadata', async () => {
+  test('recognizes an allowed legacy bootloader from firmware image metadata', async () => {
     const device = Device.fromDescriptor({
       path: 'usb-path',
       protocolType: 'V2',
@@ -3098,16 +3098,21 @@ describe('Protocol V2 feature adapter', () => {
       type: 'ProtocolInfo',
       message: {
         version: 1,
-        build_fingerprint: null,
+        build_fingerprint: '',
         supported_messages: [],
+        protobuf_definition: null,
       },
     });
     (device as any).commands = { typedCall };
 
-    await device.probeProtocolV2RuntimeState({
-      hw: { Device_type: DeviceType.PRO2, serial_no: null },
-      fw: { bootloader: { version: '1.0.0' } },
-    });
+    await device.probeProtocolV2RuntimeState(
+      {
+        hw: { Device_type: DeviceType.PRO2, serial_no: null },
+        fw: { bootloader: { version: '1.0.0' } },
+      },
+      undefined,
+      { allowLegacyProtocolV2ProtocolInfo: true }
+    );
 
     expect(typedCall).toHaveBeenCalledTimes(1);
     expect(device.features).toMatchObject({
@@ -3117,7 +3122,7 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('probes DeviceStatus for a legacy application whose ProtocolInfo omits metadata', async () => {
+  test('probes DeviceStatus for an allowed legacy application', async () => {
     const device = Device.fromDescriptor({
       path: 'usb-path',
       protocolType: 'V2',
@@ -3128,8 +3133,9 @@ describe('Protocol V2 feature adapter', () => {
         type: 'ProtocolInfo',
         message: {
           version: 1,
-          build_fingerprint: null,
+          build_fingerprint: '',
           supported_messages: [],
+          protobuf_definition: null,
         },
       })
       .mockResolvedValueOnce({
@@ -3138,10 +3144,14 @@ describe('Protocol V2 feature adapter', () => {
       });
     (device as any).commands = { typedCall };
 
-    await device.probeProtocolV2RuntimeState({
-      hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
-      fw: { application: { version: '1.0.0' } },
-    });
+    await device.probeProtocolV2RuntimeState(
+      {
+        hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
+        fw: { application: { version: '1.0.0' } },
+      },
+      undefined,
+      { allowLegacyProtocolV2ProtocolInfo: true }
+    );
 
     expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceStatusGet', 'DeviceStatus', {});
     expect(device.features).toMatchObject({
@@ -3259,7 +3269,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledTimes(1);
   });
 
-  test('rejects a cached legacy ProtocolInfo outside discovery and firmware recovery', async () => {
+  test('rejects a cached legacy ProtocolInfo outside explicitly allowed recovery flows', async () => {
     const device = Device.fromDescriptor({
       path: 'usb-path',
       protocolType: 'V2',
@@ -3338,23 +3348,20 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('maps an allowed legacy loader to bootloader only after an explicit unsupported status', async () => {
+  test('infers an allowed legacy loader from firmware image metadata', async () => {
     const device = Device.fromDescriptor({
       path: 'usb-path',
       protocolType: 'V2',
     } as any);
-    const typedCall = jest
-      .fn()
-      .mockResolvedValueOnce({
-        type: 'ProtocolInfo',
-        message: {
-          version: 1,
-          build_fingerprint: '',
-          supported_messages: [],
-          protobuf_definition: null,
-        },
-      })
-      .mockRejectedValueOnce(new Error('Failure_UnexpectedMessage,Unknown message'));
+    const typedCall = jest.fn().mockResolvedValueOnce({
+      type: 'ProtocolInfo',
+      message: {
+        version: 1,
+        build_fingerprint: '',
+        supported_messages: [],
+        protobuf_definition: null,
+      },
+    });
     (device as any).commands = { typedCall };
 
     await device.probeProtocolV2RuntimeState(
@@ -3369,7 +3376,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenNthCalledWith(1, 'ProtocolInfoRequest', 'ProtocolInfo', {
       eventless_wallet_session: true,
     });
-    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceStatusGet', 'DeviceStatus', {});
+    expect(typedCall).toHaveBeenCalledTimes(1);
     expect(device.features).toMatchObject({
       deviceType: 'neo',
       mode: 'bootloader',

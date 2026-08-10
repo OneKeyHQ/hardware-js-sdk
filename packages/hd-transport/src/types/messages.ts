@@ -4668,7 +4668,7 @@ export type ProtocolInfoRequest = {
 // ProtocolInfo
 export type ProtocolInfo = {
   version: number;
-  build_fingerprint: string | null;
+  build_fingerprint: string;
   supported_messages: number[];
 };
 

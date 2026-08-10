@@ -203,7 +203,7 @@ describe('getDeviceState', () => {
   });
 
   test.each(['bootloader', 'romloader'] as const)(
-    'uses ProtocolInfo to preserve %s mode without DeviceStatusGet',
+    'renegotiates ProtocolInfo to preserve %s mode without DeviceStatusGet',
     async mode => {
       const typedCall = jest.fn().mockImplementation((requestType: string) => {
         if (requestType === 'DeviceInfoGet') {
@@ -236,7 +236,11 @@ describe('getDeviceState', () => {
       const state = await device.getDeviceState({ refreshSections: ['status'] });
 
       expect(state.status.mode).toBe(mode);
-      expect(typedCall).not.toHaveBeenCalled();
+      expect(typedCall).toHaveBeenCalledTimes(1);
+      expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
+        eventless_wallet_session: true,
+      });
+      expect(typedCall).not.toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
     }
   );
 
