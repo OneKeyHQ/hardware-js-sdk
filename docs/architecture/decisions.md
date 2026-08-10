@@ -51,6 +51,25 @@ Pro2，也不能用 Pro/Pro2 型号反推协议。这样 Pro 后续迁移到 Pro
 - `packages/hd-transport/src/protocols/v2/frame-assembler.ts`
 - `packages/hd-transport/src/protocols/v2/link-manager.ts`
 
+## TopLevel / LowLevel 跨运行时二进制边界
+
+TopLevel 与 LowLevel SDK 可能运行在不同上下文，并通过 iframe、Extension offscreen 等只支持 JSON
+语义的宿主桥接。`ArrayBuffer`、TypedArray 和 `Blob` 不能直接依赖宿主的隐式序列化：
+
+- TopLevel 在调用 LowLevel 前递归编码二进制参数，Core 方法分发器在构造方法实例前统一还原。
+- 线格式使用带命名标记的 Base64 对象，并保留 `ArrayBuffer` 与 `Uint8Array` 的类型区别；TypedArray
+  视图只编码 `byteOffset + byteLength` 指定的有效字节，不能泄漏底层 buffer 的其他区域。
+- 编解码器必须支持嵌套对象和数组，并对已编码对象保持幂等，使 SDK 可以安全穿过 App 自己的桥接层。
+- 非法标记、非法 Base64 和循环引用在设备 I/O 前返回 `CallMethodInvalidParameter`，不得落入固件调用。
+- 该编码只属于 TopLevel / LowLevel 传输边界；同运行时直接调用 LowLevel 的路径继续使用原始二进制，
+  Protobuf、文件系统和设备协议格式均不受影响。
+
+主要实现：
+
+- `packages/core/src/topLevelInject.ts`
+- `packages/core/src/utils/bridgeBinaryPayload.ts`
+- `packages/core/src/api/utils.ts`
+
 ## 钱包 Session 所有权与缓存键
 
 Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类不同状态，不能共用缓存：
