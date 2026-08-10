@@ -72,8 +72,6 @@ export type TransportCallOptions = {
   onWriteCompleted?: (metrics: TransportWriteMetrics) => void;
   /** Prefer acknowledged BLE characteristic writes for this call when supported. */
   writeWithResponse?: boolean;
-  /** Recovery-only compatibility for the legacy Protocol V2 ProtocolInfo wire layout. */
-  allowLegacyProtocolV2ProtocolInfo?: boolean;
 };
 
 type ITransportInitFn = (

@@ -3321,7 +3321,7 @@ describe('Protocol V2 feature adapter', () => {
       'ProtocolInfoRequest',
       'ProtocolInfo',
       { eventless_wallet_session: true },
-      { timeoutMs: 5000, allowLegacyProtocolV2ProtocolInfo: true }
+      { timeoutMs: 5000 }
     );
     expect(typedCall).toHaveBeenNthCalledWith(
       2,
@@ -3366,13 +3366,9 @@ describe('Protocol V2 feature adapter', () => {
       { allowLegacyProtocolV2ProtocolInfo: true }
     );
 
-    expect(typedCall).toHaveBeenNthCalledWith(
-      1,
-      'ProtocolInfoRequest',
-      'ProtocolInfo',
-      { eventless_wallet_session: true },
-      { allowLegacyProtocolV2ProtocolInfo: true }
-    );
+    expect(typedCall).toHaveBeenNthCalledWith(1, 'ProtocolInfoRequest', 'ProtocolInfo', {
+      eventless_wallet_session: true,
+    });
     expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceStatusGet', 'DeviceStatus', {});
     expect(device.features).toMatchObject({
       deviceType: 'neo',

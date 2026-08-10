@@ -1188,7 +1188,6 @@ export class Device extends EventEmitter {
       const protocolInfo = await requestProtocolV2ProtocolInfo({
         commands: this.commands,
         timeoutMs,
-        allowLegacyProtocolV2ProtocolInfo: options?.allowLegacyProtocolV2ProtocolInfo,
       });
       if (this.protocolV2RuntimeContextRequestToken !== requestToken) {
         throw ERRORS.TypedError(

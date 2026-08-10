@@ -293,21 +293,14 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
-  test('decodes a two-byte legacy ProtocolInfo only when recovery compatibility is enabled', () => {
+  test('decodes a two-byte legacy ProtocolInfo at the generic frame boundary', () => {
     const frame = protocolV2.encodeProtobufFrame(60201, new Uint8Array([0x08, 0x01]));
     const productionSchemas = {
       protocolV1: protocolV1Messages,
       protocolV2: productionProtocolV2Messages,
     };
 
-    expect(() => ProtocolV2.decodeFrame(productionSchemas, frame)).toThrow(
-      'Protocol V2 protobuf decode failed for "ProtocolInfo"'
-    );
-    expect(
-      ProtocolV2.decodeFrame(productionSchemas, frame, {
-        allowLegacyProtocolV2ProtocolInfo: true,
-      })
-    ).toMatchObject({
+    expect(ProtocolV2.decodeFrame(productionSchemas, frame)).toMatchObject({
       type: 'ProtocolInfo',
       message: {
         version: 1,
@@ -327,8 +320,7 @@ describe('Protocol V2 framing and session', () => {
           protocolV1: protocolV1Messages,
           protocolV2: productionProtocolV2Messages,
         },
-        frame,
-        { allowLegacyProtocolV2ProtocolInfo: true }
+        frame
       )
     ).toThrow('Protocol V2 protobuf decode failed for "ProtocolInfo"');
   });
@@ -348,8 +340,7 @@ describe('Protocol V2 framing and session', () => {
         protocolV1: protocolV1Messages,
         protocolV2: productionProtocolV2Messages,
       },
-      frame,
-      { allowLegacyProtocolV2ProtocolInfo: true }
+      frame
     );
 
     expect(decoded.message).toEqual({
@@ -539,7 +530,7 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
-  test('session forwards the recovery-only legacy ProtocolInfo option to frame decoding', async () => {
+  test('session decodes legacy ProtocolInfo through the generic frame boundary', async () => {
     const productionSchemas = {
       protocolV1: protocolV1Messages,
       protocolV2: productionProtocolV2Messages,
@@ -558,7 +549,6 @@ describe('Protocol V2 framing and session', () => {
         { eventless_wallet_session: true },
         {
           expectedTypes: ['ProtocolInfo'],
-          allowLegacyProtocolV2ProtocolInfo: true,
         }
       )
     ).resolves.toEqual({
