@@ -150,6 +150,11 @@ function ExportReportView() {
 function getRequestParams(method: string) {
   // @ts-expect-error
   const params = baseParams[method];
+
+  if (!params) {
+    throw new Error(`Passphrase Switch Wallet Test 不支持方法：${method}`);
+  }
+
   let requestParams = {};
 
   if (params?.addressParameters?.path) {

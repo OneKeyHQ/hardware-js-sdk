@@ -42,13 +42,13 @@ export default function TestRunnerOptionButtons({
   return (
     <>
       {runnerInfo.runnerState !== 'running' ? (
-        <Button variant="primary" onPress={start} disabled={disabled}>
+        <Button variant="primary" onPress={() => start()} disabled={disabled}>
           {intl.formatMessage({ id: 'action__start_test' })}
         </Button>
       ) : null}
-      <ReportFailedTasks onRetryFailed={onRetryFailed} />
+      <ReportFailedTasks onRetryFailed={onRetryFailed ? () => onRetryFailed() : undefined} />
       {runnerInfo.runnerState === 'running' ? (
-        <Button variant="destructive" onPress={stop} disabled={disabled}>
+        <Button variant="destructive" onPress={() => stop()} disabled={disabled}>
           {intl.formatMessage({ id: 'action__stop_test' })}
         </Button>
       ) : null}

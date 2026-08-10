@@ -45,7 +45,7 @@
 5. 只传输设备缺少的资源对象。
 6. 更新中断或校验失败时继续使用旧资源集。
 7. 前端仍可按“界面、语言、字体、动画、壁纸、启动资源”等逻辑分组展示进度。
-8. 保留对旧固件现有 `resourceBundles` 更新方式的兼容回退。
+8. 资源升级只有 Plan ZIP、PreparedPlan 与 ArtifactReader 一条执行路径。
 
 ### 3.2 暂不作为第一版目标
 
@@ -387,7 +387,7 @@ resource_store = CONTENT_ADDRESSED
 resource_resume_supported = true
 ```
 
-SDK 支持 Resource Update V1 时走新协议，否则走现有 `firmwareUpdateV4.resourceBundles` 兼容路径。
+SDK 的 Pro2 资源升级只接受 Plan 中的资源 ZIP，并通过 PreparedPlan 与 ArtifactReader 执行。
 
 ### 14.2 分阶段落地
 
@@ -414,17 +414,10 @@ SDK 支持 Resource Update V1 时走新协议，否则走现有 `firmwareUpdateV
 - 根据 BLE 更新耗时调整包大小。
 - 评估是否需要块级增量。
 
-### 14.3 旧字段退出计划
+### 14.3 单一路径约束
 
-以下字段仅保留在旧设备兼容代码中：
-
-- `resourceBundles[].devicePath`
-- `resourceBundles[].version`
-- `resourceBundles[].payloadHash`
-- `resourceBundles[].headerHash`
-- `resourceFiles[].devicePath`
-
-新协议稳定后标记 deprecated，阻止新 Pro 2 固件使用旧模式，并在下一个 SDK 主版本评估移除公共类型。
+Pro2 资源不提供按文件直传或独立资源包绑定接口。发布配置只登记资源 ZIP 的 URL、大小和
+SHA-256；Host 统一下载并物化 ZIP，SDK 只消费 PreparedPlan 中的条目引用。
 
 ## 15. 团队边界
 

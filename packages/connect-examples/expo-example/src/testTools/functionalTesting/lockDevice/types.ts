@@ -6,7 +6,7 @@ export type TestCaseDataType = {
   title: string;
   method: string;
   params?: any;
-  type: 'lock' | 'unlock' | 'passphraseOpened' | 'passphraseClosed' | 'reset';
+  type: 'lock' | 'unlock' | 'passphraseOpened' | 'passphraseClosed' | 'reset' | 'bootloader';
   expect: boolean;
 };
 

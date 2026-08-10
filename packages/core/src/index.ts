@@ -22,6 +22,16 @@ export { preloadSessionCache } from './device/Device';
 export { projectFeatures as projectDeviceStateFeatures } from './device/DeviceStateProjector';
 export { getMethodSupportedProtocols } from './api/utils';
 export {
+  parseProtocolV2ResourceManifest,
+  selectProtocolV2ResourceManifestFiles,
+} from './protocols/protocol-v2/resources';
+export { prepareFirmwareUpdateV4MemoryHost } from './api/firmware/FirmwareMemoryHost';
+export type {
+  FirmwareMemoryArtifact,
+  FirmwareMemoryArtifactEntry,
+  FirmwareUpdateV4MemoryHost,
+} from './api/firmware/FirmwareMemoryHost';
+export {
   getFirmwareUpdateHostBindingGeneration,
   registerFirmwareUpdateHostBinding,
   unregisterFirmwareUpdateHostBinding,

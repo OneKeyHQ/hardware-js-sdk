@@ -168,13 +168,11 @@
   "label__device_select_sys_resource": "Select System Resource",
   "label__protocol_v2_remote_update": "Remote configuration update",
   "label__protocol_v2_firmware_files": "Local firmware components (optional)",
-  "label__protocol_v2_resource_files": "Resource packages ({selected}/{total})",
+  "label__protocol_v2_resource_archive": "Local resource archive (optional)",
+  "label__protocol_v2_resource_archive_zip": "Protocol V2 resource ZIP",
 
   "action__protocol_v2_remote_update": "Update from remote configuration",
   "action__protocol_v2_local_update": "Update selected files ({count})",
-  "action__pick_resource_files": "Select resource packages",
-  "action__pick_resource_folder": "Choose resource folder",
-  "action__replace_resource_folder": "Replace resource folder",
   "action__clear_selected_files": "Clear selected files",
 
   "tip__no_select_firmware_file": "No firmware file selected",
@@ -185,11 +183,7 @@
   "tip__protocol_v2_remote_update": "Uses the matching Pro2 or Neo firmware-v1 configuration and synchronizes changed resource packages automatically.",
   "tip__protocol_v2_local_update": "Local signed firmware and resource packages are optional. Neo exposes SE01 and SE02 only.",
   "tip__protocol_v2_file_not_selected": "No file selected",
-  "tip__protocol_v2_unrecognized_files": "Unrecognized resource files: {files}",
-  "tip__protocol_v2_resource_folder_hint": "Choose one resource folder to identify and list all nine .okpkg packages automatically.",
-  "tip__protocol_v2_resource_folder_ready": "{folder}: all {count} resource packages matched",
-  "tip__protocol_v2_resource_folder_selected": "{folder}: {count} resource packages found; review the missing items below",
-  "tip__protocol_v2_resource_folder_incomplete": "The resource folder is incomplete. Missing: {missing}; duplicates: {duplicates}; unrecognized: {unknown}",
+  "tip__protocol_v2_resource_archive_hint": "Select the complete CI-generated ZIP that matches the current Plan.",
   "tip__protocol_v2_remote_config_unavailable": "Unable to fetch the latest remote configuration. No update or write has started; check the network and retry, or use the local signed files below.",
   "tip__protocol_v2_already_current": "All firmware components are already up to date.",
 

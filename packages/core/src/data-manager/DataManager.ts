@@ -94,12 +94,10 @@ export default class DataManager {
       ble: [],
     },
     [EDeviceType.Pro2]: {
-      firmware: [],
-      ble: [],
+      'firmware-v1': [],
     },
     [EDeviceType.Neo]: {
-      firmware: [],
-      ble: [],
+      'firmware-v1': [],
     },
     [EDeviceType.ClassicPure]: {
       firmware: [],
@@ -120,6 +118,8 @@ export default class DataManager {
   static lastCheckTimestamp = 0;
 
   static protocolV2ResourcesConfigError: Error | undefined;
+
+  private static protocolV2NeoResourcesConfigError: Error | undefined;
 
   static getFirmwareStatus = (
     features: Features,
@@ -410,6 +410,7 @@ export default class DataManager {
   static async load(settings: ConnectSettings): Promise<boolean> {
     this.settings = settings;
     this.protocolV2ResourcesConfigError = undefined;
+    this.protocolV2NeoResourcesConfigError = undefined;
     const manifestMode =
       settings.firmwareManifestMode ?? (settings.fetchConfig ? 'sdk-managed' : undefined);
     if (settings.preloadedConfig) {
@@ -476,15 +477,21 @@ export default class DataManager {
       pro2Resources = parseProtocolV2Resources(
         (data.pro2 as { resources?: unknown } | undefined)?.resources
       );
-      neoResources = parseProtocolV2Resources(
-        (data.neo as { resources?: unknown } | undefined)?.resources
-      );
     } catch (error) {
       // Firmware resource metadata is not required for base communication. If the
       // remote config is temporarily incomplete, disable this resource update only.
       this.protocolV2ResourcesConfigError =
         error instanceof Error ? error : new Error(String(error));
-      Log.warn('[DataConfig] Ignoring invalid Protocol V2 resources config:', error);
+      Log.warn('[DataConfig] Ignoring invalid Pro2 resources config:', error);
+    }
+    try {
+      neoResources = parseProtocolV2Resources(
+        (data.neo as { resources?: unknown } | undefined)?.resources
+      );
+    } catch (error) {
+      this.protocolV2NeoResourcesConfigError =
+        error instanceof Error ? error : new Error(String(error));
+      Log.warn('[DataConfig] Ignoring invalid Neo resources config:', error);
     }
     const enrichedPro2Config = this.enrichFirmwareReleaseInfo(data.pro2);
     const enrichedNeoConfig = this.enrichFirmwareReleaseInfo(data.neo);
@@ -537,7 +544,12 @@ export default class DataManager {
   /** Force a fresh remote config before an update is allowed to mutate the device. */
   static async forceReloadData({
     requireResources = false,
-  }: { requireResources?: boolean } = {}): Promise<void> {
+    resourceDeviceType = EDeviceType.Pro2,
+  }: {
+    requireResources?: boolean;
+    resourceDeviceType?: EDeviceType.Pro2 | EDeviceType.Neo;
+  } = {}): Promise<void> {
+    const resourceDeviceName = resourceDeviceType === EDeviceType.Pro2 ? 'Pro2' : 'Neo';
     if (!this.settings) {
       throw new Error('Remote config settings are not initialized');
     }
@@ -545,10 +557,14 @@ export default class DataManager {
       this.lastCheckTimestamp > 0 &&
       getTimeStamp() - this.lastCheckTimestamp <= FIRMWARE_UPDATE_CONFIG_FRESHNESS_MS;
     if (hasFreshConfig) {
-      if (requireResources && this.protocolV2ResourcesConfigError) {
+      const resourcesConfigError =
+        resourceDeviceType === EDeviceType.Pro2
+          ? this.protocolV2ResourcesConfigError
+          : this.protocolV2NeoResourcesConfigError;
+      if (requireResources && resourcesConfigError) {
         throw ERRORS.TypedError(
           HardwareErrorCode.FirmwareUpdateDownloadFailed,
-          `Invalid Pro2 resources config: ${this.protocolV2ResourcesConfigError.message}`
+          `Invalid ${resourceDeviceName} resources config: ${resourcesConfigError.message}`
         );
       }
       return;
@@ -560,23 +576,23 @@ export default class DataManager {
         'Unable to refresh the latest remote config'
       );
     }
-    if (requireResources && this.protocolV2ResourcesConfigError) {
+    const resourcesConfigError =
+      resourceDeviceType === EDeviceType.Pro2
+        ? this.protocolV2ResourcesConfigError
+        : this.protocolV2NeoResourcesConfigError;
+    if (requireResources && resourcesConfigError) {
       throw ERRORS.TypedError(
         HardwareErrorCode.FirmwareUpdateDownloadFailed,
-        `Invalid Pro2 resources config: ${this.protocolV2ResourcesConfigError.message}`
+        `Invalid ${resourceDeviceName} resources config: ${resourcesConfigError.message}`
       );
     }
     this.lastCheckTimestamp = getTimeStamp();
   }
 
-  static getProtocolV2Resources(deviceType: EDeviceType.Pro2 | EDeviceType.Neo = EDeviceType.Pro2) {
-    return this.deviceMap[deviceType]?.resources?.stable;
-  }
-
-  static getProtocolV2BootResources(
+  static getProtocolV2ResourceSource(
     deviceType: EDeviceType.Pro2 | EDeviceType.Neo = EDeviceType.Pro2
   ) {
-    return this.deviceMap[deviceType]?.resources?.boot;
+    return this.deviceMap[deviceType]?.resources?.source;
   }
 
   static getProtobufMessages(schema: ProtobufMessageSchema = 'v1CurrentSchema'): JSON {

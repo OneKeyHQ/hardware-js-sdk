@@ -6,6 +6,7 @@ import { get } from 'lodash';
 
 import { TestRunnerView } from '../../../components/BaseTestRunner/TestRunnerView';
 import { useRunnerTest } from '../../../components/BaseTestRunner/useRunnerTest';
+import { classifyRunnerFailure } from '../../../components/BaseTestRunner/runnerResultUtils';
 import useExportReport from '../../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../../components/ui/Button';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
@@ -18,7 +19,6 @@ import {
   getProtocolAwareFeatures,
   isPassphraseProtectionEnabled,
 } from '../../../utils/protocolAwareFeatures';
-import { executeProtocolAwareMethod } from '../../../utils/protocolAwareMethod';
 
 import type { CoreMessage } from '@onekeyfe/hd-core';
 import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
@@ -229,17 +229,10 @@ function ExecuteView({
         params: requestParams,
       });
     },
-    processRequest: async (sdk, method, connectId, deviceId, requestParams, item) => {
+    processRequest: async ({ sdk, connectId, execute }) => {
       const sdkPromise = async () => {
         try {
-          const res = await executeProtocolAwareMethod({
-            sdk,
-            method,
-            connectId,
-            deviceId,
-            params: requestParams,
-            protocol,
-          });
+          const res = await execute();
           return { payload: res, skipVerify: true };
         } catch (error) {
           console.log('=====>>>>> processRequest error: ', error);
@@ -285,6 +278,17 @@ function ExecuteView({
       const error = '';
 
       const responseError = normalizeErrorMessage(get(res, 'payload.error', ''));
+
+      if (!res.success) {
+        const verifyState = classifyRunnerFailure(res.payload?.code);
+        if (verifyState !== 'fail') {
+          return Promise.resolve({
+            verifyState,
+            error: verifyState === 'skip' ? undefined : responseError,
+            ext: baseExt,
+          });
+        }
+      }
 
       // Extract coinType from path for device-specific expected result
       // Path format: m/44'/60'/0' -> coinType = 60

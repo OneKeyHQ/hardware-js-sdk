@@ -2,6 +2,10 @@ import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 
 import { buildFirmwareUpdatePlan } from '../../src/api/firmware/FirmwareUpdatePlan';
 import {
+  registerFirmwareUpdateHostBinding,
+  unregisterFirmwareUpdateHostBinding,
+} from '../../src/api/firmware/FirmwareHostBinding';
+import {
   assertFirmwareUpdatePreparedPlanDeviceIdentity,
   prepareFirmwareUpdatePlan,
 } from '../../src/api/firmware/FirmwareUpdatePreparedPlan';
@@ -179,6 +183,19 @@ describe('firmware update plan identity in bootloader mode', () => {
         ],
       });
     };
+    const createBinding = (preparedPlanDigest: string) => ({
+      preparedPlanDigest,
+      artifactReader: {
+        open: () => Promise.resolve({ readerId: 'unused', size: 0 }),
+        read: () =>
+          Promise.resolve({
+            data: new ArrayBuffer(0),
+            bytesRead: 0,
+            eof: true,
+          }),
+        close: () => Promise.resolve(),
+      },
+    });
 
     test('accepts the phase that runs after the device reboots and reports a serial', () => {
       const preparedPlan = prepareRecoveryPlan();
@@ -249,6 +266,69 @@ describe('firmware update plan identity in bootloader mode', () => {
           deviceModel: String(EDeviceType.Classic1s),
         })
       ).not.toThrow();
+    });
+
+    test('releases the identity pin when the digest-bound host workflow ends', () => {
+      const preparedPlan = prepareRecoveryPlan();
+      const firstGeneration = registerFirmwareUpdateHostBinding(
+        createBinding(preparedPlan.preparedPlanDigest)
+      );
+      try {
+        assertFirmwareUpdatePreparedPlanDeviceIdentity({
+          preparedPlan,
+          deviceIdentity: 'CLA45F0023',
+          bootloaderMode: false,
+          deviceModel: String(EDeviceType.Classic1s),
+        });
+      } finally {
+        expect(unregisterFirmwareUpdateHostBinding(firstGeneration)).toBe(true);
+      }
+
+      const secondGeneration = registerFirmwareUpdateHostBinding(
+        createBinding(preparedPlan.preparedPlanDigest)
+      );
+      try {
+        expect(() =>
+          assertFirmwareUpdatePreparedPlanDeviceIdentity({
+            preparedPlan,
+            deviceIdentity: 'CLA99Z9999',
+            bootloaderMode: false,
+            deviceModel: String(EDeviceType.Classic1s),
+          })
+        ).not.toThrow();
+      } finally {
+        expect(unregisterFirmwareUpdateHostBinding(secondGeneration)).toBe(true);
+      }
+    });
+
+    test('a stale unregister cannot release the active workflow identity pin', () => {
+      const stalePlan = prepareRecoveryPlan();
+      const staleGeneration = registerFirmwareUpdateHostBinding(
+        createBinding(stalePlan.preparedPlanDigest)
+      );
+      const activePlan = prepareRecoveryPlan();
+      const activeGeneration = registerFirmwareUpdateHostBinding(
+        createBinding(activePlan.preparedPlanDigest)
+      );
+      try {
+        assertFirmwareUpdatePreparedPlanDeviceIdentity({
+          preparedPlan: activePlan,
+          deviceIdentity: 'CLA45F0023',
+          bootloaderMode: false,
+          deviceModel: String(EDeviceType.Classic1s),
+        });
+        expect(unregisterFirmwareUpdateHostBinding(staleGeneration)).toBe(false);
+        expect(() =>
+          assertFirmwareUpdatePreparedPlanDeviceIdentity({
+            preparedPlan: activePlan,
+            deviceIdentity: 'CLA99Z9999',
+            bootloaderMode: false,
+            deviceModel: String(EDeviceType.Classic1s),
+          })
+        ).toThrow();
+      } finally {
+        expect(unregisterFirmwareUpdateHostBinding(activeGeneration)).toBe(true);
+      }
     });
   });
 

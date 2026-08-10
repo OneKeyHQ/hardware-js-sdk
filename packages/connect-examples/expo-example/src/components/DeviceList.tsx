@@ -1,17 +1,23 @@
 import { forwardRef, useCallback, useContext, useImperativeHandle } from 'react';
 import { ListItem, Stack, Text, View, XStack } from 'tamagui';
 import { FlatList, Platform } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { Check } from '@tamagui/lucide-icons';
 import { useIntl } from 'react-intl';
 import { useAtomValue, useSetAtom } from 'jotai';
 
 import HardwareSDKContext from '../provider/HardwareSDKContext';
-import { isElectronBleRuntime } from '../utils/hardwareInstance';
+import {
+  isElectronBleRuntime,
+  restartForConnectionTypeChange,
+  storeConnectionType,
+} from '../utils/hardwareInstance';
 import { Button } from './ui/Button';
 import PanelView from './ui/Panel';
 import { deviceActionsAtom, deviceListAtom, selectDeviceAtom } from '../atoms/deviceAtoms';
 
 import type { Features } from '@onekeyfe/hd-core';
+import type { ConnectionType } from '../utils/hardwareInstance';
 import type { ForwardedRef } from 'react';
 
 export type Device = {
@@ -64,7 +70,7 @@ function DeviceListFC(
   ref: ForwardedRef<IDeviceListInstance>
 ) {
   const intl = useIntl();
-  const { sdk } = useContext(HardwareSDKContext);
+  const { sdk, connectionType } = useContext(HardwareSDKContext);
   const selectedDevice = useAtomValue(selectDeviceAtom);
   const devices = useAtomValue(deviceListAtom);
   const setDeviceActions = useSetAtom(deviceActionsAtom);
@@ -81,8 +87,7 @@ function DeviceListFC(
     if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));
 
     let foundDevices: Device[] = [];
-    const useElectronBle = isElectronBleRuntime();
-    if (Platform.OS === 'web' && !useElectronBle) {
+    if (Platform.OS === 'web' && connectionType === 'webusb') {
       const accessResponse = await sdk.promptWebDeviceAccess();
       if (accessResponse.success && accessResponse.payload.device) {
         foundDevices = [accessResponse.payload.device as unknown as Device];
@@ -99,10 +104,10 @@ function DeviceListFC(
 
     setDeviceActions({ type: 'setList', payload: foundDevices });
 
-    if (Platform.OS === 'web' && !useElectronBle && foundDevices.length > 0) {
+    if (Platform.OS === 'web' && connectionType !== 'desktop-web-ble' && foundDevices.length > 0) {
       selectDevice(foundDevices[0]);
     }
-  }, [intl, sdk, selectDevice, setDeviceActions]);
+  }, [connectionType, intl, sdk, selectDevice, setDeviceActions]);
 
   const deviceCancel = useCallback(() => {
     if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));
@@ -114,10 +119,24 @@ function DeviceListFC(
     setDeviceActions({ type: 'clear' });
   }, [setDeviceActions]);
 
-  let transportLabel = 'Bluetooth';
-  if (Platform.OS === 'web') {
-    transportLabel = isElectronBleRuntime() ? 'Desktop BLE' : 'WebUSB';
-  }
+  const onSwitchConnectionType = useCallback(
+    async (value: ConnectionType) => {
+      if (!connectionType || value === connectionType) return;
+
+      try {
+        await storeConnectionType(value);
+        setDeviceActions({ type: 'clear' });
+        restartForConnectionTypeChange();
+      } catch (error) {
+        console.error('Failed to switch connection type:', error);
+        alert(
+          intl.formatMessage({ id: 'tip__switch_connection_type_failed' }) ||
+            'Failed to switch connection type'
+        );
+      }
+    },
+    [connectionType, intl, setDeviceActions]
+  );
 
   useImperativeHandle(
     ref,
@@ -154,7 +173,16 @@ function DeviceListFC(
             {selectedDevice?.connectId || intl.formatMessage({ id: 'message__no_device' })}
           </Text>
           <XStack gap={4}>
-            <Text>{transportLabel}</Text>
+            {Platform.OS === 'web' && connectionType ? (
+              <Picker selectedValue={connectionType} onValueChange={onSwitchConnectionType}>
+                <Picker.Item label="WebUSB" value="webusb" />
+                {isElectronBleRuntime() ? (
+                  <Picker.Item label="Desktop BLE" value="desktop-web-ble" />
+                ) : null}
+              </Picker>
+            ) : (
+              <Text>Bluetooth</Text>
+            )}
             <Button onPress={handleRemoveSelected}>
               {intl.formatMessage({ id: 'action__clean_device' })}
             </Button>

@@ -64,66 +64,44 @@ export type IProtocolV2FirmwareComponent = {
   version?: IVersionArray;
 };
 
-export type IProtocolV2ResourceType =
-  | 'images'
-  | 'animation'
-  | 'wallpaper'
-  | 'translations'
-  | 'roobert'
-  | 'noto'
-  | 'firmware_logo';
-
-/** Pro2 RES package descriptor. Hashes identify content without a human-managed version. */
-export type IProtocolV2Resource = {
-  type: IProtocolV2ResourceType;
-  url: string;
-  /** Complete okpkg file size in bytes. */
-  size: number;
-  /** SHA-256 of the complete okpkg file. */
-  fileHash: string;
-  /** SHA3-512 header_hash from the signed okpkg header. */
-  headerHash: string;
-};
-
-/** A file from the Protocol V2 resource manifest, written directly with FileWrite. */
-export type IProtocolV2ResourceFile = {
-  name?: string;
-  url: string;
-  devicePath: string;
-  size: number;
-  /** SHA-256 of the complete file. */
-  fileHash: string;
-};
-
-/** Optional Protocol V2 boot resources restored as individual files. */
-export type IProtocolV2BootResources = {
-  required: false;
-  target: 'RES';
-  manifestUrl?: string;
-  files: IProtocolV2ResourceFile[];
+export type IProtocolV2ResourceSource = {
+  archiveUrl: string;
+  archiveSha256: string;
+  archiveSize: number;
 };
 
 export type IProtocolV2Resources = {
-  stable: IProtocolV2Resource[];
-  boot?: IProtocolV2BootResources;
+  source: IProtocolV2ResourceSource;
 };
 
-/** Pro2 RESC bundle okpkg descriptor for incremental FileWrite synchronization. */
-export type IProtocolV2ResourceBundle = {
-  /** Bundle name, such as images, animation, translations, or fonts_roobert. */
-  name: string;
-  /** Download URL. */
-  url: string;
-  fingerprint?: string;
-  expectedSize?: number;
-  /** Device target path, such as vol0:/bundles/images/images.okpkg. */
-  devicePath: string;
-  /** okpkg payload_version used to skip matching content after FileRead. */
-  version?: IVersionArray;
-  /** okpkg payload_hash used for SHA3-512 comparison after FileRead. */
-  payloadHash?: string;
-  /** okpkg header_hash used for SHA3-512 comparison after FileRead. */
-  headerHash?: string;
+export type IProtocolV2ResourceManifestFile = {
+  archive_path: string;
+  original_name: string;
+  device_path: string;
+  size: number;
+  sha256: string;
+  signed: true;
+  sig_algo: 'ed25519' | 'mldsa65';
+  payload_version: string | null;
+};
+
+export type IProtocolV2ResourceManifest = {
+  schema: 1;
+  artifact_name: string;
+  release_name: string;
+  variant: 'resource';
+  commit: string;
+  short_sha: string;
+  timestamp_utc: string;
+  core_version: string;
+  key_set: string;
+  device_root: 'vol0:';
+  restore_mode: 'bootloader_update';
+  trees: Array<{
+    path: string;
+    device: string;
+  }>;
+  files: IProtocolV2ResourceManifestFile[];
 };
 
 /** STM32 firmware config */
@@ -153,8 +131,6 @@ export type IFirmwareReleaseInfo = {
   upgradeType?: 'payload-package-set' | string;
   components?: Record<string, IProtocolV2FirmwareComponent>;
   installOrder?: string[];
-  /** Pro2 RESC bundles for incremental direct FileWrite synchronization. */
-  resourceBundles?: IProtocolV2ResourceBundle[];
   bootloaderChangelog?: {
     [k in ILocale]: string;
   };
@@ -183,22 +159,20 @@ export type IBLEFirmwareReleaseInfo = {
 };
 
 type IKnownDevice = Exclude<IDeviceType, 'unknown'>;
-type ILegacyKnownDevice = Exclude<IKnownDevice, 'neo'>;
-
 type IDeviceReleaseInfo = {
-  firmware: IFirmwareReleaseInfo[];
+  firmware?: IFirmwareReleaseInfo[];
   /** Protocol V2 payload package set */
   'firmware-v1'?: IFirmwareReleaseInfo[];
   'firmware-v2'?: IFirmwareReleaseInfo[];
   'firmware-v8'?: IFirmwareReleaseInfo[];
   'firmware-btc-v8'?: IFirmwareReleaseInfo[];
-  ble: IBLEFirmwareReleaseInfo[];
+  ble?: IBLEFirmwareReleaseInfo[];
   /** Independent Protocol V2 resource release configuration. */
   resources?: IProtocolV2Resources;
 };
 
 export type DeviceTypeMap = {
-  [k in ILegacyKnownDevice]: IDeviceReleaseInfo;
+  [k in Exclude<IKnownDevice, 'neo'>]: IDeviceReleaseInfo;
 } & {
   /** Optional until every remote-config producer publishes a Neo entry. */
   neo?: IDeviceReleaseInfo;

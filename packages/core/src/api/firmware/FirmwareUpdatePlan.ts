@@ -10,13 +10,14 @@ import {
   getDeviceFirmwareVersion,
 } from '../../utils/deviceVersionUtils';
 
+import type { FirmwareUpdateV4Target } from '../../types/api/firmwareUpdate';
 import type {
   FirmwareUpdatePlan,
   FirmwareUpdatePlanArtifact,
   FirmwareUpdatePlanForceTarget,
   FirmwareUpdatePlanTarget,
 } from '../../types/api/firmwareUpdatePlan';
-import type { Features } from '../../types';
+import type { Features, IProtocolV2ResourceSource } from '../../types';
 
 type FirmwareUpdatePlatform = 'native' | 'desktop' | 'ext' | 'web' | 'web-embed';
 
@@ -30,7 +31,6 @@ type ReleaseRecord = {
   version?: unknown;
   components?: unknown;
   installOrder?: unknown;
-  resourceBundles?: unknown;
   fingerprint?: unknown;
   fingerprintWeb?: unknown;
   expectedSize?: unknown;
@@ -62,6 +62,11 @@ const PROTOCOL_V2_TARGETS: Readonly<
   SE04: 'se04',
 };
 
+const PROTOCOL_V2_FIRMWARE_UPDATE_TARGETS = new Set<FirmwareUpdateV4Target>([
+  ...Object.values(PROTOCOL_V2_TARGETS),
+  'resource',
+]);
+
 const asRecord = (value: unknown): Record<string, unknown> | undefined =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -90,7 +95,7 @@ const asIntegrity = ({
 }: {
   size: unknown;
   sha256: unknown;
-}): Pick<FirmwareUpdatePlanArtifact, 'expectedSize' | 'expectedSha256'> => {
+}): Partial<Pick<FirmwareUpdatePlanArtifact, 'expectedSize' | 'expectedSha256'>> => {
   const sha256Value =
     typeof value === 'string' && /^[a-f0-9]{64}$/iu.test(value) ? value.toLowerCase() : undefined;
   return {
@@ -167,6 +172,20 @@ const planError = (message: string): never => {
   });
 };
 
+const requireArtifactIntegrity = (
+  input: Parameters<typeof asIntegrity>[0],
+  label: string
+): Pick<FirmwareUpdatePlanArtifact, 'expectedSize' | 'expectedSha256'> => {
+  const integrity = asIntegrity(input);
+  if (integrity.expectedSize === undefined || integrity.expectedSha256 === undefined) {
+    return planError(`${label} integrity metadata is invalid`);
+  }
+  return {
+    expectedSize: integrity.expectedSize,
+    expectedSha256: integrity.expectedSha256,
+  };
+};
+
 const FIRMWARE_UPDATE_PLAN_FORCE_TARGETS = new Set<FirmwareUpdatePlanForceTarget>([
   'firmware',
   'ble',
@@ -189,6 +208,28 @@ export const validateFirmwareUpdatePlanForceTargets = (
     return planError('Firmware update force targets are invalid');
   }
   return [...value] as FirmwareUpdatePlanForceTarget[];
+};
+
+export const validateProtocolV2FirmwareUpdateTargets = (
+  value: unknown
+): FirmwareUpdateV4Target[] => {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    return planError('Protocol V2 firmware update targets are invalid');
+  }
+  const normalizedTargets = value.map(target =>
+    target === 'boot_resources' ? 'resource' : target
+  );
+  if (
+    normalizedTargets.length > PROTOCOL_V2_FIRMWARE_UPDATE_TARGETS.size ||
+    normalizedTargets.some(target => !PROTOCOL_V2_FIRMWARE_UPDATE_TARGETS.has(target)) ||
+    new Set(normalizedTargets).size !== normalizedTargets.length
+  ) {
+    return planError('Protocol V2 firmware update targets are invalid');
+  }
+  return normalizedTargets as FirmwareUpdateV4Target[];
 };
 
 const assertExactKeys = (
@@ -287,8 +328,8 @@ export const assertFirmwareUpdatePlan = (value: unknown): FirmwareUpdatePlan => 
     }
     assertExactKeys(
       artifact,
-      ['artifactId', 'role', 'target', 'url', 'container'],
-      ['logicalName', 'expectedSize', 'expectedSha256', 'targetVersion']
+      ['artifactId', 'role', 'target', 'url', 'container', 'expectedSize', 'expectedSha256'],
+      ['logicalName', 'targetVersion']
     );
     const artifactId = assertBoundedString(artifact.artifactId, 'artifact id', 160);
     if (artifactIds.has(artifactId)) {
@@ -307,16 +348,12 @@ export const assertFirmwareUpdatePlan = (value: unknown): FirmwareUpdatePlan => 
     if (artifact.logicalName !== undefined) {
       assertBoundedString(artifact.logicalName, 'logical name', 256);
     }
-    if (
-      artifact.expectedSize !== undefined &&
-      (!Number.isSafeInteger(artifact.expectedSize) || (artifact.expectedSize as number) <= 0)
-    ) {
+    if (!Number.isSafeInteger(artifact.expectedSize) || (artifact.expectedSize as number) <= 0) {
       return planError('Firmware update plan artifact size is invalid');
     }
     if (
-      artifact.expectedSha256 !== undefined &&
-      (typeof artifact.expectedSha256 !== 'string' ||
-        !/^[a-f0-9]{64}$/u.test(artifact.expectedSha256))
+      typeof artifact.expectedSha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/u.test(artifact.expectedSha256)
     ) {
       return planError('Firmware update plan artifact digest is invalid');
     }
@@ -351,13 +388,11 @@ export const assertFirmwareUpdatePlan = (value: unknown): FirmwareUpdatePlan => 
       plan.targetsToUpdate.some(target =>
         legacyOnlyTargets.has(target as FirmwareUpdatePlanTarget)
       )) ||
-    // Only executor v2 services identity-less bootloader recovery (classic family);
-    // Pro (v3) and Pro2 (v4) report a serial even in bootloader mode, so their plans
-    // must always carry a real identity. Degraded v2 plans are bound to the live
-    // device at install time instead.
+    // V2 仅在 bootloader 恢复时允许缺少身份；V4 设备在尚未写入序列号时也可升级。
+    // 这类 Plan 仍通过设备型号、目标、工件摘要与 preparedPlanDigest 进行约束。
     (plan.artifacts.length > 0 &&
       (plan.platform === 'native' || plan.platform === 'desktop') &&
-      plan.executor !== 'v2' &&
+      plan.executor === 'v3' &&
       plan.deviceIdentity === 'unavailable')
   ) {
     return planError('Firmware update plan executor contract is invalid');
@@ -405,7 +440,7 @@ const selectResourceUrl = ({
 
 const getExecutor = (features: Features): FirmwareUpdatePlan['executor'] => {
   const deviceType = getDeviceType(features);
-  if (deviceType === EDeviceType.Pro2) {
+  if (deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo) {
     return 'v4';
   }
   if (
@@ -421,10 +456,10 @@ const buildProtocolV2Artifacts = (
   release: ReleaseRecord,
   {
     includeComponents = true,
-    includeResources = true,
+    componentTargets: selectedComponentTargets,
   }: {
     includeComponents?: boolean;
-    includeResources?: boolean;
+    componentTargets?: ReadonlySet<FirmwareUpdatePlanTarget>;
   } = {}
 ): {
   artifacts: FirmwareUpdatePlanArtifact[];
@@ -445,12 +480,21 @@ const buildProtocolV2Artifacts = (
     includeComponents && components
       ? [...installOrder, ...Object.keys(components).filter(key => !installOrder.includes(key))]
       : [];
+  const selectedComponentKeys = selectedComponentTargets
+    ? componentKeys.filter(key => {
+        const component = asRecord(components?.[key]);
+        const targetName = asString(component?.target)?.toUpperCase();
+        const target = targetName ? PROTOCOL_V2_TARGETS[targetName] : undefined;
+        return !!target && selectedComponentTargets.has(target);
+      })
+    : componentKeys;
   const artifacts: FirmwareUpdatePlanArtifact[] = [];
   const targets: FirmwareUpdatePlanTarget[] = [];
-  const componentTargets = new Set<FirmwareUpdatePlanTarget>();
-  for (const key of componentKeys) {
+  const componentTargetSet = new Set<FirmwareUpdatePlanTarget>();
+  for (const key of selectedComponentKeys) {
     const component = asRecord(components?.[key]);
     const targetName = asString(component?.target)?.toUpperCase();
+    const target = targetName ? PROTOCOL_V2_TARGETS[targetName] : undefined;
     if (targetName === 'ROMLOADER') {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
@@ -458,7 +502,6 @@ const buildProtocolV2Artifacts = (
         { firmwareUpdateCode: 'FirmwarePlanInvalid' }
       );
     }
-    const target = targetName ? PROTOCOL_V2_TARGETS[targetName] : undefined;
     if (!component || !target) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
@@ -466,14 +509,18 @@ const buildProtocolV2Artifacts = (
         { firmwareUpdateCode: 'FirmwarePlanInvalid' }
       );
     }
-    if (componentTargets.has(target)) {
+    if (componentTargetSet.has(target)) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
         `Protocol V2 component ${key} duplicates target ${target}`,
         { firmwareUpdateCode: 'FirmwarePlanInvalid' }
       );
     }
-    componentTargets.add(target);
+    componentTargetSet.add(target);
+    const integrity = requireArtifactIntegrity(
+      { size: component.expectedSize, sha256: component.fingerprint },
+      `Protocol V2 component ${key}`
+    );
     artifacts.push({
       artifactId: `component:${target}`,
       role: 'component',
@@ -481,52 +528,12 @@ const buildProtocolV2Artifacts = (
       url: assertArtifactUrl(component.url, `Protocol V2 component ${key}`),
       container: 'raw',
       logicalName: key,
-      ...asIntegrity({
-        size: component.expectedSize,
-        sha256: component.fingerprint,
-      }),
+      ...integrity,
       ...(asVersion(component.version) ? { targetVersion: asVersion(component.version) } : {}),
     });
     targets.push(target);
   }
 
-  const bundles =
-    includeResources && Array.isArray(release.resourceBundles) ? release.resourceBundles : [];
-  const resourceBundleNames = new Set<string>();
-  for (const value of bundles) {
-    const bundle = asRecord(value);
-    const name = asString(bundle?.name);
-    if (!bundle || !name) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'Protocol V2 resource bundle is invalid',
-        { firmwareUpdateCode: 'FirmwarePlanInvalid' }
-      );
-    }
-    if (resourceBundleNames.has(name)) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        `Protocol V2 resource bundle duplicates name ${name}`,
-        { firmwareUpdateCode: 'FirmwarePlanInvalid' }
-      );
-    }
-    resourceBundleNames.add(name);
-    artifacts.push({
-      artifactId: `resourceBundle:${name}`,
-      role: 'resourceBundle',
-      target: 'resource',
-      url: assertArtifactUrl(bundle.url, `Protocol V2 resource bundle ${name}`),
-      container: 'raw',
-      logicalName: name,
-      ...asIntegrity({
-        size: bundle.expectedSize,
-        sha256: bundle.fingerprint,
-      }),
-    });
-  }
-  if (bundles.length > 0) {
-    targets.push('resource');
-  }
   return { artifacts, targets: [...new Set(targets)] };
 };
 
@@ -587,6 +594,176 @@ const assertForcedTargetsRepresented = ({
   }
 };
 
+const finalizeFirmwareUpdatePlan = ({
+  features,
+  firmwareType,
+  platform,
+  artifacts,
+  targetsToUpdate,
+}: {
+  features: Features;
+  firmwareType: EFirmwareType;
+  platform: FirmwareUpdatePlatform;
+  artifacts: FirmwareUpdatePlanArtifact[];
+  targetsToUpdate: FirmwareUpdatePlanTarget[];
+}): FirmwareUpdatePlan => {
+  const executor = getExecutor(features);
+  const bootloaderMode = resolveDeviceBootloaderMode(features);
+  // 'unavailable' is the reserved degraded-identity sentinel; a device-reported
+  // serial must never be able to collide with it.
+  const reportedIdentity = getDeviceUUID(features);
+  const deviceIdentity = reportedIdentity === 'unavailable' ? '' : reportedIdentity;
+  // Classic 系列仅在 bootloader 恢复时允许缺少身份；部分尚未完成产线写号的
+  // Pro2/Neo（V4）在正常模式下也可能没有序列号，因此允许使用降级身份。
+  const allowsUnavailableIdentity = (bootloaderMode && executor === 'v2') || executor === 'v4';
+  if (
+    artifacts.length > 0 &&
+    (platform === 'native' || platform === 'desktop') &&
+    !deviceIdentity &&
+    !allowsUnavailableIdentity
+  ) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      'Prepared firmware update requires a stable device identity',
+      { firmwareUpdateCode: 'FirmwarePlanInvalid' }
+    );
+  }
+  const planWithoutDigest: Omit<FirmwareUpdatePlan, 'planDigest'> = {
+    schemaVersion: 2,
+    executor,
+    deviceIdentity: deviceIdentity || 'unavailable',
+    deviceModel: String(getDeviceType(features)),
+    firmwareType,
+    platform,
+    artifacts,
+    targetsToUpdate,
+  };
+  return assertFirmwareUpdatePlan({
+    ...planWithoutDigest,
+    planDigest: digestFirmwareUpdatePlan(planWithoutDigest),
+  });
+};
+
+export type ProtocolV2LocalFirmwareUpdatePlanArtifact = {
+  artifactId: string;
+  target: Exclude<FirmwareUpdateV4Target, 'boot_resources'>;
+  container: 'raw' | 'zip';
+  logicalName: string;
+  expectedSize: number;
+  expectedSha256: string;
+  targetVersion?: string;
+};
+
+export const buildProtocolV2LocalFirmwareUpdatePlan = ({
+  features,
+  firmwareType,
+  platform,
+  artifacts,
+}: {
+  features: Features;
+  firmwareType: EFirmwareType;
+  platform: FirmwareUpdatePlatform;
+  artifacts: ProtocolV2LocalFirmwareUpdatePlanArtifact[];
+}): FirmwareUpdatePlan => {
+  if (artifacts.length === 0) {
+    return planError('Protocol V2 local firmware plan has no artifacts');
+  }
+  const plan = finalizeFirmwareUpdatePlan({
+    features,
+    firmwareType,
+    platform,
+    artifacts: artifacts.map(artifact => ({
+      ...artifact,
+      role: artifact.target === 'resource' ? 'resourceBundle' : 'component',
+      url: `https://local-firmware.invalid/${encodeURIComponent(artifact.artifactId)}`,
+    })),
+    targetsToUpdate: artifacts.map(artifact => artifact.target),
+  });
+  if (plan.executor !== 'v4') {
+    return planError('Protocol V2 local firmware plan requires executor v4');
+  }
+  return plan;
+};
+
+export const buildProtocolV2FirmwareUpdatePlan = ({
+  features,
+  firmwareType,
+  platform,
+  release,
+  targetsToUpdate,
+  forceUpdateTargets,
+  resourceArchive,
+}: {
+  features: Features;
+  firmwareType: EFirmwareType;
+  platform: FirmwareUpdatePlatform;
+  release: ReleaseRecord | undefined;
+  targetsToUpdate: readonly FirmwareUpdateV4Target[];
+  forceUpdateTargets?: FirmwareUpdatePlanForceTarget[];
+  resourceArchive: IProtocolV2ResourceSource | undefined;
+}): FirmwareUpdatePlan => {
+  const validatedForceTargets = validateFirmwareUpdatePlanForceTargets(forceUpdateTargets);
+  if (validatedForceTargets.some(target => target === 'ble' || target === 'bootloader')) {
+    planError('Protocol V2 does not support forced BLE or legacy bootloader targets');
+  }
+
+  const requestedComponentTargets = new Set<FirmwareUpdatePlanTarget>(
+    targetsToUpdate.filter(target => target !== 'resource')
+  );
+  if (
+    getDeviceType(features) === EDeviceType.Neo &&
+    (requestedComponentTargets.has('se03') || requestedComponentTargets.has('se04'))
+  ) {
+    planError('Neo does not support Protocol V2 targets se03 or se04');
+  }
+  const protocolV2 = buildProtocolV2Artifacts(release ?? {}, {
+    includeComponents: requestedComponentTargets.size > 0,
+    componentTargets: requestedComponentTargets,
+  });
+  const resourceRequested = targetsToUpdate.includes('resource');
+  if (resourceRequested) {
+    const archive = resourceArchive;
+    if (!archive) {
+      return planError('Protocol V2 resource target has no resource archive');
+    }
+    const integrity = requireArtifactIntegrity(
+      { size: archive.archiveSize, sha256: archive.archiveSha256 },
+      'Protocol V2 resource archive'
+    );
+    protocolV2.artifacts.push({
+      artifactId: 'resource:archive',
+      role: 'resourceBundle',
+      target: 'resource',
+      url: assertArtifactUrl(archive.archiveUrl, 'Protocol V2 resource archive'),
+      container: 'zip',
+      logicalName: 'protocol-v2-resource-archive',
+      ...integrity,
+    });
+    protocolV2.targets.push('resource');
+  }
+  const representedTargets = new Set(protocolV2.targets);
+  const missingTarget = Array.from(requestedComponentTargets).find(
+    target => !representedTargets.has(target)
+  );
+  if (missingTarget) {
+    planError(`Protocol V2 release does not contain requested target ${missingTarget}`);
+  }
+  if (validatedForceTargets.includes('firmware') && protocolV2.targets.length === 0) {
+    planError('Forced firmware update target firmware is not represented by the plan');
+  }
+  if (validatedForceTargets.includes('resource') && !resourceArchive) {
+    planError('Forced firmware update target resource has no Protocol V2 resource archive');
+  }
+
+  return finalizeFirmwareUpdatePlan({
+    features,
+    firmwareType,
+    platform,
+    artifacts: protocolV2.artifacts,
+    targetsToUpdate: protocolV2.targets,
+  });
+};
+
 export const buildFirmwareUpdatePlan = ({
   features,
   firmwareType,
@@ -623,7 +800,11 @@ export const buildFirmwareUpdatePlan = ({
     !!asRelease(release);
   const shouldUpdateFirmware =
     isUpgrade(firmware) || isRecoveryInstall(firmware) || forcedTargets.has('firmware');
-  const shouldUpdateResource = isUpgrade(firmware) || forcedTargets.has('resource');
+  // V2 cannot write legacy resources once the device is already in bootloader
+  // recovery. Do not approve an artifact that its executor cannot apply.
+  const shouldUpdateResource =
+    !(executor === 'v2' && bootloaderMode) &&
+    (isUpgrade(firmware) || forcedTargets.has('resource'));
 
   if (
     executor === 'v4' &&
@@ -635,25 +816,29 @@ export const buildFirmwareUpdatePlan = ({
   if (executor === 'v4' && (shouldUpdateFirmware || shouldUpdateResource)) {
     const protocolV2 = buildProtocolV2Artifacts(firmwareRelease ?? {}, {
       includeComponents: shouldUpdateFirmware,
-      includeResources: shouldUpdateResource,
     });
     artifacts = protocolV2.artifacts;
     targetsToUpdate = protocolV2.targets;
   } else {
     if (isUpgrade(bootloader) || forcedTargets.has('bootloader')) {
+      const bootloaderRelease = asRelease(bootloader);
+      const integrity = requireArtifactIntegrity(
+        {
+          size: bootloaderRelease?.bootloaderExpectedSize,
+          sha256: bootloaderRelease?.bootloaderFingerprint,
+        },
+        'Bootloader release'
+      );
       artifacts.push({
         artifactId: 'bootloader',
         role: 'bootloader',
         target: 'bootloader',
-        url: assertArtifactUrl(asRelease(bootloader)?.bootloaderResource, 'Bootloader release'),
+        url: assertArtifactUrl(bootloaderRelease?.bootloaderResource, 'Bootloader release'),
         container: 'raw',
-        ...asIntegrity({
-          size: asRelease(bootloader)?.bootloaderExpectedSize,
-          sha256: asRelease(bootloader)?.bootloaderFingerprint,
-        }),
-        ...(asVersion(asRelease(bootloader)?.bootloaderVersion)
+        ...integrity,
+        ...(asVersion(bootloaderRelease?.bootloaderVersion)
           ? {
-              targetVersion: asVersion(asRelease(bootloader)?.bootloaderVersion),
+              targetVersion: asVersion(bootloaderRelease?.bootloaderVersion),
             }
           : {}),
       });
@@ -665,16 +850,17 @@ export const buildFirmwareUpdatePlan = ({
         });
       }
       if (shouldUpdateFirmware) {
+        const integrity = requireArtifactIntegrity(
+          { size: firmwareRelease.expectedSize, sha256: firmwareRelease.fingerprint },
+          'Firmware release'
+        );
         artifacts.push({
           artifactId: 'firmware',
           role: 'firmware',
           target: 'firmware',
           url: assertArtifactUrl(firmwareRelease.url, 'Firmware release'),
           container: 'raw',
-          ...asIntegrity({
-            size: firmwareRelease.expectedSize,
-            sha256: firmwareRelease.fingerprint,
-          }),
+          ...integrity,
           ...(asVersion(firmwareRelease.version)
             ? { targetVersion: asVersion(firmwareRelease.version) }
             : {}),
@@ -687,13 +873,8 @@ export const buildFirmwareUpdatePlan = ({
           platform,
         });
         if (resourceUrl) {
-          artifacts.push({
-            artifactId: 'resource',
-            role: 'resource',
-            target: 'resource',
-            url: assertArtifactUrl(resourceUrl, 'Firmware resource release'),
-            container: 'zip',
-            ...asIntegrity({
+          const integrity = requireArtifactIntegrity(
+            {
               size:
                 resourceUrl === asString(firmwareRelease.fullResource)
                   ? firmwareRelease.fullResourceExpectedSize
@@ -702,23 +883,36 @@ export const buildFirmwareUpdatePlan = ({
                 resourceUrl === asString(firmwareRelease.fullResource)
                   ? firmwareRelease.fullResourceFingerprint
                   : firmwareRelease.resourceFingerprint,
-            }),
+            },
+            'Legacy resource archive'
+          );
+          artifacts.push({
+            artifactId: 'resource',
+            role: 'resource',
+            target: 'resource',
+            url: assertArtifactUrl(resourceUrl, 'Firmware resource release'),
+            container: 'zip',
+            ...integrity,
           });
         }
       }
     }
     if (isUpgrade(ble) || isRecoveryInstall(ble) || forcedTargets.has('ble')) {
       const bleRelease = asRelease(ble);
+      const integrity = requireArtifactIntegrity(
+        {
+          size: bleRelease?.expectedSize,
+          sha256: bleRelease?.fingerprintWeb ?? bleRelease?.fingerprint,
+        },
+        'BLE release'
+      );
       artifacts.push({
         artifactId: 'ble',
         role: 'ble',
         target: 'ble',
         url: assertArtifactUrl(bleRelease?.webUpdate ?? bleRelease?.url, 'BLE release'),
         container: 'raw',
-        ...asIntegrity({
-          size: bleRelease?.expectedSize,
-          sha256: bleRelease?.fingerprintWeb ?? bleRelease?.fingerprint,
-        }),
+        ...integrity,
         ...(asVersion(bleRelease?.version)
           ? { targetVersion: asVersion(bleRelease?.version) }
           : {}),
@@ -727,46 +921,25 @@ export const buildFirmwareUpdatePlan = ({
     targetsToUpdate = [...new Set(artifacts.map(artifact => artifact.target))];
   }
 
+  if (
+    executor !== 'v4' &&
+    targetsToUpdate.includes('resource') &&
+    !targetsToUpdate.includes('firmware')
+  ) {
+    planError('Legacy resource updates require a firmware target');
+  }
+
   assertForcedTargetsRepresented({
     executor,
     forcedTargets: validatedForceTargets,
     artifacts,
     targetsToUpdate,
   });
-
-  // 'unavailable' is the reserved degraded-identity sentinel; a device-reported
-  // serial must never be able to collide with it.
-  const reportedIdentity = getDeviceUUID(features);
-  const deviceIdentity = reportedIdentity === 'unavailable' ? '' : reportedIdentity;
-  // Bootloader-mode classic-family devices (executor v2, e.g. classic1s) cannot report
-  // a serial number, so their recovery plans fall back to the degraded 'unavailable'
-  // identity. Binding is then enforced against the live device at install time instead
-  // (assertFirmwareUpdatePreparedPlanDeviceIdentity), and plan integrity by the digest.
-  // Pro (v3) and Pro2 (v4) report a serial even in bootloader mode and stay strict.
-  if (
-    artifacts.length > 0 &&
-    (platform === 'native' || platform === 'desktop') &&
-    !deviceIdentity &&
-    !(bootloaderMode && executor === 'v2')
-  ) {
-    throw ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      'Prepared firmware update requires a stable device identity',
-      { firmwareUpdateCode: 'FirmwarePlanInvalid' }
-    );
-  }
-  const planWithoutDigest: Omit<FirmwareUpdatePlan, 'planDigest'> = {
-    schemaVersion: 2,
-    executor,
-    deviceIdentity: deviceIdentity || 'unavailable',
-    deviceModel: String(getDeviceType(features)),
+  return finalizeFirmwareUpdatePlan({
+    features,
     firmwareType,
     platform,
     artifacts,
     targetsToUpdate,
-  };
-  return assertFirmwareUpdatePlan({
-    ...planWithoutDigest,
-    planDigest: digestFirmwareUpdatePlan(planWithoutDigest),
   });
 };
