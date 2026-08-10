@@ -55,6 +55,8 @@ export type ProtocolV2CallOptions = {
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
   onWriteCompleted?: (metrics: TransportWriteMetrics) => void;
   writeWithResponse?: boolean;
+  /** Recovery-only compatibility for the legacy ProtocolInfo wire layout. */
+  allowLegacyProtocolV2ProtocolInfo?: boolean;
 };
 
 export { concatUint8Arrays, ProtocolV2FrameAssembler };
@@ -321,7 +323,9 @@ export class ProtocolV2Session {
         } else {
           let decoded: ReturnType<typeof ProtocolV2.decodeFrame>;
           try {
-            decoded = ProtocolV2.decodeFrame(schemas, rxFrame);
+            decoded = ProtocolV2.decodeFrame(schemas, rxFrame, {
+              allowLegacyProtocolV2ProtocolInfo: callOptions.allowLegacyProtocolV2ProtocolInfo,
+            });
           } catch (cause) {
             throw new ProtocolV2LinkError(
               'frame',
