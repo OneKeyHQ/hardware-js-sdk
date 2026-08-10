@@ -5116,9 +5116,9 @@ describe('Protocol V2 firmware update targets', () => {
       getCommands: () => activeCommands,
     });
     (method as any).protocolV2LegacyDirectUpdate = true;
-    (method as any).rebootProtocolV2ToBootloader = jest.fn().mockImplementation(async () => {
+    (method as any).rebootProtocolV2ToBootloader = jest.fn().mockImplementation(() => {
       activeCommands = { typedCall: bootloaderTypedCall };
-      return true;
+      return Promise.resolve(true);
     });
     method.postTipMessage = jest.fn();
     method.postProgressMessage = jest.fn();
