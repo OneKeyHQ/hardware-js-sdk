@@ -60,6 +60,7 @@ export async function loadProtocolV2FirmwareReleaseContext({
     refreshSections: checkFirmwareHash
       ? ['identity', 'versions', 'verification']
       : ['identity', 'versions'],
+    allowLegacyProtocolV2ProtocolInfo: true,
   });
   if (state.identity.deviceType !== 'pro2' && state.identity.deviceType !== 'neo') {
     throw ERRORS.TypedError(

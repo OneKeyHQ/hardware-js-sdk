@@ -48,7 +48,10 @@ describe('live device state reads', () => {
 
     await method.run();
 
-    expect(getDeviceState).toHaveBeenCalledWith({ refreshSections: [...refreshSections] });
+    expect(getDeviceState).toHaveBeenCalledWith({
+      refreshSections: [...refreshSections],
+      ...(scope === 'firmware' ? { allowLegacyProtocolV2ProtocolInfo: true } : {}),
+    });
   });
 
   test.each(['bootloader', 'romloader'] as const)(

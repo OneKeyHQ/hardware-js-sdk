@@ -64,6 +64,7 @@ import {
   isProtocolV2UiEnabled,
 } from '../protocols/protocol-v2/uiInteraction';
 import { createUiProgressMessageFilter } from '../utils/uiProgressThrottle';
+import { isLegacyProtocolV2FirmwareRecoveryMethod } from './protocolV2LegacyRecovery';
 
 import type { ConnectSettings, Features, KnownDevice } from '../types';
 import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } from '../events';
@@ -109,8 +110,9 @@ const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   connectProtocol: method?.payload.connectProtocol,
   forceProtocolDetection: method?.payload.forceProtocolDetection,
   protocolV2DeviceInfoTimeoutMs: method?.payload.protocolV2DeviceInfoTimeoutMs,
-  // Firmware recovery may need to discover loader builds that use the old wire layout.
-  ...(method?.name === 'firmwareUpdateV4' ? { allowLegacyProtocolV2ProtocolInfo: true } : {}),
+  ...(isLegacyProtocolV2FirmwareRecoveryMethod(method)
+    ? { allowLegacyProtocolV2ProtocolInfo: true }
+    : {}),
 });
 
 let _core: Core | undefined;
