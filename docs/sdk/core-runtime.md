@@ -155,8 +155,11 @@ Core 先把公共钱包意图归一化，再映射到各协议：
 
 隐藏钱包 / Attach-to-PIN
   -> V1: GetPassphraseState -> PassphraseRequest / PassphraseAck
-  -> V2: REQUEST_PASSPHRASE 选择 -> AskPassphrase 或 AskPin(AttachToPin)
-         -> Success -> DeviceStatusGet -> DeviceSessionGet()
+  -> V2 锁定时: AskPin(Any)
+         -> Attach PIN: DeviceStatusGet -> DeviceSessionGet()，直接使用绑定钱包
+         -> Main PIN: REQUEST_PASSPHRASE 选择 -> AskPassphrase 或 AskPin(AttachToPin)
+            -> Success -> DeviceStatusGet -> DeviceSessionGet()
+  -> V2 已解锁时: 按当前状态直接读取 Attach PIN 钱包，或进入 REQUEST_PASSPHRASE 选择
 
 恢复隐藏钱包
   -> V1: 先用无钱包绑定字段的 Initialize 校验实时 deviceId，

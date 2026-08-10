@@ -101,11 +101,13 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   `DeviceSessionAskPin(AttachToPin)`。
 - `DeviceSessionAskPin` 的 PIN 类型由目标钱包意图决定，而不是由调用前的当前上下文决定：
   `Main` 用于选择标准钱包，也用于从 Attach-to-PIN 隐藏钱包上下文切回标准钱包；
-  `AttachToPin` 只用于选择该 Attach PIN 绑定的隐藏钱包。`unlockedAttachPin=true` 是当前上下文状态，
+  `Any` 用于从锁定状态开始隐藏钱包选择，也用于普通业务访问已知隐藏钱包；`AttachToPin` 只用于用户
+  已在钱包选择器中明确选择该 Attach PIN 绑定钱包的分支。`unlockedAttachPin=true` 是当前上下文状态，
   不表示后续请求应继续使用 `AttachToPin`。
-- Pro2 的钱包 Session 协调器不得捕获 `DeviceLocked` 后隐式解锁或重放协议请求。需要选择或恢复
-  隐藏钱包的业务方法必须先刷新 `DeviceStatus`；状态明确为锁定时先执行
-  `DeviceSessionAskPin(Main)`，否则直接调用钱包 Session 协议。调用期间返回的结构化
+- Pro2 的钱包 Session 协调器不得捕获 `DeviceLocked` 后隐式解锁或重放协议请求。钱包方法必须先刷新
+  `DeviceStatus`；`openWalletSession(select-hidden)` 在明确锁定时先执行 `DeviceSessionAskPin(Any)`，
+  使主 PIN 继续进入钱包选择、Attach PIN 直接恢复绑定钱包。标准钱包、安全操作与
+  `openWalletSession(resume-hidden)` 的预解锁仍使用 `Main`。调用期间返回的结构化
   `DeviceLocked` 必须原样向上抛出，避免重复有副作用的请求。Attach-to-PIN 分支仍只执行
   `DeviceSessionAskPin(AttachToPin)`。
 - 空参数 `DeviceSessionGet()` 只读取固件当前钱包 Session，不是标准钱包选择命令。标准钱包首次打开时

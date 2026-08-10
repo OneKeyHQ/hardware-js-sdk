@@ -471,6 +471,12 @@ describe('openWalletSession', () => {
       passphraseState: 'hidden-state-after-preflight',
     });
     expect(device.unlockDevice).toHaveBeenCalledTimes(1);
+    expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Any, {
+      source: 'unlock-coordinator',
+      reason: 'device-locked',
+      deviceOnly: true,
+      method: 'openWalletSession',
+    });
     expect(device.unlockDevice.mock.invocationCallOrder[0]).toBeLessThan(
       typedCall.mock.invocationCallOrder[0]
     );

@@ -60,12 +60,17 @@
   校验原始 `DeviceStatus`，然后直接用空参数 `DeviceSessionGet()` 读取当前隐藏钱包，不重新发起
   Passphrase 选择、`DeviceSessionAskPassphrase` 或 `DeviceSessionAskPin`。复核状态不一致时失败关闭，
   不回退到钱包重选。
+- Protocol V2 从锁定状态进入 `select-hidden` 时，预解锁使用 `DeviceSessionAskPin(Any)`，与 Pro V1
+  的统一解锁入口保持一致。用户输入 Attach PIN 后直接读取其绑定钱包；输入主 PIN 后继续展示
+  Passphrase/Attach PIN 钱包选择。这里不能使用 `AttachToPin`，否则会阻止用户通过主 PIN 选择其他
+  隐藏钱包。
 - Core 把现有 `deriveCardano` 意图映射为 `DeviceSessionGet.seed_domains`：普通业务请求
   `[Standard]`，Cardano 业务请求 `[Standard, Cardano]`。调用链没有提供派生意图时省略该字段，
   保持固件“派生全部支持域”的兼容行为。
-- `DeviceSessionAskPin` 的类型按业务意图选择：标准钱包和安全操作使用 `Main`；普通业务调用已携带目标
-  `passphraseState` 时，预解锁使用 `Any`，允许主 PIN 或 Attach PIN 进入，随后仍以返回的
-  `btc_test_address` 校验目标隐藏钱包；用户明确选择 Attach PIN 打开隐藏钱包时使用 `AttachToPin`。
+- `DeviceSessionAskPin` 的类型按业务意图选择：标准钱包和安全操作使用 `Main`；`select-hidden` 或普通
+  业务调用已携带目标 `passphraseState` 时，预解锁使用 `Any`，允许主 PIN 或 Attach PIN 进入，随后
+  仍以返回的 `btc_test_address` 校验目标隐藏钱包；用户在钱包选择器中明确选择 Attach PIN 时使用
+  `AttachToPin`。
   `unlockedAttachPin=true` 只描述当前上下文，不决定下一次 Ask 的 PIN 类型。
 - 旧参数形式的 `initSession=true` 只使当前设备上明确指定的旧钱包 Session 失效；
   钱包标识不匹配、设备切换和显式 `clearSessionCache()` 也会按各自范围使缓存失效。
@@ -327,7 +332,8 @@ await HardwareSDK.clearSessionCache({ deviceId, passphraseState });
    `ProtocolInfoRequest { eventless_wallet_session: true }`。标准钱包首次打开时发送
    `DeviceSessionAskPin(Main) -> DeviceSessionGet()`；缓存存在时发送
    `DeviceSessionGet(session_id, btc_test_address)`。隐藏钱包恢复时携带 `btc_test_address`，按新钱包
-   选择时通常先发送 Ask，成功后发送 `DeviceSessionGet()`；设备已经由 Attach PIN 解锁时则复核
+   选择时，锁定设备先发送 `DeviceSessionAskPin(Any)`：Attach PIN 会直接打开绑定钱包，主 PIN 则继续
+   钱包选择并发送对应 Ask；成功后发送 `DeviceSessionGet()`。设备已经由 Attach PIN 解锁时则复核
    实时状态并直接读取当前 `DeviceSession`，避免再次询问 Passphrase 或重复输入 Attach PIN。
 7. 固件按 `btc_test_address` 校验当前 SE Session，并对带 `session_id` 的 Get 尝试恢复指定 Session。
    若首次 `passphraseState` 不匹配，标准钱包
@@ -649,6 +655,8 @@ Attach PIN。三种 Ask 路径均返回 `Success`，随后由 Get 读取 Session
 交互中转交给固件，不进入日志、缓存或钱包 Session 公共响应。
 如果 `select-hidden` 开始时设备已由 Attach PIN 解锁，则该选择已经在设备端完成；Core 不再触发
 上述 UI/Ask 路径，而是复核 `DeviceStatus` 后直接读取当前 Session。
+如果设备仍处于锁定状态，Core 先以 `Any` 类型发起预解锁；Attach PIN 可在该入口直接恢复绑定钱包，
+主 PIN 则只完成设备解锁，随后继续上述钱包选择流程。
 `DeviceSessionAskPassphrase` 必须显式携带 `on_device`：Host 输入发送
 `{ passphrase, on_device: false }`，设备输入发送 `{ on_device: true }`。
 Core 会再次执行幂等 NFKD 规范化，并按固件上限拒绝空值、NUL 或超过 50 个 UTF-8 字节的

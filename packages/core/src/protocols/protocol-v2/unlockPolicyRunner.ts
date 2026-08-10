@@ -25,6 +25,7 @@ type RunnableMethod = Pick<
   | 'run'
   | 'unlockPolicy'
   | 'useDevicePassphraseState'
+  | 'protocolV2PreUnlockPinType'
   | 'protocolV2UiInteraction'
   | 'protocolV2UiMode'
   | 'params'
@@ -48,6 +49,10 @@ type RunMethodWithUnlockPolicyOptions<T> = {
 };
 
 const resolvePreUnlockPinType = (method: RunnableMethod) => {
+  if (method.protocolV2PreUnlockPinType !== undefined) {
+    return method.protocolV2PreUnlockPinType;
+  }
+
   const targetsKnownHiddenWallet =
     method.useDevicePassphraseState &&
     method.payload?.useEmptyPassphrase !== true &&
