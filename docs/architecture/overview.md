@@ -184,6 +184,8 @@ Bootloader 或 Romloader 时复用当前 loader 连接，不重复 reboot。
 远程正式升级必须先通过最新配置生成 `FirmwareUpdatePlan`，宿主下载后再生成带完整收据的
 `PreparedPlan`；文件大小和 SHA-256 必须与远程 Plan 完全一致。执行阶段以 `PreparedPlan` 为唯一事实源，
 组件引用、升级目标和预期版本不需要调用方重复传入，也不重新依赖可能已变化的在线 release 记录。
+`hostBindingGeneration` 只允许与完整 `preparedPlan` 同时提交；不再接受把已注册 generation 用于
+非 Prepared 组件更新的旧调用方式。
 
 本地开发升级与远程 Plan 严格分离：组件可以继续通过 `firmwareUpdateV4` 的各组件 `ArrayBuffer` 字段传入；
 完整资源 ZIP 通过 `resourceArchiveBinary` 传入。Core 会把本地组件和资源 ZIP 转换成本地 Plan、PreparedPlan、

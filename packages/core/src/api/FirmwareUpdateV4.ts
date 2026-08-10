@@ -604,6 +604,24 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     const { payload } = this;
 
+    const removedResourceInputs = ['resourceFiles', 'resourceBundleArtifacts'].filter(input =>
+      Object.prototype.hasOwnProperty.call(payload, input)
+    );
+    if (removedResourceInputs.length > 0) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        `Protocol V2 ${removedResourceInputs.join(
+          ' and '
+        )} inputs are no longer supported; use resourceArchiveBinary for local updates or preparedPlan with hostBindingGeneration for remote updates`
+      );
+    }
+    if (payload.hostBindingGeneration !== undefined && !payload.preparedPlan) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'Protocol V2 hostBindingGeneration requires preparedPlan for remote updates; use direct binaries or resourceArchiveBinary for local updates'
+      );
+    }
+
     this.protocolV2HasExplicitTargetSelection = payload.targetsToUpdate !== undefined;
 
     if (typeof payload.retryCount !== 'number') {
@@ -672,10 +690,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       artifactReader = resolveFirmwareUpdateHostBinding(
         payload.hostBindingGeneration,
         preparedPlan.preparedPlanDigest
-      ).artifactReader;
-    } else if (payload.hostBindingGeneration !== undefined) {
-      artifactReader = resolveFirmwareUpdateHostBinding(
-        payload.hostBindingGeneration
       ).artifactReader;
     }
     if (preparedPlan) {
