@@ -1055,8 +1055,9 @@ export class Device extends EventEmitter {
       if (refresh.has('status') && !initializedWithDeviceInfo) {
         const cachedMode = this.state?.status.mode;
         await this.probeProtocolV2RuntimeState(refreshedDeviceInfo, undefined, {
-          // Loader 固件不支持 DeviceStatusGet。显式刷新时重新协商 ProtocolInfo，
-          // 让已重启回应用固件的设备退出缓存的 loader 状态。
+          // Loader firmware does not support DeviceStatusGet. Renegotiate ProtocolInfo
+          // during an explicit refresh so a device rebooted into application firmware
+          // can leave the cached loader state.
           forceRuntimeContextRefresh: cachedMode === 'bootloader' || cachedMode === 'romloader',
         });
       }
@@ -1507,8 +1508,9 @@ export class Device extends EventEmitter {
 
   async interruptionFromUser() {
     const error = ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
-    // 取消操作经常伴随传输会话结束（尤其是固件升级重启/退出）。必须在等待
-    // 任何异步取消回调前使 V2 状态失效，避免后续请求复用旧运行模式。
+    // Cancellation often ends the transport session, especially during firmware
+    // update reboot or exit. Invalidate V2 state before awaiting asynchronous
+    // cancellation callbacks so the next request cannot reuse a stale runtime mode.
     this.markTransportDisconnected();
     await this.cancelableAction?.(error);
     await this.commands?.cancel();
