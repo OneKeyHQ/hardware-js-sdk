@@ -68,6 +68,37 @@ const createDevice = (deviceType: 'pro2' | 'neo') => ({
   }),
 });
 
+const createFeaturelessDevice = (protocolV2: boolean) => {
+  const device = {
+    isProtocolV2: jest.fn(() => protocolV2),
+    features: undefined,
+    getDeviceState: jest.fn(),
+  };
+  device.getDeviceState.mockImplementation(() => {
+    Object.assign(device, {
+      features: {
+        deviceType: 'pro2',
+        firmwareVersion: '1.0.0',
+      },
+    });
+    return Promise.resolve({
+      identity: {
+        deviceType: 'pro2',
+        firmwareType: EFirmwareType.Universal,
+      },
+      status: { mode: 'bootloader' },
+      versions: {
+        firmware: '1.0.0',
+        applicationP1: '1.0.0',
+        bootloader: '1.0.0',
+        board: '1.0.0',
+        ble: '1.0.0',
+      },
+    });
+  });
+  return device;
+};
+
 describe.each(['pro2', 'neo'] as const)('Protocol V2 release checks for %s', deviceType => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -168,12 +199,11 @@ describe.each(['pro2', 'neo'] as const)('Protocol V2 release checks for %s', dev
   });
 });
 
-test('returns null from optional release probes when device features are unavailable', async () => {
-  const deviceWithoutFeatures = {
-    isProtocolV2: jest.fn(() => true),
-    features: undefined,
-    getDeviceState: jest.fn(),
-  };
+test('probes Protocol V2 loader state before requiring initialized features', async () => {
+  jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(release);
+  const firmwareDevice = createFeaturelessDevice(true);
+  const bleDevice = createFeaturelessDevice(true);
+  const bootloaderDevice = createFeaturelessDevice(true);
   const firmwareMethod = new CheckFirmwareRelease({
     id: 1,
     payload: { method: 'checkFirmwareRelease' },
@@ -187,13 +217,54 @@ test('returns null from optional release probes when device features are unavail
     payload: { method: 'checkBootloaderRelease' },
   });
 
-  firmwareMethod.device = deviceWithoutFeatures as unknown as CheckFirmwareRelease['device'];
-  bleMethod.device = deviceWithoutFeatures as unknown as CheckBLEFirmwareRelease['device'];
-  bootloaderMethod.device = deviceWithoutFeatures as unknown as CheckBootloaderRelease['device'];
+  firmwareMethod.device = firmwareDevice as unknown as CheckFirmwareRelease['device'];
+  bleMethod.device = bleDevice as unknown as CheckBLEFirmwareRelease['device'];
+  bootloaderMethod.device = bootloaderDevice as unknown as CheckBootloaderRelease['device'];
+
+  await expect(firmwareMethod.run()).resolves.toMatchObject({
+    status: 'outdated',
+    shouldUpdate: true,
+  });
+  await expect(bleMethod.run()).resolves.toMatchObject({
+    status: 'outdated',
+    shouldUpdate: true,
+  });
+  await expect(bootloaderMethod.run()).resolves.toMatchObject({
+    status: 'outdated',
+    shouldUpdate: true,
+  });
+  for (const device of [firmwareDevice, bleDevice, bootloaderDevice]) {
+    expect(device.isProtocolV2).toHaveBeenCalled();
+    expect(device.getDeviceState).toHaveBeenCalledTimes(1);
+  }
+});
+
+test('keeps featureless Protocol V1 release probes optional', async () => {
+  const firmwareDevice = createFeaturelessDevice(false);
+  const bleDevice = createFeaturelessDevice(false);
+  const bootloaderDevice = createFeaturelessDevice(false);
+  const firmwareMethod = new CheckFirmwareRelease({
+    id: 1,
+    payload: { method: 'checkFirmwareRelease' },
+  });
+  const bleMethod = new CheckBLEFirmwareRelease({
+    id: 2,
+    payload: { method: 'checkBLEFirmwareRelease' },
+  });
+  const bootloaderMethod = new CheckBootloaderRelease({
+    id: 3,
+    payload: { method: 'checkBootloaderRelease' },
+  });
+
+  firmwareMethod.device = firmwareDevice as unknown as CheckFirmwareRelease['device'];
+  bleMethod.device = bleDevice as unknown as CheckBLEFirmwareRelease['device'];
+  bootloaderMethod.device = bootloaderDevice as unknown as CheckBootloaderRelease['device'];
 
   await expect(firmwareMethod.run()).resolves.toBeNull();
   await expect(bleMethod.run()).resolves.toBeNull();
   await expect(bootloaderMethod.run()).resolves.toBeNull();
-  expect(deviceWithoutFeatures.isProtocolV2).not.toHaveBeenCalled();
-  expect(deviceWithoutFeatures.getDeviceState).not.toHaveBeenCalled();
+  for (const device of [firmwareDevice, bleDevice, bootloaderDevice]) {
+    expect(device.isProtocolV2).toHaveBeenCalled();
+    expect(device.getDeviceState).not.toHaveBeenCalled();
+  }
 });

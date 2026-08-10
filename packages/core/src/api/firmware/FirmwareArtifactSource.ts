@@ -1,4 +1,6 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex } from '@noble/hashes/utils';
 
 import type {
   FirmwareArtifactReader,
@@ -188,6 +190,43 @@ class ReaderFirmwareByteSource implements FirmwareByteSource {
   }
 }
 
+export const readFirmwareByteSourceFully = async (
+  source: FirmwareByteSource
+): Promise<ArrayBuffer> => {
+  const output = new Uint8Array(source.size);
+  let offset = 0;
+  while (offset < source.size) {
+    const length = Math.min(MAX_FIRMWARE_ARTIFACT_READ_BYTES, source.size - offset);
+    output.set(new Uint8Array(await source.readAt(offset, length)), offset);
+    offset += length;
+  }
+  return output.buffer;
+};
+
+export const readVerifiedFirmwareArtifact = async ({
+  artifact,
+  reader,
+}: {
+  artifact: FirmwareArtifactReference;
+  reader: FirmwareArtifactReader;
+}): Promise<ArrayBuffer> => {
+  assertFirmwareArtifactReference(artifact);
+  const source = await ReaderFirmwareByteSource.open(artifact, reader);
+  try {
+    const binary = await readFirmwareByteSourceFully(source);
+    const actualSha256 = bytesToHex(sha256(new Uint8Array(binary)));
+    if (actualSha256 !== artifact.sha256.toLowerCase()) {
+      return artifactError(
+        'FirmwareArtifactReceiptMismatch',
+        'Firmware artifact bytes do not match the approved SHA-256 receipt'
+      );
+    }
+    return binary;
+  } finally {
+    await source.close().catch(() => undefined);
+  }
+};
+
 export const openFirmwareByteSource = async ({
   binary,
   artifact,
@@ -216,20 +255,8 @@ export const openFirmwareByteSource = async ({
       'Firmware artifact reader is required for artifactRef input'
     );
   }
-  return ReaderFirmwareByteSource.open(artifact, reader);
-};
-
-export const readFirmwareByteSourceFully = async (
-  source: FirmwareByteSource
-): Promise<ArrayBuffer> => {
-  const output = new Uint8Array(source.size);
-  let offset = 0;
-  while (offset < source.size) {
-    const length = Math.min(MAX_FIRMWARE_ARTIFACT_READ_BYTES, source.size - offset);
-    output.set(new Uint8Array(await source.readAt(offset, length)), offset);
-    offset += length;
-  }
-  return output.buffer;
+  const verifiedBinary = await readVerifiedFirmwareArtifact({ artifact, reader });
+  return createMemoryFirmwareByteSource(verifiedBinary);
 };
 
 export const writeFirmwareByteSource = async ({

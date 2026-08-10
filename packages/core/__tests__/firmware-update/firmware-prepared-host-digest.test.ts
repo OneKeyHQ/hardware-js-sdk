@@ -1,4 +1,6 @@
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex } from '@noble/hashes/utils';
 
 import FirmwareUpdateV2 from '../../src/api/FirmwareUpdateV2';
 import FirmwareUpdateV3 from '../../src/api/FirmwareUpdateV3';
@@ -24,6 +26,9 @@ const noUpdate = {
   release: undefined,
 };
 
+const preparedArtifactBytes = Uint8Array.from([1, 2, 3, 4]);
+const preparedArtifactSha256 = bytesToHex(sha256(preparedArtifactBytes));
+
 const createPreparedPlan = ({
   executor,
   target,
@@ -31,11 +36,10 @@ const createPreparedPlan = ({
   executor: 'v2' | 'v3';
   target: 'firmware' | 'bootloader';
 }) => {
-  const sha256 = target === 'firmware' ? 'a'.repeat(64) : 'b'.repeat(64);
   const artifact: FirmwareArtifactReference = {
-    artifactRef: `fw:${sha256}`,
-    size: 4,
-    sha256,
+    artifactRef: `fw:${preparedArtifactSha256}`,
+    size: preparedArtifactBytes.byteLength,
+    sha256: preparedArtifactSha256,
   };
   const isV3 = executor === 'v3';
   const plan = buildFirmwareUpdatePlan({
@@ -97,11 +101,10 @@ const registerMismatchedHost = () => {
 };
 
 const createPreparedV4Plan = () => {
-  const sha256 = 'c'.repeat(64);
   const artifact: FirmwareArtifactReference = {
-    artifactRef: `fw:${sha256}`,
-    size: 4,
-    sha256,
+    artifactRef: `fw:${preparedArtifactSha256}`,
+    size: preparedArtifactBytes.byteLength,
+    sha256: preparedArtifactSha256,
   };
   const plan = buildFirmwareUpdatePlan({
     features: {
@@ -424,7 +427,14 @@ describe('prepared firmware host digest binding', () => {
     });
     const artifactReader = {
       open: jest.fn().mockResolvedValue({ readerId: 'bootloader-reader', size: artifact.size }),
-      read: jest.fn(),
+      read: jest.fn(({ offset, length }: { offset: number; length: number }) => {
+        const data = preparedArtifactBytes.slice(offset, offset + length).buffer;
+        return Promise.resolve({
+          data,
+          bytesRead: data.byteLength,
+          eof: offset + length === preparedArtifactBytes.byteLength,
+        });
+      }),
       close: jest.fn().mockResolvedValue(undefined),
     };
     const hostBindingGeneration = registerFirmwareUpdateHostBinding({

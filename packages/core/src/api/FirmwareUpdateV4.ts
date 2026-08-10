@@ -151,6 +151,18 @@ export function assertProtocolV2FirmwareTargetsSupported(
   if (params.se04Binary && (!hasExplicitTargetSelection || requestedTargets.has('se04'))) {
     unsupportedTargets.add('se04');
   }
+  if (
+    params.componentArtifacts?.se03 &&
+    (!hasExplicitTargetSelection || requestedTargets.has('se03'))
+  ) {
+    unsupportedTargets.add('se03');
+  }
+  if (
+    params.componentArtifacts?.se04 &&
+    (!hasExplicitTargetSelection || requestedTargets.has('se04'))
+  ) {
+    unsupportedTargets.add('se04');
+  }
 
   if (!unsupportedTargets.size || deviceType === EDeviceType.Pro2) return;
 

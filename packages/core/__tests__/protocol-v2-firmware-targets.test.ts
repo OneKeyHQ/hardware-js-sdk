@@ -11,6 +11,12 @@ jest.mock('../src/data/config', () => ({
   getSDKVersion: () => '0.0.0-test',
 }));
 
+const componentArtifact = {
+  artifactRef: `fw:${'a'.repeat(64)}`,
+  size: 1,
+  sha256: 'b'.repeat(64),
+};
+
 describe('Protocol V2 firmware target contract', () => {
   test('matches the current firmware-pro2 target ids', () => {
     expect(ProtocolV2FirmwareTargetType).toEqual({
@@ -63,6 +69,10 @@ describe('Protocol V2 firmware target contract', () => {
       targetsToUpdate: ['app_v1'] as Array<'app_v1'>,
       se03Binary: new ArrayBuffer(1),
       se04Binary: new ArrayBuffer(1),
+      componentArtifacts: {
+        se03: componentArtifact,
+        se04: componentArtifact,
+      },
     };
 
     expect(() =>
@@ -73,12 +83,25 @@ describe('Protocol V2 firmware target contract', () => {
     );
   });
 
+  test('rejects Neo SE03 and SE04 componentArtifacts without a target list', () => {
+    expect(() =>
+      assertProtocolV2FirmwareTargetsSupported(EDeviceType.Neo, {
+        platform: 'web',
+        componentArtifacts: {
+          se03: componentArtifact,
+          se04: componentArtifact,
+        },
+      })
+    ).toThrow('Neo only supports SE01 and SE02; unsupported firmware targets: se03, se04');
+  });
+
   test('keeps all four SE firmware targets available on Pro2', () => {
     expect(() =>
       assertProtocolV2FirmwareTargetsSupported(EDeviceType.Pro2, {
         platform: 'web',
         targetsToUpdate: ['se03'],
         se04Binary: new ArrayBuffer(1),
+        componentArtifacts: { se04: componentArtifact },
       })
     ).not.toThrow();
   });

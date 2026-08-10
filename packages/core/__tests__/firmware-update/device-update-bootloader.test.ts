@@ -1,4 +1,6 @@
 import { EDeviceType, EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex } from '@noble/hashes/utils';
 
 import DeviceUpdateBootloader from '../../src/api/device/DeviceUpdateBootloader';
 import {
@@ -27,10 +29,11 @@ jest.mock('../../src/device/DevicePool', () => ({
   DevicePool: {},
 }));
 
+const artifactBytes = Uint8Array.from([1, 2, 3, 4]);
 const artifact = {
   artifactRef: `fw:${'a'.repeat(64)}`,
-  size: 4,
-  sha256: 'a'.repeat(64),
+  size: artifactBytes.byteLength,
+  sha256: bytesToHex(sha256(artifactBytes)),
 };
 
 const createMethod = () => {
@@ -38,7 +41,14 @@ const createMethod = () => {
   const close = jest.fn().mockRejectedValue(closeError);
   const artifactReader = {
     open: jest.fn().mockResolvedValue({ readerId: 'reader-1', size: artifact.size }),
-    read: jest.fn(),
+    read: jest.fn(({ offset, length }: { offset: number; length: number }) => {
+      const data = artifactBytes.slice(offset, offset + length).buffer;
+      return Promise.resolve({
+        data,
+        bytesRead: data.byteLength,
+        eof: offset + length === artifactBytes.byteLength,
+      });
+    }),
     close,
   };
   const hostBindingGeneration = registerFirmwareUpdateHostBinding({

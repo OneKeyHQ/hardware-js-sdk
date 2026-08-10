@@ -6528,7 +6528,7 @@ describe('Protocol V2 firmware update targets', () => {
     const componentArtifact = {
       artifactRef: 'prepared-bootloader',
       size: componentBinary.byteLength,
-      sha256: 'a'.repeat(64),
+      sha256: bytesToHex(sha256(new Uint8Array(componentBinary))),
     };
     const planWithoutDigest = {
       schemaVersion: 2 as const,

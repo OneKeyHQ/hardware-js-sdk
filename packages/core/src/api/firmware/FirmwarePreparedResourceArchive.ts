@@ -3,7 +3,7 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import JSZip from 'jszip';
 
-import { openFirmwareByteSource, readFirmwareByteSourceFully } from './FirmwareArtifactSource';
+import { readVerifiedFirmwareArtifact } from './FirmwareArtifactSource';
 import { getFirmwareUpdateResourceName } from './FirmwareUpdatePreparedPlan';
 
 import type { FirmwareArtifactReader } from '../../types/api/firmwareUpdate';
@@ -92,37 +92,17 @@ export const readVerifiedPreparedResourceArchive = async ({
       'FirmwareArtifactsNotPrepared'
     );
   }
-  const archiveSource = await openFirmwareByteSource({
-    artifact: archiveArtifact.artifact,
-    reader,
-  });
-  if (!archiveSource) {
-    return resourceArchiveError(
-      'Firmware prepared resource ZIP is unavailable',
-      'FirmwareArtifactsNotPrepared'
-    );
-  }
-  if (archiveSource.size > PREPARED_RESOURCE_ARCHIVE_MAX_BYTES) {
-    await archiveSource.close().catch(() => undefined);
+  if (archiveArtifact.artifact.size > PREPARED_RESOURCE_ARCHIVE_MAX_BYTES) {
     return resourceArchiveError(
       'Firmware prepared resource ZIP exceeds the archive size limit',
       'FirmwareArtifactsNotPrepared'
     );
   }
 
-  let archiveBinary: ArrayBuffer;
-  try {
-    archiveBinary = await readFirmwareByteSourceFully(archiveSource);
-  } finally {
-    await archiveSource.close().catch(() => undefined);
-  }
-  const archiveDigest = bytesToHex(sha256(new Uint8Array(archiveBinary)));
-  if (archiveDigest !== archiveArtifact.artifact.sha256.toLowerCase()) {
-    return resourceArchiveError(
-      'Firmware prepared resource ZIP does not match its approved receipt',
-      'FirmwareArtifactReceiptMismatch'
-    );
-  }
+  const archiveBinary = await readVerifiedFirmwareArtifact({
+    artifact: archiveArtifact.artifact,
+    reader,
+  });
 
   let zip: JSZip;
   try {
