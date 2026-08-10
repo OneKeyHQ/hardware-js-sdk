@@ -1,5 +1,7 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
+import { clearFirmwareUpdatePreparedPlanDeviceIdentityPin } from './FirmwareUpdatePreparedPlan';
+
 import type { FirmwareUpdateHostBinding } from '../../types/api/firmwareUpdate';
 
 const bindingError = (message: string): never => {
@@ -16,14 +18,20 @@ class FirmwareHostBindingRegistry {
   register(binding: FirmwareUpdateHostBinding): number {
     if (
       !binding ||
+      typeof binding.preparedPlanDigest !== 'string' ||
+      !/^[0-9a-f]{64}$/i.test(binding.preparedPlanDigest) ||
       typeof binding.artifactReader?.open !== 'function' ||
       typeof binding.artifactReader.read !== 'function' ||
       typeof binding.artifactReader.close !== 'function'
     ) {
       return bindingError('Firmware host binding is invalid');
     }
+    const replacedPreparedPlanDigest = this.binding?.preparedPlanDigest;
     this.generation += 1;
     this.binding = binding;
+    if (replacedPreparedPlanDigest) {
+      clearFirmwareUpdatePreparedPlanDeviceIdentityPin(replacedPreparedPlanDigest);
+    }
     return this.generation;
   }
 
@@ -31,8 +39,12 @@ class FirmwareHostBindingRegistry {
     if (generation !== undefined && generation !== this.generation) {
       return false;
     }
+    const releasedPreparedPlanDigest = this.binding?.preparedPlanDigest;
     this.generation += 1;
     this.binding = undefined;
+    if (releasedPreparedPlanDigest) {
+      clearFirmwareUpdatePreparedPlanDeviceIdentityPin(releasedPreparedPlanDigest);
+    }
     return true;
   }
 
@@ -40,7 +52,7 @@ class FirmwareHostBindingRegistry {
     return this.generation;
   }
 
-  resolve(generation: number): FirmwareUpdateHostBinding {
+  resolve(generation: number, preparedPlanDigest?: string): FirmwareUpdateHostBinding {
     if (
       !Number.isSafeInteger(generation) ||
       generation <= 0 ||
@@ -50,12 +62,21 @@ class FirmwareHostBindingRegistry {
       return bindingError(`Firmware host binding generation ${generation} is stale`);
     }
     const { binding } = this;
+    if (
+      preparedPlanDigest !== undefined &&
+      binding.preparedPlanDigest.toLowerCase() !== preparedPlanDigest.toLowerCase()
+    ) {
+      return bindingError(
+        `Firmware host binding generation ${generation} does not match the prepared plan`
+      );
+    }
     const assertCurrent = () => {
       if (generation !== this.generation || binding !== this.binding) {
         bindingError(`Firmware host binding generation ${generation} is stale`);
       }
     };
     return {
+      preparedPlanDigest: binding.preparedPlanDigest,
       artifactReader: {
         open: async input => {
           assertCurrent();
@@ -96,5 +117,7 @@ export const getFirmwareUpdateHostBindingGeneration = (): number =>
   firmwareHostBindingRegistry.getGeneration();
 
 export const resolveFirmwareUpdateHostBinding = (
-  generation: number | undefined
-): FirmwareUpdateHostBinding => firmwareHostBindingRegistry.resolve(generation ?? Number.NaN);
+  generation: number | undefined,
+  preparedPlanDigest?: string
+): FirmwareUpdateHostBinding =>
+  firmwareHostBindingRegistry.resolve(generation ?? Number.NaN, preparedPlanDigest);

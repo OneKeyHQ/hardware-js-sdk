@@ -104,24 +104,6 @@ export type IProtocolV2ResourceManifest = {
   files: IProtocolV2ResourceManifestFile[];
 };
 
-/** Pro2 RESC bundle okpkg descriptor for incremental FileWrite synchronization. */
-export type IProtocolV2ResourceBundle = {
-  /** Bundle name, such as images, animation, translations, or fonts_roobert. */
-  name: string;
-  /** Download URL. */
-  url: string;
-  fingerprint?: string;
-  expectedSize?: number;
-  /** Device target path, such as vol0:/bundles/images/images.okpkg. */
-  devicePath: string;
-  /** okpkg payload_version used to skip matching content after FileRead. */
-  version?: IVersionArray;
-  /** okpkg payload_hash used for SHA3-512 comparison after FileRead. */
-  payloadHash?: string;
-  /** okpkg header_hash used for SHA3-512 comparison after FileRead. */
-  headerHash?: string;
-};
-
 /** STM32 firmware config */
 export type IFirmwareReleaseInfo = {
   required: boolean;
@@ -149,8 +131,6 @@ export type IFirmwareReleaseInfo = {
   upgradeType?: 'payload-package-set' | string;
   components?: Record<string, IProtocolV2FirmwareComponent>;
   installOrder?: string[];
-  /** Pro2 RESC bundles for incremental direct FileWrite synchronization. */
-  resourceBundles?: IProtocolV2ResourceBundle[];
   bootloaderChangelog?: {
     [k in ILocale]: string;
   };
@@ -179,22 +159,20 @@ export type IBLEFirmwareReleaseInfo = {
 };
 
 type IKnownDevice = Exclude<IDeviceType, 'unknown'>;
-type ILegacyKnownDevice = Exclude<IKnownDevice, 'neo'>;
-
 type IDeviceReleaseInfo = {
-  firmware: IFirmwareReleaseInfo[];
+  firmware?: IFirmwareReleaseInfo[];
   /** Protocol V2 payload package set */
   'firmware-v1'?: IFirmwareReleaseInfo[];
   'firmware-v2'?: IFirmwareReleaseInfo[];
   'firmware-v8'?: IFirmwareReleaseInfo[];
   'firmware-btc-v8'?: IFirmwareReleaseInfo[];
-  ble: IBLEFirmwareReleaseInfo[];
+  ble?: IBLEFirmwareReleaseInfo[];
   /** Independent Protocol V2 resource release configuration. */
   resources?: IProtocolV2Resources;
 };
 
 export type DeviceTypeMap = {
-  [k in ILegacyKnownDevice]: IDeviceReleaseInfo;
+  [k in Exclude<IKnownDevice, 'neo'>]: IDeviceReleaseInfo;
 } & {
   /** Optional until every remote-config producer publishes a Neo entry. */
   neo?: IDeviceReleaseInfo;

@@ -1,4 +1,7 @@
 import { EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex } from '@noble/hashes/utils';
+import JSZip from 'jszip';
 import {
   DeviceRebootType,
   DeviceSessionPinType,
@@ -103,6 +106,12 @@ import {
 } from '../src/utils';
 import { getDeviceFirmwareVersion } from '../src/utils/deviceVersionUtils';
 import { openFirmwareByteSource } from '../src/api/firmware/FirmwareArtifactSource';
+import {
+  registerFirmwareUpdateHostBinding,
+  unregisterFirmwareUpdateHostBinding,
+} from '../src/api/firmware/FirmwareHostBinding';
+import { prepareFirmwareUpdatePlan } from '../src/api/firmware/FirmwareUpdatePreparedPlan';
+import { digestFirmwareUpdateContract } from '../src/api/firmware/FirmwareUpdatePlan';
 import {
   getPassphraseState,
   getPassphraseStateWithRefreshDeviceInfo,
@@ -4027,6 +4036,71 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
+  test('filters unrequested binaries from a direct local Protocol V2 update', async () => {
+    const applicationP1Binary = new Uint8Array([1, 2, 3]).buffer;
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['app_v1'],
+        applicationP1Binary,
+        bootloaderBinary: new Uint8Array([4, 5, 6]).buffer,
+      },
+    });
+    method.init();
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    (method as any).device = stubDevice({
+      originalDescriptor: { protocolType: 'V2' },
+      features: {
+        deviceType: 'pro2',
+        firmwareVersion: '1.0.0',
+        capabilities: [],
+      },
+      getCurrentDeviceType: () => 'pro2',
+    });
+    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue('local-result');
+    method.postTipMessage = jest.fn();
+
+    await expect(method.run()).resolves.toBe('local-result');
+    expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
+      bootloaderBinary: null,
+      fwBinaryMap: [
+        {
+          fileName: 'application_p1.bin',
+          binary: applicationP1Binary,
+          targetId: 4,
+        },
+      ],
+    });
+  });
+
+  test('keeps all local binaries when no target list was supplied', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        applicationP1Binary: new Uint8Array([1]).buffer,
+        bootloaderBinary: new Uint8Array([2]).buffer,
+        resourceArchiveBinary: new Uint8Array([3]).buffer,
+      },
+    });
+    method.init();
+
+    const availableInstallItems = (method as any).buildProtocolV2InstallItems({
+      bootloaderBinary: (method as any).prepareBootloaderBinary(),
+      fwBinaryMap: (method as any).collectExplicitTargetBinaries(),
+    });
+
+    expect((method as any).params.targetsToUpdate).toEqual(['resource']);
+    expect(
+      (method as any)
+        .filterProtocolV2LocalInstallItems(availableInstallItems)
+        .map((item: { targetId: number }) => item.targetId)
+    ).toEqual([3, 4]);
+  });
+
   test('requires the external host to prepare manifest resources before bootloader entry', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -5500,6 +5574,9 @@ describe('Protocol V2 firmware update targets', () => {
       return Number(params.processedSize ?? 0) + Number(params.source.size);
     });
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
+    (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest
+      .fn()
+      .mockResolvedValue(undefined);
     (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
     (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({});
     (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
@@ -5573,6 +5650,9 @@ describe('Protocol V2 firmware update targets', () => {
         Promise.resolve(Number(params.processedSize ?? 0) + Number(params.source.size))
       );
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
+    (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest
+      .fn()
+      .mockResolvedValue(undefined);
     (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
     (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
     (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
@@ -5582,23 +5662,31 @@ describe('Protocol V2 firmware update targets', () => {
       .mockResolvedValue(undefined);
     (method as any).isProtocolV2ResourceBundleUpToDate = jest.fn().mockResolvedValue(false);
 
-    await (method as any).executeProtocolV2Update({
-      resourceBundles: [
+    await (method as any).executeProtocolV2SourceUpdate({
+      resourceSources: [
         {
           name: 'images.okpkg',
-          binary: new Uint8Array([1, 2]).buffer,
+          source: {
+            size: 2,
+            readAt: jest.fn(),
+            close: jest.fn(),
+          },
           devicePath: 'vol0:/bundles/images/images.okpkg',
           version: [1, 2, 3],
           payloadHash: '11'.repeat(64),
           headerHash: '22'.repeat(64),
         },
       ],
-      bootloaderBinary: null,
-      fwBinaryMap: [
+      installSources: [
         {
           fileName: 'application_p1.bin',
-          binary: new Uint8Array([3]).buffer,
+          source: {
+            size: 1,
+            readAt: jest.fn(),
+            close: jest.fn(),
+          },
           targetId: 4,
+          kind: 'firmware',
         },
       ],
     });
@@ -5643,6 +5731,74 @@ describe('Protocol V2 firmware update targets', () => {
     ]);
   });
 
+  test('stages the mounted boot resource before any firmware install phase', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4' },
+    });
+    const bootResource = {
+      devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+    };
+    const phases = (method as any).buildProtocolV2ExecutionPhases({
+      installSources: [{ kind: 'bootloader' }, { kind: 'component' }],
+      resourceSources: [bootResource, { devicePath: 'vol0:/resource/images/images.okpkg' }],
+    });
+
+    expect(phases.map((phase: { kind: string }) => phase.kind)).toEqual([
+      'resource-sync',
+      'bootloader-install',
+      'bootloader-verify',
+      'resource-sync',
+      'component-install',
+      'final-verify',
+    ]);
+    expect(phases[0].resourceSources).toEqual([bootResource]);
+  });
+
+  test('removes stale boot resource staging before a component-only reboot', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4' },
+    });
+    const events: string[] = [];
+    let stagingExists = true;
+    const typedCall = jest.fn((requestType: string) => {
+      if (requestType === 'FilesystemPathInfoQuery') {
+        return Promise.resolve({
+          type: 'FilesystemPathInfo',
+          message: { exist: stagingExists, directory: false, size: stagingExists ? 3 : 0 },
+        });
+      }
+      if (requestType === 'FilesystemFileDelete') {
+        events.push('delete-stale-staging');
+        stagingExists = false;
+        return Promise.resolve({ type: 'Success', message: {} });
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
+    });
+    (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
+    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
+    (method as any).executeProtocolV2TransferPhase = jest.fn().mockImplementation(() => {
+      events.push('transfer-component');
+      return Promise.resolve();
+    });
+    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockImplementation(() => {
+      events.push('reboot-normal');
+      return Promise.resolve();
+    });
+    (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
+
+    await (method as any).executeProtocolV2SourceUpdate({
+      installSources: [{ kind: 'firmware' }],
+      resourceSources: [],
+    });
+
+    expect(events).toEqual(['delete-stale-staging', 'transfer-component', 'reboot-normal']);
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'FilesystemFileDelete', 'Success', {
+      path: 'vol0:/loaders/bootloader/boot_resource.okpkg.staging',
+    });
+  });
+
   test('does not request installation when the staged file size does not match', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -5655,6 +5811,9 @@ describe('Protocol V2 firmware update targets', () => {
     method.postProgressMessage = jest.fn();
     (method as any).protocolV2SourceUpdateProcess = jest.fn().mockResolvedValue(3);
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
+    (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest
+      .fn()
+      .mockResolvedValue(undefined);
     (method as any).device = stubDevice({
       getCommands: () => ({
         typedCall: jest.fn().mockResolvedValue({
@@ -5706,6 +5865,9 @@ describe('Protocol V2 firmware update targets', () => {
         Promise.resolve(Number(params.processedSize ?? 0) + Number(params.source.size))
       );
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
+    (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest
+      .fn()
+      .mockResolvedValue(undefined);
     (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
     (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
     (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
@@ -5785,6 +5947,14 @@ describe('Protocol V2 firmware update targets', () => {
           binary: binaries.get(url) ?? new Uint8Array([0]).buffer,
         })
       );
+    const componentIntegrity = (url: string) => {
+      const binary = binaries.get(url);
+      if (!binary) throw new Error(`Missing test firmware binary: ${url}`);
+      return {
+        expectedSize: binary.byteLength,
+        fingerprint: bytesToHex(sha256(new Uint8Array(binary))),
+      };
+    };
     const getFirmwareLatestReleaseSpy = jest
       .spyOn(DataManager, 'getFirmwareLatestRelease')
       .mockReturnValue({
@@ -5809,23 +5979,43 @@ describe('Protocol V2 firmware update targets', () => {
           bootloader: {
             target: 'BOOTLOADER',
             url: 'https://example.com/bootloader.pp.bin',
+            ...componentIntegrity('https://example.com/bootloader.pp.bin'),
           },
           applicationP1: {
             target: 'APPLICATION_P1',
             url: 'https://example.com/applicationP1.pp.bin',
+            ...componentIntegrity('https://example.com/applicationP1.pp.bin'),
           },
           applicationP2: {
             target: 'APPLICATION_P2',
             url: 'https://example.com/applicationP2.pp.bin',
+            ...componentIntegrity('https://example.com/applicationP2.pp.bin'),
           },
           coprocessor: {
             target: 'COPROCESSOR',
             url: 'https://example.com/coprocessor.pp.bin',
+            ...componentIntegrity('https://example.com/coprocessor.pp.bin'),
           },
-          se01: { target: 'SE01', url: 'https://example.com/se01.pp.bin' },
-          se02: { target: 'SE02', url: 'https://example.com/se02.pp.bin' },
-          se03: { target: 'SE03', url: 'https://example.com/se03.pp.bin' },
-          se04: { target: 'SE04', url: 'https://example.com/se04.pp.bin' },
+          se01: {
+            target: 'SE01',
+            url: 'https://example.com/se01.pp.bin',
+            ...componentIntegrity('https://example.com/se01.pp.bin'),
+          },
+          se02: {
+            target: 'SE02',
+            url: 'https://example.com/se02.pp.bin',
+            ...componentIntegrity('https://example.com/se02.pp.bin'),
+          },
+          se03: {
+            target: 'SE03',
+            url: 'https://example.com/se03.pp.bin',
+            ...componentIntegrity('https://example.com/se03.pp.bin'),
+          },
+          se04: {
+            target: 'SE04',
+            url: 'https://example.com/se04.pp.bin',
+            ...componentIntegrity('https://example.com/se04.pp.bin'),
+          },
         },
         fingerprint: '',
         changelog: {
@@ -5893,10 +6083,14 @@ describe('Protocol V2 firmware update targets', () => {
           applicationP1: {
             target: 'APPLICATION_P1',
             url: 'https://example.com/applicationP1.pp.bin',
+            expectedSize: explicitApplicationBinary.byteLength,
+            fingerprint: bytesToHex(sha256(new Uint8Array(explicitApplicationBinary))),
           },
           coprocessor: {
             target: 'COPROCESSOR',
             url: 'https://example.com/coprocessor.pp.bin',
+            expectedSize: remoteCoprocessorBinary.byteLength,
+            fingerprint: bytesToHex(sha256(new Uint8Array(remoteCoprocessorBinary))),
           },
         },
         fingerprint: '',
@@ -6104,56 +6298,721 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
-  test('rejects prepared RESC bundle paths before opening an artifact source', async () => {
+  test('maps a prepared resource archive manifest to artifact-backed resource sources', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
       },
     });
-    const openPreparedSource = jest.fn();
-    (method as any).params = {
-      targetsToUpdate: ['resource'],
-      resourceBundleArtifacts: [
+    const imagesBinary = createProtocolV2OkppBinary();
+    const bootBinary = createProtocolV2OkppBinary({ payloadHashByte: 0x33 });
+    const imagesSha256 = bytesToHex(sha256(new Uint8Array(imagesBinary)));
+    const bootSha256 = bytesToHex(sha256(new Uint8Array(bootBinary)));
+    const manifest = {
+      schema: 1,
+      artifact_name: 'pro2-resource',
+      release_name: 'test-release',
+      variant: 'resource',
+      commit: 'abc123',
+      short_sha: 'abc123',
+      timestamp_utc: '2026-08-09T00:00:00Z',
+      core_version: '1.0.0',
+      key_set: 'production',
+      device_root: 'vol0:',
+      restore_mode: 'bootloader_update',
+      trees: [{ path: 'bundles', device: 'pro2' }],
+      files: [
         {
-          name: 'images',
-          artifact: {
-            artifactRef: `fw:${'a'.repeat(64)}`,
-            size: 1,
-            sha256: 'a'.repeat(64),
-          },
+          archive_path: 'bundles/images/images.okpkg',
+          original_name: 'images.okpkg',
+          device_path: 'vol0:/bundles/images/images.okpkg',
+          size: imagesBinary.byteLength,
+          sha256: imagesSha256,
+          signed: true,
+          sig_algo: 'ed25519',
+          payload_version: '1.2.3',
+        },
+        {
+          archive_path: 'loaders/bootloader/boot_resource.okpkg',
+          original_name: 'boot_resource.okpkg',
+          device_path: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+          size: bootBinary.byteLength,
+          sha256: bootSha256,
+          signed: true,
+          sig_algo: 'ed25519',
+          payload_version: '1.2.3',
         },
       ],
     };
-    (method as any).openProtocolV2PreparedSource = openPreparedSource;
-    const getFirmwareLatestReleaseSpy = jest
-      .spyOn(DataManager, 'getFirmwareLatestRelease')
-      .mockReturnValue({
-        required: false,
-        version: [1, 0, 0],
-        url: '',
-        resourceBundles: [
+    const manifestBinary = new TextEncoder().encode(JSON.stringify(manifest)).buffer;
+    const zip = new JSZip();
+    zip.file('manifest.json', manifestBinary);
+    zip.file('bundles/images/images.okpkg', imagesBinary);
+    zip.file('loaders/bootloader/boot_resource.okpkg', bootBinary);
+    const archiveBinary = await zip.generateAsync({ type: 'arraybuffer' });
+    const preparedEntries = [
+      {
+        entryName: 'manifest.json',
+        artifact: {
+          artifactRef: 'manifest',
+          size: manifestBinary.byteLength,
+          sha256: bytesToHex(sha256(new Uint8Array(manifestBinary))),
+        },
+      },
+      {
+        entryName: 'bundles/images/images.okpkg',
+        artifact: {
+          artifactRef: 'images',
+          size: imagesBinary.byteLength,
+          sha256: imagesSha256,
+        },
+      },
+      {
+        entryName: 'loaders/bootloader/boot_resource.okpkg',
+        artifact: {
+          artifactRef: 'boot',
+          size: bootBinary.byteLength,
+          sha256: bootSha256,
+        },
+      },
+    ];
+    const artifacts = new Map([['archive', archiveBinary]]);
+    (method as any).params = {
+      targetsToUpdate: ['resource'],
+      preparedPlan: {
+        artifacts: [
           {
-            name: 'images',
-            url: 'https://example.com/images.okpkg',
-            devicePath: 'vol0:/resource/../images.okpkg',
+            artifactId: 'resource:archive',
+            role: 'resourceBundle',
+            target: 'resource',
+            container: 'zip',
+            artifact: {
+              artifactRef: 'archive',
+              size: archiveBinary.byteLength,
+              sha256: bytesToHex(sha256(new Uint8Array(archiveBinary))),
+            },
+            materializedEntries: preparedEntries,
           },
         ],
-        fingerprint: '',
-        changelog: {
-          'zh-CN': '',
-          'en-US': '',
+      },
+    };
+    (method as any).openProtocolV2PreparedSource = jest.fn(async artifact => {
+      const binary = artifacts.get(artifact.artifactRef);
+      if (!binary) throw new Error(`Unknown artifact: ${artifact.artifactRef}`);
+      return openFirmwareByteSource({ binary });
+    });
+
+    const sources = await (method as any).prepareProtocolV2ResourceArchiveSources();
+
+    expect(sources).toHaveLength(2);
+    expect(sources).toEqual([
+      expect.objectContaining({
+        name: 'images.okpkg',
+        devicePath: 'vol0:/bundles/images/images.okpkg',
+        version: [1, 2, 3],
+      }),
+      expect.objectContaining({
+        name: 'boot_resource.okpkg',
+        devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+        version: [1, 2, 3],
+      }),
+    ]);
+    await Promise.all(sources.map(source => source.source.close()));
+
+    preparedEntries[1].artifact.sha256 = 'f'.repeat(64);
+    await expect((method as any).prepareProtocolV2ResourceArchiveSources()).rejects.toThrow(
+      'entries do not match the approved archive'
+    );
+  });
+
+  test('binds a prepared resource archive to the selected host generation', () => {
+    const planWithoutDigest = {
+      schemaVersion: 2 as const,
+      executor: 'v4' as const,
+      deviceIdentity: 'PRO2-SERIAL',
+      deviceModel: 'pro2',
+      firmwareType: EFirmwareType.Universal,
+      platform: 'web' as const,
+      targetsToUpdate: ['resource' as const],
+      artifacts: [
+        {
+          artifactId: 'resource:archive',
+          role: 'resourceBundle' as const,
+          target: 'resource' as const,
+          url: 'https://example.com/resource.zip',
+          container: 'zip' as const,
+          logicalName: 'protocol-v2-resource-archive',
+          expectedSize: 3,
+          expectedSha256: 'a'.repeat(64),
+        },
+      ],
+    };
+    const plan = {
+      ...planWithoutDigest,
+      planDigest: digestFirmwareUpdateContract(planWithoutDigest),
+    };
+    const preparedPlan = prepareFirmwareUpdatePlan({
+      plan,
+      leaseRef: 'resource-archive-test',
+      artifacts: [
+        {
+          artifactId: 'resource:archive',
+          artifact: {
+            artifactRef: 'resource-archive',
+            size: 3,
+            sha256: 'a'.repeat(64),
+          },
+          materializedEntries: [
+            {
+              entryName: 'manifest.json',
+              artifact: {
+                artifactRef: 'resource-manifest',
+                size: 2,
+                sha256: 'b'.repeat(64),
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const mismatchedHostBindingGeneration = registerFirmwareUpdateHostBinding({
+      preparedPlanDigest: 'c'.repeat(64),
+      artifactReader: {
+        open: jest.fn(),
+        read: jest.fn(),
+        close: jest.fn(),
+      },
+    });
+    try {
+      const mismatchedMethod = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+          platform: 'web',
+          targetsToUpdate: ['resource'],
+          preparedPlan,
+          hostBindingGeneration: mismatchedHostBindingGeneration,
         },
       });
 
-    await expect(
-      (method as any).prepareProtocolV2ResourceSources('universal', {
-        deviceType: 'pro2',
-      })
-    ).rejects.toThrow('resourceBundles[].devicePath');
-    expect(openPreparedSource).not.toHaveBeenCalled();
+      expect(() => mismatchedMethod.init()).toThrow('does not match the prepared plan');
+    } finally {
+      unregisterFirmwareUpdateHostBinding(mismatchedHostBindingGeneration);
+    }
+    const hostBindingGeneration = registerFirmwareUpdateHostBinding({
+      preparedPlanDigest: preparedPlan.preparedPlanDigest,
+      artifactReader: {
+        open: jest.fn(),
+        read: jest.fn(),
+        close: jest.fn(),
+      },
+    });
+    try {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+          platform: 'web',
+          targetsToUpdate: ['resource'],
+          preparedPlan,
+          hostBindingGeneration,
+        },
+      });
 
-    getFirmwareLatestReleaseSpy.mockRestore();
+      expect(() => method.init()).not.toThrow();
+    } finally {
+      unregisterFirmwareUpdateHostBinding(hostBindingGeneration);
+    }
+  });
+
+  test('executes a prepared component plan without duplicated component inputs', async () => {
+    const componentBinary = new Uint8Array([1, 2, 3]).buffer;
+    const componentArtifact = {
+      artifactRef: 'prepared-bootloader',
+      size: componentBinary.byteLength,
+      sha256: bytesToHex(sha256(new Uint8Array(componentBinary))),
+    };
+    const planWithoutDigest = {
+      schemaVersion: 2 as const,
+      executor: 'v4' as const,
+      deviceIdentity: 'PRO2-SERIAL',
+      deviceModel: 'pro2',
+      firmwareType: EFirmwareType.Universal,
+      platform: 'web' as const,
+      targetsToUpdate: ['boot' as const],
+      artifacts: [
+        {
+          artifactId: 'component:boot',
+          role: 'component' as const,
+          target: 'boot' as const,
+          url: 'https://example.com/bootloader.bin',
+          container: 'raw' as const,
+          logicalName: 'bootloader',
+          expectedSize: componentArtifact.size,
+          expectedSha256: componentArtifact.sha256,
+          targetVersion: '1.2.3',
+        },
+      ],
+    };
+    const preparedPlan = prepareFirmwareUpdatePlan({
+      plan: {
+        ...planWithoutDigest,
+        planDigest: digestFirmwareUpdateContract(planWithoutDigest),
+      },
+      leaseRef: 'prepared-component-test',
+      artifacts: [{ artifactId: 'component:boot', artifact: componentArtifact }],
+    });
+    const artifactReader = {
+      open: jest.fn(() =>
+        Promise.resolve({
+          readerId: 'prepared-component-reader',
+          size: componentBinary.byteLength,
+        })
+      ),
+      read: jest.fn(({ offset, length }: { offset: number; length: number }) => {
+        const data = componentBinary.slice(offset, offset + length);
+        return Promise.resolve({
+          data,
+          bytesRead: data.byteLength,
+          eof: offset + length === componentBinary.byteLength,
+        });
+      }),
+      close: jest.fn(() => Promise.resolve()),
+    };
+    const hostBindingGeneration = registerFirmwareUpdateHostBinding({
+      preparedPlanDigest: preparedPlan.preparedPlanDigest,
+      artifactReader,
+    });
+    const releaseSpy = jest
+      .spyOn(DataManager, 'getFirmwareLatestRelease')
+      .mockReturnValue(undefined);
+
+    try {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+          platform: 'web',
+          preparedPlan,
+          hostBindingGeneration,
+        },
+      });
+
+      expect(() => method.init()).not.toThrow();
+      expect((method as any).params.targetsToUpdate).toEqual(['boot']);
+      expect((method as any).params.expectedTargetVersions).toEqual({ boot: '1.2.3' });
+      expect((method as any).params.componentArtifacts).toBeUndefined();
+      (method as any).postTipMessage = jest.fn();
+      (method as any).prepareProtocolV2ResourceSources = jest.fn().mockResolvedValue([]);
+      (method as any).executeProtocolV2SourceUpdate = jest
+        .fn()
+        .mockResolvedValue('prepared-result');
+
+      await expect(
+        (method as any).runProtocolV2PreparedArtifacts({} as Features, EFirmwareType.Universal)
+      ).resolves.toBe('prepared-result');
+      expect(releaseSpy).not.toHaveBeenCalled();
+      expect(artifactReader.open).toHaveBeenCalledWith({ artifactRef: 'prepared-bootloader' });
+      expect((method as any).executeProtocolV2SourceUpdate).toHaveBeenCalledWith({
+        installSources: [
+          expect.objectContaining({
+            fileName: 'bootloader.bin',
+            kind: 'bootloader',
+          }),
+        ],
+        resourceSources: [],
+      });
+    } finally {
+      releaseSpy.mockRestore();
+      unregisterFirmwareUpdateHostBinding(hostBindingGeneration);
+    }
+  });
+
+  test('executes a resource-only prepared plan without a live firmware release', async () => {
+    const planWithoutDigest = {
+      schemaVersion: 2 as const,
+      executor: 'v4' as const,
+      deviceIdentity: 'PRO2-SERIAL',
+      deviceModel: 'pro2',
+      firmwareType: EFirmwareType.Universal,
+      platform: 'web' as const,
+      targetsToUpdate: ['resource' as const],
+      artifacts: [
+        {
+          artifactId: 'resource:archive',
+          role: 'resourceBundle' as const,
+          target: 'resource' as const,
+          url: 'https://example.com/resource.zip',
+          container: 'zip' as const,
+          logicalName: 'protocol-v2-resource-archive',
+          expectedSize: 3,
+          expectedSha256: 'a'.repeat(64),
+        },
+      ],
+    };
+    const preparedPlan = prepareFirmwareUpdatePlan({
+      plan: {
+        ...planWithoutDigest,
+        planDigest: digestFirmwareUpdateContract(planWithoutDigest),
+      },
+      leaseRef: 'prepared-resource-only-test',
+      artifacts: [
+        {
+          artifactId: 'resource:archive',
+          artifact: {
+            artifactRef: 'prepared-resource-archive',
+            size: 3,
+            sha256: 'a'.repeat(64),
+          },
+          materializedEntries: [
+            {
+              entryName: 'manifest.json',
+              artifact: {
+                artifactRef: 'prepared-resource-manifest',
+                size: 2,
+                sha256: 'b'.repeat(64),
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const hostBindingGeneration = registerFirmwareUpdateHostBinding({
+      preparedPlanDigest: preparedPlan.preparedPlanDigest,
+      artifactReader: {
+        open: jest.fn(),
+        read: jest.fn(),
+        close: jest.fn(),
+      },
+    });
+    const releaseSpy = jest
+      .spyOn(DataManager, 'getFirmwareLatestRelease')
+      .mockReturnValue(undefined);
+
+    try {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+          platform: 'web',
+          preparedPlan,
+          hostBindingGeneration,
+        },
+      });
+
+      expect(() => method.init()).not.toThrow();
+      (method as any).postTipMessage = jest.fn();
+      const resourceSources = [{ kind: 'resource' }];
+      (method as any).prepareProtocolV2ResourceSources = jest
+        .fn()
+        .mockResolvedValue(resourceSources);
+      (method as any).executeProtocolV2SourceUpdate = jest
+        .fn()
+        .mockResolvedValue('resource-result');
+
+      await expect(
+        (method as any).runProtocolV2PreparedArtifacts({} as Features, EFirmwareType.Universal)
+      ).resolves.toBe('resource-result');
+      expect(releaseSpy).not.toHaveBeenCalled();
+      expect((method as any).executeProtocolV2SourceUpdate).toHaveBeenCalledWith({
+        installSources: [],
+        resourceSources,
+      });
+    } finally {
+      releaseSpy.mockRestore();
+      unregisterFirmwareUpdateHostBinding(hostBindingGeneration);
+    }
+  });
+
+  test('converts a local resource ZIP into a local PreparedPlan without matching a remote release', async () => {
+    const imagesBinary = new Uint8Array([1, 2, 3]).buffer;
+    const bootResourceBinary = new Uint8Array([4, 5, 6]).buffer;
+    const manifest = {
+      schema: 1,
+      artifact_name: 'pro2-resource',
+      release_name: 'local-development',
+      variant: 'resource',
+      commit: 'local',
+      short_sha: 'local',
+      timestamp_utc: '2026-08-09T00:00:00Z',
+      core_version: '1.0.0',
+      key_set: 'development',
+      device_root: 'vol0:',
+      restore_mode: 'bootloader_update',
+      trees: [{ path: 'bundles', device: 'pro2' }],
+      files: [
+        {
+          archive_path: 'bundles/images/images.okpkg',
+          original_name: 'images.okpkg',
+          device_path: 'vol0:/bundles/images/images.okpkg',
+          size: imagesBinary.byteLength,
+          sha256: bytesToHex(sha256(new Uint8Array(imagesBinary))),
+          signed: true,
+          sig_algo: 'ed25519',
+          payload_version: '1.0.0',
+        },
+        {
+          archive_path: 'loaders/bootloader/boot_resource.okpkg',
+          original_name: 'boot_resource.okpkg',
+          device_path: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+          size: bootResourceBinary.byteLength,
+          sha256: bytesToHex(sha256(new Uint8Array(bootResourceBinary))),
+          signed: true,
+          sig_algo: 'ed25519',
+          payload_version: '1.0.0',
+        },
+      ],
+    };
+    const zip = new JSZip();
+    zip.file('manifest.json', JSON.stringify(manifest));
+    zip.file('bundles/images/images.okpkg', imagesBinary);
+    zip.file('loaders/bootloader/boot_resource.okpkg', bootResourceBinary);
+    const resourceArchiveBinary = await zip.generateAsync({ type: 'arraybuffer' });
+    const applicationP1Binary = new Uint8Array([7, 8, 9]).buffer;
+    const bootloaderBinary = new Uint8Array([10, 11, 12]).buffer;
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['app_v1'],
+        applicationP1Binary,
+        bootloaderBinary,
+        resourceArchiveBinary,
+      },
+    });
+    method.init();
+    expect((method as any).params.targetsToUpdate).toEqual(['app_v1', 'resource']);
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    (method as any).postTipMessage = jest.fn();
+    (method as any).device = stubDevice({
+      originalDescriptor: { protocolType: 'V2' },
+      features: {
+        deviceType: 'pro2',
+        serialNo: 'pro2-device-id',
+        firmwareVersion: '1.0.0',
+        capabilities: [],
+      },
+      getCurrentDeviceType: () => 'pro2',
+    });
+    (method as any).protocolV2ExpectedSerialNumber = 'pro2-device-id';
+    (method as any).executeProtocolV2SourceUpdate = jest
+      .fn()
+      .mockResolvedValue('local-resource-result');
+    const releaseSpy = jest.spyOn(DataManager, 'getFirmwareLatestRelease');
+    const reloadSpy = jest.spyOn(DataManager, 'forceReloadData');
+
+    try {
+      await expect(method.run()).resolves.toBe('local-resource-result');
+      expect(releaseSpy).not.toHaveBeenCalled();
+      expect(reloadSpy).not.toHaveBeenCalled();
+      expect((method as any).params.preparedPlan).toMatchObject({
+        networkPolicy: 'forbid',
+        executor: 'v4',
+        targetsToUpdate: ['app_v1', 'resource'],
+      });
+      expect(
+        (method as any).params.preparedPlan.artifacts.some(
+          (artifact: { target: string }) => artifact.target === 'boot'
+        )
+      ).toBe(false);
+      expect((method as any).executeProtocolV2SourceUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          installSources: [
+            expect.objectContaining({
+              fileName: 'application_p1.bin',
+              targetId: 4,
+            }),
+          ],
+          resourceSources: [
+            expect.objectContaining({
+              name: 'images.okpkg',
+              devicePath: 'vol0:/bundles/images/images.okpkg',
+            }),
+            expect.objectContaining({
+              name: 'boot_resource.okpkg',
+              devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+            }),
+          ],
+        })
+      );
+    } finally {
+      releaseSpy.mockRestore();
+      reloadSpy.mockRestore();
+    }
+  });
+
+  test('rejects a local resource ZIP whose file hash does not match its manifest', async () => {
+    const resourceBinary = new Uint8Array([1, 2, 3]).buffer;
+    const bootResourceBinary = new Uint8Array([4, 5, 6]).buffer;
+    const zip = new JSZip();
+    zip.file(
+      'manifest.json',
+      JSON.stringify({
+        schema: 1,
+        artifact_name: 'pro2-resource',
+        release_name: 'local-development',
+        variant: 'resource',
+        commit: 'local',
+        short_sha: 'local',
+        timestamp_utc: '2026-08-09T00:00:00Z',
+        core_version: '1.0.0',
+        key_set: 'development',
+        device_root: 'vol0:',
+        restore_mode: 'bootloader_update',
+        trees: [{ path: 'bundles', device: 'pro2' }],
+        files: [
+          {
+            archive_path: 'bundles/images/images.okpkg',
+            original_name: 'images.okpkg',
+            device_path: 'vol0:/bundles/images/images.okpkg',
+            size: resourceBinary.byteLength,
+            sha256: '0'.repeat(64),
+            signed: true,
+            sig_algo: 'ed25519',
+            payload_version: '1.0.0',
+          },
+          {
+            archive_path: 'loaders/bootloader/boot_resource.okpkg',
+            original_name: 'boot_resource.okpkg',
+            device_path: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+            size: bootResourceBinary.byteLength,
+            sha256: bytesToHex(sha256(new Uint8Array(bootResourceBinary))),
+            signed: true,
+            sig_algo: 'ed25519',
+            payload_version: '1.0.0',
+          },
+        ],
+      })
+    );
+    zip.file('bundles/images/images.okpkg', resourceBinary);
+    zip.file('loaders/bootloader/boot_resource.okpkg', bootResourceBinary);
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['resource'],
+      },
+    });
+    method.init();
+
+    await expect(
+      (method as any).prepareProtocolV2LocalResourceArchive(
+        await zip.generateAsync({ type: 'arraybuffer' })
+      )
+    ).rejects.toThrow(
+      'Protocol V2 local resource file does not match manifest: bundles/images/images.okpkg'
+    );
+  });
+
+  test('maps malformed resource ZIPs to a typed firmware preparation error', async () => {
+    const loadSpy = jest.spyOn(JSZip, 'loadAsync').mockRejectedValue(new Error('corrupt ZIP'));
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['resource'],
+      },
+    });
+    method.init();
+
+    try {
+      await expect(
+        (method as any).prepareProtocolV2LocalResourceArchive(new Uint8Array([1]).buffer)
+      ).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.RuntimeError,
+        params: { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' },
+      });
+    } finally {
+      loadSpy.mockRestore();
+    }
+  });
+
+  test('rejects an oversized ZIP entry before allocating its decompressed bytes', async () => {
+    const extractEntry = jest.fn();
+    const loadSpy = jest.spyOn(JSZip, 'loadAsync').mockResolvedValue({
+      files: {
+        'manifest.json': {
+          name: 'manifest.json',
+          dir: false,
+          _data: {
+            compressedSize: 1,
+            uncompressedSize: 2 * 1024 * 1024,
+          },
+          async: extractEntry,
+        },
+      },
+    } as unknown as JSZip);
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['resource'],
+      },
+    });
+    method.init();
+
+    try {
+      await expect(
+        (method as any).prepareProtocolV2LocalResourceArchive(new Uint8Array([1]).buffer)
+      ).rejects.toThrow('declared size exceeds the allowed limit');
+      expect(extractEntry).not.toHaveBeenCalled();
+    } finally {
+      loadSpy.mockRestore();
+    }
+  });
+
+  test('normalizes the deprecated boot_resources target to resource', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['boot_resources'],
+      },
+    });
+
+    method.init();
+    expect((method as any).params.targetsToUpdate).toEqual(['resource']);
+  });
+
+  test('keeps the legacy componentArtifacts and artifactReader path without a prepared Plan', async () => {
+    const artifactReader = {
+      open: jest.fn(),
+      read: jest.fn(),
+      close: jest.fn(),
+    };
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['boot'],
+        artifactReader,
+        componentArtifacts: {
+          boot: {
+            artifactRef: 'legacy-bootloader',
+            size: 3,
+            sha256: 'a'.repeat(64),
+          },
+        },
+      },
+    });
+
+    expect(() => method.init()).not.toThrow();
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    (method as any).device = stubDevice({
+      originalDescriptor: { protocolType: 'V2' },
+      features: { deviceType: 'pro2', firmwareVersion: '1.0.0', capabilities: [] },
+    });
+    (method as any).runProtocolV2PreparedArtifacts = jest.fn().mockResolvedValue('legacy-result');
+
+    await expect(method.run()).resolves.toBe('legacy-result');
+    expect((method as any).runProtocolV2PreparedArtifacts).toHaveBeenCalledTimes(1);
   });
 
   test('stops a remote update before reboot when the latest config cannot be refreshed', async () => {
@@ -6222,252 +7081,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
-  test('treats manual resource files as authoritative payload for resource', async () => {
-    const resourceBundle = createProtocolV2OkppBinary();
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-        platform: 'web',
-        targetsToUpdate: ['resource'],
-        resourceFiles: [
-          {
-            binary: resourceBundle,
-            devicePath: '  VOL0:/resource/images/images.okpkg  ',
-          },
-        ],
-      },
-    });
-    method.init();
-    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
-    (method as any).device = stubDevice({
-      originalDescriptor: { protocolType: 'V2' },
-      features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
-    });
-    (method as any).prepareRemoteProtocolV2Binaries = jest.fn();
-    (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(true);
-    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
-    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockResolvedValue(undefined);
-    (method as any).waitForProtocolV2FinalFeatures = jest.fn().mockResolvedValue({
-      bootloaderVersion: '1.0.0',
-      bleVersion: '0.0.0',
-      firmwareVersion: '1.0.0',
-    });
-    method.postTipMessage = jest.fn();
-
-    await method.run();
-
-    expect(forceReloadDataSpy).not.toHaveBeenCalled();
-    expect((method as any).prepareRemoteProtocolV2Binaries).not.toHaveBeenCalled();
-    expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        resourceBundles: [
-          {
-            name: 'images.okpkg',
-            binary: resourceBundle,
-            devicePath: 'vol0:/resource/images/images.okpkg',
-            version: [1, 2, 3],
-            payloadHash: '11'.repeat(64),
-            headerHash: '22'.repeat(64),
-          },
-        ],
-      })
-    );
-  });
-
-  test('downloads every missing firmware target when manifest resources are already prepared', async () => {
-    const resourceBundle = createProtocolV2OkppBinary();
-    const applicationBinary = new Uint8Array([7]).buffer;
-    const remoteBinaries = {
-      bootloaderBinary: null,
-      fwBinaryMap: [
-        {
-          fileName: 'application_p1.bin',
-          binary: applicationBinary,
-          targetId: 4,
-        },
-      ],
-      installItems: [
-        {
-          fileName: 'application_p1.bin',
-          binary: applicationBinary,
-          targetId: 4,
-          kind: 'firmware',
-        },
-      ],
-    };
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-        platform: 'web',
-        targetsToUpdate: ['app_v1', 'resource'],
-        resourceFiles: [
-          {
-            binary: resourceBundle,
-            devicePath: 'vol0:/bundles/images/images.okpkg',
-          },
-        ],
-      },
-    });
-    method.init();
-    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
-    (method as any).device = stubDevice({
-      originalDescriptor: { protocolType: 'V2' },
-      features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
-    });
-    (method as any).prepareRemoteProtocolV2Binaries = jest.fn().mockResolvedValue(remoteBinaries);
-    (method as any).executeProtocolV2Update = jest.fn().mockResolvedValue(undefined);
-    method.postTipMessage = jest.fn();
-
-    await method.run();
-
-    expect(forceReloadDataSpy).toHaveBeenCalledTimes(1);
-    expect((method as any).prepareRemoteProtocolV2Binaries).toHaveBeenCalledWith(
-      'universal',
-      expect.objectContaining({ deviceType: 'pro2' }),
-      []
-    );
-    expect((method as any).executeProtocolV2Update).toHaveBeenCalledWith({
-      bootloaderBinary: null,
-      fwBinaryMap: remoteBinaries.fwBinaryMap,
-      installItems: remoteBinaries.installItems,
-      resourceBundles: [
-        {
-          name: 'images.okpkg',
-          binary: resourceBundle,
-          devicePath: 'vol0:/bundles/images/images.okpkg',
-          version: [1, 2, 3],
-          payloadHash: '11'.repeat(64),
-          headerHash: '22'.repeat(64),
-        },
-      ],
-    });
-  });
-
-  test('rejects a mixed resource plan when the requested firmware release is unavailable', async () => {
-    const resourceBundle = createProtocolV2OkppBinary();
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-        platform: 'web',
-        targetsToUpdate: ['app_v1', 'resource'],
-        resourceFiles: [
-          {
-            binary: resourceBundle,
-            devicePath: 'vol0:/bundles/images/images.okpkg',
-          },
-        ],
-      },
-    });
-    method.init();
-    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
-    (method as any).device = stubDevice({
-      originalDescriptor: { protocolType: 'V2' },
-      features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
-    });
-    jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(undefined);
-    (method as any).executeProtocolV2Update = jest.fn();
-    method.postTipMessage = jest.fn();
-
-    await expect(method.run()).rejects.toThrow(
-      'Protocol V2 firmware release is unavailable for requested targets: app_v1'
-    );
-    expect((method as any).executeProtocolV2Update).not.toHaveBeenCalled();
-  });
-
-  test('combines prepared firmware components with explicit manifest resource files', async () => {
-    const resourceBundle = createProtocolV2OkppBinary();
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-        platform: 'web',
-      },
-    });
-    method.init();
-    (method as any).params = {
-      targetsToUpdate: ['app_v1', 'resource'],
-      resourceFiles: [
-        {
-          binary: resourceBundle,
-          devicePath: 'vol0:/bundles/images/images.okpkg',
-        },
-      ],
-    };
-    const firmwareSource = { size: 10 };
-    const resourceSource = { size: resourceBundle.byteLength };
-    (method as any).prepareProtocolV2InstallSources = jest.fn().mockResolvedValue([
-      {
-        fileName: 'application_p1.bin',
-        source: firmwareSource,
-        targetId: 4,
-        kind: 'firmware',
-      },
-    ]);
-    (method as any).prepareProtocolV2ResourceSources = jest.fn();
-    (method as any).openProtocolV2MemorySource = jest.fn().mockResolvedValue(resourceSource);
-    (method as any).executeProtocolV2SourceUpdate = jest.fn().mockResolvedValue(undefined);
-    (method as any).closeProtocolV2PreparedSources = jest.fn().mockResolvedValue(undefined);
-    method.postTipMessage = jest.fn();
-
-    await (method as any).runProtocolV2PreparedArtifacts({ deviceType: 'pro2' }, 'universal');
-
-    expect((method as any).prepareProtocolV2ResourceSources).not.toHaveBeenCalled();
-    expect((method as any).executeProtocolV2SourceUpdate).toHaveBeenCalledWith({
-      installSources: [
-        {
-          fileName: 'application_p1.bin',
-          source: firmwareSource,
-          targetId: 4,
-          kind: 'firmware',
-        },
-      ],
-      resourceSources: [
-        {
-          name: 'images.okpkg',
-          source: resourceSource,
-          devicePath: 'vol0:/bundles/images/images.okpkg',
-          version: [1, 2, 3],
-          payloadHash: '11'.repeat(64),
-          headerHash: '22'.repeat(64),
-        },
-      ],
-    });
-  });
-
-  test('rejects manual RESC bundle paths before bootloader entry', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-        platform: 'web',
-        resourceFiles: [
-          {
-            binary: new Uint8Array([1, 2, 3]).buffer,
-            devicePath: 'vol2:/resource/images/images.okpkg',
-          },
-        ],
-      },
-    });
-    method.init();
-    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
-
-    (method as any).device = stubDevice({
-      originalDescriptor: { protocolType: 'V2' },
-      features: { deviceType: 'pro2', firmwareVersion: '0.0.0', capabilities: [] },
-    });
-    (method as any).prepareRemoteProtocolV2Binaries = jest.fn();
-    (method as any).enterProtocolV2BootloaderMode = jest.fn();
-    method.postTipMessage = jest.fn();
-
-    await expect(method.run()).rejects.toThrow('resourceFiles[0].devicePath');
-    expect((method as any).prepareRemoteProtocolV2Binaries).not.toHaveBeenCalled();
-    expect((method as any).enterProtocolV2BootloaderMode).not.toHaveBeenCalled();
-  });
-
-  test('syncs resource bundles without sending a firmware install request', async () => {
+  test('syncs prepared resource sources without sending a firmware install request', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6479,21 +7093,27 @@ describe('Protocol V2 firmware update targets', () => {
     method.postProgressMessage = jest.fn();
     (method as any).protocolV2SourceUpdateProcess = jest.fn().mockResolvedValue(3);
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
+    (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest
+      .fn()
+      .mockResolvedValue(undefined);
     (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
     (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
     (method as any).protocolV2StartFirmwareUpdate = jest.fn();
     (method as any).waitForProtocolV2FirmwareUpdateComplete = jest.fn();
 
-    await (method as any).executeProtocolV2Update({
-      resourceBundles: [
+    await (method as any).executeProtocolV2SourceUpdate({
+      installSources: [],
+      resourceSources: [
         {
           name: 'images.okpkg',
-          binary: new Uint8Array([1, 2, 3]).buffer,
+          source: {
+            size: 3,
+            readAt: jest.fn(),
+            close: jest.fn(),
+          },
           devicePath: 'vol0:/resource/images/images.okpkg',
         },
       ],
-      bootloaderBinary: null,
-      fwBinaryMap: [],
     });
 
     expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledTimes(1);
@@ -6523,21 +7143,64 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
     (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
 
-    await (method as any).executeProtocolV2Update({
-      resourceBundles: [
+    await (method as any).executeProtocolV2SourceUpdate({
+      installSources: [],
+      resourceSources: [
         {
           name: 'boot_resource.okpkg',
-          binary: new Uint8Array([1, 2, 3]).buffer,
+          source: {
+            size: 3,
+            readAt: jest.fn(),
+            close: jest.fn(),
+          },
           devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
         },
       ],
-      bootloaderBinary: null,
-      fwBinaryMap: [],
     });
 
     const stagingPath = 'vol0:/loaders/bootloader/boot_resource.okpkg.staging';
     expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledWith(
       expect.objectContaining({ filePath: stagingPath })
+    );
+    expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledWith(stagingPath, 3);
+  });
+
+  test('rewrites the mounted boot resource staging file even when the final file is current', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+
+    method.postTipMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+    (method as any).isProtocolV2ResourceBundleUpToDate = jest.fn().mockResolvedValue(true);
+    (method as any).protocolV2SourceUpdateProcess = jest.fn().mockResolvedValue(3);
+    (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
+
+    const resource = {
+      name: 'boot_resource.okpkg',
+      source: {
+        size: 3,
+        readAt: jest.fn(),
+        close: jest.fn(),
+      },
+      devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+      version: [1, 0, 0],
+      payloadHash: '11'.repeat(64),
+      headerHash: '22'.repeat(64),
+    };
+
+    await (method as any).executeProtocolV2TransferPhase({
+      installSources: [],
+      resourceSources: [resource],
+    });
+
+    const stagingPath = 'vol0:/loaders/bootloader/boot_resource.okpkg.staging';
+    expect((method as any).isProtocolV2ResourceBundleUpToDate).not.toHaveBeenCalled();
+    expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledWith(
+      expect.objectContaining({ source: resource.source, filePath: stagingPath, totalSize: 3 })
     );
     expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledWith(stagingPath, 3);
   });
@@ -7311,7 +7974,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
     );
   });
 
-  test('rejects firmware update startup when DeviceInfo has no physical serial', async () => {
+  test('uses the connection route when DeviceInfo has no physical serial', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: { method: 'firmwareUpdateV4' },
@@ -7321,12 +7984,98 @@ describe('Protocol V2 firmware reconnect identity', () => {
       message: { protocol_version: 1, hw: {} },
     });
     (method as any).device = stubDevice({
+      originalDescriptor: { path: '' },
+      getConnectId: () => '000000000000',
       getCommands: () => ({ typedCall }),
     });
 
-    await expect((method as any).captureProtocolV2PhysicalIdentity()).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.DeviceNotFound,
+    await expect((method as any).captureProtocolV2PhysicalIdentity()).resolves.toBeUndefined();
+    expect((method as any).protocolV2ExpectedSerialNumber).toBeUndefined();
+    expect((method as any).protocolV2ExpectedPath).toBe('000000000000');
+  });
+
+  test('executes a serial-less Pro2 prepared plan when the live model matches', async () => {
+    const planWithoutDigest = {
+      schemaVersion: 2 as const,
+      executor: 'v4' as const,
+      deviceIdentity: 'unavailable',
+      deviceModel: 'pro2',
+      firmwareType: EFirmwareType.Universal,
+      platform: 'web' as const,
+      targetsToUpdate: ['boot' as const],
+      artifacts: [
+        {
+          artifactId: 'component:boot',
+          role: 'component' as const,
+          target: 'boot' as const,
+          url: 'https://example.com/bootloader.bin',
+          container: 'raw' as const,
+          logicalName: 'bootloader',
+          expectedSize: 1,
+          expectedSha256: 'a'.repeat(64),
+        },
+      ],
+    };
+    const preparedPlan = prepareFirmwareUpdatePlan({
+      plan: {
+        ...planWithoutDigest,
+        planDigest: digestFirmwareUpdateContract(planWithoutDigest),
+      },
+      leaseRef: 'serial-less-v4-executor-test',
+      artifacts: [
+        {
+          artifactId: 'component:boot',
+          artifact: {
+            artifactRef: 'serial-less-bootloader',
+            size: 1,
+            sha256: 'a'.repeat(64),
+          },
+        },
+      ],
     });
+    const hostBindingGeneration = registerFirmwareUpdateHostBinding({
+      preparedPlanDigest: preparedPlan.preparedPlanDigest,
+      artifactReader: {
+        open: jest.fn(),
+        read: jest.fn(),
+        close: jest.fn(),
+      },
+    });
+    try {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+          platform: 'web',
+          preparedPlan,
+          hostBindingGeneration,
+        },
+      });
+      method.init();
+      const typedCall = jest.fn().mockResolvedValue({
+        type: 'DeviceInfo',
+        message: { protocol_version: 1, hw: {} },
+      });
+      (method as any).device = stubDevice({
+        originalDescriptor: { protocolType: 'V2', path: 'serial-less-pro2' },
+        features: {
+          deviceType: 'pro2',
+          firmwareVersion: '1.0.0',
+          capabilities: [],
+        },
+        getCommands: () => ({ typedCall }),
+      });
+      (method as any).runProtocolV2PreparedArtifacts = jest
+        .fn()
+        .mockResolvedValue('serial-less-result');
+
+      await expect(method.run()).resolves.toBe('serial-less-result');
+      expect((method as any).runProtocolV2PreparedArtifacts).toHaveBeenCalled();
+      expect((method as any).protocolV2ExpectedSerialNumber).toBeUndefined();
+      expect((method as any).protocolV2ExpectedPath).toBe('serial-less-pro2');
+    } finally {
+      unregisterFirmwareUpdateHostBinding(hostBindingGeneration);
+    }
   });
 
   test('uses the BLE read limit when reading an existing firmware bundle header', async () => {
@@ -7414,27 +8163,39 @@ describe('Protocol V2 firmware reconnect identity', () => {
     expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
   });
 
-  test('rejects a manually supplied resource file when its manifest hash does not match', () => {
+  test('updates a resource when the installed file size differs despite matching headers', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
         platform: 'web',
-        resourceFiles: [
-          {
-            binary: new Uint8Array([1, 2, 3]).buffer,
-            devicePath: 'vol0:/assets/loaders/boot.staging/graphics/bootloader_crest.bin',
-            size: 3,
-            fileHash: '00'.repeat(32),
-          },
-        ],
       },
     });
     method.init();
+    const installedBinary = new Uint8Array(createProtocolV2OkppBinary());
+    const typedCall = jest.fn((requestType: string) => {
+      if (requestType === 'FilesystemPathInfoQuery') {
+        return Promise.resolve({
+          message: { exist: true, directory: false, size: installedBinary.byteLength + 1 },
+        });
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
+    });
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
 
-    expect(() => (method as any).prepareExplicitProtocolV2ResourceFiles()).toThrow(
-      'SHA-256 mismatch'
-    );
+    await expect(
+      (method as any).isProtocolV2ResourceBundleUpToDate({
+        name: 'images.okpkg',
+        source: { size: installedBinary.byteLength },
+        devicePath: 'vol0:/bundles/images/images.okpkg',
+        version: [1, 2, 3],
+        payloadHash: '11'.repeat(64),
+        headerHash: '22'.repeat(64),
+      })
+    ).resolves.toBe(false);
+    expect(typedCall).toHaveBeenCalledTimes(1);
   });
 });
 

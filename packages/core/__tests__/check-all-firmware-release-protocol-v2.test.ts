@@ -25,6 +25,11 @@ const currentVersions: DeviceStateVersions = {
   se04: '1.0.0',
 };
 
+const validComponentIntegrity = {
+  expectedSize: 1024,
+  fingerprint: '1'.repeat(64),
+};
+
 const release: IFirmwareReleaseInfo = {
   required: true,
   version: [2, 0, 0],
@@ -40,21 +45,25 @@ const release: IFirmwareReleaseInfo = {
       target: 'BOOTLOADER',
       url: 'https://example.com/bootloader.bin',
       version: [1, 1, 0],
+      ...validComponentIntegrity,
     },
     applicationP1: {
       target: 'APPLICATION_P1',
       url: 'https://example.com/application-p1.bin',
       version: [2, 0, 0],
+      ...validComponentIntegrity,
     },
     se02: {
       target: 'SE02',
       url: 'https://example.com/se02.bin',
       version: [2, 0, 0],
+      ...validComponentIntegrity,
     },
     se03: {
       target: 'SE03',
       url: 'https://example.com/se03.bin',
       version: [1, 0, 0],
+      ...validComponentIntegrity,
     },
     romloader: {
       target: 'ROMLOADER',
@@ -62,14 +71,6 @@ const release: IFirmwareReleaseInfo = {
       version: [2, 0, 0],
     },
   },
-  resourceBundles: [
-    {
-      name: 'images',
-      url: 'https://example.com/images.okpkg',
-      devicePath: 'vol0:/bundles/images/images.okpkg',
-      version: [1, 0, 0],
-    },
-  ],
 };
 
 const resourceSource = {
@@ -152,7 +153,6 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
   test('detects same-version package hotfixes by P1 and P2 payload hash', () => {
     const packageSet: IFirmwareReleaseInfo = {
       ...release,
-      resourceBundles: undefined,
       installOrder: ['applicationP1', 'applicationP2'],
       components: {
         applicationP1: {
@@ -203,7 +203,6 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     const packageSet: IFirmwareReleaseInfo = {
       ...release,
       required: false,
-      resourceBundles: undefined,
       installOrder: ['applicationP1'],
       components: {
         applicationP1: {
@@ -234,7 +233,6 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     const packageSet: IFirmwareReleaseInfo = {
       ...release,
       required: false,
-      resourceBundles: undefined,
       installOrder: ['applicationP1'],
       components: {
         applicationP1: {
@@ -265,7 +263,6 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
   test('updates both application packages when normal mode only reports P1', () => {
     const packageSet: IFirmwareReleaseInfo = {
       ...release,
-      resourceBundles: undefined,
       installOrder: ['applicationP1', 'applicationP2'],
       components: {
         applicationP1: {
@@ -331,7 +328,6 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       status: 'required',
       resourceStatus: 'unknown',
       resourceArchive: resourceSource,
-      resourcePreparationRequired: true,
       targetsToUpdate: ['boot', 'app_v1', 'resource'],
       firmwareUpdatePlan: {
         executor: 'v4',
@@ -339,8 +335,9 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         artifacts: [
           { artifactId: 'component:boot', target: 'boot' },
           { artifactId: 'component:app_v1', target: 'app_v1' },
+          { artifactId: 'resource:archive', target: 'resource' },
         ],
-        targetsToUpdate: ['boot', 'app_v1'],
+        targetsToUpdate: ['boot', 'app_v1', 'resource'],
       },
       firmware: {
         status: 'required',
@@ -391,8 +388,9 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
           { artifactId: 'component:app_v1', target: 'app_v1' },
           { artifactId: 'component:se02', target: 'se02' },
           { artifactId: 'component:se03', target: 'se03' },
+          { artifactId: 'resource:archive', target: 'resource' },
         ],
-        targetsToUpdate: ['boot', 'app_v1', 'se02', 'se03'],
+        targetsToUpdate: ['boot', 'app_v1', 'se02', 'se03', 'resource'],
       },
     });
   });
@@ -408,11 +406,13 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
           target: 'APPLICATION_P1',
           url: 'https://example.com/application-p1.okpkg',
           version: [1, 0, 0],
+          ...validComponentIntegrity,
         },
         coprocessor: {
           target: 'COPROCESSOR',
           url: 'https://example.com/coprocessor.okpkg',
           version: [1, 0, 0],
+          ...validComponentIntegrity,
         },
       },
     };
@@ -442,7 +442,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
 
     await expect(method.run()).resolves.toMatchObject({
-      targetsToUpdate: ['app_v1', 'coprocessor', 'resource'],
+      targetsToUpdate: ['app_v1', 'coprocessor'],
       firmwareUpdatePlan: {
         executor: 'v4',
         platform: 'desktop',
@@ -455,7 +455,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     });
   });
 
-  test('keeps exact force targets but omits a Desktop Plan without device identity', async () => {
+  test('builds a Desktop V4 prepared update without device identity', async () => {
     const currentRelease: IFirmwareReleaseInfo = {
       ...release,
       required: false,
@@ -466,6 +466,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
           target: 'APPLICATION_P1',
           url: 'https://example.com/application-p1.okpkg',
           version: [1, 0, 0],
+          ...validComponentIntegrity,
         },
       },
     };
@@ -491,8 +492,10 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
 
     await expect(method.run()).resolves.toMatchObject({
-      targetsToUpdate: ['app_v1', 'resource'],
-      firmwareUpdatePlan: undefined,
+      firmwareUpdatePlan: {
+        executor: 'v4',
+        deviceIdentity: 'unavailable',
+      },
     });
   });
 
@@ -539,8 +542,18 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
       ...release,
       installOrder: ['se01', 'se02', 'se03', 'se04'],
       components: {
-        se01: { target: 'SE01', url: 'https://example.com/se01.bin', version: [1, 0, 0] },
-        se02: { target: 'SE02', url: 'https://example.com/se02.bin', version: [2, 0, 0] },
+        se01: {
+          target: 'SE01',
+          url: 'https://example.com/se01.bin',
+          version: [1, 0, 0],
+          ...validComponentIntegrity,
+        },
+        se02: {
+          target: 'SE02',
+          url: 'https://example.com/se02.bin',
+          version: [2, 0, 0],
+          ...validComponentIntegrity,
+        },
         se03: { target: 'SE03', url: 'https://example.com/se03.bin', version: [1, 0, 0] },
         se04: { target: 'SE04', url: 'https://example.com/se04.bin', version: [1, 0, 0] },
       },
@@ -576,7 +589,7 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         executor: 'v4',
         deviceModel: 'neo',
         platform: 'native',
-        targetsToUpdate: ['se01', 'se02'],
+        targetsToUpdate: ['se01', 'se02', 'resource'],
       },
     });
   });
@@ -607,11 +620,71 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     });
   });
 
+  test.each(['resource', 'boot_resources'] as const)(
+    'allows an explicitly forced Protocol V2 resource-only target through %s',
+    async forceTarget => {
+      const currentRelease: IFirmwareReleaseInfo = {
+        ...release,
+        required: false,
+        installOrder: ['applicationP1'],
+        components: {
+          applicationP1: {
+            target: 'APPLICATION_P1',
+            url: 'https://example.com/application-p1.okpkg',
+            version: [1, 0, 0],
+          },
+        },
+      };
+      const method = new CheckAllFirmwareRelease({
+        id: 1,
+        payload: {
+          method: 'checkAllFirmwareRelease',
+          platform: 'desktop',
+          protocolV2ForceUpdateTargets: [forceTarget],
+        },
+      });
+      method.init();
+      method.device = {
+        isProtocolV2: () => true,
+        features: {
+          deviceType: 'pro2',
+          serialNo: 'pro2-device-id',
+          firmwareVersion: '1.0.0',
+        },
+        getDeviceState: jest.fn().mockResolvedValue({
+          identity: { deviceType: 'pro2', firmwareType: EFirmwareType.Universal },
+          status: { mode: 'normal' },
+          versions: { ...currentVersions, applicationP1: '1.0.0' },
+        }),
+      } as unknown as CheckAllFirmwareRelease['device'];
+      jest.spyOn(DataManager, 'getFirmwareLatestRelease').mockReturnValue(currentRelease);
+      jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
+
+      await expect(method.run()).resolves.toMatchObject({
+        status: 'valid',
+        hasUpgrade: true,
+        targetsToUpdate: ['resource'],
+        firmwareUpdatePlan: {
+          executor: 'v4',
+          platform: 'desktop',
+          artifacts: [
+            {
+              artifactId: 'resource:archive',
+              target: 'resource',
+              role: 'resourceBundle',
+              container: 'zip',
+            },
+          ],
+          targetsToUpdate: ['resource'],
+        },
+      });
+    }
+  );
+
   test('requests and compares firmware hashes only when explicitly enabled', async () => {
     const packageSet: IFirmwareReleaseInfo = {
       ...release,
       required: false,
-      resourceBundles: undefined,
       installOrder: ['applicationP1'],
       components: {
         applicationP1: {
@@ -684,14 +757,13 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
         protocol: 'V2',
         resourceStatus: 'unknown',
         resourceArchive: resourceSource,
-        resourcePreparationRequired: true,
         targetsToUpdate: ['boot', 'app_v1', 'resource'],
       });
       expect(typedCall).not.toHaveBeenCalled();
     }
   );
 
-  test('requires manifest preparation when only Protocol V2 resources may have changed', async () => {
+  test('exposes resource archive availability without reporting an unconfirmed update', async () => {
     const currentRelease: IFirmwareReleaseInfo = {
       ...release,
       required: false,
@@ -725,11 +797,11 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue(resourceSource);
 
     await expect(method.run()).resolves.toMatchObject({
-      status: 'unknown',
-      hasUpgrade: true,
+      status: 'valid',
+      hasUpgrade: false,
       resourceStatus: 'unknown',
-      resourcePreparationRequired: true,
-      targetsToUpdate: ['resource'],
+      resourceArchive: resourceSource,
+      targetsToUpdate: [],
       firmwareUpdatePlan: undefined,
     });
   });

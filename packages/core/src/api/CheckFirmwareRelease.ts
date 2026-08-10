@@ -29,8 +29,6 @@ export default class CheckFirmwareRelease extends BaseMethod {
   async run() {
     const payload = this.payload as CheckFirmwareReleaseParams;
 
-    if (!this.device.features) return null;
-
     if (this.device.isProtocolV2()) {
       const { state, firmwareType, release } = await loadProtocolV2FirmwareReleaseContext({
         device: this.device,
@@ -48,6 +46,8 @@ export default class CheckFirmwareRelease extends BaseMethod {
       );
       return toProtocolV2FirmwareReleaseInfo({ plan, state, release });
     }
+
+    if (!this.device.features) return null;
 
     const deviceFirmwareType = this.device.getCurrentFirmwareType();
     const firmwareType = payload.firmwareType ?? deviceFirmwareType;
