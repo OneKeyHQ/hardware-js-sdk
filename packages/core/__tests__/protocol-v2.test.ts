@@ -4372,6 +4372,43 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postTipMessage).toHaveBeenCalledWith('GoToBootloaderSuccess');
   });
 
+  test('keeps an ambiguous legacy runtime on the direct loader update path', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    (method as any).device = stubDevice({
+      originalDescriptor: { id: 'usb-id', path: 'legacy-path', protocolType: 'V2' },
+      state: {
+        raw: {
+          protocolV2ProtocolInfo: {
+            version: 1,
+            build_fingerprint: '',
+            supported_messages: [],
+            protobuf_definition: null,
+          },
+        },
+      },
+      features: {
+        deviceType: 'pro2',
+        mode: 'bootloader',
+        bootloaderMode: true,
+        capabilities: [],
+      },
+      isBootloader: () => true,
+      isRomloader: () => false,
+    });
+    (method as any).protocolV2Reboot = jest.fn();
+    method.postTipMessage = jest.fn();
+
+    await expect((method as any).enterProtocolV2BootloaderMode()).resolves.toBe(false);
+
+    expect((method as any).protocolV2LegacyDirectUpdate).toBe(true);
+    expect((method as any).protocolV2Reboot).not.toHaveBeenCalled();
+  });
+
   test('keeps Protocol V2 romloader active before firmware transfer', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -5000,6 +5037,81 @@ describe('Protocol V2 firmware update targets', () => {
       })
     ).rejects.toThrow('LIBUSB_TRANSFER_TIMED_OUT');
 
+    expect(method.postTipMessage).not.toHaveBeenCalled();
+    expect(method.postProgressMessage).not.toHaveBeenCalled();
+  });
+
+  test('reboots a legacy App only after the direct update endpoint is explicitly unavailable', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const targets = [{ target_id: 4, path: 'vol0:/application_p1.bin' }];
+    const typedCall = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('Failure_InvalidMessage,Handler not registered'))
+      .mockResolvedValueOnce({ type: 'Success', message: { message: '' } });
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    (method as any).protocolV2LegacyDirectUpdate = true;
+    (method as any).rebootProtocolV2ToBootloader = jest.fn().mockResolvedValue(true);
+    method.postTipMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+
+    await expect((method as any).protocolV2StartFirmwareUpdate({ targets })).resolves.toEqual({
+      type: 'Success',
+      message: { message: '' },
+    });
+
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenNthCalledWith(
+      1,
+      'DeviceFirmwareUpdateRequest',
+      'Success',
+      { targets },
+      { timeoutMs: 180000 }
+    );
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
+      'DeviceFirmwareUpdateRequest',
+      'Success',
+      { targets },
+      { timeoutMs: 180000 }
+    );
+    expect((method as any).rebootProtocolV2ToBootloader).toHaveBeenCalledTimes(1);
+    expect(method.postTipMessage).toHaveBeenCalledWith('FirmwareUpdating');
+    expect(method.postProgressMessage).toHaveBeenCalledWith(0, 'installingFirmware');
+  });
+
+  test('does not replay a legacy direct update after a link failure', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn().mockRejectedValue(new Error('LIBUSB_TRANSFER_TIMED_OUT'));
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    (method as any).protocolV2LegacyDirectUpdate = true;
+    (method as any).rebootProtocolV2ToBootloader = jest.fn();
+    method.postTipMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+
+    await expect(
+      (method as any).protocolV2StartFirmwareUpdate({
+        targets: [{ target_id: 4, path: 'vol0:/application_p1.bin' }],
+      })
+    ).rejects.toThrow('LIBUSB_TRANSFER_TIMED_OUT');
+
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect((method as any).rebootProtocolV2ToBootloader).not.toHaveBeenCalled();
     expect(method.postTipMessage).not.toHaveBeenCalled();
     expect(method.postProgressMessage).not.toHaveBeenCalled();
   });
