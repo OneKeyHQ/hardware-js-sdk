@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  AlertCircle,
   CheckCircle2,
   Cpu,
   Filter,
@@ -9,9 +10,12 @@ import {
   RotateCcw,
   Search,
   Square,
+  WalletCards,
   XCircle,
 } from 'lucide-react';
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
 
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { Button } from '../components/ui/Button';
@@ -30,13 +34,25 @@ import { PageLayout } from '../components/common/PageLayout';
 import { signerMethodsRegistry } from '../hooks/useMethodsRegistry';
 import { useHardwareMethodExecution } from '../hooks/useHardwareMethodExecution';
 import { cancelHardwareOperation } from '../services/hardwareService';
+import {
+  applyBatchWalletSelection,
+  BatchWalletMode,
+  DEFAULT_BATCH_WALLET_MODE,
+  getBatchWalletSelectionError,
+  resolveBatchWalletSelection,
+} from '../services/batchWalletMode';
 import { useHardwareStore } from '../store/hardwareStore';
+import { SDKUtils } from '../utils/hardwareInstance';
 import {
   getParameterDisplayValue,
   isLazyParameterValue,
   processParameters,
 } from '../utils/parameterUtils';
 import type { MethodPreset, UnifiedMethodConfig } from '../data/types';
+import type {
+  BatchWalletModeValue,
+  BatchWalletSelection,
+} from '../services/batchWalletMode';
 
 type BatchStatus = 'pending' | 'running' | 'success' | 'error' | 'cancelled';
 type PresetMode = 'first' | 'all';
@@ -66,6 +82,44 @@ const DEFAULT_PRESET: MethodPreset = {
 const RESERVED_EXECUTION_PARAM_NAMES = new Set(['connectId', 'deviceId', 'method']);
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const BATCH_WALLET_OPTIONS: Array<{
+  value: BatchWalletModeValue;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: BatchWalletMode.Standard,
+    label: 'Standard wallet (recommended)',
+    description: 'Forces the empty-passphrase wallet for every case.',
+  },
+  {
+    value: BatchWalletMode.SelectHidden,
+    label: 'Select hidden wallet',
+    description: 'Prompts once at the start of each run, then reuses that wallet.',
+  },
+  {
+    value: BatchWalletMode.ResumeHidden,
+    label: 'Resume hidden wallet',
+    description: 'Uses an existing passphraseState for every case.',
+  },
+];
+
+async function selectHiddenWalletSession(connectId: string): Promise<string> {
+  const sdk = await SDKUtils.getInstance();
+  const response = await sdk.openWalletSession(connectId, {
+    mode: OpenWalletSessionMode.SelectHidden,
+  });
+
+  if (!response.success) {
+    throw new Error(response.payload?.error || 'Failed to select a hidden wallet.');
+  }
+  if (response.payload.walletType !== 'hidden' || !response.payload.passphraseState) {
+    throw new Error('The device did not return a hidden wallet.');
+  }
+
+  return response.payload.passphraseState;
+}
 
 function summarizePreviewValue(value: unknown, depth = 0): unknown {
   if (isLazyParameterValue(value)) {
@@ -120,14 +174,6 @@ function removeReservedExecutionParams(params: Record<string, unknown>) {
   );
 }
 
-function prepareBatchParams(params: Record<string, unknown>) {
-  const nextParams = { ...params };
-  if (nextParams.useEmptyPassphrase === true) {
-    delete nextParams.passphraseState;
-  }
-  return nextParams;
-}
-
 function getMethodPresets(method: UnifiedMethodConfig, presetMode: PresetMode) {
   const presets = method.presets.length > 0 ? method.presets : [DEFAULT_PRESET];
   return presetMode === 'first' ? presets.slice(0, 1) : presets;
@@ -171,22 +217,42 @@ function BatchStatusIcon({ status }: { status: BatchStatus | 'ready' }) {
 
 const MethodBatchTestPage: React.FC = () => {
   const { executeMethod, currentDevice } = useHardwareMethodExecution();
-  const { commonParameters } = useHardwareStore();
+  const { commonParameters, setCommonParameters } = useHardwareStore();
   const [presetMode, setPresetMode] = useState<PresetMode>('first');
   const [groupFilter, setGroupFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [walletMode, setWalletMode] = useState<BatchWalletModeValue>(
+    DEFAULT_BATCH_WALLET_MODE
+  );
+  const [resumePassphraseState, setResumePassphraseState] = useState(
+    () => commonParameters.passphraseState
+  );
+  const [walletSetupError, setWalletSetupError] = useState<string>();
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [results, setResults] = useState<Partial<Record<string, BatchResult>>>({});
   const [isRunning, setIsRunning] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const stopRequestedRef = useRef(false);
 
+  const walletSelection = useMemo<BatchWalletSelection>(
+    () => ({
+      mode: walletMode,
+      ...(walletMode === BatchWalletMode.ResumeHidden
+        ? { passphraseState: resumePassphraseState }
+        : {}),
+    }),
+    [resumePassphraseState, walletMode]
+  );
+  const walletSelectionError = getBatchWalletSelectionError(walletSelection);
+  const selectedWalletOption =
+    BATCH_WALLET_OPTIONS.find(option => option.value === walletMode) ?? BATCH_WALLET_OPTIONS[0];
+
   const allCases = useMemo<BatchCase[]>(() => {
     return signerMethodsRegistry.chains.flatMap(group =>
       group.methods.flatMap((method, methodIndex) =>
         getMethodPresets(method, presetMode).map((preset, presetIndex) => {
           const methodParams = getPresetParams(preset);
-          const params = prepareBatchParams(
+          const params = applyBatchWalletSelection(
             removeReservedExecutionParams(
               Object.fromEntries(
                 Object.entries({
@@ -194,7 +260,8 @@ const MethodBatchTestPage: React.FC = () => {
                   ...methodParams,
                 }).filter(([, value]) => value !== undefined && value !== null && value !== '')
               )
-            )
+            ),
+            walletSelection
           );
           const id = `chain:${group.id}:${methodIndex}:${method.method}:${presetIndex}:${preset.title}`;
 
@@ -208,7 +275,7 @@ const MethodBatchTestPage: React.FC = () => {
         })
       )
     );
-  }, [commonParameters, presetMode]);
+  }, [commonParameters, presetMode, walletSelection]);
 
   const groupOptions = useMemo(() => {
     const groups = Array.from(new Set(allCases.map(testCase => testCase.groupId))).sort();
@@ -269,29 +336,50 @@ const MethodBatchTestPage: React.FC = () => {
     }));
   }, []);
 
+  const syncWalletSelection = useCallback(
+    (selection: BatchWalletSelection) => {
+      setCommonParameters({
+        useEmptyPassphrase: selection.mode === BatchWalletMode.Standard,
+        passphraseState: selection.passphraseState?.trim() ?? '',
+      });
+    },
+    [setCommonParameters]
+  );
+
   const runCases = useCallback(
     async (casesToRun: BatchCase[], resetResults: boolean) => {
-      if (casesToRun.length === 0 || isRunning) return;
+      if (casesToRun.length === 0 || isRunning || walletSelectionError) return;
 
       stopRequestedRef.current = false;
       setIsRunning(true);
       setIsStopping(false);
-
-      if (resetResults) {
-        setResults(
-          Object.fromEntries(
-            filteredCases.map(testCase => [
-              testCase.id,
-              {
-                caseId: testCase.id,
-                status: 'pending',
-              },
-            ])
-          )
-        );
-      }
+      setWalletSetupError(undefined);
 
       try {
+        syncWalletSelection(walletSelection);
+        const resolvedWalletSelection = await resolveBatchWalletSelection(
+          walletSelection,
+          async () => {
+            if (!currentDevice?.connectId) throw new Error('Connect a device before running.');
+            return selectHiddenWalletSession(currentDevice.connectId);
+          }
+        );
+        syncWalletSelection(resolvedWalletSelection);
+
+        if (resetResults) {
+          setResults(
+            Object.fromEntries(
+              filteredCases.map(testCase => [
+                testCase.id,
+                {
+                  caseId: testCase.id,
+                  status: 'pending',
+                },
+              ])
+            )
+          );
+        }
+
         for (const testCase of casesToRun) {
           if (stopRequestedRef.current) {
             setCaseResult(testCase.id, {
@@ -301,17 +389,21 @@ const MethodBatchTestPage: React.FC = () => {
             continue;
           }
 
+          const requestParams = applyBatchWalletSelection(
+            testCase.params,
+            resolvedWalletSelection
+          );
           const startedAt = Date.now();
           setCaseResult(testCase.id, {
             status: 'running',
-            request: testCase.params,
+            request: requestParams,
             response: undefined,
             error: undefined,
             durationMs: undefined,
           });
 
           try {
-            const response = await executeMethod(testCase.params, testCase.method);
+            const response = await executeMethod(requestParams, testCase.method);
             setCaseResult(testCase.id, {
               status: 'success',
               response,
@@ -327,12 +419,23 @@ const MethodBatchTestPage: React.FC = () => {
 
           await sleep(80);
         }
+      } catch (error) {
+        setWalletSetupError(error instanceof Error ? error.message : String(error));
       } finally {
         setIsRunning(false);
         setIsStopping(false);
       }
     },
-    [executeMethod, filteredCases, isRunning, setCaseResult]
+    [
+      currentDevice?.connectId,
+      executeMethod,
+      filteredCases,
+      isRunning,
+      setCaseResult,
+      syncWalletSelection,
+      walletSelection,
+      walletSelectionError,
+    ]
   );
 
   const handleRunVisibleCases = useCallback(() => {
@@ -359,12 +462,17 @@ const MethodBatchTestPage: React.FC = () => {
 
   const handleReset = useCallback(() => {
     stopRequestedRef.current = false;
+    setWalletSetupError(undefined);
     setSelectedCaseId(null);
     setResults({});
   }, []);
 
   const failedCount = summary.error;
-  const runDisabled = isRunning || filteredCases.length === 0;
+  const runDisabled =
+    isRunning ||
+    filteredCases.length === 0 ||
+    !currentDevice?.connectId ||
+    walletSelectionError !== null;
 
   return (
     <PageLayout fixedHeight={true}>
@@ -398,7 +506,12 @@ const MethodBatchTestPage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={handleRetryFailed}
-                disabled={isRunning || failedCount === 0}
+                disabled={
+                  isRunning ||
+                  failedCount === 0 ||
+                  !currentDevice?.connectId ||
+                  walletSelectionError !== null
+                }
               >
                 <RotateCcw />
                 Retry failed
@@ -410,11 +523,19 @@ const MethodBatchTestPage: React.FC = () => {
           </div>
 
           <DeviceNotConnectedState />
+
+          {walletSetupError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Wallet setup failed</AlertTitle>
+              <AlertDescription>{walletSetupError}</AlertDescription>
+            </Alert>
+          )}
         </div>
 
         <div className="mb-3 grid flex-shrink-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="rounded-lg border border-border/70 bg-card/80 p-3">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Group</Label>
                 <Select value={groupFilter} onValueChange={setGroupFilter}>
@@ -458,6 +579,81 @@ const MethodBatchTestPage: React.FC = () => {
                     className="h-9 pl-9"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Wallet mode</Label>
+                <Select
+                  disabled={isRunning}
+                  value={walletMode}
+                  onValueChange={value => {
+                    setWalletMode(value as BatchWalletModeValue);
+                    setWalletSetupError(undefined);
+                  }}
+                >
+                  <SelectTrigger className="h-9 bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BATCH_WALLET_OPTIONS.map(option => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="mt-3 border-t border-border/70 pt-3">
+              <div
+                className={
+                  walletMode === BatchWalletMode.ResumeHidden
+                    ? 'grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)] md:items-end'
+                    : 'flex items-start gap-2'
+                }
+              >
+                <div className="flex min-w-0 items-start gap-2">
+                  <WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div>
+                    <div className="text-xs font-medium text-foreground">
+                      {selectedWalletOption.label}
+                    </div>
+                    <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                      {selectedWalletOption.description}
+                    </p>
+                  </div>
+                </div>
+
+                {walletMode === BatchWalletMode.ResumeHidden && (
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="batch-passphrase-state"
+                      className="text-xs text-muted-foreground"
+                    >
+                      passphraseState
+                    </Label>
+                    <Input
+                      id="batch-passphrase-state"
+                      aria-invalid={walletSelectionError !== null}
+                      autoComplete="off"
+                      className="font-mono text-xs"
+                      disabled={isRunning}
+                      placeholder="Paste an existing hidden-wallet state"
+                      spellCheck={false}
+                      value={resumePassphraseState}
+                      onChange={event => {
+                        setResumePassphraseState(event.target.value);
+                        setWalletSetupError(undefined);
+                      }}
+                    />
+                    {walletSelectionError && (
+                      <p className="text-xs text-orange-600 dark:text-orange-300" role="alert">
+                        {walletSelectionError}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </section>
