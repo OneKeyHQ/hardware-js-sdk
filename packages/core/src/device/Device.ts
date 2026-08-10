@@ -1053,7 +1053,12 @@ export class Device extends EventEmitter {
       }
 
       if (refresh.has('status') && !initializedWithDeviceInfo) {
-        await this.probeProtocolV2RuntimeState(refreshedDeviceInfo);
+        const cachedMode = this.state?.status.mode;
+        await this.probeProtocolV2RuntimeState(refreshedDeviceInfo, undefined, {
+          // Loader 固件不支持 DeviceStatusGet。显式刷新时重新协商 ProtocolInfo，
+          // 让已重启回应用固件的设备退出缓存的 loader 状态。
+          forceRuntimeContextRefresh: cachedMode === 'bootloader' || cachedMode === 'romloader',
+        });
       }
 
       if (refresh.has('settings') && this.state?.status.mode === 'normal') {
@@ -1124,12 +1129,17 @@ export class Device extends EventEmitter {
     return this.features;
   }
 
-  async ensureProtocolV2RuntimeContext(timeoutMs?: number): Promise<ProtocolInfo> {
+  async ensureProtocolV2RuntimeContext(
+    timeoutMs?: number,
+    options?: { forceRefresh?: boolean }
+  ): Promise<ProtocolInfo> {
     const cachedProtocolInfo =
-      this.protocolV2RuntimeContext ??
-      (!this.protocolV2StateNeedsReload
-        ? this.state?.raw?.protocolV2ProtocolInfo ?? undefined
-        : undefined);
+      options?.forceRefresh === true
+        ? undefined
+        : this.protocolV2RuntimeContext ??
+          (!this.protocolV2StateNeedsReload
+            ? this.state?.raw?.protocolV2ProtocolInfo ?? undefined
+            : undefined);
     if (cachedProtocolInfo) {
       this.protocolV2RuntimeContext = cachedProtocolInfo;
       return cachedProtocolInfo;
@@ -1169,8 +1179,14 @@ export class Device extends EventEmitter {
     }
   }
 
-  async probeProtocolV2RuntimeState(deviceInfo?: ProtocolV2DeviceInfo, timeoutMs?: number) {
-    const protocolInfo = await this.ensureProtocolV2RuntimeContext(timeoutMs);
+  async probeProtocolV2RuntimeState(
+    deviceInfo?: ProtocolV2DeviceInfo,
+    timeoutMs?: number,
+    options?: { forceRuntimeContextRefresh?: boolean }
+  ) {
+    const protocolInfo = await this.ensureProtocolV2RuntimeContext(timeoutMs, {
+      forceRefresh: options?.forceRuntimeContextRefresh,
+    });
     const runtimeMode = getProtocolV2RuntimeMode(protocolInfo);
     const runtimeDeviceInfo = deviceInfo ?? this.state?.raw?.protocolV2DeviceInfo;
     const protocolV2DeviceType = runtimeDeviceInfo
@@ -1491,6 +1507,9 @@ export class Device extends EventEmitter {
 
   async interruptionFromUser() {
     const error = ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    // 取消操作经常伴随传输会话结束（尤其是固件升级重启/退出）。必须在等待
+    // 任何异步取消回调前使 V2 状态失效，避免后续请求复用旧运行模式。
+    this.markTransportDisconnected();
     await this.cancelableAction?.(error);
     await this.commands?.cancel();
 
