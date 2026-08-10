@@ -28,6 +28,7 @@ import { DevicePool } from '../device/DevicePool';
 import {
   PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
   ProtocolV2FirmwareTargetType,
+  isLegacyProtocolV2ProtocolInfo,
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
@@ -393,6 +394,13 @@ const isProtocolV2FirmwareStatusEndpointUnavailable = (error: unknown) => {
   );
 };
 
+const isProtocolV2FirmwareUpdateEndpointUnavailable = (error: unknown) => {
+  const message = getProtocolV2UnknownErrorText(error).toLowerCase();
+  return (
+    message.includes('handler not registered') || message.includes('message handler not found')
+  );
+};
+
 const isProtocolV2TerminalInstallStatusError = (error: unknown) =>
   error instanceof HardwareError &&
   (error.errorCode === HardwareErrorCode.FirmwareError ||
@@ -586,6 +594,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private protocolV2PreparedSources: FirmwareByteSource[] = [];
 
   private protocolV2ExecutionInLoader = false;
+
+  private protocolV2LegacyDirectUpdate = false;
 
   private protocolV2BootResourceStagingSafe = false;
 
@@ -2067,21 +2077,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return this.device.features?.mode === 'romloader';
   }
 
-  async enterProtocolV2BootloaderMode() {
-    // romloader is the first update environment and forwards targets to bootloader.
-    // It rejects DeviceRebootType.Bootloader, so reuse the current connection.
-    if (this.isProtocolV2RomloaderMode()) {
-      Log.debug('Protocol V2 device is in romloader mode; start firmware update directly');
-      this.protocolV2ExecutionInLoader = true;
-      return false;
-    }
-    if (this.isProtocolV2BootloaderMode()) {
-      Log.debug('Protocol V2 device is already in bootloader mode, skip reboot');
-      this.protocolV2ExecutionInLoader = true;
-      this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
-      return false;
-    }
+  private isLegacyProtocolV2Runtime() {
+    const protocolInfo = this.device.state?.raw?.protocolV2ProtocolInfo;
+    return protocolInfo ? isLegacyProtocolV2ProtocolInfo(protocolInfo) : false;
+  }
 
+  private async rebootProtocolV2ToBootloader() {
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.AutoRebootToBootloader);
       await this.protocolV2Reboot(DeviceRebootType.Bootloader);
@@ -2097,6 +2098,27 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       Log.log('Protocol V2 auto go to bootloader mode failed: ', error);
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure);
     }
+  }
+
+  async enterProtocolV2BootloaderMode() {
+    this.protocolV2LegacyDirectUpdate = false;
+    // romloader is the first update environment and forwards targets to bootloader.
+    // It rejects DeviceRebootType.Bootloader, so reuse the current connection.
+    if (this.isProtocolV2RomloaderMode()) {
+      Log.debug('Protocol V2 device is in romloader mode; start firmware update directly');
+      this.protocolV2LegacyDirectUpdate = this.isLegacyProtocolV2Runtime();
+      this.protocolV2ExecutionInLoader = true;
+      return false;
+    }
+    if (this.isProtocolV2BootloaderMode()) {
+      Log.debug('Protocol V2 device is already in bootloader mode, skip reboot');
+      this.protocolV2LegacyDirectUpdate = this.isLegacyProtocolV2Runtime();
+      this.protocolV2ExecutionInLoader = true;
+      this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
+      return false;
+    }
+
+    return this.rebootProtocolV2ToBootloader();
   }
 
   private async waitForProtocolV2BootloaderMode(
@@ -3047,12 +3069,34 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     targets: Array<{ target_id: number; path: string }>;
   }) {
     const commands = this.device.getCommands();
-    const response: ProtocolV2FirmwareUpdateStartResponse = await commands.typedCall(
-      'DeviceFirmwareUpdateRequest',
-      'Success',
-      { targets },
-      { timeoutMs: PROTOCOL_V2_START_UPDATE_TIMEOUT }
-    );
+    const startUpdate = () =>
+      commands.typedCall(
+        'DeviceFirmwareUpdateRequest',
+        'Success',
+        { targets },
+        { timeoutMs: PROTOCOL_V2_START_UPDATE_TIMEOUT }
+      );
+    let response: ProtocolV2FirmwareUpdateStartResponse;
+    try {
+      response = await startUpdate();
+    } catch (error) {
+      if (
+        !this.protocolV2LegacyDirectUpdate ||
+        !isProtocolV2FirmwareUpdateEndpointUnavailable(error)
+      ) {
+        throw error;
+      }
+
+      // Both legacy loaders register this request. A missing handler therefore identifies
+      // a legacy App before dispatch, so it is safe to reboot and retry the unhandled request.
+      this.protocolV2LegacyDirectUpdate = false;
+      Log.debug(
+        '[FirmwareUpdateV4] legacy App does not expose DeviceFirmwareUpdateRequest; rebooting to bootloader'
+      );
+      await this.rebootProtocolV2ToBootloader();
+      response = await startUpdate();
+    }
+    this.protocolV2LegacyDirectUpdate = false;
     // Success acknowledges that the device accepted installation. End confirmation
     // and begin status polling only after receiving this ACK.
     this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
