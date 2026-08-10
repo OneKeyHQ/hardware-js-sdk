@@ -328,8 +328,8 @@ export const assertFirmwareUpdatePlan = (value: unknown): FirmwareUpdatePlan => 
     }
     assertExactKeys(
       artifact,
-      ['artifactId', 'role', 'target', 'url', 'container', 'expectedSize', 'expectedSha256'],
-      ['logicalName', 'targetVersion']
+      ['artifactId', 'role', 'target', 'url', 'container'],
+      ['logicalName', 'expectedSize', 'expectedSha256', 'targetVersion']
     );
     const artifactId = assertBoundedString(artifact.artifactId, 'artifact id', 160);
     if (artifactIds.has(artifactId)) {
@@ -348,14 +348,24 @@ export const assertFirmwareUpdatePlan = (value: unknown): FirmwareUpdatePlan => 
     if (artifact.logicalName !== undefined) {
       assertBoundedString(artifact.logicalName, 'logical name', 256);
     }
-    if (!Number.isSafeInteger(artifact.expectedSize) || (artifact.expectedSize as number) <= 0) {
+    if (
+      artifact.expectedSize !== undefined &&
+      (!Number.isSafeInteger(artifact.expectedSize) || (artifact.expectedSize as number) <= 0)
+    ) {
       return planError('Firmware update plan artifact size is invalid');
     }
     if (
-      typeof artifact.expectedSha256 !== 'string' ||
-      !/^[a-f0-9]{64}$/u.test(artifact.expectedSha256)
+      artifact.expectedSha256 !== undefined &&
+      (typeof artifact.expectedSha256 !== 'string' ||
+        !/^[a-f0-9]{64}$/u.test(artifact.expectedSha256))
     ) {
       return planError('Firmware update plan artifact digest is invalid');
+    }
+    if (
+      plan.executor === 'v4' &&
+      (artifact.expectedSize === undefined || artifact.expectedSha256 === undefined)
+    ) {
+      return planError('Protocol V2 firmware artifact integrity metadata is invalid');
     }
     if (artifact.targetVersion !== undefined) {
       assertBoundedString(artifact.targetVersion, 'target version', 64);
@@ -822,13 +832,10 @@ export const buildFirmwareUpdatePlan = ({
   } else {
     if (isUpgrade(bootloader) || forcedTargets.has('bootloader')) {
       const bootloaderRelease = asRelease(bootloader);
-      const integrity = requireArtifactIntegrity(
-        {
-          size: bootloaderRelease?.bootloaderExpectedSize,
-          sha256: bootloaderRelease?.bootloaderFingerprint,
-        },
-        'Bootloader release'
-      );
+      const integrity = asIntegrity({
+        size: bootloaderRelease?.bootloaderExpectedSize,
+        sha256: bootloaderRelease?.bootloaderFingerprint,
+      });
       artifacts.push({
         artifactId: 'bootloader',
         role: 'bootloader',
@@ -850,10 +857,10 @@ export const buildFirmwareUpdatePlan = ({
         });
       }
       if (shouldUpdateFirmware) {
-        const integrity = requireArtifactIntegrity(
-          { size: firmwareRelease.expectedSize, sha256: firmwareRelease.fingerprint },
-          'Firmware release'
-        );
+        const integrity = asIntegrity({
+          size: firmwareRelease.expectedSize,
+          sha256: firmwareRelease.fingerprint,
+        });
         artifacts.push({
           artifactId: 'firmware',
           role: 'firmware',
@@ -873,19 +880,16 @@ export const buildFirmwareUpdatePlan = ({
           platform,
         });
         if (resourceUrl) {
-          const integrity = requireArtifactIntegrity(
-            {
-              size:
-                resourceUrl === asString(firmwareRelease.fullResource)
-                  ? firmwareRelease.fullResourceExpectedSize
-                  : firmwareRelease.resourceExpectedSize,
-              sha256:
-                resourceUrl === asString(firmwareRelease.fullResource)
-                  ? firmwareRelease.fullResourceFingerprint
-                  : firmwareRelease.resourceFingerprint,
-            },
-            'Legacy resource archive'
-          );
+          const integrity = asIntegrity({
+            size:
+              resourceUrl === asString(firmwareRelease.fullResource)
+                ? firmwareRelease.fullResourceExpectedSize
+                : firmwareRelease.resourceExpectedSize,
+            sha256:
+              resourceUrl === asString(firmwareRelease.fullResource)
+                ? firmwareRelease.fullResourceFingerprint
+                : firmwareRelease.resourceFingerprint,
+          });
           artifacts.push({
             artifactId: 'resource',
             role: 'resource',
@@ -899,13 +903,10 @@ export const buildFirmwareUpdatePlan = ({
     }
     if (isUpgrade(ble) || isRecoveryInstall(ble) || forcedTargets.has('ble')) {
       const bleRelease = asRelease(ble);
-      const integrity = requireArtifactIntegrity(
-        {
-          size: bleRelease?.expectedSize,
-          sha256: bleRelease?.fingerprintWeb ?? bleRelease?.fingerprint,
-        },
-        'BLE release'
-      );
+      const integrity = asIntegrity({
+        size: bleRelease?.expectedSize,
+        sha256: bleRelease?.fingerprintWeb ?? bleRelease?.fingerprint,
+      });
       artifacts.push({
         artifactId: 'ble',
         role: 'ble',

@@ -20,8 +20,8 @@ export interface FirmwareUpdatePlanArtifact {
   url: string;
   container: 'raw' | 'zip';
   logicalName?: string;
-  expectedSize: number;
-  expectedSha256: string;
+  expectedSize?: number;
+  expectedSha256?: string;
   targetVersion?: string;
 }
 
