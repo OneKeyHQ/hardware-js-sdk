@@ -56,6 +56,16 @@ export const getProtocolV2SeType = (se?: DeviceSEInfo): string | null =>
 
 export type ProtocolV2RuntimeMode = 'normal' | 'bootloader' | 'romloader';
 
+export type ProtocolV2ProtocolInfo = ProtocolInfo & {
+  /** Present only when hd-transport decoded the pre-build-fingerprint wire layout. */
+  protobuf_definition?: string | null;
+};
+
+export const isLegacyProtocolV2ProtocolInfo = (
+  protocolInfo: ProtocolInfo
+): protocolInfo is ProtocolV2ProtocolInfo & { protobuf_definition: string | null } =>
+  Object.prototype.hasOwnProperty.call(protocolInfo, 'protobuf_definition');
+
 /**
  * Protocol V2 fingerprints use:
  * <binary>__<version>__<commit>__<PROD|DEV>__<DEBUG|RELEASE>
@@ -94,7 +104,8 @@ export const getProtocolV2RuntimeMode = (
   if (binary === 'application') return 'normal';
   if (binary) return binary;
 
-  // 早期 loader 不返回 build_fingerprint；仅在没有 application 时按镜像信息判定。
+  // Early loaders omit build_fingerprint; infer their mode from image metadata
+  // only when the application image is absent.
   if (!protocolInfo.build_fingerprint && !deviceInfo?.fw?.application) {
     if (deviceInfo?.fw?.romloader) return 'romloader';
     if (deviceInfo?.fw?.bootloader) return 'bootloader';
@@ -166,12 +177,14 @@ export const PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS = 30 * 1000;
 export async function requestProtocolV2ProtocolInfo({
   commands,
   timeoutMs,
+  allowLegacyProtocolV2ProtocolInfo = false,
 }: {
   commands: DeviceCommands;
   timeoutMs?: number;
+  allowLegacyProtocolV2ProtocolInfo?: boolean;
 }): Promise<ProtocolInfo> {
   const response =
-    timeoutMs === undefined
+    timeoutMs === undefined && !allowLegacyProtocolV2ProtocolInfo
       ? await commands.typedCall('ProtocolInfoRequest', 'ProtocolInfo', {
           eventless_wallet_session: true,
         })
@@ -179,7 +192,12 @@ export async function requestProtocolV2ProtocolInfo({
           'ProtocolInfoRequest',
           'ProtocolInfo',
           { eventless_wallet_session: true },
-          { timeoutMs }
+          {
+            ...(timeoutMs === undefined ? {} : { timeoutMs }),
+            ...(allowLegacyProtocolV2ProtocolInfo
+              ? { allowLegacyProtocolV2ProtocolInfo: true }
+              : {}),
+          }
         );
   return response.message;
 }

@@ -38,6 +38,35 @@ describe('DevicePool state lifecycle', () => {
     expect(getDeviceState).toHaveBeenNthCalledWith(2, { refreshSections: ['settings'] });
   });
 
+  test('keeps legacy ProtocolInfo compatibility scoped to a discovery refresh', async () => {
+    const getDeviceState = jest.fn().mockResolvedValue({ status: { mode: 'bootloader' } });
+    const run = jest.fn(async (callback: () => Promise<void>) => callback());
+    const device = {
+      isProtocolV2: () => true,
+      getDeviceState,
+      run,
+    } as any;
+
+    await (DevicePool as any)._refreshRuntimeState(device, {
+      refreshRuntimeState: true,
+      allowLegacyProtocolV2ProtocolInfo: true,
+    });
+
+    expect(run).toHaveBeenCalledWith(expect.any(Function), {
+      connectProtocol: undefined,
+      forceProtocolDetection: undefined,
+      allowLegacyProtocolV2ProtocolInfo: true,
+    });
+    expect(getDeviceState).toHaveBeenNthCalledWith(1, {
+      refreshSections: ['status'],
+      allowLegacyProtocolV2ProtocolInfo: true,
+    });
+    expect(getDeviceState).toHaveBeenNthCalledWith(2, {
+      refreshSections: ['settings'],
+      allowLegacyProtocolV2ProtocolInfo: true,
+    });
+  });
+
   test('actively re-detects a cached device when protocol detection is forced', async () => {
     const descriptor = { path: 'cached-path', protocolType: 'V1' } as any;
     const device = Device.fromDescriptor(descriptor);

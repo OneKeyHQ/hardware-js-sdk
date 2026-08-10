@@ -61,6 +61,7 @@ import {
   PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
   type ProtocolV2RuntimeMode,
   getProtocolV2RuntimeMode,
+  isLegacyProtocolV2ProtocolInfo,
   requestProtocolV2DeviceInfo,
   requestProtocolV2DeviceStatus,
   requestProtocolV2ProtocolInfo,
@@ -99,6 +100,8 @@ export type InitOptions = {
   protocolV2DeviceInfoTimeoutMs?: number;
   /** Refresh Protocol V2 runtime state before returning discovery results. */
   refreshRuntimeState?: boolean;
+  /** Recovery-only compatibility used by discovery and Protocol V2 firmware updates. */
+  allowLegacyProtocolV2ProtocolInfo?: boolean;
   /**
    * Protocol V1 Initialize response timeout override. Reboot-wait polling passes a
    * short value so an unanswered probe settles before the next poll tick.
@@ -977,10 +980,16 @@ export class Device extends EventEmitter {
       });
       // The default request excludes SE/hash data and therefore uses basic scope.
       // Full version and verification data require getDeviceState({ scope: 'firmware' }).
-      const features = await this.probeProtocolV2RuntimeState(
-        deviceInfo,
-        options?.protocolV2DeviceInfoTimeoutMs
-      );
+      const features = options?.allowLegacyProtocolV2ProtocolInfo
+        ? await this.probeProtocolV2RuntimeState(
+            deviceInfo,
+            options.protocolV2DeviceInfoTimeoutMs,
+            { allowLegacyProtocolV2ProtocolInfo: true }
+          )
+        : await this.probeProtocolV2RuntimeState(
+            deviceInfo,
+            options?.protocolV2DeviceInfoTimeoutMs
+          );
       Log.debug('Protocol V2 features:', features);
     } catch (error) {
       Log.error('Protocol V2 initialization failed:', error);
@@ -1017,7 +1026,13 @@ export class Device extends EventEmitter {
           commands: this.commands,
           request: getProtocolV2DeviceInfoRequest(),
         });
-        await this.probeProtocolV2RuntimeState(deviceInfo);
+        if (params.allowLegacyProtocolV2ProtocolInfo) {
+          await this.probeProtocolV2RuntimeState(deviceInfo, undefined, {
+            allowLegacyProtocolV2ProtocolInfo: true,
+          });
+        } else {
+          await this.probeProtocolV2RuntimeState(deviceInfo);
+        }
         refreshedDeviceInfo = deviceInfo;
         initializedWithDeviceInfo = true;
       } else {
@@ -1053,7 +1068,16 @@ export class Device extends EventEmitter {
       }
 
       if (refresh.has('status') && !initializedWithDeviceInfo) {
-        await this.probeProtocolV2RuntimeState(refreshedDeviceInfo);
+        const cachedMode = this.state?.status.mode;
+        await this.probeProtocolV2RuntimeState(refreshedDeviceInfo, undefined, {
+          // Loader firmware does not support DeviceStatusGet. Renegotiate ProtocolInfo
+          // during an explicit refresh so a device rebooted into application firmware
+          // can leave the cached loader state.
+          forceRuntimeContextRefresh: cachedMode === 'bootloader' || cachedMode === 'romloader',
+          ...(params.allowLegacyProtocolV2ProtocolInfo
+            ? { allowLegacyProtocolV2ProtocolInfo: true }
+            : {}),
+        });
       }
 
       if (refresh.has('settings') && this.state?.status.mode === 'normal') {
@@ -1124,19 +1148,39 @@ export class Device extends EventEmitter {
     return this.features;
   }
 
-  async ensureProtocolV2RuntimeContext(timeoutMs?: number): Promise<ProtocolInfo> {
+  async ensureProtocolV2RuntimeContext(
+    timeoutMs?: number,
+    options?: {
+      forceRefresh?: boolean;
+      allowLegacyProtocolV2ProtocolInfo?: boolean;
+    }
+  ): Promise<ProtocolInfo> {
+    const assertProtocolInfoAllowed = (protocolInfo: ProtocolInfo) => {
+      if (
+        isLegacyProtocolV2ProtocolInfo(protocolInfo) &&
+        options?.allowLegacyProtocolV2ProtocolInfo !== true
+      ) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.DeviceInitializeFailed,
+          'Legacy Protocol V2 ProtocolInfo is supported only during device discovery and firmware update.'
+        );
+      }
+      return protocolInfo;
+    };
     const cachedProtocolInfo =
-      this.protocolV2RuntimeContext ??
-      (!this.protocolV2StateNeedsReload
-        ? this.state?.raw?.protocolV2ProtocolInfo ?? undefined
-        : undefined);
+      options?.forceRefresh === true
+        ? undefined
+        : this.protocolV2RuntimeContext ??
+          (!this.protocolV2StateNeedsReload
+            ? this.state?.raw?.protocolV2ProtocolInfo ?? undefined
+            : undefined);
     if (cachedProtocolInfo) {
       this.protocolV2RuntimeContext = cachedProtocolInfo;
-      return cachedProtocolInfo;
+      return assertProtocolInfoAllowed(cachedProtocolInfo);
     }
 
     if (this.protocolV2RuntimeContextPromise) {
-      return this.protocolV2RuntimeContextPromise;
+      return assertProtocolInfoAllowed(await this.protocolV2RuntimeContextPromise);
     }
 
     const requestToken = {};
@@ -1144,6 +1188,7 @@ export class Device extends EventEmitter {
       const protocolInfo = await requestProtocolV2ProtocolInfo({
         commands: this.commands,
         timeoutMs,
+        allowLegacyProtocolV2ProtocolInfo: options?.allowLegacyProtocolV2ProtocolInfo,
       });
       if (this.protocolV2RuntimeContextRequestToken !== requestToken) {
         throw ERRORS.TypedError(
@@ -1158,7 +1203,7 @@ export class Device extends EventEmitter {
     this.protocolV2RuntimeContextPromise = pendingRequest;
 
     try {
-      return await pendingRequest;
+      return assertProtocolInfoAllowed(await pendingRequest);
     } finally {
       if (this.protocolV2RuntimeContextPromise === pendingRequest) {
         this.protocolV2RuntimeContextPromise = undefined;
@@ -1169,8 +1214,19 @@ export class Device extends EventEmitter {
     }
   }
 
-  async probeProtocolV2RuntimeState(deviceInfo?: ProtocolV2DeviceInfo, timeoutMs?: number) {
-    const protocolInfo = await this.ensureProtocolV2RuntimeContext(timeoutMs);
+  async probeProtocolV2RuntimeState(
+    deviceInfo?: ProtocolV2DeviceInfo,
+    timeoutMs?: number,
+    options?: {
+      forceRuntimeContextRefresh?: boolean;
+      allowLegacyProtocolV2ProtocolInfo?: boolean;
+    }
+  ) {
+    const protocolInfo = await this.ensureProtocolV2RuntimeContext(timeoutMs, {
+      forceRefresh: options?.forceRuntimeContextRefresh,
+      allowLegacyProtocolV2ProtocolInfo: options?.allowLegacyProtocolV2ProtocolInfo,
+    });
+    const legacyProtocolInfo = isLegacyProtocolV2ProtocolInfo(protocolInfo);
     const runtimeDeviceInfo = deviceInfo ?? this.state?.raw?.protocolV2DeviceInfo;
     const runtimeMode = getProtocolV2RuntimeMode(protocolInfo, runtimeDeviceInfo);
     const protocolV2DeviceType = runtimeDeviceInfo
@@ -1187,6 +1243,7 @@ export class Device extends EventEmitter {
       );
     }
     const deviceStatusSupported =
+      legacyProtocolInfo ||
       supportsProtocolV2Message(protocolInfo, PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE) ||
       (!protocolInfo.build_fingerprint && runtimeMode === undefined);
 
