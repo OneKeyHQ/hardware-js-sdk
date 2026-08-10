@@ -376,62 +376,66 @@ describe('buildFirmwareUpdatePlan', () => {
     }
   );
 
-  test('rejects a legacy resource archive without complete integrity metadata', () => {
-    expectFirmwarePlanInvalid(
-      () =>
-        buildFirmwareUpdatePlan(
-          createLegacyForceInput(['resource'], {
-            url: 'https://firmware.onekey.so/pro/firmware.bin',
-            resource: 'https://firmware.onekey.so/pro/resource.zip',
-            resourceExpectedSize: 4096,
-          })
-        ),
-      'integrity metadata is invalid'
-    );
-  });
+  test.each([
+    {
+      executor: 'v2',
+      deviceType: EDeviceType.Classic1s,
+      bootloaderVersion: '2.1.2',
+    },
+    {
+      executor: 'v3',
+      deviceType: EDeviceType.Pro,
+      bootloaderVersion: '2.8.4',
+    },
+  ])(
+    'allows $executor config releases without optional integrity metadata',
+    ({ executor, deviceType, bootloaderVersion }) => {
+      const plan = buildFirmwareUpdatePlan({
+        features: createFeatures({
+          deviceType,
+          firmwareVersion: '4.21.0',
+          bootloaderVersion,
+        }),
+        firmwareType: EFirmwareType.Universal,
+        platform: 'desktop',
+        firmware: {
+          status: 'valid',
+          release: {
+            url: 'https://firmware.onekey.so/legacy/firmware.bin',
+            version: [4, 21, 0],
+            fingerprint: '',
+            resource: 'https://firmware.onekey.so/legacy/resource.zip',
+            resourceFingerprint: '',
+          },
+        },
+        ble: {
+          status: 'valid',
+          release: {
+            webUpdate: 'https://firmware.onekey.so/legacy/ble.bin',
+            version: [2, 3, 7],
+            fingerprintWeb: '',
+          },
+        },
+        bootloader: {
+          status: 'valid',
+          release: {
+            bootloaderResource: 'https://firmware.onekey.so/legacy/bootloader.bin',
+            bootloaderVersion: [2, 8, 4],
+            bootloaderFingerprint: '',
+          },
+        },
+        forceUpdateTargets: ['firmware', 'resource', 'ble', 'bootloader'],
+      });
 
-  test.each(['firmware', 'ble', 'bootloader'] as const)(
-    'rejects a remote legacy %s artifact without complete integrity metadata',
-    target => {
-      expectFirmwarePlanInvalid(
-        () =>
-          buildFirmwareUpdatePlan({
-            features: createFeatures({ deviceType: EDeviceType.Classic1s }),
-            firmwareType: EFirmwareType.Universal,
-            platform: 'desktop',
-            firmware:
-              target === 'firmware'
-                ? {
-                    status: 'outdated',
-                    release: {
-                      url: 'https://firmware.onekey.so/classic/firmware.bin',
-                      expectedSize: 1024,
-                    },
-                  }
-                : noUpdate,
-            ble:
-              target === 'ble'
-                ? {
-                    status: 'outdated',
-                    release: {
-                      webUpdate: 'https://firmware.onekey.so/classic/ble.bin',
-                      expectedSize: 512,
-                    },
-                  }
-                : noUpdate,
-            bootloader:
-              target === 'bootloader'
-                ? {
-                    status: 'outdated',
-                    release: {
-                      bootloaderResource: 'https://firmware.onekey.so/classic/bootloader.bin',
-                      bootloaderExpectedSize: 768,
-                    },
-                  }
-                : noUpdate,
-          }),
-        'integrity metadata is invalid'
-      );
+      expect(plan.executor).toBe(executor);
+      expect(plan.artifacts.map(artifact => artifact.artifactId)).toEqual([
+        'bootloader',
+        'firmware',
+        'resource',
+        'ble',
+      ]);
+      expect(plan.artifacts.every(artifact => artifact.expectedSize === undefined)).toBe(true);
+      expect(plan.artifacts.every(artifact => artifact.expectedSha256 === undefined)).toBe(true);
     }
   );
 
