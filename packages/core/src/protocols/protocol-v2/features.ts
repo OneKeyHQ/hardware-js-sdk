@@ -168,14 +168,12 @@ export const PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS = 30 * 1000;
 export async function requestProtocolV2ProtocolInfo({
   commands,
   timeoutMs,
-  allowLegacyProtocolV2ProtocolInfo = false,
 }: {
   commands: DeviceCommands;
   timeoutMs?: number;
-  allowLegacyProtocolV2ProtocolInfo?: boolean;
 }): Promise<ProtocolInfo> {
   const response =
-    timeoutMs === undefined && !allowLegacyProtocolV2ProtocolInfo
+    timeoutMs === undefined
       ? await commands.typedCall('ProtocolInfoRequest', 'ProtocolInfo', {
           eventless_wallet_session: true,
         })
@@ -183,12 +181,7 @@ export async function requestProtocolV2ProtocolInfo({
           'ProtocolInfoRequest',
           'ProtocolInfo',
           { eventless_wallet_session: true },
-          {
-            ...(timeoutMs === undefined ? {} : { timeoutMs }),
-            ...(allowLegacyProtocolV2ProtocolInfo
-              ? { allowLegacyProtocolV2ProtocolInfo: true }
-              : {}),
-          }
+          { timeoutMs }
         );
   return response.message;
 }

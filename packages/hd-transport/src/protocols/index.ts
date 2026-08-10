@@ -30,11 +30,6 @@ type ProtocolV2FrameOptions = {
   seq?: number;
 };
 
-type ProtocolV2DecodeOptions = {
-  /** Allow the pre-build-fingerprint ProtocolInfo wire layout for recovery flows. */
-  allowLegacyProtocolV2ProtocolInfo?: boolean;
-};
-
 const LEGACY_PROTOCOL_V2_PROTOCOL_INFO = Type.fromJSON('LegacyProtocolInfo', {
   fields: {
     version: {
@@ -98,6 +93,20 @@ const isLegacyProtocolV2ProtocolInfoWireLayout = (pbPayload: Uint8Array) => {
     return false;
   }
   return hasVersion;
+};
+
+const tryDecodeLegacyProtocolV2ProtocolInfo = (messageName: string, pbPayload: Uint8Array) => {
+  // TEMPORARY COMPATIBILITY: Remove this fallback after all supported Pro2 and Neo
+  // firmware versions return ProtocolInfo with the current build_fingerprint layout.
+  if (messageName !== 'ProtocolInfo' || !isLegacyProtocolV2ProtocolInfoWireLayout(pbPayload)) {
+    return undefined;
+  }
+
+  try {
+    return decodeLegacyProtocolV2ProtocolInfo(pbPayload);
+  } catch {
+    return undefined;
+  }
 };
 
 const resolveProtocolV2EncodeSchema = (name: string, schemas: ProtocolV2Schemas) => {
@@ -186,43 +195,18 @@ export const ProtocolV2 = {
     );
   },
 
-  decodeFrame(
-    schemas: ProtocolV2Schemas,
-    frame: Uint8Array,
-    options: ProtocolV2DecodeOptions = {}
-  ) {
+  decodeFrame(schemas: ProtocolV2Schemas, frame: Uint8Array) {
     const { messageTypeId, pbPayload, seq, messageName } = this.inspectFrame(schemas, frame);
     const { Message } = createProtocolV2MessageFromType(messageTypeId, schemas);
     const rxByteBuffer = ByteBuffer.wrap(Buffer.from(pbPayload) as unknown as ArrayBuffer);
-    let message: ReturnType<typeof decodeProtobuf> | undefined;
-    if (
-      messageName === 'ProtocolInfo' &&
-      options.allowLegacyProtocolV2ProtocolInfo === true &&
-      isLegacyProtocolV2ProtocolInfoWireLayout(pbPayload)
-    ) {
-      try {
-        message = decodeLegacyProtocolV2ProtocolInfo(pbPayload);
-      } catch {
-        // Let the current decoder below produce the standard compatibility error.
-      }
-    }
+    let message: ReturnType<typeof decodeProtobuf>;
     try {
-      message ??= decodeProtobuf(Message, rxByteBuffer);
+      message = decodeProtobuf(Message, rxByteBuffer);
     } catch (cause) {
-      if (
-        messageName === 'ProtocolInfo' &&
-        options.allowLegacyProtocolV2ProtocolInfo === true &&
-        isLegacyProtocolV2ProtocolInfoWireLayout(pbPayload)
-      ) {
-        try {
-          message = decodeLegacyProtocolV2ProtocolInfo(pbPayload);
-        } catch {
-          // Preserve the current-schema error below when neither layout is valid.
-        }
-      }
-      if (message) {
+      const legacyProtocolInfo = tryDecodeLegacyProtocolV2ProtocolInfo(messageName, pbPayload);
+      if (legacyProtocolInfo) {
         return {
-          message,
+          message: legacyProtocolInfo,
           messageName,
           messageTypeId,
           pbPayload,
