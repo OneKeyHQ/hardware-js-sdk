@@ -108,38 +108,44 @@ describe('SearchDevices', () => {
     );
   });
 
-  test('BLE discovery keeps transport identity separate from the unavailable serial number', async () => {
-    mockIsBleConnect.mockReturnValue(true);
+  test.each([
+    ['OneKey Pro', 'pro'],
+    ['OneKey Pro 2', 'pro2'],
+  ])(
+    'BLE discovery keeps the %s transport identity separate from device identity',
+    async (name, deviceType) => {
+      mockIsBleConnect.mockReturnValue(true);
 
-    const descriptor = {
-      id: 'ble-peripheral-id',
-      path: 'ble-peripheral-id',
-      name: 'OneKey Pro 2',
-      commType: 'ble',
-    };
-    const method = new SearchDevices({
-      id: 1,
-      payload: {
-        method: 'searchDevices',
-      },
-    } as any);
-    method.init();
-    method.connector = {
-      enumerate: jest.fn().mockResolvedValue({
-        descriptors: [descriptor],
-      }),
-    } as any;
+      const descriptor = {
+        id: 'ble-peripheral-id',
+        path: 'ble-peripheral-id',
+        name,
+        commType: 'ble',
+      };
+      const method = new SearchDevices({
+        id: 1,
+        payload: {
+          method: 'searchDevices',
+        },
+      } as any);
+      method.init();
+      method.connector = {
+        enumerate: jest.fn().mockResolvedValue({
+          descriptors: [descriptor],
+        }),
+      } as any;
 
-    await expect(method.run()).resolves.toEqual([
-      {
-        ...descriptor,
-        connectId: 'ble-peripheral-id',
-        serialNo: null,
-        uuid: 'ble-peripheral-id',
-        deviceId: null,
-        deviceType: 'pro2',
-      },
-    ]);
-    expect(mockGetDevices).not.toHaveBeenCalled();
-  });
+      await expect(method.run()).resolves.toEqual([
+        {
+          ...descriptor,
+          connectId: 'ble-peripheral-id',
+          serialNo: null,
+          uuid: '',
+          deviceId: null,
+          deviceType,
+        },
+      ]);
+      expect(mockGetDevices).not.toHaveBeenCalled();
+    }
+  );
 });
