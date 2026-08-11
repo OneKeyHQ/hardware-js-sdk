@@ -266,7 +266,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
 
   private createProtocolProbeTimeoutError(expected: ProtocolType, attempts: number) {
     return ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
+      HardwareErrorCode.DeviceInitializeFailed,
       `Protocol ${expected} probe timeout after ${attempts} attempts`
     );
   }

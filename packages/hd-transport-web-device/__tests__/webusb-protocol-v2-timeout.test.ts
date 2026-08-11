@@ -148,7 +148,7 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     expect(webusb.deviceProtocol.get(path)).toBe('V2');
   });
 
-  test('reports a Protocol V2 probe timeout only after the bounded retry is exhausted', async () => {
+  test('reports a device initialization failure only after the bounded retry is exhausted', async () => {
     const webusb = new WebUsbTransport() as any;
     const path = 'pro2-webusb';
     webusb.probeProtocolV1 = jest.fn();
@@ -156,9 +156,10 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     webusb.resetConnectionAfterProbe = jest.fn().mockResolvedValue(undefined);
     webusb.closeConnectionAfterProbe = jest.fn().mockResolvedValue(undefined);
 
-    await expect(webusb.detectProtocol(path, 'V2')).rejects.toThrow(
-      'Protocol V2 probe timeout after 2 attempts'
-    );
+    await expect(webusb.detectProtocol(path, 'V2')).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInitializeFailed,
+      message: 'Protocol V2 probe timeout after 2 attempts',
+    });
 
     expect(webusb.probeProtocolV2).toHaveBeenCalledTimes(2);
     expect(webusb.probeProtocolV1).not.toHaveBeenCalled();
