@@ -6006,7 +6006,7 @@ describe('Protocol V2 firmware update targets', () => {
     );
   });
 
-  test('passes bootloader, coprocessor, SE and app files to DeviceFirmwareUpdate targets', async () => {
+  test('preserves component-first target order for the firmware-owned loader handoff', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6035,54 +6035,65 @@ describe('Protocol V2 firmware update targets', () => {
       .mockResolvedValue(undefined);
 
     await (method as any).executeProtocolV2Update({
-      bootloaderBinary: new Uint8Array([4, 5]).buffer,
-      fwBinaryMap: [
+      // The active bootloader installs its component runners in records order and
+      // leaves the bootloader record pending for romloader after reboot. Keep boot
+      // deliberately after components to prove Core does not synthesize boot-first.
+      installItems: [
         {
-          fileName: 'coprocessor.bin',
-          binary: new Uint8Array([6]).buffer,
-          targetId: 6,
+          fileName: 'application_p1.bin',
+          binary: new Uint8Array([8]).buffer,
+          targetId: 4,
+          kind: 'firmware',
         },
         {
           fileName: 'se01.bin',
           binary: new Uint8Array([7]).buffer,
           targetId: 7,
+          kind: 'firmware',
         },
         {
-          fileName: 'application_p1.bin',
-          binary: new Uint8Array([8]).buffer,
-          targetId: 4,
+          fileName: 'bootloader.bin',
+          binary: new Uint8Array([4, 5]).buffer,
+          targetId: 3,
+          kind: 'bootloader',
+        },
+        {
+          fileName: 'coprocessor.bin',
+          binary: new Uint8Array([6]).buffer,
+          targetId: 6,
+          kind: 'firmware',
         },
       ],
     });
 
     expect(writtenPaths).toEqual([
+      'vol0:/application_p1.bin',
+      'vol0:/se01.bin',
       'vol0:/bootloader.bin',
       'vol0:/coprocessor.bin',
-      'vol0:/se01.bin',
-      'vol0:/application_p1.bin',
     ]);
     expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledTimes(4);
     expect((method as any).verifyProtocolV2StagedFile).toHaveBeenNthCalledWith(
       2,
-      'vol0:/coprocessor.bin',
+      'vol0:/se01.bin',
       1
     );
     expect((method as any).enterProtocolV2BootloaderMode).toHaveBeenCalledTimes(1);
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledTimes(1);
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
+        { target_id: 7, path: 'vol0:/se01.bin' },
         { target_id: 3, path: 'vol0:/bootloader.bin' },
         { target_id: 6, path: 'vol0:/coprocessor.bin' },
-        { target_id: 7, path: 'vol0:/se01.bin' },
-        { target_id: 4, path: 'vol0:/application_p1.bin' },
       ],
     });
     expect((method as any).waitForProtocolV2FirmwareUpdateComplete).toHaveBeenCalledTimes(1);
     expect((method as any).waitForProtocolV2FirmwareUpdateComplete).toHaveBeenCalledWith([
+      { target_id: 4, path: 'vol0:/application_p1.bin' },
+      { target_id: 7, path: 'vol0:/se01.bin' },
       { target_id: 3, path: 'vol0:/bootloader.bin' },
       { target_id: 6, path: 'vol0:/coprocessor.bin' },
-      { target_id: 7, path: 'vol0:/se01.bin' },
-      { target_id: 4, path: 'vol0:/application_p1.bin' },
     ]);
     expect((method as any).exitProtocolV2BootloaderToNormal).not.toHaveBeenCalled();
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'transferData');

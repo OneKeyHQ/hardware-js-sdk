@@ -2269,6 +2269,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       // Clear stale boot-resource staging before writing any artifacts. The new
       // boot resource, resources and firmware then share one transfer session,
       // one global progress range and one multi-target install request.
+      // Preserve the approved source order instead of synthesizing a boot-first
+      // phase. Loader firmware owns the cross-stage handoff: bootloader runs its
+      // component targets and leaves boot pending for romloader, while pending
+      // runner-backed records always resume before the application boots.
       await this.ensureProtocolV2BootResourceStagingIsEmpty();
       await this.executeProtocolV2TransferPhase({
         installSources,
