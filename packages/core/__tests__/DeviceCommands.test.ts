@@ -65,7 +65,49 @@ describe('DeviceCommands failure mapping', () => {
     expect(
       coreLog.messages.some(entry => entry.message[0] === '[DeviceCommands] [call] Received')
     ).toBe(false);
-    expect(JSON.stringify(log.messages)).not.toContain('hidden-wallet-secret');
+    expect(JSON.stringify([...log.messages, ...coreLog.messages])).not.toContain(
+      'hidden-wallet-secret'
+    );
+  });
+
+  it('redacts passphrases from transport errors logged through Core', async () => {
+    const commands = createCommands();
+    const log = getLogger(LoggerNames.DeviceCommands);
+    const coreLog = getLogger(LoggerNames.Core);
+    log.messages.length = 0;
+    coreLog.messages.length = 0;
+    const transportError = Object.assign(new Error('transport failed'), {
+      response: {
+        data: {
+          passphrase: 'hidden-wallet-secret',
+        },
+      },
+    });
+    commands.mainId = 'main-id';
+    commands.transport = {
+      call: jest.fn().mockRejectedValue(transportError),
+    } as any;
+
+    await expect(
+      commands._commonCall('DeviceSessionAskPassphrase', {
+        passphrase: 'hidden-wallet-secret',
+        on_device: false,
+      })
+    ).rejects.toBe(transportError);
+
+    expect(coreLog.messages.at(-1)?.message).toEqual([
+      '[DeviceCommands] [call] Received error',
+      {
+        request: 'DeviceSessionAskPassphrase',
+        errorCode: undefined,
+        response: {
+          passphrase: '[REDACTED]',
+        },
+      },
+    ]);
+    expect(JSON.stringify([...log.messages, ...coreLog.messages])).not.toContain(
+      'hidden-wallet-secret'
+    );
   });
 
   it('logs canonical DeviceStatus response fields without exposing the device ID', async () => {

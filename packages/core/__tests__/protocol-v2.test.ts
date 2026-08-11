@@ -5300,7 +5300,10 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postProgressMessage).not.toHaveBeenCalled();
   });
 
-  test('reboots a legacy App only after the direct update endpoint is explicitly unavailable', async () => {
+  test.each([
+    'Failure_InvalidMessage,Handler not registered',
+    'Failure_InvalidMessage,Unsupported message',
+  ])('reboots a legacy App when the direct update endpoint is unavailable: %s', async message => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -5308,9 +5311,7 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     const targets = [{ target_id: 4, path: 'vol0:/application_p1.bin' }];
-    const appTypedCall = jest
-      .fn()
-      .mockRejectedValueOnce(new Error('Failure_InvalidMessage,Handler not registered'));
+    const appTypedCall = jest.fn().mockRejectedValueOnce(new Error(message));
     const bootloaderTypedCall = jest
       .fn()
       .mockResolvedValueOnce({ type: 'Success', message: { message: '' } });

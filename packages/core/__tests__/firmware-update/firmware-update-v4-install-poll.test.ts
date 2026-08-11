@@ -1,4 +1,4 @@
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import FirmwareUpdateV4 from '../../src/api/FirmwareUpdateV4';
 import { DataManager } from '../../src/data-manager';
@@ -106,8 +106,41 @@ describe('FirmwareUpdateV4 install polling', () => {
   });
 
   test.each([
+    HardwareErrorCode.BleConnectedError,
+    HardwareErrorCode.BleCharacteristicNotifyError,
+    HardwareErrorCode.BleForceCleanRunPromise,
+    HardwareErrorCode.BleDeviceDisconnected,
+  ])('continues install polling after BLE interruption error %s', async errorCode => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        connectId: 'pro2-ble',
+      },
+    });
+    const targets = [{ target_id: 4, path: 'vol0:/application_p1.bin' }];
+    const typedCall = jest.fn().mockRejectedValue(ERRORS.TypedError(errorCode));
+
+    method.device = {
+      getCommands: () => ({ typedCall }),
+    } as unknown as Device;
+    method.postTipMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+
+    await expect(
+      (
+        method as unknown as {
+          protocolV2StartFirmwareUpdate: (params: { targets: typeof targets }) => Promise<unknown>;
+        }
+      ).protocolV2StartFirmwareUpdate({ targets })
+    ).resolves.toBeUndefined();
+
+    expect(typedCall).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
     ['webusb', 'React Native BLE transport released'],
-    ['react-native', 'Connection error has occured: Device disconnected'],
+    ['react-native', 'Unrelated transport failure'],
   ])(
     'requires both a BLE environment and an explicit transport release signal: %s / %s',
     async (env, message) => {

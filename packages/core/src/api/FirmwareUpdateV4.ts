@@ -377,13 +377,25 @@ const isProtocolV2ReconnectProbeError = (error: unknown) => {
   );
 };
 
-const isProtocolV2BleTransportReleasedError = (error: unknown) => {
+const PROTOCOL_V2_BLE_INSTALL_INTERRUPTION_ERROR_CODES = new Set<number>([
+  HardwareErrorCode.BleConnectedError,
+  HardwareErrorCode.BleCharacteristicNotifyError,
+  HardwareErrorCode.BleForceCleanRunPromise,
+  HardwareErrorCode.BleDeviceDisconnected,
+]);
+
+const isProtocolV2BleInstallInterruptionError = (error: unknown) => {
+  if (
+    error instanceof HardwareError &&
+    PROTOCOL_V2_BLE_INSTALL_INTERRUPTION_ERROR_CODES.has(error.errorCode)
+  ) {
+    return true;
+  }
+
   const message = getProtocolV2UnknownErrorText(error).toLowerCase();
   const compactMessage = message.replace(/\s+/gu, '');
   return (
-    message.includes('react native ble transport released') ||
-    message.includes('bledevicedisconnected') ||
-    message.includes('bleconnectederror') ||
+    /react native ble transport (?:released|disconnected)/u.test(message) ||
     (compactMessage.includes('rxerrorerror6') &&
       (compactMessage.includes('multiplatformbleadapter') ||
         compactMessage.includes('multipalformebleadapter')))
@@ -402,7 +414,9 @@ const isProtocolV2FirmwareStatusEndpointUnavailable = (error: unknown) => {
 const isProtocolV2FirmwareUpdateEndpointUnavailable = (error: unknown) => {
   const message = getProtocolV2UnknownErrorText(error).toLowerCase();
   return (
-    message.includes('handler not registered') || message.includes('message handler not found')
+    message.includes('handler not registered') ||
+    message.includes('message handler not found') ||
+    message.includes('unsupported message')
   );
 };
 
@@ -3150,7 +3164,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       response = await startUpdate();
       this.protocolV2InstallAckReceived = true;
     } catch (error) {
-      if (this.isBleReconnect() && isProtocolV2BleTransportReleasedError(error)) {
+      if (this.isBleReconnect() && isProtocolV2BleInstallInterruptionError(error)) {
         this.throwIfAborted();
         // Installation can reboot the device before the Success response reaches
         // the host. The request has side effects, so do not replay it; reconnect
@@ -3174,7 +3188,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           response = await startUpdate();
           this.protocolV2InstallAckReceived = true;
         } catch (retryError) {
-          if (!(this.isBleReconnect() && isProtocolV2BleTransportReleasedError(retryError))) {
+          if (!(this.isBleReconnect() && isProtocolV2BleInstallInterruptionError(retryError))) {
             throw retryError;
           }
           this.throwIfAborted();
