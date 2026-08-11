@@ -1,6 +1,7 @@
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import FirmwareUpdateV4 from '../../src/api/FirmwareUpdateV4';
+import { DataManager } from '../../src/data-manager';
 
 import type { Device } from '../../src/device/Device';
 
@@ -10,6 +11,18 @@ jest.mock('../../src/data/config', () => ({
 }));
 
 describe('FirmwareUpdateV4 install polling', () => {
+  let getSettingsSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    getSettingsSpy = jest
+      .spyOn(DataManager, 'getSettings')
+      .mockReturnValue('react-native' as never);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   test('polls status instead of replaying install after React Native BLE releases', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -91,4 +104,42 @@ describe('FirmwareUpdateV4 install polling', () => {
 
     expect(typedCall).toHaveBeenCalledTimes(1);
   });
+
+  test.each([
+    ['webusb', 'React Native BLE transport released'],
+    ['react-native', 'Connection error has occured: Device disconnected'],
+  ])(
+    'requires both a BLE environment and an explicit transport release signal: %s / %s',
+    async (env, message) => {
+      getSettingsSpy.mockReturnValue(env);
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+          connectId: 'pro2-device',
+        },
+      });
+      const targets = [{ target_id: 4, path: 'vol0:/application_p1.bin' }];
+      const typedCall = jest.fn().mockRejectedValue(new Error(message));
+
+      method.device = {
+        getCommands: () => ({ typedCall }),
+      } as unknown as Device;
+      method.postTipMessage = jest.fn();
+      method.postProgressMessage = jest.fn();
+
+      await expect(
+        (
+          method as unknown as {
+            protocolV2StartFirmwareUpdate: (params: {
+              targets: typeof targets;
+            }) => Promise<unknown>;
+          }
+        ).protocolV2StartFirmwareUpdate({ targets })
+      ).rejects.toThrow(message);
+
+      expect(method.postTipMessage).not.toHaveBeenCalled();
+      expect(method.postProgressMessage).not.toHaveBeenCalled();
+    }
+  );
 });

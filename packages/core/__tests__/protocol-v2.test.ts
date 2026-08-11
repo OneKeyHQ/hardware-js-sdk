@@ -4469,6 +4469,54 @@ describe('Protocol V2 firmware update targets', () => {
     expect(release).toHaveBeenCalledTimes(1);
   });
 
+  test('preserves SDK-managed resource installation errors after preparation', async () => {
+    const resourceArchiveBinary = new Uint8Array([1, 2, 3, 4]).buffer;
+    const installError = ERRORS.TypedError(
+      HardwareErrorCode.FirmwareError,
+      'device rejected the prepared resource installation'
+    );
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'ext',
+        targetsToUpdate: ['resource'],
+      },
+    });
+    method.init();
+
+    (method as any).device = stubDevice({
+      originalDescriptor: { id: 'usb-id', path: 'app-path', protocolType: 'V2' },
+      features: {
+        deviceType: 'pro2',
+        firmwareVersion: '1.0.0',
+        mode: 'normal',
+        bootloaderMode: false,
+        capabilities: [],
+      },
+      getCurrentDeviceType: () => 'pro2',
+      isBootloader: () => false,
+      isRomloader: () => false,
+    });
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    (method as any).downloadRemoteProtocolV2ResourceArchive = jest
+      .fn()
+      .mockResolvedValue(resourceArchiveBinary);
+    const release = jest.fn();
+    (method as any).prepareProtocolV2LocalMemoryHost = jest.fn().mockResolvedValue({ release });
+    (method as any).runProtocolV2PreparedArtifacts = jest.fn().mockRejectedValue(installError);
+    method.postTipMessage = jest.fn();
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('sdk-managed' as never);
+
+    await expect(method.run()).rejects.toBe(installError);
+
+    expect(forceReloadDataSpy).toHaveBeenCalledWith({
+      requireResources: true,
+      resourceDeviceType: EDeviceType.Pro2,
+    });
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
   test('reboots Protocol V2 normal-mode device to bootloader before transfer', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -5394,6 +5442,7 @@ describe('Protocol V2 firmware update targets', () => {
     const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
     (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
     (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(true);
+    (method as any).protocolV2InstallAckReceived = true;
     method.postProgressMessage = jest.fn();
 
     await (method as any).waitForProtocolV2FirmwareUpdateComplete([
@@ -5432,6 +5481,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
     (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
     (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(true);
+    (method as any).protocolV2InstallAckReceived = true;
     method.postProgressMessage = jest.fn();
 
     await expect(
@@ -5442,6 +5492,78 @@ describe('Protocol V2 firmware update targets', () => {
 
     expect(typedCall).toHaveBeenCalledTimes(1);
     expect((method as any).probeProtocolV2NormalMode).toHaveBeenCalledWith(deviceInfo);
+    expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
+  });
+
+  test('rejects normal mode without install ACK, target status, or a version change', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValue(new Error('Failure: Handler not registered for this message'));
+    const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
+    let now = 0;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    jest.spyOn(global, 'setTimeout').mockImplementation(((callback: () => void) => {
+      now += 31 * 1000;
+      callback();
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
+    (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(true);
+    method.postProgressMessage = jest.fn();
+
+    await expect(
+      (method as any).waitForProtocolV2FirmwareUpdateComplete([
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
+      ])
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.FirmwareError });
+
+    expect(method.postProgressMessage).not.toHaveBeenCalledWith(100, 'installingFirmware');
+  });
+
+  test('accepts ACK-less normal mode after the requested target version changes', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValue(new Error('Failure: Handler not registered for this message'));
+    const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
+    const probeProtocolV2RuntimeState = jest.fn().mockResolvedValue({
+      mode: 'normal',
+      bootloaderMode: false,
+      firmwareVersion: '2.0.0',
+    });
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+      probeProtocolV2RuntimeState,
+    });
+    (method as any).protocolV2InstallBaselineVersions = new Map([[4, '1.0.0']]);
+    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
+    method.postProgressMessage = jest.fn();
+
+    await expect(
+      (method as any).waitForProtocolV2FirmwareUpdateComplete([
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
+      ])
+    ).resolves.toBeUndefined();
+
+    expect(probeProtocolV2RuntimeState).toHaveBeenCalledWith(deviceInfo, 5000);
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
 
