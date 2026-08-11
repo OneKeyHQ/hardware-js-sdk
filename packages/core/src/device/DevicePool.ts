@@ -182,7 +182,7 @@ export class DevicePool extends EventEmitter {
       try {
         await device.initialize(initOptions);
         if (initOptions?.refreshRuntimeState && device.isProtocolV2()) {
-          await this._refreshProtocolV2DiscoveryState(device, initOptions);
+          await this._refreshProtocolV2DiscoveryState(device);
         }
       } finally {
         await device.release();
@@ -197,7 +197,7 @@ export class DevicePool extends EventEmitter {
     await device.run(
       async () => {
         try {
-          await this._refreshProtocolV2DiscoveryState(device, initOptions);
+          await this._refreshProtocolV2DiscoveryState(device);
         } catch (error) {
           // Device.run releases after the callback; then propagate the actual read error.
           refreshError = error;
@@ -206,9 +206,6 @@ export class DevicePool extends EventEmitter {
       {
         connectProtocol: initOptions.connectProtocol,
         forceProtocolDetection: initOptions.forceProtocolDetection,
-        ...(initOptions.allowLegacyProtocolV2ProtocolInfo
-          ? { allowLegacyProtocolV2ProtocolInfo: true }
-          : {}),
       }
     );
     if (refreshError instanceof Error) throw refreshError;
@@ -220,18 +217,13 @@ export class DevicePool extends EventEmitter {
    * error; settings only supplies a label, so its failure retains the existing name.
    * Device.getDeviceState skips unsupported status/settings calls in loader mode.
    */
-  static async _refreshProtocolV2DiscoveryState(device: Device, initOptions?: InitOptions) {
-    const stateReadOptions = initOptions?.allowLegacyProtocolV2ProtocolInfo
-      ? { allowLegacyProtocolV2ProtocolInfo: true as const }
-      : {};
+  static async _refreshProtocolV2DiscoveryState(device: Device) {
     await device.getDeviceState({
       refreshSections: ['status'],
-      ...stateReadOptions,
     });
     try {
       await device.getDeviceState({
         refreshSections: ['settings'],
-        ...stateReadOptions,
       });
     } catch (error) {
       Log.debug('Unable to refresh Protocol V2 device label during discovery', error);

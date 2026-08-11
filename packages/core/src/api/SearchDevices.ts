@@ -63,8 +63,6 @@ export default class SearchDevices extends BaseMethod {
           connectProtocol: undefined,
           forceProtocolDetection: true,
           refreshRuntimeState: true,
-          // Old loader firmware predates build_fingerprint. Keep this recovery-only.
-          allowLegacyProtocolV2ProtocolInfo: true,
         });
         deviceList.push(...result.deviceList);
       } catch (error) {

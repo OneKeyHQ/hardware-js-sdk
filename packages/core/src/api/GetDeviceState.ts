@@ -43,7 +43,6 @@ export default class GetDeviceState extends BaseMethod<
   async run() {
     const state = await this.device.getDeviceState({
       refreshSections: SCOPE_SECTIONS[this.params.scope],
-      ...(this.params.scope === 'firmware' ? { allowLegacyProtocolV2ProtocolInfo: true } : {}),
     });
     if (
       this.params.scope === 'settings' &&

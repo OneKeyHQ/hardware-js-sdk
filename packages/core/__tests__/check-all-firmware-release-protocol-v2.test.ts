@@ -346,7 +346,6 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     expect(typedCall).not.toHaveBeenCalled();
     expect(getDeviceState).toHaveBeenCalledWith({
       refreshSections: ['identity', 'versions'],
-      allowLegacyProtocolV2ProtocolInfo: true,
     });
     expect(method.getSupportedProtocols()).toEqual(['V1', 'V2']);
   });
@@ -726,7 +725,6 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     });
     expect(getDeviceState).toHaveBeenCalledWith({
       refreshSections: ['identity', 'versions', 'verification'],
-      allowLegacyProtocolV2ProtocolInfo: true,
     });
   });
 

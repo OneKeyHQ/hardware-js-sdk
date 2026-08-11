@@ -50,7 +50,6 @@ describe('live device state reads', () => {
 
     expect(getDeviceState).toHaveBeenCalledWith({
       refreshSections: [...refreshSections],
-      ...(scope === 'firmware' ? { allowLegacyProtocolV2ProtocolInfo: true } : {}),
     });
   });
 

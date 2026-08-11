@@ -907,6 +907,34 @@ describe('Protocol V2 feature adapter', () => {
     ).toBeUndefined();
   });
 
+  test('infers legacy Protocol V2 loader mode from firmware image metadata', () => {
+    const legacyProtocolInfo = {
+      version: 1,
+      build_fingerprint: '',
+      supported_messages: [],
+      protobuf_definition: null,
+    };
+
+    expect(
+      getProtocolV2RuntimeMode(legacyProtocolInfo, {
+        fw: { bootloader: { version: '0.2.0' } },
+      })
+    ).toBe('bootloader');
+    expect(
+      getProtocolV2RuntimeMode(legacyProtocolInfo, {
+        fw: { romloader: { version: '1.0.0' } },
+      })
+    ).toBe('romloader');
+    expect(
+      getProtocolV2RuntimeMode(legacyProtocolInfo, {
+        fw: {
+          application: { version: '1.2.3' },
+          bootloader: { version: '0.2.0' },
+        },
+      })
+    ).toBeUndefined();
+  });
+
   test('keeps the Protocol V2 main wallet on the default empty-passphrase context', async () => {
     const features = normalizeProtocolV2Features(descriptor as any);
     features.firmwareVersion = '1.2.3';
@@ -3268,33 +3296,43 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledTimes(1);
   });
 
-  test('rejects a cached legacy ProtocolInfo outside discovery and firmware recovery', async () => {
+  test('initializes a legacy Protocol V2 bootloader without compatibility options', async () => {
     const device = Device.fromDescriptor({
       path: 'usb-path',
       protocolType: 'V2',
     } as any);
-    const typedCall = jest.fn().mockResolvedValue({
-      type: 'ProtocolInfo',
-      message: {
-        version: 1,
-        build_fingerprint: '',
-        supported_messages: [],
-        protobuf_definition: null,
-      },
-    });
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'DeviceInfo',
+        message: {
+          hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
+          fw: { bootloader: { version: '0.2.0' } },
+        },
+      })
+      .mockResolvedValueOnce({
+        type: 'ProtocolInfo',
+        message: {
+          version: 1,
+          build_fingerprint: '',
+          supported_messages: [],
+          protobuf_definition: null,
+        },
+      });
     (device as any).commands = { typedCall };
 
-    await expect(
-      device.probeProtocolV2RuntimeState({
-        hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
-        fw: { application: { version: '1.2.3' } },
-      })
-    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceInitializeFailed });
+    await device.initialize();
 
-    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).not.toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
+    expect(device.features).toMatchObject({
+      mode: 'bootloader',
+      bootloaderMode: true,
+      initialized: null,
+    });
   });
 
-  test('uses DeviceStatusGet to identify App mode for an allowed legacy ProtocolInfo', async () => {
+  test('uses DeviceStatusGet to identify App mode for legacy ProtocolInfo', async () => {
     const device = Device.fromDescriptor({
       path: 'usb-path',
       protocolType: 'V2',
@@ -3321,8 +3359,7 @@ describe('Protocol V2 feature adapter', () => {
         hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
         fw: { application: { version: '1.2.3' } },
       },
-      5000,
-      { allowLegacyProtocolV2ProtocolInfo: true }
+      5000
     );
 
     expect(typedCall).toHaveBeenNthCalledWith(
@@ -3347,41 +3384,66 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('maps an allowed legacy loader to bootloader only after an explicit unsupported status', async () => {
+  test('maps legacy bootloader metadata without calling DeviceStatusGet', async () => {
     const device = Device.fromDescriptor({
       path: 'usb-path',
       protocolType: 'V2',
     } as any);
-    const typedCall = jest
-      .fn()
-      .mockResolvedValueOnce({
-        type: 'ProtocolInfo',
-        message: {
-          version: 1,
-          build_fingerprint: '',
-          supported_messages: [],
-          protobuf_definition: null,
-        },
-      })
-      .mockRejectedValueOnce(new Error('Failure_UnexpectedMessage,Unknown message'));
+    const typedCall = jest.fn().mockResolvedValueOnce({
+      type: 'ProtocolInfo',
+      message: {
+        version: 1,
+        build_fingerprint: '',
+        supported_messages: [],
+        protobuf_definition: null,
+      },
+    });
     (device as any).commands = { typedCall };
 
-    await device.probeProtocolV2RuntimeState(
-      {
-        hw: { Device_type: DeviceType.NEO, serial_no: 'NEOSERIAL' },
-        fw: { bootloader: { version: '0.2.0' } },
-      },
-      undefined,
-      { allowLegacyProtocolV2ProtocolInfo: true }
-    );
+    await device.probeProtocolV2RuntimeState({
+      hw: { Device_type: DeviceType.NEO, serial_no: 'NEOSERIAL' },
+      fw: { bootloader: { version: '0.2.0' } },
+    });
 
     expect(typedCall).toHaveBeenNthCalledWith(1, 'ProtocolInfoRequest', 'ProtocolInfo', {
       eventless_wallet_session: true,
     });
-    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceStatusGet', 'DeviceStatus', {});
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall).not.toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
     expect(device.features).toMatchObject({
       deviceType: 'neo',
       mode: 'bootloader',
+      bootloaderMode: true,
+      initialized: null,
+    });
+  });
+
+  test('maps legacy romloader metadata without calling DeviceStatusGet', async () => {
+    const device = Device.fromDescriptor({
+      path: 'usb-path',
+      protocolType: 'V2',
+    } as any);
+    const typedCall = jest.fn().mockResolvedValueOnce({
+      type: 'ProtocolInfo',
+      message: {
+        version: 1,
+        build_fingerprint: '',
+        supported_messages: [],
+        protobuf_definition: null,
+      },
+    });
+    (device as any).commands = { typedCall };
+
+    await device.probeProtocolV2RuntimeState({
+      hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
+      fw: { romloader: { version: '1.0.0' } },
+    });
+
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall).not.toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
+    expect(device.features).toMatchObject({
+      deviceType: 'pro2',
+      mode: 'romloader',
       bootloaderMode: true,
       initialized: null,
     });
@@ -5319,9 +5381,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).device = stubDevice({ probeProtocolV2RuntimeState });
 
     await expect((method as any).probeProtocolV2NormalMode(deviceInfo)).resolves.toBe(expected);
-    expect(probeProtocolV2RuntimeState).toHaveBeenCalledWith(deviceInfo, 5000, {
-      allowLegacyProtocolV2ProtocolInfo: true,
-    });
+    expect(probeProtocolV2RuntimeState).toHaveBeenCalledWith(deviceInfo, 5000);
   });
 
   test('keeps polling when the firmware status handler is missing in loader mode', async () => {

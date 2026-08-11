@@ -2142,8 +2142,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
         const features = await this.device.probeProtocolV2RuntimeState(
           deviceInfo,
-          PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
-          { allowLegacyProtocolV2ProtocolInfo: true }
+          PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
         );
         if (features?.mode === 'bootloader') {
           return features;
@@ -2832,8 +2831,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async probeProtocolV2NormalMode(deviceInfo: ProtocolV2DeviceInfo) {
     const features = await this.device.probeProtocolV2RuntimeState(
       deviceInfo,
-      PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
-      { allowLegacyProtocolV2ProtocolInfo: true }
+      PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
     );
     return features.mode === 'normal' && !features.bootloaderMode;
   }
@@ -2895,8 +2893,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
         const features = await this.device.probeProtocolV2RuntimeState(
           deviceInfo,
-          PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
-          { allowLegacyProtocolV2ProtocolInfo: true }
+          PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
         );
         if (features.mode === 'normal' && !features.bootloaderMode) {
           return features;

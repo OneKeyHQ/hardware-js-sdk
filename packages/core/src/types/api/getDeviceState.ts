@@ -11,8 +11,6 @@ export type GetDeviceStateParams = CommonParams & {
 export type DeviceStateReadOptions = {
   refreshSections?: DeviceStateSection[];
   includeRaw?: boolean;
-  /** Internal recovery-only compatibility used by discovery and firmware update flows. */
-  allowLegacyProtocolV2ProtocolInfo?: boolean;
 };
 
 export declare function getDeviceState(

@@ -94,7 +94,6 @@ describe('SearchDevices', () => {
         connectProtocol: undefined,
         forceProtocolDetection: true,
         refreshRuntimeState: true,
-        allowLegacyProtocolV2ProtocolInfo: true,
       }
     );
     expect(mockGetDevices).toHaveBeenNthCalledWith(
@@ -105,7 +104,6 @@ describe('SearchDevices', () => {
         connectProtocol: undefined,
         forceProtocolDetection: true,
         refreshRuntimeState: true,
-        allowLegacyProtocolV2ProtocolInfo: true,
       }
     );
   });
