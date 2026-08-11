@@ -235,8 +235,6 @@ export default class LowlevelTransport {
         `Device protocol has not been detected for ${uuid}`
       );
     }
-    this.Log.debug('transport call', { name, protocol });
-
     if (protocol === 'V2') {
       return this.callProtocolV2(uuid, name, data, options);
     }

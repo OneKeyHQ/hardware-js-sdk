@@ -19,8 +19,6 @@ import {
 } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
 
-import { createTransportCallLog, shouldSuppressHighVolumeCallLog } from './transportLog';
-
 import type {
   AcquireInput,
   OneKeyDeviceInfoBase,
@@ -765,10 +763,6 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         HardwareErrorCode.RuntimeError,
         `Device protocol has not been detected for ${path}`
       );
-    }
-
-    if (!shouldSuppressHighVolumeCallLog(name)) {
-      this.Log.debug('transport call', createTransportCallLog(name, protocol, data));
     }
 
     if (protocol === 'V2') {

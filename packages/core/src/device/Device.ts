@@ -982,11 +982,7 @@ export class Device extends EventEmitter {
       });
       // The default request excludes SE/hash data and therefore uses basic scope.
       // Full version and verification data require getDeviceState({ scope: 'firmware' }).
-      const features = await this.probeProtocolV2RuntimeState(
-        deviceInfo,
-        options?.protocolV2DeviceInfoTimeoutMs
-      );
-      Log.debug('Protocol V2 features:', features);
+      await this.probeProtocolV2RuntimeState(deviceInfo, options?.protocolV2DeviceInfoTimeoutMs);
     } catch (error) {
       Log.error('Protocol V2 initialization failed:', error);
       throw error;
@@ -1112,9 +1108,10 @@ export class Device extends EventEmitter {
       source,
       changedKeys: result.changedKeys,
     };
-    Log.debug('Device state patch committed', {
+    Log.debug('Device state updated', {
       source,
-      keys: result.changedKeys,
+      revision: result.revision,
+      changedKeyCount: result.changedKeys.length,
     });
     this.emit(DEVICE.STATE, this, event);
     if (result.state.protocol === 'V1') {
