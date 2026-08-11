@@ -6,7 +6,6 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { ResourceType } from '@onekeyfe/hd-transport';
 import { canvasRGBA as blurCanvasRGBA } from 'stackblur-canvas';
 import axios from 'axios';
-import { decode as decodeJpeg } from 'jpeg-js';
 
 import type { DeviceUploadResourceParams } from '@onekeyfe/hd-core';
 import type { Action } from 'expo-image-manipulator';
@@ -95,7 +94,7 @@ async function materializeNativeImageSource(source: string) {
   return { uri: cacheUri, cleanupUri: cacheUri };
 }
 
-async function nativeImageSourceToRgba(source: string, width: number, height: number) {
+async function nativeImageSourceToJpegBase64(source: string, width: number, height: number) {
   const materialized = await materializeNativeImageSource(source);
   let transformedUri: string | undefined;
   try {
@@ -118,17 +117,12 @@ async function nativeImageSourceToRgba(source: string, width: number, height: nu
     );
     transformedUri = result.uri;
     if (!result.base64) throw new Error('Image conversion did not return JPEG data');
-
-    const decoded = decodeJpeg(Buffer.from(result.base64, 'base64'), {
-      useTArray: true,
-      formatAsRGBA: true,
-    });
-    if (decoded.width !== width || decoded.height !== height) {
+    if (result.width !== width || result.height !== height) {
       throw new Error(
-        `Image conversion returned ${decoded.width}x${decoded.height}; expected ${width}x${height}`
+        `Image conversion returned ${result.width}x${result.height}; expected ${width}x${height}`
       );
     }
-    return new Uint8Array(decoded.data);
+    return result.base64;
   } finally {
     const cleanupUris = [materialized.cleanupUri, transformedUri].filter((uri): uri is string =>
       Boolean(uri && uri !== source)
@@ -139,10 +133,10 @@ async function nativeImageSourceToRgba(source: string, width: number, height: nu
   }
 }
 
-/** Convert an image source to exact-size RGBA pixels for Protocol V2 image APIs. */
-export async function imageSourceToRgba(source: string, width: number, height: number) {
+/** Convert an image source to an exact-size JPEG Base64 string for Protocol V2 image APIs. */
+export async function imageSourceToJpegBase64(source: string, width: number, height: number) {
   if (Platform.OS !== 'web') {
-    return nativeImageSourceToRgba(source, width, height);
+    return nativeImageSourceToJpegBase64(source, width, height);
   }
 
   const image = await buildHtmlImage(source);
@@ -155,7 +149,7 @@ export async function imageSourceToRgba(source: string, width: number, height: n
 
   ctx.clearRect(0, 0, width, height);
   ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
-  return new Uint8Array(ctx.getImageData(0, 0, width, height).data);
+  return stripBase64UriPrefix(canvas.toDataURL('image/jpeg', 1));
 }
 
 function stripBase64UriPrefix(base64Uri: string): string {

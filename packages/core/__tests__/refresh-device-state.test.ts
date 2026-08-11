@@ -48,7 +48,9 @@ describe('live device state reads', () => {
 
     await method.run();
 
-    expect(getDeviceState).toHaveBeenCalledWith({ refreshSections: [...refreshSections] });
+    expect(getDeviceState).toHaveBeenCalledWith({
+      refreshSections: [...refreshSections],
+    });
   });
 
   test.each(['bootloader', 'romloader'] as const)(

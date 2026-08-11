@@ -53,7 +53,6 @@ import { isHeaderChunk } from './utils/validateNotify';
 import BleTransport from './BleTransport';
 import timer from './utils/timer';
 import { bleLogger, setBleLogger } from './logger';
-import { createTransportCallLog } from './transportLog';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
 import type { Characteristic, Device, Subscription } from 'react-native-ble-plx';
@@ -1286,8 +1285,6 @@ export default class ReactNativeBleTransport {
         `Device protocol has not been detected for ${uuid}`
       );
     }
-    Log?.debug('transport call', createTransportCallLog(name, protocol, data));
-
     if (protocol === 'V2') {
       return this.callProtocolV2(uuid, name, data, options);
     }

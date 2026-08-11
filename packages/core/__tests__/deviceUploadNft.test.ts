@@ -1,4 +1,5 @@
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { encode as encodeJpeg } from 'jpeg-js';
 
 import DeviceUploadNft from '../src/api/protocol-v2/DeviceUploadNft';
 
@@ -11,6 +12,19 @@ const createRgba = (width: number, height: number) => {
   const data = new Uint8Array(width * height * 4);
   for (let index = 3; index < data.length; index += 4) data[index] = 0xff;
   return data;
+};
+
+const jpegBase64Cache = new Map<string, string>();
+
+const createJpegBase64 = (width: number, height: number) => {
+  const key = `${width}x${height}`;
+  const cached = jpegBase64Cache.get(key);
+  if (cached) return cached;
+  const value = encodeJpeg({ width, height, data: createRgba(width, height) }, 80).data.toString(
+    'base64'
+  );
+  jpegBase64Cache.set(key, value);
+  return value;
 };
 
 const createMethod = ({
@@ -26,8 +40,8 @@ const createMethod = ({
     id: 1,
     payload: {
       method: 'deviceUploadNft',
-      image: { width: 540, height: 540, rgba: createRgba(540, 540) },
-      thumbnail: { width: 263, height: 263, rgba: createRgba(263, 263) },
+      imageJpegBase64: createJpegBase64(540, 540),
+      thumbnailJpegBase64: createJpegBase64(263, 263),
       title: 'CryptoPunk #3100',
       subtitle: 'CryptoPunks',
       timestampMs: 1_760_000_000_000,
@@ -86,8 +100,8 @@ describe('DeviceUploadNft', () => {
       id: 1,
       payload: {
         method: 'deviceUploadNft',
-        image: { width: 540, height: 540, rgba: createRgba(540, 540) },
-        thumbnail: { width: 263, height: 263, rgba: createRgba(263, 263) },
+        imageJpegBase64: createJpegBase64(540, 540),
+        thumbnailJpegBase64: createJpegBase64(263, 263),
         title: 'CryptoPunk #3100',
         subtitle: 'CryptoPunks',
         timestampMs: 1_760_000_000_000,
@@ -100,6 +114,21 @@ describe('DeviceUploadNft', () => {
       chunkSize: 2048,
       paceMs: 0,
     });
+  });
+
+  test('rejects invalid image Base64 before device communication', () => {
+    const method = new DeviceUploadNft({
+      id: 1,
+      payload: {
+        method: 'deviceUploadNft',
+        imageJpegBase64: 'not-base64',
+        thumbnailJpegBase64: createJpegBase64(263, 263),
+        title: 'NFT',
+        subtitle: '',
+      },
+    });
+
+    expect(() => method.init()).toThrow('canonical Base64');
   });
 
   test('uploads the triplet in order without creating the firmware-owned directory', async () => {

@@ -9,28 +9,14 @@ const api: UnifiedMethodConfig[] = [
     presets: [
       {
         title: 'Upload Pro2 wallpaper',
-        description: 'Upload a 604x1024 raw RGBA8888 file and apply it as the wallpaper.',
+        description: 'Upload a 604x1024 JPEG file and apply it as the wallpaper.',
         parameters: [
           {
-            name: 'width',
-            type: 'number',
-            required: true,
-            label: 'Width',
-            value: 604,
-          },
-          {
-            name: 'height',
-            type: 'number',
-            required: true,
-            label: 'Height',
-            value: 1024,
-          },
-          {
-            name: 'rgba',
+            name: 'jpegBase64',
             type: 'file',
             required: true,
-            label: 'Raw RGBA File',
-            accept: '.rgba,.bin',
+            label: '604x1024 JPEG File',
+            accept: '.jpg,.jpeg',
           },
           {
             name: 'fileName',
@@ -51,45 +37,21 @@ const api: UnifiedMethodConfig[] = [
     presets: [
       {
         title: 'Upload Pro2 NFT',
-        description: 'Upload raw RGBA8888 image and thumbnail files with NFT metadata.',
+        description: 'Upload JPEG image and thumbnail files with NFT metadata.',
         parameters: [
           {
-            name: 'imageWidth',
-            type: 'number',
-            required: true,
-            label: 'Image Width',
-          },
-          {
-            name: 'imageHeight',
-            type: 'number',
-            required: true,
-            label: 'Image Height',
-          },
-          {
-            name: 'imageRgba',
+            name: 'imageJpegBase64',
             type: 'file',
             required: true,
-            label: 'Image RGBA File',
-            accept: '.rgba,.bin',
+            label: '540x540 JPEG File',
+            accept: '.jpg,.jpeg',
           },
           {
-            name: 'thumbnailWidth',
-            type: 'number',
-            required: true,
-            label: 'Thumbnail Width',
-          },
-          {
-            name: 'thumbnailHeight',
-            type: 'number',
-            required: true,
-            label: 'Thumbnail Height',
-          },
-          {
-            name: 'thumbnailRgba',
+            name: 'thumbnailJpegBase64',
             type: 'file',
             required: true,
-            label: 'Thumbnail RGBA File',
-            accept: '.rgba,.bin',
+            label: '263x263 JPEG File',
+            accept: '.jpg,.jpeg',
           },
           {
             name: 'title',
@@ -117,7 +79,7 @@ const api: UnifiedMethodConfig[] = [
         title: 'Upload Pro2 portfolio package',
         parameters: [
           {
-            name: 'packageBytes',
+            name: 'packageBase64',
             type: 'file',
             required: true,
             label: 'Portfolio Package',

@@ -7,6 +7,7 @@ export {
   getProtocolV2RuntimeMode,
   getProtocolV2SeState,
   getProtocolV2SeType,
+  isLegacyProtocolV2ProtocolInfo,
   parseProtocolV2BuildFingerprint,
   requestProtocolV2ProtocolInfo,
   supportsProtocolV2Message,
@@ -18,6 +19,7 @@ export type {
   ProtocolV2SEInfo,
   ProtocolV2SeStateLabel,
   ProtocolV2RuntimeMode,
+  ProtocolV2ProtocolInfo,
 } from './features';
 export * from './firmware';
 export * from './walletSession';

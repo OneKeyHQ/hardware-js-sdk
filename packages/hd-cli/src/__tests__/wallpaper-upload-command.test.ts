@@ -6,6 +6,7 @@ describe('upload-wallpaper CLI command', () => {
 
     expect(command).toBeDefined();
     expect(command?.description()).toBe('Upload and activate a Pro2 wallpaper');
+    expect(command?.options.some(option => option.long === '--jpeg' && option.required)).toBe(true);
   });
 
   test('reports effective transfer speed from encoded bytes and elapsed time', () => {

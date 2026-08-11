@@ -200,7 +200,7 @@ export const getAutoShutDownOptions = (
       return withNever([60_000, 120_000, 300_000, 600_000], protocol);
     case EDeviceType.Pro2:
     case EDeviceType.Neo:
-      return withNever([60_000, 120_000, 300_000, 600_000, 1_800_000], protocol);
+      return withNever([60_000, 120_000, 300_000, 600_000], protocol);
     default:
       return [];
   }

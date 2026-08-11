@@ -91,7 +91,8 @@ Result
     payload: {
         skip_validate: boolean; // Used to skip validation in classic 1s.
         signature: string;
-        signning_message: string;
+        signing_message?: string; // Corrected field returned by Pro2/Neo and normalized by the SDK.
+        signning_message?: string; // Deprecated raw Protocol V1 field.
     }
 }
 ```

@@ -13,8 +13,6 @@ import transport, {
 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
 
-import { createTransportCallLog, shouldSuppressHighVolumeCallLog } from './transportLog';
-
 import type EventEmitter from 'events';
 import type {
   AcquireInput,
@@ -502,10 +500,6 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
         `Device protocol has not been detected for ${path}`
       );
     }
-    if (!shouldSuppressHighVolumeCallLog(name)) {
-      this.Log?.debug('transport call', createTransportCallLog(name, protocol, data));
-    }
-
     if (protocol === 'V2') {
       return this.callProtocolV2(path, name, data, options);
     }

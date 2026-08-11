@@ -53,21 +53,25 @@ App 只展示“请在设备上操作”，不调用 `uiResponse()`。API `Succe
 
 `uploadPortfolio` 是后台文件同步与应用流程，不需要设备确认：
 
+- 调用方传入不带 data URL 前缀的 `packageBase64`；LowLevel SDK 严格校验并解码为设备分片。
 - 文件写入固定关闭分片进度 Event。
-- SDK 不生成 `REQUEST_PIN` 或 `REQUEST_BUTTON`；已知锁定时可静默先解锁。
+- SDK 不生成 `REQUEST_PIN` 或 `REQUEST_BUTTON`，也不触发钱包解锁。
 - firmware 直接校验 pending package、更新 Portfolio 数据并返回最终 `Success/Failure`。
 - App 以 `PortfolioUpdate` 最终响应为准，不等待设备页面。
 
 ## 壁纸上传
 
-`deviceUploadWallpaper` 接收 `604 × 1024` 的 RGBA 数据。SDK 负责编码、写入设备文件系统并设置活动壁纸：
+`deviceUploadWallpaper` 接收不带 data URL 前缀的 `604 × 1024` JPEG Base64。TopLevel 只传递字符串，
+LowLevel SDK 负责解码、设备格式转换、写入文件系统并设置活动壁纸：
 
-1. 校验尺寸、RGBA 长度、文件名和 `chunkSize`。
-2. 完全不透明图片编码为 `RGB565`，存在透明像素时编码为 `RGB565A8`。
+1. 严格校验 Base64、JPEG、固定尺寸、解码后 RGBA 长度、文件名和 `chunkSize`。
+2. 将 JPEG 解码结果编码为 `RGB565`。
 3. 使用 8×8 阈值矩阵进行有序抖动并生成设备二进制格式。
-4. 创建 `vol1:/wallpapers`，通过 `FilesystemFileWrite` 分片上传。
-5. 根据设备返回的 `processed_byte` 推进 offset。
-6. 调用 `DeviceSettingsSet` 更新 `wallpaper_path`。
+4. 从 `ProtocolInfo.supported_messages` 确认 `FilesystemDirMake(60809)`、
+   `FilesystemFileWrite(60805)` 和 `DeviceSettingsSet(60412)`。
+5. 创建 `vol1:/wallpapers`，通过 `FilesystemFileWrite` 分片上传。
+6. 根据设备返回的 `processed_byte` 推进 offset。
+7. 调用 `DeviceSettingsSet` 更新 `wallpaper_path`。
 
 文件名仅允许字母、数字、下划线、连字符和可选 `.bin`。未提供名称时，SDK 使用编码结果的 BLAKE2s 哈希生成稳定名称。调用方不能借此写入任意路径。
 
@@ -82,21 +86,22 @@ App 只展示“请在设备上操作”，不调用 `uiResponse()`。API `Succe
 ## NFT 上传
 
 `deviceUploadNft` 仅支持 Pro2、Neo / Protocol V2。调用方先将原图和缩略图分别裁剪为 `540 × 540`
-与 `263 × 263` RGBA；SDK 随后完成以下编排：
+与 `263 × 263` JPEG，并把不带 data URL 前缀的 Base64 传入 SDK；LowLevel 随后完成以下编排：
 
-1. 从当前 Link 的 `ProtocolInfo.supported_messages` 确认 `FilesystemFileWrite(60805)`、
-   `FilesystemDirList(60808)` 和 `NftUpdate(61500)`，不使用固件版本字符串推断能力。
-2. 将透明区域合成到黑色背景，以 LVGL v9 未压缩 RGB565 编码两张图片；编码与壁纸共用
+1. 严格校验两段 Base64、JPEG、固定尺寸和解码后的 RGBA 长度。
+2. 从当前 Link 的 `ProtocolInfo.supported_messages` 确认 `FilesystemPathInfoQuery(60802)`、
+   `FilesystemFileWrite(60805)`、`FilesystemDirList(60808)` 和 `NftUpdate(61500)`，不使用固件版本字符串推断能力。
+3. 将透明区域合成到黑色背景，以 LVGL v9 未压缩 RGB565 编码两张图片；编码与壁纸共用
    RGB565 抖动实现，但 NFT 不生成 A8 alpha plane。
-3. 以完整原图 `.bin` 的 BLAKE2s 前 8 位和 Unix 毫秒时间生成
+4. 以完整原图 `.bin` 的 BLAKE2s 前 8 位和 Unix 毫秒时间生成
    `nft-<hash8>-<timestamp_ms>` basename。
-4. 写入前使用 `FilesystemDirList("vol1:/nft", depth=1)` 统计完整的 NFT 三文件集合；新 NFT
+5. 写入前使用 `FilesystemDirList("vol1:/nft", depth=1)` 统计完整的 NFT 三文件集合；新 NFT
    达到 10 个上限时抛出 `NftStorageLimitReached`，不触发固件删除最旧 NFT；同 basename 的
    幂等重试不受该限制。
-5. 按原图 `.bin`、缩略图 `_m.bin`、元数据 `.json` 顺序串行写入固件预置的 `vol1:/nft`，
-   不额外发送 `FilesystemDirMake`；默认使用 512-byte chunk、20 ms pacing 和 15 秒单次请求超时。
-6. 三个文件全部确认后发送 `NftUpdate`；若响应超时，以同一 basename 重试一次，其他错误不重试；
-   只有最终 `Success` 才返回 `nftUpdated: true`。
+6. 按原图 `.bin`、缩略图 `_m.bin`、元数据 `.json` 顺序串行写入固件预置的 `vol1:/nft`，
+   不额外发送 `FilesystemDirMake`；默认使用 2048-byte chunk、0 ms pacing 和 15 秒单次请求超时。
+7. 三个文件全部确认后发送一次 `NftUpdate`；Transport 不自动重放该副作用请求，只有最终
+   `Success` 才返回 `nftUpdated: true`。
 
 `title` 限制为 1 ～ 63 UTF-8 bytes，`subtitle` 限制为 0 ～ 95 UTF-8 bytes。公开参数允许传入固定
 `timestampMs`，便于响应丢失时以同一 basename 幂等重发；Transport 不自动重放带副作用请求。
@@ -143,6 +148,8 @@ Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 与 Neo 
 - 固件未提供 target 内部百分比，安装进度只能表示已完成 target 的比例；接入方如需连续动画，
   必须将其作为有阶段上限的估算值，不能当成设备真实进度。
 - 安装开始、安装完成和用户交互使用不同超时窗口。
+- 安装请求发出后设备可能在 `Success` 回包到达前主动断开 BLE；SDK 不重放有副作用的安装请求，
+  而是进入重连与状态轮询，由 target 状态或最终 App 版本确认结果。
 - Transport 不自动重发安装请求；重试由高层流程依据阶段和幂等性决定。
 - release 配置、SDK target 类型和固件枚举必须同步发布。
 

@@ -109,6 +109,34 @@ export function buildPro2NftBundle(options: {
   const { image, thumbnail, title, subtitle, timestampMs } = options;
   assertImage('image', image, PRO2_NFT_IMAGE_WIDTH, PRO2_NFT_IMAGE_HEIGHT);
   assertImage('thumbnail', thumbnail, PRO2_NFT_THUMBNAIL_WIDTH, PRO2_NFT_THUMBNAIL_HEIGHT);
+  const encodedImage = encodePro2Image({ ...image, alphaMode: 'black-background' }).data;
+  const encodedThumbnail = encodePro2Image({
+    ...thumbnail,
+    alphaMode: 'black-background',
+  }).data;
+  return buildPro2NftBundleFromEncodedImages({
+    image: encodedImage,
+    thumbnail: encodedThumbnail,
+    title,
+    subtitle,
+    timestampMs,
+  });
+}
+
+export function buildPro2NftBundleFromEncodedImages(options: {
+  image: Uint8Array;
+  thumbnail: Uint8Array;
+  title: string;
+  subtitle: string;
+  timestampMs: number;
+}): Pro2NftBundle {
+  const { image, thumbnail, title, subtitle, timestampMs } = options;
+  if (!(image instanceof Uint8Array) || image.byteLength === 0) {
+    throw invalidParameter('Parameter [image] must contain encoded NFT image data.');
+  }
+  if (!(thumbnail instanceof Uint8Array) || thumbnail.byteLength === 0) {
+    throw invalidParameter('Parameter [thumbnail] must contain encoded NFT thumbnail data.');
+  }
   const titleLength = typeof title === 'string' ? utf8Length(title) : 0;
   const subtitleLength =
     typeof subtitle === 'string' ? utf8Length(subtitle) : Number.POSITIVE_INFINITY;
@@ -122,21 +150,16 @@ export function buildPro2NftBundle(options: {
     throw invalidParameter('Parameter [timestampMs] must be a positive safe integer.');
   }
 
-  const encodedImage = encodePro2Image({ ...image, alphaMode: 'black-background' }).data;
-  const encodedThumbnail = encodePro2Image({
-    ...thumbnail,
-    alphaMode: 'black-background',
-  }).data;
   const metadata = new TextEncoder().encode(JSON.stringify({ title, subtitle }));
   if (metadata.byteLength === 0 || metadata.byteLength > 512) {
     throw invalidParameter('Pro2 NFT metadata must contain 1 to 512 UTF-8 bytes.');
   }
 
-  const hash8 = bytesToHex(blake2s(encodedImage)).slice(0, 8);
+  const hash8 = bytesToHex(blake2s(image)).slice(0, 8);
   return {
     basename: `nft-${hash8}-${timestampMs}`,
-    image: encodedImage,
-    thumbnail: encodedThumbnail,
+    image,
+    thumbnail,
     metadata,
   };
 }
