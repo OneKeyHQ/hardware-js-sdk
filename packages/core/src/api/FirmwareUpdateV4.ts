@@ -2638,6 +2638,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
 
     while (Date.now() - startTime < PROTOCOL_V2_INSTALL_TIMEOUT) {
+      // A transport release caused by an explicit workflow cancellation must not
+      // be mistaken for the expected device reboot during installation.
+      this.throwIfAborted();
       try {
         if (shouldReconnect) {
           await this.reconnectProtocolV2Device();
@@ -3035,29 +3038,49 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           { targets },
           { timeoutMs: PROTOCOL_V2_START_UPDATE_TIMEOUT }
         );
-    let response: ProtocolV2FirmwareUpdateStartResponse;
+    let response: ProtocolV2FirmwareUpdateStartResponse | undefined;
     try {
       response = await startUpdate();
     } catch (error) {
-      if (
-        !this.protocolV2LegacyDirectUpdate ||
-        !isProtocolV2FirmwareUpdateEndpointUnavailable(error)
+      if (isProtocolV2DeviceDisconnectedError(error)) {
+        this.throwIfAborted();
+        // Installation can reboot the device before the Success response reaches
+        // the host. The request has side effects, so do not replay it; reconnect
+        // and let status polling determine whether installation was accepted.
+        Log.log(
+          '[FirmwareUpdateV4] install request interrupted by device reboot; continue status polling: ',
+          error
+        );
+      } else if (
+        this.protocolV2LegacyDirectUpdate &&
+        isProtocolV2FirmwareUpdateEndpointUnavailable(error)
       ) {
+        // Both legacy loaders register this request. A missing handler therefore identifies
+        // a legacy App before dispatch, so it is safe to reboot and retry the unhandled request.
+        this.protocolV2LegacyDirectUpdate = false;
+        Log.debug(
+          '[FirmwareUpdateV4] legacy App does not expose DeviceFirmwareUpdateRequest; rebooting to bootloader'
+        );
+        await this.rebootProtocolV2ToBootloader();
+        try {
+          response = await startUpdate();
+        } catch (retryError) {
+          if (!isProtocolV2DeviceDisconnectedError(retryError)) {
+            throw retryError;
+          }
+          this.throwIfAborted();
+          Log.log(
+            '[FirmwareUpdateV4] install request interrupted after legacy reboot; continue status polling: ',
+            retryError
+          );
+        }
+      } else {
         throw error;
       }
-
-      // Both legacy loaders register this request. A missing handler therefore identifies
-      // a legacy App before dispatch, so it is safe to reboot and retry the unhandled request.
-      this.protocolV2LegacyDirectUpdate = false;
-      Log.debug(
-        '[FirmwareUpdateV4] legacy App does not expose DeviceFirmwareUpdateRequest; rebooting to bootloader'
-      );
-      await this.rebootProtocolV2ToBootloader();
-      response = await startUpdate();
     }
     this.protocolV2LegacyDirectUpdate = false;
-    // Success acknowledges that the device accepted installation. End confirmation
-    // and begin status polling only after receiving this ACK.
+    // A Success ACK or an install-time disconnect both end confirmation. In the
+    // latter case only status polling may establish the final outcome.
     this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
     this.postProgressMessage(0, 'installingFirmware');
     return response;

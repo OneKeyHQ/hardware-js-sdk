@@ -148,6 +148,8 @@ Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 与 Neo 
 - 固件未提供 target 内部百分比，安装进度只能表示已完成 target 的比例；接入方如需连续动画，
   必须将其作为有阶段上限的估算值，不能当成设备真实进度。
 - 安装开始、安装完成和用户交互使用不同超时窗口。
+- 安装请求发出后设备可能在 `Success` 回包到达前主动断开 BLE；SDK 不重放有副作用的安装请求，
+  而是进入重连与状态轮询，由 target 状态或最终 App 版本确认结果。
 - Transport 不自动重发安装请求；重试由高层流程依据阶段和幂等性决定。
 - release 配置、SDK target 类型和固件枚举必须同步发布。
 
