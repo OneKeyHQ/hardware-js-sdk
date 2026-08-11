@@ -5988,22 +5988,29 @@ describe('Protocol V2 firmware update targets', () => {
       'vol0:/coprocessor.bin',
       1
     );
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledTimes(2);
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenNthCalledWith(1, {
-      targets: [{ target_id: 3, path: 'vol0:/bootloader.bin' }],
-    });
-    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenNthCalledWith(2, {
+    expect((method as any).enterProtocolV2BootloaderMode).toHaveBeenCalledTimes(1);
+    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledTimes(1);
+    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [
+        { target_id: 3, path: 'vol0:/bootloader.bin' },
         { target_id: 6, path: 'vol0:/coprocessor.bin' },
         { target_id: 7, path: 'vol0:/se01.bin' },
         { target_id: 4, path: 'vol0:/application_p1.bin' },
       ],
     });
+    expect((method as any).waitForProtocolV2FirmwareUpdateComplete).toHaveBeenCalledTimes(1);
+    expect((method as any).waitForProtocolV2FirmwareUpdateComplete).toHaveBeenCalledWith([
+      { target_id: 3, path: 'vol0:/bootloader.bin' },
+      { target_id: 6, path: 'vol0:/coprocessor.bin' },
+      { target_id: 7, path: 'vol0:/se01.bin' },
+      { target_id: 4, path: 'vol0:/application_p1.bin' },
+    ]);
+    expect((method as any).exitProtocolV2BootloaderToNormal).not.toHaveBeenCalled();
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'transferData');
-    expect((method as any).waitForProtocolV2FirmwareUpdateComplete).toHaveBeenCalled();
+    expect((method as any).completeProtocolV2FinalVerification).toHaveBeenCalledTimes(1);
   });
 
-  test('announces separate resource and component transfer phases', async () => {
+  test('uses one global transfer range for resources and firmware', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6060,18 +6067,24 @@ describe('Protocol V2 firmware update targets', () => {
       ],
     });
 
-    expect(method.postTipMessage).toHaveBeenCalledTimes(3);
+    expect((method as any).enterProtocolV2BootloaderMode).toHaveBeenCalledTimes(1);
+    expect(method.postTipMessage).toHaveBeenCalledTimes(2);
     expect(method.postTipMessage).toHaveBeenNthCalledWith(1, 'StartTransferData');
-    expect(method.postTipMessage).toHaveBeenNthCalledWith(2, 'StartTransferData');
-    expect(method.postTipMessage).toHaveBeenNthCalledWith(3, 'ConfirmOnDevice');
+    expect(method.postTipMessage).toHaveBeenNthCalledWith(2, 'ConfirmOnDevice');
     expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ processedSize: 0, totalSize: 2 })
+      expect.objectContaining({ processedSize: 0, totalSize: 3 })
     );
     expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ processedSize: 0, totalSize: 1 })
+      expect.objectContaining({ processedSize: 2, totalSize: 3 })
     );
+    expect(method.postProgressMessage).toHaveBeenCalledTimes(1);
+    expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'transferData');
+    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledTimes(1);
+    expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
+      targets: [{ target_id: 4, path: 'vol0:/application_p1.bin' }],
+    });
     expect((method as any).isProtocolV2ResourceBundleUpToDate).toHaveBeenCalledWith(
       expect.objectContaining({
         version: [1, 2, 3],
@@ -6081,50 +6094,7 @@ describe('Protocol V2 firmware update targets', () => {
     );
   });
 
-  test('installs and verifies bootloader before syncing manifest resources', () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: { method: 'firmwareUpdateV4' },
-    });
-    const phases = (method as any).buildProtocolV2ExecutionPhases({
-      installSources: [{ kind: 'bootloader' }, { kind: 'component' }],
-      resourceSources: [{ kind: 'resource' }],
-    });
-
-    expect(phases.map((phase: { kind: string }) => phase.kind)).toEqual([
-      'bootloader-install',
-      'bootloader-verify',
-      'resource-sync',
-      'component-install',
-      'final-verify',
-    ]);
-  });
-
-  test('stages the mounted boot resource before any firmware install phase', () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: { method: 'firmwareUpdateV4' },
-    });
-    const bootResource = {
-      devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
-    };
-    const phases = (method as any).buildProtocolV2ExecutionPhases({
-      installSources: [{ kind: 'bootloader' }, { kind: 'component' }],
-      resourceSources: [bootResource, { devicePath: 'vol0:/resource/images/images.okpkg' }],
-    });
-
-    expect(phases.map((phase: { kind: string }) => phase.kind)).toEqual([
-      'resource-sync',
-      'bootloader-install',
-      'bootloader-verify',
-      'resource-sync',
-      'component-install',
-      'final-verify',
-    ]);
-    expect(phases[0].resourceSources).toEqual([bootResource]);
-  });
-
-  test('removes stale boot resource staging before a component-only reboot', async () => {
+  test('removes stale boot resource staging before the combined transfer', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: { method: 'firmwareUpdateV4' },
@@ -6151,18 +6121,18 @@ describe('Protocol V2 firmware update targets', () => {
       events.push('transfer-component');
       return Promise.resolve();
     });
-    (method as any).exitProtocolV2BootloaderToNormal = jest.fn().mockImplementation(() => {
-      events.push('reboot-normal');
-      return Promise.resolve();
+    (method as any).completeProtocolV2FinalVerification = jest.fn().mockImplementation(() => {
+      events.push('final-verify');
+      return Promise.resolve({});
     });
-    (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
 
     await (method as any).executeProtocolV2SourceUpdate({
       installSources: [{ kind: 'firmware' }],
       resourceSources: [],
     });
 
-    expect(events).toEqual(['delete-stale-staging', 'transfer-component', 'reboot-normal']);
+    expect((method as any).enterProtocolV2BootloaderMode).toHaveBeenCalledTimes(1);
+    expect(events).toEqual(['delete-stale-staging', 'transfer-component', 'final-verify']);
     expect(typedCall).toHaveBeenNthCalledWith(2, 'FilesystemFileDelete', 'Success', {
       path: 'vol0:/loaders/bootloader/boot_resource.okpkg.staging',
     });
@@ -7509,6 +7479,9 @@ describe('Protocol V2 firmware update targets', () => {
     method.postProgressMessage = jest.fn();
     (method as any).protocolV2SourceUpdateProcess = jest.fn().mockResolvedValue(3);
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
+    (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest
+      .fn()
+      .mockResolvedValue(undefined);
     (method as any).completeProtocolV2FinalVerification = jest.fn().mockResolvedValue({});
     (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
 
@@ -7633,6 +7606,86 @@ describe('Protocol V2 firmware update targets', () => {
         elapsedMs: expect.any(Number),
       }),
     });
+  });
+
+  test('sends one monotonic device transfer progress range across multiple files', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn(
+      (
+        _name: string,
+        _resType: string,
+        params: { file: { offset: number; data: { byteLength: number } } }
+      ) =>
+        Promise.resolve({
+          type: 'FilesystemFile',
+          message: {
+            processed_byte: params.file.offset + params.file.data.byteLength,
+          },
+        })
+    );
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+      getCurrentDeviceType: () => 'pro2',
+      toMessageObject: () => ({ connectId: 'firmware-device' }),
+    });
+    method.postMessage = jest.fn();
+    method.postTipMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+    (method as any).isProtocolV2ResourceBundleUpToDate = jest.fn().mockResolvedValue(false);
+    (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
+    (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
+    (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
+      .fn()
+      .mockResolvedValue(undefined);
+
+    const resourceSource = await openFirmwareByteSource({
+      binary: new Uint8Array(4097).buffer,
+    });
+    const firmwareSource = await openFirmwareByteSource({
+      binary: new Uint8Array(4097).buffer,
+    });
+    try {
+      await (method as any).executeProtocolV2TransferPhase({
+        resourceSources: [
+          {
+            name: 'images.okpkg',
+            source: resourceSource,
+            devicePath: 'vol0:/resource/images/images.okpkg',
+          },
+        ],
+        installSources: [
+          {
+            fileName: 'application_p1.bin',
+            source: firmwareSource,
+            targetId: 4,
+            kind: 'firmware',
+          },
+        ],
+      });
+    } finally {
+      await resourceSource?.close();
+      await firmwareSource?.close();
+    }
+
+    const writePayloads = typedCall.mock.calls.map(call => call[2]);
+    const deviceProgress = writePayloads.map(payload => payload.ui_percentage);
+    expect(deviceProgress).toEqual([0, 50, 99, 100]);
+    expect(deviceProgress.filter(progress => progress === 0)).toHaveLength(1);
+    expect(deviceProgress.filter(progress => progress === 100)).toHaveLength(1);
+    expect(method.postTipMessage).toHaveBeenCalledTimes(2);
+    expect(method.postTipMessage).toHaveBeenNthCalledWith(1, 'StartTransferData');
+    expect(method.postTipMessage).toHaveBeenNthCalledWith(2, 'ConfirmOnDevice');
+    expect(
+      (method.postProgressMessage as jest.Mock).mock.calls.filter(
+        ([progress, progressType]) => progress === 100 && progressType === 'transferData'
+      )
+    ).toHaveLength(1);
   });
 
   // TODO(#850/#855): PR #855 added resume-on-retry and per-chunk retry on the

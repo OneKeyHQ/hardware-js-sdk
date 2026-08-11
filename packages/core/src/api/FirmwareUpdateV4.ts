@@ -244,15 +244,7 @@ type JSZipSizedEntry = JSZip.JSZipObject & {
   };
 };
 
-type ProtocolV2ExecutionPhaseKind =
-  | 'resource-sync'
-  | 'bootloader-install'
-  | 'bootloader-verify'
-  | 'component-install'
-  | 'final-verify';
-
-type ProtocolV2ExecutionPhase = {
-  kind: ProtocolV2ExecutionPhaseKind;
+type ProtocolV2TransferBatch = {
   installSources: ProtocolV2InstallSource[];
   resourceSources: ProtocolV2ResourceBundleSource[];
 };
@@ -2205,68 +2197,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return entries;
   }
 
-  private buildProtocolV2ExecutionPhases({
-    installSources,
-    resourceSources,
-  }: {
-    installSources: ProtocolV2InstallSource[];
-    resourceSources: ProtocolV2ResourceBundleSource[];
-  }): ProtocolV2ExecutionPhase[] {
-    const phases: ProtocolV2ExecutionPhase[] = [];
-    const bootResourceSources = resourceSources.filter(source =>
-      isProtocolV2BootResourcePackagePath(source.devicePath)
-    );
-    const remainingResourceSources = resourceSources.filter(
-      source => !isProtocolV2BootResourcePackagePath(source.devicePath)
-    );
-    // A previous interrupted run may have left a promotable staging file. Replace
-    // it with the current approved package before any firmware-triggered reboot.
-    if (bootResourceSources.length > 0) {
-      phases.push({
-        kind: 'resource-sync',
-        installSources: [],
-        resourceSources: bootResourceSources,
-      });
-    }
-    const bootloaderSources = installSources.filter(source => source.kind === 'bootloader');
-    if (bootloaderSources.length > 0) {
-      phases.push(
-        {
-          kind: 'bootloader-install',
-          installSources: bootloaderSources,
-          resourceSources: [],
-        },
-        {
-          kind: 'bootloader-verify',
-          installSources: [],
-          resourceSources: [],
-        }
-      );
-    }
-    if (remainingResourceSources.length > 0) {
-      phases.push({
-        kind: 'resource-sync',
-        installSources: [],
-        resourceSources: remainingResourceSources,
-      });
-    }
-    const componentSources = installSources.filter(source => source.kind !== 'bootloader');
-    if (componentSources.length > 0) {
-      phases.push({
-        kind: 'component-install',
-        installSources: componentSources,
-        resourceSources: [],
-      });
-    }
-    phases.push({
-      kind: 'final-verify',
-      installSources: [],
-      resourceSources: [],
-    });
-    return phases;
-  }
-
-  private async executeProtocolV2Phases({
+  private async executeProtocolV2SourceUpdate({
     installSources,
     resourceSources,
   }: {
@@ -2274,38 +2205,18 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     resourceSources: ProtocolV2ResourceBundleSource[];
   }) {
     this.protocolV2BootResourceStagingSafe = false;
-    const phases = this.buildProtocolV2ExecutionPhases({
-      installSources,
-      resourceSources,
-    });
-    for (const phase of phases) {
-      if (phase.kind === 'final-verify') {
-        return this.completeProtocolV2FinalVerification();
-      }
-      if (phase.kind === 'resource-sync') {
-        await this.enterProtocolV2BootloaderMode();
-        if (
-          !phase.resourceSources.some(source =>
-            isProtocolV2BootResourcePackagePath(source.devicePath)
-          )
-        ) {
-          await this.ensureProtocolV2BootResourceStagingIsEmpty();
-        }
-        await this.executeProtocolV2TransferPhase(phase);
-      } else if (phase.kind === 'bootloader-install' || phase.kind === 'component-install') {
-        await this.enterProtocolV2BootloaderMode();
-        await this.ensureProtocolV2BootResourceStagingIsEmpty();
-        await this.executeProtocolV2TransferPhase(phase);
-        await this.exitProtocolV2BootloaderToNormal();
-      } else if (phase.kind === 'bootloader-verify') {
-        await this.waitForProtocolV2FinalFeatures();
-        this.assertExpectedProtocolV2Versions(['boot']);
-      }
+    if (installSources.length > 0 || resourceSources.length > 0) {
+      await this.enterProtocolV2BootloaderMode();
+      // Clear stale boot-resource staging before writing any artifacts. The new
+      // boot resource, resources and firmware then share one transfer session,
+      // one global progress range and one multi-target install request.
+      await this.ensureProtocolV2BootResourceStagingIsEmpty();
+      await this.executeProtocolV2TransferPhase({
+        installSources,
+        resourceSources,
+      });
     }
-    throw ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      'Protocol V2 execution has no final verification phase'
-    );
+    return this.completeProtocolV2FinalVerification();
   }
 
   private async ensureProtocolV2BootResourceStagingIsEmpty() {
@@ -2337,19 +2248,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.protocolV2BootResourceStagingSafe = true;
   }
 
-  private async executeProtocolV2SourceUpdate({
-    installSources,
-    resourceSources,
-  }: {
-    installSources: ProtocolV2InstallSource[];
-    resourceSources: ProtocolV2ResourceBundleSource[];
-  }) {
-    return this.executeProtocolV2Phases({
-      installSources,
-      resourceSources,
-    });
-  }
-
   private async executeProtocolV2Update({
     fwBinaryMap,
     bootloaderBinary,
@@ -2374,7 +2272,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           kind: item.kind,
         }))
       );
-      return await this.executeProtocolV2Phases({
+      return await this.executeProtocolV2SourceUpdate({
         installSources,
         resourceSources: [],
       });
@@ -2386,7 +2284,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async executeProtocolV2TransferPhase({
     installSources,
     resourceSources,
-  }: ProtocolV2ExecutionPhase) {
+  }: ProtocolV2TransferBatch) {
     let totalSize = installSources.reduce((total, item) => total + item.source.size, 0);
     const resourcesToSync: ProtocolV2ResourceBundleSource[] = [];
     for (const resource of resourceSources) {
