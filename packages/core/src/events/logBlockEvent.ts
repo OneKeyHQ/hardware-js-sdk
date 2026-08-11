@@ -17,6 +17,14 @@ const LogLabelMethod: Set<string> = new Set([
   'fileRead',
 ]);
 
+// 资源上传参数可能包含很大的 Base64 字符串。这里按方法整段跳过，避免日志层
+// 递归复制和序列化这些数据；资源 API 与传输内容本身保持不变。
+const LogPayloadBlockMethod: Set<string> = new Set([
+  'deviceUploadNft',
+  'deviceUploadWallpaper',
+  'uploadPortfolio',
+]);
+
 const SensitiveLogKeys: Set<string> = new Set([
   'devicestate',
   'entropy',
@@ -86,7 +94,12 @@ export function getLogBlockLabel(message: unknown): string | undefined {
 }
 
 export function getSafeLogPayload(value: unknown, blockLabel?: string): unknown {
-  if (blockLabel && (LogBlockEvent.has(blockLabel) || isSigningMethod(blockLabel))) {
+  if (
+    blockLabel &&
+    (LogBlockEvent.has(blockLabel) ||
+      LogPayloadBlockMethod.has(blockLabel) ||
+      isSigningMethod(blockLabel))
+  ) {
     return { method: blockLabel, payload: '[REDACTED]' };
   }
 

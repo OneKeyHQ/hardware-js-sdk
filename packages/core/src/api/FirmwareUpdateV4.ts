@@ -28,6 +28,7 @@ import { DevicePool } from '../device/DevicePool';
 import {
   PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
   ProtocolV2FirmwareTargetType,
+  isLegacyProtocolV2ProtocolInfo,
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
@@ -243,15 +244,7 @@ type JSZipSizedEntry = JSZip.JSZipObject & {
   };
 };
 
-type ProtocolV2ExecutionPhaseKind =
-  | 'resource-sync'
-  | 'bootloader-install'
-  | 'bootloader-verify'
-  | 'component-install'
-  | 'final-verify';
-
-type ProtocolV2ExecutionPhase = {
-  kind: ProtocolV2ExecutionPhaseKind;
+type ProtocolV2TransferBatch = {
   installSources: ProtocolV2InstallSource[];
   resourceSources: ProtocolV2ResourceBundleSource[];
 };
@@ -384,7 +377,41 @@ const isProtocolV2ReconnectProbeError = (error: unknown) => {
   );
 };
 
+const PROTOCOL_V2_BLE_INSTALL_INTERRUPTION_ERROR_CODES = new Set<number>([
+  HardwareErrorCode.BleConnectedError,
+  HardwareErrorCode.BleCharacteristicNotifyError,
+  HardwareErrorCode.BleForceCleanRunPromise,
+  HardwareErrorCode.BleDeviceDisconnected,
+]);
+
+const isProtocolV2BleInstallInterruptionError = (error: unknown) => {
+  if (
+    error instanceof HardwareError &&
+    PROTOCOL_V2_BLE_INSTALL_INTERRUPTION_ERROR_CODES.has(error.errorCode)
+  ) {
+    return true;
+  }
+
+  const message = getProtocolV2UnknownErrorText(error).toLowerCase();
+  const compactMessage = message.replace(/\s+/gu, '');
+  return (
+    /react native ble transport (?:released|disconnected)/u.test(message) ||
+    (compactMessage.includes('rxerrorerror6') &&
+      (compactMessage.includes('multiplatformbleadapter') ||
+        compactMessage.includes('multipalformebleadapter')))
+  );
+};
+
 const isProtocolV2FirmwareStatusEndpointUnavailable = (error: unknown) => {
+  const message = getProtocolV2UnknownErrorText(error).toLowerCase();
+  return (
+    message.includes('handler not registered') ||
+    message.includes('message handler not found') ||
+    message.includes('unsupported message')
+  );
+};
+
+const isProtocolV2FirmwareUpdateEndpointUnavailable = (error: unknown) => {
   const message = getProtocolV2UnknownErrorText(error).toLowerCase();
   return (
     message.includes('handler not registered') ||
@@ -587,6 +614,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private protocolV2ExecutionInLoader = false;
 
+  private protocolV2LegacyDirectUpdate = false;
+
   private protocolV2BootResourceStagingSafe = false;
 
   private protocolV2CompletedTargetVersions = new Map<number, number>();
@@ -594,6 +623,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private protocolV2LatestFinalFeatures?: Features;
 
   private protocolV2FinalStatusVerified = false;
+
+  private protocolV2InstallAckReceived = false;
+
+  private protocolV2InstallBaselineVersions = new Map<number, string>();
+
+  private protocolV2LastRuntimeProbeFeatures?: Features;
 
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
@@ -813,6 +848,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async runProtocolV2() {
     await this.captureProtocolV2PhysicalIdentity();
     const deviceFeatures = await this.getProtocolV2DeviceFeatures();
+    this.protocolV2InstallBaselineVersions =
+      this.getProtocolV2ObservableTargetVersions(deviceFeatures);
+    this.protocolV2LastRuntimeProbeFeatures = undefined;
     const currentDeviceType = this.device.getCurrentDeviceType();
     const capabilityDeviceType =
       currentDeviceType === EDeviceType.Pro2 || currentDeviceType === EDeviceType.Neo
@@ -826,6 +864,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
     this.validateExpectedTargetVersions();
+    const wantsResources = !!this.params.targetsToUpdate?.includes('resource');
 
     if (
       !this.params.preparedPlan &&
@@ -849,11 +888,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (this.params.preparedPlan || hasPreparedComponentArtifacts) {
       return this.runProtocolV2PreparedArtifacts(deviceFeatures, firmwareType);
     }
-    const wantsResources = !!this.params.targetsToUpdate?.includes('resource');
 
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
     let installItems: ProtocolV2InstallItem[] | undefined;
+    let resourceMemoryHost: FirmwareUpdateV4MemoryHost | undefined;
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
       fwBinaryMap = this.collectExplicitTargetBinaries();
@@ -866,17 +905,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       const needsRemoteFirmware = this.params.targetsToUpdate?.length
         ? missingFirmwareTargets.length > 0
         : explicitInstallItems.length === 0;
-      if (wantsResources) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          'Protocol V2 resource archive must be provided through a local or external PreparedPlan',
-          {
-            firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
-          }
-        );
-      }
+      const needsSdkManagedArtifacts = needsRemoteFirmware || wantsResources;
       if (
-        needsRemoteFirmware &&
+        needsSdkManagedArtifacts &&
         (this.params.artifactReader ||
           DataManager.getSettings('firmwareManifestMode') === 'external-only')
       ) {
@@ -888,9 +919,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           }
         );
       }
-      if (needsRemoteFirmware) {
+      if (needsSdkManagedArtifacts) {
         // Remote updates must use a freshly fetched config before any reboot or file write.
-        await DataManager.forceReloadData();
+        await DataManager.forceReloadData({
+          requireResources: wantsResources,
+          resourceDeviceType:
+            capabilityDeviceType === EDeviceType.Neo ? EDeviceType.Neo : EDeviceType.Pro2,
+        });
       }
       if (needsRemoteFirmware) {
         const remoteBinaries = await this.prepareRemoteProtocolV2Binaries(
@@ -913,8 +948,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             targetId: item.targetId,
           }));
       }
+      if (wantsResources) {
+        this.params.resourceArchiveBinary = await this.downloadRemoteProtocolV2ResourceArchive(
+          deviceFeatures
+        );
+        resourceMemoryHost = await this.prepareProtocolV2LocalMemoryHost({
+          features: deviceFeatures,
+          firmwareType,
+          availableInstallItems: installItems ?? explicitInstallItems,
+        });
+      }
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
+      resourceMemoryHost?.release();
       if (
         typeof err === 'object' &&
         err !== null &&
@@ -927,6 +973,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         throw err;
       }
       throw normalizeFirmwarePreparationError(err);
+    }
+
+    if (resourceMemoryHost) {
+      try {
+        return await this.runProtocolV2PreparedArtifacts(deviceFeatures, firmwareType, false);
+      } finally {
+        resourceMemoryHost.release();
+      }
     }
 
     if (!bootloaderBinary && fwBinaryMap.length === 0 && !installItems?.length) {
@@ -1082,14 +1136,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async prepareProtocolV2LocalMemoryHost({
     features,
     firmwareType,
+    availableInstallItems = this.buildProtocolV2InstallItems({
+      bootloaderBinary: this.prepareBootloaderBinary(),
+      fwBinaryMap: this.collectExplicitTargetBinaries(),
+    }),
   }: {
     features: Features;
     firmwareType: EFirmwareType;
+    availableInstallItems?: ProtocolV2InstallItem[];
   }): Promise<FirmwareUpdateV4MemoryHost> {
-    const availableInstallItems = this.buildProtocolV2InstallItems({
-      bootloaderBinary: this.prepareBootloaderBinary(),
-      fwBinaryMap: this.collectExplicitTargetBinaries(),
-    });
     const requestedComponentTargets = new Set(
       (this.params.targetsToUpdate ?? []).filter(
         (target): target is Exclude<FirmwareUpdateV4Target, 'resource' | 'boot_resources'> =>
@@ -1517,9 +1572,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return sources;
   }
 
-  private async runProtocolV2PreparedArtifacts(features: Features, firmwareType: EFirmwareType) {
+  private async runProtocolV2PreparedArtifacts(
+    features: Features,
+    firmwareType: EFirmwareType,
+    announceDownload = true
+  ) {
     try {
-      this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
+      if (announceDownload) {
+        this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
+      }
       const installSources = await this.prepareProtocolV2InstallSources(firmwareType, features);
       const resourceSources = await this.prepareProtocolV2ResourceSources();
       if (installSources.length === 0 && resourceSources.length === 0) {
@@ -1528,7 +1589,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           'No firmware to update'
         );
       }
-      this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
+      if (announceDownload) {
+        this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
+      }
 
       return await this.executeProtocolV2SourceUpdate({
         installSources,
@@ -1882,6 +1945,44 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
+  private async downloadRemoteProtocolV2ResourceArchive(features: Features): Promise<ArrayBuffer> {
+    const deviceType = getDeviceType(features);
+    if (deviceType !== EDeviceType.Pro2 && deviceType !== EDeviceType.Neo) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 resource archive requires a Pro2 or Neo device'
+      );
+    }
+    const source = DataManager.getProtocolV2ResourceSource(deviceType);
+    const expectedSha256 = normalizeProtocolV2Hex(source?.archiveSha256);
+    if (
+      !source?.archiveUrl ||
+      !Number.isSafeInteger(source.archiveSize) ||
+      source.archiveSize <= 0 ||
+      source.archiveSize > PROTOCOL_V2_RESOURCE_TOTAL_MAX_BYTES ||
+      !expectedSha256 ||
+      !/^[0-9a-f]{64}$/u.test(expectedSha256)
+    ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 resource archive integrity metadata is invalid',
+        { firmwareUpdateCode: 'FirmwarePlanInvalid' }
+      );
+    }
+    const { binary } = await getSysResourceBinary(source.archiveUrl);
+    if (
+      binary.byteLength !== source.archiveSize ||
+      bytesToHex(sha256(new Uint8Array(binary))) !== expectedSha256
+    ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 resource archive does not match the remote config',
+        { firmwareUpdateCode: 'FirmwareArtifactReceiptMismatch' }
+      );
+    }
+    return binary;
+  }
+
   private async prepareRemoteProtocolV2Binaries(
     firmwareType: EFirmwareType,
     features: Features,
@@ -2067,21 +2168,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return this.device.features?.mode === 'romloader';
   }
 
-  async enterProtocolV2BootloaderMode() {
-    // romloader is the first update environment and forwards targets to bootloader.
-    // It rejects DeviceRebootType.Bootloader, so reuse the current connection.
-    if (this.isProtocolV2RomloaderMode()) {
-      Log.debug('Protocol V2 device is in romloader mode; start firmware update directly');
-      this.protocolV2ExecutionInLoader = true;
-      return false;
-    }
-    if (this.isProtocolV2BootloaderMode()) {
-      Log.debug('Protocol V2 device is already in bootloader mode, skip reboot');
-      this.protocolV2ExecutionInLoader = true;
-      this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
-      return false;
-    }
+  private isLegacyProtocolV2Runtime() {
+    const protocolInfo = this.device.state?.raw?.protocolV2ProtocolInfo;
+    return protocolInfo ? isLegacyProtocolV2ProtocolInfo(protocolInfo) : false;
+  }
 
+  private async rebootProtocolV2ToBootloader() {
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.AutoRebootToBootloader);
       await this.protocolV2Reboot(DeviceRebootType.Bootloader);
@@ -2097,6 +2189,27 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       Log.log('Protocol V2 auto go to bootloader mode failed: ', error);
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure);
     }
+  }
+
+  async enterProtocolV2BootloaderMode() {
+    this.protocolV2LegacyDirectUpdate = false;
+    // romloader is the first update environment and forwards targets to bootloader.
+    // It rejects DeviceRebootType.Bootloader, so reuse the current connection.
+    if (this.isProtocolV2RomloaderMode()) {
+      Log.debug('Protocol V2 device is in romloader mode; start firmware update directly');
+      this.protocolV2LegacyDirectUpdate = this.isLegacyProtocolV2Runtime();
+      this.protocolV2ExecutionInLoader = true;
+      return false;
+    }
+    if (this.isProtocolV2BootloaderMode()) {
+      Log.debug('Protocol V2 device is already in bootloader mode, skip reboot');
+      this.protocolV2LegacyDirectUpdate = this.isLegacyProtocolV2Runtime();
+      this.protocolV2ExecutionInLoader = true;
+      this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
+      return false;
+    }
+
+    return this.rebootProtocolV2ToBootloader();
   }
 
   private async waitForProtocolV2BootloaderMode(
@@ -2183,68 +2296,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return entries;
   }
 
-  private buildProtocolV2ExecutionPhases({
-    installSources,
-    resourceSources,
-  }: {
-    installSources: ProtocolV2InstallSource[];
-    resourceSources: ProtocolV2ResourceBundleSource[];
-  }): ProtocolV2ExecutionPhase[] {
-    const phases: ProtocolV2ExecutionPhase[] = [];
-    const bootResourceSources = resourceSources.filter(source =>
-      isProtocolV2BootResourcePackagePath(source.devicePath)
-    );
-    const remainingResourceSources = resourceSources.filter(
-      source => !isProtocolV2BootResourcePackagePath(source.devicePath)
-    );
-    // A previous interrupted run may have left a promotable staging file. Replace
-    // it with the current approved package before any firmware-triggered reboot.
-    if (bootResourceSources.length > 0) {
-      phases.push({
-        kind: 'resource-sync',
-        installSources: [],
-        resourceSources: bootResourceSources,
-      });
-    }
-    const bootloaderSources = installSources.filter(source => source.kind === 'bootloader');
-    if (bootloaderSources.length > 0) {
-      phases.push(
-        {
-          kind: 'bootloader-install',
-          installSources: bootloaderSources,
-          resourceSources: [],
-        },
-        {
-          kind: 'bootloader-verify',
-          installSources: [],
-          resourceSources: [],
-        }
-      );
-    }
-    if (remainingResourceSources.length > 0) {
-      phases.push({
-        kind: 'resource-sync',
-        installSources: [],
-        resourceSources: remainingResourceSources,
-      });
-    }
-    const componentSources = installSources.filter(source => source.kind !== 'bootloader');
-    if (componentSources.length > 0) {
-      phases.push({
-        kind: 'component-install',
-        installSources: componentSources,
-        resourceSources: [],
-      });
-    }
-    phases.push({
-      kind: 'final-verify',
-      installSources: [],
-      resourceSources: [],
-    });
-    return phases;
-  }
-
-  private async executeProtocolV2Phases({
+  private async executeProtocolV2SourceUpdate({
     installSources,
     resourceSources,
   }: {
@@ -2252,38 +2304,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     resourceSources: ProtocolV2ResourceBundleSource[];
   }) {
     this.protocolV2BootResourceStagingSafe = false;
-    const phases = this.buildProtocolV2ExecutionPhases({
-      installSources,
-      resourceSources,
-    });
-    for (const phase of phases) {
-      if (phase.kind === 'final-verify') {
-        return this.completeProtocolV2FinalVerification();
-      }
-      if (phase.kind === 'resource-sync') {
-        await this.enterProtocolV2BootloaderMode();
-        if (
-          !phase.resourceSources.some(source =>
-            isProtocolV2BootResourcePackagePath(source.devicePath)
-          )
-        ) {
-          await this.ensureProtocolV2BootResourceStagingIsEmpty();
-        }
-        await this.executeProtocolV2TransferPhase(phase);
-      } else if (phase.kind === 'bootloader-install' || phase.kind === 'component-install') {
-        await this.enterProtocolV2BootloaderMode();
-        await this.ensureProtocolV2BootResourceStagingIsEmpty();
-        await this.executeProtocolV2TransferPhase(phase);
-        await this.exitProtocolV2BootloaderToNormal();
-      } else if (phase.kind === 'bootloader-verify') {
-        await this.waitForProtocolV2FinalFeatures();
-        this.assertExpectedProtocolV2Versions(['boot']);
-      }
+    if (installSources.length > 0 || resourceSources.length > 0) {
+      await this.enterProtocolV2BootloaderMode();
+      // Clear stale boot-resource staging before writing any artifacts. The new
+      // boot resource, resources and firmware then share one transfer session,
+      // one global progress range and one multi-target install request.
+      // Preserve the approved source order instead of synthesizing a boot-first
+      // phase. Loader firmware owns the cross-stage handoff: bootloader runs its
+      // component targets and leaves boot pending for romloader, while pending
+      // runner-backed records always resume before the application boots.
+      await this.ensureProtocolV2BootResourceStagingIsEmpty();
+      await this.executeProtocolV2TransferPhase({
+        installSources,
+        resourceSources,
+      });
     }
-    throw ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      'Protocol V2 execution has no final verification phase'
-    );
+    return this.completeProtocolV2FinalVerification();
   }
 
   private async ensureProtocolV2BootResourceStagingIsEmpty() {
@@ -2315,19 +2351,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.protocolV2BootResourceStagingSafe = true;
   }
 
-  private async executeProtocolV2SourceUpdate({
-    installSources,
-    resourceSources,
-  }: {
-    installSources: ProtocolV2InstallSource[];
-    resourceSources: ProtocolV2ResourceBundleSource[];
-  }) {
-    return this.executeProtocolV2Phases({
-      installSources,
-      resourceSources,
-    });
-  }
-
   private async executeProtocolV2Update({
     fwBinaryMap,
     bootloaderBinary,
@@ -2352,7 +2375,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           kind: item.kind,
         }))
       );
-      return await this.executeProtocolV2Phases({
+      return await this.executeProtocolV2SourceUpdate({
         installSources,
         resourceSources: [],
       });
@@ -2364,7 +2387,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async executeProtocolV2TransferPhase({
     installSources,
     resourceSources,
-  }: ProtocolV2ExecutionPhase) {
+  }: ProtocolV2TransferBatch) {
     let totalSize = installSources.reduce((total, item) => total + item.source.size, 0);
     const resourcesToSync: ProtocolV2ResourceBundleSource[] = [];
     for (const resource of resourceSources) {
@@ -2637,6 +2660,47 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return Array.from(expectedTargetIds).filter(targetId => !reportedTargetIds.has(targetId));
   }
 
+  private getProtocolV2ObservableTargetVersions(features: Features) {
+    const versions = new Map<number, string>();
+    versions.set(
+      ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
+      getDeviceBootloaderVersion(features).join('.')
+    );
+    const applicationVersion = getDeviceFirmwareVersion(features).join('.');
+    versions.set(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1, applicationVersion);
+    versions.set(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2, applicationVersion);
+    versions.set(
+      ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR,
+      getDeviceBLEFirmwareVersion(features).join('.')
+    );
+    const secureElementVersions: Array<[number, string | null | undefined]> = [
+      [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE01, features.se01Version],
+      [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE02, features.se02Version],
+      [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE03, features.se03Version],
+      [ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_SE04, features.se04Version],
+    ];
+    secureElementVersions.forEach(([targetId, version]) => {
+      if (version) versions.set(targetId, version);
+    });
+    return versions;
+  }
+
+  private hasProtocolV2InstallVersionChanged(expectedTargetIds: Set<number>) {
+    if (!this.protocolV2LastRuntimeProbeFeatures) return false;
+    const currentVersions = this.getProtocolV2ObservableTargetVersions(
+      this.protocolV2LastRuntimeProbeFeatures
+    );
+    return Array.from(expectedTargetIds).some(targetId => {
+      const previousVersion = this.protocolV2InstallBaselineVersions.get(targetId);
+      const currentVersion = currentVersions.get(targetId);
+      return (
+        previousVersion !== undefined &&
+        currentVersion !== undefined &&
+        previousVersion !== currentVersion
+      );
+    });
+  }
+
   private async waitForProtocolV2FirmwareUpdateComplete(
     targets: Array<{ target_id: number; path: string }>
   ) {
@@ -2649,12 +2713,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let deviceInfo: ProtocolV2DeviceInfo | undefined;
     let missingTargetStatusSince: number | undefined;
     let missingTargetStatusKey: string | undefined;
+    let normalModeWithoutInstallEvidenceSince: number | undefined;
+    let installEvidenceObserved = this.protocolV2InstallAckReceived;
     const resetMissingTargetStatusGrace = () => {
       missingTargetStatusSince = undefined;
       missingTargetStatusKey = undefined;
     };
 
     while (Date.now() - startTime < PROTOCOL_V2_INSTALL_TIMEOUT) {
+      // A transport release caused by an explicit workflow cancellation must not
+      // be mistaken for the expected device reboot during installation.
+      this.throwIfAborted();
       try {
         if (shouldReconnect) {
           await this.reconnectProtocolV2Device();
@@ -2677,21 +2746,33 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           );
           const statusTargets = (statusResponse.message.records ??
             []) as ProtocolV2FirmwareUpdateStatusTarget[];
+          if (
+            statusTargets.some(target => {
+              const targetId = normalizeProtocolV2TargetId(target.target_id);
+              return targetId !== undefined && expectedTargetIds.has(targetId);
+            })
+          ) {
+            installEvidenceObserved = true;
+            normalModeWithoutInstallEvidenceSince = undefined;
+          }
           if (this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds, expectedPaths)) {
             this.protocolV2FinalStatusVerified = true;
             return;
           }
 
-          if (
-            statusTargets.length === 0 &&
-            currentDeviceInfo &&
-            (await this.probeProtocolV2NormalMode(currentDeviceInfo))
-          ) {
-            Log.log(
-              '[FirmwareUpdateV4] empty firmware status after confirmed App reboot; update complete'
-            );
-            this.postProgressMessage(100, 'installingFirmware');
-            return;
+          if (statusTargets.length === 0 && currentDeviceInfo) {
+            const isNormalMode = await this.probeProtocolV2NormalMode(currentDeviceInfo);
+            if (
+              isNormalMode &&
+              (installEvidenceObserved ||
+                this.hasProtocolV2InstallVersionChanged(expectedTargetIds))
+            ) {
+              Log.log(
+                '[FirmwareUpdateV4] empty firmware status after confirmed App reboot; update complete'
+              );
+              this.postProgressMessage(100, 'installingFirmware');
+              return;
+            }
           }
 
           const missingTargetIds = this.getProtocolV2MissingTargetIds(
@@ -2741,16 +2822,39 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
                 'Protocol V2 device identity is unavailable during install polling'
               );
             }
-            if (await this.probeProtocolV2NormalMode(currentDeviceInfo)) {
+            const isNormalMode = await this.probeProtocolV2NormalMode(currentDeviceInfo);
+            if (
+              isNormalMode &&
+              (installEvidenceObserved ||
+                this.hasProtocolV2InstallVersionChanged(expectedTargetIds))
+            ) {
               Log.log(
                 '[FirmwareUpdateV4] firmware status endpoint unavailable after confirmed App reboot'
               );
               this.postProgressMessage(100, 'installingFirmware');
               return;
             }
-            lastError = new Error(
-              'Protocol V2 firmware status endpoint is unavailable while the device remains in loader mode'
-            );
+            if (isNormalMode) {
+              const now = Date.now();
+              normalModeWithoutInstallEvidenceSince ??= now;
+              if (
+                now - normalModeWithoutInstallEvidenceSince >=
+                PROTOCOL_V2_MISSING_TARGET_STATUS_GRACE_TIMEOUT
+              ) {
+                throw ERRORS.TypedError(
+                  HardwareErrorCode.FirmwareError,
+                  'Protocol V2 device returned to normal mode without install ACK, target status, or version change'
+                );
+              }
+              lastError = new Error(
+                'Protocol V2 device is in normal mode but installation is not yet confirmed'
+              );
+            } else {
+              normalModeWithoutInstallEvidenceSince = undefined;
+              lastError = new Error(
+                'Protocol V2 firmware status endpoint is unavailable while the device remains in loader mode'
+              );
+            }
           } else {
             shouldReconnect = true;
             deviceInfo = undefined;
@@ -2811,6 +2915,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       deviceInfo,
       PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
     );
+    this.protocolV2LastRuntimeProbeFeatures = features;
     return features.mode === 'normal' && !features.bootloaderMode;
   }
 
@@ -3043,15 +3148,62 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }: {
     targets: Array<{ target_id: number; path: string }>;
   }) {
-    const commands = this.device.getCommands();
-    const response: ProtocolV2FirmwareUpdateStartResponse = await commands.typedCall(
-      'DeviceFirmwareUpdateRequest',
-      'Success',
-      { targets },
-      { timeoutMs: PROTOCOL_V2_START_UPDATE_TIMEOUT }
-    );
-    // Success acknowledges that the device accepted installation. End confirmation
-    // and begin status polling only after receiving this ACK.
+    this.protocolV2InstallAckReceived = false;
+    this.protocolV2LastRuntimeProbeFeatures = undefined;
+    const startUpdate = () =>
+      this.device
+        .getCommands()
+        .typedCall(
+          'DeviceFirmwareUpdateRequest',
+          'Success',
+          { targets },
+          { timeoutMs: PROTOCOL_V2_START_UPDATE_TIMEOUT }
+        );
+    let response: ProtocolV2FirmwareUpdateStartResponse | undefined;
+    try {
+      response = await startUpdate();
+      this.protocolV2InstallAckReceived = true;
+    } catch (error) {
+      if (this.isBleReconnect() && isProtocolV2BleInstallInterruptionError(error)) {
+        this.throwIfAborted();
+        // Installation can reboot the device before the Success response reaches
+        // the host. The request has side effects, so do not replay it; reconnect
+        // and let status polling determine whether installation was accepted.
+        Log.log(
+          '[FirmwareUpdateV4] install request interrupted by device reboot; continue status polling: ',
+          error
+        );
+      } else if (
+        this.protocolV2LegacyDirectUpdate &&
+        isProtocolV2FirmwareUpdateEndpointUnavailable(error)
+      ) {
+        // Both legacy loaders register this request. A missing handler therefore identifies
+        // a legacy App before dispatch, so it is safe to reboot and retry the unhandled request.
+        this.protocolV2LegacyDirectUpdate = false;
+        Log.debug(
+          '[FirmwareUpdateV4] legacy App does not expose DeviceFirmwareUpdateRequest; rebooting to bootloader'
+        );
+        await this.rebootProtocolV2ToBootloader();
+        try {
+          response = await startUpdate();
+          this.protocolV2InstallAckReceived = true;
+        } catch (retryError) {
+          if (!(this.isBleReconnect() && isProtocolV2BleInstallInterruptionError(retryError))) {
+            throw retryError;
+          }
+          this.throwIfAborted();
+          Log.log(
+            '[FirmwareUpdateV4] install request interrupted after legacy reboot; continue status polling: ',
+            retryError
+          );
+        }
+      } else {
+        throw error;
+      }
+    }
+    this.protocolV2LegacyDirectUpdate = false;
+    // A Success ACK or an install-time disconnect both end confirmation. In the
+    // latter case only status polling may establish the final outcome.
     this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
     this.postProgressMessage(0, 'installingFirmware');
     return response;

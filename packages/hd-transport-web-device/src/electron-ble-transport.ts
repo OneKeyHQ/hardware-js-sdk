@@ -18,7 +18,6 @@ import {
   isHeaderChunk,
 } from '@onekeyfe/hd-shared';
 
-import { createTransportCallLog, shouldSuppressHighVolumeCallLog } from './transportLog';
 import { resolveBlePacketCapacity } from './ble-packet-capacity';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
@@ -806,10 +805,6 @@ export default class ElectronBleTransport {
         `Device protocol has not been detected for ${uuid}`
       );
     }
-    if (!shouldSuppressHighVolumeCallLog(name)) {
-      this.Log?.debug('transport call', createTransportCallLog(name, protocol, data));
-    }
-
     if (protocol === 'V2') {
       return this.callProtocolV2(uuid, name, data, options);
     }

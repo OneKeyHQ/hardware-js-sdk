@@ -56,6 +56,16 @@ export const getProtocolV2SeType = (se?: DeviceSEInfo): string | null =>
 
 export type ProtocolV2RuntimeMode = 'normal' | 'bootloader' | 'romloader';
 
+export type ProtocolV2ProtocolInfo = ProtocolInfo & {
+  /** Present only when hd-transport decoded the pre-build-fingerprint wire layout. */
+  protobuf_definition?: string | null;
+};
+
+export const isLegacyProtocolV2ProtocolInfo = (
+  protocolInfo: ProtocolInfo
+): protocolInfo is ProtocolV2ProtocolInfo & { protobuf_definition: string | null } =>
+  Object.prototype.hasOwnProperty.call(protocolInfo, 'protobuf_definition');
+
 /**
  * Protocol V2 fingerprints use:
  * <binary>__<version>__<commit>__<PROD|DEV>__<DEBUG|RELEASE>
@@ -87,11 +97,18 @@ export const parseProtocolV2BuildFingerprint = (
 };
 
 export const getProtocolV2RuntimeMode = (
-  protocolInfo: ProtocolInfo
+  protocolInfo: ProtocolInfo,
+  deviceInfo?: ProtocolV2DeviceInfo
 ): ProtocolV2RuntimeMode | undefined => {
   const binary = parseProtocolV2BuildFingerprint(protocolInfo.build_fingerprint)?.binary;
   if (binary === 'application') return 'normal';
-  return binary;
+  if (binary) return binary;
+
+  if (isLegacyProtocolV2ProtocolInfo(protocolInfo) && !deviceInfo?.fw?.application) {
+    if (deviceInfo?.fw?.romloader) return 'romloader';
+    if (deviceInfo?.fw?.bootloader) return 'bootloader';
+  }
+  return undefined;
 };
 
 // MessageType_DeviceStatusGet in the Protocol V2 protobuf registry.

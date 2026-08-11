@@ -218,9 +218,13 @@ export class DevicePool extends EventEmitter {
    * Device.getDeviceState skips unsupported status/settings calls in loader mode.
    */
   static async _refreshProtocolV2DiscoveryState(device: Device) {
-    await device.getDeviceState({ refreshSections: ['status'] });
+    await device.getDeviceState({
+      refreshSections: ['status'],
+    });
     try {
-      await device.getDeviceState({ refreshSections: ['settings'] });
+      await device.getDeviceState({
+        refreshSections: ['settings'],
+      });
     } catch (error) {
       Log.debug('Unable to refresh Protocol V2 device label during discovery', error);
     }

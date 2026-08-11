@@ -304,13 +304,6 @@ export class DeviceCommands {
       const promise = this.transport.call(this.mainId, type, msg ?? {}, options) as any;
       this.callPromise = promise;
       const res = await promise;
-      if (!shouldReduceDebug) {
-        LogCore.debug(
-          '[DeviceCommands] [call] Received',
-          res.type,
-          getSafeTransportLogPayload(res.message, res.type)
-        );
-      }
       return res;
     } catch (error) {
       LogCore.debug('[DeviceCommands] [call] Received error', {
@@ -445,13 +438,10 @@ export class DeviceCommands {
       if (!shouldReduceDebugForCall(callType)) {
         Log.debug('_filterCommonTypes: ', {
           request: callType,
-          response:
-            callType === 'DeviceFirmwareUpdateStatusGet'
-              ? {
-                  type: res.type,
-                  message: getSafeTransportLogPayload(res.message, res.type),
-                }
-              : res.type,
+          response: {
+            type: res.type,
+            message: getSafeTransportLogPayload(res.message, res.type),
+          },
         });
       }
     } catch (error) {

@@ -233,6 +233,32 @@ const schemas = {
 };
 const productionProtocolV2Messages = parseConfigure(require('../messages-protocol-v2.json'));
 
+const legacyProtocolInfoMessage = parseConfigure({
+  nested: {
+    ProtocolInfo: {
+      fields: {
+        version: {
+          type: 'uint32',
+          id: 1,
+          rule: 'required',
+        },
+        supported_messages: {
+          type: 'uint32',
+          id: 2,
+          rule: 'repeated',
+          options: {
+            packed: false,
+          },
+        },
+        protobuf_definition: {
+          type: 'string',
+          id: 3,
+        },
+      },
+    },
+  },
+}).lookupType('ProtocolInfo');
+
 const rewriteSeq = (frame, seq) => {
   const copy = new Uint8Array(frame);
   copy[4] = 1;
@@ -264,6 +290,64 @@ describe('Protocol V2 framing and session', () => {
         build_fingerprint: 'application__1.0.0__abc__DEV__DEBUG',
         supported_messages: [60200, 60201],
       },
+    });
+  });
+
+  test('decodes a two-byte legacy ProtocolInfo at the generic frame boundary', () => {
+    const frame = protocolV2.encodeProtobufFrame(60201, new Uint8Array([0x08, 0x01]));
+    const productionSchemas = {
+      protocolV1: protocolV1Messages,
+      protocolV2: productionProtocolV2Messages,
+    };
+
+    expect(ProtocolV2.decodeFrame(productionSchemas, frame)).toMatchObject({
+      type: 'ProtocolInfo',
+      message: {
+        version: 1,
+        build_fingerprint: '',
+        supported_messages: [],
+        protobuf_definition: null,
+      },
+    });
+  });
+
+  test('does not reinterpret a malformed current ProtocolInfo as the legacy layout', () => {
+    const frame = protocolV2.encodeProtobufFrame(60201, new Uint8Array([0x08, 0x01, 0x18, 0x01]));
+
+    expect(() =>
+      ProtocolV2.decodeFrame(
+        {
+          protocolV1: protocolV1Messages,
+          protocolV2: productionProtocolV2Messages,
+        },
+        frame
+      )
+    ).toThrow('Protocol V2 protobuf decode failed for "ProtocolInfo"');
+  });
+
+  test('preserves legacy ProtocolInfo capabilities when using the old field numbers', () => {
+    const payload = legacyProtocolInfoMessage
+      .encode({
+        version: 1,
+        supported_messages: [60602],
+        protobuf_definition: 'legacy',
+      })
+      .finish();
+    const frame = protocolV2.encodeProtobufFrame(60201, payload);
+
+    const decoded = ProtocolV2.decodeFrame(
+      {
+        protocolV1: protocolV1Messages,
+        protocolV2: productionProtocolV2Messages,
+      },
+      frame
+    );
+
+    expect(decoded.message).toEqual({
+      version: 1,
+      build_fingerprint: '',
+      supported_messages: [60602],
+      protobuf_definition: null,
     });
   });
 
@@ -442,6 +526,38 @@ describe('Protocol V2 framing and session', () => {
         version: 2,
         build_fingerprint: null,
         supported_messages: [60206],
+      },
+    });
+  });
+
+  test('session decodes legacy ProtocolInfo through the generic frame boundary', async () => {
+    const productionSchemas = {
+      protocolV1: protocolV1Messages,
+      protocolV2: productionProtocolV2Messages,
+    };
+    const response = protocolV2.encodeProtobufFrame(60201, new Uint8Array([0x08, 0x01]));
+    const session = new ProtocolV2Session({
+      schemas: productionSchemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame: () => Promise.resolve(rewriteSeq(response, 1)),
+    });
+
+    await expect(
+      session.call(
+        'ProtocolInfoRequest',
+        { eventless_wallet_session: true },
+        {
+          expectedTypes: ['ProtocolInfo'],
+        }
+      )
+    ).resolves.toEqual({
+      type: 'ProtocolInfo',
+      message: {
+        version: 1,
+        build_fingerprint: '',
+        supported_messages: [],
+        protobuf_definition: null,
       },
     });
   });

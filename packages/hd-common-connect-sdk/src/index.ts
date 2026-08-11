@@ -90,10 +90,6 @@ function handleMessage(message: CoreMessage) {
     return;
   }
 
-  const blockLog = getLogBlockLabel(message);
-  if (event !== LOG_EVENT) {
-    Log.debug('hd-common-connect-sdk handleMessage', blockLog ?? message);
-  }
   switch (event) {
     case UI_EVENT:
       // pass UI event up

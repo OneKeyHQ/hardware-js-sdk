@@ -1,21 +1,28 @@
 import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
 
 import { supportsProtocolV2Message } from '../protocols/protocol-v2/features';
+import { decodeCanonicalBase64 } from './helpers/base64Data';
 import FileWrite from './FileWrite';
 
 export type UploadPortfolioParams = {
-  packageBytes: ArrayBuffer | Uint8Array | Blob;
+  packageBase64: string;
   timeoutMs?: number | string;
 };
 
 const PORTFOLIO_PENDING_PATH = 'vol1:/portfolio/portfolio.okpkg.pending';
 const PORTFOLIO_CHUNK_SIZE = 2048;
+const PORTFOLIO_PACKAGE_MAX_BYTES = 128 * 1024;
 const FILESYSTEM_FILE_WRITE_MESSAGE_TYPE = 60805;
 const PORTFOLIO_UPDATE_MESSAGE_TYPE = 61400;
 
 export default class UploadPortfolio extends FileWrite {
   init() {
-    const { packageBytes, timeoutMs } = this.payload as UploadPortfolioParams;
+    const { packageBase64, timeoutMs } = this.payload as UploadPortfolioParams;
+    const packageBytes = decodeCanonicalBase64({
+      value: packageBase64,
+      parameterName: 'packageBase64',
+      maxBytes: PORTFOLIO_PACKAGE_MAX_BYTES,
+    });
     this.payload = {
       ...this.payload,
       path: PORTFOLIO_PENDING_PATH,

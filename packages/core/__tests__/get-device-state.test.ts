@@ -202,25 +202,61 @@ describe('getDeviceState', () => {
     expect(state.versions.se01).toBe('1.0.0');
   });
 
-  test.each(['bootloader', 'romloader'] as const)(
-    'uses ProtocolInfo to preserve %s mode without DeviceStatusGet',
-    async mode => {
+  test.each([
+    ['bootloader', EDeviceType.Pro2, DeviceType.PRO2],
+    ['romloader', EDeviceType.Pro2, DeviceType.PRO2],
+    ['bootloader', EDeviceType.Neo, DeviceType.NEO],
+    ['romloader', EDeviceType.Neo, DeviceType.NEO],
+  ] as const)(
+    'refreshes cached %s state after %s reboots into the application',
+    async (mode, deviceType, protocolV2DeviceType) => {
       const typedCall = jest.fn().mockImplementation((requestType: string) => {
-        if (requestType === 'DeviceInfoGet') {
+        if (requestType === 'ProtocolInfoRequest') {
+          return { message: protocolV2ApplicationInfo };
+        }
+        if (requestType === 'DeviceStatusGet') {
           return {
-            message: {
-              hw: { Device_type: DeviceType.PRO2, serial_no: 'SERIAL-1' },
+            message: { init_states: true, unlocked: true, device_id: 'wallet-1' },
+          };
+        }
+        throw new Error(`Unexpected request: ${requestType}`);
+      });
+      const device = createV2Device(typedCall);
+      device.updateState(
+        {
+          protocol: 'V2',
+          identity: { deviceType },
+          status: { mode },
+          raw: {
+            protocolV2DeviceInfo: {
+              hw: { Device_type: protocolV2DeviceType, serial_no: 'SERIAL-1' },
               fw:
                 mode === 'romloader'
                   ? { romloader: { version: '1.0.0' } }
                   : { bootloader: { version: '1.0.0' } },
             },
-          };
-        }
-        if (requestType === 'ProtocolInfoRequest') {
-          return { message: getProtocolV2LoaderInfo(mode) };
-        }
-        throw new Error(`Unexpected request: ${requestType}`);
+            protocolV2ProtocolInfo: getProtocolV2LoaderInfo(mode),
+          },
+        },
+        'initialize'
+      );
+
+      const state = await device.getDeviceState({ refreshSections: ['status'] });
+
+      expect(state.status.mode).toBe('normal');
+      expect(state.identity.deviceId).toBe('wallet-1');
+      expect(typedCall.mock.calls.map(call => call[0])).toEqual([
+        'ProtocolInfoRequest',
+        'DeviceStatusGet',
+      ]);
+    }
+  );
+
+  test.each(['bootloader', 'romloader'] as const)(
+    'keeps live %s mode after refreshing cached loader state',
+    async mode => {
+      const typedCall = jest.fn().mockResolvedValue({
+        message: getProtocolV2LoaderInfo(mode),
       });
       const device = createV2Device(typedCall);
       device.updateState(
@@ -236,7 +272,10 @@ describe('getDeviceState', () => {
       const state = await device.getDeviceState({ refreshSections: ['status'] });
 
       expect(state.status.mode).toBe(mode);
-      expect(typedCall).not.toHaveBeenCalled();
+      expect(typedCall).toHaveBeenCalledTimes(1);
+      expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
+        eventless_wallet_session: true,
+      });
     }
   );
 
