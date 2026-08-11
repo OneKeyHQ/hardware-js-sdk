@@ -828,6 +828,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const deviceFirmwareType = getFirmwareType(deviceFeatures);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
     this.validateExpectedTargetVersions();
+    const wantsResources = !!this.params.targetsToUpdate?.includes('resource');
 
     if (
       !this.params.preparedPlan &&
@@ -851,7 +852,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (this.params.preparedPlan || hasPreparedComponentArtifacts) {
       return this.runProtocolV2PreparedArtifacts(deviceFeatures, firmwareType);
     }
-    const wantsResources = !!this.params.targetsToUpdate?.includes('resource');
 
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
@@ -868,17 +868,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       const needsRemoteFirmware = this.params.targetsToUpdate?.length
         ? missingFirmwareTargets.length > 0
         : explicitInstallItems.length === 0;
-      if (wantsResources) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          'Protocol V2 resource archive must be provided through a local or external PreparedPlan',
-          {
-            firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
-          }
-        );
-      }
+      const needsSdkManagedArtifacts = needsRemoteFirmware || wantsResources;
       if (
-        needsRemoteFirmware &&
+        needsSdkManagedArtifacts &&
         (this.params.artifactReader ||
           DataManager.getSettings('firmwareManifestMode') === 'external-only')
       ) {
@@ -890,9 +882,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           }
         );
       }
-      if (needsRemoteFirmware) {
+      if (needsSdkManagedArtifacts) {
         // Remote updates must use a freshly fetched config before any reboot or file write.
-        await DataManager.forceReloadData();
+        await DataManager.forceReloadData({
+          requireResources: wantsResources,
+          resourceDeviceType:
+            capabilityDeviceType === EDeviceType.Neo ? EDeviceType.Neo : EDeviceType.Pro2,
+        });
       }
       if (needsRemoteFirmware) {
         const remoteBinaries = await this.prepareRemoteProtocolV2Binaries(
@@ -914,6 +910,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             binary: item.binary,
             targetId: item.targetId,
           }));
+      }
+      if (wantsResources) {
+        this.params.resourceArchiveBinary = await this.downloadRemoteProtocolV2ResourceArchive(
+          deviceFeatures
+        );
+        const localMemoryHost = await this.prepareProtocolV2LocalMemoryHost({
+          features: deviceFeatures,
+          firmwareType,
+          availableInstallItems: installItems ?? explicitInstallItems,
+        });
+        try {
+          this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
+          return await this.runProtocolV2PreparedArtifacts(deviceFeatures, firmwareType, false);
+        } finally {
+          localMemoryHost.release();
+        }
       }
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
@@ -1084,14 +1096,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async prepareProtocolV2LocalMemoryHost({
     features,
     firmwareType,
+    availableInstallItems = this.buildProtocolV2InstallItems({
+      bootloaderBinary: this.prepareBootloaderBinary(),
+      fwBinaryMap: this.collectExplicitTargetBinaries(),
+    }),
   }: {
     features: Features;
     firmwareType: EFirmwareType;
+    availableInstallItems?: ProtocolV2InstallItem[];
   }): Promise<FirmwareUpdateV4MemoryHost> {
-    const availableInstallItems = this.buildProtocolV2InstallItems({
-      bootloaderBinary: this.prepareBootloaderBinary(),
-      fwBinaryMap: this.collectExplicitTargetBinaries(),
-    });
     const requestedComponentTargets = new Set(
       (this.params.targetsToUpdate ?? []).filter(
         (target): target is Exclude<FirmwareUpdateV4Target, 'resource' | 'boot_resources'> =>
@@ -1519,9 +1532,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return sources;
   }
 
-  private async runProtocolV2PreparedArtifacts(features: Features, firmwareType: EFirmwareType) {
+  private async runProtocolV2PreparedArtifacts(
+    features: Features,
+    firmwareType: EFirmwareType,
+    announceDownload = true
+  ) {
     try {
-      this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
+      if (announceDownload) {
+        this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
+      }
       const installSources = await this.prepareProtocolV2InstallSources(firmwareType, features);
       const resourceSources = await this.prepareProtocolV2ResourceSources();
       if (installSources.length === 0 && resourceSources.length === 0) {
@@ -1530,7 +1549,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           'No firmware to update'
         );
       }
-      this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
+      if (announceDownload) {
+        this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
+      }
 
       return await this.executeProtocolV2SourceUpdate({
         installSources,
@@ -1882,6 +1903,44 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       ...target,
       binary,
     };
+  }
+
+  private async downloadRemoteProtocolV2ResourceArchive(features: Features): Promise<ArrayBuffer> {
+    const deviceType = getDeviceType(features);
+    if (deviceType !== EDeviceType.Pro2 && deviceType !== EDeviceType.Neo) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 resource archive requires a Pro2 or Neo device'
+      );
+    }
+    const source = DataManager.getProtocolV2ResourceSource(deviceType);
+    const expectedSha256 = normalizeProtocolV2Hex(source?.archiveSha256);
+    if (
+      !source?.archiveUrl ||
+      !Number.isSafeInteger(source.archiveSize) ||
+      source.archiveSize <= 0 ||
+      source.archiveSize > PROTOCOL_V2_RESOURCE_TOTAL_MAX_BYTES ||
+      !expectedSha256 ||
+      !/^[0-9a-f]{64}$/u.test(expectedSha256)
+    ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 resource archive integrity metadata is invalid',
+        { firmwareUpdateCode: 'FirmwarePlanInvalid' }
+      );
+    }
+    const { binary } = await getSysResourceBinary(source.archiveUrl);
+    if (
+      binary.byteLength !== source.archiveSize ||
+      bytesToHex(sha256(new Uint8Array(binary))) !== expectedSha256
+    ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Protocol V2 resource archive does not match the remote config',
+        { firmwareUpdateCode: 'FirmwareArtifactReceiptMismatch' }
+      );
+    }
+    return binary;
   }
 
   private async prepareRemoteProtocolV2Binaries(

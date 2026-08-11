@@ -1,5 +1,5 @@
 import { Buffer } from 'buffer';
-import { EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import JSZip from 'jszip';
@@ -4353,7 +4353,7 @@ describe('Protocol V2 firmware update targets', () => {
     ).toEqual([3, 4]);
   });
 
-  test('requires the external host to prepare manifest resources before bootloader entry', async () => {
+  test('keeps external-only resource updates on the prepared host path', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -4363,6 +4363,7 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     method.init();
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('external-only' as never);
 
     (method as any).device = stubDevice({
       originalDescriptor: { id: 'usb-id', path: 'app-path', protocolType: 'V2' },
@@ -4388,6 +4389,84 @@ describe('Protocol V2 firmware update targets', () => {
       }),
     });
     expect((method as any).enterProtocolV2BootloaderMode).not.toHaveBeenCalled();
+  });
+
+  test('downloads Protocol V2 resource archives in SDK-managed mode', async () => {
+    const resourceArchiveBinary = new Uint8Array([1, 2, 3, 4]).buffer;
+    const applicationP1Binary = new Uint8Array([5, 6, 7, 8]).buffer;
+    const applicationP1InstallItem = {
+      fileName: 'application_p1.bin',
+      binary: applicationP1Binary,
+      targetId: 4,
+      kind: 'firmware',
+    };
+    const resourceArchiveSha256 = bytesToHex(sha256(new Uint8Array(resourceArchiveBinary)));
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'ext',
+        targetsToUpdate: ['app_v1', 'resource'],
+      },
+    });
+    method.init();
+
+    (method as any).device = stubDevice({
+      originalDescriptor: { id: 'usb-id', path: 'app-path', protocolType: 'V2' },
+      features: {
+        deviceType: 'pro2',
+        firmwareVersion: '1.0.0',
+        mode: 'normal',
+        bootloaderMode: false,
+        capabilities: [],
+      },
+      getCurrentDeviceType: () => 'pro2',
+      isBootloader: () => false,
+      isRomloader: () => false,
+    });
+    (method as any).captureProtocolV2PhysicalIdentity = jest.fn().mockResolvedValue(undefined);
+    (method as any).prepareRemoteProtocolV2Binaries = jest.fn().mockResolvedValue({
+      bootloaderBinary: null,
+      fwBinaryMap: [
+        {
+          fileName: applicationP1InstallItem.fileName,
+          binary: applicationP1Binary,
+          targetId: applicationP1InstallItem.targetId,
+        },
+      ],
+      installItems: [applicationP1InstallItem],
+    });
+    const release = jest.fn();
+    (method as any).prepareProtocolV2LocalMemoryHost = jest.fn().mockResolvedValue({ release });
+    (method as any).runProtocolV2PreparedArtifacts = jest
+      .fn()
+      .mockResolvedValue('sdk-managed-resource-result');
+    method.postTipMessage = jest.fn();
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('sdk-managed' as never);
+    jest.spyOn(DataManager, 'getProtocolV2ResourceSource').mockReturnValue({
+      archiveUrl: 'https://example.com/pro2-resource.zip',
+      archiveSize: resourceArchiveBinary.byteLength,
+      archiveSha256: resourceArchiveSha256,
+    });
+    const getSysResourceBinarySpy = jest
+      .spyOn(firmwareBinaryApi, 'getSysResourceBinary')
+      .mockResolvedValue({ binary: resourceArchiveBinary });
+
+    await expect(method.run()).resolves.toBe('sdk-managed-resource-result');
+
+    expect(forceReloadDataSpy).toHaveBeenCalledWith({
+      requireResources: true,
+      resourceDeviceType: EDeviceType.Pro2,
+    });
+    expect(getSysResourceBinarySpy).toHaveBeenCalledWith('https://example.com/pro2-resource.zip');
+    expect((method as any).params.resourceArchiveBinary).toBe(resourceArchiveBinary);
+    expect((method as any).prepareProtocolV2LocalMemoryHost).toHaveBeenCalledWith({
+      features: expect.objectContaining({ deviceType: 'pro2' }),
+      firmwareType: EFirmwareType.Universal,
+      availableInstallItems: [applicationP1InstallItem],
+    });
+    expect((method as any).runProtocolV2PreparedArtifacts).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledTimes(1);
   });
 
   test('reboots Protocol V2 normal-mode device to bootloader before transfer', async () => {
