@@ -7746,7 +7746,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([4000, 97]);
     expect(writePayloads.map(payload => payload.overwrite)).toEqual([true, false]);
     expect(writePayloads.every(payload => payload.append === false)).toBe(true);
-    expect(writePayloads.map(payload => payload.ui_percentage)).toEqual([0, 100]);
+    expect(writePayloads.map(payload => payload.ui_percentage)).toEqual([0, 99]);
     expect(method.postMessage).toHaveBeenLastCalledWith({
       event: 'UI_EVENT',
       type: UI_REQUEST.FIRMWARE_PROGRESS,
@@ -7827,9 +7827,9 @@ describe('Protocol V2 firmware update targets', () => {
 
     const writePayloads = typedCall.mock.calls.map(call => call[2]);
     const deviceProgress = writePayloads.map(payload => payload.ui_percentage);
-    expect(deviceProgress).toEqual([0, 50, 99, 100]);
+    expect(deviceProgress).toEqual([0, 50, 99, 99]);
     expect(deviceProgress.filter(progress => progress === 0)).toHaveLength(1);
-    expect(deviceProgress.filter(progress => progress === 100)).toHaveLength(1);
+    expect(deviceProgress.filter(progress => progress === 100)).toHaveLength(0);
     expect(method.postTipMessage).toHaveBeenCalledTimes(2);
     expect(method.postTipMessage).toHaveBeenNthCalledWith(1, 'StartTransferData');
     expect(method.postTipMessage).toHaveBeenNthCalledWith(2, 'ConfirmOnDevice');
@@ -8147,7 +8147,7 @@ describe('Protocol V2 firmware update targets', () => {
     const writePayloads = typedCall.mock.calls.map(call => call[2]);
     expect(writePayloads.map(payload => payload.file.offset)).toEqual([0, 1800]);
     expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([1800, 1]);
-    expect(writePayloads.map(payload => payload.ui_percentage)).toEqual([0, 100]);
+    expect(writePayloads.map(payload => payload.ui_percentage)).toEqual([0, 99]);
     expect(typedCall.mock.calls.map(call => call[3])).toEqual([
       expect.objectContaining({
         writeWithResponse: false,

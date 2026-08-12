@@ -151,9 +151,7 @@ export function parseProtocolV2ResourceManifest(value: unknown): IProtocolV2Reso
   if (
     files.length === 0 ||
     devicePaths.size !== files.length ||
-    archivePaths.size !== files.length ||
-    !devicePaths.has(PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH) ||
-    !files.some(file => file.device_path.startsWith('vol0:/bundles/'))
+    archivePaths.size !== files.length
   ) {
     throw new Error('Invalid Pro2 resource manifest file set');
   }

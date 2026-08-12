@@ -187,13 +187,10 @@ const getProtocolV2DeviceTransferProgress = (
   totalBytes: number
 ) => {
   if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
-    return 100;
+    return 0;
   }
   if (bytesBeforeChunk <= 0 && bytesAfterChunk < totalBytes) {
     return 0;
-  }
-  if (bytesAfterChunk >= totalBytes) {
-    return 100;
   }
   return Math.min(Math.max(Math.ceil((bytesAfterChunk / totalBytes) * 100), 1), 99);
 };
