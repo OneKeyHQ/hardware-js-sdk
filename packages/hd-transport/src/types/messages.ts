@@ -4355,6 +4355,7 @@ export type TonSignedMessage = {
   signature?: string;
   signning_message?: string;
   init_data_length?: number;
+  signing_message?: string;
 };
 
 // TonSignProof

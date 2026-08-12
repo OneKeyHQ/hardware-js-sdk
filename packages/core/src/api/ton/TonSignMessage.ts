@@ -174,7 +174,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     if (!request.init_data_length) {
       const deviceType = this.device.getCurrentDeviceType();
       const hasClassic = DeviceModelToTypes.model_classic1s.includes(deviceType);
-      const signingMessage = request.signning_message;
+      const signingMessage = request.signing_message ?? request.signning_message;
       // Blind signing omits the signing message in both protocol schemas.
       const shouldSkipValidation = signingMessage == null;
 
