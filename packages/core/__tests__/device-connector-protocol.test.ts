@@ -63,6 +63,29 @@ describe('DeviceConnector protocol validation', () => {
     );
   });
 
+  it('forwards connected-only BLE reuse to the active transport', async () => {
+    const acquire = jest.fn().mockResolvedValue({
+      id: 'pro2-id',
+      path: 'pro2-id',
+      protocolType: 'V2',
+    });
+    transportManagerMock.default.getTransport.mockReturnValue({
+      acquire,
+      getProtocolType: jest.fn(() => 'V2'),
+    });
+    const connector = new DeviceConnector();
+
+    await connector.acquire('pro2-id', undefined, true, 'V2', undefined, true);
+
+    expect(acquire).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedProtocol: 'V2',
+        reuseConnectedOnly: true,
+        uuid: 'pro2-id',
+      })
+    );
+  });
+
   it('still rejects a real mismatch reported by the active protocol probe', async () => {
     transportManagerMock.default.getTransport.mockReturnValue({
       acquire: jest.fn().mockResolvedValue({

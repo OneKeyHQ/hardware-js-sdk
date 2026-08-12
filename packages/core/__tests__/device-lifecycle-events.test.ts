@@ -111,7 +111,7 @@ describe('public device lifecycle events', () => {
 
     await device.acquire();
 
-    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, 'V1', undefined);
+    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, 'V1', undefined, undefined);
     expect(device.getProtocol()).toBe('V1');
     expect(device.originalDescriptor.protocolType).toBe('V1');
   });
@@ -129,9 +129,32 @@ describe('public device lifecycle events', () => {
 
     await device.acquire(undefined, { forceProtocolDetection: true });
 
-    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, undefined, undefined);
+    expect(acquire).toHaveBeenCalledWith(
+      'ble-id',
+      undefined,
+      true,
+      undefined,
+      undefined,
+      undefined
+    );
     expect(device.getProtocol()).toBe('V2');
     expect(device.originalDescriptor.protocolType).toBe('V2');
+  });
+
+  test('forwards connected-only reuse through the BLE device lifecycle', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('desktop-web-ble' as never);
+    const device = Device.fromDescriptor({
+      id: 'ble-id',
+      path: 'ble-id',
+      commType: 'electron-ble',
+      protocolType: 'V2',
+    } as never);
+    const acquire = jest.fn().mockResolvedValue({ uuid: 'ble-id', protocolType: 'V2' });
+    device.deviceConnector = { acquire } as never;
+
+    await device.acquire('V2', { reuseConnectedOnly: true });
+
+    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, 'V2', undefined, true);
   });
 
   test('does not reuse a stale protocol when active detection returns no protocol', async () => {
@@ -230,7 +253,7 @@ describe('public device lifecycle events', () => {
 
     await device.acquire('V2');
 
-    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, 'V2', undefined);
+    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, 'V2', undefined, undefined);
     expect(device.getProtocol()).toBe('V2');
   });
 

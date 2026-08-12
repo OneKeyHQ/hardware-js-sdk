@@ -41,6 +41,7 @@ declare global {
 export type BleAcquireInput = {
   uuid: string;
   forceCleanRunPromise?: boolean;
+  reuseConnectedOnly?: boolean;
   expectedProtocol?: ProtocolType;
   protocolHint?: ProtocolType;
 };
@@ -282,7 +283,7 @@ export default class ElectronBleTransport {
   }
 
   async acquire(input: BleAcquireInput) {
-    const { uuid, forceCleanRunPromise, expectedProtocol } = input;
+    const { uuid, forceCleanRunPromise, expectedProtocol, reuseConnectedOnly } = input;
 
     if (!uuid) {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
@@ -308,6 +309,13 @@ export default class ElectronBleTransport {
       if (!device) {
         throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device ${uuid} not found`);
       }
+      const deviceState = (device as typeof device & { state?: string }).state;
+      if (reuseConnectedOnly && deviceState !== 'connected') {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.DeviceNotFound,
+          `Device ${uuid} is no longer connected`
+        );
+      }
       const protocolHint = expectedProtocol
         ? undefined
         : input.protocolHint ??
@@ -318,9 +326,27 @@ export default class ElectronBleTransport {
       }
 
       try {
-        await window.desktopApi.nobleBle.connect(uuid);
+        if (reuseConnectedOnly) {
+          const { connectConnectedOnly } = window.desktopApi.nobleBle;
+          if (!connectConnectedOnly) {
+            throw ERRORS.TypedError(
+              HardwareErrorCode.DeviceNotFound,
+              'Desktop host does not support connected-only BLE reuse'
+            );
+          }
+          await connectConnectedOnly(uuid);
+        } else {
+          await window.desktopApi.nobleBle.connect(uuid);
+        }
         this.connectedDevices.add(uuid);
       } catch (error) {
+        if (reuseConnectedOnly) {
+          // Electron IPC does not reliably preserve custom Error fields such as errorCode.
+          throw ERRORS.TypedError(
+            HardwareErrorCode.DeviceNotFound,
+            error instanceof Error ? error.message : `Device ${uuid} is no longer connected`
+          );
+        }
         this.handleBluetoothError(error);
       }
 
@@ -372,7 +398,7 @@ export default class ElectronBleTransport {
     } catch (error) {
       this.Log?.error('[Electron BLE] acquire failed:', error);
       try {
-        if (window.desktopApi?.nobleBle && this.connectedDevices.has(uuid)) {
+        if (!reuseConnectedOnly && window.desktopApi?.nobleBle && this.connectedDevices.has(uuid)) {
           await window.desktopApi.nobleBle.unsubscribe(uuid);
           await window.desktopApi.nobleBle.disconnect(uuid);
         }

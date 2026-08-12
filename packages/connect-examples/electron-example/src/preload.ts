@@ -8,6 +8,7 @@ import { ipcMessageKeys } from './config';
 import type {
   DesktopAPI as BaseDesktopAPI,
   NobleBleAPI,
+  NobleBleConnectOptions,
   NobleBleWriteOptions,
 } from '@onekeyfe/hd-transport-electron';
 
@@ -72,7 +73,12 @@ const desktopApi = {
     enumerate: () => ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE),
     getDevice: (uuid: string) =>
       ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_GET_DEVICE, uuid),
-    connect: (uuid: string) => ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT, uuid),
+    connect: (uuid: string, options?: NobleBleConnectOptions) =>
+      ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT, uuid, options),
+    connectConnectedOnly: (uuid: string) =>
+      ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT, uuid, {
+        reuseConnectedOnly: true,
+      }),
     disconnect: (uuid: string) =>
       ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_DISCONNECT, uuid),
     subscribe: (uuid: string) =>

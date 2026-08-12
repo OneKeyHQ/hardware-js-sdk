@@ -70,6 +70,12 @@ export interface CommonParams {
    * protocol again. Intended for the first verified connection or explicit recovery.
    */
   forceProtocolDetection?: boolean;
+
+  /**
+   * Reuse an already-connected BLE link. If the physical link is gone, fail
+   * immediately without direct-connect recovery or scanning.
+   */
+  reuseConnectedOnly?: boolean;
 }
 
 export type Params<T> = CommonParams & T & { bundle?: undefined };

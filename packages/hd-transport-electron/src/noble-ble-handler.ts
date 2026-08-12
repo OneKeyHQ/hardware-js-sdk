@@ -31,7 +31,7 @@ import {
 
 import type { IpcMain, IpcMainInvokeEvent, WebContents } from 'electron';
 import type { Characteristic, Peripheral, Service } from '@stoprocent/noble';
-import type { NobleBleWriteOptions } from './types/desktop-api';
+import type { NobleBleConnectOptions, NobleBleWriteOptions } from './types/desktop-api';
 import type { CharacteristicPair, DeviceInfo, Logger, NobleModule } from './types/noble-extended';
 
 // Noble will be dynamically imported to avoid bundling issues
@@ -1387,7 +1387,11 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
 }
 
 // Connect to device - supports both discovered and direct connection modes
-async function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
+async function connectDevice(
+  deviceId: string,
+  webContents: WebContents,
+  options?: NobleBleConnectOptions
+): Promise<void> {
   logger?.info('[NobleBLE] Connect device request:', {
     deviceId,
     hasDiscovered: discoveredDevices.has(deviceId),
@@ -1396,6 +1400,18 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     totalDiscovered: discoveredDevices.size,
     totalConnected: connectedDevices.size,
   });
+
+  if (options?.reuseConnectedOnly) {
+    const connectedPeripheral = connectedDevices.get(deviceId);
+    if (connectedPeripheral?.state !== 'connected' || !deviceCharacteristics.has(deviceId)) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.DeviceNotFound,
+        `Device ${deviceId} has no reusable BLE connection`
+      );
+    }
+    setupDisconnectListener(connectedPeripheral, deviceId, webContents);
+    return;
+  }
 
   // enumerate clears the discovery map; a kept-alive link outlives it.
   let peripheral = discoveredDevices.get(deviceId) ?? connectedDevices.get(deviceId);
@@ -1786,7 +1802,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     // Handle connect request
     handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT,
-      async (_event: IpcMainInvokeEvent, deviceId: string) => {
+      async (_event: IpcMainInvokeEvent, deviceId: string, options?: NobleBleConnectOptions) => {
         logger?.info('[NobleBLE] IPC CONNECT request received:', {
           deviceId,
           hasPeripheral: connectedDevices.has(deviceId),
@@ -1798,7 +1814,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
         // A fired timer must settle first, or the fast path returns a dying link.
         await awaitIdleDisconnect(deviceId);
         try {
-          await connectDevice(deviceId, webContents);
+          await connectDevice(deviceId, webContents, options);
         } finally {
           // This timer is the only thing that frees a kept-alive link.
           if (connectedDevices.has(deviceId)) {

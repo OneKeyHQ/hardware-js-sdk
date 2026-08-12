@@ -64,6 +64,7 @@ import {
   isProtocolV2UiEnabled,
 } from '../protocols/protocol-v2/uiInteraction';
 import { createUiProgressMessageFilter } from '../utils/uiProgressThrottle';
+import { shouldRetryBleConnection, shouldStopBleConnectionPolling } from './bleConnectionErrors';
 
 import type { ConnectSettings, Features, KnownDevice } from '../types';
 import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } from '../events';
@@ -892,16 +893,6 @@ function canSkipInitialize(method: BaseMethod, device: Device): boolean {
   return true;
 }
 
-function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) {
-  const message = error instanceof Error ? error.message : String(error ?? '');
-  return (
-    method.payload.connectProtocol === 'V2' &&
-    message.includes('Device protocol mismatch') &&
-    message.includes('expected V2') &&
-    message.includes('did not respond to expected protocol')
-  );
-}
-
 /**
  * If the Bluetooth connection times out, retry up to 6 times
  * @param retryCount - Current retry count (default 0)
@@ -919,6 +910,7 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
     if (shouldAcquire) {
       await device.acquire(method.payload.connectProtocol, {
         forceProtocolDetection: method.payload.forceProtocolDetection,
+        reuseConnectedOnly: method.payload.reuseConnectedOnly,
       });
     }
     if (method.payload?.onlyConnectBleDevice) {
@@ -954,12 +946,7 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       // next attempt skip acquire and initialize onto the link we just cut.
       device.markTransportDisconnected();
     }
-    if (
-      (err.errorCode === HardwareErrorCode.BleTimeoutError ||
-        err.errorCode === HardwareErrorCode.BleConnectedError ||
-        isRetryableBleProtocolV2ProbeError(method, err)) &&
-      retryCount < 6
-    ) {
+    if (shouldRetryBleConnection(method, err) && retryCount < 6) {
       const nextRetry = retryCount + 1;
       Log.debug(`Bluetooth connect timeout and will retry, retry count: ${nextRetry}`);
       await wait(3000);
@@ -1097,7 +1084,8 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceDetectInBootloaderMode,
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
             HardwareErrorCode.BridgeNeedsPermission,
-          ].includes(error.errorCode)
+          ].includes(error.errorCode) ||
+          shouldStopBleConnectionPolling(method, error)
         ) {
           reject(error);
           return;

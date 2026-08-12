@@ -52,6 +52,8 @@ export type AcquireInput = {
   previous?: string | null;
   uuid?: string;
   forceCleanRunPromise?: boolean;
+  /** Reuse an already-connected BLE link and fail without scanning when it is gone. */
+  reuseConnectedOnly?: boolean;
   expectedProtocol?: ProtocolType;
   protocolHint?: ProtocolType;
 };

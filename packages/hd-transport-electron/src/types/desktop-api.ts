@@ -8,10 +8,19 @@ export interface NobleBleWriteOptions {
   pacingDelayMs?: number;
 }
 
+export interface NobleBleConnectOptions {
+  /** Reuse only a fully initialized physical link; never scan, reconnect, or rediscover services. */
+  reuseConnectedOnly?: boolean;
+}
+
 export interface NobleBleAPI {
   enumerate: () => Promise<{ id: string; name: string }[]>;
-  getDevice: (uuid: string) => Promise<{ id: string; name: string; mtu?: number } | null>;
-  connect: (uuid: string) => Promise<void>;
+  getDevice: (
+    uuid: string
+  ) => Promise<{ id: string; name: string; mtu?: number; state?: string } | null>;
+  connect: (uuid: string, options?: NobleBleConnectOptions) => Promise<void>;
+  /** Optional host capability: reuse a fully initialized link without scanning or reconnecting. */
+  connectConnectedOnly?: (uuid: string) => Promise<void>;
   // Logical end-of-operation: link stays up, idle countdown starts. Optional —
   // older hosts do not bridge it, so the transport feature-detects.
   release?: (uuid: string, keepSession?: boolean) => Promise<void>;

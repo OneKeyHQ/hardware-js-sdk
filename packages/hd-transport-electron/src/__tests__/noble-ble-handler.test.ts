@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { EOneKeyBleMessageKeys } from '@onekeyfe/hd-shared';
+import { EOneKeyBleMessageKeys, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import {
   NOBLE_BLE_CONNECTION_TIMEOUT_MS,
@@ -177,6 +177,49 @@ describe('Electron Noble BLE device discovery', () => {
     stopScanningCallback?.();
     await expect(connectPromise).rejects.toThrow('expected test connection failure');
     expect(peripheral.connect).toHaveBeenCalledTimes(1);
+  });
+
+  test('connected-only reuse fails before Noble can scan or reconnect', async () => {
+    const handlers = new Map<string, IpcHandler>();
+    const ipcMain = {
+      handle: jest.fn((channel: string, handler: IpcHandler) => {
+        handlers.set(channel, handler);
+      }),
+      removeHandler: jest.fn((channel: string) => {
+        handlers.delete(channel);
+      }),
+    };
+    const noble = Object.assign(new EventEmitter(), {
+      state: 'poweredOn',
+      startScanning: jest.fn(),
+      stopScanning: jest.fn(),
+      connectAsync: jest.fn(),
+    });
+
+    jest.doMock('@stoprocent/noble', () => noble);
+    jest.doMock('electron', () => ({ ipcMain }));
+    jest.doMock('electron-log', () => ({
+      info: jest.fn(),
+      debug: jest.fn(),
+      error: jest.fn(),
+    }));
+
+    const { setupNobleBleHandlers } = await import('../noble-ble-handler');
+    setupNobleBleHandlers({
+      on: jest.fn(),
+      send: jest.fn(),
+    } as unknown as WebContents);
+
+    const connect = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT);
+    if (!connect) {
+      throw new Error('Electron Noble BLE connect handler was not registered');
+    }
+
+    await expect(
+      connect(undefined, 'stale-device', { reuseConnectedOnly: true })
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceNotFound });
+    expect(noble.connectAsync).not.toHaveBeenCalled();
+    expect(noble.startScanning).not.toHaveBeenCalled();
   });
 
   test('disconnects a connection callback that arrives after timeout', async () => {

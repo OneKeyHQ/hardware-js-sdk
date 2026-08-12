@@ -67,7 +67,7 @@ export declare function deviceUploadNft(
 
 export declare function uploadPortfolio(
   connectId: string,
-  params: {
+  params: CommonParams & {
     packageBase64: string;
     timeoutMs?: number | string;
   }

@@ -6,6 +6,7 @@ import FileWrite from './FileWrite';
 
 export type UploadPortfolioParams = {
   packageBase64: string;
+  reuseConnectedOnly?: boolean;
   timeoutMs?: number | string;
 };
 

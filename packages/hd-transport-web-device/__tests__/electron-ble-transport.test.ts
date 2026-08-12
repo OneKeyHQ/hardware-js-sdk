@@ -100,6 +100,7 @@ const createNobleBle = (device = { id: 'flaky-pro2-id', name: 'Unknown BLE Devic
   enumerate: jest.fn(() => Promise.resolve([device])),
   getDevice: jest.fn(() => Promise.resolve(device)),
   connect: jest.fn(() => Promise.resolve()),
+  connectConnectedOnly: jest.fn(() => Promise.resolve()),
   disconnect: jest.fn(() => Promise.resolve()),
   subscribe: jest.fn(() => Promise.resolve()),
   unsubscribe: jest.fn(() => Promise.resolve()),
@@ -141,7 +142,11 @@ describe('ElectronBleTransport protocol detection', () => {
   });
 
   test('keeps raw BLE lifecycle payloads off the public device event channel', async () => {
-    const device = { id: 'lifecycle-pro2-id', name: 'OneKey Pro 2' };
+    const device = {
+      id: 'lifecycle-pro2-id',
+      name: 'OneKey Pro 2',
+      state: 'connected',
+    };
     const nobleBle = createNobleBle(device);
     const emitter = new EventEmitter();
     let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
@@ -176,7 +181,13 @@ describe('ElectronBleTransport protocol detection', () => {
     emitter.on('transport-device-disconnect', transportDisconnect);
     const bleTransport = configureTransport(nobleBle, emitter);
 
-    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    await bleTransport.acquire({
+      uuid: device.id,
+      expectedProtocol: 'V2',
+      reuseConnectedOnly: true,
+    });
+    expect(nobleBle.connectConnectedOnly).toHaveBeenCalledWith(device.id);
+    expect(nobleBle.connect).not.toHaveBeenCalled();
     expect(nobleBle.subscribe.mock.invocationCallOrder[0]).toBeLessThan(
       nobleBle.getDevice.mock.invocationCallOrder[1]
     );
@@ -189,6 +200,92 @@ describe('ElectronBleTransport protocol detection', () => {
       connectId: device.id,
       name: device.name,
     });
+  });
+
+  test('does not reconnect or scan when connected-only reuse finds a stale link', async () => {
+    const device = {
+      id: 'stale-pro2-id',
+      name: 'OneKey Pro 2',
+      state: 'disconnected',
+    };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle);
+
+    await expect(
+      bleTransport.acquire({
+        uuid: device.id,
+        expectedProtocol: 'V2',
+        reuseConnectedOnly: true,
+      })
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceNotFound });
+
+    expect(nobleBle.connect).not.toHaveBeenCalled();
+    expect(nobleBle.subscribe).not.toHaveBeenCalled();
+  });
+
+  test('fails closed when the desktop host lacks connected-only capability', async () => {
+    const device = {
+      id: 'legacy-host-pro2-id',
+      name: 'OneKey Pro 2',
+      state: 'connected',
+    };
+    const nobleBle = createNobleBle(device);
+    delete (nobleBle as Partial<typeof nobleBle>).connectConnectedOnly;
+    const bleTransport = configureTransport(nobleBle);
+
+    await expect(
+      bleTransport.acquire({
+        uuid: device.id,
+        expectedProtocol: 'V2',
+        reuseConnectedOnly: true,
+      })
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceNotFound });
+
+    expect(nobleBle.connect).not.toHaveBeenCalled();
+    expect(nobleBle.subscribe).not.toHaveBeenCalled();
+  });
+
+  test('rebuilds an IPC connection rejection as a terminal DeviceNotFound error', async () => {
+    const device = {
+      id: 'ipc-disconnected-pro2-id',
+      name: 'OneKey Pro 2',
+      state: 'connected',
+    };
+    const nobleBle = createNobleBle(device);
+    nobleBle.connectConnectedOnly.mockRejectedValue(new Error('Error invoking remote method'));
+    const bleTransport = configureTransport(nobleBle);
+
+    await expect(
+      bleTransport.acquire({
+        uuid: device.id,
+        expectedProtocol: 'V2',
+        reuseConnectedOnly: true,
+      })
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceNotFound });
+
+    expect(nobleBle.disconnect).not.toHaveBeenCalled();
+  });
+
+  test('does not tear down the kept-alive link when connected-only setup fails', async () => {
+    const device = {
+      id: 'subscribe-failed-pro2-id',
+      name: 'OneKey Pro 2',
+      state: 'connected',
+    };
+    const nobleBle = createNobleBle(device);
+    nobleBle.subscribe.mockRejectedValue(new Error('subscribe failed'));
+    const bleTransport = configureTransport(nobleBle);
+
+    await expect(
+      bleTransport.acquire({
+        uuid: device.id,
+        expectedProtocol: 'V2',
+        reuseConnectedOnly: true,
+      })
+    ).rejects.toThrow('subscribe failed');
+
+    expect(nobleBle.unsubscribe).not.toHaveBeenCalled();
+    expect(nobleBle.disconnect).not.toHaveBeenCalled();
   });
 
   test('uses the Protocol V2 BLE writer with the Electron packet size', async () => {
