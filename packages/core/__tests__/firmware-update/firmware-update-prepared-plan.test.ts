@@ -234,7 +234,11 @@ describe('FirmwareUpdatePreparedPlan', () => {
         },
       ],
     });
-    const resourceArtifact = prepared.artifacts.find(item => item.target === 'resource')!;
+    const resourceArtifact = prepared.artifacts.find(item => item.target === 'resource');
+    expect(resourceArtifact).toBeDefined();
+    if (!resourceArtifact) {
+      throw new Error('Expected prepared resource artifact');
+    }
     const tamperedWithoutDigest = {
       ...prepared,
       artifacts: prepared.artifacts.map(item =>
@@ -242,7 +246,7 @@ describe('FirmwareUpdatePreparedPlan', () => {
           ? {
               ...item,
               materializedEntries: [
-                ...resourceArtifact.materializedEntries!,
+                ...(resourceArtifact.materializedEntries ?? []),
                 {
                   entryName: 'other/index.bin',
                   artifact: artifact('d'.repeat(64), 2),

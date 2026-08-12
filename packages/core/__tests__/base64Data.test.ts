@@ -1,5 +1,4 @@
 import { Buffer } from 'buffer';
-
 import { encode as encodeJpeg } from 'jpeg-js';
 
 import { decodeCanonicalBase64, decodeJpegBase64ToRgba } from '../src/api/helpers/base64Data';
