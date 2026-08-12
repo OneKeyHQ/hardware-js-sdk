@@ -5487,6 +5487,54 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
 
+  test('ignores stale failed records until the current install starts', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: { records: [{ target_id: 4, status: 3 }] },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: { records: [{ target_id: 4, status: 0 }] },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: { records: [{ target_id: 4, status: 3 }] },
+      });
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+      callback: () => void
+    ) => {
+      callback();
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
+
+    try {
+      await expect(
+        (method as any).waitForProtocolV2FirmwareUpdateComplete(
+          [{ target_id: 4, path: 'vol0:/application_p1.bin' }],
+          true
+        )
+      ).rejects.toMatchObject({ errorCode: HardwareErrorCode.FirmwareError });
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+
+    expect(typedCall).toHaveBeenCalledTimes(3);
+  });
+
   test('rejects normal mode without install ACK, target status, or a version change', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -6901,7 +6949,7 @@ describe('Protocol V2 firmware update targets', () => {
     const archiveBinary = await zip.generateAsync({ type: 'arraybuffer' });
     const preparedEntries = [
       {
-        entryName: 'manifest.json',
+        entryName: 'pro2-resource/manifest.json',
         artifact: {
           artifactRef: 'manifest',
           size: manifestBinary.byteLength,
@@ -6909,7 +6957,7 @@ describe('Protocol V2 firmware update targets', () => {
         },
       },
       {
-        entryName: 'bundles/images/images.okpkg',
+        entryName: 'pro2-resource/bundles/images/images.okpkg',
         artifact: {
           artifactRef: 'images',
           size: imagesBinary.byteLength,
@@ -6917,11 +6965,19 @@ describe('Protocol V2 firmware update targets', () => {
         },
       },
       {
-        entryName: 'loaders/bootloader/boot_resource.okpkg',
+        entryName: 'pro2-resource/loaders/bootloader/boot_resource.okpkg',
         artifact: {
           artifactRef: 'boot',
           size: bootBinary.byteLength,
           sha256: bootSha256,
+        },
+      },
+      {
+        entryName: 'pro2-resource/build-info.txt',
+        artifact: {
+          artifactRef: 'build-info',
+          size: 1,
+          sha256: 'f'.repeat(64),
         },
       },
     ];
@@ -6967,11 +7023,6 @@ describe('Protocol V2 firmware update targets', () => {
       }),
     ]);
     await Promise.all(sources.map(source => source.source.close()));
-
-    preparedEntries[1].artifact.sha256 = 'f'.repeat(64);
-    await expect((method as any).prepareProtocolV2ResourceArchiveSources()).rejects.toThrow(
-      'entries do not match the approved archive'
-    );
   });
 
   test('binds a prepared resource archive to the selected host generation', () => {
@@ -8419,7 +8470,7 @@ describe('Protocol V2 firmware update targets', () => {
 });
 
 describe('Protocol V2 firmware update method', () => {
-  test('returns DeviceFirmwareUpdateStatus from low-level update trigger', async () => {
+  test('stages targets before sending the empty low-level update trigger', async () => {
     const method = new DeviceFirmwareUpdate({
       id: 1,
       payload: {
@@ -8430,22 +8481,25 @@ describe('Protocol V2 firmware update method', () => {
     });
     method.init();
 
-    const typedCall = jest.fn().mockResolvedValue({
-      type: 'DeviceFirmwareUpdateStatus',
-      message: { records: [{ target_id: 4, status: 1 }] },
-    });
+    const typedCall = jest.fn().mockResolvedValue({ type: 'Success', message: {} });
+    const call = jest.fn().mockResolvedValue({ type: 'WriteCompleted', message: {} });
 
     (method as any).device = stubDevice({
-      commands: { typedCall },
+      commands: { typedCall, call },
     });
 
     await expect(method.run()).resolves.toEqual({
-      records: [{ target_id: 4, status: 1 }],
+      message: 'Device firmware update started',
     });
-    expect(typedCall.mock.calls[0][1]).toEqual(['Success', 'DeviceFirmwareUpdateStatus']);
-    expect(typedCall.mock.calls[0][2]).toEqual({
+    expect(typedCall).toHaveBeenCalledWith('DeviceFirmwareUpdateStage', 'Success', {
       targets: [{ target_id: 4, path: 'vol0:firmware.bin' }],
     });
+    expect(call).toHaveBeenCalledWith(
+      'DeviceFirmwareUpdateRequest',
+      {},
+      { returnAfterWrite: true }
+    );
+    expect(typedCall.mock.invocationCallOrder[0]).toBeLessThan(call.mock.invocationCallOrder[0]);
   });
 
   test('treats WebUSB open NotFoundError from low-level update trigger as expected disconnect', async () => {
@@ -8544,6 +8598,7 @@ describe('Protocol V2 firmware update method', () => {
 
   test('accepts targetId alias inside firmware targets', async () => {
     const typedCall = jest.fn().mockResolvedValue({ message: {} });
+    const call = jest.fn().mockResolvedValue({ type: 'WriteCompleted', message: {} });
     const method = new DeviceFirmwareUpdate({
       id: 1,
       payload: {
@@ -8559,7 +8614,7 @@ describe('Protocol V2 firmware update method', () => {
     });
     method.init();
     (method as any).device = stubDevice({
-      commands: { typedCall },
+      commands: { typedCall, call },
     });
 
     await method.run();
@@ -8570,6 +8625,7 @@ describe('Protocol V2 firmware update method', () => {
 
   test('accepts firmware target enum names from low-level update params', async () => {
     const typedCall = jest.fn().mockResolvedValue({ message: {} });
+    const call = jest.fn().mockResolvedValue({ type: 'WriteCompleted', message: {} });
     const method = new DeviceFirmwareUpdate({
       id: 1,
       payload: {
@@ -8580,7 +8636,7 @@ describe('Protocol V2 firmware update method', () => {
     });
     method.init();
     (method as any).device = stubDevice({
-      commands: { typedCall },
+      commands: { typedCall, call },
     });
 
     await method.run();

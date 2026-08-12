@@ -314,7 +314,7 @@ Pro2 接入的强制前置条件。
 
 | 层级                        | 职责                                                                                      |
 | --------------------------- | ----------------------------------------------------------------------------------------- |
-| 内部 `DeviceFirmwareUpdate` | 规范化 targets，发送 `DeviceFirmwareUpdateRequest`，接收中间 `DeviceFirmwareUpdateStatus` |
+| 内部 `DeviceFirmwareUpdate` | 规范化 targets，通过 `DeviceFirmwareUpdateStage` 暂存目标，再发送空的 `DeviceFirmwareUpdateRequest` 触发安装 |
 | 高层固件升级                | 校验包、创建目录、分块暂存 resource/bootloader/firmware、触发安装、轮询、处理断连与重连   |
 
 “功能拆分”应记录在本适配页和对应业务文档，不能写进帧格式或 Transport 文档。

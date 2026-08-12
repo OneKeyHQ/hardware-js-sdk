@@ -1435,29 +1435,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       );
     }
 
-    // materializedEntries 由宿主生成，只有与获批 ZIP 的规范字节完全一致后才能使用。
+    // The verified archive bytes are authoritative. Host materialization is an
+    // implementation detail and may preserve wrapper paths or extra metadata files.
     const verifiedArchive = await this.prepareProtocolV2LocalResourceArchive(archiveBinary);
-    const entries = archiveArtifact.materializedEntries ?? [];
-    const entriesByName = new Map(entries.map(entry => [entry.entryName, entry] as const));
-    if (
-      entries.length !== verifiedArchive.materializedEntries.length ||
-      verifiedArchive.materializedEntries.some(entry => {
-        const preparedEntry = entriesByName.get(entry.entryName);
-        const digest = bytesToHex(sha256(new Uint8Array(entry.binary)));
-        return (
-          !preparedEntry ||
-          preparedEntry.artifact.size !== entry.binary.byteLength ||
-          preparedEntry.artifact.sha256.toLowerCase() !== digest
-        );
-      })
-    ) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'Protocol V2 prepared resource entries do not match the approved archive',
-        { firmwareUpdateCode: 'FirmwareArtifactReceiptMismatch' }
-      );
-    }
-
     const verifiedEntriesByName = new Map(
       verifiedArchive.materializedEntries.map(entry => [entry.entryName, entry.binary] as const)
     );
@@ -2731,13 +2711,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             const targetId = normalizeProtocolV2TargetId(target.target_id);
             return targetId !== undefined && expectedTargetIds.has(targetId);
           });
-          const allReportedTargetsFinished =
-            matchingStatusTargets.length > 0 &&
-            matchingStatusTargets.every(target => isProtocolV2TargetStatusFinished(target.status));
           const shouldVerifyTargetCompletion =
-            !requireCurrentInstallStatus ||
-            currentInstallStatusObserved ||
-            !allReportedTargetsFinished;
+            !requireCurrentInstallStatus || currentInstallStatusObserved;
           if (
             shouldVerifyTargetCompletion &&
             this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds, expectedPaths)
@@ -2749,7 +2724,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           if (
             requireCurrentInstallStatus &&
             !currentInstallStatusObserved &&
-            allReportedTargetsFinished
+            matchingStatusTargets.length > 0
           ) {
             lastError = new Error(
               'Protocol V2 firmware status is stale; waiting for the current install to start'
