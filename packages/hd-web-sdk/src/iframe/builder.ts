@@ -38,7 +38,7 @@ export const init = async (settings: any) => {
   origin = getOrigin(instance.src);
   timeout = window.setTimeout(() => {
     initPromise.reject(ERRORS.TypedError(HardwareErrorCode.IframeTimeout));
-  }, 10000);
+  }, 20_000);
 
   const onLoad = () => {
     if (!instance) {
