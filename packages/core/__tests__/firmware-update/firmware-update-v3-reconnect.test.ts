@@ -172,4 +172,66 @@ describe('FirmwareUpdateV3 reconnect', () => {
     );
     expect(waitForDeviceReconnect).toHaveBeenCalledWith(60 * 1000);
   });
+
+  it('does not treat cached firmware versions as Browser WebUSB install completion', async () => {
+    jest.spyOn(hdShared, 'wait').mockResolvedValue(undefined);
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('webusb' as never);
+    jest.spyOn(DataManager, 'isBrowserWebUsb').mockReturnValue(true);
+    const method = new FirmwareUpdateV3({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV3',
+        connectId: 'webusb-device',
+      },
+    });
+    method.params = {
+      platform: 'web',
+    } as any;
+    const commands = {
+      typedCall: jest
+        .fn()
+        .mockResolvedValueOnce({
+          type: 'Features',
+          message: {
+            major_version: 0,
+            minor_version: 0,
+            patch_version: 0,
+          },
+        })
+        .mockResolvedValueOnce({
+          type: 'Features',
+          message: {
+            major_version: 4,
+            minor_version: 21,
+            patch_version: 0,
+            onekey_ble_version: '2.3.7',
+          },
+        }),
+    };
+    method.device = {
+      features: {
+        firmwareVersion: '4.21.0',
+        bleVersion: '2.3.7',
+      },
+      getCommands: () => commands,
+    } as unknown as Device;
+    (method as any).createUpdatesFolderIfNotExists = jest.fn().mockResolvedValue(undefined);
+    (method as any).startEmmcFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
+    method.postTipMessage = jest.fn();
+    method.postProcessingMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+
+    const result = await (method as any).executeUpdate({
+      resourceBinary: null,
+      resourceEntries: [],
+      fwSources: [],
+      bootloaderSource: null,
+    });
+
+    expect(commands.typedCall).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      firmwareVersion: '4.21.0',
+      bleVersion: '2.3.7',
+    });
+  });
 });

@@ -637,8 +637,12 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
         const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
         const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
-        // Treat update as complete once firmware version becomes non-zero
-        if (firmwareVersion !== '0.0.0') {
+        // Browser WebUSB may read updater Features before the final reboot. Do not let cached
+        // pre-update versions promote a current 0.0.0 response to install completion.
+        const completionFirmwareVersion = isBrowserWebUsb
+          ? getDeviceFirmwareVersion(featuresRes.message).join('.')
+          : firmwareVersion;
+        if (completionFirmwareVersion !== '0.0.0') {
           this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
           DevicePool.resetState();
           return {
@@ -647,7 +651,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
             firmwareVersion,
           };
         }
-        // Still in update mode; continue polling (e.g., iOS may return firmwareVersion 0.0.0 during switches)
         await wait(1000);
       } catch (error) {
         Log.log('getFeatures error', error);
