@@ -1,6 +1,7 @@
 import * as hdShared from '@onekeyfe/hd-shared';
 
 import FirmwareUpdateV3 from '../../src/api/FirmwareUpdateV3';
+import { DataManager } from '../../src/data-manager';
 import { DevicePool } from '../../src/device/DevicePool';
 
 import type { Device } from '../../src/device/Device';
@@ -112,10 +113,125 @@ describe('FirmwareUpdateV3 reconnect', () => {
         })
       ).rejects.toBe(reconnectError);
 
+      expect(commands.typedCall).toHaveBeenCalledWith('GetFeatures', 'Features', {});
       expect(waitForDeviceReconnect).toHaveBeenCalledWith(3 * 60 * 1000);
     } finally {
       jest.clearAllTimers();
       jest.useRealTimers();
     }
+  });
+
+  it('lets Browser WebUSB clean up a timed out install probe before reconnecting', async () => {
+    jest.spyOn(hdShared, 'wait').mockResolvedValue(undefined);
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('webusb' as never);
+    jest.spyOn(DataManager, 'isBrowserWebUsb').mockReturnValue(true);
+    const method = new FirmwareUpdateV3({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV3',
+        connectId: 'webusb-device',
+      },
+    });
+    const reconnectError = new Error('stop after WebUSB reconnect assertion');
+    const waitForDeviceReconnect = jest
+      .spyOn(method, 'waitForDeviceReconnect')
+      .mockRejectedValue(reconnectError);
+    method.isBleReconnect = jest.fn(() => false);
+    method.params = {
+      platform: 'web',
+    } as any;
+    const commands = {
+      typedCall: jest.fn().mockRejectedValue(new Error('Protocol V1 read timeout after 3000ms')),
+    };
+    method.device = {
+      features: {},
+      getCommands: () => commands,
+    } as unknown as Device;
+    (method as any).createUpdatesFolderIfNotExists = jest.fn().mockResolvedValue(undefined);
+    (method as any).startEmmcFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
+    method.postTipMessage = jest.fn();
+    method.postProcessingMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+
+    await expect(
+      (method as any).executeUpdate({
+        resourceBinary: null,
+        resourceEntries: [],
+        fwSources: [],
+        bootloaderSource: null,
+      })
+    ).rejects.toBe(reconnectError);
+
+    expect(commands.typedCall).toHaveBeenCalledWith(
+      'GetFeatures',
+      'Features',
+      {},
+      {
+        timeoutMs: 3000,
+      }
+    );
+    expect(waitForDeviceReconnect).toHaveBeenCalledWith(60 * 1000);
+  });
+
+  it('does not treat cached firmware versions as Browser WebUSB install completion', async () => {
+    jest.spyOn(hdShared, 'wait').mockResolvedValue(undefined);
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('webusb' as never);
+    jest.spyOn(DataManager, 'isBrowserWebUsb').mockReturnValue(true);
+    const method = new FirmwareUpdateV3({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV3',
+        connectId: 'webusb-device',
+      },
+    });
+    method.params = {
+      platform: 'web',
+    } as any;
+    const commands = {
+      typedCall: jest
+        .fn()
+        .mockResolvedValueOnce({
+          type: 'Features',
+          message: {
+            major_version: 0,
+            minor_version: 0,
+            patch_version: 0,
+          },
+        })
+        .mockResolvedValueOnce({
+          type: 'Features',
+          message: {
+            major_version: 4,
+            minor_version: 21,
+            patch_version: 0,
+            onekey_ble_version: '2.3.7',
+          },
+        }),
+    };
+    method.device = {
+      features: {
+        firmwareVersion: '4.21.0',
+        bleVersion: '2.3.7',
+      },
+      getCommands: () => commands,
+    } as unknown as Device;
+    (method as any).createUpdatesFolderIfNotExists = jest.fn().mockResolvedValue(undefined);
+    (method as any).startEmmcFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
+    method.postTipMessage = jest.fn();
+    method.postProcessingMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+
+    const result = await (method as any).executeUpdate({
+      resourceBinary: null,
+      resourceEntries: [],
+      fwSources: [],
+      bootloaderSource: null,
+    });
+
+    expect(commands.typedCall).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      firmwareVersion: '4.21.0',
+      bleVersion: '2.3.7',
+    });
   });
 });
