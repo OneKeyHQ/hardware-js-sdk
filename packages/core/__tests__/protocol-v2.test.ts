@@ -9178,6 +9178,29 @@ describe('Protocol V2 protected method execution', () => {
     }
   );
 
+  test('skips DeviceStatus and unlock when Protocol V2 is not initialized', async () => {
+    const method = {
+      name: 'firmwareUpdateV4',
+      unlockPolicy: 'unlock-before-run',
+      run: jest.fn().mockResolvedValue({ message: 'updating' }),
+    };
+    const device = {
+      state: { status: { initialized: false } },
+      commands: { typedCall: jest.fn() },
+      isProtocolV2: () => true,
+      isBootloader: () => false,
+      isRomloader: () => false,
+      unlockDevice: jest.fn(),
+    };
+
+    await expect(runMethodWithUnlockPolicy(method as any, device as any)).resolves.toEqual({
+      message: 'updating',
+    });
+    expect(device.commands.typedCall).not.toHaveBeenCalled();
+    expect(device.unlockDevice).not.toHaveBeenCalled();
+    expect(method.run).toHaveBeenCalledTimes(1);
+  });
+
   test('keeps Protocol V1 and lock-free methods outside the preflight path', async () => {
     for (const [isProtocolV2, unlockPolicy] of [
       [false, 'unlock-before-run'],
