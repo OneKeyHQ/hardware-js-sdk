@@ -609,22 +609,29 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       try {
         const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
         const timeoutMs = 3000;
-        const featuresRes = await Promise.race<TypedResponseMessage<'Features'>>([
-          typedCall('GetFeatures', 'Features', {}),
-          new Promise<never>((_, reject) => {
-            setTimeout(
-              () =>
-                reject(
-                  ERRORS.TypedError(
-                    HardwareErrorCode.CallMethodNotResponse,
-                    'GetFeatures timeout',
-                    { method: 'GetFeatures', timeoutMs }
-                  )
-                ),
-              timeoutMs
-            );
-          }),
-        ]);
+        const isBrowserWebUsb = DataManager.isBrowserWebUsb(DataManager.getSettings('env'));
+        const getFeaturesPromise = isBrowserWebUsb
+          ? typedCall('GetFeatures', 'Features', {}, { timeoutMs })
+          : typedCall('GetFeatures', 'Features', {});
+        // WebUSB owns timeout cleanup so a reboot cannot leave a pending transfer blocking reconnect.
+        const featuresRes = isBrowserWebUsb
+          ? await getFeaturesPromise
+          : await Promise.race<TypedResponseMessage<'Features'>>([
+              getFeaturesPromise,
+              new Promise<never>((_, reject) => {
+                setTimeout(
+                  () =>
+                    reject(
+                      ERRORS.TypedError(
+                        HardwareErrorCode.CallMethodNotResponse,
+                        'GetFeatures timeout',
+                        { method: 'GetFeatures', timeoutMs }
+                      )
+                    ),
+                  timeoutMs
+                );
+              }),
+            ]);
         getFeaturesTimeoutCount = 0;
         const features = buildProtocolV1FeaturesPayload(featuresRes.message, this.device.features);
         const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
