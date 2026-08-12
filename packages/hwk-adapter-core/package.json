@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-adapter-core",
-  "version": "1.2.0-alpha.116",
+  "version": "1.2.0-alpha.117",
   "description": "Shared types and utilities for OneKey hardware wallet kit",
   "author": "OneKey",
   "license": "MIT",
