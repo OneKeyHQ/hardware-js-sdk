@@ -139,7 +139,7 @@ export const getFirmwareUploadWriteRetryType = (
 
 const resolveFirmwareUploadRetryDelay = (attempt: number, baseDelayMs = 200, maxDelayMs = 1200) =>
   Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
-const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
+const PROTOCOL_PROBE_TIMEOUT_MS = 3000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 10_000;
 /**
  * Per-packet write budget. iOS only resolves writeWithoutResponse once CoreBluetooth
