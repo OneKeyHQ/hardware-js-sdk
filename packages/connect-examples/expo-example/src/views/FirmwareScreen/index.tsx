@@ -420,12 +420,16 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     firmwareVersion,
   } = getDeviceBasicInfo(features, undefined);
   const deviceTypeLowerCase = deviceType.toLowerCase();
-  const selectedDeviceType = (selectDevice?.deviceType ?? deviceTypeLowerCase).toLowerCase();
+  const selectedDeviceType = (
+    deviceTypeLowerCase !== EDeviceType.Unknown
+      ? deviceTypeLowerCase
+      : selectDevice?.deviceType ?? deviceTypeLowerCase
+  ).toLowerCase();
   const isProtocolV2Device =
     (features?.protocol === 'V2' || selectDevice?.connectProtocol === 'V2') &&
     (selectedDeviceType === EDeviceType.Pro2 || selectedDeviceType === EDeviceType.Neo);
 
-  useEffect(() => {
+  const loadDeviceFeatures = useCallback(async () => {
     if (!sdk) return;
     if (selectDevice?.connectId == null) {
       setFeatures(undefined);
@@ -433,35 +437,35 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
       return;
     }
 
-    const loadDeviceFeatures = async () => {
-      setConnecting(true);
-      setFeatures(undefined);
-      setDeviceState(undefined);
-      setError(undefined);
+    setConnecting(true);
+    setFeatures(undefined);
+    setDeviceState(undefined);
+    setError(undefined);
 
-      try {
-        console.log('Loading device features for:', selectDevice.connectId);
+    try {
+      console.log('Loading device features for:', selectDevice.connectId);
 
-        const stateRes = await sdk.getDeviceState(selectDevice.connectId, { scope: 'firmware' });
-        console.log('getDeviceState(firmware) result:', stateRes);
+      const stateRes = await sdk.getDeviceState(selectDevice.connectId, { scope: 'firmware' });
+      console.log('getDeviceState(firmware) result:', stateRes);
 
-        if (stateRes.success) {
-          setDeviceState(stateRes.payload);
-          setFeatures(projectDeviceStateFeatures(stateRes.payload));
-        } else {
-          console.error('Failed to get device state:', stateRes.payload.error);
-          setError(stateRes.payload.error);
-        }
-      } catch (error) {
-        console.error('Exception in loadDeviceFeatures:', error);
-        setError(error instanceof Error ? error.message : String(error));
-      } finally {
-        setConnecting(false);
+      if (stateRes.success) {
+        setDeviceState(stateRes.payload);
+        setFeatures(projectDeviceStateFeatures(stateRes.payload));
+      } else {
+        console.error('Failed to get device state:', stateRes.payload.error);
+        setError(stateRes.payload.error);
       }
-    };
-
-    loadDeviceFeatures();
+    } catch (error) {
+      console.error('Exception in loadDeviceFeatures:', error);
+      setError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setConnecting(false);
+    }
   }, [sdk, selectDevice?.connectId]);
+
+  useEffect(() => {
+    loadDeviceFeatures();
+  }, [loadDeviceFeatures]);
 
   const disconnectDevice = useCallback(() => {
     setFeatures(undefined);
@@ -539,6 +543,9 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
             ...params,
             targetsToUpdate: [...new Set(localTargets)],
           });
+          if (localResponse.success) {
+            await loadDeviceFeatures();
+          }
           return {
             success: localResponse.success,
             payload: localResponse.success ? undefined : localResponse.payload.error,
@@ -569,6 +576,9 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
         } finally {
           memoryHost.release();
         }
+        if (res.success) {
+          await loadDeviceFeatures();
+        }
         return {
           success: res.success,
           payload: res.success ? undefined : res.payload.error,
@@ -582,7 +592,7 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
         setShowUpdateDialog(false);
       }
     },
-    [features, intl, sdk, selectDevice]
+    [features, intl, loadDeviceFeatures, sdk, selectDevice]
   );
 
   const checkProtocolV2FirmwareUpdates = useCallback(

@@ -1,4 +1,20 @@
-import type { IFirmwareUpdateTipMessage } from '@onekeyfe/hd-core';
+import type { IFirmwareUpdateProgressType, IFirmwareUpdateTipMessage } from '@onekeyfe/hd-core';
+
+export function getFirmwareOverallProgress({
+  previous,
+  progress,
+  progressType,
+}: {
+  previous: number;
+  progress: number;
+  progressType: IFirmwareUpdateProgressType;
+}) {
+  const normalized = Math.max(0, Math.min(100, progress));
+  if (progressType === 'installingFirmware') {
+    return normalized >= 100 ? 100 : Math.max(previous, 99);
+  }
+  return Math.max(previous, Math.min(normalized, 99));
+}
 
 export const FIRMWARE_TIP_MESSAGE_IDS: Partial<Record<IFirmwareUpdateTipMessage, string>> = {
   CheckLatestUiResource: 'message__check_latest_ui_resource',

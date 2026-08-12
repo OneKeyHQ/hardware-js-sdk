@@ -1,4 +1,4 @@
-import { FIRMWARE_TIP_MESSAGE_IDS } from './firmwareUpdateMessages';
+import { FIRMWARE_TIP_MESSAGE_IDS, getFirmwareOverallProgress } from './firmwareUpdateMessages';
 
 describe('firmware update status messages', () => {
   test('maps every status emitted by Protocol V2 firmwareUpdateV4', () => {
@@ -13,5 +13,28 @@ describe('firmware update status messages', () => {
       SwitchFirmwareReconnectDevice: 'message__firmware_reconnecting',
       FirmwareUpdateCompleted: 'message__firmware_update_completed',
     });
+  });
+
+  test('keeps one monotonic progress range across transfer and install', () => {
+    expect(
+      getFirmwareOverallProgress({ previous: 0, progress: 50, progressType: 'transferData' })
+    ).toBe(50);
+    expect(
+      getFirmwareOverallProgress({ previous: 50, progress: 100, progressType: 'transferData' })
+    ).toBe(99);
+    expect(
+      getFirmwareOverallProgress({
+        previous: 99,
+        progress: 0,
+        progressType: 'installingFirmware',
+      })
+    ).toBe(99);
+    expect(
+      getFirmwareOverallProgress({
+        previous: 99,
+        progress: 100,
+        progressType: 'installingFirmware',
+      })
+    ).toBe(100);
   });
 });
