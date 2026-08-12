@@ -450,7 +450,7 @@ export default class DataManager {
       Log.debug('[DataConfig] Trying SDK-managed config request...');
       try {
         const response = await axios.get<RemoteConfigResponse>(urlWithCache, {
-          // because of iframe timeout is 10000
+          // Keep the config request below the 20-second iframe initialization timeout.
           timeout: 7000,
         });
         data = response.data;
