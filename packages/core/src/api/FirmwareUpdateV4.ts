@@ -1893,16 +1893,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         `Protocol V2 firmware fingerprint mismatch: ${key}/${component.target}`
       );
     }
-    const expectedPayloadHash = normalizeProtocolV2Hex(component.payloadHash);
-    if (expectedPayloadHash) {
-      const header = parseProtocolV2OkppHeader(toProtocolV2Bytes(binary));
-      if (!header || header.payloadHash !== expectedPayloadHash) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          `Protocol V2 firmware payload hash mismatch: ${key}/${component.target}`
-        );
-      }
-    }
     return {
       ...target,
       binary,

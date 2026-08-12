@@ -6531,6 +6531,8 @@ describe('Protocol V2 firmware update targets', () => {
             target: 'APPLICATION_P1',
             url: 'https://example.com/applicationP1.pp.bin',
             ...componentIntegrity('https://example.com/applicationP1.pp.bin'),
+            // Core treats the package as opaque; the device owns its internal format validation.
+            payloadHash: '00'.repeat(64),
           },
           applicationP2: {
             target: 'APPLICATION_P2',
