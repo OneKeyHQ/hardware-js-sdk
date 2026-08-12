@@ -137,7 +137,7 @@ const protocolV2Messages = parseConfigure({
         },
       },
     },
-    DeviceFirmwareUpdateRequest: {
+    DeviceFirmwareUpdateStage: {
       fields: {
         targets: {
           type: 'DeviceFirmwareTarget',
@@ -145,6 +145,9 @@ const protocolV2Messages = parseConfigure({
           rule: 'repeated',
         },
       },
+    },
+    DeviceFirmwareUpdateRequest: {
+      fields: {},
     },
     DeviceFirmwareUpdateRecord: {
       fields: {
@@ -218,7 +221,8 @@ const protocolV2Messages = parseConfigure({
         MessageType_Success: 60207,
         MessageType_Failure: 60208,
         MessageType_FileWrite: 60805,
-        MessageType_DeviceFirmwareUpdateRequest: 61000,
+        MessageType_DeviceFirmwareUpdateStage: 61000,
+        MessageType_DeviceFirmwareUpdateRequest: 61001,
         MessageType_DeviceFirmwareUpdateStatus: 61002,
         MessageType_DeviceSession: 61201,
         MessageType_PartialNested: 62000,
@@ -966,24 +970,10 @@ describe('Protocol V2 framing and session', () => {
     expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('skip unexpected response'));
   });
 
-  test('session consumes intermediate response frames before returning the final response', async () => {
+  test('session can return after a request frame is written', async () => {
     const written = [];
-    const progress = ProtocolV2.encodeFrame(schemas, 'DeviceFirmwareUpdateStatus', {
-      records: [{ target_id: 4, status: 1 }],
-    });
-    const success = ProtocolV2.encodeFrame(schemas, 'Success', {
-      message: 'ok',
-    });
-    const onIntermediateResponse = jest.fn();
-    const readFrame = jest.fn(() => {
-      const [writtenFrame] = written;
-      const { seq } = protocolV2.decodeFrame(writtenFrame);
-      return Promise.resolve(
-        readFrame.mock.calls.length === 1
-          ? rewriteSeq(progress, seq)
-          : rewriteSeq(success, protocolV2.nextProtoSeq(seq))
-      );
-    });
+    const readFrame = jest.fn();
+    const onWriteCompleted = jest.fn();
     const session = new ProtocolV2Session({
       schemas,
       router: 1,
@@ -996,26 +986,20 @@ describe('Protocol V2 framing and session', () => {
 
     const result = await session.call(
       'DeviceFirmwareUpdateRequest',
-      { targets: [{ target_id: 4, path: 'vol1:firmware.bin' }] },
+      {},
       {
-        intermediateTypes: ['DeviceFirmwareUpdateStatus'],
-        onIntermediateResponse,
+        returnAfterWrite: true,
+        onWriteCompleted,
       }
     );
 
-    expect(readFrame).toHaveBeenCalledTimes(2);
-    expect(onIntermediateResponse).toHaveBeenCalledWith({
-      type: 'DeviceFirmwareUpdateStatus',
-      message: {
-        records: [{ target_id: 4, status: 1, payload_version: null, path: null }],
-      },
-    });
-    expect(result).toEqual({
-      type: 'Success',
-      message: {
-        message: 'ok',
-      },
-    });
+    expect(written).toHaveLength(1);
+    expect(ProtocolV2.decodeFrame(schemas, written[0]).messageName).toBe(
+      'DeviceFirmwareUpdateRequest'
+    );
+    expect(readFrame).not.toHaveBeenCalled();
+    expect(onWriteCompleted).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ type: 'WriteCompleted', message: {} });
   });
 
   test('probeProtocolV2 accepts Success as a normal V2 probe response', async () => {

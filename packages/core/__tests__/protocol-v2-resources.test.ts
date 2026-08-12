@@ -126,6 +126,14 @@ describe('Pro2 resource configuration', () => {
     expect(parseProtocolV2ResourceManifest(resourceManifest).files).toHaveLength(9);
   });
 
+  test('uses only the resource file list from a manifest', () => {
+    expect(
+      parseProtocolV2ResourceManifest({
+        files: resourceManifest.files,
+      })
+    ).toEqual({ files: resourceManifest.files });
+  });
+
   test('rejects missing source and malformed manifest paths', () => {
     expect(() => parseProtocolV2Resources({})).toThrow('source is required');
     expect(() =>

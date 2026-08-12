@@ -4355,7 +4355,6 @@ export type TonSignedMessage = {
   signature?: string;
   signning_message?: string;
   init_data_length?: number;
-  signing_message?: string;
 };
 
 // TonSignProof
@@ -4785,8 +4784,8 @@ export type DeviceFactoryInfoManufactureTime = {
 export type DeviceFactoryInfo = {
   version?: number;
   serial_number?: string;
-  burn_in_completed?: boolean;
   factory_test_completed?: boolean;
+  factory_burn_in_completed?: boolean;
   manufacture_time?: DeviceFactoryInfoManufactureTime;
 };
 
@@ -4843,10 +4842,13 @@ export type DeviceFirmwareTarget = {
   path: string;
 };
 
-// DeviceFirmwareUpdateRequest
-export type DeviceFirmwareUpdateRequest = {
+// DeviceFirmwareUpdateStage
+export type DeviceFirmwareUpdateStage = {
   targets: DeviceFirmwareTarget[];
 };
+
+// DeviceFirmwareUpdateRequest
+export type DeviceFirmwareUpdateRequest = {};
 
 // DeviceFirmwareUpdateRecord
 export type DeviceFirmwareUpdateRecord = {
@@ -4937,7 +4939,7 @@ export type DeviceSEInfo = {
 // DeviceInfoTargets
 export type DeviceInfoTargets = {
   hw?: boolean;
-  fw?: boolean;
+  main_mcu?: boolean;
   coprocessor?: boolean;
   se1?: boolean;
   se2?: boolean;
@@ -4963,7 +4965,7 @@ export type DeviceInfoGet = {
 export type ProtocolV2DeviceInfo = {
   protocol_version: number;
   hw?: DeviceHardwareInfo;
-  fw?: DeviceMainMcuInfo;
+  main_mcu?: DeviceMainMcuInfo;
   coprocessor?: DeviceCoprocessorInfo;
   se1?: DeviceSEInfo;
   se2?: DeviceSEInfo;
@@ -5215,7 +5217,8 @@ export enum ViewTipType {
 // ViewTip
 export type ViewTip = {
   type: ViewTipType;
-  text: string;
+  text?: string;
+  text_id?: number;
 };
 
 // ViewRawData
@@ -5235,23 +5238,26 @@ export enum ViewSignLayout {
 
 // ViewSignPage
 export type ViewSignPage = {
-  title: string;
+  title?: string;
   amount?: UintType;
   general: ViewDetail[];
   tip?: ViewTip;
   raw_data?: ViewRawData;
   slide_to_confirm?: boolean;
   layout?: ViewSignLayout;
+  title_id?: number;
 };
 
 // ViewVerifyPage
 export type ViewVerifyPage = {
-  title: string;
+  title?: string;
   address: string;
   path: string;
   network?: string;
   derive_type?: string;
   value_key?: number;
+  title_id?: number;
+  chain_id?: number;
 };
 
 export enum ProtocolV2FailureType {
@@ -5888,6 +5894,7 @@ export type MessageType = {
   DeviceFactoryPermanentLock: DeviceFactoryPermanentLock;
   DeviceFactoryTest: DeviceFactoryTest;
   DeviceFirmwareTarget: DeviceFirmwareTarget;
+  DeviceFirmwareUpdateStage: DeviceFirmwareUpdateStage;
   DeviceFirmwareUpdateRequest: DeviceFirmwareUpdateRequest;
   DeviceFirmwareUpdateRecord: DeviceFirmwareUpdateRecord;
   DeviceFirmwareUpdateRecordFields: DeviceFirmwareUpdateRecordFields;

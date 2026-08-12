@@ -216,9 +216,9 @@ export const buildProtocolV2FeaturesPayload = ({
   runtimeMode?: ProtocolV2RuntimeMode;
 }): Features => {
   const info = deviceInfo;
-  const fwApplication = info?.fw?.application;
-  const fwBootloader = info?.fw?.bootloader;
-  const fwBoard = info?.fw?.romloader;
+  const fwApplication = info?.main_mcu?.application;
+  const fwBootloader = info?.main_mcu?.bootloader;
+  const fwBoard = info?.main_mcu?.romloader;
   const bleApplication = info?.coprocessor?.application;
   const status = deviceStatus;
   const incomingSerialNo = info?.hw?.serial_no;

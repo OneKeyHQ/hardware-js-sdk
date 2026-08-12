@@ -613,7 +613,7 @@ const protocolV2BootloaderDeviceInfo: ProtocolV2DeviceInfo = {
   hw: {
     serial_no: 'PR9999999999',
   },
-  fw: {
+  main_mcu: {
     bootloader: {
       version: '0.0.1',
     },
@@ -677,7 +677,7 @@ describe('Protocol V2 feature adapter', () => {
     const deviceInfo: ProtocolV2DeviceInfo = {
       protocol_version: 1,
       hw: { serial_no: 'P2-STATIC' },
-      fw: { application: { version: '1.0.0' } },
+      main_mcu: { application: { version: '1.0.0' } },
       coprocessor: { bt_adv_name: 'Pro2 STATIC' },
     };
     const deviceStatus: DeviceStatus = {
@@ -751,7 +751,7 @@ describe('Protocol V2 feature adapter', () => {
         Device_type: DeviceType.PRO2,
         serial_no: 'PR2SERIAL',
       },
-      fw: {
+      main_mcu: {
         romloader: {
           version: '0.1.0',
           build_id: 'rom-build',
@@ -841,7 +841,7 @@ describe('Protocol V2 feature adapter', () => {
       hw: {
         serial_no: 'PR2BOOT',
       },
-      fw: {
+      main_mcu: {
         bootloader: {
           version: '0.2.0',
         },
@@ -863,7 +863,7 @@ describe('Protocol V2 feature adapter', () => {
     const features = normalizeProtocolV2Features(descriptor as any, {
       protocol_version: 1,
       hw: { serial_no: 'PR2NORMAL' },
-      fw: { bootloader: { version: '0.2.0' } },
+      main_mcu: { bootloader: { version: '0.2.0' } },
     });
 
     expect(features.mode).toBe('normal');
@@ -876,7 +876,7 @@ describe('Protocol V2 feature adapter', () => {
       hw: {
         serial_no: 'PR2ROM',
       },
-      fw: {
+      main_mcu: {
         romloader: {
           version: '1.0.0',
         },
@@ -917,17 +917,17 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(
       getProtocolV2RuntimeMode(legacyProtocolInfo, {
-        fw: { bootloader: { version: '0.2.0' } },
+        main_mcu: { bootloader: { version: '0.2.0' } },
       })
     ).toBe('bootloader');
     expect(
       getProtocolV2RuntimeMode(legacyProtocolInfo, {
-        fw: { romloader: { version: '1.0.0' } },
+        main_mcu: { romloader: { version: '1.0.0' } },
       })
     ).toBe('romloader');
     expect(
       getProtocolV2RuntimeMode(legacyProtocolInfo, {
-        fw: {
+        main_mcu: {
           application: { version: '1.2.3' },
           bootloader: { version: '0.2.0' },
         },
@@ -1998,7 +1998,7 @@ describe('Protocol V2 feature adapter', () => {
       { ...descriptor, protocolType: 'V2' } as any,
       {
         protocol_version: 2,
-        fw: { application: { version: '1.2.3' } },
+        main_mcu: { application: { version: '1.2.3' } },
         se1: { application: { version: '4.5.6' } },
         status: { unlocked: false, passphrase_enabled: false },
       }
@@ -2035,7 +2035,7 @@ describe('Protocol V2 feature adapter', () => {
       deviceInfo: {
         protocol_version: 1,
         hw: { serial_no: 'PR9999999999' },
-        fw: { application: { version: '1.0.0' } },
+        main_mcu: { application: { version: '1.0.0' } },
       },
       deviceStatus: {
         device_id: 'firmware-reconnect-id',
@@ -2400,7 +2400,7 @@ describe('Protocol V2 feature adapter', () => {
     (device as any).features = {
       ...normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any, {
         hw: { serial_no: 'PR2SERIAL' },
-        fw: { application: { version: '4.15.0' } },
+        main_mcu: { application: { version: '4.15.0' } },
         status: { passphrase_enabled: true },
       }),
       unlocked: true,
@@ -2825,7 +2825,7 @@ describe('Protocol V2 feature adapter', () => {
         type: 'DeviceInfo',
         message: {
           hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
-          fw: { application: { version: '1.2.3' } },
+          main_mcu: { application: { version: '1.2.3' } },
         },
       }),
     };
@@ -2846,7 +2846,7 @@ describe('Protocol V2 feature adapter', () => {
       {
         targets: {
           hw: true,
-          fw: true,
+          main_mcu: true,
           coprocessor: true,
         },
         types: {
@@ -2955,7 +2955,7 @@ describe('Protocol V2 feature adapter', () => {
     const device = stubDevice({
       originalDescriptor: { protocolType: 'V2' },
       features: normalizeProtocolV2Features({ ...descriptor, protocolType: 'V2' } as any, {
-        fw: {
+        main_mcu: {
           application: {
             version: '4.14.0',
           },
@@ -3009,7 +3009,7 @@ describe('Protocol V2 feature adapter', () => {
         type: 'DeviceInfo',
         message: {
           hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
-          fw: { application: { version: '1.2.3' } },
+          main_mcu: { application: { version: '1.2.3' } },
         },
       })
       .mockResolvedValueOnce({
@@ -3044,7 +3044,7 @@ describe('Protocol V2 feature adapter', () => {
       {
         targets: {
           hw: true,
-          fw: true,
+          main_mcu: true,
           coprocessor: true,
         },
         types: {
@@ -3073,7 +3073,7 @@ describe('Protocol V2 feature adapter', () => {
         type: 'DeviceInfo',
         message: {
           hw: { serial_no: 'PR2SERIAL' },
-          fw: { bootloader: { version: '0.2.0' } },
+          main_mcu: { bootloader: { version: '0.2.0' } },
           se1: {},
         },
       })
@@ -3123,7 +3123,7 @@ describe('Protocol V2 feature adapter', () => {
 
     await device.probeProtocolV2RuntimeState({
       hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
-      fw: { romloader: { version: '1.0.0' } },
+      main_mcu: { romloader: { version: '1.0.0' } },
     });
 
     expect(typedCall).toHaveBeenCalledTimes(1);
@@ -3151,7 +3151,7 @@ describe('Protocol V2 feature adapter', () => {
     await expect(
       device.probeProtocolV2RuntimeState({
         hw: { Device_type: DeviceType.PRO, serial_no: 'PRO-SERIAL' },
-        fw: { romloader: { version: '1.0.0' } },
+        main_mcu: { romloader: { version: '1.0.0' } },
       })
     ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceInitializeFailed });
 
@@ -3176,7 +3176,7 @@ describe('Protocol V2 feature adapter', () => {
 
     await device.probeProtocolV2RuntimeState({
       hw: { serial_no: 'PR2SERIAL' },
-      fw: { application: { version: '1.2.3' } },
+      main_mcu: { application: { version: '1.2.3' } },
     });
 
     expect(typedCall).toHaveBeenCalledTimes(1);
@@ -3208,7 +3208,7 @@ describe('Protocol V2 feature adapter', () => {
 
     await device.probeProtocolV2RuntimeState({
       hw: { serial_no: 'PR2SERIAL' },
-      fw: { application: { version: '1.2.3' } },
+      main_mcu: { application: { version: '1.2.3' } },
     });
 
     expect(typedCall).toHaveBeenCalledTimes(2);
@@ -3236,7 +3236,7 @@ describe('Protocol V2 feature adapter', () => {
 
     await device.probeProtocolV2RuntimeState({
       hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
-      fw: { bootloader: { version: '0.2.0' } },
+      main_mcu: { bootloader: { version: '0.2.0' } },
     });
 
     expect(device.features).toMatchObject({
@@ -3265,7 +3265,7 @@ describe('Protocol V2 feature adapter', () => {
     await expect(
       device.probeProtocolV2RuntimeState({
         hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
-        fw: { application: { version: '1.2.3' } },
+        main_mcu: { application: { version: '1.2.3' } },
       })
     ).rejects.toBe(linkError);
 
@@ -3290,7 +3290,7 @@ describe('Protocol V2 feature adapter', () => {
     await expect(
       device.probeProtocolV2RuntimeState({
         hw: { serial_no: 'PR2SERIAL' },
-        fw: { application: { version: '1.2.3' } },
+        main_mcu: { application: { version: '1.2.3' } },
       })
     ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceInitializeFailed });
     expect(typedCall).toHaveBeenCalledTimes(1);
@@ -3307,7 +3307,7 @@ describe('Protocol V2 feature adapter', () => {
         type: 'DeviceInfo',
         message: {
           hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
-          fw: { bootloader: { version: '0.2.0' } },
+          main_mcu: { bootloader: { version: '0.2.0' } },
         },
       })
       .mockResolvedValueOnce({
@@ -3357,7 +3357,7 @@ describe('Protocol V2 feature adapter', () => {
     await device.probeProtocolV2RuntimeState(
       {
         hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
-        fw: { application: { version: '1.2.3' } },
+        main_mcu: { application: { version: '1.2.3' } },
       },
       5000
     );
@@ -3402,7 +3402,7 @@ describe('Protocol V2 feature adapter', () => {
 
     await device.probeProtocolV2RuntimeState({
       hw: { Device_type: DeviceType.NEO, serial_no: 'NEOSERIAL' },
-      fw: { bootloader: { version: '0.2.0' } },
+      main_mcu: { bootloader: { version: '0.2.0' } },
     });
 
     expect(typedCall).toHaveBeenNthCalledWith(1, 'ProtocolInfoRequest', 'ProtocolInfo', {
@@ -3436,7 +3436,7 @@ describe('Protocol V2 feature adapter', () => {
 
     await device.probeProtocolV2RuntimeState({
       hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
-      fw: { romloader: { version: '1.0.0' } },
+      main_mcu: { romloader: { version: '1.0.0' } },
     });
 
     expect(typedCall).toHaveBeenCalledTimes(1);
@@ -3474,7 +3474,7 @@ describe('Protocol V2 feature adapter', () => {
     await expect(
       device.probeProtocolV2RuntimeState({
         hw: { serial_no: 'PR2SERIAL' },
-        fw: { application: { version: '1.0.0' } },
+        main_mcu: { application: { version: '1.0.0' } },
       })
     ).rejects.toThrow('state update failed');
 
@@ -3499,7 +3499,7 @@ describe('Protocol V2 feature adapter', () => {
         type: 'DeviceInfo',
         message: {
           hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
-          fw: { application: { version: '1.2.3' } },
+          main_mcu: { application: { version: '1.2.3' } },
         },
       })
       .mockResolvedValueOnce({
@@ -3514,7 +3514,7 @@ describe('Protocol V2 feature adapter', () => {
         type: 'DeviceInfo',
         message: {
           hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
-          fw: { application: { version: '1.2.4' } },
+          main_mcu: { application: { version: '1.2.4' } },
         },
       })
       .mockResolvedValueOnce({
@@ -3546,7 +3546,7 @@ describe('Protocol V2 feature adapter', () => {
       {
         targets: {
           hw: true,
-          fw: true,
+          main_mcu: true,
           coprocessor: true,
         },
         types: {
@@ -3567,7 +3567,7 @@ describe('Protocol V2 feature adapter', () => {
         type: 'DeviceInfo',
         message: {
           hw: { serial_no: 'PR2SERIAL' },
-          fw: { application: { version: '1.2.4' } },
+          main_mcu: { application: { version: '1.2.4' } },
         },
       })
       .mockResolvedValueOnce({
@@ -3644,7 +3644,7 @@ describe('Protocol V2 feature adapter', () => {
       { ...descriptor, protocolType: 'V2' } as any,
       {
         hw: { Device_type: DeviceType.PRO2, serial_no: 'PR2SERIAL' },
-        fw: { application: { version: '1.2.3' } },
+        main_mcu: { application: { version: '1.2.3' } },
         status: { init_states: true },
       }
     );
@@ -3684,7 +3684,7 @@ describe('Protocol V2 feature adapter', () => {
       { ...descriptor, protocolType: 'V2' } as any,
       {
         hw: { serial_no: 'PR2SERIAL' },
-        fw: { application: { version: '4.15.0' } },
+        main_mcu: { application: { version: '4.15.0' } },
         status: { passphrase_enabled: false },
       }
     );
@@ -3731,7 +3731,7 @@ describe('Protocol V2 feature adapter', () => {
     (device as any).features = normalizeProtocolV2Features(
       { ...descriptor, protocolType: 'V2' } as any,
       {
-        fw: { application: { version: '1.2.3' } },
+        main_mcu: { application: { version: '1.2.3' } },
         status: { unlocked: false },
       }
     );
@@ -4160,7 +4160,7 @@ describe('Protocol V2 firmware update targets', () => {
           type: 'DeviceInfo',
           message: {
             hw: { serial_no: 'BLE-PRO2-SERIAL' },
-            fw: {
+            main_mcu: {
               bootloader: { version: '0.0.0' },
               application: { version: '0.0.0' },
             },
@@ -4212,7 +4212,7 @@ describe('Protocol V2 firmware update targets', () => {
       {
         targets: {
           hw: true,
-          fw: true,
+          main_mcu: true,
           coprocessor: true,
           se1: true,
           se2: true,
@@ -4629,43 +4629,6 @@ describe('Protocol V2 firmware update targets', () => {
     expect((method as any).protocolV2Reboot).not.toHaveBeenCalled();
     expect(method.postTipMessage).not.toHaveBeenCalledWith('AutoRebootToBootloader');
     expect(method.postTipMessage).toHaveBeenCalledWith('GoToBootloaderSuccess');
-  });
-
-  test('keeps an ambiguous legacy runtime on the direct loader update path', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-      },
-    });
-    (method as any).device = stubDevice({
-      originalDescriptor: { id: 'usb-id', path: 'legacy-path', protocolType: 'V2' },
-      state: {
-        raw: {
-          protocolV2ProtocolInfo: {
-            version: 1,
-            build_fingerprint: '',
-            supported_messages: [],
-            protobuf_definition: null,
-          },
-        },
-      },
-      features: {
-        deviceType: 'pro2',
-        mode: 'bootloader',
-        bootloaderMode: true,
-        capabilities: [],
-      },
-      isBootloader: () => true,
-      isRomloader: () => false,
-    });
-    (method as any).protocolV2Reboot = jest.fn();
-    method.postTipMessage = jest.fn();
-
-    await expect((method as any).enterProtocolV2BootloaderMode()).resolves.toBe(false);
-
-    expect((method as any).protocolV2LegacyDirectUpdate).toBe(true);
-    expect((method as any).protocolV2Reboot).not.toHaveBeenCalled();
   });
 
   test('keeps Protocol V2 romloader active before firmware transfer', async () => {
@@ -5116,7 +5079,7 @@ describe('Protocol V2 firmware update targets', () => {
       type: 'DeviceInfo',
       message: {
         hw: { serial_no: 'PR2SERIAL' },
-        fw: { application: { version: '1.0.0' } },
+        main_mcu: { application: { version: '1.0.0' } },
       },
     });
     (method as any).protocolV2ExpectedSerialNumber = 'expected-serial';
@@ -5243,49 +5206,50 @@ describe('Protocol V2 firmware update targets', () => {
     );
   });
 
-  test('requires an explicit Protocol V2 update ACK before entering install state', async () => {
+  test('stages targets before sending the empty Protocol V2 install request', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
       },
     });
-    const typedCall = jest
-      .fn()
-      .mockRejectedValue(
-        Object.assign(
-          new Error("Failed to execute 'open' on 'USBDevice': The device was disconnected"),
-          { name: 'NotFoundError' }
-        )
-      );
+    const targets = [{ target_id: 4, path: 'vol1:firmware.bin' }];
+    const typedCall = jest.fn().mockResolvedValue({ type: 'Success', message: {} });
+    const call = jest.fn().mockResolvedValue({ type: 'WriteCompleted', message: {} });
 
     (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall }),
+      getCommands: () => ({ typedCall, call }),
     });
     method.postTipMessage = jest.fn();
     method.postProgressMessage = jest.fn();
 
     await expect(
-      (method as any).protocolV2StartFirmwareUpdate({
-        targets: [{ target_id: 4, path: 'vol1:firmware.bin' }],
-      })
-    ).rejects.toThrow();
+      (method as any).protocolV2StartFirmwareUpdate({ targets })
+    ).resolves.toBeUndefined();
 
-    expect(method.postTipMessage).not.toHaveBeenCalled();
-    expect(method.postProgressMessage).not.toHaveBeenCalled();
+    expect(typedCall).toHaveBeenCalledWith('DeviceFirmwareUpdateStage', 'Success', { targets });
+    expect(call).toHaveBeenCalledWith(
+      'DeviceFirmwareUpdateRequest',
+      {},
+      { returnAfterWrite: true }
+    );
+    expect(typedCall.mock.invocationCallOrder[0]).toBeLessThan(call.mock.invocationCallOrder[0]);
+    expect(method.postTipMessage).toHaveBeenCalledWith('FirmwareUpdating');
+    expect(method.postProgressMessage).toHaveBeenCalledWith(0, 'installingFirmware');
   });
 
-  test('does not poll Protocol V2 install status when the update ACK times out', async () => {
+  test('does not send the install request when Protocol V2 staging fails', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
       },
     });
-    const typedCall = jest.fn().mockRejectedValue(new Error('LIBUSB_TRANSFER_TIMED_OUT'));
+    const typedCall = jest.fn().mockRejectedValue(new Error('stage failed'));
+    const call = jest.fn();
 
     (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall }),
+      getCommands: () => ({ typedCall, call }),
     });
     method.postTipMessage = jest.fn();
     method.postProgressMessage = jest.fn();
@@ -5294,78 +5258,26 @@ describe('Protocol V2 firmware update targets', () => {
       (method as any).protocolV2StartFirmwareUpdate({
         targets: [{ target_id: 4, path: 'vol1:application_p1.bin' }],
       })
-    ).rejects.toThrow('LIBUSB_TRANSFER_TIMED_OUT');
+    ).rejects.toThrow('stage failed');
 
+    expect(call).not.toHaveBeenCalled();
     expect(method.postTipMessage).not.toHaveBeenCalled();
     expect(method.postProgressMessage).not.toHaveBeenCalled();
   });
 
-  test.each([
-    'Failure_InvalidMessage,Handler not registered',
-    'Failure_InvalidMessage,Unsupported message',
-  ])('reboots a legacy App when the direct update endpoint is unavailable: %s', async message => {
+  test('does not enter install state when writing the empty request fails', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
       },
     });
-    const targets = [{ target_id: 4, path: 'vol0:/application_p1.bin' }];
-    const appTypedCall = jest.fn().mockRejectedValueOnce(new Error(message));
-    const bootloaderTypedCall = jest
-      .fn()
-      .mockResolvedValueOnce({ type: 'Success', message: { message: '' } });
-    let activeCommands = { typedCall: appTypedCall };
+    const typedCall = jest.fn().mockResolvedValue({ type: 'Success', message: {} });
+    const call = jest.fn().mockRejectedValue(new Error('write failed'));
 
     (method as any).device = stubDevice({
-      getCommands: () => activeCommands,
+      getCommands: () => ({ typedCall, call }),
     });
-    (method as any).protocolV2LegacyDirectUpdate = true;
-    (method as any).rebootProtocolV2ToBootloader = jest.fn().mockImplementation(() => {
-      activeCommands = { typedCall: bootloaderTypedCall };
-      return Promise.resolve(true);
-    });
-    method.postTipMessage = jest.fn();
-    method.postProgressMessage = jest.fn();
-
-    await expect((method as any).protocolV2StartFirmwareUpdate({ targets })).resolves.toEqual({
-      type: 'Success',
-      message: { message: '' },
-    });
-
-    expect(appTypedCall).toHaveBeenCalledTimes(1);
-    expect(appTypedCall).toHaveBeenCalledWith(
-      'DeviceFirmwareUpdateRequest',
-      'Success',
-      { targets },
-      { timeoutMs: 180000 }
-    );
-    expect(bootloaderTypedCall).toHaveBeenCalledTimes(1);
-    expect(bootloaderTypedCall).toHaveBeenCalledWith(
-      'DeviceFirmwareUpdateRequest',
-      'Success',
-      { targets },
-      { timeoutMs: 180000 }
-    );
-    expect((method as any).rebootProtocolV2ToBootloader).toHaveBeenCalledTimes(1);
-    expect(method.postTipMessage).toHaveBeenCalledWith('FirmwareUpdating');
-    expect(method.postProgressMessage).toHaveBeenCalledWith(0, 'installingFirmware');
-  });
-
-  test('does not replay a legacy direct update after a link failure', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-      },
-    });
-    const typedCall = jest.fn().mockRejectedValue(new Error('LIBUSB_TRANSFER_TIMED_OUT'));
-
-    (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall }),
-    });
-    (method as any).protocolV2LegacyDirectUpdate = true;
-    (method as any).rebootProtocolV2ToBootloader = jest.fn();
     method.postTipMessage = jest.fn();
     method.postProgressMessage = jest.fn();
 
@@ -5373,10 +5285,9 @@ describe('Protocol V2 firmware update targets', () => {
       (method as any).protocolV2StartFirmwareUpdate({
         targets: [{ target_id: 4, path: 'vol0:/application_p1.bin' }],
       })
-    ).rejects.toThrow('LIBUSB_TRANSFER_TIMED_OUT');
+    ).rejects.toThrow('write failed');
 
-    expect(typedCall).toHaveBeenCalledTimes(1);
-    expect((method as any).rebootProtocolV2ToBootloader).not.toHaveBeenCalled();
+    expect(call).toHaveBeenCalledTimes(1);
     expect(method.postTipMessage).not.toHaveBeenCalled();
     expect(method.postProgressMessage).not.toHaveBeenCalled();
   });
@@ -5424,26 +5335,21 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
 
-  test('accepts a missing firmware status handler only after confirming normal mode', async () => {
+  test('accepts the terminal Success returned by the install request', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
       },
     });
-    const typedCall = jest
-      .fn()
-      .mockRejectedValue(new Error('Failure: Handler not registered for this message'));
+    const typedCall = jest.fn().mockResolvedValue({ type: 'Success', message: {} });
     const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
 
     (method as any).device = stubDevice({
       getCommands: () => ({ typedCall }),
     });
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
-    const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
-    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
-    (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(true);
-    (method as any).protocolV2InstallAckReceived = true;
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
     method.postProgressMessage = jest.fn();
 
     await (method as any).waitForProtocolV2FirmwareUpdateComplete([
@@ -5452,47 +5358,7 @@ describe('Protocol V2 firmware update targets', () => {
 
     expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
     expect(typedCall.mock.calls.map(call => call[0])).toEqual(['DeviceFirmwareUpdateStatusGet']);
-    expect((method as any).probeProtocolV2NormalMode).toHaveBeenCalledWith(deviceInfo);
-    expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
-  });
-
-  test('accepts an empty firmware status dump only after confirming normal mode', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-      },
-    });
-    const typedCall = jest.fn().mockResolvedValue({
-      type: 'DeviceFirmwareUpdateStatus',
-      message: { records: [] },
-    });
-    const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
-    let now = 0;
-    jest.spyOn(Date, 'now').mockImplementation(() => now);
-    jest.spyOn(global, 'setTimeout').mockImplementation(((callback: () => void) => {
-      now += 31 * 1000;
-      callback();
-      return 0 as any;
-    }) as typeof setTimeout);
-
-    (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall }),
-    });
-    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
-    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
-    (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(true);
-    (method as any).protocolV2InstallAckReceived = true;
-    method.postProgressMessage = jest.fn();
-
-    await expect(
-      (method as any).waitForProtocolV2FirmwareUpdateComplete([
-        { target_id: 4, path: 'vol0:/application_p1.bin' },
-      ])
-    ).resolves.toBeUndefined();
-
-    expect(typedCall).toHaveBeenCalledTimes(1);
-    expect((method as any).probeProtocolV2NormalMode).toHaveBeenCalledWith(deviceInfo);
+    expect((method as any).protocolV2FinalStatusVerified).toBe(true);
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
 
@@ -5806,7 +5672,7 @@ describe('Protocol V2 firmware update targets', () => {
     );
   });
 
-  test('polls target status after update ACK and finishes when all targets complete', async () => {
+  test('polls target status after the install request and finishes when all targets complete', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -5841,7 +5707,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
     expect(typedCall).toHaveBeenCalledWith(
       'DeviceFirmwareUpdateStatusGet',
-      'DeviceFirmwareUpdateStatus',
+      ['DeviceFirmwareUpdateStatus', 'Success'],
       expect.anything(),
       expect.anything()
     );
@@ -6117,7 +5983,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
     expect(typedCall).toHaveBeenCalledWith(
       'DeviceFirmwareUpdateStatusGet',
-      'DeviceFirmwareUpdateStatus',
+      ['DeviceFirmwareUpdateStatus', 'Success'],
       {
         fields: {
           status: true,
@@ -7317,9 +7183,10 @@ describe('Protocol V2 firmware update targets', () => {
       ],
     };
     const zip = new JSZip();
-    zip.file('manifest.json', JSON.stringify(manifest));
-    zip.file('bundles/images/images.okpkg', imagesBinary);
-    zip.file('loaders/bootloader/boot_resource.okpkg', bootResourceBinary);
+    zip.file('pro2-resource/manifest.json', JSON.stringify(manifest));
+    zip.file('pro2-resource/bundles/images/images.okpkg', imagesBinary);
+    zip.file('pro2-resource/loaders/bootloader/boot_resource.okpkg', bootResourceBinary);
+    zip.file('pro2-resource/build-info.txt', 'ignored');
     const resourceArchiveBinary = await zip.generateAsync({ type: 'arraybuffer' });
     const applicationP1Binary = new Uint8Array([7, 8, 9]).buffer;
     const bootloaderBinary = new Uint8Array([10, 11, 12]).buffer;
@@ -7393,6 +7260,39 @@ describe('Protocol V2 firmware update targets', () => {
       releaseSpy.mockRestore();
       reloadSpy.mockRestore();
     }
+  });
+
+  test('accepts a local resource ZIP without manifest.json', async () => {
+    const imagesBinary = new Uint8Array([1, 2, 3]).buffer;
+    const bootResourceBinary = new Uint8Array([4, 5, 6]).buffer;
+    const zip = new JSZip();
+    zip.file('pro2-resource/bundles/images/images.okpkg', imagesBinary);
+    zip.file('pro2-resource/loaders/bootloader/boot_resource.okpkg', bootResourceBinary);
+    zip.file('pro2-resource/build-info.txt', 'ignored');
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+        targetsToUpdate: ['resource'],
+      },
+    });
+    method.init();
+
+    await expect(
+      (method as any).prepareProtocolV2LocalResourceArchive(
+        await zip.generateAsync({ type: 'arraybuffer' })
+      )
+    ).resolves.toMatchObject({
+      materializedEntries: [
+        { entryName: 'manifest.json' },
+        { entryName: 'bundles/images/images.okpkg', binary: imagesBinary },
+        {
+          entryName: 'loaders/bootloader/boot_resource.okpkg',
+          binary: bootResourceBinary,
+        },
+      ],
+    });
   });
 
   test('rejects a local resource ZIP whose file hash does not match its manifest', async () => {
@@ -7485,18 +7385,57 @@ describe('Protocol V2 firmware update targets', () => {
 
   test('rejects an oversized ZIP entry before allocating its decompressed bytes', async () => {
     const extractEntry = jest.fn();
-    const loadSpy = jest.spyOn(JSZip, 'loadAsync').mockResolvedValue({
-      files: {
-        'manifest.json': {
-          name: 'manifest.json',
-          dir: false,
-          _data: {
-            compressedSize: 1,
-            uncompressedSize: 2 * 1024 * 1024,
+    const oversizedFileSize = 257 * 1024 * 1024;
+    const manifestBinary = new TextEncoder().encode(
+      JSON.stringify({
+        files: [
+          {
+            archive_path: 'loaders/bootloader/boot_resource.okpkg',
+            original_name: 'boot_resource.okpkg',
+            device_path: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+            size: oversizedFileSize,
+            sha256: '0'.repeat(64),
+            signed: true,
+            sig_algo: 'ed25519',
           },
-          async: extractEntry,
+          {
+            archive_path: 'bundles/images/images.okpkg',
+            original_name: 'images.okpkg',
+            device_path: 'vol0:/bundles/images/images.okpkg',
+            size: oversizedFileSize,
+            sha256: '0'.repeat(64),
+            signed: true,
+            sig_algo: 'ed25519',
+          },
+        ],
+      })
+    );
+    const zipFiles = {
+      'manifest.json': {
+        name: 'manifest.json',
+        dir: false,
+        _data: {
+          compressedSize: manifestBinary.byteLength,
+          uncompressedSize: manifestBinary.byteLength,
         },
+        async: jest.fn().mockResolvedValue(manifestBinary.buffer),
       },
+      'loaders/bootloader/boot_resource.okpkg': {
+        name: 'loaders/bootloader/boot_resource.okpkg',
+        dir: false,
+        _data: { compressedSize: 1, uncompressedSize: oversizedFileSize },
+        async: extractEntry,
+      },
+      'bundles/images/images.okpkg': {
+        name: 'bundles/images/images.okpkg',
+        dir: false,
+        _data: { compressedSize: 1, uncompressedSize: oversizedFileSize },
+        async: extractEntry,
+      },
+    };
+    const loadSpy = jest.spyOn(JSZip, 'loadAsync').mockResolvedValue({
+      files: zipFiles,
+      file: (name: string) => zipFiles[name as keyof typeof zipFiles] ?? null,
     } as unknown as JSZip);
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -7511,7 +7450,7 @@ describe('Protocol V2 firmware update targets', () => {
     try {
       await expect(
         (method as any).prepareProtocolV2LocalResourceArchive(new Uint8Array([1]).buffer)
-      ).rejects.toThrow('declared size exceeds the allowed limit');
+      ).rejects.toThrow('declared size is invalid');
       expect(extractEntry).not.toHaveBeenCalled();
     } finally {
       loadSpy.mockRestore();
@@ -8267,23 +8206,24 @@ describe('Protocol V2 firmware update targets', () => {
     expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([1960, 1]);
   });
 
-  test('ends device confirmation and starts install progress only after Protocol V2 ACK', async () => {
+  test('starts install progress only after Stage and the empty Request are written', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
       },
     });
-    let resolveRequest: ((value: unknown) => void) | undefined;
-    const typedCall = jest.fn().mockImplementation(
+    let resolveWrite: ((value: unknown) => void) | undefined;
+    const typedCall = jest.fn().mockResolvedValue({ type: 'Success', message: {} });
+    const call = jest.fn().mockImplementation(
       () =>
         new Promise(resolve => {
-          resolveRequest = resolve;
+          resolveWrite = resolve;
         })
     );
 
     (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall }),
+      getCommands: () => ({ typedCall, call }),
     });
     method.postProgressMessage = jest.fn();
     method.postTipMessage = jest.fn();
@@ -8291,21 +8231,31 @@ describe('Protocol V2 firmware update targets', () => {
     const startPromise = (method as any).protocolV2StartFirmwareUpdate({
       targets: [{ target_id: 4, path: 'vol1:firmware.bin' }],
     });
-    await Promise.resolve();
+    await new Promise<void>(resolve => {
+      setImmediate(resolve);
+    });
 
-    expect(typedCall.mock.calls[0][1]).toBe('Success');
-    expect(typedCall.mock.calls[0][3]).toEqual(expect.objectContaining({ timeoutMs: 180_000 }));
+    expect(typedCall.mock.calls[0]).toEqual([
+      'DeviceFirmwareUpdateStage',
+      'Success',
+      { targets: [{ target_id: 4, path: 'vol1:firmware.bin' }] },
+    ]);
+    expect(call).toHaveBeenCalledWith(
+      'DeviceFirmwareUpdateRequest',
+      {},
+      { returnAfterWrite: true }
+    );
     expect(method.postTipMessage).not.toHaveBeenCalled();
     expect(method.postProgressMessage).not.toHaveBeenCalled();
 
-    resolveRequest?.({ type: 'Success', message: { message: 'ok' } });
+    resolveWrite?.({ type: 'WriteCompleted', message: {} });
     await startPromise;
     expect(method.postTipMessage).toHaveBeenCalledWith('FirmwareUpdating');
     expect(method.postProgressMessage).toHaveBeenCalledWith(0, 'installingFirmware');
     expect(method.postTipMessage).toHaveBeenCalledTimes(1);
   });
 
-  test('requests only a Success ACK for Protocol V2 firmware install', async () => {
+  test('sends an empty Protocol V2 firmware install request without waiting for its response', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -8316,9 +8266,10 @@ describe('Protocol V2 firmware update targets', () => {
       type: 'Success',
       message: { message: 'accepted' },
     });
+    const call = jest.fn().mockResolvedValue({ type: 'WriteCompleted', message: {} });
 
     (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall }),
+      getCommands: () => ({ typedCall, call }),
     });
     method.postProgressMessage = jest.fn();
     method.postTipMessage = jest.fn();
@@ -8327,7 +8278,12 @@ describe('Protocol V2 firmware update targets', () => {
       targets: [{ target_id: 4, path: 'vol1:firmware.bin' }],
     });
 
-    expect(typedCall.mock.calls[0][1]).toBe('Success');
+    expect(typedCall.mock.calls[0][0]).toBe('DeviceFirmwareUpdateStage');
+    expect(call).toHaveBeenCalledWith(
+      'DeviceFirmwareUpdateRequest',
+      {},
+      { returnAfterWrite: true }
+    );
     expect(method.postTipMessage).toHaveBeenCalledWith('FirmwareUpdating');
   });
 });
@@ -9401,7 +9357,7 @@ describe('Protocol V2 current low-level methods', () => {
       info: {
         version: undefined,
         serial_number: 'PR2SERIAL',
-        burn_in_completed: true,
+        factory_burn_in_completed: true,
         factory_test_completed: undefined,
         manufacture_time: undefined,
       },
@@ -9651,7 +9607,7 @@ describe('Protocol V2 raw device info method', () => {
       'DeviceInfoGet',
       'DeviceInfo',
       {
-        targets: { hw: true, fw: true, coprocessor: true },
+        targets: { hw: true, main_mcu: true, coprocessor: true },
         types: { version: true, specific: true },
       },
       { timeoutMs: PROTOCOL_V2_DEVICE_INFO_TIMEOUT_MS }

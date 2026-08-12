@@ -5,7 +5,7 @@ import { invalidParameter } from '../helpers/filesystemValidation';
 
 export type DeviceInfoGetTargets = {
   hw?: boolean;
-  fw?: boolean;
+  main_mcu?: boolean;
   coprocessor?: boolean;
   se1?: boolean;
   se2?: boolean;
@@ -27,7 +27,7 @@ export type DeviceInfoGetParams = {
 
 const TARGET_KEYS: (keyof DeviceInfoGetTargets)[] = [
   'hw',
-  'fw',
+  'main_mcu',
   'coprocessor',
   'se1',
   'se2',
@@ -39,7 +39,7 @@ const TYPE_KEYS: (keyof DeviceInfoGetTypes)[] = ['version', 'build_id', 'hash', 
 
 const DEFAULT_TARGETS: DeviceInfoGetTargets = {
   hw: true,
-  fw: true,
+  main_mcu: true,
   coprocessor: true,
 };
 

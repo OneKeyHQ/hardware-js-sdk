@@ -107,10 +107,10 @@ function parseProtocolV2ResourceManifestFile(
   }
   const file = value as Partial<IProtocolV2ResourceManifestFile>;
   const archivePath = assertManifestRelativePath(file.archive_path, `files[${index}].archive_path`);
-  const originalName = assertManifestRelativePath(
-    file.original_name,
-    `files[${index}].original_name`
-  );
+  const originalName =
+    file.original_name === undefined
+      ? archivePath.split('/').pop() ?? archivePath
+      : assertManifestRelativePath(file.original_name, `files[${index}].original_name`);
   if (originalName.includes('/')) {
     throw new Error(`Invalid Pro2 resource manifest files[${index}].original_name`);
   }
@@ -122,15 +122,6 @@ function parseProtocolV2ResourceManifestFile(
     throw new Error(`Invalid Pro2 resource manifest files[${index}].size`);
   }
   const digest = normalizeHex(file.sha256, SHA256_HEX_LENGTH, `files[${index}].sha256`);
-  if (file.signed !== true) {
-    throw new Error(`Invalid Pro2 resource manifest files[${index}].signed`);
-  }
-  if (file.sig_algo !== 'ed25519' && file.sig_algo !== 'mldsa65') {
-    throw new Error(`Invalid Pro2 resource manifest files[${index}].sig_algo`);
-  }
-  if (file.payload_version !== null && typeof file.payload_version !== 'string') {
-    throw new Error(`Invalid Pro2 resource manifest files[${index}].payload_version`);
-  }
   if (!archivePath.endsWith('.okpkg') || !originalName.endsWith('.okpkg')) {
     throw new Error(`Invalid Pro2 resource manifest files[${index}] package extension`);
   }
@@ -140,9 +131,9 @@ function parseProtocolV2ResourceManifestFile(
     device_path: devicePath,
     size: Number(file.size),
     sha256: digest,
-    signed: true,
-    sig_algo: file.sig_algo,
-    payload_version: file.payload_version ?? null,
+    ...(file.signed === undefined ? {} : { signed: file.signed }),
+    ...(file.sig_algo === undefined ? {} : { sig_algo: file.sig_algo }),
+    ...(file.payload_version === undefined ? {} : { payload_version: file.payload_version }),
   };
 }
 
@@ -151,15 +142,8 @@ export function parseProtocolV2ResourceManifest(value: unknown): IProtocolV2Reso
     throw new Error('Invalid Pro2 resource manifest');
   }
   const manifest = value as Partial<IProtocolV2ResourceManifest>;
-  if (
-    manifest.schema !== 1 ||
-    manifest.variant !== 'resource' ||
-    manifest.device_root !== 'vol0:' ||
-    manifest.restore_mode !== 'bootloader_update' ||
-    !Array.isArray(manifest.trees) ||
-    !Array.isArray(manifest.files)
-  ) {
-    throw new Error('Invalid Pro2 resource manifest contract');
+  if (!Array.isArray(manifest.files)) {
+    throw new Error('Invalid Pro2 resource manifest files');
   }
   const files = manifest.files.map(parseProtocolV2ResourceManifestFile);
   const devicePaths = new Set(files.map(file => file.device_path));
@@ -174,27 +158,6 @@ export function parseProtocolV2ResourceManifest(value: unknown): IProtocolV2Reso
     throw new Error('Invalid Pro2 resource manifest file set');
   }
   return {
-    schema: 1,
-    artifact_name: assertManifestString(manifest.artifact_name, 'artifact_name'),
-    release_name: assertManifestString(manifest.release_name, 'release_name'),
-    variant: 'resource',
-    commit: assertManifestString(manifest.commit, 'commit'),
-    short_sha: assertManifestString(manifest.short_sha, 'short_sha'),
-    timestamp_utc: assertManifestString(manifest.timestamp_utc, 'timestamp_utc'),
-    core_version: assertManifestString(manifest.core_version, 'core_version'),
-    key_set: assertManifestString(manifest.key_set, 'key_set'),
-    device_root: 'vol0:',
-    restore_mode: 'bootloader_update',
-    trees: manifest.trees.map((tree, index) => {
-      if (!tree || typeof tree !== 'object') {
-        throw new Error(`Invalid Pro2 resource manifest trees[${index}]`);
-      }
-      const item = tree as { path?: unknown; device?: unknown };
-      return {
-        path: assertManifestRelativePath(item.path, `trees[${index}].path`),
-        device: assertManifestString(item.device, `trees[${index}].device`),
-      };
-    }),
     files,
   };
 }

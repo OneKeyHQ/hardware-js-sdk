@@ -353,7 +353,7 @@ describe('public device lifecycle events', () => {
             message: {
               protocol_version: 2,
               hw: { Device_type: protocolV2DeviceType, serial_no: 'SERIAL-001' },
-              fw: { application: { version: '5.0.0' } },
+              main_mcu: { application: { version: '5.0.0' } },
             },
           };
         }
