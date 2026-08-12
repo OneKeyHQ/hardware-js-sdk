@@ -299,7 +299,7 @@ describe('ElectronBleTransport protocol detection', () => {
     }
   });
 
-  test('reconnects Protocol V1 with a non-destructive GetFeatures probe', async () => {
+  test('reconnects Protocol V1 with an Initialize probe', async () => {
     const device = { id: 'classic-id', name: 'OneKey Classic' };
     const nobleBle = createNobleBle(device);
     let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
@@ -313,7 +313,7 @@ describe('ElectronBleTransport protocol detection', () => {
       return jest.fn();
     });
     nobleBle.write.mockImplementation(() => {
-      // The first write is the V1 GetFeatures probe; answer with a V1 Success response.
+      // The first write is the V1 Initialize probe; answer with a V1 Success response.
       setTimeout(() => notificationHandler?.(device.id, v1ResponseHex), 0);
       return Promise.resolve();
     });
@@ -333,7 +333,7 @@ describe('ElectronBleTransport protocol detection', () => {
         })
       );
       expect(nobleBle.write).toHaveBeenCalledTimes(2);
-      expect(nobleBle.write.mock.calls.every(([, hex]) => /^3f23230037/.test(hex))).toBe(true);
+      expect(nobleBle.write.mock.calls.every(([, hex]) => /^3f23230001/.test(hex))).toBe(true);
       expect(protocolV2Writer).not.toHaveBeenCalled();
     } finally {
       await transport.release(device.id);

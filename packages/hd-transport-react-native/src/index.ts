@@ -1518,13 +1518,13 @@ export default class ReactNativeBleTransport {
       const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
-      if (name === 'GetFeatures' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS) {
-        Log?.debug('[ReactNativeBleTransport] Protocol V1 GetFeatures probe call failed:', e);
+      if (name === 'Initialize' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS) {
+        Log?.debug('[ReactNativeBleTransport] Protocol V1 Initialize probe call failed:', e);
       } else {
         Log?.error('call error: ', e);
       }
       const isProbeTimeout =
-        name === 'GetFeatures' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS;
+        name === 'Initialize' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS;
       // A call that has been superseded (forceRun) or cleaned up no longer owns the
       // transport; its late timeout must not tear down the connection the current
       // call is actively using.
@@ -1868,7 +1868,7 @@ export default class ReactNativeBleTransport {
   private createProtocolDetectionError() {
     return ERRORS.TypedError(
       HardwareErrorCode.BleTimeoutError,
-      'Unable to detect BLE protocol: device did not respond to Protocol V1 GetFeatures or Protocol V2 Ping'
+      'Unable to detect BLE protocol: device did not respond to Protocol V1 Initialize or Protocol V2 Ping'
     );
   }
 
@@ -2044,14 +2044,12 @@ export default class ReactNativeBleTransport {
 
     try {
       this.probingProtocols.set(uuid, 'V1');
-      // GetFeatures identifies Protocol V1 without resetting an existing wallet
-      // session before Core has a chance to restore a hidden wallet.
-      await this.callProtocolV1(uuid, 'GetFeatures', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
+      await this.callProtocolV1(uuid, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
       this.probingProtocols.delete(uuid);
       return true;
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
-      Log?.debug('[ReactNativeBleTransport] Protocol V1 GetFeatures probe failed:', error);
+      Log?.debug('[ReactNativeBleTransport] Protocol V1 Initialize probe failed:', error);
       // A wedged write already dropped the link, so probing another protocol on it
       // would only fail against a torn-down transport: surface the real cause.
       if (isWedgedWriteError(error)) {

@@ -78,7 +78,7 @@ const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
  * Desktop Electron BLE transport with automatic Protocol V1/V2 detection.
  *
  * Protocol V1 devices continue using chunked packets. Protocol V2 is detected
- * after a Protocol V1 GetFeatures timeout by probing Protocol V2 Ping.
+ * after a Protocol V1 Initialize timeout by probing Protocol V2 Ping.
  */
 export default class ElectronBleTransport {
   private _messages: ReturnType<typeof transport.parseConfigure> | undefined;
@@ -452,7 +452,7 @@ export default class ElectronBleTransport {
   private createProtocolDetectionError() {
     return ERRORS.TypedError(
       HardwareErrorCode.BleTimeoutError,
-      'Unable to detect BLE protocol: device did not respond to Protocol V1 GetFeatures or Protocol V2 Ping'
+      'Unable to detect BLE protocol: device did not respond to Protocol V1 Initialize or Protocol V2 Ping'
     );
   }
 
@@ -579,13 +579,11 @@ export default class ElectronBleTransport {
 
     try {
       this.deviceProtocol.set(uuid, 'V1');
-      // GetFeatures identifies Protocol V1 without resetting an existing wallet
-      // session before Core has a chance to restore a hidden wallet.
-      await this.callProtocolV1(uuid, 'GetFeatures', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
+      await this.callProtocolV1(uuid, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
       return true;
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
-      this.Log?.debug('[Electron BLE] Protocol V1 GetFeatures probe failed:', error);
+      this.Log?.debug('[Electron BLE] Protocol V1 Initialize probe failed:', error);
       return false;
     }
   }
@@ -875,7 +873,7 @@ export default class ElectronBleTransport {
     } catch (e) {
       this.Log?.error('[Electron BLE] Protocol V1 call error:', e);
       const isProbeTimeout =
-        name === 'GetFeatures' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS;
+        name === 'Initialize' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS;
       if ((e as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleTimeoutError) {
         this.v1Buffers.set(uuid, { buffer: [], bufferLength: 0 });
         const notifyCleanup = this.notificationCleanups.get(uuid);
