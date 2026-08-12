@@ -90,6 +90,7 @@ const PROTOCOL_V2_FINAL_RECONNECT_TIMEOUT = 3 * 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
 const PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT = 15 * 1000;
 const PROTOCOL_V2_INSTALL_TIMEOUT = 8 * 60 * 1000;
+const PROTOCOL_V2_INSTALL_STATUS_INITIAL_DELAY = 1000;
 const PROTOCOL_V2_MISSING_TARGET_STATUS_GRACE_TIMEOUT = 30 * 1000;
 const PROTOCOL_V2_TARGET_STATUS_PENDING = 0;
 const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
@@ -2405,7 +2406,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       path: item.path,
     }));
     await this.protocolV2StartFirmwareUpdate({ targets });
-    await this.waitForProtocolV2FirmwareUpdateComplete(targets);
+    await wait(PROTOCOL_V2_INSTALL_STATUS_INITIAL_DELAY);
+    await this.waitForProtocolV2FirmwareUpdateComplete(targets, true);
   }
 
   private async protocolV2SourceUpdateProcess({
@@ -2657,7 +2659,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private async waitForProtocolV2FirmwareUpdateComplete(
-    targets: Array<{ target_id: number; path: string }>
+    targets: Array<{ target_id: number; path: string }>,
+    requireCurrentInstallStatus = false
   ) {
     this.protocolV2FinalStatusVerified = false;
     const expectedTargetIds = new Set(targets.map(target => target.target_id));
@@ -2670,6 +2673,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let missingTargetStatusKey: string | undefined;
     let normalModeWithoutInstallEvidenceSince: number | undefined;
     let installEvidenceObserved = false;
+    let currentInstallStatusObserved = false;
     const resetMissingTargetStatusGrace = () => {
       missingTargetStatusSince = undefined;
       missingTargetStatusKey = undefined;
@@ -2700,24 +2704,66 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             { timeoutMs: PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT }
           );
           if (statusResponse.type === 'Success') {
-            this.protocolV2FinalStatusVerified = true;
-            this.postProgressMessage(100, 'installingFirmware');
-            return;
+            installEvidenceObserved = true;
+            resetMissingTargetStatusGrace();
+            lastError = new Error(
+              'Protocol V2 firmware install acknowledged; waiting for target status'
+            );
           }
-          const statusTargets = (statusResponse.message.records ??
-            []) as ProtocolV2FirmwareUpdateStatusTarget[];
+          const statusTargets =
+            statusResponse.type === 'DeviceFirmwareUpdateStatus'
+              ? ((statusResponse.message.records ?? []) as ProtocolV2FirmwareUpdateStatusTarget[])
+              : [];
           if (
             statusTargets.some(target => {
               const targetId = normalizeProtocolV2TargetId(target.target_id);
-              return targetId !== undefined && expectedTargetIds.has(targetId);
+              return (
+                targetId !== undefined &&
+                expectedTargetIds.has(targetId) &&
+                isProtocolV2TargetStatusInProgress(target.status)
+              );
             })
+          ) {
+            currentInstallStatusObserved = true;
+          }
+          const hasMatchingTargetStatus = statusTargets.some(target => {
+            const targetId = normalizeProtocolV2TargetId(target.target_id);
+            return targetId !== undefined && expectedTargetIds.has(targetId);
+          });
+          if (
+            hasMatchingTargetStatus &&
+            (!requireCurrentInstallStatus || currentInstallStatusObserved)
           ) {
             installEvidenceObserved = true;
             normalModeWithoutInstallEvidenceSince = undefined;
           }
-          if (this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds, expectedPaths)) {
+          const matchingStatusTargets = statusTargets.filter(target => {
+            const targetId = normalizeProtocolV2TargetId(target.target_id);
+            return targetId !== undefined && expectedTargetIds.has(targetId);
+          });
+          const allReportedTargetsFinished =
+            matchingStatusTargets.length > 0 &&
+            matchingStatusTargets.every(target => isProtocolV2TargetStatusFinished(target.status));
+          const shouldVerifyTargetCompletion =
+            !requireCurrentInstallStatus ||
+            currentInstallStatusObserved ||
+            !allReportedTargetsFinished;
+          if (
+            shouldVerifyTargetCompletion &&
+            this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds, expectedPaths)
+          ) {
             this.protocolV2FinalStatusVerified = true;
             return;
+          }
+
+          if (
+            requireCurrentInstallStatus &&
+            !currentInstallStatusObserved &&
+            allReportedTargetsFinished
+          ) {
+            lastError = new Error(
+              'Protocol V2 firmware status is stale; waiting for the current install to start'
+            );
           }
 
           if (statusTargets.length === 0 && currentDeviceInfo) {
@@ -2735,36 +2781,45 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             }
           }
 
-          const missingTargetIds = this.getProtocolV2MissingTargetIds(
-            statusTargets,
-            expectedTargetIds
-          );
-          if (missingTargetIds.length > 0) {
-            const now = Date.now();
-            const missingKey = missingTargetIds.join(',');
-            if (missingTargetStatusSince === undefined || missingTargetStatusKey !== missingKey) {
-              missingTargetStatusSince = now;
-              missingTargetStatusKey = missingKey;
-            } else if (
-              now - missingTargetStatusSince >=
-              PROTOCOL_V2_MISSING_TARGET_STATUS_GRACE_TIMEOUT
-            ) {
-              const reportedTargetIds = statusTargets
-                .map(target => normalizeProtocolV2TargetId(target.target_id))
-                .filter((targetId): targetId is number => targetId !== undefined);
-              throw ERRORS.TypedError(
-                HardwareErrorCode.FirmwareError,
-                `Protocol V2 firmware status is missing requested records: targetIds=${missingKey} reportedTargetIds=${reportedTargetIds.join(
-                  ','
-                )}`
+          if (statusTargets.length === 0) {
+            resetMissingTargetStatusGrace();
+            if (statusResponse.type !== 'Success') {
+              lastError = new Error(
+                'Protocol V2 firmware update is waiting for user confirmation or target status'
               );
             }
-            lastError = new Error(
-              `Protocol V2 firmware status is temporarily missing targetIds=${missingKey}`
-            );
           } else {
-            resetMissingTargetStatusGrace();
-            lastError = new Error('Protocol V2 firmware targets are still installing');
+            const missingTargetIds = this.getProtocolV2MissingTargetIds(
+              statusTargets,
+              expectedTargetIds
+            );
+            if (missingTargetIds.length > 0) {
+              const now = Date.now();
+              const missingKey = missingTargetIds.join(',');
+              if (missingTargetStatusSince === undefined || missingTargetStatusKey !== missingKey) {
+                missingTargetStatusSince = now;
+                missingTargetStatusKey = missingKey;
+              } else if (
+                now - missingTargetStatusSince >=
+                PROTOCOL_V2_MISSING_TARGET_STATUS_GRACE_TIMEOUT
+              ) {
+                const reportedTargetIds = statusTargets
+                  .map(target => normalizeProtocolV2TargetId(target.target_id))
+                  .filter((targetId): targetId is number => targetId !== undefined);
+                throw ERRORS.TypedError(
+                  HardwareErrorCode.FirmwareError,
+                  `Protocol V2 firmware status is missing requested records: targetIds=${missingKey} reportedTargetIds=${reportedTargetIds.join(
+                    ','
+                  )}`
+                );
+              }
+              lastError = new Error(
+                `Protocol V2 firmware status is temporarily missing targetIds=${missingKey}`
+              );
+            } else {
+              resetMissingTargetStatusGrace();
+              lastError = new Error('Protocol V2 firmware targets are still installing');
+            }
           }
         } catch (error) {
           if (isProtocolV2TerminalInstallStatusError(error)) {
