@@ -44,6 +44,7 @@
     "@onekeyfe/hwk-trezor-protobuf": "1.2.1",
     "@onekeyfe/hwk-trezor-protocol": "1.2.1",
     "@onekeyfe/hwk-trezor-transport": "1.2.1",
+    "@onekeyfe/hwk-trezor-transport-common": "1.2.1",
     "buffer": "^6.0.3",
     "rimraf": "^5.0.0",
     "tsup": "^8.0.0",

@@ -21,6 +21,10 @@ const aliases: Record<string, string> = {
   ),
   '@onekeyfe/hwk-trezor-transport': resolve(__dirname, '../hwk-trezor-transport/src/index.ts'),
   '@onekeyfe/hwk-trezor-transport/hwk': resolve(__dirname, '../hwk-trezor-transport/hwk.ts'),
+  '@onekeyfe/hwk-trezor-transport-common': resolve(
+    __dirname,
+    '../hwk-trezor-transport-common/src/index.ts'
+  ),
   '@onekeyfe/hwk-trezor-type-utils': resolve(__dirname, '../hwk-trezor-type-utils/src/index.ts'),
   '@onekeyfe/hwk-trezor-utils': resolve(__dirname, '../hwk-trezor-utils/src/index.ts'),
   crypto: resolve(__dirname, 'src/runtime/crypto.ts'),
@@ -54,6 +58,7 @@ export default defineConfig({
     '@onekeyfe/hwk-trezor-protocol',
     '@onekeyfe/hwk-trezor-schema-utils',
     '@onekeyfe/hwk-trezor-transport',
+    '@onekeyfe/hwk-trezor-transport-common',
     '@onekeyfe/hwk-trezor-type-utils',
     '@onekeyfe/hwk-trezor-utils',
     '@trezor/protobuf',
