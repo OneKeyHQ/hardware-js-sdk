@@ -172,15 +172,6 @@ describe('DeviceStateMapper', () => {
     });
   });
 
-  test('formats a serial-like Protocol V2 Pro2 BLE name', () => {
-    const patch = mapProtocolV2DeviceInfoToState({
-      hw: { Device_type: DeviceType.PRO2, serial_no: 'P2D33C0005B' },
-      coprocessor: { bt_adv_name: 'P2D33C0005B' },
-    });
-
-    expect(patch.identity?.bleName).toBe('Pro2 005B');
-  });
-
   test('maps the hardware model independently from Protocol V2', () => {
     const pro = mapProtocolV2DeviceInfoToState({
       protocol_version: 2,

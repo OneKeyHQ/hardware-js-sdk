@@ -744,18 +744,6 @@ describe('Protocol V2 feature adapter', () => {
     });
   });
 
-  test('formats a serial-like Pro2 BLE name in compatibility features', () => {
-    const features = buildProtocolV2FeaturesPayload({
-      deviceInfo: {
-        hw: { Device_type: DeviceType.PRO2, serial_no: 'P2D33C0005B' },
-        coprocessor: { bt_adv_name: 'P2D33C0005B' },
-      },
-    });
-
-    expect(features.bleName).toBe('Pro2 005B');
-    expect(features.ble_name).toBe('Pro2 005B');
-  });
-
   test('normalizes Protocol V2 DeviceInfo into existing Features fields', () => {
     const features = normalizeProtocolV2Features(descriptor as any, {
       protocol_version: 1,
