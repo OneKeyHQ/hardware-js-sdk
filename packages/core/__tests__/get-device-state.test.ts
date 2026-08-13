@@ -116,6 +116,39 @@ describe('getDeviceState', () => {
     expect(state).not.toHaveProperty('session');
   });
 
+  test('emits an authoritative Protocol V1 settings snapshot when the SDK cache is unchanged', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      message: {
+        onekey_device_type: 'PRO',
+        initialized: true,
+        language: 'zh_hk',
+        brightness_prcent: 88,
+      },
+    });
+    const device = createV1Device(typedCall);
+    await device.getDeviceState({ refreshSections: ['settings'] });
+    const cachedRevision = device.state?.revision;
+    const onState = jest.fn();
+    device.on(DEVICE.STATE, onState);
+
+    const state = await device.getDeviceState({ refreshSections: ['settings'] });
+
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenLastCalledWith('GetFeatures', 'Features', {});
+    expect(state.settings.language).toBe('zh_hk');
+    expect(state.revision).toBe(cachedRevision);
+    expect(onState).toHaveBeenCalledWith(
+      device,
+      expect.objectContaining({
+        source: 'settings-read',
+        changedKeys: ['settings'],
+        state: expect.objectContaining({
+          settings: expect.objectContaining({ language: 'zh_hk', brightness: 88 }),
+        }),
+      })
+    );
+  });
+
   test('hydrates Protocol V2 with separate DeviceInfoGet and DeviceStatusGet', async () => {
     const typedCall = jest.fn().mockImplementation((requestType: string) => {
       if (requestType === 'DeviceInfoGet') {

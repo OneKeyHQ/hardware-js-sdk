@@ -344,13 +344,16 @@ HardwareSDK.on(FIRMWARE_EVENT, message => {
 | ------------------------- | ---------------------- | ---------------------------------------- | -------------------------------------------------- |
 | `DEVICE.CONNECT`          | Transport / DevicePool | DevicePool 枚举或初始化出设备            | `{ device: KnownDevice }` 快照                     |
 | `DEVICE.DISCONNECT`       | Transport / DevicePool | USB 拔出、BLE 断开或 DevicePool 移除设备 | `{ device: KnownDevice }` 快照                     |
-| `DEVICE.STATE`            | 设备响应               | DeviceState 实际发生变化                 | `DeviceStateEvent`                                 |
-| `DEVICE.FEATURES`         | Protocol V1 兼容投影   | V1 DeviceState 实际发生变化              | `Features`                                         |
+| `DEVICE.STATE`            | 设备响应               | DeviceState 变化或权威设置快照读回       | `DeviceStateEvent`                                 |
+| `DEVICE.FEATURES`         | Protocol V1 兼容投影   | V1 DeviceState 变化或权威设置快照读回    | `Features`                                         |
 | `DEVICE.SUPPORT_FEATURES` | SDK 能力计算           | BaseMethod 运行前计算附加能力            | `{ inputPinOnSoftware, modifyHomescreen, device }` |
 
 `SUPPORT_FEATURES` 不是硬件主动推送。它是 SDK 根据设备型号和 Features 计算出的业务辅助信息。
 
-`DEVICE.STATE` 是 V1/V2 的统一状态变更通知。它可能来自设备读取或解锁结果；相同状态不会重复发送。
+`DEVICE.STATE` 是 V1/V2 的统一状态通知。它可能来自设备读取或解锁结果；普通读取不会重复发送
+相同状态。Protocol V1 的权威 settings 读取即使与 Core 缓存相同，也会发送
+`source='settings-read' + changedKeys=['settings']` 的完整快照。连接初始化可能在本次 API 的设备监听器
+挂载前更新 Core 缓存，强制发送可保证宿主仍能把该 settings 分区同步到自己的持久化状态。
 两种协议的设置写入成功后都会强制读回设备状态，只发布设备返回的状态。新接入只消费完整
 `DeviceState`，无需识别底层协议。
 

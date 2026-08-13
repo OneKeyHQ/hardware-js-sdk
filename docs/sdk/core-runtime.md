@@ -122,7 +122,9 @@ Protocol V1 的发送边界兼容早期 SDK 1.2 alpha 暴露的 `0`，并将其�
 `safetyChecks` 在公共写入参数、`DeviceState` 和事件中统一使用数值枚举
 `Strict=0`、`PromptAlways=1`、`PromptTemporarily=2`。
 
-每次实际状态变化都会发送 `DEVICE.STATE`。宿主应用应监听该事件并持久化完整状态，
+实际状态变化和 Protocol V1 权威 settings 读回都会发送 `DEVICE.STATE`。V1 settings 读回即使与
+Core 缓存相同，也会用 `source='settings-read'` 广播完整 settings 分区，避免连接初始化早于本次调用的
+设备监听器时，宿主遗漏已经进入 Core 缓存的设备端变化。宿主应用应监听该事件并持久化完整状态，
 不需要为 label、language、auto-lock 等字段分别维护手工数据库 patch。Protocol V1 额外发送
 兼容事件 `DEVICE.FEATURES`；Protocol V2 不发送该事件。两种协议的设置写入成功后都会强制刷新
 设备设置，状态只以设备读回结果为准；不会再用请求参数生成 `settings-write` patch。Protocol V1

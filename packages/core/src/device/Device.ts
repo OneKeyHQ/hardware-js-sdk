@@ -989,7 +989,7 @@ export class Device extends EventEmitter {
     }
   }
 
-  async getFeatures() {
+  async getFeatures(options?: { source?: DeviceStateUpdateSource; forceChangedKeys?: string[] }) {
     if (this.isProtocolV2()) {
       const deviceInfo = await requestProtocolV2DeviceInfo({
         commands: this.commands,
@@ -998,7 +998,7 @@ export class Device extends EventEmitter {
     }
 
     const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
-    this._updateFeatures(message);
+    this._updateFeatures(message, undefined, options);
     return this.features;
   }
 
@@ -1012,6 +1012,13 @@ export class Device extends EventEmitter {
     let initializedWithDeviceInfo = false;
     let refreshedDeviceInfo: ProtocolV2DeviceInfo | undefined;
 
+    const protocolV1RefreshOptions = refresh.has('settings')
+      ? {
+          source: 'settings-read' as const,
+          forceChangedKeys: ['settings'],
+        }
+      : undefined;
+
     if (!this.state) {
       if (this.isProtocolV2()) {
         const deviceInfo = await requestProtocolV2DeviceInfo({
@@ -1022,10 +1029,10 @@ export class Device extends EventEmitter {
         refreshedDeviceInfo = deviceInfo;
         initializedWithDeviceInfo = true;
       } else {
-        await this.getFeatures();
+        await this.getFeatures(protocolV1RefreshOptions);
       }
     } else if (!this.isProtocolV2() && refresh.size > 0) {
-      await this.getFeatures();
+      await this.getFeatures(protocolV1RefreshOptions);
     }
 
     const supportsProtocolV1OnekeyFeatures =
@@ -1079,7 +1086,14 @@ export class Device extends EventEmitter {
     return params.includeRaw ? cloneDeviceState(this.state) : createPublicDeviceState(this.state);
   }
 
-  _updateFeatures(protoFeatures: PROTO.Features | Features, initSession?: boolean) {
+  _updateFeatures(
+    protoFeatures: PROTO.Features | Features,
+    initSession?: boolean,
+    options?: {
+      source?: DeviceStateUpdateSource;
+      forceChangedKeys?: string[];
+    }
+  ) {
     const previousDeviceId = this.getCurrentDeviceId();
     let feat =
       'protocol' in protoFeatures
@@ -1090,28 +1104,36 @@ export class Device extends EventEmitter {
 
     feat = fixFeaturesFirmwareVersion(feat);
 
-    this.updateState(mapFeaturesToState(feat), 'initialize');
+    this.updateState(mapFeaturesToState(feat), options?.source ?? 'initialize', {
+      forceChangedKeys: options?.forceChangedKeys,
+    });
     this.reconcileSessionCacheDeviceIdentity(previousDeviceId);
     if (feat.deviceId && feat.sessionId) {
       this.setInternalState(feat.sessionId, initSession);
     }
   }
 
-  updateState(patch: DeviceStatePatch, source: DeviceStateUpdateSource) {
+  updateState(
+    patch: DeviceStatePatch,
+    source: DeviceStateUpdateSource,
+    options?: { forceChangedKeys?: string[] }
+  ) {
     const result = this.stateStore.update(patch, source);
-    if (result.changedKeys.length === 0) return result.state;
+    const changedKeys =
+      result.changedKeys.length > 0 ? result.changedKeys : options?.forceChangedKeys ?? [];
+    if (changedKeys.length === 0) return result.state;
 
     const event: DeviceStateEvent = {
       connectId: this.getConnectId() ?? null,
       state: createPublicDeviceState(result.state),
       revision: result.revision,
       source,
-      changedKeys: result.changedKeys,
+      changedKeys,
     };
     Log.debug('Device state updated', {
       source,
       revision: result.revision,
-      changedKeyCount: result.changedKeys.length,
+      changedKeyCount: changedKeys.length,
     });
     this.emit(DEVICE.STATE, this, event);
     if (result.state.protocol === 'V1') {
