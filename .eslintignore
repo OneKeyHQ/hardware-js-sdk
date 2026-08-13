@@ -18,5 +18,7 @@ packages/hwk-trezor-protobuf/
 packages/hwk-trezor-protocol/
 packages/hwk-trezor-schema-utils/
 packages/hwk-trezor-transport/
+packages/hwk-trezor-transport-common/
+packages/hwk-trezor-transport-web/
 packages/hwk-trezor-type-utils/
 packages/hwk-trezor-utils/
