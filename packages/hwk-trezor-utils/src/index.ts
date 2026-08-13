@@ -31,7 +31,6 @@ export * from './getWeakRandomInt';
 export * from './getWeakRandomNumberInRange';
 export { hexToRgba } from './hexToRgba';
 export { hexToRgbaArray } from './hexToRgbaArray';
-export { isApproximatelyEqual } from './isApproximatelyEqual';
 export * from './isArrayMember';
 export * from './isFullPath';
 export * from './isHex';
