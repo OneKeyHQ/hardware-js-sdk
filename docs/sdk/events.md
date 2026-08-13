@@ -340,23 +340,23 @@ HardwareSDK.on(FIRMWARE_EVENT, message => {
 
 ## 设备事件
 
-| 事件                      | 来源                       | 实际触发点                               | payload                                            |
-| ------------------------- | -------------------------- | ---------------------------------------- | -------------------------------------------------- |
-| `DEVICE.CONNECT`          | Transport / DevicePool     | DevicePool 枚举或初始化出设备            | `{ device: KnownDevice }` 快照                     |
-| `DEVICE.DISCONNECT`       | Transport / DevicePool     | USB 拔出、BLE 断开或 DevicePool 移除设备 | `{ device: KnownDevice }` 快照                     |
-| `DEVICE.STATE`            | 设备响应或已确认设置 patch | DeviceState 实际发生变化                 | `DeviceStateEvent`                                 |
-| `DEVICE.FEATURES`         | Protocol V1 兼容投影       | V1 DeviceState 实际发生变化              | `Features`                                         |
-| `DEVICE.SUPPORT_FEATURES` | SDK 能力计算               | BaseMethod 运行前计算附加能力            | `{ inputPinOnSoftware, modifyHomescreen, device }` |
+| 事件                      | 来源                   | 实际触发点                               | payload                                            |
+| ------------------------- | ---------------------- | ---------------------------------------- | -------------------------------------------------- |
+| `DEVICE.CONNECT`          | Transport / DevicePool | DevicePool 枚举或初始化出设备            | `{ device: KnownDevice }` 快照                     |
+| `DEVICE.DISCONNECT`       | Transport / DevicePool | USB 拔出、BLE 断开或 DevicePool 移除设备 | `{ device: KnownDevice }` 快照                     |
+| `DEVICE.STATE`            | 设备响应               | DeviceState 实际发生变化                 | `DeviceStateEvent`                                 |
+| `DEVICE.FEATURES`         | Protocol V1 兼容投影   | V1 DeviceState 实际发生变化              | `Features`                                         |
+| `DEVICE.SUPPORT_FEATURES` | SDK 能力计算           | BaseMethod 运行前计算附加能力            | `{ inputPinOnSoftware, modifyHomescreen, device }` |
 
 `SUPPORT_FEATURES` 不是硬件主动推送。它是 SDK 根据设备型号和 Features 计算出的业务辅助信息。
 
-`DEVICE.STATE` 是 V1/V2 的统一状态变更通知。它可能来自设备读取、Protocol V1 设置成功后的
-confirmed patch 或解锁结果；相同 patch 不会重复发送。Protocol V2 设置成功后会强制读回
-`status` 与 `settings`，只发布设备返回的状态。新接入只消费完整 `DeviceState`，无需识别底层协议。
+`DEVICE.STATE` 是 V1/V2 的统一状态变更通知。它可能来自设备读取或解锁结果；相同状态不会重复发送。
+两种协议的设置写入成功后都会强制读回设备状态，只发布设备返回的状态。新接入只消费完整
+`DeviceState`，无需识别底层协议。
 
 设置调用中的状态刷新会先在 Core 内更新 `DeviceState` 并同步发出 `DEVICE.STATE`，随后 API Promise
-才完成。Protocol V2 的 API Promise 还会等待写后 `status + settings` 读回完成；读回失败时调用失败，
-即使此前的设置命令可能已经被设备接受。App 如果在 listener 中异步落库，必须把“设置调用完成”和
+才完成。Protocol V1 等待写后 `GetFeatures`，Protocol V2 等待写后 `status + settings`；读回失败时
+调用失败，即使此前的设置命令可能已经被设备接受。App 如果在 listener 中异步落库，必须把“设置调用完成”和
 “该设备的事件落库完成”串行化，再读取本地状态；不能在 Promise 返回后立即读取旧 `Features` 缓存，
 也不能用请求参数乐观覆盖设备状态。
 

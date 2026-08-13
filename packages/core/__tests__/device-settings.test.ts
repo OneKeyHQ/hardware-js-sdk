@@ -77,7 +77,7 @@ describe('DeviceSettings protocol routing', () => {
     expect(method.unlockPolicy).toBe('unlock-before-run');
   });
 
-  it('uses ApplySettings and commits the confirmed patch for Protocol V1', async () => {
+  it('uses ApplySettings and refreshes Protocol V1 settings from the device', async () => {
     const { device, typedCall, updateState } = createDevice({ protocol: 'V1' });
     const method = new DeviceSettings({
       id: 1,
@@ -107,13 +107,8 @@ describe('DeviceSettings protocol routing', () => {
       use_ble: true,
       haptic_feedback: undefined,
     });
-    expect(updateState).toHaveBeenCalledWith(
-      {
-        identity: { label: 'Shared Label' },
-        settings: { language: 'ja', bleEnabled: true },
-      },
-      'settings-write'
-    );
+    expect(device.getDeviceState).toHaveBeenCalledWith({ refreshSections: ['settings'] });
+    expect(updateState).not.toHaveBeenCalled();
   });
 
   it('normalizes legacy Protocol V1 never values before ApplySettings', async () => {
@@ -138,15 +133,33 @@ describe('DeviceSettings protocol routing', () => {
         auto_shutdown_delay_ms: DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
       })
     );
-    expect(updateState).toHaveBeenCalledWith(
-      {
-        settings: {
-          autoLockDelayMs: DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
-          autoShutdownDelayMs: DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
-        },
+    expect(device.getDeviceState).toHaveBeenCalledWith({ refreshSections: ['settings'] });
+    expect(updateState).not.toHaveBeenCalled();
+  });
+
+  it('refreshes Protocol V1 settings after the on-device brightness update completes', async () => {
+    const { device, typedCall, updateState, getDeviceState } = createDevice({ protocol: 'V1' });
+    const method = new DeviceSettings({
+      id: 3,
+      payload: {
+        method: 'deviceSettings',
+        changeBrightness: true,
       },
-      'settings-write'
+    });
+    method.init();
+    (method as any).device = device;
+
+    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+    expect(typedCall).toHaveBeenCalledWith(
+      'ApplySettings',
+      'Success',
+      expect.objectContaining({ change_brightness: true })
     );
+    expect(getDeviceState).toHaveBeenCalledWith({ refreshSections: ['settings'] });
+    expect(typedCall.mock.invocationCallOrder[0]).toBeLessThan(
+      getDeviceState.mock.invocationCallOrder[0]
+    );
+    expect(updateState).not.toHaveBeenCalled();
   });
 
   it('uses DeviceSettingsSet and reloads Protocol V2 status and settings from the device', async () => {
@@ -325,7 +338,7 @@ describe('DeviceSettings protocol routing', () => {
       'Success',
       expect.objectContaining({ use_passphrase: true })
     );
-    expect(getDeviceState).not.toHaveBeenCalled();
+    expect(getDeviceState).toHaveBeenCalledWith({ refreshSections: ['settings'] });
   });
 
   it('rejects combining a Pro2 device-side toggle with direct settings', async () => {

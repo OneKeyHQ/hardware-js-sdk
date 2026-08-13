@@ -4,10 +4,7 @@ import { DeviceSessionPinType, DeviceSettingsPage } from '@onekeyfe/hd-transport
 import { BaseMethod } from '../BaseMethod';
 import { invalidParameter } from '../helpers/filesystemValidation';
 import { validateParams } from '../helpers/paramsValidator';
-import {
-  mapApplySettingsToState,
-  mapCommonSettingsToProtocolV2,
-} from '../../device/DeviceStateMapper';
+import { mapCommonSettingsToProtocolV2 } from '../../device/DeviceStateMapper';
 import { getProtocolV2SettingsBehavior } from '../../protocols/protocol-v2/settingsUnlockPolicy';
 import {
   DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
@@ -271,7 +268,7 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
         'Success',
         protocolV1Params
       );
-      this.device.updateState(mapApplySettingsToState(protocolV1Params), 'settings-write');
+      await this.device.getDeviceState({ refreshSections: ['settings'] });
       return res.message;
     } catch (error) {
       if (error.message?.toLowerCase().includes('no setting provided')) {

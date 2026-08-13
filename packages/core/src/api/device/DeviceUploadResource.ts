@@ -198,6 +198,10 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
       this.params
     );
 
-    return this.processResourceRequest(res);
+    const result = await this.processResourceRequest(res);
+    if (this.payload.resType === PROTO.ResourceType.WallPaper) {
+      await this.device.getDeviceState({ refreshSections: ['settings'] });
+    }
+    return result;
   }
 }

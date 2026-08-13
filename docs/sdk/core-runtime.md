@@ -98,7 +98,9 @@ selector。
 ## 统一设置与 DeviceState 更新
 
 公共 `deviceSettings` 是 OneKey V1/V2 的协议无关写入入口。Core 根据协议选择
-`ApplySettings` 或 `DeviceSettingsSet`，成功后把已确认参数合并进唯一的 DeviceState 缓存。
+`ApplySettings` 或 `DeviceSettingsSet`，成功后在同一次方法调用内读回设备设置并更新唯一的
+DeviceState 缓存。Protocol V1 通过 `GetFeatures` 读回，Protocol V2 通过 `DeviceStatusGet +
+DeviceSettingsGet` 读回；请求参数不作为最终状态来源。
 原始 V2 `DeviceSettingsGet/Set` 与 `DeviceSettingsPageShow` 只作为 SDK 内部命令保留，不生成 `CoreApi` 便捷方法。
 
 设置能力按当前协议源定义：
@@ -122,9 +124,9 @@ Protocol V1 的发送边界兼容早期 SDK 1.2 alpha 暴露的 `0`，并将其�
 
 每次实际状态变化都会发送 `DEVICE.STATE`。宿主应用应监听该事件并持久化完整状态，
 不需要为 label、language、auto-lock 等字段分别维护手工数据库 patch。Protocol V1 额外发送
-兼容事件 `DEVICE.FEATURES`；Protocol V2 不发送该事件。Protocol V2 设置写入成功后会强制刷新
-`status` 与 `settings`，状态只以设备读回结果为准，对应事件来源为 `device-status` 和
-`settings-read`；不会再用请求参数生成 `settings-write` patch。App 在设置页进入或重新聚焦时仍可
+兼容事件 `DEVICE.FEATURES`；Protocol V2 不发送该事件。两种协议的设置写入成功后都会强制刷新
+设备设置，状态只以设备读回结果为准；不会再用请求参数生成 `settings-write` patch。Protocol V1
+壁纸资源上传成功后也会在同一次方法调用内通过 `GetFeatures` 刷新设置。App 在设置页进入或重新聚焦时仍可
 显式调用 `getDeviceState({ scope: 'settings' })`，用于发现设备端或其他客户端产生的外部变化。
 
 详见 [钱包 Session 与设备安全](../device/wallet-session-and-security.md) 和 [SDK 关键架构决策](../architecture/decisions.md#受保护方法的调用前解锁)。
