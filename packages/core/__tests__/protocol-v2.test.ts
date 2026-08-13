@@ -4145,7 +4145,7 @@ describe('Protocol V2 firmware update targets', () => {
     );
   });
 
-  test('uses Protocol V2 features after BLE final reconnect without V1 Initialize', async () => {
+  test('accepts uninitialized Protocol V2 features after BLE final reconnect', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -4173,7 +4173,7 @@ describe('Protocol V2 firmware update targets', () => {
       if (name === 'DeviceStatusGet') {
         return Promise.resolve({
           type: 'DeviceStatus',
-          message: { init_states: true, unlocked: true },
+          message: { init_states: false, unlocked: false },
         });
       }
       if (name === 'ProtocolInfoRequest') {
@@ -4194,7 +4194,7 @@ describe('Protocol V2 firmware update targets', () => {
       getCommands: () => commands,
       updateProtocolV2Features: jest.fn(() => ({
         bootloaderMode: false,
-        mode: 'normal',
+        mode: 'notInitialized',
         firmwareVersion: '0.0.0',
         bootloaderVersion: '0.0.0',
         bleVersion: '0.0.0',
@@ -5609,6 +5609,7 @@ describe('Protocol V2 firmware update targets', () => {
 
   test.each([
     [{ mode: 'normal', bootloaderMode: false }, true],
+    [{ mode: 'notInitialized', bootloaderMode: false }, true],
     [{ mode: 'bootloader', bootloaderMode: true }, false],
   ])('derives firmware completion from the runtime-state probe: %o', async (features, expected) => {
     const method = new FirmwareUpdateV4({
