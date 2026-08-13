@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "useUnknownInCatchVariables": false,
+    "types": ["sharedworker"],
+    "baseUrl": ".",
+    "paths": {
+      "@trezor/transport-common": ["../hwk-trezor-transport-common/src/index.ts"],
+      "@trezor/transport-common/*": ["../hwk-trezor-transport-common/src/*"]
+    }
+  },
+  "include": ["src/**/*"]
+}
