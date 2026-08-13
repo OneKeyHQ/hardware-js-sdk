@@ -65,8 +65,6 @@ import {
 import {
     ButtonAck,
     ButtonRequest,
-    Deprecated_PassphraseStateAck,
-    Deprecated_PassphraseStateRequest,
     Failure,
     PassphraseAck,
     PassphraseRequest,
@@ -108,6 +106,8 @@ import {
 } from './messages-eos';
 import {
     EthereumAddress,
+    EthereumDefinitionAck,
+    EthereumDefinitionRequest,
     EthereumGetAddress,
     EthereumGetPublicKey,
     EthereumMessageSignature,
@@ -162,8 +162,8 @@ import {
     EntropyRequest,
     Features,
     FirmwareHash,
-    GetEntropy,
     GetAuthenticityProofChunk,
+    GetEntropy,
     GetFeatures,
     GetFirmwareHash,
     GetNextU2FCounter,
@@ -230,14 +230,18 @@ import {
     MoneroTransactionSignInputRequest,
     MoneroWatchKey,
 } from './messages-monero';
+import { NostrEventSignature, NostrGetPubkey, NostrPubkey, NostrSignEvent } from './messages-nostr';
 import { RippleAddress, RippleGetAddress, RippleSignTx, RippleSignedTx } from './messages-ripple';
 import {
     SolanaAddress,
     SolanaGetAddress,
     SolanaGetPublicKey,
+    SolanaMessageSignature,
     SolanaPublicKey,
+    SolanaSignMessage,
     SolanaSignTx,
     SolanaTxSignature,
+    SolanaVerifyMessage,
 } from './messages-solana';
 import {
     StellarAccountMergeOp,
@@ -300,6 +304,7 @@ import {
     TronTriggerSmartContract,
     TronUnfreezeBalanceV2Contract,
     TronVoteWitnessContract,
+    TronWithdrawBalance,
     TronWithdrawUnfreeze,
 } from './messages-tron';
 
@@ -318,6 +323,7 @@ export * from './messages-ethereum';
 export * from './messages-ethereum-eip712';
 export * from './messages-evolu';
 export * from './messages-monero';
+export * from './messages-nostr';
 export * from './messages-ripple';
 export * from './messages-solana';
 export * from './messages-stellar';
@@ -338,8 +344,6 @@ export const MessageType = Type.Object(
         PinMatrixAck,
         PassphraseRequest,
         PassphraseAck,
-        Deprecated_PassphraseStateRequest,
-        Deprecated_PassphraseStateAck,
         PaymentRequest,
         GetPublicKey,
         PublicKey,
@@ -485,6 +489,8 @@ export const MessageType = Type.Object(
         EthereumSignTxEIP1559,
         EthereumTxRequest,
         EthereumTxAck,
+        EthereumDefinitionRequest,
+        EthereumDefinitionAck,
         EthereumSignMessage,
         EthereumMessageSignature,
         EthereumVerifyMessage,
@@ -539,6 +545,10 @@ export const MessageType = Type.Object(
         MoneroLiveRefreshFinalAck,
         DebugMoneroDiagRequest,
         DebugMoneroDiagAck,
+        NostrGetPubkey,
+        NostrPubkey,
+        NostrSignEvent,
+        NostrEventSignature,
         RippleGetAddress,
         RippleAddress,
         RippleSignTx,
@@ -549,6 +559,9 @@ export const MessageType = Type.Object(
         SolanaAddress,
         SolanaSignTx,
         SolanaTxSignature,
+        SolanaSignMessage,
+        SolanaMessageSignature,
+        SolanaVerifyMessage,
         StellarGetAddress,
         StellarAddress,
         StellarSignTx,
@@ -604,6 +617,7 @@ export const MessageType = Type.Object(
         TronFreezeBalanceV2Contract,
         TronUnfreezeBalanceV2Contract,
         TronWithdrawUnfreeze,
+        TronWithdrawBalance,
         TronSignature,
     },
     { $id: 'MessageType' },
@@ -705,6 +719,7 @@ export type WireInMessage =
     | 'EthereumSignTx'
     | 'EthereumSignTxEIP1559'
     | 'EthereumTxAck'
+    | 'EthereumDefinitionAck'
     | 'EthereumSignMessage'
     | 'EthereumVerifyMessage'
     | 'EthereumSignTypedHash'
@@ -717,16 +732,31 @@ export type WireInMessage =
     | 'EvoluIndexManagement'
     | 'MoneroGetAddress'
     | 'MoneroGetWatchKey'
+    | 'MoneroTransactionInitRequest'
+    | 'MoneroTransactionSetInputRequest'
+    | 'MoneroTransactionInputViniRequest'
+    | 'MoneroTransactionAllInputsSetRequest'
+    | 'MoneroTransactionSetOutputRequest'
+    | 'MoneroTransactionAllOutSetRequest'
+    | 'MoneroTransactionSignInputRequest'
+    | 'MoneroTransactionFinalRequest'
+    | 'MoneroKeyImageExportInitRequest'
+    | 'MoneroKeyImageSyncStepRequest'
+    | 'MoneroKeyImageSyncFinalRequest'
     | 'MoneroGetTxKeyRequest'
     | 'MoneroLiveRefreshStartRequest'
     | 'MoneroLiveRefreshStepRequest'
     | 'MoneroLiveRefreshFinalRequest'
     | 'DebugMoneroDiagRequest'
+    | 'NostrGetPubkey'
+    | 'NostrSignEvent'
     | 'RippleGetAddress'
     | 'RippleSignTx'
     | 'SolanaGetPublicKey'
     | 'SolanaGetAddress'
     | 'SolanaSignTx'
+    | 'SolanaSignMessage'
+    | 'SolanaVerifyMessage'
     | 'StellarGetAddress'
     | 'StellarSignTx'
     | 'StellarPaymentOp'
@@ -763,7 +793,8 @@ export type WireInMessage =
     | 'TronTriggerSmartContract'
     | 'TronFreezeBalanceV2Contract'
     | 'TronUnfreezeBalanceV2Contract'
-    | 'TronWithdrawUnfreeze';
+    | 'TronWithdrawUnfreeze'
+    | 'TronWithdrawBalance';
 
 export type WireOutMessage =
     | 'Success'
@@ -812,6 +843,7 @@ export type WireOutMessage =
     | 'EthereumPublicKey'
     | 'EthereumAddress'
     | 'EthereumTxRequest'
+    | 'EthereumDefinitionRequest'
     | 'EthereumMessageSignature'
     | 'EthereumTypedDataSignature'
     | 'EthereumTypedDataStructRequest'
@@ -822,38 +854,30 @@ export type WireOutMessage =
     | 'EvoluIndexManagementResponse'
     | 'MoneroAddress'
     | 'MoneroWatchKey'
-    | 'MoneroTransactionInitRequest'
     | 'MoneroTransactionInitAck'
-    | 'MoneroTransactionSetInputRequest'
     | 'MoneroTransactionSetInputAck'
-    | 'MoneroTransactionInputViniRequest'
     | 'MoneroTransactionInputViniAck'
-    | 'MoneroTransactionAllInputsSetRequest'
     | 'MoneroTransactionAllInputsSetAck'
-    | 'MoneroTransactionSetOutputRequest'
     | 'MoneroTransactionSetOutputAck'
-    | 'MoneroTransactionAllOutSetRequest'
     | 'MoneroTransactionAllOutSetAck'
-    | 'MoneroTransactionSignInputRequest'
     | 'MoneroTransactionSignInputAck'
-    | 'MoneroTransactionFinalRequest'
     | 'MoneroTransactionFinalAck'
-    | 'MoneroKeyImageExportInitRequest'
     | 'MoneroKeyImageExportInitAck'
-    | 'MoneroKeyImageSyncStepRequest'
     | 'MoneroKeyImageSyncStepAck'
-    | 'MoneroKeyImageSyncFinalRequest'
     | 'MoneroKeyImageSyncFinalAck'
     | 'MoneroGetTxKeyAck'
     | 'MoneroLiveRefreshStartAck'
     | 'MoneroLiveRefreshStepAck'
     | 'MoneroLiveRefreshFinalAck'
     | 'DebugMoneroDiagAck'
+    | 'NostrPubkey'
+    | 'NostrEventSignature'
     | 'RippleAddress'
     | 'RippleSignedTx'
     | 'SolanaPublicKey'
     | 'SolanaAddress'
     | 'SolanaTxSignature'
+    | 'SolanaMessageSignature'
     | 'StellarAddress'
     | 'StellarTxOpRequest'
     | 'StellarSignedTx'
@@ -886,12 +910,12 @@ export type MessageResponse<T extends MessageKey = MessageKey> = T extends any
     : never;
 
 export type TypedCall = {
-    <T extends MessageKey, R extends MessageKey[]>(
+    <T extends WireInMessage, R extends WireOutMessage[]>(
         type: T,
         resType: R,
         message?: MessagePayload<T>,
     ): Promise<MessageResponse<R[number]>>;
-    <T extends MessageKey, R extends MessageKey>(
+    <T extends WireInMessage, R extends WireOutMessage>(
         type: T,
         resType: R,
         message?: MessagePayload<T>,
