@@ -10,12 +10,12 @@ import type { WebContents } from 'electron';
 
 type IpcHandler = (...args: unknown[]) => Promise<unknown> | unknown;
 
-const createPeripheral = (id: string, localName?: string) => ({
+const createPeripheral = (id: string, localName?: string, serviceUuids = ['0001', 'fffd']) => ({
   id,
   state: 'disconnected',
   advertisement: {
     localName,
-    serviceUuids: ['0001', 'fffd'],
+    serviceUuids,
   },
 });
 
@@ -171,6 +171,7 @@ describe('Electron Noble BLE device discovery', () => {
     const connectPromise = Promise.resolve(connect(undefined, 'target-device'));
     await scanStarted;
 
+    expect(noble.startScanning).toHaveBeenCalledWith([], true, expect.any(Function));
     expect(noble.stopScanning).toHaveBeenCalledTimes(1);
     expect(peripheral.connect).not.toHaveBeenCalled();
 
@@ -250,7 +251,7 @@ describe('Electron Noble BLE device discovery', () => {
     expect(peripheral.disconnect).toHaveBeenCalledTimes(1);
   });
 
-  test('does not enumerate a Pro2 Find My advertisement with the communication service', async () => {
+  test('enumerates a Pro2 communication advertisement after Find My changes its name', async () => {
     jest.useFakeTimers({ doNotFake: ['performance'] });
 
     const handlers = new Map<string, IpcHandler>();
@@ -274,8 +275,8 @@ describe('Electron Noble BLE device discovery', () => {
     noble.state = 'poweredOn';
     noble.startScanning = jest.fn((_services, _duplicates, callback) => {
       callback?.();
-      noble.emit('discover', createPeripheral('find-my-device', 'Pro2 A1B2 - Find My'));
-      noble.emit('discover', createPeripheral('onekey-device', 'Pro2 A1B2'));
+      noble.emit('discover', createPeripheral('find-my-device', 'Pro2 A1B2 - Find My', ['fffd']));
+      noble.emit('discover', createPeripheral('onekey-device', 'Pro2 A1B2 - Find My'));
       resolveScanStarted();
     });
     noble.stopScanning = jest.fn(callback => callback?.());
@@ -301,17 +302,18 @@ describe('Electron Noble BLE device discovery', () => {
 
     const devicesPromise = Promise.resolve(enumerate());
     await scanStarted;
+    expect(noble.startScanning).toHaveBeenCalledWith([], true, expect.any(Function));
     jest.advanceTimersByTime(5000);
 
     await expect(devicesPromise).resolves.toEqual([
       expect.objectContaining({
         id: 'onekey-device',
-        name: 'Pro2 A1B2',
+        name: 'Pro2 A1B2 - Find My',
       }),
     ]);
   });
 
-  test('does not enumerate a Find My peripheral first discovered without a name', async () => {
+  test('accepts a communication peripheral after its scan response gains a name', async () => {
     jest.useFakeTimers({ doNotFake: ['performance'] });
 
     const handlers = new Map<string, IpcHandler>();
@@ -368,6 +370,10 @@ describe('Electron Noble BLE device discovery', () => {
     jest.advanceTimersByTime(5000);
 
     await expect(devicesPromise).resolves.toEqual([
+      expect.objectContaining({
+        id: 'find-my-device',
+        name: 'Pro2 A1B2 - Find My',
+      }),
       expect.objectContaining({
         id: 'onekey-device',
         name: 'Pro2 A1B2',

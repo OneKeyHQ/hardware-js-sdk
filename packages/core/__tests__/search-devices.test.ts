@@ -111,6 +111,7 @@ describe('SearchDevices', () => {
   test.each([
     ['OneKey Pro', 'pro'],
     ['OneKey Pro 2', 'pro2'],
+    ['Neo A1B2', 'neo'],
   ])(
     'BLE discovery keeps the %s transport identity separate from device identity',
     async (name, deviceType) => {
@@ -146,6 +147,44 @@ describe('SearchDevices', () => {
         },
       ]);
       expect(mockGetDevices).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each([
+    ['Pro2 A1B2 - Find My', undefined, 'Pro2 A1B2'],
+    ['Pro2 5E9D - Finde My', undefined, 'Pro2 5E9D'],
+    [undefined, 'OneKey Pro 2 A1B2 - Find My', 'OneKey Pro 2 A1B2'],
+  ])(
+    'BLE discovery normalizes the Find My display name from name=%s localName=%s',
+    async (name, localName, expectedName) => {
+      mockIsBleConnect.mockReturnValue(true);
+
+      const method = new SearchDevices({
+        id: 1,
+        payload: { method: 'searchDevices' },
+      } as any);
+      method.init();
+      method.connector = {
+        enumerate: jest.fn().mockResolvedValue({
+          descriptors: [
+            {
+              id: 'ble-peripheral-id',
+              path: 'ble-peripheral-id',
+              name,
+              localName,
+              commType: 'ble',
+            },
+          ],
+        }),
+      } as any;
+
+      await expect(method.run()).resolves.toEqual([
+        expect.objectContaining({
+          connectId: 'ble-peripheral-id',
+          name: expectedName,
+          deviceType: 'pro2',
+        }),
+      ]);
     }
   );
 });

@@ -5,6 +5,7 @@ import {
   isOnekeyBluetoothDevice,
   isOnekeyDevice,
   matchesKnownBleUuid,
+  normalizePro2FindMyAdvertisementName,
 } from './constants';
 
 describe('hardware device identity filters', () => {
@@ -67,6 +68,16 @@ describe('hardware device identity filters', () => {
         serviceUuids: ['fffd'],
       })
     ).toBe(false);
+  });
+
+  it.each([
+    ['Pro2 A1B2 - Find My', 'Pro2 A1B2'],
+    ['Pro2 5E9D - Finde My', 'Pro2 5E9D'],
+    ['  OneKey Pro 2 A1B2 Find My  ', '  OneKey Pro 2 A1B2'],
+    ['Pro2 A1B2', 'Pro2 A1B2'],
+    ['Find My', 'Find My'],
+  ])('normalizes the public Pro2 advertisement name %s', (name, expected) => {
+    expect(normalizePro2FindMyAdvertisementName(name)).toBe(expected);
   });
 
   it('keeps OneKey discovery on the communication service', () => {

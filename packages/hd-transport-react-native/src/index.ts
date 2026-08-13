@@ -29,7 +29,6 @@ import {
   HardwareErrorCode,
   createDeferred,
   isOnekeyBluetoothDevice,
-  isPro2FindMyAdvertisementName,
 } from '@onekeyfe/hd-shared';
 
 import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
@@ -714,12 +713,8 @@ export default class ReactNativeBleTransport {
           // iOS may report a service-only advertisement before the named scan response.
           // Do not cache that incomplete advertisement as an unknown device.
           const isUnnamedIOSPeripheral = Platform.OS === 'ios' && !displayName?.trim();
-          const isFindMyPeripheral =
-            isPro2FindMyAdvertisementName(device?.name) ||
-            isPro2FindMyAdvertisementName(device?.localName);
           const isOneKey =
             !isUnnamedIOSPeripheral &&
-            !isFindMyPeripheral &&
             isOnekeyBluetoothDevice({
               id: device?.id,
               name: device?.name,
@@ -746,12 +741,7 @@ export default class ReactNativeBleTransport {
               'localName' in device && typeof device.localName === 'string'
                 ? device.localName
                 : null;
-            const isFindMyPeripheral =
-              isPro2FindMyAdvertisementName(device.name) ||
-              isPro2FindMyAdvertisementName(localName);
-
             if (
-              !isFindMyPeripheral &&
               isOnekeyBluetoothDevice({
                 id: device.id,
                 name: device.name,

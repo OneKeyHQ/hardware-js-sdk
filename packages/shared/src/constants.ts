@@ -201,6 +201,11 @@ export const isPro2FindMyAdvertisementName = (value?: string | null) => {
   return /\bpro\s*2\b/.test(normalizedName) && /\bfinde?\s+my\b/.test(normalizedName);
 };
 
+export const normalizePro2FindMyAdvertisementName = (value: string) =>
+  isPro2FindMyAdvertisementName(value)
+    ? value.replace(/\s*(?:-\s*)?finde?\s+my\s*$/i, '').trimEnd()
+    : value;
+
 export const hasOnekeyCommunicationService = (
   serviceUuids: Array<string | null | undefined> | null | undefined
 ) =>

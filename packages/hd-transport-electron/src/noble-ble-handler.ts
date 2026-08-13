@@ -15,7 +15,6 @@ import {
   createKnownBleUuidAliases,
   hasOnekeyCommunicationService,
   isOnekeyBluetoothDevice,
-  isPro2FindMyAdvertisementName,
   matchesKnownBleUuid,
   wait,
 } from '@onekeyfe/hd-shared';
@@ -115,9 +114,7 @@ function isOneKeyPeripheral(peripheral: Peripheral) {
   const serviceUuids = peripheral.advertisement?.serviceUuids;
   const localName = peripheral.advertisement?.localName;
 
-  // Noble localName is the current advertisement name, so reject the Pro2
-  // Find My endpoint before the communication-service fast path accepts it.
-  if (!localName?.trim() || isPro2FindMyAdvertisementName(localName)) {
+  if (!localName?.trim()) {
     return false;
   }
 
@@ -843,8 +840,9 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
     // Add local listener for this scan
     nobleInstance.on('discover', onDiscover);
 
-    // Start scanning — no service UUID filter (Pro2 may use different service UUID)
-    nobleInstance.startScanning([], false, (error?: Error) => {
+    // Allow repeated advertisements so a service-only packet can be followed by
+    // the named scan response needed to validate the target peripheral.
+    nobleInstance.startScanning([], true, (error?: Error) => {
       if (error) {
         finish(null, error).catch(reject);
         return;
@@ -915,9 +913,10 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
     }, DEVICE_SCAN_TIMEOUT);
 
     // Start scanning without a service UUID filter so Pro2 advertisements with
-    // short vendor UUIDs can be found, but only OneKey candidates are logged/returned.
+    // short vendor UUIDs can be found. Repeated advertisements are required when
+    // the local name arrives in a later scan response; discoveredDevices handles deduplication.
     logger?.info('[NobleBLE] Scanning for OneKey BLE devices');
-    nobleInstance.startScanning([], false, async (error?: Error) => {
+    nobleInstance.startScanning([], true, async (error?: Error) => {
       if (error) {
         await cleanup();
         logger?.error('[NobleBLE] Failed to start scanning:', error);
