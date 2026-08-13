@@ -76,9 +76,10 @@ function decodeScalar(scalar: Uint8Array): bigint {
     }
 
     const array = new Uint8Array(scalar);
-    array[0] &= 248;
-    array[31] &= 127;
-    array[31] |= 64;
+    const s0: number = array[0];
+    const s31: number = array[31];
+    array[0] = s0 & 248;
+    array[31] = (s31 & 127) | 64;
 
     return littleEndianBytesToBigInt(array);
 }
@@ -91,7 +92,8 @@ function decodeCoordinate(coordinate: Uint8Array): bigint {
     }
 
     const array = new Uint8Array(coordinate);
-    array[array.length - 1] &= 0x7f;
+    const last: number = array[array.length - 1];
+    array[array.length - 1] = last & 0x7f;
 
     return littleEndianBytesToBigInt(array);
 }
@@ -239,9 +241,10 @@ export function elligator2(point: Uint8Array): Uint8Array {
 // Computing secret keys
 export const getCurve25519KeyPair = (randomBytes: Buffer) => {
     const randomPriv = Buffer.from(randomBytes);
-    randomPriv[0] &= 248;
-    randomPriv[31] &= 127;
-    randomPriv[31] |= 64;
+    const rp0: number = randomPriv[0];
+    const rp31: number = randomPriv[31];
+    randomPriv[0] = rp0 & 248;
+    randomPriv[31] = (rp31 & 127) | 64;
 
     const basepoint = Buffer.alloc(32).fill(0);
     basepoint[0] = 0x09;
