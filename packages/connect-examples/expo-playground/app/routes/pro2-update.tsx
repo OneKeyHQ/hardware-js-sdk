@@ -285,7 +285,7 @@ export default function Pro2UpdatePage() {
     setIsConnecting(true);
     setIsConnectingLocal(true);
     try {
-      const response = await searchDevices();
+      const response = await searchDevices({ promptWebUsbAccess: true });
       if (!response.success || !Array.isArray(response.payload)) {
         throw new Error(getApiError(response.payload, 'searchDevices failed'));
       }

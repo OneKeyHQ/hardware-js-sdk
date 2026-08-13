@@ -56,6 +56,16 @@ export const getProtocolV2SeType = (se?: DeviceSEInfo): string | null =>
 
 export type ProtocolV2RuntimeMode = 'normal' | 'bootloader' | 'romloader';
 
+export type ProtocolV2ProtocolInfo = ProtocolInfo & {
+  /** Present only when hd-transport decoded the pre-build-fingerprint wire layout. */
+  protobuf_definition?: string | null;
+};
+
+export const isLegacyProtocolV2ProtocolInfo = (
+  protocolInfo: ProtocolInfo
+): protocolInfo is ProtocolV2ProtocolInfo & { protobuf_definition: string | null } =>
+  Object.prototype.hasOwnProperty.call(protocolInfo, 'protobuf_definition');
+
 /**
  * Protocol V2 fingerprints use:
  * <binary>__<version>__<commit>__<PROD|DEV>__<DEBUG|RELEASE>
@@ -94,10 +104,10 @@ export const getProtocolV2RuntimeMode = (
   if (binary === 'application') return 'normal';
   if (binary) return binary;
 
-  // 早期 loader 不返回 build_fingerprint；仅在没有 application 时按镜像信息判定。
-  if (!protocolInfo.build_fingerprint && !deviceInfo?.fw?.application) {
-    if (deviceInfo?.fw?.romloader) return 'romloader';
-    if (deviceInfo?.fw?.bootloader) return 'bootloader';
+  // Early loaders omit build_fingerprint; infer loader mode only when no application is present.
+  if (!protocolInfo.build_fingerprint && !deviceInfo?.main_mcu?.application) {
+    if (deviceInfo?.main_mcu?.romloader) return 'romloader';
+    if (deviceInfo?.main_mcu?.bootloader) return 'bootloader';
   }
   return undefined;
 };
@@ -113,7 +123,7 @@ export const supportsProtocolV2Message = (
 export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,
-    fw: true,
+    main_mcu: true,
     coprocessor: true,
   },
   types: {
@@ -129,7 +139,7 @@ export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
 export const PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,
-    fw: true,
+    main_mcu: true,
     coprocessor: true,
     se1: true,
     se2: true,
@@ -145,7 +155,7 @@ export const PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST = {
 export const PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,
-    fw: true,
+    main_mcu: true,
     coprocessor: true,
     se1: true,
     se2: true,

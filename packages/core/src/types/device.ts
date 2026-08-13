@@ -75,7 +75,8 @@ export type SearchDevice = {
   serialNo?: string | null;
   /**
    * @deprecated Ambiguous legacy identifier. Use serialNo for hardware identity
-   * and connectId for transport routing.
+   * and connectId for transport routing. Empty during BLE discovery until the
+   * physical serial number is available after initialization.
    */
   uuid: string;
   deviceId: string | null;

@@ -137,7 +137,7 @@ const protocolV2Messages = parseConfigure({
         },
       },
     },
-    DeviceFirmwareUpdateRequest: {
+    DeviceFirmwareUpdateStage: {
       fields: {
         targets: {
           type: 'DeviceFirmwareTarget',
@@ -145,6 +145,9 @@ const protocolV2Messages = parseConfigure({
           rule: 'repeated',
         },
       },
+    },
+    DeviceFirmwareUpdateRequest: {
+      fields: {},
     },
     DeviceFirmwareUpdateRecord: {
       fields: {
@@ -218,7 +221,8 @@ const protocolV2Messages = parseConfigure({
         MessageType_Success: 60207,
         MessageType_Failure: 60208,
         MessageType_FileWrite: 60805,
-        MessageType_DeviceFirmwareUpdateRequest: 61000,
+        MessageType_DeviceFirmwareUpdateStage: 61000,
+        MessageType_DeviceFirmwareUpdateRequest: 61001,
         MessageType_DeviceFirmwareUpdateStatus: 61002,
         MessageType_DeviceSession: 61201,
         MessageType_PartialNested: 62000,
@@ -232,6 +236,32 @@ const schemas = {
   protocolV2: protocolV2Messages,
 };
 const productionProtocolV2Messages = parseConfigure(require('../messages-protocol-v2.json'));
+
+const legacyProtocolInfoMessage = parseConfigure({
+  nested: {
+    ProtocolInfo: {
+      fields: {
+        version: {
+          type: 'uint32',
+          id: 1,
+          rule: 'required',
+        },
+        supported_messages: {
+          type: 'uint32',
+          id: 2,
+          rule: 'repeated',
+          options: {
+            packed: false,
+          },
+        },
+        protobuf_definition: {
+          type: 'string',
+          id: 3,
+        },
+      },
+    },
+  },
+}).lookupType('ProtocolInfo');
 
 const rewriteSeq = (frame, seq) => {
   const copy = new Uint8Array(frame);
@@ -264,6 +294,64 @@ describe('Protocol V2 framing and session', () => {
         build_fingerprint: 'application__1.0.0__abc__DEV__DEBUG',
         supported_messages: [60200, 60201],
       },
+    });
+  });
+
+  test('decodes a two-byte legacy ProtocolInfo at the generic frame boundary', () => {
+    const frame = protocolV2.encodeProtobufFrame(60201, new Uint8Array([0x08, 0x01]));
+    const productionSchemas = {
+      protocolV1: protocolV1Messages,
+      protocolV2: productionProtocolV2Messages,
+    };
+
+    expect(ProtocolV2.decodeFrame(productionSchemas, frame)).toMatchObject({
+      type: 'ProtocolInfo',
+      message: {
+        version: 1,
+        build_fingerprint: '',
+        supported_messages: [],
+        protobuf_definition: null,
+      },
+    });
+  });
+
+  test('does not reinterpret a malformed current ProtocolInfo as the legacy layout', () => {
+    const frame = protocolV2.encodeProtobufFrame(60201, new Uint8Array([0x08, 0x01, 0x18, 0x01]));
+
+    expect(() =>
+      ProtocolV2.decodeFrame(
+        {
+          protocolV1: protocolV1Messages,
+          protocolV2: productionProtocolV2Messages,
+        },
+        frame
+      )
+    ).toThrow('Protocol V2 protobuf decode failed for "ProtocolInfo"');
+  });
+
+  test('preserves legacy ProtocolInfo capabilities when using the old field numbers', () => {
+    const payload = legacyProtocolInfoMessage
+      .encode({
+        version: 1,
+        supported_messages: [60602],
+        protobuf_definition: 'legacy',
+      })
+      .finish();
+    const frame = protocolV2.encodeProtobufFrame(60201, payload);
+
+    const decoded = ProtocolV2.decodeFrame(
+      {
+        protocolV1: protocolV1Messages,
+        protocolV2: productionProtocolV2Messages,
+      },
+      frame
+    );
+
+    expect(decoded.message).toEqual({
+      version: 1,
+      build_fingerprint: '',
+      supported_messages: [60602],
+      protobuf_definition: null,
     });
   });
 
@@ -442,6 +530,38 @@ describe('Protocol V2 framing and session', () => {
         version: 2,
         build_fingerprint: null,
         supported_messages: [60206],
+      },
+    });
+  });
+
+  test('session decodes legacy ProtocolInfo through the generic frame boundary', async () => {
+    const productionSchemas = {
+      protocolV1: protocolV1Messages,
+      protocolV2: productionProtocolV2Messages,
+    };
+    const response = protocolV2.encodeProtobufFrame(60201, new Uint8Array([0x08, 0x01]));
+    const session = new ProtocolV2Session({
+      schemas: productionSchemas,
+      router: 1,
+      writeFrame: () => Promise.resolve(),
+      readFrame: () => Promise.resolve(rewriteSeq(response, 1)),
+    });
+
+    await expect(
+      session.call(
+        'ProtocolInfoRequest',
+        { eventless_wallet_session: true },
+        {
+          expectedTypes: ['ProtocolInfo'],
+        }
+      )
+    ).resolves.toEqual({
+      type: 'ProtocolInfo',
+      message: {
+        version: 1,
+        build_fingerprint: '',
+        supported_messages: [],
+        protobuf_definition: null,
       },
     });
   });
@@ -850,24 +970,10 @@ describe('Protocol V2 framing and session', () => {
     expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('skip unexpected response'));
   });
 
-  test('session consumes intermediate response frames before returning the final response', async () => {
+  test('session can return after a request frame is written', async () => {
     const written = [];
-    const progress = ProtocolV2.encodeFrame(schemas, 'DeviceFirmwareUpdateStatus', {
-      records: [{ target_id: 4, status: 1 }],
-    });
-    const success = ProtocolV2.encodeFrame(schemas, 'Success', {
-      message: 'ok',
-    });
-    const onIntermediateResponse = jest.fn();
-    const readFrame = jest.fn(() => {
-      const [writtenFrame] = written;
-      const { seq } = protocolV2.decodeFrame(writtenFrame);
-      return Promise.resolve(
-        readFrame.mock.calls.length === 1
-          ? rewriteSeq(progress, seq)
-          : rewriteSeq(success, protocolV2.nextProtoSeq(seq))
-      );
-    });
+    const readFrame = jest.fn();
+    const onWriteCompleted = jest.fn();
     const session = new ProtocolV2Session({
       schemas,
       router: 1,
@@ -880,26 +986,20 @@ describe('Protocol V2 framing and session', () => {
 
     const result = await session.call(
       'DeviceFirmwareUpdateRequest',
-      { targets: [{ target_id: 4, path: 'vol1:firmware.bin' }] },
+      {},
       {
-        intermediateTypes: ['DeviceFirmwareUpdateStatus'],
-        onIntermediateResponse,
+        returnAfterWrite: true,
+        onWriteCompleted,
       }
     );
 
-    expect(readFrame).toHaveBeenCalledTimes(2);
-    expect(onIntermediateResponse).toHaveBeenCalledWith({
-      type: 'DeviceFirmwareUpdateStatus',
-      message: {
-        records: [{ target_id: 4, status: 1, payload_version: null, path: null }],
-      },
-    });
-    expect(result).toEqual({
-      type: 'Success',
-      message: {
-        message: 'ok',
-      },
-    });
+    expect(written).toHaveLength(1);
+    expect(ProtocolV2.decodeFrame(schemas, written[0]).messageName).toBe(
+      'DeviceFirmwareUpdateRequest'
+    );
+    expect(readFrame).not.toHaveBeenCalled();
+    expect(onWriteCompleted).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ type: 'WriteCompleted', message: {} });
   });
 
   test('probeProtocolV2 accepts Success as a normal V2 probe response', async () => {

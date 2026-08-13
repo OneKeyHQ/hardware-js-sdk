@@ -13,7 +13,7 @@ import {
   formatBytes,
   generateUploadNFTParams,
   getImageSize,
-  imageSourceToRgba,
+  imageSourceToJpegBase64,
   imageToBase64,
   processImageBlur,
 } from './nftUtils';
@@ -257,14 +257,14 @@ function UploadScreenComponent() {
             throw new Error(`NFT dimensions are not configured for ${deviceType}`);
           }
 
-          const [rgba, thumbnailRgba] = await Promise.all([
-            imageSourceToRgba(base64, imageSize.width, imageSize.height),
-            imageSourceToRgba(base64, thumbnailSize.width, thumbnailSize.height),
+          const [imageJpegBase64, thumbnailJpegBase64] = await Promise.all([
+            imageSourceToJpegBase64(base64, imageSize.width, imageSize.height),
+            imageSourceToJpegBase64(base64, thumbnailSize.width, thumbnailSize.height),
           ]);
           setProtocolV2NftParams({
             ...commonParams,
-            image: { ...imageSize, rgba },
-            thumbnail: { ...thumbnailSize, rgba: thumbnailRgba },
+            imageJpegBase64,
+            thumbnailJpegBase64,
             title: uploadScreenParams.fileNameNoExt || 'OneKey NFT',
             subtitle: uploadScreenParams.nftMetaData || '',
           });
@@ -352,16 +352,14 @@ function UploadScreenComponent() {
           if (!HomeScreenSize) {
             throw new Error(`Wallpaper dimensions are not configured for ${deviceType}`);
           }
-          const rgba = await imageSourceToRgba(
+          const jpegBase64 = await imageSourceToJpegBase64(
             image.uri,
             HomeScreenSize.width,
             HomeScreenSize.height
           );
           const response = await SDK?.deviceUploadWallpaper(selectedDevice?.connectId ?? '', {
             ...commonParams,
-            width: HomeScreenSize.width,
-            height: HomeScreenSize.height,
-            rgba,
+            jpegBase64,
             fileName: uploadScreenParams.fileNameNoExt,
           });
           if (!response?.success) {

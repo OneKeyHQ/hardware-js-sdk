@@ -99,18 +99,12 @@ program
 program
   .command('upload-wallpaper')
   .description('Upload and activate a Pro2 wallpaper')
-  .requiredOption('--rgba <path>', '604x1024 raw RGBA file')
+  .requiredOption('--jpeg <path>', '604x1024 JPEG file')
   .option('--file-name <name>', 'Device wallpaper file name', 'wallpaper-cli')
   .option('--chunk-size <bytes>', 'Transfer chunk size in bytes')
   .action(opts =>
     runCommand({}, async ({ sdk, globalOpts, params }) => {
-      const rgba = readBinaryParam(opts.rgba);
-      const expectedBytes = 604 * 1024 * 4;
-      if (rgba.byteLength !== expectedBytes) {
-        throw new Error(
-          `Invalid RGBA size: expected ${expectedBytes} bytes, received ${rgba.byteLength}`
-        );
-      }
+      const jpegBase64 = readFileSync(opts.jpeg).toString('base64');
 
       let transferStartedAt: number | undefined;
       let transferEndedAt: number | undefined;
@@ -159,9 +153,7 @@ program
       try {
         result = await sdk.deviceUploadWallpaper(globalOpts.connectId, {
           ...params,
-          width: 604,
-          height: 1024,
-          rgba,
+          jpegBase64,
           fileName: opts.fileName,
           chunkSize: opts.chunkSize ? safeParseInt(opts.chunkSize, '--chunk-size') : undefined,
         });

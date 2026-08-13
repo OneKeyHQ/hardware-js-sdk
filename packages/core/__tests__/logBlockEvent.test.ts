@@ -104,7 +104,19 @@ describe('getLogBlockLabel', () => {
     });
   });
 
-  it.each(['deviceUploadNft', 'deviceUploadWallpaper', 'uploadPortfolio', 'fileWrite', 'fileRead'])(
+  it.each(['deviceUploadNft', 'deviceUploadWallpaper', 'uploadPortfolio'])(
+    'skips large Base64 resource payload logging for %s',
+    method => {
+      const request = { method, path: 'resource.bin', data: 'A'.repeat(1024 * 1024) };
+      expect(getLogBlockLabel(request)).toBe(method);
+      expect(getSafeLogPayload(request, method)).toEqual({
+        method,
+        payload: '[REDACTED]',
+      });
+    }
+  );
+
+  it.each(['fileWrite', 'fileRead'])(
     'keeps metadata and replaces binary payloads with their size for %s',
     method => {
       const request = { method, path: 'resource.bin', data: new Uint8Array(1024) };

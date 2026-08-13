@@ -67,7 +67,6 @@ describe('Pro 2 device settings options', () => {
       { label: '2 minutes', valueMs: 120_000 },
       { label: '5 minutes', valueMs: 300_000 },
       { label: '10 minutes', valueMs: 600_000 },
-      { label: '30 minutes', valueMs: 1_800_000 },
       { label: 'Never', valueMs: PROTOCOL_V2_NEVER_TIMEOUT_MS },
     ]);
   });

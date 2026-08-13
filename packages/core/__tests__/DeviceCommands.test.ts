@@ -19,12 +19,12 @@ const createCommands = () => {
 };
 
 describe('DeviceCommands failure mapping', () => {
-  it('logs passphrase call request and response without exposing the passphrase', async () => {
+  it('logs passphrase request and canonical response without exposing the passphrase', async () => {
     const commands = createCommands();
-    const requestLog = getLogger(LoggerNames.DeviceCommands);
-    const responseLog = getLogger(LoggerNames.Core);
-    requestLog.messages.length = 0;
-    responseLog.messages.length = 0;
+    const log = getLogger(LoggerNames.DeviceCommands);
+    const coreLog = getLogger(LoggerNames.Core);
+    log.messages.length = 0;
+    coreLog.messages.length = 0;
     commands.mainId = 'main-id';
     commands.transport = {
       call: jest.fn().mockResolvedValue({
@@ -36,13 +36,13 @@ describe('DeviceCommands failure mapping', () => {
     } as any;
 
     await expect(
-      commands.call('DeviceSessionAskPassphrase', {
+      commands._commonCall('DeviceSessionAskPassphrase', {
         passphrase: 'hidden-wallet-secret',
         on_device: false,
       })
     ).resolves.toMatchObject({ type: 'Success' });
 
-    expect(requestLog.messages.at(-1)?.message).toEqual([
+    expect(log.messages.at(-2)?.message).toEqual([
       '[DeviceCommands] [call] Sending',
       'DeviceSessionAskPassphrase',
       {
@@ -50,21 +50,69 @@ describe('DeviceCommands failure mapping', () => {
         on_device: false,
       },
     ]);
-    expect(responseLog.messages.at(-1)?.message).toEqual([
-      '[DeviceCommands] [call] Received',
-      'Success',
+    expect(log.messages.at(-1)?.message).toEqual([
+      '_filterCommonTypes: ',
       {
-        message: 'Passphrase accepted',
+        request: 'DeviceSessionAskPassphrase',
+        response: {
+          type: 'Success',
+          message: {
+            message: 'Passphrase accepted',
+          },
+        },
       },
     ]);
-    expect(JSON.stringify([...requestLog.messages, ...responseLog.messages])).not.toContain(
+    expect(
+      coreLog.messages.some(entry => entry.message[0] === '[DeviceCommands] [call] Received')
+    ).toBe(false);
+    expect(JSON.stringify([...log.messages, ...coreLog.messages])).not.toContain(
       'hidden-wallet-secret'
     );
   });
 
-  it('logs DeviceStatus response fields without exposing the device ID', async () => {
+  it('redacts passphrases from transport errors logged through Core', async () => {
     const commands = createCommands();
-    const log = getLogger(LoggerNames.Core);
+    const log = getLogger(LoggerNames.DeviceCommands);
+    const coreLog = getLogger(LoggerNames.Core);
+    log.messages.length = 0;
+    coreLog.messages.length = 0;
+    const transportError = Object.assign(new Error('transport failed'), {
+      response: {
+        data: {
+          passphrase: 'hidden-wallet-secret',
+        },
+      },
+    });
+    commands.mainId = 'main-id';
+    commands.transport = {
+      call: jest.fn().mockRejectedValue(transportError),
+    } as any;
+
+    await expect(
+      commands._commonCall('DeviceSessionAskPassphrase', {
+        passphrase: 'hidden-wallet-secret',
+        on_device: false,
+      })
+    ).rejects.toBe(transportError);
+
+    expect(coreLog.messages.at(-1)?.message).toEqual([
+      '[DeviceCommands] [call] Received error',
+      {
+        request: 'DeviceSessionAskPassphrase',
+        errorCode: undefined,
+        response: {
+          passphrase: '[REDACTED]',
+        },
+      },
+    ]);
+    expect(JSON.stringify([...log.messages, ...coreLog.messages])).not.toContain(
+      'hidden-wallet-secret'
+    );
+  });
+
+  it('logs canonical DeviceStatus response fields without exposing the device ID', async () => {
+    const commands = createCommands();
+    const log = getLogger(LoggerNames.DeviceCommands);
     log.messages.length = 0;
     commands.mainId = 'main-id';
     commands.transport = {
@@ -82,22 +130,27 @@ describe('DeviceCommands failure mapping', () => {
       }),
     } as any;
 
-    await expect(commands.call('DeviceStatusGet', {})).resolves.toMatchObject({
+    await expect(commands._commonCall('DeviceStatusGet', {})).resolves.toMatchObject({
       type: 'DeviceStatus',
     });
 
     const receivedLog = log.messages.at(-1)?.message;
     expect(receivedLog).toEqual([
-      '[DeviceCommands] [call] Received',
-      'DeviceStatus',
+      '_filterCommonTypes: ',
       {
-        device_id: '[REDACTED]',
-        unlocked: true,
-        init_states: true,
-        backup_required: false,
-        passphrase_enabled: true,
-        attach_to_pin_enabled: false,
-        unlocked_by_attach_to_pin: false,
+        request: 'DeviceStatusGet',
+        response: {
+          type: 'DeviceStatus',
+          message: {
+            device_id: '[REDACTED]',
+            unlocked: true,
+            init_states: true,
+            backup_required: false,
+            passphrase_enabled: true,
+            attach_to_pin_enabled: false,
+            unlocked_by_attach_to_pin: false,
+          },
+        },
       },
     ]);
     expect(JSON.stringify(receivedLog)).not.toContain('sensitive-device-id');
@@ -123,6 +176,59 @@ describe('DeviceCommands failure mapping', () => {
 
     expect(JSON.stringify(log.messages)).not.toContain('secret-session-id');
     expect(JSON.stringify(log.messages)).not.toContain('secret-wallet-address');
+  });
+
+  it('logs the sanitized DeviceInfo response payload', async () => {
+    const commands = createCommands();
+    const log = getLogger(LoggerNames.DeviceCommands);
+    log.messages.length = 0;
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'DeviceInfo',
+          message: {
+            protocol_version: 2,
+            hw: {
+              Device_type: 7,
+              hardware_version: '1.0.0',
+            },
+            main_mcu: {
+              application: {
+                version: '5.0.0',
+                build_id: '20260811',
+                hash: 'firmware-hash',
+              },
+            },
+          },
+        } as any,
+        'DeviceInfoGet'
+      )
+    ).resolves.toMatchObject({ type: 'DeviceInfo' });
+
+    expect(log.messages.at(-1)?.message).toEqual([
+      '_filterCommonTypes: ',
+      {
+        request: 'DeviceInfoGet',
+        response: {
+          type: 'DeviceInfo',
+          message: {
+            protocol_version: 2,
+            hw: {
+              Device_type: 7,
+              hardware_version: '1.0.0',
+            },
+            main_mcu: {
+              application: {
+                version: '5.0.0',
+                build_id: '20260811',
+                hash: 'firmware-hash',
+              },
+            },
+          },
+        },
+      },
+    ]);
   });
 
   it('logs the sanitized DeviceFirmwareUpdateStatus response payload', async () => {
@@ -561,17 +667,22 @@ describe('DeviceCommands failure mapping', () => {
 });
 
 describe('DeviceCommands Protocol V2 interactive response compatibility', () => {
-  it('still auto-acks ButtonRequest when no hardware UI listener is registered', async () => {
+  it('auto-acks Pro2 ButtonRequest and registers Cancel instead of Initialize', async () => {
     const commands = createCommands();
     const emit = jest.fn();
+    const cancelDevice = jest.spyOn(commands, 'cancelDevice').mockResolvedValue(undefined);
+    const cancelDeviceOnOneKeyDevice = jest
+      .spyOn(commands, 'cancelDeviceOnOneKeyDevice')
+      .mockResolvedValue(undefined);
     const commonCall = jest.fn().mockResolvedValue({
       type: 'Success',
       message: {},
     });
+    const setCancelableAction = jest.fn();
     commands.device = {
       ...commands.device,
       getCurrentDeviceType: jest.fn(() => 'pro2'),
-      setCancelableAction: jest.fn(),
+      setCancelableAction,
       emit,
       listenerCount: jest.fn(() => 0),
     } as any;
@@ -593,6 +704,9 @@ describe('DeviceCommands Protocol V2 interactive response compatibility', () => 
       expect.objectContaining({ code: 'ButtonRequest_PinEntry' })
     );
     expect(commonCall).toHaveBeenCalledWith('ButtonAck', {}, undefined);
+    await setCancelableAction.mock.calls[0][0]();
+    expect(cancelDevice).toHaveBeenCalledTimes(1);
+    expect(cancelDeviceOnOneKeyDevice).not.toHaveBeenCalled();
   });
 
   it('rejects PassphraseRequest when the Pro2 UI listener is not registered', async () => {

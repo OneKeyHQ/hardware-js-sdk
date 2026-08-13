@@ -29,26 +29,35 @@ describe('protocol-aware playground parameters', () => {
     });
   });
 
-  test('builds the nested image parameters required by the Pro2 NFT API', () => {
-    const imageRgba = new ArrayBuffer(8);
-    const thumbnailRgba = new ArrayBuffer(4);
+  test('converts Pro2 NFT files to the Base64 API contract', () => {
+    const imageJpeg = Uint8Array.from([1, 2, 3]).buffer;
+    const thumbnailJpeg = Uint8Array.from([4, 5]).buffer;
 
     expect(
       normalizeProtocolAwareParams('deviceUploadNft', {
-        imageWidth: 2,
-        imageHeight: 1,
-        imageRgba,
-        thumbnailWidth: 1,
-        thumbnailHeight: 1,
-        thumbnailRgba,
+        imageJpegBase64: imageJpeg,
+        thumbnailJpegBase64: thumbnailJpeg,
         title: 'NFT',
         subtitle: 'Playground',
       })
     ).toEqual({
-      image: { width: 2, height: 1, rgba: imageRgba },
-      thumbnail: { width: 1, height: 1, rgba: thumbnailRgba },
+      imageJpegBase64: 'AQID',
+      thumbnailJpegBase64: 'BAU=',
       title: 'NFT',
       subtitle: 'Playground',
     });
+  });
+
+  test('converts wallpaper and portfolio files to Base64 strings', () => {
+    expect(
+      normalizeProtocolAwareParams('deviceUploadWallpaper', {
+        jpegBase64: Uint8Array.from([0xff, 0xd8, 0xff]).buffer,
+      })
+    ).toEqual({ jpegBase64: '/9j/' });
+    expect(
+      normalizeProtocolAwareParams('uploadPortfolio', {
+        packageBase64: Uint8Array.from([1, 2, 3]).buffer,
+      })
+    ).toEqual({ packageBase64: 'AQID' });
   });
 });

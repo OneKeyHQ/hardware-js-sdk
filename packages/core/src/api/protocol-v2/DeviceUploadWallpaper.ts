@@ -1,10 +1,13 @@
 import { blake2s } from '@noble/hashes/blake2s';
 import { bytesToHex } from '@noble/hashes/utils';
+import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from '../BaseMethod';
+import { decodeJpegBase64ToRgba } from '../helpers/base64Data';
 import { invalidParameter } from '../helpers/filesystemValidation';
 import { writeProtocolV2File } from '../helpers/protocolV2FileWrite';
 import { UI_REQUEST, createUiMessage } from '../../events/ui-request';
+import { supportsProtocolV2Message } from '../../protocols/protocol-v2/features';
 import {
   PRO2_WALLPAPER_HEIGHT,
   PRO2_WALLPAPER_WIDTH,
@@ -13,9 +16,7 @@ import {
 } from '../../utils/pro2Wallpaper';
 
 export type DeviceUploadWallpaperParams = {
-  width: number;
-  height: number;
-  rgba: Uint8Array | ArrayBuffer;
+  jpegBase64: string;
   fileName?: string;
   chunkSize?: number;
 };
@@ -29,6 +30,9 @@ export type DeviceUploadWallpaperResponse = {
 
 const WALLPAPER_DIRECTORY = 'vol1:/wallpapers';
 const SAFE_FILE_NAME = /^[A-Za-z0-9_-]+(?:\.bin)?$/;
+const DEVICE_SETTINGS_SET_MESSAGE_TYPE = 60412;
+const FILESYSTEM_FILE_WRITE_MESSAGE_TYPE = 60805;
+const FILESYSTEM_DIR_MAKE_MESSAGE_TYPE = 60809;
 
 function normalizeFileName(fileName: string | undefined, data: Uint8Array): string {
   if (fileName !== undefined && (!fileName || !SAFE_FILE_NAME.test(fileName))) {
@@ -54,29 +58,43 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
   private path = '';
 
   init() {
-    const { width, height, rgba, fileName, chunkSize } = this.payload;
-    if (width !== PRO2_WALLPAPER_WIDTH || height !== PRO2_WALLPAPER_HEIGHT) {
-      throw invalidParameter(
-        `Pro2 wallpaper dimensions must be ${PRO2_WALLPAPER_WIDTH}x${PRO2_WALLPAPER_HEIGHT}.`
-      );
-    }
-    if (!(rgba instanceof ArrayBuffer) && !ArrayBuffer.isView(rgba)) {
-      throw invalidParameter('Parameter [rgba] must be an ArrayBuffer or Uint8Array.');
-    }
+    const { jpegBase64, fileName, chunkSize } = this.payload;
     if (chunkSize !== undefined && (!Number.isInteger(chunkSize) || chunkSize <= 0)) {
       throw invalidParameter('Parameter [chunkSize] must be a positive integer.');
     }
 
-    const rgbaBytes =
-      rgba instanceof ArrayBuffer
-        ? rgba
-        : new Uint8Array(rgba.buffer, rgba.byteOffset, rgba.byteLength);
-    this.encoded = encodePro2Wallpaper({ width, height, rgba: rgbaBytes });
+    const decoded = decodeJpegBase64ToRgba({
+      jpegBase64,
+      parameterName: 'jpegBase64',
+      expectedWidth: PRO2_WALLPAPER_WIDTH,
+      expectedHeight: PRO2_WALLPAPER_HEIGHT,
+    });
+    this.encoded = encodePro2Wallpaper({
+      width: PRO2_WALLPAPER_WIDTH,
+      height: PRO2_WALLPAPER_HEIGHT,
+      rgba: decoded.data,
+    });
     this.path = `${WALLPAPER_DIRECTORY}/${normalizeFileName(fileName, this.encoded.data)}`;
-    this.params = { width, height, rgba: rgbaBytes, fileName, chunkSize };
+    this.params = { jpegBase64, fileName, chunkSize };
     this.unlockPolicy = 'none';
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
+  }
+
+  private async assertCapabilities() {
+    const protocolInfo = await this.device.ensureProtocolV2RuntimeContext();
+    const requiredMessageTypes = [
+      DEVICE_SETTINGS_SET_MESSAGE_TYPE,
+      FILESYSTEM_FILE_WRITE_MESSAGE_TYPE,
+      FILESYSTEM_DIR_MAKE_MESSAGE_TYPE,
+    ];
+    if (
+      requiredMessageTypes.some(
+        messageType => !supportsProtocolV2Message(protocolInfo, messageType)
+      )
+    ) {
+      throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
+    }
   }
 
   private async ensureDirectory() {
@@ -119,6 +137,7 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
   async run(): Promise<DeviceUploadWallpaperResponse> {
     const { encoded } = this;
     if (!encoded) throw invalidParameter('Wallpaper data has not been initialized.');
+    await this.assertCapabilities();
     await this.ensureDirectory();
     await this.upload();
     const response = await this.device.commands.typedCall('DeviceSettingsSet', 'Success', {

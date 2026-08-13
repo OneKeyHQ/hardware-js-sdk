@@ -89,7 +89,7 @@ describe('device feature selectors', () => {
     const features = buildProtocolV2FeaturesPayload({
       deviceInfo: {
         hw: { Device_type: DeviceType.PRO2, serial_no: 'P2-001' },
-        fw: {
+        main_mcu: {
           application: { version: '5.0.0' },
           bootloader: { version: '2.0.0' },
           romloader: { version: '1.0.0' },

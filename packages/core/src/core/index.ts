@@ -136,6 +136,9 @@ const toError = (error: unknown): Error | undefined => {
   }
 };
 
+const isExpectedCompatibilityError = (error: unknown) =>
+  error instanceof HardwareError && error.errorCode === HardwareErrorCode.DeviceNotSupportMethod;
+
 const updateMethodRequestContext = (method: BaseMethod, updates: any) => {
   if (method.requestContext) {
     updateRequestContext(method.requestContext.responseID, updates);
@@ -693,7 +696,9 @@ const onCallDevice = async (
     try {
       return await task.callPromise.promise;
     } catch (e) {
-      Log.debug('Device Run Error: ', e);
+      if (!isExpectedCompatibilityError(e)) {
+        Log.debug('Device Run Error: ', e);
+      }
       completeMethodRequestContext(method, e);
       return createResponseMessage(method.responseID, false, { error: e });
     }
@@ -1248,7 +1253,6 @@ const cleanup = () => {
     pendingUiPromises,
     ERRORS.TypedError(HardwareErrorCode.ActionCancelled, 'UI request was cancelled')
   );
-  Log.debug('Cleanup...');
 };
 
 const removeDeviceListener = (device: Device) => {

@@ -18,7 +18,6 @@ import {
   isHeaderChunk,
 } from '@onekeyfe/hd-shared';
 
-import { createTransportCallLog, shouldSuppressHighVolumeCallLog } from './transportLog';
 import { resolveBlePacketCapacity } from './ble-packet-capacity';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
@@ -72,7 +71,7 @@ const toBleDescriptor = (
 const BLE_PACKET_SIZE_FALLBACK = 192;
 const BLE_PACKET_SIZE_MAXIMUM = 244;
 const BLE_WRITE_DELAY_MS = 5;
-const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
+const PROTOCOL_PROBE_TIMEOUT_MS = 3000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
 
 /**
@@ -806,10 +805,6 @@ export default class ElectronBleTransport {
         `Device protocol has not been detected for ${uuid}`
       );
     }
-    if (!shouldSuppressHighVolumeCallLog(name)) {
-      this.Log?.debug('transport call', createTransportCallLog(name, protocol, data));
-    }
-
     if (protocol === 'V2') {
       return this.callProtocolV2(uuid, name, data, options);
     }

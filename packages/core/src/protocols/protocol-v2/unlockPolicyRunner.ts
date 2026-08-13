@@ -80,6 +80,7 @@ export async function runMethodWithUnlockPolicy<T = unknown>(
   const requiresPreUnlock =
     device.isProtocolV2() &&
     (method.useDevicePassphraseState || method.unlockPolicy === 'unlock-before-run') &&
+    device.state?.status.initialized !== false &&
     !device.isBootloader?.() &&
     !device.isRomloader?.();
 

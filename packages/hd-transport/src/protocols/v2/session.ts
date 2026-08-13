@@ -54,6 +54,7 @@ export type ProtocolV2CallOptions = {
   intermediateTypes?: string[];
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
   onWriteCompleted?: (metrics: TransportWriteMetrics) => void;
+  returnAfterWrite?: boolean;
   writeWithResponse?: boolean;
 };
 
@@ -269,6 +270,10 @@ export class ProtocolV2Session {
         });
       } catch (error) {
         logger?.error?.(`${logPrefix} write metrics callback failed: ${String(error)}`);
+      }
+
+      if (callOptions.returnAfterWrite) {
+        return { type: 'WriteCompleted', message: {} };
       }
 
       // Some Protocol V2 operations emit progress notifications before the

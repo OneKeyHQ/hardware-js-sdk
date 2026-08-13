@@ -51,6 +51,29 @@ Pro2，也不能用 Pro/Pro2 型号反推协议。这样 Pro 后续迁移到 Pro
 - `packages/hd-transport/src/protocols/v2/frame-assembler.ts`
 - `packages/hd-transport/src/protocols/v2/link-manager.ts`
 
+## 资源上传的跨运行时参数边界
+
+TopLevel 与 LowLevel SDK 可能通过 Extension background/offscreen、React Native bridge 等只支持 JSON
+语义的宿主桥接。公共业务 API 不提供递归二进制 codec，而是让确实需要跨运行时的资源使用明确、可校验
+的字符串契约：
+
+- Portfolio package、Pro2 壁纸 JPEG、NFT 原图 JPEG 与缩略图 JPEG 使用不带 data URL 前缀的标准
+  Base64；LowLevel Core 在设备 I/O 前完成严格解码、大小和格式校验。
+- Base64 只用于公共运行时边界；LowLevel 内部仍使用 `Uint8Array` 完成设备格式转换、protobuf 编码和
+  文件分片，不在每个内部调用之间重复编解码。
+- Protocol V1 的老 Pro/Touch 资源接口继续使用既有 hex 契约，不因 Protocol V2 的资源 API 改变。
+- 固件升级在 LowLevel 所在运行时下载或读取 artifact；Extension background 不把原生二进制传入
+  offscreen。Desktop Bridge 的直连二进制也不经过全局 Base64 包装。
+- 非法、非规范或超过上限的 Base64，以及无效 JPEG 和错误图片尺寸，必须在设备 I/O 前返回
+  `CallMethodInvalidParameter`。
+
+主要实现：
+
+- `packages/core/src/api/helpers/base64Data.ts`
+- `packages/core/src/api/UploadPortfolio.ts`
+- `packages/core/src/api/protocol-v2/DeviceUploadWallpaper.ts`
+- `packages/core/src/api/protocol-v2/DeviceUploadNft.ts`
+
 ## 钱包 Session 所有权与缓存键
 
 Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类不同状态，不能共用缓存：

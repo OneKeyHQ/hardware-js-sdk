@@ -42,8 +42,8 @@ export default class SearchDevices extends BaseMethod {
             ...device,
             connectId: device.id,
             serialNo: null,
-            // Legacy BLE discovery identifier. The physical serial number is unavailable here.
-            uuid: device.id,
+            // BLE discovery cannot provide a physical-device identity before initialization.
+            uuid: '',
             deviceId: null,
             name: bleName || device.name,
             deviceType: getDeviceTypeByBleName(bleName),

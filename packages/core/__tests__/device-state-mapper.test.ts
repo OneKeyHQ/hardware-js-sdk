@@ -115,7 +115,7 @@ describe('DeviceStateMapper', () => {
       {
         protocol_version: 2,
         hw: { Device_type: DeviceType.PRO2, serial_no: 'SERIAL-1' },
-        fw: {
+        main_mcu: {
           application: { version: '5.0.0', build_id: 'p1-build', hash: [0x01, 0x02] },
           application_data: { version: '5.0.1', build_id: 'p2-build', hash: [0x03, 0x04] },
           bootloader: { version: '2.0.0' },
@@ -188,7 +188,7 @@ describe('DeviceStateMapper', () => {
       {
         protocol_version: 2,
         hw: { serial_no: 'SERIAL-NORMAL' },
-        fw: {
+        main_mcu: {
           application: { version: '5.0.0' },
           bootloader: { version: '2.0.0' },
         },
@@ -214,7 +214,7 @@ describe('DeviceStateMapper', () => {
       'bootloader',
       {
         hw: { serial_no: 'SERIAL-BOOT' },
-        fw: { bootloader: { version: '2.0.0' } },
+        main_mcu: { bootloader: { version: '2.0.0' } },
         se1: {},
       },
     ],
@@ -222,7 +222,7 @@ describe('DeviceStateMapper', () => {
       'romloader',
       {
         hw: { serial_no: 'SERIAL-ROM' },
-        fw: {
+        main_mcu: {
           romloader: { version: '1.0.0' },
           bootloader: { version: '2.0.0' },
         },

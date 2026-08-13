@@ -61,6 +61,7 @@ import {
   PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST,
   type ProtocolV2RuntimeMode,
   getProtocolV2RuntimeMode,
+  isLegacyProtocolV2ProtocolInfo,
   requestProtocolV2DeviceInfo,
   requestProtocolV2DeviceStatus,
   requestProtocolV2ProtocolInfo,
@@ -485,6 +486,10 @@ export class Device extends EventEmitter {
       }
 
       this.commands = new DeviceCommands(this, this.mainId ?? '');
+      // Protocol V2 runtime metadata belongs to one active transport link. A
+      // successful acquire creates a fresh link/session, so never carry cached
+      // ProtocolInfo or pre-initialize state across that boundary.
+      this.invalidateProtocolV2RuntimeState();
     } catch (error) {
       if (options?.forceProtocolDetection) {
         this.originalDescriptor.protocolType = previousProtocol;
@@ -977,11 +982,7 @@ export class Device extends EventEmitter {
       });
       // The default request excludes SE/hash data and therefore uses basic scope.
       // Full version and verification data require getDeviceState({ scope: 'firmware' }).
-      const features = await this.probeProtocolV2RuntimeState(
-        deviceInfo,
-        options?.protocolV2DeviceInfoTimeoutMs
-      );
-      Log.debug('Protocol V2 features:', features);
+      await this.probeProtocolV2RuntimeState(deviceInfo, options?.protocolV2DeviceInfoTimeoutMs);
     } catch (error) {
       Log.error('Protocol V2 initialization failed:', error);
       throw error;
@@ -1053,7 +1054,13 @@ export class Device extends EventEmitter {
       }
 
       if (refresh.has('status') && !initializedWithDeviceInfo) {
-        await this.probeProtocolV2RuntimeState(refreshedDeviceInfo);
+        const cachedMode = this.state?.status.mode;
+        await this.probeProtocolV2RuntimeState(refreshedDeviceInfo, undefined, {
+          // Loader firmware does not support DeviceStatusGet. Renegotiate ProtocolInfo
+          // during an explicit refresh so a device rebooted into application firmware
+          // can leave the cached loader state.
+          forceRuntimeContextRefresh: cachedMode === 'bootloader' || cachedMode === 'romloader',
+        });
       }
 
       if (refresh.has('settings') && this.state?.status.mode === 'normal') {
@@ -1101,9 +1108,10 @@ export class Device extends EventEmitter {
       source,
       changedKeys: result.changedKeys,
     };
-    Log.debug('Device state patch committed', {
+    Log.debug('Device state updated', {
       source,
-      keys: result.changedKeys,
+      revision: result.revision,
+      changedKeyCount: result.changedKeys.length,
     });
     this.emit(DEVICE.STATE, this, event);
     if (result.state.protocol === 'V1') {
@@ -1124,12 +1132,17 @@ export class Device extends EventEmitter {
     return this.features;
   }
 
-  async ensureProtocolV2RuntimeContext(timeoutMs?: number): Promise<ProtocolInfo> {
+  async ensureProtocolV2RuntimeContext(
+    timeoutMs?: number,
+    options?: { forceRefresh?: boolean }
+  ): Promise<ProtocolInfo> {
     const cachedProtocolInfo =
-      this.protocolV2RuntimeContext ??
-      (!this.protocolV2StateNeedsReload
-        ? this.state?.raw?.protocolV2ProtocolInfo ?? undefined
-        : undefined);
+      options?.forceRefresh === true
+        ? undefined
+        : this.protocolV2RuntimeContext ??
+          (!this.protocolV2StateNeedsReload
+            ? this.state?.raw?.protocolV2ProtocolInfo ?? undefined
+            : undefined);
     if (cachedProtocolInfo) {
       this.protocolV2RuntimeContext = cachedProtocolInfo;
       return cachedProtocolInfo;
@@ -1169,10 +1182,19 @@ export class Device extends EventEmitter {
     }
   }
 
-  async probeProtocolV2RuntimeState(deviceInfo?: ProtocolV2DeviceInfo, timeoutMs?: number) {
-    const protocolInfo = await this.ensureProtocolV2RuntimeContext(timeoutMs);
+  async probeProtocolV2RuntimeState(
+    deviceInfo?: ProtocolV2DeviceInfo,
+    timeoutMs?: number,
+    options?: {
+      forceRuntimeContextRefresh?: boolean;
+    }
+  ) {
+    const protocolInfo = await this.ensureProtocolV2RuntimeContext(timeoutMs, {
+      forceRefresh: options?.forceRuntimeContextRefresh,
+    });
     const runtimeDeviceInfo = deviceInfo ?? this.state?.raw?.protocolV2DeviceInfo;
     const runtimeMode = getProtocolV2RuntimeMode(protocolInfo, runtimeDeviceInfo);
+    const legacyProtocolInfo = isLegacyProtocolV2ProtocolInfo(protocolInfo);
     const protocolV2DeviceType = runtimeDeviceInfo
       ? resolveProtocolV2DeviceIdentity(runtimeDeviceInfo.hw?.Device_type).deviceType
       : this.getCurrentDeviceType();
@@ -1187,6 +1209,7 @@ export class Device extends EventEmitter {
       );
     }
     const deviceStatusSupported =
+      legacyProtocolInfo ||
       supportsProtocolV2Message(protocolInfo, PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE) ||
       (!protocolInfo.build_fingerprint && runtimeMode === undefined);
 
@@ -1249,14 +1272,18 @@ export class Device extends EventEmitter {
     });
   }
 
-  markTransportDisconnected() {
-    this.deviceAcquired = false;
+  private invalidateProtocolV2RuntimeState() {
     if (!this.isProtocolV2()) return;
     this.protocolV2StateNeedsReload = true;
     this.protocolV2RuntimeContext = undefined;
     this.protocolV2RuntimeContextPromise = undefined;
     this.protocolV2RuntimeContextRequestToken = undefined;
     this.clearPreInitialized();
+  }
+
+  markTransportDisconnected() {
+    this.deviceAcquired = false;
+    this.invalidateProtocolV2RuntimeState();
   }
 
   invalidateAfterWipe() {
@@ -1268,10 +1295,7 @@ export class Device extends EventEmitter {
       if (this.originalDescriptor.path !== deviceId) {
         deviceWalletSessionStore.deleteDevice(this.originalDescriptor.path);
       }
-      this.protocolV2StateNeedsReload = true;
-      this.protocolV2RuntimeContext = undefined;
-      this.protocolV2RuntimeContextPromise = undefined;
-      this.protocolV2RuntimeContextRequestToken = undefined;
+      this.invalidateProtocolV2RuntimeState();
     }
 
     this.passphraseState = undefined;
@@ -1283,11 +1307,7 @@ export class Device extends EventEmitter {
   markProtocolV2Reboot(rebootType: DeviceRebootType) {
     if (!this.isProtocolV2()) return;
 
-    this.protocolV2StateNeedsReload = true;
-    this.protocolV2RuntimeContext = undefined;
-    this.protocolV2RuntimeContextPromise = undefined;
-    this.protocolV2RuntimeContextRequestToken = undefined;
-    this.clearPreInitialized();
+    this.invalidateProtocolV2RuntimeState();
     let loaderMode: 'bootloader' | 'romloader' | undefined;
     if (rebootType === DeviceRebootType.Bootloader) {
       loaderMode = 'bootloader';
@@ -1361,6 +1381,10 @@ export class Device extends EventEmitter {
     if (device.features) {
       this._updateFeatures(device.features);
     }
+    // Adopting another Device instance's command channel also crosses an active
+    // link boundary. Renegotiate runtime metadata on that channel instead of
+    // retaining ProtocolInfo from the previous instance/session.
+    this.invalidateProtocolV2RuntimeState();
   }
 
   async run(fn?: () => Promise<void>, options?: RunOptions) {

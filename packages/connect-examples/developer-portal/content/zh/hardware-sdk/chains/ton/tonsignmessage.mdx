@@ -91,7 +91,8 @@ const jettonResponse = await HardwareSDK.tonSignMessage(connectId, deviceId, {
     payload: {
         skip_validate: boolean; // 用于在 Classic 1s 中跳过验证
         signature: string;
-        signning_message: string;
+        signing_message?: string; // Correct Pro2/Neo field; the SDK also normalizes legacy responses
+        signning_message?: string; // Deprecated; retained only for raw Protocol V1 compatibility
     }
 }
 ```

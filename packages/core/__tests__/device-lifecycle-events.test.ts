@@ -1,12 +1,14 @@
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
+import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { DeviceType, TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
 
 import { initConnector, initCore } from '../src/core';
 import { DataManager } from '../src/data-manager';
 import TransportManager from '../src/data-manager/TransportManager';
 import { Device } from '../src/device/Device';
+import { cancelDeviceInPrompt, cancelDeviceWithInitialize } from '../src/device/DeviceCommands';
 import { DevicePool } from '../src/device/DevicePool';
 import { CORE_EVENT, DEVICE, IFRAME } from '../src/events';
+import { PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE } from '../src/protocols/protocol-v2';
 
 import type Core from '../src/core';
 import type { CoreMessage } from '../src/events';
@@ -270,6 +272,115 @@ describe('public device lifecycle events', () => {
     device.markTransportDisconnected();
     expect(device.isUsedHere()).toBe(false);
   });
+
+  test.each([
+    ['V2', 'Cancel', 'webusb'],
+    ['V2', 'Cancel', 'desktop-web-ble'],
+    ['V2', 'Cancel', 'react-native'],
+    ['V1', 'Initialize', 'webusb'],
+    ['V1', 'Cancel', 'desktop-web-ble'],
+  ] as const)(
+    'sends Protocol %s %s without treating the acquired %s session as disconnected',
+    async (protocol, messageType, env) => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
+      const device = createInitializedDevice(protocol);
+      const post = jest.fn().mockResolvedValue(undefined);
+      const call = jest.fn().mockResolvedValue(undefined);
+      const cancel = jest.fn().mockResolvedValue(undefined);
+      device.originalDescriptor.session = device.mainId;
+      (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+      (device as any).commands = { transport: { post, call }, cancel };
+      device.setCancelableAction(() =>
+        messageType === 'Cancel'
+          ? cancelDeviceInPrompt(device, false)
+          : cancelDeviceWithInitialize(device)
+      );
+
+      await device.interruptionFromUser();
+
+      if (messageType === 'Cancel') {
+        expect(post).toHaveBeenCalledWith(device.mainId, 'Cancel', {});
+        expect(call).not.toHaveBeenCalled();
+      } else {
+        expect(call).toHaveBeenCalledWith(device.mainId, 'Initialize', {});
+        expect(post).not.toHaveBeenCalled();
+      }
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(device.hasDeviceAcquire()).toBe(true);
+    }
+  );
+
+  test.each([
+    [EDeviceType.Pro2, 'webusb', false, DeviceType.PRO2],
+    [EDeviceType.Neo, 'webusb', false, DeviceType.NEO],
+    [EDeviceType.Pro2, 'desktop-web-ble', true, DeviceType.PRO2],
+    [EDeviceType.Neo, 'desktop-web-ble', true, DeviceType.NEO],
+    [EDeviceType.Pro2, 'react-native', true, DeviceType.PRO2],
+    [EDeviceType.Neo, 'react-native', true, DeviceType.NEO],
+    [EDeviceType.Pro2, 'lowlevel', false, DeviceType.PRO2],
+  ] as const)(
+    'refreshes %s runtime state after acquiring a fresh %s session',
+    async (deviceType, env, isBle, protocolV2DeviceType) => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
+      const device = createInitializedDevice('V2');
+      const staleProtocolInfo = {
+        version: 1,
+        build_fingerprint: 'bootloader__1.0.0__abcdef0__PROD__RELEASE',
+        supported_messages: [],
+      };
+      const freshProtocolInfo = {
+        version: 1,
+        build_fingerprint: 'application__5.0.0__abcdef0__PROD__RELEASE',
+        supported_messages: [PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE],
+      };
+      device.updateState(
+        {
+          identity: { deviceType },
+          status: { mode: 'bootloader' },
+          raw: { protocolV2ProtocolInfo: staleProtocolInfo },
+        },
+        'initialize'
+      );
+      const acquire = jest
+        .fn()
+        .mockResolvedValue(isBle ? { uuid: 'fresh-session', protocolType: 'V2' } : 'fresh-session');
+      device.deviceConnector = { acquire } as never;
+
+      await device.acquire('V2', { throwOnRunPromiseError: true });
+      const typedCall = jest.fn().mockImplementation((requestType: string) => {
+        if (requestType === 'DeviceInfoGet') {
+          return {
+            message: {
+              protocol_version: 2,
+              hw: { Device_type: protocolV2DeviceType, serial_no: 'SERIAL-001' },
+              main_mcu: { application: { version: '5.0.0' } },
+            },
+          };
+        }
+        if (requestType === 'ProtocolInfoRequest') {
+          return { message: freshProtocolInfo };
+        }
+        if (requestType === 'DeviceStatusGet') {
+          return {
+            message: { init_states: true, unlocked: true, device_id: 'wallet-device-id' },
+          };
+        }
+        throw new Error(`Unexpected request: ${requestType}`);
+      });
+      device.commands.typedCall = typedCall as never;
+
+      await device.initialize();
+
+      expect(typedCall.mock.calls.map(callArgs => callArgs[0])).toEqual([
+        'DeviceInfoGet',
+        'ProtocolInfoRequest',
+        'DeviceStatusGet',
+      ]);
+      expect(device.state?.status.mode).toBe('normal');
+      expect(device.state?.identity.deviceType).toBe(deviceType);
+      expect(device.hasDeviceAcquire()).toBe(true);
+    }
+  );
 
   test('exposes the current transport usage state in public device snapshots', () => {
     const getSettings = jest

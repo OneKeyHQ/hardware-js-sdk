@@ -124,8 +124,6 @@ export default class EmulatorTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
     const messages = this._messages;
-    this.Log.debug('transport call', { name, protocol: 'V1' });
-
     const o = ProtocolV1.encodeEnvelope(messages, name, data);
     const outData = o.toString('hex');
     const resData = await this._post({
