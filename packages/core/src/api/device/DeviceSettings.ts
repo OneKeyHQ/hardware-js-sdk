@@ -10,6 +10,7 @@ import {
 } from '../../device/DeviceStateMapper';
 import { getProtocolV2SettingsBehavior } from '../../protocols/protocol-v2/settingsUnlockPolicy';
 import {
+  DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
   DEVICE_SETTINGS_V1_ONLY_FIELDS,
   DEVICE_SETTINGS_V2_ONLY_FIELDS,
   LANGUAGE_LABELS,
@@ -29,6 +30,9 @@ const assertSettingsSupported = (
     throw invalidParameter(`${protocol} does not support settings: ${provided.join(', ')}.`);
   }
 };
+
+const normalizeProtocolV1DelayMs = (value: number | undefined) =>
+  value === 0 ? DEVICE_SETTINGS_NEVER_TIMEOUT_MS : value;
 
 const assertProtocolV2SettingValues = (
   payload: DeviceSettingsParams,
@@ -253,10 +257,19 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
         );
       }
 
-      const res = await this.device.commands.typedCall('ApplySettings', 'Success', {
+      // Early SDK 1.2 alphas exposed 0 as Protocol V1 "Never". Normalize at the
+      // protocol boundary so existing consumers send the firmware-supported value.
+      const protocolV1Params = {
         ...this.params,
-      });
-      this.device.updateState(mapApplySettingsToState(this.params), 'settings-write');
+        auto_lock_delay_ms: normalizeProtocolV1DelayMs(this.params.auto_lock_delay_ms),
+        auto_shutdown_delay_ms: normalizeProtocolV1DelayMs(this.params.auto_shutdown_delay_ms),
+      };
+      const res = await this.device.commands.typedCall(
+        'ApplySettings',
+        'Success',
+        protocolV1Params
+      );
+      this.device.updateState(mapApplySettingsToState(protocolV1Params), 'settings-write');
       return res.message;
     } catch (error) {
       if (error.message?.toLowerCase().includes('no setting provided')) {
