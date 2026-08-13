@@ -115,7 +115,8 @@ Core 会在发送任何命令前返回参数错误，避免同一请求中的其
 
 `getDeviceSettingsCapabilities(deviceType, protocol)` 是字段、语言、时长选项、数值范围和设备端确认
 要求的单一公共来源；调用方必须传入已通过设备响应确认的协议，不能从 PID 或设备名推断。
-Protocol V2 的自动锁屏和自动关机使用 `0x10000000` 表示“永不”，Protocol V1 仍使用 `0`。
+Protocol V1/V2 的自动锁屏和自动关机均使用 `0x10000000` 表示“永不”。Core 在
+Protocol V1 的发送边界兼容早期 SDK 1.2 alpha 暴露的 `0`，并将其规范化为固件支持的值。
 `safetyChecks` 在公共写入参数、`DeviceState` 和事件中统一使用数值枚举
 `Strict=0`、`PromptAlways=1`、`PromptTemporarily=2`。
 

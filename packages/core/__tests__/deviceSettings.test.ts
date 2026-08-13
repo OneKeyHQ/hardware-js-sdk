@@ -1,6 +1,7 @@
 import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import {
+  DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
   PROTOCOL_V2_NEVER_TIMEOUT_MS,
   getAutoLockOptions,
   getAutoShutDownOptions,
@@ -81,10 +82,14 @@ describe('Pro 2 device settings options', () => {
     );
   });
 
-  test('keeps the legacy and Protocol V2 never values protocol-specific', () => {
+  test('returns the firmware-supported never value for both protocols', () => {
     expect(getAutoLockOptions(EDeviceType.Pro, 'V1').slice(-1)[0]).toEqual({
       label: 'Never',
-      valueMs: 0,
+      valueMs: DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
+    });
+    expect(getAutoShutDownOptions(EDeviceType.Pro, 'V1').slice(-1)[0]).toEqual({
+      label: 'Never',
+      valueMs: DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
     });
     expect(getAutoLockOptions(EDeviceType.Pro2, 'V2').slice(-1)[0]).toEqual({
       label: 'Never',

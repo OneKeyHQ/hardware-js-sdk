@@ -2,6 +2,7 @@ import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { DeviceSettingsPage } from '@onekeyfe/hd-transport';
 
 import DeviceSettings from '../src/api/device/DeviceSettings';
+import { DEVICE_SETTINGS_NEVER_TIMEOUT_MS } from '../src/utils/deviceSettings';
 
 import type { Features } from '../src/types';
 
@@ -110,6 +111,39 @@ describe('DeviceSettings protocol routing', () => {
       {
         identity: { label: 'Shared Label' },
         settings: { language: 'ja', bleEnabled: true },
+      },
+      'settings-write'
+    );
+  });
+
+  it('normalizes legacy Protocol V1 never values before ApplySettings', async () => {
+    const { device, typedCall, updateState } = createDevice({ protocol: 'V1' });
+    const method = new DeviceSettings({
+      id: 2,
+      payload: {
+        method: 'deviceSettings',
+        autoLockDelayMs: 0,
+        autoShutdownDelayMs: 0,
+      },
+    });
+    method.init();
+    (method as any).device = device;
+
+    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+    expect(typedCall).toHaveBeenCalledWith(
+      'ApplySettings',
+      'Success',
+      expect.objectContaining({
+        auto_lock_delay_ms: DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
+        auto_shutdown_delay_ms: DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
+      })
+    );
+    expect(updateState).toHaveBeenCalledWith(
+      {
+        settings: {
+          autoLockDelayMs: DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
+          autoShutdownDelayMs: DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
+        },
       },
       'settings-write'
     );
