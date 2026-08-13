@@ -6,7 +6,11 @@ import {
   createDeviceNotSupportMethodError,
   createNeedUpgradeFirmwareHardwareError,
 } from '@onekeyfe/hd-shared';
-import { Enum_SafetyCheckLevel, type ProtocolType } from '@onekeyfe/hd-transport';
+import {
+  type DeviceSessionPinType,
+  Enum_SafetyCheckLevel,
+  type ProtocolType,
+} from '@onekeyfe/hd-transport';
 
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
@@ -166,6 +170,9 @@ export abstract class BaseMethod<Params = undefined> {
 
   /** Non-wallet methods may explicitly require Protocol V2 pre-unlock. */
   unlockPolicy: UnlockPolicy = 'none';
+
+  /** PIN type accepted by an explicit Protocol V2 pre-unlock. */
+  protocolV2PreUnlockPinType?: DeviceSessionPinType;
 
   /** Shared by composite methods so nested calls do not repeat the root preflight. */
   protocolV2UnlockContext?: ProtocolV2UnlockContext;
