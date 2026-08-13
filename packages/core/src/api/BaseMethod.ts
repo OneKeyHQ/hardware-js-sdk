@@ -7,8 +7,8 @@ import {
   createNeedUpgradeFirmwareHardwareError,
 } from '@onekeyfe/hd-shared';
 import {
-  Enum_SafetyCheckLevel,
   type DeviceSessionPinType,
+  Enum_SafetyCheckLevel,
   type ProtocolType,
 } from '@onekeyfe/hd-transport';
 
