@@ -33,3 +33,19 @@ export const resolveProtocolV2DeviceIdentity = (
       return { deviceType: EDeviceType.Unknown, model: null };
   }
 };
+
+export const resolveProtocolV2BleName = ({
+  bleName,
+  deviceType,
+}: {
+  bleName?: string | null;
+  deviceType: EDeviceType;
+}): string | null => {
+  const normalizedBleName = bleName?.trim();
+  if (!normalizedBleName) return null;
+  // Early Pro2 firmware can expose its serial as the BLE advertising name.
+  if (deviceType === EDeviceType.Pro2 && /^P2[A-Z0-9]{8,}$/iu.test(normalizedBleName)) {
+    return `Pro2 ${normalizedBleName.slice(-4).toUpperCase()}`;
+  }
+  return normalizedBleName;
+};

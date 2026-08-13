@@ -1,5 +1,5 @@
 import { HardwareErrorCode, TypedError } from '@onekeyfe/hd-shared';
-import { DeviceSettingsPage } from '@onekeyfe/hd-transport';
+import { DeviceSessionPinType, DeviceSettingsPage } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
 import { invalidParameter } from '../helpers/filesystemValidation';
@@ -149,6 +149,8 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
           })
         : getProtocolV2SettingsBehavior({ kind: 'page', page });
     this.unlockPolicy = behavior.unlockPolicy;
+    this.protocolV2PreUnlockPinType =
+      behavior.unlockPolicy === 'unlock-before-run' ? DeviceSessionPinType.Any : undefined;
     this.protocolV2UiInteraction = behavior.uiInteraction;
   }
 

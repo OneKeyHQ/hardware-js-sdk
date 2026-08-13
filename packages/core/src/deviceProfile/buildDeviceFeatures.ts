@@ -11,7 +11,10 @@ import {
   resolveDeviceType,
 } from '../utils/deviceFeaturesCompat';
 import { normalizeSafetyCheckLevel } from '../utils/deviceSettings';
-import { resolveProtocolV2DeviceIdentity } from './protocolV2DeviceIdentity';
+import {
+  resolveProtocolV2BleName,
+  resolveProtocolV2DeviceIdentity,
+} from './protocolV2DeviceIdentity';
 
 import type {
   DeviceFirmwareImageInfo,
@@ -245,7 +248,10 @@ export const buildProtocolV2FeaturesPayload = ({
   const deviceId = status?.device_id ?? cached?.deviceId ?? null;
   const serialNo = firstValue(incomingSerialNo, cached?.serialNo) ?? '';
   const label = cached?.label ?? null;
-  const bleName = firstValue(info?.coprocessor?.bt_adv_name, cached?.bleName);
+  const bleName = resolveProtocolV2BleName({
+    bleName: firstValue(info?.coprocessor?.bt_adv_name, cached?.bleName),
+    deviceType,
+  });
   const initialized = firstValue(status?.init_states, cached?.initialized) ?? null;
   // passphrase_enabled from a locked Pro2 is not authoritative. Only DeviceStatus
   // after PIN unlock can determine the final passphrase setting.
