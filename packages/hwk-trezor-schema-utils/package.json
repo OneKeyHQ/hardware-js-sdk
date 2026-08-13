@@ -45,6 +45,7 @@
   "sideEffects": false,
   "dependencies": {
     "@onekeyfe/hwk-trezor-type-utils": "1.2.1",
+    "@onekeyfe/hwk-trezor-utils": "1.2.1",
     "@sinclair/typebox": "^0.34.49",
     "ts-mixer": "^6.0.4"
   },
