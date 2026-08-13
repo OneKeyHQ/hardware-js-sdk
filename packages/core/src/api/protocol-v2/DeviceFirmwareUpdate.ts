@@ -1,14 +1,6 @@
 import { BaseMethod } from '../BaseMethod';
-import {
-  PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS,
-  PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
-  isProtocolV2DeviceDisconnectedError,
-  normalizeFirmwareTargets,
-} from './helpers';
-import { UI_REQUEST, createUiMessage } from '../../events/ui-request';
+import { isProtocolV2DeviceDisconnectedError, normalizeFirmwareTargets } from './helpers';
 
-import type { KnownDevice } from '../../types';
-import type { MessageFromOneKey } from '@onekeyfe/hd-transport';
 import type { DeviceFirmwareUpdateParams } from './helpers';
 
 export default class DeviceFirmwareUpdate extends BaseMethod<DeviceFirmwareUpdateParams> {
@@ -31,27 +23,13 @@ export default class DeviceFirmwareUpdate extends BaseMethod<DeviceFirmwareUpdat
   async run() {
     const targets = normalizeFirmwareTargets(this.params);
     try {
-      const res = await this.device.commands.typedCall(
+      await this.device.commands.typedCall('DeviceFirmwareUpdateStage', 'Success', { targets });
+      await this.device.commands.call(
         'DeviceFirmwareUpdateRequest',
-        PROTOCOL_V2_FIRMWARE_UPDATE_RESPONSE_TYPES,
-        {
-          targets,
-        },
-        {
-          ...PROTOCOL_V2_FIRMWARE_UPDATE_OPTIONS,
-          onIntermediateResponse: (response: MessageFromOneKey) => {
-            if (response.type !== 'DeviceFirmwareUpdateStatus') return;
-            this.postMessage(
-              createUiMessage(UI_REQUEST.FIRMWARE_PROGRESS, {
-                device: this.device.toMessageObject() as KnownDevice,
-                progress: 99,
-                progressType: 'installingFirmware',
-              })
-            );
-          },
-        }
+        {},
+        { returnAfterWrite: true }
       );
-      return res.message;
+      return { message: 'Device firmware update started' };
     } catch (error) {
       if (isProtocolV2DeviceDisconnectedError(error)) {
         return {

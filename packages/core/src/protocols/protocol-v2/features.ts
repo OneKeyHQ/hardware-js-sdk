@@ -104,9 +104,9 @@ export const getProtocolV2RuntimeMode = (
   if (binary === 'application') return 'normal';
   if (binary) return binary;
 
-  if (isLegacyProtocolV2ProtocolInfo(protocolInfo) && !deviceInfo?.fw?.application) {
-    if (deviceInfo?.fw?.romloader) return 'romloader';
-    if (deviceInfo?.fw?.bootloader) return 'bootloader';
+  if (isLegacyProtocolV2ProtocolInfo(protocolInfo) && !deviceInfo?.main_mcu?.application) {
+    if (deviceInfo?.main_mcu?.romloader) return 'romloader';
+    if (deviceInfo?.main_mcu?.bootloader) return 'bootloader';
   }
   return undefined;
 };
@@ -122,7 +122,7 @@ export const supportsProtocolV2Message = (
 export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,
-    fw: true,
+    main_mcu: true,
     coprocessor: true,
   },
   types: {
@@ -138,7 +138,7 @@ export const PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST = {
 export const PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,
-    fw: true,
+    main_mcu: true,
     coprocessor: true,
     se1: true,
     se2: true,
@@ -154,7 +154,7 @@ export const PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST = {
 export const PROTOCOL_V2_FULL_DEVICE_INFO_REQUEST = {
   targets: {
     hw: true,
-    fw: true,
+    main_mcu: true,
     coprocessor: true,
     se1: true,
     se2: true,

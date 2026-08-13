@@ -70,6 +70,8 @@ export type TransportCallOptions = {
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
   /** Called after the complete request frame has been submitted to the transport. */
   onWriteCompleted?: (metrics: TransportWriteMetrics) => void;
+  /** Resolve after the complete request frame is written without waiting for a response. */
+  returnAfterWrite?: boolean;
   /** Prefer acknowledged BLE characteristic writes for this call when supported. */
   writeWithResponse?: boolean;
 };

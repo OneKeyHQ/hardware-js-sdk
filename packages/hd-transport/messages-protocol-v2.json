@@ -462,9 +462,10 @@
         "MessageType_FilesystemDirMake": 60809,
         "MessageType_FilesystemDirRemove": 60810,
         "MessageType_FilesystemFormat": 60811,
-        "MessageType_DeviceFirmwareUpdateRequest": 61000,
-        "MessageType_DeviceFirmwareUpdateStatusGet": 61001,
-        "MessageType_DeviceFirmwareUpdateStatus": 61002,
+        "MessageType_DeviceFirmwareUpdateStage": 61000,
+        "MessageType_DeviceFirmwareUpdateRequest": 61001,
+        "MessageType_DeviceFirmwareUpdateStatusGet": 61002,
+        "MessageType_DeviceFirmwareUpdateStatus": 61003,
         "MessageType_DeviceSessionGet": 61200,
         "MessageType_DeviceSession": 61201,
         "MessageType_DeviceSessionAskPin": 61202,
@@ -10924,7 +10925,7 @@
           "type": "bytes",
           "id": 1
         },
-        "signing_message": {
+        "signning_message": {
           "type": "bytes",
           "id": 2
         },
@@ -11813,13 +11814,13 @@
           "type": "string",
           "id": 2
         },
-        "burn_in_completed": {
-          "type": "bool",
-          "id": 3
-        },
         "factory_test_completed": {
           "type": "bool",
           "id": 4
+        },
+        "factory_burn_in_completed": {
+          "type": "bool",
+          "id": 3
         },
         "manufacture_time": {
           "type": "DeviceFactoryInfoManufactureTime",
@@ -11906,7 +11907,7 @@
         }
       }
     },
-    "DeviceFirmwareUpdateRequest": {
+    "DeviceFirmwareUpdateStage": {
       "fields": {
         "targets": {
           "rule": "repeated",
@@ -11914,6 +11915,9 @@
           "id": 1
         }
       }
+    },
+    "DeviceFirmwareUpdateRequest": {
+      "fields": {}
     },
     "DeviceFirmwareUpdateRecord": {
       "fields": {
@@ -12096,7 +12100,7 @@
           "type": "bool",
           "id": 100
         },
-        "fw": {
+        "main_mcu": {
           "type": "bool",
           "id": 200
         },
@@ -12165,7 +12169,7 @@
           "type": "DeviceHardwareInfo",
           "id": 100
         },
-        "fw": {
+        "main_mcu": {
           "type": "DeviceMainMcuInfo",
           "id": 200
         },
@@ -12703,9 +12707,12 @@
           "id": 1
         },
         "text": {
-          "rule": "required",
           "type": "string",
           "id": 2
+        },
+        "text_id": {
+          "type": "uint32",
+          "id": 3
         }
       }
     },
@@ -12736,7 +12743,6 @@
     "ViewSignPage": {
       "fields": {
         "title": {
-          "rule": "required",
           "type": "string",
           "id": 1
         },
@@ -12770,13 +12776,16 @@
           "options": {
             "default": "LayoutDefault"
           }
+        },
+        "title_id": {
+          "type": "uint32",
+          "id": 8
         }
       }
     },
     "ViewVerifyPage": {
       "fields": {
         "title": {
-          "rule": "required",
           "type": "string",
           "id": 1
         },
@@ -12801,6 +12810,14 @@
         "value_key": {
           "type": "uint32",
           "id": 6
+        },
+        "title_id": {
+          "type": "uint32",
+          "id": 7
+        },
+        "chain_id": {
+          "type": "uint32",
+          "id": 8
         }
       }
     },

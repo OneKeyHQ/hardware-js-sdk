@@ -126,6 +126,26 @@ describe('Pro2 resource configuration', () => {
     expect(parseProtocolV2ResourceManifest(resourceManifest).files).toHaveLength(9);
   });
 
+  test('uses only the resource file list from a manifest', () => {
+    expect(
+      parseProtocolV2ResourceManifest({
+        files: resourceManifest.files,
+      })
+    ).toEqual({ files: resourceManifest.files });
+  });
+
+  test('ignores release metadata and accepts a partial resource file set', () => {
+    expect(
+      parseProtocolV2ResourceManifest({
+        schema: 1,
+        variant: 'dev_resource',
+        restore_mode: 'bootloader_update',
+        trees: [],
+        files: [resourceManifest.files[0]],
+      })
+    ).toEqual({ files: [resourceManifest.files[0]] });
+  });
+
   test('rejects missing source and malformed manifest paths', () => {
     expect(() => parseProtocolV2Resources({})).toThrow('source is required');
     expect(() =>

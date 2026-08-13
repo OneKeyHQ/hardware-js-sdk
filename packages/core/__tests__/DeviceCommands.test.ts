@@ -193,7 +193,7 @@ describe('DeviceCommands failure mapping', () => {
               Device_type: 7,
               hardware_version: '1.0.0',
             },
-            fw: {
+            main_mcu: {
               application: {
                 version: '5.0.0',
                 build_id: '20260811',
@@ -218,7 +218,7 @@ describe('DeviceCommands failure mapping', () => {
               Device_type: 7,
               hardware_version: '1.0.0',
             },
-            fw: {
+            main_mcu: {
               application: {
                 version: '5.0.0',
                 build_id: '20260811',

@@ -7,7 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 import { useMedia } from '../../provider/MediaProvider';
-import { FIRMWARE_TIP_MESSAGE_IDS } from './firmwareUpdateMessages';
+import { FIRMWARE_TIP_MESSAGE_IDS, getFirmwareOverallProgress } from './firmwareUpdateMessages';
 
 import type { CoreMessage, IFirmwareUpdateTipMessage } from '@onekeyfe/hd-core';
 
@@ -68,7 +68,11 @@ function FirmwareUpdateEventView({
         if (message.type === UI_REQUEST.FIRMWARE_PROGRESS) {
           setUpdateState(previous => ({
             ...previous,
-            progress: Math.max(0, Math.min(100, message.payload.progress)),
+            progress: getFirmwareOverallProgress({
+              previous: previous.progress,
+              progress: message.payload.progress,
+              progressType: message.payload.progressType,
+            }),
           }));
         }
       };

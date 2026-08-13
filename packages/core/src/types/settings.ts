@@ -76,31 +76,16 @@ export type IProtocolV2Resources = {
 
 export type IProtocolV2ResourceManifestFile = {
   archive_path: string;
-  original_name: string;
+  original_name?: string;
   device_path: string;
   size: number;
   sha256: string;
-  signed: true;
-  sig_algo: 'ed25519' | 'mldsa65';
-  payload_version: string | null;
+  signed?: boolean;
+  sig_algo?: string;
+  payload_version?: string | null;
 };
 
 export type IProtocolV2ResourceManifest = {
-  schema: 1;
-  artifact_name: string;
-  release_name: string;
-  variant: 'resource';
-  commit: string;
-  short_sha: string;
-  timestamp_utc: string;
-  core_version: string;
-  key_set: string;
-  device_root: 'vol0:';
-  restore_mode: 'bootloader_update';
-  trees: Array<{
-    path: string;
-    device: string;
-  }>;
   files: IProtocolV2ResourceManifestFile[];
 };
 

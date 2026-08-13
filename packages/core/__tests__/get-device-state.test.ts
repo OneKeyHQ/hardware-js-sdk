@@ -123,7 +123,7 @@ describe('getDeviceState', () => {
           message: {
             protocol_version: 2,
             hw: { serial_no: 'SERIAL-1' },
-            fw: { application: { version: '5.0.0' } },
+            main_mcu: { application: { version: '5.0.0' } },
           },
         };
       }
@@ -150,7 +150,7 @@ describe('getDeviceState', () => {
           message: {
             protocol_version: 2,
             hw: { serial_no: 'SERIAL-1' },
-            fw: { application: { version: '5.0.0', hash: 'HASH-1' } },
+            main_mcu: { application: { version: '5.0.0', hash: 'HASH-1' } },
           },
         };
       }
@@ -182,7 +182,7 @@ describe('getDeviceState', () => {
       message: {
         protocol_version: 2,
         hw: { serial_no: 'SERIAL-1' },
-        fw: { application: { version: '5.0.0' } },
+        main_mcu: { application: { version: '5.0.0' } },
         se1: { application: { version: '1.0.0' } },
       },
     });
@@ -230,7 +230,7 @@ describe('getDeviceState', () => {
           raw: {
             protocolV2DeviceInfo: {
               hw: { Device_type: protocolV2DeviceType, serial_no: 'SERIAL-1' },
-              fw:
+              main_mcu:
                 mode === 'romloader'
                   ? { romloader: { version: '1.0.0' } }
                   : { bootloader: { version: '1.0.0' } },
@@ -285,7 +285,7 @@ describe('getDeviceState', () => {
         return {
           message: {
             hw: { serial_no: 'SERIAL-1' },
-            fw: { application: { version: '5.0.0' } },
+            main_mcu: { application: { version: '5.0.0' } },
           },
         };
       }
@@ -354,7 +354,7 @@ describe('getDeviceState', () => {
         return {
           message: {
             hw: { serial_no: 'SERIAL-1' },
-            fw: { application: { version: '5.0.0' } },
+            main_mcu: { application: { version: '5.0.0' } },
           },
         };
       }
@@ -397,7 +397,7 @@ describe('getDeviceState', () => {
         return {
           message: {
             hw: { serial_no: 'SERIAL-1' },
-            fw: { application: { version: '5.0.0' } },
+            main_mcu: { application: { version: '5.0.0' } },
           },
         };
       }
@@ -582,7 +582,7 @@ describe('getDeviceState', () => {
           message: {
             protocol_version: 1,
             hw: { serial_no: 'SERIAL-1' },
-            fw: { bootloader: { version: '1.0.0' } },
+            main_mcu: { bootloader: { version: '1.0.0' } },
             se1: {},
           },
         };
