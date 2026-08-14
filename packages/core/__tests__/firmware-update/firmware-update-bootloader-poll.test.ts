@@ -203,6 +203,69 @@ describe.each([
   });
 });
 
+describe('FirmwareUpdateV2 WebUSB bootloader polling', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['setImmediate', 'performance'] });
+  });
+
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  test('skips interval ticks while a bootloader probe is in flight and resumes afterward', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('desktop' as never);
+    jest.spyOn(DataManager, 'isBleConnect').mockReturnValue(false);
+    jest.spyOn(DataManager, 'isBrowserWebUsb').mockReturnValue(false);
+
+    const method = new FirmwareUpdateV2({
+      id: 1,
+      payload: { method: 'firmwareUpdateV2', connectId: WEBUSB_ID },
+    });
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const resolveProbes: Array<(found: boolean) => void> = [];
+    const probe = jest.spyOn(method as any, '_checkDeviceInBootloaderMode').mockImplementation(
+      () =>
+        new Promise<boolean>(resolve => {
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          resolveProbes.push(found => {
+            inFlight -= 1;
+            resolve(found);
+          });
+        })
+    );
+
+    method.device = {
+      getCurrentDeviceType: jest.fn(() => EDeviceType.Classic),
+    } as unknown as Device;
+
+    method.checkDeviceToBootloader(WEBUSB_ID);
+
+    for (let elapsed = 0; elapsed < 6500; elapsed += 500) {
+      jest.advanceTimersByTime(500);
+      // eslint-disable-next-line no-await-in-loop
+      await flush();
+    }
+
+    expect(probe).toHaveBeenCalled();
+    expect(maxInFlight).toBe(1);
+
+    resolveProbes[0]?.(false);
+    await flush();
+    jest.advanceTimersByTime(2000);
+    await flush();
+
+    expect(probe).toHaveBeenCalledTimes(2);
+    expect(maxInFlight).toBe(1);
+    resolveProbes[1]?.(false);
+    await flush();
+  });
+});
+
 describe.each([
   [
     'FirmwareUpdateV2',
