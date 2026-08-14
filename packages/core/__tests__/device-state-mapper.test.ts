@@ -172,6 +172,15 @@ describe('DeviceStateMapper', () => {
     });
   });
 
+  test('removes a truncated Find My suffix from the Protocol V2 BLE name', () => {
+    const patch = mapProtocolV2DeviceInfoToState({
+      hw: { Device_type: DeviceType.PRO2, serial_no: 'SERIAL-1' },
+      coprocessor: { bt_adv_name: 'Pro2 22D8 - Fin' },
+    });
+
+    expect(patch.identity?.bleName).toBe('Pro2 22D8');
+  });
+
   test('maps the hardware model independently from Protocol V2', () => {
     const pro = mapProtocolV2DeviceInfoToState({
       protocol_version: 2,

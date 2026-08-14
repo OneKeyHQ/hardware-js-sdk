@@ -76,7 +76,10 @@ describe('hardware device identity filters', () => {
     ['  OneKey Pro 2 A1B2 Find My  ', '  OneKey Pro 2 A1B2'],
     ['OneKey Pro-2 22D8--Find-My', 'OneKey Pro-2 22D8'],
     ['Pro2 22D8FindMy', 'Pro2 22D8'],
+    ['Pro2 22D8 - Fin', 'Pro2 22D8'],
+    ['Pro2 22D8FindM', 'Pro2 22D8'],
     ['Pro2 A1B2', 'Pro2 A1B2'],
+    ['Pro2 Griffin', 'Pro2 Griffin'],
     ['Find My', 'Find My'],
   ])('normalizes the public Pro2 advertisement name %s', (name, expected) => {
     expect(normalizePro2FindMyAdvertisementName(name)).toBe(expected);

@@ -204,9 +204,10 @@ Pro2 绑定 Find My 后，通信广播的名称会在原 BLE 名称末尾附加 
 3. 名称只用于搜索结果的友好展示和兼容回退，不用于推导协议版本；协议仍由连接后的活动响应确认。
 
 名称格式不得按单个固定字符串严格匹配。SDK 识别时忽略空格和连字符差异，并兼容固件历史拼写
-`Finde My`；例如 `Find My`、`FindMy`、`Find-My` 和 `Finde My` 都视为末尾标记。向上层展示时
-仅移除名称末尾的该标记，保留原设备名前缀和 BLE peripheral id。Neo 不具备 Find My，不能把
-这套名称规则用于推导 Neo 能力。
+`Finde My`；例如 `Find My`、`FindMy`、`Find-My` 和 `Finde My` 都视为末尾标记。设备信息字段
+可能受长度限制，把标记截断为 `Fin`、`Find` 或 `FindM`，这些前缀也按末尾标记处理。向上层展示
+时仅移除名称末尾的该标记，保留原设备名前缀和 BLE peripheral id；类似 `Pro2 Griffin` 的普通
+名称不能被误删。Neo 不具备 Find My，不能把这套名称规则用于推导 Neo 能力。
 
 BLE 分包大小是平台传输参数，不属于 protobuf 或业务 API。性能结论见 [Pro2 BLE 传输测速记录](../testing/pro2-ble-performance.md)。
 

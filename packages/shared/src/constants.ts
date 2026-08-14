@@ -195,7 +195,9 @@ export const matchesKnownBleUuid = (
 
 const ONEKEY_COMMUNICATION_SERVICE_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
 const FIDO_SERVICE_ALIASES = createKnownBleUuidAliases('0000fffd-0000-1000-8000-00805f9b34fb');
-const FIND_MY_SUFFIX_PATTERN = /[\s-]*finde?[\s-]*my\s*$/i;
+const PRO2_FIND_MY_COMPACT_NAME_PATTERN =
+  /^(?:onekey)?pro2[a-f0-9]{4}fin(?:d(?:e)?(?:m(?:y)?)?)?$/i;
+const FIND_MY_SUFFIX_PATTERN = /[\s-]*fin(?:d(?:e)?(?:[\s-]*m(?:y)?)?)?\s*$/i;
 
 export const isPro2FindMyAdvertisementName = (value?: string | null) => {
   const compactName =
@@ -203,7 +205,7 @@ export const isPro2FindMyAdvertisementName = (value?: string | null) => {
       ?.trim()
       .toLowerCase()
       .replace(/[\s-]+/g, '') ?? '';
-  return compactName.includes('pro2') && /finde?my$/.test(compactName);
+  return PRO2_FIND_MY_COMPACT_NAME_PATTERN.test(compactName);
 };
 
 export const normalizePro2FindMyAdvertisementName = (value: string) =>
