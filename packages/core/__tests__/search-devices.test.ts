@@ -153,6 +153,7 @@ describe('SearchDevices', () => {
   test.each([
     ['Pro2 A1B2 - Find My', undefined, 'Pro2 A1B2'],
     ['Pro2 5E9D - Finde My', undefined, 'Pro2 5E9D'],
+    ['Pro2 22D8FindMy', undefined, 'Pro2 22D8'],
     [undefined, 'OneKey Pro 2 A1B2 - Find My', 'OneKey Pro 2 A1B2'],
   ])(
     'BLE discovery normalizes the Find My display name from name=%s localName=%s',

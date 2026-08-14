@@ -195,15 +195,20 @@ export const matchesKnownBleUuid = (
 
 const ONEKEY_COMMUNICATION_SERVICE_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
 const FIDO_SERVICE_ALIASES = createKnownBleUuidAliases('0000fffd-0000-1000-8000-00805f9b34fb');
+const FIND_MY_SUFFIX_PATTERN = /[\s-]*finde?[\s-]*my\s*$/i;
 
 export const isPro2FindMyAdvertisementName = (value?: string | null) => {
-  const normalizedName = value?.trim().toLowerCase() ?? '';
-  return /\bpro\s*2\b/.test(normalizedName) && /\bfinde?\s+my\b/.test(normalizedName);
+  const compactName =
+    value
+      ?.trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, '') ?? '';
+  return compactName.includes('pro2') && /finde?my$/.test(compactName);
 };
 
 export const normalizePro2FindMyAdvertisementName = (value: string) =>
   isPro2FindMyAdvertisementName(value)
-    ? value.replace(/\s*(?:-\s*)?finde?\s+my\s*$/i, '').trimEnd()
+    ? value.replace(FIND_MY_SUFFIX_PATTERN, '').trimEnd()
     : value;
 
 export const hasOnekeyCommunicationService = (
