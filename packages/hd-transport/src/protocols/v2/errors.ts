@@ -47,3 +47,8 @@ export const isProtocolV2LinkDisabledError = (
   error.name === 'ProtocolV2LinkDisabledError' &&
   'failureCode' in error &&
   'firmwareMessage' in error;
+
+export const isProtocolV2LinkDisabledFailure = (failureCode: unknown, firmwareMessage: unknown) =>
+  (failureCode === 'Failure_ProcessError' || failureCode === 5) &&
+  typeof firmwareMessage === 'string' &&
+  firmwareMessage.trim().toLowerCase() === 'link disabled';

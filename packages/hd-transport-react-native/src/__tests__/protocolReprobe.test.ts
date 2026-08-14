@@ -61,6 +61,30 @@ const detect = (transport: ReactNativeBleTransport) =>
     Promise.resolve()
   ) as Promise<string>;
 
+describe('iOS expected-protocol detection', () => {
+  test('still probes an expected Protocol V2 so USB-priority can surface', async () => {
+    const { transport, probeV1, probeV2 } = createHarness({ v1: false, v2: true });
+
+    await expect(
+      (transport as any).detectProtocol(UUID, 'V2', undefined, () => Promise.resolve())
+    ).resolves.toBe('V2');
+
+    expect(probeV2).toHaveBeenCalledTimes(1);
+    expect(probeV1).not.toHaveBeenCalled();
+  });
+
+  test('keeps the existing iOS shortcut for an expected Protocol V1', async () => {
+    const { transport, probeV1, probeV2 } = createHarness({ v1: false, v2: false });
+
+    await expect(
+      (transport as any).detectProtocol(UUID, 'V1', undefined, () => Promise.resolve())
+    ).resolves.toBe('V1');
+
+    expect(probeV1).not.toHaveBeenCalled();
+    expect(probeV2).not.toHaveBeenCalled();
+  });
+});
+
 describe('protocol re-probe after a known device goes away', () => {
   test('an unknown device still probes both protocols', async () => {
     const { transport, probeV1, probeV2 } = createHarness({ v1: false, v2: false });

@@ -1079,6 +1079,10 @@ const ensureConnected = async (
         }
       } catch (error) {
         Log.debug('device error: ', error);
+        if (error.errorCode === HardwareErrorCode.BleUnavailableWhileUsbConnected) {
+          reject(error);
+          return;
+        }
         if (isProtocolV2LinkDisabledError(error)) {
           reject(
             ERRORS.TypedError(HardwareErrorCode.BleUnavailableWhileUsbConnected, undefined, {

@@ -207,7 +207,9 @@ Pro2 绑定 Find My 后，通信广播的名称会在原 BLE 名称末尾附加 
 `Finde My`；例如 `Find My`、`FindMy`、`Find-My` 和 `Finde My` 都视为末尾标记。设备信息字段
 可能受长度限制，把标记截断为 `Fin`、`Find` 或 `FindM`，这些前缀也按末尾标记处理。向上层展示
 时仅移除名称末尾的该标记，保留原设备名前缀和 BLE peripheral id；类似 `Pro2 Griffin` 的普通
-名称不能被误删。Neo 不具备 Find My，不能把这套名称规则用于推导 Neo 能力。
+名称不能被误删。Android 无 service UUID 的已配对回退可以把完整 Find My 后缀加名称中的
+`pro2` 视为非通信端点，但不能用这套更宽的规则去剥离展示名。Neo 不具备 Find My，不能把
+这套名称规则用于推导 Neo 能力。
 
 Neo 真机通信广播使用 `Neo <4 位标识>`，例如 `Neo 22D8`；已观察到的服务集合与 Pro2 通信广播
 一致，可同时包含 `180a`、`180f`、`fffd` 和 `0001`。SDK 保留完整 Neo 名称并识别为 Neo，连接
@@ -219,6 +221,7 @@ BLE 分包大小是平台传输参数，不属于 protobuf 或业务 API。性�
 
 | 错误类型                            | 处理层                    | 默认行为                     |
 | ----------------------------------- | ------------------------- | ---------------------------- |
+| BLE USB-priority `link disabled`    | Transport probe / Core    | 立即返回 723，不 reset、不重试 |
 | protobuf `Failure`                  | Core / method             | 保持 Link，根据业务语义处理  |
 | `DeviceLocked`                      | 显式声明解锁策略的 method | 解锁后最多重试一次           |
 | 超时、断连、I/O                     | Protocol Link / Transport | 使 Link 失效并清理平台资源   |

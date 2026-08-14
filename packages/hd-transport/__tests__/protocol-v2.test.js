@@ -8,6 +8,7 @@ const {
   hexToBytes,
   isProtocolV2HighThroughputCall,
   probeProtocolV2,
+  isProtocolV2LinkDisabledFailure,
 } = require('../src/protocols/v2/session');
 const protocolV2 = require('../src/protocols/v2');
 const {
@@ -1016,6 +1017,12 @@ describe('Protocol V2 framing and session', () => {
         timeoutMs: 1,
       })
     ).resolves.toBe(false);
+  });
+
+  test('recognizes USB-priority firmware failures independently of surrounding whitespace', () => {
+    expect(isProtocolV2LinkDisabledFailure('Failure_ProcessError', ' link disabled ')).toBe(true);
+    expect(isProtocolV2LinkDisabledFailure(5, 'Link Disabled')).toBe(true);
+    expect(isProtocolV2LinkDisabledFailure('Failure_ProcessError', 'busy')).toBe(false);
   });
 
   test.each(['Failure_ProcessError', 5])(

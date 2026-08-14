@@ -4,6 +4,7 @@ import {
   isKnownTrezorWebUsbDevice,
   isOnekeyBluetoothDevice,
   isOnekeyDevice,
+  isPro2FindMyAdvertisementName,
   matchesKnownBleUuid,
   normalizePro2FindMyAdvertisementName,
 } from './constants';
@@ -68,6 +69,18 @@ describe('hardware device identity filters', () => {
         serviceUuids: ['fffd'],
       })
     ).toBe(false);
+    expect(isOnekeyBluetoothDevice({ name: 'Pro2 - Find My' })).toBe(false);
+    expect(isOnekeyBluetoothDevice({ name: 'Pro2 G12Z - Find My' })).toBe(false);
+  });
+
+  it('uses a broad Find My guard without broadening public name normalization', () => {
+    expect(isPro2FindMyAdvertisementName('Pro2 Griffin - Find My')).toBe(true);
+    expect(isPro2FindMyAdvertisementName('Pro2 Griffin')).toBe(false);
+    expect(isPro2FindMyAdvertisementName('Pro2 22D8 - Find My')).toBe(true);
+    expect(normalizePro2FindMyAdvertisementName('Pro2 Griffin - Find My')).toBe(
+      'Pro2 Griffin - Find My'
+    );
+    expect(normalizePro2FindMyAdvertisementName('Pro2 22D8 - Find My')).toBe('Pro2 22D8');
   });
 
   it.each([

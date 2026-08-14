@@ -8,6 +8,7 @@ import {
   ProtocolV2LinkError,
   createProtocolV2LinkDisabledError,
   isProtocolV2LinkDisabledError,
+  isProtocolV2LinkDisabledFailure,
 } from './errors';
 import { ProtocolV2 } from '..';
 import * as check from '../../utils/highlevel-checks';
@@ -416,11 +417,7 @@ export async function probeProtocolV2({
     if (response.type === 'Failure') {
       const failureCode = response.message?.code;
       const firmwareMessage = response.message?.message;
-      if (
-        (failureCode === 'Failure_ProcessError' || failureCode === 5) &&
-        typeof firmwareMessage === 'string' &&
-        firmwareMessage.trim().toLowerCase() === 'link disabled'
-      ) {
+      if (isProtocolV2LinkDisabledFailure(failureCode, firmwareMessage)) {
         throw createProtocolV2LinkDisabledError(failureCode, firmwareMessage);
       }
     }

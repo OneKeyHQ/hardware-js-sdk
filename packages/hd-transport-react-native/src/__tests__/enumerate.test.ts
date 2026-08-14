@@ -84,6 +84,30 @@ describe('ReactNativeBleTransport iOS discovery', () => {
     expect(devices.map(device => device.id)).toEqual(['wallet-peripheral']);
   });
 
+  test('keeps a service-filtered Pro2 scan result when ble-plx omits service UUIDs', async () => {
+    jest.mocked(getConnectedDeviceIds).mockResolvedValueOnce([]);
+    const blePlxManager = {
+      startDeviceScan: jest.fn((_serviceUUIDs, _options, listener) => {
+        queueMicrotask(() => {
+          listener(null, {
+            id: 'wallet-peripheral',
+            name: 'Pro2 6E9E - Find My',
+            localName: null,
+            serviceUUIDs: null,
+          });
+        });
+      }),
+      stopDeviceScan: jest.fn(),
+    };
+    const transport = new ReactNativeBleTransport({ scanTimeout: 1 });
+    transport.blePlxManager = blePlxManager as never;
+    transport.init({ debug: jest.fn(), error: jest.fn() }, new EventEmitter());
+
+    const devices = await transport.enumerate();
+
+    expect(devices.map(device => device.id)).toEqual(['wallet-peripheral']);
+  });
+
   test('ignores an unnamed scanned advertisement while keeping the named wallet peripheral', async () => {
     jest.mocked(getConnectedDeviceIds).mockResolvedValueOnce([]);
     const blePlxManager = {

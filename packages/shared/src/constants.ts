@@ -205,6 +205,7 @@ const FIND_MY_COMPACT_SUFFIXES = [
   'find',
   'fin',
 ] as const;
+const COMPLETE_FIND_MY_COMPACT_SUFFIXES = ['findemy', 'findmy'] as const;
 
 const compactBleName = (value: string) =>
   Array.from(value)
@@ -212,9 +213,12 @@ const compactBleName = (value: string) =>
     .join('')
     .toLowerCase();
 
+const getFindMyCompactSuffix = (compactName: string) =>
+  FIND_MY_COMPACT_SUFFIXES.find(candidate => compactName.endsWith(candidate));
+
 const getPro2FindMyBaseLength = (value: string) => {
   const compactName = compactBleName(value);
-  const suffix = FIND_MY_COMPACT_SUFFIXES.find(candidate => compactName.endsWith(candidate));
+  const suffix = getFindMyCompactSuffix(compactName);
   if (!suffix) return undefined;
 
   const compactBaseName = compactName.slice(0, -suffix.length);
@@ -223,7 +227,15 @@ const getPro2FindMyBaseLength = (value: string) => {
 
 export const isPro2FindMyAdvertisementName = (value?: string | null) => {
   if (!value) return false;
-  return getPro2FindMyBaseLength(value) !== undefined;
+  if (getPro2FindMyBaseLength(value) !== undefined) return true;
+
+  const compactName = compactBleName(value);
+  const suffix = COMPLETE_FIND_MY_COMPACT_SUFFIXES.find(candidate =>
+    compactName.endsWith(candidate)
+  );
+  if (!suffix) return false;
+
+  return compactName.slice(0, -suffix.length).includes('pro2');
 };
 
 export const normalizePro2FindMyAdvertisementName = (value: string) => {

@@ -625,7 +625,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
     await transport.call(uuid, 'Ping', { message: 'first-core-command' });
 
-    expect(sentSeqs).toEqual([1]);
+    expect(sentSeqs).toEqual([1, 2]);
     await transport.release(uuid, true);
   });
 
@@ -660,7 +660,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
     await transport.call(uuid, 'Ping', { message: 'second-generation' });
 
-    expect(sentSeqs).toEqual([1, 2]);
+    expect(sentSeqs).toEqual([1, 2, 3, 4]);
     await transport.release(uuid, true);
   });
 
@@ -670,12 +670,12 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
     const releaseNative = jest.spyOn(transport as any, 'releaseNative');
     expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
-    expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
 
     await transport.call(uuid, 'DeviceInfoGet', {});
     await transport.call(uuid, 'ProtocolInfoRequest', {});
 
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(2);
+    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(3);
     expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
     expect(releaseNative).not.toHaveBeenCalled();
 
@@ -690,7 +690,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.call(uuid, 'FileWrite', {});
     await transport.call(uuid, 'FileWrite', {});
     expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(2);
-    expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
     expect(
       logger.debug.mock.calls.filter(
         ([message]) =>
@@ -723,7 +723,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
 
     await transport.call(uuid, 'FileWrite', {}, { writeWithResponse: true });
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(2);
     expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
     await transport.release(uuid, true);
   });
@@ -737,7 +737,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.call(uuid, 'ProtocolInfoRequest', {});
 
     expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
-    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(2);
     await transport.release(uuid, true);
   });
 
