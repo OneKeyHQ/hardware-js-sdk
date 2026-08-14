@@ -29,7 +29,6 @@ import {
   HardwareErrorCode,
   createDeferred,
   isOnekeyBluetoothDevice,
-  isPro2FindMyAdvertisementName,
 } from '@onekeyfe/hd-shared';
 
 import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
@@ -714,17 +713,15 @@ export default class ReactNativeBleTransport {
           // iOS may report a service-only advertisement before the named scan response.
           // Do not cache that incomplete advertisement as an unknown device.
           const isUnnamedIOSPeripheral = Platform.OS === 'ios' && !displayName?.trim();
-          const isFindMyPeripheral =
-            isPro2FindMyAdvertisementName(device?.name) ||
-            isPro2FindMyAdvertisementName(device?.localName);
           const isOneKey =
             !isUnnamedIOSPeripheral &&
-            !isFindMyPeripheral &&
             isOnekeyBluetoothDevice({
               id: device?.id,
               name: device?.name,
               localName: device?.localName,
-              serviceUuids: device?.serviceUUIDs,
+              // The native scan is already restricted to the OneKey communication service,
+              // but ble-plx permits the returned advertisement field to be null.
+              serviceUuids: device?.serviceUUIDs ?? getBluetoothServiceUuids(),
             });
           if (isOneKey) {
             addDevice(device as unknown as Device);
@@ -746,12 +743,7 @@ export default class ReactNativeBleTransport {
               'localName' in device && typeof device.localName === 'string'
                 ? device.localName
                 : null;
-            const isFindMyPeripheral =
-              isPro2FindMyAdvertisementName(device.name) ||
-              isPro2FindMyAdvertisementName(localName);
-
             if (
-              !isFindMyPeripheral &&
               isOnekeyBluetoothDevice({
                 id: device.id,
                 name: device.name,
@@ -1892,7 +1884,10 @@ export default class ReactNativeBleTransport {
     protocolHint?: ProtocolType,
     rebuildTransport?: () => Promise<void>
   ): Promise<ProtocolType> {
-    if (Platform.OS === 'ios' && expectedProtocol) {
+    // iOS still skips an extra V1 Initialize during acquire. Expected V2 must
+    // Ping so USB-priority `link disabled` can surface instead of a later
+    // unmapped RuntimeError.
+    if (Platform.OS === 'ios' && expectedProtocol === 'V1') {
       this.deviceProtocol.set(uuid, expectedProtocol);
       Log?.debug('[ReactNativeBleTransport] protocol selected', {
         deviceId: uuid,

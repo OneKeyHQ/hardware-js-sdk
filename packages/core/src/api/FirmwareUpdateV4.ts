@@ -2962,7 +2962,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
         const features = await this.device.probeProtocolV2RuntimeState(
           deviceInfo,
-          PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
+          PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+          { forceRuntimeContextRefresh: true }
         );
         if (this.isProtocolV2ApplicationMode(features)) {
           return features;

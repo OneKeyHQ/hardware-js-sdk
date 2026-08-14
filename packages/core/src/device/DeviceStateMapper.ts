@@ -1,4 +1,4 @@
-import { EFirmwareType } from '@onekeyfe/hd-shared';
+import { EFirmwareType, normalizePro2FindMyAdvertisementName } from '@onekeyfe/hd-shared';
 
 import { buildProtocolV1FeaturesPayload } from '../deviceProfile/buildDeviceFeatures';
 import { resolveProtocolV2DeviceIdentity } from '../deviceProfile/protocolV2DeviceIdentity';
@@ -247,7 +247,9 @@ export const mapProtocolV2DeviceInfoToState = (
       model: identity.model,
       vendor: 'onekey.so',
       serialNo: info.hw?.serial_no,
-      bleName: info.coprocessor?.bt_adv_name,
+      bleName: info.coprocessor?.bt_adv_name
+        ? normalizePro2FindMyAdvertisementName(info.coprocessor.bt_adv_name)
+        : undefined,
       deviceId: loader ? null : undefined,
     }),
     status: loader

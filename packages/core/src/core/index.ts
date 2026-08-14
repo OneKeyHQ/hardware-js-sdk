@@ -1,6 +1,10 @@
 import semver from 'semver';
 import EventEmitter from 'events';
-import { DeviceSessionPinType, TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
+import {
+  DeviceSessionPinType,
+  TRANSPORT_EVENT,
+  isProtocolV2LinkDisabledError,
+} from '@onekeyfe/hd-transport';
 import {
   ERRORS,
   ERROR_CODES_REQUIRE_DISCONNECT,
@@ -1075,6 +1079,19 @@ const ensureConnected = async (
         }
       } catch (error) {
         Log.debug('device error: ', error);
+        if (error.errorCode === HardwareErrorCode.BleUnavailableWhileUsbConnected) {
+          reject(error);
+          return;
+        }
+        if (isProtocolV2LinkDisabledError(error)) {
+          reject(
+            ERRORS.TypedError(HardwareErrorCode.BleUnavailableWhileUsbConnected, undefined, {
+              failureCode: error.failureCode,
+              firmwareMessage: error.firmwareMessage,
+            })
+          );
+          return;
+        }
         if ([HardwareErrorCode.BleCharacteristicNotifyChangeFailure].includes(error.errorCode)) {
           postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE));
         }

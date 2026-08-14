@@ -1,3 +1,5 @@
+import { normalizePro2FindMyAdvertisementName } from '@onekeyfe/hd-shared';
+
 import { BaseMethod } from './BaseMethod';
 import TransportManager from '../data-manager/TransportManager';
 import { DataManager } from '../data-manager';
@@ -36,8 +38,9 @@ export default class SearchDevices extends BaseMethod {
         const lowerId = device.id?.toLowerCase();
         if (!seenIds.has(lowerId)) {
           seenIds.add(lowerId);
-          const bleName =
+          const rawBleName =
             device.name ?? (device as unknown as { localName?: string }).localName ?? '';
+          const bleName = normalizePro2FindMyAdvertisementName(rawBleName);
           devices.push({
             ...device,
             connectId: device.id,

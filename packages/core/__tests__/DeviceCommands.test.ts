@@ -276,6 +276,32 @@ describe('DeviceCommands failure mapping', () => {
     ]);
   });
 
+  it.each(['Failure_ProcessError', 5])(
+    'maps USB-priority link disabled to public BLE error 723 for code %s',
+    async code => {
+      const commands = createCommands();
+
+      await expect(
+        commands._filterCommonTypes(
+          {
+            type: 'Failure',
+            message: {
+              code,
+              message: ' link disabled ',
+            },
+          } as any,
+          'DeviceInfo'
+        )
+      ).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleUnavailableWhileUsbConnected,
+        params: {
+          failureCode: code,
+          firmwareMessage: ' link disabled ',
+        },
+      });
+    }
+  );
+
   it('maps an invalid DeviceSessionGet resume to WalletSessionInvalid', async () => {
     const commands = createCommands();
 

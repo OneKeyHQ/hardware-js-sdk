@@ -8,6 +8,7 @@ const {
   hexToBytes,
   isProtocolV2HighThroughputCall,
   probeProtocolV2,
+  isProtocolV2LinkDisabledFailure,
 } = require('../src/protocols/v2/session');
 const protocolV2 = require('../src/protocols/v2');
 const {
@@ -1017,6 +1018,36 @@ describe('Protocol V2 framing and session', () => {
       })
     ).resolves.toBe(false);
   });
+
+  test('recognizes USB-priority firmware failures independently of surrounding whitespace', () => {
+    expect(isProtocolV2LinkDisabledFailure('Failure_ProcessError', ' link disabled ')).toBe(true);
+    expect(isProtocolV2LinkDisabledFailure(5, 'Link Disabled')).toBe(true);
+    expect(isProtocolV2LinkDisabledFailure('Failure_ProcessError', 'busy')).toBe(false);
+  });
+
+  test.each(['Failure_ProcessError', 5])(
+    'probeProtocolV2 surfaces link disabled without resetting the link for code %s',
+    async code => {
+      const onProbeFailed = jest.fn();
+
+      await expect(
+        probeProtocolV2({
+          call: () =>
+            Promise.resolve({
+              type: 'Failure',
+              message: { code, message: ' link disabled ' },
+            }),
+          timeoutMs: 1,
+          onProbeFailed,
+        })
+      ).rejects.toMatchObject({
+        name: 'ProtocolV2LinkDisabledError',
+        failureCode: code,
+        firmwareMessage: ' link disabled ',
+      });
+      expect(onProbeFailed).not.toHaveBeenCalled();
+    }
+  );
 
   test('decodeFrame rejects frames that are too short', () => {
     expect(() => protocolV2.decodeFrame(new Uint8Array([0x5a, 0x08, 0x00]))).toThrow(
