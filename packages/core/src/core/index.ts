@@ -1081,7 +1081,7 @@ const ensureConnected = async (
         Log.debug('device error: ', error);
         if (isProtocolV2LinkDisabledError(error)) {
           reject(
-            ERRORS.TypedError(HardwareErrorCode.DeviceBusy, error.firmwareMessage, {
+            ERRORS.TypedError(HardwareErrorCode.BleUnavailableWhileUsbConnected, undefined, {
               failureCode: error.failureCode,
               firmwareMessage: error.firmwareMessage,
             })
