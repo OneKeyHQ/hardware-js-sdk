@@ -78,6 +78,7 @@ describe('hardware device identity filters', () => {
     ['Pro2 22D8FindMy', 'Pro2 22D8'],
     ['Pro2 22D8 - Fin', 'Pro2 22D8'],
     ['Pro2 22D8FindM', 'Pro2 22D8'],
+    [`Pro2 22D8${'\t'.repeat(10_000)}Find My`, 'Pro2 22D8'],
     ['Pro2 A1B2', 'Pro2 A1B2'],
     ['Pro2 Griffin', 'Pro2 Griffin'],
     ['Find My', 'Find My'],

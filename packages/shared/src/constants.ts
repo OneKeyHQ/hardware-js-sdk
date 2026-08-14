@@ -195,23 +195,53 @@ export const matchesKnownBleUuid = (
 
 const ONEKEY_COMMUNICATION_SERVICE_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
 const FIDO_SERVICE_ALIASES = createKnownBleUuidAliases('0000fffd-0000-1000-8000-00805f9b34fb');
-const PRO2_FIND_MY_COMPACT_NAME_PATTERN =
-  /^(?:onekey)?pro2[a-f0-9]{4}fin(?:d(?:e)?(?:m(?:y)?)?)?$/i;
-const FIND_MY_SUFFIX_PATTERN = /[\s-]*fin(?:d(?:e)?(?:[\s-]*m(?:y)?)?)?\s*$/i;
+const PRO2_COMPACT_NAME_PATTERN = /^(?:onekey)?pro2[a-f0-9]{4}$/i;
+const FIND_MY_COMPACT_SUFFIXES = [
+  'findemy',
+  'findem',
+  'finde',
+  'findmy',
+  'findm',
+  'find',
+  'fin',
+] as const;
 
-export const isPro2FindMyAdvertisementName = (value?: string | null) => {
-  const compactName =
-    value
-      ?.trim()
-      .toLowerCase()
-      .replace(/[\s-]+/g, '') ?? '';
-  return PRO2_FIND_MY_COMPACT_NAME_PATTERN.test(compactName);
+const compactBleName = (value: string) =>
+  Array.from(value)
+    .filter(character => character !== '-' && character.trim() !== '')
+    .join('')
+    .toLowerCase();
+
+const getPro2FindMyBaseLength = (value: string) => {
+  const compactName = compactBleName(value);
+  const suffix = FIND_MY_COMPACT_SUFFIXES.find(candidate => compactName.endsWith(candidate));
+  if (!suffix) return undefined;
+
+  const compactBaseName = compactName.slice(0, -suffix.length);
+  return PRO2_COMPACT_NAME_PATTERN.test(compactBaseName) ? compactBaseName.length : undefined;
 };
 
-export const normalizePro2FindMyAdvertisementName = (value: string) =>
-  isPro2FindMyAdvertisementName(value)
-    ? value.replace(FIND_MY_SUFFIX_PATTERN, '').trimEnd()
-    : value;
+export const isPro2FindMyAdvertisementName = (value?: string | null) => {
+  if (!value) return false;
+  return getPro2FindMyBaseLength(value) !== undefined;
+};
+
+export const normalizePro2FindMyAdvertisementName = (value: string) => {
+  const baseLength = getPro2FindMyBaseLength(value);
+  if (baseLength === undefined) return value;
+
+  let compactLength = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (character !== '-' && character.trim() !== '') {
+      compactLength += 1;
+      if (compactLength === baseLength) {
+        return value.slice(0, index + 1).trimEnd();
+      }
+    }
+  }
+  return value;
+};
 
 export const hasOnekeyCommunicationService = (
   serviceUuids: Array<string | null | undefined> | null | undefined
