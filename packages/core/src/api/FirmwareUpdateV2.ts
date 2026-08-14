@@ -276,10 +276,9 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     this.checkPromise = createDeferred();
     const env = DataManager.getSettings('env');
     const isBleReconnect = connectId && DataManager.isBleConnect(env);
-    // Tracks the in-flight BLE probe so interval ticks never overlap: a superseded
-    // Initialize left pending on the V1 transport is exactly what later times out
-    // and used to tear down the connection mid-firmware-upload.
-    let bleProbeInFlight = false;
+    // Bootloader probes can outlive the polling interval. Keep discovery and
+    // acquire serialized so concurrent ticks never race the same connection.
+    let probeInFlight = false;
 
     Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isBleReconnect: ', isBleReconnect);
 
@@ -321,7 +320,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
 
     let startPolling: () => void = () => undefined;
     const pollForBootloader = async () => {
-      if (isFinished || isPromptingWebDevice) return;
+      if (isFinished || isPromptingWebDevice || probeInFlight) return;
+      probeInFlight = true;
       checkCount += 1;
       Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
       if (isTouchOrProDevice && isFirstCheck) {
@@ -362,13 +362,12 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           this.checkPromise?.reject(e);
         } finally {
           isPromptingWebDevice = false;
+          probeInFlight = false;
         }
         return;
       }
 
       if (isBleReconnect) {
-        if (bleProbeInFlight) return;
-        bleProbeInFlight = true;
         try {
           await this.device.deviceConnector?.acquire(
             this.device.originalDescriptor.id,
@@ -389,10 +388,14 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           // ignore error because of device is not connected
           Log.log('catch Bluetooth error when device is restarting: ', e);
         } finally {
-          bleProbeInFlight = false;
+          probeInFlight = false;
         }
       } else {
-        await checkForBootloader(true);
+        try {
+          await checkForBootloader(true);
+        } finally {
+          probeInFlight = false;
+        }
       }
     };
 
