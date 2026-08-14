@@ -209,6 +209,10 @@ Pro2 绑定 Find My 后，通信广播的名称会在原 BLE 名称末尾附加 
 时仅移除名称末尾的该标记，保留原设备名前缀和 BLE peripheral id；类似 `Pro2 Griffin` 的普通
 名称不能被误删。Neo 不具备 Find My，不能把这套名称规则用于推导 Neo 能力。
 
+Neo 真机通信广播使用 `Neo <4 位标识>`，例如 `Neo 22D8`；已观察到的服务集合与 Pro2 通信广播
+一致，可同时包含 `180a`、`180f`、`fffd` 和 `0001`。SDK 保留完整 Neo 名称并识别为 Neo，连接
+端点仍以 `0001` 为准，不能因同时存在 `fffd` 而过滤，也不能仅凭 `Neo` 名称推导协议版本。
+
 BLE 分包大小是平台传输参数，不属于 protobuf 或业务 API。性能结论见 [Pro2 BLE 传输测速记录](../testing/pro2-ble-performance.md)。
 
 ## 错误与重试边界
