@@ -4,7 +4,11 @@ import {
 } from '../../constants';
 import { ProtocolV2FrameAssembler, concatUint8Arrays } from './frame-assembler';
 import { ProtocolV2SequenceCursor } from './sequence-cursor';
-import { ProtocolV2LinkError } from './errors';
+import {
+  ProtocolV2LinkError,
+  createProtocolV2LinkDisabledError,
+  isProtocolV2LinkDisabledError,
+} from './errors';
 import { ProtocolV2 } from '..';
 import * as check from '../../utils/highlevel-checks';
 import { LogBlockCommand } from '../../utils/logBlockCommand';
@@ -409,8 +413,22 @@ export async function probeProtocolV2({
     if (response.type === 'Success') {
       return true;
     }
+    if (response.type === 'Failure') {
+      const failureCode = response.message?.code;
+      const firmwareMessage = response.message?.message;
+      if (
+        (failureCode === 'Failure_ProcessError' || failureCode === 5) &&
+        typeof firmwareMessage === 'string' &&
+        firmwareMessage.trim().toLowerCase() === 'link disabled'
+      ) {
+        throw createProtocolV2LinkDisabledError(failureCode, firmwareMessage);
+      }
+    }
     probeError = new Error(`unexpected response type ${response.type}`);
   } catch (error) {
+    if (isProtocolV2LinkDisabledError(error)) {
+      throw error;
+    }
     probeError = error;
   }
 
