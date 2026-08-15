@@ -78,6 +78,17 @@ export class ProtocolV2LinkManager<Key> {
     return result;
   }
 
+  sendFlowControl(
+    key: Key,
+    createAdapter: () => ProtocolV2LinkAdapter,
+    name: string,
+    data: Record<string, unknown>
+  ): Promise<MessageFromOneKey> {
+    const generation = this.generations.get(key) ?? 0;
+    this.assertCallGeneration(key, generation);
+    return this.getOrCreateLink(key, createAdapter).session.sendFlowControl(name, data);
+  }
+
   async invalidateLink(key: Key, reason: string): Promise<void> {
     const generation = (this.generations.get(key) ?? 0) + 1;
     this.generations.set(key, generation);

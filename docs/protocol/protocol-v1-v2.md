@@ -190,6 +190,8 @@ BLE 平台实现包括 Electron、React Native 和 lowlevel 插件。公共约�
   burst 或 flush pause；只对明确的 `GATT_CONGESTED` 做有界退避重试，断连或 generation
   变化立即中止，不能跨连接继续写。
 - notification 数据统一进入 `ProtocolV2FrameAssembler`，不能假设一次通知就是一帧。
+- Electron BLE 在 V1/V2 probe 回退时只轮换 renderer notification token 和协议缓冲，不断开或
+  重新订阅 GATT；未配对设备因此只触发一次系统配对流程。
 - 重连或重新订阅后，旧回调必须通过 generation/token 失效。
 - lowlevel 插件只提供连接、读写和订阅能力，不复制协议状态机。
 

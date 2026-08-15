@@ -1253,6 +1253,15 @@ export default class ReactNativeBleTransport {
   }
 
   async post(session: string, name: string, data: Record<string, unknown>) {
+    if (this.getProtocolType(session) === 'V2') {
+      await this.protocolV2Links.sendFlowControl(
+        session,
+        () => this.createProtocolV2Adapter(session),
+        name,
+        data
+      );
+      return;
+    }
     await this.call(session, name, data);
   }
 

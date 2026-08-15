@@ -493,7 +493,8 @@ export default class ElectronBleTransport {
     for (let i = 0; i < probeOrder.length; i += 1) {
       const protocol = probeOrder[i];
       if (i > 0) {
-        // Reset subscriptions and buffers after a failed probe before trying another protocol.
+        // Keep the physical BLE link while switching probes. Reconnecting here can
+        // summon a second OS pairing prompt for a device that is still onboarding.
         await this.resetProbeStateAfterProtocolProbe(uuid, probeOrder[i - 1]);
       }
       const detected =
@@ -540,36 +541,13 @@ export default class ElectronBleTransport {
       this.runPromiseDeviceId = null;
     }
 
-    const notifyCleanup = this.notificationCleanups.get(uuid);
-    if (notifyCleanup) {
-      notifyCleanup();
-      this.notificationCleanups.delete(uuid);
+    // A timed-out V1 probe retires its renderer notification token so a late V1
+    // response cannot satisfy the V2 probe. Install a fresh listener without
+    // touching the native GATT subscription or physical connection.
+    if (!this.notificationCleanups.has(uuid)) {
+      const cleanup = this.createNotificationSubscription(uuid);
+      this.notificationCleanups.set(uuid, cleanup);
     }
-    this.notificationTokens.delete(uuid);
-
-    try {
-      await window.desktopApi?.nobleBle?.unsubscribe(uuid);
-    } catch (error) {
-      this.Log?.debug(`[Electron BLE] unsubscribe after Protocol ${protocol} probe failed:`, error);
-    }
-    try {
-      await window.desktopApi?.nobleBle?.disconnect(uuid);
-    } catch (error) {
-      this.Log?.debug(`[Electron BLE] disconnect after Protocol ${protocol} probe failed:`, error);
-    }
-    this.connectedDevices.delete(uuid);
-    try {
-      await window.desktopApi?.nobleBle?.connect(uuid);
-      this.connectedDevices.add(uuid);
-      await window.desktopApi?.nobleBle?.subscribe(uuid);
-      await this.refreshBlePacketCapacity(uuid);
-    } catch (error) {
-      this.Log?.debug(`[Electron BLE] reconnect after Protocol ${protocol} probe failed:`, error);
-      throw error;
-    }
-
-    const cleanup = this.createNotificationSubscription(uuid);
-    this.notificationCleanups.set(uuid, cleanup);
   }
 
   private async probeProtocolV1(uuid: string) {
@@ -809,6 +787,19 @@ export default class ElectronBleTransport {
       return this.callProtocolV2(uuid, name, data, options);
     }
     return this.callProtocolV1(uuid, name, data, options);
+  }
+
+  async post(uuid: string, name: string, data: Record<string, unknown>) {
+    if (this.deviceProtocol.get(uuid) === 'V2') {
+      await this.protocolV2Links.sendFlowControl(
+        uuid,
+        () => this.createProtocolV2Adapter(uuid),
+        name,
+        data
+      );
+      return;
+    }
+    await this.callProtocolV1(uuid, name, data);
   }
 
   private async callProtocolV1(

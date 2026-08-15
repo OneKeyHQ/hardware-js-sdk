@@ -278,6 +278,11 @@ V2 中，地址/公钥、签名和设备管理方法在进入设备交互前直�
 `ButtonAck`。应用在两个协议版本下都只需展示“请在设备上确认”，不要调用 `uiResponse()`。
 
 Pro2 设置页 Event 还会携带 `source='method-lifecycle'`、`reason`、`completion` 和 `page`。
+
+`firmwareUpdateV4` 在 `DeviceFirmwareUpdateStage` 成功后、发送
+`DeviceFirmwareUpdateRequest` 前发出同类非阻塞 `REQUEST_BUTTON`，其中
+`reason='firmware-update'`、`completion='operation-completed'`。App 只展示设备确认提示，不调用
+`uiResponse()`；安装进度继续通过 `FIRMWARE_TIP` 与 `FIRMWARE_PROGRESS` 通知。
 `completion='page-accepted'` 表示 API 成功只证明设备页面已打开，不代表用户已经完成或确认设置。
 
 `uploadPortfolio` 不属于设备确认流程：SDK 不为它生成 `REQUEST_BUTTON/REQUEST_PIN`，文件写入也关闭
@@ -298,6 +303,8 @@ V1 用户选择设备端输入后，设备可能返回 `ButtonRequest_Passphrase
 
 关闭事件是状态通知，不代表一个新的业务失败，也不需要回传。App 收到关闭通知时只幂等收起 UI，
 不能反向触发第二次 Cancel；只有用户主动关闭/取消交互时才取消当前 SDK 调用。
+用户取消 `firmwareUpdateV4` 的设备确认提示时，Core 先在当前 Protocol V2 link 上发送仅写 `Cancel`
+流控帧，再中断并释放原调用；该帧不排在等待设备确认的业务响应之后。
 
 ## 进度和中间结果
 
