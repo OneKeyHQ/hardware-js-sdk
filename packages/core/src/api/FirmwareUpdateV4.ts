@@ -915,7 +915,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       }
       if (wantsResources) {
         this.params.resourceArchiveBinary = await this.downloadRemoteProtocolV2ResourceArchive(
-          deviceFeatures
+          deviceFeatures,
+          firmwareType
         );
         resourceMemoryHost = await this.prepareProtocolV2LocalMemoryHost({
           features: deviceFeatures,
@@ -1880,7 +1881,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private async downloadRemoteProtocolV2ResourceArchive(features: Features): Promise<ArrayBuffer> {
+  private async downloadRemoteProtocolV2ResourceArchive(
+    features: Features,
+    firmwareType: EFirmwareType
+  ): Promise<ArrayBuffer> {
     const deviceType = getDeviceType(features);
     if (deviceType !== EDeviceType.Pro2 && deviceType !== EDeviceType.Neo) {
       throw ERRORS.TypedError(
@@ -1888,7 +1892,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         'Protocol V2 resource archive requires a Pro2 or Neo device'
       );
     }
-    const source = DataManager.getProtocolV2ResourceSource(deviceType);
+    const release = DataManager.getFirmwareLatestRelease(features, firmwareType);
+    const source = DataManager.getProtocolV2ResourceSource(release);
     const expectedSha256 = normalizeProtocolV2Hex(source?.archiveSha256);
     if (
       !source?.archiveUrl ||
