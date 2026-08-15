@@ -482,7 +482,7 @@ export class DeviceCommands {
         if (message === 'Please confirm the BlindSign enabled') {
           error = ERRORS.TypedError(HardwareErrorCode.BlindSignDisabled);
         }
-        if (message === 'File already exists') {
+        if (message === 'File already exists' || message === 'NFT already exists') {
           error = ERRORS.TypedError(HardwareErrorCode.FileAlreadyExists);
         }
         if (message?.includes('bytes overflow')) {
