@@ -105,6 +105,27 @@ const createPreparedResourcePlan = ({
 };
 
 describe.each(['v2', 'v3'] as const)('%s prepared resource archive binding', executor => {
+  test('rejects a missing artifact reader', async () => {
+    const entryBinary = Uint8Array.from([1, 2, 3, 4]).buffer;
+    const zip = new JSZip();
+    zip.file('images/logo.bin', entryBinary);
+    const archiveBinary = await zip.generateAsync({ type: 'arraybuffer' });
+    const { preparedPlan } = createPreparedResourcePlan({
+      executor,
+      archiveBinary,
+      entryBinary,
+    });
+
+    await expect(
+      readVerifiedPreparedResourceArchive({
+        preparedPlan,
+        reader: undefined,
+      })
+    ).rejects.toMatchObject({
+      params: { firmwareUpdateCode: 'FirmwareArtifactReaderInvalid' },
+    });
+  });
+
   test('uses canonical bytes extracted from the approved ZIP', async () => {
     const entryBinary = Uint8Array.from([1, 2, 3, 4]).buffer;
     const zip = new JSZip();

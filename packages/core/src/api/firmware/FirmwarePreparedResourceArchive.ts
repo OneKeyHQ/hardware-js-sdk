@@ -26,7 +26,10 @@ export type VerifiedPreparedResourceEntry = {
 
 const resourceArchiveError = (
   message: string,
-  firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' | 'FirmwareArtifactReceiptMismatch'
+  firmwareUpdateCode:
+    | 'FirmwareArtifactsNotPrepared'
+    | 'FirmwareArtifactReceiptMismatch'
+    | 'FirmwareArtifactReaderInvalid'
 ): never => {
   throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, message, { firmwareUpdateCode });
 };
@@ -72,6 +75,12 @@ export const readVerifiedPreparedResourceArchive = async ({
       );
     }
     return [];
+  }
+  if (!reader) {
+    return resourceArchiveError(
+      'Firmware artifact reader is required for prepared resource archives',
+      'FirmwareArtifactReaderInvalid'
+    );
   }
   if (resourceArtifacts.length !== 1) {
     return resourceArchiveError(
