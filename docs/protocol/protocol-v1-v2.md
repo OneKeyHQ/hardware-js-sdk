@@ -181,6 +181,8 @@ Link 错误，并触发 session、assembler、读取状态和平台连接重建�
 BLE 平台实现包括 Electron、React Native 和 lowlevel 插件。公共约束如下：
 
 - 连接后发现服务和特征，先建立 notification 订阅，再开始协议调用。
+- OneKey 通信服务使用 `0001`，写特征使用 `0002`，notification 特征使用 `0003`；连接后的
+  服务解析和订阅不能选择 Find My/FIDO 的 `fffd` 服务。
 - Protocol V2 完整 frame 统一由 `ProtocolV2BleFrameWriter` 按平台 MTU 或插件上限分包；
   平台 adapter 只提供单包写入、容量、节流参数和平台错误映射。Protocol V1 保持原有分包协议，
   不进入该 writer。
@@ -191,12 +193,35 @@ BLE 平台实现包括 Electron、React Native 和 lowlevel 插件。公共约�
 - 重连或重新订阅后，旧回调必须通过 generation/token 失效。
 - lowlevel 插件只提供连接、读写和订阅能力，不复制协议状态机。
 
+### Pro2 Find My 广播名称
+
+Pro2 绑定 Find My 后，通信广播的名称会在原 BLE 名称末尾附加 Find My 标记。真机已观察到的
+代表性格式为 `Pro2 <4 位标识> - Find My`，同一通信广播可同时包含 `180a`、`180f`、`fffd`
+和 `0001`。因此设备识别必须遵循以下顺序：
+
+1. 广播包含 `0001` 通信服务时按 OneKey 通信端点处理，即使名称带 Find My 且同时包含 `fffd`。
+2. 只有 `fffd`、没有 `0001` 的广播不是 OneKey 通信端点，不进入连接和订阅流程。
+3. 名称只用于搜索结果的友好展示和兼容回退，不用于推导协议版本；协议仍由连接后的活动响应确认。
+
+名称格式不得按单个固定字符串严格匹配。SDK 识别时忽略空格和连字符差异，并兼容固件历史拼写
+`Finde My`；例如 `Find My`、`FindMy`、`Find-My` 和 `Finde My` 都视为末尾标记。设备信息字段
+可能受长度限制，把标记截断为 `Fin`、`Find` 或 `FindM`，这些前缀也按末尾标记处理。向上层展示
+时仅移除名称末尾的该标记，保留原设备名前缀和 BLE peripheral id；类似 `Pro2 Griffin` 的普通
+名称不能被误删。Android 无 service UUID 的已配对回退可以把完整 Find My 后缀加名称中的
+`pro2` 视为非通信端点，但不能用这套更宽的规则去剥离展示名。Neo 不具备 Find My，不能把
+这套名称规则用于推导 Neo 能力。
+
+Neo 真机通信广播使用 `Neo <4 位标识>`，例如 `Neo 22D8`；已观察到的服务集合与 Pro2 通信广播
+一致，可同时包含 `180a`、`180f`、`fffd` 和 `0001`。SDK 保留完整 Neo 名称并识别为 Neo，连接
+端点仍以 `0001` 为准，不能因同时存在 `fffd` 而过滤，也不能仅凭 `Neo` 名称推导协议版本。
+
 BLE 分包大小是平台传输参数，不属于 protobuf 或业务 API。性能结论见 [Pro2 BLE 传输测速记录](../testing/pro2-ble-performance.md)。
 
 ## 错误与重试边界
 
 | 错误类型                            | 处理层                    | 默认行为                     |
 | ----------------------------------- | ------------------------- | ---------------------------- |
+| BLE USB-priority `link disabled`    | Transport probe / Core    | 立即返回 723，不 reset、不重试 |
 | protobuf `Failure`                  | Core / method             | 保持 Link，根据业务语义处理  |
 | `DeviceLocked`                      | 显式声明解锁策略的 method | 解锁后最多重试一次           |
 | 超时、断连、I/O                     | Protocol Link / Transport | 使 Link 失效并清理平台资源   |

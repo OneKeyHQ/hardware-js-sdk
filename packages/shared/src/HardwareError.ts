@@ -345,6 +345,7 @@ export const HardwareErrorCode = {
   BleDeviceDisconnected: 720,
   BlePoweredOff: 721,
   BleUnsupported: 722,
+  BleUnavailableWhileUsbConnected: 723,
 
   /**
    * Hardware runtiome errors
@@ -619,6 +620,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleDeviceDisconnected]: 'Device disconnected',
   [HardwareErrorCode.BlePoweredOff]: 'Bluetooth is turned off',
   [HardwareErrorCode.BleUnsupported]: 'Bluetooth is not supported on this device',
+  [HardwareErrorCode.BleUnavailableWhileUsbConnected]:
+    'Bluetooth is unavailable while USB is connected. Unplug USB and try again.',
 
   /**
    * Runtime Error

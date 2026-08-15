@@ -7,6 +7,7 @@ import {
   type Transport,
   type TransportCallOptions,
   getSafeTransportLogPayload,
+  isProtocolV2LinkDisabledFailure,
 } from '@onekeyfe/hd-transport';
 
 import TransportManager from '../data-manager/TransportManager';
@@ -495,7 +496,12 @@ export class DeviceCommands {
         }
       }
 
-      if (code === 'Failure_ProcessError') {
+      if (isProtocolV2LinkDisabledFailure(code, message)) {
+        error = ERRORS.TypedError(HardwareErrorCode.BleUnavailableWhileUsbConnected, undefined, {
+          failureCode: code,
+          firmwareMessage: message,
+        });
+      } else if (code === 'Failure_ProcessError') {
         const normalizedMessage = message?.trim() ?? '';
         const isProtocolV2ActionCancelledFailure =
           this.device.isProtocolV2() && isProtocolV2ActionCancelledMessage(normalizedMessage);

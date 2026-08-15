@@ -1,4 +1,5 @@
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { createProtocolV2LinkDisabledError } from '@onekeyfe/hd-transport';
 
 import DeviceConnector from '../src/device/DeviceConnector';
 
@@ -77,5 +78,25 @@ describe('DeviceConnector protocol validation', () => {
     await expect(connector.acquire('classic-id', undefined, undefined, 'V2')).rejects.toThrow(
       'Device protocol mismatch: expected V2, detected V1'
     );
+  });
+
+  it('preserves the Protocol V2 USB-priority failure as public BLE error 723', async () => {
+    transportManagerMock.default.getTransport.mockReturnValue({
+      acquire: jest
+        .fn()
+        .mockRejectedValue(
+          createProtocolV2LinkDisabledError('Failure_ProcessError', 'link disabled')
+        ),
+      getProtocolType: jest.fn(() => undefined),
+    });
+    const connector = new DeviceConnector();
+
+    await expect(connector.acquire('pro2-id', undefined, undefined, 'V2')).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleUnavailableWhileUsbConnected,
+      params: {
+        failureCode: 'Failure_ProcessError',
+        firmwareMessage: 'link disabled',
+      },
+    });
   });
 });

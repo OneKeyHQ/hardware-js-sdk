@@ -39,7 +39,14 @@ export const DEVICE_SETTINGS_V2_ONLY_FIELDS = [
   'randomKeypad',
 ] as const satisfies readonly DeviceSettingsField[];
 
-export const PROTOCOL_V2_NEVER_TIMEOUT_MS = 0x10000000;
+export const DEVICE_SETTINGS_NEVER_TIMEOUT_MS = 0x10000000;
+// Keep the protocol-specific name for compatibility with existing SDK consumers.
+export const PROTOCOL_V2_NEVER_TIMEOUT_MS = DEVICE_SETTINGS_NEVER_TIMEOUT_MS;
+
+const NEVER_TIMEOUT_MS_BY_PROTOCOL: Record<DeviceSettingsProtocol, number> = {
+  V1: DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
+  V2: PROTOCOL_V2_NEVER_TIMEOUT_MS,
+};
 
 export const normalizeSafetyCheckLevel = (
   value: SafetyCheckLevel | null | undefined
@@ -148,7 +155,7 @@ export type DeviceSettingsValueOption<T> = {
 };
 
 const durationOption = (valueMs: number): DeviceSettingsDurationOption => {
-  if (valueMs === 0 || valueMs === PROTOCOL_V2_NEVER_TIMEOUT_MS) {
+  if (valueMs === DEVICE_SETTINGS_NEVER_TIMEOUT_MS) {
     return { label: 'Never', valueMs };
   }
   if (valueMs < 60_000) {
@@ -162,7 +169,7 @@ const withNever = (
   values: readonly number[],
   protocol: DeviceSettingsProtocol
 ): DeviceSettingsDurationOption[] =>
-  [...values, protocol === 'V2' ? PROTOCOL_V2_NEVER_TIMEOUT_MS : 0].map(durationOption);
+  [...values, NEVER_TIMEOUT_MS_BY_PROTOCOL[protocol]].map(durationOption);
 
 export const getAutoLockOptions = (
   deviceType: IDeviceType,

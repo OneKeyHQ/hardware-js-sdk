@@ -194,12 +194,31 @@ export default class LowlevelTransport {
     const protocolHint = input.expectedProtocol
       ? undefined
       : input.protocolHint ?? this.deviceProtocolHints.get(input.uuid);
-    const protocolType = await this.detectProtocol(
-      input.uuid,
-      input.expectedProtocol,
-      protocolHint
-    );
-    return { uuid: input.uuid, protocolType };
+    try {
+      const protocolType = await this.detectProtocol(
+        input.uuid,
+        input.expectedProtocol,
+        protocolHint
+      );
+      return { uuid: input.uuid, protocolType };
+    } catch (error) {
+      try {
+        await this.protocolV2Links.invalidateLink(input.uuid, 'Lowlevel transport acquire failed');
+      } catch (cleanupError) {
+        this.Log?.debug('[LowlevelTransport] acquire link cleanup failed:', cleanupError);
+      }
+      try {
+        await this.plugin.disconnect(input.uuid);
+      } catch (cleanupError) {
+        this.Log?.debug('[LowlevelTransport] acquire disconnect failed:', cleanupError);
+      } finally {
+        this.connectedDevices.delete(input.uuid);
+        this.deviceProtocol.delete(input.uuid);
+        this.protocolV2Assemblers.delete(input.uuid);
+        this.advanceProtocolV2Generation(input.uuid);
+      }
+      throw error;
+    }
   }
 
   async release(uuid: string) {

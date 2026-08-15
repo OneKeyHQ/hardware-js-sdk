@@ -2896,7 +2896,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
     );
     this.protocolV2LastRuntimeProbeFeatures = features;
-    return features.mode === 'normal' && !features.bootloaderMode;
+    return this.isProtocolV2ApplicationMode(features);
+  }
+
+  private isProtocolV2ApplicationMode(features: Features) {
+    return (
+      (features.mode === 'normal' || features.mode === 'notInitialized') && !features.bootloaderMode
+    );
   }
 
   private async waitForProtocolV2FinalFeatures() {
@@ -2956,9 +2962,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
         const features = await this.device.probeProtocolV2RuntimeState(
           deviceInfo,
-          PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
+          PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+          { forceRuntimeContextRefresh: true }
         );
-        if (features.mode === 'normal' && !features.bootloaderMode) {
+        if (this.isProtocolV2ApplicationMode(features)) {
           return features;
         }
         lastError = ERRORS.TypedError(

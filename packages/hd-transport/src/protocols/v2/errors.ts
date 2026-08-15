@@ -23,3 +23,32 @@ export class ProtocolV2LinkError extends Error {
 
 export const isProtocolV2LinkError = (error: unknown): error is ProtocolV2LinkError =>
   error instanceof ProtocolV2LinkError;
+
+export type ProtocolV2LinkDisabledError = Error & {
+  name: 'ProtocolV2LinkDisabledError';
+  failureCode: string | number;
+  firmwareMessage: string;
+};
+
+export const createProtocolV2LinkDisabledError = (
+  failureCode: string | number,
+  firmwareMessage: string
+): ProtocolV2LinkDisabledError =>
+  Object.assign(new Error(firmwareMessage), {
+    name: 'ProtocolV2LinkDisabledError' as const,
+    failureCode,
+    firmwareMessage,
+  });
+
+export const isProtocolV2LinkDisabledError = (
+  error: unknown
+): error is ProtocolV2LinkDisabledError =>
+  error instanceof Error &&
+  error.name === 'ProtocolV2LinkDisabledError' &&
+  'failureCode' in error &&
+  'firmwareMessage' in error;
+
+export const isProtocolV2LinkDisabledFailure = (failureCode: unknown, firmwareMessage: unknown) =>
+  (failureCode === 'Failure_ProcessError' || failureCode === 5) &&
+  typeof firmwareMessage === 'string' &&
+  firmwareMessage.trim().toLowerCase() === 'link disabled';

@@ -246,8 +246,8 @@ DeviceSettingsPageShow 打开必须在设备端确认的设置页面
 | 设备端确认 | `passphrase_enable`           | 可读取，修改必须在设备端确认 |
 | 设备端确认 | `airgap_mode`                 | 可读取，修改必须在设备端确认 |
 
-`autolock_delay_ms` 与 `autoshutdown_delay_ms` 的“永不”值为 `0x10000000`
-（`268435456`），不是 Protocol V1 使用的 `0`。应用应从
+`autolock_delay_ms` 与 `autoshutdown_delay_ms` 的“永不”值在 Protocol V1/V2 中均为
+`0x10000000`（`268435456`）。应用应从
 `getDeviceSettingsCapabilities(deviceType, 'V2')` 获取可选值。
 
 Protocol V2 固件使用完整 BCP-47 语言标识；Core 对外保持与 Protocol V1

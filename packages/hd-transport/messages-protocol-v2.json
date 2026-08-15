@@ -10925,7 +10925,7 @@
           "type": "bytes",
           "id": 1
         },
-        "signning_message": {
+        "signing_message": {
           "type": "bytes",
           "id": 2
         },

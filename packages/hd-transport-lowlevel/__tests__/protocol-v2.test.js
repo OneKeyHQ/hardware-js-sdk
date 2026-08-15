@@ -68,12 +68,25 @@ const protocolV2Schema = {
         },
       },
     },
+    Failure: {
+      fields: {
+        code: {
+          type: 'uint32',
+          id: 1,
+        },
+        message: {
+          type: 'string',
+          id: 2,
+        },
+      },
+    },
     MessageType: {
       values: {
         MessageType_ProtocolInfoRequest: 60200,
         MessageType_ProtocolInfo: 60201,
         MessageType_Ping: 60206,
         MessageType_Success: 60207,
+        MessageType_Failure: 60208,
       },
     },
   },
@@ -371,6 +384,33 @@ describe('LowlevelTransport protocol framing', () => {
     });
     expect(plugin.send).toHaveBeenCalledTimes(1);
     expect(plugin.receive).toHaveBeenCalledTimes(1);
+  });
+
+  test('disconnects and clears a lowlevel connection when Protocol V2 reports link disabled', async () => {
+    const failureResponse = ProtocolV2.encodeFrame(
+      schemas,
+      'Failure',
+      { code: 5, message: 'link disabled' },
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+    );
+    const plugin = createPlugin({
+      devices: [{ id: 'usb-owned-id', name: 'OneKey Pro 2', commType: 'ble' }],
+      responses: [bytesToHex(failureResponse)],
+    });
+    const lowlevel = configureTransport(plugin);
+
+    await expect(
+      lowlevel.acquire({ uuid: 'usb-owned-id', expectedProtocol: 'V2' })
+    ).rejects.toMatchObject({
+      name: 'ProtocolV2LinkDisabledError',
+      failureCode: 5,
+      firmwareMessage: 'link disabled',
+    });
+
+    expect(plugin.disconnect).toHaveBeenCalledWith('usb-owned-id');
+    expect(lowlevel.connectedDevices.has('usb-owned-id')).toBe(false);
+    expect(lowlevel.getProtocolType('usb-owned-id')).toBeUndefined();
+    expect(lowlevel.protocolV2Assemblers.has('usb-owned-id')).toBe(false);
   });
 
   test('resets the lowlevel connection before probing Protocol V2 after a V1 timeout', async () => {

@@ -30,6 +30,7 @@ export {
   checkNeedUpdateBootForClassicAndMini,
 } from '../api/firmware/updateBootloader';
 export {
+  DEVICE_SETTINGS_NEVER_TIMEOUT_MS,
   DEVICE_SETTINGS_SHARED_FIELDS,
   DEVICE_SETTINGS_V1_ONLY_FIELDS,
   DEVICE_SETTINGS_V2_ONLY_FIELDS,

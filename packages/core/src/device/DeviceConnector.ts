@@ -1,3 +1,4 @@
+import { isProtocolV2LinkDisabledError } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { safeThrowError } from '../constants';
@@ -134,6 +135,12 @@ export default class DeviceConnector {
       return res;
     } catch (error) {
       Log.error('acquire error: ', error.message);
+      if (isProtocolV2LinkDisabledError(error)) {
+        throw ERRORS.TypedError(HardwareErrorCode.BleUnavailableWhileUsbConnected, undefined, {
+          failureCode: error.failureCode,
+          firmwareMessage: error.firmwareMessage,
+        });
+      }
       safeThrowError(error);
     }
   }
