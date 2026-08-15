@@ -23,7 +23,7 @@ export default class DeviceFactoryInfoSet extends BaseMethod<DeviceFactoryInfoSe
       info: {
         version: this.params.version,
         serial_number: this.params.serial_number,
-        factory_burn_in_completed: this.params.burn_in_completed,
+        factory_burn_in_completed: this.params.factory_burn_in_completed,
         factory_test_completed: this.params.factory_test_completed,
         manufacture_time: this.params.manufacture_time,
       },

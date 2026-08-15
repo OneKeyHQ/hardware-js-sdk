@@ -39,7 +39,7 @@ export type DeviceFirmwareUpdateStatusGetParams = {
 export type DeviceFactoryInfoSetParams = {
   version: number;
   serial_number: string;
-  burn_in_completed: boolean;
+  factory_burn_in_completed: boolean;
   factory_test_completed: boolean;
   manufacture_time: {
     year: number;
@@ -162,7 +162,10 @@ export function validateDeviceFactoryInfoSetParams(
   return {
     version: validateIntegerInRange(payload.version, 'version', 0, 255),
     serial_number: serialNumber,
-    burn_in_completed: validateRequiredBoolean(payload.burn_in_completed, 'burn_in_completed'),
+    factory_burn_in_completed: validateRequiredBoolean(
+      payload.factory_burn_in_completed,
+      'factory_burn_in_completed'
+    ),
     factory_test_completed: validateRequiredBoolean(
       payload.factory_test_completed,
       'factory_test_completed'

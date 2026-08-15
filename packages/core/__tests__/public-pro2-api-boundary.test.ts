@@ -92,7 +92,7 @@ describe('public factory and Protocol V2 API boundary', () => {
     await api.deviceProvisionFactoryInfo('neo', {
       version: 1,
       serial_number: 'NEO00000001',
-      burn_in_completed: true,
+      factory_burn_in_completed: true,
       factory_test_completed: true,
       manufacture_time: manufactureTime,
       connectProtocol: 'V2',
@@ -114,7 +114,7 @@ describe('public factory and Protocol V2 API boundary', () => {
       connectId: 'neo',
       version: 1,
       serial_number: 'NEO00000001',
-      burn_in_completed: true,
+      factory_burn_in_completed: true,
       factory_test_completed: true,
       manufacture_time: manufactureTime,
       connectProtocol: 'V2',

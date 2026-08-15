@@ -9718,7 +9718,7 @@ describe('Protocol V2 current low-level methods', () => {
         method: 'deviceFactoryInfoSet',
         version: 1,
         serial_number: 'PR2SERIAL',
-        burn_in_completed: true,
+        factory_burn_in_completed: true,
         factory_test_completed: true,
         manufacture_time: manufactureTime,
       },
@@ -9738,7 +9738,14 @@ describe('Protocol V2 current low-level methods', () => {
       },
     });
 
-    typedCall.mockResolvedValueOnce({ message: { serial_number: 'PR2SERIAL' } });
+    const factoryInfo = {
+      version: 1,
+      serial_number: 'PR2SERIAL',
+      factory_burn_in_completed: true,
+      factory_test_completed: true,
+      manufacture_time: manufactureTime,
+    };
+    typedCall.mockResolvedValueOnce({ message: factoryInfo });
     const getMethod = new DeviceFactoryInfoGet({
       id: 2,
       payload: { method: 'deviceFactoryInfoGet' },
@@ -9746,7 +9753,7 @@ describe('Protocol V2 current low-level methods', () => {
     getMethod.init();
     (getMethod as any).device = stubDevice({ commands: { typedCall } });
 
-    await getMethod.run();
+    await expect(getMethod.run()).resolves.toEqual(factoryInfo);
 
     expect(typedCall).toHaveBeenLastCalledWith('DeviceFactoryInfoGet', 'DeviceFactoryInfo', {});
   });
@@ -9769,7 +9776,7 @@ describe('Protocol V2 current low-level methods', () => {
           method: 'deviceProvisionFactoryInfo',
           version: 1,
           serial_number: 'P'.repeat(25),
-          burn_in_completed: true,
+          factory_burn_in_completed: true,
           factory_test_completed: true,
           manufacture_time: {
             year: 2026,
