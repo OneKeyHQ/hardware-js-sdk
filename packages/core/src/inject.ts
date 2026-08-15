@@ -235,6 +235,8 @@ export const createCoreApi = (
   deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
   deviceGetOnboardingStatus: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
+  deviceFactoryPermanentLock: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceFactoryPermanentLock' }),
   deviceProvisionFactoryInfo: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceProvisionFactoryInfo' }),
   deviceReadFactoryInfo: (connectId, params) =>

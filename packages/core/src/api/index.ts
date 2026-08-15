@@ -56,6 +56,7 @@ export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 export { default as deviceReboot } from './protocol-v2/DeviceReboot';
 export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
 export { default as deviceProvisionFactoryInfo } from './protocol-v2/DeviceFactoryInfoSet';
+export { default as deviceFactoryPermanentLock } from './protocol-v2/DeviceFactoryPermanentLock';
 export { default as deviceReadFactoryInfo } from './protocol-v2/DeviceFactoryInfoGet';
 export { default as deviceWriteFactoryCertificate } from './protocol-v2/DeviceFactoryCertificateWrite';
 export { default as deviceReadFactoryCertificate } from './protocol-v2/DeviceFactoryCertificateRead';

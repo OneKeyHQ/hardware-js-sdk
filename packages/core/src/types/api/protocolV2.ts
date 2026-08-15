@@ -76,6 +76,11 @@ export declare function deviceProvisionFactoryInfo(
   params: CommonParams & DeviceFactoryInfoSetParams
 ): Response<Success>;
 
+export declare function deviceFactoryPermanentLock(
+  connectId: string,
+  params?: CommonParams
+): Response<Success>;
+
 export declare function deviceReadFactoryInfo(
   connectId: string,
   params?: CommonParams

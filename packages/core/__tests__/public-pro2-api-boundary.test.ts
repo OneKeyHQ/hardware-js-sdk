@@ -48,6 +48,7 @@ describe('public factory and Protocol V2 API boundary', () => {
     const api = createCoreApi(jest.fn() as CoreApi['call']) as Record<string, unknown>;
 
     expect(api.deviceGetOnboardingStatus).toBeInstanceOf(Function);
+    expect(api.deviceFactoryPermanentLock).toBeInstanceOf(Function);
     expect(api.deviceProvisionFactoryInfo).toBeInstanceOf(Function);
     expect(api.deviceReadFactoryInfo).toBeInstanceOf(Function);
     expect(api.deviceWriteFactoryCertificate).toBeInstanceOf(Function);
@@ -96,6 +97,7 @@ describe('public factory and Protocol V2 API boundary', () => {
       manufacture_time: manufactureTime,
       connectProtocol: 'V2',
     });
+    await api.deviceFactoryPermanentLock('neo', { connectProtocol: 'V2' });
     await api.deviceReadFactoryInfo('neo', { connectProtocol: 'V2' });
     await api.deviceWriteFactoryCertificate('neo', {
       certificate: 'aabb',
@@ -118,22 +120,27 @@ describe('public factory and Protocol V2 API boundary', () => {
       connectProtocol: 'V2',
     });
     expect(call).toHaveBeenNthCalledWith(2, {
-      method: 'deviceReadFactoryInfo',
+      method: 'deviceFactoryPermanentLock',
       connectId: 'neo',
       connectProtocol: 'V2',
     });
     expect(call).toHaveBeenNthCalledWith(3, {
+      method: 'deviceReadFactoryInfo',
+      connectId: 'neo',
+      connectProtocol: 'V2',
+    });
+    expect(call).toHaveBeenNthCalledWith(4, {
       method: 'deviceWriteFactoryCertificate',
       connectId: 'neo',
       certificate: 'aabb',
       connectProtocol: 'V2',
     });
-    expect(call).toHaveBeenNthCalledWith(4, {
+    expect(call).toHaveBeenNthCalledWith(5, {
       method: 'deviceReadFactoryCertificate',
       connectId: 'neo',
       connectProtocol: 'V2',
     });
-    expect(call).toHaveBeenNthCalledWith(5, {
+    expect(call).toHaveBeenNthCalledWith(6, {
       method: 'deviceSignFactoryChallenge',
       connectId: 'neo',
       digest: '22'.repeat(32),

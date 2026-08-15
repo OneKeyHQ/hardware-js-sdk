@@ -1,4 +1,5 @@
 import type {
+  deviceFactoryPermanentLock,
   deviceGetOnboardingStatus,
   deviceProvisionFactoryInfo,
   deviceReadFactoryCertificate,
@@ -276,6 +277,7 @@ export type CoreApi = {
    */
   deviceReboot: typeof deviceReboot;
   deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
+  deviceFactoryPermanentLock: typeof deviceFactoryPermanentLock;
   deviceProvisionFactoryInfo: typeof deviceProvisionFactoryInfo;
   deviceReadFactoryInfo: typeof deviceReadFactoryInfo;
   deviceWriteFactoryCertificate: typeof deviceWriteFactoryCertificate;

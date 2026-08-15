@@ -23,6 +23,7 @@ import DeviceFactoryCertificateWrite from '../src/api/protocol-v2/DeviceFactoryC
 import DeviceFactoryChallengeSign from '../src/api/protocol-v2/DeviceFactoryChallengeSign';
 import DeviceFactoryInfoGet from '../src/api/protocol-v2/DeviceFactoryInfoGet';
 import DeviceFactoryInfoSet from '../src/api/protocol-v2/DeviceFactoryInfoSet';
+import DeviceFactoryPermanentLock from '../src/api/protocol-v2/DeviceFactoryPermanentLock';
 import DeviceFirmwareUpdate from '../src/api/protocol-v2/DeviceFirmwareUpdate';
 import DeviceGetFirmwareUpdateStatus from '../src/api/protocol-v2/DeviceGetFirmwareUpdateStatus';
 import DeviceGetOnboardingStatus from '../src/api/protocol-v2/DeviceGetOnboardingStatus';
@@ -9781,6 +9782,23 @@ describe('Protocol V2 current low-level methods', () => {
         },
       }).init()
     ).toThrow('must not exceed 24 UTF-8 bytes');
+  });
+
+  test('sends DeviceFactoryPermanentLock with both irreversible-operation guards', async () => {
+    const typedCall = jest.fn().mockResolvedValue({ message: {} });
+    const method = new DeviceFactoryPermanentLock({
+      id: 1,
+      payload: { method: 'deviceFactoryPermanentLock' },
+    });
+    method.init();
+    (method as any).device = stubDevice({ commands: { typedCall } });
+
+    await method.run();
+
+    expect(typedCall).toHaveBeenCalledWith('DeviceFactoryPermanentLock', 'Success', {
+      check_a: 'a55a5aa5',
+      check_b: '5aa5a55a',
+    });
   });
 
   test('writes, reads and signs with the Protocol V2 factory certificate API', async () => {
