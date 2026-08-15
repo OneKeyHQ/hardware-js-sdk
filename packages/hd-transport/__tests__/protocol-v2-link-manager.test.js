@@ -26,6 +26,9 @@ const protocolV2Messages = parseConfigure({
         message: { type: 'string', id: 1 },
       },
     },
+    Cancel: {
+      fields: {},
+    },
     Success: {
       fields: {
         message: { type: 'string', id: 1 },
@@ -35,6 +38,7 @@ const protocolV2Messages = parseConfigure({
       values: {
         MessageType_Ping: 60206,
         MessageType_Success: 60207,
+        MessageType_Cancel: 60004,
       },
     },
   },
@@ -311,6 +315,58 @@ describe('ProtocolV2LinkManager', () => {
       'write:device-a:2',
       'read:device-a:2',
     ]);
+  });
+
+  test('writes flow control while the active call is waiting for its response', async () => {
+    const sentSeqs = [];
+    let releaseRead;
+    let markReadStarted;
+    const readStarted = new Promise(resolve => {
+      markReadStarted = resolve;
+    });
+    const readBlocked = new Promise(resolve => {
+      releaseRead = resolve;
+    });
+    const success = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: 1, packetSrc: 0, seq: 1 }
+    );
+    let requestSeq = 0;
+    const adapter = {
+      router: 1,
+      generation: 1,
+      prepareCall: jest.fn(),
+      writeFrame: jest.fn(frame => {
+        [, , , , , , requestSeq] = frame;
+        sentSeqs.push(requestSeq);
+        return Promise.resolve();
+      }),
+      readFrame: jest.fn(async () => {
+        markReadStarted();
+        await readBlocked;
+        return rewriteSeq(success, 1);
+      }),
+      reset: jest.fn(),
+    };
+    const manager = new ProtocolV2LinkManager({
+      getSchemas: () => schemas,
+      classifyError: () => 'recoverable',
+    });
+    const createAdapter = jest.fn(() => adapter);
+
+    const activeCall = manager.call('device-a', createAdapter, 'Ping', { message: 'pending' });
+    await readStarted;
+    await expect(manager.sendFlowControl('device-a', createAdapter, 'Cancel', {})).resolves.toEqual(
+      { type: 'WriteCompleted', message: {} }
+    );
+
+    expect(sentSeqs).toEqual([1, 2]);
+    expect(adapter.prepareCall).toHaveBeenCalledTimes(1);
+    expect(adapter.readFrame).toHaveBeenCalledTimes(1);
+    releaseRead();
+    await activeCall;
   });
 
   test('keeps a recoverable link after a call error', async () => {

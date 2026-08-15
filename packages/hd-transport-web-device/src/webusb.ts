@@ -481,6 +481,10 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   }
 
   async post(session: string, name: string, data: Record<string, unknown>) {
+    if (this.deviceProtocol.get(session) === 'V2') {
+      await this.sendProtocolV2UsbFlowControl(session, name, data);
+      return;
+    }
     await this.call(session, name, data);
   }
 

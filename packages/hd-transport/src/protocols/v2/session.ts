@@ -195,6 +195,10 @@ export class ProtocolV2Session {
   // in-flight calls on the same session would steal each other's responses.
   private pendingCall: Promise<unknown> = Promise.resolve();
 
+  // Flow-control messages may interrupt a call that is waiting for a device UI
+  // response, but their frames must never interleave with the active request write.
+  private pendingWrite: Promise<unknown> = Promise.resolve();
+
   private lastResponseSequence?: number;
 
   constructor(options: ProtocolV2SessionOptions) {
@@ -212,6 +216,47 @@ export class ProtocolV2Session {
     // Keep the chain alive even when a call fails; errors still propagate to
     // the per-call promise returned below.
     this.pendingCall = result.catch(() => undefined);
+    return result;
+  }
+
+  sendFlowControl(name: string, data: Record<string, unknown>): Promise<MessageFromOneKey> {
+    const {
+      schemas,
+      router,
+      packetSrc = PROTOCOL_V2_PACKET_SRC_COMMAND,
+      maxFrameBytes,
+      writeFrame,
+      generation = 0,
+    } = this.options;
+    const abortController = new AbortController();
+    const context: ProtocolV2CallContext = {
+      messageName: name,
+      highThroughput: false,
+      generation,
+      signal: abortController.signal,
+    };
+    const protoSeq = this.sequenceCursor.next();
+    const frame = ProtocolV2.encodeFrame(schemas, name, data, {
+      packetSrc,
+      router,
+      seq: protoSeq,
+    });
+
+    if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
+      return Promise.reject(
+        new Error(`Protocol V2 frame too large for transport: ${frame.length} > ${maxFrameBytes}`)
+      );
+    }
+
+    return this.serializeWrite(() => writeFrame(frame, context)).then(() => ({
+      type: 'WriteCompleted',
+      message: {},
+    }));
+  }
+
+  private serializeWrite<T>(write: () => Promise<T>): Promise<T> {
+    const result = this.pendingWrite.then(write, write);
+    this.pendingWrite = result.catch(() => undefined);
     return result;
   }
 
@@ -267,7 +312,7 @@ export class ProtocolV2Session {
       }
 
       const writeStartedAt = Date.now();
-      await writeFrame(frame, baseCallContext);
+      await this.serializeWrite(() => writeFrame(frame, baseCallContext));
       try {
         callOptions.onWriteCompleted?.({
           elapsedMs: Math.max(Date.now() - writeStartedAt, 0),

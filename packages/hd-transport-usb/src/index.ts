@@ -277,6 +277,10 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     if (!this.messages) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
+    if (this.deviceProtocol.get(path) === 'V2') {
+      await this.sendProtocolV2UsbFlowControl(path, name, data);
+      return;
+    }
     const encodeBuffers = ProtocolV1.encodeMessageChunks(this.messages, name, data);
     await this.sendAllChunksWithRetry(path, encodeBuffers);
   }

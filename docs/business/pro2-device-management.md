@@ -136,7 +136,9 @@ Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 与 Neo 
 5. 必要时重启进入 bootloader，并轮询确认模式。
 6. 将目标文件分片写入 `vol0:/`，再使用 PathInfo 校验大小。
 7. 先通过 `DeviceFirmwareUpdateStage.targets[]` 提交全部待安装文件，再发送空的
-   `DeviceFirmwareUpdateRequest` 触发安装。
+   `DeviceFirmwareUpdateRequest` 触发安装。发送安装请求前，SDK 发出非阻塞
+   `REQUEST_BUTTON`（`reason='firmware-update'`），提示 App 展示“请在设备上确认”；App 不调用
+   `uiResponse()`。
 8. 轮询 target 安装状态，允许安装阶段断连、超时和重连探测；同一连接可用时复用当前
    command channel，只在链路失败后重新枚举和校验物理身份。
 9. 确认设备已自动回到 normal mode 时不再重复发送 Normal reboot；随后显式刷新

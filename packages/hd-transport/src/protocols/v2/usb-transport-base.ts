@@ -93,6 +93,19 @@ export abstract class ProtocolV2UsbTransportBase<Key> {
     );
   }
 
+  protected sendProtocolV2UsbFlowControl(
+    key: Key,
+    name: string,
+    data: Record<string, unknown>
+  ): Promise<MessageFromOneKey> {
+    return this.protocolV2UsbLinks.sendFlowControl(
+      key,
+      () => this.createProtocolV2UsbAdapter(key),
+      name,
+      data
+    );
+  }
+
   protected invalidateProtocolV2UsbLink(key: Key, reason: string): Promise<void> {
     return this.protocolV2UsbLinks.invalidateLink(key, reason);
   }

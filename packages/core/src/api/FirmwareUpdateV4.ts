@@ -9,7 +9,7 @@ import {
 } from '@onekeyfe/hd-transport';
 import { sha256 } from '@noble/hashes/sha256';
 
-import { FirmwareUpdateTipMessage, UI_REQUEST } from '../events/ui-request';
+import { FirmwareUpdateTipMessage, UI_REQUEST, createUiMessage } from '../events/ui-request';
 import { validateParams } from './helpers/paramsValidator';
 import {
   LoggerNames,
@@ -71,6 +71,7 @@ import type {
   IProtocolV2FirmwareComponent,
   IProtocolV2ResourceManifestFile,
   IVersionArray,
+  KnownDevice,
 } from '../types';
 import type { FirmwareByteSource } from './firmware/FirmwareArtifactSource';
 import type {
@@ -2375,9 +2376,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       target_id: item.targetId,
       path: item.path,
     }));
-    await this.protocolV2StartFirmwareUpdate({ targets });
-    await wait(PROTOCOL_V2_INSTALL_STATUS_INITIAL_DELAY);
-    await this.waitForProtocolV2FirmwareUpdateComplete(targets, true);
+    try {
+      await this.protocolV2StartFirmwareUpdate({ targets });
+      await wait(PROTOCOL_V2_INSTALL_STATUS_INITIAL_DELAY);
+      await this.waitForProtocolV2FirmwareUpdateComplete(targets, true);
+    } finally {
+      this.device?.clearCancelableAction();
+    }
   }
 
   private async protocolV2SourceUpdateProcess({
@@ -2637,7 +2642,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const expectedPaths = new Map(targets.map(target => [target.target_id, target.path]));
     const startTime = Date.now();
     let lastError: unknown;
-    let shouldReconnect = true;
+    // DeviceFirmwareUpdateRequest leaves the current loader link usable for status polling.
+    // Reconnecting here probes DeviceInfo, which loaders reject while installation is active.
+    let shouldReconnect = false;
     let deviceInfo: ProtocolV2DeviceInfo | undefined;
     let missingTargetStatusSince: number | undefined;
     let missingTargetStatusKey: string | undefined;
@@ -2684,16 +2691,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             statusResponse.type === 'DeviceFirmwareUpdateStatus'
               ? ((statusResponse.message.records ?? []) as ProtocolV2FirmwareUpdateStatusTarget[])
               : [];
-          if (
-            statusTargets.some(target => {
-              const targetId = normalizeProtocolV2TargetId(target.target_id);
-              return (
-                targetId !== undefined &&
-                expectedTargetIds.has(targetId) &&
-                isProtocolV2TargetStatusInProgress(target.status)
-              );
-            })
-          ) {
+          const hasInProgressTarget = statusTargets.some(target => {
+            const targetId = normalizeProtocolV2TargetId(target.target_id);
+            return (
+              targetId !== undefined &&
+              expectedTargetIds.has(targetId) &&
+              isProtocolV2TargetStatusInProgress(target.status)
+            );
+          });
+          if (hasInProgressTarget) {
             currentInstallStatusObserved = true;
           }
           const hasMatchingTargetStatus = statusTargets.some(target => {
@@ -3138,9 +3144,20 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.protocolV2LastRuntimeProbeFeatures = undefined;
     const commands = this.device.getCommands();
     await commands.typedCall('DeviceFirmwareUpdateStage', 'Success', { targets });
+    this.device.setCancelableAction(() => commands.cancelDevice());
+    const interaction = this.device.createProtocolV2UiPhaseMetadata('button', 'start');
+    this.postMessage(
+      createUiMessage(UI_REQUEST.REQUEST_BUTTON, {
+        device: this.device.toMessageObject() as KnownDevice,
+        source: 'method-lifecycle',
+        reason: 'firmware-update',
+        completion: 'operation-completed',
+        deviceOnly: true,
+        operation: this.name,
+        ...(interaction ? { interaction } : {}),
+      })
+    );
     await commands.call('DeviceFirmwareUpdateRequest', {}, { returnAfterWrite: true });
-    this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
-    this.postProgressMessage(0, 'installingFirmware');
   }
 
   private async protocolV2Reboot(rebootType: DeviceRebootType) {
