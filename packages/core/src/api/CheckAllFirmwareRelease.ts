@@ -1,4 +1,4 @@
-import { EDeviceType, HardwareError } from '@onekeyfe/hd-shared';
+import { HardwareError } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 
 import { BaseMethod } from './BaseMethod';
@@ -411,9 +411,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       release,
       deviceType: state.identity.deviceType,
     });
-    const resourceDeviceType =
-      state.identity.deviceType === 'neo' ? EDeviceType.Neo : EDeviceType.Pro2;
-    const resourceSource = DataManager.getProtocolV2ResourceSource(resourceDeviceType);
+    const resourceSource = DataManager.getProtocolV2ResourceSource(features, firmwareType);
     const resourceStatus = 'unknown' as const;
     const detectedComponentTargets = validatedForceUpdateTargets.includes('firmware')
       ? plan.components.flatMap(component =>

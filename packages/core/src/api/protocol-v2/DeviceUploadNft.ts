@@ -129,7 +129,7 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
       paceMs,
       timeoutMs,
     };
-    this.unlockPolicy = 'none';
+    this.unlockPolicy = 'unlock-before-run';
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
   }

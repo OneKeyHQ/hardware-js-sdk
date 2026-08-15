@@ -914,7 +914,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       }
       if (wantsResources) {
         this.params.resourceArchiveBinary = await this.downloadRemoteProtocolV2ResourceArchive(
-          deviceFeatures
+          deviceFeatures,
+          firmwareType
         );
         resourceMemoryHost = await this.prepareProtocolV2LocalMemoryHost({
           features: deviceFeatures,
@@ -1879,7 +1880,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private async downloadRemoteProtocolV2ResourceArchive(features: Features): Promise<ArrayBuffer> {
+  private async downloadRemoteProtocolV2ResourceArchive(
+    features: Features,
+    firmwareType: EFirmwareType
+  ): Promise<ArrayBuffer> {
     const deviceType = getDeviceType(features);
     if (deviceType !== EDeviceType.Pro2 && deviceType !== EDeviceType.Neo) {
       throw ERRORS.TypedError(
@@ -1887,7 +1891,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         'Protocol V2 resource archive requires a Pro2 or Neo device'
       );
     }
-    const source = DataManager.getProtocolV2ResourceSource(deviceType);
+    const source = DataManager.getProtocolV2ResourceSource(features, firmwareType);
     const expectedSha256 = normalizeProtocolV2Hex(source?.archiveSha256);
     if (
       !source?.archiveUrl ||
@@ -2644,6 +2648,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let normalModeWithoutInstallEvidenceSince: number | undefined;
     let installEvidenceObserved = false;
     let currentInstallStatusObserved = false;
+    let firmwareUpdatingTipPosted = false;
     const resetMissingTargetStatusGrace = () => {
       missingTargetStatusSince = undefined;
       missingTargetStatusKey = undefined;
@@ -2684,17 +2689,20 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             statusResponse.type === 'DeviceFirmwareUpdateStatus'
               ? ((statusResponse.message.records ?? []) as ProtocolV2FirmwareUpdateStatusTarget[])
               : [];
-          if (
-            statusTargets.some(target => {
-              const targetId = normalizeProtocolV2TargetId(target.target_id);
-              return (
-                targetId !== undefined &&
-                expectedTargetIds.has(targetId) &&
-                isProtocolV2TargetStatusInProgress(target.status)
-              );
-            })
-          ) {
+          const hasCurrentInstallStatus = statusTargets.some(target => {
+            const targetId = normalizeProtocolV2TargetId(target.target_id);
+            return (
+              targetId !== undefined &&
+              expectedTargetIds.has(targetId) &&
+              isProtocolV2TargetStatusInProgress(target.status)
+            );
+          });
+          if (hasCurrentInstallStatus) {
             currentInstallStatusObserved = true;
+            if (!firmwareUpdatingTipPosted) {
+              this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
+              firmwareUpdatingTipPosted = true;
+            }
           }
           const hasMatchingTargetStatus = statusTargets.some(target => {
             const targetId = normalizeProtocolV2TargetId(target.target_id);
@@ -2768,6 +2776,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
                 now - missingTargetStatusSince >=
                 PROTOCOL_V2_MISSING_TARGET_STATUS_GRACE_TIMEOUT
               ) {
+                if (requireCurrentInstallStatus && !currentInstallStatusObserved) {
+                  throw ERRORS.TypedError(
+                    HardwareErrorCode.FirmwareError,
+                    'Protocol V2 firmware installation was not confirmed on the device'
+                  );
+                }
                 const reportedTargetIds = statusTargets
                   .map(target => normalizeProtocolV2TargetId(target.target_id))
                   .filter((targetId): targetId is number => targetId !== undefined);
@@ -3139,8 +3153,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const commands = this.device.getCommands();
     await commands.typedCall('DeviceFirmwareUpdateStage', 'Success', { targets });
     await commands.call('DeviceFirmwareUpdateRequest', {}, { returnAfterWrite: true });
-    this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
-    this.postProgressMessage(0, 'installingFirmware');
+    this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
   }
 
   private async protocolV2Reboot(rebootType: DeviceRebootType) {

@@ -114,6 +114,7 @@ describe('DeviceUploadNft', () => {
       chunkSize: 2048,
       paceMs: 0,
     });
+    expect(method.unlockPolicy).toBe('unlock-before-run');
   });
 
   test('rejects invalid image Base64 before device communication', () => {

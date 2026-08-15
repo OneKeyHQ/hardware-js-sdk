@@ -211,7 +211,7 @@ describe('DeviceUploadWallpaper', () => {
     const result = await method.run();
 
     expect(method.getSupportedProtocols()).toEqual(['V2']);
-    expect(method.unlockPolicy).toBe('none');
+    expect(method.unlockPolicy).toBe('unlock-before-run');
     expect(typedCall).toHaveBeenNthCalledWith(1, 'FilesystemDirMake', 'Success', {
       path: 'vol1:/wallpapers',
     });
@@ -5272,8 +5272,8 @@ describe('Protocol V2 firmware update targets', () => {
       { returnAfterWrite: true }
     );
     expect(typedCall.mock.invocationCallOrder[0]).toBeLessThan(call.mock.invocationCallOrder[0]);
-    expect(method.postTipMessage).toHaveBeenCalledWith('FirmwareUpdating');
-    expect(method.postProgressMessage).toHaveBeenCalledWith(0, 'installingFirmware');
+    expect(method.postTipMessage).toHaveBeenCalledWith('ConfirmOnDevice');
+    expect(method.postProgressMessage).not.toHaveBeenCalled();
   });
 
   test('does not send the install request when Protocol V2 staging fails', async () => {
@@ -5358,6 +5358,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
     (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
     method.postProgressMessage = jest.fn();
+    method.postTipMessage = jest.fn();
 
     await (method as any).waitForProtocolV2FirmwareUpdateComplete([
       { target_id: 4, path: 'vol0:/application_p1.bin' },
@@ -5409,6 +5410,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
     (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
     method.postProgressMessage = jest.fn();
+    method.postTipMessage = jest.fn();
 
     try {
       await (method as any).waitForProtocolV2FirmwareUpdateComplete([
@@ -5463,6 +5465,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
     (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
     method.postProgressMessage = jest.fn();
+    method.postTipMessage = jest.fn();
 
     try {
       await (method as any).waitForProtocolV2FirmwareUpdateComplete(
@@ -5474,7 +5477,48 @@ describe('Protocol V2 firmware update targets', () => {
     }
 
     expect(typedCall).toHaveBeenCalledTimes(3);
+    expect(method.postTipMessage).toHaveBeenCalledTimes(1);
+    expect(method.postTipMessage).toHaveBeenCalledWith('FirmwareUpdating');
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
+  });
+
+  test('reports missing current target records as unconfirmed device installation', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DeviceFirmwareUpdateStatus',
+      message: {
+        records: [{ target_id: 7, status: 2 }],
+      },
+    });
+    let now = 0;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    jest.spyOn(global, 'setTimeout').mockImplementation(((callback: () => void) => {
+      now += 31 * 1000;
+      callback();
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
+
+    await expect(
+      (method as any).waitForProtocolV2FirmwareUpdateComplete(
+        [{ target_id: 4, path: 'vol0:/application_p1.bin' }],
+        true
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.FirmwareError,
+      message: expect.stringContaining('was not confirmed on the device'),
+    });
+    expect(typedCall).toHaveBeenCalledTimes(2);
   });
 
   test('ignores stale finished records until the current install starts', async () => {
@@ -8470,8 +8514,8 @@ describe('Protocol V2 firmware update targets', () => {
 
     resolveWrite?.({ type: 'WriteCompleted', message: {} });
     await startPromise;
-    expect(method.postTipMessage).toHaveBeenCalledWith('FirmwareUpdating');
-    expect(method.postProgressMessage).toHaveBeenCalledWith(0, 'installingFirmware');
+    expect(method.postTipMessage).toHaveBeenCalledWith('ConfirmOnDevice');
+    expect(method.postProgressMessage).not.toHaveBeenCalled();
     expect(method.postTipMessage).toHaveBeenCalledTimes(1);
   });
 
@@ -8504,7 +8548,7 @@ describe('Protocol V2 firmware update targets', () => {
       {},
       { returnAfterWrite: true }
     );
-    expect(method.postTipMessage).toHaveBeenCalledWith('FirmwareUpdating');
+    expect(method.postTipMessage).toHaveBeenCalledWith('ConfirmOnDevice');
   });
 });
 
