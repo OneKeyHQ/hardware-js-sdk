@@ -19,6 +19,22 @@ const createCommands = () => {
 };
 
 describe('DeviceCommands failure mapping', () => {
+  it.each(['File already exists', 'NFT already exists'])(
+    'maps duplicate file response "%s" to FileAlreadyExists',
+    async message => {
+      const commands = createCommands();
+      await expect(
+        commands._filterCommonTypes(
+          {
+            type: 'Failure',
+            message: { code: 'Failure_DataError', message },
+          } as any,
+          'NFTUpdate'
+        )
+      ).rejects.toMatchObject({ errorCode: HardwareErrorCode.FileAlreadyExists });
+    }
+  );
+
   it('logs passphrase request and canonical response without exposing the passphrase', async () => {
     const commands = createCommands();
     const log = getLogger(LoggerNames.DeviceCommands);
