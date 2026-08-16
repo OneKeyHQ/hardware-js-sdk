@@ -377,12 +377,12 @@ describe('DeviceSettings protocol routing', () => {
     (method as any).device = device;
 
     await expect(method.run()).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.RuntimeError,
+      errorCode: HardwareErrorCode.DeviceCheckPassphraseStateError,
       message: 'Protocol V2 passphrase setting did not reach the requested value.',
     });
   });
 
-  it('accepts a locked Pro2 as confirmation after disabling passphrase', async () => {
+  it('rejects a locked Pro2 when disabling passphrase was not confirmed', async () => {
     const { device, getDeviceState } = createDevice({ protocol: 'V2' });
     getDeviceState
       .mockResolvedValueOnce({
@@ -401,7 +401,10 @@ describe('DeviceSettings protocol routing', () => {
     method.init();
     (method as any).device = device;
 
-    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceCheckPassphraseStateError,
+      message: 'Protocol V2 passphrase setting did not reach the requested value.',
+    });
   });
 
   it('keeps Protocol V1 passphrase settings on ApplySettings', async () => {

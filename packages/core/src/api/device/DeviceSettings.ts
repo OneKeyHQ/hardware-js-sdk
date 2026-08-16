@@ -201,16 +201,9 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
             page: DeviceSettingsPage.DevicePassphrase,
           });
           const updated = await refreshStatusAndSettings();
-          const lockedAfterDisabling =
-            requestedPassphrase === false &&
-            current.status.unlocked === true &&
-            updated.status.unlocked === false;
-          if (
-            updated.status.passphraseProtection !== requestedPassphrase &&
-            !lockedAfterDisabling
-          ) {
+          if (updated.status.passphraseProtection !== requestedPassphrase) {
             throw TypedError(
-              HardwareErrorCode.RuntimeError,
+              HardwareErrorCode.DeviceCheckPassphraseStateError,
               'Protocol V2 passphrase setting did not reach the requested value.'
             );
           }
