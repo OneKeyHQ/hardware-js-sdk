@@ -1,4 +1,4 @@
-import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import { DeviceType, TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
 
 import { initConnector, initCore } from '../src/core';
@@ -309,6 +309,62 @@ describe('public device lifecycle events', () => {
       expect(device.hasDeviceAcquire()).toBe(true);
     }
   );
+
+  test('sends a fallback Cancel for an acquired Protocol V2 BLE call without a prompt callback', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    const device = createInitializedDevice('V2');
+    const post = jest.fn().mockResolvedValue(undefined);
+    const cancelDevice = jest.fn(() => cancelDeviceInPrompt(device, false));
+    const cancel = jest.fn().mockResolvedValue(undefined);
+    (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+    device.commands = {
+      transport: { post },
+      cancelDevice,
+      cancel,
+    } as never;
+
+    await device.interruptionFromUser();
+
+    expect(cancelDevice).toHaveBeenCalledTimes(1);
+    expect(post).toHaveBeenCalledWith(device.mainId, 'Cancel', {});
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  test('waits for the canceled run to finish releasing before cancellation completes', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    const device = createInitializedDevice('V2');
+    const operation = createDeferred<void>();
+    const releaseGate = createDeferred<void>();
+    const cancelError = ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    const release = jest.spyOn(device, 'release').mockImplementation(() => releaseGate.promise);
+    device.commands = {
+      disposed: false,
+      cancel: jest.fn(() => {
+        operation.reject(cancelError);
+        return Promise.resolve();
+      }),
+    } as never;
+    (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+
+    const runResult = device.run(() => operation.promise).catch(error => error);
+    const cancellation = device.interruptionFromUser();
+    let cancellationCompleted = false;
+    cancellation.then(() => {
+      cancellationCompleted = true;
+    });
+
+    await new Promise(resolve => {
+      setImmediate(resolve);
+    });
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(cancellationCompleted).toBe(false);
+
+    releaseGate.resolve();
+    await cancellation;
+    await expect(runResult).resolves.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInterruptedFromUser,
+    });
+  });
 
   test.each([
     [EDeviceType.Pro2, 'webusb', false, DeviceType.PRO2],

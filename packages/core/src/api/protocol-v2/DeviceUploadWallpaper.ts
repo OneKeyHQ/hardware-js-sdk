@@ -143,6 +143,7 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
     const response = await this.device.commands.typedCall('DeviceSettingsSet', 'Success', {
       settings: { wallpaper_path: this.path },
     });
+    await this.device.refreshProtocolV2SettingsAfterMutation();
     return {
       path: this.path,
       size: encoded.data.byteLength,

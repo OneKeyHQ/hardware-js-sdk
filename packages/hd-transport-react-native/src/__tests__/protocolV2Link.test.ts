@@ -420,6 +420,43 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
+  test('waits for an in-flight release before reacquiring the same device', async () => {
+    const { transport, uuid } = createHarness();
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
+    const releaseGate = createDeferred<void>();
+    const releaseStarted = createDeferred<void>();
+    const { protocolV2Links } = transport as any;
+    const invalidateLink = protocolV2Links.invalidateLink.bind(protocolV2Links);
+    jest
+      .spyOn(protocolV2Links, 'invalidateLink')
+      .mockImplementationOnce(async (...args: unknown[]) => {
+        releaseStarted.resolve();
+        await releaseGate.promise;
+        return invalidateLink(...args);
+      });
+
+    const release = transport.release(uuid, true);
+    await releaseStarted.promise;
+    let reacquired = false;
+    const acquire = transport.acquire({ uuid, expectedProtocol: 'V2' }).then(result => {
+      reacquired = true;
+      return result;
+    });
+
+    await Promise.resolve();
+    expect(reacquired).toBe(false);
+
+    releaseGate.resolve();
+    await release;
+    await expect(acquire).resolves.toEqual({ uuid, protocolType: 'V2' });
+    await expect(transport.call(uuid, 'Ping', { message: 'after-release' })).resolves.toMatchObject(
+      {
+        type: 'Success',
+        message: { message: 'ok' },
+      }
+    );
+  });
+
   test('falls back to the other active probe on iOS when protocol metadata is absent', async () => {
     const { transport, uuid } = createHarness({ deviceName: 'OneKey' });
     const probeProtocolV1 = jest

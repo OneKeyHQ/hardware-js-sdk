@@ -168,8 +168,7 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
   async run() {
     try {
       if (this.device.isProtocolV2()) {
-        const refreshStatusAndSettings = () =>
-          this.device.getDeviceState({ refreshSections: ['status', 'settings'] });
+        const refreshStatusAndSettings = () => this.device.refreshProtocolV2SettingsAfterMutation();
         assertSettingsSupported(this.payload, DEVICE_SETTINGS_V1_ONLY_FIELDS, 'Protocol V2');
         const capabilities = getDeviceSettingsCapabilities(
           this.device.getCurrentDeviceType(),

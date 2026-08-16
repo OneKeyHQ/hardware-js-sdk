@@ -183,6 +183,7 @@ describe('DeviceUploadWallpaper', () => {
     stubDevice({
       ...device,
       ensureProtocolV2RuntimeContext: jest.fn().mockResolvedValue(wallpaperProtocolInfo),
+      refreshProtocolV2SettingsAfterMutation: jest.fn().mockResolvedValue({}),
     });
 
   test('encodes, uploads and applies a Pro2 wallpaper', async () => {
@@ -204,7 +205,8 @@ describe('DeviceUploadWallpaper', () => {
         jpegBase64: createJpegBase64(604, 1024),
       },
     });
-    (method as any).device = stubWallpaperDevice({ commands: { typedCall } });
+    const device = stubWallpaperDevice({ commands: { typedCall } });
+    (method as any).device = device;
     method.postMessage = jest.fn();
 
     method.init();
@@ -224,6 +226,7 @@ describe('DeviceUploadWallpaper', () => {
     expect(typedCall).toHaveBeenLastCalledWith('DeviceSettingsSet', 'Success', {
       settings: { wallpaper_path: result.path },
     });
+    expect(device.refreshProtocolV2SettingsAfterMutation).toHaveBeenCalledTimes(1);
     expect(typedCall.mock.calls.some(call => call[0] === 'SetWallpaper')).toBe(false);
     expect(result).toMatchObject({ colorFormat: 'RGB565', message: 'wallpaper applied' });
     const fileWriteCallCount = typedCall.mock.calls.filter(

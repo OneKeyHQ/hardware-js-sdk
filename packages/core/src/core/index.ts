@@ -296,13 +296,6 @@ const handlePreWarmSignal = async (
   }
 };
 
-const waitWithTimeout = async (promise: Promise<any>, timeout: number) => {
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Request timeout')), timeout);
-  });
-  return Promise.race([promise, timeoutPromise]);
-};
-
 const waitForPendingPromise = async (
   getPrePendingCallPromise: () => Promise<void> | undefined,
   removePrePendingCallPromise?: (promise: Promise<void> | undefined) => void
@@ -311,9 +304,9 @@ const waitForPendingPromise = async (
   if (pendingPromise) {
     Log.debug('pre pending call promise before call method, wait for it');
     try {
-      await waitWithTimeout(pendingPromise, 5 * 1000);
+      await pendingPromise;
     } catch (error) {
-      // ignore timeout error
+      // Cancellation is best-effort, but its teardown must settle before reuse.
     }
     removePrePendingCallPromise?.(pendingPromise);
     Log.debug('pre pending call promise before call method done');
@@ -906,6 +899,15 @@ function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) 
   );
 }
 
+function isMissingDetectedProtocolError(error: unknown) {
+  const typedError = error as { errorCode?: unknown; message?: unknown };
+  return (
+    typedError?.errorCode === HardwareErrorCode.RuntimeError &&
+    typeof typedError.message === 'string' &&
+    typedError.message.includes('Device protocol has not been detected')
+  );
+}
+
 /**
  * If the Bluetooth connection times out, retry up to 6 times
  * @param retryCount - Current retry count (default 0)
@@ -943,12 +945,13 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       DevicePool.emitter.emit(DEVICE.CONNECT, device);
     }
   } catch (err) {
+    const requiresColdReconnect = isMissingDetectedProtocolError(err);
     // Device.run()'s REQUIRE_DISCONNECT handling never sees acquire/initialize
     // failures, so with keep-alive a wedged link would be reused by every retry
     // (field case: Initialize timing out at 25s per attempt, forever). Drop it
     // here so the next retry cold-connects.
     if (
-      ERROR_CODES_REQUIRE_DISCONNECT.includes(err.errorCode) &&
+      (ERROR_CODES_REQUIRE_DISCONNECT.includes(err.errorCode) || requiresColdReconnect) &&
       device.mainId &&
       device.deviceConnector
     ) {
@@ -961,11 +964,12 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
     if (
       (err.errorCode === HardwareErrorCode.BleTimeoutError ||
         err.errorCode === HardwareErrorCode.BleConnectedError ||
-        isRetryableBleProtocolV2ProbeError(method, err)) &&
+        isRetryableBleProtocolV2ProbeError(method, err) ||
+        requiresColdReconnect) &&
       retryCount < 6
     ) {
       const nextRetry = retryCount + 1;
-      Log.debug(`Bluetooth connect timeout and will retry, retry count: ${nextRetry}`);
+      Log.debug(`Bluetooth connection will retry, retry count: ${nextRetry}`);
       await wait(3000);
       await connectDeviceForBle(method, device, nextRetry);
     } else {

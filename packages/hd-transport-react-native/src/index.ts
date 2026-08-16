@@ -422,6 +422,9 @@ export default class ReactNativeBleTransport {
 
   private nextMonitorToken = 1;
 
+  /** Serializes transport lifecycle changes for the same physical device. */
+  private lifecycleOperations: Map<string, Promise<void>> = new Map();
+
   constructor(options: TransportOptions) {
     this.scanTimeout = options.scanTimeout ?? DEVICE_SCAN_TIMEOUT_MS;
   }
@@ -860,11 +863,17 @@ export default class ReactNativeBleTransport {
   }
 
   async acquire(input: BleAcquireInput) {
-    const { uuid, forceCleanRunPromise, expectedProtocol } = input;
+    const { uuid } = input;
 
     if (!uuid) {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
     }
+
+    return this.runLifecycleOperation(uuid, () => this.acquireUnlocked(input));
+  }
+
+  private async acquireUnlocked(input: BleAcquireInput) {
+    const { uuid, forceCleanRunPromise, expectedProtocol } = input;
 
     const cachedTransport = transportCache[uuid];
     if (cachedTransport) {
@@ -884,7 +893,7 @@ export default class ReactNativeBleTransport {
        * connection, clean it up before creating a new transport instance.
        */
       Log?.debug('transport not reusable, will release: ', uuid);
-      await this.release(uuid, true);
+      await this.releaseUnlocked(uuid, true);
     }
 
     let device: Device | null = null;
@@ -1010,7 +1019,7 @@ export default class ReactNativeBleTransport {
         inferProtocolHintFromDeviceName(getDeviceDisplayName(acquiredDevice));
 
     // release transport before new transport instance
-    await this.release(uuid, true);
+    await this.releaseUnlocked(uuid, true);
     if (protocolHint) {
       this.deviceProtocolHints.set(uuid, protocolHint);
     }
@@ -1036,7 +1045,7 @@ export default class ReactNativeBleTransport {
       this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
       return { uuid, protocolType };
     } catch (error) {
-      await this.release(uuid, true);
+      await this.releaseUnlocked(uuid, true);
       throw error;
     }
   }
@@ -1181,6 +1190,10 @@ export default class ReactNativeBleTransport {
   }
 
   async release(uuid: string, onclose = false) {
+    return this.runLifecycleOperation(uuid, () => this.releaseUnlocked(uuid, onclose));
+  }
+
+  private async releaseUnlocked(uuid: string, onclose = false) {
     await this.protocolV2Links.invalidateLink(uuid, 'React Native BLE transport released');
     return this.releaseNative(uuid, onclose);
   }
@@ -1552,6 +1565,10 @@ export default class ReactNativeBleTransport {
   }
 
   async disconnect(session: string) {
+    return this.runLifecycleOperation(session, () => this.disconnectUnlocked(session));
+  }
+
+  private async disconnectUnlocked(session: string) {
     await this.protocolV2Links.invalidateLink(session, 'React Native BLE transport disconnected');
     const transport = transportCache[session];
     const monitorToken = transport?.monitorToken ?? this.monitorTokens.get(session);
@@ -1630,6 +1647,26 @@ export default class ReactNativeBleTransport {
     }
     // eslint-disable-next-line no-promise-executor-return
     await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
+  }
+
+  private async runLifecycleOperation<T>(uuid: string, operation: () => Promise<T>): Promise<T> {
+    const previousOperation = this.lifecycleOperations.get(uuid) ?? Promise.resolve();
+    let completeOperation!: () => void;
+    const operationGate = new Promise<void>(resolve => {
+      completeOperation = resolve;
+    });
+    const operationTail = previousOperation.catch(() => undefined).then(() => operationGate);
+    this.lifecycleOperations.set(uuid, operationTail);
+
+    await previousOperation.catch(() => undefined);
+    try {
+      return await operation();
+    } finally {
+      completeOperation();
+      if (this.lifecycleOperations.get(uuid) === operationTail) {
+        this.lifecycleOperations.delete(uuid);
+      }
+    }
   }
 
   cancel() {
