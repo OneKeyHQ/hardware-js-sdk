@@ -26,7 +26,7 @@ import type {
   Features,
   IDeviceBLEFirmwareStatus,
   IDeviceFirmwareStatus,
-  IProtocolV2Resources,
+  IFirmwareReleaseInfo,
   ITransportStatus,
   IVersionArray,
   RemoteConfigResponse,
@@ -407,6 +407,37 @@ export default class DataManager {
     return enrichedData;
   }
 
+  private static enrichProtocolV2FirmwareReleaseInfo(
+    deviceData: DeviceTypeMap[keyof DeviceTypeMap] | undefined,
+    onResourcesError: (error: Error) => void
+  ): NonNullable<DeviceTypeMap[keyof DeviceTypeMap]> {
+    const enrichedData = this.enrichFirmwareReleaseInfo(deviceData);
+    const releases = enrichedData['firmware-v1'];
+    if (!Array.isArray(releases)) {
+      return enrichedData;
+    }
+    const latestRelease = findLatestRelease(releases);
+
+    return {
+      ...enrichedData,
+      'firmware-v1': releases.map(release => {
+        const { resources: rawResources, ...releaseWithoutResources } = release;
+        try {
+          const resources = parseProtocolV2Resources(rawResources);
+          return {
+            ...releaseWithoutResources,
+            ...(resources ? { resources } : undefined),
+          };
+        } catch (error) {
+          if (release === latestRelease) {
+            onResourcesError(error instanceof Error ? error : new Error(String(error)));
+          }
+          return releaseWithoutResources;
+        }
+      }),
+    };
+  }
+
   static async load(settings: ConnectSettings): Promise<boolean> {
     this.settings = settings;
     this.protocolV2ResourcesConfigError = undefined;
@@ -471,32 +502,16 @@ export default class DataManager {
   }
 
   private static applyRemoteConfig(data: RemoteConfigResponse) {
-    let pro2Resources: IProtocolV2Resources | undefined;
-    let neoResources: IProtocolV2Resources | undefined;
-    try {
-      pro2Resources = parseProtocolV2Resources(
-        (data.pro2 as { resources?: unknown } | undefined)?.resources
-      );
-    } catch (error) {
+    const pro2Config = this.enrichProtocolV2FirmwareReleaseInfo(data.pro2, error => {
       // Firmware resource metadata is not required for base communication. If the
-      // remote config is temporarily incomplete, disable this resource update only.
-      this.protocolV2ResourcesConfigError =
-        error instanceof Error ? error : new Error(String(error));
-      Log.warn('[DataConfig] Ignoring invalid Pro2 resources config:', error);
-    }
-    try {
-      neoResources = parseProtocolV2Resources(
-        (data.neo as { resources?: unknown } | undefined)?.resources
-      );
-    } catch (error) {
-      this.protocolV2NeoResourcesConfigError =
-        error instanceof Error ? error : new Error(String(error));
-      Log.warn('[DataConfig] Ignoring invalid Neo resources config:', error);
-    }
-    const enrichedPro2Config = this.enrichFirmwareReleaseInfo(data.pro2);
-    const enrichedNeoConfig = this.enrichFirmwareReleaseInfo(data.neo);
-    const { resources: _unvalidatedResources, ...pro2Config } = enrichedPro2Config;
-    const { resources: _unvalidatedNeoResources, ...neoConfig } = enrichedNeoConfig;
+      // The selected release is incomplete, so disable its resource update only.
+      this.protocolV2ResourcesConfigError = error;
+      Log.warn('[DataConfig] Ignoring invalid Pro2 release resources config:', error);
+    });
+    const neoConfig = this.enrichProtocolV2FirmwareReleaseInfo(data.neo, error => {
+      this.protocolV2NeoResourcesConfigError = error;
+      Log.warn('[DataConfig] Ignoring invalid Neo release resources config:', error);
+    });
     this.deviceMap = {
       [EDeviceType.Classic]: this.enrichFirmwareReleaseInfo(data.classic),
       [EDeviceType.Classic1s]: this.enrichFirmwareReleaseInfo(data.classic1s),
@@ -504,14 +519,8 @@ export default class DataManager {
       [EDeviceType.Mini]: this.enrichFirmwareReleaseInfo(data.mini),
       [EDeviceType.Touch]: this.enrichFirmwareReleaseInfo(data.touch),
       [EDeviceType.Pro]: this.enrichFirmwareReleaseInfo(data.pro),
-      [EDeviceType.Pro2]: {
-        ...pro2Config,
-        ...(pro2Resources ? { resources: pro2Resources } : undefined),
-      },
-      [EDeviceType.Neo]: {
-        ...neoConfig,
-        ...(neoResources ? { resources: neoResources } : undefined),
-      },
+      [EDeviceType.Pro2]: pro2Config,
+      [EDeviceType.Neo]: neoConfig,
     };
     this.assets = {
       bridge: data.bridge,
@@ -589,10 +598,8 @@ export default class DataManager {
     this.lastCheckTimestamp = getTimeStamp();
   }
 
-  static getProtocolV2ResourceSource(
-    deviceType: EDeviceType.Pro2 | EDeviceType.Neo = EDeviceType.Pro2
-  ) {
-    return this.deviceMap[deviceType]?.resources?.source;
+  static getProtocolV2ResourceSource(release: IFirmwareReleaseInfo | undefined) {
+    return release?.resources?.source;
   }
 
   static getProtobufMessages(schema: ProtobufMessageSchema = 'v1CurrentSchema'): JSON {

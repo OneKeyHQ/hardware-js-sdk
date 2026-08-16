@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { sha256 } from '@noble/hashes/sha256';
-import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { DataManager } from '../src/data-manager';
 import {
@@ -8,7 +8,7 @@ import {
   parseProtocolV2Resources,
 } from '../src/protocols/protocol-v2/resources';
 
-import type { ConnectSettings, RemoteConfigResponse } from '../src/types';
+import type { ConnectSettings, Features, RemoteConfigResponse } from '../src/types';
 
 jest.mock('axios');
 jest.mock('../src/data/config', () => ({
@@ -108,10 +108,37 @@ const createRemoteConfig = (): RemoteConfigResponse =>
     mini: { firmware: [], ble: [] },
     touch: { firmware: [], ble: [] },
     pro: { firmware: [], ble: [] },
-    pro2: { firmware: [], ble: [], resources: { source: resourceSource } },
-    neo: { firmware: [], ble: [], resources: { source: neoResourceSource } },
+    pro2: {
+      'firmware-v1': [
+        {
+          required: false,
+          version: [1, 0, 0],
+          url: 'https://example.com/pro2.okpkg',
+          fingerprint: 'a'.repeat(64),
+          changelog: { 'zh-CN': 'Pro2', 'en-US': 'Pro2' },
+          resources: { source: resourceSource },
+        },
+      ],
+      ble: [],
+    },
+    neo: {
+      'firmware-v1': [
+        {
+          required: false,
+          version: [1, 0, 0],
+          url: 'https://example.com/neo.okpkg',
+          fingerprint: 'b'.repeat(64),
+          changelog: { 'zh-CN': 'Neo', 'en-US': 'Neo' },
+          resources: { source: neoResourceSource },
+        },
+      ],
+      ble: [],
+    },
     bridge: {},
   } as unknown as RemoteConfigResponse);
+
+const getProtocolV2Release = (deviceType: EDeviceType.Pro2 | EDeviceType.Neo) =>
+  DataManager.deviceMap[deviceType]?.['firmware-v1']?.[0];
 
 describe('Pro2 resource configuration', () => {
   beforeEach(() => {
@@ -184,8 +211,68 @@ describe('Pro2 resource configuration', () => {
     expect(configFetcher).toHaveBeenCalledWith(
       expect.stringMatching(/^https:\/\/data\.onekey\.so\/pre-config\.json\?noCache=/)
     );
-    expect(DataManager.getProtocolV2ResourceSource()).toEqual(resourceSource);
+    expect(DataManager.getProtocolV2ResourceSource(getProtocolV2Release(EDeviceType.Pro2))).toEqual(
+      resourceSource
+    );
     expect(DataManager.lastCheckTimestamp).toBeGreaterThan(0);
+  });
+
+  test('uses the resource archive bound to the selected firmware release', async () => {
+    const newerResourceSource = {
+      archiveUrl: 'https://example.com/resource/pro2-resource-v2.zip',
+      archiveSha256: 'c'.repeat(64),
+      archiveSize: 20_000_000,
+    };
+    const remoteConfig = createRemoteConfig();
+    remoteConfig.pro2['firmware-v1']?.push({
+      ...remoteConfig.pro2['firmware-v1'][0],
+      version: [2, 0, 0],
+      resources: { source: newerResourceSource },
+    });
+
+    await expect(
+      DataManager.load(createSettings(jest.fn().mockResolvedValue(remoteConfig)))
+    ).resolves.toBe(true);
+
+    const selectedRelease = DataManager.getFirmwareLatestRelease(
+      { deviceType: 'pro2', firmwareVersion: '1.0.0' } as Features,
+      EFirmwareType.Universal
+    );
+    expect(selectedRelease?.version).toEqual([2, 0, 0]);
+    expect(DataManager.getProtocolV2ResourceSource(selectedRelease)).toEqual(newerResourceSource);
+  });
+
+  test('does not use a device-level Protocol V2 resource archive', async () => {
+    const remoteConfig = createRemoteConfig();
+    delete remoteConfig.pro2['firmware-v1']?.[0].resources;
+    (remoteConfig.pro2 as unknown as { resources: unknown }).resources = {
+      source: resourceSource,
+    };
+
+    await expect(
+      DataManager.load(createSettings(jest.fn().mockResolvedValue(remoteConfig)))
+    ).resolves.toBe(true);
+
+    expect(
+      DataManager.getProtocolV2ResourceSource(getProtocolV2Release(EDeviceType.Pro2))
+    ).toBeUndefined();
+  });
+
+  test('does not block the latest release when an older release has invalid resources', async () => {
+    const remoteConfig = createRemoteConfig();
+    (remoteConfig.pro2['firmware-v1']?.[0] as { resources?: unknown }).resources = { source: {} };
+    remoteConfig.pro2['firmware-v1']?.push({
+      ...remoteConfig.pro2['firmware-v1'][0],
+      version: [2, 0, 0],
+      resources: { source: resourceSource },
+    });
+    const configFetcher = jest.fn().mockResolvedValue(remoteConfig);
+
+    await expect(DataManager.load(createSettings(configFetcher))).resolves.toBe(true);
+    await expect(DataManager.forceReloadData({ requireResources: true })).resolves.toBeUndefined();
+
+    const latestRelease = DataManager.deviceMap[EDeviceType.Pro2]?.['firmware-v1']?.[1];
+    expect(DataManager.getProtocolV2ResourceSource(latestRelease)).toEqual(resourceSource);
   });
 
   test('reuses the configuration fetched during SDK initialization for an immediate update', async () => {
@@ -200,25 +287,33 @@ describe('Pro2 resource configuration', () => {
 
   test('keeps base SDK initialization available when remote Pro2 resources are invalid', async () => {
     const remoteConfig = createRemoteConfig();
-    (remoteConfig.pro2 as { resources?: unknown }).resources = { source: {} };
+    (remoteConfig.pro2['firmware-v1']?.[0] as { resources?: unknown }).resources = { source: {} };
     const configFetcher = jest.fn().mockResolvedValue(remoteConfig);
 
     await expect(DataManager.load(createSettings(configFetcher))).resolves.toBe(true);
 
-    expect(DataManager.getProtocolV2ResourceSource()).toBeUndefined();
+    expect(
+      DataManager.getProtocolV2ResourceSource(getProtocolV2Release(EDeviceType.Pro2))
+    ).toBeUndefined();
     expect(DataManager.protocolV2ResourcesConfigError).toBeInstanceOf(Error);
-    expect(DataManager.getProtocolV2ResourceSource(EDeviceType.Neo)).toEqual(neoResourceSource);
+    expect(DataManager.getProtocolV2ResourceSource(getProtocolV2Release(EDeviceType.Neo))).toEqual(
+      neoResourceSource
+    );
   });
 
   test('keeps Pro2 resources available when remote Neo resources are invalid', async () => {
     const remoteConfig = createRemoteConfig();
-    (remoteConfig.neo as { resources?: unknown }).resources = { source: {} };
+    (remoteConfig.neo?.['firmware-v1']?.[0] as { resources?: unknown }).resources = { source: {} };
     const configFetcher = jest.fn().mockResolvedValue(remoteConfig);
 
     await expect(DataManager.load(createSettings(configFetcher))).resolves.toBe(true);
 
-    expect(DataManager.getProtocolV2ResourceSource(EDeviceType.Pro2)).toEqual(resourceSource);
-    expect(DataManager.getProtocolV2ResourceSource(EDeviceType.Neo)).toBeUndefined();
+    expect(DataManager.getProtocolV2ResourceSource(getProtocolV2Release(EDeviceType.Pro2))).toEqual(
+      resourceSource
+    );
+    expect(
+      DataManager.getProtocolV2ResourceSource(getProtocolV2Release(EDeviceType.Neo))
+    ).toBeUndefined();
     await expect(
       DataManager.forceReloadData({
         requireResources: true,
@@ -238,7 +333,7 @@ describe('Pro2 resource configuration', () => {
 
   test('only blocks resource mutation when the refreshed Pro2 resources are invalid', async () => {
     const remoteConfig = createRemoteConfig();
-    (remoteConfig.pro2 as { resources?: unknown }).resources = { source: {} };
+    (remoteConfig.pro2['firmware-v1']?.[0] as { resources?: unknown }).resources = { source: {} };
     const settings = createSettings(jest.fn().mockResolvedValue(remoteConfig));
     DataManager.settings = settings;
 
@@ -252,7 +347,7 @@ describe('Pro2 resource configuration', () => {
 
   test('checks resource configuration errors for the requested device only', async () => {
     const remoteConfig = createRemoteConfig();
-    (remoteConfig.pro2 as { resources?: unknown }).resources = { source: {} };
+    (remoteConfig.pro2['firmware-v1']?.[0] as { resources?: unknown }).resources = { source: {} };
     const settings = createSettings(jest.fn().mockResolvedValue(remoteConfig));
     DataManager.settings = settings;
 

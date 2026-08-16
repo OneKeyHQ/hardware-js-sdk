@@ -42,7 +42,12 @@ describe('FirmwareUpdateV4 install polling', () => {
 
     method.device = {
       getCommands: () => ({ typedCall, call }),
+      createProtocolV2UiPhaseMetadata: jest.fn().mockReturnValue(undefined),
+      toMessageObject: jest.fn().mockReturnValue({ connectId: 'pro2-ble' }),
+      setCancelableAction: jest.fn(),
+      clearCancelableAction: jest.fn(),
     } as unknown as Device;
+    method.postMessage = jest.fn();
     method.postTipMessage = jest.fn();
     method.postProgressMessage = jest.fn();
 

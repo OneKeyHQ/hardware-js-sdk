@@ -294,6 +294,10 @@ describe('ElectronBleTransport protocol detection', () => {
         })
       );
       expect(transport.getProtocolType(device.id)).toBe('V2');
+      expect(nobleBle.connect).toHaveBeenCalledTimes(1);
+      expect(nobleBle.subscribe).toHaveBeenCalledTimes(1);
+      expect(nobleBle.unsubscribe).not.toHaveBeenCalled();
+      expect(nobleBle.disconnect).not.toHaveBeenCalled();
     } finally {
       await transport.release(device.id);
     }

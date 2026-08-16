@@ -116,6 +116,8 @@ export type IFirmwareReleaseInfo = {
   upgradeType?: 'payload-package-set' | string;
   components?: Record<string, IProtocolV2FirmwareComponent>;
   installOrder?: string[];
+  /** Protocol V2 resources matched to this firmware release. */
+  resources?: IProtocolV2Resources;
   bootloaderChangelog?: {
     [k in ILocale]: string;
   };
@@ -152,8 +154,6 @@ type IDeviceReleaseInfo = {
   'firmware-v8'?: IFirmwareReleaseInfo[];
   'firmware-btc-v8'?: IFirmwareReleaseInfo[];
   ble?: IBLEFirmwareReleaseInfo[];
-  /** Independent Protocol V2 resource release configuration. */
-  resources?: IProtocolV2Resources;
 };
 
 export type DeviceTypeMap = {

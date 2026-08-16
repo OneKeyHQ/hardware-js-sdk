@@ -261,6 +261,19 @@ export default class LowlevelTransport {
     return this.callProtocolV1(uuid, name, data, options);
   }
 
+  async post(uuid: string, name: string, data: Record<string, unknown>) {
+    if (this.getProtocolType(uuid) === 'V2') {
+      await this.protocolV2Links.sendFlowControl(
+        uuid,
+        () => this.createProtocolV2Adapter(uuid),
+        name,
+        data
+      );
+      return;
+    }
+    await this.callProtocolV1(uuid, name, data);
+  }
+
   private async callProtocolV1(
     uuid: string,
     name: string,
