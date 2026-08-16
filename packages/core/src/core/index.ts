@@ -924,9 +924,10 @@ function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) 
   );
 }
 
-function isMissingDetectedProtocolError(error: unknown) {
+export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unknown) {
   const typedError = error as { errorCode?: unknown; message?: unknown };
   return (
+    method.payload.connectProtocol === 'V2' &&
     typedError?.errorCode === HardwareErrorCode.RuntimeError &&
     typeof typedError.message === 'string' &&
     typedError.message.includes('Device protocol has not been detected')
@@ -970,7 +971,7 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       DevicePool.emitter.emit(DEVICE.CONNECT, device);
     }
   } catch (err) {
-    const requiresColdReconnect = isMissingDetectedProtocolError(err);
+    const requiresColdReconnect = isMissingDetectedProtocolV2Error(method, err);
     // Device.run()'s REQUIRE_DISCONNECT handling never sees acquire/initialize
     // failures, so with keep-alive a wedged link would be reused by every retry
     // (field case: Initialize timing out at 25s per attempt, forever). Drop it

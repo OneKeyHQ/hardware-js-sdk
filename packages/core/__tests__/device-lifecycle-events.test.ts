@@ -1,7 +1,7 @@
 import { EDeviceType, ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import { DeviceType, TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
 
-import { initConnector, initCore } from '../src/core';
+import { initConnector, initCore, isMissingDetectedProtocolV2Error } from '../src/core';
 import { DataManager } from '../src/data-manager';
 import TransportManager from '../src/data-manager/TransportManager';
 import { Device } from '../src/device/Device';
@@ -250,6 +250,22 @@ describe('public device lifecycle events', () => {
     expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, 'V2', undefined);
     expect(device.getProtocol()).toBe('V2');
   });
+
+  test.each([
+    ['V2', true],
+    ['V1', false],
+  ] as const)(
+    'retries a missing detected protocol only for an explicit Protocol %s connection',
+    (connectProtocol, expected) => {
+      const method = { payload: { connectProtocol } } as never;
+      const error = {
+        errorCode: HardwareErrorCode.RuntimeError,
+        message: 'Device protocol has not been detected for ble-id',
+      };
+
+      expect(isMissingDetectedProtocolV2Error(method, error)).toBe(expected);
+    }
+  );
 
   test('converts an internal transport disconnect into a public KnownDevice snapshot', () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
