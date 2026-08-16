@@ -466,6 +466,19 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     async () => {
       const { transport, uuid, device, bleManager } = createHarness();
       await transport.acquire({ uuid, expectedProtocol: 'V2' });
+      const otherUuid = 'rn-pro2-other-id';
+      const otherDevice = {
+        ...device,
+        id: otherUuid,
+        name: 'OneKey Pro 2 Other',
+        localName: 'OneKey Pro 2 Other',
+      };
+      await (transport as any).installTransportForAcquire(otherUuid, otherDevice);
+      (transport as any).deviceProtocol.set(otherUuid, 'V2');
+      const disconnectEvents: Array<{ connectId: string }> = [];
+      transport.emitter?.on(TRANSPORT_EVENT.DEVICE_DISCONNECT, event => {
+        disconnectEvents.push(event);
+      });
       const stalledNativeCleanup = createDeferred<void>();
       bleManager.cancelTransaction
         .mockImplementationOnce(() => stalledNativeCleanup.promise)
@@ -480,6 +493,8 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       await expect(nextOperation).resolves.toBe('next-operation');
       expect(resetPlxManager).toHaveBeenCalledTimes(1);
       expect(nextLifecycleOperation).toHaveBeenCalledTimes(1);
+      expect(disconnectEvents).toContainEqual(expect.objectContaining({ connectId: otherUuid }));
+      expect(() => (transport as any).getCachedTransport(otherUuid)).toThrow();
 
       await (transport as any).installTransportForAcquire(uuid, device);
       (transport as any).deviceProtocol.set(uuid, 'V2');

@@ -1930,9 +1930,37 @@ export default class ReactNativeBleTransport {
   private resetPlxManager() {
     const manager = this.blePlxManager;
     this.blePlxManager = undefined;
-    // Every cached transport belongs to the destroyed manager's peripherals.
-    Object.keys(transportCache).forEach(key => {
-      delete transportCache[key];
+    const reason = 'React Native BLE manager reset';
+    // Destroying the shared manager invalidates every peripheral it owns. Notify
+    // each cached session before clearing generations so Core cannot retain a
+    // silently stale connection for an unrelated device.
+    Object.entries(transportCache).forEach(([uuid, cachedTransport]) => {
+      try {
+        cachedTransport.disconnectSubscription?.remove();
+      } catch (error) {
+        Log?.debug('BLE manager reset disconnect subscription removal failed:', error);
+      }
+      cachedTransport.disconnectSubscription = undefined;
+      try {
+        cachedTransport.notifySubscription?.remove();
+      } catch (error) {
+        Log?.debug('BLE manager reset notify subscription removal failed:', error);
+      }
+      cachedTransport.notifySubscription = undefined;
+      this.rejectProtocolV2Frames(uuid, new Error(reason));
+      try {
+        this.emitDeviceDisconnect(
+          uuid,
+          cachedTransport.device?.name,
+          cachedTransport.monitorToken ?? this.monitorTokens.get(uuid)
+        );
+      } catch (error) {
+        Log?.debug('BLE manager reset disconnect event failed:', error);
+      }
+      delete transportCache[uuid];
+    });
+    this.protocolV2Links.invalidateAllLinks(reason).catch(error => {
+      Log?.debug('[ReactNativeBleTransport] BLE manager link invalidation failed:', error);
     });
     this.deviceProtocol.clear();
     this.probingProtocols.clear();

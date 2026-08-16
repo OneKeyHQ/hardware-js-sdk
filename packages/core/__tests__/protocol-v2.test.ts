@@ -265,6 +265,36 @@ describe('DeviceUploadWallpaper', () => {
     expect(typedCall.mock.calls.some(call => call[0] === 'DeviceSettingsSet')).toBe(false);
   });
 
+  test('returns success when wallpaper read-back fails after apply', async () => {
+    const typedCall = jest.fn().mockImplementation((request, _response, params) => {
+      if (request === 'FilesystemDirMake') return { message: {} };
+      if (request === 'FilesystemFileWrite') {
+        const file = params.file as { data: Uint8Array; offset: number };
+        return { message: { processed_byte: file.offset + file.data.byteLength } };
+      }
+      if (request === 'DeviceSettingsSet') {
+        return { message: { message: 'wallpaper applied' } };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = new DeviceUploadWallpaper({
+      id: 1,
+      payload: {
+        method: 'deviceUploadWallpaper',
+        jpegBase64: createJpegBase64(604, 1024),
+      },
+    });
+    const device = stubWallpaperDevice({ commands: { typedCall } });
+    device.refreshProtocolV2SettingsAfterMutation.mockRejectedValueOnce(
+      new Error('settings read-back failed')
+    );
+    (method as any).device = device;
+    method.init();
+
+    await expect(method.run()).resolves.toMatchObject({ message: 'wallpaper applied' });
+    expect(device.refreshProtocolV2SettingsAfterMutation).toHaveBeenCalledTimes(1);
+  });
+
   test('rejects unsafe filenames before device communication', () => {
     const method = new DeviceUploadWallpaper({
       id: 1,
