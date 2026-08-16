@@ -149,6 +149,7 @@ const PROTOCOL_V2_PROBE_TIMEOUT_MS = 10_000;
  * A healthy packet completes in milliseconds, so this only fires on a dead link.
  */
 export const BLE_WRITE_PACKET_TIMEOUT_MS = 10_000;
+export const BLE_NATIVE_TEARDOWN_TIMEOUT_MS = 3_000;
 const WEDGED_WRITE_MESSAGE = 'BLE write timeout after';
 const isWedgedWriteError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleWriteCharacteristicError &&
@@ -1200,6 +1201,7 @@ export default class ReactNativeBleTransport {
 
   private async releaseNative(uuid: string, onclose = false) {
     const transport = transportCache[uuid];
+    const manager = this.blePlxManager;
     if (this.runPromise && this.runPromiseDeviceId === uuid) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
       this.runPromise.reject(error);
@@ -1215,8 +1217,6 @@ export default class ReactNativeBleTransport {
       this.resetProtocolV2Frames(uuid);
       return Promise.resolve(true);
     }
-
-    await this.restoreAndroidConnectionPriority(uuid, transport);
 
     if (transport) {
       if (this.monitorTokens.get(uuid) === transport.monitorToken) {
@@ -1235,16 +1235,9 @@ export default class ReactNativeBleTransport {
       );
       transport.notifySubscription?.remove();
       transport.notifySubscription = undefined;
-
-      if (transport.notifyTransactionId) {
-        try {
-          await this.blePlxManager?.cancelTransaction(transport.notifyTransactionId);
-        } catch (e) {
-          Log?.debug('release: cancel notify transaction error (ignored): ', e?.message || e);
-        }
+      if (transportCache[uuid] === transport) {
+        delete transportCache[uuid];
       }
-
-      delete transportCache[uuid];
     }
 
     this.protocolV2HighVolumeLogSignatures.delete(uuid);
@@ -1256,11 +1249,28 @@ export default class ReactNativeBleTransport {
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);
 
-    try {
-      await this.blePlxManager?.cancelTransaction(uuid);
-    } catch (e) {
-      Log?.debug('release: cancel transaction error (ignored): ', e?.message || e);
-    }
+    await this.runNativeTeardown(uuid, manager, async () => {
+      const operations: Promise<unknown>[] = [
+        this.runBestEffortNativeOperation('release: restore connection priority', () =>
+          this.restoreAndroidConnectionPriority(uuid, transport)
+        ),
+      ];
+      if (transport?.notifyTransactionId && manager) {
+        operations.push(
+          this.runBestEffortNativeOperation('release: cancel notify transaction', () =>
+            manager.cancelTransaction(transport.notifyTransactionId as string)
+          )
+        );
+      }
+      if (manager) {
+        operations.push(
+          this.runBestEffortNativeOperation('release: cancel transaction', () =>
+            manager.cancelTransaction(uuid)
+          )
+        );
+      }
+      await Promise.all(operations);
+    });
 
     return Promise.resolve(true);
   }
@@ -1571,6 +1581,7 @@ export default class ReactNativeBleTransport {
   private async disconnectUnlocked(session: string) {
     await this.protocolV2Links.invalidateLink(session, 'React Native BLE transport disconnected');
     const transport = transportCache[session];
+    const manager = this.blePlxManager;
     const monitorToken = transport?.monitorToken ?? this.monitorTokens.get(session);
 
     // Clean up disconnect subscription first to prevent onDisconnected callback
@@ -1599,33 +1610,8 @@ export default class ReactNativeBleTransport {
       }
     }
 
-    // cancel the ble transaction
-    if (session) {
-      try {
-        await this.blePlxManager?.cancelTransaction(session);
-      } catch (e) {
-        Log?.debug('resetSession: cancel transaction error (ignored): ', e?.message || e);
-      }
-    }
-
-    // disconnect the device via the device object
-    if (transport?.device) {
-      try {
-        await transport.device.cancelConnection();
-      } catch (e) {
-        Log?.debug('resetSession: device.cancelConnection error (ignored): ', e?.message || e);
-      }
-    }
-
-    // disconnect the device via the ble manager
-    try {
-      await this.blePlxManager?.cancelDeviceConnection(session);
-    } catch (e) {
-      Log?.debug('resetSession: manager.cancelDeviceConnection error (ignored): ', e?.message || e);
-    }
-
     // clear the transport cache
-    if (transportCache[session]) {
+    if (!transport || transportCache[session] === transport) {
       delete transportCache[session];
     }
     this.deviceProtocol.delete(session);
@@ -1645,8 +1631,75 @@ export default class ReactNativeBleTransport {
     if (monitorToken !== undefined && this.monitorTokens.get(session) === monitorToken) {
       this.monitorTokens.delete(session);
     }
+
+    await this.runNativeTeardown(session, manager, async () => {
+      const operations: Promise<unknown>[] = [];
+      if (manager) {
+        operations.push(
+          this.runBestEffortNativeOperation('disconnect: cancel transaction', () =>
+            manager.cancelTransaction(session)
+          )
+        );
+        operations.push(
+          this.runBestEffortNativeOperation('disconnect: cancel device connection', () =>
+            manager.cancelDeviceConnection(session)
+          )
+        );
+      }
+      if (transport?.device) {
+        operations.push(
+          this.runBestEffortNativeOperation('disconnect: device cancel connection', () =>
+            transport.device.cancelConnection()
+          )
+        );
+      }
+      await Promise.all(operations);
+    });
+
     // eslint-disable-next-line no-promise-executor-return
     await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
+  }
+
+  private async runNativeTeardown(
+    uuid: string,
+    manager: BlePlxManager | undefined,
+    teardown: () => Promise<void>
+  ) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    const pending = Promise.resolve()
+      .then(teardown)
+      .catch(error => {
+        Log?.debug('BLE native teardown error (ignored): ', error?.message || error);
+      });
+    try {
+      await Promise.race([
+        pending,
+        new Promise<void>(resolve => {
+          timer = setTimeout(() => {
+            timedOut = true;
+            resolve();
+          }, BLE_NATIVE_TEARDOWN_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+
+    if (timedOut) {
+      Log?.error('[ReactNativeBleTransport] BLE native teardown timed out:', uuid);
+      if (this.blePlxManager === manager) {
+        this.resetPlxManager();
+      }
+    }
+  }
+
+  private runBestEffortNativeOperation(label: string, operation: () => Promise<unknown>) {
+    return Promise.resolve()
+      .then(operation)
+      .catch(error => {
+        Log?.debug(`${label} error (ignored): `, error?.message || error);
+      });
   }
 
   private async runLifecycleOperation<T>(uuid: string, operation: () => Promise<T>): Promise<T> {
@@ -2481,6 +2534,7 @@ export default class ReactNativeBleTransport {
         return rxFrame;
       },
       reset: (reason: string) => {
+        if (this.monitorTokens.get(uuid) !== generation) return;
         this.protocolV2Assemblers.get(uuid)?.reset();
         this.rejectProtocolV2Frames(uuid, new Error(reason));
       },

@@ -83,6 +83,7 @@ import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
 const PRE_INITIALIZE_TTL_MS = 60 * 1000;
+const PRE_PENDING_CALL_TIMEOUT_MS = 15 * 1000;
 
 // Dedup/coalesce state for "pre-warm signal" methods (isPreWarmSignal),
 // keyed by getPreWarmKey(): coalesce in-flight, skip if warmed within TTL.
@@ -297,18 +298,34 @@ const handlePreWarmSignal = async (
 };
 
 const waitForPendingPromise = async (
-  getPrePendingCallPromise: () => Promise<void> | undefined,
-  removePrePendingCallPromise?: (promise: Promise<void> | undefined) => void
+  connectId: string,
+  getPrePendingCallPromise: (connectId: string) => Promise<void> | undefined,
+  removePrePendingCallPromise?: (connectId: string, promise: Promise<void>) => void
 ) => {
-  const pendingPromise = getPrePendingCallPromise();
+  const pendingPromise = getPrePendingCallPromise(connectId);
   if (pendingPromise) {
     Log.debug('pre pending call promise before call method, wait for it');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
     try {
-      await pendingPromise;
+      await Promise.race([
+        pendingPromise,
+        new Promise<void>(resolve => {
+          timer = setTimeout(() => {
+            timedOut = true;
+            resolve();
+          }, PRE_PENDING_CALL_TIMEOUT_MS);
+        }),
+      ]);
     } catch (error) {
-      // Cancellation is best-effort, but its teardown must settle before reuse.
+      // Cancellation is best-effort; the transport teardown owns recovery.
+    } finally {
+      if (timer) clearTimeout(timer);
+      removePrePendingCallPromise?.(connectId, pendingPromise);
     }
-    removePrePendingCallPromise?.(pendingPromise);
+    if (timedOut) {
+      Log.warn('pre pending call promise timed out before call method', { connectId });
+    }
     Log.debug('pre pending call promise before call method done');
   }
 };
@@ -320,7 +337,7 @@ const onCallDevice = async (
 ): Promise<any> => {
   let messageResponse: any;
 
-  const { requestQueue, getPrePendingCallPromise, setPrePendingCallPromise } = context;
+  const { requestQueue, getPrePendingCallPromise, removePrePendingCallPromise } = context;
 
   updateMethodRequestContext(method, { status: 'running' });
 
@@ -348,7 +365,11 @@ const onCallDevice = async (
     await context.waitForCallbackTasks(method.connectId);
   }
 
-  await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
+  await waitForPendingPromise(
+    method.connectId ?? '',
+    getPrePendingCallPromise,
+    removePrePendingCallPromise
+  );
 
   const task = requestQueue.createTask(method);
 
@@ -447,7 +468,11 @@ const onCallDevice = async (
       await context.waitForCallbackTasks(method.connectId, preWarmCallbackTask);
     }
 
-    await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
+    await waitForPendingPromise(
+      method.connectId ?? '',
+      getPrePendingCallPromise,
+      removePrePendingCallPromise
+    );
 
     const inner = async (): Promise<void> => {
       // Protocol is established from an active device response during acquire/initialize.
@@ -1181,7 +1206,10 @@ export const cancel = (context: CoreContext, connectId?: string) => {
         if (task && task.method?.device) {
           if (!canceledDevices.includes(task.method.device)) {
             const { device } = task.method;
-            setPrePendingCallPromise(device?.interruptionFromUser());
+            setPrePendingCallPromise(
+              task.method.connectId ?? connectId,
+              device.interruptionFromUser()
+            );
             canceledDevices.push(device);
           }
           requestQueue.rejectRequest(
@@ -1535,7 +1563,7 @@ export default class Core extends EventEmitter {
   private disposePromise?: Promise<void>;
 
   // background task
-  private prePendingCallPromise: Promise<void> | undefined;
+  private prePendingCallPromises = new Map<string, Promise<void>>();
 
   private methodSynchronize = getSynchronize();
 
@@ -1552,9 +1580,18 @@ export default class Core extends EventEmitter {
       tracingContext: this.tracingContext,
       requestQueue: this.requestQueue,
       methodSynchronize: this.methodSynchronize,
-      getPrePendingCallPromise: () => this.prePendingCallPromise,
-      setPrePendingCallPromise: (promise: Promise<void> | undefined) => {
-        this.prePendingCallPromise = promise;
+      getPrePendingCallPromise: (connectId: string) => this.prePendingCallPromises.get(connectId),
+      setPrePendingCallPromise: (connectId: string, promise?: Promise<void>) => {
+        if (!promise) {
+          this.prePendingCallPromises.delete(connectId);
+          return;
+        }
+        this.prePendingCallPromises.set(connectId, promise);
+      },
+      removePrePendingCallPromise: (connectId: string, promise: Promise<void>) => {
+        if (this.prePendingCallPromises.get(connectId) === promise) {
+          this.prePendingCallPromises.delete(connectId);
+        }
       },
       // callback 任务管理
       registerCallbackTask: (connectId: string, callbackPromise: Deferred<any>) => {
@@ -1669,7 +1706,7 @@ export default class Core extends EventEmitter {
     preWarmInflight.clear();
     preWarmDoneAt.clear();
     preConnectCache = { passphraseState: undefined };
-    this.prePendingCallPromise = undefined;
+    this.prePendingCallPromises.clear();
     this.removeAllListeners();
     cleanupSdkInstance(this.sdkInstanceId);
     if (_core === this) _core = undefined;

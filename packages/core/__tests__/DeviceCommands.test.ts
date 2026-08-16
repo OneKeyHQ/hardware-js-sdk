@@ -800,7 +800,13 @@ describe('DeviceCommands cancellation', () => {
     try {
       const commands = createCommands();
       commands.disposed = false;
+      commands.mainId = 'main-id';
       commands.callPromise = new Promise(() => {});
+      const disconnect = jest.fn().mockResolvedValue(undefined);
+      commands.transport = {
+        name: 'ReactNativeBleTransport',
+        disconnect,
+      } as any;
       const dispose = jest.fn().mockResolvedValue(undefined);
       commands.dispose = dispose;
 
@@ -810,6 +816,7 @@ describe('DeviceCommands cancellation', () => {
 
       await expect(cancellation).resolves.toBeUndefined();
       expect(dispose).toHaveBeenCalledWith(true);
+      expect(disconnect).toHaveBeenCalledWith('main-id');
       expect(commands.callPromise).toBeUndefined();
     } finally {
       jest.useRealTimers();

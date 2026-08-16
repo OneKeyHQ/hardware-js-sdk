@@ -7,6 +7,7 @@ import transportPackage, {
 import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
 import ReactNativeBleTransport, {
+  BLE_NATIVE_TEARDOWN_TIMEOUT_MS,
   BLE_WRITE_PACKET_TIMEOUT_MS,
   configureProtocolV2BleTuning,
   getFirmwareUploadWriteRetryType,
@@ -174,6 +175,8 @@ const createHarness = ({
     devices: jest.fn(() => Promise.resolve([device])),
     connectedDevices: jest.fn(() => Promise.resolve([])),
     cancelTransaction: jest.fn(() => Promise.resolve()),
+    cancelDeviceConnection: jest.fn(() => Promise.resolve()),
+    destroy: jest.fn(),
   };
   const transport = new ReactNativeBleTransport({ scanTimeout: 1 });
   const emitter = new EventEmitter();
@@ -192,6 +195,7 @@ const createHarness = ({
     logger,
     uuid,
     device,
+    bleManager,
     sentSeqs,
     writeCharacteristic,
     setShouldRespond(value: boolean) {
@@ -456,6 +460,41 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       }
     );
   });
+
+  test(
+    'releases the lifecycle queue when native teardown never settles',
+    async () => {
+      const { transport, uuid, device, bleManager } = createHarness();
+      await transport.acquire({ uuid, expectedProtocol: 'V2' });
+      const stalledNativeCleanup = createDeferred<void>();
+      bleManager.cancelTransaction
+        .mockImplementationOnce(() => stalledNativeCleanup.promise)
+        .mockResolvedValue(undefined);
+      const resetPlxManager = jest.spyOn(transport as any, 'resetPlxManager');
+      const nextLifecycleOperation = jest.fn().mockResolvedValue('next-operation');
+
+      const release = transport.release(uuid, true);
+      const nextOperation = (transport as any).runLifecycleOperation(uuid, nextLifecycleOperation);
+
+      await expect(release).resolves.toBe(true);
+      await expect(nextOperation).resolves.toBe('next-operation');
+      expect(resetPlxManager).toHaveBeenCalledTimes(1);
+      expect(nextLifecycleOperation).toHaveBeenCalledTimes(1);
+
+      await (transport as any).installTransportForAcquire(uuid, device);
+      (transport as any).deviceProtocol.set(uuid, 'V2');
+
+      stalledNativeCleanup.resolve();
+      await Promise.resolve();
+      await expect(
+        transport.call(uuid, 'Ping', { message: 'after-stale-cleanup' })
+      ).resolves.toMatchObject({
+        type: 'Success',
+        message: { message: 'ok' },
+      });
+    },
+    BLE_NATIVE_TEARDOWN_TIMEOUT_MS + 5_000
+  );
 
   test('falls back to the other active probe on iOS when protocol metadata is absent', async () => {
     const { transport, uuid } = createHarness({ deviceName: 'OneKey' });

@@ -82,6 +82,23 @@ describe('public device lifecycle events', () => {
     expect(DevicePool.emitter.listenerCount(DEVICE.DISCONNECT)).toBe(1);
   });
 
+  test('isolates pending cancellation cleanup by connect id', () => {
+    core = initCore();
+    const context = (core as any).getCoreContext();
+    const firstCleanup = createDeferred<void>();
+    const replacementCleanup = createDeferred<void>();
+
+    context.setPrePendingCallPromise('device-a', firstCleanup.promise);
+
+    expect(context.getPrePendingCallPromise('device-a')).toBe(firstCleanup.promise);
+    expect(context.getPrePendingCallPromise('device-b')).toBeUndefined();
+
+    context.setPrePendingCallPromise('device-a', replacementCleanup.promise);
+    context.removePrePendingCallPromise('device-a', firstCleanup.promise);
+
+    expect(context.getPrePendingCallPromise('device-a')).toBe(replacementCleanup.promise);
+  });
+
   test('keeps shared device lifecycle listeners across a device cache reset', () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
     core = initCore();
