@@ -361,8 +361,8 @@ describe('DeviceSettings protocol routing', () => {
     expect(getDeviceState).toHaveBeenCalledWith({ refreshSections: ['settings'] });
   });
 
-  it('rejects a successful Pro2 page response when the hardware did not reach the target', async () => {
-    const { device, getDeviceState } = createDevice({ protocol: 'V2' });
+  it('does not overwrite Pro2 passphrase state when refreshed state does not match', async () => {
+    const { device, getDeviceState, updateState } = createDevice({ protocol: 'V2' });
     getDeviceState.mockResolvedValue({
       status: { passphraseProtection: false },
     });
@@ -376,14 +376,12 @@ describe('DeviceSettings protocol routing', () => {
     method.init();
     (method as any).device = device;
 
-    await expect(method.run()).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.DeviceCheckPassphraseStateError,
-      message: 'Protocol V2 passphrase setting did not reach the requested value.',
-    });
+    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+    expect(updateState).not.toHaveBeenCalled();
   });
 
-  it('rejects a locked Pro2 when disabling passphrase was not confirmed', async () => {
-    const { device, getDeviceState } = createDevice({ protocol: 'V2' });
+  it('keeps the previous Pro2 passphrase state when refreshed state is unavailable after locking', async () => {
+    const { device, getDeviceState, updateState } = createDevice({ protocol: 'V2' });
     getDeviceState
       .mockResolvedValueOnce({
         status: { unlocked: true, passphraseProtection: true },
@@ -401,10 +399,8 @@ describe('DeviceSettings protocol routing', () => {
     method.init();
     (method as any).device = device;
 
-    await expect(method.run()).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.DeviceCheckPassphraseStateError,
-      message: 'Protocol V2 passphrase setting did not reach the requested value.',
-    });
+    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+    expect(updateState).not.toHaveBeenCalled();
   });
 
   it('keeps Protocol V1 passphrase settings on ApplySettings', async () => {

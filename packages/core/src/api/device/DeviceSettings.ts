@@ -200,13 +200,7 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
           const res = await this.device.commands.typedCall('DeviceSettingsPageShow', 'Success', {
             page: DeviceSettingsPage.DevicePassphrase,
           });
-          const updated = await refreshStatusAndSettings();
-          if (updated.status.passphraseProtection !== requestedPassphrase) {
-            throw TypedError(
-              HardwareErrorCode.DeviceCheckPassphraseStateError,
-              'Protocol V2 passphrase setting did not reach the requested value.'
-            );
-          }
+          await refreshStatusAndSettings();
           return res.message;
         }
         if (requestedAirgap !== undefined) {
