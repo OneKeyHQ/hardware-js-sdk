@@ -222,10 +222,6 @@ export const createCoreApi = (
   cipherKeyValue: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'cipherKeyValue' }),
 
-  testInitializeDeviceDuration: (connectId, params) =>
-    call({ ...params, connectId, method: 'testInitializeDeviceDuration' }),
-  testProtocolV2Ping: (connectId, params) =>
-    call({ ...params, connectId, method: 'testProtocolV2Ping' }),
   preInitialize: (connectId, params) => call({ ...params, connectId, method: 'preInitialize' }),
   deviceBackup: connectId => call({ connectId, method: 'deviceBackup' }),
   deviceChangePin: (connectId, params) => call({ ...params, connectId, method: 'deviceChangePin' }),
@@ -237,16 +233,6 @@ export const createCoreApi = (
   deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
   deviceGetOnboardingStatus: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
-  deviceProvisionFactoryInfo: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceProvisionFactoryInfo' }),
-  deviceReadFactoryInfo: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceReadFactoryInfo' }),
-  deviceWriteFactoryCertificate: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceWriteFactoryCertificate' }),
-  deviceReadFactoryCertificate: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceReadFactoryCertificate' }),
-  deviceSignFactoryChallenge: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceSignFactoryChallenge' }),
   deviceUploadWallpaper: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceUploadWallpaper' }),
   deviceUploadNft: (connectId, params) => call({ ...params, connectId, method: 'deviceUploadNft' }),
@@ -259,6 +245,10 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'deviceUploadResource' }),
   deviceSupportFeatures: connectId => call({ connectId, method: 'deviceSupportFeatures' }),
   deviceVerify: (connectId, params) => call({ ...params, connectId, method: 'deviceVerify' }),
+  deviceReadSEPublicCert: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceReadSEPublicCert' }),
+  deviceSESignMessage: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSESignMessage' }),
   deviceWipe: connectId => call({ connectId, method: 'deviceWipe' }),
   deviceFullyUploadResource: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceFullyUploadResource' }),
@@ -514,17 +504,4 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'neoGetAddress' }),
   neoSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'neoSignTransaction' }),
-
-  // Pro Protocol V1 factory API
-  deviceInfoSettings: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceInfoSettings' }),
-  deviceGetInfo: (connectId, params) => call({ ...params, connectId, method: 'deviceGetInfo' }),
-  deviceReadSEPublicCert: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceReadSEPublicCert' }),
-  deviceWriteSEPrivateKey: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceWriteSEPrivateKey' }),
-  deviceWriteSEPublicCert: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceWriteSEPublicCert' }),
-  deviceSESignMessage: (connectId, params) =>
-    call({ ...params, connectId, method: 'deviceSESignMessage' }),
 });

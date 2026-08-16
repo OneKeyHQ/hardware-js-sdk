@@ -30,6 +30,7 @@ import type {
   ConnectSettings,
   Core,
   CoreMessage,
+  CoreOptions,
   LowLevelCoreApi,
   UiResponseEvent,
 } from '@onekeyfe/hd-core';
@@ -146,30 +147,32 @@ async function postMessage(message: CoreMessage, usePromise = true) {
   _core.handleMessage(message);
 }
 
-const init = async (
-  settings: Partial<ConnectSettings>,
-  _?: LowLevelCoreApi,
-  plugin?: LowlevelTransportSharedPlugin
-) => {
-  _settings = { ..._settings, ...settings, env: settings.env ?? 'node' };
+const createInit =
+  (coreOptions: CoreOptions) =>
+  async (
+    settings: Partial<ConnectSettings>,
+    _?: LowLevelCoreApi,
+    plugin?: LowlevelTransportSharedPlugin
+  ) => {
+    _settings = { ..._settings, ...settings, env: settings.env ?? 'node' };
 
-  enableLog(!!settings.debug);
+    enableLog(!!settings.debug);
 
-  Log.debug('init');
+    Log.debug('init');
 
-  try {
-    const Transport = await getTransport(_settings.env);
-    _core = await initCore(_settings, Transport, plugin);
-    _core?.on(CORE_EVENT, handleMessage);
-    setLoggerPostMessage(handleMessage);
+    try {
+      const Transport = await getTransport(_settings.env);
+      _core = await initCore(_settings, Transport, plugin, coreOptions);
+      _core?.on(CORE_EVENT, handleMessage);
+      setLoggerPostMessage(handleMessage);
 
-    return true;
-  } catch (error) {
-    Log.error(createErrorMessage(error));
+      return true;
+    } catch (error) {
+      Log.error(createErrorMessage(error));
 
-    return false;
-  }
-};
+      return false;
+    }
+  };
 
 const call = async (params: any) => {
   const blockLog = getLogBlockLabel(params);
@@ -205,15 +208,20 @@ const call = async (params: any) => {
 const updateSettings = () => Promise.resolve(true);
 const switchTransport = () => Promise.resolve({ success: true });
 
-const HardwareCommonConnectSdk = HardwareSdk({
-  eventEmitter,
-  init,
-  call,
-  cancel,
-  dispose,
-  uiResponse,
-  updateSettings,
-  switchTransport,
-});
+export type HardwareCommonConnectSdkOptions = CoreOptions;
+
+export const createHardwareCommonConnectSdk = (options: HardwareCommonConnectSdkOptions = {}) =>
+  HardwareSdk({
+    eventEmitter,
+    init: createInit(options),
+    call,
+    cancel,
+    dispose,
+    uiResponse,
+    updateSettings,
+    switchTransport,
+  });
+
+const HardwareCommonConnectSdk = createHardwareCommonConnectSdk();
 
 export default HardwareCommonConnectSdk;

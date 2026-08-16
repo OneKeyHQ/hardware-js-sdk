@@ -10,6 +10,10 @@ export type { LowLevelCoreApi, LowLevelInjectApi } from './lowLevelInject';
 export type { TopLevelInjectApi } from './topLevelInject';
 
 export { default as Core, init as initCore, switchTransport } from './core';
+export type { CoreOptions } from './core';
+export type { CoreMethodConstructor, CoreMethodExtension } from './api/methodExtension';
+export { BaseMethod as CoreExtensionBaseMethod } from './api/BaseMethod';
+export type { Device as CoreExtensionDevice } from './device/Device';
 
 export * from './constants';
 export * from './utils';

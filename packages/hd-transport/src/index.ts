@@ -58,6 +58,7 @@ export * from './protocols/v2/session';
 export * from './protocols/v2/link-manager';
 export * from './protocols/v2/ble-frame-writer';
 export * from './protocols/v2/usb-transport-base';
+export * from './serialization/protobuf/schema-extension';
 
 export default {
   check,

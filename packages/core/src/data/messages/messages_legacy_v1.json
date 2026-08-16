@@ -3117,67 +3117,6 @@
         }
       }
     },
-    "CosiCommit": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "data": {
-          "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "CosiCommitment": {
-      "fields": {
-        "commitment": {
-          "type": "bytes",
-          "id": 1
-        },
-        "pubkey": {
-          "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "CosiSign": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "data": {
-          "type": "bytes",
-          "id": 2
-        },
-        "global_commitment": {
-          "type": "bytes",
-          "id": 3
-        },
-        "global_pubkey": {
-          "type": "bytes",
-          "id": 4
-        }
-      }
-    },
-    "CosiSignature": {
-      "fields": {
-        "signature": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
     "BatchGetPublickeys": {
       "fields": {
         "ecdsa_curve_name": {
@@ -3213,225 +3152,6 @@
         "public_keys": {
           "rule": "repeated",
           "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "DebugLinkDecision": {
-      "fields": {
-        "yes_no": {
-          "type": "bool",
-          "id": 1
-        },
-        "swipe": {
-          "type": "DebugSwipeDirection",
-          "id": 2
-        },
-        "input": {
-          "type": "string",
-          "id": 3
-        },
-        "x": {
-          "type": "uint32",
-          "id": 4
-        },
-        "y": {
-          "type": "uint32",
-          "id": 5
-        },
-        "wait": {
-          "type": "bool",
-          "id": 6
-        },
-        "hold_ms": {
-          "type": "uint32",
-          "id": 7
-        }
-      },
-      "nested": {
-        "DebugSwipeDirection": {
-          "values": {
-            "UP": 0,
-            "DOWN": 1,
-            "LEFT": 2,
-            "RIGHT": 3
-          }
-        }
-      }
-    },
-    "DebugLinkLayout": {
-      "fields": {
-        "lines": {
-          "rule": "repeated",
-          "type": "string",
-          "id": 1
-        }
-      }
-    },
-    "DebugLinkReseedRandom": {
-      "fields": {
-        "value": {
-          "type": "uint32",
-          "id": 1
-        }
-      }
-    },
-    "DebugLinkRecordScreen": {
-      "fields": {
-        "target_directory": {
-          "type": "string",
-          "id": 1
-        }
-      }
-    },
-    "DebugLinkGetState": {
-      "fields": {
-        "wait_word_list": {
-          "type": "bool",
-          "id": 1
-        },
-        "wait_word_pos": {
-          "type": "bool",
-          "id": 2
-        },
-        "wait_layout": {
-          "type": "bool",
-          "id": 3
-        }
-      }
-    },
-    "DebugLinkState": {
-      "fields": {
-        "layout": {
-          "type": "bytes",
-          "id": 1
-        },
-        "pin": {
-          "type": "string",
-          "id": 2
-        },
-        "matrix": {
-          "type": "string",
-          "id": 3
-        },
-        "mnemonic_secret": {
-          "type": "bytes",
-          "id": 4
-        },
-        "node": {
-          "type": "HDNodeType",
-          "id": 5
-        },
-        "passphrase_protection": {
-          "type": "bool",
-          "id": 6
-        },
-        "reset_word": {
-          "type": "string",
-          "id": 7
-        },
-        "reset_entropy": {
-          "type": "bytes",
-          "id": 8
-        },
-        "recovery_fake_word": {
-          "type": "string",
-          "id": 9
-        },
-        "recovery_word_pos": {
-          "type": "uint32",
-          "id": 10
-        },
-        "reset_word_pos": {
-          "type": "uint32",
-          "id": 11
-        },
-        "mnemonic_type": {
-          "type": "BackupType",
-          "id": 12
-        },
-        "layout_lines": {
-          "rule": "repeated",
-          "type": "string",
-          "id": 13
-        }
-      }
-    },
-    "DebugLinkStop": {
-      "fields": {}
-    },
-    "DebugLinkLog": {
-      "fields": {
-        "level": {
-          "type": "uint32",
-          "id": 1
-        },
-        "bucket": {
-          "type": "string",
-          "id": 2
-        },
-        "text": {
-          "type": "string",
-          "id": 3
-        }
-      }
-    },
-    "DebugLinkMemoryRead": {
-      "fields": {
-        "address": {
-          "type": "uint32",
-          "id": 1
-        },
-        "length": {
-          "type": "uint32",
-          "id": 2
-        }
-      }
-    },
-    "DebugLinkMemory": {
-      "fields": {
-        "memory": {
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "DebugLinkMemoryWrite": {
-      "fields": {
-        "address": {
-          "type": "uint32",
-          "id": 1
-        },
-        "memory": {
-          "type": "bytes",
-          "id": 2
-        },
-        "flash": {
-          "type": "bool",
-          "id": 3
-        }
-      }
-    },
-    "DebugLinkFlashErase": {
-      "fields": {
-        "sector": {
-          "type": "uint32",
-          "id": 1
-        }
-      }
-    },
-    "DebugLinkEraseSdCard": {
-      "fields": {
-        "format": {
-          "type": "bool",
-          "id": 1
-        }
-      }
-    },
-    "DebugLinkWatchLayout": {
-      "fields": {
-        "watch": {
-          "type": "bool",
           "id": 1
         }
       }
@@ -5306,50 +5026,6 @@
     "WipeDevice": {
       "fields": {}
     },
-    "LoadDevice": {
-      "fields": {
-        "mnemonics": {
-          "rule": "repeated",
-          "type": "string",
-          "id": 1
-        },
-        "pin": {
-          "type": "string",
-          "id": 3
-        },
-        "passphrase_protection": {
-          "type": "bool",
-          "id": 4
-        },
-        "language": {
-          "type": "string",
-          "id": 5,
-          "options": {
-            "default": "en-US"
-          }
-        },
-        "label": {
-          "type": "string",
-          "id": 6
-        },
-        "skip_checksum": {
-          "type": "bool",
-          "id": 7
-        },
-        "u2f_counter": {
-          "type": "uint32",
-          "id": 8
-        },
-        "needs_backup": {
-          "type": "bool",
-          "id": 9
-        },
-        "no_backup": {
-          "type": "bool",
-          "id": 10
-        }
-      }
-    },
     "ResetDevice": {
       "fields": {
         "display_random": {
@@ -5697,25 +5373,6 @@
         }
       }
     },
-    "DeviceInfoSettings": {
-      "fields": {
-        "serial_no": {
-          "type": "string",
-          "id": 1
-        },
-        "cpu_info": {
-          "type": "string",
-          "id": 2
-        },
-        "pre_firmware": {
-          "type": "string",
-          "id": 3
-        }
-      }
-    },
-    "GetDeviceInfo": {
-      "fields": {}
-    },
     "DeviceInfo": {
       "fields": {
         "serial_no": {
@@ -5750,15 +5407,6 @@
     "SEPublicKey": {
       "fields": {
         "public_key": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "WriteSEPublicCert": {
-      "fields": {
-        "public_cert": {
           "rule": "required",
           "type": "bytes",
           "id": 1
@@ -6876,70 +6524,6 @@
     },
     "MoneroLiveRefreshFinalAck": {
       "fields": {}
-    },
-    "DebugMoneroDiagRequest": {
-      "fields": {
-        "ins": {
-          "type": "uint64",
-          "id": 1
-        },
-        "p1": {
-          "type": "uint64",
-          "id": 2
-        },
-        "p2": {
-          "type": "uint64",
-          "id": 3
-        },
-        "pd": {
-          "rule": "repeated",
-          "type": "uint64",
-          "id": 4,
-          "options": {
-            "packed": false
-          }
-        },
-        "data1": {
-          "type": "bytes",
-          "id": 5
-        },
-        "data2": {
-          "type": "bytes",
-          "id": 6
-        }
-      }
-    },
-    "DebugMoneroDiagAck": {
-      "fields": {
-        "ins": {
-          "type": "uint64",
-          "id": 1
-        },
-        "p1": {
-          "type": "uint64",
-          "id": 2
-        },
-        "p2": {
-          "type": "uint64",
-          "id": 3
-        },
-        "pd": {
-          "rule": "repeated",
-          "type": "uint64",
-          "id": 4,
-          "options": {
-            "packed": false
-          }
-        },
-        "data1": {
-          "type": "bytes",
-          "id": 5
-        },
-        "data2": {
-          "type": "bytes",
-          "id": 6
-        }
-      }
     },
     "NearGetAddress": {
       "fields": {
@@ -9081,88 +8665,6 @@
         }
       }
     },
-    "WebAuthnListResidentCredentials": {
-      "fields": {}
-    },
-    "WebAuthnAddResidentCredential": {
-      "fields": {
-        "credential_id": {
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "WebAuthnRemoveResidentCredential": {
-      "fields": {
-        "index": {
-          "type": "uint32",
-          "id": 1
-        }
-      }
-    },
-    "WebAuthnCredentials": {
-      "fields": {
-        "credentials": {
-          "rule": "repeated",
-          "type": "WebAuthnCredential",
-          "id": 1
-        }
-      },
-      "nested": {
-        "WebAuthnCredential": {
-          "fields": {
-            "index": {
-              "type": "uint32",
-              "id": 1
-            },
-            "id": {
-              "type": "bytes",
-              "id": 2
-            },
-            "rp_id": {
-              "type": "string",
-              "id": 3
-            },
-            "rp_name": {
-              "type": "string",
-              "id": 4
-            },
-            "user_id": {
-              "type": "bytes",
-              "id": 5
-            },
-            "user_name": {
-              "type": "string",
-              "id": 6
-            },
-            "user_display_name": {
-              "type": "string",
-              "id": 7
-            },
-            "creation_time": {
-              "type": "uint32",
-              "id": 8
-            },
-            "hmac_secret": {
-              "type": "bool",
-              "id": 9
-            },
-            "use_sign_count": {
-              "type": "bool",
-              "id": 10
-            },
-            "algorithm": {
-              "type": "sint32",
-              "id": 11
-            },
-            "curve": {
-              "type": "sint32",
-              "id": 12
-            }
-          }
-        }
-      }
-    },
     "wire_in": {
       "type": "bool",
       "id": 50002,
@@ -9252,7 +8754,6 @@
         "MessageType_WipeDevice": 5,
         "MessageType_GetEntropy": 9,
         "MessageType_Entropy": 10,
-        "MessageType_LoadDevice": 13,
         "MessageType_ResetDevice": 14,
         "MessageType_Features": 17,
         "MessageType_PinMatrixRequest": 18,
@@ -9312,26 +8813,8 @@
         "MessageType_SignedIdentity": 54,
         "MessageType_GetECDHSessionKey": 61,
         "MessageType_ECDHSessionKey": 62,
-        "MessageType_CosiCommit": 71,
-        "MessageType_CosiCommitment": 72,
-        "MessageType_CosiSign": 73,
-        "MessageType_CosiSignature": 74,
         "MessageType_BatchGetPublickeys": 10016,
         "MessageType_EcdsaPublicKeys": 10017,
-        "MessageType_DebugLinkDecision": 100,
-        "MessageType_DebugLinkGetState": 101,
-        "MessageType_DebugLinkState": 102,
-        "MessageType_DebugLinkStop": 103,
-        "MessageType_DebugLinkLog": 104,
-        "MessageType_DebugLinkMemoryRead": 110,
-        "MessageType_DebugLinkMemory": 111,
-        "MessageType_DebugLinkMemoryWrite": 112,
-        "MessageType_DebugLinkFlashErase": 113,
-        "MessageType_DebugLinkLayout": 9001,
-        "MessageType_DebugLinkReseedRandom": 9002,
-        "MessageType_DebugLinkRecordScreen": 9003,
-        "MessageType_DebugLinkEraseSdCard": 9005,
-        "MessageType_DebugLinkWatchLayout": 9006,
         "MessageType_EmmcFixPermission": 30100,
         "MessageType_EmmcPath": 30101,
         "MessageType_EmmcPathInfo": 30102,
@@ -9454,8 +8937,6 @@
         "MessageType_MoneroAddress": 541,
         "MessageType_MoneroGetWatchKey": 542,
         "MessageType_MoneroWatchKey": 543,
-        "MessageType_DebugMoneroDiagRequest": 546,
-        "MessageType_DebugMoneroDiagAck": 547,
         "MessageType_MoneroGetTxKeyRequest": 550,
         "MessageType_MoneroGetTxKeyAck": 551,
         "MessageType_MoneroLiveRefreshStartRequest": 552,
@@ -9499,10 +8980,6 @@
         "MessageType_AptosSignedTx": 10603,
         "MessageType_AptosSignMessage": 10604,
         "MessageType_AptosMessageSignature": 10605,
-        "MessageType_WebAuthnListResidentCredentials": 800,
-        "MessageType_WebAuthnCredentials": 801,
-        "MessageType_WebAuthnAddResidentCredential": 802,
-        "MessageType_WebAuthnRemoveResidentCredential": 803,
         "MessageType_BixinSeedOperate": 901,
         "MessageType_BixinMessageSE": 902,
         "MessageType_BixinOutMessageSE": 904,
@@ -9572,12 +9049,9 @@
         "MessageType_NexaTxInputRequest": 11404,
         "MessageType_NexaTxInputAck": 11405,
         "MessageType_DeviceBackToBoot": 903,
-        "MessageType_DeviceInfoSettings": 10001,
-        "MessageType_GetDeviceInfo": 10002,
         "MessageType_DeviceInfo": 10003,
         "MessageType_ReadSEPublicKey": 10004,
         "MessageType_SEPublicKey": 10005,
-        "MessageType_WriteSEPublicCert": 10006,
         "MessageType_ReadSEPublicCert": 10007,
         "MessageType_SEPublicCert": 10008,
         "MessageType_SpiFlashWrite": 10009,

@@ -1,4 +1,5 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { mergeProtobufSchemas } from '@onekeyfe/hd-transport';
 
 import DataManager from './DataManager';
 import { LoggerNames, getLogger } from '../utils';
@@ -6,9 +7,14 @@ import { LoggerNames, getLogger } from '../utils';
 import { DevicePool } from '../device/DevicePool';
 import { getSupportProtocolV1MessageSchema } from '../utils/deviceFeaturesUtils';
 
+import type {
+  LowlevelTransportSharedPlugin,
+  ProtobufSchema,
+  Transport,
+} from '@onekeyfe/hd-transport';
 import type { ProtocolV1MessageSchema } from './DataManager';
-import type { LowlevelTransportSharedPlugin, Transport } from '@onekeyfe/hd-transport';
 import type { Features } from '../types';
+import type { CoreMethodExtension } from '../api/methodExtension';
 
 const Log = getLogger(LoggerNames.Transport);
 const BleLogger = getLogger(LoggerNames.HdBleTransport);
@@ -37,9 +43,31 @@ export default class TransportManager {
 
   static plugin: LowlevelTransportSharedPlugin | null = null;
 
+  static protobufSchemaExtensions: Partial<
+    Record<ProtocolV1MessageSchema | 'v2Schema', ProtobufSchema[]>
+  > = {};
+
+  static setMethodExtensions(extensions: readonly CoreMethodExtension[] = []) {
+    this.protobufSchemaExtensions = {};
+    extensions.forEach(extension => {
+      Object.entries(extension.protobufSchemas ?? {}).forEach(([schema, value]) => {
+        if (!value) return;
+        const key = schema as ProtocolV1MessageSchema | 'v2Schema';
+        (this.protobufSchemaExtensions[key] ??= []).push(value);
+      });
+    });
+  }
+
+  static getMessages(schema: ProtocolV1MessageSchema | 'v2Schema') {
+    return mergeProtobufSchemas(
+      DataManager.getProtobufMessages(schema) as unknown as ProtobufSchema,
+      this.protobufSchemaExtensions[schema]
+    );
+  }
+
   static load() {
     Log.debug('transport manager load');
-    this.defaultMessages = DataManager.getProtobufMessages();
+    this.defaultMessages = this.getMessages('v1CurrentSchema');
     this.currentMessages = this.defaultMessages;
     this.protocolV1MessageSchema = 'v1CurrentSchema';
   }
@@ -100,7 +128,18 @@ export default class TransportManager {
       return;
     }
 
-    const { protocolV1MessageSchema, messages } = getSupportProtocolV1MessageSchema(features);
+    const { protocolV1MessageSchema, messages: productionMessages } =
+      getSupportProtocolV1MessageSchema(features);
+    if (this.protocolV1MessageSchema === protocolV1MessageSchema) {
+      return;
+    }
+
+    const messages = productionMessages
+      ? mergeProtobufSchemas(
+          productionMessages as unknown as ProtobufSchema,
+          this.protobufSchemaExtensions[protocolV1MessageSchema]
+        )
+      : productionMessages;
 
     if (this.currentMessages === messages || !messages) {
       return;
@@ -154,7 +193,7 @@ export default class TransportManager {
   }
 
   private static async configureProtocolV2Messages() {
-    const protocolV2Messages = DataManager.getProtobufMessages('v2Schema');
+    const protocolV2Messages = this.getMessages('v2Schema');
     const { configureProtocolV2 } = this.transport;
     if (protocolV2Messages && typeof configureProtocolV2 === 'function') {
       await configureProtocolV2.call(this.transport, JSON.stringify(protocolV2Messages));

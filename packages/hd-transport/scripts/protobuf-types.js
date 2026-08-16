@@ -15,7 +15,11 @@ const coreMessagesJsonPath = path.join(__dirname, '../../core/src/data/messages/
 const json = readJson(
   fs.existsSync(localMessagesJsonPath) ? localMessagesJsonPath : coreMessagesJsonPath
 );
-const optionalJsonFiles = ['../messages-protocol-v2.json'];
+const optionalJsonFiles = [
+  '../messages-protocol-v2.json',
+  '../../hd-test-api/src/protobuf/messages-v1.json',
+  '../../hd-test-api/src/protobuf/messages-protocol-v2.json',
+];
 const OPTIONAL_DUPLICATE_TYPE_ALIASES = {
   DeviceInfo: 'ProtocolV2DeviceInfo',
 };

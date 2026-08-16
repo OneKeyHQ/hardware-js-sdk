@@ -427,6 +427,24 @@ export class DeviceCommands {
     return response;
   }
 
+  /**
+   * Typed protobuf call boundary for separately published Core method extensions.
+   * Runtime validation remains identical to typedCall; only the compile-time message registry is external.
+   */
+  async typedCallExtension<Request extends Record<string, unknown>, Response>(
+    type: string,
+    resType: string | string[],
+    msg?: Request,
+    options?: TransportCallOptions
+  ): Promise<{ type: string; message: Response }> {
+    return this.typedCall(
+      type as MessageKey,
+      resType as MessageKey,
+      msg as MessageType[MessageKey],
+      options
+    ) as unknown as Promise<{ type: string; message: Response }>;
+  }
+
   async _commonCall(
     type: MessageKey,
     msg?: DefaultMessageResponse['message'],

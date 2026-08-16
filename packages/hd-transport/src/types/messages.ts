@@ -2851,16 +2851,6 @@ export type BixinBackupDeviceAck = {
   mnemonics: string;
 };
 
-// DeviceInfoSettings
-export type DeviceInfoSettings = {
-  serial_no?: string;
-  cpu_info?: string;
-  pre_firmware?: string;
-};
-
-// GetDeviceInfo
-export type GetDeviceInfo = {};
-
 // DeviceInfo
 export type DeviceInfo = {
   serial_no?: string;
@@ -2877,11 +2867,6 @@ export type ReadSEPublicKey = {};
 // SEPublicKey
 export type SEPublicKey = {
   public_key: string;
-};
-
-// WriteSEPublicCert
-export type WriteSEPublicCert = {
-  public_cert: string;
 };
 
 // ReadSEPublicCert
@@ -4619,11 +4604,6 @@ export type Nonce = {
   nonce: string;
 };
 
-// WriteSEPrivateKey
-export type WriteSEPrivateKey = {
-  private_key: string;
-};
-
 // UnlockPath
 export type UnlockPath = {
   address_n: number[];
@@ -4737,76 +4717,9 @@ export type DeviceSettingsPageShow = {
   field_name?: string;
 };
 
-// DeviceCertificate
-export type DeviceCertificate = {
-  cert_and_pubkey: string;
-  private_key?: string;
-};
-
-// DeviceCertificateWrite
-export type DeviceCertificateWrite = {
-  cert: DeviceCertificate;
-};
-
-// DeviceCertificateRead
-export type DeviceCertificateRead = {};
-
-// DeviceCertificateSignature
-export type DeviceCertificateSignature = {
-  data: string;
-};
-
-// DeviceCertificateSign
-export type DeviceCertificateSign = {
-  data: string;
-};
-
 // DeviceMiscUsbMscControl
 export type DeviceMiscUsbMscControl = {
   enable: boolean;
-};
-
-export enum DeviceFactoryAck {
-  FACTORY_ACK_SUCCESS = 0,
-  FACTORY_ACK_FAIL = 1,
-}
-
-// DeviceFactoryInfoManufactureTime
-export type DeviceFactoryInfoManufactureTime = {
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  second: number;
-};
-
-// DeviceFactoryInfo
-export type DeviceFactoryInfo = {
-  version?: number;
-  serial_number?: string;
-  burn_in_completed?: boolean;
-  factory_test_completed?: boolean;
-  manufacture_time?: DeviceFactoryInfoManufactureTime;
-};
-
-// DeviceFactoryInfoSet
-export type DeviceFactoryInfoSet = {
-  info: DeviceFactoryInfo;
-};
-
-// DeviceFactoryInfoGet
-export type DeviceFactoryInfoGet = {};
-
-// DeviceFactoryPermanentLock
-export type DeviceFactoryPermanentLock = {
-  check_a: string;
-  check_b: string;
-};
-
-// DeviceFactoryTest
-export type DeviceFactoryTest = {
-  burn_in_test: boolean;
 };
 
 export enum DeviceFirmwareTargetType {
@@ -4895,6 +4808,15 @@ export enum DeviceSEState {
   APP = 85,
 }
 
+export enum ResourceBundleType {
+  IMAGES = 0,
+  ANIMATION = 1,
+  WALLPAPER = 2,
+  TRANSLATIONS = 3,
+  ROOBERT = 4,
+  NOTO = 5,
+}
+
 // DeviceFirmwareImageInfo
 export type DeviceFirmwareImageInfo = {
   version?: string;
@@ -4969,6 +4891,21 @@ export type ProtocolV2DeviceInfo = {
   se2?: DeviceSEInfo;
   se3?: DeviceSEInfo;
   se4?: DeviceSEInfo;
+};
+
+// ResourceInventoryGet
+export type ResourceInventoryGet = {};
+
+// ResourceInventoryItem
+export type ResourceInventoryItem = {
+  type: ResourceBundleType;
+  size: number;
+  header_hash: string;
+};
+
+// ResourceInventory
+export type ResourceInventory = {
+  items: ResourceInventoryItem[];
 };
 
 export enum DeviceSessionErrorCode {
@@ -5284,6 +5221,197 @@ export enum Enum_ProtocolV2Capability {
   Capability_EthereumTypedData = 1000,
 }
 export type ProtocolV2Capability = keyof typeof Enum_ProtocolV2Capability;
+
+// CosiCommit
+export type CosiCommit = {
+  address_n: number[];
+  data?: string;
+};
+
+// CosiCommitment
+export type CosiCommitment = {
+  commitment?: string;
+  pubkey?: string;
+};
+
+// CosiSign
+export type CosiSign = {
+  address_n: number[];
+  data?: string;
+  global_commitment?: string;
+  global_pubkey?: string;
+};
+
+// CosiSignature
+export type CosiSignature = {
+  signature: string;
+};
+
+export enum DebugSwipeDirection {
+  UP = 0,
+  DOWN = 1,
+  LEFT = 2,
+  RIGHT = 3,
+}
+
+// DebugLinkDecision
+export type DebugLinkDecision = {
+  yes_no?: boolean;
+  swipe?: DebugSwipeDirection;
+  input?: string;
+  x?: number;
+  y?: number;
+  wait?: boolean;
+  hold_ms?: number;
+};
+
+// DebugLinkLayout
+export type DebugLinkLayout = {
+  lines: string[];
+};
+
+// DebugLinkReseedRandom
+export type DebugLinkReseedRandom = {
+  value?: number;
+};
+
+// DebugLinkRecordScreen
+export type DebugLinkRecordScreen = {
+  target_directory?: string;
+};
+
+// DebugLinkGetState
+export type DebugLinkGetState = {
+  wait_word_list?: boolean;
+  wait_word_pos?: boolean;
+  wait_layout?: boolean;
+};
+
+// DebugLinkState
+export type DebugLinkState = {
+  layout?: string;
+  pin?: string;
+  matrix?: string;
+  mnemonic_secret?: string;
+  node?: HDNodeType;
+  passphrase_protection?: boolean;
+  reset_word?: string;
+  reset_entropy?: string;
+  recovery_fake_word?: string;
+  recovery_word_pos?: number;
+  reset_word_pos?: number;
+  mnemonic_type?: BackupType;
+  layout_lines: string[];
+};
+
+// DebugLinkStop
+export type DebugLinkStop = {};
+
+// DebugLinkLog
+export type DebugLinkLog = {
+  level?: number;
+  bucket?: string;
+  text?: string;
+};
+
+// DebugLinkMemoryRead
+export type DebugLinkMemoryRead = {
+  address?: number;
+  length?: number;
+};
+
+// DebugLinkMemory
+export type DebugLinkMemory = {
+  memory?: string;
+};
+
+// DebugLinkMemoryWrite
+export type DebugLinkMemoryWrite = {
+  address?: number;
+  memory?: string;
+  flash?: boolean;
+};
+
+// DebugLinkFlashErase
+export type DebugLinkFlashErase = {
+  sector?: number;
+};
+
+// DebugLinkEraseSdCard
+export type DebugLinkEraseSdCard = {
+  format?: boolean;
+};
+
+// DebugLinkWatchLayout
+export type DebugLinkWatchLayout = {
+  watch?: boolean;
+};
+
+// LoadDevice
+export type LoadDevice = {
+  mnemonics: string[];
+  pin?: string;
+  passphrase_protection?: boolean;
+  language?: string;
+  label?: string;
+  skip_checksum?: boolean;
+  u2f_counter?: number;
+  needs_backup?: boolean;
+  no_backup?: boolean;
+};
+
+// DebugMoneroDiagRequest
+export type DebugMoneroDiagRequest = {
+  ins?: number;
+  p1?: number;
+  p2?: number;
+  pd: number[];
+  data1?: string;
+  data2?: string;
+};
+
+// DebugMoneroDiagAck
+export type DebugMoneroDiagAck = {
+  ins?: number;
+  p1?: number;
+  p2?: number;
+  pd: number[];
+  data1?: string;
+  data2?: string;
+};
+
+// WebAuthnListResidentCredentials
+export type WebAuthnListResidentCredentials = {};
+
+// WebAuthnAddResidentCredential
+export type WebAuthnAddResidentCredential = {
+  credential_id?: string;
+};
+
+// WebAuthnRemoveResidentCredential
+export type WebAuthnRemoveResidentCredential = {
+  index?: number;
+};
+
+export type WebAuthnCredential = {
+  index?: number;
+  id?: string;
+  rp_id?: string;
+  rp_name?: string;
+  user_id?: string;
+  user_name?: string;
+  user_display_name?: string;
+  creation_time?: number;
+  hmac_secret?: boolean;
+  use_sign_count?: boolean;
+  algorithm?: number;
+  curve?: number;
+};
+
+// WebAuthnCredentials
+export type WebAuthnCredentials = {
+  credentials: WebAuthnCredential[];
+};
 
 // custom connect definitions
 export type MessageType = {
@@ -5617,12 +5745,9 @@ export type MessageType = {
   BixinLoadDevice: BixinLoadDevice;
   BixinBackupDevice: BixinBackupDevice;
   BixinBackupDeviceAck: BixinBackupDeviceAck;
-  DeviceInfoSettings: DeviceInfoSettings;
-  GetDeviceInfo: GetDeviceInfo;
   DeviceInfo: DeviceInfo | ProtocolV2DeviceInfo;
   ReadSEPublicKey: ReadSEPublicKey;
   SEPublicKey: SEPublicKey;
-  WriteSEPublicCert: WriteSEPublicCert;
   ReadSEPublicCert: ReadSEPublicCert;
   SEPublicCert: SEPublicCert;
   SpiFlashWrite: SpiFlashWrite;
@@ -5864,7 +5989,6 @@ export type MessageType = {
   FirmwareHash: FirmwareHash;
   GetNonce: GetNonce;
   Nonce: Nonce;
-  WriteSEPrivateKey: WriteSEPrivateKey;
   UnlockPath: UnlockPath;
   UnlockedPathRequest: UnlockedPathRequest;
   UiAnimationRequest: UiAnimationRequest;
@@ -5875,18 +5999,7 @@ export type MessageType = {
   DeviceSettingsGet: DeviceSettingsGet;
   DeviceSettingsSet: DeviceSettingsSet;
   DeviceSettingsPageShow: DeviceSettingsPageShow;
-  DeviceCertificate: DeviceCertificate;
-  DeviceCertificateWrite: DeviceCertificateWrite;
-  DeviceCertificateRead: DeviceCertificateRead;
-  DeviceCertificateSignature: DeviceCertificateSignature;
-  DeviceCertificateSign: DeviceCertificateSign;
   DeviceMiscUsbMscControl: DeviceMiscUsbMscControl;
-  DeviceFactoryInfoManufactureTime: DeviceFactoryInfoManufactureTime;
-  DeviceFactoryInfo: DeviceFactoryInfo;
-  DeviceFactoryInfoSet: DeviceFactoryInfoSet;
-  DeviceFactoryInfoGet: DeviceFactoryInfoGet;
-  DeviceFactoryPermanentLock: DeviceFactoryPermanentLock;
-  DeviceFactoryTest: DeviceFactoryTest;
   DeviceFirmwareTarget: DeviceFirmwareTarget;
   DeviceFirmwareUpdateRequest: DeviceFirmwareUpdateRequest;
   DeviceFirmwareUpdateRecord: DeviceFirmwareUpdateRecord;
@@ -5901,6 +6014,9 @@ export type MessageType = {
   DeviceInfoTargets: DeviceInfoTargets;
   DeviceInfoTypes: DeviceInfoTypes;
   DeviceInfoGet: DeviceInfoGet;
+  ResourceInventoryGet: ResourceInventoryGet;
+  ResourceInventoryItem: ResourceInventoryItem;
+  ResourceInventory: ResourceInventory;
   DeviceSessionGet: DeviceSessionGet;
   DeviceSession: DeviceSession;
   DeviceSessionAskPin: DeviceSessionAskPin;
@@ -5931,6 +6047,32 @@ export type MessageType = {
   ViewRawData: ViewRawData;
   ViewSignPage: ViewSignPage;
   ViewVerifyPage: ViewVerifyPage;
+  CosiCommit: CosiCommit;
+  CosiCommitment: CosiCommitment;
+  CosiSign: CosiSign;
+  CosiSignature: CosiSignature;
+  DebugLinkDecision: DebugLinkDecision;
+  DebugLinkLayout: DebugLinkLayout;
+  DebugLinkReseedRandom: DebugLinkReseedRandom;
+  DebugLinkRecordScreen: DebugLinkRecordScreen;
+  DebugLinkGetState: DebugLinkGetState;
+  DebugLinkState: DebugLinkState;
+  DebugLinkStop: DebugLinkStop;
+  DebugLinkLog: DebugLinkLog;
+  DebugLinkMemoryRead: DebugLinkMemoryRead;
+  DebugLinkMemory: DebugLinkMemory;
+  DebugLinkMemoryWrite: DebugLinkMemoryWrite;
+  DebugLinkFlashErase: DebugLinkFlashErase;
+  DebugLinkEraseSdCard: DebugLinkEraseSdCard;
+  DebugLinkWatchLayout: DebugLinkWatchLayout;
+  LoadDevice: LoadDevice;
+  DebugMoneroDiagRequest: DebugMoneroDiagRequest;
+  DebugMoneroDiagAck: DebugMoneroDiagAck;
+  WebAuthnListResidentCredentials: WebAuthnListResidentCredentials;
+  WebAuthnAddResidentCredential: WebAuthnAddResidentCredential;
+  WebAuthnRemoveResidentCredential: WebAuthnRemoveResidentCredential;
+  WebAuthnCredential: WebAuthnCredential;
+  WebAuthnCredentials: WebAuthnCredentials;
 };
 
 export type MessageKey = keyof MessageType;

@@ -1,0 +1,20 @@
+import { CoreExtensionBaseMethod as BaseMethod, UI_REQUEST } from '@onekeyfe/hd-core';
+
+import type { EmmcFileRead as HardwareEmmcFileRead } from '@onekeyfe/hd-transport';
+
+export default class EmmcFileRead extends BaseMethod<HardwareEmmcFileRead> {
+  init() {
+    this.useDevicePassphraseState = false;
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.params = {
+      file: this.payload.file,
+      ui_percentage: this.payload.ui_percentage,
+    };
+  }
+
+  async run() {
+    const res = await this.device.commands.typedCall('EmmcFileRead', 'EmmcFile', this.params);
+
+    return Promise.resolve(res.message);
+  }
+}

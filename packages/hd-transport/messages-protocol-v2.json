@@ -75,7 +75,6 @@
         "MessageType_WipeDevice": 5,
         "MessageType_GetEntropy": 9,
         "MessageType_Entropy": 10,
-        "MessageType_LoadDevice": 13,
         "MessageType_ResetDevice": 14,
         "MessageType_SetBusy": 16,
         "MessageType_Features": 17,
@@ -134,10 +133,6 @@
         "MessageType_SignedIdentity": 54,
         "MessageType_GetECDHSessionKey": 61,
         "MessageType_ECDHSessionKey": 62,
-        "MessageType_CosiCommit": 71,
-        "MessageType_CosiCommitment": 72,
-        "MessageType_CosiSign": 73,
-        "MessageType_CosiSignature": 74,
         "MessageType_BatchGetPublickeys": 10016,
         "MessageType_EcdsaPublicKeys": 10017,
         "MessageType_EthereumGetPublicKey": 450,
@@ -271,8 +266,6 @@
         "MessageType_MoneroAddress": 541,
         "MessageType_MoneroGetWatchKey": 542,
         "MessageType_MoneroWatchKey": 543,
-        "MessageType_DebugMoneroDiagRequest": 546,
-        "MessageType_DebugMoneroDiagAck": 547,
         "MessageType_MoneroGetTxKeyRequest": 550,
         "MessageType_MoneroGetTxKeyAck": 551,
         "MessageType_MoneroLiveRefreshStartRequest": 552,
@@ -331,10 +324,6 @@
         "MessageType_AptosSignMessage": 10604,
         "MessageType_AptosMessageSignature": 10605,
         "MessageType_AptosSignSIWAMessage": 10606,
-        "MessageType_WebAuthnListResidentCredentials": 800,
-        "MessageType_WebAuthnCredentials": 801,
-        "MessageType_WebAuthnAddResidentCredential": 802,
-        "MessageType_WebAuthnRemoveResidentCredential": 803,
         "MessageType_SolanaGetAddress": 10100,
         "MessageType_SolanaAddress": 10101,
         "MessageType_SolanaSignTx": 10102,
@@ -425,11 +414,6 @@
         "MessageType_NeoAddress": 12302,
         "MessageType_NeoSignTx": 12303,
         "MessageType_NeoSignedTx": 12304,
-        "MessageType_DeviceFactoryInfoSet": 60000,
-        "MessageType_DeviceFactoryInfoGet": 60001,
-        "MessageType_DeviceFactoryInfo": 60002,
-        "MessageType_DeviceFactoryPermanentLock": 60003,
-        "MessageType_DeviceFactoryTest": 60004,
         "MessageType_ProtocolInfoRequest": 60200,
         "MessageType_ProtocolInfo": 60201,
         "MessageType_Ping": 60206,
@@ -440,16 +424,13 @@
         "MessageType_DeviceSettingsGet": 60411,
         "MessageType_DeviceSettingsSet": 60412,
         "MessageType_DeviceSettingsPageShow": 60413,
-        "MessageType_DeviceCertificate": 60420,
-        "MessageType_DeviceCertificateWrite": 60421,
-        "MessageType_DeviceCertificateRead": 60422,
-        "MessageType_DeviceCertificateSignature": 60423,
-        "MessageType_DeviceCertificateSign": 60424,
         "MessageType_DeviceMiscUsbMscControl": 60440,
         "MessageType_DeviceInfoGet": 60600,
         "MessageType_DeviceInfo": 60601,
         "MessageType_DeviceStatusGet": 60602,
         "MessageType_DeviceStatus": 60603,
+        "MessageType_ResourceInventoryGet": 60604,
+        "MessageType_ResourceInventory": 60605,
         "MessageType_FilesystemPermissionFix": 60800,
         "MessageType_FilesystemPathInfo": 60801,
         "MessageType_FilesystemPathInfoQuery": 60802,
@@ -3949,70 +3930,6 @@
         }
       }
     },
-    "CosiCommit": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "data": {
-          "type": "bytes",
-          "id": 2,
-          "options": {
-            "deprecated": true
-          }
-        }
-      }
-    },
-    "CosiCommitment": {
-      "fields": {
-        "commitment": {
-          "type": "bytes",
-          "id": 1
-        },
-        "pubkey": {
-          "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "CosiSign": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "data": {
-          "type": "bytes",
-          "id": 2
-        },
-        "global_commitment": {
-          "type": "bytes",
-          "id": 3
-        },
-        "global_pubkey": {
-          "type": "bytes",
-          "id": 4
-        }
-      }
-    },
-    "CosiSignature": {
-      "fields": {
-        "signature": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
     "BatchGetPublickeys": {
       "fields": {
         "ecdsa_curve_name": {
@@ -6866,50 +6783,6 @@
     "WipeDevice": {
       "fields": {}
     },
-    "LoadDevice": {
-      "fields": {
-        "mnemonics": {
-          "rule": "repeated",
-          "type": "string",
-          "id": 1
-        },
-        "pin": {
-          "type": "string",
-          "id": 3
-        },
-        "passphrase_protection": {
-          "type": "bool",
-          "id": 4
-        },
-        "language": {
-          "type": "string",
-          "id": 5,
-          "options": {
-            "default": "en-US"
-          }
-        },
-        "label": {
-          "type": "string",
-          "id": 6
-        },
-        "skip_checksum": {
-          "type": "bool",
-          "id": 7
-        },
-        "u2f_counter": {
-          "type": "uint32",
-          "id": 8
-        },
-        "needs_backup": {
-          "type": "bool",
-          "id": 9
-        },
-        "no_backup": {
-          "type": "bool",
-          "id": 10
-        }
-      }
-    },
     "ResetDevice": {
       "fields": {
         "display_random": {
@@ -7101,30 +6974,12 @@
         }
       }
     },
-    "WriteSEPrivateKey": {
-      "fields": {
-        "private_key": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
     "ReadSEPublicKey": {
       "fields": {}
     },
     "SEPublicKey": {
       "fields": {
         "public_key": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "WriteSEPublicCert": {
-      "fields": {
-        "public_cert": {
           "rule": "required",
           "type": "bytes",
           "id": 1
@@ -8256,70 +8111,6 @@
     },
     "MoneroLiveRefreshFinalAck": {
       "fields": {}
-    },
-    "DebugMoneroDiagRequest": {
-      "fields": {
-        "ins": {
-          "type": "uint64",
-          "id": 1
-        },
-        "p1": {
-          "type": "uint64",
-          "id": 2
-        },
-        "p2": {
-          "type": "uint64",
-          "id": 3
-        },
-        "pd": {
-          "rule": "repeated",
-          "type": "uint64",
-          "id": 4,
-          "options": {
-            "packed": false
-          }
-        },
-        "data1": {
-          "type": "bytes",
-          "id": 5
-        },
-        "data2": {
-          "type": "bytes",
-          "id": 6
-        }
-      }
-    },
-    "DebugMoneroDiagAck": {
-      "fields": {
-        "ins": {
-          "type": "uint64",
-          "id": 1
-        },
-        "p1": {
-          "type": "uint64",
-          "id": 2
-        },
-        "p2": {
-          "type": "uint64",
-          "id": 3
-        },
-        "pd": {
-          "rule": "repeated",
-          "type": "uint64",
-          "id": 4,
-          "options": {
-            "packed": false
-          }
-        },
-        "data1": {
-          "type": "bytes",
-          "id": 5
-        },
-        "data2": {
-          "type": "bytes",
-          "id": 6
-        }
-      }
     },
     "NearGetAddress": {
       "fields": {
@@ -11415,88 +11206,6 @@
         }
       }
     },
-    "WebAuthnListResidentCredentials": {
-      "fields": {}
-    },
-    "WebAuthnAddResidentCredential": {
-      "fields": {
-        "credential_id": {
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "WebAuthnRemoveResidentCredential": {
-      "fields": {
-        "index": {
-          "type": "uint32",
-          "id": 1
-        }
-      }
-    },
-    "WebAuthnCredentials": {
-      "fields": {
-        "credentials": {
-          "rule": "repeated",
-          "type": "WebAuthnCredential",
-          "id": 1
-        }
-      },
-      "nested": {
-        "WebAuthnCredential": {
-          "fields": {
-            "index": {
-              "type": "uint32",
-              "id": 1
-            },
-            "id": {
-              "type": "bytes",
-              "id": 2
-            },
-            "rp_id": {
-              "type": "string",
-              "id": 3
-            },
-            "rp_name": {
-              "type": "string",
-              "id": 4
-            },
-            "user_id": {
-              "type": "bytes",
-              "id": 5
-            },
-            "user_name": {
-              "type": "string",
-              "id": 6
-            },
-            "user_display_name": {
-              "type": "string",
-              "id": 7
-            },
-            "creation_time": {
-              "type": "uint32",
-              "id": 8
-            },
-            "hmac_secret": {
-              "type": "bool",
-              "id": 9
-            },
-            "use_sign_count": {
-              "type": "bool",
-              "id": 10
-            },
-            "algorithm": {
-              "type": "sint32",
-              "id": 11
-            },
-            "curve": {
-              "type": "sint32",
-              "id": 12
-            }
-          }
-        }
-      }
-    },
     "ProtocolInfoRequest": {
       "fields": {
         "eventless_wallet_session": {
@@ -11711,151 +11420,9 @@
         }
       }
     },
-    "DeviceCertificate": {
-      "fields": {
-        "cert_and_pubkey": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        },
-        "private_key": {
-          "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "DeviceCertificateWrite": {
-      "fields": {
-        "cert": {
-          "rule": "required",
-          "type": "DeviceCertificate",
-          "id": 1
-        }
-      }
-    },
-    "DeviceCertificateRead": {
-      "fields": {}
-    },
-    "DeviceCertificateSignature": {
-      "fields": {
-        "data": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "DeviceCertificateSign": {
-      "fields": {
-        "data": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
     "DeviceMiscUsbMscControl": {
       "fields": {
         "enable": {
-          "rule": "required",
-          "type": "bool",
-          "id": 1
-        }
-      }
-    },
-    "DeviceFactoryAck": {
-      "values": {
-        "FACTORY_ACK_SUCCESS": 0,
-        "FACTORY_ACK_FAIL": 1
-      }
-    },
-    "DeviceFactoryInfoManufactureTime": {
-      "fields": {
-        "year": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        },
-        "month": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 2
-        },
-        "day": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 3
-        },
-        "hour": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 4
-        },
-        "minute": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 5
-        },
-        "second": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 6
-        }
-      }
-    },
-    "DeviceFactoryInfo": {
-      "fields": {
-        "version": {
-          "type": "uint32",
-          "id": 1
-        },
-        "serial_number": {
-          "type": "string",
-          "id": 2
-        },
-        "burn_in_completed": {
-          "type": "bool",
-          "id": 3
-        },
-        "factory_test_completed": {
-          "type": "bool",
-          "id": 4
-        },
-        "manufacture_time": {
-          "type": "DeviceFactoryInfoManufactureTime",
-          "id": 5
-        }
-      }
-    },
-    "DeviceFactoryInfoSet": {
-      "fields": {
-        "info": {
-          "rule": "required",
-          "type": "DeviceFactoryInfo",
-          "id": 1
-        }
-      }
-    },
-    "DeviceFactoryInfoGet": {
-      "fields": {}
-    },
-    "DeviceFactoryPermanentLock": {
-      "fields": {
-        "check_a": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        },
-        "check_b": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "DeviceFactoryTest": {
-      "fields": {
-        "burn_in_test": {
           "rule": "required",
           "type": "bool",
           "id": 1
@@ -11992,6 +11559,16 @@
         "BOOT": 0,
         "APP_FACTORY": 51,
         "APP": 85
+      }
+    },
+    "ResourceBundleType": {
+      "values": {
+        "IMAGES": 0,
+        "ANIMATION": 1,
+        "WALLPAPER": 2,
+        "TRANSLATIONS": 3,
+        "ROOBERT": 4,
+        "NOTO": 5
       }
     },
     "DeviceFirmwareImageInfo": {
@@ -12188,6 +11765,37 @@
         "se4": {
           "type": "DeviceSEInfo",
           "id": 430
+        }
+      }
+    },
+    "ResourceInventoryGet": {
+      "fields": {}
+    },
+    "ResourceInventoryItem": {
+      "fields": {
+        "type": {
+          "rule": "required",
+          "type": "ResourceBundleType",
+          "id": 1
+        },
+        "size": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "header_hash": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "ResourceInventory": {
+      "fields": {
+        "items": {
+          "rule": "repeated",
+          "type": "ResourceInventoryItem",
+          "id": 1
         }
       }
     },

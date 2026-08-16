@@ -40,8 +40,12 @@ else
 fi
 
 V1_TMP_PROTO="$DIST_PATH/messages-tmp.proto"
+V1_FULL_JSON="$PARENT_PATH/messages-v1-full.json"
 V2_TMP_PROTO="$PARENT_PATH/messages-protocol-v2-tmp.proto"
-trap 'rm -f "$V1_TMP_PROTO" "$V2_TMP_PROTO"' EXIT
+V2_FULL_JSON="$PARENT_PATH/messages-protocol-v2-full.json"
+V1_EXTENSION_JSON="$REPO_ROOT/packages/hd-test-api/src/protobuf/messages-v1.json"
+V2_EXTENSION_JSON="$REPO_ROOT/packages/hd-test-api/src/protobuf/messages-protocol-v2.json"
+trap 'rm -f "$V1_TMP_PROTO" "$V1_FULL_JSON" "$V2_TMP_PROTO" "$V2_FULL_JSON"' EXIT
 
 echo "=== Building Protocol V1 messages ==="
 echo 'syntax = "proto2";' > "$V1_TMP_PROTO"
@@ -54,7 +58,12 @@ grep -hv -e '^import ' -e '^syntax' -e '^package' -e 'option java_' "$SRC_PATH"/
 | sed 's/^option /\/\/ option /' \
 | grep -v '    reserved ' >> "$V1_TMP_PROTO"
 
-npx pbjs -t json -p "$DIST_PATH" -o "$DIST_PATH/messages.json" --keep-case "$V1_TMP_PROTO"
+npx pbjs -t json -p "$DIST_PATH" -o "$V1_FULL_JSON" --keep-case "$V1_TMP_PROTO"
+node "$PARENT_PATH/split-protobuf-extensions.js" \
+  "$V1_FULL_JSON" \
+  "$DIST_PATH/messages.json" \
+  "$V1_EXTENSION_JSON" \
+  protocol-v1-extension
 cp "$DIST_PATH/messages.json" "$CORE_MESSAGES_DIR/messages.json"
 
 echo "=== Building Protocol V2 messages ==="
@@ -124,7 +133,11 @@ function removeLastTopLevelMessage(source, name) {
 fs.writeFileSync(protoPath, proto);
 NODE
 
-npx pbjs -t json -p "$PARENT_PATH" -o "$PACKAGE_ROOT/messages-protocol-v2.json" --keep-case "$V2_TMP_PROTO"
+npx pbjs -t json -p "$PARENT_PATH" -o "$V2_FULL_JSON" --keep-case "$V2_TMP_PROTO"
+node "$PARENT_PATH/split-protobuf-extensions.js" \
+  "$V2_FULL_JSON" \
+  "$PACKAGE_ROOT/messages-protocol-v2.json" \
+  "$V2_EXTENSION_JSON"
 cp "$PACKAGE_ROOT/messages-protocol-v2.json" "$CORE_MESSAGES_DIR/messages-protocol-v2.json"
 
 echo "generating type definitions for: $LANG"
@@ -133,6 +146,8 @@ node ./protobuf-types.js "$LANG"
 
 yarn --cwd "$PACKAGE_ROOT" prettier --write "$DIST_PATH/messages.json"
 yarn --cwd "$PACKAGE_ROOT" prettier --write "$CORE_MESSAGES_DIR/messages.json"
+yarn --cwd "$PACKAGE_ROOT" prettier --write "$V1_EXTENSION_JSON"
 yarn --cwd "$PACKAGE_ROOT" prettier --write "$PACKAGE_ROOT/messages-protocol-v2.json"
 yarn --cwd "$PACKAGE_ROOT" prettier --write "$CORE_MESSAGES_DIR/messages-protocol-v2.json"
+yarn --cwd "$PACKAGE_ROOT" prettier --write "$V2_EXTENSION_JSON"
 yarn --cwd "$PACKAGE_ROOT" prettier --write "$PACKAGE_ROOT/src/types/messages.ts"

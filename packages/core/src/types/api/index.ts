@@ -1,20 +1,13 @@
 import type {
   deviceGetOnboardingStatus,
-  deviceProvisionFactoryInfo,
-  deviceReadFactoryCertificate,
-  deviceReadFactoryInfo,
   deviceReboot,
-  deviceSignFactoryChallenge,
   deviceUploadNft,
   deviceUploadWallpaper,
-  deviceWriteFactoryCertificate,
-  testProtocolV2Ping,
   uploadPortfolio,
 } from './protocolV2';
 import type { off, on, removeAllListeners } from './event';
 import type { uiResponse } from './uiResponse';
 import type { init, updateSettings } from './init';
-import type { testInitializeDeviceDuration } from './testInitializeDeviceDuration';
 import type { preInitialize } from './preInitialize';
 import type { getLogs } from './getLogs';
 import type { clearSessionCache } from './sessionCache';
@@ -159,11 +152,7 @@ import type { benfenSignTransaction } from './benfenSignTransaction';
 import type { benfenSignMessage } from './benfenSignMessage';
 import type { neoGetAddress } from './neoGetAddress';
 import type { neoSignTransaction } from './neoSignTransaction';
-import type { deviceInfoSettings } from './deviceInfoSettings';
-import type { deviceGetInfo } from './deviceGetInfo';
-import type { deviceWriteSEPrivateKey } from './deviceWriteSEPrivateKey';
 import type { deviceReadSEPublicCert } from './deviceReadSEPublicCert';
-import type { deviceWriteSEPublicCert } from './deviceWriteSEPublicCert';
 import type { deviceSESignMessage } from './deviceSESignMessage';
 import type { ConnectSettings } from '../settings';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
@@ -178,12 +167,6 @@ export type {
   OpenWalletSessionPayload,
 } from './openWalletSession';
 export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
-export type {
-  DeviceFactoryCertificateWriteParams,
-  DeviceFactoryChallengeSignParams,
-  DeviceFactoryInfoSetParams,
-  TestProtocolV2PingParams,
-} from './protocolV2';
 
 export type CoreApi = {
   /**
@@ -211,11 +194,6 @@ export type CoreApi = {
   getLogs: typeof getLogs;
   clearSessionCache: typeof clearSessionCache;
 
-  /**
-   * Test function
-   */
-  testInitializeDeviceDuration: typeof testInitializeDeviceDuration;
-  testProtocolV2Ping: typeof testProtocolV2Ping;
   preInitialize: typeof preInitialize;
 
   /**
@@ -250,6 +228,8 @@ export type CoreApi = {
   deviceUploadResource: typeof deviceUploadResource;
   deviceSupportFeatures: typeof deviceSupportFeatures;
   deviceVerify: typeof deviceVerify;
+  deviceReadSEPublicCert: typeof deviceReadSEPublicCert;
+  deviceSESignMessage: typeof deviceSESignMessage;
   deviceWipe: typeof deviceWipe;
   deviceFullyUploadResource: typeof deviceFullyUploadResource;
   deviceUpdateBootloader: typeof deviceUpdateBootloader;
@@ -278,11 +258,6 @@ export type CoreApi = {
    */
   deviceReboot: typeof deviceReboot;
   deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
-  deviceProvisionFactoryInfo: typeof deviceProvisionFactoryInfo;
-  deviceReadFactoryInfo: typeof deviceReadFactoryInfo;
-  deviceWriteFactoryCertificate: typeof deviceWriteFactoryCertificate;
-  deviceReadFactoryCertificate: typeof deviceReadFactoryCertificate;
-  deviceSignFactoryChallenge: typeof deviceSignFactoryChallenge;
   deviceUploadNft: typeof deviceUploadNft;
   deviceUploadWallpaper: typeof deviceUploadWallpaper;
   uploadPortfolio: typeof uploadPortfolio;
@@ -493,12 +468,4 @@ export type CoreApi = {
    */
   neoGetAddress: typeof neoGetAddress;
   neoSignTransaction: typeof neoSignTransaction;
-
-  /** Pro Protocol V1 factory API. */
-  deviceInfoSettings: typeof deviceInfoSettings;
-  deviceGetInfo: typeof deviceGetInfo;
-  deviceWriteSEPrivateKey: typeof deviceWriteSEPrivateKey;
-  deviceReadSEPublicCert: typeof deviceReadSEPublicCert;
-  deviceWriteSEPublicCert: typeof deviceWriteSEPublicCert;
-  deviceSESignMessage: typeof deviceSESignMessage;
 };

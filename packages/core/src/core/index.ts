@@ -76,6 +76,7 @@ import type {
   TransportDeviceDisconnectEvent,
 } from '@onekeyfe/hd-transport';
 import type { BaseMethod } from '../api/BaseMethod';
+import type { CoreMethodExtension } from '../api/methodExtension';
 
 const Log = getLogger(LoggerNames.Core);
 const PRE_INITIALIZE_TTL_MS = 60 * 1000;
@@ -86,6 +87,11 @@ const preWarmInflight = new Map<string, Promise<any>>();
 const preWarmDoneAt = new Map<string, number>();
 
 export type CoreContext = ReturnType<Core['getCoreContext']>;
+
+export type CoreOptions = {
+  methodExtensions?: readonly CoreMethodExtension[];
+  allowDestructiveOperations?: boolean;
+};
 
 function hasDeriveCardano(method: BaseMethod): boolean {
   if (
@@ -157,7 +163,10 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   // find api method
   let method!: BaseMethod;
   try {
-    method = findMethod(message as IFrameCallMessage);
+    method = findMethod(message as IFrameCallMessage, {
+      extensions: context.methodExtensions,
+      allowDestructiveOperations: context.allowDestructiveOperations,
+    });
     method.connector = _connector;
     const shouldPostMessage = createUiProgressMessageFilter();
     method.postMessage = event => {
@@ -1501,6 +1510,8 @@ const removeUiPromise = (promise: Deferred<any>) => {
 };
 
 export default class Core extends EventEmitter {
+  private readonly options: CoreOptions;
+
   private tracingContext: SdkTracingContext;
 
   public readonly sdkInstanceId: string;
@@ -1514,8 +1525,9 @@ export default class Core extends EventEmitter {
 
   private methodSynchronize = getSynchronize();
 
-  constructor() {
+  constructor(options: CoreOptions = {}) {
     super();
+    this.options = options;
     this.tracingContext = createSdkTracingContext();
     this.sdkInstanceId = this.tracingContext.sdkInstanceId;
     Log.debug(`[Core] Created SDK instance: ${this.sdkInstanceId}`);
@@ -1524,6 +1536,8 @@ export default class Core extends EventEmitter {
   private getCoreContext() {
     return {
       sdkInstanceId: this.sdkInstanceId,
+      methodExtensions: this.options.methodExtensions ?? [],
+      allowDestructiveOperations: this.options.allowDestructiveOperations === true,
       tracingContext: this.tracingContext,
       requestQueue: this.requestQueue,
       methodSynchronize: this.methodSynchronize,
@@ -1654,8 +1668,8 @@ export default class Core extends EventEmitter {
   }
 }
 
-export const initCore = () => {
-  const core = new Core();
+export const initCore = (options: CoreOptions = {}) => {
+  const core = new Core(options);
   _core = core;
   return core;
 };
@@ -1681,7 +1695,8 @@ const initTransport = (Transport: any, plugin?: LowlevelTransportSharedPlugin) =
 export const init = async (
   settings: ConnectSettings,
   Transport: any,
-  plugin?: LowlevelTransportSharedPlugin
+  plugin?: LowlevelTransportSharedPlugin,
+  options: CoreOptions = {}
 ) => {
   try {
     await DataManager.load(settings);
@@ -1690,7 +1705,8 @@ export const init = async (
     if (DataManager.getSettings('env') !== 'react-native') {
       setLoggerPostMessage(postMessage);
     }
-    initCore();
+    TransportManager.setMethodExtensions(options.methodExtensions);
+    initCore(options);
     initConnector();
 
     return _core;
