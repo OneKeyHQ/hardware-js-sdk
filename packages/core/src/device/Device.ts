@@ -931,6 +931,22 @@ export class Device extends EventEmitter {
 
       const expectedDeviceId = options?.deviceId;
 
+      if (expectedDeviceId && !(this.features && this.checkDeviceId(expectedDeviceId))) {
+        // No locally-cached evidence that the device at this path is the
+        // expected one (first contact, or the cached features already disagree
+        // with the caller). Establish identity with a context-free Initialize
+        // BEFORE any wallet context (session_id / passphrase_state) goes on
+        // the wire. In normal flows features are always fresh — enumerate /
+        // getFeatures run first and every call response refreshes them — so
+        // this extra round trip is confined to the ambiguous cases where the
+        // disclosure risk actually lives.
+        this.passphraseState = undefined;
+        await callInitialize({ is_contains_attach: true });
+        if (!this.checkDeviceId(expectedDeviceId)) {
+          throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+        }
+      }
+
       this.passphraseState = options?.passphraseState;
 
       if (options?.initSession) {

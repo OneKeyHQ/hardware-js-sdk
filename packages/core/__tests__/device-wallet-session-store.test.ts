@@ -352,6 +352,74 @@ describe('Protocol V1 wallet identity initialization', () => {
     jest.restoreAllMocks();
   });
 
+  test('sends no wallet context before identity is proven on first contact', async () => {
+    const device = Device.fromDescriptor({ id: 'connect-a', path: 'connect-a' } as never);
+    // No cached features: there is no local evidence which device sits here.
+    deviceWalletSessionStore.set('device-a', 'hidden-a', 'session-a');
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'Features',
+      message: { device_id: 'intruder-device', session_id: 'intruder-session' },
+    });
+    device.commands = { typedCall } as never;
+    jest.spyOn(TransportManager, 'reconfigure').mockResolvedValue(undefined);
+
+    await expect(
+      device.initialize({ deviceId: 'device-a', passphraseState: 'hidden-a' })
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceCheckDeviceIdError });
+
+    // Exactly one context-free Initialize: neither the cached session_id nor
+    // the passphrase_state may reach an unproven device.
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall).toHaveBeenCalledWith(
+      'Initialize',
+      'Features',
+      { is_contains_attach: true },
+      expect.any(Object)
+    );
+    // The expected device's cached session is untouched.
+    expect(deviceWalletSessionStore.get('device-a', 'hidden-a')).toBe('session-a');
+  });
+
+  test('proves identity first, then resumes the wallet session on first contact', async () => {
+    const device = Device.fromDescriptor({ id: 'connect-a', path: 'connect-a' } as never);
+    deviceWalletSessionStore.set('device-a', 'hidden-a', 'session-a');
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'Features',
+        message: { device_id: 'device-a', session_id: 'standard-session' },
+      })
+      .mockResolvedValueOnce({
+        type: 'Features',
+        message: { device_id: 'device-a', session_id: 'session-a' },
+      });
+    device.commands = { typedCall } as never;
+    jest.spyOn(TransportManager, 'reconfigure').mockResolvedValue(undefined);
+
+    await device.initialize({ deviceId: 'device-a', passphraseState: 'hidden-a' });
+
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenNthCalledWith(
+      1,
+      'Initialize',
+      'Features',
+      { is_contains_attach: true },
+      expect.any(Object)
+    );
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
+      'Initialize',
+      'Features',
+      expect.objectContaining({
+        session_id: 'session-a',
+        passphrase_state: 'hidden-a',
+      }),
+      expect.any(Object)
+    );
+    // The context-free identity call must not overwrite the cached session.
+    expect(deviceWalletSessionStore.get('device-a', 'hidden-a')).toBe('session-a');
+  });
+
   test('purges cached sessions and rejects when the live device identity changes', async () => {
     const device = Device.fromDescriptor({ id: 'connect-b', path: 'connect-b' } as never);
     device.features = {
