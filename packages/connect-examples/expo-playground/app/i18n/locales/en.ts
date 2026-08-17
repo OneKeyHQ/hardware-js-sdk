@@ -17,6 +17,7 @@ export const en = {
       methodBatchTest: 'Batch Test',
       multisigTest: 'Multisig Test',
       walletSessionTest: 'Wallet Session',
+      portfolioTest: 'Portfolio Test',
       connect: 'Connect',
       shareLog: 'Share Logs',
       features: 'Get Features',

@@ -37,6 +37,7 @@ import MethodBatchTestPage from './routes/method-batch-test';
 import MultisigTestPage from './routes/multisig-test';
 import Pro2UpdatePage from './routes/pro2-update';
 import WalletSessionTestPage from './routes/wallet-session-test';
+import PortfolioTestPage from './routes/portfolio-test';
 
 // Import styles
 import './tailwind.css';
@@ -138,6 +139,10 @@ const router = createHashRouter(
         {
           path: 'wallet-session-test',
           element: <WalletSessionTestPage />,
+        },
+        {
+          path: 'portfolio-test',
+          element: <PortfolioTestPage />,
         },
 
         {

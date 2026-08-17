@@ -17,6 +17,7 @@ export const zh = {
       methodBatchTest: '批量测试',
       multisigTest: '多签测试',
       walletSessionTest: '钱包会话',
+      portfolioTest: 'Portfolio 测试',
       connect: '连接',
       shareLog: '分享日志',
       features: '获取特性',
