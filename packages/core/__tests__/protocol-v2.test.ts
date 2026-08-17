@@ -5501,7 +5501,6 @@ describe('Protocol V2 firmware update targets', () => {
       'DeviceFirmwareUpdateStatusGet',
       'DeviceFirmwareUpdateStatusGet',
     ]);
-    expect((method as any).protocolV2FinalStatusVerified).toBe(true);
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
 
@@ -5649,7 +5648,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall).toHaveBeenCalledTimes(3);
   });
 
-  test('rejects normal mode without install ACK, target status, or a version change', async () => {
+  test('waits five minutes before rejecting normal mode without install evidence', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -5663,7 +5662,7 @@ describe('Protocol V2 firmware update targets', () => {
     let now = 0;
     jest.spyOn(Date, 'now').mockImplementation(() => now);
     jest.spyOn(global, 'setTimeout').mockImplementation(((callback: () => void) => {
-      now += 31 * 1000;
+      now += 60 * 1000;
       callback();
       return 0 as any;
     }) as typeof setTimeout);
@@ -5680,9 +5679,14 @@ describe('Protocol V2 firmware update targets', () => {
       (method as any).waitForProtocolV2FirmwareUpdateComplete([
         { target_id: 4, path: 'vol0:/application_p1.bin' },
       ])
-    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.FirmwareError });
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.FirmwareError,
+      message: 'Firmware installation failed',
+      params: { firmwareUpdateCode: 'FirmwareInstallTimeout' },
+    });
 
     expect(method.postProgressMessage).not.toHaveBeenCalledWith(100, 'installingFirmware');
+    expect(typedCall).toHaveBeenCalledTimes(5);
   });
 
   test('accepts ACK-less normal mode after the requested target version changes', async () => {
@@ -5899,8 +5903,8 @@ describe('Protocol V2 firmware update targets', () => {
           { target_id: 4, path: 'vol0:/application_p1.bin' },
         ])
       ).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.RuntimeError,
-        message: 'Protocol V2 install status conflicts with target 4',
+        errorCode: HardwareErrorCode.FirmwareError,
+        message: 'Firmware installation failed',
         params: {
           firmwareUpdateCode: 'FirmwareInstallStatusConflict',
         },
@@ -5937,7 +5941,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(() => (method as any).assertExpectedProtocolV2Versions()).not.toThrow();
   });
 
-  test('rejects unobservable final versions after the status endpoint fallback', () => {
+  test('accepts unobservable final versions after the status endpoint fallback', () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -5957,8 +5961,30 @@ describe('Protocol V2 firmware update targets', () => {
       patch_version: 0,
     };
 
+    expect(() => (method as any).assertExpectedProtocolV2Versions()).not.toThrow();
+  });
+
+  test('still rejects an unobservable non-app version after the status endpoint fallback', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'desktop',
+        targetsToUpdate: ['se01'],
+        expectedTargetVersions: {
+          se01: '1.0.0',
+        },
+      },
+    });
+    method.init();
+    (method as any).protocolV2LatestFinalFeatures = {
+      major_version: 3,
+      minor_version: 0,
+      patch_version: 0,
+    };
+
     expect(() => (method as any).assertExpectedProtocolV2Versions()).toThrow(
-      'has no observable final version after status fallback'
+      'target se01 has no observable final version after status fallback'
     );
   });
 
@@ -6004,7 +6030,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
 
-  test('fails clearly when a requested target stays absent from the full status dump', async () => {
+  test('keeps polling missing target records until the five-minute timeout', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6020,7 +6046,7 @@ describe('Protocol V2 firmware update targets', () => {
     let now = 0;
     jest.spyOn(Date, 'now').mockImplementation(() => now);
     jest.spyOn(global, 'setTimeout').mockImplementation(((callback: () => void) => {
-      now += 31 * 1000;
+      now += 60 * 1000;
       callback();
       return 0 as any;
     }) as typeof setTimeout);
@@ -6039,12 +6065,13 @@ describe('Protocol V2 firmware update targets', () => {
       ])
     ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.FirmwareError,
-      message: expect.stringContaining('targetIds=3'),
+      message: 'Firmware installation failed',
+      params: { firmwareUpdateCode: 'FirmwareInstallTimeout' },
     });
-    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenCalledTimes(5);
   });
 
-  test('resets the missing-record grace period after a Pro2 reboot interruption', async () => {
+  test('keeps polling incomplete records after a Pro2 reboot interruption', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6097,7 +6124,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall).toHaveBeenCalledTimes(4);
   });
 
-  test('uses an eight-minute Pro2 install status window', async () => {
+  test('uses a five-minute Pro2 install status window', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6107,13 +6134,17 @@ describe('Protocol V2 firmware update targets', () => {
     jest
       .spyOn(Date, 'now')
       .mockReturnValueOnce(0)
-      .mockReturnValue(8 * 60 * 1000);
+      .mockReturnValue(5 * 60 * 1000);
 
     await expect(
       (method as any).waitForProtocolV2FirmwareUpdateComplete([
         { target_id: 4, path: 'vol0:/application_p1.bin' },
       ])
-    ).rejects.toThrow('within 480s');
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.FirmwareError,
+      message: 'Firmware installation failed',
+      params: { firmwareUpdateCode: 'FirmwareInstallTimeout' },
+    });
   });
 
   test('uses a 90-second Pro2 bootloader reconnect window', async () => {
@@ -6191,7 +6222,7 @@ describe('Protocol V2 firmware update targets', () => {
         ],
         new Set([4, 10])
       )
-    ).toThrow('Protocol V2 install status conflicts with target 4');
+    ).toThrow('Firmware installation failed');
     expect(method.postProgressMessage).not.toHaveBeenCalled();
     expect(method.postProgressMessage).not.toHaveBeenCalledWith(100, 'installingFirmware');
 
@@ -6231,8 +6262,8 @@ describe('Protocol V2 firmware update targets', () => {
       throw new Error('Expected Protocol V2 failed firmware status to throw');
     } catch (error: any) {
       expect(error.errorCode).toBe(HardwareErrorCode.FirmwareError);
-      expect(error.message).toContain('FW_MGMT_UPDATER_TASK_STATUS_FAILED_VERIFY');
-      expect(error.message).toContain('vol0:/application_p1.bin');
+      expect(error.message).toBe('Firmware installation failed');
+      expect(error.params).toEqual({ firmwareUpdateCode: 'FirmwareInstallFailed' });
     }
   });
 
@@ -6269,7 +6300,8 @@ describe('Protocol V2 firmware update targets', () => {
       ])
     ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.FirmwareError,
-      message: expect.stringContaining('vol0:/application_p1.bin'),
+      message: 'Firmware installation failed',
+      params: { firmwareUpdateCode: 'FirmwareInstallFailed' },
     });
     expect(typedCall).toHaveBeenCalledWith(
       'DeviceFirmwareUpdateStatusGet',
