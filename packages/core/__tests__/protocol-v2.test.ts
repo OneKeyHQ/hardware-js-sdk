@@ -5200,6 +5200,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(probeProtocolV2RuntimeState).toHaveBeenCalledWith(deviceInfo, 5000, {
       forceRuntimeContextRefresh: true,
     });
+    expect((method as any).protocolV2LatestFinalDeviceInfo).toBe(deviceInfo);
   });
 
   test('reboots Protocol V2 firmware flow back to normal without legacy switch-firmware prompt', async () => {
@@ -5716,11 +5717,16 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall).toHaveBeenCalledTimes(5);
   });
 
-  test('accepts ACK-less normal mode after the requested target version changes', async () => {
+  test('preserves multi-app completion evidence when App mode replaces the status endpoint', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
+        targetsToUpdate: ['app_v1', 'app_v2'],
+        expectedTargetVersions: {
+          app_v1: '2.0.0',
+          app_v2: '2.0.0',
+        },
       },
     });
     const typedCall = jest
@@ -5737,7 +5743,10 @@ describe('Protocol V2 firmware update targets', () => {
       getCommands: () => ({ typedCall }),
       probeProtocolV2RuntimeState,
     });
-    (method as any).protocolV2InstallBaselineVersions = new Map([[4, '1.0.0']]);
+    (method as any).protocolV2InstallBaselineVersions = new Map([
+      [4, '1.0.0'],
+      [5, '1.0.0'],
+    ]);
     (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
     (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
     method.postProgressMessage = jest.fn();
@@ -5745,10 +5754,68 @@ describe('Protocol V2 firmware update targets', () => {
     await expect(
       (method as any).waitForProtocolV2FirmwareUpdateComplete([
         { target_id: 4, path: 'vol0:/application_p1.bin' },
+        { target_id: 5, path: 'vol0:/application_p2.bin' },
       ])
     ).resolves.toBeUndefined();
 
     expect(probeProtocolV2RuntimeState).toHaveBeenCalledWith(deviceInfo, 5000);
+    expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
+    expect(Array.from((method as any).protocolV2CompletedTargetIds)).toEqual([4, 5]);
+
+    (method as any).protocolV2LatestFinalFeatures = {
+      firmwareVersion: '2.0.0',
+    };
+    (method as any).protocolV2LatestFinalDeviceInfo = {
+      main_mcu: {
+        application: { version: '2.0.0' },
+      },
+    };
+    expect(() => (method as any).assertExpectedProtocolV2Versions()).not.toThrow();
+  });
+
+  test('preserves all target completion evidence when status records disappear after reboot', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ type: 'Success', message: {} })
+      .mockRejectedValueOnce(new Error('Pro2 is rebooting'))
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: { records: [] },
+      });
+    const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+      callback: () => void
+    ) => {
+      callback();
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
+    (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(true);
+    method.postProgressMessage = jest.fn();
+
+    try {
+      await expect(
+        (method as any).waitForProtocolV2FirmwareUpdateComplete([
+          { target_id: 4, path: 'vol0:/application_p1.bin' },
+          { target_id: 5, path: 'vol0:/application_p2.bin' },
+        ])
+      ).resolves.toBeUndefined();
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+
+    expect(Array.from((method as any).protocolV2CompletedTargetIds)).toEqual([4, 5]);
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
 
@@ -5966,6 +6033,66 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).protocolV2CompletedTargetIds = new Set([4, 5]);
 
     expect(() => (method as any).assertExpectedProtocolV2Versions()).not.toThrow();
+  });
+
+  test('uses final DeviceInfo versions for both application slots after status polling ends', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'desktop',
+        targetsToUpdate: ['app_v1', 'app_v2'],
+        expectedTargetVersions: {
+          app_v1: '1.0.0',
+          app_v2: '2.0.0',
+        },
+      },
+    });
+    method.init();
+    (method as any).protocolV2LatestFinalFeatures = {
+      major_version: 3,
+      minor_version: 0,
+      patch_version: 0,
+    };
+    (method as any).protocolV2LatestFinalDeviceInfo = {
+      main_mcu: {
+        application: { version: '1.0.0' },
+        application_data: { version: '2.0.0' },
+      },
+    };
+
+    expect(() => (method as any).assertExpectedProtocolV2Versions()).not.toThrow();
+  });
+
+  test('rejects a mismatched final DeviceInfo application slot version', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'desktop',
+        targetsToUpdate: ['app_v1', 'app_v2'],
+        expectedTargetVersions: {
+          app_v1: '1.0.0',
+          app_v2: '2.0.0',
+        },
+      },
+    });
+    method.init();
+    (method as any).protocolV2LatestFinalFeatures = {
+      major_version: 3,
+      minor_version: 0,
+      patch_version: 0,
+    };
+    (method as any).protocolV2LatestFinalDeviceInfo = {
+      main_mcu: {
+        application: { version: '1.0.0' },
+        application_data: { version: '2.0.1' },
+      },
+    };
+
+    expect(() => (method as any).assertExpectedProtocolV2Versions()).toThrow(
+      'target app_v2 reached 2.0.1, expected 2.0.0'
+    );
   });
 
   test('rejects unobservable multi-app versions without per-target completion evidence', () => {
@@ -8146,6 +8273,66 @@ describe('Protocol V2 firmware update targets', () => {
         elapsedMs: expect.any(Number),
       }),
     });
+  });
+
+  test('throttles repeated transfer progress while preserving file completion', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn(
+      (
+        _name: string,
+        _resType: string,
+        params: { file: { offset: number; data: { byteLength: number } } }
+      ) =>
+        Promise.resolve({
+          type: 'FilesystemFile',
+          message: {
+            processed_byte: params.file.offset + params.file.data.byteLength,
+          },
+        })
+    );
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+      getCurrentDeviceType: () => 'pro2',
+    });
+    (method as any).getProtocolV2FirmwareChunkSize = jest.fn().mockReturnValue(1000);
+    method.postProgressMessage = jest.fn();
+    const dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(10_000);
+
+    const source = await openFirmwareByteSource({
+      binary: new Uint8Array(2500).buffer,
+    });
+    try {
+      await (method as any).protocolV2SourceUpdateProcess({
+        source,
+        filePath: 'vol0:/resource/images/images.okpkg',
+        processedSize: 0,
+        totalSize: 1_000_000,
+      });
+    } finally {
+      dateNowSpy.mockRestore();
+      await source?.close();
+    }
+
+    expect(typedCall).toHaveBeenCalledTimes(3);
+    expect(method.postProgressMessage).toHaveBeenCalledTimes(2);
+    expect(method.postProgressMessage).toHaveBeenNthCalledWith(
+      1,
+      1,
+      'transferData',
+      expect.objectContaining({ transferredBytes: 1000 })
+    );
+    expect(method.postProgressMessage).toHaveBeenNthCalledWith(
+      2,
+      1,
+      'transferData',
+      expect.objectContaining({ transferredBytes: 2500 })
+    );
   });
 
   test('sends one monotonic device transfer progress range across multiple files', async () => {

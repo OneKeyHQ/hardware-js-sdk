@@ -105,6 +105,7 @@ const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
 const PROTOCOL_V2_CONNECT_SINGLE_TIMEOUT = 75 * 1000;
 const PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT = 30 * 1000;
 const PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT = 3;
+const PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS = 1000;
 const PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE = 'FirmwareInstallStatusConflict';
 const PROTOCOL_V2_INSTALL_FAILED_CODE = 'FirmwareInstallFailed';
 const PROTOCOL_V2_INSTALL_TIMEOUT_CODE = 'FirmwareInstallTimeout';
@@ -594,9 +595,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private protocolV2LatestFinalFeatures?: Features;
 
+  private protocolV2LatestFinalDeviceInfo?: ProtocolV2DeviceInfo;
+
   private protocolV2InstallBaselineVersions = new Map<number, string>();
 
   private protocolV2LastRuntimeProbeFeatures?: Features;
+
+  private protocolV2LastTransferProgress?: number;
+
+  private protocolV2LastTransferProgressAt = 0;
 
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
@@ -1598,19 +1605,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const expected = this.params?.expectedTargetVersions;
     if (!expected) return;
     const features = this.protocolV2LatestFinalFeatures;
+    const deviceInfo = this.protocolV2LatestFinalDeviceInfo;
     const requestedTargets = this.getProtocolV2RequestedTargets();
     const applicationTargets = requestedTargets.filter(
       target => target === 'app_v1' || target === 'app_v2'
     );
     const visibleVersions: Partial<Record<FirmwareUpdateV4Target, string>> = {
       boot: features ? getDeviceBootloaderVersion(features).join('.') : undefined,
+      app_v1: deviceInfo?.main_mcu?.application?.version,
+      app_v2: deviceInfo?.main_mcu?.application_data?.version,
       coprocessor: features ? getDeviceBLEFirmwareVersion(features).join('.') : undefined,
       se01: features?.se01Version ?? undefined,
       se02: features?.se02Version ?? undefined,
       se03: features?.se03Version ?? undefined,
       se04: features?.se04Version ?? undefined,
     };
-    if (features && applicationTargets.length === 1) {
+    if (features && applicationTargets.length === 1 && !visibleVersions[applicationTargets[0]]) {
       visibleVersions[applicationTargets[0]] = getDeviceFirmwareVersion(features).join('.');
     }
     const expectedEntries = (
@@ -2364,6 +2374,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
+    this.protocolV2LastTransferProgress = undefined;
+    this.protocolV2LastTransferProgressAt = 0;
     let processedSize = 0;
     for (const resource of resourcesToSync) {
       // The bootloader keeps its live resource package mounted. FatFs rejects
@@ -2460,18 +2472,25 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
               );
             }
             const transferredBytes = processedSize + chunkEnd;
-            const elapsedMs = Math.max(Date.now() - transferStartedAt, 0);
-            this.postProgressMessage(
-              Math.min(Math.ceil((transferredBytes / totalSize) * 100), 99),
-              'transferData',
-              {
+            const now = Date.now();
+            const elapsedMs = Math.max(now - transferStartedAt, 0);
+            const progress = Math.min(Math.ceil((transferredBytes / totalSize) * 100), 99);
+            const shouldPostProgress =
+              progress !== this.protocolV2LastTransferProgress ||
+              now - this.protocolV2LastTransferProgressAt >=
+                PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS ||
+              chunkEnd === source.size;
+            if (shouldPostProgress) {
+              this.protocolV2LastTransferProgress = progress;
+              this.protocolV2LastTransferProgressAt = now;
+              this.postProgressMessage(progress, 'transferData', {
                 transferredBytes,
                 totalBytes: totalSize,
                 rateBytesPerSecond:
                   elapsedMs > 0 ? Math.round((chunkEnd / elapsedMs) * 1000) : undefined,
                 elapsedMs,
-              }
-            );
+              });
+            }
             return length;
           },
         });
@@ -2667,6 +2686,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     });
   }
 
+  private recordProtocolV2AuthoritativeInstallCompletion(expectedTargetIds: Set<number>) {
+    expectedTargetIds.forEach(targetId => this.protocolV2CompletedTargetIds.add(targetId));
+  }
+
   private async waitForProtocolV2FirmwareUpdateComplete(
     targets: Array<{ target_id: number; path: string }>,
     requireCurrentInstallStatus = false
@@ -2770,6 +2793,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
               Log.log(
                 '[FirmwareUpdateV4] empty firmware status after confirmed App reboot; update complete'
               );
+              this.recordProtocolV2AuthoritativeInstallCompletion(expectedTargetIds);
               this.postProgressMessage(100, 'installingFirmware');
               return;
             }
@@ -2817,6 +2841,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
               Log.log(
                 '[FirmwareUpdateV4] firmware status endpoint unavailable after confirmed App reboot'
               );
+              this.recordProtocolV2AuthoritativeInstallCompletion(expectedTargetIds);
               this.postProgressMessage(100, 'installingFirmware');
               return;
             }
@@ -2945,6 +2970,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const startTime = Date.now();
     let lastError: unknown;
     let shouldReconnect = true;
+    this.protocolV2LatestFinalDeviceInfo = undefined;
 
     while (Date.now() - startTime < timeout) {
       try {
@@ -2965,6 +2991,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           { forceRuntimeContextRefresh: true }
         );
         if (this.isProtocolV2ApplicationMode(features)) {
+          this.protocolV2LatestFinalDeviceInfo = deviceInfo;
           return features;
         }
         lastError = ERRORS.TypedError(
