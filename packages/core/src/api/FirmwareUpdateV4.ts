@@ -1987,13 +1987,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         ? PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID.get(target.targetId)
         : undefined;
       if (updateTarget && targetsToUpdate.has(updateTarget)) {
-        if (component.version) {
-          this.params.expectedTargetVersions ??= {};
-          this.params.expectedTargetVersions[updateTarget] = component.version.join('.');
-        }
         const explicitInstallItem = explicitInstallItemByTargetId.get(target.targetId);
-        const installItem =
-          explicitInstallItem ?? (await this.downloadRemoteProtocolV2Component(key, component));
+        let installItem = explicitInstallItem;
+        if (!installItem) {
+          installItem = await this.downloadRemoteProtocolV2Component(key, component);
+          if (component.version) {
+            this.params.expectedTargetVersions ??= {};
+            this.params.expectedTargetVersions[updateTarget] = component.version.join('.');
+          }
+        }
         if (installItem.kind === 'bootloader') {
           bootloaderBinary = installItem.binary;
         } else {

@@ -6859,6 +6859,9 @@ describe('Protocol V2 firmware update targets', () => {
         method: 'firmwareUpdateV4',
         platform: 'web',
         targetsToUpdate: ['app_v1', 'coprocessor'],
+        expectedTargetVersions: {
+          app_v1: '9.9.9',
+        },
       },
     });
     method.init();
@@ -6877,12 +6880,14 @@ describe('Protocol V2 firmware update targets', () => {
           applicationP1: {
             target: 'APPLICATION_P1',
             url: 'https://example.com/applicationP1.pp.bin',
+            version: [2, 0, 0],
             expectedSize: explicitApplicationBinary.byteLength,
             fingerprint: bytesToHex(sha256(new Uint8Array(explicitApplicationBinary))),
           },
           coprocessor: {
             target: 'COPROCESSOR',
             url: 'https://example.com/coprocessor.pp.bin',
+            version: [1, 1, 0],
             expectedSize: remoteCoprocessorBinary.byteLength,
             fingerprint: bytesToHex(sha256(new Uint8Array(remoteCoprocessorBinary))),
           },
@@ -6923,6 +6928,10 @@ describe('Protocol V2 firmware update targets', () => {
         kind: 'firmware',
       },
     ]);
+    expect((method as any).params.expectedTargetVersions).toEqual({
+      app_v1: '9.9.9',
+      coprocessor: '1.1.0',
+    });
 
     getSysResourceBinarySpy.mockRestore();
     getFirmwareLatestReleaseSpy.mockRestore();
