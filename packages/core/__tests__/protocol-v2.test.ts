@@ -6011,7 +6011,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall).toHaveBeenCalledTimes(1);
   });
 
-  test('does not fail a completed multi-app install when final app versions are unobservable', () => {
+  test('uses the device firmware version for P1 and install completion for unobservable P2', () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6019,7 +6019,7 @@ describe('Protocol V2 firmware update targets', () => {
         platform: 'desktop',
         targetsToUpdate: ['app_v1', 'app_v2'],
         expectedTargetVersions: {
-          app_v1: '1.0.0',
+          app_v1: '3.0.0',
           app_v2: '2.0.0',
         },
       },
@@ -6035,7 +6035,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(() => (method as any).assertExpectedProtocolV2Versions()).not.toThrow();
   });
 
-  test('uses final DeviceInfo versions for both application slots after status polling ends', () => {
+  test('uses the firmware version for P1 and the optional DeviceInfo version for P2', () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6050,13 +6050,13 @@ describe('Protocol V2 firmware update targets', () => {
     });
     method.init();
     (method as any).protocolV2LatestFinalFeatures = {
-      major_version: 3,
+      major_version: 1,
       minor_version: 0,
       patch_version: 0,
     };
     (method as any).protocolV2LatestFinalDeviceInfo = {
       main_mcu: {
-        application: { version: '1.0.0' },
+        application: { version: '9.9.9' },
         application_data: { version: '2.0.0' },
       },
     };
@@ -6079,7 +6079,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
     method.init();
     (method as any).protocolV2LatestFinalFeatures = {
-      major_version: 3,
+      major_version: 1,
       minor_version: 0,
       patch_version: 0,
     };
@@ -6095,7 +6095,7 @@ describe('Protocol V2 firmware update targets', () => {
     );
   });
 
-  test('rejects unobservable multi-app versions without per-target completion evidence', () => {
+  test('rejects an unobservable P2 version without P2 completion evidence', () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6103,7 +6103,7 @@ describe('Protocol V2 firmware update targets', () => {
         platform: 'desktop',
         targetsToUpdate: ['app_v1', 'app_v2'],
         expectedTargetVersions: {
-          app_v1: '1.0.0',
+          app_v1: '3.0.0',
           app_v2: '2.0.0',
         },
       },
@@ -6118,7 +6118,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).protocolV2CompletedTargetIds = new Set([4]);
 
     expect(() => (method as any).assertExpectedProtocolV2Versions()).toThrow(
-      'target app_v1 has no observable final version after status fallback'
+      'target app_v2 has no observable final version after status fallback'
     );
   });
 

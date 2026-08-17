@@ -1606,13 +1606,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (!expected) return;
     const features = this.protocolV2LatestFinalFeatures;
     const deviceInfo = this.protocolV2LatestFinalDeviceInfo;
-    const requestedTargets = this.getProtocolV2RequestedTargets();
-    const applicationTargets = requestedTargets.filter(
-      target => target === 'app_v1' || target === 'app_v2'
-    );
     const visibleVersions: Partial<Record<FirmwareUpdateV4Target, string>> = {
       boot: features ? getDeviceBootloaderVersion(features).join('.') : undefined,
-      app_v1: deviceInfo?.main_mcu?.application?.version,
+      // Protocol V2 firmware exposes P1 as the device firmware version after reboot.
+      app_v1: features
+        ? getDeviceFirmwareVersion(features).join('.')
+        : deviceInfo?.main_mcu?.application?.version,
       app_v2: deviceInfo?.main_mcu?.application_data?.version,
       coprocessor: features ? getDeviceBLEFirmwareVersion(features).join('.') : undefined,
       se01: features?.se01Version ?? undefined,
@@ -1620,9 +1619,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       se03: features?.se03Version ?? undefined,
       se04: features?.se04Version ?? undefined,
     };
-    if (features && applicationTargets.length === 1 && !visibleVersions[applicationTargets[0]]) {
-      visibleVersions[applicationTargets[0]] = getDeviceFirmwareVersion(features).join('.');
-    }
     const expectedEntries = (
       Object.entries(expected) as Array<[FirmwareUpdateV4Target, string]>
     ).filter(([target]) => !targets || targets.includes(target));
@@ -1639,14 +1635,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
               Math.floor(statusVersion / 0x100) % 0x100
             }.${statusVersion % 0x100}`;
       if (!observedVersion) {
-        const requestedTargetIds = requestedTargets.flatMap(requestedTarget => {
-          if (requestedTarget === 'resource' || requestedTarget === 'boot_resources') return [];
-          const installTarget = PROTOCOL_V2_INSTALL_TARGET_BY_UPDATE_TARGET.get(requestedTarget);
-          return installTarget ? [installTarget.targetId] : [];
-        });
         const hasCompleteTargetEvidence =
-          requestedTargetIds.length > 0 &&
-          requestedTargetIds.every(targetId => this.protocolV2CompletedTargetIds.has(targetId));
+          targetId !== undefined && this.protocolV2CompletedTargetIds.has(targetId);
         if (hasCompleteTargetEvidence) {
           Log.warn(
             `Protocol V2 target ${target} has no observable final version; install completion is authoritative`
@@ -1664,28 +1654,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         );
       }
     }
-  }
-
-  private getProtocolV2RequestedTargets(): FirmwareUpdateV4Target[] {
-    if (this.params.targetsToUpdate?.length) {
-      return [...new Set(this.params.targetsToUpdate)];
-    }
-    if (this.params.preparedPlan?.targetsToUpdate.length) {
-      return [...new Set(this.params.preparedPlan.targetsToUpdate)] as FirmwareUpdateV4Target[];
-    }
-    const targets = new Set<FirmwareUpdateV4Target>();
-    Object.keys(this.params.componentArtifacts ?? {}).forEach(target =>
-      targets.add(target as FirmwareUpdateV4Target)
-    );
-    if (this.params.bootloaderBinary) targets.add('boot');
-    if (this.params.applicationP1Binary) targets.add('app_v1');
-    if (this.params.applicationP2Binary) targets.add('app_v2');
-    if (this.params.coprocessorBinary) targets.add('coprocessor');
-    if (this.params.se01Binary) targets.add('se01');
-    if (this.params.se02Binary) targets.add('se02');
-    if (this.params.se03Binary) targets.add('se03');
-    if (this.params.se04Binary) targets.add('se04');
-    return Array.from(targets);
   }
 
   private async getProtocolV2DeviceFeatures(): Promise<Features> {
