@@ -2525,9 +2525,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         path: failedTarget.path,
       });
       Log.error(`[FirmwareUpdateV4] firmware install failed target=${failedTargetDetails}`);
-      throw ERRORS.TypedError(HardwareErrorCode.FirmwareError, undefined, {
-        firmwareUpdateCode: PROTOCOL_V2_INSTALL_FAILED_CODE,
-      });
+      throw ERRORS.TypedError(
+        HardwareErrorCode.FirmwareError,
+        'Protocol V2 firmware install failed',
+        {
+          firmwareUpdateCode: PROTOCOL_V2_INSTALL_FAILED_CODE,
+        }
+      );
     }
 
     const matchingTargets = statusTargets.filter(target =>
@@ -2542,9 +2546,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         (target.path && expectedPaths.get(targetId) && target.path !== expectedPaths.get(targetId))
       ) {
         Log.error(`[FirmwareUpdateV4] install status conflicts with target=${target.target_id}`);
-        throw ERRORS.TypedError(HardwareErrorCode.FirmwareError, undefined, {
-          firmwareUpdateCode: PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE,
-        });
+        throw ERRORS.TypedError(
+          HardwareErrorCode.FirmwareError,
+          'Protocol V2 firmware install status conflict',
+          {
+            firmwareUpdateCode: PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE,
+          }
+        );
       }
       seenTargetIds.add(targetId);
     }
@@ -2855,9 +2863,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         PROTOCOL_V2_INSTALL_TIMEOUT / 1000
       }s: ${this.normalizeErrorMessage(lastError)}`
     );
-    throw ERRORS.TypedError(HardwareErrorCode.FirmwareError, undefined, {
-      firmwareUpdateCode: PROTOCOL_V2_INSTALL_TIMEOUT_CODE,
-    });
+    throw ERRORS.TypedError(
+      HardwareErrorCode.FirmwareError,
+      'Protocol V2 firmware install timed out',
+      {
+        firmwareUpdateCode: PROTOCOL_V2_INSTALL_TIMEOUT_CODE,
+      }
+    );
   }
 
   private async exitProtocolV2BootloaderToNormal() {

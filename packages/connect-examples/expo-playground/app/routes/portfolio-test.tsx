@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Ban,
   CheckCircle2,
@@ -26,7 +27,6 @@ import { useDeviceStore } from '../store/deviceStore';
 import type { DeviceInfo } from '../types/hardware';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 import {
-  getExpectationLabel,
   validatePortfolioSignificantDigits,
   type PortfolioCaseDefinition,
   type PortfolioCasesManifest,
@@ -61,8 +61,12 @@ function getPortfolioCaseUrl(path: string) {
   return `${getPortfolioCasesBaseUrl()}/${path.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-function getResponseError(response: unknown): string {
-  if (!response || typeof response !== 'object') return '未知错误';
+function getResponseError(
+  response: unknown,
+  fallbackUnknown: string,
+  fallbackSdkError: string
+): string {
+  if (!response || typeof response !== 'object') return fallbackUnknown;
   const payload = (response as { payload?: unknown }).payload;
   if (typeof payload === 'string') return payload;
   if (payload && typeof payload === 'object') {
@@ -71,7 +75,7 @@ function getResponseError(response: unknown): string {
     if (typeof error === 'string') return error;
     if (typeof message === 'string') return message;
   }
-  return 'SDK 调用失败，但没有返回错误说明';
+  return fallbackSdkError;
 }
 
 function formatDuration(durationMs?: number) {
@@ -79,36 +83,37 @@ function formatDuration(durationMs?: number) {
   return durationMs < 1000 ? `${durationMs} ms` : `${(durationMs / 1000).toFixed(1)} s`;
 }
 
-function resultBadge(result: CaseResult) {
+function resultBadge(result: CaseResult, labels: Record<CaseStatus, string>) {
   if (result.status === 'running') {
     return (
       <Badge variant="outline" className="gap-1">
-        <Loader2 className="h-3 w-3 animate-spin" /> 执行中
+        <Loader2 className="h-3 w-3 animate-spin" /> {labels.running}
       </Badge>
     );
   }
   if (result.status === 'passed') {
     return (
       <Badge variant="success" className="gap-1">
-        <CheckCircle2 className="h-3 w-3" /> 通过
+        <CheckCircle2 className="h-3 w-3" /> {labels.passed}
       </Badge>
     );
   }
   if (result.status === 'failed') {
     return (
       <Badge variant="destructive" className="gap-1">
-        <XCircle className="h-3 w-3" /> 失败
+        <XCircle className="h-3 w-3" /> {labels.failed}
       </Badge>
     );
   }
   return (
     <Badge variant="secondary" className="gap-1">
-      <Circle className="h-3 w-3" /> 未执行
+      <Circle className="h-3 w-3" /> {labels.idle}
     </Badge>
   );
 }
 
 export default function PortfolioTestPage() {
+  const { t } = useTranslation();
   const {
     currentDevice,
     sdkInitState,
@@ -158,6 +163,15 @@ export default function PortfolioTestPage() {
     [cases, results]
   );
   const progress = cases.length ? (completedCount / cases.length) * 100 : 0;
+  const intervalSeconds = (manifest?.intervalMs ?? 0) / 1000;
+  const resultLabels: Record<CaseStatus, string> = {
+    idle: t('portfolioTest.status.idle'),
+    running: t('portfolioTest.status.running'),
+    passed: t('portfolioTest.status.passed'),
+    failed: t('portfolioTest.status.failed'),
+  };
+  const getLocalizedExpectationLabel = (expected: PortfolioCaseDefinition['expected']) =>
+    t(`portfolioTest.expectation.${expected}`);
 
   const connectDevice = useCallback(async (): Promise<DeviceInfo> => {
     if (isPortfolioTestDevice(currentDevice)) return currentDevice;
@@ -166,10 +180,16 @@ export default function PortfolioTestPage() {
     try {
       const response = await searchDevices({ promptWebUsbAccess: true });
       if (!response.success || !Array.isArray(response.payload)) {
-        throw new Error(getResponseError(response));
+        throw new Error(
+          getResponseError(
+            response,
+            t('portfolioTest.errors.unknown'),
+            t('portfolioTest.errors.sdkWithoutMessage')
+          )
+        );
       }
       const devices = (response.payload as DeviceInfo[]).filter(isPortfolioTestDevice);
-      if (!devices.length) throw new Error('没有找到 OneKey Pro 2');
+      if (!devices.length) throw new Error(t('portfolioTest.errors.deviceNotFound'));
       const device = await hydrateConnectedDeviceInfo(devices[0]);
       setConnectedDevices([device, ...devices.slice(1)]);
       setCurrentDevice(device);
@@ -179,7 +199,7 @@ export default function PortfolioTestPage() {
       setIsConnecting(false);
       setIsConnectingLocal(false);
     }
-  }, [currentDevice, setConnectedDevices, setCurrentDevice, setDeviceFeatures, setIsConnecting]);
+  }, [currentDevice, setConnectedDevices, setCurrentDevice, setDeviceFeatures, setIsConnecting, t]);
 
   const runCaseWithDevice = useCallback(
     async (item: PortfolioCaseDefinition, device?: DeviceInfo) => {
@@ -189,27 +209,32 @@ export default function PortfolioTestPage() {
       try {
         const digitError = validatePortfolioSignificantDigits(item.payload);
         if (item.expected === 'client-block') {
-          if (!digitError) throw new Error('客户端未拦截超过 7 位有效数字的金额');
+          if (!digitError) throw new Error(t('portfolioTest.errors.clientDidNotBlock'));
           setResults(previous => ({
             ...previous,
             [item.id]: {
               status: 'passed',
-              message: `${digitError}；未向硬件发包`,
+              message: t('portfolioTest.errors.blockedBeforeSend', { error: digitError }),
               durationMs: Math.round(performance.now() - startedAt),
             },
           }));
           return true;
         }
         if (digitError) throw new Error(digitError);
-        if (!device) throw new Error('执行硬件用例前必须连接 OneKey Pro 2');
-        if (!device.connectId) throw new Error('OneKey Pro 2 缺少 connectId');
-        if (!item.package) throw new Error('该用例缺少 .okpkg 文件');
+        if (!device) throw new Error(t('portfolioTest.errors.deviceRequired'));
+        if (!device.connectId) throw new Error(t('portfolioTest.errors.connectIdMissing'));
+        if (!item.package) throw new Error(t('portfolioTest.errors.packageMissing'));
 
         const packageResponse = await fetch(getPortfolioCaseUrl(item.package), {
           cache: 'no-store',
         });
         if (!packageResponse.ok) {
-          throw new Error(`加载 ${item.package} 失败：HTTP ${packageResponse.status}`);
+          throw new Error(
+            t('portfolioTest.errors.packageLoadFailed', {
+              packageName: item.package,
+              status: packageResponse.status,
+            })
+          );
         }
         const packageBytes = await packageResponse.arrayBuffer();
         const response = await callHardwareAPI(
@@ -218,7 +243,13 @@ export default function PortfolioTestPage() {
           'connectId-params'
         );
 
-        const responseError = response.success ? '' : getResponseError(response);
+        const responseError = response.success
+          ? ''
+          : getResponseError(
+              response,
+              t('portfolioTest.errors.unknown'),
+              t('portfolioTest.errors.sdkWithoutMessage')
+            );
         const passed =
           item.expected === 'accept'
             ? response.success
@@ -226,7 +257,7 @@ export default function PortfolioTestPage() {
               Boolean(item.expectedError) &&
               responseError.includes(item.expectedError as string);
         const message = response.success
-          ? 'FilesystemFileWrite 与 PortfolioUpdate 均成功'
+          ? t('portfolioTest.errors.uploadSucceeded')
           : responseError;
         setResults(previous => ({
           ...previous,
@@ -234,10 +265,13 @@ export default function PortfolioTestPage() {
             status: passed ? 'passed' : 'failed',
             message: passed
               ? item.expected === 'reject'
-                ? `按预期拒绝：${message}`
+                ? t('portfolioTest.errors.rejectedAsExpected', { message })
                 : message
               : item.expected === 'reject'
-              ? `预期拒绝原因包含“${item.expectedError}”，实际：${message}`
+              ? t('portfolioTest.errors.unexpectedRejectReason', {
+                  expectedError: item.expectedError,
+                  message,
+                })
               : message,
             durationMs: Math.round(performance.now() - startedAt),
           },
@@ -257,7 +291,7 @@ export default function PortfolioTestPage() {
         setRunningCaseId(null);
       }
     },
-    []
+    [t]
   );
 
   const runSingleCase = useCallback(
@@ -336,20 +370,19 @@ export default function PortfolioTestPage() {
           <div className="max-w-3xl">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-7 w-7 text-primary" />
-              <h1 className="text-2xl font-semibold text-foreground">Pro2 Portfolio 专项测试</h1>
+              <h1 className="text-2xl font-semibold text-foreground">{t('portfolioTest.title')}</h1>
             </div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              逐项验证金额格式、Native/Contract/All Networks Token 映射、精确 JSON 结构与固件边界。
-              批量模式每隔 15 秒执行一次；正向用例必须完整通过上传和 PortfolioUpdate，反向用例必须返回指定拒绝原因。
+              {t('portfolioTest.description', { intervalSeconds })}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={resetResults} disabled={isRunning}>
-              <RotateCcw /> 清空结果
+              <RotateCcw /> {t('portfolioTest.resetResults')}
             </Button>
             {isRunning ? (
               <Button variant="warning" onClick={stopBatch}>
-                <Square /> 停止后续用例
+                <Square /> {t('portfolioTest.stopBatch')}
               </Button>
             ) : (
               <Button
@@ -357,7 +390,7 @@ export default function PortfolioTestPage() {
                 disabled={!manifest || !sdkInitState.isInitialized}
                 data-testid="portfolio-test-run-all"
               >
-                <Play /> 运行全部用例
+                <Play /> {t('portfolioTest.runAll')}
               </Button>
             )}
           </div>
@@ -367,23 +400,29 @@ export default function PortfolioTestPage() {
           <CardContent className="space-y-4 pt-5">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <div className="text-xs text-muted-foreground">设备</div>
+                <div className="text-xs text-muted-foreground">{t('portfolioTest.device')}</div>
                 <div className="mt-1 font-medium text-foreground">
                   {isConnectingLocal
-                    ? '连接中…'
+                    ? t('portfolioTest.connecting')
                     : isPortfolioTestDevice(currentDevice)
                     ? currentDevice.label || currentDevice.name || 'OneKey Pro 2'
-                    : '未连接 Pro 2'}
+                    : t('portfolioTest.notConnected')}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">测试进度</div>
+                <div className="text-xs text-muted-foreground">{t('portfolioTest.progress')}</div>
                 <div className="mt-1 font-medium text-foreground">
-                  {completedCount}/{cases.length}，通过 {passedCount}
+                  {t('portfolioTest.progressValue', {
+                    completed: completedCount,
+                    total: cases.length,
+                    passed: passedCount,
+                  })}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">固件规则来源</div>
+                <div className="text-xs text-muted-foreground">
+                  {t('portfolioTest.firmwareSource')}
+                </div>
                 <div
                   className="mt-1 truncate font-mono text-sm text-foreground"
                   title={manifest?.firmwareCommit}
@@ -392,29 +431,37 @@ export default function PortfolioTestPage() {
                 </div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">下一用例</div>
+                <div className="text-xs text-muted-foreground">{t('portfolioTest.nextCase')}</div>
                 <div className="mt-1 flex items-center gap-1 font-medium text-foreground">
                   <Clock3 className="h-4 w-4" />
-                  {countdownMs > 0 ? `${Math.ceil(countdownMs / 1000)} 秒` : runningCaseId || '--'}
+                  {countdownMs > 0
+                    ? t('portfolioTest.seconds', { count: Math.ceil(countdownMs / 1000) })
+                    : runningCaseId || '--'}
                 </div>
               </div>
             </div>
             <Progress value={progress} />
             <div className="flex flex-wrap gap-2 text-xs">
               <Badge variant={sdkInitState.isInitialized ? 'success' : 'secondary'}>
-                SDK {sdkInitState.isInitialized ? '已就绪' : '未就绪'}
+                SDK{' '}
+                {sdkInitState.isInitialized
+                  ? t('portfolioTest.sdkReady')
+                  : t('portfolioTest.sdkNotReady')}
               </Badge>
               <Badge variant="outline">
-                {cases.filter(item => Boolean(item.package)).length} 个签名包
+                {t('portfolioTest.signedPackages', {
+                  count: cases.filter(item => Boolean(item.package)).length,
+                })}
               </Badge>
               <Badge variant="outline">
-                {cases.filter(item => item.expected === 'client-block').length} 个客户端拦截
+                {t('portfolioTest.clientBlocks', {
+                  count: cases.filter(item => item.expected === 'client-block').length,
+                })}
               </Badge>
-              <Badge variant="outline">{(manifest?.intervalMs ?? 0) / 1000} 秒间隔</Badge>
+              <Badge variant="outline">{t('portfolioTest.interval', { intervalSeconds })}</Badge>
             </div>
             <p className="text-xs leading-5 text-muted-foreground">
-              测试包使用 firmware-pro2 标准打包器和开发签名生成，仅适用于接受开发 RESOURCE
-              包的测试固件。客户端拦截用例不会向设备发送任何字节。
+              {t('portfolioTest.packageNotice')}
             </p>
           </CardContent>
         </Card>
@@ -427,7 +474,7 @@ export default function PortfolioTestPage() {
 
         {!manifest && !manifestError ? (
           <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" /> 正在加载测试用例…
+            <Loader2 className="h-5 w-5 animate-spin" /> {t('portfolioTest.loadingCases')}
           </div>
         ) : null}
 
@@ -461,9 +508,9 @@ export default function PortfolioTestPage() {
                           {item.expected === 'client-block' ? (
                             <Ban className="mr-1 h-3 w-3" />
                           ) : null}
-                          {getExpectationLabel(item.expected)}
+                          {getLocalizedExpectationLabel(item.expected)}
                         </Badge>
-                        {resultBadge(result)}
+                        {resultBadge(result, resultLabels)}
                       </div>
                       <p className="mt-2 text-sm leading-6 text-muted-foreground">
                         {item.description}
@@ -492,21 +539,33 @@ export default function PortfolioTestPage() {
                       data-testid={`portfolio-case-run-${item.id}`}
                     >
                       {item.expected === 'client-block' ? <Ban /> : <Play />}
-                      {item.expected === 'client-block' ? '验证拦截' : '执行'}
+                      {item.expected === 'client-block'
+                        ? t('portfolioTest.verifyBlock')
+                        : t('portfolioTest.run')}
                     </Button>
                   </div>
                   <details className="mt-3 rounded-xl border border-border bg-muted/30 px-3 py-2">
                     <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
-                      查看 Payload 与预期
+                      {t('portfolioTest.viewPayload')}
                     </summary>
                     <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
                       <pre className="max-h-80 overflow-auto rounded-lg bg-background p-3 text-xs text-foreground">
                         {JSON.stringify(item.payload, null, 2)}
                       </pre>
                       <div className="space-y-2 text-xs text-muted-foreground">
-                        <div>预期：{getExpectationLabel(item.expected)}</div>
-                        <div>包文件：{item.package || '无（禁止发送）'}</div>
-                        {item.expectedError ? <div>匹配信息：{item.expectedError}</div> : null}
+                        <div>
+                          {t('portfolioTest.expected')}:{' '}
+                          {getLocalizedExpectationLabel(item.expected)}
+                        </div>
+                        <div>
+                          {t('portfolioTest.packageFile')}:{' '}
+                          {item.package || t('portfolioTest.noPackage')}
+                        </div>
+                        {item.expectedError ? (
+                          <div>
+                            {t('portfolioTest.matchMessage')}: {item.expectedError}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </details>
@@ -524,7 +583,7 @@ export default function PortfolioTestPage() {
               disabled={isConnectingLocal}
             >
               {isConnectingLocal ? <Loader2 className="animate-spin" /> : <Search />}
-              搜索并连接 Pro 2
+              {t('portfolioTest.searchAndConnect')}
             </Button>
           </div>
         ) : null}

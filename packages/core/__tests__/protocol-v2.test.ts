@@ -5708,7 +5708,7 @@ describe('Protocol V2 firmware update targets', () => {
       ])
     ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.FirmwareError,
-      message: 'Firmware installation failed',
+      message: 'Protocol V2 firmware install timed out',
       params: { firmwareUpdateCode: 'FirmwareInstallTimeout' },
     });
 
@@ -5931,7 +5931,7 @@ describe('Protocol V2 firmware update targets', () => {
         ])
       ).rejects.toMatchObject({
         errorCode: HardwareErrorCode.FirmwareError,
-        message: 'Firmware installation failed',
+        message: 'Protocol V2 firmware install status conflict',
         params: {
           firmwareUpdateCode: 'FirmwareInstallStatusConflict',
         },
@@ -6096,7 +6096,7 @@ describe('Protocol V2 firmware update targets', () => {
       ])
     ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.FirmwareError,
-      message: 'Firmware installation failed',
+      message: 'Protocol V2 firmware install timed out',
       params: { firmwareUpdateCode: 'FirmwareInstallTimeout' },
     });
     expect(typedCall).toHaveBeenCalledTimes(5);
@@ -6173,7 +6173,7 @@ describe('Protocol V2 firmware update targets', () => {
       ])
     ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.FirmwareError,
-      message: 'Firmware installation failed',
+      message: 'Protocol V2 firmware install timed out',
       params: { firmwareUpdateCode: 'FirmwareInstallTimeout' },
     });
   });
@@ -6253,7 +6253,7 @@ describe('Protocol V2 firmware update targets', () => {
         ],
         new Set([4, 10])
       )
-    ).toThrow('Firmware installation failed');
+    ).toThrow('Protocol V2 firmware install status conflict');
     expect(method.postProgressMessage).not.toHaveBeenCalled();
     expect(method.postProgressMessage).not.toHaveBeenCalledWith(100, 'installingFirmware');
 
@@ -6293,7 +6293,7 @@ describe('Protocol V2 firmware update targets', () => {
       throw new Error('Expected Protocol V2 failed firmware status to throw');
     } catch (error: any) {
       expect(error.errorCode).toBe(HardwareErrorCode.FirmwareError);
-      expect(error.message).toBe('Firmware installation failed');
+      expect(error.message).toBe('Protocol V2 firmware install failed');
       expect(error.params).toEqual({ firmwareUpdateCode: 'FirmwareInstallFailed' });
     }
   });
@@ -6331,7 +6331,7 @@ describe('Protocol V2 firmware update targets', () => {
       ])
     ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.FirmwareError,
-      message: 'Firmware installation failed',
+      message: 'Protocol V2 firmware install failed',
       params: { firmwareUpdateCode: 'FirmwareInstallFailed' },
     });
     expect(typedCall).toHaveBeenCalledWith(
