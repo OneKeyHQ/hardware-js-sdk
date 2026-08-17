@@ -1,8 +1,12 @@
 import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import ConfluxSignMessageCIP23 from '../src/api/conflux/ConfluxSignMessageCIP23';
+import DeviceChangePin from '../src/api/device/DeviceChangePin';
 import DeviceLock from '../src/api/device/DeviceLock';
 import DeviceSettings from '../src/api/device/DeviceSettings';
+import DeviceVerify from '../src/api/device/DeviceVerify';
+import DeviceWipe from '../src/api/device/DeviceWipe';
+import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
 import OpenWalletSession from '../src/api/OpenWalletSession';
 import { runMethodWithUnlockPolicy } from '../src/protocols/protocol-v2/unlockPolicyRunner';
 
@@ -188,6 +192,61 @@ describe('Protocol V2 unlock semantics', () => {
       message: 'ok',
     });
 
+    expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Any, expect.any(Object));
+  });
+
+  test.each([
+    [
+      'PIN changes',
+      () =>
+        new DeviceChangePin({
+          id: 1,
+          payload: { method: 'deviceChangePin', remove: false },
+        }),
+    ],
+    ['device wipe', () => new DeviceWipe({ id: 1, payload: { method: 'deviceWipe' } })],
+    [
+      'firmware updates',
+      () =>
+        new FirmwareUpdateV4({
+          id: 1,
+          payload: { method: 'firmwareUpdateV4', platform: 'desktop' } as any,
+        }),
+    ],
+    [
+      'genuine-device verification',
+      () =>
+        new DeviceVerify({
+          id: 1,
+          payload: { method: 'deviceVerify', dataHex: '00' },
+        }),
+    ],
+  ])('allows either PIN type when pre-unlocking %s', async (_name, createMethod) => {
+    const method = createMethod();
+    method.init();
+    const features = { unlocked: false };
+    const device = {
+      features,
+      commands: {
+        typedCall: jest.fn().mockResolvedValue({ message: { unlocked: false } }),
+      },
+      isProtocolV2: () => true,
+      isBootloader: () => false,
+      isRomloader: () => false,
+      updateProtocolV2Status: jest.fn(() => features),
+      unlockDevice: jest.fn().mockImplementation(() => {
+        features.unlocked = true;
+        return Promise.resolve(features);
+      }),
+    };
+    method.run = jest.fn().mockResolvedValue({ message: 'ok' });
+
+    await expect(runMethodWithUnlockPolicy(method, device as any)).resolves.toEqual({
+      message: 'ok',
+    });
+
+    expect(method.unlockPolicy).toBe('unlock-before-run');
+    expect(method.getSupportedProtocols()).toContain('V2');
     expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Any, expect.any(Object));
   });
 

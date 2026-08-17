@@ -1,4 +1,4 @@
-import { DeviceSettingsPage } from '@onekeyfe/hd-transport';
+import { DeviceSessionPinType, DeviceSettingsPage } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
@@ -13,6 +13,9 @@ export default class DeviceChangePin extends BaseMethod<ChangePin> {
 
   init() {
     this.unlockPolicy = 'unlock-before-run';
+    // Protocol V2 device-management actions are not wallet-scoped, so either
+    // the main PIN or an Attach PIN may authorize them.
+    this.protocolV2PreUnlockPinType = DeviceSessionPinType.Any;
     this.useDevicePassphraseState = false;
 
     // check payload
