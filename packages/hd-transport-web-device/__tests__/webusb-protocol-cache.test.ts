@@ -16,12 +16,17 @@ const schema = {
   },
 };
 
-function buildAcquirableTransport() {
+function buildAcquirableTransport(path = 'pro-webusb') {
   const webusb = new WebUsbTransport() as any;
   webusb.Log = { debug: jest.fn() };
   webusb.rotateProtocolV2UsbGeneration = jest.fn().mockResolvedValue(undefined);
   webusb.closeOpenDevice = jest.fn().mockResolvedValue(undefined);
   webusb.connect = jest.fn().mockResolvedValue(undefined);
+  // Simulate a device that stayed connected since the probe: same USBDevice
+  // object present in the device list and recorded as the probed object.
+  const deviceObject = { serialNumber: path } as unknown as USBDevice;
+  webusb.deviceList = [{ path, device: deviceObject, commType: 'webusb' }];
+  webusb.probedDeviceObjects.set(path, deviceObject);
   return webusb;
 }
 
@@ -62,6 +67,25 @@ describe('WebUsbTransport protocol probe cache', () => {
     await expect(webusb.acquire({ path, expectedProtocol: 'V1' })).resolves.toBe(path);
 
     expect(webusb.detectProtocol).toHaveBeenCalledWith(path, 'V1', undefined);
+  });
+
+  test('acquire re-probes when the USBDevice object identity changed since the probe', async () => {
+    const webusb = buildAcquirableTransport();
+    const path = 'pro-webusb';
+    webusb.deviceProtocol.set(path, 'V1');
+    // Simulate a replug the transport never saw a disconnect event for: the OS
+    // re-enumerated the device, so the list now holds a NEW USBDevice object.
+    webusb.deviceList = [
+      { path, device: { serialNumber: path } as unknown as USBDevice, commType: 'webusb' },
+    ];
+    webusb.detectProtocol = jest.fn().mockImplementation((p: string) => {
+      webusb.deviceProtocol.set(p, 'V1');
+      return Promise.resolve('V1');
+    });
+
+    await expect(webusb.acquire({ path, expectedProtocol: 'V1' })).resolves.toBe(path);
+
+    expect(webusb.detectProtocol).toHaveBeenCalledTimes(1);
   });
 
   test('acquire re-probes a stale-marked path even when a protocol is cached', async () => {

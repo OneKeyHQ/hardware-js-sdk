@@ -79,7 +79,8 @@ interface TransferCancelToken {
 let activeWebUsbTransport: WebUsbTransport | undefined;
 let usbDisconnectListenerAttached = false;
 
-function attachUsbDisconnectListener(usb: USB) {
+function registerActiveWebUsbTransport(instance: WebUsbTransport, usb: USB) {
+  activeWebUsbTransport = instance;
   if (usbDisconnectListenerAttached) return;
   usbDisconnectListenerAttached = true;
   usb.addEventListener('disconnect', event => {
@@ -110,6 +111,15 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
 
   /** Paths currently acquired (between a successful acquire() and its release()). */
   private acquiredPaths: Set<string> = new Set();
+
+  /**
+   * The exact USBDevice object each cached protocol was probed against. The
+   * browser returns the same object identity for a device as long as it stays
+   * connected, and a replug/reboot always yields a new object — so an identity
+   * mismatch proves the device was re-enumerated since the probe, even when the
+   * disconnect event itself was delayed or missed.
+   */
+  private probedDeviceObjects: Map<string, USBDevice> = new Map();
 
   /** Per-path USB endpoint / interface numbers (discovered from USB descriptors) */
   private deviceEndpoints: Map<string, DeviceEndpoints> = new Map();
@@ -158,8 +168,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       );
     }
     this.usb = usb;
-    activeWebUsbTransport = this;
-    attachUsbDisconnectListener(usb);
+    registerActiveWebUsbTransport(this, usb);
   }
 
   /**
@@ -174,6 +183,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    */
   markProtocolStale(path: string) {
     this.staleProtocolPaths.add(path);
+    this.probedDeviceObjects.delete(path);
   }
 
   /**
@@ -282,6 +292,15 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         this.staleProtocolPaths.delete(input.path);
         this.deviceProtocol.delete(input.path);
       }
+      if (this.deviceProtocol.has(input.path)) {
+        const currentDevice = this.deviceList.find(d => d.path === input.path)?.device;
+        if (!currentDevice || currentDevice !== this.probedDeviceObjects.get(input.path)) {
+          // The OS re-enumerated the device since the probe (a replug/reboot we
+          // may not have seen a disconnect event for) — the cached protocol can
+          // no longer be trusted; re-probe on the wire below.
+          this.deviceProtocol.delete(input.path);
+        }
+      }
       const cachedProtocol = this.deviceProtocol.get(input.path);
       if (cachedProtocol && input.expectedProtocol && cachedProtocol !== input.expectedProtocol) {
         // The caller expects a different protocol than the cached probe result;
@@ -300,6 +319,10 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
           this.deviceProtocolHints.set(input.path, protocolHint);
         }
         await this.detectProtocol(input.path, input.expectedProtocol, protocolHint);
+        const probedDevice = this.deviceList.find(d => d.path === input.path)?.device;
+        if (probedDevice) {
+          this.probedDeviceObjects.set(input.path, probedDevice);
+        }
       }
       this.acquiredPaths.add(input.path);
       return await Promise.resolve(input.path);
@@ -550,10 +573,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    */
   private assertAcquired(path: string) {
     if (!this.acquiredPaths.has(path)) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        `Device is not acquired for ${path}`
-      );
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, `Device is not acquired for ${path}`);
     }
   }
 
