@@ -930,17 +930,6 @@ export class Device extends EventEmitter {
       };
 
       const expectedDeviceId = options?.deviceId;
-      if (expectedDeviceId) {
-        // 先只读校验物理设备身份；钱包上下文仍由下方携带完整参数的
-        // Initialize 选择，避免标准钱包请求复用此前的隐藏钱包上下文。
-        this.passphraseState = undefined;
-        const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
-        this._updateFeatures(message);
-        await TransportManager.reconfigure(this.features);
-        if (!this.checkDeviceId(expectedDeviceId)) {
-          throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
-        }
-      }
 
       this.passphraseState = options?.passphraseState;
 
@@ -960,7 +949,46 @@ export class Device extends EventEmitter {
         payload.derive_cardano = true;
       }
 
-      await callInitialize(payload, options?.initSession);
+      if (this.features) {
+        // Re-sync the V1 message schema for THIS device before encoding
+        // Initialize: the process-global schema may still reflect another
+        // device (e.g. legacy-firmware Touch/Mini) on multi-device setups, and
+        // a stale legacy schema would silently strip passphrase_state /
+        // is_contains_attach from the wire message. Local operation, no wire
+        // I/O; a no-op when the schema is unchanged.
+        await TransportManager.reconfigure(this.features);
+      }
+
+      // Initialize's own Features response carries device_id, so the physical
+      // device identity is validated on the same round trip instead of via a
+      // separate read-only GetFeatures preflight (which doubled the wire cost
+      // of every deviceId-carrying call). The method fn has not run yet, so a
+      // mismatch still fails before any wallet data can be derived, with the
+      // same DeviceCheckDeviceIdError. Wallet-context selection is unchanged:
+      // it is decided by the Initialize payload above either way.
+      const assertExpectedDeviceIdentity = () => {
+        if (expectedDeviceId && !this.checkDeviceId(expectedDeviceId)) {
+          // The mismatched Initialize may have cached a session under the wrong
+          // device's identity; drop it so no wallet context survives from it.
+          // (This also evicts any session the wrong device legitimately cached
+          // under the same passphraseState — a deliberate conservative purge
+          // after a physical-swap event, consistent with
+          // reconcileDeviceIdentity purging the previous device's sessions.)
+          this.clearInternalState();
+          throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+        }
+      };
+
+      try {
+        await callInitialize(payload, options?.initSession);
+      } catch (error) {
+        // callInitialize can fail AFTER the wire call cached the session (e.g.
+        // TransportManager.reconfigure rejecting); the identity check must
+        // still run so a wrong-device session never survives the error path.
+        assertExpectedDeviceIdentity();
+        throw error;
+      }
+      assertExpectedDeviceIdentity();
     } catch (error) {
       Log.error('Initialization failed:', error);
       throw error;

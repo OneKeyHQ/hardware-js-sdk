@@ -352,7 +352,7 @@ describe('Protocol V1 wallet identity initialization', () => {
     jest.restoreAllMocks();
   });
 
-  test('verifies the live device id without resetting the cached wallet session', async () => {
+  test('purges cached sessions and rejects when the live device identity changes', async () => {
     const device = Device.fromDescriptor({ id: 'connect-b', path: 'connect-b' } as never);
     device.features = {
       protocol: 'V1',
@@ -363,7 +363,7 @@ describe('Protocol V1 wallet identity initialization', () => {
     deviceWalletSessionStore.set('cached-device-a', 'hidden-a', 'session-a');
     const typedCall = jest.fn().mockResolvedValue({
       type: 'Features',
-      message: { device_id: 'live-device-b' },
+      message: { device_id: 'live-device-b', session_id: 'wrong-device-session' },
     });
     device.commands = { typedCall } as never;
     jest.spyOn(TransportManager, 'reconfigure').mockResolvedValue(undefined);
@@ -371,11 +371,76 @@ describe('Protocol V1 wallet identity initialization', () => {
     await expect(
       device.initialize({ deviceId: 'cached-device-a', passphraseState: 'hidden-a' })
     ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceCheckDeviceIdError });
+    // Identity is validated from the single Initialize round trip; no separate
+    // GetFeatures preflight.
     expect(typedCall).toHaveBeenCalledTimes(1);
-    expect(typedCall).toHaveBeenCalledWith('GetFeatures', 'Features', {});
+    expect(typedCall).toHaveBeenCalledWith(
+      'Initialize',
+      'Features',
+      expect.objectContaining({ passphrase_state: 'hidden-a' }),
+      expect.any(Object)
+    );
+    // Identity change purges the previous device's cached sessions (pre-existing
+    // reconcileDeviceIdentity behavior — never carry sessions across devices)…
+    expect(deviceWalletSessionStore.get('cached-device-a', 'hidden-a')).toBeUndefined();
+    // …and the session the mismatched Initialize cached under the wrong
+    // device's identity is dropped as well.
+    expect(deviceWalletSessionStore.get('live-device-b', 'hidden-a')).toBeUndefined();
   });
 
-  test('resumes a cached V1 wallet after a non-destructive live identity read', async () => {
+  test('drops the wrong-device session even when reconfigure fails after Initialize', async () => {
+    const device = Device.fromDescriptor({ id: 'connect-b', path: 'connect-b' } as never);
+    device.features = {
+      protocol: 'V1',
+      deviceId: 'cached-device-a',
+      unlocked: true,
+      passphraseProtection: true,
+    } as never;
+    deviceWalletSessionStore.set('cached-device-a', 'hidden-a', 'session-a');
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'Features',
+      message: { device_id: 'live-device-b', session_id: 'wrong-device-session' },
+    });
+    device.commands = { typedCall } as never;
+    // Pre-encode resync succeeds; the post-response reconfigure inside
+    // callInitialize rejects — the session write has already happened by then.
+    jest
+      .spyOn(TransportManager, 'reconfigure')
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('configure failed'));
+
+    await expect(
+      device.initialize({ deviceId: 'cached-device-a', passphraseState: 'hidden-a' })
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceCheckDeviceIdError });
+    // The wrong-device session must not survive the error path either.
+    expect(deviceWalletSessionStore.get('live-device-b', 'hidden-a')).toBeUndefined();
+  });
+
+  test('re-syncs the V1 message schema for this device before encoding Initialize', async () => {
+    const device = Device.fromDescriptor({ id: 'connect-a', path: 'connect-a' } as never);
+    device.features = {
+      protocol: 'V1',
+      deviceId: 'device-a',
+      unlocked: true,
+      passphraseProtection: true,
+    } as never;
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'Features',
+      message: { device_id: 'device-a' },
+    });
+    device.commands = { typedCall } as never;
+    const reconfigure = jest.spyOn(TransportManager, 'reconfigure').mockResolvedValue(undefined);
+
+    await device.initialize({ deviceId: 'device-a', passphraseState: 'hidden-a' });
+
+    // A stale process-global schema (from another device) would silently strip
+    // passphrase_state from the wire message, so the resync must come first.
+    expect(reconfigure.mock.invocationCallOrder[0]).toBeLessThan(
+      typedCall.mock.invocationCallOrder[0]
+    );
+  });
+
+  test('resumes a cached V1 wallet with a single identity-validated Initialize', async () => {
     const device = Device.fromDescriptor({ id: 'connect-a', path: 'connect-a' } as never);
     device.features = {
       protocol: 'V1',
@@ -384,22 +449,17 @@ describe('Protocol V1 wallet identity initialization', () => {
       passphraseProtection: true,
     } as never;
     deviceWalletSessionStore.set('device-a', 'hidden-a', 'session-a');
-    const typedCall = jest
-      .fn()
-      .mockResolvedValueOnce({ type: 'Features', message: { device_id: 'device-a' } })
-      .mockResolvedValueOnce({
-        type: 'Features',
-        message: { device_id: 'device-a', session_id: 'session-a' },
-      });
+    const typedCall = jest.fn().mockResolvedValueOnce({
+      type: 'Features',
+      message: { device_id: 'device-a', session_id: 'session-a' },
+    });
     device.commands = { typedCall } as never;
     jest.spyOn(TransportManager, 'reconfigure').mockResolvedValue(undefined);
 
     await device.initialize({ deviceId: 'device-a', passphraseState: 'hidden-a' });
 
-    expect(typedCall).toHaveBeenCalledTimes(2);
-    expect(typedCall).toHaveBeenNthCalledWith(1, 'GetFeatures', 'Features', {});
-    expect(typedCall).toHaveBeenNthCalledWith(
-      2,
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall).toHaveBeenCalledWith(
       'Initialize',
       'Features',
       expect.objectContaining({
@@ -408,9 +468,10 @@ describe('Protocol V1 wallet identity initialization', () => {
       }),
       expect.any(Object)
     );
+    expect(deviceWalletSessionStore.get('device-a', 'hidden-a')).toBe('session-a');
   });
 
-  test('selects the standard V1 wallet after a non-destructive live identity read', async () => {
+  test('selects the standard V1 wallet with a single identity-validated Initialize', async () => {
     const device = Device.fromDescriptor({ id: 'connect-a', path: 'connect-a' } as never);
     device.features = {
       protocol: 'V1',
@@ -420,17 +481,14 @@ describe('Protocol V1 wallet identity initialization', () => {
     } as never;
     const typedCall = jest
       .fn()
-      .mockResolvedValueOnce({ type: 'Features', message: { device_id: 'device-a' } })
       .mockResolvedValueOnce({ type: 'Features', message: { device_id: 'device-a' } });
     device.commands = { typedCall } as never;
     jest.spyOn(TransportManager, 'reconfigure').mockResolvedValue(undefined);
 
     await device.initialize({ deviceId: 'device-a' });
 
-    expect(typedCall).toHaveBeenCalledTimes(2);
-    expect(typedCall).toHaveBeenNthCalledWith(1, 'GetFeatures', 'Features', {});
-    expect(typedCall).toHaveBeenNthCalledWith(
-      2,
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall).toHaveBeenCalledWith(
       'Initialize',
       'Features',
       {
