@@ -449,7 +449,8 @@ export class Device extends EventEmitter {
           undefined,
           true,
           strictProtocol,
-          undefined
+          undefined,
+          options?.forceProtocolDetection
         );
         this.mainId = (acquireResult as any)?.uuid ?? '';
         Log.debug('Expected uuid:', this.mainId);
@@ -459,7 +460,8 @@ export class Device extends EventEmitter {
           this.originalDescriptor.session,
           undefined,
           strictProtocol,
-          undefined
+          undefined,
+          options?.forceProtocolDetection
         );
         this.mainId = acquireResult as string | undefined;
         Log.debug('Expected session id:', this.mainId);

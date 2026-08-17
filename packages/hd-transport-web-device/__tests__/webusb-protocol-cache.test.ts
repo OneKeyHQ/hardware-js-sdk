@@ -69,6 +69,22 @@ describe('WebUsbTransport protocol probe cache', () => {
     expect(webusb.detectProtocol).toHaveBeenCalledWith(path, 'V1', undefined);
   });
 
+  test('forced protocol detection bypasses a valid cache and probes on the wire', async () => {
+    const webusb = buildAcquirableTransport();
+    const path = 'pro-webusb';
+    // Valid cache AND unchanged USBDevice object — the strongest cache hit.
+    webusb.deviceProtocol.set(path, 'V1');
+    webusb.detectProtocol = jest.fn().mockImplementation((p: string) => {
+      webusb.deviceProtocol.set(p, 'V1');
+      return Promise.resolve('V1');
+    });
+
+    await expect(webusb.acquire({ path, forceProtocolDetection: true })).resolves.toBe(path);
+
+    // Explicit recovery must always reach the wire probe.
+    expect(webusb.detectProtocol).toHaveBeenCalledTimes(1);
+  });
+
   test('acquire re-probes when the USBDevice object identity changed since the probe', async () => {
     const webusb = buildAcquirableTransport();
     const path = 'pro-webusb';

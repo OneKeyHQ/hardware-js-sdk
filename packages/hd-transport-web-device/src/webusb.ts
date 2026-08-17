@@ -286,6 +286,14 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       await this.rotateProtocolV2UsbGeneration(input.path, 'WebUSB transport acquired');
       await this.closeOpenDevice(input.path);
       await this.connect(input.path ?? '', true);
+      if (input.forceProtocolDetection) {
+        // Explicit recovery/discovery (e.g. detectDeviceConnectProtocol) must
+        // probe on the wire regardless of any cached result — the cached
+        // binding may be exactly what the caller is trying to recover from.
+        this.staleProtocolPaths.delete(input.path);
+        this.deviceProtocol.delete(input.path);
+        this.deviceProtocolHints.delete(input.path);
+      }
       if (this.staleProtocolPaths.has(input.path)) {
         // The device disconnected (possibly rebooting into another mode) since
         // the protocol was probed — drop the cache so it is re-probed below.
