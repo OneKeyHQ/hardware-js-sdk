@@ -393,7 +393,8 @@ const isProtocolV2FirmwareStatusEndpointUnavailable = (error: unknown) => {
 
 const isProtocolV2TerminalInstallStatusError = (error: unknown) =>
   error instanceof HardwareError &&
-  (error.errorCode === HardwareErrorCode.FirmwareError ||
+  (error.errorCode === HardwareErrorCode.ActionCancelled ||
+    error.errorCode === HardwareErrorCode.FirmwareError ||
     error.errorCode === HardwareErrorCode.FirmwareVerificationFailed ||
     error.params?.firmwareUpdateCode === PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE);
 

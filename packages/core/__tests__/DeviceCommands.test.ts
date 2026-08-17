@@ -485,7 +485,7 @@ describe('DeviceCommands failure mapping', () => {
     });
   });
 
-  it.each(['Cancelled on device', 'Confirm dismissed'])(
+  it.each(['Cancelled on device', 'Confirm dismissed', 'Update cancelled'])(
     'maps legacy Protocol V2 cancellation message "%s" without a subcode',
     async message => {
       const commands = createCommands();

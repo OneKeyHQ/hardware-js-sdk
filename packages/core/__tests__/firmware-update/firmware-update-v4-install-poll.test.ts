@@ -1,4 +1,4 @@
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import FirmwareUpdateV4 from '../../src/api/FirmwareUpdateV4';
 
@@ -126,5 +126,41 @@ describe('FirmwareUpdateV4 install polling', () => {
     ).rejects.toMatchObject({
       errorCode: HardwareErrorCode.CallQueueActionCancelled,
     });
+  });
+
+  test('stops polling when the device cancels firmware installation', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        connectId: 'pro2-ble',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
+    const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+
+    method.device = {
+      getCommands: () => ({ typedCall }),
+    } as unknown as Device;
+    const firmwareUpdate = method as unknown as {
+      waitForProtocolV2FirmwareUpdateComplete: (
+        targets: Array<{ target_id: number; path: string }>
+      ) => Promise<void>;
+      reconnectProtocolV2Device: () => Promise<void>;
+    };
+    firmwareUpdate.reconnectProtocolV2Device = reconnectProtocolV2Device;
+
+    await expect(
+      firmwareUpdate.waitForProtocolV2FirmwareUpdateComplete([
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
+      ])
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.ActionCancelled,
+    });
+
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(reconnectProtocolV2Device).not.toHaveBeenCalled();
   });
 });

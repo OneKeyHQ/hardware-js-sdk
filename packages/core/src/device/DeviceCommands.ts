@@ -69,7 +69,7 @@ const DEVICE_CONTROL_CALLS = new Set([
 // Older Protocol V2 firmware may omit the cancellation subcode, so retain a
 // narrow message fallback for compatibility.
 const isProtocolV2ActionCancelledMessage = (message: string) =>
-  /^(?:cancel(?:led|ed)(?: on device)?|confirm dismissed|user cancel(?:led|ed)(?:\s+.*)?)$/i.test(
+  /^(?:cancel(?:led|ed)(?: on device)?|confirm dismissed|update cancel(?:led|ed)|user cancel(?:led|ed)(?:\s+.*)?)$/i.test(
     message
   );
 
