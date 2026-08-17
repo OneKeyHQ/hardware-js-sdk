@@ -54,6 +54,11 @@ export type AcquireInput = {
   forceCleanRunPromise?: boolean;
   expectedProtocol?: ProtocolType;
   protocolHint?: ProtocolType;
+  /**
+   * Explicit recovery/discovery (e.g. detectDeviceConnectProtocol): the
+   * transport must probe the protocol on the wire, bypassing any cached result.
+   */
+  forceProtocolDetection?: boolean;
 };
 
 export type MessageFromOneKey = { type: string; message: Record<string, any> };
