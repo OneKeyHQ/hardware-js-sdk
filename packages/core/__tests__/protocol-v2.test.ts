@@ -4364,6 +4364,33 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
+  test('uses the DeviceState identity for Protocol V2 firmware artifact lookups', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'web',
+      },
+    });
+    method.init();
+    (method as any).device = stubDevice({
+      originalDescriptor: { protocolType: 'V2' },
+      features: {
+        firmwareVersion: '1.0.0',
+        serialNo: 'device-without-model-prefix',
+      },
+      getCurrentDeviceType: () => EDeviceType.Pro2,
+      getCurrentFirmwareType: () => EFirmwareType.Universal,
+    });
+
+    await expect((method as any).getProtocolV2DeviceFeatures()).resolves.toEqual(
+      expect.objectContaining({
+        deviceType: EDeviceType.Pro2,
+        firmwareType: EFirmwareType.Universal,
+      })
+    );
+  });
+
   test('keeps all local binaries when no target list was supplied', () => {
     const method = new FirmwareUpdateV4({
       id: 1,

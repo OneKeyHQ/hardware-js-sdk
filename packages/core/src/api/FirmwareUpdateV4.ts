@@ -1673,14 +1673,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private async getProtocolV2DeviceFeatures(): Promise<Features> {
-    if (this.device.features) {
-      return this.device.features;
-    }
+    let { features } = this.device;
     if (typeof this.device.getFeatures === 'function') {
-      const features = await this.device.getFeatures();
-      if (features) return features;
+      features ??= await this.device.getFeatures();
     }
-    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
+    if (!features) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
+    }
+    const deviceType = this.device.getCurrentDeviceType();
+    if (deviceType !== EDeviceType.Pro2 && deviceType !== EDeviceType.Neo) {
+      return features;
+    }
+    return {
+      ...features,
+      deviceType,
+      firmwareType: this.device.getCurrentFirmwareType(),
+    };
   }
 
   private getProtocolV2SerialNumber(deviceInfo: ProtocolV2DeviceInfo) {
