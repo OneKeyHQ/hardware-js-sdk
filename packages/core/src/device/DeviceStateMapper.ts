@@ -347,8 +347,10 @@ export const mapProtocolV2DeviceStatusToState = (status: DeviceStatus): DeviceSt
     unlocked: status.unlocked,
     passphraseProtection: status.unlocked === true ? status.passphrase_enabled ?? null : undefined,
     backupRequired: status.backup_required,
-    attachToPinEnabled: status.attach_to_pin_enabled,
-    unlockedAttachPin: status.unlocked_by_attach_to_pin,
+    attachToPinEnabled:
+      status.unlocked === true ? status.attach_to_pin_enabled ?? undefined : undefined,
+    unlockedAttachPin:
+      status.unlocked === true ? status.unlocked_by_attach_to_pin ?? null : undefined,
   }),
   raw: { protocolV2DeviceStatus: status },
 });
@@ -375,21 +377,23 @@ export const mapApplySettingsToState = (settings: ApplySettings): DeviceStatePat
 };
 
 export const mapDeviceSettingsToState = (settings: DeviceSettings): DeviceStatePatch => {
-  const identity = definedEntries({ label: settings.label });
-  const status = definedEntries({ passphraseProtection: settings.passphrase_enable });
+  const identity = definedEntries({ label: settings.label ?? undefined });
+  const status = definedEntries({
+    passphraseProtection: settings.passphrase_enable ?? undefined,
+  });
   const stateSettings = definedEntries({
     bleEnabled: settings.bt_enable,
     language: mapLanguageFromProtocolV2(settings.language),
     wallpaperPath: settings.wallpaper_path,
     brightness: settings.brightness,
-    autoLockDelayMs: settings.autolock_delay_ms,
-    autoShutdownDelayMs: settings.autoshutdown_delay_ms,
+    autoLockDelayMs: settings.autolock_delay_ms ?? undefined,
+    autoShutdownDelayMs: settings.autoshutdown_delay_ms ?? undefined,
     animationEnabled: settings.animation_enable,
     tapToWake: settings.tap_to_wake,
     hapticFeedback: settings.haptic_feedback,
     deviceNameDisplayEnabled: settings.device_name_display_enabled,
     airgapMode: settings.airgap_mode,
-    fidoEnabled: settings.fido_enabled,
+    fidoEnabled: settings.fido_enabled ?? undefined,
     usbLockEnabled: settings.usb_lock_enable,
     randomKeypad: settings.random_keypad,
   });
