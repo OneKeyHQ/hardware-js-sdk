@@ -284,6 +284,9 @@ export class Device extends EventEmitter {
 
   runPromise?: Deferred<void> | null;
 
+  /** Resolves only after the active run has completed its release path. */
+  private runCleanupPromise?: Promise<void>;
+
   externalState: string[] = [];
 
   unavailableCapabilities: UnavailableCapabilities = {};
@@ -1079,6 +1082,10 @@ export class Device extends EventEmitter {
     return params.includeRaw ? cloneDeviceState(this.state) : createPublicDeviceState(this.state);
   }
 
+  async refreshProtocolV2SettingsAfterMutation() {
+    return this.getDeviceState({ refreshSections: ['status', 'settings'] });
+  }
+
   _updateFeatures(protoFeatures: PROTO.Features | Features, initSession?: boolean) {
     const previousDeviceId = this.getCurrentDeviceId();
     let feat =
@@ -1396,12 +1403,20 @@ export class Device extends EventEmitter {
 
     const runPromise = createDeferred<void>();
     this.runPromise = runPromise;
-    this._runInner(fn, options, runPromise).catch(error => {
+    const cleanupPromise = this._runInner(fn, options, runPromise).catch(error => {
       if (this.runPromise === runPromise) {
         this.runPromise = null;
       }
       runPromise.reject(error);
     });
+    this.runCleanupPromise = cleanupPromise;
+    cleanupPromise
+      .finally(() => {
+        if (this.runCleanupPromise === cleanupPromise) {
+          this.runCleanupPromise = undefined;
+        }
+      })
+      .catch(() => undefined);
     return runPromise.promise;
   }
 
@@ -1513,13 +1528,26 @@ export class Device extends EventEmitter {
 
   async interruptionFromUser() {
     const error = ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
-    await this.cancelableAction?.(error);
+    const cleanupPromise = this.runCleanupPromise;
+    const { cancelableAction } = this;
+    if (cancelableAction) {
+      await cancelableAction(error);
+    } else if (
+      this.isProtocolV2() &&
+      DataManager.isBleConnect(DataManager.getSettings('env')) &&
+      this.hasDeviceAcquire()
+    ) {
+      await this.commands?.cancelDevice?.().catch(cancelError => {
+        Log.debug('Protocol V2 BLE fallback cancel error', cancelError);
+      });
+    }
     await this.commands?.cancel();
 
     if (this.runPromise) {
       this.runPromise.reject(error);
       this.runPromise = null;
     }
+    await cleanupPromise?.catch(() => undefined);
   }
 
   setCancelableAction(callback: (err?: Error) => Promise<unknown>) {

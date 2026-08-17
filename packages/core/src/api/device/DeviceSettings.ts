@@ -168,8 +168,7 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
   async run() {
     try {
       if (this.device.isProtocolV2()) {
-        const refreshStatusAndSettings = () =>
-          this.device.getDeviceState({ refreshSections: ['status', 'settings'] });
+        const refreshStatusAndSettings = () => this.device.refreshProtocolV2SettingsAfterMutation();
         assertSettingsSupported(this.payload, DEVICE_SETTINGS_V1_ONLY_FIELDS, 'Protocol V2');
         const capabilities = getDeviceSettingsCapabilities(
           this.device.getCurrentDeviceType(),
@@ -201,20 +200,7 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
           const res = await this.device.commands.typedCall('DeviceSettingsPageShow', 'Success', {
             page: DeviceSettingsPage.DevicePassphrase,
           });
-          const updated = await refreshStatusAndSettings();
-          const lockedAfterDisabling =
-            requestedPassphrase === false &&
-            current.status.unlocked === true &&
-            updated.status.unlocked === false;
-          if (
-            updated.status.passphraseProtection !== requestedPassphrase &&
-            !lockedAfterDisabling
-          ) {
-            throw TypedError(
-              HardwareErrorCode.RuntimeError,
-              'Protocol V2 passphrase setting did not reach the requested value.'
-            );
-          }
+          await refreshStatusAndSettings();
           return res.message;
         }
         if (requestedAirgap !== undefined) {

@@ -83,6 +83,7 @@ import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
 const PRE_INITIALIZE_TTL_MS = 60 * 1000;
+const PRE_PENDING_CALL_TIMEOUT_MS = 15 * 1000;
 
 // Dedup/coalesce state for "pre-warm signal" methods (isPreWarmSignal),
 // keyed by getPreWarmKey(): coalesce in-flight, skip if warmed within TTL.
@@ -296,26 +297,35 @@ const handlePreWarmSignal = async (
   }
 };
 
-const waitWithTimeout = async (promise: Promise<any>, timeout: number) => {
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Request timeout')), timeout);
-  });
-  return Promise.race([promise, timeoutPromise]);
-};
-
 const waitForPendingPromise = async (
-  getPrePendingCallPromise: () => Promise<void> | undefined,
-  removePrePendingCallPromise?: (promise: Promise<void> | undefined) => void
+  connectId: string,
+  getPrePendingCallPromise: (connectId: string) => Promise<void> | undefined,
+  removePrePendingCallPromise?: (connectId: string, promise: Promise<void>) => void
 ) => {
-  const pendingPromise = getPrePendingCallPromise();
+  const pendingPromise = getPrePendingCallPromise(connectId);
   if (pendingPromise) {
     Log.debug('pre pending call promise before call method, wait for it');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
     try {
-      await waitWithTimeout(pendingPromise, 5 * 1000);
+      await Promise.race([
+        pendingPromise,
+        new Promise<void>(resolve => {
+          timer = setTimeout(() => {
+            timedOut = true;
+            resolve();
+          }, PRE_PENDING_CALL_TIMEOUT_MS);
+        }),
+      ]);
     } catch (error) {
-      // ignore timeout error
+      // Cancellation is best-effort; the transport teardown owns recovery.
+    } finally {
+      if (timer) clearTimeout(timer);
+      removePrePendingCallPromise?.(connectId, pendingPromise);
     }
-    removePrePendingCallPromise?.(pendingPromise);
+    if (timedOut) {
+      Log.warn('pre pending call promise timed out before call method', { connectId });
+    }
     Log.debug('pre pending call promise before call method done');
   }
 };
@@ -327,7 +337,7 @@ const onCallDevice = async (
 ): Promise<any> => {
   let messageResponse: any;
 
-  const { requestQueue, getPrePendingCallPromise, setPrePendingCallPromise } = context;
+  const { requestQueue, getPrePendingCallPromise, removePrePendingCallPromise } = context;
 
   updateMethodRequestContext(method, { status: 'running' });
 
@@ -355,7 +365,11 @@ const onCallDevice = async (
     await context.waitForCallbackTasks(method.connectId);
   }
 
-  await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
+  await waitForPendingPromise(
+    method.connectId ?? '',
+    getPrePendingCallPromise,
+    removePrePendingCallPromise
+  );
 
   const task = requestQueue.createTask(method);
 
@@ -454,7 +468,11 @@ const onCallDevice = async (
       await context.waitForCallbackTasks(method.connectId, preWarmCallbackTask);
     }
 
-    await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
+    await waitForPendingPromise(
+      method.connectId ?? '',
+      getPrePendingCallPromise,
+      removePrePendingCallPromise
+    );
 
     const inner = async (): Promise<void> => {
       // Protocol is established from an active device response during acquire/initialize.
@@ -906,6 +924,16 @@ function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) 
   );
 }
 
+export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unknown) {
+  const typedError = error as { errorCode?: unknown; message?: unknown };
+  return (
+    method.payload.connectProtocol === 'V2' &&
+    typedError?.errorCode === HardwareErrorCode.RuntimeError &&
+    typeof typedError.message === 'string' &&
+    typedError.message.includes('Device protocol has not been detected')
+  );
+}
+
 /**
  * If the Bluetooth connection times out, retry up to 6 times
  * @param retryCount - Current retry count (default 0)
@@ -943,12 +971,13 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       DevicePool.emitter.emit(DEVICE.CONNECT, device);
     }
   } catch (err) {
+    const requiresColdReconnect = isMissingDetectedProtocolV2Error(method, err);
     // Device.run()'s REQUIRE_DISCONNECT handling never sees acquire/initialize
     // failures, so with keep-alive a wedged link would be reused by every retry
     // (field case: Initialize timing out at 25s per attempt, forever). Drop it
     // here so the next retry cold-connects.
     if (
-      ERROR_CODES_REQUIRE_DISCONNECT.includes(err.errorCode) &&
+      (ERROR_CODES_REQUIRE_DISCONNECT.includes(err.errorCode) || requiresColdReconnect) &&
       device.mainId &&
       device.deviceConnector
     ) {
@@ -961,11 +990,12 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
     if (
       (err.errorCode === HardwareErrorCode.BleTimeoutError ||
         err.errorCode === HardwareErrorCode.BleConnectedError ||
-        isRetryableBleProtocolV2ProbeError(method, err)) &&
+        isRetryableBleProtocolV2ProbeError(method, err) ||
+        requiresColdReconnect) &&
       retryCount < 6
     ) {
       const nextRetry = retryCount + 1;
-      Log.debug(`Bluetooth connect timeout and will retry, retry count: ${nextRetry}`);
+      Log.debug(`Bluetooth connection will retry, retry count: ${nextRetry}`);
       await wait(3000);
       await connectDeviceForBle(method, device, nextRetry);
     } else {
@@ -1177,7 +1207,10 @@ export const cancel = (context: CoreContext, connectId?: string) => {
         if (task && task.method?.device) {
           if (!canceledDevices.includes(task.method.device)) {
             const { device } = task.method;
-            setPrePendingCallPromise(device?.interruptionFromUser());
+            setPrePendingCallPromise(
+              task.method.connectId ?? connectId,
+              device.interruptionFromUser()
+            );
             canceledDevices.push(device);
           }
           requestQueue.rejectRequest(
@@ -1531,7 +1564,7 @@ export default class Core extends EventEmitter {
   private disposePromise?: Promise<void>;
 
   // background task
-  private prePendingCallPromise: Promise<void> | undefined;
+  private prePendingCallPromises = new Map<string, Promise<void>>();
 
   private methodSynchronize = getSynchronize();
 
@@ -1548,9 +1581,18 @@ export default class Core extends EventEmitter {
       tracingContext: this.tracingContext,
       requestQueue: this.requestQueue,
       methodSynchronize: this.methodSynchronize,
-      getPrePendingCallPromise: () => this.prePendingCallPromise,
-      setPrePendingCallPromise: (promise: Promise<void> | undefined) => {
-        this.prePendingCallPromise = promise;
+      getPrePendingCallPromise: (connectId: string) => this.prePendingCallPromises.get(connectId),
+      setPrePendingCallPromise: (connectId: string, promise?: Promise<void>) => {
+        if (!promise) {
+          this.prePendingCallPromises.delete(connectId);
+          return;
+        }
+        this.prePendingCallPromises.set(connectId, promise);
+      },
+      removePrePendingCallPromise: (connectId: string, promise: Promise<void>) => {
+        if (this.prePendingCallPromises.get(connectId) === promise) {
+          this.prePendingCallPromises.delete(connectId);
+        }
       },
       // callback 任务管理
       registerCallbackTask: (connectId: string, callbackPromise: Deferred<any>) => {
@@ -1665,7 +1707,7 @@ export default class Core extends EventEmitter {
     preWarmInflight.clear();
     preWarmDoneAt.clear();
     preConnectCache = { passphraseState: undefined };
-    this.prePendingCallPromise = undefined;
+    this.prePendingCallPromises.clear();
     this.removeAllListeners();
     cleanupSdkInstance(this.sdkInstanceId);
     if (_core === this) _core = undefined;

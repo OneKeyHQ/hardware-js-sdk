@@ -264,6 +264,7 @@ export class DeviceCommands {
     }
     const activeCall = this.callPromise;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
     const cancellation = (async () => {
       await this.dispose(true);
       await activeCall?.catch(() => undefined);
@@ -273,11 +274,23 @@ export class DeviceCommands {
       await Promise.race([
         cancellation,
         new Promise<void>(resolve => {
-          timer = setTimeout(resolve, 10 * 1000);
+          timer = setTimeout(() => {
+            timedOut = true;
+            resolve();
+          }, 10 * 1000);
         }),
       ]);
     } finally {
       if (timer) clearTimeout(timer);
+      if (
+        timedOut &&
+        this.transport.name === 'ReactNativeBleTransport' &&
+        this.transport.disconnect
+      ) {
+        await this.transport.disconnect(this.mainId).catch(error => {
+          Log.debug('BLE cancellation timeout disconnect error (ignored)', error);
+        });
+      }
       if (this.callPromise === activeCall) {
         this.callPromise = undefined;
       }
