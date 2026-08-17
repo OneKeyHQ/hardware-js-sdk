@@ -5963,12 +5963,12 @@ describe('Protocol V2 firmware update targets', () => {
       minor_version: 0,
       patch_version: 0,
     };
-    (method as any).protocolV2FinalStatusVerified = true;
+    (method as any).protocolV2CompletedTargetIds = new Set([4, 5]);
 
     expect(() => (method as any).assertExpectedProtocolV2Versions()).not.toThrow();
   });
 
-  test('accepts unobservable final versions after the status endpoint fallback', () => {
+  test('rejects unobservable multi-app versions without per-target completion evidence', () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -5988,7 +5988,11 @@ describe('Protocol V2 firmware update targets', () => {
       patch_version: 0,
     };
 
-    expect(() => (method as any).assertExpectedProtocolV2Versions()).not.toThrow();
+    (method as any).protocolV2CompletedTargetIds = new Set([4]);
+
+    expect(() => (method as any).assertExpectedProtocolV2Versions()).toThrow(
+      'target app_v1 has no observable final version after status fallback'
+    );
   });
 
   test('still rejects an unobservable non-app version after the status endpoint fallback', () => {
@@ -6749,11 +6753,13 @@ describe('Protocol V2 firmware update targets', () => {
           bootloader: {
             target: 'BOOTLOADER',
             url: 'https://example.com/bootloader.pp.bin',
+            version: [1, 0, 0],
             ...componentIntegrity('https://example.com/bootloader.pp.bin'),
           },
           applicationP1: {
             target: 'APPLICATION_P1',
             url: 'https://example.com/applicationP1.pp.bin',
+            version: [2, 0, 0],
             ...componentIntegrity('https://example.com/applicationP1.pp.bin'),
             // Core treats the package as opaque; the device owns its internal format validation.
             payloadHash: '00'.repeat(64),
@@ -6761,31 +6767,37 @@ describe('Protocol V2 firmware update targets', () => {
           applicationP2: {
             target: 'APPLICATION_P2',
             url: 'https://example.com/applicationP2.pp.bin',
+            version: [2, 0, 1],
             ...componentIntegrity('https://example.com/applicationP2.pp.bin'),
           },
           coprocessor: {
             target: 'COPROCESSOR',
             url: 'https://example.com/coprocessor.pp.bin',
+            version: [1, 1, 0],
             ...componentIntegrity('https://example.com/coprocessor.pp.bin'),
           },
           se01: {
             target: 'SE01',
             url: 'https://example.com/se01.pp.bin',
+            version: [1, 2, 1],
             ...componentIntegrity('https://example.com/se01.pp.bin'),
           },
           se02: {
             target: 'SE02',
             url: 'https://example.com/se02.pp.bin',
+            version: [1, 2, 2],
             ...componentIntegrity('https://example.com/se02.pp.bin'),
           },
           se03: {
             target: 'SE03',
             url: 'https://example.com/se03.pp.bin',
+            version: [1, 2, 3],
             ...componentIntegrity('https://example.com/se03.pp.bin'),
           },
           se04: {
             target: 'SE04',
             url: 'https://example.com/se04.pp.bin',
+            version: [1, 2, 4],
             ...componentIntegrity('https://example.com/se04.pp.bin'),
           },
         },
@@ -6823,6 +6835,16 @@ describe('Protocol V2 firmware update targets', () => {
       'https://example.com/se03.pp.bin',
       'https://example.com/se04.pp.bin',
     ]);
+    expect((method as any).params.expectedTargetVersions).toEqual({
+      boot: '1.0.0',
+      app_v1: '2.0.0',
+      app_v2: '2.0.1',
+      coprocessor: '1.1.0',
+      se01: '1.2.1',
+      se02: '1.2.2',
+      se03: '1.2.3',
+      se04: '1.2.4',
+    });
 
     getSysResourceBinarySpy.mockRestore();
     getFirmwareLatestReleaseSpy.mockRestore();

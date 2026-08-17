@@ -1,4 +1,4 @@
-import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
+import TransportUtils, { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import ConfluxSignMessageCIP23 from '../src/api/conflux/ConfluxSignMessageCIP23';
 import DeviceChangePin from '../src/api/device/DeviceChangePin';
@@ -8,6 +8,7 @@ import DeviceVerify from '../src/api/device/DeviceVerify';
 import DeviceWipe from '../src/api/device/DeviceWipe';
 import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
 import OpenWalletSession from '../src/api/OpenWalletSession';
+import DataManager from '../src/data-manager/DataManager';
 import { runMethodWithUnlockPolicy } from '../src/protocols/protocol-v2/unlockPolicyRunner';
 
 jest.mock('../src/data/config', () => ({
@@ -16,6 +17,42 @@ jest.mock('../src/data/config', () => ({
 }));
 
 describe('Protocol V2 unlock semantics', () => {
+  test('serializes genuine-device verification with Protocol V2 certificate messages', async () => {
+    const method = new DeviceVerify({
+      id: 1,
+      payload: { method: 'deviceVerify', dataHex: 'aabb' },
+    });
+    method.init();
+    const protocolV2Messages = TransportUtils.parseConfigure(
+      DataManager.getProtobufMessages('v2Schema')
+    );
+    const typedCall = jest.fn(
+      (requestType: string, responseType: string, payload: Record<string, unknown> = {}) => {
+        const request = TransportUtils.createMessageFromName(protocolV2Messages, requestType);
+        request.Message.encode(request.Message.create(payload)).finish();
+        TransportUtils.createMessageFromName(protocolV2Messages, responseType);
+        if (requestType === 'DeviceCertificateSign') {
+          return Promise.resolve({ message: { data: 'signature' } });
+        }
+        return Promise.resolve({ message: { cert_and_pubkey: 'certificate' } });
+      }
+    );
+    method.device = {
+      getCurrentDeviceType: () => 'pro2',
+      isProtocolV2: () => true,
+      commands: { typedCall },
+    } as any;
+
+    await expect(method.run()).resolves.toEqual({
+      cert: 'certificate',
+      signature: 'signature',
+    });
+    expect(typedCall.mock.calls.map(call => call.slice(0, 2))).toEqual([
+      ['DeviceCertificateSign', 'DeviceCertificateSignature'],
+      ['DeviceCertificateRead', 'DeviceCertificate'],
+    ]);
+  });
+
   test('wallet business methods inherit the wallet-session unlock requirement', () => {
     const method = new ConfluxSignMessageCIP23({
       id: 1,

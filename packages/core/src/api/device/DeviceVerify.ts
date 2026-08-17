@@ -47,6 +47,22 @@ export default class DeviceVerify extends BaseMethod<BixinVerifyDeviceRequest> {
         }
       );
       response = res.message;
+    } else if (this.device.isProtocolV2()) {
+      const signatureRes = await this.device.commands.typedCall(
+        'DeviceCertificateSign',
+        'DeviceCertificateSignature',
+        {
+          data: this.params.data,
+        }
+      );
+      const certRes = await this.device.commands.typedCall(
+        'DeviceCertificateRead',
+        'DeviceCertificate'
+      );
+      response = {
+        cert: certRes.message.cert_and_pubkey,
+        signature: signatureRes.message.data,
+      };
     } else {
       const signatureRes = await this.device.commands.typedCall(
         'SESignMessage',

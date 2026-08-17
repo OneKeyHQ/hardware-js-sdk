@@ -590,9 +590,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private protocolV2CompletedTargetVersions = new Map<number, number>();
 
-  private protocolV2LatestFinalFeatures?: Features;
+  private protocolV2CompletedTargetIds = new Set<number>();
 
-  private protocolV2FinalStatusVerified = false;
+  private protocolV2LatestFinalFeatures?: Features;
 
   private protocolV2InstallBaselineVersions = new Map<number, string>();
 
@@ -1629,9 +1629,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
               Math.floor(statusVersion / 0x100) % 0x100
             }.${statusVersion % 0x100}`;
       if (!observedVersion) {
-        const isUnobservableApplicationSlot =
-          applicationTargets.length > 1 && (target === 'app_v1' || target === 'app_v2');
-        if (this.protocolV2FinalStatusVerified || isUnobservableApplicationSlot) {
+        const requestedTargetIds = requestedTargets.flatMap(requestedTarget => {
+          if (requestedTarget === 'resource' || requestedTarget === 'boot_resources') return [];
+          const installTarget = PROTOCOL_V2_INSTALL_TARGET_BY_UPDATE_TARGET.get(requestedTarget);
+          return installTarget ? [installTarget.targetId] : [];
+        });
+        const hasCompleteTargetEvidence =
+          requestedTargetIds.length > 0 &&
+          requestedTargetIds.every(targetId => this.protocolV2CompletedTargetIds.has(targetId));
+        if (hasCompleteTargetEvidence) {
           Log.warn(
             `Protocol V2 target ${target} has no observable final version; install completion is authoritative`
           );
@@ -1981,6 +1987,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         ? PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID.get(target.targetId)
         : undefined;
       if (updateTarget && targetsToUpdate.has(updateTarget)) {
+        if (component.version) {
+          this.params.expectedTargetVersions ??= {};
+          this.params.expectedTargetVersions[updateTarget] = component.version.join('.');
+        }
         const explicitInstallItem = explicitInstallItemByTargetId.get(target.targetId);
         const installItem =
           explicitInstallItem ?? (await this.downloadRemoteProtocolV2Component(key, component));
@@ -2546,6 +2556,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       const targetId = normalizeProtocolV2TargetId(target.target_id);
       if (targetId !== undefined) {
         completedTargetIds.add(targetId);
+        this.protocolV2CompletedTargetIds.add(targetId);
       }
     });
     if (completedTargetIds.size === expectedTargetIds.size && expectedTargetIds.size > 0) {
@@ -2650,7 +2661,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     targets: Array<{ target_id: number; path: string }>,
     requireCurrentInstallStatus = false
   ) {
-    this.protocolV2FinalStatusVerified = false;
     const expectedTargetIds = new Set(targets.map(target => target.target_id));
     const expectedPaths = new Map(targets.map(target => [target.target_id, target.path]));
     const startTime = Date.now();
@@ -2727,7 +2737,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             shouldVerifyTargetCompletion &&
             this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds, expectedPaths)
           ) {
-            this.protocolV2FinalStatusVerified = true;
             return;
           }
 
