@@ -128,7 +128,7 @@ describe('public device lifecycle events', () => {
 
     await device.acquire();
 
-    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, 'V1', undefined);
+    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, 'V1', undefined, undefined);
     expect(device.getProtocol()).toBe('V1');
     expect(device.originalDescriptor.protocolType).toBe('V1');
   });
@@ -146,7 +146,9 @@ describe('public device lifecycle events', () => {
 
     await device.acquire(undefined, { forceProtocolDetection: true });
 
-    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, undefined, undefined);
+    // Explicit active detection forwards forceProtocolDetection so the
+    // transport bypasses its protocol cache.
+    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, undefined, undefined, true);
     expect(device.getProtocol()).toBe('V2');
     expect(device.originalDescriptor.protocolType).toBe('V2');
   });
@@ -247,7 +249,7 @@ describe('public device lifecycle events', () => {
 
     await device.acquire('V2');
 
-    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, 'V2', undefined);
+    expect(acquire).toHaveBeenCalledWith('ble-id', undefined, true, 'V2', undefined, undefined);
     expect(device.getProtocol()).toBe('V2');
   });
 

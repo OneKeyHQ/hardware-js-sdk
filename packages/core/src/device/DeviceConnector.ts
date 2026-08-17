@@ -95,7 +95,8 @@ export default class DeviceConnector {
     session?: string | null,
     forceCleanRunPromise?: boolean,
     expectedProtocol?: HardwareConnectProtocol,
-    protocolHint?: HardwareConnectProtocol
+    protocolHint?: HardwareConnectProtocol,
+    forceProtocolDetection?: boolean
   ) {
     Log.debug('acquire', path, session, expectedProtocol, protocolHint);
     const env = DataManager.getSettings('env');
@@ -108,6 +109,7 @@ export default class DeviceConnector {
           forceCleanRunPromise,
           expectedProtocol,
           protocolHint,
+          forceProtocolDetection,
         });
       } else {
         res = await transport.acquire({
@@ -115,6 +117,7 @@ export default class DeviceConnector {
           previous: session ?? null,
           expectedProtocol,
           protocolHint,
+          forceProtocolDetection,
         });
       }
       if (expectedProtocol) {
