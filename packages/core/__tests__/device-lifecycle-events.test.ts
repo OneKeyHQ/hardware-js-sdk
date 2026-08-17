@@ -343,25 +343,29 @@ describe('public device lifecycle events', () => {
     }
   );
 
-  test('sends a fallback Cancel for an acquired Protocol V2 BLE call without a prompt callback', async () => {
-    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
-    const device = createInitializedDevice('V2');
-    const post = jest.fn().mockResolvedValue(undefined);
-    const cancelDevice = jest.fn(() => cancelDeviceInPrompt(device, false));
-    const cancel = jest.fn().mockResolvedValue(undefined);
-    (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
-    device.commands = {
-      transport: { post },
-      cancelDevice,
-      cancel,
-    } as never;
+  test.each(['react-native', 'webusb', 'desktop-webusb'] as const)(
+    'sends a fallback Cancel for an acquired Protocol V2 %s call without a prompt callback',
+    async env => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
+      const device = createInitializedDevice('V2');
+      const post = jest.fn().mockResolvedValue(undefined);
+      const cancelDevice = jest.fn(() => cancelDeviceInPrompt(device, false));
+      const cancel = jest.fn().mockResolvedValue(undefined);
+      device.originalDescriptor.session = device.mainId;
+      (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+      device.commands = {
+        transport: { post },
+        cancelDevice,
+        cancel,
+      } as never;
 
-    await device.interruptionFromUser();
+      await device.interruptionFromUser();
 
-    expect(cancelDevice).toHaveBeenCalledTimes(1);
-    expect(post).toHaveBeenCalledWith(device.mainId, 'Cancel', {});
-    expect(cancel).toHaveBeenCalledTimes(1);
-  });
+      expect(cancelDevice).toHaveBeenCalledTimes(1);
+      expect(post).toHaveBeenCalledWith(device.mainId, 'Cancel', {});
+      expect(cancel).toHaveBeenCalledTimes(1);
+    }
+  );
 
   test('waits for the canceled run to finish releasing before cancellation completes', async () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);

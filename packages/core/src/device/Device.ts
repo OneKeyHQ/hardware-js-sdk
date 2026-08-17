@@ -1530,15 +1530,18 @@ export class Device extends EventEmitter {
     const error = ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
     const cleanupPromise = this.runCleanupPromise;
     const { cancelableAction } = this;
+    const env = DataManager.getSettings('env');
     if (cancelableAction) {
       await cancelableAction(error);
     } else if (
       this.isProtocolV2() &&
-      DataManager.isBleConnect(DataManager.getSettings('env')) &&
+      (DataManager.isBleConnect(env) ||
+        DataManager.isBrowserWebUsb(env) ||
+        DataManager.isDesktopWebUsb(env)) &&
       this.hasDeviceAcquire()
     ) {
       await this.commands?.cancelDevice?.().catch(cancelError => {
-        Log.debug('Protocol V2 BLE fallback cancel error', cancelError);
+        Log.debug('Protocol V2 fallback cancel error', cancelError);
       });
     }
     await this.commands?.cancel();
