@@ -235,6 +235,12 @@ export class Device extends EventEmitter {
    */
   private deviceAcquired = false;
 
+  /**
+   * Set by interruptionFromUser() so an in-flight acquire/initialize cannot
+   * finish the link and send Cancel after the caller already aborted.
+   */
+  private interruptedByUser = false;
+
   /** Canonical device-state cache; legacy Features is a compatibility projection. */
   private stateStore = new DeviceStateStore();
 
@@ -429,6 +435,7 @@ export class Device extends EventEmitter {
     expectedProtocol?: HardwareConnectProtocol,
     options?: { throwOnRunPromiseError?: boolean; forceProtocolDetection?: boolean }
   ) {
+    this.throwIfInterruptedByUser();
     const env = DataManager.getSettings('env');
     const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
     const previousProtocol = this.originalDescriptor.protocolType;
@@ -482,6 +489,15 @@ export class Device extends EventEmitter {
       }
       if (detectedProtocol) {
         this.originalDescriptor.protocolType = detectedProtocol;
+      }
+      if (this.interruptedByUser) {
+        const session = this.mainId;
+        if (session && this.deviceConnector?.disconnect) {
+          await this.deviceConnector.disconnect(session).catch(disconnectError => {
+            Log.debug('Ignored disconnect after user cancel during acquire', disconnectError);
+          });
+        }
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
       }
       this.deviceAcquired = true;
       this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
@@ -903,6 +919,7 @@ export class Device extends EventEmitter {
   }
 
   async initialize(options?: InitOptions) {
+    this.throwIfInterruptedByUser();
     // Protocol V2 does not support legacy Initialize; use its dedicated flow.
     if (this.isProtocolV2()) {
       this.passphraseState = options?.passphraseState;
@@ -1445,6 +1462,7 @@ export class Device extends EventEmitter {
       Log.debug('[Device] run error:', 'Device is running, but will cancel previous operate');
     }
 
+    this.interruptedByUser = false;
     options = parseRunOptions(options);
 
     const runPromise = createDeferred<void>();
@@ -1574,21 +1592,24 @@ export class Device extends EventEmitter {
 
   async interruptionFromUser() {
     const error = ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    this.interruptedByUser = true;
     const cleanupPromise = this.runCleanupPromise;
     const { cancelableAction } = this;
-    const env = DataManager.getSettings('env');
     if (cancelableAction) {
       await cancelableAction(error);
-    } else if (
-      this.isProtocolV2() &&
-      (DataManager.isBleConnect(env) ||
-        DataManager.isBrowserWebUsb(env) ||
-        DataManager.isDesktopWebUsb(env)) &&
-      this.hasDeviceAcquire()
-    ) {
+    } else if (this.shouldSendFallbackProtocolCancel()) {
       await this.commands?.cancelDevice?.().catch(cancelError => {
         Log.debug('Protocol V2 fallback cancel error', cancelError);
       });
+    } else if (!this.hasDeviceAcquire()) {
+      // Pairing / connect-native / probe: drop the physical link only.
+      // Never acquire or send protocol Cancel just to abort setup.
+      if (this.mainId && this.deviceConnector?.disconnect) {
+        await this.deviceConnector.disconnect(this.mainId).catch(disconnectError => {
+          Log.debug('Ignored disconnect during user cancel without acquire', disconnectError);
+        });
+      }
+      this.markTransportDisconnected();
     }
     await this.commands?.cancel();
 
@@ -1650,6 +1671,36 @@ export class Device extends EventEmitter {
 
   isUsed() {
     return typeof this.originalDescriptor.session === 'string';
+  }
+
+  wasInterruptedByUser() {
+    return this.interruptedByUser;
+  }
+
+  private throwIfInterruptedByUser() {
+    if (this.interruptedByUser) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
+  }
+
+  /**
+   * Protocol Cancel is only for an acquired session that is already in a
+   * user-facing prompt. Connect, probe and initialize must not send Cancel
+   * and must not re-acquire just to deliver one.
+   */
+  private shouldSendFallbackProtocolCancel() {
+    if (!this.hasDeviceAcquire() || !this.isProtocolV2()) {
+      return false;
+    }
+    if (!this.hasOpenProtocolV2UiInteraction()) {
+      return false;
+    }
+    const env = DataManager.getSettings('env');
+    return (
+      DataManager.isBleConnect(env) ||
+      DataManager.isBrowserWebUsb(env) ||
+      DataManager.isDesktopWebUsb(env)
+    );
   }
 
   hasDeviceAcquire() {

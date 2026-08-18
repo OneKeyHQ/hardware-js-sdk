@@ -20,6 +20,23 @@ Protocol V2 响应依靠串行调用、消息类型和帧序号维持请求边�
 - `packages/hd-transport/src/protocols/v2/session.ts`
 - `packages/hd-transport/src/protocols/v2/sequence-cursor.ts`
 
+## 用户 Cancel 的所有权
+
+协议 `Cancel` 只由 SDK Core 决定是否发送。App 关闭 UI 可以随时调用 `sdk.cancel()`，但不得按机型、配对阶段或权限弹窗自行决定“这次要不要发 Cancel”。
+
+当前规则：
+
+- 未 acquire 的连接、配对、probe 或 initialize：只中止本地调用并断开物理链路，不发送协议 `Cancel`，也不为了发 `Cancel` 再 acquire。
+- 已 acquire 且存在 PIN / passphrase / Button 的 `cancelableAction`，或 Protocol V2 已打开用户交互：才向设备发送 `Cancel`（V1 OneKey 设备上的 PIN 仍走既有 `Initialize` 取消）。
+- 用户取消后，同一轮 acquire / initialize / BLE 重试必须立即失败，不得把 `BleConnectedError` 当成可重试错误继续连。
+- 固件升级过程中是否关闭页面、是否继续安装属于 App 导航生命周期，不是协议 Cancel 策略。
+
+主要实现：
+
+- `packages/core/src/device/Device.ts` `interruptionFromUser()`
+- `packages/core/src/device/DeviceCommands.ts` `cancelDeviceInPrompt()`
+- `packages/core/src/core/index.ts` `cancel()` / `connectDeviceForBle()`
+
 ## 公共协议层与 Transport 边界
 
 为保证 USB 和 BLE 使用一致的调用与恢复语义，公共协议层和平台 Transport 的职责严格分离：

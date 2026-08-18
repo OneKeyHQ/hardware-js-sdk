@@ -928,6 +928,9 @@ export function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: un
 }
 
 export function isRetryableBleConnectionError(method: BaseMethod, error: unknown) {
+  if (method.device?.wasInterruptedByUser()) {
+    return false;
+  }
   const typedError = error as { errorCode?: unknown };
   return (
     typedError?.errorCode === HardwareErrorCode.BleTimeoutError ||
@@ -953,6 +956,9 @@ export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unkn
  */
 async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
   try {
+    if (device.wasInterruptedByUser()) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
     if (method.payload.forceProtocolDetection && device.hasDeviceAcquire()) {
       await device.release();
     }
