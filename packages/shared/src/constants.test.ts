@@ -1,12 +1,14 @@
 import {
   createKnownBleUuidAliases,
   hasOnekeyCommunicationService,
+  inferProtocolHintFromUsbId,
   isKnownTrezorWebUsbDevice,
   isOnekeyBluetoothDevice,
   isOnekeyDevice,
   isPro2FindMyAdvertisementName,
   matchesKnownBleUuid,
   normalizePro2FindMyAdvertisementName,
+  resolveOneKeyUsbDevicePath,
 } from './constants';
 
 describe('hardware device identity filters', () => {
@@ -14,6 +16,9 @@ describe('hardware device identity filters', () => {
     expect(isOnekeyDevice('Touch A1B2')).toBe(true);
     expect(isOnekeyDevice('Pro A1B2')).toBe(true);
     expect(isOnekeyDevice('Neo A1B2')).toBe(true);
+    expect(isOnekeyDevice('Pro2A1B2')).toBe(true);
+    expect(isOnekeyDevice('OneKeyPro2A1B2')).toBe(true);
+    expect(isOnekeyDevice('Neo22D8')).toBe(true);
     expect(isOnekeyDevice('K1234')).toBe(true);
     expect(isOnekeyDevice('S8')).toBe(true);
   });
@@ -134,6 +139,32 @@ describe('hardware device identity filters', () => {
     expect(hasOnekeyCommunicationService([])).toBe(false);
     expect(hasOnekeyCommunicationService(['0001'])).toBe(true);
     expect(hasOnekeyCommunicationService(['abcd0001-1234-5678-9012-abcdefabcdef'])).toBe(false);
+  });
+
+  it('hints Protocol V2 from the current Pro2/Neo USB ID only', () => {
+    expect(inferProtocolHintFromUsbId(0x1209, 0x4f4c)).toBe('V2');
+    expect(inferProtocolHintFromUsbId(0x1209, 0x53c1)).toBeUndefined();
+    expect(inferProtocolHintFromUsbId(0x1209, 0x4f4a)).toBeUndefined();
+    expect(inferProtocolHintFromUsbId(0x1209, 0x4f4b)).toBeUndefined();
+  });
+
+  it('uses the USB serial when present and synthesizes a path when firmware omits it', () => {
+    expect(
+      resolveOneKeyUsbDevicePath({
+        vendorId: 0x1209,
+        productId: 0x4f4c,
+        productName: 'OneKey Pro 2',
+        serialNumber: 'PRO2-SERIAL',
+      })
+    ).toBe('PRO2-SERIAL');
+    expect(
+      resolveOneKeyUsbDevicePath({
+        vendorId: 0x1209,
+        productId: 0x4f4c,
+        productName: 'OneKey Neo',
+        serialNumber: '',
+      })
+    ).toBe('usb-1209-4f4c-onekey-neo');
   });
 
   it('only filters WebUSB descriptors that are explicitly identified as Trezor', () => {

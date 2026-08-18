@@ -51,10 +51,6 @@ interface PacketProcessResult {
   error?: string;
 }
 
-function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
-  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
-}
-
 const toBleDescriptor = (
   device: { id: string; name: string | null },
   protocolType?: ProtocolType
@@ -275,10 +271,6 @@ export default class ElectronBleTransport {
       this.Log?.debug(`[Electron BLE] enumerate found ${devices.length} device(s):`);
       for (const dev of devices) {
         this.Log?.debug(`[Electron BLE]   id="${dev.id}" name="${dev.name}"`);
-        const protocolHint = inferProtocolHintFromDeviceName(dev.name);
-        if (protocolHint) {
-          this.deviceProtocolHints.set(dev.id, protocolHint);
-        }
       }
       return devices.map(device => toBleDescriptor(device));
     } catch (error) {
@@ -316,9 +308,7 @@ export default class ElectronBleTransport {
       }
       const protocolHint = expectedProtocol
         ? undefined
-        : input.protocolHint ??
-          this.deviceProtocolHints.get(uuid) ??
-          inferProtocolHintFromDeviceName(device.name);
+        : input.protocolHint ?? this.deviceProtocolHints.get(uuid);
       if (protocolHint) {
         this.deviceProtocolHints.set(uuid, protocolHint);
       }

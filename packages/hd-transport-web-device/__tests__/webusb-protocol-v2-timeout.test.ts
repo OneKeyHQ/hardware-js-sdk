@@ -21,8 +21,9 @@ const schema = {
 };
 
 describe('WebUsbTransport Protocol V2 timeout recovery', () => {
-  test('only enumerates devices with real USB serial numbers', async () => {
-    const filter = ONEKEY_WEBUSB_FILTER[0];
+  test('enumerates OneKey USB devices even when the serial string is omitted', async () => {
+    const filter =
+      ONEKEY_WEBUSB_FILTER.find(item => item.productId === 0x4f4c) ?? ONEKEY_WEBUSB_FILTER[0];
     const deviceWithSerial = {
       ...filter,
       manufacturerName: 'OneKey',
@@ -32,7 +33,7 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     const deviceWithoutSerial = {
       ...filter,
       manufacturerName: 'OneKey',
-      productName: 'OneKey Pro 2',
+      productName: 'OneKey Neo',
       serialNumber: null,
     } as USBDevice;
     const webusb = new WebUsbTransport();
@@ -44,6 +45,11 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
       {
         path: 'PRO2-SERIAL',
         device: deviceWithSerial,
+        commType: 'webusb',
+      },
+      {
+        path: 'usb-1209-4f4c-onekey-neo',
+        device: deviceWithoutSerial,
         commType: 'webusb',
       },
     ]);

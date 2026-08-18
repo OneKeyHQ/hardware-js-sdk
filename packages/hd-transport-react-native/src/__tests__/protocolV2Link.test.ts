@@ -405,7 +405,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
-  test('actively probes Protocol V2 on iOS when only a name-derived hint is available', async () => {
+  test('detects Protocol V2 on iOS without using the BLE name as a protocol hint', async () => {
     const { transport, uuid, device, sentSeqs, writeCharacteristic } = createHarness({
       deviceName: 'Pro2 6E9E',
     });
@@ -415,12 +415,12 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       protocolType: 'V2',
     });
     expect(device.requestMTU).toHaveBeenCalledWith(247);
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithResponse.mock.calls.length).toBeGreaterThan(1);
 
     await expect(
       transport.call(uuid, 'Ping', { message: 'first-core-command' })
     ).resolves.toBeDefined();
-    expect(sentSeqs).toEqual([1, 2]);
+    expect(sentSeqs.filter(seq => seq > 0)).toEqual([1, 2]);
     await transport.release(uuid, true);
   });
 

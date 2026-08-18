@@ -203,10 +203,6 @@ export function getProtocolV2BleTuning() {
   return { ...protocolV2BleTuning };
 }
 
-function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
-  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
-}
-
 function getDeviceDisplayName(device?: Device | null) {
   return device?.name || device?.localName || null;
 }
@@ -771,10 +767,7 @@ export default class ReactNativeBleTransport {
       const addDevice = (device: Device) => {
         if (deviceList.every(d => d.id !== device.id)) {
           const displayName = getDeviceDisplayName(device) ?? 'Unknown BLE Device';
-          const protocolHint = inferProtocolHintFromDeviceName(displayName);
-          if (protocolHint) {
-            this.deviceProtocolHints.set(device.id, protocolHint);
-          }
+
           deviceList.push({
             ...device,
             name: displayName,
@@ -784,7 +777,6 @@ export default class ReactNativeBleTransport {
             deviceId: device.id,
             name: displayName,
             serviceUUIDs: device.serviceUUIDs,
-            protocolHint,
           });
         }
       };
@@ -1021,9 +1013,7 @@ export default class ReactNativeBleTransport {
 
     const protocolHint = expectedProtocol
       ? undefined
-      : input.protocolHint ??
-        this.deviceProtocolHints.get(uuid) ??
-        inferProtocolHintFromDeviceName(getDeviceDisplayName(acquiredDevice));
+      : input.protocolHint ?? this.deviceProtocolHints.get(uuid);
 
     // release transport before new transport instance
     await this.releaseUnlocked(uuid, true);
@@ -1254,7 +1244,7 @@ export default class ReactNativeBleTransport {
 
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
-    // Preserve a name-derived hint across disconnects so reconnect can probe V2 first.
+    // Confirmed protocol and caller hints stay in deviceProtocol / protocolHint.
     this.protocolV2Assemblers.get(uuid)?.reset();
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);

@@ -123,6 +123,14 @@ describe('device feature selectors', () => {
   test('recognizes Neo discovery names before initialization', () => {
     expect(getDeviceTypeByBleName('OneKey Neo 1234')).toBe(EDeviceType.Neo);
     expect(getDeviceTypeByBleName('Neo 1234')).toBe(EDeviceType.Neo);
+    expect(getDeviceTypeByBleName('Neo22D8')).toBe(EDeviceType.Neo);
+    expect(getDeviceTypeByBleName('OneKeyNeo22D8')).toBe(EDeviceType.Neo);
+  });
+
+  test('recognizes compact Pro2 discovery names before initialization', () => {
+    expect(getDeviceTypeByBleName('Pro2 A1B2')).toBe(EDeviceType.Pro2);
+    expect(getDeviceTypeByBleName('Pro2A1B2')).toBe(EDeviceType.Pro2);
+    expect(getDeviceTypeByBleName('OneKeyPro2A1B2')).toBe(EDeviceType.Pro2);
   });
 
   test.each([EDeviceType.Pro2, EDeviceType.Neo])(

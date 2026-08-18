@@ -230,7 +230,7 @@ describe('WebUsbTransport protocol probe cache', () => {
       expect(second.deviceProtocol.get(path)).toBe('V1');
       expect(first.staleProtocolPaths.has(path)).toBe(false);
 
-      // Events without a usable serial are ignored.
+      // Events without a device identity are ignored.
       handler({ device: { serialNumber: null } });
       handler({});
       expect(second.staleProtocolPaths.size).toBe(1);

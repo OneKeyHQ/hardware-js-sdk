@@ -497,7 +497,7 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(transport.getProtocolType(device.id)).toBeUndefined();
   });
 
-  test('probes Protocol V2 instead of trusting the Pro2 name hint', async () => {
+  test('does not take a Protocol V2 hint from the BLE name', async () => {
     const device = { id: 'named-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
     let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
@@ -527,15 +527,15 @@ describe('ElectronBleTransport protocol detection', () => {
           protocolType: 'V2',
         })
       );
-      expect(nobleBle.write).toHaveBeenCalledTimes(1);
+      expect(nobleBle.write.mock.calls.length).toBeGreaterThan(1);
       expect(transport.getProtocolType(device.id)).toBe('V2');
       await expect(transport.call(device.id, 'Ping', { message: 'after-probe' })).resolves.toEqual({
         type: 'Success',
         message: { message: 'ok' },
       });
-      const sentSeqs = nobleBle.write.mock.calls.map(([, hex]) =>
-        Number.parseInt(hex.slice(12, 14), 16)
-      );
+      const sentSeqs = nobleBle.write.mock.calls
+        .map(([, hex]) => Number.parseInt(hex.slice(12, 14), 16))
+        .filter(seq => seq > 0);
       expect(sentSeqs).toEqual([1, 2]);
     } finally {
       await transport.release(device.id);
@@ -615,9 +615,9 @@ describe('ElectronBleTransport protocol detection', () => {
         message: { message: 'ok' },
       });
 
-      const sentSeqs = nobleBle.write.mock.calls.map(([, hex]) =>
-        Number.parseInt(hex.slice(12, 14), 16)
-      );
+      const sentSeqs = nobleBle.write.mock.calls
+        .map(([, hex]) => Number.parseInt(hex.slice(12, 14), 16))
+        .filter(seq => seq > 0);
       expect(sentSeqs).toEqual([1, 2, 3]);
     } finally {
       await transport.release(device.id);

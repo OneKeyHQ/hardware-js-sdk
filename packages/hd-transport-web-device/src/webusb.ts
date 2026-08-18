@@ -14,7 +14,9 @@ import {
   ERRORS,
   HardwareErrorCode,
   ONEKEY_WEBUSB_FILTER,
+  inferProtocolHintFromUsbId,
   isKnownTrezorWebUsbDevice,
+  resolveOneKeyUsbDevicePath,
   wait,
 } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
@@ -45,9 +47,6 @@ const PACKET_IO_RETRY_DELAY = 300;
 const PROTOCOL_V1_PROBE_TIMEOUT = 5000;
 const PROTOCOL_V2_PROBE_TIMEOUT = 1000;
 const EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS = 2;
-function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
-  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
-}
 
 /**
  * Device information with path and WebUSB device instance
@@ -84,9 +83,10 @@ function registerActiveWebUsbTransport(instance: WebUsbTransport, usb: USB) {
   if (usbDisconnectListenerAttached) return;
   usbDisconnectListenerAttached = true;
   usb.addEventListener('disconnect', event => {
-    const serial = event.device?.serialNumber;
-    if (typeof serial !== 'string' || serial.length === 0) return;
-    activeWebUsbTransport?.markProtocolStale(serial);
+    if (!event.device) return;
+    const path = resolveOneKeyUsbDevicePath(event.device);
+    if (!path) return;
+    activeWebUsbTransport?.markProtocolStale(path);
   });
 }
 
@@ -256,22 +256,24 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         (desc: { vendorId: number; productId: number }) =>
           dev.vendorId === desc.vendorId && dev.productId === desc.productId
       );
-      const hasSerialNumber = typeof dev.serialNumber === 'string' && dev.serialNumber.length > 0;
-      return isOneKey && hasSerialNumber && !isKnownTrezorWebUsbDevice(dev);
+      return isOneKey && !isKnownTrezorWebUsbDevice(dev);
     });
 
-    this.deviceList = onekeyDevices.map(device => {
-      const path = device.serialNumber as string;
-      const protocolHint = inferProtocolHintFromDeviceName(device.productName);
+    this.deviceList = onekeyDevices.flatMap(device => {
+      const path = resolveOneKeyUsbDevicePath(device);
+      if (!path) return [];
+      const protocolHint = inferProtocolHintFromUsbId(device.vendorId, device.productId);
       if (protocolHint) {
         this.deviceProtocolHints.set(path, protocolHint);
       }
 
-      return {
-        path,
-        device,
-        commType: 'webusb',
-      };
+      return [
+        {
+          path,
+          device,
+          commType: 'webusb',
+        },
+      ];
     });
 
     return this.deviceList;
@@ -316,13 +318,12 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         this.deviceProtocol.delete(input.path);
       }
       if (!this.deviceProtocol.has(input.path)) {
-        const deviceName = this.deviceList.find(device => device.path === input.path)?.device
-          .productName;
+        const usbDevice = this.deviceList.find(device => device.path === input.path)?.device;
         const protocolHint = input.expectedProtocol
           ? undefined
           : input.protocolHint ??
             this.deviceProtocolHints.get(input.path) ??
-            inferProtocolHintFromDeviceName(deviceName);
+            inferProtocolHintFromUsbId(usbDevice?.vendorId, usbDevice?.productId);
         if (protocolHint) {
           this.deviceProtocolHints.set(input.path, protocolHint);
         }
