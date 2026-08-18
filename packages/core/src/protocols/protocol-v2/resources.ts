@@ -1,29 +1,20 @@
-import type {
-  IProtocolV2ResourceManifest,
-  IProtocolV2ResourceManifestFile,
-  IProtocolV2Resources,
-} from '../../types';
-import type { FirmwareUpdateV4Target } from '../../types/api/firmwareUpdate';
+import { bytesToHex } from '@noble/hashes/utils';
+
+import type { IProtocolV2Resources, IVersionArray } from '../../types';
 
 export const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH =
   'vol0:/loaders/bootloader/boot_resource.okpkg';
 export const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH = `${PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH}.staging`;
 export const PROTOCOL_V2_ROM_PARAMS_PACKAGE_PATH = 'vol0:/loaders/rom/params.okpkg';
+export const PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE = 0x5f90;
 
-const SHA256_HEX_LENGTH = 64;
-
-function normalizeHex(value: unknown, expectedLength: number, field: string): string {
-  if (typeof value !== 'string') {
-    throw new Error(`Invalid Pro2 resource ${field}: expected a hexadecimal string`);
-  }
-  const normalized = value.replace(/^0x/i, '').toLowerCase();
-  if (normalized.length !== expectedLength || !/^[0-9a-f]+$/.test(normalized)) {
-    throw new Error(
-      `Invalid Pro2 resource ${field}: expected ${expectedLength} hexadecimal characters`
-    );
-  }
-  return normalized;
-}
+const PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_VERSION = 1;
+const PROTOCOL_V2_RESOURCE_PACKAGE_FLEXIBLE_OFFSET = 0x6c;
+const PROTOCOL_V2_RESOURCE_PACKAGE_FLEXIBLE_SIZE = 64;
+const PROTOCOL_V2_RESOURCE_PACKAGE_PAYLOAD_HASH_OFFSET = 0x200;
+const PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_HASH_OFFSET = 0x240;
+const PROTOCOL_V2_RESOURCE_PACKAGE_HASH_SIZE = 64;
+const PROTOCOL_V2_RESOURCE_PACKAGE_TYPE = 'RESC';
 
 /** Validate a complete Pro2 stable resource set from remote configuration. */
 export function parseProtocolV2Resources(value: unknown): IProtocolV2Resources | undefined {
@@ -58,114 +49,113 @@ export function parseProtocolV2Resources(value: unknown): IProtocolV2Resources |
   };
 }
 
-const PROTOCOL_V2_RESOURCE_MANIFEST_DEVICE_ROOTS = [
-  'vol0:/bundles/',
-  'vol0:/loaders/rom/',
-] as const;
+const PROTOCOL_V2_RESOURCE_DEVICE_ROOTS = ['vol0:/bundles/', 'vol0:/loaders/rom/'] as const;
 
-function isAllowedManifestDevicePath(path: string): boolean {
+function isAllowedResourceDevicePath(path: string): boolean {
   if (
-    !path.endsWith('.okpkg') ||
     path.includes('\\') ||
     path.includes('//') ||
+    [...path].some(char => {
+      const code = char.charCodeAt(0);
+      return code <= 0x1f || code === 0x7f;
+    }) ||
     path.split('/').some(part => part === '.' || part === '..')
   ) {
     return false;
   }
-  if (path === PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH) {
+  if (path === PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH) {
     return true;
   }
-  return PROTOCOL_V2_RESOURCE_MANIFEST_DEVICE_ROOTS.some(root => path.startsWith(root));
+  return (
+    path.endsWith('.okpkg') && PROTOCOL_V2_RESOURCE_DEVICE_ROOTS.some(root => path.startsWith(root))
+  );
 }
 
-function assertManifestString(value: unknown, field: string): string {
-  if (typeof value !== 'string' || value.length === 0) {
-    throw new Error(`Invalid Pro2 resource manifest ${field}`);
-  }
-  return value;
+function readAscii(bytes: Uint8Array, offset: number, length: number): string {
+  return Array.from(bytes.slice(offset, offset + length))
+    .map(byte => String.fromCharCode(byte))
+    .join('');
 }
 
-function assertManifestRelativePath(value: unknown, field: string): string {
-  const path = assertManifestString(value, field);
+function readResourceDevicePath(bytes: Uint8Array): string {
+  const metadata = bytes.slice(
+    PROTOCOL_V2_RESOURCE_PACKAGE_FLEXIBLE_OFFSET,
+    PROTOCOL_V2_RESOURCE_PACKAGE_FLEXIBLE_OFFSET + PROTOCOL_V2_RESOURCE_PACKAGE_FLEXIBLE_SIZE
+  );
+  const terminator = metadata.indexOf(0);
+  const pathBytes = terminator === -1 ? metadata : metadata.slice(0, terminator);
+  const padding = terminator === -1 ? new Uint8Array(0) : metadata.slice(terminator);
   if (
-    path.startsWith('/') ||
-    path.includes('\\') ||
-    path.includes(':') ||
-    path.split('/').some(part => !part || part === '.' || part === '..')
+    pathBytes.byteLength === 0 ||
+    Array.from(pathBytes).some(byte => byte < 0x20 || byte > 0x7e) ||
+    Array.from(padding).some(byte => byte !== 0)
   ) {
-    throw new Error(`Invalid Pro2 resource manifest ${field}`);
+    throw new Error('Invalid Pro2 RESOURCE package device path metadata');
+  }
+  const path = readAscii(pathBytes, 0, pathBytes.byteLength);
+  if (!isAllowedResourceDevicePath(path)) {
+    throw new Error(`Invalid Pro2 RESOURCE package device path: ${path}`);
   }
   return path;
 }
 
-function parseProtocolV2ResourceManifestFile(
-  value: unknown,
-  index: number
-): IProtocolV2ResourceManifestFile {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error(`Invalid Pro2 resource manifest files[${index}]`);
-  }
-  const file = value as Partial<IProtocolV2ResourceManifestFile>;
-  const archivePath = assertManifestRelativePath(file.archive_path, `files[${index}].archive_path`);
-  const originalName =
-    file.original_name === undefined
-      ? archivePath.split('/').pop() ?? archivePath
-      : assertManifestRelativePath(file.original_name, `files[${index}].original_name`);
-  if (originalName.includes('/')) {
-    throw new Error(`Invalid Pro2 resource manifest files[${index}].original_name`);
-  }
-  const devicePath = assertManifestString(file.device_path, `files[${index}].device_path`);
-  if (!isAllowedManifestDevicePath(devicePath)) {
-    throw new Error(`Invalid Pro2 resource manifest files[${index}].device_path`);
-  }
-  if (!Number.isSafeInteger(file.size) || Number(file.size) <= 0) {
-    throw new Error(`Invalid Pro2 resource manifest files[${index}].size`);
-  }
-  const digest = normalizeHex(file.sha256, SHA256_HEX_LENGTH, `files[${index}].sha256`);
-  if (!archivePath.endsWith('.okpkg') || !originalName.endsWith('.okpkg')) {
-    throw new Error(`Invalid Pro2 resource manifest files[${index}] package extension`);
-  }
-  return {
-    archive_path: archivePath,
-    original_name: originalName,
-    device_path: devicePath,
-    size: Number(file.size),
-    sha256: digest,
-    ...(file.signed === undefined ? {} : { signed: file.signed }),
-    ...(file.sig_algo === undefined ? {} : { sig_algo: file.sig_algo }),
-    ...(file.payload_version === undefined ? {} : { payload_version: file.payload_version }),
-  };
-}
+export type ProtocolV2ResourcePackageHeader = {
+  version: IVersionArray;
+  payloadLength: number;
+  devicePath: string;
+  payloadHash: string;
+  headerHash: string;
+};
 
-export function parseProtocolV2ResourceManifest(value: unknown): IProtocolV2ResourceManifest {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('Invalid Pro2 resource manifest');
+export function parseProtocolV2ResourcePackageHeader(
+  bytes: Uint8Array,
+  packageSize: number
+): ProtocolV2ResourcePackageHeader {
+  if (bytes.byteLength < PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE) {
+    throw new Error('Pro2 RESOURCE package is shorter than its header');
   }
-  const manifest = value as Partial<IProtocolV2ResourceManifest>;
-  if (!Array.isArray(manifest.files)) {
-    throw new Error('Invalid Pro2 resource manifest files');
-  }
-  const files = manifest.files.map(parseProtocolV2ResourceManifestFile);
-  const devicePaths = new Set(files.map(file => file.device_path));
-  const archivePaths = new Set(files.map(file => file.archive_path));
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const headerVersion = view.getUint32(0x04, true);
+  const headerLength = view.getUint32(0x0c, true);
+  const payloadLength = view.getUint32(0x14, true);
   if (
-    files.length === 0 ||
-    devicePaths.size !== files.length ||
-    archivePaths.size !== files.length
+    readAscii(bytes, 0, 4) !== 'OKPP' ||
+    readAscii(bytes, 0x08, 4) !== PROTOCOL_V2_RESOURCE_PACKAGE_TYPE ||
+    headerVersion !== PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_VERSION ||
+    headerLength !== PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE ||
+    payloadLength <= 0 ||
+    headerLength + payloadLength !== packageSize
   ) {
-    throw new Error('Invalid Pro2 resource manifest file set');
+    throw new Error('Invalid Pro2 RESOURCE package header');
   }
+
+  const packedVersion = view.getUint32(0x10, true);
   return {
-    files,
+    version: [
+      Math.floor(packedVersion / 0x10000) % 0x100,
+      Math.floor(packedVersion / 0x100) % 0x100,
+      packedVersion % 0x100,
+    ],
+    payloadLength,
+    devicePath: readResourceDevicePath(bytes),
+    payloadHash: bytesToHex(
+      bytes.slice(
+        PROTOCOL_V2_RESOURCE_PACKAGE_PAYLOAD_HASH_OFFSET,
+        PROTOCOL_V2_RESOURCE_PACKAGE_PAYLOAD_HASH_OFFSET + PROTOCOL_V2_RESOURCE_PACKAGE_HASH_SIZE
+      )
+    ),
+    headerHash: bytesToHex(
+      bytes.slice(
+        PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_HASH_OFFSET,
+        PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_HASH_OFFSET + PROTOCOL_V2_RESOURCE_PACKAGE_HASH_SIZE
+      )
+    ),
   };
 }
 
-export function selectProtocolV2ResourceManifestFiles({
-  manifest,
-  targetsToUpdate,
-}: {
-  manifest: IProtocolV2ResourceManifest;
-  targetsToUpdate: readonly FirmwareUpdateV4Target[];
-}): IProtocolV2ResourceManifestFile[] {
-  return targetsToUpdate.includes('resource') ? [...manifest.files] : [];
+export function parseProtocolV2ResourcePackage(
+  binary: ArrayBuffer | Uint8Array
+): ProtocolV2ResourcePackageHeader {
+  const bytes = binary instanceof Uint8Array ? binary : new Uint8Array(binary);
+  return parseProtocolV2ResourcePackageHeader(bytes, bytes.byteLength);
 }

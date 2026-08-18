@@ -139,21 +139,29 @@ const createJpegBase64 = (width: number, height: number) => {
 
 const createProtocolV2OkppBinary = ({
   version = [1, 2, 3],
+  devicePath = 'vol0:/bundles/images/images.okpkg',
   payloadHashByte = 0x11,
   headerHashByte = 0x22,
 }: {
   version?: [number, number, number];
+  devicePath?: string;
   payloadHashByte?: number;
   headerHashByte?: number;
 } = {}) => {
-  const bytes = new Uint8Array(0x52a0);
+  const headerSize = 0x5f90;
+  const payloadSize = 1;
+  const bytes = new Uint8Array(headerSize + payloadSize);
   bytes.set([0x4f, 0x4b, 0x50, 0x50], 0);
   bytes.set([0x52, 0x45, 0x53, 0x43], 0x08);
   const view = new DataView(bytes.buffer);
-  view.setUint32(0x0c, 0x52a0, true);
+  view.setUint32(0x04, 1, true);
+  view.setUint32(0x0c, headerSize, true);
   view.setUint32(0x10, version[0] * 0x10000 + version[1] * 0x100 + version[2], true);
+  view.setUint32(0x14, payloadSize, true);
+  bytes.set(new TextEncoder().encode(devicePath), 0x6c);
   bytes.fill(payloadHashByte, 0x200, 0x240);
   bytes.fill(headerHashByte, 0x240, 0x280);
+  bytes[headerSize] = 0xaa;
   return bytes.buffer;
 };
 
@@ -7228,7 +7236,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
-  test('maps a prepared resource archive manifest to artifact-backed resource sources', async () => {
+  test('maps self-describing packages from a prepared resource archive', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -7236,60 +7244,18 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     const imagesBinary = createProtocolV2OkppBinary();
-    const bootBinary = createProtocolV2OkppBinary({ payloadHashByte: 0x33 });
+    const bootBinary = createProtocolV2OkppBinary({
+      devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg.staging',
+      payloadHashByte: 0x33,
+    });
     const imagesSha256 = bytesToHex(sha256(new Uint8Array(imagesBinary)));
     const bootSha256 = bytesToHex(sha256(new Uint8Array(bootBinary)));
-    const manifest = {
-      schema: 1,
-      artifact_name: 'pro2-resource',
-      release_name: 'test-release',
-      variant: 'resource',
-      commit: 'abc123',
-      short_sha: 'abc123',
-      timestamp_utc: '2026-08-09T00:00:00Z',
-      core_version: '1.0.0',
-      key_set: 'production',
-      device_root: 'vol0:',
-      restore_mode: 'bootloader_update',
-      trees: [{ path: 'bundles', device: 'pro2' }],
-      files: [
-        {
-          archive_path: 'bundles/images/images.okpkg',
-          original_name: 'images.okpkg',
-          device_path: 'vol0:/bundles/images/images.okpkg',
-          size: imagesBinary.byteLength,
-          sha256: imagesSha256,
-          signed: true,
-          sig_algo: 'ed25519',
-          payload_version: '1.2.3',
-        },
-        {
-          archive_path: 'loaders/bootloader/boot_resource.okpkg',
-          original_name: 'boot_resource.okpkg',
-          device_path: 'vol0:/loaders/bootloader/boot_resource.okpkg',
-          size: bootBinary.byteLength,
-          sha256: bootSha256,
-          signed: true,
-          sig_algo: 'ed25519',
-          payload_version: '1.2.3',
-        },
-      ],
-    };
-    const manifestBinary = new TextEncoder().encode(JSON.stringify(manifest)).buffer;
     const zip = new JSZip();
-    zip.file('manifest.json', manifestBinary);
     zip.file('bundles/images/images.okpkg', imagesBinary);
     zip.file('loaders/bootloader/boot_resource.okpkg', bootBinary);
+    zip.file('manifest.json', '{"ignored":true}');
     const archiveBinary = await zip.generateAsync({ type: 'arraybuffer' });
     const preparedEntries = [
-      {
-        entryName: 'pro2-resource/manifest.json',
-        artifact: {
-          artifactRef: 'manifest',
-          size: manifestBinary.byteLength,
-          sha256: bytesToHex(sha256(new Uint8Array(manifestBinary))),
-        },
-      },
       {
         entryName: 'pro2-resource/bundles/images/images.okpkg',
         artifact: {
@@ -7352,7 +7318,7 @@ describe('Protocol V2 firmware update targets', () => {
       }),
       expect.objectContaining({
         name: 'boot_resource.okpkg',
-        devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+        devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg.staging',
         version: [1, 2, 3],
       }),
     ]);
@@ -7398,9 +7364,9 @@ describe('Protocol V2 firmware update targets', () => {
           },
           materializedEntries: [
             {
-              entryName: 'manifest.json',
+              entryName: 'bundles/images/images.okpkg',
               artifact: {
-                artifactRef: 'resource-manifest',
+                artifactRef: 'resource-package',
                 size: 2,
                 sha256: 'b'.repeat(64),
               },
@@ -7600,9 +7566,9 @@ describe('Protocol V2 firmware update targets', () => {
           },
           materializedEntries: [
             {
-              entryName: 'manifest.json',
+              entryName: 'bundles/images/images.okpkg',
               artifact: {
-                artifactRef: 'prepared-resource-manifest',
+                artifactRef: 'prepared-resource-package',
                 size: 2,
                 sha256: 'b'.repeat(64),
               },
@@ -7659,48 +7625,15 @@ describe('Protocol V2 firmware update targets', () => {
   });
 
   test('converts a local resource ZIP into a local PreparedPlan without matching a remote release', async () => {
-    const imagesBinary = new Uint8Array([1, 2, 3]).buffer;
-    const bootResourceBinary = new Uint8Array([4, 5, 6]).buffer;
-    const manifest = {
-      schema: 1,
-      artifact_name: 'pro2-resource',
-      release_name: 'local-development',
-      variant: 'resource',
-      commit: 'local',
-      short_sha: 'local',
-      timestamp_utc: '2026-08-09T00:00:00Z',
-      core_version: '1.0.0',
-      key_set: 'development',
-      device_root: 'vol0:',
-      restore_mode: 'bootloader_update',
-      trees: [{ path: 'bundles', device: 'pro2' }],
-      files: [
-        {
-          archive_path: 'bundles/images/images.okpkg',
-          original_name: 'images.okpkg',
-          device_path: 'vol0:/bundles/images/images.okpkg',
-          size: imagesBinary.byteLength,
-          sha256: bytesToHex(sha256(new Uint8Array(imagesBinary))),
-          signed: true,
-          sig_algo: 'ed25519',
-          payload_version: '1.0.0',
-        },
-        {
-          archive_path: 'loaders/bootloader/boot_resource.okpkg',
-          original_name: 'boot_resource.okpkg',
-          device_path: 'vol0:/loaders/bootloader/boot_resource.okpkg',
-          size: bootResourceBinary.byteLength,
-          sha256: bytesToHex(sha256(new Uint8Array(bootResourceBinary))),
-          signed: true,
-          sig_algo: 'ed25519',
-          payload_version: '1.0.0',
-        },
-      ],
-    };
+    const imagesBinary = createProtocolV2OkppBinary({ version: [1, 0, 0] });
+    const bootResourceBinary = createProtocolV2OkppBinary({
+      version: [1, 0, 0],
+      devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg.staging',
+    });
     const zip = new JSZip();
-    zip.file('pro2-resource/manifest.json', JSON.stringify(manifest));
     zip.file('pro2-resource/bundles/images/images.okpkg', imagesBinary);
     zip.file('pro2-resource/loaders/bootloader/boot_resource.okpkg', bootResourceBinary);
+    zip.file('pro2-resource/manifest.json', '{"ignored":true}');
     zip.file('pro2-resource/build-info.txt', 'ignored');
     const resourceArchiveBinary = await zip.generateAsync({ type: 'arraybuffer' });
     const applicationP1Binary = new Uint8Array([7, 8, 9]).buffer;
@@ -7766,7 +7699,7 @@ describe('Protocol V2 firmware update targets', () => {
             }),
             expect.objectContaining({
               name: 'boot_resource.okpkg',
-              devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+              devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg.staging',
             }),
           ],
         })
@@ -7777,9 +7710,11 @@ describe('Protocol V2 firmware update targets', () => {
     }
   });
 
-  test('accepts a local resource ZIP without manifest.json', async () => {
-    const imagesBinary = new Uint8Array([1, 2, 3]).buffer;
-    const bootResourceBinary = new Uint8Array([4, 5, 6]).buffer;
+  test('accepts every okpkg in a local resource ZIP and ignores other files', async () => {
+    const imagesBinary = createProtocolV2OkppBinary();
+    const bootResourceBinary = createProtocolV2OkppBinary({
+      devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg.staging',
+    });
     const zip = new JSZip();
     zip.file('pro2-resource/bundles/images/images.okpkg', imagesBinary);
     zip.file('pro2-resource/loaders/bootloader/boot_resource.okpkg', bootResourceBinary);
@@ -7800,61 +7735,21 @@ describe('Protocol V2 firmware update targets', () => {
       )
     ).resolves.toMatchObject({
       materializedEntries: [
-        { entryName: 'manifest.json' },
-        { entryName: 'bundles/images/images.okpkg', binary: imagesBinary },
+        { entryName: 'pro2-resource/bundles/images/images.okpkg', binary: imagesBinary },
         {
-          entryName: 'loaders/bootloader/boot_resource.okpkg',
+          entryName: 'pro2-resource/loaders/bootloader/boot_resource.okpkg',
           binary: bootResourceBinary,
         },
       ],
     });
   });
 
-  test('rejects a local resource ZIP whose file hash does not match its manifest', async () => {
-    const resourceBinary = new Uint8Array([1, 2, 3]).buffer;
-    const bootResourceBinary = new Uint8Array([4, 5, 6]).buffer;
+  test('rejects a local resource ZIP with duplicate package device paths', async () => {
+    const resourceBinary = createProtocolV2OkppBinary();
+    const duplicateResourceBinary = createProtocolV2OkppBinary({ payloadHashByte: 0x44 });
     const zip = new JSZip();
-    zip.file(
-      'manifest.json',
-      JSON.stringify({
-        schema: 1,
-        artifact_name: 'pro2-resource',
-        release_name: 'local-development',
-        variant: 'resource',
-        commit: 'local',
-        short_sha: 'local',
-        timestamp_utc: '2026-08-09T00:00:00Z',
-        core_version: '1.0.0',
-        key_set: 'development',
-        device_root: 'vol0:',
-        restore_mode: 'bootloader_update',
-        trees: [{ path: 'bundles', device: 'pro2' }],
-        files: [
-          {
-            archive_path: 'bundles/images/images.okpkg',
-            original_name: 'images.okpkg',
-            device_path: 'vol0:/bundles/images/images.okpkg',
-            size: resourceBinary.byteLength,
-            sha256: '0'.repeat(64),
-            signed: true,
-            sig_algo: 'ed25519',
-            payload_version: '1.0.0',
-          },
-          {
-            archive_path: 'loaders/bootloader/boot_resource.okpkg',
-            original_name: 'boot_resource.okpkg',
-            device_path: 'vol0:/loaders/bootloader/boot_resource.okpkg',
-            size: bootResourceBinary.byteLength,
-            sha256: bytesToHex(sha256(new Uint8Array(bootResourceBinary))),
-            signed: true,
-            sig_algo: 'ed25519',
-            payload_version: '1.0.0',
-          },
-        ],
-      })
-    );
     zip.file('bundles/images/images.okpkg', resourceBinary);
-    zip.file('loaders/bootloader/boot_resource.okpkg', bootResourceBinary);
+    zip.file('copies/images.okpkg', duplicateResourceBinary);
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -7869,9 +7764,7 @@ describe('Protocol V2 firmware update targets', () => {
       (method as any).prepareProtocolV2LocalResourceArchive(
         await zip.generateAsync({ type: 'arraybuffer' })
       )
-    ).rejects.toThrow(
-      'Protocol V2 local resource file does not match manifest: bundles/images/images.okpkg'
-    );
+    ).rejects.toThrow('duplicate device path: vol0:/bundles/images/images.okpkg');
   });
 
   test('maps malformed resource ZIPs to a typed firmware preparation error', async () => {
@@ -7901,40 +7794,7 @@ describe('Protocol V2 firmware update targets', () => {
   test('rejects an oversized ZIP entry before allocating its decompressed bytes', async () => {
     const extractEntry = jest.fn();
     const oversizedFileSize = 257 * 1024 * 1024;
-    const manifestBinary = new TextEncoder().encode(
-      JSON.stringify({
-        files: [
-          {
-            archive_path: 'loaders/bootloader/boot_resource.okpkg',
-            original_name: 'boot_resource.okpkg',
-            device_path: 'vol0:/loaders/bootloader/boot_resource.okpkg',
-            size: oversizedFileSize,
-            sha256: '0'.repeat(64),
-            signed: true,
-            sig_algo: 'ed25519',
-          },
-          {
-            archive_path: 'bundles/images/images.okpkg',
-            original_name: 'images.okpkg',
-            device_path: 'vol0:/bundles/images/images.okpkg',
-            size: oversizedFileSize,
-            sha256: '0'.repeat(64),
-            signed: true,
-            sig_algo: 'ed25519',
-          },
-        ],
-      })
-    );
     const zipFiles = {
-      'manifest.json': {
-        name: 'manifest.json',
-        dir: false,
-        _data: {
-          compressedSize: manifestBinary.byteLength,
-          uncompressedSize: manifestBinary.byteLength,
-        },
-        async: jest.fn().mockResolvedValue(manifestBinary.buffer),
-      },
       'loaders/bootloader/boot_resource.okpkg': {
         name: 'loaders/bootloader/boot_resource.okpkg',
         dir: false,
@@ -7965,7 +7825,7 @@ describe('Protocol V2 firmware update targets', () => {
     try {
       await expect(
         (method as any).prepareProtocolV2LocalResourceArchive(new Uint8Array([1]).buffer)
-      ).rejects.toThrow('declared size is invalid');
+      ).rejects.toThrow('resource package size is invalid');
       expect(extractEntry).not.toHaveBeenCalled();
     } finally {
       loadSpy.mockRestore();
@@ -8117,17 +7977,17 @@ describe('Protocol V2 firmware update targets', () => {
             readAt: jest.fn(),
             close: jest.fn(),
           },
-          devicePath: 'vol0:/resource/images/images.okpkg',
+          devicePath: 'vol0:/bundles/images/images.okpkg',
         },
       ],
     });
 
     expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledTimes(1);
     expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledWith(
-      expect.objectContaining({ filePath: 'vol0:/resource/images/images.okpkg' })
+      expect.objectContaining({ filePath: 'vol0:/bundles/images/images.okpkg' })
     );
     expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledWith(
-      'vol0:/resource/images/images.okpkg',
+      'vol0:/bundles/images/images.okpkg',
       3
     );
     expect((method as any).protocolV2StartFirmwareUpdate).not.toHaveBeenCalled();
@@ -8162,7 +8022,7 @@ describe('Protocol V2 firmware update targets', () => {
             readAt: jest.fn(),
             close: jest.fn(),
           },
-          devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+          devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg.staging',
         },
       ],
     });
@@ -8195,7 +8055,7 @@ describe('Protocol V2 firmware update targets', () => {
         readAt: jest.fn(),
         close: jest.fn(),
       },
-      devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg',
+      devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg.staging',
       version: [1, 0, 0],
       payloadHash: '11'.repeat(64),
       headerHash: '22'.repeat(64),
@@ -9267,7 +9127,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
     const readChunkLengths: number[] = [];
     const typedCall = jest.fn((requestType: string, _responseType: string, request: any) => {
       if (requestType === 'FilesystemPathInfoQuery') {
-        return Promise.resolve({ message: { exist: true, directory: false, size: 0x52a0 } });
+        return Promise.resolve({ message: { exist: true, directory: false, size: 0x5f91 } });
       }
       if (requestType === 'FilesystemFileRead') {
         readChunkLengths.push(request.chunk_len);

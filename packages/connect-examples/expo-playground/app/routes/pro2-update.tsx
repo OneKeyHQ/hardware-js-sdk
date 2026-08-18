@@ -492,7 +492,7 @@ export default function Pro2UpdatePage() {
                 <div className="grid gap-px overflow-hidden rounded-lg border border-border/70 bg-border/70">
                   <CompactFileSlot
                     label="Protocol V2 resource ZIP"
-                    meta="target resource · ZIP with manifest.json"
+                    meta="target resource · ZIP with self-describing RESC packages"
                     formatHint="complete signed resource archive .zip"
                     accept=".zip,application/zip"
                     file={resourceArchiveFile}
