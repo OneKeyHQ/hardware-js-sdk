@@ -1,6 +1,6 @@
 {
   "name": "hwk-demo",
-  "version": "1.2.0-alpha.146",
+  "version": "1.2.0-alpha.147",
   "private": true,
   "main": "index.js",
   "scripts": {
