@@ -176,9 +176,10 @@ Application 模式只允许宿主访问 `vol1:/wallpapers`、`vol1:/portfolio` �
 `FilesystemFileRead` 比较资源大小及文件头哈希，最后只下载和写入有差异的资源。设备已经在
 Bootloader 或 Romloader 时复用当前 loader 连接，不重复 reboot。
 
-`DeviceFirmwareUpdate.targets` 只包含需要安装的固件。稳定 RESC bundle 与 boot resource manifest
-中的文件都通过 `FilesystemFileWrite` 同步；普通资源写入最终路径，但 bootloader 当前挂载的
-`boot_resource.okpkg` 必须写入 `.staging` 路径，由下次启动在挂载前完成替换，避免 FatFs 因文件已打开而拒绝覆盖。
+`DeviceFirmwareUpdate.targets` 只包含需要安装的固件。资源 ZIP 中的每个 `RESC .okpkg` 都通过
+OKPP header 的 `flexible_metadata` 携带完整设备路径，并通过 `FilesystemFileWrite` 同步。普通资源
+header 指向最终路径；boot resource header 直接指向 `.staging` 路径，由下次启动在挂载前完成替换，
+避免 FatFs 因文件已打开而拒绝覆盖。
 资源单独更新时不发送空的安装请求。SDK 不假设固件端会隐式扫描其他已写入路径。
 
 远程正式升级必须先通过最新配置生成 `FirmwareUpdatePlan`，宿主下载后再生成带完整收据的
@@ -189,8 +190,9 @@ Bootloader 或 Romloader 时复用当前 loader 连接，不重复 reboot。
 
 本地开发升级与远程 Plan 严格分离：组件可以继续通过 `firmwareUpdateV4` 的各组件 `ArrayBuffer` 字段传入；
 完整资源 ZIP 通过 `resourceArchiveBinary` 传入。Core 会把本地组件和资源 ZIP 转换成本地 Plan、PreparedPlan、
-receipt 与内存 `ArtifactReader`；该路径不读取或匹配远程配置，但仍会在修改设备前校验 ZIP 声明展开大小、
-manifest 合约、允许写入路径、条目集合、文件大小和 SHA-256；设备端继续负责签名包的最终验证与启用。
+receipt 与内存 `ArtifactReader`；该路径不读取或匹配远程配置。Core 遍历 ZIP 内所有 `.okpkg`，忽略
+其他条目，并在修改设备前校验每个包的 `RESC` header、包大小、自描述路径及路径唯一性；设备端继续
+负责签名包的最终验证与启用。
 旧的 `resourceFiles` 与 `resourceBundleArtifacts` 裸文件参数已在 Protocol V2 alpha 阶段删除。新调用方必须
 迁移到 `resourceArchiveBinary` 或完整 `PreparedPlan`；SDK 不再维护第二套逐文件资源输入和远程 release 绑定流程。
 不得把本地文件作为远程 Plan 的 override 来绕过远程收据校验。

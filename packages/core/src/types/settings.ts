@@ -74,21 +74,6 @@ export type IProtocolV2Resources = {
   source: IProtocolV2ResourceSource;
 };
 
-export type IProtocolV2ResourceManifestFile = {
-  archive_path: string;
-  original_name?: string;
-  device_path: string;
-  size: number;
-  sha256: string;
-  signed?: boolean;
-  sig_algo?: string;
-  payload_version?: string | null;
-};
-
-export type IProtocolV2ResourceManifest = {
-  files: IProtocolV2ResourceManifestFile[];
-};
-
 /** STM32 firmware config */
 export type IFirmwareReleaseInfo = {
   required: boolean;
