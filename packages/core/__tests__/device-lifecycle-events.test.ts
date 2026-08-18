@@ -1,7 +1,12 @@
 import { EDeviceType, ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import { DeviceType, TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
 
-import { initConnector, initCore, isMissingDetectedProtocolV2Error } from '../src/core';
+import {
+  initConnector,
+  initCore,
+  isMissingDetectedProtocolV2Error,
+  isRetryableBleProtocolV2ProbeError,
+} from '../src/core';
 import { DataManager } from '../src/data-manager';
 import TransportManager from '../src/data-manager/TransportManager';
 import { Device } from '../src/device/Device';
@@ -266,6 +271,23 @@ describe('public device lifecycle events', () => {
       };
 
       expect(isMissingDetectedProtocolV2Error(method, error)).toBe(expected);
+    }
+  );
+
+  test.each([
+    [HardwareErrorCode.RuntimeError, true],
+    [HardwareErrorCode.BleDeviceBondError, false],
+  ] as const)(
+    'retries a Protocol V2 probe mismatch with error code %s: %s',
+    (errorCode, expected) => {
+      const method = { payload: { connectProtocol: 'V2' } } as never;
+      const error = {
+        errorCode,
+        message:
+          'Device protocol mismatch: expected V2, but device did not respond to expected protocol',
+      };
+
+      expect(isRetryableBleProtocolV2ProbeError(method, error)).toBe(expected);
     }
   );
 

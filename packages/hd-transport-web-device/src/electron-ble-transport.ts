@@ -443,8 +443,10 @@ export default class ElectronBleTransport {
   }
 
   private createProtocolMismatchError(expected: ProtocolType) {
+    // A persisted V2 expectation means this endpoint answered a V2 probe before.
+    // If it no longer answers after reconnect, the device-side bond was most likely reset.
     return ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
+      expected === 'V2' ? HardwareErrorCode.BleDeviceBondError : HardwareErrorCode.RuntimeError,
       `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
     );
   }

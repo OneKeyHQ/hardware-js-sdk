@@ -914,10 +914,13 @@ function canSkipInitialize(method: BaseMethod, device: Device): boolean {
   return true;
 }
 
-function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) {
-  const message = error instanceof Error ? error.message : String(error ?? '');
+export function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) {
+  const typedError = error as { errorCode?: unknown; message?: unknown };
+  const message =
+    typeof typedError?.message === 'string' ? typedError.message : String(error ?? '');
   return (
     method.payload.connectProtocol === 'V2' &&
+    typedError?.errorCode === HardwareErrorCode.RuntimeError &&
     message.includes('Device protocol mismatch') &&
     message.includes('expected V2') &&
     message.includes('did not respond to expected protocol')

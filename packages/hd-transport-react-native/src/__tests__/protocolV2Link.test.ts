@@ -424,6 +424,22 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
+  test.each(['ios', 'android'] as const)(
+    'reports a stale bond on %s when a previously confirmed Protocol V2 device stops responding',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid, device } = createHarness();
+      jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(false);
+
+      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleDeviceBondError,
+      });
+
+      expect(device.cancelConnection).toHaveBeenCalledTimes(1);
+      expect(transport.getProtocolType(uuid)).toBeUndefined();
+    }
+  );
+
   test('waits for an in-flight release before reacquiring the same device', async () => {
     const { transport, uuid } = createHarness();
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
