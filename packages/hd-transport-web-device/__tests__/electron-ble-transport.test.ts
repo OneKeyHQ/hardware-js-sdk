@@ -440,8 +440,8 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(transport.getProtocolType(device.id)).toBeUndefined();
   });
 
-  test('reports a stale bond when a previously confirmed Protocol V2 device stops responding', async () => {
-    const device = { id: 'reset-pro2-id', name: 'OneKey Pro 2' };
+  test('keeps a first expected Protocol V2 probe miss retryable', async () => {
+    const device = { id: 'first-v2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
     const transport = configureTransport(nobleBle);
     jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(false);
@@ -449,10 +449,49 @@ describe('ElectronBleTransport protocol detection', () => {
     await expect(
       transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
     ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BleDeviceBondError,
+      errorCode: HardwareErrorCode.RuntimeError,
     });
 
     expect(nobleBle.connect).toHaveBeenCalledTimes(1);
+    expect(transport.getProtocolType(device.id)).toBeUndefined();
+  });
+
+  test('reports a stale bond after a second expected Protocol V2 probe miss', async () => {
+    const device = { id: 'retry-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    const transport = configureTransport(nobleBle);
+    jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(false);
+
+    await expect(
+      transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.RuntimeError,
+    });
+    await expect(
+      transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceBondError,
+    });
+
+    expect(transport.getProtocolType(device.id)).toBeUndefined();
+  });
+
+  test('reports a stale bond when a previously confirmed Protocol V2 device stops responding', async () => {
+    const device = { id: 'reset-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    const transport = configureTransport(nobleBle);
+    const probe = jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(true);
+
+    await transport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    await transport.release(device.id);
+    probe.mockResolvedValue(false);
+
+    await expect(
+      transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceBondError,
+    });
+
     expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
     expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
     expect(transport.getProtocolType(device.id)).toBeUndefined();

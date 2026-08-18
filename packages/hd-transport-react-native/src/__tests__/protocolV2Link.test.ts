@@ -425,17 +425,54 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   });
 
   test.each(['ios', 'android'] as const)(
-    'reports a stale bond on %s when a previously confirmed Protocol V2 device stops responding',
+    'keeps a first expected Protocol V2 probe miss retryable on %s',
     async platform => {
       setPlatformOS(platform);
       const { transport, uuid, device } = createHarness();
       jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(false);
 
       await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.RuntimeError,
+      });
+
+      expect(device.cancelConnection).not.toHaveBeenCalled();
+      expect(transport.getProtocolType(uuid)).toBeUndefined();
+    }
+  );
+
+  test.each(['ios', 'android'] as const)(
+    'reports a stale bond on %s after a second expected Protocol V2 probe miss',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid, device } = createHarness();
+      jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(false);
+
+      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.RuntimeError,
+      });
+      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
         errorCode: HardwareErrorCode.BleDeviceBondError,
       });
 
       expect(device.cancelConnection).toHaveBeenCalledTimes(1);
+      expect(transport.getProtocolType(uuid)).toBeUndefined();
+    }
+  );
+
+  test.each(['ios', 'android'] as const)(
+    'reports a stale bond on %s when a previously confirmed Protocol V2 device stops responding',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid, device } = createHarness();
+      await transport.acquire({ uuid, expectedProtocol: 'V2' });
+      await transport.release(uuid, true);
+      jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(false);
+
+      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleDeviceBondError,
+      });
+
+      expect(device.cancelConnection).toHaveBeenCalled();
       expect(transport.getProtocolType(uuid)).toBeUndefined();
     }
   );
