@@ -969,6 +969,13 @@ function raceBleAcquire<T>(acquirePromise: Promise<T>, abortSignal?: AbortSignal
         ),
       BLE_ACQUIRE_DEADLINE_MS
     );
+    // Attach before any early return so a late settlement of acquirePromise
+    // is always consumed — an abort or deadline must never leave the acquire
+    // rejection unhandled.
+    acquirePromise.then(
+      value => settle(() => resolve(value)),
+      error => settle(() => reject(error))
+    );
     if (abortSignal) {
       if (abortSignal.aborted) {
         onAbort();
@@ -976,10 +983,6 @@ function raceBleAcquire<T>(acquirePromise: Promise<T>, abortSignal?: AbortSignal
       }
       abortSignal.addEventListener('abort', onAbort);
     }
-    acquirePromise.then(
-      value => settle(() => resolve(value)),
-      error => settle(() => reject(error))
-    );
   });
 }
 
@@ -999,6 +1002,10 @@ async function connectDeviceForBle(
       !device.commands ||
       device.commands.disposed;
     if (shouldAcquire) {
+      // A cancel landing during the retry backoff must not start a new acquire.
+      if (abortSignal?.aborted) {
+        throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+      }
       try {
         await raceBleAcquire(
           device.acquire(method.payload.connectProtocol, {
