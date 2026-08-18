@@ -5,6 +5,7 @@ import {
   initConnector,
   initCore,
   isMissingDetectedProtocolV2Error,
+  isRetryableBleConnectionError,
   isRetryableBleProtocolV2ProbeError,
 } from '../src/core';
 import { DataManager } from '../src/data-manager';
@@ -290,6 +291,21 @@ describe('public device lifecycle events', () => {
       expect(isRetryableBleProtocolV2ProbeError(method, error)).toBe(expected);
     }
   );
+
+  test.each([
+    [HardwareErrorCode.BleConnectedError, true],
+    [HardwareErrorCode.BleTimeoutError, true],
+    [HardwareErrorCode.PollingTimeout, false],
+    [HardwareErrorCode.BleDeviceBondError, false],
+  ] as const)('retries a BLE connection error with error code %s: %s', (errorCode, expected) => {
+    const method = { payload: { connectProtocol: 'V2' } } as never;
+    const error = {
+      errorCode,
+      message: 'BLE setup wedged repeatedly',
+    };
+
+    expect(isRetryableBleConnectionError(method, error)).toBe(expected);
+  });
 
   test('converts an internal transport disconnect into a public KnownDevice snapshot', () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);

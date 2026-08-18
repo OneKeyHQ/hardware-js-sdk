@@ -254,10 +254,17 @@ export const PROTOCOL_REPROBE_FALLBACK_ATTEMPTS = 3;
 /** BLE setup timeouts since the last successful setup before the manager is recreated. */
 export const BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD = 2;
 const CONNECT_TIMEOUT_MESSAGE = 'BLE connect timeout after';
+export const BLE_SETUP_WEDGED_MESSAGE = 'BLE setup wedged repeatedly';
 const isConnectTimeoutError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleConnectedError &&
   typeof (error as { message?: unknown })?.message === 'string' &&
   (error as { message: string }).message.startsWith(CONNECT_TIMEOUT_MESSAGE);
+const isWedgedBleSetupError = (error: unknown): boolean =>
+  (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.PollingTimeout &&
+  typeof (error as { message?: unknown })?.message === 'string' &&
+  (error as { message: string }).message.startsWith(BLE_SETUP_WEDGED_MESSAGE);
+const shouldRethrowBleSetupError = (error: unknown): boolean =>
+  isConnectTimeoutError(error) || isWedgedBleSetupError(error);
 const isNativeOperationTimeoutError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === BleErrorCode.OperationTimedOut;
 
@@ -939,7 +946,7 @@ export default class ReactNativeBleTransport {
         );
       } catch (e) {
         Log?.debug('try to connect to device has error: ', e);
-        if (isConnectTimeoutError(e)) {
+        if (shouldRethrowBleSetupError(e)) {
           throw e;
         }
         if (
@@ -973,7 +980,7 @@ export default class ReactNativeBleTransport {
         );
       } catch (e) {
         Log?.debug('not connected, try to connect to device has error: ', e);
-        if (isConnectTimeoutError(e)) {
+        if (shouldRethrowBleSetupError(e)) {
           throw e;
         }
         if (
@@ -1754,7 +1761,13 @@ export default class ReactNativeBleTransport {
       return result;
     } catch (error) {
       if (timedOut || isNativeOperationTimeoutError(error)) {
-        this.abandonStalledConnection(uuid, timedOut ? 'connect-backstop' : 'connect-native');
+        const resetManager = this.abandonStalledConnection(
+          uuid,
+          timedOut ? 'connect-backstop' : 'connect-native'
+        );
+        if (resetManager) {
+          throw this.createWedgedBleSetupError();
+        }
       }
       throw error;
     } finally {
@@ -1790,7 +1803,13 @@ export default class ReactNativeBleTransport {
       return result;
     } catch (error) {
       if (timedOut || isNativeOperationTimeoutError(error)) {
-        this.abandonStalledConnection(uuid, timedOut ? 'gatt-backstop' : 'gatt-native');
+        const resetManager = this.abandonStalledConnection(
+          uuid,
+          timedOut ? 'gatt-backstop' : 'gatt-native'
+        );
+        if (resetManager) {
+          throw this.createWedgedBleSetupError();
+        }
       }
       throw error;
     } finally {
@@ -1802,11 +1821,12 @@ export default class ReactNativeBleTransport {
    * Give up on a BLE setup operation the native layer did not settle. The abandoned
    * operation still owns native connection/GATT state that can poison the next attempt,
    * so it is cleared here without awaiting the same queue that stopped responding.
+   * Returns true when the manager itself was reset so the caller can stop Core retries.
    */
   private abandonStalledConnection(
     uuid: string,
     stage: 'connect-backstop' | 'connect-native' | 'gatt-backstop' | 'gatt-native'
-  ) {
+  ): boolean {
     const timeouts = (this.connectionSetupTimeoutCounts.get(uuid) ?? 0) + 1;
     this.connectionSetupTimeoutCounts.set(uuid, timeouts);
     Log?.error('[ReactNativeBleTransport] BLE setup timed out:', uuid, {
@@ -1832,7 +1852,15 @@ export default class ReactNativeBleTransport {
       Log?.error('[ReactNativeBleTransport] BLE setup wedged repeatedly, resetting BLE manager');
       this.resetPlxManager();
       this.connectionSetupTimeoutCounts.delete(uuid);
+      return true;
     }
+    return false;
+  }
+
+  private createWedgedBleSetupError() {
+    // PollingTimeout is not retried by connectDeviceForBle and already maps
+    // to the App "connection failed" help text.
+    return ERRORS.TypedError(HardwareErrorCode.PollingTimeout, BLE_SETUP_WEDGED_MESSAGE);
   }
 
   private getCachedTransport(uuid: string) {

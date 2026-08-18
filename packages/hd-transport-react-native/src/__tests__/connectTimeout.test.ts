@@ -6,6 +6,7 @@ import ReactNativeBleTransport, {
   BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD,
   BLE_CONNECT_TIMEOUT_MS,
   BLE_GATT_SETUP_TIMEOUT_MS,
+  BLE_SETUP_WEDGED_MESSAGE,
 } from '../index';
 import protocolV1Schema from './protocolV1SchemaFixture';
 
@@ -179,7 +180,7 @@ describe('BLE connect timeout', () => {
     expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(UUID);
   });
 
-  test('repeated stalled connects recreate the BLE manager', async () => {
+  test('repeated stalled connects recreate the BLE manager and stop with PollingTimeout', async () => {
     const { transport, bleManager } = createHarness(
       () =>
         new Promise(() => {
@@ -188,10 +189,12 @@ describe('BLE connect timeout', () => {
     );
     const destroy = jest.fn();
     (bleManager as unknown as { destroy: jest.Mock }).destroy = destroy;
+    const errors: Array<{ errorCode?: unknown; message?: unknown }> = [];
 
     for (let attempt = 0; attempt < BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD; attempt += 1) {
       let settled = false;
-      transport.acquire({ uuid: UUID }).catch(() => {
+      transport.acquire({ uuid: UUID }).catch(error => {
+        errors.push(error);
         settled = true;
       });
       // eslint-disable-next-line no-await-in-loop
@@ -202,6 +205,11 @@ describe('BLE connect timeout', () => {
 
     expect(destroy).toHaveBeenCalledTimes(1);
     expect((transport as unknown as { blePlxManager?: unknown }).blePlxManager).toBeUndefined();
+    expect(errors[0]?.errorCode).toBe(HardwareErrorCode.BleConnectedError);
+    expect(errors[1]).toMatchObject({
+      errorCode: HardwareErrorCode.PollingTimeout,
+      message: BLE_SETUP_WEDGED_MESSAGE,
+    });
   });
 
   test('a recreated BLE manager starts with fresh timeout budgets for every device', () => {
@@ -224,12 +232,15 @@ describe('BLE connect timeout', () => {
       errorCode: BleErrorCode.OperationTimedOut,
     });
 
-    for (let attempt = 0; attempt < BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD; attempt += 1) {
-      // eslint-disable-next-line no-await-in-loop
-      await expect(
-        (transport as any).connectWithTimeout(UUID, () => Promise.reject(nativeTimeout))
-      ).rejects.toBe(nativeTimeout);
-    }
+    await expect(
+      (transport as any).connectWithTimeout(UUID, () => Promise.reject(nativeTimeout))
+    ).rejects.toBe(nativeTimeout);
+    await expect(
+      (transport as any).connectWithTimeout(UUID, () => Promise.reject(nativeTimeout))
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.PollingTimeout,
+      message: BLE_SETUP_WEDGED_MESSAGE,
+    });
 
     expect(destroy).toHaveBeenCalledTimes(1);
   });

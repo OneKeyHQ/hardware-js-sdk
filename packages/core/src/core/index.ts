@@ -927,6 +927,16 @@ export function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: un
   );
 }
 
+export function isRetryableBleConnectionError(method: BaseMethod, error: unknown) {
+  const typedError = error as { errorCode?: unknown };
+  return (
+    typedError?.errorCode === HardwareErrorCode.BleTimeoutError ||
+    typedError?.errorCode === HardwareErrorCode.BleConnectedError ||
+    isRetryableBleProtocolV2ProbeError(method, error) ||
+    isMissingDetectedProtocolV2Error(method, error)
+  );
+}
+
 export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unknown) {
   const typedError = error as { errorCode?: unknown; message?: unknown };
   return (
@@ -990,13 +1000,7 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       // next attempt skip acquire and initialize onto the link we just cut.
       device.markTransportDisconnected();
     }
-    if (
-      (err.errorCode === HardwareErrorCode.BleTimeoutError ||
-        err.errorCode === HardwareErrorCode.BleConnectedError ||
-        isRetryableBleProtocolV2ProbeError(method, err) ||
-        requiresColdReconnect) &&
-      retryCount < 6
-    ) {
+    if (isRetryableBleConnectionError(method, err) && retryCount < 6) {
       const nextRetry = retryCount + 1;
       Log.debug(`Bluetooth connection will retry, retry count: ${nextRetry}`);
       await wait(3000);
