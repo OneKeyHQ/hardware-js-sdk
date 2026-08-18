@@ -415,6 +415,10 @@ const onCallDevice = async (
   if (method.payload?.onlyConnectBleDevice) {
     preWarmCallbackTask?.resolve();
     Log.debug('Call API - only connect ble device: ', device?.mainId);
+    // This early return bypasses the normal-path releaseTask at the end of the
+    // call; without it the task leaks and haunts every later queue snapshot
+    // and cancel sweep (field log: a completed task lingered for 6 minutes).
+    requestQueue.releaseTask(method.responseID);
     return createResponseMessage(method.responseID, true, null);
   }
 
