@@ -256,6 +256,11 @@ async function initializeNoble(): Promise<void> {
     noble = require('@stoprocent/noble') as NobleModule;
     logger?.info('[NobleBLE] Noble library loaded');
 
+    // Register the process-lifetime state listener before any early return:
+    // the poweredOn fast path below would otherwise skip it for the whole
+    // session, leaving poweredOff cache/state reconciliation dead.
+    setupPersistentStateListener();
+
     // Wait for Bluetooth to be ready
     await new Promise<void>((resolve, reject) => {
       if (!noble) {
@@ -267,9 +272,6 @@ async function initializeNoble(): Promise<void> {
         resolve();
         return;
       }
-
-      // Setup persistent state listener before initialization
-      setupPersistentStateListener();
 
       const timeout = setTimeout(() => {
         reject(
@@ -494,6 +496,9 @@ function handleDeviceDisconnect(deviceId: string, webContents: WebContents): voi
 
   cleanupDevice(deviceId, webContents, {
     cleanupConnection: true,
+    // Same stale-object hazard as manual disconnect: an externally dropped
+    // link invalidates the cached peripheral for the next reconnect.
+    cleanupDiscoveredCache: true,
     sendDisconnectEvent: true,
     cancelOperations: true,
     reason: 'auto-disconnect',
@@ -1588,6 +1593,10 @@ async function disconnectDevice(deviceId: string): Promise<void> {
   });
   cleanupDevice(deviceId, undefined, {
     cleanupConnection: true,
+    // macOS returns zero GATT services when a previously-disconnected
+    // peripheral object is reconnected; drop the discovery cache so the next
+    // connect resolves a fresh peripheral (direct connect by id, or scan).
+    cleanupDiscoveredCache: true,
     sendDisconnectEvent: false,
     cancelOperations: true,
     reason: 'manual-disconnect',
@@ -1913,10 +1922,12 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
         }
 
         await stopScanning().catch(() => undefined);
-        if (noble && persistentStateListener) {
-          noble.removeListener('stateChange', persistentStateListener);
-          persistentStateListener = null;
-        }
+        // persistentStateListener is process-lifetime, NOT per-window: this
+        // destroy handler also fires on a renderer soft restart, and removing
+        // the listener here permanently killed poweredOff/poweredOn
+        // reconciliation for the rest of the process (nothing re-registers it:
+        // initializeNoble early-returns once noble is loaded). The null-guard
+        // in setupPersistentStateListener keeps it deduped to one instance.
         cleanupNobleListeners();
         discoveredDevices.clear();
         safeLog(logger, 'info', 'Noble BLE cleanup completed');
