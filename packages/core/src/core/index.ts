@@ -938,7 +938,57 @@ export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unkn
  * If the Bluetooth connection times out, retry up to 6 times
  * @param retryCount - Current retry count (default 0)
  */
-async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
+// device.acquire awaits a transport reply with no deadline of its own; a
+// transport that never settles (field case: Electron main lost an IPC reply,
+// "reply was never sent" after 5 minutes) hangs the call forever and cancel()
+// only takes effect at poll checkpoints. Race acquire against a deadline and
+// the caller's abort signal so the hang is bounded and cancel is immediate.
+const BLE_ACQUIRE_DEADLINE_MS = 60 * 1000;
+
+function raceBleAcquire<T>(acquirePromise: Promise<T>, abortSignal?: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      abortSignal?.removeEventListener('abort', onAbort);
+      fn();
+    };
+    const onAbort = () =>
+      settle(() => reject(ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)));
+    const deadline = setTimeout(
+      () =>
+        settle(() =>
+          reject(
+            ERRORS.TypedError(
+              HardwareErrorCode.BleTimeoutError,
+              `BLE acquire exceeded ${BLE_ACQUIRE_DEADLINE_MS}ms deadline`
+            )
+          )
+        ),
+      BLE_ACQUIRE_DEADLINE_MS
+    );
+    if (abortSignal) {
+      if (abortSignal.aborted) {
+        onAbort();
+        return;
+      }
+      abortSignal.addEventListener('abort', onAbort);
+    }
+    acquirePromise.then(
+      value => settle(() => resolve(value)),
+      error => settle(() => reject(error))
+    );
+  });
+}
+
+async function connectDeviceForBle(
+  method: BaseMethod,
+  device: Device,
+  abortSignal?: AbortSignal,
+  retryCount = 0
+) {
   try {
     if (method.payload.forceProtocolDetection && device.hasDeviceAcquire()) {
       await device.release();
@@ -949,9 +999,27 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       !device.commands ||
       device.commands.disposed;
     if (shouldAcquire) {
-      await device.acquire(method.payload.connectProtocol, {
-        forceProtocolDetection: method.payload.forceProtocolDetection,
-      });
+      try {
+        await raceBleAcquire(
+          device.acquire(method.payload.connectProtocol, {
+            forceProtocolDetection: method.payload.forceProtocolDetection,
+          }),
+          abortSignal
+        );
+      } catch (err) {
+        // A deadline hit means the transport is wedged mid-acquire; drop the
+        // link before the retry so it cold-connects instead of stacking a
+        // second connect onto the half-open one.
+        if (
+          err.errorCode === HardwareErrorCode.BleTimeoutError &&
+          device.mainId &&
+          device.deviceConnector
+        ) {
+          await device.deviceConnector.disconnect(device.mainId).catch(() => undefined);
+          device.markTransportDisconnected();
+        }
+        throw err;
+      }
     }
     if (method.payload?.onlyConnectBleDevice) {
       if (shouldAcquire) {
@@ -997,7 +1065,7 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       const nextRetry = retryCount + 1;
       Log.debug(`Bluetooth connection will retry, retry count: ${nextRetry}`);
       await wait(3000);
-      await connectDeviceForBle(method, device, nextRetry);
+      await connectDeviceForBle(method, device, abortSignal, nextRetry);
     } else {
       throw err;
     }
@@ -1102,7 +1170,7 @@ const ensureConnected = async (
             if (abort()) {
               return;
             }
-            await connectDeviceForBle(method, device);
+            await connectDeviceForBle(method, device, abortSignal);
           }
           resolve(device);
           return;
@@ -1144,6 +1212,8 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceDetectInBootloaderMode,
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
             HardwareErrorCode.BridgeNeedsPermission,
+            // Cancel must fail the call now, not after another poll round.
+            HardwareErrorCode.CallQueueActionCancelled,
           ].includes(error.errorCode)
         ) {
           reject(error);
