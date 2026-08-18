@@ -1,5 +1,6 @@
 import { sha256 } from '@noble/hashes/sha256';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 import { bytesToHex } from '@noble/hashes/utils';
 
 import { formatAnyHex } from '../helpers/hexUtils';
@@ -11,7 +12,15 @@ import type { BixinVerifyDeviceRequest } from '@onekeyfe/hd-transport';
 import type { DeviceVerifySignature } from '../../types';
 
 export default class DeviceVerify extends BaseMethod<BixinVerifyDeviceRequest> {
+  getSupportedProtocols() {
+    return ['V1', 'V2'] as const;
+  }
+
   init() {
+    this.unlockPolicy = 'unlock-before-run';
+    // Protocol V2 device-management actions are not wallet-scoped, so either
+    // the main PIN or an Attach PIN may authorize them.
+    this.protocolV2PreUnlockPinType = DeviceSessionPinType.Any;
     this.useDevicePassphraseState = false;
 
     // check payload
@@ -38,6 +47,22 @@ export default class DeviceVerify extends BaseMethod<BixinVerifyDeviceRequest> {
         }
       );
       response = res.message;
+    } else if (this.device.isProtocolV2()) {
+      const signatureRes = await this.device.commands.typedCall(
+        'DeviceCertificateSign',
+        'DeviceCertificateSignature',
+        {
+          data: this.params.data,
+        }
+      );
+      const certRes = await this.device.commands.typedCall(
+        'DeviceCertificateRead',
+        'DeviceCertificate'
+      );
+      response = {
+        cert: certRes.message.cert_and_pubkey,
+        signature: signatureRes.message.data,
+      };
     } else {
       const signatureRes = await this.device.commands.typedCall(
         'SESignMessage',

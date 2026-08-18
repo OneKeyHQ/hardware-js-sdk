@@ -200,6 +200,19 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
           const res = await this.device.commands.typedCall('DeviceSettingsPageShow', 'Success', {
             page: DeviceSettingsPage.DevicePassphrase,
           });
+          // A successful page response confirms the device-side toggle. When an Attach PIN
+          // session disables passphrase protection, the firmware locks immediately and omits
+          // private passphrase fields from subsequent reads, so persist the confirmed value
+          // before refreshing the remaining device state.
+          this.device.updateState(
+            {
+              status: {
+                passphraseProtection: requestedPassphrase,
+                ...(requestedPassphrase === false ? { unlockedAttachPin: false } : undefined),
+              },
+            },
+            'settings-write'
+          );
           await refreshStatusAndSettings();
           return res.message;
         }

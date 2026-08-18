@@ -77,11 +77,16 @@ export async function loadProtocolV2FirmwareReleaseContext({
   }
 
   const firmwareType = firmwareTypeParam ?? state.identity.firmwareType ?? EFirmwareType.Universal;
+  const normalizedFeatures: Features = {
+    ...features,
+    deviceType: state.identity.deviceType,
+    firmwareType,
+  };
   return {
     state: state as ProtocolV2FirmwareReleaseContext['state'],
-    features,
+    features: normalizedFeatures,
     firmwareType,
-    release: DataManager.getFirmwareLatestRelease(features, firmwareType),
+    release: DataManager.getFirmwareLatestRelease(normalizedFeatures, firmwareType),
   };
 }
 
