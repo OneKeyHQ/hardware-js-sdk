@@ -485,7 +485,10 @@ describe('public device lifecycle events', () => {
 
   test('does not retry a BLE connection error after the user cancelled', () => {
     const device = createInitializedDevice('V2');
-    (device as unknown as { interruptedByUser: boolean }).interruptedByUser = true;
+    device.beginConnectionAttempt();
+    (device as unknown as { interruptedAttempt: number }).interruptedAttempt = (
+      device as unknown as { connectionAttempt: number }
+    ).connectionAttempt;
     const method = { payload: { connectProtocol: 'V2' }, device } as never;
     const error = {
       errorCode: HardwareErrorCode.BleConnectedError,
@@ -493,6 +496,52 @@ describe('public device lifecycle events', () => {
     };
 
     expect(isRetryableBleConnectionError(method, error)).toBe(false);
+  });
+
+  test('allows a new BLE connect after the previous attempt was cancelled', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    const device = createInitializedDevice('V2');
+    const disconnect = jest.fn().mockResolvedValue(undefined);
+    const acquire = jest.fn().mockResolvedValue({ uuid: 'next-session', protocolType: 'V2' });
+    device.deviceConnector = { acquire, disconnect } as never;
+
+    device.beginConnectionAttempt();
+    await device.interruptionFromUser();
+    expect(device.wasInterruptedByUser()).toBe(true);
+
+    device.beginConnectionAttempt();
+    await expect(device.acquire('V2')).resolves.toBeUndefined();
+
+    expect(device.wasInterruptedByUser()).toBe(false);
+    expect(device.hasDeviceAcquire()).toBe(true);
+    expect(acquire).toHaveBeenCalledTimes(1);
+  });
+
+  test('discards a late cancelled acquire after a newer connect attempt starts', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    const device = createInitializedDevice('V2');
+    const disconnect = jest.fn().mockResolvedValue(undefined);
+    let resolveAcquire: ((value: { uuid: string; protocolType: 'V2' }) => void) | undefined;
+    const acquire = jest.fn(
+      () =>
+        new Promise<{ uuid: string; protocolType: 'V2' }>(resolve => {
+          resolveAcquire = resolve;
+        })
+    );
+    device.deviceConnector = { acquire, disconnect } as never;
+
+    device.beginConnectionAttempt();
+    const cancelledAcquire = device.acquire('V2');
+    await device.interruptionFromUser();
+    device.beginConnectionAttempt();
+    resolveAcquire?.({ uuid: 'stale-session', protocolType: 'V2' });
+
+    await expect(cancelledAcquire).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInterruptedFromUser,
+    });
+    expect(disconnect).toHaveBeenCalledWith('stale-session');
+    expect(device.hasDeviceAcquire()).toBe(false);
+    expect(device.wasInterruptedByUser()).toBe(false);
   });
 
   test('waits for the canceled run to finish releasing before cancellation completes', async () => {

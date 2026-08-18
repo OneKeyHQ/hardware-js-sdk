@@ -236,10 +236,13 @@ export class Device extends EventEmitter {
   private deviceAcquired = false;
 
   /**
-   * Set by interruptionFromUser() so an in-flight acquire/initialize cannot
-   * finish the link and send Cancel after the caller already aborted.
+   * Connection-attempt generation. interruptionFromUser() pins the current
+   * attempt so a late acquire cannot finish, while the next public connect
+   * increments this and is allowed to proceed.
    */
-  private interruptedByUser = false;
+  private connectionAttempt = 0;
+
+  private interruptedAttempt: number | null = null;
 
   /** Canonical device-state cache; legacy Features is a compatibility projection. */
   private stateStore = new DeviceStateStore();
@@ -435,6 +438,7 @@ export class Device extends EventEmitter {
     expectedProtocol?: HardwareConnectProtocol,
     options?: { throwOnRunPromiseError?: boolean; forceProtocolDetection?: boolean }
   ) {
+    const attempt = this.connectionAttempt;
     this.throwIfInterruptedByUser();
     const env = DataManager.getSettings('env');
     const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
@@ -490,7 +494,7 @@ export class Device extends EventEmitter {
       if (detectedProtocol) {
         this.originalDescriptor.protocolType = detectedProtocol;
       }
-      if (this.interruptedByUser) {
+      if (this.interruptedAttempt === attempt || this.connectionAttempt !== attempt) {
         const session = this.mainId;
         if (session && this.deviceConnector?.disconnect) {
           await this.deviceConnector.disconnect(session).catch(disconnectError => {
@@ -1462,7 +1466,7 @@ export class Device extends EventEmitter {
       Log.debug('[Device] run error:', 'Device is running, but will cancel previous operate');
     }
 
-    this.interruptedByUser = false;
+    this.beginConnectionAttempt();
     options = parseRunOptions(options);
 
     const runPromise = createDeferred<void>();
@@ -1592,7 +1596,7 @@ export class Device extends EventEmitter {
 
   async interruptionFromUser() {
     const error = ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
-    this.interruptedByUser = true;
+    this.interruptedAttempt = this.connectionAttempt;
     const cleanupPromise = this.runCleanupPromise;
     const { cancelableAction } = this;
     if (cancelableAction) {
@@ -1673,12 +1677,20 @@ export class Device extends EventEmitter {
     return typeof this.originalDescriptor.session === 'string';
   }
 
+  beginConnectionAttempt() {
+    this.connectionAttempt += 1;
+    return this.connectionAttempt;
+  }
+
   wasInterruptedByUser() {
-    return this.interruptedByUser;
+    return (
+      typeof this.interruptedAttempt === 'number' &&
+      this.interruptedAttempt === this.connectionAttempt
+    );
   }
 
   private throwIfInterruptedByUser() {
-    if (this.interruptedByUser) {
+    if (this.wasInterruptedByUser()) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
     }
   }

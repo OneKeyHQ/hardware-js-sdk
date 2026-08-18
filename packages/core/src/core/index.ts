@@ -956,6 +956,9 @@ export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unkn
  */
 async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
   try {
+    if (retryCount === 0) {
+      device.beginConnectionAttempt();
+    }
     if (device.wasInterruptedByUser()) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
     }
