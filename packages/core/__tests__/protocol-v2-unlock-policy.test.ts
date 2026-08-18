@@ -1,4 +1,5 @@
 import TransportUtils, { DeviceSessionPinType } from '@onekeyfe/hd-transport';
+import { encode as encodeJpeg } from 'jpeg-js';
 
 import ConfluxSignMessageCIP23 from '../src/api/conflux/ConfluxSignMessageCIP23';
 import DeviceChangePin from '../src/api/device/DeviceChangePin';
@@ -6,6 +7,8 @@ import DeviceLock from '../src/api/device/DeviceLock';
 import DeviceSettings from '../src/api/device/DeviceSettings';
 import DeviceVerify from '../src/api/device/DeviceVerify';
 import DeviceWipe from '../src/api/device/DeviceWipe';
+import DeviceUploadNft from '../src/api/protocol-v2/DeviceUploadNft';
+import DeviceUploadWallpaper from '../src/api/protocol-v2/DeviceUploadWallpaper';
 import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
 import OpenWalletSession from '../src/api/OpenWalletSession';
 import DataManager from '../src/data-manager/DataManager';
@@ -15,6 +18,12 @@ jest.mock('../src/data/config', () => ({
   DEFAULT_DOMAIN: 'https://example.com/',
   getSDKVersion: () => '0.0.0-test',
 }));
+
+const createJpegBase64 = (width: number, height: number) => {
+  const data = new Uint8Array(width * height * 4);
+  for (let index = 3; index < data.length; index += 4) data[index] = 0xff;
+  return encodeJpeg({ width, height, data }, 80).data.toString('base64');
+};
 
 describe('Protocol V2 unlock semantics', () => {
   test('serializes genuine-device verification with Protocol V2 certificate messages', async () => {
@@ -256,6 +265,32 @@ describe('Protocol V2 unlock semantics', () => {
         new DeviceVerify({
           id: 1,
           payload: { method: 'deviceVerify', dataHex: '00' },
+        }),
+    ],
+    [
+      'wallpaper uploads',
+      () =>
+        new DeviceUploadWallpaper({
+          id: 1,
+          payload: {
+            method: 'deviceUploadWallpaper',
+            jpegBase64: createJpegBase64(604, 1024),
+          },
+        }),
+    ],
+    [
+      'NFT uploads',
+      () =>
+        new DeviceUploadNft({
+          id: 1,
+          payload: {
+            method: 'deviceUploadNft',
+            imageJpegBase64: createJpegBase64(540, 540),
+            thumbnailJpegBase64: createJpegBase64(263, 263),
+            title: 'NFT',
+            subtitle: '',
+            timestampMs: 1,
+          },
         }),
     ],
   ])('allows either PIN type when pre-unlocking %s', async (_name, createMethod) => {

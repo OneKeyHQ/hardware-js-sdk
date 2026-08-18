@@ -221,7 +221,8 @@ describe('DeviceUploadWallpaper', () => {
     const result = await method.run();
 
     expect(method.getSupportedProtocols()).toEqual(['V2']);
-    expect(method.unlockPolicy).toBe('none');
+    expect(method.unlockPolicy).toBe('unlock-before-run');
+    expect(method.protocolV2PreUnlockPinType).toBe(DeviceSessionPinType.Any);
     expect(typedCall).toHaveBeenNthCalledWith(1, 'FilesystemDirMake', 'Success', {
       path: 'vol1:/wallpapers',
     });

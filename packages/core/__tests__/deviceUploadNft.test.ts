@@ -1,4 +1,5 @@
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 import { encode as encodeJpeg } from 'jpeg-js';
 
 import DeviceUploadNft from '../src/api/protocol-v2/DeviceUploadNft';
@@ -110,6 +111,8 @@ describe('DeviceUploadNft', () => {
 
     method.init();
 
+    expect(method.unlockPolicy).toBe('unlock-before-run');
+    expect(method.protocolV2PreUnlockPinType).toBe(DeviceSessionPinType.Any);
     expect((method as any).params).toMatchObject({
       chunkSize: 2048,
       paceMs: 0,

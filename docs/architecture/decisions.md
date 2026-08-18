@@ -181,9 +181,11 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   loader 流程。
 - all-network root、bundle 和内部链方法共享轻量 preflight context，因此每个 logical operation
   只执行一次 Status/Unlock；每个子链仍按固件语义独立恢复和校验 Wallet Session。
-- Pro2 设置按固件锁定边界分类：语言、亮度、动画、轻触唤醒、振动反馈、设备名称显示和壁纸
+- Pro2 设置按固件锁定边界分类：语言、亮度、动画、轻触唤醒、振动反馈和设备名称显示
   无需解锁；自动锁定、自动关机、蓝牙、FIDO、USB Lock、随机键盘和设备名称修改需要先解锁；
   Change PIN、Passphrase、Air-gap 与 Wipe 先解锁后打开设备确认页。未知新增设置默认要求解锁。
+  壁纸和 NFT 文件上传（`deviceUploadWallpaper`、`deviceUploadNft`）写文件系统，显式使用
+  `unlock-before-run`。
 - 业务 callback 只执行一次。业务阶段返回结构化 `HardwareErrorCode.DeviceLocked` 时直接失败，
   不捕获、不解锁、不重放；解锁取消、失败或 post-unlock Status 仍锁定时，业务发送次数为零。
 - Protocol V1，以及同时满足 `useDevicePassphraseState=false` 和 `unlockPolicy='none'` 的方法，
