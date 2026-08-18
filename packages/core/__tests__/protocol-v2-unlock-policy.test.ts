@@ -4,9 +4,12 @@ import { encode as encodeJpeg } from 'jpeg-js';
 import ConfluxSignMessageCIP23 from '../src/api/conflux/ConfluxSignMessageCIP23';
 import DeviceChangePin from '../src/api/device/DeviceChangePin';
 import DeviceLock from '../src/api/device/DeviceLock';
+import DeviceRebootToBoardloader from '../src/api/device/DeviceRebootToBoardloader';
+import DeviceRebootToBootloader from '../src/api/device/DeviceRebootToBootloader';
 import DeviceSettings from '../src/api/device/DeviceSettings';
 import DeviceVerify from '../src/api/device/DeviceVerify';
 import DeviceWipe from '../src/api/device/DeviceWipe';
+import DeviceReboot from '../src/api/protocol-v2/DeviceReboot';
 import DeviceUploadNft from '../src/api/protocol-v2/DeviceUploadNft';
 import DeviceUploadWallpaper from '../src/api/protocol-v2/DeviceUploadWallpaper';
 import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
@@ -71,6 +74,40 @@ describe('Protocol V2 unlock semantics', () => {
     expect(method.useDevicePassphraseState).toBe(true);
     expect(method.unlockPolicy).toBe('none');
     expect(method.getSupportedProtocols()).toContain('V2');
+  });
+
+  test.each([
+    [
+      'deviceReboot',
+      () =>
+        new DeviceReboot({
+          id: 1,
+          payload: { method: 'deviceReboot', rebootType: 2 },
+        }),
+    ],
+    [
+      'deviceRebootToBootloader',
+      () =>
+        new DeviceRebootToBootloader({
+          id: 1,
+          payload: { method: 'deviceRebootToBootloader' },
+        }),
+    ],
+    [
+      'deviceRebootToBoardloader',
+      () =>
+        new DeviceRebootToBoardloader({
+          id: 1,
+          payload: { method: 'deviceRebootToBoardloader' },
+        }),
+    ],
+  ])('pre-unlocks %s before sending DeviceReboot', (_name, createMethod) => {
+    const method = createMethod();
+    method.init();
+
+    expect(method.unlockPolicy).toBe('unlock-before-run');
+    expect(method.protocolV2PreUnlockPinType).toBe(DeviceSessionPinType.Any);
+    expect(method.useDevicePassphraseState).toBe(false);
   });
 
   test('lock-free Protocol V2 controls explicitly opt out of wallet-session handling', () => {

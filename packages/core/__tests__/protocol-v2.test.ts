@@ -9295,6 +9295,8 @@ describe('Protocol V2 reboot methods', () => {
     const device = stubDevice({ commands: { typedCall } });
     (method as any).device = device;
 
+    expect(method.unlockPolicy).toBe('unlock-before-run');
+
     await method.run();
 
     expect(typedCall).toHaveBeenCalledWith('DeviceReboot', 'Success', {
