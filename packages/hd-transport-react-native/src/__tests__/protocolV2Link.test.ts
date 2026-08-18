@@ -441,7 +441,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   );
 
   test.each(['ios', 'android'] as const)(
-    'reports a stale bond on %s after a second expected Protocol V2 probe miss',
+    'keeps a second expected Protocol V2 probe miss retryable on %s',
     async platform => {
       setPlatformOS(platform);
       const { transport, uuid, device } = createHarness();
@@ -451,10 +451,10 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
         errorCode: HardwareErrorCode.RuntimeError,
       });
       await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.BleDeviceBondError,
+        errorCode: HardwareErrorCode.RuntimeError,
       });
 
-      expect(device.cancelConnection).toHaveBeenCalledTimes(1);
+      expect(device.cancelConnection).not.toHaveBeenCalled();
       expect(transport.getProtocolType(uuid)).toBeUndefined();
     }
   );

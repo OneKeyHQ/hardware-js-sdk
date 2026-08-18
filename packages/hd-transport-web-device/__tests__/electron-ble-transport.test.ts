@@ -456,7 +456,7 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(transport.getProtocolType(device.id)).toBeUndefined();
   });
 
-  test('reports a stale bond after a second expected Protocol V2 probe miss', async () => {
+  test('keeps a second expected Protocol V2 probe miss retryable', async () => {
     const device = { id: 'retry-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
     const transport = configureTransport(nobleBle);
@@ -470,7 +470,7 @@ describe('ElectronBleTransport protocol detection', () => {
     await expect(
       transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
     ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BleDeviceBondError,
+      errorCode: HardwareErrorCode.RuntimeError,
     });
 
     expect(transport.getProtocolType(device.id)).toBeUndefined();

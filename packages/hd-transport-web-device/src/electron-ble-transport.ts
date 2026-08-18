@@ -104,9 +104,6 @@ export default class ElectronBleTransport {
   /** Endpoints that answered a V2 probe in this transport lifetime. Survives disconnect. */
   private confirmedProtocolV2 = new Set<string>();
 
-  /** First expected-V2 miss for an unconfirmed endpoint; the next miss is a stale bond. */
-  private retryableV2Mismatch = new Set<string>();
-
   private deviceMtus: Map<string, number> = new Map();
 
   private devicePacketCapacities: Map<string, number> = new Map();
@@ -439,17 +436,9 @@ export default class ElectronBleTransport {
   }
 
   private createProtocolMismatchError(expected: ProtocolType, uuid: string) {
-    // Caller `expectedProtocol: 'V2'` is not proof this endpoint already answered.
-    // A first-connect or flaky Ping must stay retryable. A later miss after a
-    // confirmed V2 answer, or a second miss on the same uuid, is a stale bond.
-    const isStaleV2Bond =
-      expected === 'V2' &&
-      (this.confirmedProtocolV2.has(uuid) || this.retryableV2Mismatch.has(uuid));
-    if (expected === 'V2' && !isStaleV2Bond) {
-      this.retryableV2Mismatch.add(uuid);
-    } else if (isStaleV2Bond) {
-      this.retryableV2Mismatch.delete(uuid);
-    }
+    // A generic Ping miss is not a bond failure. Only a later miss after this
+    // endpoint already answered V2, or a native encryption/pairing error, is.
+    const isStaleV2Bond = expected === 'V2' && this.confirmedProtocolV2.has(uuid);
     return ERRORS.TypedError(
       isStaleV2Bond ? HardwareErrorCode.BleDeviceBondError : HardwareErrorCode.RuntimeError,
       `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
@@ -487,7 +476,6 @@ export default class ElectronBleTransport {
       if (await this.probeProtocolV2(uuid)) {
         this.deviceProtocol.set(uuid, 'V2');
         this.confirmedProtocolV2.add(uuid);
-        this.retryableV2Mismatch.delete(uuid);
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2 (expected)`);
         return 'V2';
       }
@@ -512,7 +500,6 @@ export default class ElectronBleTransport {
         this.deviceProtocol.set(uuid, protocol);
         if (protocol === 'V2') {
           this.confirmedProtocolV2.add(uuid);
-          this.retryableV2Mismatch.delete(uuid);
         }
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> ${protocol}`);
         return protocol;
