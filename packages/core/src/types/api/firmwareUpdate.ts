@@ -158,7 +158,7 @@ export interface FirmwareUpdateV4Params {
   se02Binary?: ArrayBuffer;
   se03Binary?: ArrayBuffer;
   se04Binary?: ArrayBuffer;
-  /** Complete Protocol V2 resource ZIP for local development; Core converts it to a local PreparedPlan. */
+  /** Complete Protocol V2 resource ZIP. Core parses RESC packages and writes only changed files. */
   resourceArchiveBinary?: ArrayBuffer;
   forcedUpdateRes?: boolean;
   artifactReader?: FirmwareArtifactReader;
