@@ -34,6 +34,7 @@ import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
   PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH,
   PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE,
+  isProtocolV2ResourceArchiveEntryName,
   parseProtocolV2ResourcePackage,
   parseProtocolV2ResourcePackageHeader,
   type ProtocolV2ResourcePackageHeader,
@@ -1210,7 +1211,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
     const zipEntries = Object.values(zip.files);
     const resourceEntries = zipEntries.filter(
-      entry => !entry.dir && entry.name.toLowerCase().endsWith('.okpkg')
+      entry => !entry.dir && isProtocolV2ResourceArchiveEntryName(entry.name)
     );
     if (
       resourceEntries.length === 0 ||

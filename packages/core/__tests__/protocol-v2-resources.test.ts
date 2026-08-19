@@ -3,6 +3,7 @@ import { EDeviceType, EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shar
 
 import { DataManager } from '../src/data-manager';
 import {
+  isProtocolV2ResourceArchiveEntryName,
   parseProtocolV2ResourcePackage,
   parseProtocolV2Resources,
 } from '../src/protocols/protocol-v2/resources';
@@ -102,6 +103,24 @@ describe('Pro2 resource configuration', () => {
     expect(parseProtocolV2Resources({ source: resourceSource })).toEqual({
       source: resourceSource,
     });
+  });
+
+  test('ignores macOS ZIP metadata that only looks like a resource package', () => {
+    expect(
+      isProtocolV2ResourceArchiveEntryName(
+        'bundles/firmware_logo-pro2-prod_resource-signed.okpkg'
+      )
+    ).toBe(true);
+    expect(
+      isProtocolV2ResourceArchiveEntryName(
+        '__MACOSX/pro2-prod_resource 2/bundles/._firmware_logo-pro2-prod_resource-signed.okpkg'
+      )
+    ).toBe(false);
+    expect(
+      isProtocolV2ResourceArchiveEntryName(
+        'bundles/._firmware_logo-pro2-prod_resource-signed.okpkg'
+      )
+    ).toBe(false);
   });
 
   test('reads the version, hashes, and direct device path from a RESC package', () => {

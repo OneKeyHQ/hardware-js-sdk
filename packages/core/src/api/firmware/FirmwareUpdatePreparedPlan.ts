@@ -71,6 +71,11 @@ export const getFirmwareUpdateResourceName = (value: unknown): string => {
   return resourceName;
 };
 
+const getPreparedEntryIdentity = (entryName: unknown): string => {
+  getFirmwareUpdateResourceName(entryName);
+  return (entryName as string).toLowerCase();
+};
+
 const assertPreparedEntry = (value: unknown): FirmwareUpdatePreparedEntry => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return preparedPlanError('Firmware prepared plan entry must be an object');
@@ -141,11 +146,8 @@ const assertPreparedArtifacts = ({
     }
     if (
       materializedEntries &&
-      new Set(
-        materializedEntries.map(entry =>
-          getFirmwareUpdateResourceName(entry.entryName).toLowerCase()
-        )
-      ).size !== materializedEntries.length
+      new Set(materializedEntries.map(entry => getPreparedEntryIdentity(entry.entryName))).size !==
+        materializedEntries.length
     ) {
       return preparedPlanError('Firmware prepared plan contains duplicate entry names');
     }
@@ -281,7 +283,7 @@ export const validateFirmwareUpdatePreparedPlan = (value: unknown): FirmwareUpda
     const materializedEntryNames =
       artifact.materializedEntries?.map(entry => {
         assertPreparedEntry(entry);
-        return getFirmwareUpdateResourceName(entry.entryName).toLowerCase();
+        return getPreparedEntryIdentity(entry.entryName);
       }) ?? [];
     if (new Set(materializedEntryNames).size !== materializedEntryNames.length) {
       return preparedPlanError('Firmware prepared plan contains duplicate entry names');

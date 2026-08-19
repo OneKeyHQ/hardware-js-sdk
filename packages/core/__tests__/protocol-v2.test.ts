@@ -7720,6 +7720,10 @@ describe('Protocol V2 firmware update targets', () => {
     zip.file('pro2-resource/bundles/images/images.okpkg', imagesBinary);
     zip.file('pro2-resource/loaders/bootloader/boot_resource.okpkg', bootResourceBinary);
     zip.file('pro2-resource/build-info.txt', 'ignored');
+    zip.file(
+      '__MACOSX/pro2-resource 2/bundles/._images.okpkg',
+      new Uint8Array([0x00, 0x05, 0x16, 0x07])
+    );
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
