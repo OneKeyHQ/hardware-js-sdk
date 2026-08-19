@@ -13,9 +13,12 @@ export const ONEKEY_WEBUSB_FILTER = [
   { vendorId: 0x1209, productId: 0x53c1 }, // Classic/Classic1s/Mini/Pro/Touch firmware and legacy Pro2; keep for existing devices
   { vendorId: 0x1209, productId: 0x4f4a }, // Pro bootloader, Touch bootloader, Pro2
   { vendorId: 0x1209, productId: 0x4f4b }, // Pro/Touch firmware (Trezor not implemented), Pro2
-  { vendorId: 0x1209, productId: 0x4f4c }, // Pro board and Pro2 with the new firmware PID
+  { vendorId: 0x1209, productId: 0x4f4c }, // Pro2 / Neo current firmware, all modes
   // { vendorId: 0x1209, productId: 0x4f50 }, // Touch Board
 ];
+
+/** USB IDs whose first probe should be Protocol V2. Shared Pro/Touch PIDs stay unhinted. */
+export const ONEKEY_PROTOCOL_V2_USB_IDS = [{ vendorId: 0x1209, productId: 0x4f4c }] as const;
 
 type WebUsbIdentityDescriptor = {
   vendorId?: number;
@@ -152,12 +155,45 @@ export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
   if (
     normalizedName.startsWith('touch ') ||
     normalizedName.startsWith('pro ') ||
-    normalizedName.startsWith('pro2 ') ||
-    normalizedName.startsWith('neo ')
+    normalizedName.startsWith('pro2') ||
+    normalizedName.startsWith('neo')
   ) {
     return true;
   }
+  const compactName = compactBleName(normalizedName);
+  if (PRO2_COMPACT_NAME_PATTERN.test(compactName) || NEO_COMPACT_NAME_PATTERN.test(compactName)) {
+    return true;
+  }
   return isOneKeyShortName(normalizedName);
+};
+
+export const inferProtocolHintFromUsbId = (vendorId?: number | null, productId?: number | null) =>
+  ONEKEY_PROTOCOL_V2_USB_IDS.some(id => id.vendorId === vendorId && id.productId === productId)
+    ? ('V2' as const)
+    : undefined;
+
+type UsbDevicePathInput = {
+  serialNumber?: string | null;
+  vendorId?: number;
+  productId?: number;
+  productName?: string | null;
+};
+
+export const resolveOneKeyUsbDevicePath = (device: UsbDevicePathInput): string | undefined => {
+  const serial = device.serialNumber?.trim();
+  if (serial) return serial;
+  if (device.vendorId == null && device.productId == null && !device.productName) {
+    return undefined;
+  }
+
+  const vendorId = (device.vendorId ?? 0).toString(16).padStart(4, '0');
+  const productId = (device.productId ?? 0).toString(16).padStart(4, '0');
+  const product = (device.productName ?? 'onekey')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+  return `usb-${vendorId}-${productId}-${product || 'onekey'}`;
 };
 
 type BluetoothDeviceIdentity = {
@@ -196,6 +232,7 @@ export const matchesKnownBleUuid = (
 const ONEKEY_COMMUNICATION_SERVICE_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
 const FIDO_SERVICE_ALIASES = createKnownBleUuidAliases('0000fffd-0000-1000-8000-00805f9b34fb');
 const PRO2_COMPACT_NAME_PATTERN = /^(?:onekey)?pro2[a-f0-9]{4}$/i;
+const NEO_COMPACT_NAME_PATTERN = /^(?:onekey)?neo[a-f0-9]{4}$/i;
 const FIND_MY_COMPACT_SUFFIXES = [
   'findemy',
   'findem',

@@ -1,4 +1,4 @@
-import { DeviceRebootType } from '@onekeyfe/hd-transport';
+import { DeviceRebootType, DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
 
@@ -13,6 +13,8 @@ export default class DeviceRebootToBootloader extends BaseMethod<RebootToBootloa
   init() {
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
+    this.unlockPolicy = 'unlock-before-run';
+    this.protocolV2PreUnlockPinType = DeviceSessionPinType.Any;
   }
 
   getVersionRange() {

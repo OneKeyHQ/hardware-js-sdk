@@ -51,10 +51,6 @@ interface PacketProcessResult {
   error?: string;
 }
 
-function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
-  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
-}
-
 const toBleDescriptor = (
   device: { id: string; name: string | null },
   protocolType?: ProtocolType
@@ -104,6 +100,9 @@ export default class ElectronBleTransport {
   private deviceProtocol: Map<string, ProtocolType> = new Map();
 
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
+
+  /** Endpoints that answered a V2 probe in this transport lifetime. Survives disconnect. */
+  private confirmedProtocolV2 = new Set<string>();
 
   private deviceMtus: Map<string, number> = new Map();
 
@@ -269,10 +268,6 @@ export default class ElectronBleTransport {
       this.Log?.debug(`[Electron BLE] enumerate found ${devices.length} device(s):`);
       for (const dev of devices) {
         this.Log?.debug(`[Electron BLE]   id="${dev.id}" name="${dev.name}"`);
-        const protocolHint = inferProtocolHintFromDeviceName(dev.name);
-        if (protocolHint) {
-          this.deviceProtocolHints.set(dev.id, protocolHint);
-        }
       }
       return devices.map(device => toBleDescriptor(device));
     } catch (error) {
@@ -310,9 +305,7 @@ export default class ElectronBleTransport {
       }
       const protocolHint = expectedProtocol
         ? undefined
-        : input.protocolHint ??
-          this.deviceProtocolHints.get(uuid) ??
-          inferProtocolHintFromDeviceName(device.name);
+        : input.protocolHint ?? this.deviceProtocolHints.get(uuid);
       if (protocolHint) {
         this.deviceProtocolHints.set(uuid, protocolHint);
       }
@@ -442,9 +435,12 @@ export default class ElectronBleTransport {
     }
   }
 
-  private createProtocolMismatchError(expected: ProtocolType) {
+  private createProtocolMismatchError(expected: ProtocolType, uuid: string) {
+    // A generic Ping miss is not a bond failure. Only a later miss after this
+    // endpoint already answered V2, or a native encryption/pairing error, is.
+    const isStaleV2Bond = expected === 'V2' && this.confirmedProtocolV2.has(uuid);
     return ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
+      isStaleV2Bond ? HardwareErrorCode.BleDeviceBondError : HardwareErrorCode.RuntimeError,
       `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
     );
   }
@@ -473,16 +469,17 @@ export default class ElectronBleTransport {
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V1 (expected)`);
         return 'V1';
       }
-      throw this.createProtocolMismatchError(expectedProtocol);
+      throw this.createProtocolMismatchError(expectedProtocol, uuid);
     }
 
     if (expectedProtocol === 'V2') {
       if (await this.probeProtocolV2(uuid)) {
         this.deviceProtocol.set(uuid, 'V2');
+        this.confirmedProtocolV2.add(uuid);
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2 (expected)`);
         return 'V2';
       }
-      throw this.createProtocolMismatchError(expectedProtocol);
+      throw this.createProtocolMismatchError(expectedProtocol, uuid);
     }
 
     // Protocol must be actively probed after connection. Name, PID, and descriptors only
@@ -501,6 +498,9 @@ export default class ElectronBleTransport {
         protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
+        if (protocol === 'V2') {
+          this.confirmedProtocolV2.add(uuid);
+        }
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> ${protocol}`);
         return protocol;
       }

@@ -20,6 +20,23 @@ Protocol V2 响应依靠串行调用、消息类型和帧序号维持请求边�
 - `packages/hd-transport/src/protocols/v2/session.ts`
 - `packages/hd-transport/src/protocols/v2/sequence-cursor.ts`
 
+## 用户 Cancel 的所有权
+
+协议 `Cancel` 只由 SDK Core 决定是否发送。App 关闭 UI 可以随时调用 `sdk.cancel()`，但不得按机型、配对阶段或权限弹窗自行决定“这次要不要发 Cancel”。
+
+当前规则：
+
+- 未 acquire 的连接、配对、probe 或 initialize：只中止本地调用并断开物理链路，不发送协议 `Cancel`，也不为了发 `Cancel` 再 acquire。
+- 已 acquire 且存在 PIN / passphrase / Button 的 `cancelableAction`，或 Protocol V2 已打开用户交互：才向设备发送 `Cancel`（V1 OneKey 设备上的 PIN 仍走既有 `Initialize` 取消）。
+- 用户取消后，同一轮 acquire / initialize / BLE 重试必须立即失败，不得把 `BleConnectedError` 当成可重试错误继续连。
+- 固件升级过程中是否关闭页面、是否继续安装属于 App 导航生命周期，不是协议 Cancel 策略。
+
+主要实现：
+
+- `packages/core/src/device/Device.ts` `interruptionFromUser()`
+- `packages/core/src/device/DeviceCommands.ts` `cancelDeviceInPrompt()`
+- `packages/core/src/core/index.ts` `cancel()` / `connectDeviceForBle()`
+
 ## 公共协议层与 Transport 边界
 
 为保证 USB 和 BLE 使用一致的调用与恢复语义，公共协议层和平台 Transport 的职责严格分离：
@@ -181,9 +198,11 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   loader 流程。
 - all-network root、bundle 和内部链方法共享轻量 preflight context，因此每个 logical operation
   只执行一次 Status/Unlock；每个子链仍按固件语义独立恢复和校验 Wallet Session。
-- Pro2 设置按固件锁定边界分类：语言、亮度、动画、轻触唤醒、振动反馈、设备名称显示和壁纸
+- Pro2 设置按固件锁定边界分类：语言、亮度、动画、轻触唤醒、振动反馈和设备名称显示
   无需解锁；自动锁定、自动关机、蓝牙、FIDO、USB Lock、随机键盘和设备名称修改需要先解锁；
   Change PIN、Passphrase、Air-gap 与 Wipe 先解锁后打开设备确认页。未知新增设置默认要求解锁。
+  壁纸和 NFT 文件上传（`deviceUploadWallpaper`、`deviceUploadNft`）写文件系统，显式使用
+  `unlock-before-run`。
 - 业务 callback 只执行一次。业务阶段返回结构化 `HardwareErrorCode.DeviceLocked` 时直接失败，
   不捕获、不解锁、不重放；解锁取消、失败或 post-unlock Status 仍锁定时，业务发送次数为零。
 - Protocol V1，以及同时满足 `useDevicePassphraseState=false` 和 `unlockPolicy='none'` 的方法，
@@ -268,7 +287,8 @@ Prepared 固件更新将 artifact 获取与设备执行分离，完整性责任�
   独立防线，不能替代 Host 对资源 artifact 的完整性校验。
 - Protocol V2 资源归档必须作为 `role: resourceBundle`、`target: resource`、`container: zip`
   的 Plan artifact 参与统一下载；Host 在 PreparedPlan 的 `materializedEntries` 中登记
-  `manifest.json` 与资源包，SDK 仅通过 `ArtifactReader` 分块读取。公共
+  解压后的 `.okpkg` 资源包，SDK 仅通过 `ArtifactReader` 分块读取。资源包的设备写入路径来自
+  已签名 OKPP header 的 `flexible_metadata`，ZIP 内其他条目不参与更新。公共
   `resourceArchiveBinary` 是本地开发便利入口，Core 必须先将它转换成本地 Plan、PreparedPlan、
   receipt 和内存 `ArtifactReader`，不得直接进入设备写入流程。
 - Web 与示例环境没有持久化 artifact store 时，可以使用内存 Host 适配器，但仍必须保持

@@ -1,6 +1,7 @@
 import { blake2s } from '@noble/hashes/blake2s';
 import { bytesToHex } from '@noble/hashes/utils';
 import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
 import { decodeJpegBase64ToRgba } from '../helpers/base64Data';
@@ -78,7 +79,10 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
     });
     this.path = `${WALLPAPER_DIRECTORY}/${normalizeFileName(fileName, this.encoded.data)}`;
     this.params = { jpegBase64, fileName, chunkSize };
-    this.unlockPolicy = 'none';
+    this.unlockPolicy = 'unlock-before-run';
+    // File writes and wallpaper apply require an unlocked device. Either PIN
+    // may authorize this device-management action.
+    this.protocolV2PreUnlockPinType = DeviceSessionPinType.Any;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
   }

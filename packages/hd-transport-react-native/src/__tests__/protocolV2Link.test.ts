@@ -405,7 +405,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
-  test('actively probes Protocol V2 on iOS when only a name-derived hint is available', async () => {
+  test('detects Protocol V2 on iOS without using the BLE name as a protocol hint', async () => {
     const { transport, uuid, device, sentSeqs, writeCharacteristic } = createHarness({
       deviceName: 'Pro2 6E9E',
     });
@@ -415,14 +415,67 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       protocolType: 'V2',
     });
     expect(device.requestMTU).toHaveBeenCalledWith(247);
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithResponse.mock.calls.length).toBeGreaterThan(1);
 
     await expect(
       transport.call(uuid, 'Ping', { message: 'first-core-command' })
     ).resolves.toBeDefined();
-    expect(sentSeqs).toEqual([1, 2]);
+    expect(sentSeqs.filter(seq => seq > 0)).toEqual([1, 2]);
     await transport.release(uuid, true);
   });
+
+  test.each(['ios', 'android'] as const)(
+    'keeps a first expected Protocol V2 probe miss retryable on %s',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid, device } = createHarness();
+      jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(false);
+
+      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.RuntimeError,
+      });
+
+      expect(device.cancelConnection).not.toHaveBeenCalled();
+      expect(transport.getProtocolType(uuid)).toBeUndefined();
+    }
+  );
+
+  test.each(['ios', 'android'] as const)(
+    'keeps a second expected Protocol V2 probe miss retryable on %s',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid, device } = createHarness();
+      jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(false);
+
+      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.RuntimeError,
+      });
+      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.RuntimeError,
+      });
+
+      expect(device.cancelConnection).not.toHaveBeenCalled();
+      expect(transport.getProtocolType(uuid)).toBeUndefined();
+    }
+  );
+
+  test.each(['ios', 'android'] as const)(
+    'reports a stale bond on %s when a previously confirmed Protocol V2 device stops responding',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid, device } = createHarness();
+      await transport.acquire({ uuid, expectedProtocol: 'V2' });
+      await transport.release(uuid, true);
+      jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(false);
+
+      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleDeviceBondError,
+      });
+
+      expect(device.cancelConnection).toHaveBeenCalled();
+      expect(transport.getProtocolType(uuid)).toBeUndefined();
+    }
+  );
 
   test('waits for an in-flight release before reacquiring the same device', async () => {
     const { transport, uuid } = createHarness();

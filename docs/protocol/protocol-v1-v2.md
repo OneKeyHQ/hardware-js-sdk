@@ -216,6 +216,15 @@ Pro2 绑定 Find My 后，通信广播的名称会在原 BLE 名称末尾附加 
 Neo 真机通信广播使用 `Neo <4 位标识>`，例如 `Neo 22D8`；已观察到的服务集合与 Pro2 通信广播
 一致，可同时包含 `180a`、`180f`、`fffd` 和 `0001`。SDK 保留完整 Neo 名称并识别为 Neo，连接
 端点仍以 `0001` 为准，不能因同时存在 `fffd` 而过滤，也不能仅凭 `Neo` 名称推导协议版本。
+最新 firmware-pro2 也可能广播去掉空格的紧凑名称（如 `Pro2A1B2`、`Neo22D8`）；搜索必须把它们
+识别为 OneKey，但不能因此把协议结论从名称推出来。
+
+最新 firmware-pro2 在 application、bootloader 和 romloader 共用 USB VID/PID `1209:4f4c`，Pro2
+和 Neo 相同。USB 首次探测顺序只根据这个 VID/PID 给 V2 hint，不根据产品名或 BLE 名。`4f4a` /
+`4f4b` 仍与 Pro/Touch 共用，不能当作 V2 hint。协议仍由连接后的活动响应确认。
+
+USB 序列号来自出厂制造信息；槽位已写但序列号为空时，固件省略 `iSerialNumber` 字符串。WebUSB
+不能因此丢弃设备，应使用合成 path 完成搜索和 acquire。
 
 BLE 分包大小是平台传输参数，不属于 protobuf 或业务 API。性能结论见 [Pro2 BLE 传输测速记录](../testing/pro2-ble-performance.md)。
 

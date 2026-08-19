@@ -203,10 +203,6 @@ export function getProtocolV2BleTuning() {
   return { ...protocolV2BleTuning };
 }
 
-function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
-  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
-}
-
 function getDeviceDisplayName(device?: Device | null) {
   return device?.name || device?.localName || null;
 }
@@ -258,10 +254,17 @@ export const PROTOCOL_REPROBE_FALLBACK_ATTEMPTS = 3;
 /** BLE setup timeouts since the last successful setup before the manager is recreated. */
 export const BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD = 2;
 const CONNECT_TIMEOUT_MESSAGE = 'BLE connect timeout after';
+export const BLE_SETUP_WEDGED_MESSAGE = 'BLE setup wedged repeatedly';
 const isConnectTimeoutError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleConnectedError &&
   typeof (error as { message?: unknown })?.message === 'string' &&
   (error as { message: string }).message.startsWith(CONNECT_TIMEOUT_MESSAGE);
+const isWedgedBleSetupError = (error: unknown): boolean =>
+  (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.PollingTimeout &&
+  typeof (error as { message?: unknown })?.message === 'string' &&
+  (error as { message: string }).message.startsWith(BLE_SETUP_WEDGED_MESSAGE);
+const shouldRethrowBleSetupError = (error: unknown): boolean =>
+  isConnectTimeoutError(error) || isWedgedBleSetupError(error);
 const isNativeOperationTimeoutError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === BleErrorCode.OperationTimedOut;
 
@@ -380,6 +383,9 @@ export default class ReactNativeBleTransport {
 
   /** Protocol this device actually answered on, kept across reconnects of one session. */
   private sessionProtocols: Map<string, ProtocolType> = new Map();
+
+  /** Endpoints that answered a V2 probe in this transport lifetime. Survives disconnect. */
+  private confirmedProtocolV2 = new Set<string>();
 
   /** Consecutive detections that failed while trusting sessionProtocols. */
   private protocolReprobeFailures: Map<string, number> = new Map();
@@ -765,10 +771,7 @@ export default class ReactNativeBleTransport {
       const addDevice = (device: Device) => {
         if (deviceList.every(d => d.id !== device.id)) {
           const displayName = getDeviceDisplayName(device) ?? 'Unknown BLE Device';
-          const protocolHint = inferProtocolHintFromDeviceName(displayName);
-          if (protocolHint) {
-            this.deviceProtocolHints.set(device.id, protocolHint);
-          }
+
           deviceList.push({
             ...device,
             name: displayName,
@@ -778,7 +781,6 @@ export default class ReactNativeBleTransport {
             deviceId: device.id,
             name: displayName,
             serviceUUIDs: device.serviceUUIDs,
-            protocolHint,
           });
         }
       };
@@ -944,7 +946,7 @@ export default class ReactNativeBleTransport {
         );
       } catch (e) {
         Log?.debug('try to connect to device has error: ', e);
-        if (isConnectTimeoutError(e)) {
+        if (shouldRethrowBleSetupError(e)) {
           throw e;
         }
         if (
@@ -978,7 +980,7 @@ export default class ReactNativeBleTransport {
         );
       } catch (e) {
         Log?.debug('not connected, try to connect to device has error: ', e);
-        if (isConnectTimeoutError(e)) {
+        if (shouldRethrowBleSetupError(e)) {
           throw e;
         }
         if (
@@ -1015,9 +1017,7 @@ export default class ReactNativeBleTransport {
 
     const protocolHint = expectedProtocol
       ? undefined
-      : input.protocolHint ??
-        this.deviceProtocolHints.get(uuid) ??
-        inferProtocolHintFromDeviceName(getDeviceDisplayName(acquiredDevice));
+      : input.protocolHint ?? this.deviceProtocolHints.get(uuid);
 
     // release transport before new transport instance
     await this.releaseUnlocked(uuid, true);
@@ -1046,7 +1046,11 @@ export default class ReactNativeBleTransport {
       this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
       return { uuid, protocolType };
     } catch (error) {
-      await this.releaseUnlocked(uuid, true);
+      if ((error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleDeviceBondError) {
+        await this.disconnectUnlocked(uuid);
+      } else {
+        await this.releaseUnlocked(uuid, true);
+      }
       throw error;
     }
   }
@@ -1244,7 +1248,7 @@ export default class ReactNativeBleTransport {
 
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
-    // Preserve a name-derived hint across disconnects so reconnect can probe V2 first.
+    // Confirmed protocol and caller hints stay in deviceProtocol / protocolHint.
     this.protocolV2Assemblers.get(uuid)?.reset();
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);
@@ -1757,7 +1761,13 @@ export default class ReactNativeBleTransport {
       return result;
     } catch (error) {
       if (timedOut || isNativeOperationTimeoutError(error)) {
-        this.abandonStalledConnection(uuid, timedOut ? 'connect-backstop' : 'connect-native');
+        const resetManager = this.abandonStalledConnection(
+          uuid,
+          timedOut ? 'connect-backstop' : 'connect-native'
+        );
+        if (resetManager) {
+          throw this.createWedgedBleSetupError();
+        }
       }
       throw error;
     } finally {
@@ -1793,7 +1803,13 @@ export default class ReactNativeBleTransport {
       return result;
     } catch (error) {
       if (timedOut || isNativeOperationTimeoutError(error)) {
-        this.abandonStalledConnection(uuid, timedOut ? 'gatt-backstop' : 'gatt-native');
+        const resetManager = this.abandonStalledConnection(
+          uuid,
+          timedOut ? 'gatt-backstop' : 'gatt-native'
+        );
+        if (resetManager) {
+          throw this.createWedgedBleSetupError();
+        }
       }
       throw error;
     } finally {
@@ -1805,11 +1821,12 @@ export default class ReactNativeBleTransport {
    * Give up on a BLE setup operation the native layer did not settle. The abandoned
    * operation still owns native connection/GATT state that can poison the next attempt,
    * so it is cleared here without awaiting the same queue that stopped responding.
+   * Returns true when the manager itself was reset so the caller can stop Core retries.
    */
   private abandonStalledConnection(
     uuid: string,
     stage: 'connect-backstop' | 'connect-native' | 'gatt-backstop' | 'gatt-native'
-  ) {
+  ): boolean {
     const timeouts = (this.connectionSetupTimeoutCounts.get(uuid) ?? 0) + 1;
     this.connectionSetupTimeoutCounts.set(uuid, timeouts);
     Log?.error('[ReactNativeBleTransport] BLE setup timed out:', uuid, {
@@ -1835,7 +1852,15 @@ export default class ReactNativeBleTransport {
       Log?.error('[ReactNativeBleTransport] BLE setup wedged repeatedly, resetting BLE manager');
       this.resetPlxManager();
       this.connectionSetupTimeoutCounts.delete(uuid);
+      return true;
     }
+    return false;
+  }
+
+  private createWedgedBleSetupError() {
+    // PollingTimeout is not retried by connectDeviceForBle and already maps
+    // to the App "connection failed" help text.
+    return ERRORS.TypedError(HardwareErrorCode.PollingTimeout, BLE_SETUP_WEDGED_MESSAGE);
   }
 
   private getCachedTransport(uuid: string) {
@@ -1965,6 +1990,7 @@ export default class ReactNativeBleTransport {
     this.deviceProtocol.clear();
     this.probingProtocols.clear();
     this.sessionProtocols.clear();
+    this.confirmedProtocolV2.clear();
     this.protocolReprobeFailures.clear();
     this.writeTimeoutCounts.clear();
     this.connectionSetupTimeoutCounts.clear();
@@ -1977,9 +2003,12 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  private createProtocolMismatchError(expected: ProtocolType) {
+  private createProtocolMismatchError(expected: ProtocolType, uuid: string) {
+    // A generic Ping miss is not a bond failure. Only a later miss after this
+    // endpoint already answered V2, or a native encryption/pairing error, is.
+    const isStaleV2Bond = expected === 'V2' && this.confirmedProtocolV2.has(uuid);
     return ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
+      isStaleV2Bond ? HardwareErrorCode.BleDeviceBondError : HardwareErrorCode.RuntimeError,
       `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
     );
   }
@@ -2035,13 +2064,14 @@ export default class ReactNativeBleTransport {
         });
         return 'V1';
       }
-      throw this.createProtocolMismatchError(expectedProtocol);
+      throw this.createProtocolMismatchError(expectedProtocol, uuid);
     }
 
     if (expectedProtocol === 'V2') {
       if (await this.probeProtocolV2(uuid)) {
         this.deviceProtocol.set(uuid, 'V2');
         this.sessionProtocols.set(uuid, 'V2');
+        this.confirmedProtocolV2.add(uuid);
         Log?.debug('[ReactNativeBleTransport] protocol detected', {
           deviceId: uuid,
           protocol: 'V2',
@@ -2049,7 +2079,7 @@ export default class ReactNativeBleTransport {
         });
         return 'V2';
       }
-      throw this.createProtocolMismatchError(expectedProtocol);
+      throw this.createProtocolMismatchError(expectedProtocol, uuid);
     }
 
     // Protocol must be actively probed after connection. Name, PID, and descriptors only
@@ -2084,6 +2114,9 @@ export default class ReactNativeBleTransport {
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
         this.sessionProtocols.set(uuid, protocol);
+        if (protocol === 'V2') {
+          this.confirmedProtocolV2.add(uuid);
+        }
         this.protocolReprobeFailures.delete(uuid);
         Log?.debug('[ReactNativeBleTransport] protocol detected', {
           deviceId: uuid,

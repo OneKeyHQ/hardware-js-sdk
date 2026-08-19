@@ -1,4 +1,5 @@
 import { ERRORS, HardwareErrorCode, createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import { UI_REQUEST, createUiMessage } from '../../events/ui-request';
 import { supportsProtocolV2Message } from '../../protocols/protocol-v2/features';
@@ -129,7 +130,10 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
       paceMs,
       timeoutMs,
     };
-    this.unlockPolicy = 'none';
+    this.unlockPolicy = 'unlock-before-run';
+    // File writes and NftUpdate require an unlocked device. Either PIN may
+    // authorize this device-management action.
+    this.protocolV2PreUnlockPinType = DeviceSessionPinType.Any;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
   }
