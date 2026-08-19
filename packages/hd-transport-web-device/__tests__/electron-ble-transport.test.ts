@@ -725,10 +725,11 @@ describe('ElectronBleTransport protocol detection', () => {
     });
   });
 
-  test('does not report an idle keep-alive release as a device disconnect', async () => {
-    // The main process reclaims idle links on its own timer. The device is
-    // still present, so surfacing that as a disconnect would blank the UI for
-    // a device the user can still see and use.
+  test('reports an idle keep-alive release as a device disconnect', async () => {
+    // The main process reclaims idle links on its own timer. That is still a
+    // closed link, and consumers track link liveness, so it is reported like
+    // any other drop. Nothing reconnects on its own, so the state settles once
+    // until the user acts.
     const device = { id: 'keep-alive-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
     const emitter = new EventEmitter();
@@ -747,8 +748,12 @@ describe('ElectronBleTransport protocol detection', () => {
     await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
     disconnectHandler?.({ ...device, reason: EBleDisconnectReason.IdleKeepAlive });
 
-    expect(transportDisconnect).not.toHaveBeenCalled();
-    // The link really is gone, so cached link state must still be dropped.
+    expect(transportDisconnect).toHaveBeenCalledWith({
+      id: device.id,
+      connectId: device.id,
+      name: device.name,
+    });
+    // The link really is gone, so cached link state must be dropped too.
     expect(bleTransport.getProtocolType(device.id)).toBeUndefined();
   });
 

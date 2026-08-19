@@ -251,18 +251,21 @@ export default class ElectronBleTransport {
         const uuid = disconnectedDevice?.id;
         if (!uuid) return;
 
-        // The link is gone either way, so renderer-side state must go with it;
-        // the next acquire reconnects from scratch.
+        // The link is gone, so renderer-side state must go with it; the next
+        // acquire reconnects from scratch.
         this.cleanupDeviceState(uuid);
 
-        // An idle keep-alive release is the main process reclaiming a link we
-        // are not using. The device is still present, so reporting it as
-        // disconnected would blank the UI's connected state for a device the
-        // user can still see and use.
-        if (disconnectedDevice.reason === EBleDisconnectReason.IdleKeepAlive) {
-          this.Log?.debug('[Electron BLE] Idle keep-alive release, device still present:', uuid);
-          return;
-        }
+        // Every link drop is reported, including the main process reclaiming
+        // an idle link on its keep-alive timer: consumers track whether a BLE
+        // link is live, not whether the peripheral is theoretically in range,
+        // and a link we closed ourselves is still a closed link. Nothing
+        // reconnects on its own, so this settles once until the user acts.
+        // `reason` is carried for diagnostics only — behaviour is uniform.
+        this.Log?.debug(
+          '[Electron BLE] Device link dropped:',
+          uuid,
+          disconnectedDevice.reason ?? EBleDisconnectReason.DeviceDisconnected
+        );
 
         this.emitter?.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, {
           name: disconnectedDevice.name,
