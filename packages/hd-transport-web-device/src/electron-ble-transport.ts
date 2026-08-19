@@ -16,6 +16,8 @@ import {
   HardwareErrorCode,
   HardwareErrorCodeMessage,
   createDeferred,
+  isBleStaleBondErrorText,
+  isBleStaleBondHardwareError,
   isHeaderChunk,
 } from '@onekeyfe/hd-shared';
 
@@ -159,7 +161,30 @@ export default class ElectronBleTransport {
 
   private nextNotificationToken = 1;
 
+  private toStaleBondError(error: unknown): Error | null {
+    if (isBleStaleBondHardwareError(error)) {
+      return error as Error;
+    }
+    const errorMessage =
+      error && typeof error === 'object' && 'message' in error
+        ? String((error as { message?: unknown }).message ?? '')
+        : String(error ?? '');
+    if (!isBleStaleBondErrorText(errorMessage)) {
+      return null;
+    }
+    return ERRORS.TypedError(
+      errorMessage.includes('Peer removed pairing information')
+        ? HardwareErrorCode.BlePeerRemovedPairingInformation
+        : HardwareErrorCode.BleDeviceBondError,
+      errorMessage
+    );
+  }
+
   private handleBluetoothError(error: any): never {
+    const staleBondError = this.toStaleBondError(error);
+    if (staleBondError) {
+      throw staleBondError;
+    }
     if (error && typeof error === 'object') {
       if ('code' in error) {
         if (error.code === HardwareErrorCode.BlePoweredOff) {
@@ -367,7 +392,11 @@ export default class ElectronBleTransport {
       this.v1Buffers.set(uuid, { buffer: [], bufferLength: 0 });
       this.v2Assemblers.set(uuid, new ProtocolV2FrameAssembler(PROTOCOL_V2_BLE_FRAME_MAX_BYTES));
 
-      await window.desktopApi.nobleBle.subscribe(uuid);
+      try {
+        await window.desktopApi.nobleBle.subscribe(uuid);
+      } catch (error) {
+        this.handleBluetoothError(error);
+      }
       await this.refreshBlePacketCapacity(uuid);
 
       const cleanup = this.createNotificationSubscription(uuid);
@@ -588,6 +617,9 @@ export default class ElectronBleTransport {
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
       this.Log?.debug('[Electron BLE] Protocol V1 GetFeatures probe failed:', error);
+      if (isBleStaleBondHardwareError(error)) {
+        throw error;
+      }
       return false;
     }
   }
@@ -608,6 +640,7 @@ export default class ElectronBleTransport {
         this.v2Assemblers.get(uuid)?.reset();
         this.resetProtocolV2Frames(uuid);
       },
+      shouldRethrow: isBleStaleBondHardwareError,
     });
     if (!detected) {
       this.clearProbeProtocol(uuid, 'V2');
@@ -621,7 +654,15 @@ export default class ElectronBleTransport {
       throw new Error('Noble BLE API not available');
     }
 
-    await nobleBle.write(uuid, hexData, { pacingDelayMs: 0 });
+    try {
+      await nobleBle.write(uuid, hexData, { pacingDelayMs: 0 });
+    } catch (error) {
+      const staleBondError = this.toStaleBondError(error);
+      if (staleBondError) {
+        throw staleBondError;
+      }
+      throw error;
+    }
   }
 
   private async refreshBlePacketCapacity(uuid: string): Promise<void> {
@@ -863,7 +904,15 @@ export default class ElectronBleTransport {
         if (hexString.length === 0) {
           throw new Error(`Buffer ${i + 1} is empty`);
         }
-        await window.desktopApi.nobleBle.write(uuid, hexString);
+        try {
+          await window.desktopApi.nobleBle.write(uuid, hexString);
+        } catch (error) {
+          const staleBondError = this.toStaleBondError(error);
+          if (staleBondError) {
+            throw staleBondError;
+          }
+          throw error;
+        }
       }
 
       const response = await Promise.race([
