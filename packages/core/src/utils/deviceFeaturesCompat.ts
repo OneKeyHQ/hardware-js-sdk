@@ -1,4 +1,8 @@
-import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+import {
+  EDeviceType,
+  EFirmwareType,
+  canonicalizePro2BleAdvertisementName,
+} from '@onekeyfe/hd-shared';
 import { Enum_Capability } from '@onekeyfe/hd-transport';
 
 import type { PROTO } from '../constants';
@@ -125,9 +129,10 @@ export const resolveDeviceFirmwareType = (features?: DeviceFeaturesInput): EFirm
 export const resolveDeviceBleName = (features?: DeviceFeaturesInput): string | null => {
   if (!features) return null;
   const compatible = asCompatibleFeatures(features);
-  return (
-    firstNonEmptyString(compatible.bleName, compatible.onekey_ble_name, compatible.ble_name) ?? null
-  );
+  const bleName =
+    firstNonEmptyString(compatible.bleName, compatible.onekey_ble_name, compatible.ble_name) ??
+    null;
+  return bleName ? canonicalizePro2BleAdvertisementName(bleName) : null;
 };
 
 export const resolveDeviceFirmwareVersion = (features?: DeviceFeaturesInput): string | null => {

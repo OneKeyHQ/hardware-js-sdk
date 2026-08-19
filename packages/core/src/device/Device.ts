@@ -9,6 +9,7 @@ import {
   ERROR_CODES_REQUIRE_RELEASE,
   HardwareError,
   HardwareErrorCode,
+  canonicalizePro2BleAdvertisementName,
   createDeferred,
   createDeviceNotSupportMethodError,
 } from '@onekeyfe/hd-shared';
@@ -672,7 +673,8 @@ export class Device extends EventEmitter {
   }
 
   getCurrentBleName() {
-    return this.state?.identity.bleName ?? null;
+    const bleName = this.state?.identity.bleName ?? null;
+    return bleName ? canonicalizePro2BleAdvertisementName(bleName) : null;
   }
 
   getCurrentLabel() {

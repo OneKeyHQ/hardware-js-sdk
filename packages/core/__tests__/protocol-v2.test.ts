@@ -744,7 +744,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(features).toMatchObject({
       deviceId: 'P2-DYNAMIC',
       serialNo: 'P2-STATIC',
-      bleName: 'Pro2 STATIC',
+      bleName: 'Pro 2 STATIC',
       initialized: true,
       unlocked: true,
       passphraseProtection: true,
@@ -865,7 +865,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.boardVersion).toBe('0.1.0');
     expect(features.verify?.boardBuildId).toBe('rom-build');
     expect(features.verify?.boardHash).toBe('0102ff');
-    expect(features.bleName).toBe('Pro2 BLE');
+    expect(features.bleName).toBe('Pro 2 BLE');
     expect(features.bleVersion).toBe('4.5.6');
     expect(features.verify?.bleHash).toBe('0c0d');
     expect(features.se01Version).toBe('7.8.9');
@@ -2806,9 +2806,9 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(device.toMessageObject()).toMatchObject({
       serialNo: 'PR9999999999',
-      bleName: 'Pro2 6136',
-      name: 'Pro2 6136',
-      label: 'Pro2 6136',
+      bleName: 'Pro 2 6136',
+      name: 'Pro 2 6136',
+      label: 'Pro 2 6136',
     });
     expect(device.features?.label).toBeNull();
   });
@@ -2823,8 +2823,8 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(device.getCurrentDisplayName()).toBe('My Pro 2');
     expect(device.toMessageObject()).toMatchObject({
-      bleName: 'Pro2 6136',
-      name: 'Pro2 6136',
+      bleName: 'Pro 2 6136',
+      name: 'Pro 2 6136',
       label: 'My Pro 2',
     });
   });

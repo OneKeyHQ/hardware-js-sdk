@@ -292,6 +292,30 @@ export const normalizePro2FindMyAdvertisementName = (value: string) => {
   return value;
 };
 
+/**
+ * Current Pro2 advertisements use "Pro 2 XXXX". Older firmware used "Pro2 XXXX".
+ * Discovery and DeviceInfo both go through this helper so the public BLE name
+ * stays on the spaced form without changing OneKey Pro / Neo names.
+ */
+export const canonicalizePro2BleAdvertisementName = (value: string) => {
+  const withoutFindMy = normalizePro2FindMyAdvertisementName(value);
+  const match = withoutFindMy.match(/^(onekey\s*)?pro\s*2\s*/i);
+  if (!match) return withoutFindMy;
+
+  const rest = withoutFindMy.slice(match[0].length);
+  const prefix = match[1] ? 'OneKey Pro 2' : 'Pro 2';
+  return rest ? `${prefix} ${rest}` : prefix;
+};
+
+export const isSameOnekeyBleName = (left?: string | null, right?: string | null) => {
+  if (!left || !right) return false;
+  if (left === right) return true;
+  return (
+    compactBleName(canonicalizePro2BleAdvertisementName(left)) ===
+    compactBleName(canonicalizePro2BleAdvertisementName(right))
+  );
+};
+
 export const hasOnekeyCommunicationService = (
   serviceUuids: Array<string | null | undefined> | null | undefined
 ) =>
