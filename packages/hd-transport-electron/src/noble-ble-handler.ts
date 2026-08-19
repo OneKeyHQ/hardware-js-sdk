@@ -89,6 +89,10 @@ const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
 const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
 const BLE_CLEANUP_TIMEOUT = 250;
+// A physical teardown must actually reach the OS before the device can return
+// to a clean state; 250ms routinely declared success while CoreBluetooth was
+// still disconnecting, leaving no trace when the teardown never completed.
+const BLE_DISCONNECT_CONFIRM_TIMEOUT_MS = 3000;
 // Renderer release is logical only; this timer physically frees the device.
 const BLE_IDLE_DISCONNECT_MS = 3 * 60_000;
 // Ceiling while a call is in flight: no outstanding write, but not forever.
@@ -393,7 +397,21 @@ function armIdleDisconnect(
       logger?.info('[NobleBLE] Keep-alive timeout, disconnecting device', { deviceId, reason });
       const peripheral = connectedDevices.get(deviceId);
       const deviceName = peripheral?.advertisement?.localName || 'Unknown Device';
-      const pending = disconnectDevice(deviceId)
+      // Unsubscribe CCCD before dropping the link, matching every other
+      // teardown path: the 1S leaves its notify session half-open when the
+      // link drops without an unsubscribe and then ignores application
+      // protocol traffic on NEW links for tens of minutes (field log
+      // 2026-08-19: the lone unsubscribe-skipping idle teardown caused a
+      // 6-attempt reconnect loop; unsubscribe-first teardowns reconnected
+      // instantly).
+      const pending = unsubscribeNotifications(deviceId)
+        .catch(error => {
+          logger?.warn('[NobleBLE] Keep-alive unsubscribe failed, disconnecting anyway', {
+            deviceId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        })
+        .then(() => disconnectDevice(deviceId))
         .then(() => {
           // A call is still in flight here; it must reject, not hang.
           broadcastToAllWebContents(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, {
@@ -1588,9 +1606,12 @@ async function disconnectDevice(deviceId: string): Promise<void> {
   }
 
   await runBleCallbackOperation(callback => peripheral.disconnect(() => callback()), {
-    timeoutMs: BLE_CLEANUP_TIMEOUT,
+    timeoutMs: BLE_DISCONNECT_CONFIRM_TIMEOUT_MS,
     timeoutBehavior: 'resolve',
   });
+  if (peripheral.state === 'connected') {
+    logger?.warn('[NobleBLE] Physical disconnect did not confirm in time', { deviceId });
+  }
   cleanupDevice(deviceId, undefined, {
     cleanupConnection: true,
     // macOS returns zero GATT services when a previously-disconnected
