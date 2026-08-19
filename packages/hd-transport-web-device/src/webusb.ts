@@ -8,6 +8,7 @@ import transport, {
   PROTOCOL_V2_FRAME_MAX_BYTES,
   ProtocolV2LinkError,
   ProtocolV2UsbTransportBase,
+  TRANSPORT_EVENT,
   probeProtocolV2 as probeProtocolV2Helper,
 } from '@onekeyfe/hd-transport';
 import {
@@ -21,6 +22,7 @@ import {
 } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
 
+import type EventEmitter from 'events';
 import type {
   AcquireInput,
   OneKeyDeviceInfoBase,
@@ -87,6 +89,10 @@ function registerActiveWebUsbTransport(instance: WebUsbTransport, usb: USB) {
     const path = resolveOneKeyUsbDevicePath(event.device);
     if (!path) return;
     activeWebUsbTransport?.markProtocolStale(path);
+    // WebUSB has no device-list poller behind it, so this event is the only
+    // signal that the device is gone. Without it consumers never see a
+    // DEVICE.DISCONNECT for USB (OK-60486).
+    activeWebUsbTransport?.emitDeviceDisconnect(path, event.device);
   });
 }
 
@@ -134,6 +140,8 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
 
   usb?: USB;
 
+  emitter?: EventEmitter;
+
   /**
    * Cached list of connected devices
    * This is essential for maintaining device references between operations
@@ -157,8 +165,9 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   /**
    * Initialize WebUSB transport
    */
-  init(logger: any) {
+  init(logger: any, emitter?: EventEmitter) {
     this.Log = logger;
+    this.emitter = emitter;
 
     const { usb } = navigator;
     if (!usb) {
@@ -169,6 +178,18 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     }
     this.usb = usb;
     registerActiveWebUsbTransport(this, usb);
+  }
+
+  /**
+   * Announce that a USB device left. Called from the module-scoped disconnect
+   * listener, which is why it is public rather than inlined.
+   */
+  emitDeviceDisconnect(path: string, device?: USBDevice) {
+    this.emitter?.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, {
+      name: device?.productName ?? '',
+      id: path,
+      connectId: path,
+    });
   }
 
   /**

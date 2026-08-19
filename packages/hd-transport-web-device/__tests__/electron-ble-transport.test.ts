@@ -1,5 +1,5 @@
 import transport, { PROTOCOL_V2_CHANNEL_BLE_UART, bytesToHex } from '@onekeyfe/hd-transport';
-import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
+import { EBleDisconnectReason, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import EventEmitter from 'events';
 
 import ElectronBleTransport from '../src/electron-ble-transport';
@@ -132,6 +132,30 @@ const configureTransport = (
   transport.configure(protocolV1Schema);
   transport.configureProtocolV2(protocolV2Schema);
   return transport;
+};
+
+/**
+ * Wire the mock so acquire()'s Protocol V2 probe gets an answer. Without it
+ * detectProtocol throws and the test never reaches the disconnect behaviour.
+ */
+const echoProtocolV2 = (nobleBle: ReturnType<typeof createNobleBle>, deviceId: string) => {
+  let notificationHandler: ((id: string, data: string) => void) | undefined;
+  nobleBle.onNotification.mockImplementation(handler => {
+    notificationHandler = handler;
+    return jest.fn();
+  });
+  let responseSeq = 0;
+  nobleBle.write.mockImplementation(() => {
+    responseSeq += 1;
+    const response = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: responseSeq }
+    );
+    setTimeout(() => notificationHandler?.(deviceId, bytesToHex(response)), 0);
+    return Promise.resolve();
+  });
 };
 
 describe('ElectronBleTransport protocol detection', () => {
@@ -624,19 +648,17 @@ describe('ElectronBleTransport protocol detection', () => {
     }
   });
 
-  test('ignores a delayed disconnect event from the previous BLE connection', async () => {
-    const device = { id: 'delayed-disconnect-pro2-id', name: 'OneKey Pro 2' };
+  test('subscribes to host disconnects once for the transport lifetime', async () => {
+    // The previous design registered a listener inside every acquire() and
+    // overwrote the cleanup entry without disposing the old one, so each
+    // acquire leaked a live handler and a delayed event from a superseded
+    // connection could tear down the current one. One transport-lifetime
+    // subscription removes that whole class of bug.
+    const device = { id: 'single-subscription-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
     let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
-    const disconnectHandlers: Array<
-      (disconnectedDevice: { id: string; name: string | null }) => void
-    > = [];
     nobleBle.onNotification.mockImplementation(handler => {
       notificationHandler = handler;
-      return jest.fn();
-    });
-    nobleBle.onDeviceDisconnected.mockImplementation(handler => {
-      disconnectHandlers.push(handler);
       return jest.fn();
     });
     let responseSeq = 0;
@@ -654,14 +676,15 @@ describe('ElectronBleTransport protocol detection', () => {
     const bleTransport = configureTransport(nobleBle);
 
     try {
+      expect(nobleBle.onDeviceDisconnected).toHaveBeenCalledTimes(1);
+
       await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
       await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
 
-      disconnectHandlers[0]?.(device);
-
+      expect(nobleBle.onDeviceDisconnected).toHaveBeenCalledTimes(1);
       expect(bleTransport.getProtocolType(device.id)).toBe('V2');
       await expect(
-        bleTransport.call(device.id, 'Ping', { message: 'after-stale-disconnect' })
+        bleTransport.call(device.id, 'Ping', { message: 'after-reacquire' })
       ).resolves.toEqual({
         type: 'Success',
         message: { message: 'ok' },
@@ -669,6 +692,90 @@ describe('ElectronBleTransport protocol detection', () => {
     } finally {
       await bleTransport.release(device.id);
     }
+  });
+
+  test('reports a device that drops after a logical release (OK-60486)', async () => {
+    // A logical release keeps the native link alive for the keep-alive window.
+    // A drop during that window must still reach consumers, or the UI keeps
+    // showing the device as connected forever.
+    const device = { id: 'idle-drop-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    const emitter = new EventEmitter();
+    let disconnectHandler:
+      | ((d: { id: string; name: string; reason?: EBleDisconnectReason }) => void)
+      | undefined;
+    nobleBle.onDeviceDisconnected.mockImplementation(handler => {
+      disconnectHandler = handler;
+      return jest.fn();
+    });
+    echoProtocolV2(nobleBle, device.id);
+    const transportDisconnect = jest.fn();
+    emitter.on('transport-device-disconnect', transportDisconnect);
+    const bleTransport = configureTransport(nobleBle, emitter);
+
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    await bleTransport.release(device.id);
+
+    disconnectHandler?.({ ...device, reason: EBleDisconnectReason.DeviceDisconnected });
+
+    expect(transportDisconnect).toHaveBeenCalledWith({
+      id: device.id,
+      connectId: device.id,
+      name: device.name,
+    });
+  });
+
+  test('does not report an idle keep-alive release as a device disconnect', async () => {
+    // The main process reclaims idle links on its own timer. The device is
+    // still present, so surfacing that as a disconnect would blank the UI for
+    // a device the user can still see and use.
+    const device = { id: 'keep-alive-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    const emitter = new EventEmitter();
+    let disconnectHandler:
+      | ((d: { id: string; name: string; reason?: EBleDisconnectReason }) => void)
+      | undefined;
+    nobleBle.onDeviceDisconnected.mockImplementation(handler => {
+      disconnectHandler = handler;
+      return jest.fn();
+    });
+    echoProtocolV2(nobleBle, device.id);
+    const transportDisconnect = jest.fn();
+    emitter.on('transport-device-disconnect', transportDisconnect);
+    const bleTransport = configureTransport(nobleBle, emitter);
+
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    disconnectHandler?.({ ...device, reason: EBleDisconnectReason.IdleKeepAlive });
+
+    expect(transportDisconnect).not.toHaveBeenCalled();
+    // The link really is gone, so cached link state must still be dropped.
+    expect(bleTransport.getProtocolType(device.id)).toBeUndefined();
+  });
+
+  test('treats a disconnect with no reason as a real device drop', async () => {
+    // An older host bridge does not send `reason`; defaulting to "device left"
+    // preserves the pre-existing behaviour rather than silently ignoring it.
+    const device = { id: 'legacy-host-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    const emitter = new EventEmitter();
+    let disconnectHandler: ((d: { id: string; name: string }) => void) | undefined;
+    nobleBle.onDeviceDisconnected.mockImplementation(handler => {
+      disconnectHandler = handler;
+      return jest.fn();
+    });
+    echoProtocolV2(nobleBle, device.id);
+    const transportDisconnect = jest.fn();
+    emitter.on('transport-device-disconnect', transportDisconnect);
+    const bleTransport = configureTransport(nobleBle, emitter);
+
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    disconnectHandler?.(device);
+
+    expect(transportDisconnect).toHaveBeenCalledWith({
+      id: device.id,
+      connectId: device.id,
+      name: device.name,
+    });
   });
 
   test('preserves the active Protocol V2 link when the same schema is configured again', async () => {
