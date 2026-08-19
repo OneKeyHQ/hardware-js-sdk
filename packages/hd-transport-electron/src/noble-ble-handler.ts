@@ -6,6 +6,7 @@
 /* eslint-disable @typescript-eslint/no-var-requires, import/no-extraneous-dependencies */
 
 import {
+  EBleDisconnectReason,
   EOneKeyBleMessageKeys,
   ERRORS,
   HardwareErrorCode,
@@ -336,6 +337,12 @@ interface DeviceCleanupOptions {
   cleanupDiscoveredCache?: boolean;
   /** Whether to send disconnect event */
   sendDisconnectEvent?: boolean;
+  /**
+   * Why the link went down, forwarded to renderers on BLE_DEVICE_DISCONNECTED.
+   * Defaults to a real peripheral drop; the keep-alive path overrides it so
+   * consumers can tell an internal idle release from a device that left.
+   */
+  disconnectReason?: EBleDisconnectReason;
   /** Whether to cancel ongoing operations */
   cancelOperations?: boolean;
   /** Cleanup reason (for logging) */
@@ -394,9 +401,14 @@ function armIdleDisconnect(
       const pending = disconnectDevice(deviceId)
         .then(() => {
           // A call is still in flight here; it must reject, not hang.
+          // Both 'idle' and 'busy-backstop' report IdleKeepAlive on purpose:
+          // we reclaimed the link ourselves and have no evidence the device
+          // left, so consumers must not mark it disconnected. The in-flight
+          // call still fails, via the renderer dropping its device state.
           broadcastToAllWebContents(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, {
             id: deviceId,
             name: deviceName,
+            reason: EBleDisconnectReason.IdleKeepAlive,
           });
         })
         .catch(error => {
@@ -426,6 +438,7 @@ function cleanupDevice(
     sendDisconnectEvent = false,
     cancelOperations = true,
     reason = 'unknown',
+    disconnectReason = EBleDisconnectReason.DeviceDisconnected,
   } = options;
 
   logger?.info('[NobleBLE] Starting device cleanup', {
@@ -475,6 +488,7 @@ function cleanupDevice(
     broadcastToAllWebContents(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, {
       id: deviceId,
       name: deviceName,
+      reason: disconnectReason,
     });
   }
 

@@ -101,6 +101,21 @@ export enum EOneKeyBleMessageKeys {
   NOBLE_BLE_CANCEL_PAIRING = '$onekey-noble-ble-cancel-pairing',
 }
 
+/**
+ * Why a BLE link went down, carried on BLE_DEVICE_DISCONNECTED.
+ *
+ * The main process frees an idle link on its own keep-alive timer, which is an
+ * internal optimisation the device knows nothing about — consumers must not
+ * treat it as "the device is gone". Only DeviceDisconnected means the
+ * peripheral actually dropped.
+ */
+export enum EBleDisconnectReason {
+  /** Unsolicited peripheral drop: powered off, out of range, cable/BLE lost. */
+  DeviceDisconnected = 'device-disconnected',
+  /** Main-process keep-alive timer released an idle link; device still present. */
+  IdleKeepAlive = 'idle-keep-alive',
+}
+
 export const ONEKEY_SERVICE_UUID = '00000001-0000-1000-8000-00805f9b34fb';
 export const ONEKEY_WRITE_CHARACTERISTIC_UUID = '00000002-0000-1000-8000-00805f9b34fb';
 export const ONEKEY_NOTIFY_CHARACTERISTIC_UUID = '00000003-0000-1000-8000-00805f9b34fb';
