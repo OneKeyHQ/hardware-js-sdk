@@ -94,7 +94,13 @@ const BLE_CLEANUP_TIMEOUT = 250;
 // still disconnecting, leaving no trace when the teardown never completed.
 const BLE_DISCONNECT_CONFIRM_TIMEOUT_MS = 3000;
 // Renderer release is logical only; this timer physically frees the device.
-const BLE_IDLE_DISCONNECT_MS = 3 * 60_000;
+// Keep it SHORT: the Classic 1S goes protocol-deaf when a link is dropped
+// after sitting idle for minutes (field logs 2026-08-19: every deaf window
+// followed a 3-minute-idle disconnect, while disconnects right after traffic
+// have never produced one across 6.5.0's per-call teardown history). A hot
+// disconnect ~20s after the last operation stays inside the proven-safe
+// pattern and also shrinks the window in which phones cannot see the device.
+const BLE_IDLE_DISCONNECT_MS = 20_000;
 // Ceiling while a call is in flight: no outstanding write, but not forever.
 const BLE_BUSY_BACKSTOP_MS = 10 * 60_000;
 
