@@ -22,9 +22,12 @@ export { preloadSessionCache } from './device/Device';
 export { projectFeatures as projectDeviceStateFeatures } from './device/DeviceStateProjector';
 export { getMethodSupportedProtocols } from './api/utils';
 export {
-  parseProtocolV2ResourceManifest,
-  selectProtocolV2ResourceManifestFiles,
+  PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH,
+  PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE,
+  parseProtocolV2ResourcePackage,
+  parseProtocolV2ResourcePackageHeader,
 } from './protocols/protocol-v2/resources';
+export type { ProtocolV2ResourcePackageHeader } from './protocols/protocol-v2/resources';
 export { prepareFirmwareUpdateV4MemoryHost } from './api/firmware/FirmwareMemoryHost';
 export type {
   FirmwareMemoryArtifact,

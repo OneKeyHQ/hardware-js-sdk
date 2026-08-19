@@ -31,8 +31,11 @@ import {
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
-  parseProtocolV2ResourceManifest,
-  selectProtocolV2ResourceManifestFiles,
+  PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH,
+  PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE,
+  parseProtocolV2ResourcePackage,
+  parseProtocolV2ResourcePackageHeader,
+  type ProtocolV2ResourcePackageHeader,
 } from '../protocols/protocol-v2/resources';
 import {
   getProtocolV2UnknownErrorText,
@@ -69,7 +72,6 @@ import type {
   Features,
   IFirmwareReleaseInfo,
   IProtocolV2FirmwareComponent,
-  IProtocolV2ResourceManifestFile,
   IVersionArray,
   KnownDevice,
 } from '../types';
@@ -106,20 +108,8 @@ const PROTOCOL_V2_CONNECT_SINGLE_TIMEOUT = 75 * 1000;
 const PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT = 30 * 1000;
 const PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT = 3;
 const PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE = 'FirmwareInstallStatusConflict';
-const PROTOCOL_V2_OKPP_HEADER_SIZE = 0x52a0;
-const PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET = 0x200;
-const PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET = 0x240;
-const PROTOCOL_V2_OKPP_HASH_SIZE = 64;
-const PROTOCOL_V2_RESOURCE_MANIFEST_MAX_BYTES = 1024 * 1024;
 const PROTOCOL_V2_RESOURCE_FILE_MAX_COUNT = 512;
 const PROTOCOL_V2_RESOURCE_TOTAL_MAX_BYTES = 256 * 1024 * 1024;
-
-const getProtocolV2LocalResourceArchivePath = (entryName: string) => {
-  const match = entryName.match(
-    /(?:^|\/)((?:bundles\/|loaders\/(?:bootloader|rom)\/).+\.okpkg)$/iu
-  );
-  return match?.[1];
-};
 
 const PROTOCOL_V2_NEO_UNSUPPORTED_TARGETS = new Set<FirmwareUpdateV4Target>(['se03', 'se04']);
 
@@ -238,6 +228,11 @@ type ProtocolV2ResourceBundleSource = {
 type ProtocolV2LocalResourceArchive = {
   binary: ArrayBuffer;
   materializedEntries: FirmwareMemoryArtifactEntry[];
+  resources: Array<{
+    entryName: string;
+    binary: ArrayBuffer;
+    header: ProtocolV2ResourcePackageHeader;
+  }>;
 };
 
 type JSZipSizedEntry = JSZip.JSZipObject & {
@@ -250,13 +245,6 @@ type JSZipSizedEntry = JSZip.JSZipObject & {
 type ProtocolV2TransferBatch = {
   installSources: ProtocolV2InstallSource[];
   resourceSources: ProtocolV2ResourceBundleSource[];
-};
-
-type ProtocolV2OkppHeader = {
-  type: string;
-  version: IVersionArray;
-  payloadHash: string;
-  headerHash: string;
 };
 
 const PROTOCOL_V2_REMOTE_COMPONENT_TARGETS: Readonly<
@@ -310,18 +298,9 @@ const PROTOCOL_V2_FIRMWARE_STAGING_PATHS = new Set(
   )
 );
 
-const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH = 'vol0:/loaders/bootloader/boot_resource.okpkg';
-const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH = `${PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH}.staging`;
-
 const isProtocolV2BootResourcePackagePath = (devicePath: string) =>
   typeof devicePath === 'string' &&
-  devicePath.replace(/^vol0:(?!\/)/i, 'vol0:/').toLowerCase() ===
-    PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH;
-
-const resolveProtocolV2ResourceWritePath = (devicePath: string) =>
-  isProtocolV2BootResourcePackagePath(devicePath)
-    ? PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH
-    : devicePath;
+  devicePath.toLowerCase() === PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH;
 
 const PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID = new Map<
   number,
@@ -485,42 +464,6 @@ const toProtocolV2FiniteNumber = (value: unknown) => {
     }
   }
   return undefined;
-};
-
-const readProtocolV2Ascii = (bytes: Uint8Array, offset: number, length: number) =>
-  Array.from(bytes.slice(offset, offset + length))
-    .map(byte => String.fromCharCode(byte))
-    .join('');
-
-const parseProtocolV2OkppHeader = (bytes: Uint8Array): ProtocolV2OkppHeader | null => {
-  if (bytes.byteLength < PROTOCOL_V2_OKPP_HEADER_SIZE) return null;
-  if (readProtocolV2Ascii(bytes, 0, 4) !== 'OKPP') return null;
-
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const headerLen = view.getUint32(0x0c, true);
-  if (headerLen !== PROTOCOL_V2_OKPP_HEADER_SIZE) return null;
-
-  const packedVersion = view.getUint32(0x10, true);
-  return {
-    type: readProtocolV2Ascii(bytes, 0x08, 4),
-    version: [
-      Math.floor(packedVersion / 0x10000) % 0x100,
-      Math.floor(packedVersion / 0x100) % 0x100,
-      packedVersion % 0x100,
-    ],
-    payloadHash: bytesToHex(
-      bytes.slice(
-        PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET,
-        PROTOCOL_V2_OKPP_PAYLOAD_HASH_OFFSET + PROTOCOL_V2_OKPP_HASH_SIZE
-      )
-    ),
-    headerHash: bytesToHex(
-      bytes.slice(
-        PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET,
-        PROTOCOL_V2_OKPP_HEADER_HASH_OFFSET + PROTOCOL_V2_OKPP_HASH_SIZE
-      )
-    ),
-  };
 };
 
 export const isProtocolV2FirmwareFingerprintValid = (
@@ -1248,130 +1191,69 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       );
     }
     const zipEntries = Object.values(zip.files);
+    const resourceEntries = zipEntries.filter(
+      entry => !entry.dir && entry.name.toLowerCase().endsWith('.okpkg')
+    );
     if (
-      zipEntries.some(entry => entry.unsafeOriginalName && entry.unsafeOriginalName !== entry.name)
+      resourceEntries.length === 0 ||
+      resourceEntries.length > PROTOCOL_V2_RESOURCE_FILE_MAX_COUNT
     ) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
-        'Protocol V2 local resource ZIP contains an unsafe entry path',
-        { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
-      );
-    }
-    const entries = zipEntries.filter(entry => !entry.dir);
-    if (entries.length === 0) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'Protocol V2 local resource ZIP entry set is invalid',
-        { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
-      );
-    }
-    const manifestEntry = entries.find(entry => entry.name.split('/').pop() === 'manifest.json');
-    let manifestBinary: ArrayBuffer | undefined;
-    let manifestDirectory = '';
-    let selectedFiles: IProtocolV2ResourceManifestFile[];
-    if (manifestEntry) {
-      if (
-        getProtocolV2ZipEntrySizes(manifestEntry).uncompressedSize >
-        PROTOCOL_V2_RESOURCE_MANIFEST_MAX_BYTES
-      ) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          'Protocol V2 local resource manifest size is invalid',
-          { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
-        );
-      }
-      manifestBinary = await manifestEntry.async('arraybuffer');
-      if (
-        manifestBinary.byteLength <= 0 ||
-        manifestBinary.byteLength > PROTOCOL_V2_RESOURCE_MANIFEST_MAX_BYTES
-      ) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          'Protocol V2 local resource manifest size is invalid',
-          { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
-        );
-      }
-      let manifestValue: unknown;
-      try {
-        manifestValue = JSON.parse(new TextDecoder().decode(manifestBinary));
-      } catch (error) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          `Protocol V2 local resource manifest is invalid: ${String(error)}`,
-          { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
-        );
-      }
-      selectedFiles = selectProtocolV2ResourceManifestFiles({
-        manifest: parseProtocolV2ResourceManifest(manifestValue),
-        targetsToUpdate: this.params.targetsToUpdate ?? [],
-      });
-      manifestDirectory = manifestEntry.name.slice(0, -'manifest.json'.length);
-    } else {
-      selectedFiles = entries.flatMap(entry => {
-        const archivePath = getProtocolV2LocalResourceArchivePath(entry.name);
-        if (!archivePath) return [];
-        return [
-          {
-            archive_path: archivePath,
-            original_name: archivePath.split('/').pop() ?? archivePath,
-            device_path: `vol0:/${archivePath}`,
-            size: getProtocolV2ZipEntrySizes(entry).uncompressedSize,
-            sha256: '',
-          },
-        ];
-      });
-    }
-    if (selectedFiles.length === 0 || selectedFiles.length > PROTOCOL_V2_RESOURCE_FILE_MAX_COUNT) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'Protocol V2 local resource ZIP has no resource packages',
+        'Protocol V2 resource ZIP has no valid resource package set',
         { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
       );
     }
 
     let totalSize = 0;
     const materializedEntries: FirmwareMemoryArtifactEntry[] = [];
-    const normalizedFiles: IProtocolV2ResourceManifestFile[] = [];
-    for (const file of selectedFiles) {
-      const entry = manifestEntry
-        ? zip.file(`${manifestDirectory}${file.archive_path}`)
-        : entries.find(
-            candidate => getProtocolV2LocalResourceArchivePath(candidate.name) === file.archive_path
-          );
-      if (!entry) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          `Protocol V2 local resource ZIP is missing ${file.archive_path}`,
-          { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
-        );
-      }
-      const { uncompressedSize } = getProtocolV2ZipEntrySizes(entry);
+    const resources: ProtocolV2LocalResourceArchive['resources'] = [];
+    const devicePaths = new Set<string>();
+    for (const entry of resourceEntries) {
+      const { compressedSize, uncompressedSize } = getProtocolV2ZipEntrySizes(entry);
       totalSize += uncompressedSize;
-      if (uncompressedSize !== file.size || totalSize > PROTOCOL_V2_RESOURCE_TOTAL_MAX_BYTES) {
+      if (
+        compressedSize > binary.byteLength ||
+        uncompressedSize > PROTOCOL_V2_RESOURCE_TOTAL_MAX_BYTES ||
+        totalSize > PROTOCOL_V2_RESOURCE_TOTAL_MAX_BYTES
+      ) {
         throw ERRORS.TypedError(
           HardwareErrorCode.RuntimeError,
-          `Protocol V2 local resource file declared size is invalid: ${file.archive_path}`,
+          `Protocol V2 resource package size is invalid: ${entry.name}`,
           { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
         );
       }
       const fileBinary = await entry.async('arraybuffer');
-      const digest = bytesToHex(sha256(new Uint8Array(fileBinary)));
-      if (
-        fileBinary.byteLength !== file.size ||
-        (file.sha256 && digest !== file.sha256.toLowerCase())
-      ) {
+      if (fileBinary.byteLength !== uncompressedSize) {
         throw ERRORS.TypedError(
           HardwareErrorCode.RuntimeError,
-          `Protocol V2 local resource file does not match manifest: ${file.archive_path}`,
+          `Protocol V2 resource package is incomplete: ${entry.name}`,
           { firmwareUpdateCode: 'FirmwareArtifactReceiptMismatch' }
         );
       }
-      normalizedFiles.push({ ...file, sha256: digest });
-      materializedEntries.push({ entryName: file.archive_path, binary: fileBinary });
+      let header: ProtocolV2ResourcePackageHeader;
+      try {
+        header = parseProtocolV2ResourcePackage(fileBinary);
+      } catch (error) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `Protocol V2 resource package is invalid: ${entry.name}: ${String(error)}`,
+          { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
+        );
+      }
+      const canonicalDevicePath = header.devicePath.toLowerCase();
+      if (devicePaths.has(canonicalDevicePath)) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `Protocol V2 resource ZIP contains duplicate device path: ${header.devicePath}`,
+          { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
+        );
+      }
+      devicePaths.add(canonicalDevicePath);
+      materializedEntries.push({ entryName: entry.name, binary: fileBinary });
+      resources.push({ entryName: entry.name, binary: fileBinary, header });
     }
-    manifestBinary ??= new TextEncoder().encode(JSON.stringify({ files: normalizedFiles })).buffer;
-    materializedEntries.unshift({ entryName: 'manifest.json', binary: manifestBinary });
-    return { binary, materializedEntries };
+    return { binary, materializedEntries, resources };
   }
 
   private async prepareProtocolV2ResourceSources(): Promise<ProtocolV2ResourceBundleSource[]> {
@@ -1436,82 +1318,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       );
     }
 
-    // The verified archive bytes are authoritative. Host materialization is an
-    // implementation detail and may preserve wrapper paths or extra metadata files.
+    // The verified ZIP bytes are authoritative. Non-okpkg entries are release
+    // metadata only; each RESOURCE package carries its own device path.
     const verifiedArchive = await this.prepareProtocolV2LocalResourceArchive(archiveBinary);
-    const verifiedEntriesByName = new Map(
-      verifiedArchive.materializedEntries.map(entry => [entry.entryName, entry.binary] as const)
-    );
-    const manifestBinary = verifiedEntriesByName.get('manifest.json');
-    if (!manifestBinary) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'Protocol V2 prepared resource archive has no valid manifest.json',
-        { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
-      );
-    }
-
-    let manifestValue: unknown;
-    try {
-      manifestValue = JSON.parse(new TextDecoder().decode(manifestBinary));
-    } catch (error) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        `Protocol V2 prepared resource manifest is invalid: ${String(error)}`,
-        { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
-      );
-    }
-    const manifest = parseProtocolV2ResourceManifest(manifestValue);
-    const selectedFiles = selectProtocolV2ResourceManifestFiles({
-      manifest,
-      targetsToUpdate: this.params.targetsToUpdate ?? [],
-    });
-    if (selectedFiles.length > PROTOCOL_V2_RESOURCE_FILE_MAX_COUNT) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'Protocol V2 prepared resource archive contains too many files',
-        { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
-      );
-    }
-
-    let totalSize = 0;
     const sources: ProtocolV2ResourceBundleSource[] = [];
-    for (const [index, file] of selectedFiles.entries()) {
-      const binary = verifiedEntriesByName.get(file.archive_path);
-      if (!binary || binary.byteLength !== file.size) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          `Protocol V2 prepared resource file does not match manifest: ${file.archive_path}`,
-          { firmwareUpdateCode: 'FirmwareArtifactReceiptMismatch' }
-        );
-      }
-      totalSize += binary.byteLength;
-      if (totalSize > PROTOCOL_V2_RESOURCE_TOTAL_MAX_BYTES) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          'Protocol V2 prepared resource archive exceeds the total size limit',
-          { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
-        );
-      }
-      // 使用从获批 ZIP 中提取的规范字节，避免宿主在校验后替换 entry reader 内容。
-      const source = await this.openProtocolV2MemorySource(binary);
-      const header =
-        source.size >= PROTOCOL_V2_OKPP_HEADER_SIZE
-          ? parseProtocolV2OkppHeader(
-              new Uint8Array(await source.readAt(0, PROTOCOL_V2_OKPP_HEADER_SIZE))
-            )
-          : null;
+    for (const resource of verifiedArchive.resources) {
+      const source = await this.openProtocolV2MemorySource(resource.binary);
       sources.push({
-        name: file.original_name || `resource-${index}`,
+        name: resource.entryName.split('/').pop() ?? resource.entryName,
         source,
-        devicePath: file.device_path,
-        ...(header
-          ? {
-              version: header.version,
-              payloadHash: header.payloadHash,
-              headerHash: header.headerHash,
-            }
-          : {}),
+        devicePath: resource.header.devicePath,
+        version: resource.header.version,
+        payloadHash: resource.header.payloadHash,
+        headerHash: resource.header.headerHash,
       });
     }
     return sources;
@@ -2012,7 +1831,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       !pathInfoRes.message?.exist ||
       pathInfoRes.message?.directory ||
       fileSize === undefined ||
-      fileSize < PROTOCOL_V2_OKPP_HEADER_SIZE ||
+      fileSize < PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE ||
       (expectedSize !== undefined && fileSize !== expectedSize)
     ) {
       return null;
@@ -2021,8 +1840,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const chunkSize = this.getProtocolV2FirmwareChunkSize('read');
     const chunks: Uint8Array[] = [];
     let offset = 0;
-    while (offset < PROTOCOL_V2_OKPP_HEADER_SIZE) {
-      const readLen = Math.min(chunkSize, PROTOCOL_V2_OKPP_HEADER_SIZE - offset);
+    while (offset < PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE) {
+      const readLen = Math.min(chunkSize, PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE - offset);
       const res = await typedCall('FilesystemFileRead', 'FilesystemFile', {
         file: {
           path: filePath,
@@ -2044,7 +1863,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       headerBytes.set(chunk, cursor);
       cursor += chunk.byteLength;
     });
-    return parseProtocolV2OkppHeader(headerBytes);
+    try {
+      return parseProtocolV2ResourcePackageHeader(headerBytes, fileSize);
+    } catch {
+      return null;
+    }
   }
 
   /** Compare the downloaded and installed okpkg headers before transferring a resource. */
@@ -2335,7 +2158,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     for (const resource of resourcesToSync) {
       // The bootloader keeps its live resource package mounted. FatFs rejects
       // replacing an open file, so early boot promotes this staging file before mounting it.
-      const writePath = resolveProtocolV2ResourceWritePath(resource.devicePath);
+      const writePath = resource.devicePath;
       processedSize = await this.protocolV2SourceUpdateProcess({
         source: resource.source,
         filePath: writePath,
