@@ -89,12 +89,21 @@ describe('Pro2 resource configuration', () => {
     });
   });
 
-  test('accepts the boot resource staging path and rejects paths outside resource roots', () => {
+  test('accepts bootloader and romloader package paths, including staging files', () => {
     expect(
       parseProtocolV2ResourcePackage(
         createResourcePackage('vol0:/loaders/bootloader/boot_resource.okpkg.staging')
       ).devicePath
     ).toBe('vol0:/loaders/bootloader/boot_resource.okpkg.staging');
+    expect(
+      parseProtocolV2ResourcePackage(
+        createResourcePackage('vol0:/loaders/bootloader/params.okpkg.staging')
+      ).devicePath
+    ).toBe('vol0:/loaders/bootloader/params.okpkg.staging');
+    expect(
+      parseProtocolV2ResourcePackage(createResourcePackage('vol0:/loaders/rom/params.okpkg'))
+        .devicePath
+    ).toBe('vol0:/loaders/rom/params.okpkg');
     expect(() =>
       parseProtocolV2ResourcePackage(createResourcePackage('vol0:/unexpected/images.okpkg'))
     ).toThrow('device path');

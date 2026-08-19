@@ -49,7 +49,15 @@ export function parseProtocolV2Resources(value: unknown): IProtocolV2Resources |
   };
 }
 
-const PROTOCOL_V2_RESOURCE_DEVICE_ROOTS = ['vol0:/bundles/', 'vol0:/loaders/rom/'] as const;
+const PROTOCOL_V2_RESOURCE_DEVICE_ROOTS = [
+  'vol0:/bundles/',
+  'vol0:/loaders/rom/',
+  'vol0:/loaders/bootloader/',
+] as const;
+
+function isProtocolV2ResourcePackagePath(path: string): boolean {
+  return path.endsWith('.okpkg') || path.endsWith('.okpkg.staging');
+}
 
 function isAllowedResourceDevicePath(path: string): boolean {
   if (
@@ -63,11 +71,9 @@ function isAllowedResourceDevicePath(path: string): boolean {
   ) {
     return false;
   }
-  if (path === PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH) {
-    return true;
-  }
   return (
-    path.endsWith('.okpkg') && PROTOCOL_V2_RESOURCE_DEVICE_ROOTS.some(root => path.startsWith(root))
+    isProtocolV2ResourcePackagePath(path) &&
+    PROTOCOL_V2_RESOURCE_DEVICE_ROOTS.some(root => path.startsWith(root))
   );
 }
 
