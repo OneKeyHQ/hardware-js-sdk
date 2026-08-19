@@ -8079,6 +8079,42 @@ describe('Protocol V2 firmware update targets', () => {
     expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledWith(stagingPath, 3);
   });
 
+  test('skips bootloader params staging when the on-device package is already current', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+
+    method.postTipMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+    (method as any).isProtocolV2ResourceBundleUpToDate = jest.fn().mockResolvedValue(true);
+    (method as any).protocolV2SourceUpdateProcess = jest.fn().mockResolvedValue(3);
+    (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
+
+    const resource = {
+      name: 'params.okpkg',
+      source: {
+        size: 3,
+        readAt: jest.fn(),
+        close: jest.fn(),
+      },
+      devicePath: 'vol0:/loaders/bootloader/params.okpkg.staging',
+      version: [1, 0, 0],
+      payloadHash: '11'.repeat(64),
+      headerHash: '22'.repeat(64),
+    };
+
+    await (method as any).executeProtocolV2TransferPhase({
+      installSources: [],
+      resourceSources: [resource],
+    });
+
+    expect((method as any).isProtocolV2ResourceBundleUpToDate).toHaveBeenCalledWith(resource);
+    expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
+  });
+
   test('uses absolute processed_byte offsets and disables append for firmware file writes', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,

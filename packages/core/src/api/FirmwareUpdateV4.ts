@@ -302,13 +302,9 @@ const PROTOCOL_V2_FIRMWARE_STAGING_PATHS = new Set(
   )
 );
 
-const isProtocolV2BootResourcePackagePath = (devicePath: string) => {
-  if (typeof devicePath !== 'string') return false;
-  const normalized = devicePath.toLowerCase();
-  return (
-    normalized.startsWith('vol0:/loaders/bootloader/') && normalized.endsWith('.okpkg.staging')
-  );
-};
+const isProtocolV2BootResourcePackagePath = (devicePath: string) =>
+  typeof devicePath === 'string' &&
+  devicePath.toLowerCase() === PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH;
 
 const PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID = new Map<
   number,
