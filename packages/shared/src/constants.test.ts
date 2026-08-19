@@ -125,6 +125,9 @@ describe('hardware device identity filters', () => {
     ['OneKey Pro 2 A1B2', 'OneKey Pro 2 A1B2'],
     ['OneKey Pro 2', 'OneKey Pro 2'],
     ['Pro A1B2', 'Pro A1B2'],
+    ['Pro 22D8', 'Pro 22D8'],
+    ['Pro 2D8F', 'Pro 2D8F'],
+    ['OneKey Pro 22D8', 'OneKey Pro 22D8'],
     ['Neo 22D8', 'Neo 22D8'],
   ])('canonicalizes the public Pro2 advertisement name %s', (name, expected) => {
     expect(canonicalizePro2BleAdvertisementName(name)).toBe(expected);
@@ -135,6 +138,9 @@ describe('hardware device identity filters', () => {
     expect(isSameOnekeyBleName('Pro2 6136 - Find My', 'Pro 2 6136')).toBe(true);
     expect(isSameOnekeyBleName('Pro 2 6136', 'Pro 2 0088')).toBe(false);
     expect(isSameOnekeyBleName('Pro A1B2', 'Pro 2 A1B2')).toBe(false);
+    expect(isSameOnekeyBleName('Pro 22D8', 'Pro 22D8')).toBe(true);
+    expect(isSameOnekeyBleName('Pro 22D8', 'Pro2 22D8')).toBe(false);
+    expect(isSameOnekeyBleName('Pro 22D8', 'Pro 2 22D8')).toBe(false);
   });
 
   it('keeps OneKey discovery on the communication service', () => {

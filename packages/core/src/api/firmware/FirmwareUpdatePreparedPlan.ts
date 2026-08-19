@@ -73,6 +73,8 @@ export const getFirmwareUpdateResourceName = (value: unknown): string => {
 
 const getPreparedEntryIdentity = (entryName: unknown): string => {
   getFirmwareUpdateResourceName(entryName);
+  // Protocol V2 resource ZIPs can ship the same basename from different
+  // directories, such as rom/params.okpkg and bootloader/params.okpkg.
   return (entryName as string).toLowerCase();
 };
 

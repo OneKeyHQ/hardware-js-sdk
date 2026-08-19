@@ -63,6 +63,12 @@ export function isProtocolV2ResourceArchiveEntryName(entryName: string): boolean
   );
 }
 
+const PROTOCOL_V2_RESOURCE_DEVICE_RULES = [
+  { root: 'vol0:/bundles/', suffix: '.okpkg' },
+  { root: 'vol0:/loaders/rom/', suffix: '.okpkg' },
+  { root: 'vol0:/loaders/bootloader/', suffix: '.okpkg.staging' },
+] as const;
+
 function isSafeResourceDevicePath(path: string): boolean {
   return !(
     path.includes('\\') ||
@@ -72,6 +78,18 @@ function isSafeResourceDevicePath(path: string): boolean {
       return code <= 0x1f || code === 0x7f;
     }) ||
     path.split('/').some(part => part === '.' || part === '..')
+  );
+}
+
+function isAllowedResourceDevicePath(path: string): boolean {
+  if (!isSafeResourceDevicePath(path)) {
+    return false;
+  }
+  return PROTOCOL_V2_RESOURCE_DEVICE_RULES.some(
+    rule =>
+      path.startsWith(rule.root) &&
+      path.endsWith(rule.suffix) &&
+      path.length > rule.root.length + rule.suffix.length
   );
 }
 
@@ -97,7 +115,7 @@ function readResourceDevicePath(bytes: Uint8Array): string {
     throw new Error('Invalid Pro2 RESOURCE package device path metadata');
   }
   const path = readAscii(pathBytes, 0, pathBytes.byteLength);
-  if (!isSafeResourceDevicePath(path)) {
+  if (!isAllowedResourceDevicePath(path)) {
     throw new Error(`Invalid Pro2 RESOURCE package device path: ${path}`);
   }
   return path;

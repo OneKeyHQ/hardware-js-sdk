@@ -724,7 +724,7 @@ describe('Protocol V2 feature adapter', () => {
       protocol_version: 1,
       hw: { serial_no: 'P2-STATIC' },
       main_mcu: { application: { version: '1.0.0' } },
-      coprocessor: { bt_adv_name: 'Pro2 STATIC' },
+      coprocessor: { bt_adv_name: 'Pro2 A1B2' },
     };
     const deviceStatus: DeviceStatus = {
       device_id: 'P2-DYNAMIC',
@@ -744,7 +744,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(features).toMatchObject({
       deviceId: 'P2-DYNAMIC',
       serialNo: 'P2-STATIC',
-      bleName: 'Pro 2 STATIC',
+      bleName: 'Pro 2 A1B2',
       initialized: true,
       unlocked: true,
       passphraseProtection: true,
@@ -767,7 +767,7 @@ describe('Protocol V2 feature adapter', () => {
     const protocolV2 = buildProtocolV2FeaturesPayload({
       deviceInfo: {
         hw: { Device_type: DeviceType.PRO2, serial_no: 'P2-001' },
-        coprocessor: { bt_adv_name: 'Pro 2 BLE' },
+        coprocessor: { bt_adv_name: 'Pro 2 B1E2' },
       },
       deviceStatus: {
         device_id: 'v2-device',
@@ -784,7 +784,7 @@ describe('Protocol V2 feature adapter', () => {
     });
     expect(protocolV2).toMatchObject({
       device_id: 'v2-device',
-      ble_name: 'Pro 2 BLE',
+      ble_name: 'Pro 2 B1E2',
       onekey_device_type: 'PRO2',
       passphrase_protection: true,
     });
@@ -825,7 +825,7 @@ describe('Protocol V2 feature adapter', () => {
           build_id: 'bt-build',
           hash: [12, 13],
         },
-        bt_adv_name: 'Pro2 BLE',
+        bt_adv_name: 'Pro2 B1E2',
       },
       se1: {
         application: {
@@ -865,7 +865,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.boardVersion).toBe('0.1.0');
     expect(features.verify?.boardBuildId).toBe('rom-build');
     expect(features.verify?.boardHash).toBe('0102ff');
-    expect(features.bleName).toBe('Pro 2 BLE');
+    expect(features.bleName).toBe('Pro 2 B1E2');
     expect(features.bleVersion).toBe('4.5.6');
     expect(features.verify?.bleHash).toBe('0c0d');
     expect(features.se01Version).toBe('7.8.9');

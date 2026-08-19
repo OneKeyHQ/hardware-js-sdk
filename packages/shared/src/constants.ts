@@ -296,9 +296,15 @@ export const normalizePro2FindMyAdvertisementName = (value: string) => {
  * Current Pro2 advertisements use "Pro 2 XXXX". Older firmware used "Pro2 XXXX".
  * Discovery and DeviceInfo both go through this helper so the public BLE name
  * stays on the spaced form without changing OneKey Pro / Neo names.
+ *
+ * Match the compact Pro2 form first. A leading "Pro 2" regex would also eat the
+ * first digit of a OneKey Pro suffix such as "Pro 22D8" or "Pro 2D8F".
  */
 export const canonicalizePro2BleAdvertisementName = (value: string) => {
   const withoutFindMy = normalizePro2FindMyAdvertisementName(value);
+  const compact = compactBleName(withoutFindMy);
+  if (!PRO2_COMPACT_NAME_PATTERN.test(compact)) return withoutFindMy;
+
   const match = withoutFindMy.match(/^(onekey\s*)?pro\s*2\s*/i);
   if (!match) return withoutFindMy;
 

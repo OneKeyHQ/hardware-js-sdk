@@ -31,7 +31,9 @@ export const getDeviceTypeByBleName = (name?: string): IDeviceType => {
   if (/^Touch/i.test(name)) return EDeviceType.Touch;
 
   const compactName = name.replace(/[\s-]/g, '');
-  if (/\bPro\s*2\b/i.test(name) || /^Pro2/i.test(name) || /^(?:OneKey)?Pro2/i.test(compactName)) {
+  // Require a 4-hex Pro2 suffix in the compact form. A bare `^Pro2` prefix
+  // would also match OneKey Pro names such as "Pro 22D8" / "Pro 2D8F".
+  if (/\bPro\s*2\b/i.test(name) || /^(?:OneKey)?Pro2[a-f0-9]{4}$/i.test(compactName)) {
     return EDeviceType.Pro2;
   }
   if (/\bNeo\b/i.test(name) || /^Neo/i.test(name) || /^(?:OneKey)?Neo/i.test(compactName)) {
