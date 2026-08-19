@@ -500,6 +500,24 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(transport.getProtocolType(device.id)).toBeUndefined();
   });
 
+  test('fails Protocol V2 acquire immediately when subscribe reports insufficient encryption', async () => {
+    const device = { id: 'stale-bond-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.subscribe.mockRejectedValue(new Error('Encryption is insufficient'));
+    const transport = configureTransport(nobleBle);
+    const probe = jest.spyOn(transport as any, 'probeProtocolV2');
+
+    await expect(
+      transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceBondError,
+    });
+
+    expect(probe).not.toHaveBeenCalled();
+    expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+  });
+
   test('reports a stale bond when a previously confirmed Protocol V2 device stops responding', async () => {
     const device = { id: 'reset-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);

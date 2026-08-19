@@ -1003,6 +1003,21 @@ describe('Protocol V2 framing and session', () => {
     expect(result).toEqual({ type: 'WriteCompleted', message: {} });
   });
 
+  test('probeProtocolV2 rethrows caller-selected fatal errors without treating them as a miss', async () => {
+    const onProbeFailed = jest.fn();
+    const staleBond = Object.assign(new Error('Bluetooth pairing failed'), { errorCode: 715 });
+
+    await expect(
+      probeProtocolV2({
+        call: () => Promise.reject(staleBond),
+        timeoutMs: 1,
+        onProbeFailed,
+        shouldRethrow: error => error?.errorCode === 715,
+      })
+    ).rejects.toBe(staleBond);
+    expect(onProbeFailed).not.toHaveBeenCalled();
+  });
+
   test('probeProtocolV2 accepts Success as a normal V2 probe response', async () => {
     await expect(
       probeProtocolV2({
