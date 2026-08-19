@@ -49,6 +49,20 @@ export function parseProtocolV2Resources(value: unknown): IProtocolV2Resources |
   };
 }
 
+export function isProtocolV2ResourceArchiveEntryName(entryName: string): boolean {
+  const normalized = entryName.replace(/\\/g, '/');
+  if (!normalized.toLowerCase().endsWith('.okpkg')) {
+    return false;
+  }
+  const parts = normalized.split('/');
+  const fileName = parts[parts.length - 1] ?? '';
+  return (
+    fileName.length > 0 &&
+    !fileName.startsWith('.') &&
+    !parts.some(part => part === '__MACOSX' || part === '.' || part === '..' || part === '')
+  );
+}
+
 function isSafeResourceDevicePath(path: string): boolean {
   return !(
     path.includes('\\') ||
