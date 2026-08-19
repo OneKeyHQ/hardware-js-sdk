@@ -1153,6 +1153,7 @@ const ensureConnected = async (
             HardwareErrorCode.BleLocationServicesDisabled,
             HardwareErrorCode.BleDeviceNotBonded,
             HardwareErrorCode.BleDeviceBondError,
+            HardwareErrorCode.BlePeerRemovedPairingInformation,
             HardwareErrorCode.BleDeviceBondedCanceled,
             HardwareErrorCode.BleCharacteristicNotifyError,
             HardwareErrorCode.BleTimeoutError,

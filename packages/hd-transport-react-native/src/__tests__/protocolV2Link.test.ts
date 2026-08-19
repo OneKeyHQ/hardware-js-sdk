@@ -109,9 +109,11 @@ const schemas = {
 const createHarness = ({
   deviceName = 'OneKey Pro 2',
   isWritableWithResponse = true,
+  monitorError,
 }: {
   deviceName?: string;
   isWritableWithResponse?: boolean;
+  monitorError?: (Error & { reason?: string; attErrorCode?: number; iosErrorCode?: number }) | null;
 } = {}) => {
   const uuid = 'rn-pro2-id';
   const sentSeqs: number[] = [];
@@ -130,6 +132,9 @@ const createHarness = ({
     isNotifiable: true,
     monitor: jest.fn(callback => {
       notifyCallback = callback;
+      if (monitorError) {
+        queueMicrotask(() => callback(monitorError, null));
+      }
       return { remove: jest.fn() };
     }),
   };
@@ -515,6 +520,35 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       });
 
       expect(device.cancelConnection).not.toHaveBeenCalled();
+      expect(transport.getProtocolType(uuid)).toBeUndefined();
+    }
+  );
+
+  test.each([
+    [
+      'Encryption is insufficient',
+      { reason: 'Encryption is insufficient', attErrorCode: 15 },
+      HardwareErrorCode.BleDeviceBondError,
+    ],
+    [
+      'Peer removed pairing information',
+      { reason: 'Peer removed pairing information', iosErrorCode: 14 },
+      HardwareErrorCode.BlePeerRemovedPairingInformation,
+    ],
+  ] as const)(
+    'fails Protocol V2 acquire immediately on %s instead of waiting for Ping',
+    async (_label, nativeError, errorCode) => {
+      const { transport, uuid, device } = createHarness({
+        monitorError: Object.assign(new Error(nativeError.reason), nativeError),
+      });
+      const probe = jest.spyOn(transport as any, 'probeProtocolV2');
+
+      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+        errorCode,
+      });
+
+      expect(probe).not.toHaveBeenCalled();
+      expect(device.cancelConnection).toHaveBeenCalled();
       expect(transport.getProtocolType(uuid)).toBeUndefined();
     }
   );

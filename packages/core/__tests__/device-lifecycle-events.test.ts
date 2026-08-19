@@ -278,6 +278,7 @@ describe('public device lifecycle events', () => {
   test.each([
     [HardwareErrorCode.RuntimeError, true],
     [HardwareErrorCode.BleDeviceBondError, false],
+    [HardwareErrorCode.BlePeerRemovedPairingInformation, false],
   ] as const)(
     'retries a Protocol V2 probe mismatch with error code %s: %s',
     (errorCode, expected) => {
@@ -297,6 +298,7 @@ describe('public device lifecycle events', () => {
     [HardwareErrorCode.BleTimeoutError, true],
     [HardwareErrorCode.PollingTimeout, false],
     [HardwareErrorCode.BleDeviceBondError, false],
+    [HardwareErrorCode.BlePeerRemovedPairingInformation, false],
   ] as const)('retries a BLE connection error with error code %s: %s', (errorCode, expected) => {
     const method = { payload: { connectProtocol: 'V2' } } as never;
     const error = {

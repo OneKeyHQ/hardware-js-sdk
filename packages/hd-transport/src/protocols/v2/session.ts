@@ -468,6 +468,7 @@ export async function probeProtocolV2({
   logPrefix = 'ProtocolV2',
   onBeforeProbe,
   onProbeFailed,
+  shouldRethrow,
 }: {
   call: (
     name: string,
@@ -479,6 +480,7 @@ export async function probeProtocolV2({
   logPrefix?: string;
   onBeforeProbe?: () => Promise<void> | void;
   onProbeFailed?: (error: unknown) => Promise<void> | void;
+  shouldRethrow?: (error: unknown) => boolean;
 }) {
   let probeError: unknown;
   try {
@@ -503,7 +505,7 @@ export async function probeProtocolV2({
     }
     probeError = new Error(`unexpected response type ${response.type}`);
   } catch (error) {
-    if (isProtocolV2LinkDisabledError(error)) {
+    if (isProtocolV2LinkDisabledError(error) || shouldRethrow?.(error)) {
       throw error;
     }
     probeError = error;
