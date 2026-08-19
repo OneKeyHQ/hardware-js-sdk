@@ -172,6 +172,9 @@ export class DevicePool extends EventEmitter {
     const device = cachedDevice ?? Device.fromDescriptor(descriptor);
     if (isNewDevice || forceProtocolDetection) {
       device.deviceConnector = this.connector;
+      // Search/discovery acquires outside Device.run(). Start a new attempt so
+      // a previous user cancel does not hide this device from later searches.
+      device.beginConnectionAttempt?.();
       if (forceProtocolDetection && !isNewDevice) {
         await device.acquire(initOptions?.connectProtocol, { forceProtocolDetection: true });
       } else {

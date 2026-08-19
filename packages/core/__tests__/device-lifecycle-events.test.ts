@@ -498,6 +498,26 @@ describe('public device lifecycle events', () => {
     expect(isRetryableBleConnectionError(method, error)).toBe(false);
   });
 
+  test('keeps a user cancel across a later BLE poll iteration', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    const device = createInitializedDevice('V2');
+    const disconnect = jest.fn().mockResolvedValue(undefined);
+    const acquire = jest.fn().mockResolvedValue({ uuid: 'poll-session', protocolType: 'V2' });
+    device.deviceConnector = { acquire, disconnect } as never;
+
+    // First ensureConnected poll iteration.
+    device.beginConnectionAttempt();
+    await device.interruptionFromUser();
+    expect(device.wasInterruptedByUser()).toBe(true);
+
+    // A later poll must not call beginConnectionAttempt() again.
+    await expect(device.acquire('V2')).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInterruptedFromUser,
+    });
+    expect(device.wasInterruptedByUser()).toBe(true);
+    expect(acquire).not.toHaveBeenCalled();
+  });
+
   test('allows a new BLE connect after the previous attempt was cancelled', async () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
     const device = createInitializedDevice('V2');

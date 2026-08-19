@@ -956,9 +956,6 @@ export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unkn
  */
 async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
   try {
-    if (retryCount === 0) {
-      device.beginConnectionAttempt();
-    }
     if (device.wasInterruptedByUser()) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
     }
@@ -1118,6 +1115,11 @@ const ensureConnected = async (
             if (abort()) {
               return;
             }
+            // One generation per public ensureConnected() call, not per poll
+            // iteration. A later poll must not clear a user cancel.
+            if (tryCount === 1) {
+              device.beginConnectionAttempt();
+            }
             await connectDeviceForBle(method, device);
           }
           resolve(device);
@@ -1160,6 +1162,8 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceDetectInBootloaderMode,
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
             HardwareErrorCode.BridgeNeedsPermission,
+            HardwareErrorCode.DeviceInterruptedFromUser,
+            HardwareErrorCode.CallQueueActionCancelled,
           ].includes(error.errorCode)
         ) {
           reject(error);
@@ -1217,25 +1221,31 @@ export const cancel = (context: CoreContext, connectId?: string) => {
         )}`
       );
       const canceledDevices: Device[] = [];
+      const interruptDevice = (device: Device | undefined, deviceConnectId: string) => {
+        if (!device || canceledDevices.includes(device)) {
+          return;
+        }
+        setPrePendingCallPromise(deviceConnectId, device.interruptionFromUser());
+        canceledDevices.push(device);
+      };
       for (const requestId of requestIds) {
         const task = requestQueue.getTask(requestId);
         Log.debug('Cancel Api connect task: ', task);
-        if (task && task.method?.device) {
-          if (!canceledDevices.includes(task.method.device)) {
-            const { device } = task.method;
-            setPrePendingCallPromise(
-              task.method.connectId ?? connectId,
-              device.interruptionFromUser()
-            );
-            canceledDevices.push(device);
-          }
+        if (task) {
+          // During ensureConnected the method has a connectId but device is
+          // assigned only after the poll succeeds. Interrupt the cached BLE
+          // Device so an in-flight acquire/initialize cannot finish.
+          interruptDevice(task.method?.device, task.method.connectId ?? connectId);
+          interruptDevice(deviceCacheMap.get(connectId), connectId);
           requestQueue.rejectRequest(
             requestId,
             ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)
           );
         }
       }
+      interruptDevice(deviceCacheMap.get(connectId), connectId);
       requestQueue.abortRequestsByConnectId(connectId);
+      pollingManager.stop(connectId);
     } catch (e) {
       Log.error('Cancel API Error: ', e);
     }
@@ -1244,22 +1254,31 @@ export const cancel = (context: CoreContext, connectId?: string) => {
     if (DataManager.isBleConnect(env)) {
       Log.debug('Cancel Api all _deviceList: ');
       const canceledDevices: Device[] = [];
+      const interruptDevice = (device?: Device) => {
+        if (!device || canceledDevices.includes(device)) {
+          return;
+        }
+        device.interruptionFromUser().catch(() => undefined);
+        canceledDevices.push(device);
+      };
       for (const requestId of requestQueue.getRequestTasksId()) {
         const task = requestQueue.getTask(requestId);
         Log.debug('Cancel Api connect task: ', task);
-        if (task && task.method?.device) {
-          if (!canceledDevices.includes(task.method.device)) {
-            const { device } = task.method;
-            device?.interruptionFromUser();
-            canceledDevices.push(device);
+        if (task) {
+          interruptDevice(task.method?.device);
+          if (task.method.connectId) {
+            interruptDevice(deviceCacheMap.get(task.method.connectId));
+            pollingManager.stop(task.method.connectId);
           }
-
           requestQueue.rejectRequest(
             requestId,
             ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)
           );
         }
       }
+      deviceCacheMap.forEach(interruptDevice);
+      requestQueue.abortAllRequests();
+      pollingManager.stopAll();
     } else {
       _deviceList?.allDevices().forEach(device => {
         Log.debug('device: ', device, ' device.hasDeviceAcquire: ', device.hasDeviceAcquire());
