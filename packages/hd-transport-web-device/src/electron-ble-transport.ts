@@ -11,6 +11,7 @@ import transport, {
   writeProtocolV2BleFrame,
 } from '@onekeyfe/hd-transport';
 import {
+  EBleDisconnectReason,
   ERRORS,
   HardwareErrorCode,
   HardwareErrorCodeMessage,
@@ -144,7 +145,15 @@ export default class ElectronBleTransport {
 
   private mtuCleanups: Map<string, () => void> = new Map();
 
-  private disconnectCleanups: Map<string, () => void> = new Map();
+  /**
+   * Transport-lifetime subscription to host BLE disconnects.
+   *
+   * This must NOT be scoped to acquire()/release(): a logical release keeps the
+   * native link alive for the keep-alive window, so a device that drops while
+   * idle would otherwise go unobserved and consumers would never learn it left
+   * (OK-60486).
+   */
+  private hostDisconnectCleanup?: () => void;
 
   private notificationTokens: Map<string, number> = new Map();
 
@@ -212,12 +221,6 @@ export default class ElectronBleTransport {
       mtuCleanup();
       this.mtuCleanups.delete(deviceId);
     }
-
-    const disconnectCleanup = this.disconnectCleanups.get(deviceId);
-    if (disconnectCleanup) {
-      disconnectCleanup();
-      this.disconnectCleanups.delete(deviceId);
-    }
   }
 
   init(logger: any, emitter?: EventEmitter) {
@@ -231,7 +234,46 @@ export default class ElectronBleTransport {
       );
     }
 
+    this.subscribeHostDisconnects();
+
     this.Log?.debug('[Electron BLE] Transport initialized');
+  }
+
+  /**
+   * One host subscription for the whole transport lifetime. init() can run
+   * again after an SDK reset, so drop the previous listener first rather than
+   * stacking duplicates.
+   */
+  private subscribeHostDisconnects() {
+    this.hostDisconnectCleanup?.();
+    this.hostDisconnectCleanup = window.desktopApi?.nobleBle?.onDeviceDisconnected(
+      (disconnectedDevice: { id: string; name: string; reason?: EBleDisconnectReason }) => {
+        const uuid = disconnectedDevice?.id;
+        if (!uuid) return;
+
+        // The link is gone, so renderer-side state must go with it; the next
+        // acquire reconnects from scratch.
+        this.cleanupDeviceState(uuid);
+
+        // Every link drop is reported, including the main process reclaiming
+        // an idle link on its keep-alive timer: consumers track whether a BLE
+        // link is live, not whether the peripheral is theoretically in range,
+        // and a link we closed ourselves is still a closed link. Nothing
+        // reconnects on its own, so this settles once until the user acts.
+        // `reason` is carried for diagnostics only — behaviour is uniform.
+        this.Log?.debug(
+          '[Electron BLE] Device link dropped:',
+          uuid,
+          disconnectedDevice.reason ?? EBleDisconnectReason.DeviceDisconnected
+        );
+
+        this.emitter?.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, {
+          name: disconnectedDevice.name,
+          id: uuid,
+          connectId: uuid,
+        });
+      }
+    );
   }
 
   configure(signedData: any) {
@@ -330,7 +372,6 @@ export default class ElectronBleTransport {
 
       const cleanup = this.createNotificationSubscription(uuid);
       this.notificationCleanups.set(uuid, cleanup);
-      const connectionToken = this.notificationTokens.get(uuid);
 
       const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint);
       if (protocolType === 'V2') {
@@ -340,23 +381,6 @@ export default class ElectronBleTransport {
           packetCapacity: this.devicePacketCapacities.get(uuid) ?? BLE_PACKET_SIZE_FALLBACK,
         });
       }
-
-      const disconnectCleanup = window.desktopApi.nobleBle.onDeviceDisconnected(
-        (disconnectedDevice: any) => {
-          if (
-            disconnectedDevice.id === uuid &&
-            this.notificationTokens.get(uuid) === connectionToken
-          ) {
-            this.cleanupDeviceState(uuid);
-            this.emitter?.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, {
-              name: disconnectedDevice.name,
-              id: disconnectedDevice.id,
-              connectId: disconnectedDevice.id,
-            });
-          }
-        }
-      );
-      this.disconnectCleanups.set(uuid, disconnectCleanup);
 
       return {
         ...toBleDescriptor({ id: device.id, name: device.name }, protocolType),

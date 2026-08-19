@@ -69,7 +69,9 @@ export default class TransportManager {
       } else if (env === 'desktop-web-ble') {
         await this.transport.init(WebBleLogger, DevicePool.emitter);
       } else if (env === 'webusb' || env === 'desktop-webusb') {
-        await this.transport.init(WebUsbLogger);
+        // The emitter is what turns a navigator.usb 'disconnect' into a
+        // DEVICE.DISCONNECT; without it WebUSB never reports device removal.
+        await this.transport.init(WebUsbLogger, DevicePool.emitter);
       } else {
         await this.transport.init(HttpLogger);
       }
