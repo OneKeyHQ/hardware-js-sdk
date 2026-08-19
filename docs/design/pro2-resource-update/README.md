@@ -44,8 +44,8 @@ flowchart LR
 `ArtifactReader` 流程，不依赖远程 release。
 
 Core 在 loader 模式读取设备现有文件的当前 OKPP header。大小、版本、payload hash 和 header hash
-全部一致时跳过普通资源传输；`forcedUpdateRes` 会强制重传。boot resource 始终重写 staging 文件，
-由 early boot 在挂载正式文件前完成提升。
+全部一致时跳过传输；`forcedUpdateRes` 会强制重传。boot resource 的写入目标是 staging 文件，
+但比对的是已挂载的 live `boot_resource.okpkg`：hash 一致则只清掉残留 staging，不再传包。
 
 ## 责任边界
 
