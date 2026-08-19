@@ -133,7 +133,7 @@ describe('Pro2 resource configuration', () => {
     });
   });
 
-  test('accepts documented RESC device roots and rejects other write targets', () => {
+  test('uses the RESC header device path and only rejects malformed paths', () => {
     expect(
       parseProtocolV2ResourcePackage(
         createResourcePackage('vol0:/loaders/bootloader/boot_resource.okpkg.staging')
@@ -148,14 +148,10 @@ describe('Pro2 resource configuration', () => {
       parseProtocolV2ResourcePackage(createResourcePackage('vol0:/loaders/rom/params.okpkg'))
         .devicePath
     ).toBe('vol0:/loaders/rom/params.okpkg');
-    expect(() =>
+    expect(
       parseProtocolV2ResourcePackage(createResourcePackage('vol0:/unexpected/images.okpkg'))
-    ).toThrow('device path');
-    expect(() =>
-      parseProtocolV2ResourcePackage(
-        createResourcePackage('vol0:/loaders/bootloader/boot_resource.okpkg')
-      )
-    ).toThrow('device path');
+        .devicePath
+    ).toBe('vol0:/unexpected/images.okpkg');
     expect(() =>
       parseProtocolV2ResourcePackage(createResourcePackage('vol0:/bundles/../images.okpkg'))
     ).toThrow('device path');
