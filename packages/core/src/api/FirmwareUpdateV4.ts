@@ -33,10 +33,10 @@ import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
   PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH,
   PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE,
+  type ProtocolV2ResourcePackageHeader,
   isProtocolV2ResourceArchiveEntryName,
   parseProtocolV2ResourcePackage,
   parseProtocolV2ResourcePackageHeader,
-  type ProtocolV2ResourcePackageHeader,
 } from '../protocols/protocol-v2/resources';
 import {
   getProtocolV2UnknownErrorText,
