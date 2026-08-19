@@ -210,10 +210,7 @@ describe('FirmwareUpdatePreparedPlan', () => {
       prepareFirmwareUpdatePlan({
         plan,
         leaseRef: 'fwlease:00000000-0000-4000-8000-000000000001',
-        artifacts: buildArtifacts([
-          'loaders/rom/params.okpkg',
-          'loaders/rom/params.okpkg',
-        ]),
+        artifacts: buildArtifacts(['loaders/rom/params.okpkg', 'loaders/rom/params.okpkg']),
       })
     ).toThrow('duplicate entry names');
     expect(() =>

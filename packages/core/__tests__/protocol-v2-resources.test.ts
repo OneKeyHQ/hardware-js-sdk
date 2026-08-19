@@ -107,9 +107,7 @@ describe('Pro2 resource configuration', () => {
 
   test('ignores macOS ZIP metadata that only looks like a resource package', () => {
     expect(
-      isProtocolV2ResourceArchiveEntryName(
-        'bundles/firmware_logo-pro2-prod_resource-signed.okpkg'
-      )
+      isProtocolV2ResourceArchiveEntryName('bundles/firmware_logo-pro2-prod_resource-signed.okpkg')
     ).toBe(true);
     expect(
       isProtocolV2ResourceArchiveEntryName(
