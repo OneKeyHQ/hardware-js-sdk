@@ -111,6 +111,11 @@ describe('Pro2 resource configuration', () => {
     ).toBe(true);
     expect(
       isProtocolV2ResourceArchiveEntryName(
+        'pro2-prod_resource/bundles/firmware_logo-pro2-prod_resource-signed.okpkg'
+      )
+    ).toBe(true);
+    expect(
+      isProtocolV2ResourceArchiveEntryName(
         '__MACOSX/pro2-prod_resource 2/bundles/._firmware_logo-pro2-prod_resource-signed.okpkg'
       )
     ).toBe(false);
@@ -119,6 +124,8 @@ describe('Pro2 resource configuration', () => {
         'bundles/._firmware_logo-pro2-prod_resource-signed.okpkg'
       )
     ).toBe(false);
+    expect(isProtocolV2ResourceArchiveEntryName('pro2-prod_resource/manifest.json')).toBe(false);
+    expect(isProtocolV2ResourceArchiveEntryName('pro2-prod_resource/.DS_Store')).toBe(false);
   });
 
   test('reads the version, hashes, and direct device path from a RESC package', () => {
