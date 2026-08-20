@@ -5551,15 +5551,11 @@ describe('Protocol V2 firmware update targets', () => {
         method: 'firmwareUpdateV4',
       },
     });
-    const typedCall = jest.fn().mockImplementation((type: string) => {
-      if (type === 'DeviceFirmwareUpdateRequest') {
-        return Promise.reject(new Error('React Native BLE transport released'));
-      }
-      return Promise.resolve({ type: 'Success', message: {} });
-    });
+    const typedCall = jest.fn().mockResolvedValue({ type: 'Success', message: {} });
+    const call = jest.fn().mockRejectedValue(new Error('React Native BLE transport released'));
 
     (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall }),
+      getCommands: () => ({ typedCall, call }),
       createProtocolV2UiPhaseMetadata: jest.fn().mockReturnValue(undefined),
       toMessageObject: jest.fn().mockReturnValue({ connectId: 'pro2' }),
     });
@@ -5572,7 +5568,12 @@ describe('Protocol V2 firmware update targets', () => {
       })
     ).resolves.toBeUndefined();
 
-    expect(typedCall).toHaveBeenCalledWith('DeviceFirmwareUpdateRequest', 'Success', {});
+    expect(call).toHaveBeenCalledWith(
+      'DeviceFirmwareUpdateRequest',
+      {},
+      { returnAfterWrite: true }
+    );
+    expect(typedCall).not.toHaveBeenCalledWith('DeviceFirmwareUpdateRequest', 'Success', {});
     expect((method as any).protocolV2InstallNeedsBleReconnect).toBe(true);
   });
 

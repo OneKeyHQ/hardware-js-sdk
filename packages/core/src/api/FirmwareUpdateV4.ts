@@ -2476,6 +2476,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             { timeoutMs: PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT }
           );
           if (statusResponse.type === 'Success') {
+            if (this.isBleReconnect()) {
+              Log.log(
+                '[FirmwareUpdateV4] BLE firmware install completed by terminal Success response'
+              );
+              this.recordProtocolV2AuthoritativeInstallCompletion(expectedTargetIds);
+              this.postProgressMessage(100, 'installingFirmware');
+              return;
+            }
             installEvidenceObserved = true;
             lastError = new Error(
               'Protocol V2 firmware install acknowledged; waiting for target status'
@@ -2987,6 +2995,26 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         ...(interaction ? { interaction } : {}),
       })
     );
+
+    if (this.isBleReconnect()) {
+      try {
+        await commands.call('DeviceFirmwareUpdateRequest', {}, { returnAfterWrite: true });
+        Log.log(
+          '[FirmwareUpdateV4] BLE firmware install request written; continue with status polling'
+        );
+      } catch (error) {
+        this.throwIfAborted();
+        if (!isProtocolV2DeviceDisconnectedError(error)) {
+          throw error;
+        }
+        Log.log(
+          '[FirmwareUpdateV4] BLE transport released while writing install request; continue status polling'
+        );
+        this.protocolV2InstallNeedsBleReconnect = true;
+      }
+      return;
+    }
+
     try {
       await commands.typedCall('DeviceFirmwareUpdateRequest', 'Success', {});
       this.protocolV2InstallRequestConfirmed = true;
