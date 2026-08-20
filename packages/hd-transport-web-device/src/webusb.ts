@@ -107,6 +107,9 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   /** Per-path protocol type detected by active wire-level probe. */
   private deviceProtocol: Map<string, ProtocolType> = new Map();
 
+  /** Protocols previously confirmed by an active response for this transport instance. */
+  private confirmedDeviceProtocols: Map<string, ProtocolType> = new Map();
+
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
 
   /**
@@ -316,6 +319,12 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
             'skipProtocolProbe requires an expected protocol'
           );
         }
+        if (this.confirmedDeviceProtocols.get(input.path) !== input.expectedProtocol) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'skipProtocolProbe requires a previously confirmed protocol for this WebUSB endpoint'
+          );
+        }
         this.staleProtocolPaths.delete(input.path);
         this.deviceProtocol.set(input.path, input.expectedProtocol);
         const currentDevice = this.deviceList.find(d => d.path === input.path)?.device;
@@ -366,7 +375,12 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         if (protocolHint) {
           this.deviceProtocolHints.set(input.path, protocolHint);
         }
-        await this.detectProtocol(input.path, input.expectedProtocol, protocolHint);
+        const detectedProtocol = await this.detectProtocol(
+          input.path,
+          input.expectedProtocol,
+          protocolHint
+        );
+        this.confirmedDeviceProtocols.set(input.path, detectedProtocol);
         const probedDevice = this.deviceList.find(d => d.path === input.path)?.device;
         if (probedDevice) {
           this.probedDeviceObjects.set(input.path, probedDevice);

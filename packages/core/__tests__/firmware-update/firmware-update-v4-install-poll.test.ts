@@ -73,7 +73,7 @@ describe('FirmwareUpdateV4 install polling', () => {
     );
   });
 
-  test('writes the BLE Request and consumes its terminal Success from status polling', async () => {
+  test('writes the BLE Request and completes only from target status polling', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -85,7 +85,30 @@ describe('FirmwareUpdateV4 install polling', () => {
     const typedCall = jest
       .fn()
       .mockResolvedValueOnce({ type: 'Success', message: {} })
-      .mockResolvedValueOnce({ type: 'Success', message: {} });
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: {
+          records: [
+            {
+              target_id: 6,
+              status: 'FW_MGMT_UPDATER_TASK_STATUS_IN_PROGRESS',
+              path: 'vol0:/coprocessor.bin',
+            },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: {
+          records: [
+            {
+              target_id: 6,
+              status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED',
+              path: 'vol0:/coprocessor.bin',
+            },
+          ],
+        },
+      });
     const call = jest.fn().mockResolvedValue({
       type: 'WriteCompleted',
       message: {},
@@ -96,6 +119,7 @@ describe('FirmwareUpdateV4 install polling', () => {
       createProtocolV2UiPhaseMetadata: jest.fn().mockReturnValue(undefined),
       toMessageObject: jest.fn().mockReturnValue({ connectId: 'pro2-ble' }),
       setCancelableAction: jest.fn(),
+      clearCancelableAction: jest.fn(),
     } as unknown as Device;
     method.postMessage = jest.fn();
     method.postProgressMessage = jest.fn();
@@ -116,13 +140,18 @@ describe('FirmwareUpdateV4 install polling', () => {
     expect(call).toHaveBeenCalledWith(
       'DeviceFirmwareUpdateRequest',
       {},
-      { returnAfterWrite: true }
+      expect.objectContaining({
+        returnAfterWrite: true,
+        expectedTypes: ['Success'],
+        onResponseAfterWrite: expect.any(Function),
+      })
     );
     expect(method.postProgressMessage).not.toHaveBeenCalled();
 
     await firmwareUpdate.waitForProtocolV2FirmwareUpdateComplete(targets, true);
 
     expect(typedCall.mock.calls[1]?.[0]).toBe('DeviceFirmwareUpdateStatusGet');
+    expect(typedCall.mock.calls[1]?.[1]).toBe('DeviceFirmwareUpdateStatus');
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
 

@@ -427,6 +427,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   test('reacquires a known Protocol V2 firmware install link without sending Ping', async () => {
     const { transport, uuid, writeCharacteristic } = createHarness();
     const probeProtocolV2 = jest.spyOn(transport as any, 'probeProtocolV2');
+    (transport as any).sessionProtocols.set(uuid, 'V2');
 
     await expect(
       transport.acquire({ uuid, expectedProtocol: 'V2', skipProtocolProbe: true })
@@ -440,6 +441,16 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
     expect(transport.getProtocolType(uuid)).toBe('V2');
     await transport.release(uuid, true);
+  });
+
+  test('rejects no-probe acquire before the BLE endpoint has confirmed a protocol', async () => {
+    const { transport, uuid } = createHarness();
+
+    await expect(
+      transport.acquire({ uuid, expectedProtocol: 'V2', skipProtocolProbe: true })
+    ).rejects.toThrow('previously confirmed protocol');
+
+    expect(transport.getProtocolType(uuid)).toBeUndefined();
   });
 
   test.each(['ios', 'android'] as const)(

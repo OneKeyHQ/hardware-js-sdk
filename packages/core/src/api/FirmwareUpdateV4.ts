@@ -2316,9 +2316,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       }
       seenTargetIds.add(targetId);
     }
-    const completedTargets = matchingTargets.filter(target =>
-      isProtocolV2TargetStatusFinished(target.status)
-    );
+    const completedTargets = matchingTargets.filter(target => {
+      const targetId = normalizeProtocolV2TargetId(target.target_id);
+      return (
+        isProtocolV2TargetStatusFinished(target.status) &&
+        (!liveTargetIds || (targetId !== undefined && liveTargetIds.has(targetId)))
+      );
+    });
     const completedTargetIds = new Set<number>();
     completedTargets.forEach(target => {
       const targetId = normalizeProtocolV2TargetId(target.target_id);
@@ -2465,7 +2469,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         try {
           const statusResponse = await this.device.getCommands().typedCall(
             'DeviceFirmwareUpdateStatusGet',
-            ['DeviceFirmwareUpdateStatus', 'Success'],
+            'DeviceFirmwareUpdateStatus',
             {
               fields: {
                 status: true,
@@ -2475,24 +2479,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             },
             { timeoutMs: PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT }
           );
-          if (statusResponse.type === 'Success') {
-            if (this.isBleReconnect()) {
-              Log.log(
-                '[FirmwareUpdateV4] BLE firmware install completed by terminal Success response'
-              );
-              this.recordProtocolV2AuthoritativeInstallCompletion(expectedTargetIds);
-              this.postProgressMessage(100, 'installingFirmware');
-              return;
-            }
+          if (this.protocolV2InstallRequestConfirmed) {
             installEvidenceObserved = true;
-            lastError = new Error(
-              'Protocol V2 firmware install acknowledged; waiting for target status'
-            );
           }
-          const statusTargets =
-            statusResponse.type === 'DeviceFirmwareUpdateStatus'
-              ? ((statusResponse.message.records ?? []) as ProtocolV2FirmwareUpdateStatusTarget[])
-              : [];
+          const statusTargets = (statusResponse.message.records ??
+            []) as ProtocolV2FirmwareUpdateStatusTarget[];
           this.collectProtocolV2LiveTargetIds(statusTargets, expectedTargetIds, liveTargetIds);
           if (liveTargetIds.size > 0) {
             currentInstallStatusObserved = true;
@@ -2552,11 +2543,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           }
 
           if (statusTargets.length === 0) {
-            if (statusResponse.type !== 'Success') {
-              lastError = new Error(
-                'Protocol V2 firmware update is waiting for user confirmation or target status'
-              );
-            }
+            lastError = new Error(
+              'Protocol V2 firmware update is waiting for user confirmation or target status'
+            );
           } else {
             const missingTargetIds = this.getProtocolV2MissingTargetIds(
               statusTargets,
@@ -2952,15 +2941,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       await connector?.acquire(expectedId, null, true, PROTOCOL_V2_CONNECT_PROTOCOL);
       return;
     }
-    const deviceDiff = await connector?.enumerate();
-    const reconnectDescriptor = deviceDiff?.descriptors?.find(
-      descriptor => descriptor.id === expectedId
-    );
-    if (!reconnectDescriptor) {
-      throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
-    }
     await connector?.acquire(
-      reconnectDescriptor.id,
+      expectedId,
       null,
       true,
       PROTOCOL_V2_CONNECT_PROTOCOL,
@@ -2969,7 +2951,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       skipProtocolProbe
     );
     this.device.commands.disposed = false;
-    this.device.getCommands().mainId = reconnectDescriptor.id;
+    this.device.getCommands().mainId = expectedId;
   }
 
   private async protocolV2StartFirmwareUpdate({
@@ -2998,7 +2980,21 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     if (this.isBleReconnect()) {
       try {
-        await commands.call('DeviceFirmwareUpdateRequest', {}, { returnAfterWrite: true });
+        await commands.call(
+          'DeviceFirmwareUpdateRequest',
+          {},
+          {
+            returnAfterWrite: true,
+            expectedTypes: ['Success'],
+            onResponseAfterWrite: response => {
+              if (response.type !== 'Success') return;
+              this.protocolV2InstallRequestConfirmed = true;
+              this.device.clearCancelableAction();
+              this.postProgressMessage(1, 'installingFirmware');
+              Log.log('[FirmwareUpdateV4] BLE firmware install confirmed by device response');
+            },
+          }
+        );
         Log.log(
           '[FirmwareUpdateV4] BLE firmware install request written; continue with status polling'
         );

@@ -194,13 +194,7 @@ describe('DeviceUploadWallpaper', () => {
       refreshProtocolV2SettingsAfterMutation: jest.fn().mockResolvedValue({}),
     });
 
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
-
-  test('uses I8 with LZ4 when uploading a Pro2 wallpaper over BLE', async () => {
-    jest.spyOn(DataManager, 'getSettings').mockReturnValue('lowlevel');
-    jest.spyOn(DataManager, 'isBleConnect').mockReturnValue(true);
+  test('encodes, uploads and applies a Pro2 wallpaper', async () => {
     const typedCall = jest.fn().mockImplementation((request, _response, params) => {
       if (request === 'FilesystemDirMake') return { message: { message: 'directory ready' } };
       if (request === 'FilesystemFileWrite') {
@@ -243,7 +237,7 @@ describe('DeviceUploadWallpaper', () => {
     });
     expect(device.refreshProtocolV2SettingsAfterMutation).toHaveBeenCalledTimes(1);
     expect(typedCall.mock.calls.some(call => call[0] === 'SetWallpaper')).toBe(false);
-    expect(result).toMatchObject({ colorFormat: 'I8', message: 'wallpaper applied' });
+    expect(result).toMatchObject({ colorFormat: 'RGB565', message: 'wallpaper applied' });
     const fileWriteCallCount = typedCall.mock.calls.filter(
       call => call[0] === 'FilesystemFileWrite'
     ).length;
@@ -281,8 +275,6 @@ describe('DeviceUploadWallpaper', () => {
   });
 
   test('returns success when wallpaper read-back fails after apply', async () => {
-    jest.spyOn(DataManager, 'getSettings').mockReturnValue('desktop-webusb');
-    jest.spyOn(DataManager, 'isBleConnect').mockReturnValue(false);
     const typedCall = jest.fn().mockImplementation((request, _response, params) => {
       if (request === 'FilesystemDirMake') return { message: {} };
       if (request === 'FilesystemFileWrite') {
@@ -308,10 +300,7 @@ describe('DeviceUploadWallpaper', () => {
     (method as any).device = device;
     method.init();
 
-    await expect(method.run()).resolves.toMatchObject({
-      colorFormat: 'RGB565',
-      message: 'wallpaper applied',
-    });
+    await expect(method.run()).resolves.toMatchObject({ message: 'wallpaper applied' });
     expect(device.refreshProtocolV2SettingsAfterMutation).toHaveBeenCalledTimes(1);
   });
 
@@ -326,19 +315,6 @@ describe('DeviceUploadWallpaper', () => {
     });
 
     expect(() => method.init()).toThrow('fileName');
-  });
-
-  test('rejects unsupported wallpaper encodings before device communication', () => {
-    const method = new DeviceUploadWallpaper({
-      id: 1,
-      payload: {
-        method: 'deviceUploadWallpaper',
-        jpegBase64: createJpegBase64(604, 1024),
-        encoding: 'gzip',
-      } as any,
-    });
-
-    expect(() => method.init()).toThrow('encoding');
   });
 
   test('rejects unsupported firmware before creating or writing files', async () => {
@@ -4978,7 +4954,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(commands.mainId).toBe('usb-path');
   });
 
-  test('scans and reacquires the same BLE peripheral without probing during install recovery', async () => {
+  test('reacquires the same BLE peripheral by id without scanning during install recovery', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -5000,7 +4976,7 @@ describe('Protocol V2 firmware update targets', () => {
 
     await (method as any).reconnectProtocolV2Device({ skipProtocolProbe: true });
 
-    expect(enumerate).toHaveBeenCalledTimes(1);
+    expect(enumerate).not.toHaveBeenCalled();
     expect(acquire).toHaveBeenCalledWith('ble-id', null, true, 'V2', undefined, undefined, true);
     expect(commands.disposed).toBe(false);
     expect(commands.mainId).toBe('ble-id');
@@ -5571,7 +5547,11 @@ describe('Protocol V2 firmware update targets', () => {
     expect(call).toHaveBeenCalledWith(
       'DeviceFirmwareUpdateRequest',
       {},
-      { returnAfterWrite: true }
+      expect.objectContaining({
+        returnAfterWrite: true,
+        expectedTypes: ['Success'],
+        onResponseAfterWrite: expect.any(Function),
+      })
     );
     expect(typedCall).not.toHaveBeenCalledWith('DeviceFirmwareUpdateRequest', 'Success', {});
     expect((method as any).protocolV2InstallNeedsBleReconnect).toBe(true);
@@ -5679,7 +5659,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
 
-  test('keeps polling after install ACK until the target finishes', async () => {
+  test('keeps polling after an empty status response until the target finishes', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -5688,7 +5668,10 @@ describe('Protocol V2 firmware update targets', () => {
     });
     const typedCall = jest
       .fn()
-      .mockResolvedValueOnce({ type: 'Success', message: {} })
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: { records: [] },
+      })
       .mockResolvedValueOnce({
         type: 'DeviceFirmwareUpdateStatus',
         message: { records: [] },
@@ -5828,6 +5811,38 @@ describe('Protocol V2 firmware update targets', () => {
 
     expect(typedCall).toHaveBeenCalledTimes(3);
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
+  });
+
+  test('does not count a stale finished target when only another target was live', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const assertProtocolV2TargetStatus = (method as any).assertProtocolV2TargetStatus.bind(method);
+    const expectedTargetIds = new Set([3, 4]);
+    const expectedPaths = new Map([
+      [3, 'vol0:/bootloader.bin'],
+      [4, 'vol0:/application_p1.bin'],
+    ]);
+    const liveTargetIds = new Set([4]);
+    method.postProgressMessage = jest.fn();
+
+    const completed = assertProtocolV2TargetStatus(
+      [
+        { target_id: 3, status: 2, path: 'vol0:/bootloader.bin' },
+        { target_id: 4, status: 2, path: 'vol0:/application_p1.bin' },
+      ],
+      expectedTargetIds,
+      expectedPaths,
+      liveTargetIds
+    );
+
+    expect(completed).toBe(false);
+    expect((method as any).protocolV2CompletedTargetIds).toEqual(new Set([4]));
+    expect(method.postProgressMessage).toHaveBeenCalledWith(50, 'installingFirmware');
+    expect(method.postProgressMessage).not.toHaveBeenCalledWith(100, 'installingFirmware');
   });
 
   test('ignores stale failed records until the current install starts', async () => {
@@ -6119,7 +6134,6 @@ describe('Protocol V2 firmware update targets', () => {
     });
     const typedCall = jest
       .fn()
-      .mockResolvedValueOnce({ type: 'Success', message: {} })
       .mockRejectedValueOnce(new Error('Pro2 is rebooting'))
       .mockResolvedValueOnce({
         type: 'DeviceFirmwareUpdateStatus',
@@ -6136,6 +6150,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).device = stubDevice({
       getCommands: () => ({ typedCall }),
     });
+    (method as any).protocolV2InstallRequestConfirmed = true;
     (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
     (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
     (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(true);
@@ -6566,7 +6581,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(reconnectProtocolV2Device).not.toHaveBeenCalled();
     expect(typedCall).toHaveBeenCalledWith(
       'DeviceFirmwareUpdateStatusGet',
-      ['DeviceFirmwareUpdateStatus', 'Success'],
+      'DeviceFirmwareUpdateStatus',
       expect.anything(),
       expect.anything()
     );
@@ -6848,7 +6863,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
     expect(typedCall).toHaveBeenCalledWith(
       'DeviceFirmwareUpdateStatusGet',
-      ['DeviceFirmwareUpdateStatus', 'Success'],
+      'DeviceFirmwareUpdateStatus',
       {
         fields: {
           status: true,

@@ -1047,6 +1047,12 @@ export default class ReactNativeBleTransport {
             'skipProtocolProbe requires an expected BLE protocol'
           );
         }
+        if (this.sessionProtocols.get(uuid) !== expectedProtocol) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'skipProtocolProbe requires a previously confirmed protocol for this BLE endpoint'
+          );
+        }
         this.deviceProtocol.set(uuid, expectedProtocol);
         this.sessionProtocols.set(uuid, expectedProtocol);
         this.protocolReprobeFailures.delete(uuid);

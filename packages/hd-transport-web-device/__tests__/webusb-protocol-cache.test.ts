@@ -69,10 +69,11 @@ describe('WebUsbTransport protocol probe cache', () => {
     expect(webusb.detectProtocol).toHaveBeenCalledWith(path, 'V1', undefined);
   });
 
-  test('acquire trusts the expected protocol during an explicit no-probe recovery', async () => {
+  test('acquire reuses a previously confirmed protocol during explicit no-probe recovery', async () => {
     const webusb = buildAcquirableTransport();
     const path = 'pro-webusb';
     webusb.deviceProtocol.set(path, 'V1');
+    webusb.confirmedDeviceProtocols.set(path, 'V2');
     webusb.markProtocolStale(path);
     webusb.detectProtocol = jest.fn();
 
@@ -84,6 +85,20 @@ describe('WebUsbTransport protocol probe cache', () => {
     expect(webusb.deviceProtocol.get(path)).toBe('V2');
     expect(webusb.staleProtocolPaths.has(path)).toBe(false);
     expect(webusb.acquiredPaths.has(path)).toBe(true);
+  });
+
+  test('acquire rejects no-probe recovery without a previously confirmed protocol', async () => {
+    const webusb = buildAcquirableTransport();
+    const path = 'pro-webusb';
+    webusb.detectProtocol = jest.fn();
+
+    await expect(
+      webusb.acquire({ path, expectedProtocol: 'V2', skipProtocolProbe: true })
+    ).rejects.toThrow('previously confirmed protocol');
+
+    expect(webusb.detectProtocol).not.toHaveBeenCalled();
+    expect(webusb.deviceProtocol.has(path)).toBe(false);
+    expect(webusb.acquiredPaths.has(path)).toBe(false);
   });
 
   test('forced protocol detection bypasses a valid cache and probes on the wire', async () => {
