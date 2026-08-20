@@ -59,7 +59,15 @@ export function isProtocolV2ResourceArchiveEntryName(entryName: string): boolean
   return (
     fileName.length > 0 &&
     !fileName.startsWith('.') &&
-    !parts.some(part => part === '__MACOSX' || part === '.' || part === '..' || part === '')
+    !parts.some(
+      part =>
+        !part ||
+        part === '.' ||
+        part === '..' ||
+        part === '.DS_Store' ||
+        part.startsWith('._') ||
+        part.toUpperCase() === '__MACOSX'
+    )
   );
 }
 

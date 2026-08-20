@@ -2212,19 +2212,41 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
   }
 
+  private collectProtocolV2LiveTargetIds(
+    statusTargets: ProtocolV2FirmwareUpdateStatusTarget[],
+    expectedTargetIds: Set<number>,
+    liveTargetIds: Set<number>
+  ) {
+    statusTargets.forEach(target => {
+      const targetId = normalizeProtocolV2TargetId(target.target_id);
+      if (
+        targetId !== undefined &&
+        expectedTargetIds.has(targetId) &&
+        isProtocolV2TargetStatusInProgress(target.status)
+      ) {
+        liveTargetIds.add(targetId);
+      }
+    });
+  }
+
   private assertProtocolV2TargetStatus(
     statusTargets: ProtocolV2FirmwareUpdateStatusTarget[],
     expectedTargetIds: Set<number>,
-    expectedPaths = new Map<number, string>()
+    expectedPaths?: Map<number, string>,
+    liveTargetIds?: Set<number>
   ) {
+    const resolvedExpectedPaths = expectedPaths ?? new Map<number, string>();
     Log.log(
       `[FirmwareUpdateV4] DeviceFirmwareUpdateStatus records=${JSON.stringify(statusTargets)}`
     );
-    const failedTarget = statusTargets.find(
-      target =>
-        expectedTargetIds.has(normalizeProtocolV2TargetId(target.target_id) ?? -1) &&
-        isProtocolV2TargetStatusFailed(target.status)
-    );
+    const failedTarget = statusTargets.find(target => {
+      const targetId = normalizeProtocolV2TargetId(target.target_id) ?? -1;
+      return (
+        expectedTargetIds.has(targetId) &&
+        isProtocolV2TargetStatusFailed(target.status) &&
+        (!liveTargetIds || liveTargetIds.has(targetId))
+      );
+    });
     if (failedTarget) {
       const failedTargetDetails = JSON.stringify({
         targetId: failedTarget.target_id,
@@ -2241,6 +2263,27 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         }
       );
     }
+    if (liveTargetIds) {
+      const staleFailedTargets = statusTargets.filter(target => {
+        const targetId = normalizeProtocolV2TargetId(target.target_id) ?? -1;
+        return (
+          expectedTargetIds.has(targetId) &&
+          isProtocolV2TargetStatusFailed(target.status) &&
+          !liveTargetIds.has(targetId)
+        );
+      });
+      if (staleFailedTargets.length > 0) {
+        Log.log(
+          `[FirmwareUpdateV4] ignoring stale failed firmware status until those targets start: ${JSON.stringify(
+            staleFailedTargets.map(target => ({
+              targetId: target.target_id,
+              status: target.status,
+              path: target.path,
+            }))
+          )}`
+        );
+      }
+    }
 
     const matchingTargets = statusTargets.filter(target =>
       expectedTargetIds.has(normalizeProtocolV2TargetId(target.target_id) ?? -1)
@@ -2248,10 +2291,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const seenTargetIds = new Set<number>();
     for (const target of matchingTargets) {
       const targetId = normalizeProtocolV2TargetId(target.target_id);
+      const pathConflictsWithCurrentInstall =
+        Boolean(target.path) &&
+        Boolean(resolvedExpectedPaths.get(targetId)) &&
+        target.path !== resolvedExpectedPaths.get(targetId) &&
+        (!liveTargetIds || liveTargetIds.has(targetId));
       if (
         targetId === undefined ||
         seenTargetIds.has(targetId) ||
-        (target.path && expectedPaths.get(targetId) && target.path !== expectedPaths.get(targetId))
+        pathConflictsWithCurrentInstall
       ) {
         Log.error(`[FirmwareUpdateV4] install status conflicts with target=${target.target_id}`);
         throw ERRORS.TypedError(
@@ -2391,6 +2439,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let deviceInfo: ProtocolV2DeviceInfo | undefined;
     let installEvidenceObserved = false;
     let currentInstallStatusObserved = false;
+    const liveTargetIds = new Set<number>();
 
     while (Date.now() - startTime < PROTOCOL_V2_INSTALL_TIMEOUT) {
       // A transport release caused by an explicit workflow cancellation must not
@@ -2426,15 +2475,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             statusResponse.type === 'DeviceFirmwareUpdateStatus'
               ? ((statusResponse.message.records ?? []) as ProtocolV2FirmwareUpdateStatusTarget[])
               : [];
-          const hasInProgressTarget = statusTargets.some(target => {
-            const targetId = normalizeProtocolV2TargetId(target.target_id);
-            return (
-              targetId !== undefined &&
-              expectedTargetIds.has(targetId) &&
-              isProtocolV2TargetStatusInProgress(target.status)
-            );
-          });
-          if (hasInProgressTarget) {
+          this.collectProtocolV2LiveTargetIds(statusTargets, expectedTargetIds, liveTargetIds);
+          if (liveTargetIds.size > 0) {
             currentInstallStatusObserved = true;
           }
           const hasMatchingTargetStatus = statusTargets.some(target => {
@@ -2455,7 +2497,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             !requireCurrentInstallStatus || currentInstallStatusObserved;
           if (
             shouldVerifyTargetCompletion &&
-            this.assertProtocolV2TargetStatus(statusTargets, expectedTargetIds, expectedPaths)
+            this.assertProtocolV2TargetStatus(
+              statusTargets,
+              expectedTargetIds,
+              expectedPaths,
+              requireCurrentInstallStatus ? liveTargetIds : undefined
+            )
           ) {
             return;
           }

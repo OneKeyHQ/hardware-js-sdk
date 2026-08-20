@@ -5678,6 +5678,141 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall).toHaveBeenCalledTimes(3);
   });
 
+  test('ignores leftover failed records while another leftover target is still pending', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: {
+          records: [
+            { target_id: 3, status: 0, path: 'vol0:/bootloader.bin' },
+            { target_id: 4, status: 3, path: 'vol0:/application_p1.bin' },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: {
+          records: [
+            { target_id: 3, status: 0, path: 'vol0:/bootloader.bin' },
+            { target_id: 4, status: 0, path: 'vol0:/application_p1.bin' },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: {
+          records: [
+            { target_id: 3, status: 2, path: 'vol0:/bootloader.bin' },
+            { target_id: 4, status: 2, path: 'vol0:/application_p1.bin' },
+          ],
+        },
+      });
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+      callback: () => void
+    ) => {
+      callback();
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
+    method.postProgressMessage = jest.fn();
+
+    try {
+      await (method as any).waitForProtocolV2FirmwareUpdateComplete(
+        [
+          { target_id: 3, path: 'vol0:/bootloader.bin' },
+          { target_id: 4, path: 'vol0:/application_p1.bin' },
+        ],
+        true
+      );
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+
+    expect(typedCall).toHaveBeenCalledTimes(3);
+    expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
+  });
+
+  test('reports failed only after that target was live in the current install', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: {
+          records: [
+            { target_id: 3, status: 0, path: 'vol0:/bootloader.bin' },
+            { target_id: 4, status: 3, path: 'vol0:/application_p1.bin' },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: {
+          records: [
+            { target_id: 3, status: 0, path: 'vol0:/bootloader.bin' },
+            { target_id: 4, status: 0, path: 'vol0:/application_p1.bin' },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: {
+          records: [
+            { target_id: 3, status: 0, path: 'vol0:/bootloader.bin' },
+            { target_id: 4, status: 3, path: 'vol0:/application_p1.bin' },
+          ],
+        },
+      });
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+      callback: () => void
+    ) => {
+      callback();
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(undefined);
+
+    try {
+      await expect(
+        (method as any).waitForProtocolV2FirmwareUpdateComplete(
+          [
+            { target_id: 3, path: 'vol0:/bootloader.bin' },
+            { target_id: 4, path: 'vol0:/application_p1.bin' },
+          ],
+          true
+        )
+      ).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.FirmwareError,
+        message: 'Protocol V2 firmware install failed',
+      });
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+
+    expect(typedCall).toHaveBeenCalledTimes(3);
+  });
+
   test('waits five minutes before rejecting normal mode without install evidence', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
