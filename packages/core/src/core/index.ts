@@ -950,6 +950,14 @@ export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unkn
   );
 }
 
+export function isProtocolV2PeerRemovedPairingError(method: BaseMethod, error: unknown) {
+  return (
+    method.payload.connectProtocol === 'V2' &&
+    (error as { errorCode?: unknown })?.errorCode ===
+      HardwareErrorCode.BlePeerRemovedPairingInformation
+  );
+}
+
 /**
  * If the Bluetooth connection times out, retry up to 6 times
  * @param retryCount - Current retry count (default 0)
@@ -1152,7 +1160,6 @@ const ensureConnected = async (
             HardwareErrorCode.BleLocationServicesDisabled,
             HardwareErrorCode.BleDeviceNotBonded,
             HardwareErrorCode.BleDeviceBondError,
-            HardwareErrorCode.BlePeerRemovedPairingInformation,
             HardwareErrorCode.BleDeviceBondedCanceled,
             HardwareErrorCode.BleCharacteristicNotifyError,
             HardwareErrorCode.BleTimeoutError,
@@ -1165,7 +1172,8 @@ const ensureConnected = async (
             HardwareErrorCode.BridgeNeedsPermission,
             HardwareErrorCode.DeviceInterruptedFromUser,
             HardwareErrorCode.CallQueueActionCancelled,
-          ].includes(error.errorCode)
+          ].includes(error.errorCode) ||
+          isProtocolV2PeerRemovedPairingError(method, error)
         ) {
           reject(error);
           return;

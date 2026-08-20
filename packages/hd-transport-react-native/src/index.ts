@@ -311,9 +311,9 @@ const resolveNegotiatedMtu = (device: Device) => requestNegotiatedMtu(device, 'c
 
 type IOBleErrorRemap = Error | BleError | null | undefined;
 
-function remapError(error: IOBleErrorRemap) {
+function remapError(error: IOBleErrorRemap, mapProtocolV2StaleBond: boolean) {
   if (error instanceof BleError) {
-    if (isNativeBleStaleBondError(error)) {
+    if (mapProtocolV2StaleBond && isNativeBleStaleBondError(error)) {
       throw toBleStaleBondHardwareError(error);
     }
 
@@ -392,9 +392,12 @@ export default class ReactNativeBleTransport {
   /**
    * Native encryption/pairing failures seen before Protocol V2 probe starts.
    * Pro2/Neo GATT connect can succeed on a stale iOS bond; the CCCD write then
-   * fails with ATT 14/15. Remember it so detectProtocol fails immediately.
+   * fails with ATT 5/15. Remember it so detectProtocol fails immediately.
    */
   private staleBondErrors: Map<string, Error> = new Map();
+
+  /** Strict or previously confirmed V2 target while acquire installs notifications. */
+  private acquiringProtocolV2 = new Set<string>();
 
   private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
 
@@ -883,6 +886,9 @@ export default class ReactNativeBleTransport {
 
   private async acquireUnlocked(input: BleAcquireInput) {
     const { uuid, forceCleanRunPromise, expectedProtocol } = input;
+    const shouldMapProtocolV2StaleBond = expectedProtocol
+      ? expectedProtocol === 'V2'
+      : this.confirmedProtocolV2.has(uuid);
 
     const cachedTransport = transportCache[uuid];
     if (cachedTransport) {
@@ -967,7 +973,7 @@ export default class ReactNativeBleTransport {
           Log?.debug('device already connected');
           throw ERRORS.TypedError(HardwareErrorCode.BleAlreadyConnected);
         } else {
-          remapError(e);
+          remapError(e, shouldMapProtocolV2StaleBond);
         }
       }
     }
@@ -1011,7 +1017,7 @@ export default class ReactNativeBleTransport {
             }
           }
         } else {
-          remapError(e);
+          remapError(e, shouldMapProtocolV2StaleBond);
         }
       }
     }
@@ -1031,12 +1037,15 @@ export default class ReactNativeBleTransport {
       this.deviceProtocolHints.set(uuid, protocolHint);
     }
 
-    await this.installTransportForAcquire(uuid, acquiredDevice, {
-      writeCharacteristic,
-      notifyCharacteristic,
-    });
+    if (shouldMapProtocolV2StaleBond) {
+      this.acquiringProtocolV2.add(uuid);
+    }
 
     try {
+      await this.installTransportForAcquire(uuid, acquiredDevice, {
+        writeCharacteristic,
+        notifyCharacteristic,
+      });
       const protocolType = await this.detectProtocol(
         uuid,
         expectedProtocol,
@@ -1058,6 +1067,8 @@ export default class ReactNativeBleTransport {
         await this.releaseUnlocked(uuid, true);
       }
       throw error;
+    } finally {
+      this.acquiringProtocolV2.delete(uuid);
     }
   }
 
@@ -1085,7 +1096,10 @@ export default class ReactNativeBleTransport {
           Log?.debug('monitor error ignored for stale transport: ', uuid, notifyTransactionId);
           return;
         }
-        if (isNativeBleStaleBondError(error)) {
+        if (
+          (this.getActiveProtocol(uuid) === 'V2' || this.acquiringProtocolV2.has(uuid)) &&
+          isNativeBleStaleBondError(error)
+        ) {
           this.rememberStaleBondError(uuid, toBleStaleBondHardwareError(error));
           return;
         }
@@ -1252,6 +1266,7 @@ export default class ReactNativeBleTransport {
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
     this.staleBondErrors.delete(uuid);
+    this.acquiringProtocolV2.delete(uuid);
     // Confirmed protocol and caller hints stay in deviceProtocol / protocolHint.
     this.protocolV2Assemblers.get(uuid)?.reset();
     this.protocolV2Assemblers.delete(uuid);
@@ -1389,9 +1404,6 @@ export default class ReactNativeBleTransport {
             if (isWedgedWriteError(e)) {
               throw e;
             }
-            if (isNativeBleStaleBondError(e) || isBleStaleBondHardwareError(e)) {
-              throw toBleStaleBondHardwareError(e);
-            }
             throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
           }
         }
@@ -1425,9 +1437,6 @@ export default class ReactNativeBleTransport {
             onError(e);
             if (isWedgedWriteError(e)) {
               throw e;
-            }
-            if (isNativeBleStaleBondError(e) || isBleStaleBondHardwareError(e)) {
-              throw toBleStaleBondHardwareError(e);
             }
             throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
           }
@@ -1520,11 +1529,6 @@ export default class ReactNativeBleTransport {
           releaseOwnershipIfCurrent();
           if (isWedgedWriteError(e)) {
             throw e;
-          }
-          if (isNativeBleStaleBondError(e) || isBleStaleBondHardwareError(e)) {
-            const bondError = toBleStaleBondHardwareError(e);
-            this.rememberStaleBondError(uuid, bondError);
-            throw bondError;
           }
           if (e.errorCode === BleErrorCode.DeviceDisconnected) {
             throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded);
@@ -1860,6 +1864,7 @@ export default class ReactNativeBleTransport {
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
     this.staleBondErrors.delete(uuid);
+    this.acquiringProtocolV2.delete(uuid);
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);
 
@@ -1957,6 +1962,7 @@ export default class ReactNativeBleTransport {
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
     this.staleBondErrors.delete(uuid);
+    this.acquiringProtocolV2.delete(uuid);
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);
 
@@ -2008,6 +2014,7 @@ export default class ReactNativeBleTransport {
     this.deviceProtocol.clear();
     this.probingProtocols.clear();
     this.staleBondErrors.clear();
+    this.acquiringProtocolV2.clear();
     this.sessionProtocols.clear();
     this.confirmedProtocolV2.clear();
     this.protocolReprobeFailures.clear();
@@ -2072,10 +2079,11 @@ export default class ReactNativeBleTransport {
       return expectedProtocol;
     }
 
-    // iOS Classic/Touch/Pro skip probing above. Pro2/Neo still probe, and a stale
-    // OS bond must not wait for Ping/GetFeatures timeouts after ATT 14/15.
-    this.throwIfStaleBondError(uuid);
+    if (expectedProtocol === 'V2' || this.acquiringProtocolV2.has(uuid)) {
+      this.throwIfStaleBondError(uuid);
+    }
 
+    // Non-iOS V1 devices still require an active GetFeatures probe.
     if (expectedProtocol === 'V1') {
       if (await this.probeProtocolV1(uuid)) {
         this.deviceProtocol.set(uuid, 'V1');
@@ -2232,7 +2240,7 @@ export default class ReactNativeBleTransport {
       Log?.debug('[ReactNativeBleTransport] Protocol V1 GetFeatures probe failed:', error);
       // A wedged write already dropped the link, so probing another protocol on it
       // would only fail against a torn-down transport: surface the real cause.
-      if (isWedgedWriteError(error) || isBleStaleBondHardwareError(error)) {
+      if (isWedgedWriteError(error)) {
         throw error;
       }
       return false;

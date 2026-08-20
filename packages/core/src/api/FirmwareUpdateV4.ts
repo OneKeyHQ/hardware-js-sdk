@@ -1,4 +1,11 @@
-import { EDeviceType, ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
+import {
+  EDeviceType,
+  ERRORS,
+  HardwareError,
+  HardwareErrorCode,
+  isBleStaleBondHardwareError,
+  wait,
+} from '@onekeyfe/hd-shared';
 import JSZip from 'jszip';
 import {
   DeviceRebootType,
@@ -372,11 +379,12 @@ const isProtocolV2FirmwareStatusEndpointUnavailable = (error: unknown) => {
 };
 
 const isProtocolV2TerminalInstallStatusError = (error: unknown) =>
-  error instanceof HardwareError &&
-  (error.errorCode === HardwareErrorCode.ActionCancelled ||
-    error.errorCode === HardwareErrorCode.FirmwareError ||
-    error.errorCode === HardwareErrorCode.FirmwareVerificationFailed ||
-    error.params?.firmwareUpdateCode === PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE);
+  isBleStaleBondHardwareError(error) ||
+  (error instanceof HardwareError &&
+    (error.errorCode === HardwareErrorCode.ActionCancelled ||
+      error.errorCode === HardwareErrorCode.FirmwareError ||
+      error.errorCode === HardwareErrorCode.FirmwareVerificationFailed ||
+      error.params?.firmwareUpdateCode === PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE));
 
 const isProtocolV2TargetStatusFinished = (status: ProtocolV2FirmwareUpdateStatusTarget['status']) =>
   normalizeProtocolV2TargetStatus(status) === PROTOCOL_V2_TARGET_STATUS_FINISHED;
@@ -1908,6 +1916,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       if (!expectedHeaderHash || header.headerHash !== expectedHeaderHash) return false;
       return true;
     } catch (error) {
+      if (isBleStaleBondHardwareError(error)) {
+        throw error;
+      }
       Log.log(`[FirmwareUpdateV4] RESC bundle ${bundle.name} header check failed: `, error);
       return false;
     }
@@ -2001,7 +2012,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         }
         lastError = new Error('Protocol V2 device is reachable but is not in bootloader mode');
       } catch (error) {
-        if (this.isProtocolV2ReconnectIdentityError(error)) {
+        if (isBleStaleBondHardwareError(error) || this.isProtocolV2ReconnectIdentityError(error)) {
           throw error;
         }
         shouldReconnect = true;
@@ -2287,6 +2298,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         });
         return processedSize + source.size;
       } catch (error) {
+        if (isBleStaleBondHardwareError(error)) {
+          throw error;
+        }
         lastError = error;
         if (attempt < PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT) {
           await this.recoverProtocolV2FileTransfer();
@@ -2699,6 +2713,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         return;
       }
     } catch (error) {
+      if (isBleStaleBondHardwareError(error)) {
+        throw error;
+      }
       Log.log('[FirmwareUpdateV4] unable to confirm App mode before Normal reboot: ', error);
     }
     await this.protocolV2Reboot(DeviceRebootType.Normal);
@@ -2790,7 +2807,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           'Protocol V2 device is still in bootloader mode'
         );
       } catch (error) {
-        if (this.isProtocolV2ReconnectIdentityError(error)) {
+        if (isBleStaleBondHardwareError(error) || this.isProtocolV2ReconnectIdentityError(error)) {
           throw error;
         }
         shouldReconnect = true;

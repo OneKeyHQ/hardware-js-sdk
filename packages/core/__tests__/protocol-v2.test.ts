@@ -4827,6 +4827,23 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall.mock.calls.map(call => call[0])).toEqual(['DeviceInfoGet']);
   });
 
+  test('stops V4 bootloader reconnect polling on a stale BLE bond', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const staleBondError = ERRORS.TypedError(HardwareErrorCode.BlePeerRemovedPairingInformation);
+    const reconnectProtocolV2Device = jest.fn().mockRejectedValue(staleBondError);
+    (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
+
+    await expect((method as any).waitForProtocolV2BootloaderMode(60_000, 0)).rejects.toBe(
+      staleBondError
+    );
+    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
+  });
+
   test('polls again when Protocol V2 bootloader serial is temporarily unavailable', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -8134,6 +8151,36 @@ describe('Protocol V2 firmware update targets', () => {
         elapsedMs: expect.any(Number),
       }),
     });
+  });
+
+  test('does not retry or wrap a stale BLE bond during a V4 file transfer', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const staleBondError = ERRORS.TypedError(HardwareErrorCode.BlePeerRemovedPairingInformation);
+    (method as any).fileWriteChunk = jest.fn().mockRejectedValue(staleBondError);
+    const recoverProtocolV2FileTransfer = jest.fn();
+    (method as any).recoverProtocolV2FileTransfer = recoverProtocolV2FileTransfer;
+    const source = await openFirmwareByteSource({
+      binary: new Uint8Array([1]).buffer,
+    });
+
+    try {
+      await expect(
+        (method as any).protocolV2SourceUpdateProcess({
+          source,
+          filePath: 'vol1:firmware.bin',
+          processedSize: 0,
+          totalSize: 1,
+        })
+      ).rejects.toBe(staleBondError);
+    } finally {
+      await source?.close();
+    }
+    expect(recoverProtocolV2FileTransfer).not.toHaveBeenCalled();
   });
 
   test('throttles repeated transfer progress while preserving file completion', async () => {
