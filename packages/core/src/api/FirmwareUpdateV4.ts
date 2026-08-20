@@ -32,11 +32,13 @@ import {
 } from '../protocols/protocol-v2';
 import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
+  PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH,
   PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH,
   PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE,
+  type ProtocolV2ResourcePackageHeader,
+  isProtocolV2ResourceArchiveEntryName,
   parseProtocolV2ResourcePackage,
   parseProtocolV2ResourcePackageHeader,
-  type ProtocolV2ResourcePackageHeader,
 } from '../protocols/protocol-v2/resources';
 import {
   getProtocolV2UnknownErrorText,
@@ -47,20 +49,12 @@ import {
   readFirmwareByteSourceFully,
   writeFirmwareByteSource,
 } from './firmware/FirmwareArtifactSource';
-import {
-  registerFirmwareUpdateHostBinding,
-  resolveFirmwareUpdateHostBinding,
-  unregisterFirmwareUpdateHostBinding,
-} from './firmware/FirmwareHostBinding';
+import { resolveFirmwareUpdateHostBinding } from './firmware/FirmwareHostBinding';
 import {
   assertFirmwareUpdatePreparedPlanBinding,
   assertFirmwareUpdatePreparedPlanDeviceIdentity,
-  prepareFirmwareUpdatePlan,
   validateFirmwareUpdatePreparedPlan,
 } from './firmware/FirmwareUpdatePreparedPlan';
-import { prepareFirmwareUpdateV4MemoryHost } from './firmware/FirmwareMemoryHost';
-import { buildProtocolV2LocalFirmwareUpdatePlan } from './firmware/FirmwareUpdatePlan';
-
 import type {
   FirmwareArtifactReference,
   FirmwareUpdateV4Params,
@@ -77,11 +71,6 @@ import type {
   KnownDevice,
 } from '../types';
 import type { FirmwareByteSource } from './firmware/FirmwareArtifactSource';
-import type {
-  FirmwareMemoryArtifact,
-  FirmwareMemoryArtifactEntry,
-  FirmwareUpdateV4MemoryHost,
-} from './firmware/FirmwareMemoryHost';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -230,7 +219,6 @@ type ProtocolV2ResourceBundleSource = {
 
 type ProtocolV2LocalResourceArchive = {
   binary: ArrayBuffer;
-  materializedEntries: FirmwareMemoryArtifactEntry[];
   resources: Array<{
     entryName: string;
     binary: ArrayBuffer;
@@ -792,15 +780,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       this.params.resourceArchiveBinary &&
       this.params.targetsToUpdate?.includes('resource')
     ) {
-      const localMemoryHost = await this.prepareProtocolV2LocalMemoryHost({
-        features: deviceFeatures,
-        firmwareType,
-      });
-      try {
-        return await this.runProtocolV2PreparedArtifacts(deviceFeatures, firmwareType);
-      } finally {
-        localMemoryHost.release();
-      }
+      return this.runProtocolV2DirectArtifacts({});
     }
 
     const hasPreparedComponentArtifacts = Object.values(this.params.componentArtifacts ?? {}).some(
@@ -813,12 +793,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let fwBinaryMap: ProtocolV2TargetBinary[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
     let installItems: ProtocolV2InstallItem[] | undefined;
-    let resourceMemoryHost: FirmwareUpdateV4MemoryHost | undefined;
+    let explicitInstallItems: ProtocolV2InstallItem[] | undefined;
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
       fwBinaryMap = this.collectExplicitTargetBinaries();
       bootloaderBinary = this.prepareBootloaderBinary();
-      const explicitInstallItems = this.buildProtocolV2InstallItems({
+      explicitInstallItems = this.buildProtocolV2InstallItems({
         bootloaderBinary,
         fwBinaryMap,
       });
@@ -874,15 +854,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           deviceFeatures,
           firmwareType
         );
-        resourceMemoryHost = await this.prepareProtocolV2LocalMemoryHost({
-          features: deviceFeatures,
-          firmwareType,
-          availableInstallItems: installItems ?? explicitInstallItems,
-        });
       }
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
-      resourceMemoryHost?.release();
       if (
         typeof err === 'object' &&
         err !== null &&
@@ -897,12 +871,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       throw normalizeFirmwarePreparationError(err);
     }
 
-    if (resourceMemoryHost) {
-      try {
-        return await this.runProtocolV2PreparedArtifacts(deviceFeatures, firmwareType, false);
-      } finally {
-        resourceMemoryHost.release();
-      }
+    if (wantsResources && this.params.resourceArchiveBinary) {
+      return this.runProtocolV2DirectArtifacts({
+        availableInstallItems: installItems ?? explicitInstallItems,
+        announceDownload: false,
+      });
     }
 
     if (!bootloaderBinary && fwBinaryMap.length === 0 && !installItems?.length) {
@@ -1055,133 +1028,69 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return installSources;
   }
 
-  private async prepareProtocolV2LocalMemoryHost({
-    features,
-    firmwareType,
-    availableInstallItems = this.buildProtocolV2InstallItems({
-      bootloaderBinary: this.prepareBootloaderBinary(),
-      fwBinaryMap: this.collectExplicitTargetBinaries(),
-    }),
+  private async runProtocolV2DirectArtifacts({
+    availableInstallItems,
+    announceDownload = true,
   }: {
-    features: Features;
-    firmwareType: EFirmwareType;
     availableInstallItems?: ProtocolV2InstallItem[];
-  }): Promise<FirmwareUpdateV4MemoryHost> {
-    const requestedComponentTargets = new Set(
-      (this.params.targetsToUpdate ?? []).filter(
-        (target): target is Exclude<FirmwareUpdateV4Target, 'resource' | 'boot_resources'> =>
-          target !== 'resource' && target !== 'boot_resources'
-      )
-    );
-    const localComponentTargets = new Set(
-      availableInstallItems.flatMap(item => {
-        const target = PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID.get(item.targetId);
-        return target ? [target] : [];
-      })
-    );
-    const missingTarget = Array.from(requestedComponentTargets).find(
-      target => !localComponentTargets.has(target)
-    );
-    if (missingTarget) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        `Protocol V2 local update has no binary for requested target ${missingTarget}`,
-        {
-          firmwareUpdateCode: 'FirmwareArtifactsNotPrepared',
-          artifactName: missingTarget,
-        }
+    announceDownload?: boolean;
+  }) {
+    try {
+      if (announceDownload) {
+        this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
+      }
+      const installItems = this.filterProtocolV2LocalInstallItems(
+        availableInstallItems ??
+          this.buildProtocolV2InstallItems({
+            bootloaderBinary: this.prepareBootloaderBinary(),
+            fwBinaryMap: this.collectExplicitTargetBinaries(),
+          })
       );
-    }
-    const installItems = this.filterProtocolV2LocalInstallItems(availableInstallItems);
-
-    const planArtifacts: Parameters<typeof buildProtocolV2LocalFirmwareUpdatePlan>[0]['artifacts'] =
-      [];
-    const memoryArtifacts: FirmwareMemoryArtifact[] = [];
-    for (const item of installItems) {
-      const target = PROTOCOL_V2_UPDATE_TARGET_BY_TARGET_ID.get(item.targetId);
-      if (!target || item.binary.byteLength <= 0) {
+      const installSources = await Promise.all(
+        installItems.map(async item => ({
+          fileName: item.fileName,
+          source: await this.openProtocolV2MemorySource(item.binary),
+          targetId: item.targetId,
+          kind: item.kind,
+        }))
+      );
+      const resourceSources = this.params.resourceArchiveBinary
+        ? await this.createProtocolV2ResourceSourcesFromArchive(this.params.resourceArchiveBinary)
+        : [];
+      if (installSources.length === 0 && resourceSources.length === 0) {
         throw ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          `Protocol V2 local firmware artifact is invalid: ${item.fileName}`,
-          { firmwareUpdateCode: 'FirmwareArtifactsNotPrepared' }
+          HardwareErrorCode.FirmwareUpdateDownloadFailed,
+          'No firmware to update'
         );
       }
-      const artifactId = `component:${target}`;
-      planArtifacts.push({
-        artifactId,
-        target,
-        container: 'raw',
-        logicalName: item.fileName,
-        expectedSize: item.binary.byteLength,
-        expectedSha256: bytesToHex(sha256(new Uint8Array(item.binary))),
-        ...(this.params.expectedTargetVersions?.[target]
-          ? { targetVersion: this.params.expectedTargetVersions[target] }
-          : {}),
+      if (announceDownload) {
+        this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
+      }
+      return await this.executeProtocolV2SourceUpdate({
+        installSources,
+        resourceSources,
       });
-      memoryArtifacts.push({ artifactId, binary: item.binary });
+    } finally {
+      await this.closeProtocolV2PreparedSources();
     }
+  }
 
-    const resourceArchive = await this.prepareProtocolV2LocalResourceArchive(
-      this.params.resourceArchiveBinary as ArrayBuffer
-    );
-    const resourceArtifactId = 'resource:archive';
-    planArtifacts.push({
-      artifactId: resourceArtifactId,
-      target: 'resource',
-      container: 'zip',
-      logicalName: 'protocol-v2-local-resource-archive',
-      expectedSize: resourceArchive.binary.byteLength,
-      expectedSha256: bytesToHex(sha256(new Uint8Array(resourceArchive.binary))),
-    });
-    memoryArtifacts.push({
-      artifactId: resourceArtifactId,
-      binary: resourceArchive.binary,
-      materializedEntries: resourceArchive.materializedEntries,
-    });
-
-    const plan = buildProtocolV2LocalFirmwareUpdatePlan({
-      features,
-      firmwareType,
-      platform: this.params.platform,
-      artifacts: planArtifacts,
-    });
-    let memoryHost: FirmwareUpdateV4MemoryHost | undefined;
-    try {
-      memoryHost = prepareFirmwareUpdateV4MemoryHost({
-        sdk: {
-          prepareFirmwareUpdatePlan,
-          registerFirmwareUpdateHostBinding,
-          unregisterFirmwareUpdateHostBinding,
-        },
-        plan,
-        artifacts: memoryArtifacts,
+  private async createProtocolV2ResourceSourcesFromArchive(
+    binary: ArrayBuffer
+  ): Promise<ProtocolV2ResourceBundleSource[]> {
+    const archive = await this.prepareProtocolV2LocalResourceArchive(binary);
+    const sources: ProtocolV2ResourceBundleSource[] = [];
+    for (const resource of archive.resources) {
+      sources.push({
+        name: resource.entryName.split('/').pop() ?? resource.entryName,
+        source: await this.openProtocolV2MemorySource(resource.binary),
+        devicePath: resource.header.devicePath,
+        version: resource.header.version,
+        payloadHash: resource.header.payloadHash,
+        headerHash: resource.header.headerHash,
       });
-      const preparedPlan = validateFirmwareUpdatePreparedPlan(memoryHost.preparedPlan);
-      assertFirmwareUpdatePreparedPlanBinding({
-        preparedPlan,
-        executor: 'v4',
-        platform: this.params.platform,
-        scopeTargets: [],
-        bindings: [],
-      });
-      assertFirmwareUpdatePreparedPlanDeviceIdentity({
-        preparedPlan,
-        deviceIdentity: this.protocolV2ExpectedSerialNumber,
-        deviceModel: this.getProtocolV2PreparedPlanDeviceModel(features),
-      });
-      const hostBinding = resolveFirmwareUpdateHostBinding(
-        memoryHost.hostBindingGeneration,
-        preparedPlan.preparedPlanDigest
-      );
-      this.params.preparedPlan = preparedPlan;
-      this.params.targetsToUpdate = [...preparedPlan.targetsToUpdate] as FirmwareUpdateV4Target[];
-      this.params.artifactReader = hostBinding.artifactReader;
-      this.params.componentArtifacts = undefined;
-      return memoryHost;
-    } catch (error) {
-      memoryHost?.release();
-      throw error;
     }
+    return sources;
   }
 
   private async prepareProtocolV2LocalResourceArchive(
@@ -1206,7 +1115,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
     const zipEntries = Object.values(zip.files);
     const resourceEntries = zipEntries.filter(
-      entry => !entry.dir && entry.name.toLowerCase().endsWith('.okpkg')
+      entry => !entry.dir && isProtocolV2ResourceArchiveEntryName(entry.name)
     );
     if (
       resourceEntries.length === 0 ||
@@ -1220,7 +1129,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     let totalSize = 0;
-    const materializedEntries: FirmwareMemoryArtifactEntry[] = [];
     const resources: ProtocolV2LocalResourceArchive['resources'] = [];
     const devicePaths = new Set<string>();
     for (const entry of resourceEntries) {
@@ -1264,10 +1172,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         );
       }
       devicePaths.add(canonicalDevicePath);
-      materializedEntries.push({ entryName: entry.name, binary: fileBinary });
       resources.push({ entryName: entry.name, binary: fileBinary, header });
     }
-    return { binary, materializedEntries, resources };
+    return { binary, resources };
   }
 
   private async prepareProtocolV2ResourceSources(): Promise<ProtocolV2ResourceBundleSource[]> {
@@ -1334,20 +1241,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     // The verified ZIP bytes are authoritative. Non-okpkg entries are release
     // metadata only; each RESOURCE package carries its own device path.
-    const verifiedArchive = await this.prepareProtocolV2LocalResourceArchive(archiveBinary);
-    const sources: ProtocolV2ResourceBundleSource[] = [];
-    for (const resource of verifiedArchive.resources) {
-      const source = await this.openProtocolV2MemorySource(resource.binary);
-      sources.push({
-        name: resource.entryName.split('/').pop() ?? resource.entryName,
-        source,
-        devicePath: resource.header.devicePath,
-        version: resource.header.version,
-        payloadHash: resource.header.payloadHash,
-        headerHash: resource.header.headerHash,
-      });
-    }
-    return sources;
+    return this.createProtocolV2ResourceSourcesFromArchive(archiveBinary);
   }
 
   private async runProtocolV2PreparedArtifacts(
@@ -1831,6 +1725,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return `vol0:/${path}`;
   }
 
+  private getProtocolV2ResourceComparePath(devicePath: string) {
+    return isProtocolV2BootResourcePackagePath(devicePath)
+      ? PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH
+      : devicePath;
+  }
+
   private async readProtocolV2DeviceFileHeader(path: string, expectedSize?: number) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     const filePath = this.getProtocolV2ResourceFilePath(path);
@@ -1893,7 +1793,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
     try {
       const header = await this.readProtocolV2DeviceFileHeader(
-        bundle.devicePath,
+        this.getProtocolV2ResourceComparePath(bundle.devicePath),
         bundle.source.size
       );
       if (!header) return false;
@@ -2152,11 +2052,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let totalSize = installSources.reduce((total, item) => total + item.source.size, 0);
     const resourcesToSync: ProtocolV2ResourceBundleSource[] = [];
     for (const resource of resourceSources) {
-      // Early boot promotes this mounted package's staging file. Always replace any
-      // stale staging bytes with the artifact approved by the current PreparedPlan,
-      // even when the mounted final file itself is already current.
-      const requiresFreshStaging = isProtocolV2BootResourcePackagePath(resource.devicePath);
-      if (!requiresFreshStaging && (await this.isProtocolV2ResourceBundleUpToDate(resource))) {
+      if (await this.isProtocolV2ResourceBundleUpToDate(resource)) {
         Log.log(`[FirmwareUpdateV4] skip RESC bundle ${resource.name}; already up to date`);
       } else {
         resourcesToSync.push(resource);

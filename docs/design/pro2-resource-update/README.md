@@ -1,62 +1,80 @@
-# Pro2 / Neo 资源更新架构
+# Pro2 / Neo Resource Update Architecture
 
-## 当前合约
+## Current contract
 
-Protocol V2 资源发布物是一个 ZIP 容器。ZIP 没有目录结构或 Manifest 合约；SDK 递归遍历其中
-所有文件，只处理扩展名为 `.okpkg` 的条目，并忽略 hash report、build metadata 及其他文件。
+Protocol V2 resource releases are a ZIP container. The ZIP has no directory layout or Manifest
+contract. The SDK recursively walks every file, processes only `.okpkg` entries, and ignores hash
+reports, build metadata, and other files.
 
-每个资源包必须使用当前 OKPP header：
+Each resource package must use the current OKPP header:
 
-- `header_magic` 为 `OKPP`；
-- `type_magic` 为 `RESC`；
-- `header_version` 为 `1`；
-- `header_len` 为 `0x5f90`，且 `header_len + payload_len` 等于文件大小；
-- `flexible_metadata` 是零填充 ASCII，直接保存设备上的完整写入路径；
-- `payload_hash`、`header_hash` 和 `payload_version` 用于比较设备上的现有包。
+- `header_magic` is `OKPP`
+- `type_magic` is `RESC`
+- `header_version` is `1`
+- `header_len` is `0x5f90`, and `header_len + payload_len` equals the file size
+- `flexible_metadata` is zero-padded ASCII that stores the full on-device write path
+- `payload_hash`, `header_hash`, and `payload_version` are used to compare the package already on
+  the device
 
-允许的路径为 `vol0:/bundles/**/*.okpkg`、`vol0:/loaders/rom/**/*.okpkg`，以及 boot resource
-专用 staging 路径：
+Allowed paths are `vol0:/bundles/**/*.okpkg`, `vol0:/loaders/rom/**/*.okpkg`, and the boot-resource
+staging path:
 
 ```text
 vol0:/loaders/bootloader/boot_resource.okpkg.staging
 ```
 
-ZIP 内不能有两个包声明相同的设备路径。ZIP 条目名仅用于日志和显示，不参与设备路径推导。
+A ZIP cannot contain two packages that declare the same device path. ZIP entry names are only used
+for logs and display; they do not derive the device path.
 
-## 数据流
+## Data flow
 
 ```mermaid
 flowchart LR
   Release["Release config: ZIP URL / size / SHA-256"]
-  Host["App host: download + receipt + PreparedPlan"]
+  AppHost["App host: download + receipt + PreparedPlan"]
+  LocalHost["CLI / examples / updater-web: binaries + resourceArchiveBinary"]
   Core["Core: enumerate .okpkg + parse RESC header"]
   Loader["Pro2 / Neo loader"]
 
-  Release --> Host
-  Host -->|ArtifactReader| Core
+  Release --> AppHost
+  AppHost -->|ArtifactReader| Core
+  LocalHost -->|direct binaries| Core
   Core -->|FilesystemFileRead: compare header| Loader
   Core -->|FilesystemFileWrite: header path| Loader
 ```
 
-远程更新由 release config 只描述整个 ZIP 的 URL、大小和 SHA-256。Desktop 与 React Native host
-下载并物化 ZIP 后生成 `PreparedPlan`；Core 再从经过 receipt 绑定的 ZIP 字节解析各个 RESC 包。
-本地更新通过 `resourceArchiveBinary` 进入同一套本地 Plan、PreparedPlan、receipt 与
-`ArtifactReader` 流程，不依赖远程 release。
+There are two update paths:
 
-Core 在 loader 模式读取设备现有文件的当前 OKPP header。大小、版本、payload hash 和 header hash
-全部一致时跳过普通资源传输；`forcedUpdateRes` 会强制重传。boot resource 始终重写 staging 文件，
-由 early boot 在挂载正式文件前完成提升。
+- **Remote (app-monorepo):** release config describes the ZIP URL, size, and SHA-256. The desktop
+  and React Native hosts download the archive, build a `PreparedPlan`, and call
+  `firmwareUpdateV4({ preparedPlan, hostBindingGeneration })`. Core then parses each RESC package
+  from the receipt-bound ZIP bytes.
+- **Local (CLI, examples, firmware-updater-web):** callers pass component `ArrayBuffer`s and/or
+  `resourceArchiveBinary`. Core parses the ZIP, compares headers, and writes changed packages. This
+  path does not wrap the ZIP in a memory `PreparedPlan`.
 
-## 责任边界
+Core reads the current OKPP header of each on-device file while in loader mode. Transfer is skipped
+when size, version, payload hash, and header hash all match. `forcedUpdateRes` forces a rewrite.
+Boot resource is written to the staging file, but comparison uses the mounted live
+`boot_resource.okpkg`: if that hash already matches, leftover staging is deleted and the package is
+not transferred again.
 
-- firmware-pro2 构建工具负责把正确设备路径写入每个 RESC header，并在发布归档前重新解析验证。
-- App host 负责 ZIP 的下载、整体大小/SHA-256 校验、持久化和 `ArtifactReader` 生命周期。
-- Hardware SDK Core 负责 ZIP 遍历、RESC header/路径校验、去重、按需比较和传输编排。
-- Electron BLE、React Native BLE、WebUSB 与 Node USB transport 只负责连接和字节传输，不解析资源包。
-- 设备固件负责包签名、header hash、payload hash 的最终认证及 boot resource staging 提升。
+## Responsibility boundaries
 
-## 失败条件
+- firmware-pro2 build tools write the correct device path into each RESC header and re-parse the
+  archive before publishing.
+- The App host downloads the ZIP, verifies overall size/SHA-256, persists it, and owns the
+  `ArtifactReader` lifecycle.
+- Hardware SDK Core walks the ZIP, validates RESC headers/paths, deduplicates, compares on demand,
+  and orchestrates transfer.
+- Electron BLE, React Native BLE, WebUSB, and Node USB transports only move bytes. They do not parse
+  resource packages.
+- Device firmware owns package signatures, header hash, payload hash, and boot-resource staging
+  promotion.
 
-以下情况必须在首次设备写入前失败：ZIP 无 `.okpkg`、条目数量或展开大小超过限制、包不是当前
-`RESC` 格式、包长度不一致、路径为空/越界/包含 traversal、或路径重复。ZIP 中非 `.okpkg` 文件
-不会导致失败，也不会传给设备。
+## Failure conditions
+
+These must fail before the first device write: the ZIP has no `.okpkg`, entry count or expanded size
+exceeds limits, a package is not current `RESC`, package length is inconsistent, a path is empty,
+out of bounds, or contains traversal, or two packages share a path. Non-`.okpkg` files in the ZIP
+do not fail the update and are not sent to the device.

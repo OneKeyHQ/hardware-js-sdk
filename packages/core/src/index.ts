@@ -21,12 +21,6 @@ export { executeCallback, cleanupCallback };
 export { preloadSessionCache } from './device/Device';
 export { projectFeatures as projectDeviceStateFeatures } from './device/DeviceStateProjector';
 export { getMethodSupportedProtocols } from './api/utils';
-export { prepareFirmwareUpdateV4MemoryHost } from './api/firmware/FirmwareMemoryHost';
-export type {
-  FirmwareMemoryArtifact,
-  FirmwareMemoryArtifactEntry,
-  FirmwareUpdateV4MemoryHost,
-} from './api/firmware/FirmwareMemoryHost';
 export {
   getFirmwareUpdateHostBindingGeneration,
   registerFirmwareUpdateHostBinding,

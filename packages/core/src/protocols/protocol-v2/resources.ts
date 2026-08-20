@@ -49,10 +49,22 @@ export function parseProtocolV2Resources(value: unknown): IProtocolV2Resources |
   };
 }
 
-const PROTOCOL_V2_RESOURCE_DEVICE_ROOTS = ['vol0:/bundles/', 'vol0:/loaders/rom/'] as const;
+export function isProtocolV2ResourceArchiveEntryName(entryName: string): boolean {
+  const normalized = entryName.replace(/\\/g, '/');
+  if (!normalized.toLowerCase().endsWith('.okpkg')) {
+    return false;
+  }
+  const parts = normalized.split('/');
+  const fileName = parts[parts.length - 1] ?? '';
+  return (
+    fileName.length > 0 &&
+    !fileName.startsWith('.') &&
+    !parts.some(part => part === '__MACOSX' || part === '.' || part === '..' || part === '')
+  );
+}
 
-function isAllowedResourceDevicePath(path: string): boolean {
-  if (
+function isSafeResourceDevicePath(path: string): boolean {
+  return !(
     path.includes('\\') ||
     path.includes('//') ||
     [...path].some(char => {
@@ -60,14 +72,6 @@ function isAllowedResourceDevicePath(path: string): boolean {
       return code <= 0x1f || code === 0x7f;
     }) ||
     path.split('/').some(part => part === '.' || part === '..')
-  ) {
-    return false;
-  }
-  if (path === PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH) {
-    return true;
-  }
-  return (
-    path.endsWith('.okpkg') && PROTOCOL_V2_RESOURCE_DEVICE_ROOTS.some(root => path.startsWith(root))
   );
 }
 
@@ -93,7 +97,7 @@ function readResourceDevicePath(bytes: Uint8Array): string {
     throw new Error('Invalid Pro2 RESOURCE package device path metadata');
   }
   const path = readAscii(pathBytes, 0, pathBytes.byteLength);
-  if (!isAllowedResourceDevicePath(path)) {
+  if (!isSafeResourceDevicePath(path)) {
     throw new Error(`Invalid Pro2 RESOURCE package device path: ${path}`);
   }
   return path;

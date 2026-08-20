@@ -136,7 +136,7 @@ describe('DeviceStateMapper', () => {
     expect(patch.identity).toMatchObject({
       deviceType: EDeviceType.Pro2,
       serialNo: 'SERIAL-1',
-      bleName: 'Pro2 1234',
+      bleName: 'Pro 2 1234',
     });
     expect(patch.versions).toMatchObject({
       firmware: '5.0.0',
@@ -178,7 +178,16 @@ describe('DeviceStateMapper', () => {
       coprocessor: { bt_adv_name: 'Pro2 22D8 - Fin' },
     });
 
-    expect(patch.identity?.bleName).toBe('Pro2 22D8');
+    expect(patch.identity?.bleName).toBe('Pro 2 22D8');
+  });
+
+  test('canonicalizes a spaced Pro2 advertisement name from DeviceInfo', () => {
+    const patch = mapProtocolV2DeviceInfoToState({
+      hw: { Device_type: DeviceType.PRO2, serial_no: 'SERIAL-1' },
+      coprocessor: { bt_adv_name: 'Pro 2 0088 - Find My' },
+    });
+
+    expect(patch.identity?.bleName).toBe('Pro 2 0088');
   });
 
   test('maps the hardware model independently from Protocol V2', () => {

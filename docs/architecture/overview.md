@@ -189,10 +189,10 @@ header 指向最终路径；boot resource header 直接指向 `.staging` 路径�
 非 Prepared 组件更新的旧调用方式。
 
 本地开发升级与远程 Plan 严格分离：组件可以继续通过 `firmwareUpdateV4` 的各组件 `ArrayBuffer` 字段传入；
-完整资源 ZIP 通过 `resourceArchiveBinary` 传入。Core 会把本地组件和资源 ZIP 转换成本地 Plan、PreparedPlan、
-receipt 与内存 `ArtifactReader`；该路径不读取或匹配远程配置。Core 遍历 ZIP 内所有 `.okpkg`，忽略
-其他条目，并在修改设备前校验每个包的 `RESC` header、包大小、自描述路径及路径唯一性；设备端继续
-负责签名包的最终验证与启用。
+完整资源 ZIP 通过 `resourceArchiveBinary` 传入。Core 直接解析 ZIP 并比对设备上的 RESC header，
+只写入有差异的包；该路径不读取远程配置，也不再包装成内存 PreparedPlan。Core 遍历 ZIP 内所有
+`.okpkg`，忽略其他条目，并在修改设备前校验每个包的 `RESC` header、包大小、自描述路径及路径唯一性；
+设备端继续负责签名包的最终验证与启用。
 旧的 `resourceFiles` 与 `resourceBundleArtifacts` 裸文件参数已在 Protocol V2 alpha 阶段删除。新调用方必须
 迁移到 `resourceArchiveBinary` 或完整 `PreparedPlan`；SDK 不再维护第二套逐文件资源输入和远程 release 绑定流程。
 不得把本地文件作为远程 Plan 的 override 来绕过远程收据校验。
