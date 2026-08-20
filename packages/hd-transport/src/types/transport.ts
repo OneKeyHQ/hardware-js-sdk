@@ -59,6 +59,8 @@ export type AcquireInput = {
    * transport must probe the protocol on the wire, bypassing any cached result.
    */
   forceProtocolDetection?: boolean;
+  /** Reuse expectedProtocol only when this transport previously confirmed it for the same endpoint. */
+  skipProtocolProbe?: boolean;
 };
 
 export type MessageFromOneKey = { type: string; message: Record<string, any> };
@@ -77,6 +79,8 @@ export type TransportCallOptions = {
   onWriteCompleted?: (metrics: TransportWriteMetrics) => void;
   /** Resolve after the complete request frame is written without waiting for a response. */
   returnAfterWrite?: boolean;
+  /** Observe the delayed terminal response of a write-only call while a later call is active. */
+  onResponseAfterWrite?: (response: MessageFromOneKey) => void;
   /** Prefer acknowledged BLE characteristic writes for this call when supported. */
   writeWithResponse?: boolean;
 };

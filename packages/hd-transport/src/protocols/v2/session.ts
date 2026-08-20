@@ -60,6 +60,7 @@ export type ProtocolV2CallOptions = {
   onIntermediateResponse?: (response: MessageFromOneKey) => void;
   onWriteCompleted?: (metrics: TransportWriteMetrics) => void;
   returnAfterWrite?: boolean;
+  onResponseAfterWrite?: (response: MessageFromOneKey) => void;
   writeWithResponse?: boolean;
 };
 
@@ -199,6 +200,11 @@ export class ProtocolV2Session {
   // response, but their frames must never interleave with the active request write.
   private pendingWrite: Promise<unknown> = Promise.resolve();
 
+  private pendingResponseAfterWrite?: {
+    expectedTypes: Set<string>;
+    onResponse?: (response: MessageFromOneKey) => void;
+  };
+
   private lastResponseSequence?: number;
 
   constructor(options: ProtocolV2SessionOptions) {
@@ -297,7 +303,11 @@ export class ProtocolV2Session {
     };
 
     const runCall = async (): Promise<MessageFromOneKey> => {
-      await prepareCall?.(baseCallContext);
+      // A write-only call may still have a terminal response in flight. Preserve
+      // the continuous receive queue until the next call consumes that response.
+      if (!this.pendingResponseAfterWrite) {
+        await prepareCall?.(baseCallContext);
+      }
       const protoSeq = this.sequenceCursor.next();
       const frame = ProtocolV2.encodeFrame(schemas, name, data, {
         packetSrc,
@@ -323,6 +333,12 @@ export class ProtocolV2Session {
       }
 
       if (callOptions.returnAfterWrite) {
+        if (callOptions.expectedTypes?.length) {
+          this.pendingResponseAfterWrite = {
+            expectedTypes: new Set(callOptions.expectedTypes),
+            onResponse: callOptions.onResponseAfterWrite,
+          };
+        }
         return { type: 'WriteCompleted', message: {} };
       }
 
@@ -395,7 +411,26 @@ export class ProtocolV2Session {
           this.lastResponseSequence = decoded.seq;
 
           const response = check.call(decoded);
-          if (callOptions.intermediateTypes?.includes(response.type)) {
+          const { pendingResponseAfterWrite } = this;
+          let belongsToWriteOnlyCall = false;
+          if (pendingResponseAfterWrite) {
+            belongsToWriteOnlyCall = pendingResponseAfterWrite.expectedTypes.has(response.type);
+            if (belongsToWriteOnlyCall || COMMON_TERMINAL_RESPONSE_TYPES.has(response.type)) {
+              this.pendingResponseAfterWrite = undefined;
+              if (belongsToWriteOnlyCall) {
+                try {
+                  pendingResponseAfterWrite.onResponse?.(response);
+                } catch (error) {
+                  logger?.error?.(
+                    `${logPrefix} delayed response callback failed: ${String(error)}`
+                  );
+                }
+              }
+            }
+          }
+          if (belongsToWriteOnlyCall) {
+            // The delayed response belongs to the preceding write-only call.
+          } else if (callOptions.intermediateTypes?.includes(response.type)) {
             callOptions.onIntermediateResponse?.(response);
           } else if (isExpectedTerminalResponse(response, callOptions.expectedTypes)) {
             return response;
