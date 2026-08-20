@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-trezor-type-utils",
-  "version": "1.2.0-alpha.173",
+  "version": "1.2.0-alpha.174",
   "private": true,
   "description": "Type helpers vendored from Trezor Suite MIT sources for HWK Trezor support",
   "author": "OneKey",
