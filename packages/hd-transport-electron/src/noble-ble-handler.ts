@@ -1334,26 +1334,28 @@ async function setupConnectionAndDiscoverServices(
   deviceId: string,
   webContents: WebContents
 ): Promise<CharacteristicPair> {
-  setupDisconnectListener(peripheral, deviceId, webContents);
-
+  // Reset the link before any protocol traffic reaches the device. 6.5.0 did
+  // this on every cold setup and never produced a protocol-deaf Classic 1S
+  // (control log 2026-08-20: 16/16 links answered within ~1s, including after
+  // a 15-minute idle). Demoting it to a discovery-failure fallback removed the
+  // reset entirely for this device, because discovery always succeeds: the link
+  // comes up, GATT resolves from cache, and the device then answers nothing on
+  // a session it no longer serves. Costs ~1.3s per cold setup; a kept-alive
+  // link with an intact subscription returns before reaching here, so reuse
+  // inside a workflow is unaffected.
   try {
-    return await discoverServicesAndCharacteristicsWithRetry(peripheral, deviceId);
-  } catch (initialError) {
-    logger?.info('[NobleBLE] Direct service discovery failed, retrying after reconnect', {
-      deviceId,
-      error: initialError,
-    });
+    await forceReconnectPeripheral(peripheral, deviceId);
+  } catch (resetError) {
+    // A failed reset must not abort the attempt: discovery on the existing
+    // link, then the fresh-scan fallback, still have a chance to recover.
+    logger?.error('[NobleBLE] Connection reset before discovery failed, continuing', resetError);
   }
-
-  await forceReconnectPeripheral(peripheral, deviceId);
   setupDisconnectListener(peripheral, deviceId, webContents);
+
   try {
     return await discoverServicesAndCharacteristicsWithRetry(peripheral, deviceId);
-  } catch (reconnectError) {
-    logger?.error(
-      '[NobleBLE] Service discovery failed after reconnect, attempting fresh scan...',
-      reconnectError
-    );
+  } catch (discoveryError) {
+    logger?.error('[NobleBLE] Service discovery failed, attempting fresh scan...', discoveryError);
     return freshScanAndDiscover(deviceId, webContents);
   }
 }
