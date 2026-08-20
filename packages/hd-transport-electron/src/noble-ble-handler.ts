@@ -503,8 +503,16 @@ function cleanupDevice(
     pairedDevices.delete(deviceId);
   }
 
-  // 2. Clean up discovered cache (optional)
+  // 2. Clean up discovered cache (optional). A peripheral that has been
+  // through a disconnect is never preferred again — reconnecting it is what
+  // produces stale-session links — but it is kept aside as the last resort for
+  // a bonded device that stays silent, so eviction cannot turn a working
+  // reconnect into DeviceNotFound.
   if (cleanupDiscoveredCache) {
+    const evicted = discoveredDevices.get(deviceId);
+    if (evicted) {
+      stalePeripherals.set(deviceId, evicted);
+    }
     discoveredDevices.delete(deviceId);
   }
 
@@ -795,6 +803,10 @@ async function transmitHexDataToDevice(
 // fallback runs. Every advertisement in the 6.5.0 control logs arrived within
 // 631ms, so this leaves ~2x headroom while keeping a miss cheap.
 const BLE_COLD_CONNECT_SCAN_TIMEOUT_MS = 1500;
+
+// Peripherals evicted by a disconnect, kept only as the fallback of last
+// resort in connectDevice (see cleanupDevice).
+const stalePeripherals = new Map<string, Peripheral>();
 
 // Advertised names, kept for the life of the process: device caches are purged
 // on every disconnect, but the family a device belongs to never changes and
@@ -1225,7 +1237,10 @@ async function forceReconnectPeripheral(peripheral: Peripheral, deviceId: string
     reason: 'force-reconnect',
   });
 
-  // Step 2: Force disconnect if connected
+  // Step 2: Force disconnect if connected. Wait for the teardown to be
+  // confirmed: reconnecting while CoreBluetooth is still closing the old link
+  // rebuilds the very stale-session state this reset exists to clear, and
+  // 250ms is not enough to prove a physical teardown on macOS.
   if (peripheral.state === 'connected') {
     await runBleCallbackOperation(
       callback =>
@@ -1233,8 +1248,13 @@ async function forceReconnectPeripheral(peripheral: Peripheral, deviceId: string
           logger?.info('[NobleBLE] Force disconnect completed');
           callback();
         }),
-      { timeoutMs: BLE_CLEANUP_TIMEOUT, timeoutBehavior: 'resolve' }
+      { timeoutMs: BLE_DISCONNECT_CONFIRM_TIMEOUT_MS, timeoutBehavior: 'resolve' }
     );
+    if (peripheral.state === 'connected') {
+      logger?.warn('[NobleBLE] Reset disconnect did not confirm, reconnecting anyway', {
+        deviceId,
+      });
+    }
   }
 
   // Step 3: Re-establish connection
@@ -1534,6 +1554,18 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       // The preferred route came up empty: not advertising (held elsewhere, or
       // silent), or not reachable by id. Try the other one before giving up.
       peripheral = byIdFirst ? await scanForPeripheral() : await connectById();
+    }
+    if (!peripheral) {
+      // Neither route resolved a peripheral: a bonded device that has gone
+      // silent, or connect-by-id sitting in its cooldown. The evicted object is
+      // worse than a fresh one, but it beats failing the call outright.
+      const stale = stalePeripherals.get(deviceId);
+      if (stale) {
+        logger?.info('[NobleBLE] Falling back to the last known peripheral:', deviceId);
+        peripheral = stale;
+      }
+    } else {
+      stalePeripherals.delete(deviceId);
     }
   }
 

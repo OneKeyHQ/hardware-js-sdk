@@ -415,9 +415,12 @@ const onCallDevice = async (
   if (method.payload?.onlyConnectBleDevice) {
     preWarmCallbackTask?.resolve();
     Log.debug('Call API - only connect ble device: ', device?.mainId);
-    // This early return bypasses the normal-path releaseTask at the end of the
-    // call; without it the task leaks and haunts every later queue snapshot
-    // and cancel sweep (field log: a completed task lingered for 6 minutes).
+    // This early return bypasses the normal-path bookkeeping at the end of the
+    // call. Without it the task leaks and haunts every later queue snapshot
+    // and cancel sweep (field log: a completed task lingered for 6 minutes),
+    // and the request stays in the active maps, so repeated preconnects pile
+    // up phantom work in diagnostics.
+    completeMethodRequestContext(method);
     requestQueue.releaseTask(method.responseID);
     return createResponseMessage(method.responseID, true, null);
   }
@@ -1048,9 +1051,16 @@ async function connectDeviceForBle(
             abortSignal
           );
         } catch (err) {
-          // A deadline hit means the transport is wedged mid-acquire; drop the
-          // link before the retry so it cold-connects instead of stacking a
-          // second connect onto the half-open one.
+          // The abandoned acquire keeps running: raceBleAcquire only rejects
+          // its own wrapper. Supersede it so that, if it settles later, the
+          // generation guard in Device.acquire drops the link it built instead
+          // of committing mainId/commands over the newer attempt.
+          device.beginConnectionAttempt();
+          // A deadline hit also means the transport is wedged mid-acquire; drop
+          // the link we know about before the retry so it cold-connects instead
+          // of stacking a second connect onto the half-open one. `mainId` is
+          // unset while the first acquire is still pending, which is exactly
+          // the case the generation bump above covers.
           if (
             err.errorCode === HardwareErrorCode.BleTimeoutError &&
             device.mainId &&
