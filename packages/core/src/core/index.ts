@@ -950,9 +950,14 @@ export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unkn
   );
 }
 
-export function isProtocolV2PeerRemovedPairingError(method: BaseMethod, error: unknown) {
+export function isProtocolV2PeerRemovedPairingError(
+  method: BaseMethod,
+  error: unknown,
+  device?: Pick<Device, 'originalDescriptor'>
+) {
+  const protocol = method.payload.connectProtocol ?? device?.originalDescriptor?.protocolType;
   return (
-    method.payload.connectProtocol === 'V2' &&
+    protocol === 'V2' &&
     (error as { errorCode?: unknown })?.errorCode ===
       HardwareErrorCode.BlePeerRemovedPairingInformation
   );
@@ -1103,7 +1108,7 @@ const ensureConnected = async (
       }
 
       const env = DataManager.getSettings('env');
-      let device: Device;
+      let device: Device | undefined;
       try {
         if (DataManager.isBleConnect(env)) {
           device = initDeviceForBle(method);
@@ -1173,7 +1178,7 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceInterruptedFromUser,
             HardwareErrorCode.CallQueueActionCancelled,
           ].includes(error.errorCode) ||
-          isProtocolV2PeerRemovedPairingError(method, error)
+          isProtocolV2PeerRemovedPairingError(method, error, device)
         ) {
           reject(error);
           return;

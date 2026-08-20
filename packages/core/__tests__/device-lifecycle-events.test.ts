@@ -311,18 +311,24 @@ describe('public device lifecycle events', () => {
   });
 
   test.each([
-    ['V2', true],
-    ['V1', false],
-    [undefined, false],
+    ['V2', undefined, true],
+    ['V1', undefined, false],
+    [undefined, undefined, false],
+    [undefined, 'V2', true],
+    [undefined, 'V1', false],
+    ['V1', 'V2', false],
   ] as const)(
-    'treats peer-removed pairing as terminal only for Protocol %s: %s',
-    (connectProtocol, expected) => {
+    'treats peer-removed pairing as terminal for payload %s cached %s: %s',
+    (connectProtocol, cachedProtocol, expected) => {
       const method = { payload: { connectProtocol } } as never;
       const error = {
         errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
       };
+      const device = cachedProtocol
+        ? ({ originalDescriptor: { protocolType: cachedProtocol } } as never)
+        : undefined;
 
-      expect(isProtocolV2PeerRemovedPairingError(method, error)).toBe(expected);
+      expect(isProtocolV2PeerRemovedPairingError(method, error, device)).toBe(expected);
     }
   );
 
