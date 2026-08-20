@@ -1444,10 +1444,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   // enumerate clears the discovery map; a kept-alive link outlives it.
   let peripheral = discoveredDevices.get(deviceId) ?? connectedDevices.get(deviceId);
 
-  // If device not discovered, try a targeted scan for this specific device
   if (!peripheral) {
-    logger?.info('[NobleBLE] Device not discovered, attempting targeted scan for:', deviceId);
-
     // Initialize Noble if not already done
     if (!noble) {
       await initializeNoble();
@@ -1457,27 +1454,31 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
     }
 
-    // Reaches a bonded device that is not advertising; else falls to the scan.
-    peripheral = await tryDirectConnectById(deviceId);
-    if (peripheral) {
-      discoveredDevices.set(deviceId, peripheral);
-    }
-  }
-
-  if (!peripheral) {
-    // Perform a targeted scan to find the specific device
+    // Scan before connecting by id. A live advertisement proves the device
+    // holds no link and will open a fresh session, and it is how 6.5.0 reached
+    // every cold connect (control logs: found in ~52ms, 16/16 sessions
+    // answered within ~1s). Connecting by id resolves through the OS cache
+    // instead: on a Classic 1S that can hand back a session the device no
+    // longer serves, where the link comes up and GATT resolves from cache but
+    // the device answers no protocol traffic at all.
+    logger?.info('[NobleBLE] Device not cached, scanning for:', deviceId);
     try {
-      const foundPeripheral = await performTargetedScan(deviceId);
-      if (!foundPeripheral) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.DeviceNotFound,
-          `Device ${deviceId} not found even after targeted scan`
-        );
+      peripheral = (await performTargetedScan(deviceId)) ?? undefined;
+    } catch (scanError) {
+      logger?.info('[NobleBLE] Targeted scan failed, falling back to direct connect', {
+        deviceId,
+        error: scanError instanceof Error ? scanError.message : String(scanError),
+      });
+    }
+
+    if (!peripheral) {
+      // Not advertising: held by another host, or bonded and silent. Connect
+      // by id is then the only way in.
+      logger?.info('[NobleBLE] Device not advertising, attempting direct connect by id:', deviceId);
+      peripheral = await tryDirectConnectById(deviceId);
+      if (peripheral) {
+        discoveredDevices.set(deviceId, peripheral);
       }
-      peripheral = foundPeripheral;
-    } catch (error) {
-      logger?.error('[NobleBLE] Targeted scan failed:', error);
-      throw error;
     }
   }
 
