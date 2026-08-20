@@ -59,8 +59,12 @@ Transport 在 `acquire()` 完成物理连接后执行协议探测：
 严格预期的验证规则：
 
 - `connectProtocol='V1'`：必须收到有效的 V1 响应。
-- `connectProtocol='V2'`：必须收到有效的 V2 `Ping` 响应；固件升级重连也不能只信任 PID、
-  设备名或旧连接缓存。
+- `connectProtocol='V2'`：必须收到有效的 V2 `Ping` 响应，不能只信任 PID、设备名或未确认的缓存。
+- 唯一例外是已经通过活动响应确认过 V2 的同一 BLE endpoint，在
+  `DeviceFirmwareUpdateRequest` 引发预期断链后的 install polling 重连。部分 loader 在安装期间不响应
+  通用 `Ping`，此时 Transport 只恢复已确认的 V2 路由，Core 必须立即发送幂等的
+  `DeviceFirmwareUpdateStatusGet`；其有效响应才证明新链路可用。该例外不能用于普通 reconnect、首次连接、
+  身份判断或其他业务请求。
 
 V2 probe 使用 `Ping { message: 'protocol-v2-probe' }`。探测消息只用于确认链路，不等同于查询协议版本或设备信息。
 

@@ -28,6 +28,10 @@ describe('FirmwareUpdateV4 install polling', () => {
       .mockResolvedValueOnce({ type: 'Success', message: {} })
       .mockResolvedValueOnce({
         type: 'DeviceFirmwareUpdateStatus',
+        message: { records: [] },
+      })
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
         message: {
           records: [
             {
@@ -64,13 +68,9 @@ describe('FirmwareUpdateV4 install polling', () => {
     await firmwareUpdate.waitForProtocolV2FirmwareUpdateComplete(targets);
 
     expect(typedCall.mock.calls[0]).toEqual(['DeviceFirmwareUpdateStage', 'Success', { targets }]);
-    expect(call).toHaveBeenCalledWith(
-      'DeviceFirmwareUpdateRequest',
-      {},
-      { returnAfterWrite: true }
-    );
+    expect(call).toHaveBeenCalledWith('DeviceFirmwareUpdateRequest', {});
     expect(typedCall.mock.calls[1]?.[0]).toBe('DeviceFirmwareUpdateStatusGet');
-    expect(call.mock.invocationCallOrder[0]).toBeLessThan(typedCall.mock.invocationCallOrder[1]);
+    expect(call.mock.invocationCallOrder[0]).toBeLessThan(typedCall.mock.invocationCallOrder[2]);
   });
 
   test('does not send Request when Stage is rejected', async () => {

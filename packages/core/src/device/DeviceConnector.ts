@@ -96,7 +96,8 @@ export default class DeviceConnector {
     forceCleanRunPromise?: boolean,
     expectedProtocol?: HardwareConnectProtocol,
     protocolHint?: HardwareConnectProtocol,
-    forceProtocolDetection?: boolean
+    forceProtocolDetection?: boolean,
+    skipProtocolProbe?: boolean
   ) {
     Log.debug('acquire', path, session, expectedProtocol, protocolHint);
     const env = DataManager.getSettings('env');
@@ -104,13 +105,17 @@ export default class DeviceConnector {
       const transport = this.getActiveTransport();
       let res;
       if (DataManager.isBleConnect(env)) {
-        res = await transport.acquire({
+        const acquireInput: Parameters<Transport['acquire']>[0] & {
+          skipProtocolProbe?: boolean;
+        } = {
           uuid: path,
           forceCleanRunPromise,
           expectedProtocol,
           protocolHint,
           forceProtocolDetection,
-        });
+          skipProtocolProbe,
+        };
+        res = await transport.acquire(acquireInput);
       } else {
         res = await transport.acquire({
           path,
