@@ -7,6 +7,7 @@ import { BaseMethod } from '../BaseMethod';
 import { decodeJpegBase64ToRgba } from '../helpers/base64Data';
 import { invalidParameter } from '../helpers/filesystemValidation';
 import { writeProtocolV2File } from '../helpers/protocolV2FileWrite';
+import { DataManager } from '../../data-manager';
 import { UI_REQUEST, createUiMessage } from '../../events/ui-request';
 import { supportsProtocolV2Message } from '../../protocols/protocol-v2/features';
 import { LoggerNames, getLogger } from '../../utils';
@@ -14,6 +15,7 @@ import {
   PRO2_WALLPAPER_HEIGHT,
   PRO2_WALLPAPER_WIDTH,
   type Pro2WallpaperColorFormat,
+  type Pro2WallpaperEncoding,
   encodePro2Wallpaper,
 } from '../../utils/pro2Wallpaper';
 
@@ -21,6 +23,7 @@ export type DeviceUploadWallpaperParams = {
   jpegBase64: string;
   fileName?: string;
   chunkSize?: number;
+  encoding?: Pro2WallpaperEncoding;
 };
 
 export type DeviceUploadWallpaperResponse = {
@@ -61,10 +64,16 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
   private path = '';
 
   init() {
-    const { jpegBase64, fileName, chunkSize } = this.payload;
+    const { jpegBase64, fileName, chunkSize, encoding } = this.payload;
     if (chunkSize !== undefined && (!Number.isInteger(chunkSize) || chunkSize <= 0)) {
       throw invalidParameter('Parameter [chunkSize] must be a positive integer.');
     }
+    if (encoding !== undefined && encoding !== 'rgb565' && encoding !== 'i8-lz4') {
+      throw invalidParameter('Parameter [encoding] must be either rgb565 or i8-lz4.');
+    }
+    const env = DataManager.getSettings('env');
+    const resolvedEncoding: Pro2WallpaperEncoding =
+      encoding ?? (env && DataManager.isBleConnect(env) ? 'i8-lz4' : 'rgb565');
 
     const decoded = decodeJpegBase64ToRgba({
       jpegBase64,
@@ -76,9 +85,10 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
       width: PRO2_WALLPAPER_WIDTH,
       height: PRO2_WALLPAPER_HEIGHT,
       rgba: decoded.data,
+      encoding: resolvedEncoding,
     });
     this.path = `${WALLPAPER_DIRECTORY}/${normalizeFileName(fileName, this.encoded.data)}`;
-    this.params = { jpegBase64, fileName, chunkSize };
+    this.params = { jpegBase64, fileName, chunkSize, encoding: resolvedEncoding };
     this.unlockPolicy = 'unlock-before-run';
     // File writes and wallpaper apply require an unlocked device. Either PIN
     // may authorize this device-management action.
