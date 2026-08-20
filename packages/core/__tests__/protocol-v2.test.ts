@@ -194,7 +194,13 @@ describe('DeviceUploadWallpaper', () => {
       refreshProtocolV2SettingsAfterMutation: jest.fn().mockResolvedValue({}),
     });
 
-  test('encodes, uploads and applies a Pro2 wallpaper', async () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test('uses I8 with LZ4 when uploading a Pro2 wallpaper over BLE', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('lowlevel');
+    jest.spyOn(DataManager, 'isBleConnect').mockReturnValue(true);
     const typedCall = jest.fn().mockImplementation((request, _response, params) => {
       if (request === 'FilesystemDirMake') return { message: { message: 'directory ready' } };
       if (request === 'FilesystemFileWrite') {
@@ -237,7 +243,7 @@ describe('DeviceUploadWallpaper', () => {
     });
     expect(device.refreshProtocolV2SettingsAfterMutation).toHaveBeenCalledTimes(1);
     expect(typedCall.mock.calls.some(call => call[0] === 'SetWallpaper')).toBe(false);
-    expect(result).toMatchObject({ colorFormat: 'RGB565', message: 'wallpaper applied' });
+    expect(result).toMatchObject({ colorFormat: 'I8', message: 'wallpaper applied' });
     const fileWriteCallCount = typedCall.mock.calls.filter(
       call => call[0] === 'FilesystemFileWrite'
     ).length;
@@ -275,6 +281,8 @@ describe('DeviceUploadWallpaper', () => {
   });
 
   test('returns success when wallpaper read-back fails after apply', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('desktop-webusb');
+    jest.spyOn(DataManager, 'isBleConnect').mockReturnValue(false);
     const typedCall = jest.fn().mockImplementation((request, _response, params) => {
       if (request === 'FilesystemDirMake') return { message: {} };
       if (request === 'FilesystemFileWrite') {
@@ -300,7 +308,10 @@ describe('DeviceUploadWallpaper', () => {
     (method as any).device = device;
     method.init();
 
-    await expect(method.run()).resolves.toMatchObject({ message: 'wallpaper applied' });
+    await expect(method.run()).resolves.toMatchObject({
+      colorFormat: 'RGB565',
+      message: 'wallpaper applied',
+    });
     expect(device.refreshProtocolV2SettingsAfterMutation).toHaveBeenCalledTimes(1);
   });
 
@@ -315,6 +326,19 @@ describe('DeviceUploadWallpaper', () => {
     });
 
     expect(() => method.init()).toThrow('fileName');
+  });
+
+  test('rejects unsupported wallpaper encodings before device communication', () => {
+    const method = new DeviceUploadWallpaper({
+      id: 1,
+      payload: {
+        method: 'deviceUploadWallpaper',
+        jpegBase64: createJpegBase64(604, 1024),
+        encoding: 'gzip',
+      } as any,
+    });
+
+    expect(() => method.init()).toThrow('encoding');
   });
 
   test('rejects unsupported firmware before creating or writing files', async () => {
