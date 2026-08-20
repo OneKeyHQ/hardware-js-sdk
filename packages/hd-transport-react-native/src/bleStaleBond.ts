@@ -8,7 +8,6 @@ import {
 export { isBleStaleBondHardwareError };
 
 const ATT_INSUFFICIENT_AUTHENTICATION = 5;
-const ATT_UNLIKELY_ERROR = 14;
 const ATT_INSUFFICIENT_ENCRYPTION = 15;
 const IOS_PEER_REMOVED_PAIRING_INFORMATION = 14;
 
@@ -32,7 +31,6 @@ export const isNativeBleStaleBondError = (error: unknown): boolean => {
   const nativeError = error as NativeBleErrorFields;
   if (
     nativeError.attErrorCode === ATT_INSUFFICIENT_AUTHENTICATION ||
-    nativeError.attErrorCode === ATT_UNLIKELY_ERROR ||
     nativeError.attErrorCode === ATT_INSUFFICIENT_ENCRYPTION ||
     nativeError.iosErrorCode === IOS_PEER_REMOVED_PAIRING_INFORMATION
   ) {
@@ -51,7 +49,6 @@ export const toBleStaleBondHardwareError = (error: unknown) => {
   const text = nativeErrorText(nativeError);
   const peerRemoved =
     nativeError.iosErrorCode === IOS_PEER_REMOVED_PAIRING_INFORMATION ||
-    nativeError.attErrorCode === ATT_UNLIKELY_ERROR ||
     text.includes('Peer removed pairing information');
 
   return ERRORS.TypedError(

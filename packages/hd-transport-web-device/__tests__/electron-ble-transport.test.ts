@@ -571,6 +571,22 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
   });
 
+  test('keeps stale-bond subscribe mapping out of Protocol V1 acquire', async () => {
+    const device = { id: 'classic-v1-id', name: 'OneKey Classic' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.subscribe.mockRejectedValue(new Error('Encryption is insufficient'));
+    const transport = configureTransport(nobleBle);
+
+    try {
+      await transport.acquire({ uuid: device.id, expectedProtocol: 'V1' });
+      throw new Error('Expected Protocol V1 acquire to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe('Encryption is insufficient');
+      expect((error as { errorCode?: unknown }).errorCode).toBeUndefined();
+    }
+  });
+
   test('reports a stale bond when a previously confirmed Protocol V2 device stops responding', async () => {
     const device = { id: 'reset-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
