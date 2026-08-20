@@ -4925,6 +4925,59 @@ describe('Protocol V2 firmware update targets', () => {
     expect(initialize).not.toHaveBeenCalled();
   });
 
+  test('reacquires the same WebUSB device without a protocol probe during install recovery', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const acquire = jest.fn().mockResolvedValue('usb-path');
+    const enumerate = jest.fn().mockResolvedValue({
+      descriptors: [
+        { id: 'other-usb', path: 'other-usb', protocolType: 'V2' },
+        { id: 'usb-id', path: 'usb-path', protocolType: 'V2' },
+      ],
+    });
+    const commands = { disposed: true, mainId: '' };
+    const device = stubDevice({
+      originalDescriptor: { id: 'usb-id', path: 'usb-path', protocolType: 'V2' },
+      deviceConnector: { acquire, enumerate },
+      updateDescriptor: jest.fn(),
+      acquire: jest.fn(),
+      commands,
+      getCommands: () => commands,
+      mainId: 'old-usb-path',
+    });
+    const getDevices = jest.spyOn(DevicePool, 'getDevices');
+    const isBrowserWebUsb = jest.spyOn(DataManager, 'isBrowserWebUsb').mockReturnValue(false);
+    const isDesktopWebUsb = jest.spyOn(DataManager, 'isDesktopWebUsb').mockReturnValue(true);
+    (method as any).device = device;
+    (method as any).protocolV2ExpectedPath = 'usb-path';
+
+    try {
+      await (method as any).reconnectProtocolV2Device({ skipProtocolProbe: true });
+    } finally {
+      getDevices.mockRestore();
+      isBrowserWebUsb.mockRestore();
+      isDesktopWebUsb.mockRestore();
+    }
+
+    expect(getDevices).not.toHaveBeenCalled();
+    expect(acquire).toHaveBeenCalledWith(
+      'usb-path',
+      null,
+      undefined,
+      'V2',
+      undefined,
+      undefined,
+      true
+    );
+    expect(device.acquire).not.toHaveBeenCalled();
+    expect(commands.disposed).toBe(false);
+    expect(commands.mainId).toBe('usb-path');
+  });
+
   test('scans and reacquires the same BLE peripheral without probing during install recovery', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -4945,7 +4998,7 @@ describe('Protocol V2 firmware update targets', () => {
       getCommands: () => commands,
     });
 
-    await (method as any).reconnectProtocolV2Device({ skipBleProtocolProbe: true });
+    await (method as any).reconnectProtocolV2Device({ skipProtocolProbe: true });
 
     expect(enumerate).toHaveBeenCalledTimes(1);
     expect(acquire).toHaveBeenCalledWith('ble-id', null, true, 'V2', undefined, undefined, true);
@@ -5372,7 +5425,6 @@ describe('Protocol V2 firmware update targets', () => {
     });
     const targets = [{ target_id: 4, path: 'vol1:firmware.bin' }];
     const typedCall = jest.fn().mockResolvedValue({ type: 'Success', message: {} });
-    const call = jest.fn().mockResolvedValue({ type: 'WriteCompleted', message: {} });
     const cancelDevice = jest.fn().mockResolvedValue(undefined);
     let cancelableAction: (() => Promise<unknown>) | undefined;
     const interaction = {
@@ -5385,7 +5437,7 @@ describe('Protocol V2 firmware update targets', () => {
     };
 
     (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall, call, cancelDevice }),
+      getCommands: () => ({ typedCall, cancelDevice }),
       createProtocolV2UiPhaseMetadata: jest.fn().mockReturnValue(interaction),
       toMessageObject: jest.fn().mockReturnValue({ connectId: 'pro2' }),
       setCancelableAction: jest.fn(action => {
@@ -5414,17 +5466,18 @@ describe('Protocol V2 firmware update targets', () => {
         interaction,
       },
     });
-    expect(call).toHaveBeenCalledWith(
-      'DeviceFirmwareUpdateRequest',
-      {},
-      { returnAfterWrite: true }
+    expect(typedCall).toHaveBeenCalledWith('DeviceFirmwareUpdateRequest', 'Success', {});
+    const requestCallIndex = typedCall.mock.calls.findIndex(
+      ([type]) => type === 'DeviceFirmwareUpdateRequest'
     );
-    expect(typedCall.mock.invocationCallOrder[0]).toBeLessThan(call.mock.invocationCallOrder[0]);
+    expect(typedCall.mock.invocationCallOrder[0]).toBeLessThan(
+      typedCall.mock.invocationCallOrder[requestCallIndex]
+    );
     expect((method.postMessage as jest.Mock).mock.invocationCallOrder[0]).toBeLessThan(
-      call.mock.invocationCallOrder[0]
+      typedCall.mock.invocationCallOrder[requestCallIndex]
     );
     expect(method.postTipMessage).not.toHaveBeenCalled();
-    expect(method.postProgressMessage).not.toHaveBeenCalled();
+    expect(method.postProgressMessage).toHaveBeenCalledWith(1, 'installingFirmware');
     await cancelableAction?.();
     expect(cancelDevice).toHaveBeenCalledTimes(1);
   });
@@ -5437,10 +5490,9 @@ describe('Protocol V2 firmware update targets', () => {
       },
     });
     const typedCall = jest.fn().mockRejectedValue(new Error('stage failed'));
-    const call = jest.fn();
 
     (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall, call }),
+      getCommands: () => ({ typedCall }),
     });
     method.postMessage = jest.fn();
     method.postTipMessage = jest.fn();
@@ -5452,24 +5504,28 @@ describe('Protocol V2 firmware update targets', () => {
       })
     ).rejects.toThrow('stage failed');
 
-    expect(call).not.toHaveBeenCalled();
+    expect(typedCall).not.toHaveBeenCalledWith('DeviceFirmwareUpdateRequest', 'Success', {});
     expect(method.postMessage).not.toHaveBeenCalled();
     expect(method.postTipMessage).not.toHaveBeenCalled();
     expect(method.postProgressMessage).not.toHaveBeenCalled();
   });
 
-  test('does not enter install state when writing the empty request fails', async () => {
+  test('does not enter install state when the empty request fails', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
       },
     });
-    const typedCall = jest.fn().mockResolvedValue({ type: 'Success', message: {} });
-    const call = jest.fn().mockRejectedValue(new Error('write failed'));
+    const typedCall = jest.fn().mockImplementation((type: string) => {
+      if (type === 'DeviceFirmwareUpdateRequest') {
+        return Promise.reject(new Error('request failed'));
+      }
+      return Promise.resolve({ type: 'Success', message: {} });
+    });
 
     (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall, call }),
+      getCommands: () => ({ typedCall }),
       createProtocolV2UiPhaseMetadata: jest.fn().mockReturnValue(undefined),
       toMessageObject: jest.fn().mockReturnValue({ connectId: 'pro2' }),
     });
@@ -5481,9 +5537,9 @@ describe('Protocol V2 firmware update targets', () => {
       (method as any).protocolV2StartFirmwareUpdate({
         targets: [{ target_id: 4, path: 'vol0:/application_p1.bin' }],
       })
-    ).rejects.toThrow('write failed');
+    ).rejects.toThrow('request failed');
 
-    expect(call).toHaveBeenCalledTimes(1);
+    expect(typedCall).toHaveBeenCalledWith('DeviceFirmwareUpdateRequest', 'Success', {});
     expect(method.postTipMessage).not.toHaveBeenCalled();
     expect(method.postProgressMessage).not.toHaveBeenCalled();
   });
@@ -5495,11 +5551,15 @@ describe('Protocol V2 firmware update targets', () => {
         method: 'firmwareUpdateV4',
       },
     });
-    const typedCall = jest.fn().mockResolvedValue({ type: 'Success', message: {} });
-    const call = jest.fn().mockRejectedValue(new Error('React Native BLE transport released'));
+    const typedCall = jest.fn().mockImplementation((type: string) => {
+      if (type === 'DeviceFirmwareUpdateRequest') {
+        return Promise.reject(new Error('React Native BLE transport released'));
+      }
+      return Promise.resolve({ type: 'Success', message: {} });
+    });
 
     (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall, call }),
+      getCommands: () => ({ typedCall }),
       createProtocolV2UiPhaseMetadata: jest.fn().mockReturnValue(undefined),
       toMessageObject: jest.fn().mockReturnValue({ connectId: 'pro2' }),
     });
@@ -5512,7 +5572,7 @@ describe('Protocol V2 firmware update targets', () => {
       })
     ).resolves.toBeUndefined();
 
-    expect(call).toHaveBeenCalledWith('DeviceFirmwareUpdateRequest', {});
+    expect(typedCall).toHaveBeenCalledWith('DeviceFirmwareUpdateRequest', 'Success', {});
     expect((method as any).protocolV2InstallNeedsBleReconnect).toBe(true);
   });
 
@@ -5566,7 +5626,7 @@ describe('Protocol V2 firmware update targets', () => {
         setTimeoutSpy.mockRestore();
       }
 
-      expect(reconnectProtocolV2Device).toHaveBeenCalledWith({ skipBleProtocolProbe: true });
+      expect(reconnectProtocolV2Device).toHaveBeenCalledWith({ skipProtocolProbe: true });
       expect(verifyProtocolV2ReconnectIdentity).not.toHaveBeenCalled();
       expect(typedCall.mock.calls.map(callArgs => callArgs[0])).toEqual([
         'DeviceFirmwareUpdateStatusGet',
@@ -6093,6 +6153,54 @@ describe('Protocol V2 firmware update targets', () => {
 
     expect(Array.from((method as any).protocolV2CompletedTargetIds)).toEqual([4, 5]);
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
+  });
+
+  test('uses the confirmed install request as evidence after the same device returns', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('The USB device was disconnected'))
+      .mockResolvedValueOnce({
+        type: 'DeviceFirmwareUpdateStatus',
+        message: { records: [] },
+      });
+    const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+      callback: () => void
+    ) => {
+      callback();
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    (method as any).protocolV2InstallRequestConfirmed = true;
+    (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+    (method as any).verifyProtocolV2ReconnectIdentity = jest.fn().mockResolvedValue(deviceInfo);
+    (method as any).probeProtocolV2NormalMode = jest.fn().mockResolvedValue(true);
+    method.postProgressMessage = jest.fn();
+
+    try {
+      await expect(
+        (method as any).waitForProtocolV2FirmwareUpdateComplete(
+          [{ target_id: 4, path: 'vol0:/application_p1.bin' }],
+          true
+        )
+      ).resolves.toBeUndefined();
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+
+    expect((method as any).reconnectProtocolV2Device).toHaveBeenCalledWith({
+      skipProtocolProbe: true,
+    });
+    expect(method.postProgressMessage).toHaveBeenLastCalledWith(100, 'installingFirmware');
   });
 
   test.each([
@@ -8963,24 +9071,25 @@ describe('Protocol V2 firmware update targets', () => {
     expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([1960, 1]);
   });
 
-  test('keeps the confirmation UI active after Stage and the empty Request are written', async () => {
+  test('keeps confirmation active until the empty Request responds, then enters install', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
         method: 'firmwareUpdateV4',
       },
     });
-    let resolveWrite: ((value: unknown) => void) | undefined;
-    const typedCall = jest.fn().mockResolvedValue({ type: 'Success', message: {} });
-    const call = jest.fn().mockImplementation(
-      () =>
-        new Promise(resolve => {
-          resolveWrite = resolve;
-        })
-    );
+    let resolveRequest: ((value: unknown) => void) | undefined;
+    const typedCall = jest.fn().mockImplementation((type: string) => {
+      if (type === 'DeviceFirmwareUpdateRequest') {
+        return new Promise(resolve => {
+          resolveRequest = resolve;
+        });
+      }
+      return Promise.resolve({ type: 'Success', message: {} });
+    });
 
     (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall, call }),
+      getCommands: () => ({ typedCall }),
       createProtocolV2UiPhaseMetadata: jest.fn().mockReturnValue(undefined),
       toMessageObject: jest.fn().mockReturnValue({ connectId: 'pro2' }),
     });
@@ -9000,21 +9109,17 @@ describe('Protocol V2 firmware update targets', () => {
       'Success',
       { targets: [{ target_id: 4, path: 'vol1:firmware.bin' }] },
     ]);
-    expect(call).toHaveBeenCalledWith(
-      'DeviceFirmwareUpdateRequest',
-      {},
-      { returnAfterWrite: true }
-    );
+    expect(typedCall).toHaveBeenCalledWith('DeviceFirmwareUpdateRequest', 'Success', {});
     expect(method.postTipMessage).not.toHaveBeenCalled();
     expect(method.postProgressMessage).not.toHaveBeenCalled();
 
-    resolveWrite?.({ type: 'WriteCompleted', message: {} });
+    resolveRequest?.({ type: 'Success', message: {} });
     await startPromise;
     expect(method.postTipMessage).not.toHaveBeenCalled();
-    expect(method.postProgressMessage).not.toHaveBeenCalled();
+    expect(method.postProgressMessage).toHaveBeenCalledWith(1, 'installingFirmware');
   });
 
-  test('sends an empty Protocol V2 firmware install request without waiting for its response', async () => {
+  test('returns after the empty Protocol V2 firmware install request responds', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -9025,10 +9130,9 @@ describe('Protocol V2 firmware update targets', () => {
       type: 'Success',
       message: { message: 'accepted' },
     });
-    const call = jest.fn().mockResolvedValue({ type: 'WriteCompleted', message: {} });
 
     (method as any).device = stubDevice({
-      getCommands: () => ({ typedCall, call }),
+      getCommands: () => ({ typedCall }),
       createProtocolV2UiPhaseMetadata: jest.fn().mockReturnValue(undefined),
       toMessageObject: jest.fn().mockReturnValue({ connectId: 'pro2' }),
     });
@@ -9041,12 +9145,9 @@ describe('Protocol V2 firmware update targets', () => {
     });
 
     expect(typedCall.mock.calls[0][0]).toBe('DeviceFirmwareUpdateStage');
-    expect(call).toHaveBeenCalledWith(
-      'DeviceFirmwareUpdateRequest',
-      {},
-      { returnAfterWrite: true }
-    );
+    expect(typedCall).toHaveBeenCalledWith('DeviceFirmwareUpdateRequest', 'Success', {});
     expect(method.postTipMessage).not.toHaveBeenCalled();
+    expect(method.postProgressMessage).toHaveBeenCalledWith(1, 'installingFirmware');
   });
 });
 

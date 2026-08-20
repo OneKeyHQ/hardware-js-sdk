@@ -59,6 +59,8 @@ export type AcquireInput = {
    * transport must probe the protocol on the wire, bypassing any cached result.
    */
   forceProtocolDetection?: boolean;
+  /** Reuse expectedProtocol without probing when a caller is recovering a known device workflow. */
+  skipProtocolProbe?: boolean;
 };
 
 export type MessageFromOneKey = { type: string; message: Record<string, any> };

@@ -105,9 +105,7 @@ export default class DeviceConnector {
       const transport = this.getActiveTransport();
       let res;
       if (DataManager.isBleConnect(env)) {
-        const acquireInput: Parameters<Transport['acquire']>[0] & {
-          skipProtocolProbe?: boolean;
-        } = {
+        const acquireInput: Parameters<Transport['acquire']>[0] = {
           uuid: path,
           forceCleanRunPromise,
           expectedProtocol,
@@ -123,6 +121,7 @@ export default class DeviceConnector {
           expectedProtocol,
           protocolHint,
           forceProtocolDetection,
+          skipProtocolProbe,
         });
       }
       if (expectedProtocol) {

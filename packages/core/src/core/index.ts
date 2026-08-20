@@ -1220,6 +1220,9 @@ export const cancel = (context: CoreContext, connectId?: string) => {
           ','
         )}`
       );
+      // Abort before rejecting: rejectRequest releases the task and would make
+      // its AbortController unreachable to an in-flight method loop.
+      requestQueue.abortRequestsByConnectId(connectId);
       const canceledDevices: Device[] = [];
       const interruptDevice = (device: Device | undefined, deviceConnectId: string) => {
         if (!device || canceledDevices.includes(device)) {
@@ -1244,7 +1247,6 @@ export const cancel = (context: CoreContext, connectId?: string) => {
         }
       }
       interruptDevice(deviceCacheMap.get(connectId), connectId);
-      requestQueue.abortRequestsByConnectId(connectId);
       pollingManager.stop(connectId);
     } catch (e) {
       Log.error('Cancel API Error: ', e);
@@ -1253,6 +1255,8 @@ export const cancel = (context: CoreContext, connectId?: string) => {
     const env = DataManager.getSettings('env');
     if (DataManager.isBleConnect(env)) {
       Log.debug('Cancel Api all _deviceList: ');
+      // Keep method abort signals observable until every active task is rejected.
+      requestQueue.abortAllRequests();
       const canceledDevices: Device[] = [];
       const interruptDevice = (device?: Device) => {
         if (!device || canceledDevices.includes(device)) {
@@ -1277,7 +1281,6 @@ export const cancel = (context: CoreContext, connectId?: string) => {
         }
       }
       deviceCacheMap.forEach(interruptDevice);
-      requestQueue.abortAllRequests();
       pollingManager.stopAll();
     } else {
       _deviceList?.allDevices().forEach(device => {

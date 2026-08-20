@@ -532,6 +532,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private protocolV2InstallNeedsBleReconnect = false;
 
+  private protocolV2InstallRequestConfirmed = false;
+
   private protocolV2LastRuntimeProbeFeatures?: Features;
 
   private protocolV2LastTransferProgress?: number;
@@ -2441,7 +2443,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.protocolV2InstallNeedsBleReconnect = false;
     let deviceInfo: ProtocolV2DeviceInfo | undefined;
     let bleInstallLinkReady = false;
-    let installEvidenceObserved = false;
+    let installEvidenceObserved = this.protocolV2InstallRequestConfirmed;
     let currentInstallStatusObserved = false;
     const liveTargetIds = new Set<number>();
 
@@ -2452,7 +2454,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       try {
         if (shouldReconnect) {
           const isBleInstallReconnect = this.isBleReconnect();
-          await this.reconnectProtocolV2Device({ skipBleProtocolProbe: isBleInstallReconnect });
+          await this.reconnectProtocolV2Device({ skipProtocolProbe: true });
           bleInstallLinkReady = isBleInstallReconnect;
           deviceInfo = isBleInstallReconnect
             ? undefined
@@ -2771,19 +2773,53 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     );
   }
 
-  private async reconnectProtocolV2Device(options?: { skipBleProtocolProbe?: boolean }) {
+  private async reconnectProtocolV2Device(options?: { skipProtocolProbe?: boolean }) {
     if (this.isBleReconnect()) {
-      await this.acquireProtocolV2BleDevice(options?.skipBleProtocolProbe);
+      await this.acquireProtocolV2BleDevice(options?.skipProtocolProbe);
       return;
     }
 
     const deviceDiff = await this.device.deviceConnector?.enumerate();
     const devicesDescriptor = deviceDiff?.descriptors ?? [];
+    const env = DataManager.getSettings('env');
+    const isWebUsb = DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env);
 
-    if (
-      DataManager.isBrowserWebUsb(DataManager.getSettings('env')) &&
-      devicesDescriptor.length === 1
-    ) {
+    if (isWebUsb && options?.skipProtocolProbe) {
+      const expectedSerialNumber = this.protocolV2ExpectedSerialNumber?.trim();
+      const expectedPath = this.protocolV2ExpectedPath?.trim();
+      const reconnectDescriptor = devicesDescriptor.find(descriptor => {
+        const descriptorPath = descriptor.path?.trim();
+        return (
+          (!!expectedSerialNumber && descriptorPath === expectedSerialNumber) ||
+          (!!expectedPath && descriptorPath === expectedPath)
+        );
+      });
+      if (!reconnectDescriptor?.path) {
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
+      }
+      this.device.updateDescriptor(
+        {
+          ...reconnectDescriptor,
+          protocolType: PROTOCOL_V2_CONNECT_PROTOCOL,
+        },
+        true
+      );
+      const mainId = await this.device.deviceConnector?.acquire(
+        reconnectDescriptor.path,
+        null,
+        undefined,
+        PROTOCOL_V2_CONNECT_PROTOCOL,
+        undefined,
+        undefined,
+        true
+      );
+      this.device.mainId = typeof mainId === 'string' ? mainId : reconnectDescriptor.path;
+      this.device.commands.disposed = false;
+      this.device.getCommands().mainId = this.device.mainId;
+      return;
+    }
+
+    if (isWebUsb && devicesDescriptor.length === 1) {
       const descriptor = devicesDescriptor[0];
       if (!this.protocolV2ExpectedSerialNumber && descriptor.path !== this.protocolV2ExpectedPath) {
         throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
@@ -2935,6 +2971,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }) {
     this.protocolV2LastRuntimeProbeFeatures = undefined;
     this.protocolV2InstallNeedsBleReconnect = false;
+    this.protocolV2InstallRequestConfirmed = false;
     const commands = this.device.getCommands();
     await commands.typedCall('DeviceFirmwareUpdateStage', 'Success', { targets });
     this.device.setCancelableAction(() => commands.cancelDevice());
@@ -2951,7 +2988,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       })
     );
     try {
-      await commands.call('DeviceFirmwareUpdateRequest', {});
+      await commands.typedCall('DeviceFirmwareUpdateRequest', 'Success', {});
+      this.protocolV2InstallRequestConfirmed = true;
+      this.postProgressMessage(1, 'installingFirmware');
+      Log.log('[FirmwareUpdateV4] firmware install confirmed by device response');
     } catch (error) {
       this.throwIfAborted();
       if (!isProtocolV2DeviceDisconnectedError(error)) {

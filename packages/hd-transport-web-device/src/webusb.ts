@@ -309,7 +309,20 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       await this.rotateProtocolV2UsbGeneration(input.path, 'WebUSB transport acquired');
       await this.closeOpenDevice(input.path);
       await this.connect(input.path ?? '', true);
-      if (input.forceProtocolDetection) {
+      if (input.skipProtocolProbe) {
+        if (!input.expectedProtocol) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'skipProtocolProbe requires an expected protocol'
+          );
+        }
+        this.staleProtocolPaths.delete(input.path);
+        this.deviceProtocol.set(input.path, input.expectedProtocol);
+        const currentDevice = this.deviceList.find(d => d.path === input.path)?.device;
+        if (currentDevice) {
+          this.probedDeviceObjects.set(input.path, currentDevice);
+        }
+      } else if (input.forceProtocolDetection) {
         // Explicit recovery/discovery (e.g. detectDeviceConnectProtocol) must
         // probe on the wire regardless of any cached result — the cached
         // binding may be exactly what the caller is trying to recover from.
@@ -317,13 +330,13 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         this.deviceProtocol.delete(input.path);
         this.deviceProtocolHints.delete(input.path);
       }
-      if (this.staleProtocolPaths.has(input.path)) {
+      if (!input.skipProtocolProbe && this.staleProtocolPaths.has(input.path)) {
         // The device disconnected (possibly rebooting into another mode) since
         // the protocol was probed — drop the cache so it is re-probed below.
         this.staleProtocolPaths.delete(input.path);
         this.deviceProtocol.delete(input.path);
       }
-      if (this.deviceProtocol.has(input.path)) {
+      if (!input.skipProtocolProbe && this.deviceProtocol.has(input.path)) {
         const currentDevice = this.deviceList.find(d => d.path === input.path)?.device;
         if (!currentDevice || currentDevice !== this.probedDeviceObjects.get(input.path)) {
           // The OS re-enumerated the device since the probe (a replug/reboot we
@@ -333,7 +346,12 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         }
       }
       const cachedProtocol = this.deviceProtocol.get(input.path);
-      if (cachedProtocol && input.expectedProtocol && cachedProtocol !== input.expectedProtocol) {
+      if (
+        !input.skipProtocolProbe &&
+        cachedProtocol &&
+        input.expectedProtocol &&
+        cachedProtocol !== input.expectedProtocol
+      ) {
         // The caller expects a different protocol than the cached probe result;
         // the cache is stale — drop it and re-probe on the wire below.
         this.deviceProtocol.delete(input.path);
