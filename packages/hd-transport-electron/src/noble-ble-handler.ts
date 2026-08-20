@@ -16,6 +16,7 @@ import {
   createKnownBleUuidAliases,
   hasOnekeyCommunicationService,
   isOnekeyBluetoothDevice,
+  isPro2FamilyBleName,
   matchesKnownBleUuid,
   wait,
 } from '@onekeyfe/hd-shared';
@@ -790,6 +791,41 @@ async function transmitHexDataToDevice(
 }
 
 // Handle discovered device (for general enumeration only)
+// A scan that finds nothing costs this much before the direct-connect
+// fallback runs. Every advertisement in the 6.5.0 control logs arrived within
+// 631ms, so this leaves ~2x headroom while keeping a miss cheap.
+const BLE_COLD_CONNECT_SCAN_TIMEOUT_MS = 1500;
+
+// Advertised names, kept for the life of the process: device caches are purged
+// on every disconnect, but the family a device belongs to never changes and
+// decides which connection strategy is safe for it.
+const bleNamesById = new Map<string, string>();
+
+function rememberBleName(deviceId: string, name?: string | null): void {
+  const trimmed = name?.trim();
+  if (trimmed) {
+    bleNamesById.set(deviceId, trimmed);
+  }
+}
+
+function resolveBleName(deviceId: string): string | undefined {
+  const live =
+    connectedDevices.get(deviceId)?.advertisement?.localName?.trim() ||
+    discoveredDevices.get(deviceId)?.advertisement?.localName?.trim();
+  return live || bleNamesById.get(deviceId);
+}
+
+/**
+ * Pro2/Neo connect by id first: they are unaffected by the stale-session
+ * problem and advertise under Find My names a OneKey-filtered scan cannot
+ * match. Everything else — Classic family, and any device whose name is not
+ * known yet — scans first, because connecting by id can resolve a session the
+ * device no longer serves (see setupConnectionAndDiscoverServices).
+ */
+function shouldConnectByIdFirst(deviceId: string): boolean {
+  return isPro2FamilyBleName(resolveBleName(deviceId));
+}
+
 function handleDeviceDiscovered(peripheral: Peripheral): void {
   // Only process OneKey candidates for general discovery. Avoid logging every
   // ambient BLE peripheral; it makes Pro2 debugging hard to read.
@@ -799,6 +835,7 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
 
   const isNewDevice = !discoveredDevices.has(peripheral.id);
   discoveredDevices.set(peripheral.id, peripheral);
+  rememberBleName(peripheral.id, peripheral.advertisement?.localName);
   if (isNewDevice) {
     logger?.debug('[NobleBLE] OneKey BLE device discovered', {
       deviceId: peripheral.id,
@@ -833,7 +870,10 @@ async function waitForNobleScanStop(nobleInstance: NobleModule): Promise<void> {
 
 // Perform targeted scan for a specific device ID
 // Uses self-contained local listener pattern - no global state needed
-async function performTargetedScan(targetDeviceId: string): Promise<Peripheral | null> {
+async function performTargetedScan(
+  targetDeviceId: string,
+  timeoutMs: number = NOBLE_BLE_TARGETED_SCAN_TIMEOUT_MS
+): Promise<Peripheral | null> {
   if (!noble) {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
   }
@@ -878,7 +918,7 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
     const timeoutId = setTimeout(() => {
       logger?.info('[NobleBLE] Targeted scan timeout for device:', targetDeviceId);
       finish(null).catch(reject);
-    }, NOBLE_BLE_TARGETED_SCAN_TIMEOUT_MS);
+    }, timeoutMs);
 
     // Add local listener for this scan
     nobleInstance.on('discover', onDiscover);
@@ -1454,31 +1494,46 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
     }
 
-    // Scan before connecting by id. A live advertisement proves the device
-    // holds no link and will open a fresh session, and it is how 6.5.0 reached
-    // every cold connect (control logs: found in ~52ms, 16/16 sessions
-    // answered within ~1s). Connecting by id resolves through the OS cache
-    // instead: on a Classic 1S that can hand back a session the device no
-    // longer serves, where the link comes up and GATT resolves from cache but
-    // the device answers no protocol traffic at all.
-    logger?.info('[NobleBLE] Device not cached, scanning for:', deviceId);
-    try {
-      peripheral = (await performTargetedScan(deviceId)) ?? undefined;
-    } catch (scanError) {
-      logger?.info('[NobleBLE] Targeted scan failed, falling back to direct connect', {
-        deviceId,
-        error: scanError instanceof Error ? scanError.message : String(scanError),
-      });
-    }
+    // A live advertisement proves the device holds no link and will open a
+    // fresh session; connecting by id resolves through the OS cache instead
+    // and can hand back a session the device no longer serves (see
+    // setupConnectionAndDiscoverServices). Scanning is also the faster of the
+    // two when the device does advertise: ~96ms median against ~784ms for
+    // connect-by-id across the field logs. Pro2/Neo keep connect-by-id first
+    // because they are unaffected and may advertise under an unmatchable Find
+    // My name.
+    const byIdFirst = shouldConnectByIdFirst(deviceId);
+    logger?.info('[NobleBLE] Resolving device for cold connect', {
+      deviceId,
+      name: resolveBleName(deviceId) ?? 'unknown',
+      strategy: byIdFirst ? 'connect-by-id-first' : 'scan-first',
+    });
 
-    if (!peripheral) {
-      // Not advertising: held by another host, or bonded and silent. Connect
-      // by id is then the only way in.
-      logger?.info('[NobleBLE] Device not advertising, attempting direct connect by id:', deviceId);
-      peripheral = await tryDirectConnectById(deviceId);
-      if (peripheral) {
-        discoveredDevices.set(deviceId, peripheral);
+    const scanForPeripheral = async () => {
+      try {
+        return (await performTargetedScan(deviceId, BLE_COLD_CONNECT_SCAN_TIMEOUT_MS)) ?? undefined;
+      } catch (scanError) {
+        logger?.info('[NobleBLE] Targeted scan failed', {
+          deviceId,
+          error: scanError instanceof Error ? scanError.message : String(scanError),
+        });
+        return undefined;
       }
+    };
+
+    const connectById = async () => {
+      const found = await tryDirectConnectById(deviceId);
+      if (found) {
+        discoveredDevices.set(deviceId, found);
+      }
+      return found;
+    };
+
+    peripheral = byIdFirst ? await connectById() : await scanForPeripheral();
+    if (!peripheral) {
+      // The preferred route came up empty: not advertising (held elsewhere, or
+      // silent), or not reachable by id. Try the other one before giving up.
+      peripheral = byIdFirst ? await scanForPeripheral() : await connectById();
     }
   }
 
@@ -1486,6 +1541,10 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   if (!peripheral) {
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device ${deviceId} not found`);
   }
+
+  // Also covers the connect-by-id route, whose simulated discovery carries no
+  // service UUIDs and therefore never reaches handleDeviceDiscovered.
+  rememberBleName(deviceId, peripheral.advertisement?.localName);
 
   logger?.info('[NobleBLE] Connecting to device:', deviceId);
 

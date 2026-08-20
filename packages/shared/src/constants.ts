@@ -314,6 +314,30 @@ export const hasOnekeyCommunicationService = (
     matchesKnownBleUuid(uuid, ONEKEY_COMMUNICATION_SERVICE_ALIASES)
   );
 
+/**
+ * Protocol V2 family (Pro2 / Neo) by advertised BLE name. Callers use it to
+ * pick a connection strategy: this family also advertises under Find My names
+ * that carry no OneKey service UUID, so a scan cannot always see it.
+ */
+export const isPro2FamilyBleName = (value?: string | null): boolean => {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  if (normalized.startsWith('pro2') || normalized.startsWith('neo')) {
+    return true;
+  }
+  const compact = compactBleName(normalized);
+  return (
+    PRO2_COMPACT_NAME_PATTERN.test(compact) ||
+    NEO_COMPACT_NAME_PATTERN.test(compact) ||
+    isPro2FindMyAdvertisementName(value)
+  );
+};
+
 export const isOnekeyBluetoothDevice = ({
   id,
   name,
