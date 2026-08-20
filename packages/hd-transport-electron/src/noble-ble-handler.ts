@@ -733,6 +733,17 @@ async function transmitHexDataToDevice(
   );
   const pacingDelayMs = resolveNobleBleWritePacingDelay(options);
 
+  // Diagnostics: the frame header alone (report id + magic + message type +
+  // length) identifies which protocol frame went out, without logging payload.
+  logger?.info('[NobleBLE] Write frame', {
+    deviceId,
+    bytes: toBuffer.length,
+    head: toBuffer.subarray(0, 8).toString('hex'),
+    packetCapacity,
+    mtu: peripheral.mtu ?? null,
+    pacingDelayMs,
+  });
+
   if (!IS_WINDOWS || pairedDevices.has(deviceId)) {
     // macOS / Linux or already paired on Windows: direct write
     const writeCharacteristic = doGetWriteCharacteristic();
@@ -1830,6 +1841,11 @@ async function subscribeNotifications(
     });
 
     notifyCharacteristic.on('data', (data: Buffer) => {
+      logger?.debug('[NobleBLE] Notify frame', {
+        deviceId,
+        bytes: data.length,
+        head: data.subarray(0, 8).toString('hex'),
+      });
       // Windows BLE pairing detection: receiving any data means device is paired
       if (!pairedDevices.has(deviceId)) {
         pairedDevices.add(deviceId);
@@ -1840,9 +1856,14 @@ async function subscribeNotifications(
     });
   }
 
+  const subscribeStartedAt = Date.now();
   try {
     await rebuildAppSubscription(deviceId, notifyCharacteristic);
     subscribedDevices.set(deviceId, true);
+    logger?.info('[NobleBLE] Notification subscription active', {
+      deviceId,
+      ms: Date.now() - subscribeStartedAt,
+    });
   } finally {
     // 🔒 CRITICAL: Always clear operation state (even on error)
     subscriptionOperations.set(deviceId, 'idle');
