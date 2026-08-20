@@ -1051,16 +1051,9 @@ async function connectDeviceForBle(
             abortSignal
           );
         } catch (err) {
-          // The abandoned acquire keeps running: raceBleAcquire only rejects
-          // its own wrapper. Supersede it so that, if it settles later, the
-          // generation guard in Device.acquire drops the link it built instead
-          // of committing mainId/commands over the newer attempt.
-          device.beginConnectionAttempt();
-          // A deadline hit also means the transport is wedged mid-acquire; drop
-          // the link we know about before the retry so it cold-connects instead
-          // of stacking a second connect onto the half-open one. `mainId` is
-          // unset while the first acquire is still pending, which is exactly
-          // the case the generation bump above covers.
+          // A deadline hit means the transport is wedged mid-acquire; drop the
+          // link before the retry so it cold-connects instead of stacking a
+          // second connect onto the half-open one.
           if (
             err.errorCode === HardwareErrorCode.BleTimeoutError &&
             device.mainId &&
