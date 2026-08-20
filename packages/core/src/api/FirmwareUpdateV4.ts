@@ -544,6 +544,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private protocolV2InstallStatusBaseline?: ProtocolV2FirmwareUpdateStatusTarget[];
 
+  private protocolV2InstallNeedsBleReconnect = false;
+
   private protocolV2LastRuntimeProbeFeatures?: Features;
 
   private protocolV2LastTransferProgress?: number;
@@ -2404,10 +2406,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       ? getProtocolV2FirmwareStatusFingerprint(effectiveBaselineStatusTargets)
       : undefined;
     let lastError: unknown;
-    // DeviceFirmwareUpdateRequest leaves the current loader link usable for status polling.
-    // Reconnecting here probes DeviceInfo, which loaders reject while installation is active.
-    let shouldReconnect = false;
+    // USB may keep the loader link usable. BLE can release it as installation starts, so its
+    // recovery reconnects directly to status polling without generic Ping or DeviceInfo probes.
+    let shouldReconnect = this.protocolV2InstallNeedsBleReconnect;
+    this.protocolV2InstallNeedsBleReconnect = false;
     let deviceInfo: ProtocolV2DeviceInfo | undefined;
+    let bleInstallLinkReady = false;
     let installEvidenceObserved = false;
     let currentInstallStatusObserved = false;
 
@@ -2417,8 +2421,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       this.throwIfAborted();
       try {
         if (shouldReconnect) {
-          await this.reconnectProtocolV2Device();
-          deviceInfo = await this.verifyProtocolV2ReconnectIdentity();
+          const isBleInstallReconnect = this.isBleReconnect();
+          await this.reconnectProtocolV2Device({ skipBleProtocolProbe: isBleInstallReconnect });
+          bleInstallLinkReady = isBleInstallReconnect;
+          deviceInfo = isBleInstallReconnect
+            ? undefined
+            : await this.verifyProtocolV2ReconnectIdentity();
           shouldReconnect = false;
         }
         const currentDeviceInfo = deviceInfo;
@@ -2550,12 +2558,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           // missing endpoint as completion only after the runtime probe confirms App mode.
           if (isProtocolV2FirmwareStatusEndpointUnavailable(error)) {
             if (!currentDeviceInfo) {
+              if (!bleInstallLinkReady) {
+                throw ERRORS.TypedError(
+                  HardwareErrorCode.RuntimeError,
+                  'Protocol V2 device identity is unavailable during install polling'
+                );
+              }
+              deviceInfo = await this.verifyProtocolV2ReconnectIdentity();
+            }
+            const reconnectDeviceInfo = currentDeviceInfo ?? deviceInfo;
+            if (!reconnectDeviceInfo) {
               throw ERRORS.TypedError(
                 HardwareErrorCode.RuntimeError,
                 'Protocol V2 device identity is unavailable during install polling'
               );
             }
-            const isNormalMode = await this.probeProtocolV2NormalMode(currentDeviceInfo);
+            const isNormalMode = await this.probeProtocolV2NormalMode(reconnectDeviceInfo);
             if (
               isNormalMode &&
               (installEvidenceObserved ||
@@ -2580,6 +2598,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           } else {
             shouldReconnect = true;
             deviceInfo = undefined;
+            bleInstallLinkReady = false;
             lastError = error;
             Log.log(
               '[FirmwareUpdateV4] DeviceFirmwareUpdateStatusGet unavailable during install: ',
@@ -2603,6 +2622,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         }
         shouldReconnect = true;
         deviceInfo = undefined;
+        bleInstallLinkReady = false;
         Log.log('Protocol V2 firmware install device readiness probe failed: ', error);
       }
       await wait(1000);
@@ -2740,9 +2760,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     );
   }
 
-  private async reconnectProtocolV2Device() {
+  private async reconnectProtocolV2Device(options?: { skipBleProtocolProbe?: boolean }) {
     if (this.isBleReconnect()) {
-      await this.acquireProtocolV2BleDevice();
+      await this.acquireProtocolV2BleDevice(options?.skipBleProtocolProbe);
       return;
     }
 
@@ -2870,13 +2890,31 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     await wait(2000);
   }
 
-  private async acquireProtocolV2BleDevice() {
-    await this.device.deviceConnector?.acquire(
-      this.device.originalDescriptor.id,
+  private async acquireProtocolV2BleDevice(skipProtocolProbe = false) {
+    const connector = this.device.deviceConnector;
+    const expectedId = this.device.originalDescriptor.id;
+    if (!skipProtocolProbe) {
+      await connector?.acquire(expectedId, null, true, PROTOCOL_V2_CONNECT_PROTOCOL);
+      return;
+    }
+    const deviceDiff = await connector?.enumerate();
+    const reconnectDescriptor = deviceDiff?.descriptors?.find(
+      descriptor => descriptor.id === expectedId
+    );
+    if (!reconnectDescriptor) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
+    }
+    await connector?.acquire(
+      reconnectDescriptor.id,
       null,
       true,
-      PROTOCOL_V2_CONNECT_PROTOCOL
+      PROTOCOL_V2_CONNECT_PROTOCOL,
+      undefined,
+      undefined,
+      skipProtocolProbe
     );
+    this.device.commands.disposed = false;
+    this.device.getCommands().mainId = reconnectDescriptor.id;
   }
 
   private async protocolV2StartFirmwareUpdate({
@@ -2886,6 +2924,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }) {
     this.protocolV2LastRuntimeProbeFeatures = undefined;
     this.protocolV2InstallStatusBaseline = undefined;
+    this.protocolV2InstallNeedsBleReconnect = false;
     const commands = this.device.getCommands();
     await commands.typedCall('DeviceFirmwareUpdateStage', 'Success', { targets });
     try {
@@ -2932,6 +2971,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       Log.log(
         '[FirmwareUpdateV4] BLE transport released after install request; continue status polling'
       );
+      if (this.isBleReconnect()) {
+        this.protocolV2InstallNeedsBleReconnect = true;
+      }
     }
   }
 

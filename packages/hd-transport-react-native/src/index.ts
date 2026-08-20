@@ -58,6 +58,15 @@ import type { Characteristic, Device, Subscription } from 'react-native-ble-plx'
 import type EventEmitter from 'events';
 import type { BleAcquireInput, TransportOptions } from './types';
 
+type FirmwareInstallBleAcquireInput = BleAcquireInput & {
+  /**
+   * Reuse the already-verified protocol after an expected firmware-install
+   * disconnect. The install loader accepts status requests but may not answer
+   * the generic protocol probe used by a normal acquire.
+   */
+  skipProtocolProbe?: boolean;
+};
+
 const { check, ProtocolV1, parseConfigure } = transport;
 
 const Log = bleLogger;
@@ -865,7 +874,7 @@ export default class ReactNativeBleTransport {
     return transport;
   }
 
-  async acquire(input: BleAcquireInput) {
+  async acquire(input: FirmwareInstallBleAcquireInput) {
     const { uuid } = input;
 
     if (!uuid) {
@@ -875,8 +884,8 @@ export default class ReactNativeBleTransport {
     return this.runLifecycleOperation(uuid, () => this.acquireUnlocked(input));
   }
 
-  private async acquireUnlocked(input: BleAcquireInput) {
-    const { uuid, forceCleanRunPromise, expectedProtocol } = input;
+  private async acquireUnlocked(input: FirmwareInstallBleAcquireInput) {
+    const { uuid, forceCleanRunPromise, expectedProtocol, skipProtocolProbe } = input;
 
     const cachedTransport = transportCache[uuid];
     if (cachedTransport) {
@@ -1031,6 +1040,29 @@ export default class ReactNativeBleTransport {
     });
 
     try {
+      if (skipProtocolProbe) {
+        if (!expectedProtocol) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'skipProtocolProbe requires an expected BLE protocol'
+          );
+        }
+        this.deviceProtocol.set(uuid, expectedProtocol);
+        this.sessionProtocols.set(uuid, expectedProtocol);
+        this.protocolReprobeFailures.delete(uuid);
+        Log?.debug('[ReactNativeBleTransport] protocol selected without probe', {
+          deviceId: uuid,
+          protocol: expectedProtocol,
+          source: 'firmware-install-reconnect',
+        });
+        const currentTransport = transportCache[uuid];
+        if (!currentTransport) {
+          throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
+        }
+        this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
+        return { uuid, protocolType: expectedProtocol };
+      }
+
       const protocolType = await this.detectProtocol(
         uuid,
         expectedProtocol,
