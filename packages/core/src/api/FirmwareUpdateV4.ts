@@ -375,6 +375,18 @@ const isProtocolV2TargetStatusInProgress = (
   normalizeProtocolV2TargetStatus(status) === PROTOCOL_V2_TARGET_STATUS_PENDING ||
   normalizeProtocolV2TargetStatus(status) === PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS;
 
+const getProtocolV2FirmwareStatusFingerprint = (
+  statusTargets: ProtocolV2FirmwareUpdateStatusTarget[]
+) =>
+  JSON.stringify(
+    statusTargets.map(target => ({
+      targetId: normalizeProtocolV2TargetId(target.target_id) ?? target.target_id,
+      status: normalizeProtocolV2TargetStatus(target.status) ?? target.status ?? null,
+      payloadVersion: target.payload_version ?? null,
+      path: target.path ?? null,
+    }))
+  );
+
 const isProtocolV2TargetStatusFailed = (status: ProtocolV2FirmwareUpdateStatusTarget['status']) => {
   const normalizedStatus = normalizeProtocolV2TargetStatus(status);
   return (
@@ -529,6 +541,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private protocolV2LatestFinalDeviceInfo?: ProtocolV2DeviceInfo;
 
   private protocolV2InstallBaselineVersions = new Map<number, string>();
+
+  private protocolV2InstallStatusBaseline?: ProtocolV2FirmwareUpdateStatusTarget[];
 
   private protocolV2LastRuntimeProbeFeatures?: Features;
 
@@ -2383,7 +2397,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ) {
     const expectedTargetIds = new Set(targets.map(target => target.target_id));
     const expectedPaths = new Map(targets.map(target => [target.target_id, target.path]));
-    const startTime = Date.now();
+    const confirmationStartedAt = Date.now();
+    let installStartedAt = requireCurrentInstallStatus ? undefined : confirmationStartedAt;
+    const effectiveBaselineStatusTargets = this.protocolV2InstallStatusBaseline;
+    const baselineStatusFingerprint = effectiveBaselineStatusTargets
+      ? getProtocolV2FirmwareStatusFingerprint(effectiveBaselineStatusTargets)
+      : undefined;
     let lastError: unknown;
     // DeviceFirmwareUpdateRequest leaves the current loader link usable for status polling.
     // Reconnecting here probes DeviceInfo, which loaders reject while installation is active.
@@ -2392,7 +2411,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let installEvidenceObserved = false;
     let currentInstallStatusObserved = false;
 
-    while (Date.now() - startTime < PROTOCOL_V2_INSTALL_TIMEOUT) {
+    while (Date.now() - (installStartedAt ?? confirmationStartedAt) < PROTOCOL_V2_INSTALL_TIMEOUT) {
       // A transport release caused by an explicit workflow cancellation must not
       // be mistaken for the expected device reboot during installation.
       this.throwIfAborted();
@@ -2426,7 +2445,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             statusResponse.type === 'DeviceFirmwareUpdateStatus'
               ? ((statusResponse.message.records ?? []) as ProtocolV2FirmwareUpdateStatusTarget[])
               : [];
-          const hasInProgressTarget = statusTargets.some(target => {
+          const hasPendingOrInProgressTarget = statusTargets.some(target => {
             const targetId = normalizeProtocolV2TargetId(target.target_id);
             return (
               targetId !== undefined &&
@@ -2434,8 +2453,25 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
               isProtocolV2TargetStatusInProgress(target.status)
             );
           });
-          if (hasInProgressTarget) {
+          const isExpectedStatusSnapshot =
+            statusTargets.length === targets.length &&
+            targets.every((expectedTarget, index) => {
+              const statusTarget = statusTargets[index];
+              return (
+                statusTarget !== undefined &&
+                normalizeProtocolV2TargetId(statusTarget.target_id) === expectedTarget.target_id &&
+                statusTarget.path === expectedTarget.path
+              );
+            });
+          const statusFingerprint = getProtocolV2FirmwareStatusFingerprint(statusTargets);
+          const hasCurrentInstallTransition =
+            baselineStatusFingerprint !== undefined
+              ? isExpectedStatusSnapshot && statusFingerprint !== baselineStatusFingerprint
+              : hasPendingOrInProgressTarget;
+          if (!currentInstallStatusObserved && hasCurrentInstallTransition) {
             currentInstallStatusObserved = true;
+            installStartedAt = Date.now();
+            Log.log('[FirmwareUpdateV4] current firmware install records observed');
           }
           const hasMatchingTargetStatus = statusTargets.some(target => {
             const targetId = normalizeProtocolV2TargetId(target.target_id);
@@ -2849,8 +2885,30 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     targets: Array<{ target_id: number; path: string }>;
   }) {
     this.protocolV2LastRuntimeProbeFeatures = undefined;
+    this.protocolV2InstallStatusBaseline = undefined;
     const commands = this.device.getCommands();
     await commands.typedCall('DeviceFirmwareUpdateStage', 'Success', { targets });
+    try {
+      const baselineStatusResponse = await commands.typedCall(
+        'DeviceFirmwareUpdateStatusGet',
+        ['DeviceFirmwareUpdateStatus', 'Success'],
+        {
+          fields: {
+            status: true,
+            payload_version: true,
+            path: true,
+          },
+        },
+        { timeoutMs: PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT }
+      );
+      this.protocolV2InstallStatusBaseline =
+        baselineStatusResponse.type === 'DeviceFirmwareUpdateStatus'
+          ? ((baselineStatusResponse.message.records ??
+              []) as ProtocolV2FirmwareUpdateStatusTarget[])
+          : [];
+    } catch (error) {
+      Log.log('[FirmwareUpdateV4] unable to capture pre-install firmware status: ', error);
+    }
     this.device.setCancelableAction(() => commands.cancelDevice());
     const interaction = this.device.createProtocolV2UiPhaseMetadata('button', 'start');
     this.postMessage(
@@ -2864,7 +2922,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         ...(interaction ? { interaction } : {}),
       })
     );
-    await commands.call('DeviceFirmwareUpdateRequest', {}, { returnAfterWrite: true });
+    try {
+      await commands.call('DeviceFirmwareUpdateRequest', {});
+    } catch (error) {
+      this.throwIfAborted();
+      if (!isProtocolV2DeviceDisconnectedError(error)) {
+        throw error;
+      }
+      Log.log(
+        '[FirmwareUpdateV4] BLE transport released after install request; continue status polling'
+      );
+    }
   }
 
   private async protocolV2Reboot(rebootType: DeviceRebootType) {
