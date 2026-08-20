@@ -131,6 +131,12 @@ describe('device feature selectors', () => {
     expect(getDeviceTypeByBleName('Pro2 A1B2')).toBe(EDeviceType.Pro2);
     expect(getDeviceTypeByBleName('Pro2A1B2')).toBe(EDeviceType.Pro2);
     expect(getDeviceTypeByBleName('OneKeyPro2A1B2')).toBe(EDeviceType.Pro2);
+    expect(getDeviceTypeByBleName('Pro 2 A1B2')).toBe(EDeviceType.Pro2);
+    expect(getDeviceTypeByBleName('Pro 2 0088')).toBe(EDeviceType.Pro2);
+    expect(getDeviceTypeByBleName('OneKey Pro 2 A1B2')).toBe(EDeviceType.Pro2);
+    expect(getDeviceTypeByBleName('Pro A1B2')).toBe(EDeviceType.Pro);
+    expect(getDeviceTypeByBleName('Pro 22D8')).toBe(EDeviceType.Pro);
+    expect(getDeviceTypeByBleName('Pro 2D8F')).toBe(EDeviceType.Pro);
   });
 
   test.each([EDeviceType.Pro2, EDeviceType.Neo])(

@@ -724,7 +724,7 @@ describe('Protocol V2 feature adapter', () => {
       protocol_version: 1,
       hw: { serial_no: 'P2-STATIC' },
       main_mcu: { application: { version: '1.0.0' } },
-      coprocessor: { bt_adv_name: 'Pro2 STATIC' },
+      coprocessor: { bt_adv_name: 'Pro2 A1B2' },
     };
     const deviceStatus: DeviceStatus = {
       device_id: 'P2-DYNAMIC',
@@ -744,7 +744,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(features).toMatchObject({
       deviceId: 'P2-DYNAMIC',
       serialNo: 'P2-STATIC',
-      bleName: 'Pro2 STATIC',
+      bleName: 'Pro 2 A1B2',
       initialized: true,
       unlocked: true,
       passphraseProtection: true,
@@ -767,7 +767,7 @@ describe('Protocol V2 feature adapter', () => {
     const protocolV2 = buildProtocolV2FeaturesPayload({
       deviceInfo: {
         hw: { Device_type: DeviceType.PRO2, serial_no: 'P2-001' },
-        coprocessor: { bt_adv_name: 'Pro 2 BLE' },
+        coprocessor: { bt_adv_name: 'Pro 2 B1E2' },
       },
       deviceStatus: {
         device_id: 'v2-device',
@@ -784,7 +784,7 @@ describe('Protocol V2 feature adapter', () => {
     });
     expect(protocolV2).toMatchObject({
       device_id: 'v2-device',
-      ble_name: 'Pro 2 BLE',
+      ble_name: 'Pro 2 B1E2',
       onekey_device_type: 'PRO2',
       passphrase_protection: true,
     });
@@ -825,7 +825,7 @@ describe('Protocol V2 feature adapter', () => {
           build_id: 'bt-build',
           hash: [12, 13],
         },
-        bt_adv_name: 'Pro2 BLE',
+        bt_adv_name: 'Pro2 B1E2',
       },
       se1: {
         application: {
@@ -865,7 +865,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(features.boardVersion).toBe('0.1.0');
     expect(features.verify?.boardBuildId).toBe('rom-build');
     expect(features.verify?.boardHash).toBe('0102ff');
-    expect(features.bleName).toBe('Pro2 BLE');
+    expect(features.bleName).toBe('Pro 2 B1E2');
     expect(features.bleVersion).toBe('4.5.6');
     expect(features.verify?.bleHash).toBe('0c0d');
     expect(features.se01Version).toBe('7.8.9');
@@ -2806,9 +2806,9 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(device.toMessageObject()).toMatchObject({
       serialNo: 'PR9999999999',
-      bleName: 'Pro2 6136',
-      name: 'Pro2 6136',
-      label: 'Pro2 6136',
+      bleName: 'Pro 2 6136',
+      name: 'Pro 2 6136',
+      label: 'Pro 2 6136',
     });
     expect(device.features?.label).toBeNull();
   });
@@ -2823,8 +2823,8 @@ describe('Protocol V2 feature adapter', () => {
 
     expect(device.getCurrentDisplayName()).toBe('My Pro 2');
     expect(device.toMessageObject()).toMatchObject({
-      bleName: 'Pro2 6136',
-      name: 'Pro2 6136',
+      bleName: 'Pro 2 6136',
+      name: 'Pro 2 6136',
       label: 'My Pro 2',
     });
   });
@@ -4509,9 +4509,7 @@ describe('Protocol V2 firmware update targets', () => {
       ],
       installItems: [applicationP1InstallItem],
     });
-    const release = jest.fn();
-    (method as any).prepareProtocolV2LocalMemoryHost = jest.fn().mockResolvedValue({ release });
-    (method as any).runProtocolV2PreparedArtifacts = jest
+    (method as any).runProtocolV2DirectArtifacts = jest
       .fn()
       .mockResolvedValue('sdk-managed-resource-result');
     method.postTipMessage = jest.fn();
@@ -4533,13 +4531,10 @@ describe('Protocol V2 firmware update targets', () => {
     });
     expect(getSysResourceBinarySpy).toHaveBeenCalledWith('https://example.com/pro2-resource.zip');
     expect((method as any).params.resourceArchiveBinary).toBe(resourceArchiveBinary);
-    expect((method as any).prepareProtocolV2LocalMemoryHost).toHaveBeenCalledWith({
-      features: expect.objectContaining({ deviceType: 'pro2' }),
-      firmwareType: EFirmwareType.Universal,
+    expect((method as any).runProtocolV2DirectArtifacts).toHaveBeenCalledWith({
       availableInstallItems: [applicationP1InstallItem],
+      announceDownload: false,
     });
-    expect((method as any).runProtocolV2PreparedArtifacts).toHaveBeenCalledTimes(1);
-    expect(release).toHaveBeenCalledTimes(1);
   });
 
   test('preserves SDK-managed resource installation errors after preparation', async () => {
@@ -4575,9 +4570,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).downloadRemoteProtocolV2ResourceArchive = jest
       .fn()
       .mockResolvedValue(resourceArchiveBinary);
-    const release = jest.fn();
-    (method as any).prepareProtocolV2LocalMemoryHost = jest.fn().mockResolvedValue({ release });
-    (method as any).runProtocolV2PreparedArtifacts = jest.fn().mockRejectedValue(installError);
+    (method as any).runProtocolV2DirectArtifacts = jest.fn().mockRejectedValue(installError);
     method.postTipMessage = jest.fn();
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('sdk-managed' as never);
 
@@ -4587,7 +4580,7 @@ describe('Protocol V2 firmware update targets', () => {
       requireResources: true,
       resourceDeviceType: EDeviceType.Pro2,
     });
-    expect(release).toHaveBeenCalledTimes(1);
+    expect((method as any).runProtocolV2DirectArtifacts).toHaveBeenCalledTimes(1);
   });
 
   test('reboots Protocol V2 normal-mode device to bootloader before transfer', async () => {
@@ -7625,7 +7618,7 @@ describe('Protocol V2 firmware update targets', () => {
     }
   });
 
-  test('converts a local resource ZIP into a local PreparedPlan without matching a remote release', async () => {
+  test('installs a local resource ZIP without matching a remote release', async () => {
     const imagesBinary = createProtocolV2OkppBinary({ version: [1, 0, 0] });
     const bootResourceBinary = createProtocolV2OkppBinary({
       version: [1, 0, 0],
@@ -7675,16 +7668,7 @@ describe('Protocol V2 firmware update targets', () => {
       await expect(method.run()).resolves.toBe('local-resource-result');
       expect(releaseSpy).not.toHaveBeenCalled();
       expect(reloadSpy).not.toHaveBeenCalled();
-      expect((method as any).params.preparedPlan).toMatchObject({
-        networkPolicy: 'forbid',
-        executor: 'v4',
-        targetsToUpdate: ['app_v1', 'resource'],
-      });
-      expect(
-        (method as any).params.preparedPlan.artifacts.some(
-          (artifact: { target: string }) => artifact.target === 'boot'
-        )
-      ).toBe(false);
+      expect((method as any).params.preparedPlan).toBeUndefined();
       expect((method as any).executeProtocolV2SourceUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           installSources: [
@@ -7720,6 +7704,10 @@ describe('Protocol V2 firmware update targets', () => {
     zip.file('pro2-resource/bundles/images/images.okpkg', imagesBinary);
     zip.file('pro2-resource/loaders/bootloader/boot_resource.okpkg', bootResourceBinary);
     zip.file('pro2-resource/build-info.txt', 'ignored');
+    zip.file(
+      '__MACOSX/pro2-resource 2/bundles/._images.okpkg',
+      new Uint8Array([0x00, 0x05, 0x16, 0x07])
+    );
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -7735,11 +7723,20 @@ describe('Protocol V2 firmware update targets', () => {
         await zip.generateAsync({ type: 'arraybuffer' })
       )
     ).resolves.toMatchObject({
-      materializedEntries: [
-        { entryName: 'pro2-resource/bundles/images/images.okpkg', binary: imagesBinary },
+      resources: [
+        {
+          entryName: 'pro2-resource/bundles/images/images.okpkg',
+          binary: imagesBinary,
+          header: expect.objectContaining({
+            devicePath: 'vol0:/bundles/images/images.okpkg',
+          }),
+        },
         {
           entryName: 'pro2-resource/loaders/bootloader/boot_resource.okpkg',
           binary: bootResourceBinary,
+          header: expect.objectContaining({
+            devicePath: 'vol0:/loaders/bootloader/boot_resource.okpkg.staging',
+          }),
         },
       ],
     });
@@ -8035,7 +8032,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledWith(stagingPath, 3);
   });
 
-  test('rewrites the mounted boot resource staging file even when the final file is current', async () => {
+  test('skips boot resource staging when the live package hash matches', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -8067,12 +8064,62 @@ describe('Protocol V2 firmware update targets', () => {
       resourceSources: [resource],
     });
 
-    const stagingPath = 'vol0:/loaders/bootloader/boot_resource.okpkg.staging';
-    expect((method as any).isProtocolV2ResourceBundleUpToDate).not.toHaveBeenCalled();
-    expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledWith(
-      expect.objectContaining({ source: resource.source, filePath: stagingPath, totalSize: 3 })
+    expect((method as any).isProtocolV2ResourceBundleUpToDate).toHaveBeenCalledWith(resource);
+    expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
+  });
+
+  test('compares boot resource staging against the live mounted package path', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+
+    expect(
+      (method as any).getProtocolV2ResourceComparePath(
+        'vol0:/loaders/bootloader/boot_resource.okpkg.staging'
+      )
+    ).toBe('vol0:/loaders/bootloader/boot_resource.okpkg');
+    expect((method as any).getProtocolV2ResourceComparePath('vol0:/bundles/images.okpkg')).toBe(
+      'vol0:/bundles/images.okpkg'
     );
-    expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledWith(stagingPath, 3);
+  });
+
+  test('skips bootloader params staging when the on-device package is already current', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+
+    method.postTipMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+    (method as any).isProtocolV2ResourceBundleUpToDate = jest.fn().mockResolvedValue(true);
+    (method as any).protocolV2SourceUpdateProcess = jest.fn().mockResolvedValue(3);
+    (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
+
+    const resource = {
+      name: 'params.okpkg',
+      source: {
+        size: 3,
+        readAt: jest.fn(),
+        close: jest.fn(),
+      },
+      devicePath: 'vol0:/loaders/bootloader/params.okpkg.staging',
+      version: [1, 0, 0],
+      payloadHash: '11'.repeat(64),
+      headerHash: '22'.repeat(64),
+    };
+
+    await (method as any).executeProtocolV2TransferPhase({
+      installSources: [],
+      resourceSources: [resource],
+    });
+
+    expect((method as any).isProtocolV2ResourceBundleUpToDate).toHaveBeenCalledWith(resource);
+    expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
   });
 
   test('uses absolute processed_byte offsets and disables append for firmware file writes', async () => {

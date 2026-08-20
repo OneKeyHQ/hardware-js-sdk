@@ -30,7 +30,7 @@ import {
   ProtocolV2FirmwareUpdate,
   type ProtocolV2FirmwareUpdateRequest,
 } from './ProtocolV2FirmwareUpdate';
-import { prepareFirmwareUpdatePlanMemoryHost } from './firmwareUpdatePlanHost';
+import { loadFirmwareUpdatePlanBinaries } from './firmwareUpdatePlanHost';
 import { buildDeviceAdvancedInfo } from './deviceAdvancedInfo';
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 import { HardwareInputPinDialogProvider } from '../../provider/HardwareInputPinProvider';
@@ -562,20 +562,11 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
         if (!plan || plan.executor !== 'v4') {
           throw new Error('Protocol V2 firmware update Plan is unavailable');
         }
-        const memoryHost = await prepareFirmwareUpdatePlanMemoryHost({
-          hardwareSDK: sdk,
-          plan,
+        const binaries = await loadFirmwareUpdatePlanBinaries({ plan });
+        const res = await sdk.firmwareUpdateV4(selectDevice.connectId, {
+          platform: params.platform,
+          ...binaries,
         });
-        let res;
-        try {
-          res = await sdk.firmwareUpdateV4(selectDevice.connectId, {
-            platform: params.platform,
-            preparedPlan: memoryHost.preparedPlan,
-            hostBindingGeneration: memoryHost.hostBindingGeneration,
-          });
-        } finally {
-          memoryHost.release();
-        }
         if (res.success) {
           await loadDeviceFeatures();
         }

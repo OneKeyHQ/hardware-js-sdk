@@ -3,6 +3,7 @@ import { EDeviceType, EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shar
 
 import { DataManager } from '../src/data-manager';
 import {
+  isProtocolV2ResourceArchiveEntryName,
   parseProtocolV2ResourcePackage,
   parseProtocolV2Resources,
 } from '../src/protocols/protocol-v2/resources';
@@ -104,6 +105,22 @@ describe('Pro2 resource configuration', () => {
     });
   });
 
+  test('ignores macOS ZIP metadata that only looks like a resource package', () => {
+    expect(
+      isProtocolV2ResourceArchiveEntryName('bundles/firmware_logo-pro2-prod_resource-signed.okpkg')
+    ).toBe(true);
+    expect(
+      isProtocolV2ResourceArchiveEntryName(
+        '__MACOSX/pro2-prod_resource 2/bundles/._firmware_logo-pro2-prod_resource-signed.okpkg'
+      )
+    ).toBe(false);
+    expect(
+      isProtocolV2ResourceArchiveEntryName(
+        'bundles/._firmware_logo-pro2-prod_resource-signed.okpkg'
+      )
+    ).toBe(false);
+  });
+
   test('reads the version, hashes, and direct device path from a RESC package', () => {
     expect(
       parseProtocolV2ResourcePackage(createResourcePackage('vol0:/bundles/images.okpkg'))
@@ -116,14 +133,30 @@ describe('Pro2 resource configuration', () => {
     });
   });
 
-  test('accepts the boot resource staging path and rejects paths outside resource roots', () => {
+  test('uses the RESC header device path and only rejects malformed paths', () => {
     expect(
       parseProtocolV2ResourcePackage(
         createResourcePackage('vol0:/loaders/bootloader/boot_resource.okpkg.staging')
       ).devicePath
     ).toBe('vol0:/loaders/bootloader/boot_resource.okpkg.staging');
-    expect(() =>
+    expect(
+      parseProtocolV2ResourcePackage(
+        createResourcePackage('vol0:/loaders/bootloader/params.okpkg.staging')
+      ).devicePath
+    ).toBe('vol0:/loaders/bootloader/params.okpkg.staging');
+    expect(
+      parseProtocolV2ResourcePackage(createResourcePackage('vol0:/loaders/rom/params.okpkg'))
+        .devicePath
+    ).toBe('vol0:/loaders/rom/params.okpkg');
+    expect(
       parseProtocolV2ResourcePackage(createResourcePackage('vol0:/unexpected/images.okpkg'))
+        .devicePath
+    ).toBe('vol0:/unexpected/images.okpkg');
+    expect(() =>
+      parseProtocolV2ResourcePackage(createResourcePackage('vol0:/bundles/../images.okpkg'))
+    ).toThrow('device path');
+    expect(() =>
+      parseProtocolV2ResourcePackage(createResourcePackage('vol0://bundles/images.okpkg'))
     ).toThrow('device path');
   });
 

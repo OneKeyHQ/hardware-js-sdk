@@ -179,7 +179,7 @@ describe('FirmwareUpdatePreparedPlan', () => {
     ).toThrow('plan digest is invalid');
   });
 
-  test('projects portable archive paths to unique device resource names', () => {
+  test('keeps ZIP entries unique by archive path, not basename', () => {
     const plan = buildPlan();
     const buildArtifacts = (entryNames: string[]) => [
       {
@@ -200,7 +200,17 @@ describe('FirmwareUpdatePreparedPlan', () => {
       prepareFirmwareUpdatePlan({
         plan,
         leaseRef: 'fwlease:00000000-0000-4000-8000-000000000001',
-        artifacts: buildArtifacts(['icons/index.bin', 'fonts/index.bin']),
+        artifacts: buildArtifacts([
+          'loaders/bootloader/params-pro2-prod_resource-unsigned.okpkg',
+          'loaders/rom/params-pro2-prod_resource-unsigned.okpkg',
+        ]),
+      })
+    ).not.toThrow();
+    expect(() =>
+      prepareFirmwareUpdatePlan({
+        plan,
+        leaseRef: 'fwlease:00000000-0000-4000-8000-000000000001',
+        artifacts: buildArtifacts(['loaders/rom/params.okpkg', 'loaders/rom/params.okpkg']),
       })
     ).toThrow('duplicate entry names');
     expect(() =>
@@ -248,7 +258,7 @@ describe('FirmwareUpdatePreparedPlan', () => {
               materializedEntries: [
                 ...(resourceArtifact.materializedEntries ?? []),
                 {
-                  entryName: 'other/index.bin',
+                  entryName: 'resource/index.bin',
                   artifact: artifact('d'.repeat(64), 2),
                 },
               ],

@@ -1,4 +1,8 @@
-import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+import {
+  EDeviceType,
+  EFirmwareType,
+  canonicalizePro2BleAdvertisementName,
+} from '@onekeyfe/hd-shared';
 
 import {
   resolveDeviceBleFirmwareVersion,
@@ -245,7 +249,8 @@ export const buildProtocolV2FeaturesPayload = ({
   const deviceId = status?.device_id ?? cached?.deviceId ?? null;
   const serialNo = firstValue(incomingSerialNo, cached?.serialNo) ?? '';
   const label = cached?.label ?? null;
-  const bleName = firstValue(info?.coprocessor?.bt_adv_name, cached?.bleName);
+  const rawBleName = firstValue(info?.coprocessor?.bt_adv_name, cached?.bleName);
+  const bleName = rawBleName ? canonicalizePro2BleAdvertisementName(rawBleName) : rawBleName;
   const initialized = firstValue(status?.init_states, cached?.initialized) ?? null;
   // passphrase_enabled from a locked Pro2 is not authoritative. Only DeviceStatus
   // after PIN unlock can determine the final passphrase setting.
