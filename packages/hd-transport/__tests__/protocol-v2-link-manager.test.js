@@ -317,6 +317,76 @@ describe('ProtocolV2LinkManager', () => {
     ]);
   });
 
+  test('times out a queued call without sending it after the active call settles', async () => {
+    let releaseActiveRead;
+    let markActiveReadStarted;
+    const activeReadStarted = new Promise(resolve => {
+      markActiveReadStarted = resolve;
+    });
+    const activeReadBlocked = new Promise(resolve => {
+      releaseActiveRead = resolve;
+    });
+    const sentSeqs = [];
+    const success = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: 1, packetSrc: 0, seq: 1 }
+    );
+    let requestSeq = 0;
+    let readCount = 0;
+    const adapter = {
+      router: 1,
+      generation: 1,
+      prepareCall: jest.fn(),
+      writeFrame: jest.fn(frame => {
+        [, , , , , , requestSeq] = frame;
+        sentSeqs.push(requestSeq);
+        return Promise.resolve();
+      }),
+      readFrame: jest.fn(async () => {
+        readCount += 1;
+        if (readCount === 1) {
+          markActiveReadStarted();
+          await activeReadBlocked;
+        }
+        return rewriteSeq(success, requestSeq);
+      }),
+      reset: jest.fn(),
+      createTimeoutError: (name, timeoutMs) =>
+        new Error(`response timeout after ${timeoutMs}ms for ${name}`),
+    };
+    const manager = new ProtocolV2LinkManager({
+      getSchemas: () => schemas,
+      classifyError: () => 'recoverable',
+    });
+    const createAdapter = jest.fn(() => adapter);
+
+    const activeCall = manager.call('device-a', createAdapter, 'Ping', { message: 'active' });
+    await activeReadStarted;
+    const queuedCall = manager.call(
+      'device-a',
+      createAdapter,
+      'Ping',
+      { message: 'queued' },
+      { timeoutMs: 20 }
+    );
+
+    await expect(queuedCall).rejects.toThrow('response timeout after 20ms for Ping');
+    expect(sentSeqs).toEqual([1]);
+
+    releaseActiveRead();
+    await activeCall;
+    await expect(
+      manager.call('device-a', createAdapter, 'Ping', { message: 'after-timeout' })
+    ).resolves.toEqual({
+      type: 'Success',
+      message: { message: 'ok' },
+    });
+
+    expect(sentSeqs).toEqual([1, 2]);
+  });
+
   test('writes flow control while the active call is waiting for its response', async () => {
     const sentSeqs = [];
     let releaseRead;

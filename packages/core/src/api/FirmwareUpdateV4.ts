@@ -530,9 +530,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private protocolV2InstallBaselineVersions = new Map<number, string>();
 
-  private protocolV2InstallNeedsBleReconnect = false;
+  private protocolV2InstallNeedsReconnect = false;
 
-  private protocolV2InstallRequestConfirmed = false;
+  private protocolV2InstallTerminalSuccessObserved = false;
 
   private protocolV2LastRuntimeProbeFeatures?: Features;
 
@@ -2441,13 +2441,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const expectedPaths = new Map(targets.map(target => [target.target_id, target.path]));
     const startTime = Date.now();
     let lastError: unknown;
-    // USB may keep the loader link usable. BLE can release it as installation starts, so its
-    // recovery reconnects directly to status polling without generic Ping or DeviceInfo probes.
-    let shouldReconnect = this.protocolV2InstallNeedsBleReconnect;
-    this.protocolV2InstallNeedsBleReconnect = false;
+    // The loader may release either USB or BLE as installation starts. Recovery reconnects
+    // directly to status polling without generic Ping or DeviceInfo probes.
+    let shouldReconnect = this.protocolV2InstallNeedsReconnect;
+    this.protocolV2InstallNeedsReconnect = false;
     let deviceInfo: ProtocolV2DeviceInfo | undefined;
     let bleInstallLinkReady = false;
-    let installEvidenceObserved = this.protocolV2InstallRequestConfirmed;
+    let installEvidenceObserved = this.protocolV2InstallTerminalSuccessObserved;
     let currentInstallStatusObserved = false;
     const liveTargetIds = new Set<number>();
 
@@ -2465,7 +2465,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             : await this.verifyProtocolV2ReconnectIdentity();
           shouldReconnect = false;
         }
-        const currentDeviceInfo = deviceInfo;
+        let currentDeviceInfo = deviceInfo;
         try {
           const statusResponse = await this.device.getCommands().typedCall(
             'DeviceFirmwareUpdateStatusGet',
@@ -2479,7 +2479,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             },
             { timeoutMs: PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT }
           );
-          if (this.protocolV2InstallRequestConfirmed) {
+          if (this.protocolV2InstallTerminalSuccessObserved) {
             installEvidenceObserved = true;
           }
           const statusTargets = (statusResponse.message.records ??
@@ -2502,28 +2502,50 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             const targetId = normalizeProtocolV2TargetId(target.target_id);
             return targetId !== undefined && expectedTargetIds.has(targetId);
           });
+          const hasCurrentInstallEvidence =
+            currentInstallStatusObserved || this.protocolV2InstallTerminalSuccessObserved;
           const shouldVerifyTargetCompletion =
-            !requireCurrentInstallStatus || currentInstallStatusObserved;
+            !requireCurrentInstallStatus || hasCurrentInstallEvidence;
           if (
             shouldVerifyTargetCompletion &&
             this.assertProtocolV2TargetStatus(
               statusTargets,
               expectedTargetIds,
               expectedPaths,
-              requireCurrentInstallStatus ? liveTargetIds : undefined
+              requireCurrentInstallStatus && !this.protocolV2InstallTerminalSuccessObserved
+                ? liveTargetIds
+                : undefined
             )
           ) {
             return;
           }
 
+          if (!hasCurrentInstallEvidence) {
+            // A successful status poll clears DeviceCommands' cancel action. Keep cancellation
+            // available while UpdateRequest is still waiting for confirmation on the device.
+            this.device.setCancelableAction(() => this.device.getCommands().cancelDevice());
+          }
+
           if (
             requireCurrentInstallStatus &&
-            !currentInstallStatusObserved &&
+            !hasCurrentInstallEvidence &&
             matchingStatusTargets.length > 0
           ) {
             lastError = new Error(
               'Protocol V2 firmware status is stale; waiting for the current install to start'
             );
+          }
+
+          if (
+            statusTargets.length === 0 &&
+            !currentDeviceInfo &&
+            bleInstallLinkReady &&
+            installEvidenceObserved
+          ) {
+            // BLE install reconnect skips generic probes because loaders may not answer Ping.
+            // Restore the verified identity only after current-install evidence disappears.
+            currentDeviceInfo = await this.verifyProtocolV2ReconnectIdentity();
+            deviceInfo = currentDeviceInfo;
           }
 
           if (statusTargets.length === 0 && currentDeviceInfo) {
@@ -2960,11 +2982,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     targets: Array<{ target_id: number; path: string }>;
   }) {
     this.protocolV2LastRuntimeProbeFeatures = undefined;
-    this.protocolV2InstallNeedsBleReconnect = false;
-    this.protocolV2InstallRequestConfirmed = false;
+    this.protocolV2InstallNeedsReconnect = false;
+    this.protocolV2InstallTerminalSuccessObserved = false;
     const commands = this.device.getCommands();
     await commands.typedCall('DeviceFirmwareUpdateStage', 'Success', { targets });
-    this.device.setCancelableAction(() => commands.cancelDevice());
+    this.device.setCancelableAction(() => this.device.getCommands().cancelDevice());
     const interaction = this.device.createProtocolV2UiPhaseMetadata('button', 'start');
     this.postMessage(
       createUiMessage(UI_REQUEST.REQUEST_BUTTON, {
@@ -2978,55 +3000,31 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       })
     );
 
-    if (this.isBleReconnect()) {
-      try {
-        await commands.call(
-          'DeviceFirmwareUpdateRequest',
-          {},
-          {
-            returnAfterWrite: true,
-            expectedTypes: ['Success'],
-            onResponseAfterWrite: response => {
-              if (response.type !== 'Success') return;
-              this.protocolV2InstallRequestConfirmed = true;
-              this.device.clearCancelableAction();
-              this.postProgressMessage(1, 'installingFirmware');
-              Log.log('[FirmwareUpdateV4] BLE firmware install confirmed by device response');
-            },
-          }
-        );
-        Log.log(
-          '[FirmwareUpdateV4] BLE firmware install request written; continue with status polling'
-        );
-      } catch (error) {
-        this.throwIfAborted();
-        if (!isProtocolV2DeviceDisconnectedError(error)) {
-          throw error;
-        }
-        Log.log(
-          '[FirmwareUpdateV4] BLE transport released while writing install request; continue status polling'
-        );
-        this.protocolV2InstallNeedsBleReconnect = true;
-      }
-      return;
-    }
-
     try {
-      await commands.typedCall('DeviceFirmwareUpdateRequest', 'Success', {});
-      this.protocolV2InstallRequestConfirmed = true;
-      this.postProgressMessage(1, 'installingFirmware');
-      Log.log('[FirmwareUpdateV4] firmware install confirmed by device response');
+      await commands.call(
+        'DeviceFirmwareUpdateRequest',
+        {},
+        {
+          returnAfterWrite: true,
+          expectedTypes: ['Success'],
+          onResponseAfterWrite: response => {
+            if (response.type !== 'Success') return;
+            this.protocolV2InstallTerminalSuccessObserved = true;
+            this.device.clearCancelableAction();
+            Log.log('[FirmwareUpdateV4] firmware install completed by device response');
+          },
+        }
+      );
+      Log.log('[FirmwareUpdateV4] firmware install request written; continue with status polling');
     } catch (error) {
       this.throwIfAborted();
       if (!isProtocolV2DeviceDisconnectedError(error)) {
         throw error;
       }
       Log.log(
-        '[FirmwareUpdateV4] BLE transport released after install request; continue status polling'
+        '[FirmwareUpdateV4] transport released while writing install request; continue status polling'
       );
-      if (this.isBleReconnect()) {
-        this.protocolV2InstallNeedsBleReconnect = true;
-      }
+      this.protocolV2InstallNeedsReconnect = true;
     }
   }
 
