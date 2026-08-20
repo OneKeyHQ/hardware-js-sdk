@@ -1131,9 +1131,17 @@ async function discoverServicesAndCharacteristics(
 
   // Main discovery logic as async function
   const discoveryPromise = (async (): Promise<CharacteristicPair> => {
-    // Step 1: Discover ALL services (no filter — Pro2 may use different service UUID)
+    // Step 1: Discover the OneKey service by UUID. Filtering is not just a
+    // narrowing: an unfiltered discovery is answered from the OS GATT cache, so
+    // a device whose stack still advertises and accepts links but no longer
+    // serves its application layer still looks healthy — the link comes up, the
+    // cached services resolve, the protocol frame goes out and nothing ever
+    // answers. A targeted query returns nothing in that state, which is what
+    // 6.5.0 relied on to trip the recovery path below (retry, reset, fresh
+    // scan) — the sequence that brings such a device back. Pro2/Neo expose the
+    // same service UUID, and the selection below only ever accepts that one.
     const services = await new Promise<Service[]>((resolve, reject) => {
-      peripheral.discoverServices([], (error, svc) => {
+      peripheral.discoverServices(ONEKEY_SERVICE_UUIDS, (error, svc) => {
         if (error) {
           logger?.error('[NobleBLE] Service discovery failed:', error);
           reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error.message));
@@ -1144,7 +1152,7 @@ async function discoverServicesAndCharacteristics(
     });
 
     if (!services || services.length === 0) {
-      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No services found');
+      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found');
     }
 
     logger?.debug('[NobleBLE] services discovered', {
