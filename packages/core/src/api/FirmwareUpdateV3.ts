@@ -566,7 +566,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           HardwareErrorCode.BlePermissionError,
           HardwareErrorCode.BleLocationError,
           HardwareErrorCode.BleDeviceBondError,
-          HardwareErrorCode.BlePeerRemovedPairingInformation,
           HardwareErrorCode.BleCharacteristicNotifyError,
           HardwareErrorCode.BleTimeoutError,
           HardwareErrorCode.BleWriteCharacteristicError,

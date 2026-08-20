@@ -392,7 +392,7 @@ export default class ReactNativeBleTransport {
   /**
    * Native encryption/pairing failures seen before Protocol V2 probe starts.
    * Pro2/Neo GATT connect can succeed on a stale iOS bond; the CCCD write then
-   * fails with ATT 14/15. Remember it so detectProtocol fails immediately.
+   * fails with ATT 5/15. Remember it so detectProtocol fails immediately.
    */
   private staleBondErrors: Map<string, Error> = new Map();
 
@@ -2073,7 +2073,7 @@ export default class ReactNativeBleTransport {
     }
 
     // iOS Classic/Touch/Pro skip probing above. Pro2/Neo still probe, and a stale
-    // OS bond must not wait for Ping/GetFeatures timeouts after ATT 14/15.
+    // OS bond must not wait for Ping/GetFeatures timeouts after ATT 5/15.
     this.throwIfStaleBondError(uuid);
 
     if (expectedProtocol === 'V1') {
