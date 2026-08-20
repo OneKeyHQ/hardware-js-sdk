@@ -410,6 +410,22 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
+  test('keeps native stale-bond write mapping out of Protocol V1 calls', async () => {
+    const { transport, uuid, writeCharacteristic } = createV1Harness();
+    const nativeError = Object.assign(new Error('Encryption is insufficient'), {
+      attErrorCode: 15,
+      reason: 'Encryption is insufficient',
+    });
+
+    await transport.acquire({ uuid, expectedProtocol: 'V1' });
+    writeCharacteristic.writeWithResponse.mockRejectedValueOnce(nativeError);
+
+    await expect(transport.call(uuid, 'Initialize', {}, { timeoutMs: 50 })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleWriteCharacteristicError,
+    });
+    await transport.release(uuid, true);
+  });
+
   test('detects Protocol V2 on iOS without using the BLE name as a protocol hint', async () => {
     const { transport, uuid, device, sentSeqs, writeCharacteristic } = createHarness({
       deviceName: 'Pro2 6E9E',

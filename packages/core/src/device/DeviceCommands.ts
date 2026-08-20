@@ -325,10 +325,7 @@ export class DeviceCommands {
         errorCode: error?.errorCode,
         response: getSafeTransportLogPayload(error?.response?.data, type),
       });
-      if (
-        error.errorCode === HardwareErrorCode.BleDeviceBondError ||
-        error.errorCode === HardwareErrorCode.BlePeerRemovedPairingInformation
-      ) {
+      if (error.errorCode === HardwareErrorCode.BleDeviceBondError) {
         return {
           type: 'BleDeviceBondError',
           message: {
@@ -423,9 +420,6 @@ export class DeviceCommands {
           }
           if (error.message.indexOf('BleDeviceBondError') > -1) {
             throw ERRORS.TypedError(HardwareErrorCode.BleDeviceBondError);
-          }
-          if (error.message.indexOf('BlePeerRemovedPairingInformation') > -1) {
-            throw ERRORS.TypedError(HardwareErrorCode.BlePeerRemovedPairingInformation);
           }
           if (error.message.indexOf('BridgeDeviceDisconnected') > -1) {
             throw ERRORS.TypedError(HardwareErrorCode.BridgeDeviceDisconnected);

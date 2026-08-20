@@ -126,6 +126,19 @@ describe('DeviceCommands failure mapping', () => {
     );
   });
 
+  it('preserves the Protocol V2 peer-removed pairing error code', async () => {
+    const commands = createCommands();
+    const transportError = Object.assign(new Error('Peer removed pairing information'), {
+      errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
+    });
+    commands.mainId = 'main-id';
+    commands.transport = {
+      call: jest.fn().mockRejectedValue(transportError),
+    } as any;
+
+    await expect(commands._commonCall('DeviceInfoGet', {})).rejects.toBe(transportError);
+  });
+
   it('logs canonical DeviceStatus response fields without exposing the device ID', async () => {
     const commands = createCommands();
     const log = getLogger(LoggerNames.DeviceCommands);
