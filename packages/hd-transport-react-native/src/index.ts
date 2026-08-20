@@ -2078,31 +2078,23 @@ export default class ReactNativeBleTransport {
     protocolHint?: ProtocolType,
     rebuildTransport?: () => Promise<void>
   ): Promise<ProtocolType> {
-    // iOS still skips an extra V1 Initialize during acquire. Expected V2 must
-    // Ping so USB-priority `link disabled` can surface instead of a later
-    // unmapped RuntimeError.
-    if (Platform.OS === 'ios' && expectedProtocol === 'V1') {
-      this.deviceProtocol.set(uuid, expectedProtocol);
+    // A declared V1 is taken at face value on every platform, as iOS has done
+    // since protocol probing arrived: the caller reads the protocol off its own
+    // device record, so the probe re-asks a question that is already answered
+    // and costs a round trip on every acquire. Expected V2 must still Ping so
+    // USB-priority `link disabled` surfaces here instead of as a later unmapped
+    // RuntimeError. sessionProtocols is stamped too — the iOS path skipped it,
+    // which left the firmware-install reconnect (skipProtocolProbe) without the
+    // confirmed protocol it requires.
+    if (expectedProtocol === 'V1') {
+      this.deviceProtocol.set(uuid, 'V1');
+      this.sessionProtocols.set(uuid, 'V1');
       Log?.debug('[ReactNativeBleTransport] protocol selected', {
         deviceId: uuid,
-        protocol: expectedProtocol,
+        protocol: 'V1',
         source: 'expected',
       });
-      return expectedProtocol;
-    }
-
-    if (expectedProtocol === 'V1') {
-      if (await this.probeProtocolV1(uuid)) {
-        this.deviceProtocol.set(uuid, 'V1');
-        this.sessionProtocols.set(uuid, 'V1');
-        Log?.debug('[ReactNativeBleTransport] protocol detected', {
-          deviceId: uuid,
-          protocol: 'V1',
-          source: 'expected',
-        });
-        return 'V1';
-      }
-      throw this.createProtocolMismatchError(expectedProtocol, uuid);
+      return 'V1';
     }
 
     if (expectedProtocol === 'V2') {
