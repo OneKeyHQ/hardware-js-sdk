@@ -1431,21 +1431,24 @@ async function setupConnectionAndDiscoverServices(
   try {
     return await discoverServicesAndCharacteristicsWithRetry(peripheral, deviceId);
   } catch (discoveryError) {
-    // A connected peripheral does not advertise, so the fresh scan below can
-    // only run out its timeout. Drop the link instead and let the caller come
-    // back with a cold connect: that reconnect is what recovers a device whose
-    // stack stopped serving its application layer, and it starts seconds
-    // earlier this way. The scan still runs when the link is already down,
-    // which is the case it was written for.
+    // A connected peripheral does not advertise, so the fresh scan below would
+    // only run out its timeout. Drop the link first, then rescan: the cold
+    // reconnect is what recovers a device whose stack stopped serving its
+    // application layer. Recover here rather than throwing to the caller —
+    // one acquire pays ~2s for the rescan, while a thrown error costs the
+    // renderer a full retry round trip.
     if (peripheral.state === 'connected') {
       logger?.error(
-        '[NobleBLE] Service discovery failed on a live link, dropping it for a cold retry',
+        '[NobleBLE] Service discovery failed on a live link, dropping it before the fresh scan',
         discoveryError
       );
       await disconnectDevice(deviceId).catch(() => undefined);
-      throw discoveryError;
+    } else {
+      logger?.error(
+        '[NobleBLE] Service discovery failed, attempting fresh scan...',
+        discoveryError
+      );
     }
-    logger?.error('[NobleBLE] Service discovery failed, attempting fresh scan...', discoveryError);
     return freshScanAndDiscover(deviceId, webContents);
   }
 }
@@ -1716,9 +1719,14 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
         resolve();
       } catch (setupError) {
         logger?.error('[NobleBLE] Connection setup failed:', setupError);
-        connectedPeripheral.disconnect(() => {
-          reject(setupError);
-        });
+        // Never reject from inside a raw disconnect callback: noble only fires
+        // it on a real 'disconnect' event, so a peripheral that is already
+        // down leaves this promise — and the renderer acquire awaiting it —
+        // pending forever. disconnectDevice always settles (it no-ops on an
+        // unknown peripheral and caps the confirm wait).
+        disconnectDevice(deviceId)
+          .catch(() => undefined)
+          .then(() => reject(setupError));
       }
     });
   });
