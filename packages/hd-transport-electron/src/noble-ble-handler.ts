@@ -1431,6 +1431,20 @@ async function setupConnectionAndDiscoverServices(
   try {
     return await discoverServicesAndCharacteristicsWithRetry(peripheral, deviceId);
   } catch (discoveryError) {
+    // A connected peripheral does not advertise, so the fresh scan below can
+    // only run out its timeout. Drop the link instead and let the caller come
+    // back with a cold connect: that reconnect is what recovers a device whose
+    // stack stopped serving its application layer, and it starts seconds
+    // earlier this way. The scan still runs when the link is already down,
+    // which is the case it was written for.
+    if (peripheral.state === 'connected') {
+      logger?.error(
+        '[NobleBLE] Service discovery failed on a live link, dropping it for a cold retry',
+        discoveryError
+      );
+      await disconnectDevice(deviceId).catch(() => undefined);
+      throw discoveryError;
+    }
     logger?.error('[NobleBLE] Service discovery failed, attempting fresh scan...', discoveryError);
     return freshScanAndDiscover(deviceId, webContents);
   }
