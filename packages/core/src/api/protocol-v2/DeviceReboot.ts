@@ -1,3 +1,5 @@
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
+
 import { BaseMethod } from '../BaseMethod';
 import { normalizeRebootType } from './helpers';
 
@@ -11,6 +13,9 @@ export default class DeviceReboot extends BaseMethod<DeviceRebootParams> {
   init() {
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
+    this.unlockPolicy = 'unlock-before-run';
+    // Device-management action: main PIN or Attach PIN may authorize reboot.
+    this.protocolV2PreUnlockPinType = DeviceSessionPinType.Any;
     this.params = {
       rebootType: this.payload.rebootType,
       reboot_type: this.payload.reboot_type,

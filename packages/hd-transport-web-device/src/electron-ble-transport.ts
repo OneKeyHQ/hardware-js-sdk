@@ -11,6 +11,7 @@ import transport, {
   writeProtocolV2BleFrame,
 } from '@onekeyfe/hd-transport';
 import {
+  EBleDisconnectReason,
   ERRORS,
   HardwareErrorCode,
   HardwareErrorCodeMessage,
@@ -49,10 +50,6 @@ interface PacketProcessResult {
   isComplete: boolean;
   completePacket?: string;
   error?: string;
-}
-
-function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
-  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
 }
 
 const toBleDescriptor = (
@@ -105,6 +102,9 @@ export default class ElectronBleTransport {
 
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
 
+  /** Endpoints that answered a V2 probe in this transport lifetime. Survives disconnect. */
+  private confirmedProtocolV2 = new Set<string>();
+
   private deviceMtus: Map<string, number> = new Map();
 
   private devicePacketCapacities: Map<string, number> = new Map();
@@ -145,7 +145,15 @@ export default class ElectronBleTransport {
 
   private mtuCleanups: Map<string, () => void> = new Map();
 
-  private disconnectCleanups: Map<string, () => void> = new Map();
+  /**
+   * Transport-lifetime subscription to host BLE disconnects.
+   *
+   * This must NOT be scoped to acquire()/release(): a logical release keeps the
+   * native link alive for the keep-alive window, so a device that drops while
+   * idle would otherwise go unobserved and consumers would never learn it left
+   * (OK-60486).
+   */
+  private hostDisconnectCleanup?: () => void;
 
   private notificationTokens: Map<string, number> = new Map();
 
@@ -213,12 +221,6 @@ export default class ElectronBleTransport {
       mtuCleanup();
       this.mtuCleanups.delete(deviceId);
     }
-
-    const disconnectCleanup = this.disconnectCleanups.get(deviceId);
-    if (disconnectCleanup) {
-      disconnectCleanup();
-      this.disconnectCleanups.delete(deviceId);
-    }
   }
 
   init(logger: any, emitter?: EventEmitter) {
@@ -232,7 +234,46 @@ export default class ElectronBleTransport {
       );
     }
 
+    this.subscribeHostDisconnects();
+
     this.Log?.debug('[Electron BLE] Transport initialized');
+  }
+
+  /**
+   * One host subscription for the whole transport lifetime. init() can run
+   * again after an SDK reset, so drop the previous listener first rather than
+   * stacking duplicates.
+   */
+  private subscribeHostDisconnects() {
+    this.hostDisconnectCleanup?.();
+    this.hostDisconnectCleanup = window.desktopApi?.nobleBle?.onDeviceDisconnected(
+      (disconnectedDevice: { id: string; name: string; reason?: EBleDisconnectReason }) => {
+        const uuid = disconnectedDevice?.id;
+        if (!uuid) return;
+
+        // The link is gone, so renderer-side state must go with it; the next
+        // acquire reconnects from scratch.
+        this.cleanupDeviceState(uuid);
+
+        // Every link drop is reported, including the main process reclaiming
+        // an idle link on its keep-alive timer: consumers track whether a BLE
+        // link is live, not whether the peripheral is theoretically in range,
+        // and a link we closed ourselves is still a closed link. Nothing
+        // reconnects on its own, so this settles once until the user acts.
+        // `reason` is carried for diagnostics only — behaviour is uniform.
+        this.Log?.debug(
+          '[Electron BLE] Device link dropped:',
+          uuid,
+          disconnectedDevice.reason ?? EBleDisconnectReason.DeviceDisconnected
+        );
+
+        this.emitter?.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, {
+          name: disconnectedDevice.name,
+          id: uuid,
+          connectId: uuid,
+        });
+      }
+    );
   }
 
   configure(signedData: any) {
@@ -269,10 +310,6 @@ export default class ElectronBleTransport {
       this.Log?.debug(`[Electron BLE] enumerate found ${devices.length} device(s):`);
       for (const dev of devices) {
         this.Log?.debug(`[Electron BLE]   id="${dev.id}" name="${dev.name}"`);
-        const protocolHint = inferProtocolHintFromDeviceName(dev.name);
-        if (protocolHint) {
-          this.deviceProtocolHints.set(dev.id, protocolHint);
-        }
       }
       return devices.map(device => toBleDescriptor(device));
     } catch (error) {
@@ -310,9 +347,7 @@ export default class ElectronBleTransport {
       }
       const protocolHint = expectedProtocol
         ? undefined
-        : input.protocolHint ??
-          this.deviceProtocolHints.get(uuid) ??
-          inferProtocolHintFromDeviceName(device.name);
+        : input.protocolHint ?? this.deviceProtocolHints.get(uuid);
       if (protocolHint) {
         this.deviceProtocolHints.set(uuid, protocolHint);
       }
@@ -337,7 +372,6 @@ export default class ElectronBleTransport {
 
       const cleanup = this.createNotificationSubscription(uuid);
       this.notificationCleanups.set(uuid, cleanup);
-      const connectionToken = this.notificationTokens.get(uuid);
 
       const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint);
       if (protocolType === 'V2') {
@@ -347,23 +381,6 @@ export default class ElectronBleTransport {
           packetCapacity: this.devicePacketCapacities.get(uuid) ?? BLE_PACKET_SIZE_FALLBACK,
         });
       }
-
-      const disconnectCleanup = window.desktopApi.nobleBle.onDeviceDisconnected(
-        (disconnectedDevice: any) => {
-          if (
-            disconnectedDevice.id === uuid &&
-            this.notificationTokens.get(uuid) === connectionToken
-          ) {
-            this.cleanupDeviceState(uuid);
-            this.emitter?.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, {
-              name: disconnectedDevice.name,
-              id: disconnectedDevice.id,
-              connectId: disconnectedDevice.id,
-            });
-          }
-        }
-      );
-      this.disconnectCleanups.set(uuid, disconnectCleanup);
 
       return {
         ...toBleDescriptor({ id: device.id, name: device.name }, protocolType),
@@ -442,9 +459,12 @@ export default class ElectronBleTransport {
     }
   }
 
-  private createProtocolMismatchError(expected: ProtocolType) {
+  private createProtocolMismatchError(expected: ProtocolType, uuid: string) {
+    // A generic Ping miss is not a bond failure. Only a later miss after this
+    // endpoint already answered V2, or a native encryption/pairing error, is.
+    const isStaleV2Bond = expected === 'V2' && this.confirmedProtocolV2.has(uuid);
     return ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
+      isStaleV2Bond ? HardwareErrorCode.BleDeviceBondError : HardwareErrorCode.RuntimeError,
       `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
     );
   }
@@ -473,16 +493,17 @@ export default class ElectronBleTransport {
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V1 (expected)`);
         return 'V1';
       }
-      throw this.createProtocolMismatchError(expectedProtocol);
+      throw this.createProtocolMismatchError(expectedProtocol, uuid);
     }
 
     if (expectedProtocol === 'V2') {
       if (await this.probeProtocolV2(uuid)) {
         this.deviceProtocol.set(uuid, 'V2');
+        this.confirmedProtocolV2.add(uuid);
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2 (expected)`);
         return 'V2';
       }
-      throw this.createProtocolMismatchError(expectedProtocol);
+      throw this.createProtocolMismatchError(expectedProtocol, uuid);
     }
 
     // Protocol must be actively probed after connection. Name, PID, and descriptors only
@@ -501,6 +522,9 @@ export default class ElectronBleTransport {
         protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
+        if (protocol === 'V2') {
+          this.confirmedProtocolV2.add(uuid);
+        }
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> ${protocol}`);
         return protocol;
       }

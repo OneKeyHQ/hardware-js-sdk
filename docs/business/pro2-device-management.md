@@ -62,7 +62,9 @@ App 只展示“请在设备上操作”，不调用 `uiResponse()`。API `Succe
 ## 壁纸上传
 
 `deviceUploadWallpaper` 接收不带 data URL 前缀的 `604 × 1024` JPEG Base64。TopLevel 只传递字符串，
-LowLevel SDK 负责解码、设备格式转换、写入文件系统并设置活动壁纸：
+LowLevel SDK 负责解码、设备格式转换、写入文件系统并设置活动壁纸。该方法使用
+`unlock-before-run`：已知设备锁定时先解锁并亮屏，再写文件和设置 `wallpaper_path`。业务阶段若
+仍收到 `DeviceLocked`，不重放上传或设置写入。
 
 1. 严格校验 Base64、JPEG、固定尺寸、解码后 RGBA 长度、文件名和 `chunkSize`。
 2. 将 JPEG 解码结果编码为 `RGB565`。
@@ -85,7 +87,9 @@ LowLevel SDK 负责解码、设备格式转换、写入文件系统并设置活�
 
 ## NFT 上传
 
-`deviceUploadNft` 仅支持 Pro2、Neo / Protocol V2。调用方先将原图和缩略图分别裁剪为 `540 × 540`
+`deviceUploadNft` 仅支持 Pro2、Neo / Protocol V2。该方法同样使用 `unlock-before-run`：已知设备
+锁定时先解锁并亮屏，再写 NFT 文件和发送 `NftUpdate`。业务阶段若仍收到 `DeviceLocked`，不重放
+带副作用请求。调用方先将原图和缩略图分别裁剪为 `540 × 540`
 与 `263 × 263` JPEG，并把不带 data URL 前缀的 Base64 传入 SDK；LowLevel 随后完成以下编排：
 
 1. 严格校验两段 Base64、JPEG、固定尺寸和解码后的 RGBA 长度。

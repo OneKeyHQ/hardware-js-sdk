@@ -8,17 +8,21 @@ import transport, {
   PROTOCOL_V2_FRAME_MAX_BYTES,
   ProtocolV2LinkError,
   ProtocolV2UsbTransportBase,
+  TRANSPORT_EVENT,
   probeProtocolV2 as probeProtocolV2Helper,
 } from '@onekeyfe/hd-transport';
 import {
   ERRORS,
   HardwareErrorCode,
   ONEKEY_WEBUSB_FILTER,
+  inferProtocolHintFromUsbId,
   isKnownTrezorWebUsbDevice,
+  resolveOneKeyUsbDevicePath,
   wait,
 } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
 
+import type EventEmitter from 'events';
 import type {
   AcquireInput,
   OneKeyDeviceInfoBase,
@@ -45,9 +49,6 @@ const PACKET_IO_RETRY_DELAY = 300;
 const PROTOCOL_V1_PROBE_TIMEOUT = 5000;
 const PROTOCOL_V2_PROBE_TIMEOUT = 1000;
 const EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS = 2;
-function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
-  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
-}
 
 /**
  * Device information with path and WebUSB device instance
@@ -69,6 +70,32 @@ interface TransferCancelToken {
   cancelled: boolean;
 }
 
+/**
+ * The navigator.usb disconnect listener is module-scoped and attached at most
+ * once: listeners on navigator.usb are global and never garbage collected, so a
+ * per-instance listener would retain every transport instance created across
+ * SDK re-initializations. Events are routed to the most recently initialized
+ * transport instance instead.
+ */
+let activeWebUsbTransport: WebUsbTransport | undefined;
+let usbDisconnectListenerAttached = false;
+
+function registerActiveWebUsbTransport(instance: WebUsbTransport, usb: USB) {
+  activeWebUsbTransport = instance;
+  if (usbDisconnectListenerAttached) return;
+  usbDisconnectListenerAttached = true;
+  usb.addEventListener('disconnect', event => {
+    if (!event.device) return;
+    const path = resolveOneKeyUsbDevicePath(event.device);
+    if (!path) return;
+    activeWebUsbTransport?.markProtocolStale(path);
+    // WebUSB has no device-list poller behind it, so this event is the only
+    // signal that the device is gone. Without it consumers never see a
+    // DEVICE.DISCONNECT for USB (OK-60486).
+    activeWebUsbTransport?.emitDeviceDisconnect(path, event.device);
+  });
+}
+
 export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> {
   messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
@@ -80,7 +107,28 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   /** Per-path protocol type detected by active wire-level probe. */
   private deviceProtocol: Map<string, ProtocolType> = new Map();
 
+  /** Protocols previously confirmed by an active response for this transport instance. */
+  private confirmedDeviceProtocols: Map<string, ProtocolType> = new Map();
+
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
+
+  /**
+   * Paths whose cached protocol must be re-probed on the next acquire (a USB
+   * disconnect was seen, or a transfer-level reconnect happened mid-call).
+   */
+  private staleProtocolPaths: Set<string> = new Set();
+
+  /** Paths currently acquired (between a successful acquire() and its release()). */
+  private acquiredPaths: Set<string> = new Set();
+
+  /**
+   * The exact USBDevice object each cached protocol was probed against. The
+   * browser returns the same object identity for a device as long as it stays
+   * connected, and a replug/reboot always yields a new object — so an identity
+   * mismatch proves the device was re-enumerated since the probe, even when the
+   * disconnect event itself was delayed or missed.
+   */
+  private probedDeviceObjects: Map<string, USBDevice> = new Map();
 
   /** Per-path USB endpoint / interface numbers (discovered from USB descriptors) */
   private deviceEndpoints: Map<string, DeviceEndpoints> = new Map();
@@ -94,6 +142,8 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   Log?: any;
 
   usb?: USB;
+
+  emitter?: EventEmitter;
 
   /**
    * Cached list of connected devices
@@ -118,8 +168,9 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   /**
    * Initialize WebUSB transport
    */
-  init(logger: any) {
+  init(logger: any, emitter?: EventEmitter) {
     this.Log = logger;
+    this.emitter = emitter;
 
     const { usb } = navigator;
     if (!usb) {
@@ -129,6 +180,34 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       );
     }
     this.usb = usb;
+    registerActiveWebUsbTransport(this, usb);
+  }
+
+  /**
+   * Announce that a USB device left. Called from the module-scoped disconnect
+   * listener, which is why it is public rather than inlined.
+   */
+  emitDeviceDisconnect(path: string, device?: USBDevice) {
+    this.emitter?.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, {
+      name: device?.productName ?? '',
+      id: path,
+      connectId: path,
+    });
+  }
+
+  /**
+   * Protocol type is a property of the physical device keyed by USB serial number.
+   * It can only change across a device reboot (e.g. normal ↔ bootloader mode), and
+   * a reboot always surfaces as a USB disconnect. Disconnects (and transfer-level
+   * reconnects, which cover a missed disconnect event) only MARK the cached probe
+   * result stale instead of deleting it: an in-flight session keeps using the old
+   * value so the transfer-level reconnect retries can absorb a transient
+   * re-enumeration exactly as they did before the cache existed, while the next
+   * acquire re-probes from scratch.
+   */
+  markProtocolStale(path: string) {
+    this.staleProtocolPaths.add(path);
+    this.probedDeviceObjects.delete(path);
   }
 
   /**
@@ -201,22 +280,24 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         (desc: { vendorId: number; productId: number }) =>
           dev.vendorId === desc.vendorId && dev.productId === desc.productId
       );
-      const hasSerialNumber = typeof dev.serialNumber === 'string' && dev.serialNumber.length > 0;
-      return isOneKey && hasSerialNumber && !isKnownTrezorWebUsbDevice(dev);
+      return isOneKey && !isKnownTrezorWebUsbDevice(dev);
     });
 
-    this.deviceList = onekeyDevices.map(device => {
-      const path = device.serialNumber as string;
-      const protocolHint = inferProtocolHintFromDeviceName(device.productName);
+    this.deviceList = onekeyDevices.flatMap(device => {
+      const path = resolveOneKeyUsbDevicePath(device);
+      if (!path) return [];
+      const protocolHint = inferProtocolHintFromUsbId(device.vendorId, device.productId);
       if (protocolHint) {
         this.deviceProtocolHints.set(path, protocolHint);
       }
 
-      return {
-        path,
-        device,
-        commType: 'webusb',
-      };
+      return [
+        {
+          path,
+          device,
+          commType: 'webusb',
+        },
+      ];
     });
 
     return this.deviceList;
@@ -231,20 +312,85 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       await this.rotateProtocolV2UsbGeneration(input.path, 'WebUSB transport acquired');
       await this.closeOpenDevice(input.path);
       await this.connect(input.path ?? '', true);
-      const deviceName = this.deviceList.find(device => device.path === input.path)?.device
-        .productName;
-      const protocolHint = input.expectedProtocol
-        ? undefined
-        : input.protocolHint ??
-          this.deviceProtocolHints.get(input.path) ??
-          inferProtocolHintFromDeviceName(deviceName);
-      if (protocolHint) {
-        this.deviceProtocolHints.set(input.path, protocolHint);
+      if (input.skipProtocolProbe) {
+        if (!input.expectedProtocol) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'skipProtocolProbe requires an expected protocol'
+          );
+        }
+        if (this.confirmedDeviceProtocols.get(input.path) !== input.expectedProtocol) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'skipProtocolProbe requires a previously confirmed protocol for this WebUSB endpoint'
+          );
+        }
+        this.staleProtocolPaths.delete(input.path);
+        this.deviceProtocol.set(input.path, input.expectedProtocol);
+        const currentDevice = this.deviceList.find(d => d.path === input.path)?.device;
+        if (currentDevice) {
+          this.probedDeviceObjects.set(input.path, currentDevice);
+        }
+      } else if (input.forceProtocolDetection) {
+        // Explicit recovery/discovery (e.g. detectDeviceConnectProtocol) must
+        // probe on the wire regardless of any cached result — the cached
+        // binding may be exactly what the caller is trying to recover from.
+        this.staleProtocolPaths.delete(input.path);
+        this.deviceProtocol.delete(input.path);
+        this.deviceProtocolHints.delete(input.path);
       }
-      await this.detectProtocol(input.path, input.expectedProtocol, protocolHint);
+      if (!input.skipProtocolProbe && this.staleProtocolPaths.has(input.path)) {
+        // The device disconnected (possibly rebooting into another mode) since
+        // the protocol was probed — drop the cache so it is re-probed below.
+        this.staleProtocolPaths.delete(input.path);
+        this.deviceProtocol.delete(input.path);
+      }
+      if (!input.skipProtocolProbe && this.deviceProtocol.has(input.path)) {
+        const currentDevice = this.deviceList.find(d => d.path === input.path)?.device;
+        if (!currentDevice || currentDevice !== this.probedDeviceObjects.get(input.path)) {
+          // The OS re-enumerated the device since the probe (a replug/reboot we
+          // may not have seen a disconnect event for) — the cached protocol can
+          // no longer be trusted; re-probe on the wire below.
+          this.deviceProtocol.delete(input.path);
+        }
+      }
+      const cachedProtocol = this.deviceProtocol.get(input.path);
+      if (
+        !input.skipProtocolProbe &&
+        cachedProtocol &&
+        input.expectedProtocol &&
+        cachedProtocol !== input.expectedProtocol
+      ) {
+        // The caller expects a different protocol than the cached probe result;
+        // the cache is stale — drop it and re-probe on the wire below.
+        this.deviceProtocol.delete(input.path);
+      }
+      if (!this.deviceProtocol.has(input.path)) {
+        const usbDevice = this.deviceList.find(device => device.path === input.path)?.device;
+        const protocolHint = input.expectedProtocol
+          ? undefined
+          : input.protocolHint ??
+            this.deviceProtocolHints.get(input.path) ??
+            inferProtocolHintFromUsbId(usbDevice?.vendorId, usbDevice?.productId);
+        if (protocolHint) {
+          this.deviceProtocolHints.set(input.path, protocolHint);
+        }
+        const detectedProtocol = await this.detectProtocol(
+          input.path,
+          input.expectedProtocol,
+          protocolHint
+        );
+        this.confirmedDeviceProtocols.set(input.path, detectedProtocol);
+        const probedDevice = this.deviceList.find(d => d.path === input.path)?.device;
+        if (probedDevice) {
+          this.probedDeviceObjects.set(input.path, probedDevice);
+        }
+      }
+      this.acquiredPaths.add(input.path);
       return await Promise.resolve(input.path);
     } catch (e) {
       this.Log.debug('acquire error: ', e instanceof Error ? `${e.name}: ${e.message}` : String(e));
+      this.acquiredPaths.delete(input.path);
       await this.closeOpenDevice(input.path);
       throw e;
     }
@@ -480,7 +626,21 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     }
   }
 
+  /**
+   * With the protocol cache surviving release(), deviceProtocol presence no
+   * longer implies an active session. Guard call()/post() explicitly so a
+   * post-release straggler fails fast instead of silently reopening the device
+   * and driving it outside any session (pre-cache behavior: the deleted
+   * protocol entry produced the same fail-fast).
+   */
+  private assertAcquired(path: string) {
+    if (!this.acquiredPaths.has(path)) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, `Device is not acquired for ${path}`);
+    }
+  }
+
   async post(session: string, name: string, data: Record<string, unknown>) {
+    this.assertAcquired(session);
     if (this.deviceProtocol.get(session) === 'V2') {
       await this.sendProtocolV2UsbFlowControl(session, name, data);
       return;
@@ -522,6 +682,11 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         error
       )}`
     );
+    // The device dropped off the bus mid-call and may have rebooted into a
+    // different mode. The in-flight retry keeps the known protocol, but the
+    // next acquire must re-probe — this also self-heals a stale cache when the
+    // USB disconnect event itself was missed.
+    this.staleProtocolPaths.add(path);
     await wait(attempt * PACKET_IO_RETRY_DELAY);
 
     try {
@@ -755,6 +920,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     if (this.messages == null) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
+    this.assertAcquired(path);
 
     const device = await this.findDevice(path);
     if (!device) {
@@ -871,10 +1037,14 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    * Release device
    */
   async release(path: string) {
+    this.acquiredPaths.delete(path);
     await this.invalidateProtocolV2UsbLink(path, 'WebUSB transport released');
     await this.closeOpenDevice(path);
-    this.deviceProtocol.delete(path);
-    this.deviceProtocolHints.delete(path);
+    // Keep deviceProtocol/deviceProtocolHints across release: the probe result is a
+    // physical-device property, so the next acquire can skip the wire-level probe.
+    // V2 entries are still dropped by onProtocolV2UsbLinkInvalidated via the link
+    // invalidation above, and any entry is re-probed after a USB disconnect or a
+    // transfer-level reconnect (see markProtocolStale).
     this.deviceEndpoints.delete(path);
   }
 

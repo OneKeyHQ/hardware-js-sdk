@@ -9,6 +9,7 @@ import {
   ERROR_CODES_REQUIRE_RELEASE,
   HardwareError,
   HardwareErrorCode,
+  canonicalizePro2BleAdvertisementName,
   createDeferred,
   createDeviceNotSupportMethodError,
 } from '@onekeyfe/hd-shared';
@@ -235,6 +236,15 @@ export class Device extends EventEmitter {
    */
   private deviceAcquired = false;
 
+  /**
+   * Connection-attempt generation. interruptionFromUser() pins the current
+   * attempt so a late acquire cannot finish, while the next public connect
+   * increments this and is allowed to proceed.
+   */
+  private connectionAttempt = 0;
+
+  private interruptedAttempt: number | null = null;
+
   /** Canonical device-state cache; legacy Features is a compatibility projection. */
   private stateStore = new DeviceStateStore();
 
@@ -283,6 +293,9 @@ export class Device extends EventEmitter {
   }
 
   runPromise?: Deferred<void> | null;
+
+  /** Resolves only after the active run has completed its release path. */
+  private runCleanupPromise?: Promise<void>;
 
   externalState: string[] = [];
 
@@ -426,6 +439,8 @@ export class Device extends EventEmitter {
     expectedProtocol?: HardwareConnectProtocol,
     options?: { throwOnRunPromiseError?: boolean; forceProtocolDetection?: boolean }
   ) {
+    const attempt = this.connectionAttempt;
+    this.throwIfInterruptedByUser();
     const env = DataManager.getSettings('env');
     const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
     const previousProtocol = this.originalDescriptor.protocolType;
@@ -446,7 +461,8 @@ export class Device extends EventEmitter {
           undefined,
           true,
           strictProtocol,
-          undefined
+          undefined,
+          options?.forceProtocolDetection
         );
         this.mainId = (acquireResult as any)?.uuid ?? '';
         Log.debug('Expected uuid:', this.mainId);
@@ -456,7 +472,8 @@ export class Device extends EventEmitter {
           this.originalDescriptor.session,
           undefined,
           strictProtocol,
-          undefined
+          undefined,
+          options?.forceProtocolDetection
         );
         this.mainId = acquireResult as string | undefined;
         Log.debug('Expected session id:', this.mainId);
@@ -477,6 +494,15 @@ export class Device extends EventEmitter {
       }
       if (detectedProtocol) {
         this.originalDescriptor.protocolType = detectedProtocol;
+      }
+      if (this.interruptedAttempt === attempt || this.connectionAttempt !== attempt) {
+        const session = this.mainId;
+        if (session && this.deviceConnector?.disconnect) {
+          await this.deviceConnector.disconnect(session).catch(disconnectError => {
+            Log.debug('Ignored disconnect after user cancel during acquire', disconnectError);
+          });
+        }
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
       }
       this.deviceAcquired = true;
       this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
@@ -647,7 +673,8 @@ export class Device extends EventEmitter {
   }
 
   getCurrentBleName() {
-    return this.state?.identity.bleName ?? null;
+    const bleName = this.state?.identity.bleName ?? null;
+    return bleName ? canonicalizePro2BleAdvertisementName(bleName) : null;
   }
 
   getCurrentLabel() {
@@ -898,6 +925,7 @@ export class Device extends EventEmitter {
   }
 
   async initialize(options?: InitOptions) {
+    this.throwIfInterruptedByUser();
     // Protocol V2 does not support legacy Initialize; use its dedicated flow.
     if (this.isProtocolV2()) {
       this.passphraseState = options?.passphraseState;
@@ -927,13 +955,18 @@ export class Device extends EventEmitter {
       };
 
       const expectedDeviceId = options?.deviceId;
-      if (expectedDeviceId) {
-        // 先只读校验物理设备身份；钱包上下文仍由下方携带完整参数的
-        // Initialize 选择，避免标准钱包请求复用此前的隐藏钱包上下文。
+
+      if (expectedDeviceId && !(this.features && this.checkDeviceId(expectedDeviceId))) {
+        // No locally-cached evidence that the device at this path is the
+        // expected one (first contact, or the cached features already disagree
+        // with the caller). Establish identity with a context-free Initialize
+        // BEFORE any wallet context (session_id / passphrase_state) goes on
+        // the wire. In normal flows features are always fresh — enumerate /
+        // getFeatures run first and every call response refreshes them — so
+        // this extra round trip is confined to the ambiguous cases where the
+        // disclosure risk actually lives.
         this.passphraseState = undefined;
-        const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
-        this._updateFeatures(message);
-        await TransportManager.reconfigure(this.features);
+        await callInitialize({ is_contains_attach: true });
         if (!this.checkDeviceId(expectedDeviceId)) {
           throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
         }
@@ -957,7 +990,46 @@ export class Device extends EventEmitter {
         payload.derive_cardano = true;
       }
 
-      await callInitialize(payload, options?.initSession);
+      if (this.features) {
+        // Re-sync the V1 message schema for THIS device before encoding
+        // Initialize: the process-global schema may still reflect another
+        // device (e.g. legacy-firmware Touch/Mini) on multi-device setups, and
+        // a stale legacy schema would silently strip passphrase_state /
+        // is_contains_attach from the wire message. Local operation, no wire
+        // I/O; a no-op when the schema is unchanged.
+        await TransportManager.reconfigure(this.features);
+      }
+
+      // Initialize's own Features response carries device_id, so the physical
+      // device identity is validated on the same round trip instead of via a
+      // separate read-only GetFeatures preflight (which doubled the wire cost
+      // of every deviceId-carrying call). The method fn has not run yet, so a
+      // mismatch still fails before any wallet data can be derived, with the
+      // same DeviceCheckDeviceIdError. Wallet-context selection is unchanged:
+      // it is decided by the Initialize payload above either way.
+      const assertExpectedDeviceIdentity = () => {
+        if (expectedDeviceId && !this.checkDeviceId(expectedDeviceId)) {
+          // The mismatched Initialize may have cached a session under the wrong
+          // device's identity; drop it so no wallet context survives from it.
+          // (This also evicts any session the wrong device legitimately cached
+          // under the same passphraseState — a deliberate conservative purge
+          // after a physical-swap event, consistent with
+          // reconcileDeviceIdentity purging the previous device's sessions.)
+          this.clearInternalState();
+          throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+        }
+      };
+
+      try {
+        await callInitialize(payload, options?.initSession);
+      } catch (error) {
+        // callInitialize can fail AFTER the wire call cached the session (e.g.
+        // TransportManager.reconfigure rejecting); the identity check must
+        // still run so a wrong-device session never survives the error path.
+        assertExpectedDeviceIdentity();
+        throw error;
+      }
+      assertExpectedDeviceIdentity();
     } catch (error) {
       Log.error('Initialization failed:', error);
       throw error;
@@ -1077,6 +1149,10 @@ export class Device extends EventEmitter {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed);
     }
     return params.includeRaw ? cloneDeviceState(this.state) : createPublicDeviceState(this.state);
+  }
+
+  async refreshProtocolV2SettingsAfterMutation() {
+    return this.getDeviceState({ refreshSections: ['status', 'settings'] });
   }
 
   _updateFeatures(protoFeatures: PROTO.Features | Features, initSession?: boolean) {
@@ -1393,16 +1469,25 @@ export class Device extends EventEmitter {
       Log.debug('[Device] run error:', 'Device is running, but will cancel previous operate');
     }
 
+    this.beginConnectionAttempt();
     options = parseRunOptions(options);
 
     const runPromise = createDeferred<void>();
     this.runPromise = runPromise;
-    this._runInner(fn, options, runPromise).catch(error => {
+    const cleanupPromise = this._runInner(fn, options, runPromise).catch(error => {
       if (this.runPromise === runPromise) {
         this.runPromise = null;
       }
       runPromise.reject(error);
     });
+    this.runCleanupPromise = cleanupPromise;
+    cleanupPromise
+      .finally(() => {
+        if (this.runCleanupPromise === cleanupPromise) {
+          this.runCleanupPromise = undefined;
+        }
+      })
+      .catch(() => undefined);
     return runPromise.promise;
   }
 
@@ -1514,13 +1599,32 @@ export class Device extends EventEmitter {
 
   async interruptionFromUser() {
     const error = ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
-    await this.cancelableAction?.(error);
+    this.interruptedAttempt = this.connectionAttempt;
+    const cleanupPromise = this.runCleanupPromise;
+    const { cancelableAction } = this;
+    if (cancelableAction) {
+      await cancelableAction(error);
+    } else if (this.shouldSendFallbackProtocolCancel()) {
+      await this.commands?.cancelDevice?.().catch(cancelError => {
+        Log.debug('Protocol V2 fallback cancel error', cancelError);
+      });
+    } else if (!this.hasDeviceAcquire()) {
+      // Pairing / connect-native / probe: drop the physical link only.
+      // Never acquire or send protocol Cancel just to abort setup.
+      if (this.mainId && this.deviceConnector?.disconnect) {
+        await this.deviceConnector.disconnect(this.mainId).catch(disconnectError => {
+          Log.debug('Ignored disconnect during user cancel without acquire', disconnectError);
+        });
+      }
+      this.markTransportDisconnected();
+    }
     await this.commands?.cancel();
 
     if (this.runPromise) {
       this.runPromise.reject(error);
       this.runPromise = null;
     }
+    await cleanupPromise?.catch(() => undefined);
   }
 
   setCancelableAction(callback: (err?: Error) => Promise<unknown>) {
@@ -1574,6 +1678,44 @@ export class Device extends EventEmitter {
 
   isUsed() {
     return typeof this.originalDescriptor.session === 'string';
+  }
+
+  beginConnectionAttempt() {
+    this.connectionAttempt += 1;
+    return this.connectionAttempt;
+  }
+
+  wasInterruptedByUser() {
+    return (
+      typeof this.interruptedAttempt === 'number' &&
+      this.interruptedAttempt === this.connectionAttempt
+    );
+  }
+
+  private throwIfInterruptedByUser() {
+    if (this.wasInterruptedByUser()) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
+  }
+
+  /**
+   * Protocol Cancel is only for an acquired session that is already in a
+   * user-facing prompt. Connect, probe and initialize must not send Cancel
+   * and must not re-acquire just to deliver one.
+   */
+  private shouldSendFallbackProtocolCancel() {
+    if (!this.hasDeviceAcquire() || !this.isProtocolV2()) {
+      return false;
+    }
+    if (!this.hasOpenProtocolV2UiInteraction()) {
+      return false;
+    }
+    const env = DataManager.getSettings('env');
+    return (
+      DataManager.isBleConnect(env) ||
+      DataManager.isBrowserWebUsb(env) ||
+      DataManager.isDesktopWebUsb(env)
+    );
   }
 
   hasDeviceAcquire() {

@@ -1,6 +1,7 @@
 import { blake2s } from '@noble/hashes/blake2s';
 import { bytesToHex } from '@noble/hashes/utils';
 import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
 import { decodeJpegBase64ToRgba } from '../helpers/base64Data';
@@ -8,6 +9,7 @@ import { invalidParameter } from '../helpers/filesystemValidation';
 import { writeProtocolV2File } from '../helpers/protocolV2FileWrite';
 import { UI_REQUEST, createUiMessage } from '../../events/ui-request';
 import { supportsProtocolV2Message } from '../../protocols/protocol-v2/features';
+import { LoggerNames, getLogger } from '../../utils';
 import {
   PRO2_WALLPAPER_HEIGHT,
   PRO2_WALLPAPER_WIDTH,
@@ -33,6 +35,7 @@ const SAFE_FILE_NAME = /^[A-Za-z0-9_-]+(?:\.bin)?$/;
 const DEVICE_SETTINGS_SET_MESSAGE_TYPE = 60412;
 const FILESYSTEM_FILE_WRITE_MESSAGE_TYPE = 60805;
 const FILESYSTEM_DIR_MAKE_MESSAGE_TYPE = 60809;
+const Log = getLogger(LoggerNames.Method);
 
 function normalizeFileName(fileName: string | undefined, data: Uint8Array): string {
   if (fileName !== undefined && (!fileName || !SAFE_FILE_NAME.test(fileName))) {
@@ -76,7 +79,10 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
     });
     this.path = `${WALLPAPER_DIRECTORY}/${normalizeFileName(fileName, this.encoded.data)}`;
     this.params = { jpegBase64, fileName, chunkSize };
-    this.unlockPolicy = 'none';
+    this.unlockPolicy = 'unlock-before-run';
+    // File writes and wallpaper apply require an unlocked device. Either PIN
+    // may authorize this device-management action.
+    this.protocolV2PreUnlockPinType = DeviceSessionPinType.Any;
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
   }
@@ -143,6 +149,15 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
     const response = await this.device.commands.typedCall('DeviceSettingsSet', 'Success', {
       settings: { wallpaper_path: this.path },
     });
+    try {
+      await this.device.refreshProtocolV2SettingsAfterMutation();
+    } catch (error) {
+      // The wallpaper is already applied. A transient read-back failure must not
+      // make callers retry the completed file upload.
+      Log.warn('Protocol V2 wallpaper settings refresh failed after apply', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     return {
       path: this.path,
       size: encoded.data.byteLength,

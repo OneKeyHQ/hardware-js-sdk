@@ -31,6 +31,7 @@ import {
   KeyRound,
   ListChecks,
   ShieldCheck,
+  ChartPie,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -87,6 +88,11 @@ const navigationItems = [
     title: 'common.walletSessionTest',
     url: '/wallet-session-test',
     icon: KeyRound,
+  },
+  {
+    title: 'common.portfolioTest',
+    url: '/portfolio-test',
+    icon: ChartPie,
   },
 ];
 

@@ -59,8 +59,12 @@ Transport 在 `acquire()` 完成物理连接后执行协议探测：
 严格预期的验证规则：
 
 - `connectProtocol='V1'`：必须收到有效的 V1 响应。
-- `connectProtocol='V2'`：必须收到有效的 V2 `Ping` 响应；固件升级重连也不能只信任 PID、
-  设备名或旧连接缓存。
+- `connectProtocol='V2'`：必须收到有效的 V2 `Ping` 响应，不能只信任 PID、设备名或未确认的缓存。
+- 唯一例外是已经通过活动响应确认过 V2 的同一 BLE endpoint，在
+  `DeviceFirmwareUpdateRequest` 引发预期断链后的 install polling 重连。部分 loader 在安装期间不响应
+  通用 `Ping`，此时 Transport 只恢复已确认的 V2 路由，Core 必须立即发送幂等的
+  `DeviceFirmwareUpdateStatusGet`；其有效响应才证明新链路可用。该例外不能用于普通 reconnect、首次连接、
+  身份判断或其他业务请求。
 
 V2 probe 使用 `Ping { message: 'protocol-v2-probe' }`。探测消息只用于确认链路，不等同于查询协议版本或设备信息。
 
@@ -216,6 +220,15 @@ Pro2 绑定 Find My 后，通信广播的名称会在原 BLE 名称末尾附加 
 Neo 真机通信广播使用 `Neo <4 位标识>`，例如 `Neo 22D8`；已观察到的服务集合与 Pro2 通信广播
 一致，可同时包含 `180a`、`180f`、`fffd` 和 `0001`。SDK 保留完整 Neo 名称并识别为 Neo，连接
 端点仍以 `0001` 为准，不能因同时存在 `fffd` 而过滤，也不能仅凭 `Neo` 名称推导协议版本。
+最新 firmware-pro2 也可能广播去掉空格的紧凑名称（如 `Pro2A1B2`、`Neo22D8`）；搜索必须把它们
+识别为 OneKey，但不能因此把协议结论从名称推出来。
+
+最新 firmware-pro2 在 application、bootloader 和 romloader 共用 USB VID/PID `1209:4f4c`，Pro2
+和 Neo 相同。USB 首次探测顺序只根据这个 VID/PID 给 V2 hint，不根据产品名或 BLE 名。`4f4a` /
+`4f4b` 仍与 Pro/Touch 共用，不能当作 V2 hint。协议仍由连接后的活动响应确认。
+
+USB 序列号来自出厂制造信息；槽位已写但序列号为空时，固件省略 `iSerialNumber` 字符串。WebUSB
+不能因此丢弃设备，应使用合成 path 完成搜索和 acquire。
 
 BLE 分包大小是平台传输参数，不属于 protobuf 或业务 API。性能结论见 [Pro2 BLE 传输测速记录](../testing/pro2-ble-performance.md)。
 

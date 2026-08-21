@@ -11,7 +11,13 @@ import transport, {
   ProtocolV2UsbTransportBase,
   probeProtocolV2 as probeProtocolV2Helper,
 } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
+import {
+  ERRORS,
+  HardwareErrorCode,
+  ONEKEY_WEBUSB_FILTER,
+  inferProtocolHintFromUsbId,
+  wait,
+} from '@onekeyfe/hd-shared';
 
 import type EventEmitter from 'events';
 import type {
@@ -348,7 +354,12 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
       await this.rotateProtocolV2UsbGeneration(path, 'Node USB transport acquired');
       await this.closeOpenDevice(path);
       await this.openDevice(path);
-      await this.detectProtocol(path, input.expectedProtocol, input.protocolHint);
+      const descriptor = this.getOpenDevice(path).device.deviceDescriptor;
+      const protocolHint = input.expectedProtocol
+        ? undefined
+        : input.protocolHint ??
+          inferProtocolHintFromUsbId(descriptor.idVendor, descriptor.idProduct);
+      await this.detectProtocol(path, input.expectedProtocol, protocolHint);
       return path;
     } catch (error: any) {
       this.Log?.debug('NodeUsbTransport acquire error: ', error);

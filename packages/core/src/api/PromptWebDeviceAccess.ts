@@ -1,4 +1,4 @@
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, resolveOneKeyUsbDevicePath } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from './BaseMethod';
 import TransportManager from '../data-manager/TransportManager';
@@ -52,7 +52,7 @@ export default class PromptWebDeviceAccess extends BaseMethod {
 
         if (isWebUsbEnv) {
           const usbDevice = device as USBDevice;
-          const path = usbDevice.serialNumber;
+          const path = resolveOneKeyUsbDevicePath(usbDevice);
           if (!path) {
             throw ERRORS.TypedError(HardwareErrorCode.WebDevicePromptAccessError);
           }

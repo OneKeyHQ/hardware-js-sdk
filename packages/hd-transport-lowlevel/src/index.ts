@@ -15,7 +15,6 @@ import transport, {
 
 import type EventEmitter from 'events';
 import type {
-  LowLevelDevice,
   LowlevelTransportSharedPlugin,
   ProtocolType,
   ProtocolV2CallContext,
@@ -51,10 +50,6 @@ export function shouldLogFirmwareUploadProgress({
 
 export function getProtocolV1SendOptions(name: string) {
   return name === 'FirmwareUpload' ? { withoutResponse: false } : undefined;
-}
-
-function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
-  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
 }
 
 function isProtocolV1TransportChunk(data: Uint8Array) {
@@ -161,13 +156,7 @@ export default class LowlevelTransport {
 
   async enumerate() {
     const devices = await this.plugin.enumerate();
-    return devices.map((device: LowLevelDevice) => {
-      const protocolHint = inferProtocolHintFromDeviceName(device.name);
-      if (protocolHint) {
-        this.deviceProtocolHints.set(device.id, protocolHint);
-      }
-      return device;
-    });
+    return devices;
   }
 
   async acquire(input: LowLevelAcquireInput) {
@@ -227,8 +216,7 @@ export default class LowlevelTransport {
       await this.plugin.disconnect(uuid);
       this.connectedDevices.delete(uuid);
       this.deviceProtocol.delete(uuid);
-      // A name-derived protocol hint survives disconnect and lets fast reconnect probe
-      // Protocol V2 first without sending a redundant V1 Initialize.
+      // Confirmed protocol stays on the device endpoint; BLE names are not a probe hint.
       this.protocolV2Assemblers.delete(uuid);
       return true;
     } catch (error) {

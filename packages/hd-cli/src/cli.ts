@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Command } from 'commander';
 import { UI_EVENT, UI_REQUEST, getDeviceType } from '@onekeyfe/hd-core';
-import { EDeviceType } from '@onekeyfe/hd-shared';
+import { EDeviceType, isSameOnekeyBleName } from '@onekeyfe/hd-shared';
 
 import {
   resolveBatchGetAddress,
@@ -1217,21 +1217,25 @@ async function resolveLegacyFirmwareConnectId(
   }
 
   const devices = searchResult.payload as EnrichedSearchDevice[];
-  const normalizedName = deviceName?.trim().toLowerCase();
-  const matches = normalizedName
-    ? devices.filter(device => device.name?.trim().toLowerCase() === normalizedName)
+  const requestedName = deviceName?.trim();
+  const matches = requestedName
+    ? devices.filter(
+        device =>
+          isSameOnekeyBleName(device.name, requestedName) ||
+          device.name?.trim().toLowerCase() === requestedName.toLowerCase()
+      )
     : devices.filter(device => device.deviceType?.toLowerCase() === 'classic');
 
   if (matches.length === 0) {
     throw new Error(
-      normalizedName
+      requestedName
         ? `BLE device not found by name: ${deviceName}`
         : 'No Classic/Pure BLE device found'
     );
   }
   if (matches.length > 1) {
     throw new Error(
-      normalizedName
+      requestedName
         ? `Multiple BLE devices found by name: ${deviceName}`
         : 'Multiple Classic/Pure BLE devices found; specify --device-name'
     );

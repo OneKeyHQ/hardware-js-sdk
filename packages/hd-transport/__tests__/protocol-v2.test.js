@@ -1003,6 +1003,111 @@ describe('Protocol V2 framing and session', () => {
     expect(result).toEqual({ type: 'WriteCompleted', message: {} });
   });
 
+  test('session consumes a delayed write-only response without completing the next call', async () => {
+    const requestSuccess = ProtocolV2.encodeFrame(schemas, 'Success', {
+      message: 'install accepted',
+    });
+    const statusResponse = ProtocolV2.encodeFrame(schemas, 'DeviceFirmwareUpdateStatus', {
+      records: [{ target_id: 6, status: 1, path: 'vol0:/coprocessor.bin' }],
+    });
+    const prepareCall = jest.fn();
+    const onResponseAfterWrite = jest.fn();
+    const readFrame = jest
+      .fn()
+      .mockResolvedValueOnce(rewriteSeq(requestSuccess, 1))
+      .mockResolvedValueOnce(rewriteSeq(statusResponse, 2));
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      prepareCall,
+      writeFrame: () => Promise.resolve(),
+      readFrame,
+    });
+
+    await expect(
+      session.call(
+        'DeviceFirmwareUpdateRequest',
+        {},
+        {
+          returnAfterWrite: true,
+          expectedTypes: ['Success'],
+          onResponseAfterWrite,
+        }
+      )
+    ).resolves.toEqual({ type: 'WriteCompleted', message: {} });
+
+    await expect(
+      session.call(
+        'Ping',
+        { message: 'status-poll' },
+        {
+          expectedTypes: ['DeviceFirmwareUpdateStatus'],
+        }
+      )
+    ).resolves.toMatchObject({
+      type: 'DeviceFirmwareUpdateStatus',
+      message: {
+        records: [{ target_id: 6, status: 1, path: 'vol0:/coprocessor.bin' }],
+      },
+    });
+
+    expect(prepareCall).toHaveBeenCalledTimes(1);
+    expect(onResponseAfterWrite).toHaveBeenCalledWith({
+      type: 'Success',
+      message: { message: 'install accepted' },
+    });
+    expect(readFrame).toHaveBeenCalledTimes(2);
+  });
+
+  test('session preserves a delayed write-only Failure for the next caller', async () => {
+    const requestFailure = ProtocolV2.encodeFrame(schemas, 'Failure', {
+      code: 4,
+      message: 'install cancelled',
+    });
+    const prepareCall = jest.fn();
+    const onResponseAfterWrite = jest.fn();
+    const readFrame = jest.fn().mockResolvedValueOnce(rewriteSeq(requestFailure, 1));
+    const session = new ProtocolV2Session({
+      schemas,
+      router: 1,
+      prepareCall,
+      writeFrame: () => Promise.resolve(),
+      readFrame,
+    });
+
+    await expect(
+      session.call(
+        'DeviceFirmwareUpdateRequest',
+        {},
+        {
+          returnAfterWrite: true,
+          expectedTypes: ['Success'],
+          onResponseAfterWrite,
+        }
+      )
+    ).resolves.toEqual({ type: 'WriteCompleted', message: {} });
+
+    await expect(
+      session.call(
+        'Ping',
+        { message: 'status-poll' },
+        {
+          expectedTypes: ['DeviceFirmwareUpdateStatus'],
+        }
+      )
+    ).resolves.toMatchObject({
+      type: 'Failure',
+      message: {
+        code: 4,
+        message: 'install cancelled',
+      },
+    });
+
+    expect(prepareCall).toHaveBeenCalledTimes(1);
+    expect(onResponseAfterWrite).not.toHaveBeenCalled();
+    expect(readFrame).toHaveBeenCalledTimes(1);
+  });
+
   test('probeProtocolV2 accepts Success as a normal V2 probe response', async () => {
     await expect(
       probeProtocolV2({

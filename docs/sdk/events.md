@@ -361,11 +361,14 @@ HardwareSDK.on(FIRMWARE_EVENT, message => {
 confirmed patch 或解锁结果；相同 patch 不会重复发送。Protocol V2 设置成功后会强制读回
 `status` 与 `settings`，只发布设备返回的状态。新接入只消费完整 `DeviceState`，无需识别底层协议。
 
-设置调用中的状态刷新会先在 Core 内更新 `DeviceState` 并同步发出 `DEVICE.STATE`，随后 API Promise
-才完成。Protocol V2 的 API Promise 还会等待写后 `status + settings` 读回完成；读回失败时调用失败，
-即使此前的设置命令可能已经被设备接受。App 如果在 listener 中异步落库，必须把“设置调用完成”和
-“该设备的事件落库完成”串行化，再读取本地状态；不能在 Promise 返回后立即读取旧 `Features` 缓存，
-也不能用请求参数乐观覆盖设备状态。
+For settings calls, Core updates `DeviceState` and emits `DEVICE.STATE` synchronously before the
+API Promise completes. Protocol V2 APIs normally wait for the post-write `status + settings`
+read-back and fail if that read-back fails, even when the device may already have accepted the
+mutation. Wallpaper upload is the exception: once `DeviceSettingsSet` applies the uploaded file,
+its cache refresh is best-effort so a transient read failure cannot trigger another large upload.
+Apps that persist listener events asynchronously must drain that persistence before reading local
+state. They must not read stale `Features` immediately after the Promise resolves or overwrite
+device state optimistically from request parameters.
 
 Pro2 的 `status.passphraseProtection` 只在设备已解锁、私有 Status 可验证时具有权威值。关闭
 passphrase 后设备可能主动锁定，此时后续锁定快照允许该字段为 `undefined`；App 应保留最近一次已确认值，

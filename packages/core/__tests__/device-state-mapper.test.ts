@@ -136,7 +136,7 @@ describe('DeviceStateMapper', () => {
     expect(patch.identity).toMatchObject({
       deviceType: EDeviceType.Pro2,
       serialNo: 'SERIAL-1',
-      bleName: 'Pro2 1234',
+      bleName: 'Pro 2 1234',
     });
     expect(patch.versions).toMatchObject({
       firmware: '5.0.0',
@@ -178,7 +178,16 @@ describe('DeviceStateMapper', () => {
       coprocessor: { bt_adv_name: 'Pro2 22D8 - Fin' },
     });
 
-    expect(patch.identity?.bleName).toBe('Pro2 22D8');
+    expect(patch.identity?.bleName).toBe('Pro 2 22D8');
+  });
+
+  test('canonicalizes a spaced Pro2 advertisement name from DeviceInfo', () => {
+    const patch = mapProtocolV2DeviceInfoToState({
+      hw: { Device_type: DeviceType.PRO2, serial_no: 'SERIAL-1' },
+      coprocessor: { bt_adv_name: 'Pro 2 0088 - Find My' },
+    });
+
+    expect(patch.identity?.bleName).toBe('Pro 2 0088');
   });
 
   test('maps the hardware model independently from Protocol V2', () => {
@@ -250,6 +259,8 @@ describe('DeviceStateMapper', () => {
       init_states: true,
       unlocked: false,
       passphrase_enabled: true,
+      attach_to_pin_enabled: true,
+      unlocked_by_attach_to_pin: true,
       backup_required: true,
     } as DeviceStatus);
 
@@ -261,6 +272,26 @@ describe('DeviceStateMapper', () => {
       backupRequired: true,
     });
     expect(locked.status).not.toHaveProperty('passphraseProtection');
+    expect(locked.status).not.toHaveProperty('attachToPinEnabled');
+    expect(locked.status).not.toHaveProperty('unlockedAttachPin');
+  });
+
+  test('omits an unavailable attach-to-PIN status after an unlocked query failure', () => {
+    const status = mapProtocolV2DeviceStatusToState({
+      init_states: true,
+      unlocked: true,
+      passphrase_enabled: true,
+      attach_to_pin_enabled: null,
+      unlocked_by_attach_to_pin: false,
+      backup_required: false,
+    } as DeviceStatus);
+
+    expect(status.status).toMatchObject({
+      unlocked: true,
+      passphraseProtection: true,
+      unlockedAttachPin: false,
+    });
+    expect(status.status).not.toHaveProperty('attachToPinEnabled');
   });
 
   test('maps common settings into identity, status and settings sections', () => {
@@ -288,10 +319,26 @@ describe('DeviceStateMapper', () => {
         language: 'en-Latn-US',
         brightness: 80,
         autolock_delay_ms: 30_000,
+        passphrase_enable: null,
       } as DeviceSettings)
     ).toEqual({
       identity: { label: 'Pro2' },
       settings: { language: 'en', brightness: 80, autoLockDelayMs: 30_000 },
+    });
+  });
+
+  test('omits private Protocol V2 settings that are unavailable while locked', () => {
+    expect(
+      mapDeviceSettingsToState({
+        brightness: 80,
+        passphrase_enable: null,
+        fido_enabled: null,
+        autolock_delay_ms: null,
+        autoshutdown_delay_ms: null,
+        label: null,
+      } as DeviceSettings)
+    ).toEqual({
+      settings: { brightness: 80 },
     });
   });
 });

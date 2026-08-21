@@ -88,9 +88,9 @@ describe('Device state events', () => {
     expect(device.getCurrentDeviceType()).toBe(EDeviceType.Pro2);
     expect(device.getCurrentDeviceId()).toBe('wallet-id');
     expect(device.getCurrentSerialNo()).toBe('SERIAL-PRO2');
-    expect(device.getCurrentBleName()).toBe('Pro2 1234');
+    expect(device.getCurrentBleName()).toBe('Pro 2 1234');
     expect(device.getCurrentLabel()).toBeNull();
-    expect((device as any).getCurrentDisplayName()).toBe('Pro2 1234');
+    expect((device as any).getCurrentDisplayName()).toBe('Pro 2 1234');
     expect(device.getCurrentPassphraseProtection()).toBe(false);
     expect(device.getCurrentFirmwareVersionString()).toBe('5.1.2');
     expect(device.getCurrentBLEFirmwareVersionString()).toBe('0.0.0');

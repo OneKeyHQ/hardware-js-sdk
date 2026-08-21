@@ -1,9 +1,20 @@
-import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
+import TransportUtils, { DeviceSessionPinType } from '@onekeyfe/hd-transport';
+import { encode as encodeJpeg } from 'jpeg-js';
 
 import ConfluxSignMessageCIP23 from '../src/api/conflux/ConfluxSignMessageCIP23';
+import DeviceChangePin from '../src/api/device/DeviceChangePin';
 import DeviceLock from '../src/api/device/DeviceLock';
+import DeviceRebootToBoardloader from '../src/api/device/DeviceRebootToBoardloader';
+import DeviceRebootToBootloader from '../src/api/device/DeviceRebootToBootloader';
 import DeviceSettings from '../src/api/device/DeviceSettings';
+import DeviceVerify from '../src/api/device/DeviceVerify';
+import DeviceWipe from '../src/api/device/DeviceWipe';
+import DeviceReboot from '../src/api/protocol-v2/DeviceReboot';
+import DeviceUploadNft from '../src/api/protocol-v2/DeviceUploadNft';
+import DeviceUploadWallpaper from '../src/api/protocol-v2/DeviceUploadWallpaper';
+import FirmwareUpdateV4 from '../src/api/FirmwareUpdateV4';
 import OpenWalletSession from '../src/api/OpenWalletSession';
+import DataManager from '../src/data-manager/DataManager';
 import { runMethodWithUnlockPolicy } from '../src/protocols/protocol-v2/unlockPolicyRunner';
 
 jest.mock('../src/data/config', () => ({
@@ -11,7 +22,49 @@ jest.mock('../src/data/config', () => ({
   getSDKVersion: () => '0.0.0-test',
 }));
 
+const createJpegBase64 = (width: number, height: number) => {
+  const data = new Uint8Array(width * height * 4);
+  for (let index = 3; index < data.length; index += 4) data[index] = 0xff;
+  return encodeJpeg({ width, height, data }, 80).data.toString('base64');
+};
+
 describe('Protocol V2 unlock semantics', () => {
+  test('serializes genuine-device verification with Protocol V2 certificate messages', async () => {
+    const method = new DeviceVerify({
+      id: 1,
+      payload: { method: 'deviceVerify', dataHex: 'aabb' },
+    });
+    method.init();
+    const protocolV2Messages = TransportUtils.parseConfigure(
+      DataManager.getProtobufMessages('v2Schema')
+    );
+    const typedCall = jest.fn(
+      (requestType: string, responseType: string, payload: Record<string, unknown> = {}) => {
+        const request = TransportUtils.createMessageFromName(protocolV2Messages, requestType);
+        request.Message.encode(request.Message.create(payload)).finish();
+        TransportUtils.createMessageFromName(protocolV2Messages, responseType);
+        if (requestType === 'DeviceCertificateSign') {
+          return Promise.resolve({ message: { data: 'signature' } });
+        }
+        return Promise.resolve({ message: { cert_and_pubkey: 'certificate' } });
+      }
+    );
+    method.device = {
+      getCurrentDeviceType: () => 'pro2',
+      isProtocolV2: () => true,
+      commands: { typedCall },
+    } as any;
+
+    await expect(method.run()).resolves.toEqual({
+      cert: 'certificate',
+      signature: 'signature',
+    });
+    expect(typedCall.mock.calls.map(call => call.slice(0, 2))).toEqual([
+      ['DeviceCertificateSign', 'DeviceCertificateSignature'],
+      ['DeviceCertificateRead', 'DeviceCertificate'],
+    ]);
+  });
+
   test('wallet business methods inherit the wallet-session unlock requirement', () => {
     const method = new ConfluxSignMessageCIP23({
       id: 1,
@@ -21,6 +74,40 @@ describe('Protocol V2 unlock semantics', () => {
     expect(method.useDevicePassphraseState).toBe(true);
     expect(method.unlockPolicy).toBe('none');
     expect(method.getSupportedProtocols()).toContain('V2');
+  });
+
+  test.each([
+    [
+      'deviceReboot',
+      () =>
+        new DeviceReboot({
+          id: 1,
+          payload: { method: 'deviceReboot', rebootType: 2 },
+        }),
+    ],
+    [
+      'deviceRebootToBootloader',
+      () =>
+        new DeviceRebootToBootloader({
+          id: 1,
+          payload: { method: 'deviceRebootToBootloader' },
+        }),
+    ],
+    [
+      'deviceRebootToBoardloader',
+      () =>
+        new DeviceRebootToBoardloader({
+          id: 1,
+          payload: { method: 'deviceRebootToBoardloader' },
+        }),
+    ],
+  ])('pre-unlocks %s before sending DeviceReboot', (_name, createMethod) => {
+    const method = createMethod();
+    method.init();
+
+    expect(method.unlockPolicy).toBe('unlock-before-run');
+    expect(method.protocolV2PreUnlockPinType).toBe(DeviceSessionPinType.Any);
+    expect(method.useDevicePassphraseState).toBe(false);
   });
 
   test('lock-free Protocol V2 controls explicitly opt out of wallet-session handling', () => {
@@ -188,6 +275,87 @@ describe('Protocol V2 unlock semantics', () => {
       message: 'ok',
     });
 
+    expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Any, expect.any(Object));
+  });
+
+  test.each([
+    [
+      'PIN changes',
+      () =>
+        new DeviceChangePin({
+          id: 1,
+          payload: { method: 'deviceChangePin', remove: false },
+        }),
+    ],
+    ['device wipe', () => new DeviceWipe({ id: 1, payload: { method: 'deviceWipe' } })],
+    [
+      'firmware updates',
+      () =>
+        new FirmwareUpdateV4({
+          id: 1,
+          payload: { method: 'firmwareUpdateV4', platform: 'desktop' } as any,
+        }),
+    ],
+    [
+      'genuine-device verification',
+      () =>
+        new DeviceVerify({
+          id: 1,
+          payload: { method: 'deviceVerify', dataHex: '00' },
+        }),
+    ],
+    [
+      'wallpaper uploads',
+      () =>
+        new DeviceUploadWallpaper({
+          id: 1,
+          payload: {
+            method: 'deviceUploadWallpaper',
+            jpegBase64: createJpegBase64(604, 1024),
+          },
+        }),
+    ],
+    [
+      'NFT uploads',
+      () =>
+        new DeviceUploadNft({
+          id: 1,
+          payload: {
+            method: 'deviceUploadNft',
+            imageJpegBase64: createJpegBase64(540, 540),
+            thumbnailJpegBase64: createJpegBase64(263, 263),
+            title: 'NFT',
+            subtitle: '',
+            timestampMs: 1,
+          },
+        }),
+    ],
+  ])('allows either PIN type when pre-unlocking %s', async (_name, createMethod) => {
+    const method = createMethod();
+    method.init();
+    const features = { unlocked: false };
+    const device = {
+      features,
+      commands: {
+        typedCall: jest.fn().mockResolvedValue({ message: { unlocked: false } }),
+      },
+      isProtocolV2: () => true,
+      isBootloader: () => false,
+      isRomloader: () => false,
+      updateProtocolV2Status: jest.fn(() => features),
+      unlockDevice: jest.fn().mockImplementation(() => {
+        features.unlocked = true;
+        return Promise.resolve(features);
+      }),
+    };
+    method.run = jest.fn().mockResolvedValue({ message: 'ok' });
+
+    await expect(runMethodWithUnlockPolicy(method, device as any)).resolves.toEqual({
+      message: 'ok',
+    });
+
+    expect(method.unlockPolicy).toBe('unlock-before-run');
+    expect(method.getSupportedProtocols()).toContain('V2');
     expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Any, expect.any(Object));
   });
 

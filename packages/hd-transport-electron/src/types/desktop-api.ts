@@ -3,6 +3,8 @@
  * These types define the core interface for Noble BLE communication
  */
 
+import type { EBleDisconnectReason } from '@onekeyfe/hd-shared';
+
 // Noble BLE API interface - core BLE functionality
 export interface NobleBleWriteOptions {
   pacingDelayMs?: number;
@@ -21,7 +23,15 @@ export interface NobleBleAPI {
   write: (uuid: string, data: string, options?: NobleBleWriteOptions) => Promise<void>;
   onNotification: (callback: (deviceId: string, data: string) => void) => () => void;
   onMtuChanged?: (callback: (device: { id: string; mtu: number }) => void) => () => void;
-  onDeviceDisconnected: (callback: (device: { id: string; name: string }) => void) => () => void;
+  /**
+   * Fires whenever a BLE link drops. `reason` distinguishes a real peripheral
+   * drop from the main process freeing an idle link on its keep-alive timer;
+   * it is optional so an older host bridge that omits it still type-checks
+   * (absent is treated as a real drop by consumers).
+   */
+  onDeviceDisconnected: (
+    callback: (device: { id: string; name: string; reason?: EBleDisconnectReason }) => void
+  ) => () => void;
   checkAvailability: () => Promise<{
     available: boolean;
     state: string;

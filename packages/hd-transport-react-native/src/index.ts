@@ -58,6 +58,15 @@ import type { Characteristic, Device, Subscription } from 'react-native-ble-plx'
 import type EventEmitter from 'events';
 import type { BleAcquireInput, TransportOptions } from './types';
 
+type FirmwareInstallBleAcquireInput = BleAcquireInput & {
+  /**
+   * Reuse the already-verified protocol after an expected firmware-install
+   * disconnect. The install loader accepts status requests but may not answer
+   * the generic protocol probe used by a normal acquire.
+   */
+  skipProtocolProbe?: boolean;
+};
+
 const { check, ProtocolV1, parseConfigure } = transport;
 
 const Log = bleLogger;
@@ -149,6 +158,7 @@ const PROTOCOL_V2_PROBE_TIMEOUT_MS = 10_000;
  * A healthy packet completes in milliseconds, so this only fires on a dead link.
  */
 export const BLE_WRITE_PACKET_TIMEOUT_MS = 10_000;
+export const BLE_NATIVE_TEARDOWN_TIMEOUT_MS = 3_000;
 const WEDGED_WRITE_MESSAGE = 'BLE write timeout after';
 const isWedgedWriteError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleWriteCharacteristicError &&
@@ -202,10 +212,6 @@ export function getProtocolV2BleTuning() {
   return { ...protocolV2BleTuning };
 }
 
-function inferProtocolHintFromDeviceName(name?: string | null): ProtocolType | undefined {
-  return /\bpro\s*2\b/i.test(name ?? '') ? 'V2' : undefined;
-}
-
 function getDeviceDisplayName(device?: Device | null) {
   return device?.name || device?.localName || null;
 }
@@ -257,10 +263,17 @@ export const PROTOCOL_REPROBE_FALLBACK_ATTEMPTS = 3;
 /** BLE setup timeouts since the last successful setup before the manager is recreated. */
 export const BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD = 2;
 const CONNECT_TIMEOUT_MESSAGE = 'BLE connect timeout after';
+export const BLE_SETUP_WEDGED_MESSAGE = 'BLE setup wedged repeatedly';
 const isConnectTimeoutError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleConnectedError &&
   typeof (error as { message?: unknown })?.message === 'string' &&
   (error as { message: string }).message.startsWith(CONNECT_TIMEOUT_MESSAGE);
+const isWedgedBleSetupError = (error: unknown): boolean =>
+  (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.PollingTimeout &&
+  typeof (error as { message?: unknown })?.message === 'string' &&
+  (error as { message: string }).message.startsWith(BLE_SETUP_WEDGED_MESSAGE);
+const shouldRethrowBleSetupError = (error: unknown): boolean =>
+  isConnectTimeoutError(error) || isWedgedBleSetupError(error);
 const isNativeOperationTimeoutError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === BleErrorCode.OperationTimedOut;
 
@@ -380,6 +393,9 @@ export default class ReactNativeBleTransport {
   /** Protocol this device actually answered on, kept across reconnects of one session. */
   private sessionProtocols: Map<string, ProtocolType> = new Map();
 
+  /** Endpoints that answered a V2 probe in this transport lifetime. Survives disconnect. */
+  private confirmedProtocolV2 = new Set<string>();
+
   /** Consecutive detections that failed while trusting sessionProtocols. */
   private protocolReprobeFailures: Map<string, number> = new Map();
 
@@ -421,6 +437,9 @@ export default class ReactNativeBleTransport {
   private androidPriorityResetTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
   private nextMonitorToken = 1;
+
+  /** Serializes transport lifecycle changes for the same physical device. */
+  private lifecycleOperations: Map<string, Promise<void>> = new Map();
 
   constructor(options: TransportOptions) {
     this.scanTimeout = options.scanTimeout ?? DEVICE_SCAN_TIMEOUT_MS;
@@ -761,10 +780,7 @@ export default class ReactNativeBleTransport {
       const addDevice = (device: Device) => {
         if (deviceList.every(d => d.id !== device.id)) {
           const displayName = getDeviceDisplayName(device) ?? 'Unknown BLE Device';
-          const protocolHint = inferProtocolHintFromDeviceName(displayName);
-          if (protocolHint) {
-            this.deviceProtocolHints.set(device.id, protocolHint);
-          }
+
           deviceList.push({
             ...device,
             name: displayName,
@@ -774,7 +790,6 @@ export default class ReactNativeBleTransport {
             deviceId: device.id,
             name: displayName,
             serviceUUIDs: device.serviceUUIDs,
-            protocolHint,
           });
         }
       };
@@ -859,32 +874,80 @@ export default class ReactNativeBleTransport {
     return transport;
   }
 
-  async acquire(input: BleAcquireInput) {
-    const { uuid, forceCleanRunPromise, expectedProtocol } = input;
+  async acquire(input: FirmwareInstallBleAcquireInput) {
+    const { uuid } = input;
 
     if (!uuid) {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
     }
 
-    const cachedTransport = transportCache[uuid];
-    if (cachedTransport) {
-      const cachedProtocol = this.deviceProtocol.get(uuid);
-      const isCachedDeviceConnected = await cachedTransport.device.isConnected().catch(() => false);
-      if (
-        isCachedDeviceConnected &&
-        cachedProtocol &&
-        (!expectedProtocol || cachedProtocol === expectedProtocol)
-      ) {
-        Log?.debug('[ReactNativeBleTransport] reuse cached BLE transport:', uuid, cachedProtocol);
-        return { uuid, protocolType: cachedProtocol };
-      }
+    return this.runLifecycleOperation(uuid, () => this.acquireUnlocked(input));
+  }
 
-      /**
-       * If the transport is not reusable due to a protocol mismatch or stale
-       * connection, clean it up before creating a new transport instance.
-       */
-      Log?.debug('transport not reusable, will release: ', uuid);
-      await this.release(uuid, true);
+  private async acquireUnlocked(input: FirmwareInstallBleAcquireInput) {
+    const { uuid, forceCleanRunPromise, expectedProtocol, skipProtocolProbe } = input;
+
+    const cachedTransport = transportCache[uuid];
+    if (skipProtocolProbe && !cachedTransport && this.blePlxManager) {
+      Log?.debug(
+        '[ReactNativeBleTransport] refresh uncached BLE connection for firmware install:',
+        uuid
+      );
+      const manager = this.blePlxManager;
+      await this.runNativeTeardown(uuid, manager, async () => {
+        await this.runBestEffortNativeOperation(
+          'firmware install reconnect: cancel uncached device connection',
+          () => manager.cancelDeviceConnection(uuid)
+        );
+      });
+    }
+    if (cachedTransport) {
+      if (skipProtocolProbe) {
+        Log?.debug(
+          '[ReactNativeBleTransport] refresh cached BLE connection for firmware install:',
+          uuid
+        );
+        const manager = this.blePlxManager;
+        await this.releaseUnlocked(uuid, true);
+        await this.runNativeTeardown(uuid, manager, async () => {
+          const operations: Promise<unknown>[] = [];
+          if (manager) {
+            operations.push(
+              this.runBestEffortNativeOperation(
+                'firmware install reconnect: cancel device connection',
+                () => manager.cancelDeviceConnection(uuid)
+              )
+            );
+          }
+          operations.push(
+            this.runBestEffortNativeOperation(
+              'firmware install reconnect: device cancel connection',
+              () => cachedTransport.device.cancelConnection()
+            )
+          );
+          await Promise.all(operations);
+        });
+      } else {
+        const cachedProtocol = this.deviceProtocol.get(uuid);
+        const isCachedDeviceConnected = await cachedTransport.device
+          .isConnected()
+          .catch(() => false);
+        if (
+          isCachedDeviceConnected &&
+          cachedProtocol &&
+          (!expectedProtocol || cachedProtocol === expectedProtocol)
+        ) {
+          Log?.debug('[ReactNativeBleTransport] reuse cached BLE transport:', uuid, cachedProtocol);
+          return { uuid, protocolType: cachedProtocol };
+        }
+
+        /**
+         * If the transport is not reusable due to a protocol mismatch or stale
+         * connection, clean it up before creating a new transport instance.
+         */
+        Log?.debug('transport not reusable, will release: ', uuid);
+        await this.releaseUnlocked(uuid, true);
+      }
     }
 
     let device: Device | null = null;
@@ -934,7 +997,7 @@ export default class ReactNativeBleTransport {
         );
       } catch (e) {
         Log?.debug('try to connect to device has error: ', e);
-        if (isConnectTimeoutError(e)) {
+        if (shouldRethrowBleSetupError(e)) {
           throw e;
         }
         if (
@@ -968,7 +1031,7 @@ export default class ReactNativeBleTransport {
         );
       } catch (e) {
         Log?.debug('not connected, try to connect to device has error: ', e);
-        if (isConnectTimeoutError(e)) {
+        if (shouldRethrowBleSetupError(e)) {
           throw e;
         }
         if (
@@ -1005,12 +1068,10 @@ export default class ReactNativeBleTransport {
 
     const protocolHint = expectedProtocol
       ? undefined
-      : input.protocolHint ??
-        this.deviceProtocolHints.get(uuid) ??
-        inferProtocolHintFromDeviceName(getDeviceDisplayName(acquiredDevice));
+      : input.protocolHint ?? this.deviceProtocolHints.get(uuid);
 
     // release transport before new transport instance
-    await this.release(uuid, true);
+    await this.releaseUnlocked(uuid, true);
     if (protocolHint) {
       this.deviceProtocolHints.set(uuid, protocolHint);
     }
@@ -1021,6 +1082,35 @@ export default class ReactNativeBleTransport {
     });
 
     try {
+      if (skipProtocolProbe) {
+        if (!expectedProtocol) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'skipProtocolProbe requires an expected BLE protocol'
+          );
+        }
+        if (this.sessionProtocols.get(uuid) !== expectedProtocol) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'skipProtocolProbe requires a previously confirmed protocol for this BLE endpoint'
+          );
+        }
+        this.deviceProtocol.set(uuid, expectedProtocol);
+        this.sessionProtocols.set(uuid, expectedProtocol);
+        this.protocolReprobeFailures.delete(uuid);
+        Log?.debug('[ReactNativeBleTransport] protocol selected without probe', {
+          deviceId: uuid,
+          protocol: expectedProtocol,
+          source: 'firmware-install-reconnect',
+        });
+        const currentTransport = transportCache[uuid];
+        if (!currentTransport) {
+          throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
+        }
+        this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
+        return { uuid, protocolType: expectedProtocol };
+      }
+
       const protocolType = await this.detectProtocol(
         uuid,
         expectedProtocol,
@@ -1036,7 +1126,11 @@ export default class ReactNativeBleTransport {
       this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
       return { uuid, protocolType };
     } catch (error) {
-      await this.release(uuid, true);
+      if ((error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleDeviceBondError) {
+        await this.disconnectUnlocked(uuid);
+      } else {
+        await this.releaseUnlocked(uuid, true);
+      }
       throw error;
     }
   }
@@ -1181,12 +1275,17 @@ export default class ReactNativeBleTransport {
   }
 
   async release(uuid: string, onclose = false) {
+    return this.runLifecycleOperation(uuid, () => this.releaseUnlocked(uuid, onclose));
+  }
+
+  private async releaseUnlocked(uuid: string, onclose = false) {
     await this.protocolV2Links.invalidateLink(uuid, 'React Native BLE transport released');
     return this.releaseNative(uuid, onclose);
   }
 
   private async releaseNative(uuid: string, onclose = false) {
     const transport = transportCache[uuid];
+    const manager = this.blePlxManager;
     if (this.runPromise && this.runPromiseDeviceId === uuid) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
       this.runPromise.reject(error);
@@ -1202,8 +1301,6 @@ export default class ReactNativeBleTransport {
       this.resetProtocolV2Frames(uuid);
       return Promise.resolve(true);
     }
-
-    await this.restoreAndroidConnectionPriority(uuid, transport);
 
     if (transport) {
       if (this.monitorTokens.get(uuid) === transport.monitorToken) {
@@ -1222,32 +1319,42 @@ export default class ReactNativeBleTransport {
       );
       transport.notifySubscription?.remove();
       transport.notifySubscription = undefined;
-
-      if (transport.notifyTransactionId) {
-        try {
-          await this.blePlxManager?.cancelTransaction(transport.notifyTransactionId);
-        } catch (e) {
-          Log?.debug('release: cancel notify transaction error (ignored): ', e?.message || e);
-        }
+      if (transportCache[uuid] === transport) {
+        delete transportCache[uuid];
       }
-
-      delete transportCache[uuid];
     }
 
     this.protocolV2HighVolumeLogSignatures.delete(uuid);
 
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
-    // Preserve a name-derived hint across disconnects so reconnect can probe V2 first.
+    // Confirmed protocol and caller hints stay in deviceProtocol / protocolHint.
     this.protocolV2Assemblers.get(uuid)?.reset();
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);
 
-    try {
-      await this.blePlxManager?.cancelTransaction(uuid);
-    } catch (e) {
-      Log?.debug('release: cancel transaction error (ignored): ', e?.message || e);
-    }
+    await this.runNativeTeardown(uuid, manager, async () => {
+      const operations: Promise<unknown>[] = [
+        this.runBestEffortNativeOperation('release: restore connection priority', () =>
+          this.restoreAndroidConnectionPriority(uuid, transport)
+        ),
+      ];
+      if (transport?.notifyTransactionId && manager) {
+        operations.push(
+          this.runBestEffortNativeOperation('release: cancel notify transaction', () =>
+            manager.cancelTransaction(transport.notifyTransactionId as string)
+          )
+        );
+      }
+      if (manager) {
+        operations.push(
+          this.runBestEffortNativeOperation('release: cancel transaction', () =>
+            manager.cancelTransaction(uuid)
+          )
+        );
+      }
+      await Promise.all(operations);
+    });
 
     return Promise.resolve(true);
   }
@@ -1552,8 +1659,13 @@ export default class ReactNativeBleTransport {
   }
 
   async disconnect(session: string) {
+    return this.runLifecycleOperation(session, () => this.disconnectUnlocked(session));
+  }
+
+  private async disconnectUnlocked(session: string) {
     await this.protocolV2Links.invalidateLink(session, 'React Native BLE transport disconnected');
     const transport = transportCache[session];
+    const manager = this.blePlxManager;
     const monitorToken = transport?.monitorToken ?? this.monitorTokens.get(session);
 
     // Clean up disconnect subscription first to prevent onDisconnected callback
@@ -1582,33 +1694,8 @@ export default class ReactNativeBleTransport {
       }
     }
 
-    // cancel the ble transaction
-    if (session) {
-      try {
-        await this.blePlxManager?.cancelTransaction(session);
-      } catch (e) {
-        Log?.debug('resetSession: cancel transaction error (ignored): ', e?.message || e);
-      }
-    }
-
-    // disconnect the device via the device object
-    if (transport?.device) {
-      try {
-        await transport.device.cancelConnection();
-      } catch (e) {
-        Log?.debug('resetSession: device.cancelConnection error (ignored): ', e?.message || e);
-      }
-    }
-
-    // disconnect the device via the ble manager
-    try {
-      await this.blePlxManager?.cancelDeviceConnection(session);
-    } catch (e) {
-      Log?.debug('resetSession: manager.cancelDeviceConnection error (ignored): ', e?.message || e);
-    }
-
     // clear the transport cache
-    if (transportCache[session]) {
+    if (!transport || transportCache[session] === transport) {
       delete transportCache[session];
     }
     this.deviceProtocol.delete(session);
@@ -1628,8 +1715,95 @@ export default class ReactNativeBleTransport {
     if (monitorToken !== undefined && this.monitorTokens.get(session) === monitorToken) {
       this.monitorTokens.delete(session);
     }
+
+    await this.runNativeTeardown(session, manager, async () => {
+      const operations: Promise<unknown>[] = [];
+      if (manager) {
+        operations.push(
+          this.runBestEffortNativeOperation('disconnect: cancel transaction', () =>
+            manager.cancelTransaction(session)
+          )
+        );
+        operations.push(
+          this.runBestEffortNativeOperation('disconnect: cancel device connection', () =>
+            manager.cancelDeviceConnection(session)
+          )
+        );
+      }
+      if (transport?.device) {
+        operations.push(
+          this.runBestEffortNativeOperation('disconnect: device cancel connection', () =>
+            transport.device.cancelConnection()
+          )
+        );
+      }
+      await Promise.all(operations);
+    });
+
     // eslint-disable-next-line no-promise-executor-return
     await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
+  }
+
+  private async runNativeTeardown(
+    uuid: string,
+    manager: BlePlxManager | undefined,
+    teardown: () => Promise<void>
+  ) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    const pending = Promise.resolve()
+      .then(teardown)
+      .catch(error => {
+        Log?.debug('BLE native teardown error (ignored): ', error?.message || error);
+      });
+    try {
+      await Promise.race([
+        pending,
+        new Promise<void>(resolve => {
+          timer = setTimeout(() => {
+            timedOut = true;
+            resolve();
+          }, BLE_NATIVE_TEARDOWN_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+
+    if (timedOut) {
+      Log?.error('[ReactNativeBleTransport] BLE native teardown timed out:', uuid);
+      if (this.blePlxManager === manager) {
+        this.resetPlxManager();
+      }
+    }
+  }
+
+  private runBestEffortNativeOperation(label: string, operation: () => Promise<unknown>) {
+    return Promise.resolve()
+      .then(operation)
+      .catch(error => {
+        Log?.debug(`${label} error (ignored): `, error?.message || error);
+      });
+  }
+
+  private async runLifecycleOperation<T>(uuid: string, operation: () => Promise<T>): Promise<T> {
+    const previousOperation = this.lifecycleOperations.get(uuid) ?? Promise.resolve();
+    let completeOperation!: () => void;
+    const operationGate = new Promise<void>(resolve => {
+      completeOperation = resolve;
+    });
+    const operationTail = previousOperation.catch(() => undefined).then(() => operationGate);
+    this.lifecycleOperations.set(uuid, operationTail);
+
+    await previousOperation.catch(() => undefined);
+    try {
+      return await operation();
+    } finally {
+      completeOperation();
+      if (this.lifecycleOperations.get(uuid) === operationTail) {
+        this.lifecycleOperations.delete(uuid);
+      }
+    }
   }
 
   cancel() {
@@ -1667,7 +1841,13 @@ export default class ReactNativeBleTransport {
       return result;
     } catch (error) {
       if (timedOut || isNativeOperationTimeoutError(error)) {
-        this.abandonStalledConnection(uuid, timedOut ? 'connect-backstop' : 'connect-native');
+        const resetManager = this.abandonStalledConnection(
+          uuid,
+          timedOut ? 'connect-backstop' : 'connect-native'
+        );
+        if (resetManager) {
+          throw this.createWedgedBleSetupError();
+        }
       }
       throw error;
     } finally {
@@ -1703,7 +1883,13 @@ export default class ReactNativeBleTransport {
       return result;
     } catch (error) {
       if (timedOut || isNativeOperationTimeoutError(error)) {
-        this.abandonStalledConnection(uuid, timedOut ? 'gatt-backstop' : 'gatt-native');
+        const resetManager = this.abandonStalledConnection(
+          uuid,
+          timedOut ? 'gatt-backstop' : 'gatt-native'
+        );
+        if (resetManager) {
+          throw this.createWedgedBleSetupError();
+        }
       }
       throw error;
     } finally {
@@ -1715,11 +1901,12 @@ export default class ReactNativeBleTransport {
    * Give up on a BLE setup operation the native layer did not settle. The abandoned
    * operation still owns native connection/GATT state that can poison the next attempt,
    * so it is cleared here without awaiting the same queue that stopped responding.
+   * Returns true when the manager itself was reset so the caller can stop Core retries.
    */
   private abandonStalledConnection(
     uuid: string,
     stage: 'connect-backstop' | 'connect-native' | 'gatt-backstop' | 'gatt-native'
-  ) {
+  ): boolean {
     const timeouts = (this.connectionSetupTimeoutCounts.get(uuid) ?? 0) + 1;
     this.connectionSetupTimeoutCounts.set(uuid, timeouts);
     Log?.error('[ReactNativeBleTransport] BLE setup timed out:', uuid, {
@@ -1745,7 +1932,15 @@ export default class ReactNativeBleTransport {
       Log?.error('[ReactNativeBleTransport] BLE setup wedged repeatedly, resetting BLE manager');
       this.resetPlxManager();
       this.connectionSetupTimeoutCounts.delete(uuid);
+      return true;
     }
+    return false;
+  }
+
+  private createWedgedBleSetupError() {
+    // PollingTimeout is not retried by connectDeviceForBle and already maps
+    // to the App "connection failed" help text.
+    return ERRORS.TypedError(HardwareErrorCode.PollingTimeout, BLE_SETUP_WEDGED_MESSAGE);
   }
 
   private getCachedTransport(uuid: string) {
@@ -1840,13 +2035,42 @@ export default class ReactNativeBleTransport {
   private resetPlxManager() {
     const manager = this.blePlxManager;
     this.blePlxManager = undefined;
-    // Every cached transport belongs to the destroyed manager's peripherals.
-    Object.keys(transportCache).forEach(key => {
-      delete transportCache[key];
+    const reason = 'React Native BLE manager reset';
+    // Destroying the shared manager invalidates every peripheral it owns. Notify
+    // each cached session before clearing generations so Core cannot retain a
+    // silently stale connection for an unrelated device.
+    Object.entries(transportCache).forEach(([uuid, cachedTransport]) => {
+      try {
+        cachedTransport.disconnectSubscription?.remove();
+      } catch (error) {
+        Log?.debug('BLE manager reset disconnect subscription removal failed:', error);
+      }
+      cachedTransport.disconnectSubscription = undefined;
+      try {
+        cachedTransport.notifySubscription?.remove();
+      } catch (error) {
+        Log?.debug('BLE manager reset notify subscription removal failed:', error);
+      }
+      cachedTransport.notifySubscription = undefined;
+      this.rejectProtocolV2Frames(uuid, new Error(reason));
+      try {
+        this.emitDeviceDisconnect(
+          uuid,
+          cachedTransport.device?.name,
+          cachedTransport.monitorToken ?? this.monitorTokens.get(uuid)
+        );
+      } catch (error) {
+        Log?.debug('BLE manager reset disconnect event failed:', error);
+      }
+      delete transportCache[uuid];
+    });
+    this.protocolV2Links.invalidateAllLinks(reason).catch(error => {
+      Log?.debug('[ReactNativeBleTransport] BLE manager link invalidation failed:', error);
     });
     this.deviceProtocol.clear();
     this.probingProtocols.clear();
     this.sessionProtocols.clear();
+    this.confirmedProtocolV2.clear();
     this.protocolReprobeFailures.clear();
     this.writeTimeoutCounts.clear();
     this.connectionSetupTimeoutCounts.clear();
@@ -1859,9 +2083,12 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  private createProtocolMismatchError(expected: ProtocolType) {
+  private createProtocolMismatchError(expected: ProtocolType, uuid: string) {
+    // A generic Ping miss is not a bond failure. Only a later miss after this
+    // endpoint already answered V2, or a native encryption/pairing error, is.
+    const isStaleV2Bond = expected === 'V2' && this.confirmedProtocolV2.has(uuid);
     return ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
+      isStaleV2Bond ? HardwareErrorCode.BleDeviceBondError : HardwareErrorCode.RuntimeError,
       `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
     );
   }
@@ -1917,13 +2144,14 @@ export default class ReactNativeBleTransport {
         });
         return 'V1';
       }
-      throw this.createProtocolMismatchError(expectedProtocol);
+      throw this.createProtocolMismatchError(expectedProtocol, uuid);
     }
 
     if (expectedProtocol === 'V2') {
       if (await this.probeProtocolV2(uuid)) {
         this.deviceProtocol.set(uuid, 'V2');
         this.sessionProtocols.set(uuid, 'V2');
+        this.confirmedProtocolV2.add(uuid);
         Log?.debug('[ReactNativeBleTransport] protocol detected', {
           deviceId: uuid,
           protocol: 'V2',
@@ -1931,7 +2159,7 @@ export default class ReactNativeBleTransport {
         });
         return 'V2';
       }
-      throw this.createProtocolMismatchError(expectedProtocol);
+      throw this.createProtocolMismatchError(expectedProtocol, uuid);
     }
 
     // Protocol must be actively probed after connection. Name, PID, and descriptors only
@@ -1966,6 +2194,9 @@ export default class ReactNativeBleTransport {
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
         this.sessionProtocols.set(uuid, protocol);
+        if (protocol === 'V2') {
+          this.confirmedProtocolV2.add(uuid);
+        }
         this.protocolReprobeFailures.delete(uuid);
         Log?.debug('[ReactNativeBleTransport] protocol detected', {
           deviceId: uuid,
@@ -2444,6 +2675,7 @@ export default class ReactNativeBleTransport {
         return rxFrame;
       },
       reset: (reason: string) => {
+        if (this.monitorTokens.get(uuid) !== generation) return;
         this.protocolV2Assemblers.get(uuid)?.reset();
         this.rejectProtocolV2Frames(uuid, new Error(reason));
       },

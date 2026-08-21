@@ -1,12 +1,8 @@
 import { sha256 } from '@noble/hashes/sha256';
-import JSZip from 'jszip';
-import { prepareFirmwareUpdateV4MemoryHost } from '@onekeyfe/hd-core';
 
 import type {
-  CoreApi,
-  FirmwareMemoryArtifact,
   FirmwareUpdatePlan,
-  FirmwareUpdateV4MemoryHost,
+  FirmwareUpdateV4Params,
   FirmwareUpdateV4Target,
 } from '@onekeyfe/hd-core';
 
@@ -20,62 +16,42 @@ type Fetcher = (url: string) => Promise<FetchResponse>;
 
 export type FirmwarePlanArtifactOverrides = Partial<Record<FirmwareUpdateV4Target, ArrayBuffer>>;
 
+export type FirmwareUpdatePlanBinaryParams = Pick<
+  FirmwareUpdateV4Params,
+  | 'targetsToUpdate'
+  | 'bootloaderBinary'
+  | 'applicationP1Binary'
+  | 'applicationP2Binary'
+  | 'coprocessorBinary'
+  | 'se01Binary'
+  | 'se02Binary'
+  | 'se03Binary'
+  | 'se04Binary'
+  | 'resourceArchiveBinary'
+>;
+
+const PLAN_TARGET_BINARY_FIELDS = {
+  boot: 'bootloaderBinary',
+  app_v1: 'applicationP1Binary',
+  app_v2: 'applicationP2Binary',
+  coprocessor: 'coprocessorBinary',
+  se01: 'se01Binary',
+  se02: 'se02Binary',
+  se03: 'se03Binary',
+  se04: 'se04Binary',
+  resource: 'resourceArchiveBinary',
+} as const;
+
+type PlanBinaryTarget = keyof typeof PLAN_TARGET_BINARY_FIELDS;
+type PlanBinaryField = (typeof PLAN_TARGET_BINARY_FIELDS)[PlanBinaryTarget];
+
 const bytesToHex = (bytes: Uint8Array) =>
   Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 
-const MAX_ZIP_ENTRY_COUNT = 512;
-const MAX_ZIP_ENTRY_BYTES = 256 * 1024 * 1024;
-const MAX_ZIP_TOTAL_BYTES = 256 * 1024 * 1024;
+const isPlanBinaryTarget = (target: string): target is PlanBinaryTarget =>
+  Object.prototype.hasOwnProperty.call(PLAN_TARGET_BINARY_FIELDS, target);
 
-type JSZipSizedEntry = JSZip.JSZipObject & {
-  _data?: { compressedSize?: unknown; uncompressedSize?: unknown };
-};
-
-async function materializeZipEntries(zip: JSZip, archiveSize: number) {
-  const zipEntries = Object.values(zip.files);
-  if (
-    zipEntries.some(entry => entry.unsafeOriginalName && entry.unsafeOriginalName !== entry.name)
-  ) {
-    throw new Error('Firmware ZIP contains an unsafe entry path');
-  }
-  const entries = zipEntries.filter(entry => !entry.dir);
-  if (entries.length === 0 || entries.length > MAX_ZIP_ENTRY_COUNT) {
-    throw new Error('Firmware ZIP entry set is invalid');
-  }
-  let totalCompressedBytes = 0;
-  let totalUncompressedBytes = 0;
-  for (const entry of entries) {
-    const { compressedSize, uncompressedSize } = (entry as JSZipSizedEntry)._data ?? {};
-    if (
-      !Number.isSafeInteger(compressedSize) ||
-      Number(compressedSize) < 0 ||
-      !Number.isSafeInteger(uncompressedSize) ||
-      Number(uncompressedSize) <= 0
-    ) {
-      throw new Error(`Firmware ZIP entry size is invalid: ${entry.name}`);
-    }
-    totalCompressedBytes += Number(compressedSize);
-    totalUncompressedBytes += Number(uncompressedSize);
-    if (
-      Number(uncompressedSize) > MAX_ZIP_ENTRY_BYTES ||
-      totalCompressedBytes > archiveSize ||
-      totalUncompressedBytes > MAX_ZIP_TOTAL_BYTES
-    ) {
-      throw new Error('Firmware ZIP declared size exceeds the allowed limit');
-    }
-  }
-  const materializedEntries: Array<{ entryName: string; binary: ArrayBuffer }> = [];
-  for (const entry of entries) {
-    const binary = await entry.async('arraybuffer');
-    if (binary.byteLength !== Number((entry as JSZipSizedEntry)._data?.uncompressedSize)) {
-      throw new Error(`Firmware ZIP entry size mismatch: ${entry.name}`);
-    }
-    materializedEntries.push({ entryName: entry.name, binary });
-  }
-  return materializedEntries;
-}
-
-async function loadPlanArtifact({
+async function loadPlanArtifactBinary({
   artifact,
   override,
   fetcher,
@@ -83,7 +59,7 @@ async function loadPlanArtifact({
   artifact: FirmwareUpdatePlan['artifacts'][number];
   override?: ArrayBuffer;
   fetcher: Fetcher;
-}): Promise<FirmwareMemoryArtifact> {
+}): Promise<ArrayBuffer> {
   let binary = override;
   if (!binary) {
     const response = await fetcher(artifact.url);
@@ -101,39 +77,49 @@ async function loadPlanArtifact({
   if (artifact.expectedSha256 !== undefined && digest !== artifact.expectedSha256.toLowerCase()) {
     throw new Error(`Firmware artifact SHA-256 mismatch: ${artifact.artifactId}`);
   }
-  if (artifact.container === 'raw') {
-    return { artifactId: artifact.artifactId, binary };
-  }
-  const zip = await JSZip.loadAsync(binary);
-  return {
-    artifactId: artifact.artifactId,
-    binary,
-    materializedEntries: await materializeZipEntries(zip, binary.byteLength),
-  };
+  return binary;
 }
-export async function prepareFirmwareUpdatePlanMemoryHost({
-  hardwareSDK,
+
+export async function loadFirmwareUpdatePlanBinaries({
   plan,
   overrides = {},
   fetcher = fetch as Fetcher,
 }: {
-  hardwareSDK: CoreApi;
   plan: FirmwareUpdatePlan;
   overrides?: FirmwarePlanArtifactOverrides;
   fetcher?: Fetcher;
-}): Promise<FirmwareUpdateV4MemoryHost> {
-  const artifacts = await Promise.all(
-    plan.artifacts.map(artifact =>
-      loadPlanArtifact({
+}): Promise<FirmwareUpdatePlanBinaryParams> {
+  if (plan.artifacts.length === 0) {
+    throw new Error('Firmware update Plan has no artifacts');
+  }
+
+  const loaded = await Promise.all(
+    plan.artifacts.map(async artifact => {
+      if (!isPlanBinaryTarget(artifact.target)) {
+        throw new Error(`Firmware update Plan target is not a V4 binary: ${artifact.target}`);
+      }
+      const field: PlanBinaryField = PLAN_TARGET_BINARY_FIELDS[artifact.target];
+      const binary = await loadPlanArtifactBinary({
         artifact,
-        override: overrides[artifact.target as FirmwareUpdateV4Target],
+        override: overrides[artifact.target],
         fetcher,
-      })
-    )
+      });
+      return { target: artifact.target, field, binary };
+    })
   );
-  return prepareFirmwareUpdateV4MemoryHost({
-    sdk: hardwareSDK,
-    plan,
-    artifacts,
-  });
+
+  const binaries: FirmwareUpdatePlanBinaryParams = {
+    targetsToUpdate: [],
+  };
+  const loadedTargets: FirmwareUpdateV4Target[] = [];
+  for (const item of loaded) {
+    if (binaries[item.field]) {
+      throw new Error(`Firmware update Plan has duplicate target ${item.target}`);
+    }
+    binaries[item.field] = item.binary;
+    loadedTargets.push(item.target);
+  }
+
+  binaries.targetsToUpdate = [...new Set(loadedTargets)];
+  return binaries;
 }

@@ -15,7 +15,7 @@ import { useFirmwareProgress } from '../components/providers/SDKProvider';
 import { useToast } from '../hooks/use-toast';
 import { useDeviceStore } from '../store/deviceStore';
 import { isPro2DeviceInfo } from '../utils/pro2Device';
-import { prepareFirmwareUpdatePlanMemoryHost } from '../utils/firmwareUpdatePlanHost';
+import { loadFirmwareUpdatePlanBinaries } from '../utils/firmwareUpdatePlanHost';
 import { SDKUtils } from '../utils/hardwareInstance';
 import type { DeviceInfo } from '../types/hardware';
 import { PRO2_FIRMWARE_FILE_ACCEPT } from '../constants/firmwareFiles';
@@ -365,20 +365,12 @@ export default function Pro2UpdatePage() {
           }
           throw new Error('Protocol V2 firmware update Plan is unavailable');
         }
-        const memoryHost = await prepareFirmwareUpdatePlanMemoryHost({
-          hardwareSDK,
-          plan,
-        });
+        const binaries = await loadFirmwareUpdatePlanBinaries({ plan });
         addLog('info', `firmwareUpdateV4 Plan targets: ${plan.targetsToUpdate.join(', ')}`);
-        try {
-          response = await hardwareSDK.firmwareUpdateV4(device.connectId ?? undefined, {
-            platform: 'web',
-            preparedPlan: memoryHost.preparedPlan,
-            hostBindingGeneration: memoryHost.hostBindingGeneration,
-          });
-        } finally {
-          memoryHost.release();
-        }
+        response = await hardwareSDK.firmwareUpdateV4(device.connectId ?? undefined, {
+          platform: 'web',
+          ...binaries,
+        });
       }
       if (!response.success) {
         throw new Error(getApiError(response.payload, 'firmwareUpdateV4 failed'));
@@ -492,7 +484,7 @@ export default function Pro2UpdatePage() {
                 <div className="grid gap-px overflow-hidden rounded-lg border border-border/70 bg-border/70">
                   <CompactFileSlot
                     label="Protocol V2 resource ZIP"
-                    meta="target resource · ZIP with manifest.json"
+                    meta="target resource · ZIP with self-describing RESC packages"
                     formatHint="complete signed resource archive .zip"
                     accept=".zip,application/zip"
                     file={resourceArchiveFile}

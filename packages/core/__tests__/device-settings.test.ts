@@ -2,6 +2,9 @@ import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { DeviceSettingsPage } from '@onekeyfe/hd-transport';
 
 import DeviceSettings from '../src/api/device/DeviceSettings';
+import { Device } from '../src/device/Device';
+import { DEVICE } from '../src/events';
+import { PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE } from '../src/protocols/protocol-v2';
 import { DEVICE_SETTINGS_NEVER_TIMEOUT_MS } from '../src/utils/deviceSettings';
 
 import type { Features } from '../src/types';
@@ -21,6 +24,9 @@ function createDevice({ protocol }: { protocol: 'V1' | 'V2' }) {
   const typedCall = jest.fn().mockResolvedValue({ message: { message: 'Success' } });
   const updateState = jest.fn();
   const getDeviceState = jest.fn();
+  const refreshProtocolV2SettingsAfterMutation = jest.fn(() =>
+    getDeviceState({ refreshSections: ['status', 'settings'] })
+  );
   return {
     device: {
       features,
@@ -29,6 +35,7 @@ function createDevice({ protocol }: { protocol: 'V1' | 'V2' }) {
       commands: { typedCall },
       updateState,
       getDeviceState,
+      refreshProtocolV2SettingsAfterMutation,
     },
     typedCall,
     updateState,
@@ -181,7 +188,98 @@ describe('DeviceSettings protocol routing', () => {
     expect(updateState).not.toHaveBeenCalled();
   });
 
-  it('uses the Pro2 passphrase page as a device-side toggle and verifies the target state', async () => {
+  it('reconciles stale passphrase and label after an unrelated Protocol V2 setting change', async () => {
+    const typedCall = jest.fn().mockImplementation((requestType: string) => {
+      if (requestType === 'DeviceSettingsSet') {
+        return { message: { message: 'Success' } };
+      }
+      if (requestType === 'DeviceStatusGet') {
+        return {
+          message: {
+            init_states: true,
+            unlocked: false,
+            passphrase_enabled: false,
+          },
+        };
+      }
+      if (requestType === 'DeviceSettingsGet') {
+        return {
+          message: {
+            label: 'Current Label',
+            brightness: 80,
+            passphrase_enable: false,
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
+    });
+    const device = Device.fromDescriptor({
+      id: 'pro2',
+      path: 'pro2',
+      protocolType: 'V2',
+    } as never);
+    (device as any).commands = { typedCall };
+    device.updateState(
+      {
+        protocol: 'V2',
+        identity: {
+          deviceType: EDeviceType.Pro2,
+          label: 'Stale Label',
+        },
+        status: {
+          mode: 'normal',
+          unlocked: false,
+          passphraseProtection: true,
+        },
+        settings: { brightness: 20 },
+        raw: {
+          protocolV2ProtocolInfo: {
+            version: 1,
+            build_fingerprint: 'application__5.0.0__abcdef0__PROD__RELEASE',
+            supported_messages: [PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE],
+          },
+        },
+      },
+      'initialize'
+    );
+    const onState = jest.fn();
+    device.on(DEVICE.STATE, onState);
+    const method = new DeviceSettings({
+      id: 3,
+      payload: {
+        method: 'deviceSettings',
+        brightness: 80,
+      },
+    });
+    method.init();
+    (method as any).device = device;
+
+    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+
+    expect(typedCall.mock.calls.map(call => call[0])).toEqual([
+      'DeviceSettingsSet',
+      'DeviceStatusGet',
+      'DeviceSettingsGet',
+    ]);
+    expect(device.state).toMatchObject({
+      identity: { label: 'Current Label' },
+      status: { passphraseProtection: false },
+      settings: { brightness: 80 },
+    });
+    expect(onState).toHaveBeenLastCalledWith(
+      device,
+      expect.objectContaining({
+        source: 'settings-read',
+        state: expect.objectContaining({
+          identity: expect.objectContaining({ label: 'Current Label' }),
+          status: expect.objectContaining({ passphraseProtection: false }),
+          settings: expect.objectContaining({ brightness: 80 }),
+        }),
+      })
+    );
+  });
+
+  it('uses the Pro2 passphrase page and refreshes device state after the toggle', async () => {
     const { device, typedCall, getDeviceState } = createDevice({ protocol: 'V2' });
     getDeviceState
       .mockResolvedValueOnce({
@@ -263,8 +361,8 @@ describe('DeviceSettings protocol routing', () => {
     expect(getDeviceState).toHaveBeenCalledWith({ refreshSections: ['settings'] });
   });
 
-  it('rejects a successful Pro2 page response when the hardware did not reach the target', async () => {
-    const { device, getDeviceState } = createDevice({ protocol: 'V2' });
+  it('persists a confirmed Pro2 passphrase enable when the refreshed state is unavailable', async () => {
+    const { device, getDeviceState, updateState } = createDevice({ protocol: 'V2' });
     getDeviceState.mockResolvedValue({
       status: { passphraseProtection: false },
     });
@@ -278,14 +376,15 @@ describe('DeviceSettings protocol routing', () => {
     method.init();
     (method as any).device = device;
 
-    await expect(method.run()).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.RuntimeError,
-      message: 'Protocol V2 passphrase setting did not reach the requested value.',
-    });
+    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+    expect(updateState).toHaveBeenCalledWith(
+      { status: { passphraseProtection: true } },
+      'settings-write'
+    );
   });
 
-  it('accepts a locked Pro2 as confirmation after disabling passphrase', async () => {
-    const { device, getDeviceState } = createDevice({ protocol: 'V2' });
+  it('persists a confirmed Pro2 passphrase disable when refreshed state is unavailable after locking', async () => {
+    const { device, getDeviceState, updateState } = createDevice({ protocol: 'V2' });
     getDeviceState
       .mockResolvedValueOnce({
         status: { unlocked: true, passphraseProtection: true },
@@ -304,6 +403,101 @@ describe('DeviceSettings protocol routing', () => {
     (method as any).device = device;
 
     await expect(method.run()).resolves.toEqual({ message: 'Success' });
+    expect(updateState).toHaveBeenCalledWith(
+      {
+        status: {
+          passphraseProtection: false,
+          unlockedAttachPin: false,
+        },
+      },
+      'settings-write'
+    );
+  });
+
+  it('persists a confirmed Pro2 passphrase disable when the Attach PIN session locks', async () => {
+    let statusReadCount = 0;
+    const typedCall = jest.fn().mockImplementation((requestType: string) => {
+      if (requestType === 'DeviceStatusGet') {
+        statusReadCount += 1;
+        return {
+          message:
+            statusReadCount === 1
+              ? {
+                  init_states: true,
+                  unlocked: true,
+                  passphrase_enabled: true,
+                  unlocked_by_attach_to_pin: true,
+                }
+              : { init_states: true, unlocked: false },
+        };
+      }
+      if (requestType === 'DeviceSettingsPageShow') {
+        return { message: { message: 'Success' } };
+      }
+      if (requestType === 'DeviceSettingsGet') {
+        return { message: { label: 'Pro 2' } };
+      }
+      throw new Error(`Unexpected request: ${requestType}`);
+    });
+    const device = Device.fromDescriptor({
+      id: 'pro2-passphrase',
+      path: 'pro2-passphrase',
+      protocolType: 'V2',
+    } as never);
+    (device as any).commands = { typedCall };
+    device.updateState(
+      {
+        protocol: 'V2',
+        identity: { deviceType: EDeviceType.Pro2 },
+        status: {
+          mode: 'normal',
+          unlocked: true,
+          passphraseProtection: true,
+          unlockedAttachPin: true,
+        },
+        raw: {
+          protocolV2ProtocolInfo: {
+            version: 1,
+            supported_messages: [PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE],
+          },
+        },
+      },
+      'initialize'
+    );
+    const method = new DeviceSettings({
+      id: 6,
+      payload: {
+        method: 'deviceSettings',
+        usePassphrase: false,
+      },
+    });
+    method.init();
+    (method as any).device = device;
+    const onState = jest.fn();
+    device.on(DEVICE.STATE, onState);
+
+    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+    expect(device.state?.status).toMatchObject({
+      unlocked: false,
+      passphraseProtection: false,
+      unlockedAttachPin: false,
+    });
+    expect(onState).toHaveBeenCalledWith(
+      device,
+      expect.objectContaining({
+        source: 'settings-write',
+        changedKeys: expect.arrayContaining([
+          'status.passphraseProtection',
+          'status.unlockedAttachPin',
+        ]),
+        state: expect.objectContaining({
+          status: expect.objectContaining({
+            passphraseProtection: false,
+            unlockedAttachPin: false,
+          }),
+        }),
+      })
+    );
   });
 
   it('keeps Protocol V1 passphrase settings on ApplySettings', async () => {

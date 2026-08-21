@@ -249,7 +249,11 @@ describe('LowlevelTransport protocol framing', () => {
     );
     const plugin = createPlugin({
       devices: [{ id: 'pro2-id', name: 'OneKey Pro 2', commType: 'ble' }],
-      responses: [...splitFrame(probeResponse, 4), ...splitFrame(callResponse, 5)],
+      responses: [
+        new Error('Protocol V1 probe timed out'),
+        ...splitFrame(probeResponse, 4),
+        ...splitFrame(callResponse, 5),
+      ],
     });
     const lowlevel = configureTransport(plugin);
 
@@ -269,9 +273,9 @@ describe('LowlevelTransport protocol framing', () => {
       },
     });
     expect(plugin.send).toHaveBeenCalled();
-    const sentSeqs = plugin.send.mock.calls.map(([, hex]) =>
-      Number.parseInt(hex.slice(12, 14), 16)
-    );
+    const sentSeqs = plugin.send.mock.calls
+      .map(([, hex]) => Number.parseInt(hex.slice(12, 14), 16))
+      .filter(seq => seq > 0);
     expect(sentSeqs).toEqual([1, 2]);
   });
 
@@ -295,7 +299,7 @@ describe('LowlevelTransport protocol framing', () => {
     expect(lowlevel.getProtocolType('unknown-pro2-id')).toBe('V2');
   });
 
-  test('retains the Protocol V2 hint and sequence cursor across release and reacquire', async () => {
+  test('detects Protocol V2 again after release without a name-derived hint', async () => {
     const probeResponse = ProtocolV2.encodeFrame(
       schemas,
       'Success',
@@ -304,7 +308,12 @@ describe('LowlevelTransport protocol framing', () => {
     );
     const plugin = createPlugin({
       devices: [{ id: 'reconnect-pro2-id', name: 'OneKey Pro 2', commType: 'ble' }],
-      responses: [bytesToHex(probeResponse), bytesToHex(probeResponse)],
+      responses: [
+        new Error('Protocol V1 probe timed out'),
+        bytesToHex(probeResponse),
+        new Error('Protocol V1 probe timed out'),
+        bytesToHex(probeResponse),
+      ],
     });
     const lowlevel = configureTransport(plugin);
 
@@ -319,9 +328,9 @@ describe('LowlevelTransport protocol framing', () => {
       protocolType: 'V2',
     });
 
-    const sentSeqs = plugin.send.mock.calls.map(([, hex]) =>
-      Number.parseInt(hex.slice(12, 14), 16)
-    );
+    const sentSeqs = plugin.send.mock.calls
+      .map(([, hex]) => Number.parseInt(hex.slice(12, 14), 16))
+      .filter(seq => seq > 0);
     expect(sentSeqs).toEqual([1, 2]);
   });
 

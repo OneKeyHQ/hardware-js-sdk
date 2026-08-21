@@ -13,9 +13,12 @@ export const ONEKEY_WEBUSB_FILTER = [
   { vendorId: 0x1209, productId: 0x53c1 }, // Classic/Classic1s/Mini/Pro/Touch firmware and legacy Pro2; keep for existing devices
   { vendorId: 0x1209, productId: 0x4f4a }, // Pro bootloader, Touch bootloader, Pro2
   { vendorId: 0x1209, productId: 0x4f4b }, // Pro/Touch firmware (Trezor not implemented), Pro2
-  { vendorId: 0x1209, productId: 0x4f4c }, // Pro board and Pro2 with the new firmware PID
+  { vendorId: 0x1209, productId: 0x4f4c }, // Pro2 / Neo current firmware, all modes
   // { vendorId: 0x1209, productId: 0x4f50 }, // Touch Board
 ];
+
+/** USB IDs whose first probe should be Protocol V2. Shared Pro/Touch PIDs stay unhinted. */
+export const ONEKEY_PROTOCOL_V2_USB_IDS = [{ vendorId: 0x1209, productId: 0x4f4c }] as const;
 
 type WebUsbIdentityDescriptor = {
   vendorId?: number;
@@ -98,6 +101,21 @@ export enum EOneKeyBleMessageKeys {
   NOBLE_BLE_CANCEL_PAIRING = '$onekey-noble-ble-cancel-pairing',
 }
 
+/**
+ * Why a BLE link went down, carried on BLE_DEVICE_DISCONNECTED.
+ *
+ * The main process frees an idle link on its own keep-alive timer, which is an
+ * internal optimisation the device knows nothing about — consumers must not
+ * treat it as "the device is gone". Only DeviceDisconnected means the
+ * peripheral actually dropped.
+ */
+export enum EBleDisconnectReason {
+  /** Unsolicited peripheral drop: powered off, out of range, cable/BLE lost. */
+  DeviceDisconnected = 'device-disconnected',
+  /** Main-process keep-alive timer released an idle link; device still present. */
+  IdleKeepAlive = 'idle-keep-alive',
+}
+
 export const ONEKEY_SERVICE_UUID = '00000001-0000-1000-8000-00805f9b34fb';
 export const ONEKEY_WRITE_CHARACTERISTIC_UUID = '00000002-0000-1000-8000-00805f9b34fb';
 export const ONEKEY_NOTIFY_CHARACTERISTIC_UUID = '00000003-0000-1000-8000-00805f9b34fb';
@@ -152,12 +170,45 @@ export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
   if (
     normalizedName.startsWith('touch ') ||
     normalizedName.startsWith('pro ') ||
-    normalizedName.startsWith('pro2 ') ||
-    normalizedName.startsWith('neo ')
+    normalizedName.startsWith('pro2') ||
+    normalizedName.startsWith('neo')
   ) {
     return true;
   }
+  const compactName = compactBleName(normalizedName);
+  if (PRO2_COMPACT_NAME_PATTERN.test(compactName) || NEO_COMPACT_NAME_PATTERN.test(compactName)) {
+    return true;
+  }
   return isOneKeyShortName(normalizedName);
+};
+
+export const inferProtocolHintFromUsbId = (vendorId?: number | null, productId?: number | null) =>
+  ONEKEY_PROTOCOL_V2_USB_IDS.some(id => id.vendorId === vendorId && id.productId === productId)
+    ? ('V2' as const)
+    : undefined;
+
+type UsbDevicePathInput = {
+  serialNumber?: string | null;
+  vendorId?: number;
+  productId?: number;
+  productName?: string | null;
+};
+
+export const resolveOneKeyUsbDevicePath = (device: UsbDevicePathInput): string | undefined => {
+  const serial = device.serialNumber?.trim();
+  if (serial) return serial;
+  if (device.vendorId == null && device.productId == null && !device.productName) {
+    return undefined;
+  }
+
+  const vendorId = (device.vendorId ?? 0).toString(16).padStart(4, '0');
+  const productId = (device.productId ?? 0).toString(16).padStart(4, '0');
+  const product = (device.productName ?? 'onekey')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+  return `usb-${vendorId}-${productId}-${product || 'onekey'}`;
 };
 
 type BluetoothDeviceIdentity = {
@@ -196,6 +247,7 @@ export const matchesKnownBleUuid = (
 const ONEKEY_COMMUNICATION_SERVICE_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
 const FIDO_SERVICE_ALIASES = createKnownBleUuidAliases('0000fffd-0000-1000-8000-00805f9b34fb');
 const PRO2_COMPACT_NAME_PATTERN = /^(?:onekey)?pro2[a-f0-9]{4}$/i;
+const NEO_COMPACT_NAME_PATTERN = /^(?:onekey)?neo[a-f0-9]{4}$/i;
 const FIND_MY_COMPACT_SUFFIXES = [
   'findemy',
   'findem',
@@ -253,6 +305,36 @@ export const normalizePro2FindMyAdvertisementName = (value: string) => {
     }
   }
   return value;
+};
+
+/**
+ * Current Pro2 advertisements use "Pro 2 XXXX". Older firmware used "Pro2 XXXX".
+ * Discovery and DeviceInfo both go through this helper so the public BLE name
+ * stays on the spaced form without changing OneKey Pro / Neo names.
+ *
+ * Match the compact Pro2 form first. A leading "Pro 2" regex would also eat the
+ * first digit of a OneKey Pro suffix such as "Pro 22D8" or "Pro 2D8F".
+ */
+export const canonicalizePro2BleAdvertisementName = (value: string) => {
+  const withoutFindMy = normalizePro2FindMyAdvertisementName(value);
+  const compact = compactBleName(withoutFindMy);
+  if (!PRO2_COMPACT_NAME_PATTERN.test(compact)) return withoutFindMy;
+
+  const match = withoutFindMy.match(/^(onekey\s*)?pro\s*2\s*/i);
+  if (!match) return withoutFindMy;
+
+  const rest = withoutFindMy.slice(match[0].length);
+  const prefix = match[1] ? 'OneKey Pro 2' : 'Pro 2';
+  return rest ? `${prefix} ${rest}` : prefix;
+};
+
+export const isSameOnekeyBleName = (left?: string | null, right?: string | null) => {
+  if (!left || !right) return false;
+  if (left === right) return true;
+  return (
+    compactBleName(canonicalizePro2BleAdvertisementName(left)) ===
+    compactBleName(canonicalizePro2BleAdvertisementName(right))
+  );
 };
 
 export const hasOnekeyCommunicationService = (

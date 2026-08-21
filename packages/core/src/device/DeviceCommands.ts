@@ -69,7 +69,7 @@ const DEVICE_CONTROL_CALLS = new Set([
 // Older Protocol V2 firmware may omit the cancellation subcode, so retain a
 // narrow message fallback for compatibility.
 const isProtocolV2ActionCancelledMessage = (message: string) =>
-  /^(?:cancel(?:led|ed)(?: on device)?|confirm dismissed|user cancel(?:led|ed)(?:\s+.*)?)$/i.test(
+  /^(?:cancel(?:led|ed)(?: on device)?|confirm dismissed|update cancel(?:led|ed)|user cancel(?:led|ed)(?:\s+.*)?)$/i.test(
     message
   );
 
@@ -264,6 +264,7 @@ export class DeviceCommands {
     }
     const activeCall = this.callPromise;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
     const cancellation = (async () => {
       await this.dispose(true);
       await activeCall?.catch(() => undefined);
@@ -273,11 +274,23 @@ export class DeviceCommands {
       await Promise.race([
         cancellation,
         new Promise<void>(resolve => {
-          timer = setTimeout(resolve, 10 * 1000);
+          timer = setTimeout(() => {
+            timedOut = true;
+            resolve();
+          }, 10 * 1000);
         }),
       ]);
     } finally {
       if (timer) clearTimeout(timer);
+      if (
+        timedOut &&
+        this.transport.name === 'ReactNativeBleTransport' &&
+        this.transport.disconnect
+      ) {
+        await this.transport.disconnect(this.mainId).catch(error => {
+          Log.debug('BLE cancellation timeout disconnect error (ignored)', error);
+        });
+      }
       if (this.callPromise === activeCall) {
         this.callPromise = undefined;
       }
@@ -482,7 +495,7 @@ export class DeviceCommands {
         if (message === 'Please confirm the BlindSign enabled') {
           error = ERRORS.TypedError(HardwareErrorCode.BlindSignDisabled);
         }
-        if (message === 'File already exists') {
+        if (message === 'File already exists' || message === 'NFT already exists') {
           error = ERRORS.TypedError(HardwareErrorCode.FileAlreadyExists);
         }
         if (message?.includes('bytes overflow')) {

@@ -1,12 +1,16 @@
 import {
+  canonicalizePro2BleAdvertisementName,
   createKnownBleUuidAliases,
   hasOnekeyCommunicationService,
+  inferProtocolHintFromUsbId,
   isKnownTrezorWebUsbDevice,
   isOnekeyBluetoothDevice,
   isOnekeyDevice,
   isPro2FindMyAdvertisementName,
+  isSameOnekeyBleName,
   matchesKnownBleUuid,
   normalizePro2FindMyAdvertisementName,
+  resolveOneKeyUsbDevicePath,
 } from './constants';
 
 describe('hardware device identity filters', () => {
@@ -14,6 +18,11 @@ describe('hardware device identity filters', () => {
     expect(isOnekeyDevice('Touch A1B2')).toBe(true);
     expect(isOnekeyDevice('Pro A1B2')).toBe(true);
     expect(isOnekeyDevice('Neo A1B2')).toBe(true);
+    expect(isOnekeyDevice('Pro2A1B2')).toBe(true);
+    expect(isOnekeyDevice('Pro 2 A1B2')).toBe(true);
+    expect(isOnekeyDevice('OneKeyPro2A1B2')).toBe(true);
+    expect(isOnekeyDevice('OneKey Pro 2 A1B2')).toBe(true);
+    expect(isOnekeyDevice('Neo22D8')).toBe(true);
     expect(isOnekeyDevice('K1234')).toBe(true);
     expect(isOnekeyDevice('S8')).toBe(true);
   });
@@ -34,6 +43,12 @@ describe('hardware device identity filters', () => {
     expect(
       isOnekeyBluetoothDevice({
         name: 'Pro2 A1B2',
+        serviceUuids: ['0001', 'fffd'],
+      })
+    ).toBe(true);
+    expect(
+      isOnekeyBluetoothDevice({
+        name: 'Pro 2 A1B2',
         serviceUuids: ['0001', 'fffd'],
       })
     ).toBe(true);
@@ -99,6 +114,35 @@ describe('hardware device identity filters', () => {
     expect(normalizePro2FindMyAdvertisementName(name)).toBe(expected);
   });
 
+  it.each([
+    ['Pro2 A1B2', 'Pro 2 A1B2'],
+    ['Pro2A1B2', 'Pro 2 A1B2'],
+    ['Pro 2 A1B2', 'Pro 2 A1B2'],
+    ['Pro 2 0088', 'Pro 2 0088'],
+    ['Pro2 22D8 - Find My', 'Pro 2 22D8'],
+    ['Pro 2 A1B2 - Find My', 'Pro 2 A1B2'],
+    ['OneKeyPro2A1B2', 'OneKey Pro 2 A1B2'],
+    ['OneKey Pro 2 A1B2', 'OneKey Pro 2 A1B2'],
+    ['OneKey Pro 2', 'OneKey Pro 2'],
+    ['Pro A1B2', 'Pro A1B2'],
+    ['Pro 22D8', 'Pro 22D8'],
+    ['Pro 2D8F', 'Pro 2D8F'],
+    ['OneKey Pro 22D8', 'OneKey Pro 22D8'],
+    ['Neo 22D8', 'Neo 22D8'],
+  ])('canonicalizes the public Pro2 advertisement name %s', (name, expected) => {
+    expect(canonicalizePro2BleAdvertisementName(name)).toBe(expected);
+  });
+
+  it('treats compact and spaced Pro2 BLE names as the same device', () => {
+    expect(isSameOnekeyBleName('Pro2 6136', 'Pro 2 6136')).toBe(true);
+    expect(isSameOnekeyBleName('Pro2 6136 - Find My', 'Pro 2 6136')).toBe(true);
+    expect(isSameOnekeyBleName('Pro 2 6136', 'Pro 2 0088')).toBe(false);
+    expect(isSameOnekeyBleName('Pro A1B2', 'Pro 2 A1B2')).toBe(false);
+    expect(isSameOnekeyBleName('Pro 22D8', 'Pro 22D8')).toBe(true);
+    expect(isSameOnekeyBleName('Pro 22D8', 'Pro2 22D8')).toBe(false);
+    expect(isSameOnekeyBleName('Pro 22D8', 'Pro 2 22D8')).toBe(false);
+  });
+
   it('keeps OneKey discovery on the communication service', () => {
     expect(
       isOnekeyBluetoothDevice({
@@ -134,6 +178,32 @@ describe('hardware device identity filters', () => {
     expect(hasOnekeyCommunicationService([])).toBe(false);
     expect(hasOnekeyCommunicationService(['0001'])).toBe(true);
     expect(hasOnekeyCommunicationService(['abcd0001-1234-5678-9012-abcdefabcdef'])).toBe(false);
+  });
+
+  it('hints Protocol V2 from the current Pro2/Neo USB ID only', () => {
+    expect(inferProtocolHintFromUsbId(0x1209, 0x4f4c)).toBe('V2');
+    expect(inferProtocolHintFromUsbId(0x1209, 0x53c1)).toBeUndefined();
+    expect(inferProtocolHintFromUsbId(0x1209, 0x4f4a)).toBeUndefined();
+    expect(inferProtocolHintFromUsbId(0x1209, 0x4f4b)).toBeUndefined();
+  });
+
+  it('uses the USB serial when present and synthesizes a path when firmware omits it', () => {
+    expect(
+      resolveOneKeyUsbDevicePath({
+        vendorId: 0x1209,
+        productId: 0x4f4c,
+        productName: 'OneKey Pro 2',
+        serialNumber: 'PRO2-SERIAL',
+      })
+    ).toBe('PRO2-SERIAL');
+    expect(
+      resolveOneKeyUsbDevicePath({
+        vendorId: 0x1209,
+        productId: 0x4f4c,
+        productName: 'OneKey Neo',
+        serialNumber: '',
+      })
+    ).toBe('usb-1209-4f4c-onekey-neo');
   });
 
   it('only filters WebUSB descriptors that are explicitly identified as Trezor', () => {

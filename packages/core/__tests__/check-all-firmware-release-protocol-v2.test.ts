@@ -620,6 +620,54 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     });
   });
 
+  test('selects the Protocol V2 resource archive using the DeviceState identity', async () => {
+    const releaseWithResources: IFirmwareReleaseInfo = {
+      ...release,
+      resources: { source: resourceSource },
+    };
+    const method = new CheckAllFirmwareRelease({
+      id: 1,
+      payload: {
+        method: 'checkAllFirmwareRelease',
+        platform: 'desktop',
+        protocolV2ForceUpdateTargets: ['resource'],
+      },
+    });
+    method.init();
+    method.device = {
+      isProtocolV2: () => true,
+      features: {
+        firmwareVersion: '1.0.0',
+        serialNo: 'device-without-model-prefix',
+      },
+      getDeviceState: jest.fn().mockResolvedValue({
+        identity: { deviceType: 'pro2', firmwareType: EFirmwareType.Universal },
+        status: { mode: 'normal' },
+        versions: currentVersions,
+      }),
+    } as unknown as CheckAllFirmwareRelease['device'];
+    const getLatestReleaseSpy = jest
+      .spyOn(DataManager, 'getFirmwareLatestRelease')
+      .mockImplementation(features =>
+        features.deviceType === 'pro2' ? releaseWithResources : undefined
+      );
+
+    await expect(method.run()).resolves.toMatchObject({
+      deviceType: 'pro2',
+      resourceArchive: resourceSource,
+      targetsToUpdate: expect.arrayContaining(['resource']),
+      firmwareUpdatePlan: {
+        executor: 'v4',
+        deviceModel: 'pro2',
+        targetsToUpdate: expect.arrayContaining(['resource']),
+      },
+    });
+    expect(getLatestReleaseSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ deviceType: 'pro2' }),
+      EFirmwareType.Universal
+    );
+  });
+
   test.each(['resource', 'boot_resources'] as const)(
     'allows an explicitly forced Protocol V2 resource-only target through %s',
     async forceTarget => {

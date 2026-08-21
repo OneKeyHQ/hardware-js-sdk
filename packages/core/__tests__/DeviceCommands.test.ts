@@ -19,6 +19,22 @@ const createCommands = () => {
 };
 
 describe('DeviceCommands failure mapping', () => {
+  it.each(['File already exists', 'NFT already exists'])(
+    'maps duplicate file response "%s" to FileAlreadyExists',
+    async message => {
+      const commands = createCommands();
+      await expect(
+        commands._filterCommonTypes(
+          {
+            type: 'Failure',
+            message: { code: 'Failure_DataError', message },
+          } as any,
+          'NFTUpdate'
+        )
+      ).rejects.toMatchObject({ errorCode: HardwareErrorCode.FileAlreadyExists });
+    }
+  );
+
   it('logs passphrase request and canonical response without exposing the passphrase', async () => {
     const commands = createCommands();
     const log = getLogger(LoggerNames.DeviceCommands);
@@ -469,7 +485,7 @@ describe('DeviceCommands failure mapping', () => {
     });
   });
 
-  it.each(['Cancelled on device', 'Confirm dismissed'])(
+  it.each(['Cancelled on device', 'Confirm dismissed', 'Update cancelled'])(
     'maps legacy Protocol V2 cancellation message "%s" without a subcode',
     async message => {
       const commands = createCommands();
@@ -784,7 +800,13 @@ describe('DeviceCommands cancellation', () => {
     try {
       const commands = createCommands();
       commands.disposed = false;
+      commands.mainId = 'main-id';
       commands.callPromise = new Promise(() => {});
+      const disconnect = jest.fn().mockResolvedValue(undefined);
+      commands.transport = {
+        name: 'ReactNativeBleTransport',
+        disconnect,
+      } as any;
       const dispose = jest.fn().mockResolvedValue(undefined);
       commands.dispose = dispose;
 
@@ -794,6 +816,7 @@ describe('DeviceCommands cancellation', () => {
 
       await expect(cancellation).resolves.toBeUndefined();
       expect(dispose).toHaveBeenCalledWith(true);
+      expect(disconnect).toHaveBeenCalledWith('main-id');
       expect(commands.callPromise).toBeUndefined();
     } finally {
       jest.useRealTimers();
