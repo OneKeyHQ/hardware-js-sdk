@@ -807,6 +807,9 @@ async function transmitHexDataToDevice(
 // 631ms, so this leaves ~2x headroom while keeping a miss cheap.
 const BLE_COLD_CONNECT_SCAN_TIMEOUT_MS = 1500;
 
+// Attempts before a link is written off as unable to serve the OneKey service.
+const SERVICE_DISCOVERY_MAX_ATTEMPTS = 2;
+
 // Advertised names, kept for the life of the process: device caches are purged
 // on every disconnect, but the family a device belongs to never changes and
 // decides which connection strategy is safe for it.
@@ -1336,12 +1339,14 @@ async function discoverServicesAndCharacteristicsWithRetry(
         deviceId,
         peripheralState: peripheral.state,
         attempt: attemptNumber,
-        maxRetries: 5,
+        maxRetries: SERVICE_DISCOVERY_MAX_ATTEMPTS,
         targetUUIDs: ONEKEY_SERVICE_UUIDS,
       });
 
       if (attemptNumber > 1) {
-        logger?.info(`[NobleBLE] Service discovery retry attempt ${attemptNumber}/5`);
+        logger?.info(
+          `[NobleBLE] Service discovery retry attempt ${attemptNumber}/${SERVICE_DISCOVERY_MAX_ATTEMPTS}`
+        );
       }
 
       // Verify connection state before attempting service discovery
@@ -1355,20 +1360,32 @@ async function discoverServicesAndCharacteristicsWithRetry(
       try {
         return await discoverServicesAndCharacteristics(peripheral);
       } catch (error) {
-        logger?.error(`[NobleBLE] No services found (attempt ${attemptNumber}/5)`);
+        logger?.error(
+          `[NobleBLE] No services found (attempt ${attemptNumber}/${SERVICE_DISCOVERY_MAX_ATTEMPTS})`
+        );
 
-        if (attemptNumber < 5) {
-          logger?.error(`[NobleBLE] Will retry service discovery (attempt ${attemptNumber + 1}/5)`);
+        if (attemptNumber < SERVICE_DISCOVERY_MAX_ATTEMPTS) {
+          logger?.error(
+            `[NobleBLE] Will retry service discovery (attempt ${
+              attemptNumber + 1
+            }/${SERVICE_DISCOVERY_MAX_ATTEMPTS})`
+          );
         }
 
         throw error; // p-retry will handle the retry logic
       }
     },
     {
-      retries: 4, // Total 5 attempts (initial + 4 retries)
-      factor: 1.5, // Exponential backoff: 1000ms → 1500ms → 2250ms → 3000ms
-      minTimeout: 1000, // Start with 1 second delay
-      maxTimeout: 3000, // Maximum 3 seconds delay
+      // One retry, not four. An empty result here is the signature of a device
+      // whose stack no longer serves its application layer, and retrying the
+      // same link has never recovered it — every observed run failed all the
+      // way through. The recovery is the teardown and cold reconnect the caller
+      // performs afterwards, so reaching it sooner is what shortens the wait.
+      // The single retry stays for a genuinely transient miss.
+      retries: SERVICE_DISCOVERY_MAX_ATTEMPTS - 1,
+      factor: 1.5,
+      minTimeout: 500,
+      maxTimeout: 3000,
       onFailedAttempt: error => {
         // This runs after each failed attempt
         logger?.error(`[NobleBLE] Service discovery attempt ${error.attemptNumber} failed:`, {
