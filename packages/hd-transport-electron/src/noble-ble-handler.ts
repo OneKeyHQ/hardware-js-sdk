@@ -15,11 +15,13 @@ import {
   ONEKEY_WRITE_CHARACTERISTIC_UUID,
   createKnownBleUuidAliases,
   hasOnekeyCommunicationService,
+  isHeaderChunk,
   isOnekeyBluetoothDevice,
   isPro2FamilyBleName,
   matchesKnownBleUuid,
   wait,
 } from '@onekeyfe/hd-shared';
+import { protocolV2 } from '@onekeyfe/hd-transport';
 import pRetry from 'p-retry';
 
 import { resolveBlePacketCapacity } from './ble-packet-capacity';
@@ -588,6 +590,28 @@ function setupMtuListener(
 
 // ===== Write helpers (inline) =====
 
+/**
+ * Hex preview of a BLE packet, for diagnostics only.
+ *
+ * Only a frame header is safe to print: a multi-packet message calls the write
+ * hook and the notify listener once per packet, and every continuation packet
+ * starts in raw protobuf payload (field logs have shown a device serial and a
+ * firmware string land in the log this way).
+ *
+ * V1 header: report id 0x3f + magic 0x23 0x23 + message type (2) + length (4).
+ * V2 header: SOF 0x5A + frame length (2) + CRC8 + router + attr + seq, i.e.
+ * bytes 0-6; byte 7 is already payload.
+ */
+function frameHeadPreview(packet: Buffer): string | undefined {
+  if (isHeaderChunk(packet)) {
+    return packet.subarray(0, 8).toString('hex');
+  }
+  if (packet.length >= 1 && packet[0] === protocolV2.PROTO_HEAD_SOF) {
+    return packet.subarray(0, 7).toString('hex');
+  }
+  return undefined;
+}
+
 async function writeCharacteristicWithoutResponse(
   deviceId: string,
   writeCharacteristic: Characteristic,
@@ -733,12 +757,12 @@ async function transmitHexDataToDevice(
   );
   const pacingDelayMs = resolveNobleBleWritePacingDelay(options);
 
-  // Diagnostics: the frame header alone (report id + magic + message type +
-  // length) identifies which protocol frame went out, without logging payload.
+  // Diagnostics: a frame header identifies which protocol frame went out.
+  // Continuation packets carry payload, so they report scalars only.
   logger?.info('[NobleBLE] Write frame', {
     deviceId,
     bytes: toBuffer.length,
-    head: toBuffer.subarray(0, 8).toString('hex'),
+    head: frameHeadPreview(toBuffer),
     packetCapacity,
     mtu: peripheral.mtu ?? null,
     pacingDelayMs,
@@ -1891,7 +1915,7 @@ async function subscribeNotifications(
       logger?.debug('[NobleBLE] Notify frame', {
         deviceId,
         bytes: data.length,
-        head: data.subarray(0, 8).toString('hex'),
+        head: frameHeadPreview(data),
       });
       // Windows BLE pairing detection: receiving any data means device is paired
       if (!pairedDevices.has(deviceId)) {
