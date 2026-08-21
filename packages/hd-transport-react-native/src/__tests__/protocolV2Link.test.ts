@@ -424,10 +424,12 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
-  test('reacquires a known Protocol V2 firmware install link without sending Ping', async () => {
-    const { transport, uuid, writeCharacteristic } = createHarness();
+  test('physically refreshes an uncached Protocol V2 firmware install link without Ping', async () => {
+    const { transport, uuid, device, bleManager, writeCharacteristic } = createHarness();
     const probeProtocolV2 = jest.spyOn(transport as any, 'probeProtocolV2');
     (transport as any).sessionProtocols.set(uuid, 'V2');
+    device.connect = jest.fn().mockResolvedValue(device);
+    device.isConnected.mockResolvedValueOnce(false);
 
     await expect(
       transport.acquire({ uuid, expectedProtocol: 'V2', skipProtocolProbe: true })
@@ -436,10 +438,39 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       protocolType: 'V2',
     });
 
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
+    expect(device.cancelConnection).not.toHaveBeenCalled();
+    expect(device.connect).toHaveBeenCalled();
     expect(probeProtocolV2).not.toHaveBeenCalled();
     expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
     expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
     expect(transport.getProtocolType(uuid)).toBe('V2');
+    await transport.release(uuid, true);
+  });
+
+  test('refreshes a cached firmware install connection instead of trusting GATT state', async () => {
+    const { transport, uuid, device, bleManager, writeCharacteristic } = createHarness();
+    const probeProtocolV2 = jest.spyOn(transport as any, 'probeProtocolV2');
+
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
+    device.connect = jest.fn().mockResolvedValue(device);
+    device.isConnected.mockResolvedValueOnce(false);
+    writeCharacteristic.writeWithResponse.mockClear();
+    writeCharacteristic.writeWithoutResponse.mockClear();
+
+    await expect(
+      transport.acquire({ uuid, expectedProtocol: 'V2', skipProtocolProbe: true })
+    ).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
+    expect(device.cancelConnection).toHaveBeenCalled();
+    expect(device.connect).toHaveBeenCalled();
+    expect(probeProtocolV2).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
     await transport.release(uuid, true);
   });
 

@@ -217,7 +217,7 @@ describe('ProtocolV2UsbTransportBase', () => {
     expect(transport.nativeResets).toEqual([['device-a', 'USB reconnected']]);
   });
 
-  test('passes each queued call its own timeout context', async () => {
+  test('passes each queued call its remaining timeout context', async () => {
     const transport = new FakeUsbTransport();
     await transport.rotate('device-a');
 
@@ -226,12 +226,14 @@ describe('ProtocolV2UsbTransportBase', () => {
       transport.callDevice('device-a', 'second', 222),
     ]);
 
-    expect(transport.readContexts).toEqual([
+    expect(transport.readContexts.slice(0, 2)).toEqual([
       ['device-a', 111],
       ['device-a', 111],
-      ['device-a', 222],
-      ['device-a', 222],
     ]);
+    const secondCallTimeouts = transport.readContexts.slice(2).map(([, timeoutMs]) => timeoutMs);
+    expect(secondCallTimeouts[0]).toBeGreaterThan(0);
+    expect(secondCallTimeouts[0]).toBeLessThanOrEqual(222);
+    expect(secondCallTimeouts[1]).toBe(secondCallTimeouts[0]);
   });
 
   test('keeps a coalesced response buffered for the next call', async () => {
