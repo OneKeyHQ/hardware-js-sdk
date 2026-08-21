@@ -153,6 +153,10 @@ describe('Protocol V2 unlock semantics', () => {
     expect(method.unlockPolicy).toBe('unlock-before-run');
     expect(device.unlockDevice).toHaveBeenCalledTimes(1);
     expect(run).toHaveBeenCalledTimes(1);
+    expect(method.protocolV2UnlockContext).toMatchObject({
+      preflightCompleted: true,
+      preflightStatusRefreshed: true,
+    });
   });
 
   test('pre-unlocks an unregistered wallet business method', async () => {

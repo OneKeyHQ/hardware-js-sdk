@@ -14,10 +14,12 @@ const Log = getLogger(LoggerNames.Core);
 
 export type ProtocolV2UnlockContext = {
   preflightCompleted: boolean;
+  preflightStatusRefreshed?: boolean;
 };
 
 export const createProtocolV2UnlockContext = (): ProtocolV2UnlockContext => ({
   preflightCompleted: false,
+  preflightStatusRefreshed: false,
 });
 
 type RunnableMethod = Pick<
@@ -123,6 +125,7 @@ export async function runMethodWithUnlockPolicy<T = unknown>(
       Log.debug('Protocol V2 pre-unlock completed', { method: method.name });
     }
 
+    context.preflightStatusRefreshed = true;
     context.preflightCompleted = true;
   }
 

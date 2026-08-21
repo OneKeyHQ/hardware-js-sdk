@@ -92,7 +92,11 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
 
   async run(): Promise<OpenWalletSessionPayload> {
     const isProtocolV2 = this.device.isProtocolV2();
-    let state = await this.device.getDeviceState({ refreshSections: ['status'] });
+    const reusePreflightStatus =
+      isProtocolV2 && this.protocolV2UnlockContext?.preflightStatusRefreshed === true;
+    let state = reusePreflightStatus
+      ? await this.device.getDeviceState()
+      : await this.device.getDeviceState({ refreshSections: ['status'] });
     let currentDeviceId = state.identity.deviceId;
     const hasAuthoritativeProtocolV2WalletStatus = (candidate: typeof state) =>
       candidate.status.unlocked === true &&
