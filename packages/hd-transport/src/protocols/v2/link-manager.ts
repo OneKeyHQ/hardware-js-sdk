@@ -1,6 +1,7 @@
 import { ProtocolV2SequenceCursor } from './sequence-cursor';
 import { ProtocolV2LinkError } from './errors';
 import { ProtocolV2Session, getErrorMessage } from './session';
+import { PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS } from '../../constants';
 
 import type { MessageFromOneKey, TransportCallOptions } from '../../types';
 import type { ProtocolV2CallContext, ProtocolV2Schemas, ProtocolV2SessionOptions } from './session';
@@ -61,15 +62,45 @@ export class ProtocolV2LinkManager<Key> {
     options?: TransportCallOptions
   ): Promise<MessageFromOneKey> {
     const generation = this.generations.get(key) ?? 0;
+    const previousQueue = this.callQueues.get(key);
+    const timeoutMs =
+      options?.timeoutMs && options.timeoutMs > 0
+        ? options.timeoutMs
+        : PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS;
+    const queuedAt = Date.now();
+    let queueTimeout: ReturnType<typeof setTimeout> | undefined;
+    let queueTimeoutError: Error | undefined;
+    const timeoutWhileQueued = new Promise<never>((_, reject) => {
+      queueTimeout = setTimeout(() => {
+        queueTimeout = undefined;
+        queueTimeoutError = this.createQueuedCallTimeoutError(key, name, timeoutMs);
+        reject(queueTimeoutError);
+      }, timeoutMs);
+    });
     const run = () => {
+      if (queueTimeout) {
+        clearTimeout(queueTimeout);
+        queueTimeout = undefined;
+      }
+      if (queueTimeoutError) {
+        throw queueTimeoutError;
+      }
       this.assertCallGeneration(key, generation);
-      return this.executeCall(key, createAdapter, name, data, options);
+      const remainingTimeoutMs = previousQueue ? timeoutMs - (Date.now() - queuedAt) : timeoutMs;
+      if (remainingTimeoutMs <= 0) {
+        throw this.createQueuedCallTimeoutError(key, name, timeoutMs);
+      }
+      return this.executeCall(key, createAdapter, name, data, {
+        ...options,
+        timeoutMs: remainingTimeoutMs,
+      });
     };
-    const previous = this.callQueues.get(key) ?? Promise.resolve();
-    const result = previous.then(run, run);
-    const queue = result.catch(() => undefined);
+    const previous = previousQueue ?? Promise.resolve();
+    const execution = previous.then(run, run);
+    const result = Promise.race([execution, timeoutWhileQueued]);
+    const queue = execution.catch(() => undefined);
     this.callQueues.set(key, queue);
-    result
+    execution
       .then(
         () => this.clearSettledCallQueue(key, queue),
         () => this.clearSettledCallQueue(key, queue)
@@ -204,6 +235,16 @@ export class ProtocolV2LinkManager<Key> {
     if (this.callQueues.get(key) === queue) {
       this.callQueues.delete(key);
     }
+  }
+
+  private createQueuedCallTimeoutError(key: Key, name: string, timeoutMs: number): Error {
+    const adapterTimeoutError = this.links.get(key)?.adapter.createTimeoutError;
+    return adapterTimeoutError
+      ? adapterTimeoutError(name, timeoutMs)
+      : new ProtocolV2LinkError(
+          'response-timeout',
+          `Protocol V2 call timeout after ${timeoutMs}ms while queued for ${name}`
+        );
   }
 
   private assertCallGeneration(key: Key, generation: number) {

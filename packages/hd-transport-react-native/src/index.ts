@@ -888,24 +888,66 @@ export default class ReactNativeBleTransport {
     const { uuid, forceCleanRunPromise, expectedProtocol, skipProtocolProbe } = input;
 
     const cachedTransport = transportCache[uuid];
+    if (skipProtocolProbe && !cachedTransport && this.blePlxManager) {
+      Log?.debug(
+        '[ReactNativeBleTransport] refresh uncached BLE connection for firmware install:',
+        uuid
+      );
+      const manager = this.blePlxManager;
+      await this.runNativeTeardown(uuid, manager, async () => {
+        await this.runBestEffortNativeOperation(
+          'firmware install reconnect: cancel uncached device connection',
+          () => manager.cancelDeviceConnection(uuid)
+        );
+      });
+    }
     if (cachedTransport) {
-      const cachedProtocol = this.deviceProtocol.get(uuid);
-      const isCachedDeviceConnected = await cachedTransport.device.isConnected().catch(() => false);
-      if (
-        isCachedDeviceConnected &&
-        cachedProtocol &&
-        (!expectedProtocol || cachedProtocol === expectedProtocol)
-      ) {
-        Log?.debug('[ReactNativeBleTransport] reuse cached BLE transport:', uuid, cachedProtocol);
-        return { uuid, protocolType: cachedProtocol };
-      }
+      if (skipProtocolProbe) {
+        Log?.debug(
+          '[ReactNativeBleTransport] refresh cached BLE connection for firmware install:',
+          uuid
+        );
+        const manager = this.blePlxManager;
+        await this.releaseUnlocked(uuid, true);
+        await this.runNativeTeardown(uuid, manager, async () => {
+          const operations: Promise<unknown>[] = [];
+          if (manager) {
+            operations.push(
+              this.runBestEffortNativeOperation(
+                'firmware install reconnect: cancel device connection',
+                () => manager.cancelDeviceConnection(uuid)
+              )
+            );
+          }
+          operations.push(
+            this.runBestEffortNativeOperation(
+              'firmware install reconnect: device cancel connection',
+              () => cachedTransport.device.cancelConnection()
+            )
+          );
+          await Promise.all(operations);
+        });
+      } else {
+        const cachedProtocol = this.deviceProtocol.get(uuid);
+        const isCachedDeviceConnected = await cachedTransport.device
+          .isConnected()
+          .catch(() => false);
+        if (
+          isCachedDeviceConnected &&
+          cachedProtocol &&
+          (!expectedProtocol || cachedProtocol === expectedProtocol)
+        ) {
+          Log?.debug('[ReactNativeBleTransport] reuse cached BLE transport:', uuid, cachedProtocol);
+          return { uuid, protocolType: cachedProtocol };
+        }
 
-      /**
-       * If the transport is not reusable due to a protocol mismatch or stale
-       * connection, clean it up before creating a new transport instance.
-       */
-      Log?.debug('transport not reusable, will release: ', uuid);
-      await this.releaseUnlocked(uuid, true);
+        /**
+         * If the transport is not reusable due to a protocol mismatch or stale
+         * connection, clean it up before creating a new transport instance.
+         */
+        Log?.debug('transport not reusable, will release: ', uuid);
+        await this.releaseUnlocked(uuid, true);
+      }
     }
 
     let device: Device | null = null;
