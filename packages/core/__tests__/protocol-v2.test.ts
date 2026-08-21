@@ -9681,12 +9681,17 @@ describe('Protocol V2 current low-level methods', () => {
     (write as any).device = stubDevice({ commands: { typedCall } });
     await write.run();
 
-    expect(typedCall).toHaveBeenLastCalledWith('DeviceCertificateWrite', 'Success', {
-      cert: {
-        cert_and_pubkey: 'aabbcc',
-        private_key: undefined,
+    expect(typedCall).toHaveBeenLastCalledWith(
+      'DeviceCertificateWrite',
+      'Success',
+      {
+        cert: {
+          cert_and_pubkey: 'aabbcc',
+          private_key: undefined,
+        },
       },
-    });
+      { timeoutMs: 15_000 }
+    );
 
     const read = new DeviceFactoryCertificateRead({
       id: 2,
