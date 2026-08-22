@@ -387,6 +387,13 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
       webusb.callProtocolV2(path, 'Ping', { message: 'short' }, { timeoutMs: 25 }),
     ]);
 
-    expect(readTimeouts).toEqual([1_000, 25]);
+    // Each call keeps its own budget instead of inheriting the other's. The
+    // queued one is a deadline, so it arrives with whatever the first call left
+    // of its 25ms — asserting the exact remainder makes this fail on a loaded
+    // machine, which is timing, not behaviour.
+    expect(readTimeouts).toHaveLength(2);
+    expect(readTimeouts[0]).toBe(1_000);
+    expect(readTimeouts[1]).toBeGreaterThan(0);
+    expect(readTimeouts[1]).toBeLessThanOrEqual(25);
   });
 });

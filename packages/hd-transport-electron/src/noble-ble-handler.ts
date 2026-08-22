@@ -16,6 +16,7 @@ import {
   createKnownBleUuidAliases,
   hasOnekeyCommunicationService,
   isOnekeyBluetoothDevice,
+  isPro2FamilyBleName,
   matchesKnownBleUuid,
   wait,
 } from '@onekeyfe/hd-shared';
@@ -90,8 +91,18 @@ const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
 const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
 const BLE_CLEANUP_TIMEOUT = 250;
+// A physical teardown must actually reach the OS before the device can return
+// to a clean state; 250ms routinely declared success while CoreBluetooth was
+// still disconnecting, leaving no trace when the teardown never completed.
+const BLE_DISCONNECT_CONFIRM_TIMEOUT_MS = 3000;
 // Renderer release is logical only; this timer physically frees the device.
-const BLE_IDLE_DISCONNECT_MS = 3 * 60_000;
+// Keep it SHORT: the Classic 1S goes protocol-deaf when a link is dropped
+// after sitting idle for minutes (field logs 2026-08-19: every deaf window
+// followed a 3-minute-idle disconnect, while disconnects right after traffic
+// have never produced one across 6.5.0's per-call teardown history). A hot
+// disconnect ~20s after the last operation stays inside the proven-safe
+// pattern and also shrinks the window in which phones cannot see the device.
+const BLE_IDLE_DISCONNECT_MS = 20_000;
 // Ceiling while a call is in flight: no outstanding write, but not forever.
 const BLE_BUSY_BACKSTOP_MS = 10 * 60_000;
 
@@ -257,6 +268,11 @@ async function initializeNoble(): Promise<void> {
     noble = require('@stoprocent/noble') as NobleModule;
     logger?.info('[NobleBLE] Noble library loaded');
 
+    // Register the process-lifetime state listener before any early return:
+    // the poweredOn fast path below would otherwise skip it for the whole
+    // session, leaving poweredOff cache/state reconciliation dead.
+    setupPersistentStateListener();
+
     // Wait for Bluetooth to be ready
     await new Promise<void>((resolve, reject) => {
       if (!noble) {
@@ -268,9 +284,6 @@ async function initializeNoble(): Promise<void> {
         resolve();
         return;
       }
-
-      // Setup persistent state listener before initialization
-      setupPersistentStateListener();
 
       const timeout = setTimeout(() => {
         reject(
@@ -398,7 +411,21 @@ function armIdleDisconnect(
       logger?.info('[NobleBLE] Keep-alive timeout, disconnecting device', { deviceId, reason });
       const peripheral = connectedDevices.get(deviceId);
       const deviceName = peripheral?.advertisement?.localName || 'Unknown Device';
-      const pending = disconnectDevice(deviceId)
+      // Unsubscribe CCCD before dropping the link, matching every other
+      // teardown path: the 1S leaves its notify session half-open when the
+      // link drops without an unsubscribe and then ignores application
+      // protocol traffic on NEW links for tens of minutes (field log
+      // 2026-08-19: the lone unsubscribe-skipping idle teardown caused a
+      // 6-attempt reconnect loop; unsubscribe-first teardowns reconnected
+      // instantly).
+      const pending = unsubscribeNotifications(deviceId)
+        .catch(error => {
+          logger?.warn('[NobleBLE] Keep-alive unsubscribe failed, disconnecting anyway', {
+            deviceId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        })
+        .then(() => disconnectDevice(deviceId))
         .then(() => {
           // A call is still in flight here; it must reject, not hang.
           // Both 'idle' and 'busy-backstop' report IdleKeepAlive on purpose:
@@ -508,6 +535,9 @@ function handleDeviceDisconnect(deviceId: string, webContents: WebContents): voi
 
   cleanupDevice(deviceId, webContents, {
     cleanupConnection: true,
+    // Same stale-object hazard as manual disconnect: an externally dropped
+    // link invalidates the cached peripheral for the next reconnect.
+    cleanupDiscoveredCache: true,
     sendDisconnectEvent: true,
     cancelOperations: true,
     reason: 'auto-disconnect',
@@ -761,6 +791,44 @@ async function transmitHexDataToDevice(
 }
 
 // Handle discovered device (for general enumeration only)
+// A scan that finds nothing costs this much before the direct-connect
+// fallback runs. Every advertisement in the 6.5.0 control logs arrived within
+// 631ms, so this leaves ~2x headroom while keeping a miss cheap.
+const BLE_COLD_CONNECT_SCAN_TIMEOUT_MS = 1500;
+
+// Attempts before a link is written off as unable to serve the OneKey service.
+const SERVICE_DISCOVERY_MAX_ATTEMPTS = 2;
+
+// Advertised names, kept for the life of the process: device caches are purged
+// on every disconnect, but the family a device belongs to never changes and
+// decides which connection strategy is safe for it.
+const bleNamesById = new Map<string, string>();
+
+function rememberBleName(deviceId: string, name?: string | null): void {
+  const trimmed = name?.trim();
+  if (trimmed) {
+    bleNamesById.set(deviceId, trimmed);
+  }
+}
+
+function resolveBleName(deviceId: string): string | undefined {
+  const live =
+    connectedDevices.get(deviceId)?.advertisement?.localName?.trim() ||
+    discoveredDevices.get(deviceId)?.advertisement?.localName?.trim();
+  return live || bleNamesById.get(deviceId);
+}
+
+/**
+ * Pro2/Neo connect by id first: they are unaffected by the stale-session
+ * problem and advertise under Find My names a OneKey-filtered scan cannot
+ * match. Everything else — Classic family, and any device whose name is not
+ * known yet — scans first, because connecting by id can resolve a session the
+ * device no longer serves (see setupConnectionAndDiscoverServices).
+ */
+function shouldConnectByIdFirst(deviceId: string): boolean {
+  return isPro2FamilyBleName(resolveBleName(deviceId));
+}
+
 function handleDeviceDiscovered(peripheral: Peripheral): void {
   // Only process OneKey candidates for general discovery. Avoid logging every
   // ambient BLE peripheral; it makes Pro2 debugging hard to read.
@@ -770,6 +838,7 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
 
   const isNewDevice = !discoveredDevices.has(peripheral.id);
   discoveredDevices.set(peripheral.id, peripheral);
+  rememberBleName(peripheral.id, peripheral.advertisement?.localName);
   if (isNewDevice) {
     logger?.debug('[NobleBLE] OneKey BLE device discovered', {
       deviceId: peripheral.id,
@@ -804,7 +873,10 @@ async function waitForNobleScanStop(nobleInstance: NobleModule): Promise<void> {
 
 // Perform targeted scan for a specific device ID
 // Uses self-contained local listener pattern - no global state needed
-async function performTargetedScan(targetDeviceId: string): Promise<Peripheral | null> {
+async function performTargetedScan(
+  targetDeviceId: string,
+  timeoutMs: number = NOBLE_BLE_TARGETED_SCAN_TIMEOUT_MS
+): Promise<Peripheral | null> {
   if (!noble) {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
   }
@@ -849,7 +921,7 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
     const timeoutId = setTimeout(() => {
       logger?.info('[NobleBLE] Targeted scan timeout for device:', targetDeviceId);
       finish(null).catch(reject);
-    }, NOBLE_BLE_TARGETED_SCAN_TIMEOUT_MS);
+    }, timeoutMs);
 
     // Add local listener for this scan
     nobleInstance.on('discover', onDiscover);
@@ -1051,9 +1123,17 @@ async function discoverServicesAndCharacteristics(
 
   // Main discovery logic as async function
   const discoveryPromise = (async (): Promise<CharacteristicPair> => {
-    // Step 1: Discover ALL services (no filter — Pro2 may use different service UUID)
+    // Step 1: Discover the OneKey service by UUID. Filtering is not just a
+    // narrowing: an unfiltered discovery is answered from the OS GATT cache, so
+    // a device whose stack still advertises and accepts links but no longer
+    // serves its application layer still looks healthy — the link comes up, the
+    // cached services resolve, the protocol frame goes out and nothing ever
+    // answers. A targeted query returns nothing in that state, which is what
+    // 6.5.0 relied on to trip the recovery path below (retry, reset, fresh
+    // scan) — the sequence that brings such a device back. Pro2/Neo expose the
+    // same service UUID, and the selection below only ever accepts that one.
     const services = await new Promise<Service[]>((resolve, reject) => {
-      peripheral.discoverServices([], (error, svc) => {
+      peripheral.discoverServices(ONEKEY_SERVICE_UUIDS, (error, svc) => {
         if (error) {
           logger?.error('[NobleBLE] Service discovery failed:', error);
           reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error.message));
@@ -1064,7 +1144,7 @@ async function discoverServicesAndCharacteristics(
     });
 
     if (!services || services.length === 0) {
-      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No services found');
+      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found');
     }
 
     logger?.debug('[NobleBLE] services discovered', {
@@ -1248,12 +1328,14 @@ async function discoverServicesAndCharacteristicsWithRetry(
         deviceId,
         peripheralState: peripheral.state,
         attempt: attemptNumber,
-        maxRetries: 5,
+        maxRetries: SERVICE_DISCOVERY_MAX_ATTEMPTS,
         targetUUIDs: ONEKEY_SERVICE_UUIDS,
       });
 
       if (attemptNumber > 1) {
-        logger?.info(`[NobleBLE] Service discovery retry attempt ${attemptNumber}/5`);
+        logger?.info(
+          `[NobleBLE] Service discovery retry attempt ${attemptNumber}/${SERVICE_DISCOVERY_MAX_ATTEMPTS}`
+        );
       }
 
       // Verify connection state before attempting service discovery
@@ -1267,20 +1349,32 @@ async function discoverServicesAndCharacteristicsWithRetry(
       try {
         return await discoverServicesAndCharacteristics(peripheral);
       } catch (error) {
-        logger?.error(`[NobleBLE] No services found (attempt ${attemptNumber}/5)`);
+        logger?.error(
+          `[NobleBLE] No services found (attempt ${attemptNumber}/${SERVICE_DISCOVERY_MAX_ATTEMPTS})`
+        );
 
-        if (attemptNumber < 5) {
-          logger?.error(`[NobleBLE] Will retry service discovery (attempt ${attemptNumber + 1}/5)`);
+        if (attemptNumber < SERVICE_DISCOVERY_MAX_ATTEMPTS) {
+          logger?.error(
+            `[NobleBLE] Will retry service discovery (attempt ${
+              attemptNumber + 1
+            }/${SERVICE_DISCOVERY_MAX_ATTEMPTS})`
+          );
         }
 
         throw error; // p-retry will handle the retry logic
       }
     },
     {
-      retries: 4, // Total 5 attempts (initial + 4 retries)
-      factor: 1.5, // Exponential backoff: 1000ms → 1500ms → 2250ms → 3000ms
-      minTimeout: 1000, // Start with 1 second delay
-      maxTimeout: 3000, // Maximum 3 seconds delay
+      // One retry, not four. An empty result here is the signature of a device
+      // whose stack no longer serves its application layer, and retrying the
+      // same link has never recovered it — every observed run failed all the
+      // way through. The recovery is the teardown and cold reconnect the caller
+      // performs afterwards, so reaching it sooner is what shortens the wait.
+      // The single retry stays for a genuinely transient miss.
+      retries: SERVICE_DISCOVERY_MAX_ATTEMPTS - 1,
+      factor: 1.5,
+      minTimeout: 500,
+      maxTimeout: 3000,
       onFailedAttempt: error => {
         // This runs after each failed attempt
         logger?.error(`[NobleBLE] Service discovery attempt ${error.attemptNumber} failed:`, {
@@ -1305,26 +1399,45 @@ async function setupConnectionAndDiscoverServices(
   deviceId: string,
   webContents: WebContents
 ): Promise<CharacteristicPair> {
-  setupDisconnectListener(peripheral, deviceId, webContents);
-
+  // Reset the link before any protocol traffic reaches the device. 6.5.0 did
+  // this on every cold setup and never produced a protocol-deaf Classic 1S
+  // (control log 2026-08-20: 16/16 links answered within ~1s, including after
+  // a 15-minute idle). Demoting it to a discovery-failure fallback removed the
+  // reset entirely for this device, because discovery always succeeds: the link
+  // comes up, GATT resolves from cache, and the device then answers nothing on
+  // a session it no longer serves. Costs ~1.3s per cold setup; a kept-alive
+  // link with an intact subscription returns before reaching here, so reuse
+  // inside a workflow is unaffected.
   try {
-    return await discoverServicesAndCharacteristicsWithRetry(peripheral, deviceId);
-  } catch (initialError) {
-    logger?.info('[NobleBLE] Direct service discovery failed, retrying after reconnect', {
-      deviceId,
-      error: initialError,
-    });
+    await forceReconnectPeripheral(peripheral, deviceId);
+  } catch (resetError) {
+    // A failed reset must not abort the attempt: discovery on the existing
+    // link, then the fresh-scan fallback, still have a chance to recover.
+    logger?.error('[NobleBLE] Connection reset before discovery failed, continuing', resetError);
   }
-
-  await forceReconnectPeripheral(peripheral, deviceId);
   setupDisconnectListener(peripheral, deviceId, webContents);
+
   try {
     return await discoverServicesAndCharacteristicsWithRetry(peripheral, deviceId);
-  } catch (reconnectError) {
-    logger?.error(
-      '[NobleBLE] Service discovery failed after reconnect, attempting fresh scan...',
-      reconnectError
-    );
+  } catch (discoveryError) {
+    // A connected peripheral does not advertise, so the fresh scan below would
+    // only run out its timeout. Drop the link first, then rescan: the cold
+    // reconnect is what recovers a device whose stack stopped serving its
+    // application layer. Recover here rather than throwing to the caller —
+    // one acquire pays ~2s for the rescan, while a thrown error costs the
+    // renderer a full retry round trip.
+    if (peripheral.state === 'connected') {
+      logger?.error(
+        '[NobleBLE] Service discovery failed on a live link, dropping it before the fresh scan',
+        discoveryError
+      );
+      await disconnectDevice(deviceId).catch(() => undefined);
+    } else {
+      logger?.error(
+        '[NobleBLE] Service discovery failed, attempting fresh scan...',
+        discoveryError
+      );
+    }
     return freshScanAndDiscover(deviceId, webContents);
   }
 }
@@ -1413,10 +1526,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   // enumerate clears the discovery map; a kept-alive link outlives it.
   let peripheral = discoveredDevices.get(deviceId) ?? connectedDevices.get(deviceId);
 
-  // If device not discovered, try a targeted scan for this specific device
   if (!peripheral) {
-    logger?.info('[NobleBLE] Device not discovered, attempting targeted scan for:', deviceId);
-
     // Initialize Noble if not already done
     if (!noble) {
       await initializeNoble();
@@ -1426,27 +1536,46 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
     }
 
-    // Reaches a bonded device that is not advertising; else falls to the scan.
-    peripheral = await tryDirectConnectById(deviceId);
-    if (peripheral) {
-      discoveredDevices.set(deviceId, peripheral);
-    }
-  }
+    // A live advertisement proves the device holds no link and will open a
+    // fresh session; connecting by id resolves through the OS cache instead
+    // and can hand back a session the device no longer serves (see
+    // setupConnectionAndDiscoverServices). Scanning is also the faster of the
+    // two when the device does advertise: ~96ms median against ~784ms for
+    // connect-by-id across the field logs. Pro2/Neo keep connect-by-id first
+    // because they are unaffected and may advertise under an unmatchable Find
+    // My name.
+    const byIdFirst = shouldConnectByIdFirst(deviceId);
+    logger?.info('[NobleBLE] Resolving device for cold connect', {
+      deviceId,
+      name: resolveBleName(deviceId) ?? 'unknown',
+      strategy: byIdFirst ? 'connect-by-id-first' : 'scan-first',
+    });
 
-  if (!peripheral) {
-    // Perform a targeted scan to find the specific device
-    try {
-      const foundPeripheral = await performTargetedScan(deviceId);
-      if (!foundPeripheral) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.DeviceNotFound,
-          `Device ${deviceId} not found even after targeted scan`
-        );
+    const scanForPeripheral = async () => {
+      try {
+        return (await performTargetedScan(deviceId, BLE_COLD_CONNECT_SCAN_TIMEOUT_MS)) ?? undefined;
+      } catch (scanError) {
+        logger?.info('[NobleBLE] Targeted scan failed', {
+          deviceId,
+          error: scanError instanceof Error ? scanError.message : String(scanError),
+        });
+        return undefined;
       }
-      peripheral = foundPeripheral;
-    } catch (error) {
-      logger?.error('[NobleBLE] Targeted scan failed:', error);
-      throw error;
+    };
+
+    const connectById = async () => {
+      const found = await tryDirectConnectById(deviceId);
+      if (found) {
+        discoveredDevices.set(deviceId, found);
+      }
+      return found;
+    };
+
+    peripheral = byIdFirst ? await connectById() : await scanForPeripheral();
+    if (!peripheral) {
+      // The preferred route came up empty: not advertising (held elsewhere, or
+      // silent), or not reachable by id. Try the other one before giving up.
+      peripheral = byIdFirst ? await scanForPeripheral() : await connectById();
     }
   }
 
@@ -1454,6 +1583,10 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   if (!peripheral) {
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device ${deviceId} not found`);
   }
+
+  // Also covers the connect-by-id route, whose simulated discovery carries no
+  // service UUIDs and therefore never reaches handleDeviceDiscovered.
+  rememberBleName(deviceId, peripheral.advertisement?.localName);
 
   logger?.info('[NobleBLE] Connecting to device:', deviceId);
 
@@ -1575,9 +1708,14 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
         resolve();
       } catch (setupError) {
         logger?.error('[NobleBLE] Connection setup failed:', setupError);
-        connectedPeripheral.disconnect(() => {
-          reject(setupError);
-        });
+        // Never reject from inside a raw disconnect callback: noble only fires
+        // it on a real 'disconnect' event, so a peripheral that is already
+        // down leaves this promise — and the renderer acquire awaiting it —
+        // pending forever. disconnectDevice always settles (it no-ops on an
+        // unknown peripheral and caps the confirm wait).
+        disconnectDevice(deviceId)
+          .catch(() => undefined)
+          .then(() => reject(setupError));
       }
     });
   });
@@ -1597,11 +1735,18 @@ async function disconnectDevice(deviceId: string): Promise<void> {
   }
 
   await runBleCallbackOperation(callback => peripheral.disconnect(() => callback()), {
-    timeoutMs: BLE_CLEANUP_TIMEOUT,
+    timeoutMs: BLE_DISCONNECT_CONFIRM_TIMEOUT_MS,
     timeoutBehavior: 'resolve',
   });
+  if (peripheral.state === 'connected') {
+    logger?.warn('[NobleBLE] Physical disconnect did not confirm in time', { deviceId });
+  }
   cleanupDevice(deviceId, undefined, {
     cleanupConnection: true,
+    // macOS returns zero GATT services when a previously-disconnected
+    // peripheral object is reconnected; drop the discovery cache so the next
+    // connect resolves a fresh peripheral (direct connect by id, or scan).
+    cleanupDiscoveredCache: true,
     sendDisconnectEvent: false,
     cancelOperations: true,
     reason: 'manual-disconnect',
@@ -1742,9 +1887,14 @@ async function subscribeNotifications(
     });
   }
 
+  const subscribeStartedAt = Date.now();
   try {
     await rebuildAppSubscription(deviceId, notifyCharacteristic);
     subscribedDevices.set(deviceId, true);
+    logger?.info('[NobleBLE] Notification subscription active', {
+      deviceId,
+      ms: Date.now() - subscribeStartedAt,
+    });
   } finally {
     // 🔒 CRITICAL: Always clear operation state (even on error)
     subscriptionOperations.set(deviceId, 'idle');
@@ -1927,10 +2077,12 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
         }
 
         await stopScanning().catch(() => undefined);
-        if (noble && persistentStateListener) {
-          noble.removeListener('stateChange', persistentStateListener);
-          persistentStateListener = null;
-        }
+        // persistentStateListener is process-lifetime, NOT per-window: this
+        // destroy handler also fires on a renderer soft restart, and removing
+        // the listener here permanently killed poweredOff/poweredOn
+        // reconciliation for the rest of the process (nothing re-registers it:
+        // initializeNoble early-returns once noble is loaded). The null-guard
+        // in setupPersistentStateListener keeps it deduped to one instance.
         cleanupNobleListeners();
         discoveredDevices.clear();
         safeLog(logger, 'info', 'Noble BLE cleanup completed');

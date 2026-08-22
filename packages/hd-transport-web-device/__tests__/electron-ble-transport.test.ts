@@ -327,7 +327,7 @@ describe('ElectronBleTransport protocol detection', () => {
     }
   });
 
-  test('reconnects Protocol V1 with a non-destructive GetFeatures probe', async () => {
+  test('reconnects a declared Protocol V1 device without probing again', async () => {
     const device = { id: 'classic-id', name: 'OneKey Classic' };
     const nobleBle = createNobleBle(device);
     let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
@@ -360,7 +360,10 @@ describe('ElectronBleTransport protocol detection', () => {
           uuid: device.id,
         })
       );
-      expect(nobleBle.write).toHaveBeenCalledTimes(2);
+      // The first acquire probes because the protocol is unknown; the second
+      // declares V1 and must send nothing at all, leaving the first frame on
+      // the link to Core — which is what carries the wallet session.
+      expect(nobleBle.write).toHaveBeenCalledTimes(1);
       expect(nobleBle.write.mock.calls.every(([, hex]) => /^3f23230037/.test(hex))).toBe(true);
       expect(protocolV2Writer).not.toHaveBeenCalled();
     } finally {
@@ -373,19 +376,13 @@ describe('ElectronBleTransport protocol detection', () => {
     const nobleBle = createNobleBle(device);
     let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
     const v1ResponseHex = '3f23230002000000040a026f6b';
-    let writeCount = 0;
-
     nobleBle.onNotification.mockImplementation(handler => {
       notificationHandler = handler;
       return jest.fn();
     });
-    nobleBle.write.mockImplementation(() => {
-      writeCount += 1;
-      if (writeCount === 1) {
-        setTimeout(() => notificationHandler?.(device.id, v1ResponseHex), 0);
-      }
-      return Promise.resolve();
-    });
+    // A declared V1 acquire writes nothing, so every write here belongs to the
+    // call under test and none of them is answered.
+    nobleBle.write.mockImplementation(() => Promise.resolve());
     const bleTransport = configureTransport(nobleBle);
 
     await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V1' });
