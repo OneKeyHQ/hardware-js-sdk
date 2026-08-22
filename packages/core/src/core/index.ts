@@ -644,7 +644,8 @@ const onCallDevice = async (
                 method.payload?.passphraseState,
                 method.payload?.useEmptyPassphrase,
                 method.payload?.skipPassphraseCheck,
-                hasDeriveCardano(method)
+                hasDeriveCardano(method),
+                method.protocolV2UnlockContext?.preflightMainPinSelected
               );
 
               // Double check, handles the special case of Touch/Pro
@@ -1330,6 +1331,10 @@ const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => 
 
 const shouldCheckPassphraseState = (method: BaseMethod, device: Device) => {
   if (!method.useDevicePassphraseState) return false;
+
+  if (device.isProtocolV2() && method.payload?.useEmptyPassphrase === true) {
+    return true;
+  }
 
   return device.hasUsePassphrase();
 };

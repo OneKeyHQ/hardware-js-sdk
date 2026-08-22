@@ -400,7 +400,8 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
               this.payload.passphraseState,
               useEmptyPassphrase,
               this.payload.skipPassphraseCheck,
-              deriveCardano
+              deriveCardano,
+              this.protocolV2UnlockContext?.preflightMainPinSelected
             );
             if (!passphraseStateSafety) {
               throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);

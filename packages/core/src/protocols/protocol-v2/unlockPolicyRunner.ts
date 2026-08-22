@@ -15,11 +15,13 @@ const Log = getLogger(LoggerNames.Core);
 export type ProtocolV2UnlockContext = {
   preflightCompleted: boolean;
   preflightStatusRefreshed?: boolean;
+  preflightMainPinSelected?: boolean;
 };
 
 export const createProtocolV2UnlockContext = (): ProtocolV2UnlockContext => ({
   preflightCompleted: false,
   preflightStatusRefreshed: false,
+  preflightMainPinSelected: false,
 });
 
 type RunnableMethod = Pick<
@@ -102,11 +104,12 @@ export async function runMethodWithUnlockPolicy<T = unknown>(
     await afterStatusBeforeUnlock?.();
 
     if (!status.unlocked) {
+      const preUnlockPinType = resolvePreUnlockPinType(method);
       const unlockInteraction: HardwareUiInteractionMeta | undefined = shouldCoordinateUi
         ? uiCoordinator.enterUnlockInteraction(method.name)
         : undefined;
       const unlockedStatus = await device.unlockDevice(
-        resolvePreUnlockPinType(method),
+        preUnlockPinType,
         shouldCoordinateUi
           ? { emitUiEvent: false, interaction: unlockInteraction }
           : {
@@ -122,6 +125,7 @@ export async function runMethodWithUnlockPolicy<T = unknown>(
           'Protocol V2 device remained locked after the unlock flow.'
         );
       }
+      context.preflightMainPinSelected = preUnlockPinType === DeviceSessionPinType.Main;
       Log.debug('Protocol V2 pre-unlock completed', { method: method.name });
     }
 

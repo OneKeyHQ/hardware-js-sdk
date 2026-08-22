@@ -150,6 +150,7 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
             selectMainWalletBeforeRestore:
               !hasAuthoritativeProtocolV2WalletStatus(state) ||
               state.status.unlockedAttachPin === true,
+            mainPinSelected: this.protocolV2UnlockContext?.preflightMainPinSelected,
           })
         : await getPassphraseStateWithRefreshDeviceInfo(this.device, {
             onlyMainPin: true,

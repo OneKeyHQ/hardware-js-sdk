@@ -156,6 +156,7 @@ describe('Protocol V2 unlock semantics', () => {
     expect(method.protocolV2UnlockContext).toMatchObject({
       preflightCompleted: true,
       preflightStatusRefreshed: true,
+      preflightMainPinSelected: true,
     });
   });
 
@@ -185,6 +186,7 @@ describe('Protocol V2 unlock semantics', () => {
     await runMethodWithUnlockPolicy(method, device as any);
 
     expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Any, expect.any(Object));
+    expect(method.protocolV2UnlockContext?.preflightMainPinSelected).toBe(false);
   });
 
   test('pre-unlocks an unregistered wallet business method', async () => {

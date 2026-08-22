@@ -191,6 +191,8 @@ export async function getProtocolV2WalletSession(
     deriveCardano?: boolean;
     /** Read the wallet already selected by Attach PIN without reopening wallet selection. */
     readCurrentAttachPinSession?: boolean;
+    /** The current call already selected the Main PIN during its unlock preflight. */
+    mainPinSelected?: boolean;
   }
 ) {
   const forceWalletSelection =
@@ -227,10 +229,12 @@ export async function getProtocolV2WalletSession(
       : undefined;
   let response;
   let resumed = false;
-  let mainPinSelected =
-    options?.onlyMainPin === true &&
-    device.features?.unlocked === true &&
-    device.features?.unlockedAttachPin === false;
+  let mainPinAuthenticated =
+    options?.mainPinSelected === true ||
+    (options?.onlyMainPin === true &&
+      device.features?.unlocked === true &&
+      device.features?.unlockedAttachPin === false);
+  let standardWalletSelected = options?.mainPinSelected === true;
 
   const clearCurrentWalletSession = () => {
     if (options?.onlyMainPin) {
@@ -265,24 +269,30 @@ export async function getProtocolV2WalletSession(
   }
 
   const selectMainPin = async (force = false) => {
-    if (force || !mainPinSelected) {
+    if (force || !mainPinAuthenticated) {
       await device.unlockDevice(DeviceSessionPinType.Main, {
         source: 'wallet-session-coordinator',
         reason: expectedPassphraseState ? 'session-recovery' : 'open-wallet',
         deviceOnly: true,
       });
-      mainPinSelected = true;
+      mainPinAuthenticated = true;
+      standardWalletSelected = true;
     }
   };
 
   const selectStandardWallet = async () => {
-    // Main PIN authenticates the device; an empty host passphrase selects the standard derivation.
-    await selectMainPin();
     if (device.features?.passphraseProtection === true) {
+      // Main PIN authenticates the device; an empty host passphrase selects the standard derivation.
+      await selectMainPin();
       await askDevicePassphrase(device, {
         passphrase: '',
         on_device: false,
       });
+      standardWalletSelected = true;
+    } else if (!standardWalletSelected) {
+      // Without passphrase protection there is no empty-passphrase selector.
+      // Main PIN selection is the only authoritative switch back to the standard wallet.
+      await selectMainPin(true);
     }
   };
 
@@ -438,7 +448,7 @@ export async function getProtocolV2WalletSession(
   let unlockedAttachPin: boolean | undefined;
   if (readCurrentAttachPinSession) {
     unlockedAttachPin = true;
-  } else if (mainPinSelected) {
+  } else if (mainPinAuthenticated) {
     unlockedAttachPin = false;
   }
 

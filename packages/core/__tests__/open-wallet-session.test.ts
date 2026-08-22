@@ -148,7 +148,7 @@ describe('openWalletSession', () => {
     });
   });
 
-  test('opens the standard wallet directly when passphrase is disabled', async () => {
+  test('selects the Main PIN before opening the standard wallet when passphrase is disabled', async () => {
     const typedCall = jest.fn((request: string) => {
       if (request === 'ProtocolInfoRequest') {
         return { message: { version: 2 } };
@@ -167,11 +167,44 @@ describe('openWalletSession', () => {
 
     await getProtocolV2WalletSession(device as any, { onlyMainPin: true });
 
+    expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Main, {
+      source: 'wallet-session-coordinator',
+      reason: 'open-wallet',
+      deviceOnly: true,
+    });
     expect(typedCall).not.toHaveBeenCalledWith(
       'DeviceSessionAskPassphrase',
       'Success',
       expect.anything()
     );
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+      seed_domains: [],
+    });
+  });
+
+  test('reuses a Main PIN selected by the current preflight when passphrase is disabled', async () => {
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'ProtocolInfoRequest') {
+        return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: 'standard-state',
+            session_id: 'standard-session',
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const device = createDevice({ passphraseProtection: false, typedCall });
+
+    await getProtocolV2WalletSession(device as any, {
+      onlyMainPin: true,
+      mainPinSelected: true,
+    });
+
+    expect(device.unlockDevice).not.toHaveBeenCalled();
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       seed_domains: [],
     });
