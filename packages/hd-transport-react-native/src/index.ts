@@ -2125,12 +2125,13 @@ export default class ReactNativeBleTransport {
     // device record, so the probe re-asks a question that is already answered
     // and costs a round trip on every acquire. Expected V2 must still Ping so
     // USB-priority `link disabled` surfaces here instead of as a later unmapped
-    // RuntimeError. sessionProtocols is stamped too — the iOS path skipped it,
-    // which left the firmware-install reconnect (skipProtocolProbe) without the
-    // confirmed protocol it requires.
+    // RuntimeError. sessionProtocols is deliberately NOT stamped here: that map
+    // records protocols the device actually answered on (it gates the
+    // trustSessionProtocol narrowing in forced detection), and this branch has
+    // received no response. skipProtocolProbe does not need it either — its only
+    // caller is the V2 firmware-install reconnect.
     if (expectedProtocol === 'V1') {
       this.deviceProtocol.set(uuid, 'V1');
-      this.sessionProtocols.set(uuid, 'V1');
       Log?.debug('[ReactNativeBleTransport] protocol selected', {
         deviceId: uuid,
         protocol: 'V1',
