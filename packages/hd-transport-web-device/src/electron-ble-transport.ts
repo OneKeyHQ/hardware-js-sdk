@@ -525,13 +525,20 @@ export default class ElectronBleTransport {
     expectedProtocol?: ProtocolType,
     protocolHint?: ProtocolType
   ): Promise<ProtocolType> {
+    // A declared V1 is taken at face value, as the React Native transport
+    // already does on iOS: the caller reads the protocol off its own device
+    // record, so probing re-asks a question that is already answered and adds a
+    // round trip to every cold connect. It also fails in a way that costs the
+    // session: a device whose protocol session has stalled ignores the probe
+    // frame, and the timeout became a protocol-mismatch error that stopped Core
+    // from ever sending Initialize — the one frame such a device still answers,
+    // and how it gets revived. A declared V2 keeps probing, matching iOS, so a
+    // USB-priority "link disabled" surfaces here rather than as an unmapped
+    // error later. An undeclared protocol still goes through full detection.
     if (expectedProtocol === 'V1') {
-      if (await this.probeProtocolV1(uuid)) {
-        this.deviceProtocol.set(uuid, 'V1');
-        this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V1 (expected)`);
-        return 'V1';
-      }
-      throw this.createProtocolMismatchError(expectedProtocol, uuid);
+      this.deviceProtocol.set(uuid, 'V1');
+      this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V1 (expected, no probe)`);
+      return 'V1';
     }
 
     if (expectedProtocol === 'V2') {

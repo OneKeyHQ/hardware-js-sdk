@@ -415,6 +415,13 @@ const onCallDevice = async (
   if (method.payload?.onlyConnectBleDevice) {
     preWarmCallbackTask?.resolve();
     Log.debug('Call API - only connect ble device: ', device?.mainId);
+    // This early return bypasses the normal-path bookkeeping at the end of the
+    // call. Without it the task leaks and haunts every later queue snapshot
+    // and cancel sweep (field log: a completed task lingered for 6 minutes),
+    // and the request stays in the active maps, so repeated preconnects pile
+    // up phantom work in diagnostics.
+    completeMethodRequestContext(method);
+    requestQueue.releaseTask(method.responseID);
     return createResponseMessage(method.responseID, true, null);
   }
 
@@ -963,7 +970,60 @@ export function isProtocolV2PeerRemovedPairingError(method: BaseMethod, error: u
  * If the Bluetooth connection times out, retry up to 6 times
  * @param retryCount - Current retry count (default 0)
  */
-async function connectDeviceForBle(method: BaseMethod, device: Device, retryCount = 0) {
+// device.acquire awaits a transport reply with no deadline of its own; a
+// transport that never settles (field case: Electron main lost an IPC reply,
+// "reply was never sent" after 5 minutes) hangs the call forever and cancel()
+// only takes effect at poll checkpoints. Race acquire against a deadline and
+// the caller's abort signal so the hang is bounded and cancel is immediate.
+const BLE_ACQUIRE_DEADLINE_MS = 60 * 1000;
+
+function raceBleAcquire<T>(acquirePromise: Promise<T>, abortSignal?: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      abortSignal?.removeEventListener('abort', onAbort);
+      fn();
+    };
+    const onAbort = () =>
+      settle(() => reject(ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)));
+    const deadline = setTimeout(
+      () =>
+        settle(() =>
+          reject(
+            ERRORS.TypedError(
+              HardwareErrorCode.BleTimeoutError,
+              `BLE acquire exceeded ${BLE_ACQUIRE_DEADLINE_MS}ms deadline`
+            )
+          )
+        ),
+      BLE_ACQUIRE_DEADLINE_MS
+    );
+    // Attach before any early return so a late settlement of acquirePromise
+    // is always consumed — an abort or deadline must never leave the acquire
+    // rejection unhandled.
+    acquirePromise.then(
+      value => settle(() => resolve(value)),
+      error => settle(() => reject(error))
+    );
+    if (abortSignal) {
+      if (abortSignal.aborted) {
+        onAbort();
+        return;
+      }
+      abortSignal.addEventListener('abort', onAbort);
+    }
+  });
+}
+
+async function connectDeviceForBle(
+  method: BaseMethod,
+  device: Device,
+  abortSignal?: AbortSignal,
+  retryCount = 0
+) {
   try {
     if (device.wasInterruptedByUser()) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
@@ -977,9 +1037,43 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       !device.commands ||
       device.commands.disposed;
     if (shouldAcquire) {
-      await device.acquire(method.payload.connectProtocol, {
-        forceProtocolDetection: method.payload.forceProtocolDetection,
-      });
+      // The deadline/abort guards are scoped to the desktop electron
+      // transport: its IPC acquire is the only path with a proven
+      // never-settling failure mode, while react-native/lowlevel acquire may
+      // legitimately block on a user-driven system bonding prompt for longer
+      // than any sane deadline. Other envs keep the plain acquire unchanged.
+      const useAcquireGuards = DataManager.getSettings('env') === 'desktop-web-ble';
+      // A cancel landing during the retry backoff must not start a new acquire.
+      if (useAcquireGuards && abortSignal?.aborted) {
+        throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+      }
+      if (!useAcquireGuards) {
+        await device.acquire(method.payload.connectProtocol, {
+          forceProtocolDetection: method.payload.forceProtocolDetection,
+        });
+      } else {
+        try {
+          await raceBleAcquire(
+            device.acquire(method.payload.connectProtocol, {
+              forceProtocolDetection: method.payload.forceProtocolDetection,
+            }),
+            abortSignal
+          );
+        } catch (err) {
+          // A deadline hit means the transport is wedged mid-acquire; drop the
+          // link before the retry so it cold-connects instead of stacking a
+          // second connect onto the half-open one.
+          if (
+            err.errorCode === HardwareErrorCode.BleTimeoutError &&
+            device.mainId &&
+            device.deviceConnector
+          ) {
+            await device.deviceConnector.disconnect(device.mainId).catch(() => undefined);
+            device.markTransportDisconnected();
+          }
+          throw err;
+        }
+      }
     }
     if (method.payload?.onlyConnectBleDevice) {
       if (shouldAcquire) {
@@ -1019,7 +1113,7 @@ async function connectDeviceForBle(method: BaseMethod, device: Device, retryCoun
       const nextRetry = retryCount + 1;
       Log.debug(`Bluetooth connection will retry, retry count: ${nextRetry}`);
       await wait(3000);
-      await connectDeviceForBle(method, device, nextRetry);
+      await connectDeviceForBle(method, device, abortSignal, nextRetry);
     } else {
       throw err;
     }
@@ -1129,7 +1223,7 @@ const ensureConnected = async (
             if (tryCount === 1) {
               device.beginConnectionAttempt();
             }
-            await connectDeviceForBle(method, device);
+            await connectDeviceForBle(method, device, abortSignal);
           }
           resolve(device);
           return;
