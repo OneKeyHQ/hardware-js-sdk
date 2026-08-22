@@ -1114,6 +1114,68 @@ describe('openWalletSession', () => {
     expect(device.getDeviceState).toHaveBeenCalledTimes(2);
   });
 
+  test('does not restrict a locked hidden-wallet selection to the Main PIN', async () => {
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ message: { version: 2 } })
+      .mockResolvedValueOnce({ message: {} })
+      .mockResolvedValueOnce({
+        message: {
+          btc_test_address: 'hidden-state',
+          session_id: 'hidden-session',
+        },
+      });
+    const promptPassphrase = jest.fn().mockResolvedValue({ passphrase: 'host hidden wallet' });
+    const method = new OpenWalletSession({
+      payload: { method: 'openWalletSession', connectId: 'connect-id', mode: 'select-hidden' },
+    });
+    method.init();
+    const device = createDevice({ typedCall, promptPassphrase });
+    device.features.unlocked = false;
+    device.getDeviceState = jest
+      .fn()
+      .mockResolvedValueOnce({
+        identity: { deviceId: undefined },
+        status: { unlocked: false, passphraseProtection: true },
+      })
+      .mockResolvedValueOnce({
+        identity: { deviceId: 'device-1' },
+        status: {
+          unlocked: true,
+          passphraseProtection: true,
+          unlockedAttachPin: false,
+        },
+      })
+      .mockResolvedValueOnce({
+        identity: { deviceId: 'device-1' },
+        status: {
+          unlocked: true,
+          passphraseProtection: true,
+          unlockedAttachPin: false,
+        },
+      });
+    device.unlockDevice = jest.fn().mockImplementation(() => {
+      device.features.unlocked = true;
+      return Promise.resolve(device.features);
+    });
+    method.device = device as any;
+
+    await expect(method.run()).resolves.toMatchObject({
+      walletType: 'hidden',
+      passphraseState: 'hidden-state',
+    });
+    expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Any, {
+      source: 'unlock-coordinator',
+      reason: 'device-locked',
+      deviceOnly: true,
+      method: 'openWalletSession',
+    });
+    expect(device.unlockDevice).not.toHaveBeenCalledWith(
+      DeviceSessionPinType.Main,
+      expect.anything()
+    );
+  });
+
   test('switches from Attach PIN to Main PIN before opening the standard wallet', async () => {
     const typedCall = jest
       .fn()

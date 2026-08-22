@@ -87,6 +87,10 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
     this.unlockPolicy = 'unlock-before-run';
     this.skipForceUpdateCheck = true;
     this.params = normalizeParams(this.payload as unknown as Record<string, unknown>);
+    this.protocolV2PreUnlockPinType =
+      this.params.mode === OpenWalletSessionMode.SelectHidden
+        ? DeviceSessionPinType.Any
+        : DeviceSessionPinType.Main;
     this.payload.useEmptyPassphrase = this.params.mode === OpenWalletSessionMode.Standard;
   }
 
@@ -121,12 +125,15 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
     };
     const ensureProtocolV2WalletStatus = async () => {
       if (isProtocolV2 && !hasAuthoritativeProtocolV2WalletStatus(state)) {
-        await this.device.unlockDevice(DeviceSessionPinType.Main, {
-          source: 'unlock-coordinator',
-          reason: 'device-locked',
-          deviceOnly: true,
-          method: 'openWalletSession',
-        });
+        await this.device.unlockDevice(
+          this.protocolV2PreUnlockPinType ?? DeviceSessionPinType.Main,
+          {
+            source: 'unlock-coordinator',
+            reason: 'device-locked',
+            deviceOnly: true,
+            method: 'openWalletSession',
+          }
+        );
         requireAuthoritativeProtocolV2WalletStatus(await refreshProtocolV2DeviceState());
       }
       return state;
