@@ -73,8 +73,26 @@ const protocolV2Schema = {
         },
       },
     },
+    Failure: {
+      fields: {
+        code: {
+          type: 'FailureType',
+          id: 1,
+        },
+        message: {
+          type: 'string',
+          id: 2,
+        },
+      },
+    },
+    FailureType: {
+      values: {
+        Failure_ProcessError: 5,
+      },
+    },
     MessageType: {
       values: {
+        MessageType_Failure: 3,
         MessageType_ProtocolInfoRequest: 60200,
         MessageType_ProtocolInfo: 60201,
         MessageType_Ping: 60206,
@@ -462,6 +480,41 @@ describe('ElectronBleTransport protocol detection', () => {
       /Unable to detect BLE protocol/
     );
     expect(transport.getProtocolType(device.id)).toBeUndefined();
+  });
+
+  test('surfaces Protocol V2 link disabled while the initial V1 probe is active', async () => {
+    const device = { id: 'usb-priority-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
+
+    nobleBle.onNotification.mockImplementation(handler => {
+      notificationHandler = handler;
+      return jest.fn();
+    });
+    nobleBle.write.mockImplementation(() => {
+      const response = ProtocolV2.encodeFrame(
+        schemas,
+        'Failure',
+        { code: 5, message: 'link disabled' },
+        { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+      );
+      const splitAt = 4;
+      setTimeout(() => {
+        notificationHandler?.(device.id, bytesToHex(response.subarray(0, splitAt)));
+        notificationHandler?.(device.id, bytesToHex(response.subarray(splitAt)));
+      }, 0);
+      return Promise.resolve();
+    });
+    const transport = configureTransport(nobleBle);
+
+    await expect(transport.acquire({ uuid: device.id })).rejects.toMatchObject({
+      name: 'ProtocolV2LinkDisabledError',
+      failureCode: 'Failure_ProcessError',
+      firmwareMessage: 'link disabled',
+    });
+    expect(nobleBle.write).toHaveBeenCalledTimes(1);
+    expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
   });
 
   test('keeps a first expected Protocol V2 probe miss retryable', async () => {

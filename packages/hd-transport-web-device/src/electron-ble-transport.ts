@@ -6,7 +6,10 @@ import transport, {
   ProtocolV2LinkManager,
   TRANSPORT_EVENT,
   bytesToHex,
+  createProtocolV2LinkDisabledError,
   hexToBytes,
+  isProtocolV2LinkDisabledError,
+  isProtocolV2LinkDisabledFailure,
   probeProtocolV2 as probeProtocolV2Helper,
   writeProtocolV2BleFrame,
 } from '@onekeyfe/hd-transport';
@@ -31,7 +34,7 @@ import type {
 } from '@onekeyfe/hd-transport';
 import type EventEmitter from 'events';
 
-const { parseConfigure, ProtocolV1, check } = transport;
+const { parseConfigure, ProtocolV1, ProtocolV2, check } = transport;
 
 declare global {
   interface Window {
@@ -588,6 +591,9 @@ export default class ElectronBleTransport {
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
       this.Log?.debug('[Electron BLE] Protocol V1 GetFeatures probe failed:', error);
+      if (isProtocolV2LinkDisabledError(error)) {
+        throw error;
+      }
       return false;
     }
   }
@@ -695,7 +701,43 @@ export default class ElectronBleTransport {
       this.handleProtocolV2Notification(deviceId, hexData);
       return;
     }
+    const linkDisabledError = this.readProtocolV2LinkDisabledFailure(deviceId, hexData);
+    if (linkDisabledError) {
+      if (this.runPromise && this.runPromiseDeviceId === deviceId) {
+        this.runPromise.reject(linkDisabledError);
+      }
+      return;
+    }
     this.handleProtocolV1Notification(deviceId, hexData);
+  }
+
+  private readProtocolV2LinkDisabledFailure(deviceId: string, hexData: string) {
+    if (!this._messages || !this._messagesV2) return undefined;
+
+    const assembler = this.v2Assemblers.get(deviceId);
+    if (!assembler) return undefined;
+
+    try {
+      for (const frame of assembler.drain(hexToBytes(hexData))) {
+        const response = check.call(
+          ProtocolV2.decodeFrame(
+            { protocolV1: this._messages, protocolV2: this._messagesV2 },
+            frame
+          )
+        );
+        if (response.type === 'Failure') {
+          const failureCode = response.message?.code;
+          const firmwareMessage = response.message?.message;
+          if (isProtocolV2LinkDisabledFailure(failureCode, firmwareMessage)) {
+            return createProtocolV2LinkDisabledError(failureCode, firmwareMessage);
+          }
+        }
+      }
+    } catch {
+      // A normal Protocol V1 notification is not a Protocol V2 frame.
+      assembler.reset();
+    }
+    return undefined;
   }
 
   private handleProtocolV2Notification(deviceId: string, hexData: string): void {
