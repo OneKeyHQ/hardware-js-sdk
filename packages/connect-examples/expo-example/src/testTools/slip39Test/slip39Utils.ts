@@ -841,7 +841,6 @@ export function analyzeSLIP39Shares(shares: string[]): SLIP39Analysis {
     }
 
     result.isValid = canRecover;
-    result.isValid = true;
   } catch (error) {
     result.errors.push(error instanceof Error ? error.message : 'Unknown error analyzing shares');
   }
