@@ -86,20 +86,23 @@ function DeviceListFC(
     selectDevice(undefined);
     if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));
 
-    let foundDevices: Device[] = [];
+    let authorizedDevice: Device | undefined;
     if (Platform.OS === 'web' && connectionType === 'webusb') {
       const accessResponse = await sdk.promptWebDeviceAccess();
       if (accessResponse.success && accessResponse.payload.device) {
-        foundDevices = [accessResponse.payload.device as unknown as Device];
+        authorizedDevice = accessResponse.payload.device as unknown as Device;
       }
     }
 
-    // Keep already-authorized devices discoverable when the permission dialog is cancelled.
-    if (foundDevices.length === 0) {
-      const response = await sdk.searchDevices();
-      if (response.success) {
-        foundDevices = (response.payload as unknown as Device[]) ?? [];
-      }
+    // Re-enumerate after WebUSB authorization so serial-less devices such as Neo
+    // use the transport descriptor and complete active protocol detection.
+    const response = await sdk.searchDevices();
+    let foundDevices: Device[] = [];
+    if (response.success) {
+      foundDevices = (response.payload as unknown as Device[]) ?? [];
+    }
+    if (foundDevices.length === 0 && authorizedDevice) {
+      foundDevices = [authorizedDevice];
     }
 
     setDeviceActions({ type: 'setList', payload: foundDevices });
