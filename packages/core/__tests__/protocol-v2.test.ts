@@ -6896,6 +6896,8 @@ describe('Protocol V2 firmware update targets', () => {
       {
         fields: {
           status: true,
+          progress_percent: true,
+          phase_info: true,
           payload_version: true,
           path: true,
         },
@@ -9429,7 +9431,16 @@ describe('Protocol V2 firmware update method', () => {
   test('passes firmware update status fields through to Protocol V2', async () => {
     const typedCall = jest.fn().mockResolvedValue({
       message: {
-        records: [{ target_id: 4, status: 2, payload_version: 1, path: 'vol1:application_p1.bin' }],
+        records: [
+          {
+            target_id: 4,
+            status: 1,
+            progress_percent: 42,
+            phase_info: { phase: 1, progress_percent: 60 },
+            payload_version: 1,
+            path: 'vol1:application_p1.bin',
+          },
+        ],
       },
     });
     const method = new DeviceGetFirmwareUpdateStatus({
@@ -9438,6 +9449,8 @@ describe('Protocol V2 firmware update method', () => {
         method: 'deviceGetFirmwareUpdateStatus',
         fields: {
           status: true,
+          progress_percent: true,
+          phase_info: true,
           payload_version: true,
           path: true,
         },
@@ -9449,7 +9462,16 @@ describe('Protocol V2 firmware update method', () => {
     });
 
     await expect(method.run()).resolves.toEqual({
-      records: [{ target_id: 4, status: 2, payload_version: 1, path: 'vol1:application_p1.bin' }],
+      records: [
+        {
+          target_id: 4,
+          status: 1,
+          progress_percent: 42,
+          phase_info: { phase: 1, progress_percent: 60 },
+          payload_version: 1,
+          path: 'vol1:application_p1.bin',
+        },
+      ],
     });
     expect(typedCall).toHaveBeenCalledWith(
       'DeviceFirmwareUpdateStatusGet',
@@ -9457,6 +9479,8 @@ describe('Protocol V2 firmware update method', () => {
       {
         fields: {
           status: true,
+          progress_percent: true,
+          phase_info: true,
           payload_version: true,
           path: true,
         },

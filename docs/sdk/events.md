@@ -316,9 +316,10 @@ V1 用户选择设备端输入后，设备可能返回 `ButtonRequest_Passphrase
 | `FIRMWARE_PROGRESS`       | SDK 计算；部分由硬件状态消息转换 | 固件传输或安装状态         | `progress`、阶段及可选传输指标 | 更新传输或安装进度条                       |
 | `FIRMWARE_TIP`            | SDK 固件状态机生成               | 下载、重启、确认和安装阶段 | `FirmwareUpdateTipMessage`     | 展示固件升级阶段提示                       |
 
-`FIRMWARE_PROGRESS` 会进行节流，不能依赖每个底层分片都产生一次事件。Protocol V2 安装阶段收到
-`DeviceFirmwareUpdateStatus` 时也会发送安装进度，但固件只报告 target 状态，不报告 target 内部
-百分比；因此该进度是已完成 target 的粗粒度比例，不能解释为设备真实安装百分比。
+`FIRMWARE_PROGRESS` 会进行节流，不能依赖每个底层分片都产生一次事件。During Protocol V2
+installation, SDK maps `DeviceFirmwareUpdateStatus.records[].progress_percent` to the overall
+`progress`. It also exposes `installTargetId`, normalized `installPhase` (`prepare`, `install`, or
+`verify`), and `installPhaseProgress` from the active record's `phase_info`.
 Protocol V2 文件传输阶段还会附带 `transferredBytes`、`totalBytes`、`rateBytesPerSecond` 和
 `elapsedMs`；这些字段在安装阶段及旧协议流程中可能缺省。
 

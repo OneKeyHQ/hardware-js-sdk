@@ -7,7 +7,7 @@
 > 最后代码核验：2026-07-30
 > 前置阅读：[SDK Core 运行时](./core-runtime.md)、[钱包 Session 与安全](../device/wallet-session-and-security.md)
 
-> 当前契约：firmware-pro2 `dev` 已实现拆分后的
+> 当前契约：firmware-pro2 `main` 已实现拆分后的
 > `DeviceSessionAskPin/DeviceSessionAskPassphrase/DeviceSessionGet` 与
 > `ProtocolInfoRequest.eventless_wallet_session`。当前实现以
 > [SDK Core 运行时](./core-runtime.md) 和 [Pro2 字段迁移](./pro2-field-migration.md)

@@ -189,6 +189,11 @@ const getProtocolV2DeviceTransferProgress = (
 type ProtocolV2FirmwareUpdateStatusTarget = {
   target_id: number | string;
   status?: number | string;
+  progress_percent?: number;
+  phase_info?: {
+    phase: number | string;
+    progress_percent: number;
+  };
   payload_version?: number;
   path?: string;
 };
@@ -409,6 +414,18 @@ const normalizeProtocolV2TargetStatus = (
   return undefined;
 };
 
+const PROTOCOL_V2_INSTALL_PHASE_BY_DECODED_VALUE = new Map<
+  number | string,
+  'prepare' | 'install' | 'verify'
+>([
+  [0, 'prepare'],
+  [1, 'install'],
+  [2, 'verify'],
+  ['FW_MGMT_UPDATER_PHASE_PREPARE', 'prepare'],
+  ['FW_MGMT_UPDATER_PHASE_INSTALL', 'install'],
+  ['FW_MGMT_UPDATER_PHASE_VERIFY', 'verify'],
+]);
+
 const normalizeProtocolV2Hex = (value?: string) => value?.replace(/^0x/i, '').toLowerCase();
 
 const versionArrayToNumber = (version?: IVersionArray) => {
@@ -464,6 +481,11 @@ const toProtocolV2FiniteNumber = (value: unknown) => {
     }
   }
   return undefined;
+};
+
+const normalizeProtocolV2ProgressPercent = (value: unknown) => {
+  const progress = toProtocolV2FiniteNumber(value);
+  return progress === undefined ? undefined : Math.min(100, Math.max(0, progress));
 };
 
 export const isProtocolV2FirmwareFingerprintValid = (
@@ -2373,16 +2395,54 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     if (expectedTargetIds.size > 0 && matchingTargets.length > 0) {
-      const hasInProgressTarget = matchingTargets.some(target =>
-        isProtocolV2TargetStatusInProgress(target.status)
-      );
+      let detailedProgress = completedTargetIds.size * 100;
+      let installProgressMetadata:
+        | {
+            installTargetId: number;
+            installPhase: 'prepare' | 'install' | 'verify';
+            installPhaseProgress: number;
+          }
+        | undefined;
+      let hasInProgressTarget = false;
+      matchingTargets.forEach(target => {
+        const targetId = normalizeProtocolV2TargetId(target.target_id);
+        if (
+          targetId === undefined ||
+          completedTargetIds.has(targetId) ||
+          !isProtocolV2TargetStatusInProgress(target.status) ||
+          (liveTargetIds && !liveTargetIds.has(targetId))
+        ) {
+          return;
+        }
+        hasInProgressTarget = true;
+        detailedProgress += normalizeProtocolV2ProgressPercent(target.progress_percent) ?? 0;
+        const installPhase = target.phase_info
+          ? PROTOCOL_V2_INSTALL_PHASE_BY_DECODED_VALUE.get(target.phase_info.phase)
+          : undefined;
+        const installPhaseProgress = normalizeProtocolV2ProgressPercent(
+          target.phase_info?.progress_percent
+        );
+        if (installPhase && installPhaseProgress !== undefined && !installProgressMetadata) {
+          installProgressMetadata = {
+            installTargetId: targetId,
+            installPhase,
+            installPhaseProgress,
+          };
+        }
+      });
       const completedProgress = Math.floor(
         (completedTargetIds.size / expectedTargetIds.size) * 100
       );
-      // The protocol exposes no per-target percentage, so report coarse progress by
-      // completed targets and use 1% once work starts to keep the UI responsive.
-      const progress = Math.min(99, Math.max(completedProgress, hasInProgressTarget ? 1 : 0));
-      this.postProgressMessage(progress, 'installingFirmware');
+      const reportedProgress = Math.floor(detailedProgress / expectedTargetIds.size);
+      const progress = Math.min(
+        99,
+        Math.max(completedProgress, reportedProgress, hasInProgressTarget ? 1 : 0)
+      );
+      if (installProgressMetadata) {
+        this.postProgressMessage(progress, 'installingFirmware', installProgressMetadata);
+      } else {
+        this.postProgressMessage(progress, 'installingFirmware');
+      }
     }
 
     return false;
@@ -2487,6 +2547,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             {
               fields: {
                 status: true,
+                progress_percent: true,
+                phase_info: true,
                 payload_version: true,
                 path: true,
               },

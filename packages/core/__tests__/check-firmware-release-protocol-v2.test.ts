@@ -16,8 +16,6 @@ jest.mock('../src/data/config', () => ({
 const release: IFirmwareReleaseInfo = {
   required: false,
   version: [2, 0, 0],
-  url: 'https://example.com/application-p1.okpkg',
-  fingerprint: 'release-fingerprint',
   changelog: {
     'zh-CN': '更新',
     'en-US': 'Update',

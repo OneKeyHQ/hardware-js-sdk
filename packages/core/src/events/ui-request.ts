@@ -189,6 +189,9 @@ export interface FirmwareProgress {
     totalBytes?: number;
     rateBytesPerSecond?: number;
     elapsedMs?: number;
+    installTargetId?: number;
+    installPhase?: 'prepare' | 'install' | 'verify';
+    installPhaseProgress?: number;
   };
 }
 

@@ -36,7 +36,12 @@ describe('FirmwareUpdateV4 install polling', () => {
           records: [
             {
               target_id: 4,
-              status: 'FW_MGMT_UPDATER_TASK_STATUS_PENDING',
+              status: 'FW_MGMT_UPDATER_TASK_STATUS_IN_PROGRESS',
+              progress_percent: 42,
+              phase_info: {
+                phase: 'FW_MGMT_UPDATER_PHASE_INSTALL',
+                progress_percent: 60,
+              },
               path: 'vol0:/application_p1.bin',
             },
           ],
@@ -101,7 +106,20 @@ describe('FirmwareUpdateV4 install polling', () => {
     await firmwareUpdate.waitForProtocolV2FirmwareUpdateComplete(targets, true);
 
     expect(typedCall.mock.calls[1]?.[0]).toBe('DeviceFirmwareUpdateStatusGet');
-    expect(method.postProgressMessage).toHaveBeenCalledWith(1, 'installingFirmware');
+    expect(typedCall.mock.calls[1]?.[2]).toEqual({
+      fields: {
+        status: true,
+        progress_percent: true,
+        phase_info: true,
+        payload_version: true,
+        path: true,
+      },
+    });
+    expect(method.postProgressMessage).toHaveBeenCalledWith(42, 'installingFirmware', {
+      installTargetId: 4,
+      installPhase: 'install',
+      installPhaseProgress: 60,
+    });
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
     expect(call.mock.invocationCallOrder[0]).toBeLessThan(typedCall.mock.invocationCallOrder[1]);
     expect(setCancelableAction).toHaveBeenCalledTimes(2);

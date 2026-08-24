@@ -152,8 +152,10 @@ Protocol V1 继续使用 `firmwareUpdate` 至 `firmwareUpdateV3`；Pro2 与 Neo 
 
 - BLE 与 WebUSB 使用不同默认 chunk，最小值为 64 字节。
 - 文件传输根据 `processed_byte` 恢复进度，总进度按全部目标字节聚合。
-- 固件未提供 target 内部百分比，安装进度只能表示已完成 target 的比例；接入方如需连续动画，
-  必须将其作为有阶段上限的估算值，不能当成设备真实进度。
+- Protocol V2 installation polling requests `progress_percent` and `phase_info`. SDK aggregates each
+  target's reported percentage into the overall installation progress and exposes the active
+  `installTargetId`, normalized `installPhase` (`prepare` / `install` / `verify`), and
+  `installPhaseProgress` through `FIRMWARE_PROGRESS`.
 - 安装开始、安装完成和用户交互使用不同超时窗口。
 - 安装请求发出后设备可能在 `Success` 回包到达前主动断开 BLE；SDK 不重放有副作用的安装请求，
   而是进入重连与状态轮询，由 target 状态或最终 App 版本确认结果。
