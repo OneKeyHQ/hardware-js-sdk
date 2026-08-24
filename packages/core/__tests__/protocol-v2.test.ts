@@ -1022,6 +1022,7 @@ describe('Protocol V2 feature adapter', () => {
       newSession: 'session-1',
       unlockedAttachPin: false,
       resumed: false,
+      walletStatusRefreshed: true,
     });
     expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
       eventless_wallet_session: true,
@@ -1285,6 +1286,7 @@ describe('Protocol V2 feature adapter', () => {
       newSession: 'main-wallet-session',
       unlockedAttachPin: undefined,
       resumed: false,
+      walletStatusRefreshed: true,
     });
 
     expect(promptPassphrase).toHaveBeenCalled();
@@ -1371,6 +1373,7 @@ describe('Protocol V2 feature adapter', () => {
       newSession: 'hidden-after-unlock-session',
       unlockedAttachPin: undefined,
       resumed: false,
+      walletStatusRefreshed: true,
     });
 
     expect(unlockDevice).not.toHaveBeenCalled();

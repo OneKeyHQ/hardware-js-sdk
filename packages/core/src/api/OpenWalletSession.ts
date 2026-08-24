@@ -29,6 +29,12 @@ const wasResumed = (session: unknown) =>
   'resumed' in session &&
   (session as { resumed?: unknown }).resumed === true;
 
+const wasWalletStatusRefreshed = (session: unknown) =>
+  !!session &&
+  typeof session === 'object' &&
+  'walletStatusRefreshed' in session &&
+  (session as { walletStatusRefreshed?: unknown }).walletStatusRefreshed === true;
+
 const requireHiddenWalletResponse = (session: { passphraseState?: string }) => {
   if (!session.passphraseState) {
     throw ERRORS.TypedError(
@@ -123,6 +129,14 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
       currentDeviceId = state.identity.deviceId;
       return state;
     };
+    const resolveProtocolV2DeviceStateAfterSession = async (session: unknown) => {
+      if (!wasWalletStatusRefreshed(session)) {
+        return refreshProtocolV2DeviceState();
+      }
+      state = await this.device.getDeviceState();
+      currentDeviceId = state.identity.deviceId;
+      return state;
+    };
     const ensureProtocolV2WalletStatus = async () => {
       if (isProtocolV2 && !hasAuthoritativeProtocolV2WalletStatus(state)) {
         await this.device.unlockDevice(
@@ -157,7 +171,9 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
             initSession: this.payload.initSession,
           });
       const refreshedState = isProtocolV2
-        ? requireAuthoritativeProtocolV2WalletStatus(await refreshProtocolV2DeviceState())
+        ? requireAuthoritativeProtocolV2WalletStatus(
+            await resolveProtocolV2DeviceStateAfterSession(session)
+          )
         : state;
       const deviceId = requireDeviceId();
       if (
@@ -245,7 +261,9 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
         })
       : await getPassphraseStateWithRefreshDeviceInfo(this.device, { initSession: true });
     const refreshedState = isProtocolV2
-      ? requireAuthoritativeProtocolV2WalletStatus(await refreshProtocolV2DeviceState())
+      ? requireAuthoritativeProtocolV2WalletStatus(
+          await resolveProtocolV2DeviceStateAfterSession(session)
+        )
       : state;
     const deviceId = requireDeviceId();
     if (isProtocolV2 && refreshedState.status.passphraseProtection !== true) {

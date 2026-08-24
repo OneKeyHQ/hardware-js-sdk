@@ -1303,7 +1303,7 @@ describe('openWalletSession', () => {
     expect(deviceWalletSessionStore.get('device-1', 'hidden-state')).toBe('hidden-session');
   });
 
-  test('reuses the fresh unlock preflight status when selecting a hidden wallet', async () => {
+  test('reuses the fresh unlock and wallet-selection statuses', async () => {
     const typedCall = jest
       .fn()
       .mockResolvedValueOnce({ message: { version: 2 } })
@@ -1331,7 +1331,7 @@ describe('openWalletSession', () => {
       passphraseState: 'hidden-state',
     });
 
-    expect(device.getDeviceState.mock.calls).toEqual([[], [{ refreshSections: ['status'] }]]);
+    expect(device.getDeviceState.mock.calls).toEqual([[], []]);
   });
 
   test('gets the prepared session after host passphrase entry', async () => {
