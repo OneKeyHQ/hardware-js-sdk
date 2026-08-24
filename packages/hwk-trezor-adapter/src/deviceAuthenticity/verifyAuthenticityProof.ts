@@ -50,23 +50,29 @@ export const prepareDeviceAuthenticityData = ({
 const getRootPubKeys = ({
   config,
   deviceModel,
+  proofType,
   allowDebugKeys,
 }: {
   config: DeviceAuthenticityConfig;
   deviceModel: string;
+  proofType: 'optiga' | 'tropic';
   allowDebugKeys?: boolean;
 }): string[] => {
   const modelConfig = config[deviceModel];
   if (!modelConfig || typeof modelConfig === 'number') {
     throw new Error(`Pubkeys for ${deviceModel} not found in config`);
   }
-  const prod = [...(modelConfig.rootPubKeysOptiga ?? []), ...(modelConfig.rootPubKeysTropic ?? [])];
+  const prod =
+    proofType === 'optiga'
+      ? modelConfig.rootPubKeysOptiga ?? []
+      : modelConfig.rootPubKeysTropic ?? [];
   if (!allowDebugKeys) return prod;
 
   return [
     ...prod,
-    ...(modelConfig.debug?.rootPubKeysOptiga ?? []),
-    ...(modelConfig.debug?.rootPubKeysTropic ?? []),
+    ...(proofType === 'optiga'
+      ? modelConfig.debug?.rootPubKeysOptiga ?? []
+      : modelConfig.debug?.rootPubKeysTropic ?? []),
   ];
 };
 
@@ -110,6 +116,7 @@ const parseSerialNumberFromDeviceCert = (deviceCert: ParsedCertificate) => {
  * Returns the per-device attestation public key (`deviceCertPubKey`) on success.
  */
 export const verifyAuthenticityProof = ({
+  proofType,
   certificates,
   signature,
   signedData,
@@ -118,7 +125,12 @@ export const verifyAuthenticityProof = ({
   allowDebugKeys,
   caPubKeyBlacklist = [],
 }: VerifyAuthenticityProofParams): VerifyAuthenticityProofResult => {
-  const allRootPubKeys = getRootPubKeys({ config, deviceModel, allowDebugKeys });
+  const allRootPubKeys = getRootPubKeys({
+    config,
+    deviceModel,
+    proofType,
+    allowDebugKeys,
+  });
 
   const parsedCertificates = certificates.map(c =>
     parseCertificate(new Uint8Array(Buffer.from(c, 'hex')))
@@ -128,7 +140,8 @@ export const verifyAuthenticityProof = ({
   // This mirrors Trezor Connect's production policy: Optiga uses P-256 and
   // Safe 7's additional Tropic proof uses Ed25519. MCU/ML-DSA is not a separate
   // client-side pass/fail condition.
-  if (firstCertAlgName !== 'P-256' && firstCertAlgName !== 'Ed25519') {
+  const expectedAlgorithmName = proofType === 'optiga' ? 'P-256' : 'Ed25519';
+  if (firstCertAlgName !== expectedAlgorithmName) {
     return { valid: false, error: 'RESPONSE_MALFORMED' };
   }
   if (parsedCertificates.length !== 2) {

@@ -136,7 +136,6 @@ describe('LedgerAdapter', () => {
     connector.callImpl.mockResolvedValueOnce({
       isGenuine: true,
       deviceId: 'ab'.repeat(32),
-      attestationPubKey: `04${'cd'.repeat(64)}`,
     });
 
     const result = await adapter.verifyDeviceAuthenticity('dev-1', {
@@ -164,7 +163,6 @@ describe('LedgerAdapter', () => {
     connector.callImpl.mockResolvedValueOnce({
       isGenuine: false,
       deviceId: 'ab'.repeat(32),
-      attestationPubKey: `04${'cd'.repeat(64)}`,
     });
 
     const result = await adapter.verifyDeviceAuthenticity('dev-1');
@@ -250,79 +248,6 @@ describe('LedgerAdapter', () => {
       [{ ledgerGenuineCheckWebSocketUrl: relayTwo }],
       [{ ledgerGenuineCheckWebSocketUrl: undefined }],
     ]);
-  });
-
-  it('reserves the device while a server-owned APDU bridge is running', async () => {
-    connector.callImpl.mockImplementation(
-      async (_sessionId: string, method: string, params: unknown) => {
-        if (method === 'startDeviceAttestationApduBridge') {
-          return {
-            id: 'physical-ledger',
-            modelId: 'nanoX',
-            name: 'Ledger Nano X',
-            connectionType: 'USB',
-          };
-        }
-        if (method === 'exchangeDeviceAttestationApdu') {
-          expect(params).toEqual({ apduHex: 'e001000000', timeoutMs: 2_000 });
-          return { dataHex: 'abcd', statusCodeHex: '9000' };
-        }
-        return {};
-      }
-    );
-
-    const result = await adapter.runDeviceAttestationApduBridge(
-      'dev-1',
-      async bridge => {
-        expect(bridge.device).toMatchObject({
-          id: 'physical-ledger',
-          modelId: 'nanoX',
-        });
-        return bridge.exchangeApdu('e001000000', 2_000);
-      }
-    );
-
-    expect(result).toEqual({
-      success: true,
-      payload: { dataHex: 'abcd', statusCodeHex: '9000' },
-    });
-    expect(connector.callImpl.mock.calls.map(call => call[1])).toEqual([
-      'startDeviceAttestationApduBridge',
-      'exchangeDeviceAttestationApdu',
-      'stopDeviceAttestationApduBridge',
-    ]);
-  });
-
-  it('always releases the server-owned APDU bridge after a relay failure', async () => {
-    connector.callImpl.mockImplementation(
-      async (_sessionId: string, method: string) => {
-        if (method === 'startDeviceAttestationApduBridge') {
-          return {
-            id: 'physical-ledger',
-            modelId: 'nanoX',
-            connectionType: 'USB',
-          };
-        }
-        return {};
-      }
-    );
-
-    const result = await adapter.runDeviceAttestationApduBridge(
-      'dev-1',
-      async () => {
-        throw new Error('local WSS disconnected');
-      }
-    );
-
-    expect(result).toMatchObject({
-      success: false,
-      payload: { error: expect.stringContaining('local WSS disconnected') },
-    });
-    expect(connector.callImpl).toHaveBeenLastCalledWith(
-      'session-abc',
-      'stopDeviceAttestationApduBridge',
-      {}
-    );
   });
 
   describe('searchDevices', () => {

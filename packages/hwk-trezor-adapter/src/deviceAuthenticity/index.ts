@@ -1,4 +1,4 @@
-import { sha256 } from '@noble/hashes/sha256';
+import { sha3_256 as sha3Hash } from '@noble/hashes/sha3';
 
 import { deviceAuthenticityConfig } from './config';
 import { prepareDeviceAuthenticityData, verifyAuthenticityProof } from './verifyAuthenticityProof';
@@ -26,18 +26,17 @@ export type AuthenticateDeviceResult = {
    * device signed our challenge:
    *  - Optiga (all secure-element models), and
    *  - Tropic (T3W1 / Safe 7).
-   * This mirrors Trezor Connect's production authenticity policy. The raw MCU
-   * fields remain in the returned proof but are not a client-side pass/fail
-   * condition.
+   * This is the currently implemented client policy, not full parity with the
+   * latest capability-based Trezor Connect policy. Raw MCU fields remain in the
+   * returned proof but are not yet a client-side pass/fail condition.
    * The reward backend must independently verify the same raw proof under its
    * own versioned policy; this client result is only a UX preview.
    */
   verified: boolean;
   /**
-   * Stable per-device identifier: the X.509 serial number (OID 2.5.4.5) when
-   * present (T3W1+), otherwise the SHA-256 of the device attestation public key.
-   * Survives wipe/recovery and cannot be forged from a seed. Do NOT trust when
-   * `verified` is false — it is then attacker-controlled.
+   * SHA3-256 of the verified Optiga device-attestation public key. It survives
+   * wipe/recovery and has one representation across supported models. Do NOT
+   * trust it when `verified` is false — it is then attacker-controlled.
    */
   deviceId?: string;
   /** Raw device attestation public key (hex) from the Optiga device certificate. */
@@ -116,6 +115,7 @@ export const authenticateDeviceFromProof = ({
     }
     const optiga = verifyAuthenticityProof({
       ...common,
+      proofType: 'optiga',
       certificates: optigaCertificates,
       signature: optigaSignature,
     });
@@ -138,6 +138,7 @@ export const authenticateDeviceFromProof = ({
       }
       const tropic = verifyAuthenticityProof({
         ...common,
+        proofType: 'tropic',
         certificates: tropicCertificates,
         signature: tropicSignature,
       });
@@ -147,11 +148,9 @@ export const authenticateDeviceFromProof = ({
       usedDebugKey = usedDebugKey || matchedDebugKey(config, deviceModel, tropic.rootPubKey);
     }
 
-    const deviceId =
-      optiga.serialNumber ??
-      Buffer.from(sha256(Uint8Array.from(Buffer.from(optiga.deviceCertPubKey, 'hex')))).toString(
-        'hex'
-      );
+    const deviceId = Buffer.from(
+      sha3Hash(Uint8Array.from(Buffer.from(optiga.deviceCertPubKey, 'hex')))
+    ).toString('hex');
 
     return {
       verified: true,

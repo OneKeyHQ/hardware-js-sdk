@@ -56,9 +56,10 @@ export type TrezorChangePinParams = {
 
 export type DeviceAuthenticityParams = {
   /**
-   * 32-byte server nonce encoded as hex. Trezor signs these exact bytes with
-   * its factory attestation key. Omit only for local diagnostics where the SDK
-   * may generate a random nonce itself.
+   * 32-byte server nonce encoded as hex. Trezor signs the protocol-framed
+   * AuthenticateDevice payload containing these bytes with its factory
+   * attestation key. Omit only for local diagnostics where the SDK may generate
+   * a random nonce itself.
    */
   challenge?: string;
   /**
@@ -78,7 +79,6 @@ export type DeviceAuthenticityResult = {
   vendor: 'trezor' | 'ledger';
   verified: boolean;
   deviceId?: string;
-  attestationPubKey?: string;
   deviceCertPubKey?: string;
   serialNumber?: string;
   rootPubKey?: string;

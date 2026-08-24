@@ -131,43 +131,6 @@ function btcAccountIndexFromPath(path: string): number | null {
   return Number.isFinite(accountIndex) ? accountIndex : null;
 }
 
-export type LedgerAttestationResult = {
-  /**
-   * Ledger's official genuine-check verdict (from Ledger's HSM, over the same
-   * secure-channel backend as app install). Only trust `deviceId` when true.
-   */
-  verified: boolean;
-  /**
-   * Stable per-device id = sha3-256 of the device attestation public key (hex),
-   * computed by DMK during the genuine check. Survives wipe/recovery and cannot
-   * be forged from a seed. Backend-verified when `verified` is true.
-   */
-  deviceId?: string;
-  /**
-   * Raw device attestation public key (65-byte uncompressed EC point, hex),
-   * recovered from the GET CERTIFICATE response during the genuine check.
-   * Best-effort: may be undefined if it could not be captured. `deviceId` is
-   * exactly sha3-256 of this key.
-   */
-  attestationPubKey?: string;
-  note: string;
-};
-
-export type LedgerAttestationBridgeDevice = {
-  id: string;
-  modelId: 'nanoS' | 'nanoSP' | 'nanoX' | 'stax' | 'flex' | 'apexp';
-  name?: string;
-  connectionType?: 'USB' | 'BLE';
-};
-
-export type LedgerAttestationApduBridge = {
-  device: LedgerAttestationBridgeDevice;
-  exchangeApdu: (
-    apduHex: string,
-    timeoutMs?: number
-  ) => Promise<{ dataHex: string; statusCodeHex: string }>;
-};
-
 export class LedgerAdapter implements IHardwareWallet {
   readonly vendor = 'ledger' as const;
 
@@ -872,75 +835,6 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   /**
-   * Reserves the existing physical Ledger session while a server-owned DMK
-   * Genuine Check drives it. The callback can only exchange raw APDUs; the
-   * authoritative verdict remains in the server state machine.
-   */
-  async runDeviceAttestationApduBridge<T>(
-    connectId: string,
-    run: (bridge: LedgerAttestationApduBridge) => Promise<T>
-  ): Promise<Response<T>> {
-    const queueKey = connectId || '__ledger_default__';
-    try {
-      const payload = await this._jobQueue.enqueue(
-        queueKey,
-        async signal => {
-          const device = (await this._runConnectorCall(
-            connectId,
-            'startDeviceAttestationApduBridge',
-            {},
-            signal
-          )) as LedgerAttestationBridgeDevice;
-          const sessionId =
-            this._sessions.get(connectId) ??
-            (this._sessions.size === 1
-              ? this._sessions.values().next().value
-              : undefined);
-          if (!sessionId) {
-            throw new Error(
-              'Ledger attestation bridge started without an active device session'
-            );
-          }
-          try {
-            return await run({
-              device,
-              exchangeApdu: async (apduHex, timeoutMs) =>
-                (await this._callConnector(
-                  sessionId,
-                  'exchangeDeviceAttestationApdu',
-                  { apduHex, timeoutMs },
-                  signal
-                )) as { dataHex: string; statusCodeHex: string },
-            });
-          } finally {
-            try {
-              await this._callConnector(
-                sessionId,
-                'stopDeviceAttestationApduBridge',
-                {}
-              );
-            } catch {
-              // reset() also releases the refresher blocker if the session died.
-              this.connector.reset();
-              this.resetState();
-            }
-          }
-        },
-        {
-          label: 'ledgerDeviceAttestationApduBridge',
-          rejectIfBusy: true,
-          busyError: LedgerAdapter._createDeviceBusyError(
-            'ledgerDeviceAttestationApduBridge'
-          ),
-        }
-      );
-      return success(payload);
-    } catch (error) {
-      return this.errorToFailure<T>(error);
-    }
-  }
-
-  /**
    * Runs Ledger's official genuine check (DMK GenuineCheckDeviceAction) over the
    * SAME secure-channel backend as app install
    * (wss://scriptrunner.api.live.ledger.com/update/genuine). It returns Ledger's
@@ -987,7 +881,6 @@ export class LedgerAdapter implements IHardwareWallet {
       const result = (await this.connectorCall(connectId, 'getDeviceGenuineCheck', {})) as {
         isGenuine: boolean;
         deviceId?: string;
-        attestationPubKey?: string;
       };
       if (!result.isGenuine) {
         return success({
@@ -1009,7 +902,6 @@ export class LedgerAdapter implements IHardwareWallet {
         vendor: 'ledger' as const,
         verified: result.isGenuine,
         deviceId: result.deviceId,
-        attestationPubKey: result.attestationPubKey,
         note: 'Verified by Ledger genuine-check backend; deviceId = sha3_256(attestation pubkey).',
       });
     } catch (err) {

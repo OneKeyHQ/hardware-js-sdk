@@ -17,6 +17,8 @@ const T2B1_ROOT_PUB_KEY_OPTIGA =
   '04626d58aca84f0fcb52ea63f0eb08de1067b8d406574a715d5e7928f4b67f113a00fb5c5918e74d2327311946c446b242c20fe7347482999bdc1e229b94e27d96';
 const DEVICE_PUB_KEY_OPTIGA =
   '049bbf06dad9ab5905e05471ce16d5222c89c2caa39f26267ac0747129885fbd441bcc7fa84de120a36755daf30a6f47e8c0d4bddc15036ed2a3447dfa7a1d3e88';
+const DEVICE_ID_OPTIGA_SHA3_256 =
+  'ab823a17c8ff21e31a767374d2db9927715585dddca68f58238b768767119230';
 
 const CA_CERT_TROPIC =
   '308201c130820173a003020102020868b1982d8b917275300506032b65703054310b300906035504061302435a311e301c060355040a0c155472657a6f7220436f6d70616e7920732e722e6f2e3125302306035504030c1c5472657a6f72204d616e75666163747572696e6720526f6f742043413020170d3235303832393132353934375a180f32303535303832323132353934375a304f310b300906035504061302435a311e301c060355040a0c155472657a6f7220436f6d70616e7920732e722e6f2e3120301e06035504030c175472657a6f72204d616e75666163747572696e67204341302a300506032b65700321009603b4971f811ed2a1cdb9ec3e6d6d0e22facfd83892a30480460872a2003f45a3663064300e0603551d0f0101ff04040302020430120603551d130101ff040830060101ff020100301d0603551d0e04160414cf35aa12a033c044ebc6c3c0c3aefea5ae5e7db4301f0603551d2304183016801424e601ebe264f0b1cfc5bc27cc03cdf69f23a85e300506032b657003410072e527330a4b079f8b8f261489595d7e0c6bc84cd4eecdf98988f4b185df503ac3ee7364ce7ef934f56c8e823f1ac38667f85d38469884f934290efdd27bef0e';
@@ -38,6 +40,7 @@ const signedData = prepareDeviceAuthenticityData({ payload: Buffer.from(CHALLENG
 describe('verifyAuthenticityProof', () => {
   it('verifies a genuine Optiga (P-256) proof', () => {
     const result = verifyAuthenticityProof({
+      proofType: 'optiga',
       certificates: [DEVICE_CERT_OPTIGA, CA_CERT_OPTIGA],
       signature: SIGNATURE_OPTIGA,
       signedData,
@@ -55,6 +58,7 @@ describe('verifyAuthenticityProof', () => {
 
   it('verifies a genuine Tropic (Ed25519) proof and extracts the serial number', () => {
     const result = verifyAuthenticityProof({
+      proofType: 'tropic',
       certificates: [DEVICE_CERT_TROPIC, CA_CERT_TROPIC],
       signature: SIGNATURE_TROPIC,
       signedData,
@@ -72,6 +76,7 @@ describe('verifyAuthenticityProof', () => {
   it('rejects a tampered challenge signature', () => {
     const tampered = `${SIGNATURE_OPTIGA.slice(0, -2)}00`;
     const result = verifyAuthenticityProof({
+      proofType: 'optiga',
       certificates: [DEVICE_CERT_OPTIGA, CA_CERT_OPTIGA],
       signature: tampered,
       signedData,
@@ -85,6 +90,7 @@ describe('verifyAuthenticityProof', () => {
 
   it('rejects when the root CA is not trusted', () => {
     const result = verifyAuthenticityProof({
+      proofType: 'optiga',
       certificates: [DEVICE_CERT_OPTIGA, CA_CERT_OPTIGA],
       signature: SIGNATURE_OPTIGA,
       signedData,
@@ -103,7 +109,7 @@ describe('authenticateDeviceFromProof', () => {
     expect(getRequiredDeviceAuthenticityLayers('T2B1')).toEqual(['optiga']);
   });
 
-  it('derives a stable per-device id (sha256 of the device pubkey when no serial)', () => {
+  it('derives the device id from the verified attestation public key', () => {
     const result = authenticateDeviceFromProof({
       proof: {
         optiga_certificates: [DEVICE_CERT_OPTIGA, CA_CERT_OPTIGA],
@@ -116,8 +122,31 @@ describe('authenticateDeviceFromProof', () => {
 
     expect(result.verified).toBe(true);
     expect(result.deviceCertPubKey).toBe(DEVICE_PUB_KEY_OPTIGA);
-    // deviceId is deterministic for a given device
-    expect(result.deviceId).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.deviceId).toBe(DEVICE_ID_OPTIGA_SHA3_256);
+  });
+
+  it('rejects a Tropic proof substituted into the Optiga fields', () => {
+    const result = authenticateDeviceFromProof({
+      proof: {
+        optiga_certificates: [DEVICE_CERT_TROPIC, CA_CERT_TROPIC],
+        optiga_signature: SIGNATURE_TROPIC,
+        tropic_certificates: [DEVICE_CERT_TROPIC, CA_CERT_TROPIC],
+        tropic_signature: SIGNATURE_TROPIC,
+      },
+      challenge: Buffer.from(CHALLENGE, 'hex'),
+      deviceModel: 'T3W1',
+      config: {
+        version: 1,
+        T3W1: {
+          rootPubKeysOptiga: [],
+          rootPubKeysTropic: [T3W1_ROOT_PUB_KEY_TROPIC],
+        },
+      },
+    });
+
+    expect(result.verified).toBe(false);
+    expect(result.deviceId).toBeUndefined();
+    expect(result.error).toBe('RESPONSE_MALFORMED');
   });
 
   it('reports verified=false for a missing proof payload', () => {
@@ -203,6 +232,7 @@ describe('M1: CA public key blacklist (revocation)', () => {
 
   it('rejects a blacklisted CA public key even when the chain is otherwise valid', () => {
     const result = verifyAuthenticityProof({
+      proofType: 'optiga',
       certificates: [DEVICE_CERT_OPTIGA, CA_CERT_OPTIGA],
       signature: SIGNATURE_OPTIGA,
       signedData,

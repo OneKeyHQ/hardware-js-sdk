@@ -14,6 +14,8 @@ export interface DeviceAuthenticityConfig {
 }
 
 export type VerifyAuthenticityProofParams = {
+  /** Binds the proof field to its expected root set and signature algorithm. */
+  proofType: 'optiga' | 'tropic';
   certificates: string[];
   signature: string;
   signedData: Uint8Array;

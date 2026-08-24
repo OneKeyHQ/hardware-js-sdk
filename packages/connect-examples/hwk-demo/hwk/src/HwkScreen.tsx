@@ -38,14 +38,7 @@ type DebugLogEntry = {
   event: string;
   data?: Record<string, unknown>;
 };
-type BusyState =
-  | null
-  | 'scan'
-  | 'connect'
-  | 'features'
-  | 'address'
-  | 'disconnect'
-  | 'attestation';
+type BusyState = null | 'scan' | 'connect' | 'features' | 'address' | 'disconnect' | 'attestation';
 type ThpPairingPrompt = {
   connectId: string;
   availableMethods: number[];
@@ -699,10 +692,8 @@ export const HwkScreen = () => {
         success: boolean;
         payload: {
           verified?: boolean;
-          deviceId?: string; // Trezor (verified)
-          unverifiedDeviceId?: string; // Ledger (local read, unverified)
+          deviceId?: string;
           usedDebugKey?: boolean;
-          attestationPubKey?: string;
           deviceCertPubKey?: string;
           serialNumber?: string;
           note?: string;
@@ -719,13 +710,13 @@ export const HwkScreen = () => {
         Alert.alert('verifyDeviceAuthenticity failed', JSON.stringify(result.payload));
         return;
       }
-      const { verified, deviceId, unverifiedDeviceId, usedDebugKey, note } = result.payload;
-      const id = deviceId ?? unverifiedDeviceId ?? '(none)';
+      const { verified, deviceId, usedDebugKey, note } = result.payload;
+      const id = deviceId ?? '(none)';
       const title = verified
         ? usedDebugKey
           ? 'Verified ⚠️ DEBUG key'
           : 'Verified ✅'
-        : 'Read only (not verified)';
+        : 'Not verified';
       Alert.alert(title, `id:\n${id}${note ? `\n\n${note}` : ''}`);
     } catch (error) {
       appendLog('error', { step: 'verifyDeviceAuthenticity.error', error: formatError(error) });
