@@ -13,7 +13,8 @@ Get public key from device using BIP32 path.
 **Use requirement**
 
 * Firmware version required
-  * pro: 4.12.0
+  * Pro: 4.12.0
+  * Classic 1S / Classic 1S Pure: 3.11.0
 
 ```typescript
 const result = await HardwareSDK.benfenGetPublicKey(connectId, deviceId, {
@@ -62,4 +63,3 @@ const batchParams = {
 };
 const batchResponse = await HardwareSDK.benfenGetPublicKey(connectId, deviceId, batchParams);
 ```
-

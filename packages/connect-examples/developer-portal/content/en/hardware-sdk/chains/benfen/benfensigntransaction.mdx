@@ -10,6 +10,12 @@ title: benfenSignTransaction
 
 Asks device to sign given transaction using the private key derived by given BIP32 path. User is asked to confirm all transaction details on OneKey.
 
+**Use requirement**
+
+* Firmware version required
+  * Pro: 4.12.0
+  * Classic 1S / Classic 1S Pure: 3.11.0
+
 ```typescript
 const result = await HardwareSDK.benfenSignTransaction(connectId, deviceId, {
   path: "m/44'/728'/0'/0'/0'",
