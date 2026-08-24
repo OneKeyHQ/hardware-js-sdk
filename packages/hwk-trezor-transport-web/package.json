@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-trezor-transport-web",
-  "version": "1.1.34-alpha.4",
+  "version": "1.2.0-alpha.187",
   "private": true,
   "description": "Browser-only Trezor transports vendored from Trezor Suite MIT sources: WebUSB and SharedWorker-backed sessions backend",
   "author": "OneKey",
@@ -39,7 +39,7 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@onekeyfe/hwk-trezor-transport-common": "1.1.34-alpha.4"
+    "@onekeyfe/hwk-trezor-transport-common": "1.2.0-alpha.187"
   },
   "devDependencies": {
     "@types/sharedworker": "^0.0.223",
