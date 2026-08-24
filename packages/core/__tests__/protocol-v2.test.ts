@@ -5391,6 +5391,29 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
+  test('treats a typed BLE disconnect during Protocol V2 normal reboot as expected', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+
+    await expect((method as any).protocolV2Reboot(DeviceRebootType.Normal)).resolves.toEqual({
+      message: 'Device rebooted successfully',
+    });
+    expect((method as any).device.markProtocolV2Reboot).toHaveBeenCalledWith(
+      DeviceRebootType.Normal
+    );
+  });
+
   test('uses a short timeout and continues after a BLE reboot response timeout', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,

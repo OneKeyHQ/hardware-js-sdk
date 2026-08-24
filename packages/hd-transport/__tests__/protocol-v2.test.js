@@ -5,6 +5,7 @@ const {
   ProtocolV2LinkError,
   ProtocolV2SequenceCursor,
   ProtocolV2Session,
+  detectProtocolV2LinkDisabledError,
   hexToBytes,
   isProtocolV2HighThroughputCall,
   probeProtocolV2,
@@ -1143,6 +1144,36 @@ describe('Protocol V2 framing and session', () => {
     expect(isProtocolV2LinkDisabledFailure('Failure_ProcessError', ' link disabled ')).toBe(true);
     expect(isProtocolV2LinkDisabledFailure(5, 'Link Disabled')).toBe(true);
     expect(isProtocolV2LinkDisabledFailure('Failure_ProcessError', 'busy')).toBe(false);
+  });
+
+  test('detects a split Protocol V2 link-disabled frame in the shared transport layer', () => {
+    const assembler = new ProtocolV2FrameAssembler();
+    const frame = ProtocolV2.encodeFrame(
+      schemas,
+      'Failure',
+      { code: 5, message: 'link disabled' },
+      { router: 2 }
+    );
+    const splitAt = 4;
+
+    expect(
+      detectProtocolV2LinkDisabledError({
+        schemas,
+        assembler,
+        bytes: frame.subarray(0, splitAt),
+      })
+    ).toBeUndefined();
+    expect(
+      detectProtocolV2LinkDisabledError({
+        schemas,
+        assembler,
+        bytes: frame.subarray(splitAt),
+      })
+    ).toMatchObject({
+      name: 'ProtocolV2LinkDisabledError',
+      failureCode: 5,
+      firmwareMessage: 'link disabled',
+    });
   });
 
   test.each(['Failure_ProcessError', 5])(

@@ -93,7 +93,7 @@ const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
 const PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT = 15 * 1000;
 const PROTOCOL_V2_INSTALL_TIMEOUT = 5 * 60 * 1000;
 const PROTOCOL_V2_INSTALL_STATUS_INITIAL_DELAY = 1000;
-const PROTOCOL_V2_INSTALL_FINISHED_AFTER_RECONNECT_POLLS = 4;
+const PROTOCOL_V2_INSTALL_FINISHED_AFTER_DISCONNECT_POLLS = 4;
 const PROTOCOL_V2_TARGET_STATUS_PENDING = 0;
 const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
 const PROTOCOL_V2_TARGET_STATUS_FINISHED = 2;
@@ -2517,15 +2517,18 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ) {
     const expectedTargetIds = new Set(targets.map(target => target.target_id));
     const expectedPaths = new Map(targets.map(target => [target.target_id, target.path]));
+    const isBleCoprocessorInstall =
+      this.isBleReconnect() &&
+      expectedTargetIds.has(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR);
     const startTime = Date.now();
     let lastError: unknown;
     // The loader may release either USB or BLE as installation starts. Recovery reconnects
     // directly to status polling without generic Ping or DeviceInfo probes.
     let shouldReconnect = this.protocolV2InstallNeedsReconnect;
-    let installTransportReleaseObserved = shouldReconnect;
     this.protocolV2InstallNeedsReconnect = false;
     let deviceInfo: ProtocolV2DeviceInfo | undefined;
     let bleInstallLinkReady = false;
+    let installStatusDisconnectObserved = false;
     let installReconnectObserved = false;
     let finishedStatusSnapshotKey: string | undefined;
     let finishedStatusSnapshotPolls = 0;
@@ -2546,7 +2549,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           deviceInfo = isBleInstallReconnect
             ? undefined
             : await this.verifyProtocolV2ReconnectIdentity();
-          if (installTransportReleaseObserved) {
+          if (isBleInstallReconnect && installStatusDisconnectObserved) {
             installReconnectObserved = true;
           }
           shouldReconnect = false;
@@ -2604,15 +2607,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
                 targetId === undefined ||
                 matchingFinishedTargetIds.has(targetId) ||
                 !isProtocolV2TargetStatusFinished(target.status) ||
-                target.path !== expectedPath ||
-                (expectedVersion !== undefined && payloadVersion !== expectedVersion)
+                (Boolean(target.path) && Boolean(expectedPath) && target.path !== expectedPath) ||
+                (expectedVersion !== undefined &&
+                  payloadVersion !== undefined &&
+                  payloadVersion !== expectedVersion)
               ) {
                 return undefined;
               }
               matchingFinishedTargetIds.add(targetId);
-              return [targetId, target.path, payloadVersion ?? null] as const;
+              return [targetId, target.path ?? null, payloadVersion ?? null] as const;
             })
-            .filter((target): target is readonly [number, string, number | null] => !!target)
+            .filter((target): target is readonly [number, string | null, number | null] => !!target)
             .sort(([leftTargetId], [rightTargetId]) => leftTargetId - rightTargetId);
           const hasCompleteMatchingFinishedStatus =
             matchingFinishedStatus.length === expectedTargetIds.size &&
@@ -2642,18 +2647,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             !this.protocolV2InstallTerminalSuccessObserved &&
             !fastFinishedInstallProgressReported
           ) {
-            // A fast coprocessor install may finish while BLE is disconnected, so the
-            // host never observes IN_PROGRESS. Enter the install UI while the matching
-            // FINISHED snapshot is stabilized; completion still requires all polls.
+            // A fast BLE install may finish while disconnected, so IN_PROGRESS can be hidden.
+            // A status response timeout alone is not evidence that the install was accepted.
             this.postProgressMessage(1, 'installingFirmware');
             fastFinishedInstallProgressReported = true;
           }
-          const finishedAfterReconnectObserved =
-            finishedStatusSnapshotPolls >= PROTOCOL_V2_INSTALL_FINISHED_AFTER_RECONNECT_POLLS;
+          const finishedAfterDisconnectObserved =
+            finishedStatusSnapshotPolls >= PROTOCOL_V2_INSTALL_FINISHED_AFTER_DISCONNECT_POLLS;
           const hasCurrentInstallEvidence =
             currentInstallStatusObserved ||
             this.protocolV2InstallTerminalSuccessObserved ||
-            finishedAfterReconnectObserved;
+            finishedAfterDisconnectObserved;
           if (hasCurrentInstallEvidence) {
             installEvidenceObserved = true;
           }
@@ -2667,7 +2671,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
               expectedPaths,
               requireCurrentInstallStatus &&
                 !this.protocolV2InstallTerminalSuccessObserved &&
-                !finishedAfterReconnectObserved
+                !finishedAfterDisconnectObserved
                 ? liveTargetIds
                 : undefined
             )
@@ -2783,8 +2787,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
               );
             }
           } else {
-            if (isProtocolV2DeviceDisconnectedError(error) || isProtocolV2ResponseTimeout(error)) {
-              installTransportReleaseObserved = true;
+            if (
+              isBleCoprocessorInstall &&
+              isProtocolV2DeviceDisconnectedError(error) &&
+              !isProtocolV2ResponseTimeout(error)
+            ) {
+              installStatusDisconnectObserved = true;
               finishedStatusSnapshotKey = undefined;
               finishedStatusSnapshotPolls = 0;
             }

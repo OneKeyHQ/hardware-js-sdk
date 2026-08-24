@@ -47,9 +47,10 @@ export const toBleStaleBondHardwareError = (error: unknown) => {
 
   const nativeError = (error ?? {}) as NativeBleErrorFields;
   const text = nativeErrorText(nativeError);
+  const normalizedText = text.toLowerCase();
   const peerRemoved =
     nativeError.iosErrorCode === IOS_PEER_REMOVED_PAIRING_INFORMATION ||
-    text.includes('Peer removed pairing information');
+    normalizedText.includes('peer removed pairing information');
 
   return ERRORS.TypedError(
     peerRemoved

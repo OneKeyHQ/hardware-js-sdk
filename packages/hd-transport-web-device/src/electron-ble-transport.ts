@@ -6,10 +6,9 @@ import transport, {
   ProtocolV2LinkManager,
   TRANSPORT_EVENT,
   bytesToHex,
-  createProtocolV2LinkDisabledError,
+  detectProtocolV2LinkDisabledError,
   hexToBytes,
   isProtocolV2LinkDisabledError,
-  isProtocolV2LinkDisabledFailure,
   probeProtocolV2 as probeProtocolV2Helper,
   writeProtocolV2BleFrame,
 } from '@onekeyfe/hd-transport';
@@ -36,7 +35,7 @@ import type {
 } from '@onekeyfe/hd-transport';
 import type EventEmitter from 'events';
 
-const { parseConfigure, ProtocolV1, ProtocolV2, check } = transport;
+const { parseConfigure, ProtocolV1, check } = transport;
 
 declare global {
   interface Window {
@@ -769,27 +768,11 @@ export default class ElectronBleTransport {
     const assembler = this.v2Assemblers.get(deviceId);
     if (!assembler) return undefined;
 
-    try {
-      for (const frame of assembler.drain(hexToBytes(hexData))) {
-        const response = check.call(
-          ProtocolV2.decodeFrame(
-            { protocolV1: this._messages, protocolV2: this._messagesV2 },
-            frame
-          )
-        );
-        if (response.type === 'Failure') {
-          const failureCode = response.message?.code;
-          const firmwareMessage = response.message?.message;
-          if (isProtocolV2LinkDisabledFailure(failureCode, firmwareMessage)) {
-            return createProtocolV2LinkDisabledError(failureCode, firmwareMessage);
-          }
-        }
-      }
-    } catch {
-      // A normal Protocol V1 notification is not a Protocol V2 frame.
-      assembler.reset();
-    }
-    return undefined;
+    return detectProtocolV2LinkDisabledError({
+      schemas: { protocolV1: this._messages, protocolV2: this._messagesV2 },
+      assembler,
+      bytes: hexToBytes(hexData),
+    });
   }
 
   private handleProtocolV2Notification(deviceId: string, hexData: string): void {

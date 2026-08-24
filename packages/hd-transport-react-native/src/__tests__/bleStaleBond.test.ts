@@ -16,6 +16,14 @@ describe('native BLE stale bond mapping', () => {
       { iosErrorCode: 14, reason: 'Peer removed pairing information' },
       HardwareErrorCode.BlePeerRemovedPairingInformation,
     ],
+    [
+      { reason: 'peer removed pairing information' },
+      HardwareErrorCode.BlePeerRemovedPairingInformation,
+    ],
+    [
+      { message: 'PEER REMOVED PAIRING INFORMATION' },
+      HardwareErrorCode.BlePeerRemovedPairingInformation,
+    ],
   ])('maps %j to %s', (nativeError, errorCode) => {
     expect(isNativeBleStaleBondError(nativeError)).toBe(true);
     expect(toBleStaleBondHardwareError(nativeError)).toMatchObject({ errorCode });
