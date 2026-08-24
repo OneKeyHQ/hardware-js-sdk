@@ -5391,6 +5391,85 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
+  test('uses a short timeout and continues after a BLE reboot response timeout', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValue(
+        ERRORS.TypedError(
+          HardwareErrorCode.BleTimeoutError,
+          'Lowlevel response timeout after 5000ms for DeviceReboot'
+        )
+      );
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+
+    await expect((method as any).protocolV2Reboot(DeviceRebootType.Normal)).resolves.toEqual({
+      message: 'Device rebooted successfully',
+    });
+    expect(typedCall).toHaveBeenCalledWith(
+      'DeviceReboot',
+      'Success',
+      { reboot_type: DeviceRebootType.Normal },
+      { timeoutMs: 5000 }
+    );
+    expect((method as any).device.markProtocolV2Reboot).toHaveBeenCalledWith(
+      DeviceRebootType.Normal
+    );
+  });
+
+  test('continues after a USB Protocol V2 reboot response timeout', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const timeoutError = Object.assign(
+      new Error('Protocol V2 response timeout after 5000ms for DeviceReboot'),
+      { code: 'response-timeout' }
+    );
+    const typedCall = jest.fn().mockRejectedValue(timeoutError);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+
+    await expect((method as any).protocolV2Reboot(DeviceRebootType.Normal)).resolves.toEqual({
+      message: 'Device rebooted successfully',
+    });
+    expect((method as any).device.markProtocolV2Reboot).toHaveBeenCalledWith(
+      DeviceRebootType.Normal
+    );
+  });
+
+  test('propagates non-transport errors from a Protocol V2 reboot', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const rebootError = new Error('Device rejected reboot');
+    const typedCall = jest.fn().mockRejectedValue(rebootError);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+
+    await expect((method as any).protocolV2Reboot(DeviceRebootType.Normal)).rejects.toBe(
+      rebootError
+    );
+    expect((method as any).device.markProtocolV2Reboot).not.toHaveBeenCalled();
+  });
+
   test('treats Android BLE transport release during Protocol V2 reboot as expected', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,

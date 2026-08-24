@@ -1105,7 +1105,10 @@ export default class ReactNativeBleTransport {
             'skipProtocolProbe requires an expected BLE protocol'
           );
         }
-        if (this.sessionProtocols.get(uuid) !== expectedProtocol) {
+        const hasConfirmedProtocol =
+          this.sessionProtocols.get(uuid) === expectedProtocol ||
+          (expectedProtocol === 'V2' && this.confirmedProtocolV2.has(uuid));
+        if (!hasConfirmedProtocol) {
           throw ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,
             'skipProtocolProbe requires a previously confirmed protocol for this BLE endpoint'
@@ -2097,7 +2100,8 @@ export default class ReactNativeBleTransport {
     this.staleBondErrors.clear();
     this.acquiringProtocolV2.clear();
     this.sessionProtocols.clear();
-    this.confirmedProtocolV2.clear();
+    // Keep transport-lifetime V2 proof so the same endpoint can finish a no-probe
+    // firmware reconnect after the native BLE manager is recreated.
     this.protocolReprobeFailures.clear();
     this.writeTimeoutCounts.clear();
     this.connectionSetupTimeoutCounts.clear();
@@ -2110,12 +2114,11 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  private createProtocolMismatchError(expected: ProtocolType, uuid: string) {
-    // A generic Ping miss is not a bond failure. Only a later miss after this
-    // endpoint already answered V2, or a native encryption/pairing error, is.
-    const isStaleV2Bond = expected === 'V2' && this.confirmedProtocolV2.has(uuid);
+  private createProtocolMismatchError(expected: ProtocolType) {
+    // A protocol probe miss alone does not prove that the OS bond is stale.
+    // Native authentication/encryption failures are mapped separately.
     return ERRORS.TypedError(
-      isStaleV2Bond ? HardwareErrorCode.BleDeviceBondError : HardwareErrorCode.RuntimeError,
+      HardwareErrorCode.RuntimeError,
       `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
     );
   }
@@ -2183,7 +2186,7 @@ export default class ReactNativeBleTransport {
         });
         return 'V2';
       }
-      throw this.createProtocolMismatchError(expectedProtocol, uuid);
+      throw this.createProtocolMismatchError(expectedProtocol);
     }
 
     // Protocol must be actively probed after connection. Name, PID, and descriptors only
