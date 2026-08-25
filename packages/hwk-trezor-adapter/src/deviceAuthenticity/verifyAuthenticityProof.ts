@@ -180,9 +180,23 @@ export const verifyAuthenticityProof = ({
       error: 'CA_PUBKEY_BLACKLISTED',
     };
   }
-  const caCertValidityFrom = caCert.tbsCertificate.validity.from.getTime();
-  if (caCertValidityFrom > Date.now()) {
-    throw new Error(`CA validity from ${caCertValidityFrom} can't be in the future`);
+  // Both the CA and the device leaf must be currently valid: neither cert's
+  // notBefore may be in the future, and neither may already be past notAfter.
+  // An expired link in the chain must not still verify as trusted.
+  const now = Date.now();
+  const isWithinValidity = (validity: { from: Date; to: Date }) =>
+    validity.from.getTime() <= now && now <= validity.to.getTime();
+  if (
+    !isWithinValidity(caCert.tbsCertificate.validity) ||
+    !isWithinValidity(deviceCert.tbsCertificate.validity)
+  ) {
+    return {
+      valid: false,
+      caPubKey,
+      rootPubKey: rootPubKeyMatch,
+      deviceCertPubKey,
+      error: 'CERTIFICATE_EXPIRED',
+    };
   }
 
   // 2) Device model in the certificate must match the connected device.

@@ -122,6 +122,54 @@ const HARDWARE_ERROR_CODE_VALUES = new Set<number>(
 const BLE_CONNECT_SCAN_TIMEOUT_MS = 1500;
 
 // ---------------------------------------------------------------------------
+// Ledger genuine-check relay allowlist
+//
+// `configure({ ledgerGenuineCheckWebSocketUrl })` rebuilds DMK to route the
+// genuine-check session (device attestation transcript) through this URL.
+// The SDK, not the caller, must own which origins are trusted: a caller that
+// could point this at an arbitrary host would leak the attestation transcript
+// to it and let that host dictate the "isGenuine" verdict. Only these exact
+// hostnames are ever accepted; the path must be the relay's session-token
+// route with no userinfo/query/fragment/non-default port.
+//
+// TODO: this only lists the staging relay confirmed in this codebase
+// (`rebate.onekeytest.com` -> `attestation.onekeytest.com`, mirroring
+// app-monorepo's `ledgerAttestationRelayUrl.ts` derivation). The production
+// hostname must be added here before this ships on a non-test dist-tag —
+// intentionally not guessed.
+const LEDGER_RELAY_ALLOWED_HOSTS = new Set<string>(['attestation.onekeytest.com']);
+const LEDGER_RELAY_PATH_PREFIX = '/v1/ledger/session/';
+const LEDGER_RELAY_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
+const MAX_LEDGER_RELAY_URL_LENGTH = 2048;
+
+function assertAllowedLedgerRelayUrl(rawUrl: string): void {
+  if (!rawUrl || rawUrl.length > MAX_LEDGER_RELAY_URL_LENGTH) {
+    throw new Error('Ledger genuine-check relay URL is invalid');
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('Ledger genuine-check relay URL is invalid');
+  }
+  const token = parsed.pathname.startsWith(LEDGER_RELAY_PATH_PREFIX)
+    ? parsed.pathname.slice(LEDGER_RELAY_PATH_PREFIX.length)
+    : '';
+  if (
+    parsed.protocol !== 'wss:' ||
+    !LEDGER_RELAY_ALLOWED_HOSTS.has(parsed.hostname) ||
+    parsed.port !== '' ||
+    parsed.username !== '' ||
+    parsed.password !== '' ||
+    parsed.search !== '' ||
+    parsed.hash !== '' ||
+    !LEDGER_RELAY_TOKEN_PATTERN.test(token)
+  ) {
+    throw new Error('Ledger genuine-check relay URL is not allowed');
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Default signer kit importer (webpack/rspack — uses "exports" field)
 // ---------------------------------------------------------------------------
 
@@ -958,15 +1006,7 @@ export class LedgerConnectorBase implements IConnector {
   async configure(config: ConnectorConfig): Promise<void> {
     const nextUrl = config.ledgerGenuineCheckWebSocketUrl;
     if (nextUrl) {
-      let parsed: URL;
-      try {
-        parsed = new URL(nextUrl);
-      } catch {
-        throw new Error('Ledger genuine-check relay URL is invalid');
-      }
-      if (parsed.protocol !== 'wss:') {
-        throw new Error('Ledger genuine-check relay URL must use wss');
-      }
+      assertAllowedLedgerRelayUrl(nextUrl);
       if (this._providedDmk) {
         throw new Error('Cannot change Ledger genuine-check relay on a pre-built DMK');
       }

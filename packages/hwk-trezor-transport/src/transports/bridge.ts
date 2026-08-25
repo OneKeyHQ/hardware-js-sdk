@@ -2,6 +2,7 @@ import {
     PROTOCOL_MALFORMED,
     type ThpState,
     type TransportProtocol,
+    bridge as protocolBridge,
     v1 as protocolV1,
 } from '@onekeyfe/hwk-trezor-protocol';
 import {
@@ -64,6 +65,11 @@ type BridgeConstructorParameters = AbstractTransportParams & { port?: number };
 
 export class BridgeTransport extends AbstractTransport {
     private useAbortEndpoint: boolean = false;
+    // A legacy trezord bridge (pre-protocol-message support) cannot parse the
+    // structured protocol-message JSON body; it only understands the raw
+    // bridge protocol. `init()` sets this from the bridge's own advertised
+    // capability, and `getProtocol`/`getRequestBody` fall back accordingly.
+    private useProtocolMessages: boolean = false;
     /**
      * url of trezord server.
      */
@@ -94,6 +100,7 @@ export class BridgeTransport extends AbstractTransport {
 
                 this.version = response.payload.version;
                 this.useAbortEndpoint = versionUtils.isNewerOrEqual(this.version, '3.2.1');
+                this.useProtocolMessages = !!response.payload.protocolMessages;
 
                 this.stopped = false;
 
@@ -178,11 +185,20 @@ export class BridgeTransport extends AbstractTransport {
     }
 
     private getProtocol(customProtocol?: TransportProtocol) {
+        if (!this.useProtocolMessages) {
+            // custom protocols not supported by legacy bridge
+            return protocolBridge;
+        }
+
         return customProtocol || protocolV1;
     }
 
     private getRequestBody(body: Buffer, protocol: TransportProtocol, thpState?: ThpState) {
-        return createProtocolMessage(body, protocol, thpState?.serialize());
+        return createProtocolMessage(
+            body,
+            this.useProtocolMessages ? protocol : undefined,
+            thpState?.serialize(),
+        );
     }
 
     // in some setups abort signal is resolved on the client-side but never resolves on the server-size (like android OkHttp request)

@@ -59,19 +59,59 @@ describe('LedgerConnectorBase error wrapping', () => {
   });
 });
 
+const VALID_RELAY_URL =
+  'wss://attestation.onekeytest.com/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678';
+
 describe('LedgerConnectorBase runtime genuine-check relay', () => {
   it('rejects relay URLs that do not use secure WebSockets', async () => {
     const connector = new LedgerConnectorBase(async () => ({}));
 
     await expect(
       connector.configure({
-        ledgerGenuineCheckWebSocketUrl: 'https://attestation.onekey.test/session',
+        ledgerGenuineCheckWebSocketUrl: 'https://attestation.onekeytest.com/v1/ledger/session/x',
       })
-    ).rejects.toThrow('must use wss');
+    ).rejects.toThrow('not allowed');
+  });
+
+  it('rejects a host that is not on the SDK-owned allowlist', async () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+
+    await expect(
+      connector.configure({
+        ledgerGenuineCheckWebSocketUrl:
+          'wss://attacker.example/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
+      })
+    ).rejects.toThrow('not allowed');
+  });
+
+  it('rejects a relay URL carrying userinfo, query, fragment, or a non-default port', async () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+    const base = 'attestation.onekeytest.com/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678';
+
+    for (const url of [
+      `wss://user:pass@${base}`,
+      `wss://${base}?x=1`,
+      `wss://${base}#frag`,
+      `wss://attestation.onekeytest.com:8443/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678`,
+    ]) {
+      await expect(connector.configure({ ledgerGenuineCheckWebSocketUrl: url })).rejects.toThrow(
+        'not allowed'
+      );
+    }
+  });
+
+  it('rejects a relay URL whose path is not the session-token route', async () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+
+    await expect(
+      connector.configure({
+        ledgerGenuineCheckWebSocketUrl: 'wss://attestation.onekeytest.com/session/opaque',
+      })
+    ).rejects.toThrow('not allowed');
   });
 
   it('passes the short-lived relay base to the DMK builder', async () => {
-    const relayUrl = 'wss://attestation.onekey.test/session/opaque';
+    const relayUrl = VALID_RELAY_URL;
     const dmk = {};
     const builder = {
       addTransport: jest.fn(),
@@ -112,7 +152,7 @@ describe('LedgerConnectorBase runtime genuine-check relay', () => {
     });
 
     await connector.configure({
-      ledgerGenuineCheckWebSocketUrl: 'wss://attestation.onekey.test/session/opaque',
+      ledgerGenuineCheckWebSocketUrl: VALID_RELAY_URL,
     });
     connector.reset();
     await (connector as any)._getOrCreateDmk();

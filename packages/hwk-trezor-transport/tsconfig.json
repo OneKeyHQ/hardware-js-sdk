@@ -6,7 +6,7 @@
     "outDir": "./dist",
     "rootDir": ".",
     "useUnknownInCatchVariables": false,
-    "types": ["node"],
+    "types": ["node", "jest"],
     "baseUrl": ".",
     "paths": {
       "@trezor/protocol": ["../hwk-trezor-protocol/src/index.ts"],

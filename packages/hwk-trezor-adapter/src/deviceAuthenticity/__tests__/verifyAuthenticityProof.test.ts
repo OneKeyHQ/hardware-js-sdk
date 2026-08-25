@@ -38,6 +38,44 @@ const CONFIG: DeviceAuthenticityConfig = {
 const signedData = prepareDeviceAuthenticityData({ payload: Buffer.from(CHALLENGE, 'hex') });
 
 describe('verifyAuthenticityProof', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  // CA_CERT_OPTIGA is valid 2023-01-01..2053-01-01; DEVICE_CERT_OPTIGA is
+  // valid 2022-04-30..2042-04-30. Mocking Date.now() past a cert's own
+  // notAfter exercises the real ASN.1-parsed validity window end to end,
+  // without needing a freshly-signed "expired" fixture.
+  it('rejects a proof whose device leaf certificate has expired', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(new Date('2045-01-01T00:00:00Z').getTime());
+    const result = verifyAuthenticityProof({
+      proofType: 'optiga',
+      certificates: [DEVICE_CERT_OPTIGA, CA_CERT_OPTIGA],
+      signature: SIGNATURE_OPTIGA,
+      signedData,
+      deviceModel: 'T2B1',
+      config: CONFIG,
+    });
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.error).toBe('CERTIFICATE_EXPIRED');
+  });
+
+  it('rejects a proof whose CA certificate has expired', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(new Date('2054-01-01T00:00:00Z').getTime());
+    const result = verifyAuthenticityProof({
+      proofType: 'optiga',
+      certificates: [DEVICE_CERT_OPTIGA, CA_CERT_OPTIGA],
+      signature: SIGNATURE_OPTIGA,
+      signedData,
+      deviceModel: 'T2B1',
+      config: CONFIG,
+    });
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.error).toBe('CERTIFICATE_EXPIRED');
+  });
+
   it('verifies a genuine Optiga (P-256) proof', () => {
     const result = verifyAuthenticityProof({
       proofType: 'optiga',

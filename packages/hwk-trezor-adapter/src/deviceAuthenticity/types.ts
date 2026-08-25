@@ -52,5 +52,6 @@ export type VerifyAuthenticityProofResult =
         | 'CA_PUBKEY_BLACKLISTED'
         | 'RESPONSE_PAYLOAD_MISSING'
         | 'RESPONSE_MALFORMED'
-        | 'UNSUPPORTED_ALGORITHM';
+        | 'UNSUPPORTED_ALGORITHM'
+        | 'CERTIFICATE_EXPIRED';
     };
