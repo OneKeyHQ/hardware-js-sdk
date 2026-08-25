@@ -1,30 +1,24 @@
 import { sha3_512 } from '@noble/hashes/sha3';
 import semver from 'semver';
 
-// The raw LZ4 block encoder below is adapted from lz4-lite 1.1.2.
-//
-// MIT License
-// Copyright (c) 2026 Alexander Vukov
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+/**
+ * Builds the unsigned host-asset package consumed by Pro2 firmware:
+ *
+ *   OKPP RESOURCE container
+ *   └── OKAR archive
+ *       └── independently compressed raw LZ4 blocks
+ *
+ * OKPP and OKAR are OneKey formats. Their constants mirror firmware-pro2's
+ * payload_package headers; the LZ4 bytes inside each block follow the standard
+ * raw block format and deliberately do not use an LZ4 frame or size prefix.
+ */
 
 /* eslint-disable no-bitwise */
 
 export const PRO2_HOST_ASSET_PACKAGE_MIN_VERSION = '1.0.1';
 
+// OKPP container layout. The fixed header has seven empty signature slots even
+// for a host-generated unsigned package.
 const CONTAINER_HEADER_SIZE = 0x5f90;
 const CONTAINER_HEADER_HASH_INPUT_LENGTH = 0x240;
 const CONTAINER_HASH_SECTION_OFFSET = 0x200;
@@ -33,6 +27,9 @@ const CONTAINER_HEADER_MAGIC = 0x50504b4f;
 const CONTAINER_HEADER_VERSION = 1;
 const CONTAINER_RESOURCE_TYPE_MAGIC = 0x43534552;
 const CONTAINER_ED25519_SIGNATURE_ALGORITHM = 0x71717171;
+const HOST_ASSET_PACKAGE_MAX_SIZE = 4 * 1024 * 1024;
+
+// OKAR archive layout.
 const ARCHIVE_MAGIC = 0x52414b4f;
 const ARCHIVE_VERSION = 1;
 const ARCHIVE_HEADER_SIZE = 42;
@@ -41,15 +38,6 @@ const ARCHIVE_ENTRY_NAME_MAX_LENGTH = 255;
 const ARCHIVE_COMPRESS_LZ4_BLOCKED = 1;
 const ARCHIVE_ALIGNMENT = 4;
 const LZ4_BLOCK_SIZE_LOG2 = 12;
-const LZ4_MIN_MATCH = 4;
-const LZ4_LAST_LITERALS = 5;
-const LZ4_MATCH_FIND_LIMIT = 12;
-const LZ4_MAX_OFFSET = 0xffff;
-const LZ4_LENGTH_MASK = 15;
-const LZ4_HASH_LOG = 16;
-const LZ4_HASH_MULTIPLIER = 2654435761;
-const LZ4_SKIP_TRIGGER = 6;
-const HOST_ASSET_PACKAGE_MAX_SIZE = 4 * 1024 * 1024;
 
 export type Pro2HostAssetPackageEntry = {
   name: string;
@@ -70,10 +58,6 @@ export function supportsPro2HostAssetPackage(firmwareVersion: string | undefined
   );
 }
 
-function align(value: number): number {
-  return (value + ARCHIVE_ALIGNMENT - 1) & ~(ARCHIVE_ALIGNMENT - 1);
-}
-
 function concatBytes(parts: Uint8Array[]): Uint8Array {
   const output = new Uint8Array(parts.reduce((length, part) => length + part.byteLength, 0));
   let offset = 0;
@@ -83,6 +67,41 @@ function concatBytes(parts: Uint8Array[]): Uint8Array {
   }
   return output;
 }
+
+// Raw LZ4 block encoder
+// ---------------------
+//
+// This encoder is adapted from lz4-lite 1.1.2 and intentionally kept local so
+// every SDK runtime uses the same dependency-free implementation. Keep this
+// section isolated from the OneKey package writer below. Firmware requires raw
+// blocks here; replacing it with an LZ4 frame encoder is not compatible.
+//
+// MIT License
+// Copyright (c) 2026 Alexander Vukov
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+const LZ4_MIN_MATCH = 4;
+const LZ4_LAST_LITERALS = 5;
+const LZ4_MATCH_FIND_LIMIT = 12;
+const LZ4_MAX_OFFSET = 0xffff;
+const LZ4_LENGTH_MASK = 15;
+const LZ4_HASH_LOG = 16;
+const LZ4_HASH_MULTIPLIER = 2654435761;
+const LZ4_SKIP_TRIGGER = 6;
 
 function writeExtendedLength(output: Uint8Array, offset: number, length: number): number {
   let remaining = length;
@@ -210,6 +229,11 @@ function compressRawLz4Block(input: Uint8Array, hashTable: Uint32Array): Uint8Ar
   return output.slice(0, outputOffset);
 }
 
+// OneKey LZ4-blocked wrapper
+// --------------------------
+// The archive stores an 8-byte descriptor, one compressed-size value per
+// block, then the concatenated raw blocks. Blocks are independent so firmware
+// can validate and decompress them with bounded memory.
 function encodeLz4Blocked(data: Uint8Array): Uint8Array {
   const blockSize = 1 << LZ4_BLOCK_SIZE_LOG2;
   const blockCount = Math.ceil(data.byteLength / blockSize);
@@ -231,6 +255,8 @@ function encodeLz4Blocked(data: Uint8Array): Uint8Array {
   return concatBytes([header, ...blocks]);
 }
 
+// OKAR integrity helpers
+// ----------------------
 const CRC32_TABLE = (() => {
   const table = new Uint32Array(256);
   for (let index = 0; index < table.length; index += 1) {
@@ -251,6 +277,12 @@ function crc32(data: Uint8Array): number {
   return (value ^ 0xffffffff) >>> 0;
 }
 
+function align(value: number): number {
+  return (value + ARCHIVE_ALIGNMENT - 1) & ~(ARCHIVE_ALIGNMENT - 1);
+}
+
+// OKAR archive writer
+// -------------------
 function buildArchive(entries: Pro2HostAssetPackageEntry[]): Uint8Array {
   const textEncoder = new TextEncoder();
   let dataOffset = ARCHIVE_HEADER_SIZE + entries.length * ARCHIVE_ENTRY_SIZE;
@@ -289,6 +321,8 @@ function buildArchive(entries: Pro2HostAssetPackageEntry[]): Uint8Array {
   return archive;
 }
 
+// OKPP container writer
+// ---------------------
 export function buildPro2HostAssetPackage(entries: Pro2HostAssetPackageEntry[]): Uint8Array {
   if (entries.length === 0 || new Set(entries.map(entry => entry.name)).size !== entries.length) {
     throw new Error('Pro2 host asset package entries must have unique, non-empty names.');
@@ -303,6 +337,11 @@ export function buildPro2HostAssetPackage(entries: Pro2HostAssetPackageEntry[]):
   view.setUint32(0x0c, CONTAINER_HEADER_SIZE, true);
   view.setUint32(0x10, 1, true);
   view.setUint32(0x14, payload.byteLength, true);
+
+  // Host asset packages are unsigned, but firmware still requires a valid
+  // payload hash, header hash, and the Ed25519 algorithm discriminator. The
+  // zero-initialized header intentionally leaves sig_used_count and every
+  // signature slot empty.
   header.set(sha3_512(payload), CONTAINER_HASH_SECTION_OFFSET);
   header.set(sha3_512(header.subarray(0, CONTAINER_HEADER_HASH_INPUT_LENGTH)), 0x240);
   view.setUint32(CONTAINER_SIGNATURE_ALGORITHM_OFFSET, CONTAINER_ED25519_SIGNATURE_ALGORITHM, true);
