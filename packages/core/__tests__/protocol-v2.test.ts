@@ -254,6 +254,52 @@ describe('DeviceUploadWallpaper', () => {
     });
   });
 
+  test('uploads and applies the fixed wallpaper package on firmware 1.0.1', async () => {
+    const typedCall = jest.fn().mockImplementation((request, _response, params) => {
+      if (request === 'FilesystemDirMake') return { message: {} };
+      if (request === 'FilesystemFileWrite') {
+        const file = params.file as { data: Uint8Array; offset: number };
+        return { message: { processed_byte: file.offset + file.data.byteLength } };
+      }
+      if (request === 'DeviceSettingsSet') {
+        return { message: { message: 'wallpaper applied' } };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = new DeviceUploadWallpaper({
+      id: 1,
+      payload: {
+        method: 'deviceUploadWallpaper',
+        jpegBase64: createJpegBase64(604, 1024),
+      },
+    });
+    const device = stubWallpaperDevice({
+      commands: { typedCall },
+      getCurrentFirmwareVersionString: jest.fn(() => '1.0.1'),
+    });
+    (method as any).device = device;
+    method.postMessage = jest.fn();
+
+    method.init();
+    const result = await method.run();
+
+    const fileWrites = typedCall.mock.calls.filter(call => call[0] === 'FilesystemFileWrite');
+    expect(new Set(fileWrites.map(call => call[2].file.path))).toEqual(
+      new Set(['vol1:/wallpapers/wallpaper.okpkg'])
+    );
+    expect(fileWrites[0][2].file.data.subarray(0, 4)).toEqual(
+      new Uint8Array([0x4f, 0x4b, 0x50, 0x50])
+    );
+    expect(typedCall).toHaveBeenLastCalledWith('DeviceSettingsSet', 'Success', {
+      settings: { wallpaper_path: 'vol1:/wallpapers/wallpaper.okpkg' },
+    });
+    expect(result).toMatchObject({
+      path: 'vol1:/wallpapers/wallpaper.okpkg',
+      colorFormat: 'RGB565',
+      message: 'wallpaper applied',
+    });
+  });
+
   test('文件上传失败时不修改 wallpaper_path', async () => {
     const typedCall = jest.fn().mockImplementation(request => {
       if (request === 'FilesystemDirMake') return { message: {} };

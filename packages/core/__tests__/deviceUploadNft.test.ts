@@ -32,10 +32,12 @@ const createMethod = ({
   typedCall,
   supportedMessages = [60802, 60805, 60808, 61500],
   useFullBundle = false,
+  firmwareVersion = '1.0.0',
 }: {
   typedCall: jest.Mock;
   supportedMessages?: number[];
   useFullBundle?: boolean;
+  firmwareVersion?: string;
 }) => {
   const method = new DeviceUploadNft({
     id: 1,
@@ -60,6 +62,7 @@ const createMethod = ({
       })
     ),
     getCurrentFirmwareType: jest.fn(),
+    getCurrentFirmwareVersionString: jest.fn(() => firmwareVersion),
   };
   method.postMessage = jest.fn();
 
@@ -199,6 +202,44 @@ describe('DeviceUploadNft', () => {
         transferredBytes: result.totalSize,
         totalBytes: result.totalSize,
       }),
+    });
+  });
+
+  test('uploads one host asset package on firmware 1.0.1', async () => {
+    const typedCall = jest.fn((request: string, _response: string, params: any) => {
+      if (request === 'FilesystemFileWrite') return fileWriteSuccess(params);
+      if (request === 'NftUpdate') return { message: { message: 'NFT updated' } };
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = createMethod({
+      typedCall,
+      supportedMessages: [60805, 61500],
+      firmwareVersion: '1.0.1',
+    });
+
+    const result = await method.run();
+
+    const requests = typedCall.mock.calls.map(call => call[0]);
+    expect(requests).not.toContain('FilesystemPathInfoQuery');
+    expect(requests).not.toContain('FilesystemDirList');
+    const fileWrites = typedCall.mock.calls.filter(call => call[0] === 'FilesystemFileWrite');
+    expect(new Set(fileWrites.map(call => call[2].file.path))).toEqual(
+      new Set(['vol1:/nft/nft-deadbeef-1760000000000.okpkg'])
+    );
+    expect(fileWrites[0][2].file.data.subarray(0, 4)).toEqual(
+      new Uint8Array([0x4f, 0x4b, 0x50, 0x50])
+    );
+    expect(typedCall).toHaveBeenLastCalledWith(
+      'NftUpdate',
+      'Success',
+      { file_name_no_ext: result.basename },
+      { timeoutMs: 15_000 }
+    );
+    expect(result).toMatchObject({
+      imagePath: 'vol1:/nft/nft-deadbeef-1760000000000.bin',
+      thumbnailPath: 'vol1:/nft/nft-deadbeef-1760000000000_m.bin',
+      metadataPath: 'vol1:/nft/nft-deadbeef-1760000000000.json',
+      nftUpdated: true,
     });
   });
 

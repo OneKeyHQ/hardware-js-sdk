@@ -20,6 +20,10 @@ import {
   getCompletePro2NftBasenames,
 } from '../../utils/pro2Nft';
 import { encodePro2Image } from '../../utils/pro2Wallpaper';
+import {
+  buildPro2HostAssetPackage,
+  supportsPro2HostAssetPackage,
+} from '../../utils/pro2HostAssetPackage';
 import { BaseMethod } from '../BaseMethod';
 import { decodeJpegBase64ToRgba } from '../helpers/base64Data';
 import { invalidParameter } from '../helpers/filesystemValidation';
@@ -138,7 +142,7 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
     this.useDevicePassphraseState = false;
   }
 
-  private async assertCapabilities() {
+  private async assertCapabilities(useHostAssetPackage: boolean) {
     const protocolInfo = await this.device.ensureProtocolV2RuntimeContext();
     const hasFileWrite = supportsProtocolV2Message(
       protocolInfo,
@@ -150,7 +154,7 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
     );
     const hasDirList = supportsProtocolV2Message(protocolInfo, FILESYSTEM_DIR_LIST_MESSAGE_TYPE);
     const hasNftUpdate = supportsProtocolV2Message(protocolInfo, NFT_UPDATE_MESSAGE_TYPE);
-    if (!hasFileWrite || !hasPathInfo || !hasDirList || !hasNftUpdate) {
+    if (!hasFileWrite || !hasNftUpdate || (!useHostAssetPackage && (!hasPathInfo || !hasDirList))) {
       throw createDeviceNotSupportMethodError(this.name, this.device.getCurrentFirmwareType());
     }
   }
@@ -192,16 +196,32 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
     const { bundle } = this;
     if (!bundle) throw invalidParameter('NFT data has not been initialized.');
 
-    await this.assertCapabilities();
+    const useHostAssetPackage = supportsPro2HostAssetPackage(
+      this.device.getCurrentFirmwareVersionString()
+    );
+    await this.assertCapabilities(useHostAssetPackage);
     this.throwIfAborted();
-    await this.assertStorageCapacity(bundle.basename);
+    if (!useHostAssetPackage) await this.assertStorageCapacity(bundle.basename);
     this.throwIfAborted();
 
-    const files = [
+    const extractedFiles = [
       { path: `${PRO2_NFT_DIRECTORY}/${bundle.basename}.bin`, data: bundle.image },
       { path: `${PRO2_NFT_DIRECTORY}/${bundle.basename}_m.bin`, data: bundle.thumbnail },
       { path: `${PRO2_NFT_DIRECTORY}/${bundle.basename}.json`, data: bundle.metadata },
     ];
+    const files = useHostAssetPackage
+      ? [
+          {
+            path: `${PRO2_NFT_DIRECTORY}/${bundle.basename}.okpkg`,
+            data: buildPro2HostAssetPackage(
+              extractedFiles.map(file => ({
+                name: file.path.slice(`${PRO2_NFT_DIRECTORY}/`.length),
+                data: file.data,
+              }))
+            ),
+          },
+        ]
+      : extractedFiles;
     const totalSize = files.reduce((sum, file) => sum + file.data.byteLength, 0);
     let transferredBeforeFile = 0;
 
@@ -238,9 +258,9 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
     const response = await this.updateNft(bundle.basename);
     return {
       basename: bundle.basename,
-      imagePath: files[0].path,
-      thumbnailPath: files[1].path,
-      metadataPath: files[2].path,
+      imagePath: extractedFiles[0].path,
+      thumbnailPath: extractedFiles[1].path,
+      metadataPath: extractedFiles[2].path,
       totalSize,
       nftUpdated: true,
       message: response.message?.message,

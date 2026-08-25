@@ -1,3 +1,5 @@
+import { EDeviceType } from '@onekeyfe/hd-shared';
+
 import EVMSignTypedData from '../src/api/evm/EVMSignTypedData';
 
 import type { EthereumSignTypedDataMessage, EthereumSignTypedDataTypes } from '../src/types';
@@ -576,4 +578,44 @@ describe('EVMSignTypedData — OneKey Pro Safe Protocol V1', () => {
       signature: 'abcd',
     });
   });
+});
+
+describe('EVMSignTypedData — Protocol V2 data size routing', () => {
+  const buildSafeTxData = (
+    dataSize: number
+  ): EthereumSignTypedDataMessage<EthereumSignTypedDataTypes> =>
+    ({
+      types: {
+        EIP712Domain: [],
+        SafeTx: [{ name: 'data', type: 'bytes' }],
+      },
+      primaryType: 'SafeTx',
+      domain: {},
+      message: { data: `0x${'ab'.repeat(dataSize)}` },
+    } as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>);
+
+  test.each([EDeviceType.Pro2, EDeviceType.Neo])(
+    'keeps SafeTx data up to 1536 bytes on the structured route for %s',
+    deviceType => {
+      const data = buildSafeTxData(1316);
+      const method = createMethod(data);
+      method.device.getCurrentDeviceType = jest.fn(() => deviceType);
+      method.device.getCurrentFirmwareVersionString = jest.fn(() => '1.0.0');
+
+      expect(method.hasBiggerData(data)).toBe(false);
+      expect(method.hasBiggerData(buildSafeTxData(1536))).toBe(false);
+    }
+  );
+
+  test.each([EDeviceType.Pro2, EDeviceType.Neo])(
+    'falls back to the hash route above 1536 bytes for %s',
+    deviceType => {
+      const data = buildSafeTxData(1537);
+      const method = createMethod(data);
+      method.device.getCurrentDeviceType = jest.fn(() => deviceType);
+      method.device.getCurrentFirmwareVersionString = jest.fn(() => '1.0.0');
+
+      expect(method.hasBiggerData(data)).toBe(true);
+    }
+  );
 });
