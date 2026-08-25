@@ -132,12 +132,13 @@ const BLE_CONNECT_SCAN_TIMEOUT_MS = 1500;
 // hostnames are ever accepted; the path must be the relay's session-token
 // route with no userinfo/query/fragment/non-default port.
 //
-// TODO: this only lists the staging relay confirmed in this codebase
-// (`rebate.onekeytest.com` -> `attestation.onekeytest.com`, mirroring
-// app-monorepo's `ledgerAttestationRelayUrl.ts` derivation). The production
-// hostname must be added here before this ships on a non-test dist-tag —
-// intentionally not guessed.
-const LEDGER_RELAY_ALLOWED_HOSTS = new Set<string>(['attestation.onekeytest.com']);
+// Mirrors app-monorepo's `ledgerAttestationRelayUrl.ts` derivation
+// (`attestation.<rebate-host-suffix>`): staging relay for `rebate.onekeytest.com`,
+// production relay for `rebate.onekey.com`.
+const LEDGER_RELAY_ALLOWED_HOSTS = new Set<string>([
+  'attestation.onekeytest.com',
+  'attestation.onekey.com',
+]);
 const LEDGER_RELAY_PATH_PREFIX = '/v1/ledger/session/';
 const LEDGER_RELAY_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
 const MAX_LEDGER_RELAY_URL_LENGTH = 2048;
