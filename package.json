@@ -25,7 +25,7 @@
   "scripts": {
     "agent:check": "node scripts/agent-check.js",
     "bootstrap": "npx patch-package && lerna bootstrap",
-    "build": "lerna run build --ignore @onekeyfe/hwk-trezor-protobuf --ignore @onekeyfe/hwk-trezor-protocol --ignore @onekeyfe/hwk-trezor-schema-utils --ignore @onekeyfe/hwk-trezor-transport --ignore @onekeyfe/hwk-trezor-transport-common --ignore @onekeyfe/hwk-trezor-transport-web --ignore @onekeyfe/hwk-trezor-type-utils --ignore @onekeyfe/hwk-trezor-utils",
+    "build": "lerna run build",
     "clean": "lerna clean --yes",
     "clean-workspace": "yarn clean && lerna run clean",
     "lint": "eslint .",
