@@ -6,7 +6,7 @@ import { type parseCertificate } from './x509certificate';
 // Any unrecognized non-critical extension is allowed. Any unrecognized critical extension is disallowed.
 export const validateCaCertExtensions = (
   cert: ReturnType<typeof parseCertificate>,
-  pathLen: number,
+  pathLen: number
 ) => {
   let hasKeyUsage = false;
   let hasBasicConstraints = false;
@@ -34,7 +34,7 @@ export const validateCaCertExtensions = (
 
   if (!hasKeyUsage || !hasBasicConstraints) {
     throw new Error(
-      `CA missing extensions keyUsage: ${hasKeyUsage}, basicConstraints: ${hasBasicConstraints}`,
+      `CA missing extensions keyUsage: ${hasKeyUsage}, basicConstraints: ${hasBasicConstraints}`
     );
   }
 };

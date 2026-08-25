@@ -2,7 +2,7 @@ import type { Oid, ParsedCertificate } from './x509certificate';
 
 export const findSubjectContentByOid = (
   deviceCert: ParsedCertificate,
-  oid: Oid,
+  oid: Oid
 ): Uint8Array | null => {
   const subjectItems = deviceCert.tbsCertificate.subject;
   const matchedItem = subjectItems.find(({ algorithmOid }) => algorithmOid === oid);

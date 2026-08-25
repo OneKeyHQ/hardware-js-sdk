@@ -349,7 +349,7 @@ const parseExtensions = (data: Asn1) => {
     const bitStringBytes = buffer.subarray(3, 3 + length - 1); // -1 because the length includes the unusedBits byte
     const bitString = bitStringBytes.reduce(
       (str, byte) => str + byte.toString(2).padStart(8, '0'),
-      '',
+      ''
     );
 
     return bitString.slice(0, bitString.length - unusedBits) as '01';
