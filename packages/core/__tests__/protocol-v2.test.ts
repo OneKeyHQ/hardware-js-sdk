@@ -1022,6 +1022,7 @@ describe('Protocol V2 feature adapter', () => {
       newSession: 'session-1',
       unlockedAttachPin: false,
       resumed: false,
+      walletStatusRefreshed: true,
     });
     expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
       eventless_wallet_session: true,
@@ -1285,6 +1286,7 @@ describe('Protocol V2 feature adapter', () => {
       newSession: 'main-wallet-session',
       unlockedAttachPin: undefined,
       resumed: false,
+      walletStatusRefreshed: true,
     });
 
     expect(promptPassphrase).toHaveBeenCalled();
@@ -1371,6 +1373,7 @@ describe('Protocol V2 feature adapter', () => {
       newSession: 'hidden-after-unlock-session',
       unlockedAttachPin: undefined,
       resumed: false,
+      walletStatusRefreshed: true,
     });
 
     expect(unlockDevice).not.toHaveBeenCalled();
@@ -4820,6 +4823,23 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall.mock.calls.map(call => call[0])).toEqual(['DeviceInfoGet']);
   });
 
+  test('stops V4 bootloader reconnect polling on a stale BLE bond', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const staleBondError = ERRORS.TypedError(HardwareErrorCode.BlePeerRemovedPairingInformation);
+    const reconnectProtocolV2Device = jest.fn().mockRejectedValue(staleBondError);
+    (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
+
+    await expect((method as any).waitForProtocolV2BootloaderMode(60_000, 0)).rejects.toBe(
+      staleBondError
+    );
+    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
+  });
+
   test('polls again when Protocol V2 bootloader serial is temporarily unavailable', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -5369,6 +5389,108 @@ describe('Protocol V2 firmware update targets', () => {
     await expect((method as any).protocolV2Reboot(DeviceRebootType.Normal)).resolves.toEqual({
       message: 'Device rebooted successfully',
     });
+  });
+
+  test('treats a typed BLE disconnect during Protocol V2 normal reboot as expected', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+
+    await expect((method as any).protocolV2Reboot(DeviceRebootType.Normal)).resolves.toEqual({
+      message: 'Device rebooted successfully',
+    });
+    expect((method as any).device.markProtocolV2Reboot).toHaveBeenCalledWith(
+      DeviceRebootType.Normal
+    );
+  });
+
+  test('uses a short timeout and continues after a BLE reboot response timeout', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValue(
+        ERRORS.TypedError(
+          HardwareErrorCode.BleTimeoutError,
+          'Lowlevel response timeout after 5000ms for DeviceReboot'
+        )
+      );
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+
+    await expect((method as any).protocolV2Reboot(DeviceRebootType.Normal)).resolves.toEqual({
+      message: 'Device rebooted successfully',
+    });
+    expect(typedCall).toHaveBeenCalledWith(
+      'DeviceReboot',
+      'Success',
+      { reboot_type: DeviceRebootType.Normal },
+      { timeoutMs: 5000 }
+    );
+    expect((method as any).device.markProtocolV2Reboot).toHaveBeenCalledWith(
+      DeviceRebootType.Normal
+    );
+  });
+
+  test('continues after a USB Protocol V2 reboot response timeout', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const timeoutError = Object.assign(
+      new Error('Protocol V2 response timeout after 5000ms for DeviceReboot'),
+      { code: 'response-timeout' }
+    );
+    const typedCall = jest.fn().mockRejectedValue(timeoutError);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+
+    await expect((method as any).protocolV2Reboot(DeviceRebootType.Normal)).resolves.toEqual({
+      message: 'Device rebooted successfully',
+    });
+    expect((method as any).device.markProtocolV2Reboot).toHaveBeenCalledWith(
+      DeviceRebootType.Normal
+    );
+  });
+
+  test('propagates non-transport errors from a Protocol V2 reboot', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const rebootError = new Error('Device rejected reboot');
+    const typedCall = jest.fn().mockRejectedValue(rebootError);
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+
+    await expect((method as any).protocolV2Reboot(DeviceRebootType.Normal)).rejects.toBe(
+      rebootError
+    );
+    expect((method as any).device.markProtocolV2Reboot).not.toHaveBeenCalled();
   });
 
   test('treats Android BLE transport release during Protocol V2 reboot as expected', async () => {
@@ -6876,6 +6998,8 @@ describe('Protocol V2 firmware update targets', () => {
       {
         fields: {
           status: true,
+          progress_percent: true,
+          phase_info: true,
           payload_version: true,
           path: true,
         },
@@ -8590,6 +8714,36 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
+  test('does not retry or wrap a stale BLE bond during a V4 file transfer', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const staleBondError = ERRORS.TypedError(HardwareErrorCode.BlePeerRemovedPairingInformation);
+    (method as any).fileWriteChunk = jest.fn().mockRejectedValue(staleBondError);
+    const recoverProtocolV2FileTransfer = jest.fn();
+    (method as any).recoverProtocolV2FileTransfer = recoverProtocolV2FileTransfer;
+    const source = await openFirmwareByteSource({
+      binary: new Uint8Array([1]).buffer,
+    });
+
+    try {
+      await expect(
+        (method as any).protocolV2SourceUpdateProcess({
+          source,
+          filePath: 'vol1:firmware.bin',
+          processedSize: 0,
+          totalSize: 1,
+        })
+      ).rejects.toBe(staleBondError);
+    } finally {
+      await source?.close();
+    }
+    expect(recoverProtocolV2FileTransfer).not.toHaveBeenCalled();
+  });
+
   test('throttles repeated transfer progress while preserving file completion', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -9379,7 +9533,16 @@ describe('Protocol V2 firmware update method', () => {
   test('passes firmware update status fields through to Protocol V2', async () => {
     const typedCall = jest.fn().mockResolvedValue({
       message: {
-        records: [{ target_id: 4, status: 2, payload_version: 1, path: 'vol1:application_p1.bin' }],
+        records: [
+          {
+            target_id: 4,
+            status: 1,
+            progress_percent: 42,
+            phase_info: { phase: 1, progress_percent: 60 },
+            payload_version: 1,
+            path: 'vol1:application_p1.bin',
+          },
+        ],
       },
     });
     const method = new DeviceGetFirmwareUpdateStatus({
@@ -9388,6 +9551,8 @@ describe('Protocol V2 firmware update method', () => {
         method: 'deviceGetFirmwareUpdateStatus',
         fields: {
           status: true,
+          progress_percent: true,
+          phase_info: true,
           payload_version: true,
           path: true,
         },
@@ -9399,7 +9564,16 @@ describe('Protocol V2 firmware update method', () => {
     });
 
     await expect(method.run()).resolves.toEqual({
-      records: [{ target_id: 4, status: 2, payload_version: 1, path: 'vol1:application_p1.bin' }],
+      records: [
+        {
+          target_id: 4,
+          status: 1,
+          progress_percent: 42,
+          phase_info: { phase: 1, progress_percent: 60 },
+          payload_version: 1,
+          path: 'vol1:application_p1.bin',
+        },
+      ],
     });
     expect(typedCall).toHaveBeenCalledWith(
       'DeviceFirmwareUpdateStatusGet',
@@ -9407,6 +9581,8 @@ describe('Protocol V2 firmware update method', () => {
       {
         fields: {
           status: true,
+          progress_percent: true,
+          phase_info: true,
           payload_version: true,
           path: true,
         },

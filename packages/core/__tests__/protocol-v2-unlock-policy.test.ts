@@ -151,8 +151,42 @@ describe('Protocol V2 unlock semantics', () => {
     });
 
     expect(method.unlockPolicy).toBe('unlock-before-run');
-    expect(device.unlockDevice).toHaveBeenCalledTimes(1);
+    expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Main, expect.any(Object));
     expect(run).toHaveBeenCalledTimes(1);
+    expect(method.protocolV2UnlockContext).toMatchObject({
+      preflightCompleted: true,
+      preflightStatusRefreshed: true,
+      preflightMainPinSelected: true,
+    });
+  });
+
+  test('allows either PIN type when pre-unlocking hidden-wallet selection', async () => {
+    const method = new OpenWalletSession({
+      id: 1,
+      payload: { method: 'openWalletSession', mode: 'select-hidden' },
+    });
+    method.init();
+    method.run = jest.fn().mockResolvedValue({ walletType: 'hidden' }) as any;
+    const features = { unlocked: false };
+    const device = {
+      features,
+      commands: {
+        typedCall: jest.fn().mockResolvedValue({ message: { unlocked: false } }),
+      },
+      isProtocolV2: () => true,
+      isBootloader: () => false,
+      isRomloader: () => false,
+      updateProtocolV2Status: jest.fn(() => features),
+      unlockDevice: jest.fn().mockImplementation(() => {
+        features.unlocked = true;
+        return Promise.resolve(features);
+      }),
+    };
+
+    await runMethodWithUnlockPolicy(method, device as any);
+
+    expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Any, expect.any(Object));
+    expect(method.protocolV2UnlockContext?.preflightMainPinSelected).toBe(false);
   });
 
   test('pre-unlocks an unregistered wallet business method', async () => {

@@ -41,9 +41,15 @@ const FIRMWARE_UPDATE_CONFIRM = 'Firmware install confirmed';
  */
 export const BOOTLOADER_POLL_INITIALIZE_TIMEOUT_MS = 5000;
 
-type FirmwareTransferMetrics = Pick<
+type FirmwareProgressMetadata = Pick<
   FirmwareProgress['payload'],
-  'transferredBytes' | 'totalBytes' | 'rateBytesPerSecond' | 'elapsedMs'
+  | 'transferredBytes'
+  | 'totalBytes'
+  | 'rateBytesPerSecond'
+  | 'elapsedMs'
+  | 'installTargetId'
+  | 'installPhase'
+  | 'installPhaseProgress'
 >;
 
 const isDeviceDisconnectedError = (error: unknown) => {
@@ -103,7 +109,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   postProgressMessage = (
     progress: number,
     progressType: IFirmwareUpdateProgressType,
-    metrics?: FirmwareTransferMetrics
+    metrics?: FirmwareProgressMetadata
   ) => {
     this.postMessage(
       createUiMessage(UI_REQUEST.FIRMWARE_PROGRESS, {

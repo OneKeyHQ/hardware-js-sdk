@@ -82,6 +82,33 @@ export function hexToBytes(hex: string): Uint8Array {
   return bytes;
 }
 
+export function detectProtocolV2LinkDisabledError({
+  schemas,
+  assembler,
+  bytes,
+}: {
+  schemas: ProtocolV2Schemas;
+  assembler: ProtocolV2FrameAssembler;
+  bytes: Uint8Array;
+}) {
+  try {
+    for (const frame of assembler.drain(bytes)) {
+      const response = check.call(ProtocolV2.decodeFrame(schemas, frame));
+      if (response.type === 'Failure') {
+        const failureCode = response.message?.code;
+        const firmwareMessage = response.message?.message;
+        if (isProtocolV2LinkDisabledFailure(failureCode, firmwareMessage)) {
+          return createProtocolV2LinkDisabledError(failureCode, firmwareMessage);
+        }
+      }
+    }
+  } catch {
+    // Cross-protocol detection may receive a normal Protocol V1 notification.
+    assembler.reset();
+  }
+  return undefined;
+}
+
 export function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
     .map(b => b.toString(16).padStart(2, '0'))
@@ -468,6 +495,7 @@ export async function probeProtocolV2({
   logPrefix = 'ProtocolV2',
   onBeforeProbe,
   onProbeFailed,
+  shouldRethrow,
 }: {
   call: (
     name: string,
@@ -479,6 +507,7 @@ export async function probeProtocolV2({
   logPrefix?: string;
   onBeforeProbe?: () => Promise<void> | void;
   onProbeFailed?: (error: unknown) => Promise<void> | void;
+  shouldRethrow?: (error: unknown) => boolean;
 }) {
   let probeError: unknown;
   try {
@@ -503,7 +532,7 @@ export async function probeProtocolV2({
     }
     probeError = new Error(`unexpected response type ${response.type}`);
   } catch (error) {
-    if (isProtocolV2LinkDisabledError(error)) {
+    if (isProtocolV2LinkDisabledError(error) || shouldRethrow?.(error)) {
       throw error;
     }
     probeError = error;

@@ -4,7 +4,13 @@ import { invalidParameter } from '../helpers/filesystemValidation';
 import type { DeviceFirmwareUpdateStatusGetParams } from './helpers';
 import type { DeviceFirmwareUpdateRecordFields } from '@onekeyfe/hd-transport';
 
-const DEVICE_FIRMWARE_UPDATE_STATUS_FIELDS = ['status', 'payload_version', 'path'] as const;
+const DEVICE_FIRMWARE_UPDATE_STATUS_FIELDS = [
+  'status',
+  'progress_percent',
+  'phase_info',
+  'payload_version',
+  'path',
+] as const;
 
 function normalizeStatusFields(
   fields: DeviceFirmwareUpdateStatusGetParams['fields']

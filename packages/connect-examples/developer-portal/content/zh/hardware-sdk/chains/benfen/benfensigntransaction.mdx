@@ -10,6 +10,12 @@ title: benfenSignTransaction
 
 使用指定 BIP32 路径派生的私钥对交易进行签名。用户需要在 OneKey 上确认所有交易详情。
 
+**使用要求**
+
+* 固件版本要求
+  * Pro: 4.12.0
+  * Classic 1S / Classic 1S Pure: 3.11.0
+
 ```typescript
 const result = await HardwareSDK.benfenSignTransaction(connectId, deviceId, {
   path: "m/44'/728'/0'/0'/0'",

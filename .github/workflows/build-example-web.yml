@@ -29,7 +29,7 @@ jobs:
         run: yarn build
 
       - name: Build Expo Example
-        run: EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn expo export:web
+        run: EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_FULL_SHA }} yarn expo export:web
         working-directory: packages/connect-examples/expo-example
 
       - name: Add commit info to Expo Example
@@ -103,7 +103,7 @@ jobs:
         run: yarn build
 
       - name: Build Expo Example (production)
-        run: EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn expo export:web
+        run: EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_FULL_SHA }} yarn expo export:web
         working-directory: packages/connect-examples/expo-example
 
       - name: Build Expo Playground (production)

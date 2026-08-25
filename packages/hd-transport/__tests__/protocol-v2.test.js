@@ -5,6 +5,7 @@ const {
   ProtocolV2LinkError,
   ProtocolV2SequenceCursor,
   ProtocolV2Session,
+  detectProtocolV2LinkDisabledError,
   hexToBytes,
   isProtocolV2HighThroughputCall,
   probeProtocolV2,
@@ -1108,6 +1109,21 @@ describe('Protocol V2 framing and session', () => {
     expect(readFrame).toHaveBeenCalledTimes(1);
   });
 
+  test('probeProtocolV2 rethrows caller-selected fatal errors without treating them as a miss', async () => {
+    const onProbeFailed = jest.fn();
+    const staleBond = Object.assign(new Error('Bluetooth pairing failed'), { errorCode: 715 });
+
+    await expect(
+      probeProtocolV2({
+        call: () => Promise.reject(staleBond),
+        timeoutMs: 1,
+        onProbeFailed,
+        shouldRethrow: error => error?.errorCode === 715,
+      })
+    ).rejects.toBe(staleBond);
+    expect(onProbeFailed).not.toHaveBeenCalled();
+  });
+
   test('probeProtocolV2 accepts Success as a normal V2 probe response', async () => {
     await expect(
       probeProtocolV2({
@@ -1128,6 +1144,36 @@ describe('Protocol V2 framing and session', () => {
     expect(isProtocolV2LinkDisabledFailure('Failure_ProcessError', ' link disabled ')).toBe(true);
     expect(isProtocolV2LinkDisabledFailure(5, 'Link Disabled')).toBe(true);
     expect(isProtocolV2LinkDisabledFailure('Failure_ProcessError', 'busy')).toBe(false);
+  });
+
+  test('detects a split Protocol V2 link-disabled frame in the shared transport layer', () => {
+    const assembler = new ProtocolV2FrameAssembler();
+    const frame = ProtocolV2.encodeFrame(
+      schemas,
+      'Failure',
+      { code: 5, message: 'link disabled' },
+      { router: 2 }
+    );
+    const splitAt = 4;
+
+    expect(
+      detectProtocolV2LinkDisabledError({
+        schemas,
+        assembler,
+        bytes: frame.subarray(0, splitAt),
+      })
+    ).toBeUndefined();
+    expect(
+      detectProtocolV2LinkDisabledError({
+        schemas,
+        assembler,
+        bytes: frame.subarray(splitAt),
+      })
+    ).toMatchObject({
+      name: 'ProtocolV2LinkDisabledError',
+      failureCode: 5,
+      firmwareMessage: 'link disabled',
+    });
   });
 
   test.each(['Failure_ProcessError', 5])(

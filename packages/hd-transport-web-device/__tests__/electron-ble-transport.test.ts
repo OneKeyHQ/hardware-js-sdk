@@ -73,8 +73,26 @@ const protocolV2Schema = {
         },
       },
     },
+    Failure: {
+      fields: {
+        code: {
+          type: 'FailureType',
+          id: 1,
+        },
+        message: {
+          type: 'string',
+          id: 2,
+        },
+      },
+    },
+    FailureType: {
+      values: {
+        Failure_ProcessError: 5,
+      },
+    },
     MessageType: {
       values: {
+        MessageType_Failure: 3,
         MessageType_ProtocolInfoRequest: 60200,
         MessageType_ProtocolInfo: 60201,
         MessageType_Ping: 60206,
@@ -461,6 +479,41 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(transport.getProtocolType(device.id)).toBeUndefined();
   });
 
+  test('surfaces Protocol V2 link disabled while the initial V1 probe is active', async () => {
+    const device = { id: 'usb-priority-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
+
+    nobleBle.onNotification.mockImplementation(handler => {
+      notificationHandler = handler;
+      return jest.fn();
+    });
+    nobleBle.write.mockImplementation(() => {
+      const response = ProtocolV2.encodeFrame(
+        schemas,
+        'Failure',
+        { code: 5, message: 'link disabled' },
+        { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+      );
+      const splitAt = 4;
+      setTimeout(() => {
+        notificationHandler?.(device.id, bytesToHex(response.subarray(0, splitAt)));
+        notificationHandler?.(device.id, bytesToHex(response.subarray(splitAt)));
+      }, 0);
+      return Promise.resolve();
+    });
+    const transport = configureTransport(nobleBle);
+
+    await expect(transport.acquire({ uuid: device.id })).rejects.toMatchObject({
+      name: 'ProtocolV2LinkDisabledError',
+      failureCode: 'Failure_ProcessError',
+      firmwareMessage: 'link disabled',
+    });
+    expect(nobleBle.write).toHaveBeenCalledTimes(1);
+    expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+  });
+
   test('keeps a first expected Protocol V2 probe miss retryable', async () => {
     const device = { id: 'first-v2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
@@ -495,6 +548,40 @@ describe('ElectronBleTransport protocol detection', () => {
     });
 
     expect(transport.getProtocolType(device.id)).toBeUndefined();
+  });
+
+  test('fails Protocol V2 acquire immediately when subscribe reports insufficient encryption', async () => {
+    const device = { id: 'stale-bond-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.subscribe.mockRejectedValue(new Error('Encryption is insufficient'));
+    const transport = configureTransport(nobleBle);
+    const probe = jest.spyOn(transport as any, 'probeProtocolV2');
+
+    await expect(
+      transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceBondError,
+    });
+
+    expect(probe).not.toHaveBeenCalled();
+    expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+  });
+
+  test('keeps stale-bond subscribe mapping out of Protocol V1 acquire', async () => {
+    const device = { id: 'classic-v1-id', name: 'OneKey Classic' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.subscribe.mockRejectedValue(new Error('Encryption is insufficient'));
+    const transport = configureTransport(nobleBle);
+
+    try {
+      await transport.acquire({ uuid: device.id, expectedProtocol: 'V1' });
+      throw new Error('Expected Protocol V1 acquire to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe('Encryption is insufficient');
+      expect((error as { errorCode?: unknown }).errorCode).toBeUndefined();
+    }
   });
 
   test('reports a stale bond when a previously confirmed Protocol V2 device stops responding', async () => {

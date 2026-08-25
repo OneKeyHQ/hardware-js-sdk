@@ -391,14 +391,14 @@ DeviceSessionAskPin -> DeviceSession -> DeviceStatusGet -> DeviceStatus
 
 主要结构：
 
-| 消息或结构                      | 字段                                             | 用途                     |
-| ------------------------------- | ------------------------------------------------ | ------------------------ |
-| `DeviceFirmwareTarget`          | `target_id`、`path`                              | 指定组件和设备侧固件路径 |
-| `DeviceFirmwareUpdateStage`     | `targets[]`                                      | 暂存一组安装目标         |
-| `DeviceFirmwareUpdateRequest`   | 无                                               | 触发已暂存目标的安装     |
-| `DeviceFirmwareUpdateRecord`    | `target_id`、`status`、`payload_version`、`path` | 保存每个组件的安装记录   |
-| `DeviceFirmwareUpdateStatusGet` | `fields`                                         | 选择需要返回的记录字段   |
-| `DeviceFirmwareUpdateStatus`    | `records[]`                                      | 返回所有安装记录         |
+| 消息或结构                      | 字段                                                                               | 用途                     |
+| ------------------------------- | ---------------------------------------------------------------------------------- | ------------------------ |
+| `DeviceFirmwareTarget`          | `target_id`、`path`                                                                | 指定组件和设备侧固件路径 |
+| `DeviceFirmwareUpdateStage`     | `targets[]`                                                                        | 暂存一组安装目标         |
+| `DeviceFirmwareUpdateRequest`   | `reboot_after_update`                                                              | 触发已暂存目标的安装     |
+| `DeviceFirmwareUpdateRecord`    | `target_id`、`status`、`progress_percent`、`phase_info`、`payload_version`、`path` | 保存每个组件的安装记录   |
+| `DeviceFirmwareUpdateStatusGet` | `fields`                                                                           | 选择需要返回的记录字段   |
+| `DeviceFirmwareUpdateStatus`    | `records[]`                                                                        | 返回所有安装记录         |
 
 支持的安装目标包括 crate、romloader、bootloader、application P1、application P2、coprocessor、SE01、SE02、SE03 和 SE04。
 

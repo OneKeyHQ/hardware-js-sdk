@@ -83,15 +83,21 @@ const buildDeviceSessionGetRequest = ({
         ],
 });
 
-const askDevicePassphrase = async (device: Device, requestPayload: DeviceSessionAskPassphrase) => {
+const askDevicePassphrase = async (
+  device: Device,
+  requestPayload: DeviceSessionAskPassphrase,
+  onStatusRefreshed?: () => void
+) => {
   await device.commands.typedCall('DeviceSessionAskPassphrase', 'Success', requestPayload);
   await refreshProtocolV2DeviceStatus(device);
+  onStatusRefreshed?.();
 };
 
 const selectDeviceSession = async (
   device: Device,
   expectedPassphraseState?: string,
-  deriveCardano?: boolean
+  deriveCardano?: boolean,
+  onStatusRefreshed?: () => void
 ) => {
   const existsAttachPinUser = device.features?.attachToPinEnabled === true;
   const metadata = {
@@ -153,14 +159,19 @@ const selectDeviceSession = async (
       emitUiEvent: false,
       interaction: attachPinInteraction,
     });
+    onStatusRefreshed?.();
     return getDeviceSession(device, buildDeviceSessionGetRequest({ deriveCardano }));
   }
 
   if (hasHostPassphrase) {
-    await askDevicePassphrase(device, {
-      passphrase: hostPassphrase,
-      on_device: false,
-    });
+    await askDevicePassphrase(
+      device,
+      {
+        passphrase: hostPassphrase,
+        on_device: false,
+      },
+      onStatusRefreshed
+    );
     return getDeviceSession(device, buildDeviceSessionGetRequest({ deriveCardano }));
   }
 
@@ -172,7 +183,7 @@ const selectDeviceSession = async (
     ...metadata,
     ...(passphraseOnDeviceInteraction ? { interaction: passphraseOnDeviceInteraction } : {}),
   });
-  await askDevicePassphrase(device, { on_device: true });
+  await askDevicePassphrase(device, { on_device: true }, onStatusRefreshed);
   return getDeviceSession(device, buildDeviceSessionGetRequest({ deriveCardano }));
 };
 
@@ -191,6 +202,8 @@ export async function getProtocolV2WalletSession(
     deriveCardano?: boolean;
     /** Read the wallet already selected by Attach PIN without reopening wallet selection. */
     readCurrentAttachPinSession?: boolean;
+    /** The current call already selected the Main PIN during its unlock preflight. */
+    mainPinSelected?: boolean;
   }
 ) {
   const forceWalletSelection =
@@ -227,10 +240,16 @@ export async function getProtocolV2WalletSession(
       : undefined;
   let response;
   let resumed = false;
-  let mainPinSelected =
-    options?.onlyMainPin === true &&
-    device.features?.unlocked === true &&
-    device.features?.unlockedAttachPin === false;
+  let walletStatusRefreshed = false;
+  const markWalletStatusRefreshed = () => {
+    walletStatusRefreshed = true;
+  };
+  let mainPinAuthenticated =
+    options?.mainPinSelected === true ||
+    (options?.onlyMainPin === true &&
+      device.features?.unlocked === true &&
+      device.features?.unlockedAttachPin === false);
+  let standardWalletSelected = options?.mainPinSelected === true;
 
   const clearCurrentWalletSession = () => {
     if (options?.onlyMainPin) {
@@ -242,6 +261,7 @@ export async function getProtocolV2WalletSession(
 
   const rejectMismatchedAttachPinWallet = async () => {
     const features = await refreshProtocolV2DeviceStatus(device);
+    markWalletStatusRefreshed();
     if (features.unlockedAttachPin !== true) {
       return;
     }
@@ -265,30 +285,42 @@ export async function getProtocolV2WalletSession(
   }
 
   const selectMainPin = async (force = false) => {
-    if (force || !mainPinSelected) {
+    if (force || !mainPinAuthenticated) {
       await device.unlockDevice(DeviceSessionPinType.Main, {
         source: 'wallet-session-coordinator',
         reason: expectedPassphraseState ? 'session-recovery' : 'open-wallet',
         deviceOnly: true,
       });
-      mainPinSelected = true;
+      markWalletStatusRefreshed();
+      mainPinAuthenticated = true;
+      standardWalletSelected = true;
     }
   };
 
   const selectStandardWallet = async () => {
-    // Main PIN authenticates the device; an empty host passphrase selects the standard derivation.
-    await selectMainPin();
     if (device.features?.passphraseProtection === true) {
-      await askDevicePassphrase(device, {
-        passphrase: '',
-        on_device: false,
-      });
+      // Main PIN authenticates the device; an empty host passphrase selects the standard derivation.
+      await selectMainPin();
+      await askDevicePassphrase(
+        device,
+        {
+          passphrase: '',
+          on_device: false,
+        },
+        markWalletStatusRefreshed
+      );
+      standardWalletSelected = true;
+    } else if (!standardWalletSelected) {
+      // Without passphrase protection there is no empty-passphrase selector.
+      // Main PIN selection is the only authoritative switch back to the standard wallet.
+      await selectMainPin(true);
     }
   };
 
   if (readCurrentAttachPinSession) {
     const status = await requestProtocolV2DeviceStatus(device);
     device.updateProtocolV2Status(status);
+    markWalletStatusRefreshed();
     if (
       status.unlocked !== true ||
       status.passphrase_enabled !== true ||
@@ -372,7 +404,12 @@ export async function getProtocolV2WalletSession(
       device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
     }
-    response = await selectDeviceSession(device, expectedPassphraseState, options?.deriveCardano);
+    response = await selectDeviceSession(
+      device,
+      expectedPassphraseState,
+      options?.deriveCardano,
+      markWalletStatusRefreshed
+    );
   }
 
   let { message } = response;
@@ -402,7 +439,12 @@ export async function getProtocolV2WalletSession(
       );
     } else {
       device.clearInternalState();
-      response = await selectDeviceSession(device, expectedPassphraseState, options?.deriveCardano);
+      response = await selectDeviceSession(
+        device,
+        expectedPassphraseState,
+        options?.deriveCardano,
+        markWalletStatusRefreshed
+      );
     }
     message = response.message;
     try {
@@ -438,7 +480,7 @@ export async function getProtocolV2WalletSession(
   let unlockedAttachPin: boolean | undefined;
   if (readCurrentAttachPinSession) {
     unlockedAttachPin = true;
-  } else if (mainPinSelected) {
+  } else if (mainPinAuthenticated) {
     unlockedAttachPin = false;
   }
 
@@ -447,6 +489,7 @@ export async function getProtocolV2WalletSession(
     newSession: message.session_id,
     unlockedAttachPin,
     resumed,
+    walletStatusRefreshed,
   };
 }
 

@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 type MockCharacteristic = EventEmitter & {
   uuid: string;
@@ -27,18 +28,19 @@ const createPeripheral = (id: string) => {
     uuid: '0001',
     discoverCharacteristics: jest.fn((_uuids, callback) => callback(null, [write, notify])),
   };
-  return {
-    peripheral: {
-      id,
-      state: 'connected',
-      advertisement: {
-        localName: `OneKey Pro 2 ${id}`,
-        serviceUuids: ['0001'],
-      },
-      discoverServices: jest.fn((_uuids, callback) => callback(null, [service])),
-      connect: jest.fn(callback => callback()),
-      disconnect: jest.fn(callback => callback()),
+  const peripheral = Object.assign(new EventEmitter(), {
+    id,
+    state: 'connected',
+    advertisement: {
+      localName: `OneKey Pro 2 ${id}`,
+      serviceUuids: ['0001'],
     },
+    discoverServices: jest.fn((_uuids, callback) => callback(null, [service])),
+    connect: jest.fn(callback => callback()),
+    disconnect: jest.fn(callback => callback()),
+  });
+  return {
+    peripheral,
     service,
     write,
     notify,
@@ -175,6 +177,38 @@ describe('Noble BLE plugin notification routing', () => {
     ]);
 
     expect(result).toBe('completed');
+  });
+
+  test('rejects a pending receive when the peripheral disconnects unexpectedly', async () => {
+    const device = createPeripheral('device-a');
+    const noble = new EventEmitter() as EventEmitter & {
+      state: string;
+      startScanning: jest.Mock;
+      stopScanning: jest.Mock;
+    };
+    noble.state = 'poweredOn';
+    noble.startScanning = jest.fn((_services, _duplicates, callback) => {
+      callback?.();
+      noble.emit('discover', device.peripheral);
+    });
+    noble.stopScanning = jest.fn(callback => callback?.());
+    jest.doMock('@stoprocent/noble', () => noble);
+
+    const { createNobleBlePlugin } = await import('../transports/nobleBlePlugin');
+    const plugin = createNobleBlePlugin();
+    await plugin.init();
+    await plugin.connect('device-a');
+
+    const receive = plugin.receive('device-a');
+    device.peripheral.state = 'disconnected';
+    device.peripheral.emit('disconnect', 'Remote User Terminated Connection');
+
+    await expect(receive).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+    await expect(plugin.receive('device-a')).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.TransportNotFound,
+    });
   });
 
   test('disconnects an untracked peripheral when service discovery fails', async () => {

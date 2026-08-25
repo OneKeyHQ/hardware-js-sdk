@@ -66,8 +66,6 @@ const createRemoteConfig = (): RemoteConfigResponse =>
         {
           required: false,
           version: [1, 0, 0],
-          url: 'https://example.com/pro2.okpkg',
-          fingerprint: 'a'.repeat(64),
           changelog: { 'zh-CN': 'Pro2', 'en-US': 'Pro2' },
           resources: { source: resourceSource },
         },
@@ -79,8 +77,6 @@ const createRemoteConfig = (): RemoteConfigResponse =>
         {
           required: false,
           version: [1, 0, 0],
-          url: 'https://example.com/neo.okpkg',
-          fingerprint: 'b'.repeat(64),
           changelog: { 'zh-CN': 'Neo', 'en-US': 'Neo' },
           resources: { source: neoResourceSource },
         },

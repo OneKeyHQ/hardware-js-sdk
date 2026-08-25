@@ -1,7 +1,6 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import { Buffer } from 'buffer';
 import {
-  BleATTErrorCode,
   BleError,
   BleErrorCode,
   BleManager as BlePlxManager,
@@ -48,6 +47,11 @@ import {
   getInfosForServiceUuid,
   isSameBleUuid,
 } from './constants';
+import {
+  isBleStaleBondHardwareError,
+  isNativeBleStaleBondError,
+  toBleStaleBondHardwareError,
+} from './bleStaleBond';
 import { isHeaderChunk } from './utils/validateNotify';
 import BleTransport from './BleTransport';
 import timer from './utils/timer';
@@ -316,15 +320,10 @@ const resolveNegotiatedMtu = (device: Device) => requestNegotiatedMtu(device, 'c
 
 type IOBleErrorRemap = Error | BleError | null | undefined;
 
-function remapError(error: IOBleErrorRemap) {
+function remapError(error: IOBleErrorRemap, mapProtocolV2StaleBond: boolean) {
   if (error instanceof BleError) {
-    if (
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-expect-error
-      error.iosErrorCode === BleATTErrorCode.UnlikelyError ||
-      error.reason === 'Peer removed pairing information'
-    ) {
-      throw ERRORS.TypedError(HardwareErrorCode.BlePeerRemovedPairingInformation);
+    if (mapProtocolV2StaleBond && isNativeBleStaleBondError(error)) {
+      throw toBleStaleBondHardwareError(error);
     }
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -398,6 +397,16 @@ export default class ReactNativeBleTransport {
 
   /** Consecutive detections that failed while trusting sessionProtocols. */
   private protocolReprobeFailures: Map<string, number> = new Map();
+
+  /**
+   * Native encryption/pairing failures seen before Protocol V2 probe starts.
+   * Pro2/Neo GATT connect can succeed on a stale iOS bond; the CCCD write then
+   * fails with ATT 5/15. Remember it so detectProtocol fails immediately.
+   */
+  private staleBondErrors: Map<string, Error> = new Map();
+
+  /** Strict or previously confirmed V2 target while acquire installs notifications. */
+  private acquiringProtocolV2 = new Set<string>();
 
   private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
 
@@ -886,6 +895,9 @@ export default class ReactNativeBleTransport {
 
   private async acquireUnlocked(input: FirmwareInstallBleAcquireInput) {
     const { uuid, forceCleanRunPromise, expectedProtocol, skipProtocolProbe } = input;
+    const shouldMapProtocolV2StaleBond = expectedProtocol
+      ? expectedProtocol === 'V2'
+      : this.confirmedProtocolV2.has(uuid);
 
     const cachedTransport = transportCache[uuid];
     if (skipProtocolProbe && !cachedTransport && this.blePlxManager) {
@@ -1012,7 +1024,7 @@ export default class ReactNativeBleTransport {
           Log?.debug('device already connected');
           throw ERRORS.TypedError(HardwareErrorCode.BleAlreadyConnected);
         } else {
-          remapError(e);
+          remapError(e, shouldMapProtocolV2StaleBond);
         }
       }
     }
@@ -1056,7 +1068,7 @@ export default class ReactNativeBleTransport {
             }
           }
         } else {
-          remapError(e);
+          remapError(e, shouldMapProtocolV2StaleBond);
         }
       }
     }
@@ -1076,12 +1088,16 @@ export default class ReactNativeBleTransport {
       this.deviceProtocolHints.set(uuid, protocolHint);
     }
 
-    await this.installTransportForAcquire(uuid, acquiredDevice, {
-      writeCharacteristic,
-      notifyCharacteristic,
-    });
+    if (shouldMapProtocolV2StaleBond) {
+      this.acquiringProtocolV2.add(uuid);
+    }
 
     try {
+      await this.installTransportForAcquire(uuid, acquiredDevice, {
+        writeCharacteristic,
+        notifyCharacteristic,
+      });
+
       if (skipProtocolProbe) {
         if (!expectedProtocol) {
           throw ERRORS.TypedError(
@@ -1089,7 +1105,10 @@ export default class ReactNativeBleTransport {
             'skipProtocolProbe requires an expected BLE protocol'
           );
         }
-        if (this.sessionProtocols.get(uuid) !== expectedProtocol) {
+        const hasConfirmedProtocol =
+          this.sessionProtocols.get(uuid) === expectedProtocol ||
+          (expectedProtocol === 'V2' && this.confirmedProtocolV2.has(uuid));
+        if (!hasConfirmedProtocol) {
           throw ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,
             'skipProtocolProbe requires a previously confirmed protocol for this BLE endpoint'
@@ -1126,12 +1145,14 @@ export default class ReactNativeBleTransport {
       this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
       return { uuid, protocolType };
     } catch (error) {
-      if ((error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleDeviceBondError) {
+      if (isBleStaleBondHardwareError(error)) {
         await this.disconnectUnlocked(uuid);
       } else {
         await this.releaseUnlocked(uuid, true);
       }
       throw error;
+    } finally {
+      this.acquiringProtocolV2.delete(uuid);
     }
   }
 
@@ -1159,17 +1180,21 @@ export default class ReactNativeBleTransport {
           Log?.debug('monitor error ignored for stale transport: ', uuid, notifyTransactionId);
           return;
         }
+        if (
+          (this.getActiveProtocol(uuid) === 'V2' || this.acquiringProtocolV2.has(uuid)) &&
+          isNativeBleStaleBondError(error)
+        ) {
+          this.rememberStaleBondError(uuid, toBleStaleBondHardwareError(error));
+          return;
+        }
         if (this.getActiveProtocol(uuid) === 'V2') {
           let errorCode:
-            | typeof HardwareErrorCode.BleDeviceBondError
             | typeof HardwareErrorCode.BleCharacteristicNotifyError
             | typeof HardwareErrorCode.BleCharacteristicNotifyChangeFailure
             | typeof HardwareErrorCode.BleTimeoutError =
             HardwareErrorCode.BleCharacteristicNotifyError;
           if (error.reason?.includes('The connection has timed out unexpectedly')) {
             errorCode = HardwareErrorCode.BleTimeoutError;
-          } else if (error.reason?.includes('Encryption is insufficient')) {
-            errorCode = HardwareErrorCode.BleDeviceBondError;
           } else if (
             error.reason?.includes('Cannot write client characteristic config descriptor') ||
             error.reason?.includes('Cannot find client characteristic config descriptor') ||
@@ -1184,15 +1209,11 @@ export default class ReactNativeBleTransport {
         }
         if (this.runPromise && this.runPromiseDeviceId === uuid) {
           let ERROR:
-            | typeof HardwareErrorCode.BleDeviceBondError
             | typeof HardwareErrorCode.BleCharacteristicNotifyError
             | typeof HardwareErrorCode.BleTimeoutError =
             HardwareErrorCode.BleCharacteristicNotifyError;
           if (error.reason?.includes('The connection has timed out unexpectedly')) {
             ERROR = HardwareErrorCode.BleTimeoutError;
-          }
-          if (error.reason?.includes('Encryption is insufficient')) {
-            ERROR = HardwareErrorCode.BleDeviceBondError;
           }
           if (
             error.reason?.includes('Cannot write client characteristic config descriptor') ||
@@ -1328,6 +1349,8 @@ export default class ReactNativeBleTransport {
 
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
+    this.staleBondErrors.delete(uuid);
+    this.acquiringProtocolV2.delete(uuid);
     // Confirmed protocol and caller hints stay in deviceProtocol / protocolHint.
     this.protocolV2Assemblers.get(uuid)?.reset();
     this.protocolV2Assemblers.delete(uuid);
@@ -1700,6 +1723,7 @@ export default class ReactNativeBleTransport {
     }
     this.deviceProtocol.delete(session);
     this.probingProtocols.delete(session);
+    this.staleBondErrors.delete(session);
     this.deviceProtocolHints.delete(session);
     this.sessionProtocols.delete(session);
     this.protocolReprobeFailures.delete(session);
@@ -1923,6 +1947,8 @@ export default class ReactNativeBleTransport {
     }
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
+    this.staleBondErrors.delete(uuid);
+    this.acquiringProtocolV2.delete(uuid);
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);
 
@@ -2019,6 +2045,8 @@ export default class ReactNativeBleTransport {
     }
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
+    this.staleBondErrors.delete(uuid);
+    this.acquiringProtocolV2.delete(uuid);
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);
 
@@ -2069,8 +2097,11 @@ export default class ReactNativeBleTransport {
     });
     this.deviceProtocol.clear();
     this.probingProtocols.clear();
+    this.staleBondErrors.clear();
+    this.acquiringProtocolV2.clear();
     this.sessionProtocols.clear();
-    this.confirmedProtocolV2.clear();
+    // Keep transport-lifetime V2 proof so the same endpoint can finish a no-probe
+    // firmware reconnect after the native BLE manager is recreated.
     this.protocolReprobeFailures.clear();
     this.writeTimeoutCounts.clear();
     this.connectionSetupTimeoutCounts.clear();
@@ -2083,12 +2114,11 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  private createProtocolMismatchError(expected: ProtocolType, uuid: string) {
-    // A generic Ping miss is not a bond failure. Only a later miss after this
-    // endpoint already answered V2, or a native encryption/pairing error, is.
-    const isStaleV2Bond = expected === 'V2' && this.confirmedProtocolV2.has(uuid);
+  private createProtocolMismatchError(expected: ProtocolType) {
+    // A protocol probe miss alone does not prove that the OS bond is stale.
+    // Native authentication/encryption failures are mapped separately.
     return ERRORS.TypedError(
-      isStaleV2Bond ? HardwareErrorCode.BleDeviceBondError : HardwareErrorCode.RuntimeError,
+      HardwareErrorCode.RuntimeError,
       `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
     );
   }
@@ -2140,6 +2170,10 @@ export default class ReactNativeBleTransport {
       return 'V1';
     }
 
+    if (expectedProtocol === 'V2' || this.acquiringProtocolV2.has(uuid)) {
+      this.throwIfStaleBondError(uuid);
+    }
+
     if (expectedProtocol === 'V2') {
       if (await this.probeProtocolV2(uuid)) {
         this.deviceProtocol.set(uuid, 'V2');
@@ -2152,7 +2186,7 @@ export default class ReactNativeBleTransport {
         });
         return 'V2';
       }
-      throw this.createProtocolMismatchError(expectedProtocol, uuid);
+      throw this.createProtocolMismatchError(expectedProtocol);
     }
 
     // Protocol must be actively probed after connection. Name, PID, and descriptors only
@@ -2296,6 +2330,7 @@ export default class ReactNativeBleTransport {
 
     this.probingProtocols.set(uuid, 'V2');
     this.protocolV2Assemblers.get(uuid)?.reset();
+    this.throwIfStaleBondError(uuid);
     const detected = await probeProtocolV2Helper({
       call: (name: string, data: Record<string, unknown>, options?: TransportCallOptions) =>
         this.callProtocolV2(uuid, name, data, options),
@@ -2306,6 +2341,7 @@ export default class ReactNativeBleTransport {
         this.protocolV2Assemblers.get(uuid)?.reset();
         this.resetProtocolV2Frames(uuid);
       },
+      shouldRethrow: isBleStaleBondHardwareError,
     });
     if (!detected) {
       this.clearProbeProtocol(uuid, 'V2');
@@ -2374,6 +2410,21 @@ export default class ReactNativeBleTransport {
     }
   }
 
+  private rememberStaleBondError(uuid: string, error: Error) {
+    this.staleBondErrors.set(uuid, error);
+    this.rejectProtocolV2Frames(uuid, error);
+    if (this.runPromise && this.runPromiseDeviceId === uuid) {
+      this.runPromise.reject(error);
+    }
+  }
+
+  private throwIfStaleBondError(uuid: string) {
+    const error = this.staleBondErrors.get(uuid);
+    if (error) {
+      throw error;
+    }
+  }
+
   private async readProtocolV2Frame(uuid: string) {
     const queuedFrame = this.getProtocolV2FrameQueue(uuid).shift();
     if (queuedFrame) {
@@ -2432,6 +2483,11 @@ export default class ReactNativeBleTransport {
         assertCurrentGeneration();
         return;
       } catch (error) {
+        if (isNativeBleStaleBondError(error) || isBleStaleBondHardwareError(error)) {
+          const bondError = toBleStaleBondHardwareError(error);
+          this.rememberStaleBondError(uuid, bondError);
+          throw bondError;
+        }
         if (
           getFirmwareUploadWriteRetryType(error) !== 'congested' ||
           attempt >= FIRMWARE_UPLOAD_WRITE_MAX_RETRIES

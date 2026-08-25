@@ -33,8 +33,6 @@ const validComponentIntegrity = {
 const release: IFirmwareReleaseInfo = {
   required: true,
   version: [2, 0, 0],
-  url: 'https://example.com/application-p1.bin',
-  fingerprint: 'release-fingerprint',
   changelog: {
     'zh-CN': '更新',
     'en-US': 'Update',

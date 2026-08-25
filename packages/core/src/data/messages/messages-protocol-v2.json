@@ -446,6 +446,9 @@
         "MessageType_DeviceCertificateSignature": 60423,
         "MessageType_DeviceCertificateSign": 60424,
         "MessageType_DeviceMiscUsbMscControl": 60440,
+        "MessageType_DeviceFindMyTokenState": 60450,
+        "MessageType_DeviceFindMyTokenUpdate": 60451,
+        "MessageType_DeviceFindMyTokenStateGet": 60452,
         "MessageType_DeviceInfoGet": 60600,
         "MessageType_DeviceInfo": 60601,
         "MessageType_DeviceStatusGet": 60602,
@@ -5404,6 +5407,10 @@
         "request_id": {
           "type": "bytes",
           "id": 5
+        },
+        "source_fingerprint": {
+          "type": "uint32",
+          "id": 6
         }
       }
     },
@@ -5539,6 +5546,14 @@
         "tx_type": {
           "type": "uint32",
           "id": 10
+        },
+        "expected_address": {
+          "type": "bytes",
+          "id": 12
+        },
+        "source_fingerprint": {
+          "type": "uint32",
+          "id": 13
         }
       }
     },
@@ -5619,6 +5634,14 @@
           "rule": "repeated",
           "type": "EthereumAccessListOneKey",
           "id": 11
+        },
+        "expected_address": {
+          "type": "bytes",
+          "id": 12
+        },
+        "source_fingerprint": {
+          "type": "uint32",
+          "id": 13
         }
       }
     },
@@ -5795,6 +5818,10 @@
         "chain_id": {
           "type": "uint64",
           "id": 3
+        },
+        "source_fingerprint": {
+          "type": "uint32",
+          "id": 4
         }
       }
     },
@@ -9474,6 +9501,10 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        },
+        "source_fingerprint": {
+          "type": "uint32",
+          "id": 3
         }
       }
     },
@@ -9518,6 +9549,10 @@
         "application_domain": {
           "type": "bytes",
           "id": 5
+        },
+        "source_fingerprint": {
+          "type": "uint32",
+          "id": 6
         }
       }
     },
@@ -9535,6 +9570,10 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        },
+        "source_fingerprint": {
+          "type": "uint32",
+          "id": 3
         }
       }
     },
@@ -11764,6 +11803,27 @@
         }
       }
     },
+    "DeviceFindMyTokenUpdate": {
+      "fields": {
+        "token": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "DeviceFindMyTokenStateGet": {
+      "fields": {}
+    },
+    "DeviceFindMyTokenState": {
+      "fields": {
+        "burned": {
+          "rule": "required",
+          "type": "bool",
+          "id": 1
+        }
+      }
+    },
     "DeviceFactoryAck": {
       "values": {
         "FACTORY_ACK_SUCCESS": 0,
@@ -11893,6 +11953,13 @@
         "FW_MGMT_UPDATER_TASK_STATUS_FAILED_ENTRY_OUT_OF_BOUNDS": 10
       }
     },
+    "DeviceFirmwareUpdatePhase": {
+      "values": {
+        "FW_MGMT_UPDATER_PHASE_PREPARE": 0,
+        "FW_MGMT_UPDATER_PHASE_INSTALL": 1,
+        "FW_MGMT_UPDATER_PHASE_VERIFY": 2
+      }
+    },
     "DeviceFirmwareTarget": {
       "fields": {
         "target_id": {
@@ -11917,7 +11984,26 @@
       }
     },
     "DeviceFirmwareUpdateRequest": {
-      "fields": {}
+      "fields": {
+        "reboot_after_update": {
+          "type": "bool",
+          "id": 1
+        }
+      }
+    },
+    "DeviceFirmwareUpdatePhaseInfo": {
+      "fields": {
+        "phase": {
+          "rule": "required",
+          "type": "DeviceFirmwareUpdatePhase",
+          "id": 1
+        },
+        "progress_percent": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
     },
     "DeviceFirmwareUpdateRecord": {
       "fields": {
@@ -11929,6 +12015,14 @@
         "status": {
           "type": "DeviceFirmwareUpdateTaskStatus",
           "id": 10
+        },
+        "progress_percent": {
+          "type": "uint32",
+          "id": 11
+        },
+        "phase_info": {
+          "type": "DeviceFirmwareUpdatePhaseInfo",
+          "id": 12
         },
         "payload_version": {
           "type": "uint32",
@@ -11945,6 +12039,14 @@
         "status": {
           "type": "bool",
           "id": 10
+        },
+        "progress_percent": {
+          "type": "bool",
+          "id": 11
+        },
+        "phase_info": {
+          "type": "bool",
+          "id": 12
         },
         "payload_version": {
           "type": "bool",
@@ -12713,6 +12815,10 @@
         "text_id": {
           "type": "uint32",
           "id": 3
+        },
+        "text_arg": {
+          "type": "string",
+          "id": 4
         }
       }
     },
@@ -12780,6 +12886,10 @@
         "title_id": {
           "type": "uint32",
           "id": 8
+        },
+        "title_arg": {
+          "type": "string",
+          "id": 9
         }
       }
     },

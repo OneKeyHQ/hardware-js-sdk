@@ -77,7 +77,8 @@ export type IProtocolV2Resources = {
 /** STM32 firmware config */
 export type IFirmwareReleaseInfo = {
   required: boolean;
-  url: string;
+  /** Legacy release artifact URL. Protocol V2 releases use component URLs. */
+  url?: string;
   /**
    * Firmware type (bitcoinonly or universal)
    * This field is not present in the remote config, but will be inferred from the firmware field name
@@ -106,7 +107,8 @@ export type IFirmwareReleaseInfo = {
   bootloaderChangelog?: {
     [k in ILocale]: string;
   };
-  fingerprint: string;
+  /** Legacy release artifact SHA-256. Protocol V2 releases use component fingerprints. */
+  fingerprint?: string;
   expectedSize?: number;
   version: IVersionArray;
   changelog: {

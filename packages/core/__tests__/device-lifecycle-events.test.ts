@@ -5,6 +5,7 @@ import {
   initConnector,
   initCore,
   isMissingDetectedProtocolV2Error,
+  isProtocolV2PeerRemovedPairingError,
   isRetryableBleConnectionError,
   isRetryableBleProtocolV2ProbeError,
 } from '../src/core';
@@ -278,6 +279,7 @@ describe('public device lifecycle events', () => {
   test.each([
     [HardwareErrorCode.RuntimeError, true],
     [HardwareErrorCode.BleDeviceBondError, false],
+    [HardwareErrorCode.BlePeerRemovedPairingInformation, false],
   ] as const)(
     'retries a Protocol V2 probe mismatch with error code %s: %s',
     (errorCode, expected) => {
@@ -297,6 +299,7 @@ describe('public device lifecycle events', () => {
     [HardwareErrorCode.BleTimeoutError, true],
     [HardwareErrorCode.PollingTimeout, false],
     [HardwareErrorCode.BleDeviceBondError, false],
+    [HardwareErrorCode.BlePeerRemovedPairingInformation, false],
   ] as const)('retries a BLE connection error with error code %s: %s', (errorCode, expected) => {
     const method = { payload: { connectProtocol: 'V2' } } as never;
     const error = {
@@ -306,6 +309,22 @@ describe('public device lifecycle events', () => {
 
     expect(isRetryableBleConnectionError(method, error)).toBe(expected);
   });
+
+  test.each([
+    ['V2', true],
+    ['V1', false],
+    [undefined, false],
+  ] as const)(
+    'treats peer-removed pairing as terminal only for Protocol %s: %s',
+    (connectProtocol, expected) => {
+      const method = { payload: { connectProtocol } } as never;
+      const error = {
+        errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
+      };
+
+      expect(isProtocolV2PeerRemovedPairingError(method, error)).toBe(expected);
+    }
+  );
 
   test('converts an internal transport disconnect into a public KnownDevice snapshot', () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);

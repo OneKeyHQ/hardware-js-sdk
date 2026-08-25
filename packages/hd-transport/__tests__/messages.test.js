@@ -88,6 +88,31 @@ describe('messages', () => {
     });
   });
 
+  test('Protocol V2 firmware update progress matches firmware-pro2 main', () => {
+    expect(v2Messages.nested.MessageType.values).toMatchObject({
+      MessageType_DeviceFindMyTokenState: 60450,
+      MessageType_DeviceFindMyTokenUpdate: 60451,
+      MessageType_DeviceFindMyTokenStateGet: 60452,
+    });
+    expect(v2Messages.nested.DeviceFirmwareUpdatePhase.values).toEqual({
+      FW_MGMT_UPDATER_PHASE_PREPARE: 0,
+      FW_MGMT_UPDATER_PHASE_INSTALL: 1,
+      FW_MGMT_UPDATER_PHASE_VERIFY: 2,
+    });
+    expect(v2Messages.nested.DeviceFirmwareUpdateRequest.fields.reboot_after_update).toMatchObject({
+      id: 1,
+      type: 'bool',
+    });
+    expect(v2Messages.nested.DeviceFirmwareUpdateRecord.fields).toMatchObject({
+      progress_percent: { id: 11, type: 'uint32' },
+      phase_info: { id: 12, type: 'DeviceFirmwareUpdatePhaseInfo' },
+    });
+    expect(v2Messages.nested.DeviceFirmwareUpdateRecordFields.fields).toMatchObject({
+      progress_percent: { id: 11, type: 'bool' },
+      phase_info: { id: 12, type: 'bool' },
+    });
+  });
+
   test('Protocol V2 conflicting enums keep their own wire values', () => {
     expect(generatedTypes.ProtocolV2FailureType).toMatchObject({
       Failure_DataError: 4,

@@ -1950,6 +1950,8 @@ export type EthereumSignTxOneKey = {
   data_length?: number;
   chain_id: number;
   tx_type?: number;
+  expected_address?: string;
+  source_fingerprint?: number;
 };
 
 // EthereumAccessListOneKey
@@ -1971,6 +1973,8 @@ export type EthereumSignTxEIP1559OneKey = {
   data_length: number;
   chain_id: number;
   access_list: EthereumAccessListOneKey[];
+  expected_address?: string;
+  source_fingerprint?: number;
 };
 
 // EthereumAuthorizationSignature
@@ -2023,6 +2027,7 @@ export type EthereumSignMessageOneKey = {
   address_n: number[];
   message: string;
   chain_id?: number;
+  source_fingerprint?: number;
 };
 
 // EthereumMessageSignatureOneKey
@@ -3815,6 +3820,7 @@ export type SolanaSignTx = {
   address_n: number[];
   raw_tx: string;
   extra_info?: SolanaTxExtraInfo;
+  source_fingerprint?: number;
 };
 
 // SolanaSignedTx
@@ -3838,12 +3844,14 @@ export type SolanaSignOffChainMessage = {
   message_version?: SolanaOffChainMessageVersion;
   message_format?: SolanaOffChainMessageFormat;
   application_domain?: string;
+  source_fingerprint?: number;
 };
 
 // SolanaSignUnsafeMessage
 export type SolanaSignUnsafeMessage = {
   address_n: number[];
   message: string;
+  source_fingerprint?: number;
 };
 
 // SolanaMessageSignature
@@ -4594,6 +4602,7 @@ export type EthereumSignTypedDataQR = {
   chain_id?: number;
   metamask_v4_compat?: boolean;
   request_id?: string;
+  source_fingerprint?: number;
 };
 
 // SetBusy
@@ -4766,6 +4775,19 @@ export type DeviceMiscUsbMscControl = {
   enable: boolean;
 };
 
+// DeviceFindMyTokenUpdate
+export type DeviceFindMyTokenUpdate = {
+  token: string;
+};
+
+// DeviceFindMyTokenStateGet
+export type DeviceFindMyTokenStateGet = {};
+
+// DeviceFindMyTokenState
+export type DeviceFindMyTokenState = {
+  burned: boolean;
+};
+
 export enum DeviceFactoryAck {
   FACTORY_ACK_SUCCESS = 0,
   FACTORY_ACK_FAIL = 1,
@@ -4837,6 +4859,12 @@ export enum DeviceFirmwareUpdateTaskStatus {
   FW_MGMT_UPDATER_TASK_STATUS_FAILED_ENTRY_OUT_OF_BOUNDS = 10,
 }
 
+export enum DeviceFirmwareUpdatePhase {
+  FW_MGMT_UPDATER_PHASE_PREPARE = 0,
+  FW_MGMT_UPDATER_PHASE_INSTALL = 1,
+  FW_MGMT_UPDATER_PHASE_VERIFY = 2,
+}
+
 // DeviceFirmwareTarget
 export type DeviceFirmwareTarget = {
   target_id: DeviceFirmwareTargetType;
@@ -4849,12 +4877,22 @@ export type DeviceFirmwareUpdateStage = {
 };
 
 // DeviceFirmwareUpdateRequest
-export type DeviceFirmwareUpdateRequest = {};
+export type DeviceFirmwareUpdateRequest = {
+  reboot_after_update?: boolean;
+};
+
+// DeviceFirmwareUpdatePhaseInfo
+export type DeviceFirmwareUpdatePhaseInfo = {
+  phase: DeviceFirmwareUpdatePhase;
+  progress_percent: number;
+};
 
 // DeviceFirmwareUpdateRecord
 export type DeviceFirmwareUpdateRecord = {
   target_id: DeviceFirmwareTargetType;
   status?: DeviceFirmwareUpdateTaskStatus;
+  progress_percent?: number;
+  phase_info?: DeviceFirmwareUpdatePhaseInfo;
   payload_version?: number;
   path?: string;
 };
@@ -4862,6 +4900,8 @@ export type DeviceFirmwareUpdateRecord = {
 // DeviceFirmwareUpdateRecordFields
 export type DeviceFirmwareUpdateRecordFields = {
   status?: boolean;
+  progress_percent?: boolean;
+  phase_info?: boolean;
   payload_version?: boolean;
   path?: boolean;
 };
@@ -5220,6 +5260,7 @@ export type ViewTip = {
   type: ViewTipType;
   text?: string;
   text_id?: number;
+  text_arg?: string;
 };
 
 // ViewRawData
@@ -5247,6 +5288,7 @@ export type ViewSignPage = {
   slide_to_confirm?: boolean;
   layout?: ViewSignLayout;
   title_id?: number;
+  title_arg?: string;
 };
 
 // ViewVerifyPage
@@ -5888,6 +5930,9 @@ export type MessageType = {
   DeviceCertificateSignature: DeviceCertificateSignature;
   DeviceCertificateSign: DeviceCertificateSign;
   DeviceMiscUsbMscControl: DeviceMiscUsbMscControl;
+  DeviceFindMyTokenUpdate: DeviceFindMyTokenUpdate;
+  DeviceFindMyTokenStateGet: DeviceFindMyTokenStateGet;
+  DeviceFindMyTokenState: DeviceFindMyTokenState;
   DeviceFactoryInfoManufactureTime: DeviceFactoryInfoManufactureTime;
   DeviceFactoryInfo: DeviceFactoryInfo;
   DeviceFactoryInfoSet: DeviceFactoryInfoSet;
@@ -5897,6 +5942,7 @@ export type MessageType = {
   DeviceFirmwareTarget: DeviceFirmwareTarget;
   DeviceFirmwareUpdateStage: DeviceFirmwareUpdateStage;
   DeviceFirmwareUpdateRequest: DeviceFirmwareUpdateRequest;
+  DeviceFirmwareUpdatePhaseInfo: DeviceFirmwareUpdatePhaseInfo;
   DeviceFirmwareUpdateRecord: DeviceFirmwareUpdateRecord;
   DeviceFirmwareUpdateRecordFields: DeviceFirmwareUpdateRecordFields;
   DeviceFirmwareUpdateStatusGet: DeviceFirmwareUpdateStatusGet;

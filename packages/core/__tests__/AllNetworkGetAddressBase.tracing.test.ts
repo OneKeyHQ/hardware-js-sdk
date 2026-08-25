@@ -95,7 +95,8 @@ describe('AllNetworkGetAddressBase tracing', () => {
       'hidden-state',
       false,
       undefined,
-      false
+      false,
+      undefined
     );
     expect(calls).toEqual(['resume-hidden-session', 'run-chain-method']);
     expect(typedCall).not.toHaveBeenCalled();
@@ -173,7 +174,13 @@ describe('AllNetworkGetAddressBase tracing', () => {
       0
     );
 
-    expect(checkPassphraseStateSafety).toHaveBeenCalledWith('hidden-state', false, undefined, true);
+    expect(checkPassphraseStateSafety).toHaveBeenCalledWith(
+      'hidden-state',
+      false,
+      undefined,
+      true,
+      undefined
+    );
     expect(calls).toEqual(['resume-cardano-session', 'run-cardano-method']);
     expect(typedCall).not.toHaveBeenCalled();
   });
@@ -212,7 +219,10 @@ describe('AllNetworkGetAddressBase tracing', () => {
         bundle: [],
       },
     });
-    method.protocolV2UnlockContext = { preflightCompleted: true };
+    method.protocolV2UnlockContext = {
+      preflightCompleted: true,
+      preflightMainPinSelected: true,
+    };
     const typedCall = jest.fn();
     method.device = {
       checkPassphraseStateSafety,
@@ -250,7 +260,13 @@ describe('AllNetworkGetAddressBase tracing', () => {
       0
     );
 
-    expect(checkPassphraseStateSafety).toHaveBeenCalledWith(undefined, true, undefined, false);
+    expect(checkPassphraseStateSafety).toHaveBeenCalledWith(
+      undefined,
+      true,
+      undefined,
+      false,
+      true
+    );
     expect(calls).toEqual(['resume-standard-session', 'run-chain-method']);
     expect(typedCall).not.toHaveBeenCalled();
   });

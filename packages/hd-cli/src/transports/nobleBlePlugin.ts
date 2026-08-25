@@ -43,6 +43,11 @@ type NobleNotificationState = {
   pendingReceivers: Set<NoblePendingReceiver>;
 };
 
+type NobleDisconnectListener = {
+  peripheral: Peripheral;
+  listener: (reason: string) => void;
+};
+
 const ONEKEY_SERVICE_UUIDS = [ONEKEY_SERVICE_UUID];
 const ONEKEY_SERVICE_UUID_ALIASES = createKnownBleUuidAliases(ONEKEY_SERVICE_UUID);
 const ONEKEY_WRITE_UUID_ALIASES = createKnownBleUuidAliases(ONEKEY_WRITE_CHARACTERISTIC_UUID);
@@ -63,6 +68,7 @@ const connectedDevices = new Map<string, Peripheral>();
 const deviceCharacteristics = new Map<string, CharacteristicPair>();
 const notificationStates = new Map<string, NobleNotificationState>();
 const notificationGenerations = new Map<string, number>();
+const disconnectListeners = new Map<string, NobleDisconnectListener>();
 
 function isOneKeyPeripheral(peripheral: Peripheral) {
   const serviceUuids = peripheral.advertisement?.serviceUuids;
@@ -108,15 +114,43 @@ function createNotificationState(deviceId: string) {
   return state;
 }
 
-function clearNotificationState(deviceId: string, reason: string) {
+function clearNotificationState(deviceId: string, reason: string | Error) {
   const state = notificationStates.get(deviceId);
   if (!state) return;
 
   notificationStates.delete(deviceId);
-  const error = new Error(reason);
+  const error = reason instanceof Error ? reason : new Error(reason);
   state.pendingReceivers.forEach(receiver => receiver.reject(error));
   state.pendingReceivers.clear();
   state.queue.length = 0;
+}
+
+function removeDisconnectListener(deviceId: string) {
+  const tracked = disconnectListeners.get(deviceId);
+  if (!tracked) return;
+  tracked.peripheral.removeListener('disconnect', tracked.listener);
+  disconnectListeners.delete(deviceId);
+}
+
+function trackUnexpectedDisconnect(deviceId: string, peripheral: Peripheral) {
+  removeDisconnectListener(deviceId);
+  const listener = (reason: string) => {
+    removeDisconnectListener(deviceId);
+    if (connectedDevices.get(deviceId) !== peripheral) return;
+
+    deviceCharacteristics.get(deviceId)?.notify.removeAllListeners('data');
+    connectedDevices.delete(deviceId);
+    deviceCharacteristics.delete(deviceId);
+    clearNotificationState(
+      deviceId,
+      ERRORS.TypedError(
+        HardwareErrorCode.BleDeviceDisconnected,
+        reason || `BLE device disconnected: ${deviceId}`
+      )
+    );
+  };
+  disconnectListeners.set(deviceId, { peripheral, listener });
+  peripheral.on('disconnect', listener);
 }
 
 function waitForNobleCleanup(registerCallback: (callback: () => void) => void) {
@@ -377,6 +411,7 @@ function writeCharacteristic(
 async function disconnectDevice(uuid: string) {
   const peripheral = connectedDevices.get(uuid);
   const characteristics = deviceCharacteristics.get(uuid);
+  removeDisconnectListener(uuid);
   clearNotificationState(uuid, `BLE device disconnected: ${uuid}`);
   if (characteristics) {
     characteristics.notify.removeAllListeners('data');
@@ -425,7 +460,9 @@ export function createNobleBlePlugin(): LowlevelTransportSharedPlugin {
         await subscribeNotifications(uuid, notificationState.generation, characteristics.notify);
         connectedDevices.set(uuid, peripheral);
         deviceCharacteristics.set(uuid, characteristics);
+        trackUnexpectedDisconnect(uuid, peripheral);
       } catch (error) {
+        removeDisconnectListener(uuid);
         clearNotificationState(uuid, `BLE notification subscription failed: ${uuid}`);
         if (characteristics) {
           characteristics.notify.removeAllListeners('data');

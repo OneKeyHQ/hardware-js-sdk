@@ -1,4 +1,11 @@
-import { EDeviceType, ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
+import {
+  EDeviceType,
+  ERRORS,
+  HardwareError,
+  HardwareErrorCode,
+  isBleStaleBondHardwareError,
+  wait,
+} from '@onekeyfe/hd-shared';
 import JSZip from 'jszip';
 import {
   DeviceRebootType,
@@ -44,6 +51,7 @@ import {
   getProtocolV2UnknownErrorText,
   isProtocolV2DeviceDisconnectedError,
 } from './protocol-v2/helpers';
+import { isProtocolV2ResponseTimeout } from './helpers/protocolV2FileWrite';
 import {
   openFirmwareByteSource,
   readFirmwareByteSourceFully,
@@ -55,6 +63,7 @@ import {
   assertFirmwareUpdatePreparedPlanDeviceIdentity,
   validateFirmwareUpdatePreparedPlan,
 } from './firmware/FirmwareUpdatePreparedPlan';
+
 import type {
   FirmwareArtifactReference,
   FirmwareUpdateV4Params,
@@ -84,6 +93,7 @@ const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
 const PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT = 15 * 1000;
 const PROTOCOL_V2_INSTALL_TIMEOUT = 5 * 60 * 1000;
 const PROTOCOL_V2_INSTALL_STATUS_INITIAL_DELAY = 1000;
+const PROTOCOL_V2_INSTALL_FINISHED_AFTER_DISCONNECT_POLLS = 4;
 const PROTOCOL_V2_TARGET_STATUS_PENDING = 0;
 const PROTOCOL_V2_TARGET_STATUS_IN_PROGRESS = 1;
 const PROTOCOL_V2_TARGET_STATUS_FINISHED = 2;
@@ -182,6 +192,11 @@ const getProtocolV2DeviceTransferProgress = (
 type ProtocolV2FirmwareUpdateStatusTarget = {
   target_id: number | string;
   status?: number | string;
+  progress_percent?: number;
+  phase_info?: {
+    phase: number | string;
+    progress_percent: number;
+  };
   payload_version?: number;
   path?: string;
 };
@@ -360,11 +375,12 @@ const isProtocolV2FirmwareStatusEndpointUnavailable = (error: unknown) => {
 };
 
 const isProtocolV2TerminalInstallStatusError = (error: unknown) =>
-  error instanceof HardwareError &&
-  (error.errorCode === HardwareErrorCode.ActionCancelled ||
-    error.errorCode === HardwareErrorCode.FirmwareError ||
-    error.errorCode === HardwareErrorCode.FirmwareVerificationFailed ||
-    error.params?.firmwareUpdateCode === PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE);
+  isBleStaleBondHardwareError(error) ||
+  (error instanceof HardwareError &&
+    (error.errorCode === HardwareErrorCode.ActionCancelled ||
+      error.errorCode === HardwareErrorCode.FirmwareError ||
+      error.errorCode === HardwareErrorCode.FirmwareVerificationFailed ||
+      error.params?.firmwareUpdateCode === PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE));
 
 const isProtocolV2TargetStatusFinished = (status: ProtocolV2FirmwareUpdateStatusTarget['status']) =>
   normalizeProtocolV2TargetStatus(status) === PROTOCOL_V2_TARGET_STATUS_FINISHED;
@@ -400,6 +416,18 @@ const normalizeProtocolV2TargetStatus = (
   }
   return undefined;
 };
+
+const PROTOCOL_V2_INSTALL_PHASE_BY_DECODED_VALUE = new Map<
+  number | string,
+  'prepare' | 'install' | 'verify'
+>([
+  [0, 'prepare'],
+  [1, 'install'],
+  [2, 'verify'],
+  ['FW_MGMT_UPDATER_PHASE_PREPARE', 'prepare'],
+  ['FW_MGMT_UPDATER_PHASE_INSTALL', 'install'],
+  ['FW_MGMT_UPDATER_PHASE_VERIFY', 'verify'],
+]);
 
 const normalizeProtocolV2Hex = (value?: string) => value?.replace(/^0x/i, '').toLowerCase();
 
@@ -456,6 +484,11 @@ const toProtocolV2FiniteNumber = (value: unknown) => {
     }
   }
   return undefined;
+};
+
+const normalizeProtocolV2ProgressPercent = (value: unknown) => {
+  const progress = toProtocolV2FiniteNumber(value);
+  return progress === undefined ? undefined : Math.min(100, Math.max(0, progress));
 };
 
 export const isProtocolV2FirmwareFingerprintValid = (
@@ -1812,6 +1845,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       if (!expectedHeaderHash || header.headerHash !== expectedHeaderHash) return false;
       return true;
     } catch (error) {
+      if (isBleStaleBondHardwareError(error)) {
+        throw error;
+      }
       Log.log(`[FirmwareUpdateV4] RESC bundle ${bundle.name} header check failed: `, error);
       return false;
     }
@@ -1905,7 +1941,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         }
         lastError = new Error('Protocol V2 device is reachable but is not in bootloader mode');
       } catch (error) {
-        if (this.isProtocolV2ReconnectIdentityError(error)) {
+        if (isBleStaleBondHardwareError(error) || this.isProtocolV2ReconnectIdentityError(error)) {
           throw error;
         }
         shouldReconnect = true;
@@ -2187,6 +2223,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         });
         return processedSize + source.size;
       } catch (error) {
+        if (isBleStaleBondHardwareError(error)) {
+          throw error;
+        }
         lastError = error;
         if (attempt < PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT) {
           await this.recoverProtocolV2FileTransfer();
@@ -2296,6 +2335,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     for (const target of matchingTargets) {
       const targetId = normalizeProtocolV2TargetId(target.target_id);
       const pathConflictsWithCurrentInstall =
+        targetId !== undefined &&
         Boolean(target.path) &&
         Boolean(resolvedExpectedPaths.get(targetId)) &&
         target.path !== resolvedExpectedPaths.get(targetId) &&
@@ -2359,16 +2399,54 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     if (expectedTargetIds.size > 0 && matchingTargets.length > 0) {
-      const hasInProgressTarget = matchingTargets.some(target =>
-        isProtocolV2TargetStatusInProgress(target.status)
-      );
+      let detailedProgress = completedTargetIds.size * 100;
+      let installProgressMetadata:
+        | {
+            installTargetId: number;
+            installPhase: 'prepare' | 'install' | 'verify';
+            installPhaseProgress: number;
+          }
+        | undefined;
+      let hasInProgressTarget = false;
+      matchingTargets.forEach(target => {
+        const targetId = normalizeProtocolV2TargetId(target.target_id);
+        if (
+          targetId === undefined ||
+          completedTargetIds.has(targetId) ||
+          !isProtocolV2TargetStatusInProgress(target.status) ||
+          (liveTargetIds && !liveTargetIds.has(targetId))
+        ) {
+          return;
+        }
+        hasInProgressTarget = true;
+        detailedProgress += normalizeProtocolV2ProgressPercent(target.progress_percent) ?? 0;
+        const installPhase = target.phase_info
+          ? PROTOCOL_V2_INSTALL_PHASE_BY_DECODED_VALUE.get(target.phase_info.phase)
+          : undefined;
+        const installPhaseProgress = normalizeProtocolV2ProgressPercent(
+          target.phase_info?.progress_percent
+        );
+        if (installPhase && installPhaseProgress !== undefined && !installProgressMetadata) {
+          installProgressMetadata = {
+            installTargetId: targetId,
+            installPhase,
+            installPhaseProgress,
+          };
+        }
+      });
       const completedProgress = Math.floor(
         (completedTargetIds.size / expectedTargetIds.size) * 100
       );
-      // The protocol exposes no per-target percentage, so report coarse progress by
-      // completed targets and use 1% once work starts to keep the UI responsive.
-      const progress = Math.min(99, Math.max(completedProgress, hasInProgressTarget ? 1 : 0));
-      this.postProgressMessage(progress, 'installingFirmware');
+      const reportedProgress = Math.floor(detailedProgress / expectedTargetIds.size);
+      const progress = Math.min(
+        99,
+        Math.max(completedProgress, reportedProgress, hasInProgressTarget ? 1 : 0)
+      );
+      if (installProgressMetadata) {
+        this.postProgressMessage(progress, 'installingFirmware', installProgressMetadata);
+      } else {
+        this.postProgressMessage(progress, 'installingFirmware');
+      }
     }
 
     return false;
@@ -2439,6 +2517,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ) {
     const expectedTargetIds = new Set(targets.map(target => target.target_id));
     const expectedPaths = new Map(targets.map(target => [target.target_id, target.path]));
+    const isBleCoprocessorInstall =
+      this.isBleReconnect() &&
+      expectedTargetIds.has(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR);
     const startTime = Date.now();
     let lastError: unknown;
     // The loader may release either USB or BLE as installation starts. Recovery reconnects
@@ -2447,6 +2528,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.protocolV2InstallNeedsReconnect = false;
     let deviceInfo: ProtocolV2DeviceInfo | undefined;
     let bleInstallLinkReady = false;
+    let installStatusDisconnectObserved = false;
+    let installReconnectObserved = false;
+    let finishedStatusSnapshotKey: string | undefined;
+    let finishedStatusSnapshotPolls = 0;
+    let fastFinishedInstallProgressReported = false;
     let installEvidenceObserved = this.protocolV2InstallTerminalSuccessObserved;
     let currentInstallStatusObserved = false;
     const liveTargetIds = new Set<number>();
@@ -2463,6 +2549,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           deviceInfo = isBleInstallReconnect
             ? undefined
             : await this.verifyProtocolV2ReconnectIdentity();
+          if (isBleInstallReconnect && installStatusDisconnectObserved) {
+            installReconnectObserved = true;
+          }
           shouldReconnect = false;
         }
         let currentDeviceInfo = deviceInfo;
@@ -2473,6 +2562,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             {
               fields: {
                 status: true,
+                progress_percent: true,
+                phase_info: true,
                 payload_version: true,
                 path: true,
               },
@@ -2502,8 +2593,74 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             const targetId = normalizeProtocolV2TargetId(target.target_id);
             return targetId !== undefined && expectedTargetIds.has(targetId);
           });
+          const matchingFinishedTargetIds = new Set<number>();
+          const matchingFinishedStatus = matchingStatusTargets
+            .map(target => {
+              const targetId = normalizeProtocolV2TargetId(target.target_id);
+              const expectedPath = targetId === undefined ? undefined : expectedPaths.get(targetId);
+              const expectedVersion =
+                targetId === undefined
+                  ? undefined
+                  : this.getExpectedProtocolV2TargetVersion(targetId);
+              const payloadVersion = toProtocolV2FiniteNumber(target.payload_version);
+              if (
+                targetId === undefined ||
+                matchingFinishedTargetIds.has(targetId) ||
+                !isProtocolV2TargetStatusFinished(target.status) ||
+                (Boolean(target.path) && Boolean(expectedPath) && target.path !== expectedPath) ||
+                (expectedVersion !== undefined &&
+                  payloadVersion !== undefined &&
+                  payloadVersion !== expectedVersion)
+              ) {
+                return undefined;
+              }
+              matchingFinishedTargetIds.add(targetId);
+              return [targetId, target.path ?? null, payloadVersion ?? null] as const;
+            })
+            .filter((target): target is readonly [number, string | null, number | null] => !!target)
+            .sort(([leftTargetId], [rightTargetId]) => leftTargetId - rightTargetId);
+          const hasCompleteMatchingFinishedStatus =
+            matchingFinishedStatus.length === expectedTargetIds.size &&
+            matchingFinishedTargetIds.size === expectedTargetIds.size &&
+            expectedTargetIds.size > 0;
+          if (
+            requireCurrentInstallStatus &&
+            installReconnectObserved &&
+            hasCompleteMatchingFinishedStatus
+          ) {
+            const nextSnapshotKey = JSON.stringify(matchingFinishedStatus);
+            if (nextSnapshotKey === finishedStatusSnapshotKey) {
+              finishedStatusSnapshotPolls += 1;
+            } else {
+              finishedStatusSnapshotKey = nextSnapshotKey;
+              finishedStatusSnapshotPolls = 1;
+            }
+          } else {
+            finishedStatusSnapshotKey = undefined;
+            finishedStatusSnapshotPolls = 0;
+          }
+          if (
+            requireCurrentInstallStatus &&
+            installReconnectObserved &&
+            hasCompleteMatchingFinishedStatus &&
+            !currentInstallStatusObserved &&
+            !this.protocolV2InstallTerminalSuccessObserved &&
+            !fastFinishedInstallProgressReported
+          ) {
+            // A fast BLE install may finish while disconnected, so IN_PROGRESS can be hidden.
+            // A status response timeout alone is not evidence that the install was accepted.
+            this.postProgressMessage(1, 'installingFirmware');
+            fastFinishedInstallProgressReported = true;
+          }
+          const finishedAfterDisconnectObserved =
+            finishedStatusSnapshotPolls >= PROTOCOL_V2_INSTALL_FINISHED_AFTER_DISCONNECT_POLLS;
           const hasCurrentInstallEvidence =
-            currentInstallStatusObserved || this.protocolV2InstallTerminalSuccessObserved;
+            currentInstallStatusObserved ||
+            this.protocolV2InstallTerminalSuccessObserved ||
+            finishedAfterDisconnectObserved;
+          if (hasCurrentInstallEvidence) {
+            installEvidenceObserved = true;
+          }
           const shouldVerifyTargetCompletion =
             !requireCurrentInstallStatus || hasCurrentInstallEvidence;
           if (
@@ -2512,7 +2669,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
               statusTargets,
               expectedTargetIds,
               expectedPaths,
-              requireCurrentInstallStatus && !this.protocolV2InstallTerminalSuccessObserved
+              requireCurrentInstallStatus &&
+                !this.protocolV2InstallTerminalSuccessObserved &&
+                !finishedAfterDisconnectObserved
                 ? liveTargetIds
                 : undefined
             )
@@ -2628,6 +2787,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
               );
             }
           } else {
+            if (
+              isBleCoprocessorInstall &&
+              isProtocolV2DeviceDisconnectedError(error) &&
+              !isProtocolV2ResponseTimeout(error)
+            ) {
+              installStatusDisconnectObserved = true;
+              finishedStatusSnapshotKey = undefined;
+              finishedStatusSnapshotPolls = 0;
+            }
             shouldReconnect = true;
             deviceInfo = undefined;
             bleInstallLinkReady = false;
@@ -2683,6 +2851,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         return;
       }
     } catch (error) {
+      if (isBleStaleBondHardwareError(error)) {
+        throw error;
+      }
       Log.log('[FirmwareUpdateV4] unable to confirm App mode before Normal reboot: ', error);
     }
     await this.protocolV2Reboot(DeviceRebootType.Normal);
@@ -2774,7 +2945,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           'Protocol V2 device is still in bootloader mode'
         );
       } catch (error) {
-        if (this.isProtocolV2ReconnectIdentityError(error)) {
+        if (isBleStaleBondHardwareError(error) || this.isProtocolV2ReconnectIdentityError(error)) {
           throw error;
         }
         shouldReconnect = true;
@@ -3031,13 +3202,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async protocolV2Reboot(rebootType: DeviceRebootType) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     try {
-      const res = await typedCall('DeviceReboot', 'Success', {
-        reboot_type: rebootType,
-      });
+      const res = await typedCall(
+        'DeviceReboot',
+        'Success',
+        {
+          reboot_type: rebootType,
+        },
+        { timeoutMs: PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT }
+      );
       this.device.markProtocolV2Reboot(rebootType);
       return res.message;
     } catch (error) {
-      if (isProtocolV2DeviceDisconnectedError(error) || isProtocolV2ReconnectProbeError(error)) {
+      if (
+        isProtocolV2DeviceDisconnectedError(error) ||
+        isProtocolV2ReconnectProbeError(error) ||
+        isProtocolV2ResponseTimeout(error)
+      ) {
         this.device.markProtocolV2Reboot(rebootType);
         return { message: 'Device rebooted successfully' };
       }

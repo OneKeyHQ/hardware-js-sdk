@@ -682,6 +682,24 @@ export const TypedError = (
   return new HardwareError({ errorCode: hardwareError, message: message ?? '', params });
 };
 
+export const isBleStaleBondHardwareError = (error: unknown): boolean => {
+  const code = (error as { errorCode?: unknown })?.errorCode;
+  return (
+    code === HardwareErrorCode.BleDeviceBondError ||
+    code === HardwareErrorCode.BlePeerRemovedPairingInformation
+  );
+};
+
+export const isBleStaleBondErrorText = (text: string): boolean => {
+  const value = text.toLowerCase();
+  return (
+    value.includes('encryption is insufficient') ||
+    value.includes('insufficient encryption') ||
+    value.includes('peer removed pairing information') ||
+    value.includes('gatt_insuf_authentication')
+  );
+};
+
 export const serializeError = (payload: any) => {
   if (payload && payload.error instanceof HardwareError) {
     return {

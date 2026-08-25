@@ -2005,7 +2005,8 @@ export class Device extends EventEmitter {
     passphraseState?: string,
     useEmptyPassphrase?: boolean,
     skipPassphraseCheck?: boolean,
-    deriveCardano?: boolean
+    deriveCardano?: boolean,
+    mainPinSelected?: boolean
   ) {
     if (this.isUnacquired()) return false;
 
@@ -2016,6 +2017,7 @@ export class Device extends EventEmitter {
         onlyMainPin: useEmptyPassphrase,
         deriveCardano,
         rejectAttachPinForMainWallet: useEmptyPassphrase === true,
+        mainPinSelected,
       });
 
     // Main wallet and unlock Attach Pin, throw safe error

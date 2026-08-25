@@ -1,4 +1,5 @@
 import { DeviceRebootType } from '@onekeyfe/hd-transport';
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { invalidParameter, validateNonEmptyString } from '../helpers/filesystemValidation';
 import { ProtocolV2FirmwareTargetType } from '../../protocols/protocol-v2/firmware';
@@ -103,6 +104,13 @@ export const getProtocolV2UnknownErrorText = (error: unknown) => {
 };
 
 export const isProtocolV2DeviceDisconnectedError = (error: unknown) => {
+  const errorCode =
+    error && typeof error === 'object'
+      ? (error as { errorCode?: number; code?: number }).errorCode ??
+        (error as { errorCode?: number; code?: number }).code
+      : undefined;
+  if (errorCode === HardwareErrorCode.BleDeviceDisconnected) return true;
+
   const message = getProtocolV2UnknownErrorText(error).toLowerCase();
   const compactMessage = message.replace(/\s+/g, '');
   return (

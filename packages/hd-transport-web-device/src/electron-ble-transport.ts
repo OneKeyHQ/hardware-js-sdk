@@ -6,7 +6,9 @@ import transport, {
   ProtocolV2LinkManager,
   TRANSPORT_EVENT,
   bytesToHex,
+  detectProtocolV2LinkDisabledError,
   hexToBytes,
+  isProtocolV2LinkDisabledError,
   probeProtocolV2 as probeProtocolV2Helper,
   writeProtocolV2BleFrame,
 } from '@onekeyfe/hd-transport';
@@ -16,6 +18,8 @@ import {
   HardwareErrorCode,
   HardwareErrorCodeMessage,
   createDeferred,
+  isBleStaleBondErrorText,
+  isBleStaleBondHardwareError,
   isHeaderChunk,
 } from '@onekeyfe/hd-shared';
 
@@ -159,7 +163,33 @@ export default class ElectronBleTransport {
 
   private nextNotificationToken = 1;
 
-  private handleBluetoothError(error: any): never {
+  private toStaleBondError(error: unknown): Error | null {
+    if (isBleStaleBondHardwareError(error)) {
+      return error as Error;
+    }
+    const errorMessage =
+      error && typeof error === 'object' && 'message' in error
+        ? String((error as { message?: unknown }).message ?? '')
+        : String(error ?? '');
+    if (!isBleStaleBondErrorText(errorMessage)) {
+      return null;
+    }
+    const normalizedErrorMessage = errorMessage.toLowerCase();
+    return ERRORS.TypedError(
+      normalizedErrorMessage.includes('peer removed pairing information')
+        ? HardwareErrorCode.BlePeerRemovedPairingInformation
+        : HardwareErrorCode.BleDeviceBondError,
+      errorMessage
+    );
+  }
+
+  private handleBluetoothError(error: any, mapProtocolV2StaleBond = false): never {
+    if (mapProtocolV2StaleBond) {
+      const staleBondError = this.toStaleBondError(error);
+      if (staleBondError) {
+        throw staleBondError;
+      }
+    }
     if (error && typeof error === 'object') {
       if ('code' in error) {
         if (error.code === HardwareErrorCode.BlePoweredOff) {
@@ -320,6 +350,9 @@ export default class ElectronBleTransport {
 
   async acquire(input: BleAcquireInput) {
     const { uuid, forceCleanRunPromise, expectedProtocol } = input;
+    const shouldMapProtocolV2StaleBond = expectedProtocol
+      ? expectedProtocol === 'V2'
+      : this.confirmedProtocolV2.has(uuid);
 
     if (!uuid) {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
@@ -356,7 +389,7 @@ export default class ElectronBleTransport {
         await window.desktopApi.nobleBle.connect(uuid);
         this.connectedDevices.add(uuid);
       } catch (error) {
-        this.handleBluetoothError(error);
+        this.handleBluetoothError(error, shouldMapProtocolV2StaleBond);
       }
 
       const mtuCleanup = this.createMtuSubscription(uuid);
@@ -367,7 +400,11 @@ export default class ElectronBleTransport {
       this.v1Buffers.set(uuid, { buffer: [], bufferLength: 0 });
       this.v2Assemblers.set(uuid, new ProtocolV2FrameAssembler(PROTOCOL_V2_BLE_FRAME_MAX_BYTES));
 
-      await window.desktopApi.nobleBle.subscribe(uuid);
+      try {
+        await window.desktopApi.nobleBle.subscribe(uuid);
+      } catch (error) {
+        this.handleBluetoothError(error, shouldMapProtocolV2StaleBond);
+      }
       await this.refreshBlePacketCapacity(uuid);
 
       const cleanup = this.createNotificationSubscription(uuid);
@@ -595,6 +632,9 @@ export default class ElectronBleTransport {
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
       this.Log?.debug('[Electron BLE] Protocol V1 GetFeatures probe failed:', error);
+      if (isProtocolV2LinkDisabledError(error)) {
+        throw error;
+      }
       return false;
     }
   }
@@ -615,6 +655,8 @@ export default class ElectronBleTransport {
         this.v2Assemblers.get(uuid)?.reset();
         this.resetProtocolV2Frames(uuid);
       },
+      shouldRethrow: error =>
+        isBleStaleBondHardwareError(error) || isProtocolV2LinkDisabledError(error),
     });
     if (!detected) {
       this.clearProbeProtocol(uuid, 'V2');
@@ -628,7 +670,15 @@ export default class ElectronBleTransport {
       throw new Error('Noble BLE API not available');
     }
 
-    await nobleBle.write(uuid, hexData, { pacingDelayMs: 0 });
+    try {
+      await nobleBle.write(uuid, hexData, { pacingDelayMs: 0 });
+    } catch (error) {
+      const staleBondError = this.toStaleBondError(error);
+      if (staleBondError) {
+        throw staleBondError;
+      }
+      throw error;
+    }
   }
 
   private async refreshBlePacketCapacity(uuid: string): Promise<void> {
@@ -702,7 +752,27 @@ export default class ElectronBleTransport {
       this.handleProtocolV2Notification(deviceId, hexData);
       return;
     }
+    const linkDisabledError = this.readProtocolV2LinkDisabledFailure(deviceId, hexData);
+    if (linkDisabledError) {
+      if (this.runPromise && this.runPromiseDeviceId === deviceId) {
+        this.runPromise.reject(linkDisabledError);
+      }
+      return;
+    }
     this.handleProtocolV1Notification(deviceId, hexData);
+  }
+
+  private readProtocolV2LinkDisabledFailure(deviceId: string, hexData: string) {
+    if (!this._messages || !this._messagesV2) return undefined;
+
+    const assembler = this.v2Assemblers.get(deviceId);
+    if (!assembler) return undefined;
+
+    return detectProtocolV2LinkDisabledError({
+      schemas: { protocolV1: this._messages, protocolV2: this._messagesV2 },
+      assembler,
+      bytes: hexToBytes(hexData),
+    });
   }
 
   private handleProtocolV2Notification(deviceId: string, hexData: string): void {
