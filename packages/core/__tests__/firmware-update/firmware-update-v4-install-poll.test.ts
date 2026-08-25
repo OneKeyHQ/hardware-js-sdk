@@ -453,7 +453,7 @@ describe('FirmwareUpdateV4 install polling', () => {
       .mockResolvedValueOnce(finishedStatus)
       .mockResolvedValueOnce(finishedStatus)
       .mockRejectedValueOnce(ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
-    const call = jest.fn().mockRejectedValue(new Error('device was disconnected'));
+    const call = jest.fn().mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.BleTimeoutError));
     const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
 
     method.device = {
@@ -590,7 +590,7 @@ describe('FirmwareUpdateV4 install polling', () => {
       .mockResolvedValueOnce(finishedStatus);
     const reconnectProtocolV2Device = jest
       .fn()
-      .mockRejectedValueOnce(new Error('device was disconnected'))
+      .mockRejectedValueOnce(ERRORS.TypedError(HardwareErrorCode.BleTimeoutError))
       .mockResolvedValueOnce(undefined);
     const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((
       callback: () => void

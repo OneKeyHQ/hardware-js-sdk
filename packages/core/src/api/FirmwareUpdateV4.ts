@@ -374,6 +374,15 @@ const isProtocolV2FirmwareStatusEndpointUnavailable = (error: unknown) => {
   );
 };
 
+const isProtocolV2InstallResponseTimeout = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+  const { code } = error as { code?: number | string };
+  return (
+    code === 'response-timeout' ||
+    /\bresponse timeout\b/i.test(getProtocolV2UnknownErrorText(error))
+  );
+};
+
 const isProtocolV2TerminalInstallStatusError = (error: unknown) =>
   isBleStaleBondHardwareError(error) ||
   (error instanceof HardwareError &&
@@ -2541,7 +2550,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       if (
         !isBleInstall ||
         !isProtocolV2DeviceDisconnectedError(error) ||
-        isProtocolV2ResponseTimeout(error)
+        isProtocolV2InstallResponseTimeout(error)
       ) {
         return;
       }
@@ -3204,7 +3213,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         '[FirmwareUpdateV4] transport released while writing install request; continue status polling'
       );
       this.protocolV2InstallNeedsReconnect = true;
-      this.protocolV2InstallDisconnectObserved = !isProtocolV2ResponseTimeout(error);
+      this.protocolV2InstallDisconnectObserved = !isProtocolV2InstallResponseTimeout(error);
     }
   }
 
