@@ -5686,6 +5686,7 @@ describe('Protocol V2 firmware update targets', () => {
     );
     expect(typedCall).not.toHaveBeenCalledWith('DeviceFirmwareUpdateRequest', 'Success', {});
     expect((method as any).protocolV2InstallNeedsReconnect).toBe(true);
+    expect((method as any).protocolV2InstallDisconnectObserved).toBe(true);
   });
 
   test.each([

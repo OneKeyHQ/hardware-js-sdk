@@ -335,7 +335,97 @@ describe('FirmwareUpdateV4 install polling', () => {
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
 
-  test('accepts stable finished BLE status after an actual install disconnect hides in-progress', async () => {
+  test.each([
+    {
+      component: 'boot',
+      targets: [{ target_id: 3, path: 'vol0:/bootloader.bin' }],
+    },
+    {
+      component: 'P1',
+      targets: [{ target_id: 4, path: 'vol0:/application_p1.bin' }],
+    },
+    {
+      component: 'P2',
+      targets: [{ target_id: 5, path: 'vol0:/application_p2.bin' }],
+    },
+    {
+      component: 'coprocessor',
+      targets: [{ target_id: 6, path: 'vol0:/coprocessor.bin' }],
+    },
+    {
+      component: 'SE',
+      targets: [
+        { target_id: 7, path: 'vol0:/se01.bin' },
+        { target_id: 8, path: 'vol0:/se02.bin' },
+        { target_id: 9, path: 'vol0:/se03.bin' },
+        { target_id: 10, path: 'vol0:/se04.bin' },
+      ],
+    },
+  ])(
+    'accepts stable finished BLE status for $component after an actual install disconnect hides in-progress',
+    async ({ targets }) => {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+          connectId: 'pro2-ble',
+        },
+      });
+      const finishedStatus = {
+        type: 'DeviceFirmwareUpdateStatus',
+        message: {
+          records: targets.map(target => ({
+            ...target,
+            status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED',
+          })),
+        },
+      };
+      const typedCall = jest
+        .fn()
+        .mockResolvedValueOnce(finishedStatus)
+        .mockImplementationOnce(() => {
+          expect(method.postProgressMessage).not.toHaveBeenCalled();
+          throw new Error('device was disconnected');
+        })
+        .mockResolvedValueOnce(finishedStatus)
+        .mockImplementationOnce(() => {
+          expect(method.postProgressMessage).toHaveBeenCalledTimes(1);
+          expect(method.postProgressMessage).toHaveBeenCalledWith(1, 'installingFirmware');
+          return finishedStatus;
+        })
+        .mockResolvedValueOnce(finishedStatus)
+        .mockResolvedValueOnce(finishedStatus)
+        .mockRejectedValueOnce(ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
+      const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+
+      method.device = {
+        getCommands: () => ({ typedCall }),
+        setCancelableAction: jest.fn(),
+      } as unknown as Device;
+      method.postProgressMessage = jest.fn();
+
+      const firmwareUpdate = method as unknown as {
+        waitForProtocolV2FirmwareUpdateComplete: (
+          value: typeof targets,
+          requireCurrentInstallStatus: boolean
+        ) => Promise<void>;
+        reconnectProtocolV2Device: (options: { skipProtocolProbe: boolean }) => Promise<void>;
+      };
+      firmwareUpdate.reconnectProtocolV2Device = reconnectProtocolV2Device;
+      (method as any).isBleReconnect = jest.fn(() => true);
+
+      await firmwareUpdate.waitForProtocolV2FirmwareUpdateComplete(targets, true);
+
+      expect(reconnectProtocolV2Device).toHaveBeenCalledWith({ skipProtocolProbe: true });
+      expect(typedCall).toHaveBeenCalledTimes(6);
+      expect(method.postProgressMessage).toHaveBeenNthCalledWith(1, 1, 'installingFirmware');
+      expect(method.postProgressMessage).toHaveBeenNthCalledWith(2, 100, 'installingFirmware');
+      expect(method.postProgressMessage).toHaveBeenCalledTimes(2);
+    },
+    10_000
+  );
+
+  test('uses a real BLE disconnect while writing the Request as install evidence', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -343,44 +433,174 @@ describe('FirmwareUpdateV4 install polling', () => {
         connectId: 'pro2-ble',
       },
     });
-    const targets = [{ target_id: 6, path: 'vol0:/coprocessor.bin' }];
+    const targets = [{ target_id: 3, path: 'vol0:/bootloader.bin' }];
     const finishedStatus = {
       type: 'DeviceFirmwareUpdateStatus',
       message: {
         records: [
           {
-            target_id: 6,
+            ...targets[0],
             status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED',
-            payload_version: 65_556,
-            path: 'vol0:/coprocessor.bin',
           },
         ],
       },
     };
     const typedCall = jest
       .fn()
+      .mockResolvedValueOnce({ type: 'Success', message: {} })
       .mockResolvedValueOnce(finishedStatus)
-      .mockImplementationOnce(() => {
-        expect(method.postProgressMessage).not.toHaveBeenCalled();
-        throw new Error('device was disconnected');
-      })
       .mockResolvedValueOnce(finishedStatus)
-      .mockImplementationOnce(() => {
-        expect(method.postProgressMessage).toHaveBeenCalledTimes(1);
-        expect(method.postProgressMessage).toHaveBeenCalledWith(1, 'installingFirmware');
-        return finishedStatus;
-      })
       .mockResolvedValueOnce(finishedStatus)
       .mockResolvedValueOnce(finishedStatus)
       .mockRejectedValueOnce(ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
+    const call = jest.fn().mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.BleTimeoutError));
     const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
 
-    (method as any).params = {
-      expectedTargetVersions: { coprocessor: '1.0.20' },
+    method.device = {
+      getCommands: () => ({ typedCall, call, cancelDevice: jest.fn() }),
+      createProtocolV2UiPhaseMetadata: jest.fn().mockReturnValue(undefined),
+      toMessageObject: jest.fn().mockReturnValue({ connectId: 'pro2-ble' }),
+      setCancelableAction: jest.fn(),
+      clearCancelableAction: jest.fn(),
+    } as unknown as Device;
+    method.postMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+
+    const firmwareUpdate = method as unknown as {
+      protocolV2StartFirmwareUpdate: (params: { targets: typeof targets }) => Promise<void>;
+      waitForProtocolV2FirmwareUpdateComplete: (
+        value: typeof targets,
+        requireCurrentInstallStatus: boolean
+      ) => Promise<void>;
+      reconnectProtocolV2Device: (options: { skipProtocolProbe: boolean }) => Promise<void>;
     };
+    firmwareUpdate.reconnectProtocolV2Device = reconnectProtocolV2Device;
+    (method as any).isBleReconnect = jest.fn(() => true);
+
+    await firmwareUpdate.protocolV2StartFirmwareUpdate({ targets });
+    await firmwareUpdate.waitForProtocolV2FirmwareUpdateComplete(targets, true);
+
+    expect(reconnectProtocolV2Device).toHaveBeenCalledWith({ skipProtocolProbe: true });
+    expect(method.postProgressMessage).toHaveBeenNthCalledWith(1, 1, 'installingFirmware');
+    expect(method.postProgressMessage).toHaveBeenNthCalledWith(2, 100, 'installingFirmware');
+    expect(typedCall).toHaveBeenCalledTimes(5);
+  }, 10_000);
+
+  test('does not use a Request response timeout as BLE install evidence', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        connectId: 'pro2-ble',
+      },
+    });
+    const targets = [{ target_id: 3, path: 'vol0:/bootloader.bin' }];
+    const finishedStatus = {
+      type: 'DeviceFirmwareUpdateStatus',
+      message: {
+        records: [
+          {
+            ...targets[0],
+            status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED',
+          },
+        ],
+      },
+    };
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ type: 'Success', message: {} })
+      .mockResolvedValueOnce(finishedStatus)
+      .mockResolvedValueOnce(finishedStatus)
+      .mockResolvedValueOnce(finishedStatus)
+      .mockResolvedValueOnce(finishedStatus)
+      .mockRejectedValueOnce(ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
+    const call = jest
+      .fn()
+      .mockRejectedValue(
+        ERRORS.TypedError(
+          HardwareErrorCode.BleTimeoutError,
+          'device was disconnected after Lowlevel response timeout'
+        )
+      );
+    const reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
 
     method.device = {
-      getCommands: () => ({ typedCall }),
+      getCommands: () => ({ typedCall, call, cancelDevice: jest.fn() }),
+      createProtocolV2UiPhaseMetadata: jest.fn().mockReturnValue(undefined),
+      toMessageObject: jest.fn().mockReturnValue({ connectId: 'pro2-ble' }),
+      setCancelableAction: jest.fn(),
+      clearCancelableAction: jest.fn(),
+    } as unknown as Device;
+    method.postMessage = jest.fn();
+    method.postProgressMessage = jest.fn();
+
+    const firmwareUpdate = method as unknown as {
+      protocolV2StartFirmwareUpdate: (params: { targets: typeof targets }) => Promise<void>;
+      waitForProtocolV2FirmwareUpdateComplete: (
+        value: typeof targets,
+        requireCurrentInstallStatus: boolean
+      ) => Promise<void>;
+      reconnectProtocolV2Device: (options: { skipProtocolProbe: boolean }) => Promise<void>;
+    };
+    firmwareUpdate.reconnectProtocolV2Device = reconnectProtocolV2Device;
+    (method as any).isBleReconnect = jest.fn(() => true);
+
+    await firmwareUpdate.protocolV2StartFirmwareUpdate({ targets });
+    await expect(
+      firmwareUpdate.waitForProtocolV2FirmwareUpdateComplete(targets, true)
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.ActionCancelled,
+    });
+
+    expect(reconnectProtocolV2Device).toHaveBeenCalledWith({ skipProtocolProbe: true });
+    expect(method.postProgressMessage).not.toHaveBeenCalled();
+  }, 10_000);
+
+  test('records a real BLE disconnect that occurs during install reconnect', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        connectId: 'pro2-ble',
+      },
+    });
+    const targets = [{ target_id: 3, path: 'vol0:/bootloader.bin' }];
+    const finishedStatus = {
+      type: 'DeviceFirmwareUpdateStatus',
+      message: {
+        records: [
+          {
+            ...targets[0],
+            status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED',
+          },
+        ],
+      },
+    };
+    const typedCall = jest
+      .fn()
+      .mockRejectedValueOnce(
+        ERRORS.TypedError(
+          HardwareErrorCode.BleTimeoutError,
+          'Lowlevel response timeout after 15000ms for DeviceFirmwareUpdateStatusGet'
+        )
+      )
+      .mockResolvedValueOnce(finishedStatus)
+      .mockResolvedValueOnce(finishedStatus)
+      .mockResolvedValueOnce(finishedStatus)
+      .mockResolvedValueOnce(finishedStatus);
+    const reconnectProtocolV2Device = jest
+      .fn()
+      .mockRejectedValueOnce(ERRORS.TypedError(HardwareErrorCode.BleTimeoutError))
+      .mockResolvedValueOnce(undefined);
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+      callback: () => void
+    ) => {
+      callback();
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    method.device = {
+      getCommands: () => ({ typedCall, cancelDevice: jest.fn() }),
       setCancelableAction: jest.fn(),
     } as unknown as Device;
     method.postProgressMessage = jest.fn();
@@ -395,14 +615,95 @@ describe('FirmwareUpdateV4 install polling', () => {
     firmwareUpdate.reconnectProtocolV2Device = reconnectProtocolV2Device;
     (method as any).isBleReconnect = jest.fn(() => true);
 
-    await firmwareUpdate.waitForProtocolV2FirmwareUpdateComplete(targets, true);
+    try {
+      await firmwareUpdate.waitForProtocolV2FirmwareUpdateComplete(targets, true);
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
 
-    expect(reconnectProtocolV2Device).toHaveBeenCalledWith({ skipProtocolProbe: true });
-    expect(typedCall).toHaveBeenCalledTimes(6);
+    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(2);
     expect(method.postProgressMessage).toHaveBeenNthCalledWith(1, 1, 'installingFirmware');
     expect(method.postProgressMessage).toHaveBeenNthCalledWith(2, 100, 'installingFirmware');
-    expect(method.postProgressMessage).toHaveBeenCalledTimes(2);
-  }, 10_000);
+  });
+
+  test('does not use a reconnect response timeout as BLE install evidence', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        connectId: 'pro2-ble',
+      },
+    });
+    const targets = [{ target_id: 3, path: 'vol0:/bootloader.bin' }];
+    const finishedStatus = {
+      type: 'DeviceFirmwareUpdateStatus',
+      message: {
+        records: [
+          {
+            ...targets[0],
+            status: 'FW_MGMT_UPDATER_TASK_STATUS_FINISHED',
+          },
+        ],
+      },
+    };
+    const typedCall = jest
+      .fn()
+      .mockRejectedValueOnce(
+        ERRORS.TypedError(
+          HardwareErrorCode.BleTimeoutError,
+          'Lowlevel response timeout after 15000ms for DeviceFirmwareUpdateStatusGet'
+        )
+      )
+      .mockResolvedValueOnce(finishedStatus)
+      .mockResolvedValueOnce(finishedStatus)
+      .mockResolvedValueOnce(finishedStatus)
+      .mockResolvedValueOnce(finishedStatus)
+      .mockRejectedValueOnce(ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
+    const reconnectProtocolV2Device = jest
+      .fn()
+      .mockRejectedValueOnce(
+        ERRORS.TypedError(
+          HardwareErrorCode.BleTimeoutError,
+          'device was disconnected after Lowlevel response timeout'
+        )
+      )
+      .mockResolvedValueOnce(undefined);
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+      callback: () => void
+    ) => {
+      callback();
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    method.device = {
+      getCommands: () => ({ typedCall, cancelDevice: jest.fn() }),
+      setCancelableAction: jest.fn(),
+    } as unknown as Device;
+    method.postProgressMessage = jest.fn();
+
+    const firmwareUpdate = method as unknown as {
+      waitForProtocolV2FirmwareUpdateComplete: (
+        value: typeof targets,
+        requireCurrentInstallStatus: boolean
+      ) => Promise<void>;
+      reconnectProtocolV2Device: (options: { skipProtocolProbe: boolean }) => Promise<void>;
+    };
+    firmwareUpdate.reconnectProtocolV2Device = reconnectProtocolV2Device;
+    (method as any).isBleReconnect = jest.fn(() => true);
+
+    try {
+      await expect(
+        firmwareUpdate.waitForProtocolV2FirmwareUpdateComplete(targets, true)
+      ).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.ActionCancelled,
+      });
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+
+    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(2);
+    expect(method.postProgressMessage).not.toHaveBeenCalled();
+  });
 
   test('rejects stable stale finished BLE status after a status response timeout', async () => {
     const method = new FirmwareUpdateV4({
