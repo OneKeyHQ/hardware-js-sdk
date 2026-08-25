@@ -128,17 +128,19 @@ const BLE_CONNECT_SCAN_TIMEOUT_MS = 1500;
 // genuine-check session (device attestation transcript) through this URL.
 // The SDK, not the caller, must own which origins are trusted: a caller that
 // could point this at an arbitrary host would leak the attestation transcript
-// to it and let that host dictate the "isGenuine" verdict. Only these exact
-// hostnames are ever accepted; the path must be the relay's session-token
-// route with no userinfo/query/fragment/non-default port.
-//
-// Mirrors app-monorepo's `ledgerAttestationRelayUrl.ts` derivation
-// (`attestation.<rebate-host-suffix>`): staging relay for `rebate.onekeytest.com`,
-// production relay for `rebate.onekey.com`.
-const LEDGER_RELAY_ALLOWED_HOSTS = new Set<string>([
-  'attestation.onekeytest.com',
-  'attestation.onekey.com',
-]);
+// to it and let that host dictate the "isGenuine" verdict. The hostname must
+// be, or be a subdomain of, one of these OneKey-owned root domains — not
+// pinned to any specific subdomain name, since that's an operational detail
+// that can change without this allowlist needing a code update. The path
+// must still be the relay's session-token route with no userinfo/query/
+// fragment/non-default port.
+const LEDGER_RELAY_ALLOWED_ROOT_DOMAINS = ['onekeytest.com', 'onekey.com'];
+
+function isAllowedLedgerRelayHost(hostname: string): boolean {
+  return LEDGER_RELAY_ALLOWED_ROOT_DOMAINS.some(
+    root => hostname === root || hostname.endsWith(`.${root}`),
+  );
+}
 const LEDGER_RELAY_PATH_PREFIX = '/v1/ledger/session/';
 const LEDGER_RELAY_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
 const MAX_LEDGER_RELAY_URL_LENGTH = 2048;
@@ -158,7 +160,7 @@ function assertAllowedLedgerRelayUrl(rawUrl: string): void {
     : '';
   if (
     parsed.protocol !== 'wss:' ||
-    !LEDGER_RELAY_ALLOWED_HOSTS.has(parsed.hostname) ||
+    !isAllowedLedgerRelayHost(parsed.hostname) ||
     parsed.port !== '' ||
     parsed.username !== '' ||
     parsed.password !== '' ||

@@ -73,15 +73,33 @@ describe('LedgerConnectorBase runtime genuine-check relay', () => {
     ).rejects.toThrow('not allowed');
   });
 
-  it('rejects a host that is not on the SDK-owned allowlist', async () => {
+  it('rejects a host that is not on any OneKey root domain', async () => {
     const connector = new LedgerConnectorBase(async () => ({}));
 
-    await expect(
-      connector.configure({
-        ledgerGenuineCheckWebSocketUrl:
-          'wss://attacker.example/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
-      })
-    ).rejects.toThrow('not allowed');
+    for (const url of [
+      'wss://attacker.example/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
+      // Lookalike hosts must not slip through a naive suffix/substring check.
+      'wss://notonekeytest.com/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
+      'wss://onekeytest.com.attacker.example/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
+    ]) {
+      await expect(connector.configure({ ledgerGenuineCheckWebSocketUrl: url })).rejects.toThrow(
+        'not allowed'
+      );
+    }
+  });
+
+  it('accepts any subdomain of an allowed root domain, not just a pinned name', async () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+
+    for (const url of [
+      'wss://onekeytest.com/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
+      'wss://relay.onekeytest.com/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
+      'wss://ws.onekey.com/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
+    ]) {
+      await expect(
+        connector.configure({ ledgerGenuineCheckWebSocketUrl: url })
+      ).resolves.toBeUndefined();
+    }
   });
 
   it('rejects a relay URL carrying userinfo, query, fragment, or a non-default port', async () => {
