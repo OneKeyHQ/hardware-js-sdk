@@ -886,7 +886,6 @@ export class LedgerAdapter implements IHardwareWallet {
         return success({
           vendor: 'ledger' as const,
           verified: false,
-          note: 'Ledger genuine-check returned NOT genuine.',
         });
       }
       if (!result.deviceId) {
@@ -902,7 +901,6 @@ export class LedgerAdapter implements IHardwareWallet {
         vendor: 'ledger' as const,
         verified: result.isGenuine,
         deviceId: result.deviceId,
-        note: 'Verified by Ledger genuine-check backend; deviceId = sha3_256(attestation pubkey).',
       });
     } catch (err) {
       return this.errorToFailure(err);

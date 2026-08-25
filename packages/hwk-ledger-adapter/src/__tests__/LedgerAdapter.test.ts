@@ -172,7 +172,6 @@ describe('LedgerAdapter', () => {
       payload: {
         vendor: 'ledger',
         verified: false,
-        note: 'Ledger genuine-check returned NOT genuine.',
       },
     });
   });

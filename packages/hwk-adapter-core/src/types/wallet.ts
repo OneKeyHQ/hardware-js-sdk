@@ -85,7 +85,6 @@ export type DeviceAuthenticityResult = {
   caPubKey?: string;
   usedDebugKey?: boolean;
   error?: string;
-  note?: string;
   /**
    * Trezor-only server-verifiable envelope. The backend must verify this proof
    * against the nonce stored for the challenge session; it must not trust the
