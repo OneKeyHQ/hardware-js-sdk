@@ -565,6 +565,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private protocolV2InstallNeedsReconnect = false;
 
+  private protocolV2InstallDisconnectObserved = false;
+
   private protocolV2InstallTerminalSuccessObserved = false;
 
   private protocolV2LastRuntimeProbeFeatures?: Features;
@@ -2517,9 +2519,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ) {
     const expectedTargetIds = new Set(targets.map(target => target.target_id));
     const expectedPaths = new Map(targets.map(target => [target.target_id, target.path]));
-    const isBleCoprocessorInstall =
-      this.isBleReconnect() &&
-      expectedTargetIds.has(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR);
+    const isBleInstall = this.isBleReconnect();
     const startTime = Date.now();
     let lastError: unknown;
     // The loader may release either USB or BLE as installation starts. Recovery reconnects
@@ -2528,7 +2528,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.protocolV2InstallNeedsReconnect = false;
     let deviceInfo: ProtocolV2DeviceInfo | undefined;
     let bleInstallLinkReady = false;
-    let installStatusDisconnectObserved = false;
+    let installStatusDisconnectObserved = isBleInstall && this.protocolV2InstallDisconnectObserved;
+    this.protocolV2InstallDisconnectObserved = false;
     let installReconnectObserved = false;
     let finishedStatusSnapshotKey: string | undefined;
     let finishedStatusSnapshotPolls = 0;
@@ -2536,6 +2537,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     let installEvidenceObserved = this.protocolV2InstallTerminalSuccessObserved;
     let currentInstallStatusObserved = false;
     const liveTargetIds = new Set<number>();
+    const recordBleInstallDisconnect = (error: unknown) => {
+      if (
+        !isBleInstall ||
+        !isProtocolV2DeviceDisconnectedError(error) ||
+        isProtocolV2ResponseTimeout(error)
+      ) {
+        return;
+      }
+      installStatusDisconnectObserved = true;
+      installReconnectObserved = false;
+      finishedStatusSnapshotKey = undefined;
+      finishedStatusSnapshotPolls = 0;
+    };
 
     while (Date.now() - startTime < PROTOCOL_V2_INSTALL_TIMEOUT) {
       // A transport release caused by an explicit workflow cancellation must not
@@ -2787,15 +2801,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
               );
             }
           } else {
-            if (
-              isBleCoprocessorInstall &&
-              isProtocolV2DeviceDisconnectedError(error) &&
-              !isProtocolV2ResponseTimeout(error)
-            ) {
-              installStatusDisconnectObserved = true;
-              finishedStatusSnapshotKey = undefined;
-              finishedStatusSnapshotPolls = 0;
-            }
+            recordBleInstallDisconnect(error);
             shouldReconnect = true;
             deviceInfo = undefined;
             bleInstallLinkReady = false;
@@ -2820,6 +2826,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         ) {
           throw error;
         }
+        recordBleInstallDisconnect(error);
         shouldReconnect = true;
         deviceInfo = undefined;
         bleInstallLinkReady = false;
@@ -3154,6 +3161,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }) {
     this.protocolV2LastRuntimeProbeFeatures = undefined;
     this.protocolV2InstallNeedsReconnect = false;
+    this.protocolV2InstallDisconnectObserved = false;
     this.protocolV2InstallTerminalSuccessObserved = false;
     const commands = this.device.getCommands();
     await commands.typedCall('DeviceFirmwareUpdateStage', 'Success', { targets });
@@ -3196,6 +3204,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         '[FirmwareUpdateV4] transport released while writing install request; continue status polling'
       );
       this.protocolV2InstallNeedsReconnect = true;
+      this.protocolV2InstallDisconnectObserved = !isProtocolV2ResponseTimeout(error);
     }
   }
 
