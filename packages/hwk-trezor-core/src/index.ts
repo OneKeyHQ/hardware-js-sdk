@@ -80,6 +80,18 @@ export type TrezorCallOptions = {
   thpState?: TrezorThpState;
 };
 
+type TrezorTransportAbortOptions = AbortSignal | { signal?: AbortSignal };
+
+const unwrapTransportAbortSignal = (
+  options?: TrezorTransportAbortOptions
+): AbortSignal | undefined => {
+  if (!options) return undefined;
+  if ('addEventListener' in options && typeof options.addEventListener === 'function') {
+    return options;
+  }
+  return (options as { signal?: AbortSignal }).signal;
+};
+
 export type TrezorThpRawTransport = {
   write?(connectId: string, data: Uint8Array): Promise<void>;
   read?(connectId: string, timeoutMs?: number): Promise<Uint8Array | undefined>;
@@ -164,13 +176,13 @@ export class TrezorCore {
       const response = await callThpMessage({
         thpState,
         chunks,
-        apiWrite: async (chunk, signal) => {
-          await this.transport.write(chunk, signal);
+        apiWrite: async (chunk, options) => {
+          await this.transport.write(chunk, unwrapTransportAbortSignal(options));
 
           return { success: true as const, payload: undefined };
         },
-        apiRead: async signal => {
-          const payload = await this.transport.read(signal);
+        apiRead: async options => {
+          const payload = await this.transport.read(unwrapTransportAbortSignal(options));
 
           return { success: true as const, payload: toRuntimeBuffer(payload) };
         },

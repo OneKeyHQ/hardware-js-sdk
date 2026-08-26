@@ -4972,7 +4972,7 @@
   resolved "https://registry.yarnpkg.com/@noble/ciphers/-/ciphers-1.3.0.tgz#f64b8ff886c240e644e5573c097f86e5b43676dc"
   integrity sha512-2I0gnIVPtfnMw9ee9h1dJG7tp81+8Ob3OJb3Mv37rx5L40/b0i7djjCVvGOVqc9AEIQyvyu1i6ypKdFw8R8gQw==
 
-"@noble/curves@1.2.0", "@noble/curves@1.9.7", "@noble/curves@^1.1.0", "@noble/curves@^1.3.0", "@noble/curves@^1.4.2", "@noble/curves@~1.4.0":
+"@noble/curves@1.2.0", "@noble/curves@1.9.7", "@noble/curves@^1.1.0", "@noble/curves@^1.3.0", "@noble/curves@^1.4.2", "@noble/curves@^1.9.7", "@noble/curves@~1.4.0":
   version "1.9.7"
   resolved "https://registry.yarnpkg.com/@noble/curves/-/curves-1.9.7.tgz#79d04b4758a43e4bca2cbdc62e7771352fa6b951"
   integrity sha512-gbKGcRUYIjA3/zCCNaWDciTMFI0dCkvou3TL8Zmy5Nc7sJ47a0jtOeZoTaMxkuqRo9cRhjOdZJXegxYE5FN/xw==
@@ -5268,6 +5268,126 @@
   version "2.2.67"
   resolved "https://registry.npmjs.org/@onekeyfe/cross-inpage-provider-types/-/cross-inpage-provider-types-2.2.67.tgz#e36a59855a1d781f296d7563a93cac868ae46098"
   integrity sha512-sjTF8kpcxWrZtFfHtdQhJ6KneyLTmg+Z4rnn0acEK5Vwoy07EjmF9xjBTyMoInrNwPc7OIwkaiXX+JYr0ovNgw==
+
+"@onekeyfe/hd-ble-sdk@1.2.2-alpha.0":
+  version "1.2.2-alpha.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-ble-sdk/-/hd-ble-sdk-1.2.2-alpha.0.tgz#89ae8593ee77de53d8b2ab409ed0d4023280b647"
+  integrity sha512-IcUYLx++KxrMCMZH3qHZHqU2l7iG5xTjyWLgyCztAOJCMl7SzK0PMYImreZ4FpYaqy/0LVBP7s0dfmSV6G5aKg==
+  dependencies:
+    "@onekeyfe/hd-core" "1.2.2-alpha.0"
+    "@onekeyfe/hd-shared" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport-react-native" "1.2.2-alpha.0"
+
+"@onekeyfe/hd-common-connect-sdk@1.2.2-alpha.0":
+  version "1.2.2-alpha.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-common-connect-sdk/-/hd-common-connect-sdk-1.2.2-alpha.0.tgz#1d8dfe4d008fe02f3093068dc223588ad89cb35d"
+  integrity sha512-w+5CjpyIjDKIuzEnrYZej8fXXlUXCTNfbOco0OC6gjDwoJiBGH4mmdA9cA/ChmNoV2Uaw33CKqHI2rg48h4Ofw==
+  dependencies:
+    "@onekeyfe/hd-core" "1.2.2-alpha.0"
+    "@onekeyfe/hd-shared" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport-emulator" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport-http" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport-lowlevel" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport-usb" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport-web-device" "1.2.2-alpha.0"
+
+"@onekeyfe/hd-core@1.2.2-alpha.0":
+  version "1.2.2-alpha.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-core/-/hd-core-1.2.2-alpha.0.tgz#158ce0a7e682d2ff50c5333b26fd9a3dad1a3972"
+  integrity sha512-L/Rd0TlBsD43x8KaZ34FNcSsb6hrZy6cb/rMeb510H7yOlRyTTmKrGAMOQMD6vAYxA5dIfXBi1AYIU0tSjEK/w==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.0"
+    axios "1.15.2"
+    bignumber.js "^9.0.2"
+    buffer "^6.0.3"
+    bytebuffer "^5.0.1"
+    jpeg-js "^0.4.4"
+    jszip "^3.10.1"
+    parse-uri "^1.0.7"
+    semver "^7.3.7"
+
+"@onekeyfe/hd-shared@1.2.2-alpha.0":
+  version "1.2.2-alpha.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-shared/-/hd-shared-1.2.2-alpha.0.tgz#f1ded8189d9b9658841a8bf22bb5133f2b38609e"
+  integrity sha512-q4c6CpVlwSbQ+eBEZCXJ4LmnIcJquG7BDPbH6OHZKqFGKWxmLU6CcOyB8SeAmTaJt+BjYbe2qkUG7Y6MQZxHzQ==
+
+"@onekeyfe/hd-transport-electron@1.2.2-alpha.0":
+  version "1.2.2-alpha.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-transport-electron/-/hd-transport-electron-1.2.2-alpha.0.tgz#16c759d721c9fef3ed983beffa8f15af6ab58d14"
+  integrity sha512-cc+3LJKN3FQZ0Q6E4i/2+NIUs1dJjOFCjU6lS6cwX3SMJZd3nedCL8OzSZRQdHqSC3R1gnUuEwwLcuKynSNJKA==
+  dependencies:
+    "@onekeyfe/hd-core" "1.2.2-alpha.0"
+    "@onekeyfe/hd-shared" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.0"
+    "@stoprocent/noble" "2.3.16"
+    p-retry "^4.6.2"
+
+"@onekeyfe/hd-transport-emulator@1.2.2-alpha.0":
+  version "1.2.2-alpha.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-transport-emulator/-/hd-transport-emulator-1.2.2-alpha.0.tgz#416b14fbc6f7905b885629b3bfd5c3cb0d4a0e47"
+  integrity sha512-KCqh8EVbcLfflDGYHVcRPgDGxlfwgF2zILUpSQSBGkF5zAaTU8Lo8JQ087/mS9TKYHKMN9oKDNheqNCv2GHOeg==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.0"
+    axios "1.15.2"
+    secure-json-parse "^4.0.0"
+
+"@onekeyfe/hd-transport-http@1.2.2-alpha.0":
+  version "1.2.2-alpha.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-transport-http/-/hd-transport-http-1.2.2-alpha.0.tgz#7b6c011a5d41728d914f622abca6d137e255c24c"
+  integrity sha512-9MS1K7ZVJpVPE7HptBDj0iRwfHAXKU+Y8kQGV/Fuujdjmvm1ZTom5ep8vAP+6e/0T4iFyrGUarqKHIKJImlhXQ==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.0"
+    axios "1.15.2"
+    secure-json-parse "^4.0.0"
+
+"@onekeyfe/hd-transport-lowlevel@1.2.2-alpha.0":
+  version "1.2.2-alpha.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-transport-lowlevel/-/hd-transport-lowlevel-1.2.2-alpha.0.tgz#8036df1cb6a3183e867dfb8f3c87a41d9912c335"
+  integrity sha512-U6wFpGeNoHHhJ4fy82wMLm1PPXIjEqI6Sc7Bmg10hHA9J1kyhb8AdqZW/mDrthSbMtC4FH3eqVpBXzzzTdRX1w==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.0"
+
+"@onekeyfe/hd-transport-react-native@1.2.2-alpha.0":
+  version "1.2.2-alpha.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-transport-react-native/-/hd-transport-react-native-1.2.2-alpha.0.tgz#e80cc21338b11f5fc98b558a9533f5979a393e34"
+  integrity sha512-gqPVLzGept9XE7cA2LhenXLhIsTXVNSEonIU6KSlhgItax6LV904xZ5DXR7OaVU4nfYKyfGGn/fnFQwcq75vcQ==
+  dependencies:
+    "@onekeyfe/hd-core" "1.2.2-alpha.0"
+    "@onekeyfe/hd-shared" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.0"
+    "@onekeyfe/react-native-ble-utils" "^0.1.6"
+    react-native-ble-plx "3.5.1"
+
+"@onekeyfe/hd-transport-usb@1.2.2-alpha.0":
+  version "1.2.2-alpha.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-transport-usb/-/hd-transport-usb-1.2.2-alpha.0.tgz#152d57ba450da5a11e8232f843cff89050ce8061"
+  integrity sha512-OG8MjVuGlfa2TT66snXnf+QcAGez+rd9EEu5+tWZL9vie4yhgWIbbgAlyh6jj6cU26cmhSUMZKdlPiF1uT7xxA==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.0"
+    bytebuffer "^5.0.1"
+    usb "^2.14.0"
+
+"@onekeyfe/hd-transport-web-device@1.2.2-alpha.0":
+  version "1.2.2-alpha.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-transport-web-device/-/hd-transport-web-device-1.2.2-alpha.0.tgz#39087f9e5c81988d5a96f487640500f999ff72fb"
+  integrity sha512-fdsWRXNXnseJ/FTwx6T2mJeE1R1tmg6gDbwzlhiykdhTqp2EPPrdNRPcYE3A84c2tBQo6DPSvOJ4l2jd4GacMw==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.2.2-alpha.0"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.0"
+
+"@onekeyfe/hd-transport@1.2.2-alpha.0":
+  version "1.2.2-alpha.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-transport/-/hd-transport-1.2.2-alpha.0.tgz#59917427df8edb30aeeaa6c05f1740c9cbb77260"
+  integrity sha512-gENRVvmTuS3+4Avk2o2M+qMlbIN/B3NLKbxkBXo9dazoDyiKdpHmJlwlP05R/kwdhPNapoKyG2xuJ3RMCqJRww==
+  dependencies:
+    bytebuffer "^5.0.1"
+    long "^4.0.0"
+    protobufjs "^6.11.2"
 
 "@onekeyfe/hwk-adapter-core@1.1.34-alpha.1":
   version "1.1.34-alpha.1"
@@ -9295,11 +9415,6 @@
   resolved "https://registry.yarnpkg.com/@types/w3c-web-usb/-/w3c-web-usb-1.0.10.tgz#cf89cccd2d93b6245e784c19afe0a9f5038d4528"
   integrity sha512-CHgUI5kTc/QLMP8hODUHhge0D4vx+9UiAwIGiT0sTy/B2XpdX1U5rJt6JSISgr6ikRT7vxV9EVAFeYZqUnl1gQ==
 
-"@types/w3c-web-usb@^1.0.14":
-  version "1.0.14"
-  resolved "https://registry.yarnpkg.com/@types/w3c-web-usb/-/w3c-web-usb-1.0.14.tgz#9b2c8e723045e7bf8018d47efe1b736815b23b38"
-  integrity sha512-Qu3Nn6JFuF4+sHKYl+IcX9vYiI40ogleXzFFSxoE1W94rG98o/kXs8uJ0QSfFzuwBCZWlGfUGpPkgwuuX4PchA==
-
 "@types/w3c-web-usb@^1.0.6":
   version "1.0.6"
   resolved "https://registry.yarnpkg.com/@types/w3c-web-usb/-/w3c-web-usb-1.0.6.tgz#5d8560d0d9f585ffc80865bc773db7bc975b680c"
@@ -11184,7 +11299,12 @@ bigint-buffer@^1.1.5:
   dependencies:
     bindings "^1.3.0"
 
-bignumber.js@^9.0.1, bignumber.js@^9.3.1:
+bignumber.js@^11.1.2:
+  version "11.1.5"
+  resolved "https://registry.yarnpkg.com/bignumber.js/-/bignumber.js-11.1.5.tgz#0f678769f989e6947138d16adaaaa475a9b0bc65"
+  integrity sha512-6WmzCNtUnfKpbozq+hOgWaZMMzORmYBwF1xZScyoIX3QRYWeKTtxxwDOW5tIz7C9BdjkIYHGTcelCLkXg0mndw==
+
+bignumber.js@^9.0.1:
   version "9.3.1"
   resolved "https://registry.yarnpkg.com/bignumber.js/-/bignumber.js-9.3.1.tgz#759c5aaddf2ffdc4f154f7b493e1c8770f88c4d7"
   integrity sha512-Ko0uX15oIUS7wJ3Rb30Fs6SkVbLmPBAKdlm7q9+ak9bbIeFf0MwuBsQV6z7+X768/cHsfg+WlysDWJcmthjsjQ==

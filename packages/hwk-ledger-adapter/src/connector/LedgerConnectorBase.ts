@@ -36,6 +36,7 @@ import {
 } from './chains';
 import { DeviceAppsManager } from '../device-apps/DeviceAppsManager';
 import { collapseSignerInteraction } from './chains/utils';
+import { deviceActionToPromise } from '../signer/deviceActionToPromise';
 
 import type {
   DeviceApps,
@@ -49,6 +50,7 @@ import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type {
   ConnectionType,
   ConnectorCallResult,
+  ConnectorConfig,
   ConnectorDevice,
   ConnectorEventMap,
   ConnectorEventType,
@@ -118,6 +120,57 @@ const HARDWARE_ERROR_CODE_VALUES = new Set<number>(
 // Slow-advertising peripherals (screensaver, post-unpair) can advertise on
 // ~1s intervals, so the 800ms list-scan window is too tight at connect time.
 const BLE_CONNECT_SCAN_TIMEOUT_MS = 1500;
+
+// ---------------------------------------------------------------------------
+// Ledger genuine-check relay allowlist
+//
+// `configure({ ledgerGenuineCheckWebSocketUrl })` rebuilds DMK to route the
+// genuine-check session (device attestation transcript) through this URL.
+// The SDK, not the caller, must own which origins are trusted: a caller that
+// could point this at an arbitrary host would leak the attestation transcript
+// to it and let that host dictate the "isGenuine" verdict. The hostname must
+// be, or be a subdomain of, one of these OneKey-owned root domains — not
+// pinned to any specific subdomain name, since that's an operational detail
+// that can change without this allowlist needing a code update. The path
+// must still be the relay's session-token route with no userinfo/query/
+// fragment/non-default port.
+const LEDGER_RELAY_ALLOWED_ROOT_DOMAINS = ['onekeytest.com', 'onekey.com'];
+
+function isAllowedLedgerRelayHost(hostname: string): boolean {
+  return LEDGER_RELAY_ALLOWED_ROOT_DOMAINS.some(
+    root => hostname === root || hostname.endsWith(`.${root}`)
+  );
+}
+const LEDGER_RELAY_PATH_PREFIX = '/v1/ledger/session/';
+const LEDGER_RELAY_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
+const MAX_LEDGER_RELAY_URL_LENGTH = 2048;
+
+function assertAllowedLedgerRelayUrl(rawUrl: string): void {
+  if (!rawUrl || rawUrl.length > MAX_LEDGER_RELAY_URL_LENGTH) {
+    throw new Error('Ledger genuine-check relay URL is invalid');
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('Ledger genuine-check relay URL is invalid');
+  }
+  const token = parsed.pathname.startsWith(LEDGER_RELAY_PATH_PREFIX)
+    ? parsed.pathname.slice(LEDGER_RELAY_PATH_PREFIX.length)
+    : '';
+  if (
+    parsed.protocol !== 'wss:' ||
+    !isAllowedLedgerRelayHost(parsed.hostname) ||
+    parsed.port !== '' ||
+    parsed.username !== '' ||
+    parsed.password !== '' ||
+    parsed.search !== '' ||
+    parsed.hash !== '' ||
+    !LEDGER_RELAY_TOKEN_PATTERN.test(token)
+  ) {
+    throw new Error('Ledger genuine-check relay URL is not allowed');
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Default signer kit importer (webpack/rspack — uses "exports" field)
@@ -205,6 +258,8 @@ export class LedgerConnectorBase implements IConnector {
   private readonly _providedDmk: DeviceManagementKit | undefined;
 
   private readonly _createTransport: TransportFactory;
+
+  private _ledgerGenuineCheckWebSocketUrl: string | undefined;
 
   public readonly connectionType: ConnectionType;
 
@@ -847,6 +902,56 @@ export class LedgerConnectorBase implements IConnector {
           ctx.clearCanceller(sessionId);
         }
       }
+      case 'getDeviceGenuineCheck': {
+        // Ledger official genuine check, over the SAME secure-channel pipeline
+        // as app install (DMK → wss://scriptrunner.api.live.ledger.com/update/genuine).
+        // DMK reads the device attestation certificate inside that session and
+        // emits deviceId = sha3_256(attestation pubkey) in the Pending
+        // intermediateValue (NOT the final output) — captured below. The final
+        // output carries the { isGenuine } verdict from Ledger's HSM.
+        try {
+          const dmk = await ctx.getOrCreateDmk();
+          const kit = await ctx.importLedgerKit('@ledgerhq/device-management-kit');
+          const action = (
+            dmk as unknown as {
+              // Loose return: deviceActionToPromise narrows the observable shape.
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              executeDeviceAction(args: { sessionId: string; deviceAction: unknown }): any;
+            }
+          ).executeDeviceAction({
+            sessionId,
+            deviceAction: new kit.GenuineCheckDeviceAction({ input: {} }),
+          });
+
+          let deviceId: string | undefined;
+          const output = await deviceActionToPromise<{ isGenuine: boolean }>(
+            action,
+            (interaction: string) =>
+              ctx.emit('ui-event', {
+                type: collapseSignerInteraction(interaction),
+                payload: { sessionId },
+              }),
+            // Generous timeout: covers websocket round-trips + the on-device
+            // "Allow secure connection" tap (the idle watchdog does not pause
+            // for it, only for unlock-device).
+            5 * 60_000,
+            cancel => ctx.registerCanceller(sessionId, cancel),
+            intermediateValue => {
+              const iv = intermediateValue as { deviceId?: Uint8Array } | undefined;
+              if (iv?.deviceId instanceof Uint8Array && iv.deviceId.length === 32 && !deviceId) {
+                deviceId = Buffer.from(iv.deviceId).toString('hex');
+              }
+            }
+          );
+
+          return { isGenuine: output.isGenuine, deviceId };
+        } catch (err) {
+          ctx.invalidateSession(sessionId);
+          throw ctx.wrapError(err);
+        } finally {
+          ctx.clearCanceller(sessionId);
+        }
+      }
       default:
         throw new Error(`LedgerConnector: unknown method "${method}"`);
     }
@@ -895,7 +1000,25 @@ export class LedgerConnectorBase implements IConnector {
   // ---------------------------------------------------------------------------
 
   reset(): void {
+    // A relay URL is a single-use capability. Any lifecycle reset must restore
+    // the official Ledger default so it cannot bleed into a later operation.
+    this._ledgerGenuineCheckWebSocketUrl = undefined;
     this._resetAll();
+  }
+
+  async configure(config: ConnectorConfig): Promise<void> {
+    const nextUrl = config.ledgerGenuineCheckWebSocketUrl;
+    if (nextUrl) {
+      assertAllowedLedgerRelayUrl(nextUrl);
+      if (this._providedDmk) {
+        throw new Error('Cannot change Ledger genuine-check relay on a pre-built DMK');
+      }
+    }
+    if (nextUrl === this._ledgerGenuineCheckWebSocketUrl) {
+      return;
+    }
+    this._resetAll();
+    this._ledgerGenuineCheckWebSocketUrl = nextUrl;
   }
 
   // ---------------------------------------------------------------------------
@@ -928,9 +1051,11 @@ export class LedgerConnectorBase implements IConnector {
 
     debugLog('[DMK] _getOrCreateDmk: transportFactory type:', typeof transportFactory);
 
-    const dmk: DeviceManagementKit = new DeviceManagementKitBuilder()
-      .addTransport(transportFactory)
-      .build();
+    const builder = new DeviceManagementKitBuilder().addTransport(transportFactory);
+    if (this._ledgerGenuineCheckWebSocketUrl) {
+      builder.addConfig({ webSocketUrl: this._ledgerGenuineCheckWebSocketUrl });
+    }
+    const dmk: DeviceManagementKit = builder.build();
     this._dmk = dmk;
 
     debugLog('[DMK] _getOrCreateDmk: DMK created');

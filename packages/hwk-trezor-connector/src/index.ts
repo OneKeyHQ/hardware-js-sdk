@@ -133,6 +133,143 @@ function getTrezorResponseMessage(response: unknown): Record<string, unknown> {
   return {};
 }
 
+const AUTHENTICITY_PROOF_CHUNK_SIZE = 500;
+const MAX_AUTHENTICITY_PROOF_PART_SIZE = 64 * 1024;
+const MAX_AUTHENTICITY_CERTIFICATE_COUNT = 4;
+
+type AuthenticityProofSizes = {
+  optiga_certificates?: number[];
+  optiga_signature?: number;
+  tropic_certificates?: number[];
+  tropic_signature?: number;
+  mcu_certificates?: number[];
+  mcu_signature?: number;
+};
+
+const validateAuthenticityProofPartSize = (size: unknown): number => {
+  if (
+    typeof size !== 'number' ||
+    !Number.isSafeInteger(size) ||
+    size < 0 ||
+    size > MAX_AUTHENTICITY_PROOF_PART_SIZE
+  ) {
+    throw createHwkError({
+      code: HardwareErrorCode.UnknownError,
+      message: `Invalid Trezor authenticity proof part size: ${String(size)}`,
+    });
+  }
+  return size;
+};
+
+const readAuthenticityProofPart = async ({
+  deviceSession,
+  proofType,
+  index,
+  size,
+}: {
+  deviceSession: TrezorDeviceSession;
+  proofType: number;
+  index?: number;
+  size: number;
+}): Promise<string> => {
+  const expectedSize = validateAuthenticityProofPartSize(size);
+  let offset = 0;
+  let result = '';
+  while (offset < expectedSize) {
+    const requestedSize = Math.min(AUTHENTICITY_PROOF_CHUNK_SIZE, expectedSize - offset);
+    const request: Record<string, unknown> = {
+      proof_type: proofType,
+      offset,
+      size: requestedSize,
+    };
+    if (index !== undefined) request.index = index;
+    const response = (await deviceSession.call(
+      'GetAuthenticityProofChunk',
+      request
+    )) as TrezorMessageResponse;
+    if (response.type !== 'AuthenticityProofChunk') {
+      throw createHwkError({
+        code: HardwareErrorCode.UnknownError,
+        message: `Expected AuthenticityProofChunk, received ${response.type}`,
+      });
+    }
+    const chunk = response.message?.chunk;
+    if (typeof chunk !== 'string' || chunk.length !== requestedSize * 2) {
+      throw createHwkError({
+        code: HardwareErrorCode.UnknownError,
+        message: 'Trezor returned an invalid authenticity proof chunk',
+      });
+    }
+    result += chunk;
+    offset += requestedSize;
+  }
+  return result;
+};
+
+const readAuthenticityProofStream = async (
+  deviceSession: TrezorDeviceSession,
+  sizes: AuthenticityProofSizes
+): Promise<Record<string, unknown>> => {
+  const readCertificates = async (proofType: number, values: unknown): Promise<string[]> => {
+    if (!Array.isArray(values)) {
+      throw createHwkError({
+        code: HardwareErrorCode.UnknownError,
+        message: 'Trezor returned invalid authenticity certificate sizes',
+      });
+    }
+    if (values.length > MAX_AUTHENTICITY_CERTIFICATE_COUNT) {
+      throw createHwkError({
+        code: HardwareErrorCode.UnknownError,
+        message: `Trezor authenticity proof contains too many certificates: ${values.length}`,
+      });
+    }
+    const certificates: string[] = [];
+    for (let index = 0; index < values.length; index += 1) {
+      certificates.push(
+        await readAuthenticityProofPart({
+          deviceSession,
+          proofType,
+          index,
+          size: validateAuthenticityProofPartSize(values[index]),
+        })
+      );
+    }
+    return certificates;
+  };
+  const readSignature = async (proofType: number, size: unknown): Promise<string | undefined> => {
+    if (size === undefined || size === null || size === 0) return undefined;
+    return readAuthenticityProofPart({
+      deviceSession,
+      proofType,
+      size: validateAuthenticityProofPartSize(size),
+    });
+  };
+
+  try {
+    // Sequential reads are required: the firmware stream permits one outstanding
+    // chunk request at a time.
+    const optigaCertificates = await readCertificates(0, sizes.optiga_certificates ?? []);
+    const optigaSignature = await readSignature(0, sizes.optiga_signature);
+    const tropicCertificates = await readCertificates(1, sizes.tropic_certificates ?? []);
+    const tropicSignature = await readSignature(1, sizes.tropic_signature);
+    const mcuCertificates = await readCertificates(2, sizes.mcu_certificates ?? []);
+    const mcuSignature = await readSignature(2, sizes.mcu_signature);
+
+    return {
+      optiga_certificates: optigaCertificates,
+      optiga_signature: optigaSignature,
+      tropic_certificates: tropicCertificates,
+      tropic_signature: tropicSignature,
+      mcu_certificates: mcuCertificates,
+      mcu_signature: mcuSignature,
+    };
+  } finally {
+    // Firmware keeps the proof stream open until this empty request. Always
+    // release it, including malformed/host-aborted responses.
+    await deviceSession.call('GetAuthenticityProofChunk', { offset: 0, size: 0 });
+  }
+};
+
 export abstract class TrezorConnectorBase implements IConnector {
   readonly connectionType: ConnectionType;
 
@@ -437,6 +574,28 @@ export abstract class TrezorConnectorBase implements IConnector {
         );
       case 'wipeDevice':
         return getTrezorResponseMessage(await session.deviceSession.call('WipeDevice', {}));
+      case 'authenticateDevice': {
+        // Current Safe 7 firmware streams the larger Optiga + Tropic + MCU/ML-DSA
+        // proof. Older secure-element models return AuthenticityProof directly.
+        const p = (params ?? {}) as { challenge: string };
+        const response = (await session.deviceSession.call('AuthenticateDevice', {
+          challenge: p.challenge,
+          stream: true,
+        })) as TrezorMessageResponse;
+        if (response.type === 'AuthenticityProof') {
+          return getTrezorResponseMessage(response);
+        }
+        if (response.type !== 'AuthenticityProofSizes') {
+          throw createHwkError({
+            code: HardwareErrorCode.UnknownError,
+            message: `Expected Trezor authenticity proof, received ${response.type}`,
+          });
+        }
+        return readAuthenticityProofStream(
+          session.deviceSession,
+          response.message as AuthenticityProofSizes
+        );
+      }
       // --- THP application-session control (Trezor-specific, driven by the
       // adapter to align the active passphrase session before a chain call).
       // The connector deals only in session ids; wallet identity belongs to the

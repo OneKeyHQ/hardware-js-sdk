@@ -38,7 +38,7 @@ type DebugLogEntry = {
   event: string;
   data?: Record<string, unknown>;
 };
-type BusyState = null | 'scan' | 'connect' | 'features' | 'address' | 'disconnect';
+type BusyState = null | 'scan' | 'connect' | 'features' | 'address' | 'disconnect' | 'attestation';
 type ThpPairingPrompt = {
   connectId: string;
   availableMethods: number[];
@@ -129,6 +129,7 @@ const busyLabelMap: Record<Exclude<BusyState, null>, string> = {
   features: 'Getting features...',
   address: 'Getting address...',
   disconnect: 'Disconnecting...',
+  attestation: 'Verifying device...',
 };
 
 const upsertDevice = (devices: DeviceInfo[], device: DeviceInfo) => {
@@ -678,6 +679,52 @@ export const HwkScreen = () => {
     }
   }, [appendLog, brand, connectedId, selected?.connectId]);
 
+  const onVerifyDevice = useCallback(async () => {
+    const adapter = adapterRef.current;
+    const connectId = selected?.connectId ?? connectedId;
+    if (!adapter || !connectId) {
+      Alert.alert('Tip', 'Please connect a device first.');
+      return;
+    }
+    // Both TrezorAdapter and LedgerAdapter expose verifyDeviceAuthenticity(connectId).
+    const verifier = adapter as unknown as {
+      verifyDeviceAuthenticity: (id: string) => Promise<{
+        success: boolean;
+        payload: {
+          verified?: boolean;
+          deviceId?: string;
+          usedDebugKey?: boolean;
+          deviceCertPubKey?: string;
+          serialNumber?: string;
+          note?: string;
+          error?: string;
+        };
+      }>;
+    };
+    try {
+      setBusy('attestation');
+      appendLog('info', `verifyDeviceAuthenticity ${connectId}... (confirm on device)`);
+      const result = await verifier.verifyDeviceAuthenticity(connectId);
+      appendLog('info', { verifyDeviceAuthenticity: result });
+      if (!result.success) {
+        Alert.alert('verifyDeviceAuthenticity failed', JSON.stringify(result.payload));
+        return;
+      }
+      const { verified, deviceId, usedDebugKey, note } = result.payload;
+      const id = deviceId ?? '(none)';
+      const title = verified
+        ? usedDebugKey
+          ? 'Verified ⚠️ DEBUG key'
+          : 'Verified ✅'
+        : 'Not verified';
+      Alert.alert(title, `id:\n${id}${note ? `\n\n${note}` : ''}`);
+    } catch (error) {
+      appendLog('error', { step: 'verifyDeviceAuthenticity.error', error: formatError(error) });
+    } finally {
+      setBusy(null);
+    }
+  }, [appendLog, connectedId, selected?.connectId]);
+
   const onGetAddress = useCallback(async () => {
     const adapter = adapterRef.current;
     const connectId = selected?.connectId ?? connectedId;
@@ -1007,6 +1054,13 @@ export const HwkScreen = () => {
             disabled={!selected || !!busy}
           >
             <Text style={styles.btnText}>getFeatures</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.btn}
+            onPress={onVerifyDevice}
+            disabled={!selected || !!busy}
+          >
+            <Text style={styles.btnText}>verifyDevice (deviceId)</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.btn}

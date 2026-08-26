@@ -1,6 +1,7 @@
 module.exports = {
   preset: '../../jest.config.js',
   testEnvironment: 'node',
+  transformIgnorePatterns: ['/node_modules/(?!@noble/(curves|hashes)/)'],
   modulePathIgnorePatterns: ['node_modules', '<rootDir>/dist'],
   moduleNameMapper: {
     '^@onekeyfe/hwk-adapter-core$': '<rootDir>/../hwk-adapter-core/src/index.ts',

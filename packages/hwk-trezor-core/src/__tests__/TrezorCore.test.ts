@@ -29,6 +29,20 @@ class MemoryByteTransport implements TrezorByteTransport {
   }
 }
 
+class SignalRecordingByteTransport extends MemoryByteTransport {
+  readonly signals: Array<AbortSignal | undefined> = [];
+
+  override async write(chunk: Buffer, signal?: AbortSignal) {
+    this.signals.push(signal);
+    await super.write(chunk);
+  }
+
+  override async read(signal?: AbortSignal) {
+    this.signals.push(signal);
+    return super.read();
+  }
+}
+
 const createRnLikeBuffer = (bytes: Buffer): Buffer =>
   Object.assign(new Uint8Array(bytes), {
     readUInt8: bytes.readUInt8.bind(bytes),
@@ -218,6 +232,33 @@ describe('TrezorCore', () => {
       );
     } finally {
       logSpy.mockRestore();
+    }
+  });
+
+  test('unwraps THP abort options before forwarding signals to the byte transport', async () => {
+    const thpState = new protocolThp.ThpState();
+    const responseBytes = Buffer.from(
+      '41ffff0022cb263fc1c42de1ac12340a045432543110001800200228022803280428017d8ccd6b',
+      'hex'
+    );
+    thpState.setChannel(responseBytes.subarray(1, 3));
+    const transport = new SignalRecordingByteTransport([responseBytes]);
+    const core = new TrezorCore({ transport, protocol: protocolV2, chunkSize: 64 });
+    const controller = new AbortController();
+
+    await core.call(
+      'ThpCreateChannelRequest',
+      { nonce: 'cb263fc1c42de1ac' },
+      { thpState, signal: controller.signal }
+    );
+
+    expect(transport.signals.length).toBeGreaterThan(0);
+    const forwardedSignals = transport.signals.filter(
+      (signal): signal is AbortSignal => signal !== undefined
+    );
+    expect(forwardedSignals.length).toBeGreaterThan(0);
+    for (const signal of forwardedSignals) {
+      expect(typeof signal.addEventListener).toBe('function');
     }
   });
 
