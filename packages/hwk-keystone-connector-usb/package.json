@@ -1,0 +1,81 @@
+{
+  "name": "@onekeyfe/hwk-keystone-connector-usb",
+  "version": "1.2.2-alpha.100",
+  "description": "IConnector implementation for Keystone hardware wallets via USB (WebUSB + Node USB)",
+  "author": "OneKey",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./webusb": {
+      "import": {
+        "types": "./dist/webusb.d.mts",
+        "default": "./dist/webusb.mjs"
+      },
+      "require": {
+        "types": "./dist/webusb.d.ts",
+        "default": "./dist/webusb.js"
+      }
+    },
+    "./nodeusb": {
+      "import": {
+        "types": "./dist/nodeusb.d.mts",
+        "default": "./dist/nodeusb.mjs"
+      },
+      "require": {
+        "types": "./dist/nodeusb.d.ts",
+        "default": "./dist/nodeusb.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist",
+    "test": "jest"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git",
+    "directory": "packages/hwk-keystone-connector-usb"
+  },
+  "keywords": [
+    "keystone",
+    "usb",
+    "webusb",
+    "hardware-wallet",
+    "onekey",
+    "connector"
+  ],
+  "dependencies": {
+    "@keystonehq/hw-transport-error": "0.0.2",
+    "@keystonehq/hw-transport-nodeusb": "0.2.0",
+    "@keystonehq/hw-transport-usb": "0.2.0",
+    "@keystonehq/hw-transport-webusb": "0.5.3",
+    "@ngraveio/bc-ur": "1.1.13",
+    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.100"
+  },
+  "devDependencies": {
+    "@keystonehq/bc-ur-registry-eth": "0.22.1",
+    "rimraf": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  }
+}

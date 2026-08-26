@@ -1,8 +1,9 @@
-export type VendorType = 'trezor' | 'ledger';
+export type VendorType = 'trezor' | 'ledger' | 'keystone';
 
-export type ConnectionType = 'usb' | 'ble';
+/** 'qr' is a virtual channel: UR payloads travel via app-rendered/scanned QR codes. */
+export type ConnectionType = 'usb' | 'ble' | 'qr';
 
-export type TransportType = 'usb' | 'ble' | 'hid' | 'bridge';
+export type TransportType = 'usb' | 'ble' | 'hid' | 'bridge' | 'qr';
 
 /**
  * Device capabilities — describes what a specific device/connection
