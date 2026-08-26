@@ -162,6 +162,10 @@ EIP-712 结构化数据签名的统一入口。SDK 内部根据设备能力与�
   - 默认解析签名
   - 若数据包含嵌套数组或数据量过大 → 哈希盲签
   - 固件要求：嵌套数组签名能力需固件 ≥ 4.2.0；更大数据阈值在固件 ≥ 4.4.0 生效（从 1KB 提升到 1.5KB）
+- Pro2 / Neo（Protocol V2）：
+  - 默认解析签名，包含 `SafeTx`、`SafeTxMultiSig` 等结构化数据
+  - `message.data` 不超过 1536 bytes 时保留结构化解析路径；超过 1536 bytes 或包含嵌套数组时转为哈希盲签
+  - 哈希盲签要求调用方同时提供 `domainHash` 与 `messageHash`
 
 注意：`evmSignMessageEIP712` 已标记为 deprecated，但为了兼容现有调用仍然公开导出。新接入应统一使用 `evmSignTypedData`；迁移完成前不要声称旧方法已经从 SDK 删除。
 

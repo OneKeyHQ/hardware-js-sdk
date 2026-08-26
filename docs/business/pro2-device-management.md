@@ -67,17 +67,28 @@ LowLevel SDK 负责解码、设备格式转换、写入文件系统并设置活�
 仍收到 `DeviceLocked`，不重放上传或设置写入。
 
 1. 严格校验 Base64、JPEG、固定尺寸、解码后 RGBA 长度、文件名和 `chunkSize`。
-2. 将 JPEG 解码结果编码为 `RGB565`。
-3. 使用 8×8 阈值矩阵进行有序抖动并生成设备二进制格式。
-4. 从 `ProtocolInfo.supported_messages` 确认 `FilesystemDirMake(60809)`、
+2. 将 JPEG 解码结果编码为 `RGB565`，并使用 8×8 阈值矩阵进行有序抖动。
+3. 从 `ProtocolInfo.supported_messages` 确认 `FilesystemDirMake(60809)`、
    `FilesystemFileWrite(60805)` 和 `DeviceSettingsSet(60412)`。
-5. 创建 `vol1:/wallpapers`，通过 `FilesystemFileWrite` 分片上传。
-6. 根据设备返回的 `processed_byte` 推进 offset。
-7. 调用 `DeviceSettingsSet` 更新 `wallpaper_path`。
+4. 创建 `vol1:/wallpapers`，通过 `FilesystemFileWrite` 分片上传，并根据设备返回的
+   `processed_byte` 推进 offset。
+5. 调用 `DeviceSettingsSet` 更新 `wallpaper_path`。
 
-文件名仅允许字母、数字、下划线、连字符和可选 `.bin`。未提供名称时，SDK 使用编码结果的 BLAKE2s 哈希生成稳定名称。调用方不能借此写入任意路径。
+固件版本决定上传格式：
 
-上传没有事务式回滚：中断可能留下不完整文件，激活失败也不会自动删除文件。重新上传同名文件会从首片覆盖；将 `wallpaper_path` 设为空字符串可恢复内置壁纸。
+- 固件 `< 1.0.1`：SDK 直接上传 RGB565 `.bin`。文件名仅允许字母、数字、下划线、连字符和可选
+  `.bin`；未提供名称时使用编码结果的 BLAKE2s 哈希生成稳定名称。
+- 正式固件 `>= 1.0.1`：SDK 生成一个 unsigned RESOURCE OKPP/OKAR package，内部只有
+  `wallpaper.bin`，并上传到固定路径 `vol1:/wallpapers/wallpaper.okpkg`。此模式下 `fileName`
+  不参与设备路径选择。固件校验并解包到 `vol1:/wallpapers/wallpaper.bin`，持久化最终 `.bin`
+  路径，然后删除临时 `.okpkg`。
+
+`DeviceUploadWallpaperResponse.path` 是传给 `DeviceSettingsSet` 的路径：旧流程返回最终 `.bin`
+路径，新 package 流程返回临时 `wallpaper.okpkg` 路径。需要当前活动壁纸路径时，应读取
+`DeviceState.settings.wallpaperPath`；SDK 在设置成功后会刷新该状态。
+
+上传没有 Host 侧事务式回滚：传输中断可能留下不完整文件；正式固件 `>= 1.0.1` 在 apply
+阶段负责 package 校验、staging、替换与清理。将 `wallpaper_path` 设为空字符串可恢复内置壁纸。
 
 主要实现：
 
@@ -93,19 +104,29 @@ LowLevel SDK 负责解码、设备格式转换、写入文件系统并设置活�
 与 `263 × 263` JPEG，并把不带 data URL 前缀的 Base64 传入 SDK；LowLevel 随后完成以下编排：
 
 1. 严格校验两段 Base64、JPEG、固定尺寸和解码后的 RGBA 长度。
-2. 从当前 Link 的 `ProtocolInfo.supported_messages` 确认 `FilesystemPathInfoQuery(60802)`、
-   `FilesystemFileWrite(60805)`、`FilesystemDirList(60808)` 和 `NftUpdate(61500)`，不使用固件版本字符串推断能力。
-3. 将透明区域合成到黑色背景，以 LVGL v9 未压缩 RGB565 编码两张图片；编码与壁纸共用
+2. 将透明区域合成到黑色背景，以 LVGL v9 未压缩 RGB565 编码两张图片；编码与壁纸共用
    RGB565 抖动实现，但 NFT 不生成 A8 alpha plane。
-4. 以完整原图 `.bin` 的 BLAKE2s 前 8 位和 Unix 毫秒时间生成
+3. 以完整原图 `.bin` 的 BLAKE2s 前 8 位和 Unix 毫秒时间生成
    `nft-<hash8>-<timestamp_ms>` basename。
-5. 写入前使用 `FilesystemDirList("vol1:/nft", depth=1)` 统计完整的 NFT 三文件集合；新 NFT
-   达到 10 个上限时抛出 `NftStorageLimitReached`，不触发固件删除最旧 NFT；同 basename 的
-   幂等重试不受该限制。
-6. 按原图 `.bin`、缩略图 `_m.bin`、元数据 `.json` 顺序串行写入固件预置的 `vol1:/nft`，
-   不额外发送 `FilesystemDirMake`；默认使用 2048-byte chunk、0 ms pacing 和 15 秒单次请求超时。
-7. 三个文件全部确认后发送一次 `NftUpdate`；Transport 不自动重放该副作用请求，只有最终
-   `Success` 才返回 `nftUpdated: true`。
+4. 按固件版本选择 legacy 三文件或 host-asset package 上传格式。
+5. 文件确认后发送一次 `NftUpdate`；Transport 不自动重放该副作用请求，只有最终 `Success`
+   才返回 `nftUpdated: true`。
+
+固件版本对应的文件编排：
+
+- 固件 `< 1.0.1`：SDK 从当前 Link 的 `ProtocolInfo.supported_messages` 确认
+  `FilesystemPathInfoQuery(60802)`、`FilesystemFileWrite(60805)`、`FilesystemDirList(60808)` 和
+  `NftUpdate(61500)`。写入前通过 `FilesystemDirList("vol1:/nft", depth=1)` 统计完整三文件集合；
+  达到 10 个上限时抛出 `NftStorageLimitReached`。随后按原图 `.bin`、缩略图 `_m.bin`、元数据
+  `.json` 顺序写入。
+- 正式固件 `>= 1.0.1`：只要求 `FilesystemFileWrite(60805)` 和 `NftUpdate(61500)`。SDK 将上述
+  三个逻辑文件封装为一个 unsigned RESOURCE OKPP/OKAR package，上传
+  `vol1:/nft/<basename>.okpkg`，不再查询目录或在 Host 侧执行容量检查。`NftUpdate` 触发固件
+  校验、解包、原子替换并删除临时 `.okpkg`；固件负责 10 个 NFT 上限，并在超限时淘汰最旧项。
+
+`DeviceUploadNftResponse.imagePath`、`thumbnailPath` 和 `metadataPath` 始终表示 apply 成功后的最终
+逻辑文件路径。package 流程实际传输的是临时 `.okpkg`，但固件会将它解包为这三个返回路径；
+`totalSize` 表示本次 Host 实际传输的总字节数。
 
 `title` 限制为 1 ～ 63 UTF-8 bytes，`subtitle` 限制为 0 ～ 95 UTF-8 bytes。公开参数允许传入固定
 `timestampMs`，便于响应丢失时以同一 basename 幂等重发；Transport 不自动重放带副作用请求。

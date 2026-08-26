@@ -360,6 +360,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     const supportBiggerData =
       DeviceModelToTypes.model_classic1s.includes(currentDeviceType) ||
+      DeviceModelToTypes.model_pro2.includes(currentDeviceType) ||
       (DeviceModelToTypes.model_touch.includes(currentDeviceType) &&
         semver.gte(currentVersion, supportBiggerDataVersion));
 

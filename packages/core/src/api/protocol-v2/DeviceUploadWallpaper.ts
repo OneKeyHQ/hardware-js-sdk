@@ -16,14 +16,26 @@ import {
   type Pro2WallpaperColorFormat,
   encodePro2Wallpaper,
 } from '../../utils/pro2Wallpaper';
+import {
+  buildPro2HostAssetPackage,
+  supportsPro2HostAssetPackage,
+} from '../../utils/pro2HostAssetPackage';
 
 export type DeviceUploadWallpaperParams = {
   jpegBase64: string;
+  /**
+   * Legacy firmware uses this name for the uploaded `.bin` file. Firmware
+   * 1.0.1+ always consumes the fixed `wallpaper.okpkg` package path.
+   */
   fileName?: string;
   chunkSize?: number;
 };
 
 export type DeviceUploadWallpaperResponse = {
+  /**
+   * Filesystem path sent to `DeviceSettingsSet`. On firmware 1.0.1+ this is
+   * the temporary package path; firmware extracts and persists wallpaper.bin.
+   */
   path: string;
   size: number;
   colorFormat: Pro2WallpaperColorFormat;
@@ -31,6 +43,8 @@ export type DeviceUploadWallpaperResponse = {
 };
 
 const WALLPAPER_DIRECTORY = 'vol1:/wallpapers';
+const WALLPAPER_PACKAGE_PATH = `${WALLPAPER_DIRECTORY}/wallpaper.okpkg`;
+const WALLPAPER_PACKAGE_ENTRY = 'wallpaper.bin';
 const SAFE_FILE_NAME = /^[A-Za-z0-9_-]+(?:\.bin)?$/;
 const DEVICE_SETTINGS_SET_MESSAGE_TYPE = 60412;
 const FILESYSTEM_FILE_WRITE_MESSAGE_TYPE = 60805;
@@ -116,16 +130,14 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
     this.directoryReady = true;
   }
 
-  private async upload() {
+  private async upload(path: string, data: Uint8Array) {
     if (this.uploaded) return;
-    const { encoded } = this;
-    if (!encoded) throw invalidParameter('Wallpaper data has not been initialized.');
 
     await writeProtocolV2File({
       commands: this.device.commands,
-      path: this.path,
-      data: encoded.data,
-      totalSize: encoded.data.byteLength,
+      path,
+      data,
+      totalSize: data.byteLength,
       chunkSize: this.params.chunkSize,
       maxChunkRetries: 3,
       overwrite: true,
@@ -145,7 +157,14 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
     if (!encoded) throw invalidParameter('Wallpaper data has not been initialized.');
     await this.assertCapabilities();
     await this.ensureDirectory();
-    await this.upload();
+    const useHostAssetPackage = supportsPro2HostAssetPackage(
+      this.device.state?.versions.firmware ?? undefined
+    );
+    const data = useHostAssetPackage
+      ? buildPro2HostAssetPackage([{ name: WALLPAPER_PACKAGE_ENTRY, data: encoded.data }])
+      : encoded.data;
+    if (useHostAssetPackage) this.path = WALLPAPER_PACKAGE_PATH;
+    await this.upload(this.path, data);
     const response = await this.device.commands.typedCall('DeviceSettingsSet', 'Success', {
       settings: { wallpaper_path: this.path },
     });
@@ -160,7 +179,7 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
     }
     return {
       path: this.path,
-      size: encoded.data.byteLength,
+      size: data.byteLength,
       colorFormat: encoded.colorFormat,
       message: response.message?.message,
     };
