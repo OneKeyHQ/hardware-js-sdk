@@ -198,7 +198,7 @@ describe('LowlevelTransport protocol framing', () => {
     });
   });
 
-  test('uses the Protocol V2 BLE writer with the lowlevel compatibility packet size', async () => {
+  test('uses 192-byte packets for Protocol V2 BLE writes', async () => {
     const plugin = createPlugin({ devices: [], responses: [] });
     const lowlevel = configureTransport(plugin);
     const context = {
@@ -209,10 +209,30 @@ describe('LowlevelTransport protocol framing', () => {
       signal: new AbortController().signal,
     };
 
-    await lowlevel.writeProtocolV2Frame('pro2-id', new Uint8Array(130), context, jest.fn());
+    await lowlevel.writeProtocolV2Frame('pro2-id', new Uint8Array(386), context, jest.fn());
 
     expect(plugin.send).toHaveBeenCalledTimes(3);
-    expect(plugin.send.mock.calls.map(([, hex]) => hex.length / 2)).toEqual([64, 64, 2]);
+    expect(plugin.send.mock.calls.map(([, hex]) => hex.length / 2)).toEqual([192, 192, 2]);
+  });
+
+  test('uses the packet capacity reported after BLE connection', async () => {
+    const plugin = createPlugin({ devices: [], responses: [] });
+    plugin.getProtocolV2PacketCapacity = jest.fn().mockResolvedValue(244);
+    const lowlevel = configureTransport(plugin);
+    lowlevel.detectProtocol = jest.fn().mockResolvedValue('V2');
+    const context = {
+      messageName: 'Ping',
+      timeoutMs: 1000,
+      highThroughput: false,
+      generation: 1,
+      signal: new AbortController().signal,
+    };
+
+    await lowlevel.acquire({ uuid: 'pro2-id', expectedProtocol: 'V2' });
+    await lowlevel.writeProtocolV2Frame('pro2-id', new Uint8Array(386), context, jest.fn());
+
+    expect(plugin.getProtocolV2PacketCapacity).toHaveBeenCalledWith('pro2-id');
+    expect(plugin.send.mock.calls.map(([, hex]) => hex.length / 2)).toEqual([244, 142]);
   });
 
   test('rejects calls before protocol detection', async () => {

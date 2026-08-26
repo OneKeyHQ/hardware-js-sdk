@@ -36,6 +36,8 @@ export type ProtocolV2FileWriteOptions = {
   chunkSize?: number;
   chunkLen?: number;
   chunkSizeLimit?: number;
+  /** BLE-only limit for a caller whose fixed short path has a verified larger frame budget. */
+  bleChunkSizeLimit?: number;
   overwrite?: boolean;
   append?: boolean;
   uiPercentage?: number;
@@ -114,11 +116,15 @@ export function isProtocolV2ResponseTimeout(error: unknown) {
   );
 }
 
-function getProtocolV2FileChunkLimit() {
+function getProtocolV2FileChunkLimit(bleChunkSizeLimit?: number) {
   const env = DataManager.getSettings('env');
-  return env && DataManager.isBleConnect(env)
-    ? PROTOCOL_V2_BLE_FILE_CHUNK_SIZE
-    : PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
+  if (env && DataManager.isBleConnect(env)) {
+    const configuredLimit = Number(bleChunkSizeLimit);
+    return Number.isFinite(configuredLimit) && configuredLimit > 0
+      ? Math.floor(configuredLimit)
+      : PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
+  }
+  return PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
 }
 
 async function dataToUint8Array(data: ProtocolV2FileWriteData): Promise<Uint8Array> {
@@ -178,7 +184,7 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
     );
   }
 
-  const defaultChunkSizeLimit = getProtocolV2FileChunkLimit();
+  const defaultChunkSizeLimit = getProtocolV2FileChunkLimit(options.bleChunkSizeLimit);
   const configuredChunkSizeLimit = Number(options.chunkSizeLimit);
   const chunkSizeLimit =
     Number.isFinite(configuredChunkSizeLimit) && configuredChunkSizeLimit > 0

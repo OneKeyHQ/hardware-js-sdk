@@ -37,7 +37,9 @@ const ARCHIVE_ENTRY_SIZE = 296;
 const ARCHIVE_ENTRY_NAME_MAX_LENGTH = 255;
 const ARCHIVE_COMPRESS_LZ4_BLOCKED = 1;
 const ARCHIVE_ALIGNMENT = 4;
-const LZ4_BLOCK_SIZE_LOG2 = 12;
+const LZ4_PREFERRED_BLOCK_SIZE_LOG2 = 14;
+const LZ4_FALLBACK_BLOCK_SIZE_LOG2 = 13;
+const LZ4_COMPRESSED_BLOCK_SIZE_MAX = 1 << 14;
 
 export type Pro2HostAssetPackageEntry = {
   name: string;
@@ -101,7 +103,7 @@ const LZ4_MAX_OFFSET = 0xffff;
 const LZ4_LENGTH_MASK = 15;
 const LZ4_HASH_LOG = 16;
 const LZ4_HASH_MULTIPLIER = 2654435761;
-const LZ4_SKIP_TRIGGER = 6;
+const LZ4_MAX_SEARCH_DEPTH = 64;
 
 function writeExtendedLength(output: Uint8Array, offset: number, length: number): number {
   let remaining = length;
@@ -178,7 +180,11 @@ function emitLastLiterals(
   return copyBytes(output, nextOffset, input, anchor, literalLength);
 }
 
-function compressRawLz4Block(input: Uint8Array, hashTable: Uint32Array): Uint8Array {
+function compressRawLz4Block(
+  input: Uint8Array,
+  hashTable: Uint32Array,
+  matchChain: Int32Array
+): Uint8Array {
   const output = new Uint8Array(input.byteLength + Math.floor(input.byteLength / 255) + 16);
   const inputView = new DataView(input.buffer, input.byteOffset, input.byteLength);
   const matchFindLimit = input.byteLength - LZ4_MATCH_FIND_LIMIT;
@@ -186,42 +192,65 @@ function compressRawLz4Block(input: Uint8Array, hashTable: Uint32Array): Uint8Ar
   let anchor = 0;
   let inputOffset = 0;
   let outputOffset = 0;
-  let searchMatchCount = 1 << LZ4_SKIP_TRIGGER;
 
   hashTable.fill(0);
   while (inputOffset < matchFindLimit) {
     const sequence = inputView.getUint32(inputOffset, true);
     const hash = Math.imul(sequence, LZ4_HASH_MULTIPLIER) >>> (32 - LZ4_HASH_LOG);
-    const candidate = hashTable[hash] - 1;
+    let candidate = hashTable[hash] - 1;
+    matchChain[inputOffset] = candidate;
     hashTable[hash] = inputOffset + 1;
 
-    const hasMatch = !(
-      candidate < 0 ||
-      inputOffset - candidate > LZ4_MAX_OFFSET ||
-      inputView.getUint32(candidate, true) !== sequence
-    );
-    if (!hasMatch) {
-      inputOffset += searchMatchCount >> LZ4_SKIP_TRIGGER;
-      searchMatchCount += 1;
-    } else {
-      searchMatchCount = 1 << LZ4_SKIP_TRIGGER;
-      let matchEnd = inputOffset + LZ4_MIN_MATCH;
-      let reference = candidate + LZ4_MIN_MATCH;
-      while (matchEnd < matchExtendLimit && input[matchEnd] === input[reference]) {
-        matchEnd += 1;
-        reference += 1;
+    let bestCandidate = -1;
+    let bestMatchEnd = inputOffset;
+    let searchDepth = 0;
+    while (
+      candidate >= 0 &&
+      inputOffset - candidate <= LZ4_MAX_OFFSET &&
+      searchDepth < LZ4_MAX_SEARCH_DEPTH
+    ) {
+      if (inputView.getUint32(candidate, true) === sequence) {
+        let matchEnd = inputOffset + LZ4_MIN_MATCH;
+        let reference = candidate + LZ4_MIN_MATCH;
+        while (matchEnd < matchExtendLimit && input[matchEnd] === input[reference]) {
+          matchEnd += 1;
+          reference += 1;
+        }
+        if (matchEnd > bestMatchEnd) {
+          bestCandidate = candidate;
+          bestMatchEnd = matchEnd;
+        }
       }
+      candidate = matchChain[candidate];
+      searchDepth += 1;
+    }
+
+    if (bestCandidate < 0) {
+      inputOffset += 1;
+    } else {
+      const matchStart = inputOffset;
       outputOffset = emitSequence(
         output,
         outputOffset,
         input,
         anchor,
         inputOffset - anchor,
-        inputOffset - candidate,
-        matchEnd - inputOffset - LZ4_MIN_MATCH
+        inputOffset - bestCandidate,
+        bestMatchEnd - inputOffset - LZ4_MIN_MATCH
       );
-      inputOffset = matchEnd;
+      inputOffset = bestMatchEnd;
       anchor = inputOffset;
+
+      for (
+        let skippedOffset = matchStart + 1;
+        skippedOffset < inputOffset && skippedOffset < matchFindLimit;
+        skippedOffset += 1
+      ) {
+        const skippedSequence = inputView.getUint32(skippedOffset, true);
+        const skippedHash = Math.imul(skippedSequence, LZ4_HASH_MULTIPLIER) >>> (32 - LZ4_HASH_LOG);
+        matchChain[skippedOffset] = hashTable[skippedHash] - 1;
+        hashTable[skippedHash] = skippedOffset + 1;
+      }
     }
   }
 
@@ -234,25 +263,42 @@ function compressRawLz4Block(input: Uint8Array, hashTable: Uint32Array): Uint8Ar
 // The archive stores an 8-byte descriptor, one compressed-size value per
 // block, then the concatenated raw blocks. Blocks are independent so firmware
 // can validate and decompress them with bounded memory.
-function encodeLz4Blocked(data: Uint8Array): Uint8Array {
-  const blockSize = 1 << LZ4_BLOCK_SIZE_LOG2;
+function encodeLz4BlockedWithBlockSize(
+  data: Uint8Array,
+  blockSizeLog2: number
+): Uint8Array | undefined {
+  const blockSize = 1 << blockSizeLog2;
   const blockCount = Math.ceil(data.byteLength / blockSize);
   const hashTable = new Uint32Array(1 << LZ4_HASH_LOG);
+  const matchChain = new Int32Array(blockSize);
   const blocks: Uint8Array[] = [];
   const header = new Uint8Array(8 + blockCount * 4);
   const headerView = new DataView(header.buffer);
   headerView.setUint16(0, blockCount, true);
-  headerView.setUint16(2, LZ4_BLOCK_SIZE_LOG2, true);
+  headerView.setUint16(2, blockSizeLog2, true);
 
   for (let index = 0; index < blockCount; index += 1) {
     const block = compressRawLz4Block(
       data.subarray(index * blockSize, Math.min((index + 1) * blockSize, data.byteLength)),
-      hashTable
+      hashTable,
+      matchChain
     );
+    if (block.byteLength > LZ4_COMPRESSED_BLOCK_SIZE_MAX) return undefined;
     headerView.setUint32(8 + index * 4, block.byteLength, true);
     blocks.push(block);
   }
   return concatBytes([header, ...blocks]);
+}
+
+function encodeLz4Blocked(data: Uint8Array): Uint8Array {
+  const preferred = encodeLz4BlockedWithBlockSize(data, LZ4_PREFERRED_BLOCK_SIZE_LOG2);
+  if (preferred) return preferred;
+
+  const fallback = encodeLz4BlockedWithBlockSize(data, LZ4_FALLBACK_BLOCK_SIZE_LOG2);
+  if (!fallback) {
+    throw new Error('Pro2 host asset package LZ4 block exceeds the firmware buffer limit.');
+  }
+  return fallback;
 }
 
 // OKAR integrity helpers

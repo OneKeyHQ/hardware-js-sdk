@@ -8,6 +8,7 @@ import {
   isProtocolV2PeerRemovedPairingError,
   isRetryableBleConnectionError,
   isRetryableBleProtocolV2ProbeError,
+  resolveBleConnectProtocol,
 } from '../src/core';
 import { DataManager } from '../src/data-manager';
 import TransportManager from '../src/data-manager/TransportManager';
@@ -69,6 +70,19 @@ describe('public device lifecycle events', () => {
     await core?.dispose();
     core = undefined;
     jest.restoreAllMocks();
+  });
+
+  test('prefers Protocol V2 only when the method contract is explicitly V2-only', () => {
+    const createMethod = (protocols: readonly ('V1' | 'V2')[], connectProtocol?: 'V1' | 'V2') =>
+      ({
+        payload: { connectProtocol },
+        getSupportedProtocols: () => protocols,
+      } as never);
+
+    expect(resolveBleConnectProtocol(createMethod(['V2']))).toBe('V2');
+    expect(resolveBleConnectProtocol(createMethod(['V1']))).toBeUndefined();
+    expect(resolveBleConnectProtocol(createMethod(['V1', 'V2']))).toBeUndefined();
+    expect(resolveBleConnectProtocol(createMethod(['V2'], 'V1'))).toBe('V1');
   });
 
   test('registers the shared device lifecycle listeners exactly once', async () => {

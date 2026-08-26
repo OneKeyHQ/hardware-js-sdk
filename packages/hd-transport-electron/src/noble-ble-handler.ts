@@ -22,7 +22,7 @@ import {
 } from '@onekeyfe/hd-shared';
 import pRetry from 'p-retry';
 
-import { resolveBlePacketCapacity } from './ble-packet-capacity';
+import { resolveBlePacketCapacity, resolveNobleAttMtu } from './ble-packet-capacity';
 import { safeLog } from './types/noble-extended';
 import { runBleCallbackOperation, softRefreshSubscription } from './ble-ops';
 import {
@@ -574,12 +574,13 @@ function setupMtuListener(
   }
 
   const listener = (mtu: number) => {
-    if (!Number.isFinite(mtu) || mtu <= 0) return;
+    const normalizedMtu = resolveNobleAttMtu(mtu);
+    if (normalizedMtu === undefined) return;
     // A kept-alive link can outlive the renderer this closure captured.
     if (webContents.isDestroyed()) return;
     webContents.send(EOneKeyBleMessageKeys.NOBLE_BLE_MTU_CHANGED, {
       id: deviceId,
-      mtu,
+      mtu: normalizedMtu,
     });
   };
   deviceMtuListeners.set(deviceId, { peripheral, listener });
@@ -727,7 +728,7 @@ async function transmitHexDataToDevice(
   const toBuffer = Buffer.from(hexData, 'hex');
   const doGetWriteCharacteristic = () => deviceCharacteristics.get(deviceId)?.write;
   const packetCapacity = resolveBlePacketCapacity(
-    peripheral.mtu,
+    resolveNobleAttMtu(peripheral.mtu),
     BLE_PACKET_SIZE_MAXIMUM,
     BLE_PACKET_SIZE_FALLBACK
   );
@@ -1047,12 +1048,13 @@ function getDevice(deviceId: string): DeviceInfo | null {
   const peripheral = discoveredDevices.get(deviceId);
   if (peripheral) {
     const deviceName = peripheral.advertisement?.localName || 'Unknown Device';
+    const mtu = resolveNobleAttMtu(peripheral.mtu);
     return {
       commType: 'electron-ble',
       id: peripheral.id,
       name: deviceName,
       state: peripheral.state || 'disconnected',
-      ...(typeof peripheral.mtu === 'number' ? { mtu: peripheral.mtu } : {}),
+      ...(mtu === undefined ? {} : { mtu }),
     };
   }
 
@@ -1060,12 +1062,13 @@ function getDevice(deviceId: string): DeviceInfo | null {
   const connectedPeripheral = connectedDevices.get(deviceId);
   if (connectedPeripheral) {
     const deviceName = connectedPeripheral.advertisement?.localName || 'Unknown Device';
+    const mtu = resolveNobleAttMtu(connectedPeripheral.mtu);
     return {
       commType: 'electron-ble',
       id: connectedPeripheral.id,
       name: deviceName,
       state: connectedPeripheral.state || 'connected',
-      ...(typeof connectedPeripheral.mtu === 'number' ? { mtu: connectedPeripheral.mtu } : {}),
+      ...(mtu === undefined ? {} : { mtu }),
     };
   }
 

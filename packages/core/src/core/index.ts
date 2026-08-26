@@ -4,6 +4,7 @@ import {
   DeviceSessionPinType,
   TRANSPORT_EVENT,
   isProtocolV2LinkDisabledError,
+  type ProtocolType,
 } from '@onekeyfe/hd-transport';
 import {
   ERRORS,
@@ -1037,6 +1038,7 @@ async function connectDeviceForBle(
       !device.commands ||
       device.commands.disposed;
     if (shouldAcquire) {
+      const connectProtocol = resolveBleConnectProtocol(method);
       // The deadline/abort guards are scoped to the desktop electron
       // transport: its IPC acquire is the only path with a proven
       // never-settling failure mode, while react-native/lowlevel acquire may
@@ -1048,13 +1050,13 @@ async function connectDeviceForBle(
         throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
       }
       if (!useAcquireGuards) {
-        await device.acquire(method.payload.connectProtocol, {
+        await device.acquire(connectProtocol, {
           forceProtocolDetection: method.payload.forceProtocolDetection,
         });
       } else {
         try {
           await raceBleAcquire(
-            device.acquire(method.payload.connectProtocol, {
+            device.acquire(connectProtocol, {
               forceProtocolDetection: method.payload.forceProtocolDetection,
             }),
             abortSignal
@@ -1118,6 +1120,14 @@ async function connectDeviceForBle(
       throw err;
     }
   }
+}
+
+export function resolveBleConnectProtocol(method: BaseMethod): ProtocolType | undefined {
+  if (method.payload.connectProtocol === 'V1' || method.payload.connectProtocol === 'V2') {
+    return method.payload.connectProtocol;
+  }
+  const supportedProtocols = method.getSupportedProtocols();
+  return supportedProtocols.length === 1 && supportedProtocols[0] === 'V2' ? 'V2' : undefined;
 }
 
 type IPollFn<T> = (time?: number) => T;

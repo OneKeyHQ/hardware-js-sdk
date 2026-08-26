@@ -2114,6 +2114,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
     this.protocolV2LastTransferProgress = undefined;
     this.protocolV2LastTransferProgressAt = 0;
+    const transferStartedAt = Date.now();
     let processedSize = 0;
     for (const resource of resourcesToSync) {
       // The bootloader keeps its live resource package mounted. FatFs rejects
@@ -2124,6 +2125,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         filePath: writePath,
         processedSize,
         totalSize,
+        transferStartedAt,
       });
       await this.verifyProtocolV2StagedFile(writePath, resource.source.size);
       if (isProtocolV2BootResourcePackagePath(resource.devicePath)) {
@@ -2139,6 +2141,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         filePath,
         processedSize,
         totalSize,
+        transferStartedAt,
       });
       await this.verifyProtocolV2StagedFile(filePath, item.source.size);
       stagedInstallTargets.push({
@@ -2148,7 +2151,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     if (totalSize > 0) {
-      this.postProgressMessage(100, 'transferData');
+      const elapsedMs = Math.max(Date.now() - transferStartedAt, 0);
+      this.postProgressMessage(100, 'transferData', {
+        transferredBytes: totalSize,
+        totalBytes: totalSize,
+        rateBytesPerSecond: elapsedMs > 0 ? Math.round((totalSize / elapsedMs) * 1000) : undefined,
+        elapsedMs,
+      });
     }
     if (stagedInstallTargets.length === 0) {
       return;
@@ -2173,16 +2182,17 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     filePath,
     processedSize,
     totalSize,
+    transferStartedAt = Date.now(),
   }: {
     source: FirmwareByteSource;
     filePath: string;
     processedSize: number;
     totalSize: number;
+    transferStartedAt?: number;
   }) {
     let lastError: unknown;
     for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
       try {
-        const transferStartedAt = Date.now();
         await writeFirmwareByteSource({
           source,
           chunkSize: this.getProtocolV2FirmwareChunkSize('write', filePath),
@@ -2225,7 +2235,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
                 transferredBytes,
                 totalBytes: totalSize,
                 rateBytesPerSecond:
-                  elapsedMs > 0 ? Math.round((chunkEnd / elapsedMs) * 1000) : undefined,
+                  elapsedMs > 0 ? Math.round((transferredBytes / elapsedMs) * 1000) : undefined,
                 elapsedMs,
               });
             }

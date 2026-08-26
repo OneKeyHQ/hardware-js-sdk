@@ -90,7 +90,7 @@ describe('React Native BLE strategy', () => {
     ).toBe(182);
   });
 
-  test('uses withoutResponse for a high-volume write unless explicitly overridden', () => {
+  test('uses withoutResponse by default unless explicitly overridden', () => {
     const characteristic = {
       isWritableWithResponse: true,
       isWritableWithoutResponse: true,
@@ -99,8 +99,7 @@ describe('React Native BLE strategy', () => {
     expect(
       shouldWriteProtocolV2WithResponse({
         platform: 'ios',
-        highThroughput: true,
-        requestedWithResponse: false,
+        highThroughput: false,
         characteristic,
       })
     ).toBe(false);

@@ -255,6 +255,9 @@ describe('DeviceUploadWallpaper', () => {
   });
 
   test('uploads and applies the fixed wallpaper package on firmware 1.0.1', async () => {
+    const getSettingsSpy = jest
+      .spyOn(DataManager, 'getSettings')
+      .mockReturnValue('react-native' as any);
     const typedCall = jest.fn().mockImplementation((request, _response, params) => {
       if (request === 'FilesystemDirMake') return { message: {} };
       if (request === 'FilesystemFileWrite') {
@@ -282,8 +285,13 @@ describe('DeviceUploadWallpaper', () => {
     (method as any).device = device;
     method.postMessage = jest.fn();
 
-    method.init();
-    const result = await method.run();
+    let result;
+    try {
+      method.init();
+      result = await method.run();
+    } finally {
+      getSettingsSpy.mockRestore();
+    }
 
     const fileWrites = typedCall.mock.calls.filter(call => call[0] === 'FilesystemFileWrite');
     expect(new Set(fileWrites.map(call => call[2].file.path))).toEqual(
@@ -292,6 +300,7 @@ describe('DeviceUploadWallpaper', () => {
     expect(fileWrites[0][2].file.data.subarray(0, 4)).toEqual(
       new Uint8Array([0x4f, 0x4b, 0x50, 0x50])
     );
+    expect(fileWrites[0][2].file.data).toHaveLength(1960);
     expect(typedCall).toHaveBeenLastCalledWith('DeviceSettingsSet', 'Success', {
       settings: { wallpaper_path: 'vol1:/wallpapers/wallpaper.okpkg' },
     });
@@ -7184,7 +7193,14 @@ describe('Protocol V2 firmware update targets', () => {
       true
     );
     expect((method as any).exitProtocolV2BootloaderToNormal).not.toHaveBeenCalled();
-    expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'transferData');
+    expect(method.postProgressMessage).toHaveBeenCalledWith(
+      100,
+      'transferData',
+      expect.objectContaining({
+        transferredBytes: 5,
+        totalBytes: 5,
+      })
+    );
     expect((method as any).completeProtocolV2FinalVerification).toHaveBeenCalledTimes(1);
   });
 
@@ -7258,7 +7274,14 @@ describe('Protocol V2 firmware update targets', () => {
       expect.objectContaining({ processedSize: 2, totalSize: 3 })
     );
     expect(method.postProgressMessage).toHaveBeenCalledTimes(1);
-    expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'transferData');
+    expect(method.postProgressMessage).toHaveBeenCalledWith(
+      100,
+      'transferData',
+      expect.objectContaining({
+        transferredBytes: 3,
+        totalBytes: 3,
+      })
+    );
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledTimes(1);
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [{ target_id: 4, path: 'vol0:/application_p1.bin' }],
@@ -8578,26 +8601,43 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
     (method as any).protocolV2StartFirmwareUpdate = jest.fn();
     (method as any).waitForProtocolV2FirmwareUpdateComplete = jest.fn();
+    const dateNowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(5_000);
 
-    await (method as any).executeProtocolV2SourceUpdate({
-      installSources: [],
-      resourceSources: [
-        {
-          name: 'images.okpkg',
-          source: {
-            size: 3,
-            readAt: jest.fn(),
-            close: jest.fn(),
+    try {
+      await (method as any).executeProtocolV2SourceUpdate({
+        installSources: [],
+        resourceSources: [
+          {
+            name: 'images.okpkg',
+            source: {
+              size: 3,
+              readAt: jest.fn(),
+              close: jest.fn(),
+            },
+            devicePath: 'vol0:/bundles/images/images.okpkg',
           },
-          devicePath: 'vol0:/bundles/images/images.okpkg',
-        },
-      ],
-    });
+        ],
+      });
+    } finally {
+      dateNowSpy.mockRestore();
+    }
 
     expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledTimes(1);
     expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledWith(
-      expect.objectContaining({ filePath: 'vol0:/bundles/images/images.okpkg' })
+      expect.objectContaining({
+        filePath: 'vol0:/bundles/images/images.okpkg',
+        transferStartedAt: 1_000,
+      })
     );
+    expect(method.postProgressMessage).toHaveBeenLastCalledWith(100, 'transferData', {
+      transferredBytes: 3,
+      totalBytes: 3,
+      rateBytesPerSecond: 1,
+      elapsedMs: 4_000,
+    });
     expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledWith(
       'vol0:/bundles/images/images.okpkg',
       3
