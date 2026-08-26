@@ -103,6 +103,13 @@ export type AllNetworkDeviceIdentity =
       vendor: 'trezor';
       type: 'deviceId';
       value: string;
+    }
+  | {
+      // Keystone exposes no hardware serial on either channel; the BIP32 master
+      // fingerprint (mfp/xfp) is the only identity shared by USB and QR.
+      vendor: 'keystone';
+      type: 'masterFingerprint';
+      value: string;
     };
 
 export type AllNetworkAddressResponsePayload = Record<string, unknown> & {

@@ -11,7 +11,8 @@
  *   10300-10399  Transport + OS-level permission
  *   10400-10499  PIN / Passphrase
  *   10500-10599  App lifecycle (wrong app, not open, too old)
- *   10600-10999  RESERVED — future adapter-level categories
+ *   10600-10699  Payload / framing limits (adapter-level)
+ *   10700-10999  RESERVED — future adapter-level categories
  *
  *   11000-11099  EVM APDU (reactive mapping)
  *   11100-11199  Solana APDU
@@ -151,6 +152,17 @@ export enum HardwareErrorCode {
   AppTooOld = 10502,
   /** Not enough free storage for install/update; user must uninstall apps first. */
   DeviceOutOfMemory = 10503,
+
+  // --- 10600s Payload / framing limits ---
+  /**
+   * The call payload exceeds a transport's fixed framing capacity (e.g.
+   * Keystone USB's ~12.5KB per-request cap — 200 frames of 64 bytes). Distinct
+   * from a generic TransportError: the request never reached the device, and
+   * retrying with the same payload over the same transport will fail the same
+   * way. Callers should route the call over a different channel (e.g. Keystone
+   * QR) or reduce the payload (e.g. a smaller PSBT) instead of retrying as-is.
+   */
+  PayloadTooLarge = 10600,
 
   // --- 11000s EVM (Ledger Ethereum App) APDU-specific ---
   /** 0x6a80 Invalid data — observed on blindSignTransactionFallback when the

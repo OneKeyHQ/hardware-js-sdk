@@ -145,6 +145,7 @@ export type {
   ConnectorCallResult,
   ConnectorSerializedError,
   ConnectorErrorParams,
+  ConnectorSearchDevicesOptions,
   IConnector,
   IHardwareBridge,
 } from './types/connector';
