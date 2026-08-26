@@ -140,6 +140,8 @@ export type DeviceFeaturesVerify = {
   boardHash?: string;
   bleBuildId?: string;
   bleHash?: string;
+  coprocessorBootBuildId?: string;
+  coprocessorBootHash?: string;
   se01BuildId?: string;
   se01Hash?: string;
   se02BuildId?: string;
@@ -248,6 +250,7 @@ export type DeviceStateVersions = {
   bootloader: string | null;
   board: string | null;
   ble: string | null;
+  coprocessorBoot?: string | null;
   /** @deprecated Kept for legacy consumers; new code should read se01. */
   se?: string | null;
   se01?: string | null;

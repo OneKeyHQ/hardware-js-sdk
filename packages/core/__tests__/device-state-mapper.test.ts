@@ -122,6 +122,7 @@ describe('DeviceStateMapper', () => {
         },
         coprocessor: {
           bt_adv_name: 'Pro2 1234',
+          bootloader: { version: '0.9.0', build_id: 'copro-boot-build', hash: [0x07, 0x08] },
           application: { version: '1.2.3' },
         },
         se1: {
@@ -144,12 +145,15 @@ describe('DeviceStateMapper', () => {
       applicationP2: '5.0.1',
       bootloader: '2.0.0',
       ble: '1.2.3',
+      coprocessorBoot: '0.9.0',
     });
     expect(patch.verification).toMatchObject({
       applicationP1BuildId: 'p1-build',
       applicationP1Hash: '0102',
       applicationP2BuildId: 'p2-build',
       applicationP2Hash: '0304',
+      coprocessorBootBuildId: 'copro-boot-build',
+      coprocessorBootHash: '0708',
       se01BuildId: 'se1-build',
       se01Hash: '0506',
     });
