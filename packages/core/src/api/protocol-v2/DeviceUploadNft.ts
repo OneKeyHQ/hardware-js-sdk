@@ -42,8 +42,11 @@ export type DeviceUploadNftParams = {
 
 export type DeviceUploadNftResponse = {
   basename: string;
+  /** Final image path after firmware extracts a host-asset package. */
   imagePath: string;
+  /** Final thumbnail path after firmware extracts a host-asset package. */
   thumbnailPath: string;
+  /** Final metadata path after firmware extracts a host-asset package. */
   metadataPath: string;
   totalSize: number;
   nftUpdated: true;
@@ -197,7 +200,7 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
     if (!bundle) throw invalidParameter('NFT data has not been initialized.');
 
     const useHostAssetPackage = supportsPro2HostAssetPackage(
-      this.device.getCurrentFirmwareVersionString()
+      this.device.state?.versions.firmware ?? undefined
     );
     await this.assertCapabilities(useHostAssetPackage);
     this.throwIfAborted();

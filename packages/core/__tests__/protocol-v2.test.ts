@@ -271,10 +271,12 @@ describe('DeviceUploadWallpaper', () => {
       payload: {
         method: 'deviceUploadWallpaper',
         jpegBase64: createJpegBase64(604, 1024),
+        fileName: 'ignored-on-package-firmware.bin',
       },
     });
     const device = stubWallpaperDevice({
       commands: { typedCall },
+      state: { versions: { firmware: '1.0.1' } },
       getCurrentFirmwareVersionString: jest.fn(() => '1.0.1'),
     });
     (method as any).device = device;
@@ -298,6 +300,40 @@ describe('DeviceUploadWallpaper', () => {
       colorFormat: 'RGB565',
       message: 'wallpaper applied',
     });
+  });
+
+  test('keeps the legacy wallpaper path on a 1.0.1 prerelease', async () => {
+    const typedCall = jest.fn().mockImplementation((request, _response, params) => {
+      if (request === 'FilesystemDirMake') return { message: {} };
+      if (request === 'FilesystemFileWrite') {
+        const file = params.file as { data: Uint8Array; offset: number };
+        return { message: { processed_byte: file.offset + file.data.byteLength } };
+      }
+      if (request === 'DeviceSettingsSet') return { message: {} };
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const method = new DeviceUploadWallpaper({
+      id: 1,
+      payload: {
+        method: 'deviceUploadWallpaper',
+        jpegBase64: createJpegBase64(604, 1024),
+        fileName: 'prerelease-wallpaper.bin',
+      },
+    });
+    const device = stubWallpaperDevice({
+      commands: { typedCall },
+      state: { versions: { firmware: '1.0.1-beta.1' } },
+    });
+    (method as any).device = device;
+
+    method.init();
+    const result = await method.run();
+
+    expect(result.path).toBe('vol1:/wallpapers/prerelease-wallpaper.bin');
+    const fileWrites = typedCall.mock.calls.filter(call => call[0] === 'FilesystemFileWrite');
+    expect(new Set(fileWrites.map(call => call[2].file.path))).toEqual(
+      new Set(['vol1:/wallpapers/prerelease-wallpaper.bin'])
+    );
   });
 
   test('文件上传失败时不修改 wallpaper_path', async () => {

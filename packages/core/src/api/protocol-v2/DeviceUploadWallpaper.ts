@@ -23,11 +23,19 @@ import {
 
 export type DeviceUploadWallpaperParams = {
   jpegBase64: string;
+  /**
+   * Legacy firmware uses this name for the uploaded `.bin` file. Firmware
+   * 1.0.1+ always consumes the fixed `wallpaper.okpkg` package path.
+   */
   fileName?: string;
   chunkSize?: number;
 };
 
 export type DeviceUploadWallpaperResponse = {
+  /**
+   * Filesystem path sent to `DeviceSettingsSet`. On firmware 1.0.1+ this is
+   * the temporary package path; firmware extracts and persists wallpaper.bin.
+   */
   path: string;
   size: number;
   colorFormat: Pro2WallpaperColorFormat;
@@ -150,7 +158,7 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
     await this.assertCapabilities();
     await this.ensureDirectory();
     const useHostAssetPackage = supportsPro2HostAssetPackage(
-      this.device.getCurrentFirmwareVersionString()
+      this.device.state?.versions.firmware ?? undefined
     );
     const data = useHostAssetPackage
       ? buildPro2HostAssetPackage([{ name: WALLPAPER_PACKAGE_ENTRY, data: encoded.data }])
