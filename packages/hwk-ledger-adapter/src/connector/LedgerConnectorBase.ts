@@ -138,7 +138,7 @@ const LEDGER_RELAY_ALLOWED_ROOT_DOMAINS = ['onekeytest.com', 'onekey.com'];
 
 function isAllowedLedgerRelayHost(hostname: string): boolean {
   return LEDGER_RELAY_ALLOWED_ROOT_DOMAINS.some(
-    root => hostname === root || hostname.endsWith(`.${root}`),
+    root => hostname === root || hostname.endsWith(`.${root}`)
   );
 }
 const LEDGER_RELAY_PATH_PREFIX = '/v1/ledger/session/';
