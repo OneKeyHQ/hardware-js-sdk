@@ -27,6 +27,21 @@ describe('detectHardwareVendorFromDescriptor', () => {
     expect(detectHardwareVendorFromDescriptor({ vendorId: 0x2c97 })).toBe('ledger');
   });
 
+  it('detects Keystone only from the full VID/PID pair on the shared pid.codes VID', () => {
+    expect(detectHardwareVendorFromDescriptor({ vendorId: 0x1209, productId: 0x3001 })).toBe(
+      'keystone'
+    );
+    expect(detectHardwareVendorFromDescriptor({ vendor: 0x1209, product: 0x3001 })).toBe(
+      'keystone'
+    );
+    expect(detectHardwareVendorFromDescriptor({ vendorId: 0x1209 })).toBeUndefined();
+    expect(detectHardwareVendorFromDescriptor({ productId: 0x3001 })).toBeUndefined();
+  });
+
+  it('detects Keystone from its USB manufacturer name', () => {
+    expect(detectHardwareVendorFromDescriptor({ manufacturerName: 'Keystone' })).toBe('keystone');
+  });
+
   it('detects OneKey and Trezor from stable USB manufacturer names', () => {
     expect(detectHardwareVendorFromDescriptor({ manufacturerName: 'OneKey' })).toBe('onekey');
     expect(detectHardwareVendorFromDescriptor({ manufacturerName: 'Trezor Company' })).toBe(
