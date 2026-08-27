@@ -9,10 +9,13 @@ title: kaspaSignTransaction
 * Firmware version required
   * Touch: 4.3.0
   * Classic/Mini: 3.0.0
+* `useTweak: false` requires newer firmware on some models
+  * Pro: 4.14.0+
+  * Classic 1S: 3.12.0+
 
 ## Kaspa: Sign transaction
 
-Asks device to sign given transaction using the private key derived by given BIP32 path. User is asked to confirm all transaction details on OneKey.
+Signs a Kaspa transaction with the private key derived from the given BIP32 path. The SDK can negotiate between the legacy blind-sign flow and the newer streaming flow based on the payload you send and the firmware the device exposes.
 
 ```typescript
 const result = await HardwareSDK.kaspaSignTransaction(connectId, deviceId, params);
@@ -23,10 +26,17 @@ const result = await HardwareSDK.kaspaSignTransaction(connectId, deviceId, param
 [**Optional common params**](/en/hardware-sdk/core-api-guide#common-params)
 
 * `version` - _required_ `number` transaction version.
-* `inputs` - _required_ `Array` of [KaspaSignInputParams](https://github.com/OneKeyHQ/hardware-js-sdk/blob/269ee367141ae2186a9a63d1d89e9f4c70428623/packages/core/src/types/api/kaspaSignTransaction.ts#L9C1-L19C3).
-* `outputs` - _required_ `Array` of [KaspaSignOutputParams](https://github.com/OneKeyHQ/hardware-js-sdk/blob/269ee367141ae2186a9a63d1d89e9f4c70428623/packages/core/src/types/api/kaspaSignTransaction.ts#L21C1-L26C1).
-* `lockTime` - _required_ `number`&#x20;
-* `sigHashType` - _required_ `number`&#x20;
+* `inputs` - _required_ `Array`
+  * `path`, `prevTxId`, `outputIndex`, and `sequenceNumber` are required on every input.
+  * `output.satoshis` is required.
+  * `output.script` is optional, but it is still needed by the legacy host-prehash flow.
+  * `sigOpCount` defaults to `1` per input.
+* `outputs` - _required_ `Array`
+  * `satoshis` is required.
+  * Use `address` for a recipient output, or `addressN` for a change output, when you want the streaming protocol.
+  * `script` and `scriptVersion` stay available for legacy compatibility.
+* `lockTime` - _required_ `number | string`
+* `sigHashType` - _optional_ `number`
   * ```
     SIGHASH_ALL = 0x01,
     SIGHASH_NONE = 0x02,
@@ -34,52 +44,73 @@ const result = await HardwareSDK.kaspaSignTransaction(connectId, deviceId, param
     SIGHASH_FORKID = 0x40,
     SIGHASH_ANYONECANPAY = 0x80,
     ```
-* `sigOpCount` - _optional_ `number`&#x20;
-* `subNetworkID` - _optional_ `string`&#x20;
-* `prefix` - _optional_ `string` Address prefix. Default is set to `kaspa`
-* `scheme` - _optional_ `string` Encryption algorithm mode. Default is set to `schnorr`
+  * Default: `SIGHASH_ALL | SIGHASH_FORKID`
+* `sigOpCount` - _optional_ `number` transaction-level default for inputs that do not override it
+* `subNetworkID` - _optional_ `string` Default is the all-zero subnetwork id
+* `payload` - _optional_ `string` Hex-encoded transaction payload
+* `gas` - _optional_ `number | string` Default is `0`
+* `refTxs` - _optional_ `Array` of previous transactions that the device may request for on-device input amount verification
+* `prefix` - _optional_ `string` Address prefix. Default is `kaspa`
+* `scheme` - _optional_ `string` Signature scheme. Default is `schnorr`
+* `useTweak` - _optional_ `boolean` Default is `true`
 
+### Flow selection and constraints
 
+* Streaming verification is available when every output includes `address` or `addressN`, the transaction uses the default sighash, and the involved scripts are plain P2PK scripts or omitted.
+* If the transaction is still legacy-signable and `refTxs` is missing, the SDK prefers blind signing for wider firmware compatibility.
+* KRC20-style P2SH commit or reveal scripts are not streamable and must use blind signing.
+* When the device asks for a previous transaction, the SDK matches it by `prevTxId` inside `refTxs`. Keep those ids exact.
 
 ### Examples
 
 ```typescript
+const inputScript = `20${'ab'.repeat(32)}ac`;
+const recipientAddress =
+  'kaspa:qr0lr4ml9fn3chekrqmjdkergxl93l4wrk3dankcgvjq776s9wn9jkdskewva';
+
 const response = await HardwareSDK.kaspaSignTransaction(
   connectId,
   deviceId,
   {
     version: 0,
     lockTime: '0',
-    sigHashType: 0x1,
-    sigOpCount: 1,
-    subNetworkID: "00000000000000000000000000000000",
-    prefix: "prefix",
-    scheme: "schnorr",
     inputs: [
       {
-        outputIndex: 1,
         path: "m/44'/111111'/0'/0/0",
-        prevTxId: '1f226507807ff7dc5a7f8f2dec353fffc9dacc2645d8aecd02e5046907e3e2b2',
+        prevTxId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        outputIndex: 1,
         sequenceNumber: '0',
-        sigOpCount: 1,
         output: {
           satoshis: '990096458',
-          script: '207afdae557e69c0040fd4135adffc60f9486fb21f4cbae233fd6db3e84ba47c55ac',
+          script: inputScript,
         },
       },
     ],
     outputs: [
       {
         satoshis: '100000000',
-        script: '205ca3a7530284e5c5e472544edd6002c3afeb8c8f84d3a728fad255a4872753fbac',
-        scriptVersion: 0,
+        address: recipientAddress,
+        script: inputScript,
       },
       {
         satoshis: '890094182',
-        script: '207afdae557e69c0040fd4135adffc60f9486fb21f4cbae233fd6db3e84ba47c55ac',
-        scriptVersion: 0,
+        addressN: "m/44'/111111'/0'/0/1",
+        script: inputScript,
       },
-    ]
+    ],
+    refTxs: [
+      {
+        txId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        version: 0,
+        inputs: [],
+        outputs: [
+          {
+            satoshis: '990096458',
+            script: inputScript,
+          },
+        ],
+      },
+    ],
   }
 );
 ```
@@ -89,21 +120,31 @@ Result
 ```typescript
 {
   success: true,
-  payload: {
-    index: 0,
-    signature: "signed data"
-  }
+  payload: [
+    {
+      index: 0,
+      signature: 'signed data',
+    },
+  ],
 }
 ```
+
+The SDK returns one signature per input and normalizes the final array by `index`, even if the device streams signatures back out of order.
 
 Error
 
 ```typescript
 {
-    success: false,
-    payload: {
-        error: string, // error message
-        code: number // error code
-    }
+  success: false,
+  payload: {
+    error: string, // error message
+    code: number, // error code
+  },
 }
 ```
+
+### Troubleshooting
+
+* `HardwareErrorCode.KaspaPrevTxIdMismatch` (`829`): the device rejected one of the referenced previous transactions. Rebuild `refTxs` from the same source as the current transaction inputs instead of silently retrying without them.
+* `HardwareErrorCode.CallMethodNeedUpgradeFirmware` (`407`): the transaction is streaming-only, but the connected firmware cannot decode the streaming packet.
+* `HardwareErrorCode.CallMethodInvalidParameter` (`405`): the payload does not describe a valid output set for either protocol, or the device requested a previous transaction that is missing from `refTxs`.

@@ -9,10 +9,13 @@ title: kaspaSignTransaction
 * 固件版本要求
   * Touch: 4.3.0
   * Classic/Mini: 3.0.0
+* 某些机型在 `useTweak: false` 时需要更高固件版本
+  * Pro: 4.14.0+
+  * Classic 1S: 3.12.0+
 
 ## Kaspa：签名交易
 
-使用指定 BIP32 路径派生的私钥对交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+使用指定 BIP32 路径派生的私钥对 Kaspa 交易进行签名。SDK 会根据你传入的参数结构和设备固件能力，在传统盲签流程与新的流式签名流程之间自动协商。
 
 ```typescript
 const result = await HardwareSDK.kaspaSignTransaction(connectId, deviceId, params);
@@ -23,10 +26,17 @@ const result = await HardwareSDK.kaspaSignTransaction(connectId, deviceId, param
 [**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
 
 * `version` - _必需_ `number` 交易版本。
-* `inputs` - _必需_ [KaspaSignInputParams](https://github.com/OneKeyHQ/hardware-js-sdk/blob/269ee367141ae2186a9a63d1d89e9f4c70428623/packages/core/src/types/api/kaspaSignTransaction.ts#L9C1-L19C3) 的 `Array`。
-* `outputs` - _必需_ [KaspaSignOutputParams](https://github.com/OneKeyHQ/hardware-js-sdk/blob/269ee367141ae2186a9a63d1d89e9f4c70428623/packages/core/src/types/api/kaspaSignTransaction.ts#L21C1-L26C1) 的 `Array`。
-* `lockTime` - _必需_ `number`
-* `sigHashType` - _必需_ `number`
+* `inputs` - _必需_ `Array`
+  * 每个 input 都必须提供 `path`、`prevTxId`、`outputIndex` 和 `sequenceNumber`。
+  * `output.satoshis` 为必填项。
+  * `output.script` 是可选项，但传统 host-prehash 盲签流程仍然需要它。
+  * 单个 input 的 `sigOpCount` 默认值为 `1`。
+* `outputs` - _必需_ `Array`
+  * `satoshis` 为必填项。
+  * 如果你希望走流式签名，请为外部收款输出传 `address`，为找零输出传 `addressN`。
+  * `script` 和 `scriptVersion` 仍然保留，用于兼容传统流程。
+* `lockTime` - _必需_ `number | string`
+* `sigHashType` - _可选_ `number`
   * ```
     SIGHASH_ALL = 0x01,
     SIGHASH_NONE = 0x02,
@@ -34,52 +44,73 @@ const result = await HardwareSDK.kaspaSignTransaction(connectId, deviceId, param
     SIGHASH_FORKID = 0x40,
     SIGHASH_ANYONECANPAY = 0x80,
     ```
-* `sigOpCount` - _可选_ `number`
-* `subNetworkID` - _可选_ `string`
-* `prefix` - _可选_ `string` 地址前缀。默认设置为 `kaspa`
-* `scheme` - _可选_ `string` 加密算法模式。默认设置为 `schnorr`
+  * 默认值：`SIGHASH_ALL | SIGHASH_FORKID`
+* `sigOpCount` - _可选_ `number` 作为没有单独覆盖值时的交易级默认值
+* `subNetworkID` - _可选_ `string` 默认值为全 0 的 subnetwork id
+* `payload` - _可选_ `string` 十六进制编码的交易 payload
+* `gas` - _可选_ `number | string` 默认值为 `0`
+* `refTxs` - _可选_ `Array` 设备在机内校验 input 金额时可能会请求的前序交易
+* `prefix` - _可选_ `string` 地址前缀。默认值为 `kaspa`
+* `scheme` - _可选_ `string` 签名方案。默认值为 `schnorr`
+* `useTweak` - _可选_ `boolean` 默认值为 `true`
 
+### 流程选择与约束
 
+* 当每个 output 都带有 `address` 或 `addressN`、交易使用默认 sighash、且相关脚本是普通 P2PK 脚本或省略时，可以启用流式校验。
+* 如果交易同时兼容传统签名流程，而你又没有提供 `refTxs`，SDK 会优先选择盲签，以兼容更广的固件范围。
+* KRC20 风格的 P2SH commit/reveal 脚本不能走流式签名，必须使用盲签。
+* 当设备请求前序交易时，SDK 会按 `prevTxId` 在 `refTxs` 中做精确匹配。
 
 ### 示例
 
 ```typescript
+const inputScript = `20${'ab'.repeat(32)}ac`;
+const recipientAddress =
+  'kaspa:qr0lr4ml9fn3chekrqmjdkergxl93l4wrk3dankcgvjq776s9wn9jkdskewva';
+
 const response = await HardwareSDK.kaspaSignTransaction(
   connectId,
   deviceId,
   {
     version: 0,
     lockTime: '0',
-    sigHashType: 0x1,
-    sigOpCount: 1,
-    subNetworkID: "00000000000000000000000000000000",
-    prefix: "prefix",
-    scheme: "schnorr",
     inputs: [
       {
-        outputIndex: 1,
         path: "m/44'/111111'/0'/0/0",
-        prevTxId: '1f226507807ff7dc5a7f8f2dec353fffc9dacc2645d8aecd02e5046907e3e2b2',
+        prevTxId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        outputIndex: 1,
         sequenceNumber: '0',
-        sigOpCount: 1,
         output: {
           satoshis: '990096458',
-          script: '207afdae557e69c0040fd4135adffc60f9486fb21f4cbae233fd6db3e84ba47c55ac',
+          script: inputScript,
         },
       },
     ],
     outputs: [
       {
         satoshis: '100000000',
-        script: '205ca3a7530284e5c5e472544edd6002c3afeb8c8f84d3a728fad255a4872753fbac',
-        scriptVersion: 0,
+        address: recipientAddress,
+        script: inputScript,
       },
       {
         satoshis: '890094182',
-        script: '207afdae557e69c0040fd4135adffc60f9486fb21f4cbae233fd6db3e84ba47c55ac',
-        scriptVersion: 0,
+        addressN: "m/44'/111111'/0'/0/1",
+        script: inputScript,
       },
-    ]
+    ],
+    refTxs: [
+      {
+        txId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        version: 0,
+        inputs: [],
+        outputs: [
+          {
+            satoshis: '990096458',
+            script: inputScript,
+          },
+        ],
+      },
+    ],
   }
 );
 ```
@@ -89,21 +120,31 @@ const response = await HardwareSDK.kaspaSignTransaction(
 ```typescript
 {
   success: true,
-  payload: {
-    index: 0,
-    signature: "signed data"
-  }
+  payload: [
+    {
+      index: 0,
+      signature: 'signed data',
+    },
+  ],
 }
 ```
+
+每个 input 都会返回一条签名结果。即使设备按乱序返回签名，SDK 也会按 `index` 整理最终数组。
 
 错误
 
 ```typescript
 {
-    success: false,
-    payload: {
-        error: string, // 错误信息
-        code: number // 错误码
-    }
+  success: false,
+  payload: {
+    error: string, // 错误信息
+    code: number, // 错误码
+  },
 }
 ```
+
+### 排障
+
+* `HardwareErrorCode.KaspaPrevTxIdMismatch` (`829`)：设备拒绝了 `refTxs` 中的某笔前序交易。请使用和当前 inputs 相同的数据源重新构建 `refTxs`，不要静默降级为不带 `refTxs` 的重试。
+* `HardwareErrorCode.CallMethodNeedUpgradeFirmware` (`407`)：当前交易只能走流式签名，但连接的固件还不能解码对应的数据包。
+* `HardwareErrorCode.CallMethodInvalidParameter` (`405`)：当前参数既不满足流式输出描述，也不满足传统流程要求，或者设备请求的前序交易不在 `refTxs` 里。
