@@ -420,6 +420,14 @@ def build_cases(sample_path: Path) -> list[dict[str, Any]]:
         "$0.00",
         0,
     )
+    single_btc = payload(
+        "8.6 BTC @ $90K",
+        "$774,000.00",
+        [token("BTC", "Bitcoin", "8.6", "$774.0K", 100, 0xF7931A, "btc--0", is_native=True)],
+        0,
+        "$0.00",
+        0,
+    )
     guard = payload(
         "P11 Negative guard",
         "$1.00K",
@@ -497,6 +505,7 @@ def build_cases(sample_path: Path) -> list[dict[str, Any]]:
         case("N09", "Other 颜色越界", "otherTokens.color 超出 RGB888 范围，预期固件拒绝。", "reject", bad_other_color),
         case("L01", "8 位 Token 金额客户端拦截", "Token balance 包含 8 位 ASCII 有效数字；必须在上传前拦截，绝不传给硬件。", "client-block", eight_digits),
         case("P12", "最终有效数据恢复", "所有反向用例结束后恢复有效 Portfolio，避免设备停留在测试保护数据之外。", "accept", guard),
+        case("P13", "单 BTC 真实持仓", "按 BTC 单价约 $90,000，模拟 8.6 BTC 持仓，总资产 $774,000.00。", "accept", single_btc),
     ]
 
 

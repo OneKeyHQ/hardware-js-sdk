@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "firmwareCommit": "9d58ee244f77324f45683e8d78f821c00ae095dc",
-  "appCommit": "0c4008b7491862d6a4d9c4809cbeea8c0db377d7",
-  "sdkCommit": "4501ad9a9c46eb74237e0f69e4c8bc1d1b02b365",
+  "firmwareCommit": "de1eb8d614d0e937ac20302e0c9a65444ba5cca1",
+  "appCommit": "262bed6a345a87439f9b25acc8291f882a398b1f",
+  "sdkCommit": "43d2856e593a93fbf056fdb334e0fe407a79cdc0",
   "intervalMs": 60000,
   "cases": [
     {
@@ -2843,6 +2843,44 @@
         }
       },
       "package": "P12.okpkg"
+    },
+    {
+      "id": "P13",
+      "title": "单 BTC 真实持仓",
+      "description": "按 BTC 单价约 $90,000，模拟 8.6 BTC 持仓，总资产 $774,000.00。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "8.6 BTC @ $90K",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$774,000.00",
+        "tokenCount": 1,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "8.6",
+            "fiatValue": "$774.0K",
+            "portfolioPercentage": 100,
+            "networkId": "btc--0"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "P13.okpkg"
     }
   ]
 }
