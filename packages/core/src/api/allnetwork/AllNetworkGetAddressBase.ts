@@ -393,8 +393,8 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
           // the root fingerprint, so each nested chain method must resume the
           // requested standard or hidden wallet before sending its device command.
           const useEmptyPassphrase = this.payload.useEmptyPassphrase === true;
-          // false would AskPassphrase with [Standard] only and permanently drop Cardano
-          // from a reused session. Omit the flag for non-Cardano nested methods.
+          // Nested Cardano methods opt in to [Standard, Cardano] if Ask rebuilds.
+          // Other chains omit the flag so V2 keeps firmware's default domains.
           const deriveCardano = method.name.startsWith('cardano') ? true : undefined;
           const shouldResumeWalletSession = useEmptyPassphrase || !!this.payload.passphraseState;
           if (this.device.isProtocolV2() && shouldResumeWalletSession) {

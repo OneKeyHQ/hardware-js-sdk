@@ -105,8 +105,10 @@ function resolveDeriveCardano(method: BaseMethod): boolean | undefined {
   if (method.name.startsWith('cardano')) {
     return true;
   }
-  if (typeof method.payload?.deriveCardano === 'boolean') {
-    return method.payload.deriveCardano;
+  // V1 Initialize only acts on a true opt-in. V2 AskPassphrase must not treat
+  // false as Standard-only, so never forward an explicit false.
+  if (method.payload?.deriveCardano === true) {
+    return true;
   }
   return undefined;
 }

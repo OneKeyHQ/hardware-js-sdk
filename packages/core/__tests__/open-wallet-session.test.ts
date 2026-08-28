@@ -1964,43 +1964,119 @@ describe('openWalletSession', () => {
     expect(deviceWalletSessionStore.get('device-1', 'hidden-state')).toBe('new-session');
   });
 
-  test.each([false, true])('keeps deriveCardano API compatibility: %s', async deriveCardano => {
-    const typedCall = jest
-      .fn()
-      .mockResolvedValueOnce({ message: { version: 2 } })
-      .mockResolvedValueOnce({ message: {} })
-      .mockResolvedValueOnce({
-        message: {
-          btc_test_address: 'hidden-state',
-          session_id: 'new-session',
+  test.each([false, true])(
+    'openWalletSession does not thread CommonParams.deriveCardano: %s',
+    async deriveCardano => {
+      const typedCall = jest
+        .fn()
+        .mockResolvedValueOnce({ message: { version: 2 } })
+        .mockResolvedValueOnce({ message: {} })
+        .mockResolvedValueOnce({
+          message: {
+            btc_test_address: 'hidden-state',
+            session_id: 'new-session',
+          },
+        });
+      const method = new OpenWalletSession({
+        payload: {
+          method: 'openWalletSession',
+          connectId: 'connect-id',
+          mode: 'select-hidden',
+          deriveCardano,
         },
       });
-    const method = new OpenWalletSession({
-      payload: {
-        method: 'openWalletSession',
-        connectId: 'connect-id',
-        mode: 'select-hidden',
-        deriveCardano,
-      },
+      method.init();
+      method.device = createDevice({
+        typedCall,
+        promptPassphrase: jest.fn().mockResolvedValue({ passphrase: 'host hidden wallet' }),
+      }) as any;
+
+      await expect(method.run()).resolves.toMatchObject({
+        walletType: 'hidden',
+        passphraseState: 'hidden-state',
+      });
+      expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
+        passphrase: 'host hidden wallet',
+        on_device: false,
+        seed_domains: [],
+      });
+      expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
+    }
+  );
+
+  test('requests Cardano seed domains when a V2 session rebuild has Cardano intent', async () => {
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'ProtocolInfoRequest') {
+        return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionAskPassphrase') {
+        return { message: {} };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: 'hidden-state',
+            session_id: 'new-session',
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${request}`);
     });
-    method.init();
-    method.device = createDevice({
+    const device = createDevice({
       typedCall,
       promptPassphrase: jest.fn().mockResolvedValue({ passphrase: 'host hidden wallet' }),
-    }) as any;
+    });
 
-    await expect(method.run()).resolves.toMatchObject({
-      walletType: 'hidden',
+    await expect(
+      getProtocolV2WalletSession(device as any, {
+        forceWalletSelection: true,
+        deriveCardano: true,
+      })
+    ).resolves.toMatchObject({
       passphraseState: 'hidden-state',
+      newSession: 'new-session',
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
       seed_domains: [
         DeviceSessionSeedDomain.SeedDomain_Standard,
-        ...(deriveCardano ? [DeviceSessionSeedDomain.SeedDomain_Cardano] : []),
+        DeviceSessionSeedDomain.SeedDomain_Cardano,
       ],
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
+  });
+
+  test('does not freeze a V2 session to Standard-only when deriveCardano is false', async () => {
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'ProtocolInfoRequest') {
+        return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionAskPassphrase') {
+        return { message: {} };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: 'hidden-state',
+            session_id: 'new-session',
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const device = createDevice({
+      typedCall,
+      promptPassphrase: jest.fn().mockResolvedValue({ passphrase: 'host hidden wallet' }),
+    });
+
+    await getProtocolV2WalletSession(device as any, {
+      forceWalletSelection: true,
+      deriveCardano: false,
+    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
+      passphrase: 'host hidden wallet',
+      on_device: false,
+      seed_domains: [],
+    });
   });
 });

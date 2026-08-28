@@ -53,8 +53,9 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
   前者通过必填 `on_device` 区分设备输入与 Host 输入。Host 输入同时携带非空 `passphrase`；
   设备输入不携带明文。Attach-to-PIN 始终使用 `DeviceSessionAskPin(AttachToPin)`。
 - `DeviceSessionGet({ session_id, btc_test_address })` 承接原
-  `Initialize(session_id, passphrase_state)` 的 Session 恢复语义；`derive_cardano` 映射到
-  `DeviceSessionAskPassphrase.seed_domains`，这不是 `PassphraseAck` 原有能力。
+  `Initialize(session_id, passphrase_state)` 的 Session 恢复语义；V1 的 `derive_cardano`
+  不再按次映射到 Get。V2 只在 AskPassphrase 上携带 `seed_domains`：Cardano 意图为
+  `[Standard, Cardano]`，其余为空列表（固件默认全部域）。这不是 `PassphraseAck` 原有能力。
 - `ButtonRequest/ButtonAck` 不改名；它们从 V2 firmware 状态机中删除，设备页面由显式 Ask 命令
   打开，对 App 的阶段提示由 SDK 合成。
 
