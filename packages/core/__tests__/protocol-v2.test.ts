@@ -7,6 +7,7 @@ import { encode as encodeJpeg } from 'jpeg-js';
 import {
   DeviceRebootType,
   DeviceSessionPinType,
+  DeviceSessionSeedDomain,
   DeviceSettingsPage,
   DeviceType,
 } from '@onekeyfe/hd-transport';
@@ -1115,7 +1116,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: '',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     device.passphraseState = 'state-1';
@@ -1538,7 +1539,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
@@ -1768,7 +1769,7 @@ describe('Protocol V2 feature adapter', () => {
       [
         'DeviceSessionAskPassphrase',
         'Success',
-        { passphrase: 'host hidden wallet', on_device: false, seed_domains: [] },
+        { passphrase: 'host hidden wallet', on_device: false, seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard] },
       ],
       ['DeviceStatusGet', 'DeviceStatus', {}],
       ['DeviceSessionGet', 'DeviceSession', {}],
@@ -2585,7 +2586,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenLastCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
@@ -2671,7 +2672,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
@@ -2780,7 +2781,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: '',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
     expect(typedCall.mock.calls.filter(([request]) => request === 'DeviceStatusGet')).toHaveLength(

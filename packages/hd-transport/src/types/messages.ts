@@ -5038,6 +5038,7 @@ export type DeviceSessionGet = {
 export type DeviceSession = {
   session_id?: string;
   btc_test_address?: string;
+  seed_domains: DeviceSessionSeedDomain[];
 };
 
 export enum DeviceSessionPinType {

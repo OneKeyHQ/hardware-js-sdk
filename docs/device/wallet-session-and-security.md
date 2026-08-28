@@ -60,13 +60,11 @@
   校验原始 `DeviceStatus`，然后直接用空参数 `DeviceSessionGet()` 读取当前隐藏钱包，不重新发起
   Passphrase 选择、`DeviceSessionAskPassphrase` 或 `DeviceSessionAskPin`。复核状态不一致时失败关闭，
   不回退到钱包重选。
-- V1 `Initialize.derive_cardano` 仍是按次 opt-in：只有当前调用明确需要 Cardano 时才置位，
-  省略或 `false` 只表示这次不派生，之后仍可再 Initialize。V2 的 seed domain 只在
-  `DeviceSessionAskPassphrase` 上生效，`DeviceSessionGet` 不能补域。因此 V2 不得把 V1 的
-  `deriveCardano: false` 映射成 `[Standard]`（那会把会话永久收窄）。开钱包
-  `openWalletSession` 不转发该 CommonParams 字段，AskPassphrase 发送空 `seed_domains`，
-  由固件默认派生全部支持域。后续 Cardano 方法若必须重建会话，才显式请求
-  `[Standard, Cardano]`。`DeviceSessionGet` 不再携带 `seed_domains`；新固件会拒绝 Get 上的未知字段。
+- V1 `Initialize.derive_cardano` 仍是按次 opt-in。V2 由 `DeviceSessionAskPassphrase.seed_domains`
+  决定这次生成哪些种子：开钱包和非 Cardano 调用发送 `[Standard]`；Cardano 调用发送
+  `[Standard, Cardano]`。`DeviceSessionGet` 不携带、也不生成 Cardano。`DeviceSession` 响应用
+  同一套 `seed_domains` 枚举回报已经生成的域。若 Get 显示还没有 Cardano，而当前调用需要 ADA，
+  SDK 再 Ask 一次带上 Cardano，然后 Get。
 - `DeviceSessionAskPin` 的类型按业务意图选择：标准钱包和安全操作使用 `Main`；普通业务调用已携带目标
   `passphraseState` 时，预解锁使用 `Any`，允许主 PIN 或 Attach PIN 进入，随后仍以返回的
   `btc_test_address` 校验目标隐藏钱包；用户明确选择 Attach PIN 打开隐藏钱包时使用 `AttachToPin`。

@@ -12334,6 +12334,11 @@
         "btc_test_address": {
           "type": "string",
           "id": 2
+        },
+        "seed_domains": {
+          "rule": "repeated",
+          "type": "DeviceSessionSeedDomain",
+          "id": 3
         }
       }
     },

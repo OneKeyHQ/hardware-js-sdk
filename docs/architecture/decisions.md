@@ -137,9 +137,9 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   `InvalidSession`。
 - Pro2 的 `DeviceSessionAskPassphrase` 必须显式携带输入来源：Host 输入发送
   `{ on_device: false, passphrase, seed_domains }`，设备输入发送 `{ on_device: true, seed_domains }`。
-  `seed_domains` 仅在当前调用明确需要 Cardano 时携带 `[Standard, Cardano]`；开钱包以及
-  `deriveCardano !== true` 时发送空列表，保留固件“派生全部支持域”的默认行为。不得把 V1 的
-  `deriveCardano: false` 映射成 `[Standard]`。不得省略 `on_device`，也不得同时发送设备输入标记和
+  `seed_domains` 在开钱包和非 Cardano 调用上发送 `[Standard]`；Cardano 调用发送
+  `[Standard, Cardano]`。不得发送空列表。`DeviceSessionGet` 不携带 `seed_domains`。
+  不得省略 `on_device`，也不得同时发送设备输入标记和
   Host Passphrase。Attach-to-PIN 继续使用 `DeviceSessionAskPin(AttachToPin)`。
 - `DeviceSessionAskPin` 的 PIN 类型由目标钱包意图决定，而不是由调用前的当前上下文决定：
   `Main` 用于选择标准钱包，也用于从 Attach-to-PIN 隐藏钱包上下文切回标准钱包；

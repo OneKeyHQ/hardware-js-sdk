@@ -63,18 +63,18 @@ const negotiateEventlessWalletSession = async (device: Device) => {
 const getDeviceSession = async (device: Device, request: DeviceSessionGet) =>
   device.commands.typedCall('DeviceSessionGet', 'DeviceSession', request);
 
-// V1 `deriveCardano` is a per-Initialize opt-in: false/omit skips Cardano this
-// round trip and a later Initialize can still add it. V2 seed domains are set
-// only on AskPassphrase and cannot be upgraded by Get, so false must not freeze
-// the session to Standard-only. true requests [Standard, Cardano]; anything
-// else leaves seed_domains empty and firmware keeps its default (all domains).
+const STANDARD_SEED_DOMAINS = [DeviceSessionSeedDomain.SeedDomain_Standard];
+const CARDANO_SEED_DOMAINS = [
+  DeviceSessionSeedDomain.SeedDomain_Standard,
+  DeviceSessionSeedDomain.SeedDomain_Cardano,
+];
+
 const buildDeviceSessionSeedDomains = (deriveCardano?: boolean): DeviceSessionSeedDomain[] =>
-  deriveCardano === true
-    ? [
-        DeviceSessionSeedDomain.SeedDomain_Standard,
-        DeviceSessionSeedDomain.SeedDomain_Cardano,
-      ]
-    : [];
+  deriveCardano === true ? CARDANO_SEED_DOMAINS : STANDARD_SEED_DOMAINS;
+
+const deviceSessionHasCardano = (message: { seed_domains?: DeviceSessionSeedDomain[] }) =>
+  Array.isArray(message.seed_domains) &&
+  message.seed_domains.includes(DeviceSessionSeedDomain.SeedDomain_Cardano);
 
 // Seed domains are applied when creating a passphrase session, not when reading/resuming one.
 // Current firmware rejects unknown DeviceSessionGet fields, including leftover seed_domains.
@@ -461,6 +461,36 @@ export async function getProtocolV2WalletSession(
       await rejectMismatchedAttachPinWallet();
       clearCurrentWalletSession();
       throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
+    }
+  }
+
+  if (options?.deriveCardano === true && !deviceSessionHasCardano(message)) {
+    if (options?.resumeOnly) {
+      device.clearInternalState();
+      throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
+    }
+    resumed = false;
+    if (options?.onlyMainPin) {
+      await selectStandardWallet();
+      response = await getDeviceSession(device, buildDeviceSessionGetRequest());
+    } else {
+      response = await selectDeviceSession(
+        device,
+        expectedPassphraseState,
+        true,
+        markWalletStatusRefreshed
+      );
+    }
+    message = response.message;
+    try {
+      assertCompleteDeviceSession(message);
+    } catch (error) {
+      if (options?.onlyMainPin) {
+        device.clearStandardInternalState?.();
+      } else {
+        device.clearInternalState();
+      }
+      throw error;
     }
   }
 

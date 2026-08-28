@@ -142,7 +142,7 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: '',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
@@ -329,7 +329,7 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenNthCalledWith(3, 'DeviceSessionGet', 'DeviceSession', {});
   });
@@ -448,7 +448,7 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenNthCalledWith(3, 'DeviceSessionGet', 'DeviceSession', {});
   });
@@ -820,7 +820,7 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     expect(promptPassphrase).toHaveBeenCalled();
@@ -1076,7 +1076,7 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: '',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     expect(promptPassphrase).not.toHaveBeenCalled();
@@ -1280,7 +1280,7 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     expect(promptPassphrase).toHaveBeenCalled();
@@ -1341,7 +1341,7 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
@@ -1388,7 +1388,7 @@ describe('openWalletSession', () => {
     });
     expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
       on_device: true,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenNthCalledWith(3, 'DeviceSessionGet', 'DeviceSession', {});
     expect(device.createProtocolV2UiPhaseMetadata).toHaveBeenNthCalledWith(
@@ -1441,7 +1441,7 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenNthCalledWith(3, 'DeviceSessionGet', 'DeviceSession', {});
   });
@@ -1465,7 +1465,7 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'cafe\u0301',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
   });
 
@@ -1489,7 +1489,7 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
       passphrase,
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
   });
 
@@ -1998,7 +1998,7 @@ describe('openWalletSession', () => {
       expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
         passphrase: 'host hidden wallet',
         on_device: false,
-        seed_domains: [],
+        seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
       });
       expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     }
@@ -2017,6 +2017,10 @@ describe('openWalletSession', () => {
           message: {
             btc_test_address: 'hidden-state',
             session_id: 'new-session',
+            seed_domains: [
+              DeviceSessionSeedDomain.SeedDomain_Standard,
+              DeviceSessionSeedDomain.SeedDomain_Cardano,
+            ],
           },
         };
       }
@@ -2046,7 +2050,63 @@ describe('openWalletSession', () => {
     });
   });
 
-  test('does not freeze a V2 session to Standard-only when deriveCardano is false', async () => {
+  test('asks Cardano seed domains after Get reports a Standard-only session', async () => {
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'ProtocolInfoRequest') {
+        return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionAskPassphrase') {
+        return { message: {} };
+      }
+      if (request === 'DeviceSessionGet') {
+        const hasCardanoAsk = typedCall.mock.calls.some(
+          call =>
+            call[0] === 'DeviceSessionAskPassphrase' &&
+            Array.isArray(call[2]?.seed_domains) &&
+            call[2].seed_domains.includes(DeviceSessionSeedDomain.SeedDomain_Cardano)
+        );
+        return {
+          message: {
+            btc_test_address: 'hidden-state',
+            session_id: 'new-session',
+            seed_domains: hasCardanoAsk
+              ? [
+                  DeviceSessionSeedDomain.SeedDomain_Standard,
+                  DeviceSessionSeedDomain.SeedDomain_Cardano,
+                ]
+              : [DeviceSessionSeedDomain.SeedDomain_Standard],
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const device = createDevice({
+      typedCall,
+      promptPassphrase: jest.fn().mockResolvedValue({ passphrase: 'host hidden wallet' }),
+    });
+    device.passphraseState = 'hidden-state';
+    deviceWalletSessionStore.set('device-1', 'hidden-state', 'cached-session');
+
+    await getProtocolV2WalletSession(device as any, {
+      expectedPassphraseState: 'hidden-state',
+      deriveCardano: true,
+    });
+
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
+      session_id: 'cached-session',
+      btc_test_address: 'hidden-state',
+    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
+      passphrase: 'host hidden wallet',
+      on_device: false,
+      seed_domains: [
+        DeviceSessionSeedDomain.SeedDomain_Standard,
+        DeviceSessionSeedDomain.SeedDomain_Cardano,
+      ],
+    });
+  });
+
+  test('asks Standard-only seed domains when deriveCardano is false', async () => {
     const typedCall = jest.fn((request: string) => {
       if (request === 'ProtocolInfoRequest') {
         return { message: { version: 2 } };
@@ -2076,7 +2136,7 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
       on_device: false,
-      seed_domains: [],
+      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
   });
 });
