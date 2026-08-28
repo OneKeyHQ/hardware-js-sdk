@@ -52,9 +52,9 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
 - `DeviceSessionAskPassphrase` 与 `DeviceSessionAskPin` 完成验证和钱包切换并返回 `Success`；
   前者通过必填 `on_device` 区分设备输入与 Host 输入。Host 输入同时携带非空 `passphrase`；
   设备输入不携带明文。Attach-to-PIN 始终使用 `DeviceSessionAskPin(AttachToPin)`。
-- `DeviceSessionGet({ session_id, btc_test_address, seed_domains })` 承接原
-  `Initialize(session_id, passphrase_state, derive_cardano)` 的 Session 恢复与派生语义，
-  这不是 `PassphraseAck` 原有能力。
+- `DeviceSessionGet({ session_id, btc_test_address })` 承接原
+  `Initialize(session_id, passphrase_state)` 的 Session 恢复语义；`derive_cardano` 映射到
+  `DeviceSessionAskPassphrase.seed_domains`，这不是 `PassphraseAck` 原有能力。
 - `ButtonRequest/ButtonAck` 不改名；它们从 V2 firmware 状态机中删除，设备页面由显式 Ask 命令
   打开，对 App 的阶段提示由 SDK 合成。
 
@@ -62,7 +62,7 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
 PassphraseAck(passphrase)                -> DeviceSessionAskPassphrase({ on_device: false, passphrase }) -> Success -> DeviceSessionGet()
 PassphraseAck(on_device)                 -> DeviceSessionAskPassphrase({ on_device: true }) -> Success -> DeviceSessionGet()
 PassphraseAck(on_device_attach_pin)      -> DeviceSessionAskPin(AttachToPin) -> Success -> DeviceSessionGet()
-Initialize(session_id, passphrase_state) -> DeviceSessionGet({ session_id, btc_test_address, seed_domains })
+Initialize(session_id, passphrase_state) -> DeviceSessionGet({ session_id, btc_test_address })
 ```
 
 ## 不在删除范围

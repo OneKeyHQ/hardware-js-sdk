@@ -132,13 +132,14 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   路径必须抑制底层重复 Event。`protocolV2UiMode='none'` 只抑制普通方法交互提示，
   不得抑制已实际触发的设备端 PIN 提示。
 - `DeviceSessionGet` 的 `session_id` 和 `btc_test_address` 均可选：`session_id` 表示尝试恢复目标
-  Session，`btc_test_address` 表示预期钱包身份；两者都缺省时读取当前 Session。`seed_domains`
-  根据调用派生意图携带 `[Standard]` 或 `[Standard, Cardano]`，没有派生意图时在线路上省略。
-  所有调用都必须返回固件最终实际的完整 `DeviceSession`，正常状态错配不返回 `InvalidSession`。
+  Session，`btc_test_address` 表示预期钱包身份；两者都缺省时读取当前 Session。Get 不再携带
+  `seed_domains`。所有调用都必须返回固件最终实际的完整 `DeviceSession`，正常状态错配不返回
+  `InvalidSession`。
 - Pro2 的 `DeviceSessionAskPassphrase` 必须显式携带输入来源：Host 输入发送
-  `{ on_device: false, passphrase }`，设备输入发送 `{ on_device: true }`。不得省略
-  `on_device`，也不得同时发送设备输入标记和 Host Passphrase。Attach-to-PIN 继续使用
-  `DeviceSessionAskPin(AttachToPin)`。
+  `{ on_device: false, passphrase, seed_domains }`，设备输入发送 `{ on_device: true, seed_domains }`。
+  `seed_domains` 根据调用派生意图携带 `[Standard]` 或 `[Standard, Cardano]`，没有派生意图时在线路上
+  省略，保留固件“派生全部支持域”的兼容行为。不得省略 `on_device`，也不得同时发送设备输入标记和
+  Host Passphrase。Attach-to-PIN 继续使用 `DeviceSessionAskPin(AttachToPin)`。
 - `DeviceSessionAskPin` 的 PIN 类型由目标钱包意图决定，而不是由调用前的当前上下文决定：
   `Main` 用于选择标准钱包，也用于从 Attach-to-PIN 隐藏钱包上下文切回标准钱包；
   `AttachToPin` 只用于选择该 Attach PIN 绑定的隐藏钱包。`unlockedAttachPin=true` 是当前上下文状态，

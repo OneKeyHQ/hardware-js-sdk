@@ -291,9 +291,9 @@ label、语言、蓝牙开关、自动锁屏和振动反馈都属于用户配置
 钱包会话通过以下消息建立或恢复：
 
 ```text
-DeviceSessionAskPassphrase -> Success -> DeviceSessionGet -> DeviceSession
+DeviceSessionAskPassphrase({ seed_domains }) -> Success -> DeviceSessionGet -> DeviceSession
 DeviceSessionAskPin(Main/AttachToPin) -> Success -> DeviceSessionGet -> DeviceSession
-DeviceSessionGet({ session_id, btc_test_address, seed_domains }) -> DeviceSession
+DeviceSessionGet({ session_id, btc_test_address }) -> DeviceSession
 ```
 
 ### 8.1 字段说明
@@ -302,9 +302,9 @@ DeviceSessionGet({ session_id, btc_test_address, seed_domains }) -> DeviceSessio
 | ------------------------------------- | -------------------------------- | --------------------------------------------------------------------- |
 | `DeviceSessionGet.session_id`         | 尝试恢复之前的钱包 Session       | Core 内部传入当前钱包缓存值                                           |
 | `DeviceSessionGet.btc_test_address`   | 请求恢复的预期钱包身份           | 从内部 `passphraseState` 映射，和缓存 Session 一起发送                |
-| `DeviceSessionGet.seed_domains`       | 本次需要派生的 Seed 域           | 普通业务为 `[Standard]`，Cardano 为 `[Standard, Cardano]`             |
+| `DeviceSessionAskPassphrase.seed_domains` | 本次需要派生的 Seed 域       | 普通业务为 `[Standard]`，Cardano 为 `[Standard, Cardano]`；省略则派生全部域 |
 | `DeviceSessionPinType`                | `Any/Main/AttachToPin` PIN 路由  | 标准钱包固定 `Main`，Attach 选择固定对应类型                          |
-| `DeviceSessionAskPassphrase`          | 创建 Passphrase 隐藏钱包会话     | Host：`{ passphrase, on_device: false }`；设备：`{ on_device: true }` |
+| `DeviceSessionAskPassphrase`          | 创建 Passphrase 隐藏钱包会话     | Host：`{ passphrase, on_device: false, seed_domains }`；设备：`{ on_device: true, seed_domains }` |
 | 响应 `session_id`                     | 当前钱包 Session ID              | 保存到当前钱包缓存                                                    |
 | 响应 `DeviceSession.btc_test_address` | 用于确认当前钱包上下文的稳定标识 | 映射为内部 `passphraseState`                                          |
 
@@ -314,7 +314,7 @@ DeviceSessionGet({ session_id, btc_test_address, seed_domains }) -> DeviceSessio
 
 ```text
 读取当前隐藏钱包缓存 session_id
-    -> DeviceSessionGet({ session_id, btc_test_address, seed_domains })
+    -> DeviceSessionGet({ session_id, btc_test_address })
     -> 返回 DeviceSession
     -> 校验 btc_test_address 是否符合预期钱包
 ```

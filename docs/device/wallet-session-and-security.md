@@ -60,9 +60,10 @@
   校验原始 `DeviceStatus`，然后直接用空参数 `DeviceSessionGet()` 读取当前隐藏钱包，不重新发起
   Passphrase 选择、`DeviceSessionAskPassphrase` 或 `DeviceSessionAskPin`。复核状态不一致时失败关闭，
   不回退到钱包重选。
-- Core 把现有 `deriveCardano` 意图映射为 `DeviceSessionGet.seed_domains`：普通业务请求
+- Core 把现有 `deriveCardano` 意图映射为 `DeviceSessionAskPassphrase.seed_domains`：普通业务请求
   `[Standard]`，Cardano 业务请求 `[Standard, Cardano]`。调用链没有提供派生意图时省略该字段，
-  保持固件“派生全部支持域”的兼容行为。
+  保持固件“派生全部支持域”的兼容行为。`DeviceSessionGet` 只恢复或读取当前 Session，不再携带
+  `seed_domains`；新固件会拒绝 Get 上的未知字段。
 - `DeviceSessionAskPin` 的类型按业务意图选择：标准钱包和安全操作使用 `Main`；普通业务调用已携带目标
   `passphraseState` 时，预解锁使用 `Any`，允许主 PIN 或 Attach PIN 进入，随后仍以返回的
   `btc_test_address` 校验目标隐藏钱包；用户明确选择 Attach PIN 打开隐藏钱包时使用 `AttachToPin`。
