@@ -2106,6 +2106,86 @@ describe('openWalletSession', () => {
     });
   });
 
+  test('does not AskPassphrase when an Attach PIN session lacks Cardano', async () => {
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'ProtocolInfoRequest') {
+        return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: 'attach-state',
+            session_id: 'attach-session',
+            seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const promptPassphrase = jest.fn().mockResolvedValue({ passphrase: 'should-not-ask' });
+    const device = createDevice({
+      typedCall,
+      promptPassphrase,
+      unlockedAttachPin: true,
+    });
+
+    await expect(
+      getProtocolV2WalletSession(device as any, {
+        readCurrentAttachPinSession: true,
+        deriveCardano: true,
+      })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.WalletSessionInvalid,
+    });
+    expect(promptPassphrase).not.toHaveBeenCalled();
+    expect(typedCall).not.toHaveBeenCalledWith(
+      'DeviceSessionAskPassphrase',
+      'Success',
+      expect.anything()
+    );
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
+  });
+
+  test('does not AskPassphrase after selecting Attach PIN for Cardano intent', async () => {
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'ProtocolInfoRequest') {
+        return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: 'attach-state',
+            session_id: 'attach-session',
+            seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const promptPassphrase = jest.fn().mockResolvedValue({ attachPinOnDevice: true });
+    const device = createDevice({ typedCall, promptPassphrase });
+    device.features.attachToPinEnabled = true;
+
+    await expect(
+      getProtocolV2WalletSession(device as any, {
+        forceWalletSelection: true,
+        deriveCardano: true,
+      })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.WalletSessionInvalid,
+    });
+    expect(promptPassphrase).toHaveBeenCalledTimes(1);
+    expect(typedCall).not.toHaveBeenCalledWith(
+      'DeviceSessionAskPassphrase',
+      'Success',
+      expect.anything()
+    );
+    expect(device.unlockDevice).toHaveBeenCalledWith(
+      DeviceSessionPinType.AttachToPin,
+      expect.objectContaining({ emitUiEvent: false })
+    );
+  });
+
   test('asks Standard-only seed domains when deriveCardano is false', async () => {
     const typedCall = jest.fn((request: string) => {
       if (request === 'ProtocolInfoRequest') {
