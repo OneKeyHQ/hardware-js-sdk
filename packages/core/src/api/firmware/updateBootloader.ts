@@ -1,5 +1,6 @@
 import ByteBuffer from 'bytebuffer';
 import semver from 'semver';
+import { EDeviceType, type EFirmwareType } from '@onekeyfe/hd-shared';
 
 import { DeviceModelToTypes } from '../../types';
 import { getDeviceBootloaderVersion, getDeviceFirmwareVersion, getDeviceType } from '../../utils';
@@ -7,14 +8,25 @@ import { DataManager } from '../../data-manager';
 import { shouldUpdateBootloaderForClassicAndMini } from './bootloaderHelper';
 
 import type { Features } from '../../types';
-import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { FirmwareByteSource } from './FirmwareArtifactSource';
+
+/** Pro MCU 4.14.0+ exceeds the pre-2.8.0 bootloader size limit. */
+export const PRO_MCU_MIN_BOOTLOADER_VERSION = '2.8.0';
 
 export function checkNeedUpdateBootForTouch(features: Features, firmwareType: EFirmwareType) {
   const deviceType = getDeviceType(features);
   if (!DeviceModelToTypes.model_touch.includes(deviceType)) return false;
-  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+
   const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
+  if (
+    deviceType === EDeviceType.Pro &&
+    semver.valid(bootloaderVersion) &&
+    semver.lt(bootloaderVersion, PRO_MCU_MIN_BOOTLOADER_VERSION)
+  ) {
+    return true;
+  }
+
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
   const targetBootloaderVersion = DataManager.getBootloaderTargetVersion(features, firmwareType);
   if (!targetBootloaderVersion) return false;
 
