@@ -171,9 +171,14 @@ describe('messages', () => {
     expect(v2Messages.nested).not.toHaveProperty('DeviceWalletSelect');
     expect(v2Messages.nested).not.toHaveProperty('DeviceWalletType');
     expect(v2Messages.nested).not.toHaveProperty('DeviceHiddenWalletSelect');
-    expect(v2Messages.nested.DeviceSession.fields).toMatchObject({
+    expect(v2Messages.nested.DeviceSession.fields).toEqual({
       session_id: { id: 1, type: 'bytes' },
       btc_test_address: { id: 2, type: 'string' },
+      seed_domains: {
+        rule: 'repeated',
+        type: 'DeviceSessionSeedDomain',
+        id: 3,
+      },
     });
     expect(v2Messages.nested.DeviceSessionAskPin.fields.type).toMatchObject({
       id: 1,
@@ -263,6 +268,30 @@ describe('messages', () => {
     expect(payload.toString('hex')).toBe('120a7462317177616c6c6574');
     expect(Message.decode(payload.toBuffer())).toMatchObject({
       btc_test_address: 'tb1qwallet',
+    });
+    expect(Message.decode(payload.toBuffer())).not.toHaveProperty('seed_domains');
+  });
+
+  test('Protocol V2 DeviceSession reports generated seed domains on wire', () => {
+    const messages = parseConfigure(v2Messages);
+    const { Message } = createMessageFromName(messages, 'DeviceSession');
+    const encoded = Message.encode(
+      Message.create({
+        btc_test_address: 'tb1qwallet',
+        seed_domains: [
+          generatedTypes.DeviceSessionSeedDomain.SeedDomain_Standard,
+          generatedTypes.DeviceSessionSeedDomain.SeedDomain_Cardano,
+        ],
+      })
+    ).finish();
+
+    expect(Buffer.from(encoded).toString('hex')).toBe('120a7462317177616c6c65741a020102');
+    expect(Message.decode(encoded)).toMatchObject({
+      btc_test_address: 'tb1qwallet',
+      seed_domains: [
+        generatedTypes.DeviceSessionSeedDomain.SeedDomain_Standard,
+        generatedTypes.DeviceSessionSeedDomain.SeedDomain_Cardano,
+      ],
     });
   });
 

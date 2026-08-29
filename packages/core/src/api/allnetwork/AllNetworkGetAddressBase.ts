@@ -394,7 +394,7 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
           // requested standard or hidden wallet before sending its device command.
           const useEmptyPassphrase = this.payload.useEmptyPassphrase === true;
           // Nested Cardano methods opt in to [Standard, Cardano] if Ask rebuilds.
-          // Other chains omit the flag so V2 keeps firmware's default domains.
+          // Other chains stay Standard-only.
           const deriveCardano = method.name.startsWith('cardano') ? true : undefined;
           const shouldResumeWalletSession = useEmptyPassphrase || !!this.payload.passphraseState;
           if (this.device.isProtocolV2() && shouldResumeWalletSession) {

@@ -76,8 +76,9 @@ const deviceSessionHasCardano = (message: { seed_domains?: DeviceSessionSeedDoma
   Array.isArray(message.seed_domains) &&
   message.seed_domains.includes(DeviceSessionSeedDomain.SeedDomain_Cardano);
 
-// Seed domains are applied when creating a passphrase session, not when reading/resuming one.
-// Current firmware rejects unknown DeviceSessionGet fields, including leftover seed_domains.
+// AskPassphrase.seed_domains selects which seeds to generate. DeviceSessionGet
+// only resumes or reads the current session; firmware rejects unknown Get
+// fields, including leftover seed_domains.
 const buildDeviceSessionGetRequest = ({
   sessionId,
   expectedPassphraseState,
@@ -464,6 +465,8 @@ export async function getProtocolV2WalletSession(
     }
   }
 
+  // DeviceSession.seed_domains reports what the SE already generated. Get
+  // cannot add Cardano, so a Cardano call on a Standard-only session must Ask again.
   if (options?.deriveCardano === true && !deviceSessionHasCardano(message)) {
     if (options?.resumeOnly) {
       device.clearInternalState();
