@@ -474,32 +474,34 @@ export async function getProtocolV2WalletSession(
   // cannot add Cardano, so a passphrase wallet must Ask again. Attach PIN
   // has no passphrase; never send DeviceSessionAskPassphrase for it.
   if (options?.deriveCardano === true && !deviceSessionHasCardano(message)) {
-    if (options?.resumeOnly || sessionIsAttachPinWallet(response)) {
-      clearCurrentWalletSession();
+    if (options?.resumeOnly) {
+      device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
     }
-    resumed = false;
-    if (options?.onlyMainPin) {
-      await selectStandardWallet();
-      response = await getDeviceSession(device, buildDeviceSessionGetRequest());
-    } else {
-      response = await selectDeviceSession(
-        device,
-        expectedPassphraseState,
-        true,
-        markWalletStatusRefreshed
-      );
-    }
-    message = response.message;
-    try {
-      assertCompleteDeviceSession(message);
-    } catch (error) {
+    if (!sessionIsAttachPinWallet(response)) {
+      resumed = false;
       if (options?.onlyMainPin) {
-        device.clearStandardInternalState?.();
+        await selectStandardWallet();
+        response = await getDeviceSession(device, buildDeviceSessionGetRequest());
       } else {
-        device.clearInternalState();
+        response = await selectDeviceSession(
+          device,
+          expectedPassphraseState,
+          true,
+          markWalletStatusRefreshed
+        );
       }
-      throw error;
+      message = response.message;
+      try {
+        assertCompleteDeviceSession(message);
+      } catch (error) {
+        if (options?.onlyMainPin) {
+          device.clearStandardInternalState?.();
+        } else {
+          device.clearInternalState();
+        }
+        throw error;
+      }
     }
   }
 

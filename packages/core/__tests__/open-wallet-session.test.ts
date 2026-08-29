@@ -2134,8 +2134,9 @@ describe('openWalletSession', () => {
         readCurrentAttachPinSession: true,
         deriveCardano: true,
       })
-    ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.WalletSessionInvalid,
+    ).resolves.toMatchObject({
+      passphraseState: 'attach-state',
+      newSession: 'attach-session',
     });
     expect(promptPassphrase).not.toHaveBeenCalled();
     expect(typedCall).not.toHaveBeenCalledWith(
@@ -2171,8 +2172,9 @@ describe('openWalletSession', () => {
         forceWalletSelection: true,
         deriveCardano: true,
       })
-    ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.WalletSessionInvalid,
+    ).resolves.toMatchObject({
+      passphraseState: 'attach-state',
+      newSession: 'attach-session',
     });
     expect(promptPassphrase).toHaveBeenCalledTimes(1);
     expect(typedCall).not.toHaveBeenCalledWith(
