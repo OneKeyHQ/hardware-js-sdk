@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-trezor-connector-rn-ble",
-  "version": "1.2.2-alpha.4",
+  "version": "1.2.2-alpha.5",
   "description": "IConnector implementation for Trezor hardware wallets via React Native BLE",
   "author": "OneKey",
   "license": "MIT",
@@ -46,9 +46,9 @@
     "connector"
   ],
   "dependencies": {
-    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.4",
-    "@onekeyfe/hwk-trezor-adapter": "1.2.2-alpha.4",
-    "@onekeyfe/hwk-trezor-connector": "1.2.2-alpha.4",
+    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.5",
+    "@onekeyfe/hwk-trezor-adapter": "1.2.2-alpha.5",
+    "@onekeyfe/hwk-trezor-connector": "1.2.2-alpha.5",
     "buffer": "^6.0.3",
     "react-native-ble-plx": "^3.5.1"
   },
