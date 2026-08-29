@@ -12852,36 +12852,57 @@
       },
       "reserved": [[2, 2], "placeholder"]
     },
-    "ViewData": {
+    "ViewContentPreview": {
       "fields": {
+        "content_key": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
         "preview": {
           "rule": "required",
           "type": "bytes",
-          "id": 1
+          "id": 2
         },
         "total_bytes": {
+          "type": "uint32",
+          "id": 3
+        }
+      }
+    },
+    "ViewContentEntry": {
+      "fields": {
+        "entry_key": {
           "rule": "required",
           "type": "uint32",
+          "id": 1
+        },
+        "value": {
+          "rule": "required",
+          "type": "bytes",
           "id": 2
         }
       }
     },
-    "ViewDataPage": {
+    "ViewContentPage": {
       "fields": {
-        "chunk": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        },
         "page_index": {
           "rule": "required",
           "type": "uint32",
-          "id": 2
+          "id": 1
         },
         "page_count": {
           "rule": "required",
           "type": "uint32",
+          "id": 2
+        },
+        "chunk": {
+          "type": "bytes",
           "id": 3
+        },
+        "entry": {
+          "type": "ViewContentEntry",
+          "id": 4
         }
       }
     },
@@ -12940,8 +12961,8 @@
           "type": "string",
           "id": 9
         },
-        "data": {
-          "type": "ViewData",
+        "content": {
+          "type": "ViewContentPreview",
           "id": 10
         },
         "custom_field": {
@@ -12965,6 +12986,10 @@
         "text_arg": {
           "type": "string",
           "id": 3
+        },
+        "cancellable": {
+          "type": "bool",
+          "id": 4
         }
       }
     },
@@ -13003,6 +13028,10 @@
         "chain_id": {
           "type": "uint32",
           "id": 8
+        },
+        "content": {
+          "type": "ViewContentPreview",
+          "id": 9
         }
       }
     },

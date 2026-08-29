@@ -5275,17 +5275,25 @@ export type ViewActionCard = {
   initial_data: string;
 };
 
-// ViewData
-export type ViewData = {
+// ViewContentPreview
+export type ViewContentPreview = {
+  content_key: number;
   preview: string;
-  total_bytes: number;
+  total_bytes?: number;
 };
 
-// ViewDataPage
-export type ViewDataPage = {
-  chunk: string;
+// ViewContentEntry
+export type ViewContentEntry = {
+  entry_key: number;
+  value: string;
+};
+
+// ViewContentPage
+export type ViewContentPage = {
   page_index: number;
   page_count: number;
+  chunk?: string;
+  entry?: ViewContentEntry;
 };
 
 export enum ViewSignLayout {
@@ -5308,7 +5316,7 @@ export type ViewSignPage = {
   layout?: ViewSignLayout;
   title_id?: number;
   title_arg?: string;
-  data?: ViewData;
+  content?: ViewContentPreview;
   custom_field?: ViewCustomField;
 };
 
@@ -5317,6 +5325,7 @@ export type ViewWarningPage = {
   title_id: number;
   text_id: number;
   text_arg?: string;
+  cancellable?: boolean;
 };
 
 // ViewVerifyPage
@@ -5329,6 +5338,7 @@ export type ViewVerifyPage = {
   value_key?: number;
   title_id?: number;
   chain_id?: number;
+  content?: ViewContentPreview;
 };
 
 export enum ProtocolV2FailureType {
@@ -6012,8 +6022,9 @@ export type MessageType = {
   ViewCustomField: ViewCustomField;
   ViewTip: ViewTip;
   ViewActionCard: ViewActionCard;
-  ViewData: ViewData;
-  ViewDataPage: ViewDataPage;
+  ViewContentPreview: ViewContentPreview;
+  ViewContentEntry: ViewContentEntry;
+  ViewContentPage: ViewContentPage;
   ViewSignPage: ViewSignPage;
   ViewWarningPage: ViewWarningPage;
   ViewVerifyPage: ViewVerifyPage;
