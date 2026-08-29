@@ -56,10 +56,10 @@
   `DeviceSessionAskPassphrase` 再 `DeviceSessionGet()`；缓存有效时先调用
   `DeviceSessionGet(session_id, btc_test_address)` 恢复。Core 使用返回的真实
   `btc_test_address` 建立标准钱包内部索引，不引入 SDK 自造的 `STANDARD_WALLET_KEY`。
-- Protocol V2 进入 `select-hidden` 时，如果实时状态明确设备已经由 Attach PIN 解锁，Core 会
-  `lockDevice` 并抛出 `DeviceCheckUnlockTypeError`，不读取当前 Attach PIN 会话，也不弹出
-  passphrase UI。用户用主 PIN 解锁后再选新的隐藏钱包。Attach PIN 会话上补 Cardano 仍走空 Host
-  `AskPassphrase({ seed_domains: [Standard, Cardano] })`，不经过 `select-hidden`。
+- Protocol V2 进入 `select-hidden` 时，如果实时状态明确设备已经由 Attach PIN 解锁，Core 读取当前
+  Attach PIN 会话，不弹出 passphrase UI（与 Pro1 一致：同一 PIN 已绑定该隐藏钱包）。要新建
+  passphrase 隐藏钱包，用户需先锁屏、用主 PIN 解锁后再点一次「+ Hidden wallet」。Attach PIN 上补
+  Cardano 走空 Host `AskPassphrase({ seed_domains: [Standard, Cardano] })`。
 - V1 `Initialize.derive_cardano` 仍是按次 opt-in。V2 由 `DeviceSessionAskPassphrase.seed_domains`
   决定这次生成哪些种子：开钱包和非 Cardano 调用发送 `[Standard]`；Cardano 调用发送
   `[Standard, Cardano]`。`DeviceSessionGet` 不携带、也不生成 Cardano（passphrase 关闭时固件

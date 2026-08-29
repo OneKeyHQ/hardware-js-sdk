@@ -702,10 +702,21 @@ describe('openWalletSession', () => {
     );
   });
 
-  test('locks before selecting a new hidden wallet from an Attach PIN session', async () => {
+  test('reuses the current Attach PIN session without reopening wallet selection', async () => {
     const typedCall = jest.fn((request: string) => {
       if (request === 'ProtocolInfoRequest') {
         return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionAskPassphrase') {
+        return { message: {} };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: 'attach-state',
+            session_id: 'attach-session',
+          },
+        };
       }
       throw new Error(`Unexpected request: ${request}`);
     });
@@ -721,10 +732,66 @@ describe('openWalletSession', () => {
     });
     method.device = device as any;
 
+    await expect(method.run()).resolves.toEqual({
+      protocol: 'V2',
+      walletType: 'hidden',
+      deviceId: 'device-1',
+      passphraseState: 'attach-state',
+      resumed: false,
+    });
+    expect(promptPassphrase).not.toHaveBeenCalled();
+    expect(device.unlockDevice).not.toHaveBeenCalled();
+    expect(device.commands.typedCall).toHaveBeenCalledWith(
+      'DeviceSessionGet',
+      'DeviceSession',
+      standardSessionGet
+    );
+    expect(device.commands.typedCall).not.toHaveBeenCalledWith(
+      'DeviceSessionAskPassphrase',
+      'Success',
+      expect.anything()
+    );
+    expect(device.commands.typedCall).not.toHaveBeenCalledWith(
+      'DeviceSessionAskPin',
+      'Success',
+      expect.anything()
+    );
+  });
+
+  test('fails closed when the Attach PIN state changes before reading the current session', async () => {
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'ProtocolInfoRequest') {
+        return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionAskPassphrase') {
+        return { message: {} };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: 'unexpected-state',
+            session_id: 'unexpected-session',
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const promptPassphrase = jest.fn().mockResolvedValue({ passphrase: 'must not be requested' });
+    const method = new OpenWalletSession({
+      payload: { method: 'openWalletSession', connectId: 'connect-id', mode: 'select-hidden' },
+    });
+    method.init();
+    const device = createDevice({
+      typedCall,
+      promptPassphrase,
+      unlockedAttachPin: true,
+      refreshedUnlockedAttachPin: false,
+    });
+    method.device = device as any;
+
     await expect(method.run()).rejects.toMatchObject({
       errorCode: HardwareErrorCode.DeviceCheckUnlockTypeError,
     });
-    expect(device.lockDevice).toHaveBeenCalled();
     expect(device.clearInternalState).toHaveBeenCalled();
     expect(promptPassphrase).not.toHaveBeenCalled();
     expect(device.commands.typedCall).not.toHaveBeenCalledWith(
