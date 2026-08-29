@@ -20,16 +20,19 @@ const createFeatures = ({
   deviceType,
   firmwareVersion,
   bootloaderVersion,
+  bootloaderMode = false,
 }: {
   deviceType: EDeviceType;
   firmwareVersion: string;
   bootloaderVersion: string;
+  bootloaderMode?: boolean;
 }) =>
   ({
     deviceType,
     serialNo: `${deviceType}-device-id`,
     firmwareVersion,
     bootloaderVersion,
+    bootloaderMode,
   } as Features);
 
 describe('checkNeedUpdateBootForTouch', () => {
@@ -52,7 +55,7 @@ describe('checkNeedUpdateBootForTouch', () => {
     ).toBe(true);
   });
 
-  test('requires a Pro bootloader update even when firmware is below 4.1.0', () => {
+  test('does not request a bootloader update when firmware cannot ResourceUpdate bootloader.bin', () => {
     expect(
       checkNeedUpdateBootForTouch(
         createFeatures({
@@ -62,16 +65,17 @@ describe('checkNeedUpdateBootForTouch', () => {
         }),
         firmwareType
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  test('requires a Pro bootloader update in bootloader mode with an unknown firmware version', () => {
+  test('requests a Pro bootloader update in bootloader mode even if firmware version is unknown', () => {
     expect(
       checkNeedUpdateBootForTouch(
         createFeatures({
           deviceType: EDeviceType.Pro,
           firmwareVersion: '0.0.0',
           bootloaderVersion: '2.7.0',
+          bootloaderMode: true,
         }),
         firmwareType
       )
