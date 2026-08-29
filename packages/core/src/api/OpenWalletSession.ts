@@ -248,13 +248,18 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
       this.device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
     }
-    const readCurrentAttachPinSession =
-      isProtocolV2 && walletStatus.status.unlockedAttachPin === true;
+    if (isProtocolV2 && walletStatus.status.unlockedAttachPin === true) {
+      try {
+        await this.device.lockDevice();
+      } catch {
+        // Reject the Attach PIN context even when an older device cannot be locked.
+      }
+      this.device.clearInternalState();
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError);
+    }
     const session = isProtocolV2
       ? await getProtocolV2WalletSession(this.device, {
-          ...(readCurrentAttachPinSession
-            ? { readCurrentAttachPinSession: true }
-            : { forceWalletSelection: true }),
+          forceWalletSelection: true,
         })
       : await getPassphraseStateWithRefreshDeviceInfo(this.device, { initSession: true });
     const refreshedState = isProtocolV2
@@ -266,14 +271,6 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
     if (isProtocolV2 && refreshedState.status.passphraseProtection !== true) {
       this.device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
-    }
-    if (
-      isProtocolV2 &&
-      readCurrentAttachPinSession &&
-      refreshedState.status.unlockedAttachPin !== true
-    ) {
-      this.device.clearInternalState();
-      throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError);
     }
     const responseBase = {
       protocol,
