@@ -138,9 +138,10 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
 - Pro2 的 `DeviceSessionAskPassphrase` 必须显式携带输入来源：Host 输入发送
   `{ on_device: false, passphrase, seed_domains }`，设备输入发送 `{ on_device: true, seed_domains }`。
   `seed_domains` 在开钱包和非 Cardano 调用上发送 `[Standard]`；Cardano 调用发送
-  `[Standard, Cardano]`。不得发送空列表。Attach PIN 会话不得发送 `AskPassphrase`（包括空
-  Host passphrase）：origin/dev 会 `SESSION_NEW` 并清掉 attach-pin 标记。不得省略 `on_device`，
-  也不得同时发送设备输入标记和 Host Passphrase。Attach-to-PIN 解锁仍使用
+  `[Standard, Cardano]`。不得发送空列表。Attach PIN 补 Cardano 时发送空 Host
+  passphrase：`AskPassphrase({ passphrase: '', on_device: false, seed_domains: [Standard, Cardano] })`，
+  不弹出 passphrase UI。固件会清掉 attach-pin 标记，SDK 仍把当前会话视为 Attach PIN。
+  不得省略 `on_device`，也不得同时发送设备输入标记和 Host Passphrase。Attach-to-PIN 解锁仍使用
   `DeviceSessionAskPin(AttachToPin)`。
 - `DeviceSessionAskPin` 的 PIN 类型由目标钱包意图决定，而不是由调用前的当前上下文决定：
   `Main` 用于选择标准钱包，也用于从 Attach-to-PIN 隐藏钱包上下文切回标准钱包；
