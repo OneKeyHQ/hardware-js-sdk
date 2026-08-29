@@ -302,7 +302,7 @@ DeviceSessionGet({ session_id, btc_test_address }) -> DeviceSession
 | ------------------------------------- | -------------------------------- | --------------------------------------------------------------------- |
 | `DeviceSessionGet.session_id`         | 尝试恢复之前的钱包 Session       | Core 内部传入当前钱包缓存值                                           |
 | `DeviceSessionGet.btc_test_address`   | 请求恢复的预期钱包身份           | 从内部 `passphraseState` 映射，和缓存 Session 一起发送                |
-| `DeviceSessionAskPassphrase.seed_domains` | 本次需要生成的种子域         | 开钱包 / 非 Cardano 为 `[Standard]`；Cardano 为 `[Standard, Cardano]`。Get 不携带该字段。`DeviceSession` 响应用同一枚举回报已生成的域 |
+| `DeviceSessionAskPassphrase.seed_domains` | 本次需要生成的种子域         | 开钱包 / 非 Cardano 为 `[Standard]`；Cardano 为 `[Standard, Cardano]`。`DeviceSessionGet` 使用同一套字段；Attach PIN 只走 Get。`DeviceSession` 响应用同一枚举回报已生成的域 |
 | `DeviceSessionPinType`                | `Any/Main/AttachToPin` PIN 路由  | 标准钱包固定 `Main`，Attach 选择固定对应类型                          |
 | `DeviceSessionAskPassphrase`          | 创建 Passphrase 隐藏钱包会话     | Host：`{ passphrase, on_device: false, seed_domains }`；设备：`{ on_device: true, seed_domains }` |
 | 响应 `session_id`                     | 当前钱包 Session ID              | 保存到当前钱包缓存                                                    |

@@ -12322,6 +12322,11 @@
         "btc_test_address": {
           "type": "string",
           "id": 2
+        },
+        "seed_domains": {
+          "rule": "repeated",
+          "type": "DeviceSessionSeedDomain",
+          "id": 3
         }
       }
     },
@@ -12852,57 +12857,36 @@
       },
       "reserved": [[2, 2], "placeholder"]
     },
-    "ViewContentPreview": {
+    "ViewData": {
       "fields": {
-        "content_key": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        },
         "preview": {
           "rule": "required",
           "type": "bytes",
-          "id": 2
-        },
-        "total_bytes": {
-          "type": "uint32",
-          "id": 3
-        }
-      }
-    },
-    "ViewContentEntry": {
-      "fields": {
-        "entry_key": {
-          "rule": "required",
-          "type": "uint32",
           "id": 1
         },
-        "value": {
+        "total_bytes": {
           "rule": "required",
-          "type": "bytes",
+          "type": "uint32",
           "id": 2
         }
       }
     },
-    "ViewContentPage": {
+    "ViewDataPage": {
       "fields": {
+        "chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
         "page_index": {
           "rule": "required",
           "type": "uint32",
-          "id": 1
+          "id": 2
         },
         "page_count": {
           "rule": "required",
           "type": "uint32",
-          "id": 2
-        },
-        "chunk": {
-          "type": "bytes",
           "id": 3
-        },
-        "entry": {
-          "type": "ViewContentEntry",
-          "id": 4
         }
       }
     },
@@ -12961,8 +12945,8 @@
           "type": "string",
           "id": 9
         },
-        "content": {
-          "type": "ViewContentPreview",
+        "data": {
+          "type": "ViewData",
           "id": 10
         },
         "custom_field": {
@@ -12986,10 +12970,6 @@
         "text_arg": {
           "type": "string",
           "id": 3
-        },
-        "cancellable": {
-          "type": "bool",
-          "id": 4
         }
       }
     },
@@ -13028,10 +13008,6 @@
         "chain_id": {
           "type": "uint32",
           "id": 8
-        },
-        "content": {
-          "type": "ViewContentPreview",
-          "id": 9
         }
       }
     },

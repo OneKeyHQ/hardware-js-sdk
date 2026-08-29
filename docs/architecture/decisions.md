@@ -132,13 +132,16 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   路径必须抑制底层重复 Event。`protocolV2UiMode='none'` 只抑制普通方法交互提示，
   不得抑制已实际触发的设备端 PIN 提示。
 - `DeviceSessionGet` 的 `session_id` 和 `btc_test_address` 均可选：`session_id` 表示尝试恢复目标
-  Session，`btc_test_address` 表示预期钱包身份；两者都缺省时读取当前 Session。Get 不再携带
-  `seed_domains`。所有调用都必须返回固件最终实际的完整 `DeviceSession`，正常状态错配不返回
-  `InvalidSession`。
+  Session，`btc_test_address` 表示预期钱包身份；两者都缺省时读取当前 Session。Get 同时携带
+  `seed_domains`：非 Cardano 调用发送 `[Standard]`，Cardano 调用发送 `[Standard, Cardano]`。
+  Attach PIN 与 passphrase 关闭的钱包可在 Get 上补 GEN Cardano；隐藏 passphrase 钱包仍只能通过
+  `DeviceSessionAskPassphrase` 生成 Cardano。所有调用都必须返回固件最终实际的完整
+  `DeviceSession`，正常状态错配不返回 `InvalidSession`。
 - Pro2 的 `DeviceSessionAskPassphrase` 必须显式携带输入来源：Host 输入发送
   `{ on_device: false, passphrase, seed_domains }`，设备输入发送 `{ on_device: true, seed_domains }`。
   `seed_domains` 在开钱包和非 Cardano 调用上发送 `[Standard]`；Cardano 调用发送
-  `[Standard, Cardano]`。不得发送空列表。`DeviceSessionGet` 不携带 `seed_domains`。
+  `[Standard, Cardano]`。不得发送空列表。`DeviceSessionGet` 使用同一套 `seed_domains`
+  在当前 SE 钱包上补齐 Cardano（仅 Attach PIN / passphrase 关闭）。
   不得省略 `on_device`，也不得同时发送设备输入标记和
   Host Passphrase。Attach-to-PIN 继续使用 `DeviceSessionAskPin(AttachToPin)`。
 - `DeviceSessionAskPin` 的 PIN 类型由目标钱包意图决定，而不是由调用前的当前上下文决定：
@@ -150,8 +153,8 @@ Transport 连接、帧序号、设备端 `session_id` 和钱包标识是四类�
   `DeviceSessionAskPin(Main)`，否则直接调用钱包 Session 协议。调用期间返回的结构化
   `DeviceLocked` 必须原样向上抛出，避免重复有副作用的请求。Attach-to-PIN 分支仍只执行
   `DeviceSessionAskPin(AttachToPin)`。
-- 空参数 `DeviceSessionGet()` 只读取固件当前钱包 Session，不是标准钱包选择命令。标准钱包首次打开时
-  执行 `AskPin(Main) -> Get()`；缓存恢复结果不匹配时执行一次相同流程重建。
+- `DeviceSessionGet({ seed_domains })` 只读取固件当前钱包 Session，不是标准钱包选择命令。标准钱包首次打开时
+  执行 `AskPin(Main) -> Get(seed_domains)`；缓存恢复结果不匹配时执行一次相同流程重建。
   隐藏钱包缓存恢复结果不匹配时执行一次统一钱包选择，再执行 Ask 与 `Get()`。恢复不得删除同设备
   的其他钱包 Session。
 - V2 的 `DeviceSessionGet` 成功响应必须同时包含非空 `session_id` 和

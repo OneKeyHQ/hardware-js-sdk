@@ -76,18 +76,18 @@ const deviceSessionHasCardano = (message: { seed_domains?: DeviceSessionSeedDoma
   Array.isArray(message.seed_domains) &&
   message.seed_domains.includes(DeviceSessionSeedDomain.SeedDomain_Cardano);
 
-// AskPassphrase.seed_domains selects which seeds to generate. DeviceSessionGet
-// only resumes or reads the current session; firmware rejects unknown Get
-// fields, including leftover seed_domains.
 const buildDeviceSessionGetRequest = ({
   sessionId,
   expectedPassphraseState,
+  deriveCardano,
 }: {
   sessionId?: string;
   expectedPassphraseState?: string;
+  deriveCardano?: boolean;
 } = {}): DeviceSessionGet => ({
   ...(sessionId ? { session_id: sessionId } : {}),
   ...(expectedPassphraseState ? { btc_test_address: expectedPassphraseState } : {}),
+  seed_domains: buildDeviceSessionSeedDomains(deriveCardano),
 });
 
 const askDevicePassphrase = async (
@@ -171,7 +171,10 @@ const selectDeviceSession = async (
       interaction: attachPinInteraction,
     });
     onStatusRefreshed?.();
-    const attachPinSession = await getDeviceSession(device, buildDeviceSessionGetRequest());
+    const attachPinSession = await getDeviceSession(
+      device,
+      buildDeviceSessionGetRequest({ deriveCardano })
+    );
     return Object.assign(attachPinSession, { viaAttachPin: true as const });
   }
 
@@ -185,7 +188,7 @@ const selectDeviceSession = async (
       deriveCardano,
       onStatusRefreshed
     );
-    return getDeviceSession(device, buildDeviceSessionGetRequest());
+    return getDeviceSession(device, buildDeviceSessionGetRequest({ deriveCardano }));
   }
 
   const passphraseOnDeviceInteraction = device.createProtocolV2UiPhaseMetadata?.(
@@ -197,7 +200,7 @@ const selectDeviceSession = async (
     ...(passphraseOnDeviceInteraction ? { interaction: passphraseOnDeviceInteraction } : {}),
   });
   await askDevicePassphrase(device, { on_device: true }, deriveCardano, onStatusRefreshed);
-  return getDeviceSession(device, buildDeviceSessionGetRequest());
+  return getDeviceSession(device, buildDeviceSessionGetRequest({ deriveCardano }));
 };
 
 export async function getProtocolV2WalletSession(
@@ -276,6 +279,19 @@ export async function getProtocolV2WalletSession(
     }
   };
 
+  const sessionGetRequest = ({
+    sessionId,
+    expectedPassphraseState: passphraseState,
+  }: {
+    sessionId?: string;
+    expectedPassphraseState?: string;
+  } = {}) =>
+    buildDeviceSessionGetRequest({
+      sessionId,
+      expectedPassphraseState: passphraseState,
+      deriveCardano: options?.deriveCardano,
+    });
+
   const rejectMismatchedAttachPinWallet = async () => {
     const features = await refreshProtocolV2DeviceStatus(device);
     markWalletStatusRefreshed();
@@ -295,6 +311,18 @@ export async function getProtocolV2WalletSession(
       clearCurrentWalletSession();
     }
     throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError);
+  };
+
+  // AskPassphrase on an Attach PIN session would prompt for a passphrase the
+  // hardware never uses. Lock first; App retries after the user unlocks.
+  const lockAttachPinBeforePassphraseSelection = async () => {
+    if (readCurrentAttachPinSession || options?.onlyMainPin) {
+      return;
+    }
+    if (device.features?.unlockedAttachPin !== true) {
+      return;
+    }
+    await rejectMismatchedAttachPinWallet();
   };
 
   if (options?.onlyMainPin && options.rejectAttachPinForMainWallet) {
@@ -347,7 +375,7 @@ export async function getProtocolV2WalletSession(
       device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError);
     }
-    response = await getDeviceSession(device, buildDeviceSessionGetRequest());
+    response = await getDeviceSession(device, sessionGetRequest());
   } else if (options?.onlyMainPin) {
     expectedPassphraseState = cachedStandardSession?.passphraseState;
     if (cachedStandardSession) {
@@ -357,7 +385,7 @@ export async function getProtocolV2WalletSession(
         }
         response = await getDeviceSession(
           device,
-          buildDeviceSessionGetRequest({
+          sessionGetRequest({
             sessionId: cachedStandardSession.sessionId,
             expectedPassphraseState,
           })
@@ -374,13 +402,13 @@ export async function getProtocolV2WalletSession(
 
     if (!response) {
       await selectStandardWallet();
-      response = await getDeviceSession(device, buildDeviceSessionGetRequest());
+      response = await getDeviceSession(device, sessionGetRequest());
     }
   } else if (cachedSessionId && expectedPassphraseState) {
     try {
       response = await getDeviceSession(
         device,
-        buildDeviceSessionGetRequest({
+        sessionGetRequest({
           sessionId: cachedSessionId,
           expectedPassphraseState,
         })
@@ -397,7 +425,7 @@ export async function getProtocolV2WalletSession(
     try {
       response = await getDeviceSession(
         device,
-        buildDeviceSessionGetRequest({
+        sessionGetRequest({
           expectedPassphraseState,
         })
       );
@@ -413,6 +441,7 @@ export async function getProtocolV2WalletSession(
       device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
     }
+    await lockAttachPinBeforePassphraseSelection();
     response = await selectDeviceSession(
       device,
       expectedPassphraseState,
@@ -442,9 +471,10 @@ export async function getProtocolV2WalletSession(
     if (options?.onlyMainPin) {
       device.clearStandardInternalState?.();
       await selectStandardWallet();
-      response = await getDeviceSession(device, buildDeviceSessionGetRequest());
+      response = await getDeviceSession(device, sessionGetRequest());
     } else {
       device.clearInternalState();
+      await lockAttachPinBeforePassphraseSelection();
       response = await selectDeviceSession(
         device,
         expectedPassphraseState,
@@ -470,38 +500,44 @@ export async function getProtocolV2WalletSession(
     }
   }
 
-  // DeviceSession.seed_domains reports what the SE already generated. Get
-  // cannot add Cardano, so a passphrase wallet must Ask again. Attach PIN
-  // has no passphrase; never send DeviceSessionAskPassphrase for it.
+  // DeviceSession.seed_domains reports generated seeds. Attach PIN and
+  // passphrase-off can GEN Cardano on Get. Hidden passphrase still needs Ask.
   if (options?.deriveCardano === true && !deviceSessionHasCardano(message)) {
     if (options?.resumeOnly) {
       device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
     }
-    if (!sessionIsAttachPinWallet(response)) {
-      resumed = false;
+    resumed = false;
+    if (sessionIsAttachPinWallet(response) || device.features?.passphraseProtection === false) {
+      response = await getDeviceSession(
+        device,
+        buildDeviceSessionGetRequest({ deriveCardano: true })
+      );
+    } else if (options?.onlyMainPin) {
+      await selectStandardWallet();
+      response = await getDeviceSession(
+        device,
+        buildDeviceSessionGetRequest({ deriveCardano: true })
+      );
+    } else {
+      await lockAttachPinBeforePassphraseSelection();
+      response = await selectDeviceSession(
+        device,
+        expectedPassphraseState,
+        true,
+        markWalletStatusRefreshed
+      );
+    }
+    message = response.message;
+    try {
+      assertCompleteDeviceSession(message);
+    } catch (error) {
       if (options?.onlyMainPin) {
-        await selectStandardWallet();
-        response = await getDeviceSession(device, buildDeviceSessionGetRequest());
+        device.clearStandardInternalState?.();
       } else {
-        response = await selectDeviceSession(
-          device,
-          expectedPassphraseState,
-          true,
-          markWalletStatusRefreshed
-        );
+        device.clearInternalState();
       }
-      message = response.message;
-      try {
-        assertCompleteDeviceSession(message);
-      } catch (error) {
-        if (options?.onlyMainPin) {
-          device.clearStandardInternalState?.();
-        } else {
-          device.clearInternalState();
-        }
-        throw error;
-      }
+      throw error;
     }
   }
 

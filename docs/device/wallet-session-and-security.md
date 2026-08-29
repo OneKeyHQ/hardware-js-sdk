@@ -51,20 +51,25 @@
   最终 `passphraseState`。V1 缺少本地 Session 缓存时仍返回 `WalletSessionInvalid`。
 - Protocol V2 的 `DeviceSessionGet` 成功响应必须同时包含非空 `session_id` 和
   `btc_test_address`；缺少任一字段都按不完整协议响应处理，不得识别为标准钱包。
-- Protocol V2 空参数 `DeviceSessionGet()` 只读取固件当前钱包 Session，不保证当前钱包是标准钱包。
-  标准钱包首次打开时调用 `DeviceSessionAskPin(Main)`，成功后调用 `DeviceSessionGet()`；缓存有效时
-  先调用 `DeviceSessionGet(session_id, btc_test_address)` 恢复，恢复结果不匹配时再执行一次
-  `AskPin(Main) -> Get()` 重建。Core 使用返回的真实
+- Protocol V2 `DeviceSessionGet({ seed_domains })` 只读取固件当前钱包 Session，不保证当前钱包是标准钱包。
+  标准钱包首次打开时调用 `DeviceSessionAskPin(Main)`，成功后调用带 `seed_domains` 的
+  `DeviceSessionGet`；缓存有效时先调用 `DeviceSessionGet(session_id, btc_test_address, seed_domains)`
+  恢复，恢复结果不匹配时再执行一次 `AskPin(Main) -> Get(seed_domains)` 重建。Core 使用返回的真实
   `btc_test_address` 建立标准钱包内部索引，不引入 SDK 自造的 `STANDARD_WALLET_KEY`。
 - Protocol V2 进入 `select-hidden` 时，如果实时状态明确设备已经由 Attach PIN 解锁，Core 会再次
-  校验原始 `DeviceStatus`，然后直接用空参数 `DeviceSessionGet()` 读取当前隐藏钱包，不重新发起
+  校验原始 `DeviceStatus`，然后直接用带 `seed_domains` 的 `DeviceSessionGet` 读取当前隐藏钱包，不重新发起
   Passphrase 选择、`DeviceSessionAskPassphrase` 或 `DeviceSessionAskPin`。复核状态不一致时失败关闭，
   不回退到钱包重选。
-- V1 `Initialize.derive_cardano` 仍是按次 opt-in。V2 由 `DeviceSessionAskPassphrase.seed_domains`
-  决定这次生成哪些种子：开钱包和非 Cardano 调用发送 `[Standard]`；Cardano 调用发送
-  `[Standard, Cardano]`。`DeviceSessionGet` 不携带、也不生成 Cardano。`DeviceSession` 响应用
-  同一套 `seed_domains` 枚举回报已经生成的域。若 Get 显示还没有 Cardano，而当前调用需要 ADA，
-  SDK 再 Ask 一次带上 Cardano，然后 Get。
+- V1 `Initialize.derive_cardano` 仍是按次 opt-in。V2 由 `seed_domains` 决定这次生成哪些种子：
+  开钱包和非 Cardano 调用发送 `[Standard]`；Cardano 调用发送 `[Standard, Cardano]`。
+  `DeviceSessionAskPassphrase` 给隐藏 passphrase 钱包生成种子；`DeviceSessionGet` 携带同一套
+  `seed_domains`，在 Attach PIN / passphrase 关闭的当前 SE 钱包上补 GEN Cardano。Attach PIN
+  不得调用 `DeviceSessionAskPassphrase`。`DeviceSession` 响应用同一套枚举回报已经生成的域。
+  若 Get 显示还没有 Cardano，而当前调用需要 ADA：Attach PIN 再 Get 一次；隐藏 passphrase
+  再 Ask 一次带上 Cardano，然后 Get。从 Attach PIN 切到标准钱包或另一个 passphrase 钱包前，
+  SDK 会 `lockDevice`（标准钱包先尝试 `AskPin(Main)`），然后抛出
+  `DeviceCheckUnlockTypeError`，由 App 在用户解锁后重试。`select-hidden` 在已经由 Attach PIN
+  解锁时仍读取当前隐藏钱包，不重新选择。
 - `DeviceSessionAskPin` 的类型按业务意图选择：标准钱包和安全操作使用 `Main`；普通业务调用已携带目标
   `passphraseState` 时，预解锁使用 `Any`，允许主 PIN 或 Attach PIN 进入，随后仍以返回的
   `btc_test_address` 校验目标隐藏钱包；用户明确选择 Attach PIN 打开隐藏钱包时使用 `AttachToPin`。
