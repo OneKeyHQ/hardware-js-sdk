@@ -1769,7 +1769,11 @@ describe('Protocol V2 feature adapter', () => {
       [
         'DeviceSessionAskPassphrase',
         'Success',
-        { passphrase: 'host hidden wallet', on_device: false, seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard] },
+        {
+          passphrase: 'host hidden wallet',
+          on_device: false,
+          seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
+        },
       ],
       ['DeviceStatusGet', 'DeviceStatus', {}],
       ['DeviceSessionGet', 'DeviceSession', {}],
