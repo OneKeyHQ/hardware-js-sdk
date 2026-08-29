@@ -2330,6 +2330,42 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
 
+  test('fails closed when Cardano fallback still lacks Cardano', async () => {
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'ProtocolInfoRequest') {
+        return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionAskPassphrase') {
+        return { message: {} };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: 'hidden-state',
+            session_id: 'hidden-session',
+            seed_domains: STANDARD_SEED_DOMAINS,
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const device = createDevice({
+      typedCall,
+      promptPassphrase: jest.fn().mockResolvedValue({ passphrase: 'host hidden wallet' }),
+    });
+    deviceWalletSessionStore.set('device-1', 'hidden-state', 'cached-session');
+
+    await expect(
+      getProtocolV2WalletSession(device as any, {
+        expectedPassphraseState: 'hidden-state',
+        deriveCardano: true,
+      })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.WalletSessionInvalid,
+    });
+    expect(device.clearInternalState).toHaveBeenCalled();
+  });
+
   test('locks before selecting a passphrase wallet from an Attach PIN session', async () => {
     const typedCall = jest.fn((request: string) => {
       if (request === 'ProtocolInfoRequest') {

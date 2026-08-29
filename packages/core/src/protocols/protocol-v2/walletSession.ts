@@ -571,6 +571,10 @@ export async function getProtocolV2WalletSession(
       clearCurrentWalletSession();
       throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
     }
+    if (!deviceSessionHasCardano(message)) {
+      clearCurrentWalletSession();
+      throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
+    }
   }
 
   const internalStateArgs = [
