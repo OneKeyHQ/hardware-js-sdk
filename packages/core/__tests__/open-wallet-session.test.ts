@@ -2144,26 +2144,17 @@ describe('openWalletSession', () => {
     });
   });
 
-  test('uses empty AskPassphrase to add Cardano on an Attach PIN session', async () => {
+  test('does not AskPassphrase when an Attach PIN session lacks Cardano', async () => {
     const typedCall = jest.fn((request: string) => {
       if (request === 'ProtocolInfoRequest') {
         return { message: { version: 2 } };
       }
-      if (request === 'DeviceSessionAskPassphrase') {
-        return { message: {} };
-      }
       if (request === 'DeviceSessionGet') {
-        const askedCardano = typedCall.mock.calls.some(
-          call =>
-            call[0] === 'DeviceSessionAskPassphrase' &&
-            Array.isArray(call[2]?.seed_domains) &&
-            call[2].seed_domains.includes(DeviceSessionSeedDomain.SeedDomain_Cardano)
-        );
         return {
           message: {
             btc_test_address: 'attach-state',
             session_id: 'attach-session',
-            seed_domains: askedCardano ? CARDANO_SEED_DOMAINS : STANDARD_SEED_DOMAINS,
+            seed_domains: STANDARD_SEED_DOMAINS,
           },
         };
       }
@@ -2186,33 +2177,25 @@ describe('openWalletSession', () => {
       newSession: 'attach-session',
     });
     expect(promptPassphrase).not.toHaveBeenCalled();
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
-      passphrase: '',
-      on_device: false,
-      seed_domains: CARDANO_SEED_DOMAINS,
-    });
+    expect(typedCall).not.toHaveBeenCalledWith(
+      'DeviceSessionAskPassphrase',
+      'Success',
+      expect.anything()
+    );
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
-    expect(
-      typedCall.mock.calls
-        .filter(call => call[0] === 'DeviceSessionGet')
-        .every(call => !('seed_domains' in (call[2] ?? {})))
-    ).toBe(true);
   });
 
-  test('uses empty AskPassphrase after selecting Attach PIN for Cardano intent', async () => {
+  test('does not AskPassphrase after selecting Attach PIN for Cardano intent', async () => {
     const typedCall = jest.fn((request: string) => {
       if (request === 'ProtocolInfoRequest') {
         return { message: { version: 2 } };
-      }
-      if (request === 'DeviceSessionAskPassphrase') {
-        return { message: {} };
       }
       if (request === 'DeviceSessionGet') {
         return {
           message: {
             btc_test_address: 'attach-state',
             session_id: 'attach-session',
-            seed_domains: CARDANO_SEED_DOMAINS,
+            seed_domains: STANDARD_SEED_DOMAINS,
           },
         };
       }
@@ -2236,17 +2219,12 @@ describe('openWalletSession', () => {
       DeviceSessionPinType.AttachToPin,
       expect.objectContaining({ emitUiEvent: false })
     );
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
-      passphrase: '',
-      on_device: false,
-      seed_domains: CARDANO_SEED_DOMAINS,
-    });
+    expect(typedCall).not.toHaveBeenCalledWith(
+      'DeviceSessionAskPassphrase',
+      'Success',
+      expect.anything()
+    );
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
-    expect(
-      typedCall.mock.calls
-        .filter(call => call[0] === 'DeviceSessionGet')
-        .every(call => !('seed_domains' in (call[2] ?? {})))
-    ).toBe(true);
   });
 
   test('uses a second Get for Cardano when passphrase protection is off', async () => {

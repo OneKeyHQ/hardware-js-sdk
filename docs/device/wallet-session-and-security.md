@@ -57,15 +57,16 @@
   `DeviceSessionGet(session_id, btc_test_address)` 恢复。Core 使用返回的真实
   `btc_test_address` 建立标准钱包内部索引，不引入 SDK 自造的 `STANDARD_WALLET_KEY`。
 - Protocol V2 进入 `select-hidden` 时，如果实时状态明确设备已经由 Attach PIN 解锁，Core 会再次
-  校验原始 `DeviceStatus`，然后用空参数 `DeviceSessionGet()` 读取当前隐藏钱包。需要 Cardano 且
-  响应还没有时，再发送空 Host passphrase 的 `AskPassphrase({ seed_domains: [Standard, Cardano] })`，
-  不弹出 passphrase UI。复核状态不一致时失败关闭，不回退到钱包重选。
+  校验原始 `DeviceStatus`，然后用空参数 `DeviceSessionGet()` 读取当前隐藏钱包，不发送
+  `AskPassphrase`。origin/dev 的 AskPassphrase 会 `SESSION_NEW` 并清掉
+  `unlocked_by_attach_to_pin`，随后 Host 可以输入 passphrase，SE 会失败。复核状态不一致时失败关闭，
+  不回退到钱包重选。从 Attach PIN 切到另一个 passphrase 钱包前，SDK 会 `lockDevice`。
 - V1 `Initialize.derive_cardano` 仍是按次 opt-in。V2 由 `DeviceSessionAskPassphrase.seed_domains`
   决定这次生成哪些种子：开钱包和非 Cardano 调用发送 `[Standard]`；Cardano 调用发送
   `[Standard, Cardano]`。`DeviceSessionGet` 不携带、也不生成 Cardano（passphrase 关闭时固件
   Get 会自己要 Cardano）。`DeviceSession` 响应用同一套枚举回报已经生成的域。若 Get 显示还没有
-  Cardano，而当前调用需要 ADA：Attach PIN / 标准钱包发送空 Host passphrase 的 Ask；隐藏
-  passphrase 再 Ask 一次带上 Cardano，然后 Get。从 Attach PIN 切到另一个非空 passphrase 钱包前，
+  Cardano，而当前调用需要 ADA：标准钱包发送空 Host passphrase 的 Ask；隐藏
+  passphrase 再 Ask 一次带上 Cardano，然后 Get。Attach PIN 不 Ask。从 Attach PIN 切到另一个非空 passphrase 钱包前，
   SDK 会 `lockDevice`，然后抛出 `DeviceCheckUnlockTypeError`。
 - `DeviceSessionAskPin` 的类型按业务意图选择：标准钱包和安全操作使用 `Main`；普通业务调用已携带目标
   `passphraseState` 时，预解锁使用 `Any`，允许主 PIN 或 Attach PIN 进入，随后仍以返回的
@@ -341,8 +342,8 @@ await HardwareSDK.clearSessionCache({ deviceId, passphraseState });
    匹配才抛出 `DeviceCheckPassphraseStateError`。SDK 不为普通过期主动 `LockDevice`。
 8. Pro2 隐藏钱包选择通过统一弹窗提供 Host 输入、设备输入和 Attach PIN。Host Passphrase 编码为
    `{ passphrase, on_device: false, seed_domains }`，仅用于当前阻塞请求，不缓存、记录或写入钱包引用；设备输入
-   编码为 `{ on_device: true, seed_domains }`，不携带明文。Attach PIN 独立使用 `DeviceSessionAskPin`；
-   需要 Cardano 时再发送空 Host passphrase 的 `AskPassphrase`，不弹出 UI。
+   编码为 `{ on_device: true, seed_domains }`，不携带明文。Attach PIN 独立使用 `DeviceSessionAskPin`，
+   不发送 `AskPassphrase`。
 9. Pro2 固件返回 `DeviceSession`：`session_id` 和 `btc_test_address`，SDK 将 `btc_test_address` 映射为上层 `passphraseState`。
 10. Pro V1 仍走 `GetPassphraseState -> PassphraseState`，返回 `passphrase_state/session_id/unlocked_attach_pin`。
 11. 如果 features 显示未开启 passphrase 但现在拿到了 state，会按需刷新设备状态。
