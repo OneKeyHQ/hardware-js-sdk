@@ -1118,9 +1118,7 @@ describe('Protocol V2 feature adapter', () => {
       on_device: false,
       seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
-      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
-    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     device.passphraseState = 'state-1';
     expect(device.getInternalState()).toBe('session-1');
   });
@@ -1173,13 +1171,10 @@ describe('Protocol V2 feature adapter', () => {
     expect(
       typedCall.mock.calls.filter(call => call[0] === 'DeviceSessionAskPassphrase')
     ).toHaveLength(1);
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
-      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
-    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'standard-session',
       btc_test_address: 'standard-state',
-      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(deviceWalletSessionStore.getStandard(deviceId)).toEqual({
       passphraseState: 'standard-state',
@@ -1546,9 +1541,7 @@ describe('Protocol V2 feature adapter', () => {
       on_device: false,
       seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
-      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
-    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
 
   test('deviceStatusGet returns raw DeviceStatus and updates dynamic features', async () => {
@@ -1657,7 +1650,6 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'session-a',
       btc_test_address: 'state-a',
-      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(device.getInternalState()).toBe('session-b');
   });
@@ -1731,7 +1723,6 @@ describe('Protocol V2 feature adapter', () => {
         {
           session_id: 'session-a',
           btc_test_address: 'state-a',
-          seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
         },
       ],
     ]);
@@ -1785,13 +1776,7 @@ describe('Protocol V2 feature adapter', () => {
         },
       ],
       ['DeviceStatusGet', 'DeviceStatus', {}],
-      [
-        'DeviceSessionGet',
-        'DeviceSession',
-        {
-          seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
-        },
-      ],
+      ['DeviceSessionGet', 'DeviceSession', {}],
     ]);
   });
 
@@ -1953,7 +1938,6 @@ describe('Protocol V2 feature adapter', () => {
       expect(promptPassphrase).not.toHaveBeenCalled();
       expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
         btc_test_address: 'expected-state',
-        seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
       });
       expect(typedCall).toHaveBeenCalledWith('LockDevice', 'Success', {});
       expect(typedCall.mock.calls.filter(call => call[0] === 'DeviceSessionGet')).toHaveLength(1);
@@ -2344,7 +2328,6 @@ describe('Protocol V2 feature adapter', () => {
     ).resolves.toMatchObject({ passphraseState: 'expected-state' });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       btc_test_address: 'expected-state',
-      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(promptPassphrase).not.toHaveBeenCalled();
   });
@@ -2418,7 +2401,6 @@ describe('Protocol V2 feature adapter', () => {
         {
           session_id: 'session-pro2-app',
           btc_test_address: 'state-pro2-app',
-          seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
         },
       ],
     ]);
@@ -2610,9 +2592,7 @@ describe('Protocol V2 feature adapter', () => {
       on_device: false,
       seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
-    expect(typedCall).toHaveBeenLastCalledWith('DeviceSessionGet', 'DeviceSession', {
-      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
-    });
+    expect(typedCall).toHaveBeenLastCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
 
   test('does not mark Pro2 passphrase enabled from a main PIN session alone', async () => {
@@ -2692,7 +2672,6 @@ describe('Protocol V2 feature adapter', () => {
     expect(device.getInternalState()).toBeUndefined();
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
       btc_test_address: 'expected-state',
-      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: 'host hidden wallet',
@@ -2700,9 +2679,7 @@ describe('Protocol V2 feature adapter', () => {
       seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
-      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
-    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
   });
 
   test('fails closed instead of switching to Main PIN during a standard-wallet safety check', async () => {
@@ -2804,9 +2781,7 @@ describe('Protocol V2 feature adapter', () => {
     expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
       eventless_wallet_session: true,
     });
-    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {
-      seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
-    });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', {});
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
       passphrase: '',
       on_device: false,
