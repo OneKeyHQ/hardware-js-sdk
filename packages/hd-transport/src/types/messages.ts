@@ -4558,12 +4558,6 @@ export enum CommandFlags {
   Factory_Only = 1,
 }
 
-// experimental_message
-export type experimental_message = {};
-
-// experimental_field
-export type experimental_field = {};
-
 export type TextMemo = {
   text: string;
 };
@@ -4668,6 +4662,12 @@ export type UiAnimationRequest = {
   command: UiAnimationCommand;
   type?: UiAnimationType;
 };
+
+// experimental_message
+export type experimental_message = {};
+
+// experimental_field
+export type experimental_field = {};
 
 // ProtocolInfoRequest
 export type ProtocolInfoRequest = {
@@ -5032,13 +5032,13 @@ export enum DeviceSessionSeedDomain {
 export type DeviceSessionGet = {
   session_id?: string;
   btc_test_address?: string;
-  seed_domains: DeviceSessionSeedDomain[];
 };
 
 // DeviceSession
 export type DeviceSession = {
   session_id?: string;
   btc_test_address?: string;
+  seed_domains: DeviceSessionSeedDomain[];
 };
 
 export enum DeviceSessionPinType {
@@ -5056,6 +5056,7 @@ export type DeviceSessionAskPin = {
 export type DeviceSessionAskPassphrase = {
   passphrase?: string;
   on_device: boolean;
+  seed_domains: DeviceSessionSeedDomain[];
 };
 
 export enum DeviceSessionAskPin_FailureSubCodes {
@@ -5247,6 +5248,12 @@ export type ViewDetail = {
   has_icon: boolean;
 };
 
+// ViewCustomField
+export type ViewCustomField = {
+  key: string;
+  value: string;
+};
+
 export enum ViewTipType {
   Default = 0,
   Highlight = 1,
@@ -5263,10 +5270,30 @@ export type ViewTip = {
   text_arg?: string;
 };
 
-// ViewRawData
-export type ViewRawData = {
+// ViewActionCard
+export type ViewActionCard = {
   initial_data: string;
-  placeholder: number;
+};
+
+// ViewContentPreview
+export type ViewContentPreview = {
+  content_key: number;
+  preview: string;
+  total_bytes?: number;
+};
+
+// ViewContentEntry
+export type ViewContentEntry = {
+  entry_key: number;
+  value: string;
+};
+
+// ViewContentPage
+export type ViewContentPage = {
+  page_index: number;
+  page_count: number;
+  chunk?: string;
+  entry?: ViewContentEntry;
 };
 
 export enum ViewSignLayout {
@@ -5284,11 +5311,21 @@ export type ViewSignPage = {
   amount?: UintType;
   general: ViewDetail[];
   tip?: ViewTip;
-  raw_data?: ViewRawData;
+  action_card?: ViewActionCard;
   slide_to_confirm?: boolean;
   layout?: ViewSignLayout;
   title_id?: number;
   title_arg?: string;
+  content?: ViewContentPreview;
+  custom_field?: ViewCustomField;
+};
+
+// ViewWarningPage
+export type ViewWarningPage = {
+  title_id: number;
+  text_id: number;
+  text_arg?: string;
+  cancellable?: boolean;
 };
 
 // ViewVerifyPage
@@ -5301,6 +5338,7 @@ export type ViewVerifyPage = {
   value_key?: number;
   title_id?: number;
   chain_id?: number;
+  content?: ViewContentPreview;
 };
 
 export enum ProtocolV2FailureType {
@@ -5900,8 +5938,6 @@ export type MessageType = {
   TronSignMessage: TronSignMessage;
   TronMessageSignature: TronMessageSignature;
   facotry: facotry;
-  experimental_message: experimental_message;
-  experimental_field: experimental_field;
   TextMemo: TextMemo;
   RefundMemo: RefundMemo;
   CoinPurchaseMemo: CoinPurchaseMemo;
@@ -5917,6 +5953,8 @@ export type MessageType = {
   UnlockPath: UnlockPath;
   UnlockedPathRequest: UnlockedPathRequest;
   UiAnimationRequest: UiAnimationRequest;
+  experimental_message: experimental_message;
+  experimental_field: experimental_field;
   ProtocolInfoRequest: ProtocolInfoRequest;
   ProtocolInfo: ProtocolInfo;
   DeviceReboot: DeviceReboot;
@@ -5981,9 +6019,14 @@ export type MessageType = {
   PortfolioUpdate: PortfolioUpdate;
   ViewAmount: ViewAmount;
   ViewDetail: ViewDetail;
+  ViewCustomField: ViewCustomField;
   ViewTip: ViewTip;
-  ViewRawData: ViewRawData;
+  ViewActionCard: ViewActionCard;
+  ViewContentPreview: ViewContentPreview;
+  ViewContentEntry: ViewContentEntry;
+  ViewContentPage: ViewContentPage;
   ViewSignPage: ViewSignPage;
+  ViewWarningPage: ViewWarningPage;
   ViewVerifyPage: ViewVerifyPage;
 };
 

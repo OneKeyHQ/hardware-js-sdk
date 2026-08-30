@@ -52,17 +52,21 @@ SDK 内部根据协议版本选择 Event 来源和后续动作。
 - `DeviceSessionAskPassphrase` 与 `DeviceSessionAskPin` 完成验证和钱包切换并返回 `Success`；
   前者通过必填 `on_device` 区分设备输入与 Host 输入。Host 输入同时携带非空 `passphrase`；
   设备输入不携带明文。Attach-to-PIN 始终使用 `DeviceSessionAskPin(AttachToPin)`。
-- `DeviceSessionGet({ session_id, btc_test_address, seed_domains })` 承接原
-  `Initialize(session_id, passphrase_state, derive_cardano)` 的 Session 恢复与派生语义，
+- `DeviceSessionGet({ session_id, btc_test_address })` 承接原
+  `Initialize(session_id, passphrase_state)` 的 Session 恢复语义。V2 只在 AskPassphrase 上携带
+  `seed_domains`：开钱包为 `[Standard]`，Cardano 为 `[Standard, Cardano]`。Get 不携带该字段。
+  Attach PIN 补 Cardano 发送空 Host passphrase 的 AskPassphrase。
   这不是 `PassphraseAck` 原有能力。
 - `ButtonRequest/ButtonAck` 不改名；它们从 V2 firmware 状态机中删除，设备页面由显式 Ask 命令
   打开，对 App 的阶段提示由 SDK 合成。
 
 ```text
-PassphraseAck(passphrase)                -> DeviceSessionAskPassphrase({ on_device: false, passphrase }) -> Success -> DeviceSessionGet()
-PassphraseAck(on_device)                 -> DeviceSessionAskPassphrase({ on_device: true }) -> Success -> DeviceSessionGet()
-PassphraseAck(on_device_attach_pin)      -> DeviceSessionAskPin(AttachToPin) -> Success -> DeviceSessionGet()
-Initialize(session_id, passphrase_state) -> DeviceSessionGet({ session_id, btc_test_address, seed_domains })
+PassphraseAck(passphrase)                -> DeviceSessionAskPassphrase({ on_device: false, passphrase, seed_domains }) -> Success -> DeviceSessionGet()
+PassphraseAck(on_device)                 -> DeviceSessionAskPassphrase({ on_device: true, seed_domains }) -> Success -> DeviceSessionGet()
+PassphraseAck(on_device_attach_pin)      -> DeviceSessionAskPin(AttachToPin) -> Success
+                                         -> [Cardano: empty AskPassphrase({ passphrase: '', on_device: false, seed_domains: [Standard, Cardano] })]
+                                         -> DeviceSessionGet()
+Initialize(session_id, passphrase_state) -> DeviceSessionGet({ session_id, btc_test_address })
 ```
 
 ## 不在删除范围
@@ -305,9 +309,10 @@ Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI
 - 标准钱包公共响应固定返回 `passphraseState=null`；隐藏钱包返回非空 `passphraseState`。
   钱包分类仍只使用 `walletType`，不得根据 `passphraseState` 是否为空反推底层协议。
 - Host Passphrase 映射到
-  `DeviceSessionAskPassphrase({ passphrase, on_device: false })`；设备端 Passphrase 映射到
-  `DeviceSessionAskPassphrase({ on_device: true })`；Attach PIN 映射到
-  `DeviceSessionAskPin(AttachToPin)`；Ask 成功后统一调用空参数 `DeviceSessionGet`。
+  `DeviceSessionAskPassphrase({ passphrase, on_device: false, seed_domains })`；设备端 Passphrase 映射到
+  `DeviceSessionAskPassphrase({ on_device: true, seed_domains })`；Attach PIN 映射到
+  `DeviceSessionAskPin(AttachToPin)`。Ask 成功后统一调用空参数 `DeviceSessionGet()`；Get 不携带
+  `seed_domains`。Attach PIN 补 Cardano 再发送空 Host passphrase 的 `AskPassphrase`。
 - Host Passphrase 先做 NFKD 规范化，并校验为 1–50 个 UTF-8 字节且不含 NUL。
 - `DeviceWalletSessionStore` 以 `deviceKey + passphraseState` 保存真实钱包映射，并为每台设备维护
   一个指向真实标准钱包记录的内部索引；该索引只由显式标准钱包意图读取。

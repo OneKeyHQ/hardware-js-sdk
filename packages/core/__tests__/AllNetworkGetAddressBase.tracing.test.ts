@@ -95,7 +95,7 @@ describe('AllNetworkGetAddressBase tracing', () => {
       'hidden-state',
       false,
       undefined,
-      false,
+      undefined,
       undefined
     );
     expect(calls).toEqual(['resume-hidden-session', 'run-chain-method']);
@@ -264,7 +264,7 @@ describe('AllNetworkGetAddressBase tracing', () => {
       undefined,
       true,
       undefined,
-      false,
+      undefined,
       true
     );
     expect(calls).toEqual(['resume-standard-session', 'run-chain-method']);

@@ -1,490 +1,5 @@
 {
   "nested": {
-    "wire_in": {
-      "type": "bool",
-      "id": 50002,
-      "extend": "google.protobuf.EnumValueOptions"
-    },
-    "wire_out": {
-      "type": "bool",
-      "id": 50003,
-      "extend": "google.protobuf.EnumValueOptions"
-    },
-    "wire_debug_in": {
-      "type": "bool",
-      "id": 50004,
-      "extend": "google.protobuf.EnumValueOptions"
-    },
-    "wire_debug_out": {
-      "type": "bool",
-      "id": 50005,
-      "extend": "google.protobuf.EnumValueOptions"
-    },
-    "wire_tiny": {
-      "type": "bool",
-      "id": 50006,
-      "extend": "google.protobuf.EnumValueOptions"
-    },
-    "wire_bootloader": {
-      "type": "bool",
-      "id": 50007,
-      "extend": "google.protobuf.EnumValueOptions"
-    },
-    "wire_no_fsm": {
-      "type": "bool",
-      "id": 50008,
-      "extend": "google.protobuf.EnumValueOptions"
-    },
-    "bitcoin_only": {
-      "type": "bool",
-      "id": 60000,
-      "extend": "google.protobuf.EnumValueOptions"
-    },
-    "has_bitcoin_only_values": {
-      "type": "bool",
-      "id": 51001,
-      "extend": "google.protobuf.EnumOptions"
-    },
-    "experimental_message": {
-      "type": "bool",
-      "id": 52001,
-      "extend": "google.protobuf.MessageOptions"
-    },
-    "wire_type": {
-      "type": "uint32",
-      "id": 52002,
-      "extend": "google.protobuf.MessageOptions"
-    },
-    "experimental_field": {
-      "type": "bool",
-      "id": 53001,
-      "extend": "google.protobuf.FieldOptions"
-    },
-    "include_in_bitcoin_only": {
-      "type": "bool",
-      "id": 60000,
-      "extend": "google.protobuf.FileOptions"
-    },
-    "MessageType": {
-      "options": {
-        "(has_bitcoin_only_values)": true
-      },
-      "values": {
-        "MessageType_Initialize": 0,
-        "MessageType_ChangePin": 4,
-        "MessageType_WipeDevice": 5,
-        "MessageType_GetEntropy": 9,
-        "MessageType_Entropy": 10,
-        "MessageType_LoadDevice": 13,
-        "MessageType_ResetDevice": 14,
-        "MessageType_SetBusy": 16,
-        "MessageType_Features": 17,
-        "MessageType_Cancel": 20,
-        "MessageType_LockDevice": 24,
-        "MessageType_ApplySettings": 25,
-        "MessageType_ButtonRequest": 26,
-        "MessageType_ButtonAck": 27,
-        "MessageType_ApplyFlags": 28,
-        "MessageType_GetNonce": 31,
-        "MessageType_Nonce": 33,
-        "MessageType_BackupDevice": 34,
-        "MessageType_EntropyRequest": 35,
-        "MessageType_EntropyAck": 36,
-        "MessageType_PassphraseRequest": 41,
-        "MessageType_PassphraseAck": 42,
-        "MessageType_RecoveryDevice": 45,
-        "MessageType_WordRequest": 46,
-        "MessageType_WordAck": 47,
-        "MessageType_GetFeatures": 55,
-        "MessageType_SdProtect": 79,
-        "MessageType_ChangeWipeCode": 82,
-        "MessageType_DoPreauthorized": 84,
-        "MessageType_PreauthorizedRequest": 85,
-        "MessageType_CancelAuthorization": 86,
-        "MessageType_GetFirmwareHash": 88,
-        "MessageType_FirmwareHash": 89,
-        "MessageType_UnlockPath": 93,
-        "MessageType_UnlockedPathRequest": 94,
-        "MessageType_SetU2FCounter": 63,
-        "MessageType_GetNextU2FCounter": 80,
-        "MessageType_NextU2FCounter": 81,
-        "MessageType_Deprecated_PassphraseStateRequest": 77,
-        "MessageType_Deprecated_PassphraseStateAck": 78,
-        "MessageType_GetPublicKey": 11,
-        "MessageType_PublicKey": 12,
-        "MessageType_SignTx": 15,
-        "MessageType_TxRequest": 21,
-        "MessageType_TxAck": 22,
-        "MessageType_GetAddress": 29,
-        "MessageType_Address": 30,
-        "MessageType_TxAckPaymentRequest": 37,
-        "MessageType_SignMessage": 38,
-        "MessageType_VerifyMessage": 39,
-        "MessageType_MessageSignature": 40,
-        "MessageType_GetOwnershipId": 43,
-        "MessageType_OwnershipId": 44,
-        "MessageType_GetOwnershipProof": 49,
-        "MessageType_OwnershipProof": 50,
-        "MessageType_AuthorizeCoinJoin": 51,
-        "MessageType_SignPsbt": 10052,
-        "MessageType_SignedPsbt": 10053,
-        "MessageType_CipherKeyValue": 23,
-        "MessageType_CipheredKeyValue": 48,
-        "MessageType_SignIdentity": 53,
-        "MessageType_SignedIdentity": 54,
-        "MessageType_GetECDHSessionKey": 61,
-        "MessageType_ECDHSessionKey": 62,
-        "MessageType_CosiCommit": 71,
-        "MessageType_CosiCommitment": 72,
-        "MessageType_CosiSign": 73,
-        "MessageType_CosiSignature": 74,
-        "MessageType_BatchGetPublickeys": 10016,
-        "MessageType_EcdsaPublicKeys": 10017,
-        "MessageType_EthereumGetPublicKey": 450,
-        "MessageType_EthereumPublicKey": 451,
-        "MessageType_EthereumGetAddress": 56,
-        "MessageType_EthereumAddress": 57,
-        "MessageType_EthereumSignTx": 58,
-        "MessageType_EthereumSignTxEIP1559": 452,
-        "MessageType_EthereumTxRequest": 59,
-        "MessageType_EthereumTxAck": 60,
-        "MessageType_EthereumSignMessage": 64,
-        "MessageType_EthereumVerifyMessage": 65,
-        "MessageType_EthereumMessageSignature": 66,
-        "MessageType_EthereumSignTypedData": 464,
-        "MessageType_EthereumTypedDataStructRequest": 465,
-        "MessageType_EthereumTypedDataStructAck": 466,
-        "MessageType_EthereumTypedDataValueRequest": 467,
-        "MessageType_EthereumTypedDataValueAck": 468,
-        "MessageType_EthereumTypedDataSignature": 469,
-        "MessageType_EthereumSignTypedHash": 470,
-        "MessageType_EthereumGetPublicKeyOneKey": 20100,
-        "MessageType_EthereumPublicKeyOneKey": 20101,
-        "MessageType_EthereumGetAddressOneKey": 20102,
-        "MessageType_EthereumAddressOneKey": 20103,
-        "MessageType_EthereumSignTxOneKey": 20104,
-        "MessageType_EthereumSignTxEIP1559OneKey": 20105,
-        "MessageType_EthereumTxRequestOneKey": 20106,
-        "MessageType_EthereumTxAckOneKey": 20107,
-        "MessageType_EthereumSignMessageOneKey": 20108,
-        "MessageType_EthereumVerifyMessageOneKey": 20109,
-        "MessageType_EthereumMessageSignatureOneKey": 20110,
-        "MessageType_EthereumSignTypedDataOneKey": 20111,
-        "MessageType_EthereumTypedDataStructRequestOneKey": 20112,
-        "MessageType_EthereumTypedDataStructAckOneKey": 20113,
-        "MessageType_EthereumTypedDataValueRequestOneKey": 20114,
-        "MessageType_EthereumTypedDataValueAckOneKey": 20115,
-        "MessageType_EthereumTypedDataSignatureOneKey": 20116,
-        "MessageType_EthereumSignTypedHashOneKey": 20117,
-        "MessageType_EthereumGnosisSafeTxAck": 20118,
-        "MessageType_EthereumGnosisSafeTxRequest": 20119,
-        "MessageType_EthereumSignTxEIP7702OneKey": 20120,
-        "MessageType_EthereumSignTypedDataQR": 20121,
-        "MessageType_NEMGetAddress": 67,
-        "MessageType_NEMAddress": 68,
-        "MessageType_NEMSignTx": 69,
-        "MessageType_NEMSignedTx": 70,
-        "MessageType_NEMDecryptMessage": 75,
-        "MessageType_NEMDecryptedMessage": 76,
-        "MessageType_TezosGetAddress": 150,
-        "MessageType_TezosAddress": 151,
-        "MessageType_TezosSignTx": 152,
-        "MessageType_TezosSignedTx": 153,
-        "MessageType_TezosGetPublicKey": 154,
-        "MessageType_TezosPublicKey": 155,
-        "MessageType_StellarSignTx": 202,
-        "MessageType_StellarTxOpRequest": 203,
-        "MessageType_StellarGetAddress": 207,
-        "MessageType_StellarAddress": 208,
-        "MessageType_StellarCreateAccountOp": 210,
-        "MessageType_StellarPaymentOp": 211,
-        "MessageType_StellarPathPaymentStrictReceiveOp": 212,
-        "MessageType_StellarManageSellOfferOp": 213,
-        "MessageType_StellarCreatePassiveSellOfferOp": 214,
-        "MessageType_StellarSetOptionsOp": 215,
-        "MessageType_StellarChangeTrustOp": 216,
-        "MessageType_StellarAllowTrustOp": 217,
-        "MessageType_StellarAccountMergeOp": 218,
-        "MessageType_StellarManageDataOp": 220,
-        "MessageType_StellarBumpSequenceOp": 221,
-        "MessageType_StellarManageBuyOfferOp": 222,
-        "MessageType_StellarPathPaymentStrictSendOp": 223,
-        "MessageType_StellarSignedTx": 230,
-        "MessageType_CardanoGetPublicKey": 305,
-        "MessageType_CardanoPublicKey": 306,
-        "MessageType_CardanoGetAddress": 307,
-        "MessageType_CardanoAddress": 308,
-        "MessageType_CardanoTxItemAck": 313,
-        "MessageType_CardanoTxAuxiliaryDataSupplement": 314,
-        "MessageType_CardanoTxWitnessRequest": 315,
-        "MessageType_CardanoTxWitnessResponse": 316,
-        "MessageType_CardanoTxHostAck": 317,
-        "MessageType_CardanoTxBodyHash": 318,
-        "MessageType_CardanoSignTxFinished": 319,
-        "MessageType_CardanoSignTxInit": 320,
-        "MessageType_CardanoTxInput": 321,
-        "MessageType_CardanoTxOutput": 322,
-        "MessageType_CardanoAssetGroup": 323,
-        "MessageType_CardanoToken": 324,
-        "MessageType_CardanoTxCertificate": 325,
-        "MessageType_CardanoTxWithdrawal": 326,
-        "MessageType_CardanoTxAuxiliaryData": 327,
-        "MessageType_CardanoPoolOwner": 328,
-        "MessageType_CardanoPoolRelayParameters": 329,
-        "MessageType_CardanoGetNativeScriptHash": 330,
-        "MessageType_CardanoNativeScriptHash": 331,
-        "MessageType_CardanoTxMint": 332,
-        "MessageType_CardanoTxCollateralInput": 333,
-        "MessageType_CardanoTxRequiredSigner": 334,
-        "MessageType_CardanoTxInlineDatumChunk": 335,
-        "MessageType_CardanoTxReferenceScriptChunk": 336,
-        "MessageType_CardanoTxReferenceInput": 337,
-        "MessageType_CardanoSignMessage": 350,
-        "MessageType_CardanoMessageSignature": 351,
-        "MessageType_RippleGetAddress": 400,
-        "MessageType_RippleAddress": 401,
-        "MessageType_RippleSignTx": 402,
-        "MessageType_RippleSignedTx": 403,
-        "MessageType_MoneroTransactionInitRequest": 501,
-        "MessageType_MoneroTransactionInitAck": 502,
-        "MessageType_MoneroTransactionSetInputRequest": 503,
-        "MessageType_MoneroTransactionSetInputAck": 504,
-        "MessageType_MoneroTransactionInputViniRequest": 507,
-        "MessageType_MoneroTransactionInputViniAck": 508,
-        "MessageType_MoneroTransactionAllInputsSetRequest": 509,
-        "MessageType_MoneroTransactionAllInputsSetAck": 510,
-        "MessageType_MoneroTransactionSetOutputRequest": 511,
-        "MessageType_MoneroTransactionSetOutputAck": 512,
-        "MessageType_MoneroTransactionAllOutSetRequest": 513,
-        "MessageType_MoneroTransactionAllOutSetAck": 514,
-        "MessageType_MoneroTransactionSignInputRequest": 515,
-        "MessageType_MoneroTransactionSignInputAck": 516,
-        "MessageType_MoneroTransactionFinalRequest": 517,
-        "MessageType_MoneroTransactionFinalAck": 518,
-        "MessageType_MoneroKeyImageExportInitRequest": 530,
-        "MessageType_MoneroKeyImageExportInitAck": 531,
-        "MessageType_MoneroKeyImageSyncStepRequest": 532,
-        "MessageType_MoneroKeyImageSyncStepAck": 533,
-        "MessageType_MoneroKeyImageSyncFinalRequest": 534,
-        "MessageType_MoneroKeyImageSyncFinalAck": 535,
-        "MessageType_MoneroGetAddress": 540,
-        "MessageType_MoneroAddress": 541,
-        "MessageType_MoneroGetWatchKey": 542,
-        "MessageType_MoneroWatchKey": 543,
-        "MessageType_DebugMoneroDiagRequest": 546,
-        "MessageType_DebugMoneroDiagAck": 547,
-        "MessageType_MoneroGetTxKeyRequest": 550,
-        "MessageType_MoneroGetTxKeyAck": 551,
-        "MessageType_MoneroLiveRefreshStartRequest": 552,
-        "MessageType_MoneroLiveRefreshStartAck": 553,
-        "MessageType_MoneroLiveRefreshStepRequest": 554,
-        "MessageType_MoneroLiveRefreshStepAck": 555,
-        "MessageType_MoneroLiveRefreshFinalRequest": 556,
-        "MessageType_MoneroLiveRefreshFinalAck": 557,
-        "MessageType_EosGetPublicKey": 600,
-        "MessageType_EosPublicKey": 601,
-        "MessageType_EosSignTx": 602,
-        "MessageType_EosTxActionRequest": 603,
-        "MessageType_EosTxActionAck": 604,
-        "MessageType_EosSignedTx": 605,
-        "MessageType_BinanceGetAddress": 700,
-        "MessageType_BinanceAddress": 701,
-        "MessageType_BinanceGetPublicKey": 702,
-        "MessageType_BinancePublicKey": 703,
-        "MessageType_BinanceSignTx": 704,
-        "MessageType_BinanceTxRequest": 705,
-        "MessageType_BinanceTransferMsg": 706,
-        "MessageType_BinanceOrderMsg": 707,
-        "MessageType_BinanceCancelMsg": 708,
-        "MessageType_BinanceSignedTx": 709,
-        "MessageType_StarcoinGetAddress": 10300,
-        "MessageType_StarcoinAddress": 10301,
-        "MessageType_StarcoinGetPublicKey": 10302,
-        "MessageType_StarcoinPublicKey": 10303,
-        "MessageType_StarcoinSignTx": 10304,
-        "MessageType_StarcoinSignedTx": 10305,
-        "MessageType_StarcoinSignMessage": 10306,
-        "MessageType_StarcoinMessageSignature": 10307,
-        "MessageType_StarcoinVerifyMessage": 10308,
-        "MessageType_ConfluxGetAddress": 10112,
-        "MessageType_ConfluxAddress": 10113,
-        "MessageType_ConfluxSignTx": 10114,
-        "MessageType_ConfluxTxRequest": 10115,
-        "MessageType_ConfluxTxAck": 10116,
-        "MessageType_ConfluxSignMessage": 10117,
-        "MessageType_ConfluxSignMessageCIP23": 10118,
-        "MessageType_ConfluxMessageSignature": 10119,
-        "MessageType_TronGetAddress": 10501,
-        "MessageType_TronAddress": 10502,
-        "MessageType_TronSignTx": 10503,
-        "MessageType_TronSignedTx": 10504,
-        "MessageType_TronSignMessage": 10505,
-        "MessageType_TronMessageSignature": 10506,
-        "MessageType_NearGetAddress": 10701,
-        "MessageType_NearAddress": 10702,
-        "MessageType_NearSignTx": 10703,
-        "MessageType_NearSignedTx": 10704,
-        "MessageType_AptosGetAddress": 10600,
-        "MessageType_AptosAddress": 10601,
-        "MessageType_AptosSignTx": 10602,
-        "MessageType_AptosSignedTx": 10603,
-        "MessageType_AptosSignMessage": 10604,
-        "MessageType_AptosMessageSignature": 10605,
-        "MessageType_AptosSignSIWAMessage": 10606,
-        "MessageType_WebAuthnListResidentCredentials": 800,
-        "MessageType_WebAuthnCredentials": 801,
-        "MessageType_WebAuthnAddResidentCredential": 802,
-        "MessageType_WebAuthnRemoveResidentCredential": 803,
-        "MessageType_SolanaGetAddress": 10100,
-        "MessageType_SolanaAddress": 10101,
-        "MessageType_SolanaSignTx": 10102,
-        "MessageType_SolanaSignedTx": 10103,
-        "MessageType_SolanaSignOffChainMessage": 10104,
-        "MessageType_SolanaMessageSignature": 10105,
-        "MessageType_SolanaSignUnsafeMessage": 10106,
-        "MessageType_CosmosGetAddress": 10800,
-        "MessageType_CosmosAddress": 10801,
-        "MessageType_CosmosSignTx": 10802,
-        "MessageType_CosmosSignedTx": 10803,
-        "MessageType_AlgorandGetAddress": 10900,
-        "MessageType_AlgorandAddress": 10901,
-        "MessageType_AlgorandSignTx": 10902,
-        "MessageType_AlgorandSignedTx": 10903,
-        "MessageType_PolkadotGetAddress": 11000,
-        "MessageType_PolkadotAddress": 11001,
-        "MessageType_PolkadotSignTx": 11002,
-        "MessageType_PolkadotSignedTx": 11003,
-        "MessageType_SuiGetAddress": 11100,
-        "MessageType_SuiAddress": 11101,
-        "MessageType_SuiSignTx": 11102,
-        "MessageType_SuiSignedTx": 11103,
-        "MessageType_SuiSignMessage": 11104,
-        "MessageType_SuiMessageSignature": 11105,
-        "MessageType_SuiTxRequest": 11106,
-        "MessageType_SuiTxAck": 11107,
-        "MessageType_FilecoinGetAddress": 11200,
-        "MessageType_FilecoinAddress": 11201,
-        "MessageType_FilecoinSignTx": 11202,
-        "MessageType_FilecoinSignedTx": 11203,
-        "MessageType_KaspaGetAddress": 11300,
-        "MessageType_KaspaAddress": 11301,
-        "MessageType_KaspaSignTx": 11302,
-        "MessageType_KaspaSignedTx": 11303,
-        "MessageType_KaspaTxInputRequest": 11304,
-        "MessageType_KaspaTxInputAck": 11305,
-        "MessageType_NexaGetAddress": 11400,
-        "MessageType_NexaAddress": 11401,
-        "MessageType_NexaSignTx": 11402,
-        "MessageType_NexaSignedTx": 11403,
-        "MessageType_NexaTxInputRequest": 11404,
-        "MessageType_NexaTxInputAck": 11405,
-        "MessageType_NostrGetPublicKey": 11500,
-        "MessageType_NostrPublicKey": 11501,
-        "MessageType_NostrSignEvent": 11502,
-        "MessageType_NostrSignedEvent": 11503,
-        "MessageType_NostrEncryptMessage": 11504,
-        "MessageType_NostrEncryptedMessage": 11505,
-        "MessageType_NostrDecryptMessage": 11506,
-        "MessageType_NostrDecryptedMessage": 11507,
-        "MessageType_NostrSignSchnorr": 11508,
-        "MessageType_NostrSignedSchnorr": 11509,
-        "MessageType_LnurlAuth": 11600,
-        "MessageType_LnurlAuthResp": 11601,
-        "MessageType_NervosGetAddress": 11701,
-        "MessageType_NervosAddress": 11702,
-        "MessageType_NervosSignTx": 11703,
-        "MessageType_NervosSignedTx": 11704,
-        "MessageType_NervosTxRequest": 11705,
-        "MessageType_NervosTxAck": 11706,
-        "MessageType_TonGetAddress": 11901,
-        "MessageType_TonAddress": 11902,
-        "MessageType_TonSignMessage": 11903,
-        "MessageType_TonSignedMessage": 11904,
-        "MessageType_TonSignProof": 11905,
-        "MessageType_TonSignedProof": 11906,
-        "MessageType_TonTxAck": 11907,
-        "MessageType_AlephiumGetAddress": 12101,
-        "MessageType_AlephiumAddress": 12102,
-        "MessageType_AlephiumSignTx": 12103,
-        "MessageType_AlephiumSignedTx": 12104,
-        "MessageType_AlephiumTxRequest": 12105,
-        "MessageType_AlephiumTxAck": 12106,
-        "MessageType_AlephiumBytecodeRequest": 12107,
-        "MessageType_AlephiumBytecodeAck": 12108,
-        "MessageType_AlephiumSignMessage": 12109,
-        "MessageType_AlephiumMessageSignature": 12110,
-        "MessageType_BenfenGetAddress": 12201,
-        "MessageType_BenfenAddress": 12202,
-        "MessageType_BenfenSignTx": 12203,
-        "MessageType_BenfenSignedTx": 12204,
-        "MessageType_BenfenSignMessage": 12205,
-        "MessageType_BenfenMessageSignature": 12206,
-        "MessageType_BenfenTxRequest": 12207,
-        "MessageType_BenfenTxAck": 12208,
-        "MessageType_NeoGetAddress": 12301,
-        "MessageType_NeoAddress": 12302,
-        "MessageType_NeoSignTx": 12303,
-        "MessageType_NeoSignedTx": 12304,
-        "MessageType_DeviceFactoryInfoSet": 60000,
-        "MessageType_DeviceFactoryInfoGet": 60001,
-        "MessageType_DeviceFactoryInfo": 60002,
-        "MessageType_DeviceFactoryPermanentLock": 60003,
-        "MessageType_DeviceFactoryTest": 60004,
-        "MessageType_ProtocolInfoRequest": 60200,
-        "MessageType_ProtocolInfo": 60201,
-        "MessageType_Ping": 60206,
-        "MessageType_Success": 60207,
-        "MessageType_Failure": 60208,
-        "MessageType_DeviceReboot": 60400,
-        "MessageType_DeviceSettings": 60410,
-        "MessageType_DeviceSettingsGet": 60411,
-        "MessageType_DeviceSettingsSet": 60412,
-        "MessageType_DeviceSettingsPageShow": 60413,
-        "MessageType_DeviceCertificate": 60420,
-        "MessageType_DeviceCertificateWrite": 60421,
-        "MessageType_DeviceCertificateRead": 60422,
-        "MessageType_DeviceCertificateSignature": 60423,
-        "MessageType_DeviceCertificateSign": 60424,
-        "MessageType_DeviceMiscUsbMscControl": 60440,
-        "MessageType_DeviceFindMyTokenState": 60450,
-        "MessageType_DeviceFindMyTokenUpdate": 60451,
-        "MessageType_DeviceFindMyTokenStateGet": 60452,
-        "MessageType_DeviceInfoGet": 60600,
-        "MessageType_DeviceInfo": 60601,
-        "MessageType_DeviceStatusGet": 60602,
-        "MessageType_DeviceStatus": 60603,
-        "MessageType_FilesystemPermissionFix": 60800,
-        "MessageType_FilesystemPathInfo": 60801,
-        "MessageType_FilesystemPathInfoQuery": 60802,
-        "MessageType_FilesystemFile": 60803,
-        "MessageType_FilesystemFileRead": 60804,
-        "MessageType_FilesystemFileWrite": 60805,
-        "MessageType_FilesystemFileDelete": 60806,
-        "MessageType_FilesystemDir": 60807,
-        "MessageType_FilesystemDirList": 60808,
-        "MessageType_FilesystemDirMake": 60809,
-        "MessageType_FilesystemDirRemove": 60810,
-        "MessageType_FilesystemFormat": 60811,
-        "MessageType_DeviceFirmwareUpdateStage": 61000,
-        "MessageType_DeviceFirmwareUpdateRequest": 61001,
-        "MessageType_DeviceFirmwareUpdateStatusGet": 61002,
-        "MessageType_DeviceFirmwareUpdateStatus": 61003,
-        "MessageType_DeviceSessionGet": 61200,
-        "MessageType_DeviceSession": 61201,
-        "MessageType_DeviceSessionAskPin": 61202,
-        "MessageType_DeviceSessionAskPassphrase": 61203,
-        "MessageType_PortfolioUpdate": 61400,
-        "MessageType_NftUpdate": 61500,
-        "MessageType_OnboardingStatusGet": 61600,
-        "MessageType_OnboardingStatus": 61601
-      },
-      "reserved": [
-        [90, 92],
-        [114, 122],
-        [300, 304],
-        [309, 312]
-      ]
-    },
     "AlephiumGetAddress": {
       "fields": {
         "address_n": {
@@ -4653,349 +4168,6 @@
         }
       }
     },
-    "EthereumGetPublicKey": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "show_display": {
-          "type": "bool",
-          "id": 2
-        }
-      }
-    },
-    "EthereumPublicKey": {
-      "fields": {
-        "node": {
-          "rule": "required",
-          "type": "HDNodeType",
-          "id": 1
-        },
-        "xpub": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        }
-      }
-    },
-    "EthereumGetAddress": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "show_display": {
-          "type": "bool",
-          "id": 2
-        },
-        "encoded_network": {
-          "type": "bytes",
-          "id": 3
-        }
-      }
-    },
-    "EthereumAddress": {
-      "fields": {
-        "_old_address": {
-          "type": "bytes",
-          "id": 1,
-          "options": {
-            "deprecated": true
-          }
-        },
-        "address": {
-          "type": "string",
-          "id": 2
-        }
-      }
-    },
-    "EthereumSignTx": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "nonce": {
-          "type": "bytes",
-          "id": 2,
-          "options": {
-            "default": ""
-          }
-        },
-        "gas_price": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 3
-        },
-        "gas_limit": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 4
-        },
-        "to": {
-          "type": "string",
-          "id": 11,
-          "options": {
-            "default": ""
-          }
-        },
-        "value": {
-          "type": "bytes",
-          "id": 6,
-          "options": {
-            "default": ""
-          }
-        },
-        "data_initial_chunk": {
-          "type": "bytes",
-          "id": 7,
-          "options": {
-            "default": ""
-          }
-        },
-        "data_length": {
-          "type": "uint32",
-          "id": 8,
-          "options": {
-            "default": 0
-          }
-        },
-        "chain_id": {
-          "rule": "required",
-          "type": "uint64",
-          "id": 9
-        },
-        "tx_type": {
-          "type": "uint32",
-          "id": 10
-        },
-        "definitions": {
-          "type": "EthereumDefinitions",
-          "id": 12
-        }
-      }
-    },
-    "EthereumSignTxEIP1559": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "nonce": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        },
-        "max_gas_fee": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 3
-        },
-        "max_priority_fee": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 4
-        },
-        "gas_limit": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 5
-        },
-        "to": {
-          "type": "string",
-          "id": 6,
-          "options": {
-            "default": ""
-          }
-        },
-        "value": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 7
-        },
-        "data_initial_chunk": {
-          "type": "bytes",
-          "id": 8,
-          "options": {
-            "default": ""
-          }
-        },
-        "data_length": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 9
-        },
-        "chain_id": {
-          "rule": "required",
-          "type": "uint64",
-          "id": 10
-        },
-        "access_list": {
-          "rule": "repeated",
-          "type": "EthereumAccessList",
-          "id": 11
-        },
-        "definitions": {
-          "type": "EthereumDefinitions",
-          "id": 12
-        }
-      },
-      "nested": {
-        "EthereumAccessList": {
-          "fields": {
-            "address": {
-              "rule": "required",
-              "type": "string",
-              "id": 1
-            },
-            "storage_keys": {
-              "rule": "repeated",
-              "type": "bytes",
-              "id": 2
-            }
-          }
-        }
-      }
-    },
-    "EthereumTxRequest": {
-      "fields": {
-        "data_length": {
-          "type": "uint32",
-          "id": 1
-        },
-        "signature_v": {
-          "type": "uint32",
-          "id": 2
-        },
-        "signature_r": {
-          "type": "bytes",
-          "id": 3
-        },
-        "signature_s": {
-          "type": "bytes",
-          "id": 4
-        }
-      }
-    },
-    "EthereumTxAck": {
-      "fields": {
-        "data_chunk": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "EthereumSignMessage": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "message": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        },
-        "encoded_network": {
-          "type": "bytes",
-          "id": 3
-        }
-      }
-    },
-    "EthereumMessageSignature": {
-      "fields": {
-        "signature": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        },
-        "address": {
-          "rule": "required",
-          "type": "string",
-          "id": 3
-        }
-      }
-    },
-    "EthereumVerifyMessage": {
-      "fields": {
-        "signature": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        },
-        "message": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 3
-        },
-        "address": {
-          "rule": "required",
-          "type": "string",
-          "id": 4
-        }
-      }
-    },
-    "EthereumSignTypedHash": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "domain_separator_hash": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        },
-        "message_hash": {
-          "type": "bytes",
-          "id": 3
-        },
-        "encoded_network": {
-          "type": "bytes",
-          "id": 4
-        }
-      }
-    },
-    "EthereumTypedDataSignature": {
-      "fields": {
-        "signature": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        },
-        "address": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        }
-      }
-    },
     "EthereumDefinitionType": {
       "values": {
         "NETWORK": 0,
@@ -5072,122 +4244,6 @@
         "encoded_token": {
           "type": "bytes",
           "id": 2
-        }
-      }
-    },
-    "EthereumSignTypedData": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "primary_type": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        },
-        "metamask_v4_compat": {
-          "type": "bool",
-          "id": 3,
-          "options": {
-            "default": true
-          }
-        },
-        "definitions": {
-          "type": "EthereumDefinitions",
-          "id": 4
-        }
-      }
-    },
-    "EthereumTypedDataStructRequest": {
-      "fields": {
-        "name": {
-          "rule": "required",
-          "type": "string",
-          "id": 1
-        }
-      }
-    },
-    "EthereumTypedDataStructAck": {
-      "fields": {
-        "members": {
-          "rule": "repeated",
-          "type": "EthereumStructMember",
-          "id": 1
-        }
-      },
-      "nested": {
-        "EthereumStructMember": {
-          "fields": {
-            "type": {
-              "rule": "required",
-              "type": "EthereumFieldType",
-              "id": 1
-            },
-            "name": {
-              "rule": "required",
-              "type": "string",
-              "id": 2
-            }
-          }
-        },
-        "EthereumFieldType": {
-          "fields": {
-            "data_type": {
-              "rule": "required",
-              "type": "EthereumDataType",
-              "id": 1
-            },
-            "size": {
-              "type": "uint32",
-              "id": 2
-            },
-            "entry_type": {
-              "type": "EthereumFieldType",
-              "id": 3
-            },
-            "struct_name": {
-              "type": "string",
-              "id": 4
-            }
-          }
-        },
-        "EthereumDataType": {
-          "values": {
-            "UINT": 1,
-            "INT": 2,
-            "BYTES": 3,
-            "STRING": 4,
-            "BOOL": 5,
-            "ADDRESS": 6,
-            "ARRAY": 7,
-            "STRUCT": 8
-          }
-        }
-      }
-    },
-    "EthereumTypedDataValueRequest": {
-      "fields": {
-        "member_path": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        }
-      }
-    },
-    "EthereumTypedDataValueAck": {
-      "fields": {
-        "value": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
         }
       }
     },
@@ -5411,6 +4467,122 @@
         "source_fingerprint": {
           "type": "uint32",
           "id": 6
+        }
+      }
+    },
+    "EthereumSignTypedData": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "primary_type": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "metamask_v4_compat": {
+          "type": "bool",
+          "id": 3,
+          "options": {
+            "default": true
+          }
+        },
+        "definitions": {
+          "type": "EthereumDefinitions",
+          "id": 4
+        }
+      }
+    },
+    "EthereumTypedDataStructRequest": {
+      "fields": {
+        "name": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "EthereumTypedDataStructAck": {
+      "fields": {
+        "members": {
+          "rule": "repeated",
+          "type": "EthereumStructMember",
+          "id": 1
+        }
+      },
+      "nested": {
+        "EthereumStructMember": {
+          "fields": {
+            "type": {
+              "rule": "required",
+              "type": "EthereumFieldType",
+              "id": 1
+            },
+            "name": {
+              "rule": "required",
+              "type": "string",
+              "id": 2
+            }
+          }
+        },
+        "EthereumFieldType": {
+          "fields": {
+            "data_type": {
+              "rule": "required",
+              "type": "EthereumDataType",
+              "id": 1
+            },
+            "size": {
+              "type": "uint32",
+              "id": 2
+            },
+            "entry_type": {
+              "type": "EthereumFieldType",
+              "id": 3
+            },
+            "struct_name": {
+              "type": "string",
+              "id": 4
+            }
+          }
+        },
+        "EthereumDataType": {
+          "values": {
+            "UINT": 1,
+            "INT": 2,
+            "BYTES": 3,
+            "STRING": 4,
+            "BOOL": 5,
+            "ADDRESS": 6,
+            "ARRAY": 7,
+            "STRUCT": 8
+          }
+        }
+      }
+    },
+    "EthereumTypedDataValueRequest": {
+      "fields": {
+        "member_path": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        }
+      }
+    },
+    "EthereumTypedDataValueAck": {
+      "fields": {
+        "value": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
         }
       }
     },
@@ -5888,6 +5060,349 @@
       }
     },
     "EthereumTypedDataSignatureOneKey": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "EthereumGetPublicKey": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "EthereumPublicKey": {
+      "fields": {
+        "node": {
+          "rule": "required",
+          "type": "HDNodeType",
+          "id": 1
+        },
+        "xpub": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "EthereumGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        },
+        "encoded_network": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "EthereumAddress": {
+      "fields": {
+        "_old_address": {
+          "type": "bytes",
+          "id": 1,
+          "options": {
+            "deprecated": true
+          }
+        },
+        "address": {
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "EthereumSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "nonce": {
+          "type": "bytes",
+          "id": 2,
+          "options": {
+            "default": ""
+          }
+        },
+        "gas_price": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "gas_limit": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 4
+        },
+        "to": {
+          "type": "string",
+          "id": 11,
+          "options": {
+            "default": ""
+          }
+        },
+        "value": {
+          "type": "bytes",
+          "id": 6,
+          "options": {
+            "default": ""
+          }
+        },
+        "data_initial_chunk": {
+          "type": "bytes",
+          "id": 7,
+          "options": {
+            "default": ""
+          }
+        },
+        "data_length": {
+          "type": "uint32",
+          "id": 8,
+          "options": {
+            "default": 0
+          }
+        },
+        "chain_id": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 9
+        },
+        "tx_type": {
+          "type": "uint32",
+          "id": 10
+        },
+        "definitions": {
+          "type": "EthereumDefinitions",
+          "id": 12
+        }
+      }
+    },
+    "EthereumSignTxEIP1559": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "nonce": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "max_gas_fee": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "max_priority_fee": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 4
+        },
+        "gas_limit": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 5
+        },
+        "to": {
+          "type": "string",
+          "id": 6,
+          "options": {
+            "default": ""
+          }
+        },
+        "value": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 7
+        },
+        "data_initial_chunk": {
+          "type": "bytes",
+          "id": 8,
+          "options": {
+            "default": ""
+          }
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 9
+        },
+        "chain_id": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 10
+        },
+        "access_list": {
+          "rule": "repeated",
+          "type": "EthereumAccessList",
+          "id": 11
+        },
+        "definitions": {
+          "type": "EthereumDefinitions",
+          "id": 12
+        }
+      },
+      "nested": {
+        "EthereumAccessList": {
+          "fields": {
+            "address": {
+              "rule": "required",
+              "type": "string",
+              "id": 1
+            },
+            "storage_keys": {
+              "rule": "repeated",
+              "type": "bytes",
+              "id": 2
+            }
+          }
+        }
+      }
+    },
+    "EthereumTxRequest": {
+      "fields": {
+        "data_length": {
+          "type": "uint32",
+          "id": 1
+        },
+        "signature_v": {
+          "type": "uint32",
+          "id": 2
+        },
+        "signature_r": {
+          "type": "bytes",
+          "id": 3
+        },
+        "signature_s": {
+          "type": "bytes",
+          "id": 4
+        }
+      }
+    },
+    "EthereumTxAck": {
+      "fields": {
+        "data_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "EthereumSignMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "message": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "encoded_network": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "EthereumMessageSignature": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 3
+        }
+      }
+    },
+    "EthereumVerifyMessage": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "message": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 4
+        }
+      }
+    },
+    "EthereumSignTypedHash": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "domain_separator_hash": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "message_hash": {
+          "type": "bytes",
+          "id": 3
+        },
+        "encoded_network": {
+          "type": "bytes",
+          "id": 4
+        }
+      }
+    },
+    "EthereumTypedDataSignature": {
       "fields": {
         "signature": {
           "rule": "required",
@@ -11537,6 +11052,491 @@
         }
       }
     },
+    "wire_in": {
+      "type": "bool",
+      "id": 50002,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_out": {
+      "type": "bool",
+      "id": 50003,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_debug_in": {
+      "type": "bool",
+      "id": 50004,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_debug_out": {
+      "type": "bool",
+      "id": 50005,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_tiny": {
+      "type": "bool",
+      "id": 50006,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_bootloader": {
+      "type": "bool",
+      "id": 50007,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_no_fsm": {
+      "type": "bool",
+      "id": 50008,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "bitcoin_only": {
+      "type": "bool",
+      "id": 60000,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "has_bitcoin_only_values": {
+      "type": "bool",
+      "id": 51001,
+      "extend": "google.protobuf.EnumOptions"
+    },
+    "experimental_message": {
+      "type": "bool",
+      "id": 52001,
+      "extend": "google.protobuf.MessageOptions"
+    },
+    "wire_type": {
+      "type": "uint32",
+      "id": 52002,
+      "extend": "google.protobuf.MessageOptions"
+    },
+    "experimental_field": {
+      "type": "bool",
+      "id": 53001,
+      "extend": "google.protobuf.FieldOptions"
+    },
+    "include_in_bitcoin_only": {
+      "type": "bool",
+      "id": 60000,
+      "extend": "google.protobuf.FileOptions"
+    },
+    "MessageType": {
+      "options": {
+        "(has_bitcoin_only_values)": true
+      },
+      "values": {
+        "MessageType_Initialize": 0,
+        "MessageType_ChangePin": 4,
+        "MessageType_WipeDevice": 5,
+        "MessageType_GetEntropy": 9,
+        "MessageType_Entropy": 10,
+        "MessageType_LoadDevice": 13,
+        "MessageType_ResetDevice": 14,
+        "MessageType_SetBusy": 16,
+        "MessageType_Features": 17,
+        "MessageType_Cancel": 20,
+        "MessageType_LockDevice": 24,
+        "MessageType_ApplySettings": 25,
+        "MessageType_ButtonRequest": 26,
+        "MessageType_ButtonAck": 27,
+        "MessageType_ApplyFlags": 28,
+        "MessageType_GetNonce": 31,
+        "MessageType_Nonce": 33,
+        "MessageType_BackupDevice": 34,
+        "MessageType_EntropyRequest": 35,
+        "MessageType_EntropyAck": 36,
+        "MessageType_PassphraseRequest": 41,
+        "MessageType_PassphraseAck": 42,
+        "MessageType_RecoveryDevice": 45,
+        "MessageType_WordRequest": 46,
+        "MessageType_WordAck": 47,
+        "MessageType_GetFeatures": 55,
+        "MessageType_SdProtect": 79,
+        "MessageType_ChangeWipeCode": 82,
+        "MessageType_DoPreauthorized": 84,
+        "MessageType_PreauthorizedRequest": 85,
+        "MessageType_CancelAuthorization": 86,
+        "MessageType_GetFirmwareHash": 88,
+        "MessageType_FirmwareHash": 89,
+        "MessageType_UnlockPath": 93,
+        "MessageType_UnlockedPathRequest": 94,
+        "MessageType_SetU2FCounter": 63,
+        "MessageType_GetNextU2FCounter": 80,
+        "MessageType_NextU2FCounter": 81,
+        "MessageType_Deprecated_PassphraseStateRequest": 77,
+        "MessageType_Deprecated_PassphraseStateAck": 78,
+        "MessageType_GetPublicKey": 11,
+        "MessageType_PublicKey": 12,
+        "MessageType_SignTx": 15,
+        "MessageType_TxRequest": 21,
+        "MessageType_TxAck": 22,
+        "MessageType_GetAddress": 29,
+        "MessageType_Address": 30,
+        "MessageType_TxAckPaymentRequest": 37,
+        "MessageType_SignMessage": 38,
+        "MessageType_VerifyMessage": 39,
+        "MessageType_MessageSignature": 40,
+        "MessageType_GetOwnershipId": 43,
+        "MessageType_OwnershipId": 44,
+        "MessageType_GetOwnershipProof": 49,
+        "MessageType_OwnershipProof": 50,
+        "MessageType_AuthorizeCoinJoin": 51,
+        "MessageType_SignPsbt": 10052,
+        "MessageType_SignedPsbt": 10053,
+        "MessageType_CipherKeyValue": 23,
+        "MessageType_CipheredKeyValue": 48,
+        "MessageType_SignIdentity": 53,
+        "MessageType_SignedIdentity": 54,
+        "MessageType_GetECDHSessionKey": 61,
+        "MessageType_ECDHSessionKey": 62,
+        "MessageType_CosiCommit": 71,
+        "MessageType_CosiCommitment": 72,
+        "MessageType_CosiSign": 73,
+        "MessageType_CosiSignature": 74,
+        "MessageType_BatchGetPublickeys": 10016,
+        "MessageType_EcdsaPublicKeys": 10017,
+        "MessageType_EthereumGetPublicKey": 450,
+        "MessageType_EthereumPublicKey": 451,
+        "MessageType_EthereumGetAddress": 56,
+        "MessageType_EthereumAddress": 57,
+        "MessageType_EthereumSignTx": 58,
+        "MessageType_EthereumSignTxEIP1559": 452,
+        "MessageType_EthereumTxRequest": 59,
+        "MessageType_EthereumTxAck": 60,
+        "MessageType_EthereumSignMessage": 64,
+        "MessageType_EthereumVerifyMessage": 65,
+        "MessageType_EthereumMessageSignature": 66,
+        "MessageType_EthereumSignTypedData": 464,
+        "MessageType_EthereumTypedDataStructRequest": 465,
+        "MessageType_EthereumTypedDataStructAck": 466,
+        "MessageType_EthereumTypedDataValueRequest": 467,
+        "MessageType_EthereumTypedDataValueAck": 468,
+        "MessageType_EthereumTypedDataSignature": 469,
+        "MessageType_EthereumSignTypedHash": 470,
+        "MessageType_EthereumGetPublicKeyOneKey": 20100,
+        "MessageType_EthereumPublicKeyOneKey": 20101,
+        "MessageType_EthereumGetAddressOneKey": 20102,
+        "MessageType_EthereumAddressOneKey": 20103,
+        "MessageType_EthereumSignTxOneKey": 20104,
+        "MessageType_EthereumSignTxEIP1559OneKey": 20105,
+        "MessageType_EthereumTxRequestOneKey": 20106,
+        "MessageType_EthereumTxAckOneKey": 20107,
+        "MessageType_EthereumSignMessageOneKey": 20108,
+        "MessageType_EthereumVerifyMessageOneKey": 20109,
+        "MessageType_EthereumMessageSignatureOneKey": 20110,
+        "MessageType_EthereumSignTypedDataOneKey": 20111,
+        "MessageType_EthereumTypedDataStructRequestOneKey": 20112,
+        "MessageType_EthereumTypedDataStructAckOneKey": 20113,
+        "MessageType_EthereumTypedDataValueRequestOneKey": 20114,
+        "MessageType_EthereumTypedDataValueAckOneKey": 20115,
+        "MessageType_EthereumTypedDataSignatureOneKey": 20116,
+        "MessageType_EthereumSignTypedHashOneKey": 20117,
+        "MessageType_EthereumGnosisSafeTxAck": 20118,
+        "MessageType_EthereumGnosisSafeTxRequest": 20119,
+        "MessageType_EthereumSignTxEIP7702OneKey": 20120,
+        "MessageType_EthereumSignTypedDataQR": 20121,
+        "MessageType_NEMGetAddress": 67,
+        "MessageType_NEMAddress": 68,
+        "MessageType_NEMSignTx": 69,
+        "MessageType_NEMSignedTx": 70,
+        "MessageType_NEMDecryptMessage": 75,
+        "MessageType_NEMDecryptedMessage": 76,
+        "MessageType_TezosGetAddress": 150,
+        "MessageType_TezosAddress": 151,
+        "MessageType_TezosSignTx": 152,
+        "MessageType_TezosSignedTx": 153,
+        "MessageType_TezosGetPublicKey": 154,
+        "MessageType_TezosPublicKey": 155,
+        "MessageType_StellarSignTx": 202,
+        "MessageType_StellarTxOpRequest": 203,
+        "MessageType_StellarGetAddress": 207,
+        "MessageType_StellarAddress": 208,
+        "MessageType_StellarCreateAccountOp": 210,
+        "MessageType_StellarPaymentOp": 211,
+        "MessageType_StellarPathPaymentStrictReceiveOp": 212,
+        "MessageType_StellarManageSellOfferOp": 213,
+        "MessageType_StellarCreatePassiveSellOfferOp": 214,
+        "MessageType_StellarSetOptionsOp": 215,
+        "MessageType_StellarChangeTrustOp": 216,
+        "MessageType_StellarAllowTrustOp": 217,
+        "MessageType_StellarAccountMergeOp": 218,
+        "MessageType_StellarManageDataOp": 220,
+        "MessageType_StellarBumpSequenceOp": 221,
+        "MessageType_StellarManageBuyOfferOp": 222,
+        "MessageType_StellarPathPaymentStrictSendOp": 223,
+        "MessageType_StellarSignedTx": 230,
+        "MessageType_CardanoGetPublicKey": 305,
+        "MessageType_CardanoPublicKey": 306,
+        "MessageType_CardanoGetAddress": 307,
+        "MessageType_CardanoAddress": 308,
+        "MessageType_CardanoTxItemAck": 313,
+        "MessageType_CardanoTxAuxiliaryDataSupplement": 314,
+        "MessageType_CardanoTxWitnessRequest": 315,
+        "MessageType_CardanoTxWitnessResponse": 316,
+        "MessageType_CardanoTxHostAck": 317,
+        "MessageType_CardanoTxBodyHash": 318,
+        "MessageType_CardanoSignTxFinished": 319,
+        "MessageType_CardanoSignTxInit": 320,
+        "MessageType_CardanoTxInput": 321,
+        "MessageType_CardanoTxOutput": 322,
+        "MessageType_CardanoAssetGroup": 323,
+        "MessageType_CardanoToken": 324,
+        "MessageType_CardanoTxCertificate": 325,
+        "MessageType_CardanoTxWithdrawal": 326,
+        "MessageType_CardanoTxAuxiliaryData": 327,
+        "MessageType_CardanoPoolOwner": 328,
+        "MessageType_CardanoPoolRelayParameters": 329,
+        "MessageType_CardanoGetNativeScriptHash": 330,
+        "MessageType_CardanoNativeScriptHash": 331,
+        "MessageType_CardanoTxMint": 332,
+        "MessageType_CardanoTxCollateralInput": 333,
+        "MessageType_CardanoTxRequiredSigner": 334,
+        "MessageType_CardanoTxInlineDatumChunk": 335,
+        "MessageType_CardanoTxReferenceScriptChunk": 336,
+        "MessageType_CardanoTxReferenceInput": 337,
+        "MessageType_CardanoSignMessage": 350,
+        "MessageType_CardanoMessageSignature": 351,
+        "MessageType_RippleGetAddress": 400,
+        "MessageType_RippleAddress": 401,
+        "MessageType_RippleSignTx": 402,
+        "MessageType_RippleSignedTx": 403,
+        "MessageType_MoneroTransactionInitRequest": 501,
+        "MessageType_MoneroTransactionInitAck": 502,
+        "MessageType_MoneroTransactionSetInputRequest": 503,
+        "MessageType_MoneroTransactionSetInputAck": 504,
+        "MessageType_MoneroTransactionInputViniRequest": 507,
+        "MessageType_MoneroTransactionInputViniAck": 508,
+        "MessageType_MoneroTransactionAllInputsSetRequest": 509,
+        "MessageType_MoneroTransactionAllInputsSetAck": 510,
+        "MessageType_MoneroTransactionSetOutputRequest": 511,
+        "MessageType_MoneroTransactionSetOutputAck": 512,
+        "MessageType_MoneroTransactionAllOutSetRequest": 513,
+        "MessageType_MoneroTransactionAllOutSetAck": 514,
+        "MessageType_MoneroTransactionSignInputRequest": 515,
+        "MessageType_MoneroTransactionSignInputAck": 516,
+        "MessageType_MoneroTransactionFinalRequest": 517,
+        "MessageType_MoneroTransactionFinalAck": 518,
+        "MessageType_MoneroKeyImageExportInitRequest": 530,
+        "MessageType_MoneroKeyImageExportInitAck": 531,
+        "MessageType_MoneroKeyImageSyncStepRequest": 532,
+        "MessageType_MoneroKeyImageSyncStepAck": 533,
+        "MessageType_MoneroKeyImageSyncFinalRequest": 534,
+        "MessageType_MoneroKeyImageSyncFinalAck": 535,
+        "MessageType_MoneroGetAddress": 540,
+        "MessageType_MoneroAddress": 541,
+        "MessageType_MoneroGetWatchKey": 542,
+        "MessageType_MoneroWatchKey": 543,
+        "MessageType_DebugMoneroDiagRequest": 546,
+        "MessageType_DebugMoneroDiagAck": 547,
+        "MessageType_MoneroGetTxKeyRequest": 550,
+        "MessageType_MoneroGetTxKeyAck": 551,
+        "MessageType_MoneroLiveRefreshStartRequest": 552,
+        "MessageType_MoneroLiveRefreshStartAck": 553,
+        "MessageType_MoneroLiveRefreshStepRequest": 554,
+        "MessageType_MoneroLiveRefreshStepAck": 555,
+        "MessageType_MoneroLiveRefreshFinalRequest": 556,
+        "MessageType_MoneroLiveRefreshFinalAck": 557,
+        "MessageType_EosGetPublicKey": 600,
+        "MessageType_EosPublicKey": 601,
+        "MessageType_EosSignTx": 602,
+        "MessageType_EosTxActionRequest": 603,
+        "MessageType_EosTxActionAck": 604,
+        "MessageType_EosSignedTx": 605,
+        "MessageType_BinanceGetAddress": 700,
+        "MessageType_BinanceAddress": 701,
+        "MessageType_BinanceGetPublicKey": 702,
+        "MessageType_BinancePublicKey": 703,
+        "MessageType_BinanceSignTx": 704,
+        "MessageType_BinanceTxRequest": 705,
+        "MessageType_BinanceTransferMsg": 706,
+        "MessageType_BinanceOrderMsg": 707,
+        "MessageType_BinanceCancelMsg": 708,
+        "MessageType_BinanceSignedTx": 709,
+        "MessageType_StarcoinGetAddress": 10300,
+        "MessageType_StarcoinAddress": 10301,
+        "MessageType_StarcoinGetPublicKey": 10302,
+        "MessageType_StarcoinPublicKey": 10303,
+        "MessageType_StarcoinSignTx": 10304,
+        "MessageType_StarcoinSignedTx": 10305,
+        "MessageType_StarcoinSignMessage": 10306,
+        "MessageType_StarcoinMessageSignature": 10307,
+        "MessageType_StarcoinVerifyMessage": 10308,
+        "MessageType_ConfluxGetAddress": 10112,
+        "MessageType_ConfluxAddress": 10113,
+        "MessageType_ConfluxSignTx": 10114,
+        "MessageType_ConfluxTxRequest": 10115,
+        "MessageType_ConfluxTxAck": 10116,
+        "MessageType_ConfluxSignMessage": 10117,
+        "MessageType_ConfluxSignMessageCIP23": 10118,
+        "MessageType_ConfluxMessageSignature": 10119,
+        "MessageType_TronGetAddress": 10501,
+        "MessageType_TronAddress": 10502,
+        "MessageType_TronSignTx": 10503,
+        "MessageType_TronSignedTx": 10504,
+        "MessageType_TronSignMessage": 10505,
+        "MessageType_TronMessageSignature": 10506,
+        "MessageType_NearGetAddress": 10701,
+        "MessageType_NearAddress": 10702,
+        "MessageType_NearSignTx": 10703,
+        "MessageType_NearSignedTx": 10704,
+        "MessageType_AptosGetAddress": 10600,
+        "MessageType_AptosAddress": 10601,
+        "MessageType_AptosSignTx": 10602,
+        "MessageType_AptosSignedTx": 10603,
+        "MessageType_AptosSignMessage": 10604,
+        "MessageType_AptosMessageSignature": 10605,
+        "MessageType_AptosSignSIWAMessage": 10606,
+        "MessageType_WebAuthnListResidentCredentials": 800,
+        "MessageType_WebAuthnCredentials": 801,
+        "MessageType_WebAuthnAddResidentCredential": 802,
+        "MessageType_WebAuthnRemoveResidentCredential": 803,
+        "MessageType_SolanaGetAddress": 10100,
+        "MessageType_SolanaAddress": 10101,
+        "MessageType_SolanaSignTx": 10102,
+        "MessageType_SolanaSignedTx": 10103,
+        "MessageType_SolanaSignOffChainMessage": 10104,
+        "MessageType_SolanaMessageSignature": 10105,
+        "MessageType_SolanaSignUnsafeMessage": 10106,
+        "MessageType_CosmosGetAddress": 10800,
+        "MessageType_CosmosAddress": 10801,
+        "MessageType_CosmosSignTx": 10802,
+        "MessageType_CosmosSignedTx": 10803,
+        "MessageType_AlgorandGetAddress": 10900,
+        "MessageType_AlgorandAddress": 10901,
+        "MessageType_AlgorandSignTx": 10902,
+        "MessageType_AlgorandSignedTx": 10903,
+        "MessageType_PolkadotGetAddress": 11000,
+        "MessageType_PolkadotAddress": 11001,
+        "MessageType_PolkadotSignTx": 11002,
+        "MessageType_PolkadotSignedTx": 11003,
+        "MessageType_SuiGetAddress": 11100,
+        "MessageType_SuiAddress": 11101,
+        "MessageType_SuiSignTx": 11102,
+        "MessageType_SuiSignedTx": 11103,
+        "MessageType_SuiSignMessage": 11104,
+        "MessageType_SuiMessageSignature": 11105,
+        "MessageType_SuiTxRequest": 11106,
+        "MessageType_SuiTxAck": 11107,
+        "MessageType_FilecoinGetAddress": 11200,
+        "MessageType_FilecoinAddress": 11201,
+        "MessageType_FilecoinSignTx": 11202,
+        "MessageType_FilecoinSignedTx": 11203,
+        "MessageType_KaspaGetAddress": 11300,
+        "MessageType_KaspaAddress": 11301,
+        "MessageType_KaspaSignTx": 11302,
+        "MessageType_KaspaSignedTx": 11303,
+        "MessageType_KaspaTxInputRequest": 11304,
+        "MessageType_KaspaTxInputAck": 11305,
+        "MessageType_NexaGetAddress": 11400,
+        "MessageType_NexaAddress": 11401,
+        "MessageType_NexaSignTx": 11402,
+        "MessageType_NexaSignedTx": 11403,
+        "MessageType_NexaTxInputRequest": 11404,
+        "MessageType_NexaTxInputAck": 11405,
+        "MessageType_NostrGetPublicKey": 11500,
+        "MessageType_NostrPublicKey": 11501,
+        "MessageType_NostrSignEvent": 11502,
+        "MessageType_NostrSignedEvent": 11503,
+        "MessageType_NostrEncryptMessage": 11504,
+        "MessageType_NostrEncryptedMessage": 11505,
+        "MessageType_NostrDecryptMessage": 11506,
+        "MessageType_NostrDecryptedMessage": 11507,
+        "MessageType_NostrSignSchnorr": 11508,
+        "MessageType_NostrSignedSchnorr": 11509,
+        "MessageType_LnurlAuth": 11600,
+        "MessageType_LnurlAuthResp": 11601,
+        "MessageType_NervosGetAddress": 11701,
+        "MessageType_NervosAddress": 11702,
+        "MessageType_NervosSignTx": 11703,
+        "MessageType_NervosSignedTx": 11704,
+        "MessageType_NervosTxRequest": 11705,
+        "MessageType_NervosTxAck": 11706,
+        "MessageType_TonGetAddress": 11901,
+        "MessageType_TonAddress": 11902,
+        "MessageType_TonSignMessage": 11903,
+        "MessageType_TonSignedMessage": 11904,
+        "MessageType_TonSignProof": 11905,
+        "MessageType_TonSignedProof": 11906,
+        "MessageType_TonTxAck": 11907,
+        "MessageType_AlephiumGetAddress": 12101,
+        "MessageType_AlephiumAddress": 12102,
+        "MessageType_AlephiumSignTx": 12103,
+        "MessageType_AlephiumSignedTx": 12104,
+        "MessageType_AlephiumTxRequest": 12105,
+        "MessageType_AlephiumTxAck": 12106,
+        "MessageType_AlephiumBytecodeRequest": 12107,
+        "MessageType_AlephiumBytecodeAck": 12108,
+        "MessageType_AlephiumSignMessage": 12109,
+        "MessageType_AlephiumMessageSignature": 12110,
+        "MessageType_BenfenGetAddress": 12201,
+        "MessageType_BenfenAddress": 12202,
+        "MessageType_BenfenSignTx": 12203,
+        "MessageType_BenfenSignedTx": 12204,
+        "MessageType_BenfenSignMessage": 12205,
+        "MessageType_BenfenMessageSignature": 12206,
+        "MessageType_BenfenTxRequest": 12207,
+        "MessageType_BenfenTxAck": 12208,
+        "MessageType_NeoGetAddress": 12301,
+        "MessageType_NeoAddress": 12302,
+        "MessageType_NeoSignTx": 12303,
+        "MessageType_NeoSignedTx": 12304,
+        "MessageType_DeviceFactoryInfoSet": 60000,
+        "MessageType_DeviceFactoryInfoGet": 60001,
+        "MessageType_DeviceFactoryInfo": 60002,
+        "MessageType_DeviceFactoryPermanentLock": 60003,
+        "MessageType_DeviceFactoryTest": 60004,
+        "MessageType_ProtocolInfoRequest": 60200,
+        "MessageType_ProtocolInfo": 60201,
+        "MessageType_Ping": 60206,
+        "MessageType_Success": 60207,
+        "MessageType_Failure": 60208,
+        "MessageType_DeviceReboot": 60400,
+        "MessageType_DeviceSettings": 60410,
+        "MessageType_DeviceSettingsGet": 60411,
+        "MessageType_DeviceSettingsSet": 60412,
+        "MessageType_DeviceSettingsPageShow": 60413,
+        "MessageType_DeviceCertificate": 60420,
+        "MessageType_DeviceCertificateWrite": 60421,
+        "MessageType_DeviceCertificateRead": 60422,
+        "MessageType_DeviceCertificateSignature": 60423,
+        "MessageType_DeviceCertificateSign": 60424,
+        "MessageType_DeviceMiscUsbMscControl": 60440,
+        "MessageType_DeviceFindMyTokenState": 60450,
+        "MessageType_DeviceFindMyTokenUpdate": 60451,
+        "MessageType_DeviceFindMyTokenStateGet": 60452,
+        "MessageType_DeviceInfoGet": 60600,
+        "MessageType_DeviceInfo": 60601,
+        "MessageType_DeviceStatusGet": 60602,
+        "MessageType_DeviceStatus": 60603,
+        "MessageType_FilesystemPermissionFix": 60800,
+        "MessageType_FilesystemPathInfo": 60801,
+        "MessageType_FilesystemPathInfoQuery": 60802,
+        "MessageType_FilesystemFile": 60803,
+        "MessageType_FilesystemFileRead": 60804,
+        "MessageType_FilesystemFileWrite": 60805,
+        "MessageType_FilesystemFileDelete": 60806,
+        "MessageType_FilesystemDir": 60807,
+        "MessageType_FilesystemDirList": 60808,
+        "MessageType_FilesystemDirMake": 60809,
+        "MessageType_FilesystemDirRemove": 60810,
+        "MessageType_FilesystemFormat": 60811,
+        "MessageType_DeviceFirmwareUpdateStage": 61000,
+        "MessageType_DeviceFirmwareUpdateRequest": 61001,
+        "MessageType_DeviceFirmwareUpdateStatusGet": 61002,
+        "MessageType_DeviceFirmwareUpdateStatus": 61003,
+        "MessageType_DeviceSessionGet": 61200,
+        "MessageType_DeviceSession": 61201,
+        "MessageType_DeviceSessionAskPin": 61202,
+        "MessageType_DeviceSessionAskPassphrase": 61203,
+        "MessageType_PortfolioUpdate": 61400,
+        "MessageType_NftUpdate": 61500,
+        "MessageType_OnboardingStatusGet": 61600,
+        "MessageType_OnboardingStatus": 61601
+      },
+      "reserved": [
+        [90, 92],
+        [114, 122],
+        [300, 304],
+        [309, 312]
+      ]
+    },
     "ProtocolInfoRequest": {
       "fields": {
         "eventless_wallet_session": {
@@ -12322,11 +12322,6 @@
         "btc_test_address": {
           "type": "string",
           "id": 2
-        },
-        "seed_domains": {
-          "rule": "repeated",
-          "type": "DeviceSessionSeedDomain",
-          "id": 3
         }
       }
     },
@@ -12339,6 +12334,11 @@
         "btc_test_address": {
           "type": "string",
           "id": 2
+        },
+        "seed_domains": {
+          "rule": "repeated",
+          "type": "DeviceSessionSeedDomain",
+          "id": 3
         }
       }
     },
@@ -12367,6 +12367,11 @@
           "rule": "required",
           "type": "bool",
           "id": 2
+        },
+        "seed_domains": {
+          "rule": "repeated",
+          "type": "DeviceSessionSeedDomain",
+          "id": 3
         }
       }
     },
@@ -12766,7 +12771,8 @@
           "type": "string",
           "id": 2
         }
-      }
+      },
+      "reserved": [[3, 3], "symbol"]
     },
     "ViewDetail": {
       "fields": {
@@ -12789,6 +12795,20 @@
           "rule": "required",
           "type": "bool",
           "id": 4
+        }
+      }
+    },
+    "ViewCustomField": {
+      "fields": {
+        "key": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "value": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
         }
       }
     },
@@ -12822,17 +12842,67 @@
         }
       }
     },
-    "ViewRawData": {
+    "ViewActionCard": {
       "fields": {
         "initial_data": {
           "rule": "required",
           "type": "string",
           "id": 1
+        }
+      },
+      "reserved": [[2, 2], "placeholder"]
+    },
+    "ViewContentPreview": {
+      "fields": {
+        "content_key": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
         },
-        "placeholder": {
+        "preview": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "total_bytes": {
+          "type": "uint32",
+          "id": 3
+        }
+      }
+    },
+    "ViewContentEntry": {
+      "fields": {
+        "entry_key": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "value": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "ViewContentPage": {
+      "fields": {
+        "page_index": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "page_count": {
           "rule": "required",
           "type": "uint32",
           "id": 2
+        },
+        "chunk": {
+          "type": "bytes",
+          "id": 3
+        },
+        "entry": {
+          "type": "ViewContentEntry",
+          "id": 4
         }
       }
     },
@@ -12865,8 +12935,8 @@
           "type": "ViewTip",
           "id": 4
         },
-        "raw_data": {
-          "type": "ViewRawData",
+        "action_card": {
+          "type": "ViewActionCard",
           "id": 5
         },
         "slide_to_confirm": {
@@ -12890,6 +12960,36 @@
         "title_arg": {
           "type": "string",
           "id": 9
+        },
+        "content": {
+          "type": "ViewContentPreview",
+          "id": 10
+        },
+        "custom_field": {
+          "type": "ViewCustomField",
+          "id": 11
+        }
+      }
+    },
+    "ViewWarningPage": {
+      "fields": {
+        "title_id": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "text_id": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "text_arg": {
+          "type": "string",
+          "id": 3
+        },
+        "cancellable": {
+          "type": "bool",
+          "id": 4
         }
       }
     },
@@ -12928,6 +13028,10 @@
         "chain_id": {
           "type": "uint32",
           "id": 8
+        },
+        "content": {
+          "type": "ViewContentPreview",
+          "id": 9
         }
       }
     },
