@@ -383,6 +383,13 @@ const isProtocolV2InstallResponseTimeout = (error: unknown) => {
   );
 };
 
+const getProtocolV2ErrorCode = (error: unknown): number | string | undefined => {
+  if (!error || typeof error !== 'object') return undefined;
+  const { errorCode, code } = error as { errorCode?: unknown; code?: unknown };
+  const causeCode = errorCode ?? code;
+  return typeof causeCode === 'number' || typeof causeCode === 'string' ? causeCode : undefined;
+};
+
 const isProtocolV2TerminalInstallStatusError = (error: unknown) =>
   isBleStaleBondHardwareError(error) ||
   (error instanceof HardwareError &&
@@ -2253,9 +2260,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         }
       }
     }
+    const causeCode = getProtocolV2ErrorCode(lastError);
     throw ERRORS.TypedError(
       HardwareErrorCode.EmmcFileWriteFirmwareError,
-      `transfer data error: ${getProtocolV2UnknownErrorText(lastError)}`
+      `transfer data error: ${getProtocolV2UnknownErrorText(lastError)}`,
+      causeCode === undefined ? undefined : { causeCode }
     );
   }
 

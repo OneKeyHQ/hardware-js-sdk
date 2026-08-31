@@ -2,9 +2,12 @@ import semver from 'semver';
 import EventEmitter from 'events';
 import {
   DeviceSessionPinType,
-  TRANSPORT_EVENT,
-  isProtocolV2LinkDisabledError,
+  type LowlevelTransportSharedPlugin,
+  type OneKeyDeviceInfo,
   type ProtocolType,
+  TRANSPORT_EVENT,
+  type TransportDeviceDisconnectEvent,
+  isProtocolV2LinkDisabledError,
 } from '@onekeyfe/hd-transport';
 import {
   ERRORS,
@@ -75,11 +78,6 @@ import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } fro
 import type { DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import type { SdkTracingContext } from '../utils/tracing';
 import type { Deferred } from '@onekeyfe/hd-shared';
-import type {
-  LowlevelTransportSharedPlugin,
-  OneKeyDeviceInfo,
-  TransportDeviceDisconnectEvent,
-} from '@onekeyfe/hd-transport';
 import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);

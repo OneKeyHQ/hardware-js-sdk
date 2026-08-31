@@ -9216,6 +9216,42 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall).toHaveBeenCalledTimes(6);
   });
 
+  test('preserves the underlying transport error code after firmware transfer retries', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.BleTimeoutError, 'response timeout'));
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    method.postProgressMessage = jest.fn();
+    method.postTipMessage = jest.fn();
+    (method as any).recoverProtocolV2FileTransfer = jest.fn().mockResolvedValue(undefined);
+
+    const source = await openFirmwareByteSource({
+      binary: new Uint8Array([1, 2, 3]).buffer,
+    });
+    await expect(
+      (method as any).protocolV2SourceUpdateProcess({
+        source,
+        filePath: 'vol0:/firmware.bin',
+        processedSize: 0,
+        totalSize: 3,
+      })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.EmmcFileWriteFirmwareError,
+      params: { causeCode: HardwareErrorCode.BleTimeoutError },
+    });
+    await source?.close();
+    expect(typedCall).toHaveBeenCalledTimes(3);
+  });
+
   // TODO(#850/#855): PR #855 added resume-on-retry and per-chunk retry on the
   // writeProtocolV2File path. PR #850 replaced that path with FirmwareByteSource
   // streaming (protocolV2SourceUpdateProcess), which restarts a failed transfer from

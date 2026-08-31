@@ -1,3 +1,4 @@
+/* eslint-disable no-bitwise -- LZ4 decoding and deterministic test data generation require bitwise operations. */
 import { sha3_512 } from '@noble/hashes/sha3';
 
 import {
