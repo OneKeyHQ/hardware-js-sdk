@@ -2,7 +2,7 @@
   "name": "hardware-example",
   "productName": "HardwareExample",
   "executableName": "onekey-hardware-example",
-  "version": "1.2.2-alpha.6",
+  "version": "1.2.2-alpha.7",
   "author": "OneKey",
   "description": "OneKey Hardware SDK Electron BLE example",
   "main": "dist/index.js",
