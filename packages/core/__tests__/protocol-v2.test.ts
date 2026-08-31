@@ -5663,7 +5663,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postTipMessage).not.toHaveBeenCalled();
     expect(method.postProgressMessage).not.toHaveBeenCalled();
     await cancelableAction?.();
-    expect(cancelDevice).toHaveBeenCalledTimes(1);
+    expect(cancelDevice).not.toHaveBeenCalled();
   });
 
   test('does not send the install request when Protocol V2 staging fails', async () => {
@@ -8852,6 +8852,40 @@ describe('Protocol V2 firmware update targets', () => {
           totalSize: 1,
         })
       ).rejects.toBe(staleBondError);
+    } finally {
+      await source?.close();
+    }
+    expect(recoverProtocolV2FileTransfer).not.toHaveBeenCalled();
+  });
+
+  test('does not recover or wrap a cancelled V4 file transfer', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const abortController = new AbortController();
+    method.abortSignal = abortController.signal;
+    (method as any).fileWriteChunk = jest.fn().mockImplementation(() => {
+      abortController.abort();
+      return Promise.reject(new Error('transport disposed'));
+    });
+    const recoverProtocolV2FileTransfer = jest.fn();
+    (method as any).recoverProtocolV2FileTransfer = recoverProtocolV2FileTransfer;
+    const source = await openFirmwareByteSource({
+      binary: new Uint8Array([1]).buffer,
+    });
+
+    try {
+      await expect(
+        (method as any).protocolV2SourceUpdateProcess({
+          source,
+          filePath: 'vol1:firmware.bin',
+          processedSize: 0,
+          totalSize: 1,
+        })
+      ).rejects.toMatchObject({ errorCode: HardwareErrorCode.CallQueueActionCancelled });
     } finally {
       await source?.close();
     }

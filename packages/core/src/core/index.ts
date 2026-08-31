@@ -1341,7 +1341,10 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       );
       // Abort before rejecting: rejectRequest releases the task and would make
       // its AbortController unreachable to an in-flight method loop.
-      requestQueue.abortRequestsByConnectId(connectId);
+      // This branch rejects every queued request below. Abort the same set first so
+      // methods whose physical connectId is selected internally (for example
+      // Desktop WebUSB firmwareUpdateV4) cannot keep retrying after rejection.
+      requestQueue.abortAllRequests();
       const canceledDevices: Device[] = [];
       const interruptDevice = (device: Device | undefined, deviceConnectId: string) => {
         if (!device || canceledDevices.includes(device)) {

@@ -2199,11 +2199,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }) {
     let lastError: unknown;
     for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
+      this.throwIfAborted();
       try {
         await writeFirmwareByteSource({
           source,
           chunkSize: this.getProtocolV2FirmwareChunkSize('write', filePath),
           write: async ({ data, sourceOffset, length, first }) => {
+            this.throwIfAborted();
             const chunkEnd = sourceOffset + length;
             const deviceProgress = getProtocolV2DeviceTransferProgress(
               processedSize + sourceOffset,
@@ -2251,12 +2253,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         });
         return processedSize + source.size;
       } catch (error) {
+        this.throwIfAborted();
         if (isBleStaleBondHardwareError(error)) {
           throw error;
         }
         lastError = error;
         if (attempt < PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT) {
           await this.recoverProtocolV2FileTransfer();
+          this.throwIfAborted();
         }
       }
     }
@@ -2724,7 +2728,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           if (!hasCurrentInstallEvidence) {
             // A successful status poll clears DeviceCommands' cancel action. Keep cancellation
             // available while UpdateRequest is still waiting for confirmation on the device.
-            this.device.setCancelableAction(() => this.device.getCommands().cancelDevice());
+            // Bootloader does not register the protocol Cancel message. Keep the
+            // operation locally cancellable; interruptionFromUser() disposes the link.
+            this.device.setCancelableAction(() => Promise.resolve());
           }
 
           if (
@@ -3193,7 +3199,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.protocolV2InstallTerminalSuccessObserved = false;
     const commands = this.device.getCommands();
     await commands.typedCall('DeviceFirmwareUpdateStage', 'Success', { targets });
-    this.device.setCancelableAction(() => this.device.getCommands().cancelDevice());
+    // Bootloader does not register the protocol Cancel message. Keep the
+    // operation locally cancellable; interruptionFromUser() disposes the link.
+    this.device.setCancelableAction(() => Promise.resolve());
     const interaction = this.device.createProtocolV2UiPhaseMetadata('button', 'start');
     this.postMessage(
       createUiMessage(UI_REQUEST.REQUEST_BUTTON, {
