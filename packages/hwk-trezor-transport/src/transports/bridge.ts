@@ -5,34 +5,32 @@ import {
     bridge as protocolBridge,
     v1 as protocolV1,
 } from '@onekeyfe/hwk-trezor-protocol';
-import { versionUtils } from '@onekeyfe/hwk-trezor-utils';
-
 import {
     AbstractTransport,
     type AbstractTransportMethodParams,
     type AbstractTransportParams,
-} from './abstract';
-import { TRANSPORT } from '../constants';
-import * as ERRORS from '../errors';
+    type AnyError,
+    type AsyncResultWithTypedError,
+    type BridgeCommonErrors,
+    type Descriptor,
+    TRANSPORT_ERROR as ERRORS,
+    type Session,
+    TRANSPORT,
+    buildMessage,
+    error,
+    parseThpMessage,
+    receiveAndParse,
+    success,
+} from '@onekeyfe/hwk-trezor-transport-common';
+import { versionUtils } from '@onekeyfe/hwk-trezor-utils';
+
 import { ping } from '../pinger/ping';
-import { parseThpMessage } from '../thp/receive';
-import type {
-    AnyError,
-    AsyncResultWithTypedError,
-    BridgeCommonErrors,
-    BridgeProtocolMessage,
-    Descriptor,
-    Session,
-} from '../types';
 import { bridgeApiCall } from '../utils/bridgeApiCall';
 import * as bridgeApiResult from '../utils/bridgeApiResult';
-import { createProtocolMessage } from '../utils/bridgeProtocolMessage';
-import { receiveAndParse } from '../utils/receive';
-import { error, success } from '../utils/result';
-import { buildMessage } from '../utils/send';
+import { type BridgeProtocolMessage, createProtocolMessage } from '../utils/bridgeProtocolMessage';
 
 const DEFAULT_URL = 'http://127.0.0.1';
-const DEFAULT_PORT = 21325;
+const DEFAULT_PORT = 21328;
 
 type BridgeEndpoint =
     | '/'
@@ -66,8 +64,12 @@ type IncompleteRequestOptions = {
 type BridgeConstructorParameters = AbstractTransportParams & { port?: number };
 
 export class BridgeTransport extends AbstractTransport {
-    private useProtocolMessages: boolean = false;
     private useAbortEndpoint: boolean = false;
+    // A legacy trezord bridge (pre-protocol-message support) cannot parse the
+    // structured protocol-message JSON body; it only understands the raw
+    // bridge protocol. `init()` sets this from the bridge's own advertised
+    // capability, and `getProtocol`/`getRequestBody` fall back accordingly.
+    private useProtocolMessages: boolean = false;
     /**
      * url of trezord server.
      */
@@ -97,12 +99,8 @@ export class BridgeTransport extends AbstractTransport {
                 }
 
                 this.version = response.payload.version;
-
-                if (!this.version.startsWith('3')) {
-                    this.isOutdated = true;
-                }
-                this.useProtocolMessages = !!response.payload.protocolMessages;
                 this.useAbortEndpoint = versionUtils.isNewerOrEqual(this.version, '3.2.1');
+                this.useProtocolMessages = !!response.payload.protocolMessages;
 
                 this.stopped = false;
 
@@ -112,7 +110,6 @@ export class BridgeTransport extends AbstractTransport {
         );
     }
 
-    // https://github.com/trezor/trezord-go/blob/f559ee5079679aeb5f897c65318d3310f78223ca/core/core.go#L373
     public listen() {
         if (this.listening) {
             return error({ code: ERRORS.ALREADY_LISTENING });
@@ -139,12 +136,10 @@ export class BridgeTransport extends AbstractTransport {
         }
     }
 
-    // https://github.com/trezor/trezord-go/blob/f559ee5079679aeb5f897c65318d3310f78223ca/core/core.go#L235
     public enumerate({ signal }: AbstractTransportMethodParams<'enumerate'> = {}) {
         return this.scheduleAction(signal => this.post('/enumerate', { signal }), { signal });
     }
 
-    // https://github.com/trezor/trezord-go/blob/f559ee5079679aeb5f897c65318d3310f78223ca/core/core.go#L420
     public acquire({ input, signal }: AbstractTransportMethodParams<'acquire'>) {
         return this.scheduleAction(
             async signal => {
@@ -163,7 +158,6 @@ export class BridgeTransport extends AbstractTransport {
         );
     }
 
-    // https://github.com/trezor/trezord-go/blob/f559ee5079679aeb5f897c65318d3310f78223ca/core/core.go#L354
     public release({ path: _, session, signal }: AbstractTransportMethodParams<'release'>) {
         return this.scheduleAction(
             async signal => {
@@ -227,7 +221,6 @@ export class BridgeTransport extends AbstractTransport {
         return abortController.signal;
     };
 
-    // https://github.com/trezor/trezord-go/blob/f559ee5079679aeb5f897c65318d3310f78223ca/core/core.go#L534
     public call({
         session,
         name,

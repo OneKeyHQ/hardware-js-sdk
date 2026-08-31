@@ -1,0 +1,50 @@
+{
+  "name": "@onekeyfe/hwk-trezor-transport-web",
+  "version": "1.2.2-alpha.6",
+  "private": true,
+  "description": "Browser-only Trezor transports vendored from Trezor Suite MIT sources: WebUSB and SharedWorker-backed sessions backend",
+  "author": "OneKey",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md",
+    "CHANGELOG.md",
+    "TREZOR_SOURCE.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git",
+    "directory": "packages/hwk-trezor-transport-web"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@onekeyfe/hwk-trezor-transport-common": "1.2.2-alpha.6"
+  },
+  "devDependencies": {
+    "@types/sharedworker": "^0.0.223",
+    "rimraf": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "5.1.6"
+  }
+}

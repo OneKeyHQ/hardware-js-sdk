@@ -3,6 +3,8 @@ const vendoredTrezorPackages = [
   'hwk-trezor-protocol',
   'hwk-trezor-schema-utils',
   'hwk-trezor-transport',
+  'hwk-trezor-transport-common',
+  'hwk-trezor-transport-web',
   'hwk-trezor-type-utils',
   'hwk-trezor-utils',
 ];

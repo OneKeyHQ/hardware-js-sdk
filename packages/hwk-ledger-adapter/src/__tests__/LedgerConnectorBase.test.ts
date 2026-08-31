@@ -59,6 +59,126 @@ describe('LedgerConnectorBase error wrapping', () => {
   });
 });
 
+const VALID_RELAY_URL =
+  'wss://attestation.onekeytest.com/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678';
+
+describe('LedgerConnectorBase runtime genuine-check relay', () => {
+  it('rejects relay URLs that do not use secure WebSockets', async () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+
+    await expect(
+      connector.configure({
+        ledgerGenuineCheckWebSocketUrl: 'https://attestation.onekeytest.com/v1/ledger/session/x',
+      })
+    ).rejects.toThrow('not allowed');
+  });
+
+  it('rejects a host that is not on any OneKey root domain', async () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+
+    for (const url of [
+      'wss://attacker.example/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
+      // Lookalike hosts must not slip through a naive suffix/substring check.
+      'wss://notonekeytest.com/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
+      'wss://onekeytest.com.attacker.example/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
+    ]) {
+      await expect(connector.configure({ ledgerGenuineCheckWebSocketUrl: url })).rejects.toThrow(
+        'not allowed'
+      );
+    }
+  });
+
+  it('accepts any subdomain of an allowed root domain, not just a pinned name', async () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+
+    for (const url of [
+      'wss://onekeytest.com/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
+      'wss://relay.onekeytest.com/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
+      'wss://ws.onekey.com/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678',
+    ]) {
+      await expect(
+        connector.configure({ ledgerGenuineCheckWebSocketUrl: url })
+      ).resolves.toBeUndefined();
+    }
+  });
+
+  it('rejects a relay URL carrying userinfo, query, fragment, or a non-default port', async () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+    const base = 'attestation.onekeytest.com/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678';
+
+    for (const url of [
+      `wss://user:pass@${base}`,
+      `wss://${base}?x=1`,
+      `wss://${base}#frag`,
+      `wss://attestation.onekeytest.com:8443/v1/ledger/session/AbCdEfGh12345678AbCdEfGh12345678`,
+    ]) {
+      await expect(connector.configure({ ledgerGenuineCheckWebSocketUrl: url })).rejects.toThrow(
+        'not allowed'
+      );
+    }
+  });
+
+  it('rejects a relay URL whose path is not the session-token route', async () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+
+    await expect(
+      connector.configure({
+        ledgerGenuineCheckWebSocketUrl: 'wss://attestation.onekeytest.com/session/opaque',
+      })
+    ).rejects.toThrow('not allowed');
+  });
+
+  it('passes the short-lived relay base to the DMK builder', async () => {
+    const relayUrl = VALID_RELAY_URL;
+    const dmk = {};
+    const builder = {
+      addTransport: jest.fn(),
+      addConfig: jest.fn(),
+      build: jest.fn(),
+    };
+    builder.addTransport.mockReturnValue(builder);
+    builder.addConfig.mockReturnValue(builder);
+    builder.build.mockReturnValue(dmk);
+    const DeviceManagementKitBuilder = jest.fn(() => builder);
+    const connector = new LedgerConnectorBase(async () => () => ({}));
+    (connector as any)._importLedgerKit = jest.fn().mockResolvedValue({
+      DeviceManagementKitBuilder,
+    });
+
+    await connector.configure({
+      ledgerGenuineCheckWebSocketUrl: relayUrl,
+    });
+    await (connector as any)._getOrCreateDmk();
+
+    expect(builder.addConfig).toHaveBeenCalledWith({
+      webSocketUrl: relayUrl,
+    });
+    expect(builder.build).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears a configured relay URL on lifecycle reset', async () => {
+    const builder = {
+      addTransport: jest.fn(),
+      addConfig: jest.fn(),
+      build: jest.fn().mockReturnValue({}),
+    };
+    builder.addTransport.mockReturnValue(builder);
+    builder.addConfig.mockReturnValue(builder);
+    const connector = new LedgerConnectorBase(async () => () => ({}));
+    (connector as any)._importLedgerKit = jest.fn().mockResolvedValue({
+      DeviceManagementKitBuilder: jest.fn(() => builder),
+    });
+
+    await connector.configure({
+      ledgerGenuineCheckWebSocketUrl: VALID_RELAY_URL,
+    });
+    connector.reset();
+    await (connector as any)._getOrCreateDmk();
+
+    expect(builder.addConfig).not.toHaveBeenCalled();
+  });
+});
+
 describe('LedgerConnectorBase BLE discovery', () => {
   it('allows transport ids as BLE connectId even when they are not four-character names', async () => {
     const connector = new SearchConnector(

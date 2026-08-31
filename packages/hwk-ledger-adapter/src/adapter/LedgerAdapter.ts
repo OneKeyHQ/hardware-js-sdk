@@ -51,6 +51,8 @@ import type {
   ConnectorCallResult,
   ConnectorDevice,
   ConnectorUiEvent,
+  DeviceAuthenticityParams,
+  DeviceAuthenticityResult,
   DeviceEventListener,
   DeviceInfo,
   DevicePermissionResponse,
@@ -156,6 +158,11 @@ export class LedgerAdapter implements IHardwareWallet {
   // layer. USB transports can't read multiple devices in parallel, and
   // BLE-only parallelism isn't worth the coordination cost.
   private readonly _jobQueue: DeviceJobQueue;
+
+  // Runtime relay configuration mutates connector-wide DMK state. Serialize
+  // the complete configure → genuine check → clear lifecycle so concurrent
+  // callers cannot reset or overwrite each other's one-shot relay.
+  private _deviceAuthenticityQueueTail: Promise<void> = Promise.resolve();
 
   // Shared across concurrent callers — only `cancel()` aborts.
   private _doConnectAbortController: AbortController | null = null;
@@ -824,6 +831,91 @@ export class LedgerAdapter implements IHardwareWallet {
       return success(result as LedgerDeviceInfo);
     } catch (err) {
       return this.errorToFailure(err);
+    }
+  }
+
+  /**
+   * Runs Ledger's official genuine check (DMK GenuineCheckDeviceAction) over the
+   * SAME secure-channel backend as app install
+   * (wss://scriptrunner.api.live.ledger.com/update/genuine). It returns Ledger's
+   * HSM verdict (`verified`) and a stable per-device id = sha3-256 of the device
+   * attestation public key, which DMK reads inside that session. The id survives
+   * wipe/recovery and cannot be forged from a seed.
+   *
+   * Requires network access to Ledger's backend and an on-device
+   * "Allow secure connection" confirmation the first time.
+   */
+  async verifyDeviceAuthenticity(
+    connectId: string,
+    params: DeviceAuthenticityParams = {}
+  ): Promise<Response<DeviceAuthenticityResult>> {
+    const waitForPrevious = this._deviceAuthenticityQueueTail;
+    let releaseQueue: () => void = () => undefined;
+    this._deviceAuthenticityQueueTail = new Promise<void>(resolve => {
+      releaseQueue = resolve;
+    });
+    await waitForPrevious;
+    try {
+      return await this._verifyDeviceAuthenticityExclusive(connectId, params);
+    } finally {
+      releaseQueue();
+    }
+  }
+
+  private async _verifyDeviceAuthenticityExclusive(
+    connectId: string,
+    params: DeviceAuthenticityParams
+  ): Promise<Response<DeviceAuthenticityResult>> {
+    const relayUrl = params.ledgerGenuineCheckWebSocketUrl;
+    try {
+      if (relayUrl) {
+        if (!this.connector.configure) {
+          return failure(
+            HardwareErrorCode.MethodNotSupported,
+            'This Ledger connector does not support genuine-check relay configuration'
+          );
+        }
+        await this.connector.configure({ ledgerGenuineCheckWebSocketUrl: relayUrl });
+        this.resetState();
+      }
+      const result = (await this.connectorCall(connectId, 'getDeviceGenuineCheck', {})) as {
+        isGenuine: boolean;
+        deviceId?: string;
+      };
+      if (!result.isGenuine) {
+        return success({
+          vendor: 'ledger' as const,
+          verified: false,
+        });
+      }
+      if (!result.deviceId) {
+        // The genuine verdict came back, but DMK did not surface a deviceId
+        // (server did not drive GET CERTIFICATE, or the certificate failed to
+        // parse). Without an id there is nothing to record for accounting.
+        return failure(
+          HardwareErrorCode.UnknownError,
+          `Genuine check completed (isGenuine=${result.isGenuine}) but no deviceId was captured`
+        );
+      }
+      return success({
+        vendor: 'ledger' as const,
+        verified: result.isGenuine,
+        deviceId: result.deviceId,
+      });
+    } catch (err) {
+      return this.errorToFailure(err);
+    } finally {
+      if (relayUrl) {
+        try {
+          await this.connector.configure?.({ ledgerGenuineCheckWebSocketUrl: undefined });
+          this.resetState();
+        } catch {
+          // Fail safe: reset() also clears the one-shot relay URL in connectors
+          // that implement runtime relay configuration.
+          this.connector.reset();
+          this.resetState();
+        }
+      }
     }
   }
 

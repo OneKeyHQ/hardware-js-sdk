@@ -141,7 +141,8 @@ const transformSchemaFields = (
         } else if (schemaField.fieldKind === 'scalar') {
             transformedData[schemaField.name] = transformField(schemaField, fieldValue);
         } else if (schemaField.fieldKind === 'enum') {
-            transformedData[schemaField.name] = fieldValue;
+            // [compatibility]: normalize absent optional enum fields to `null` (protobufjs sometimes returned the 0/first value)
+            transformedData[schemaField.name] = transformField(schemaField, fieldValue);
         } else {
             transformedData[schemaField.name] = fieldValue; // map
         }
@@ -164,7 +165,7 @@ export const ProtobufManager = () => {
             modules.forEach(m => load(m));
         } else {
             Object.keys(modules).forEach(key => {
-                const def = modules[key];
+                const def: AnyDesc = modules[key];
                 if (def.kind && def.kind !== 'file') {
                     if (def.kind === 'message') {
                         messages[key] = def;
@@ -286,11 +287,14 @@ export const ProtobufManager = () => {
         // https://github.com/trezor/trezor-firmware/pull/6549
         const patchedPayload =
             messageName === 'Failure' &&
-            binaryPayload.subarray(0, 2).compare(Buffer.from('0811', 'hex')) === 0
+            binaryPayload[0] === 0x08 &&
+            binaryPayload[1] === 0x11
                 ? binaryPayload.subarray(0, 2)
                 : binaryPayload;
 
-        const decoded = fromBinary(schema, patchedPayload, { readUnknownFields: false });
+        const decoded = fromBinary(schema, Uint8Array.from(patchedPayload), {
+            readUnknownFields: false,
+        });
         const json = toJson(schema, decoded, { useProtoFieldName: true });
         const message = transformSchemaFields('decode', schema, json as Record<string, unknown>);
 

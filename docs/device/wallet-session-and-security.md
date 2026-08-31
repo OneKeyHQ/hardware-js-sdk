@@ -52,17 +52,21 @@
 - Protocol V2 的 `DeviceSessionGet` 成功响应必须同时包含非空 `session_id` 和
   `btc_test_address`；缺少任一字段都按不完整协议响应处理，不得识别为标准钱包。
 - Protocol V2 空参数 `DeviceSessionGet()` 只读取固件当前钱包 Session，不保证当前钱包是标准钱包。
-  标准钱包首次打开时调用 `DeviceSessionAskPin(Main)`，成功后调用 `DeviceSessionGet()`；缓存有效时
-  先调用 `DeviceSessionGet(session_id, btc_test_address)` 恢复，恢复结果不匹配时再执行一次
-  `AskPin(Main) -> Get()` 重建。Core 使用返回的真实
+  标准钱包首次打开时调用 `DeviceSessionAskPin(Main)`，成功后调用空 Host passphrase 的
+  `DeviceSessionAskPassphrase` 再 `DeviceSessionGet()`；缓存有效时先调用
+  `DeviceSessionGet(session_id, btc_test_address)` 恢复。Core 使用返回的真实
   `btc_test_address` 建立标准钱包内部索引，不引入 SDK 自造的 `STANDARD_WALLET_KEY`。
-- Protocol V2 进入 `select-hidden` 时，如果实时状态明确设备已经由 Attach PIN 解锁，Core 会再次
-  校验原始 `DeviceStatus`，然后直接用空参数 `DeviceSessionGet()` 读取当前隐藏钱包，不重新发起
-  Passphrase 选择、`DeviceSessionAskPassphrase` 或 `DeviceSessionAskPin`。复核状态不一致时失败关闭，
-  不回退到钱包重选。
-- Core 把现有 `deriveCardano` 意图映射为 `DeviceSessionGet.seed_domains`：普通业务请求
-  `[Standard]`，Cardano 业务请求 `[Standard, Cardano]`。调用链没有提供派生意图时省略该字段，
-  保持固件“派生全部支持域”的兼容行为。
+- Protocol V2 进入 `select-hidden` 时，如果实时状态明确设备已经由 Attach PIN 解锁，Core 读取当前
+  Attach PIN 会话，不弹出 passphrase UI（与 Pro1 一致：同一 PIN 已绑定该隐藏钱包）。要新建
+  passphrase 隐藏钱包，用户需先锁屏、用主 PIN 解锁后再点一次「+ Hidden wallet」。Attach PIN 上补
+  Cardano 走空 Host `AskPassphrase({ seed_domains: [Standard, Cardano] })`。
+- V1 `Initialize.derive_cardano` 仍是按次 opt-in。V2 由 `DeviceSessionAskPassphrase.seed_domains`
+  决定这次生成哪些种子：开钱包和非 Cardano 调用发送 `[Standard]`；Cardano 调用发送
+  `[Standard, Cardano]`。`DeviceSessionGet` 不携带、也不生成 Cardano（passphrase 关闭时固件
+  Get 会自己要 Cardano）。`DeviceSession` 响应用同一套枚举回报已经生成的域。若 Get 显示还没有
+  Cardano，而当前调用需要 ADA：Attach PIN / 标准钱包发送空 Host passphrase 的 Ask；隐藏
+  passphrase 再 Ask 一次带上 Cardano，然后 Get。从 Attach PIN 切到另一个非空 passphrase 钱包前，
+  SDK 会 `lockDevice`，然后抛出 `DeviceCheckUnlockTypeError`。
 - `DeviceSessionAskPin` 的类型按业务意图选择：标准钱包和安全操作使用 `Main`；普通业务调用已携带目标
   `passphraseState` 时，预解锁使用 `Any`，允许主 PIN 或 Attach PIN 进入，随后仍以返回的
   `btc_test_address` 校验目标隐藏钱包；用户明确选择 Attach PIN 打开隐藏钱包时使用 `AttachToPin`。
@@ -324,18 +328,21 @@ await HardwareSDK.clearSessionCache({ deviceId, passphraseState });
 5. 旧 `initSession=true` 同时携带 `passphraseState` 时，只删除当前连接设备上该
    `deviceId + passphraseState` 对应的本地 Session，不清空该设备的其他隐藏钱包。
 6. Protocol V2 / Pro2 每次钱包预检都发送
-   `ProtocolInfoRequest { eventless_wallet_session: true }`。标准钱包首次打开时发送
-   `DeviceSessionAskPin(Main) -> DeviceSessionGet()`；缓存存在时发送
+   `ProtocolInfoRequest { eventless_wallet_session: true }`。标准钱包首次打开时：passphrase 开启则
+   `AskPin(Main) -> AskPassphrase('', seed_domains) -> Get()`；passphrase 关闭则
+   `AskPin(Main) -> Get()`。缓存存在时发送
    `DeviceSessionGet(session_id, btc_test_address)`。隐藏钱包恢复时携带 `btc_test_address`，按新钱包
    选择时通常先发送 Ask，成功后发送 `DeviceSessionGet()`；设备已经由 Attach PIN 解锁时则复核
-   实时状态并直接读取当前 `DeviceSession`，避免再次询问 Passphrase 或重复输入 Attach PIN。
+   实时状态并直接读取当前 `DeviceSession`，避免弹出 passphrase UI 或重复输入 Attach PIN。
 7. 固件按 `btc_test_address` 校验当前 SE Session，并对带 `session_id` 的 Get 尝试恢复指定 Session。
-   若首次 `passphraseState` 不匹配，标准钱包
-   执行一次 `AskPin(Main) -> Get()`；隐藏钱包执行一次统一钱包选择及 `Ask -> Get()`。第二次仍不
+   若首次 `passphraseState` 不匹配，标准钱包执行一次
+   `AskPin(Main) -> AskPassphrase('', seed_domains) -> Get()`（passphrase 关闭则只 AskPin 再 Get）；
+   隐藏钱包执行一次统一钱包选择及 `Ask -> Get()`。第二次仍不
    匹配才抛出 `DeviceCheckPassphraseStateError`。SDK 不为普通过期主动 `LockDevice`。
 8. Pro2 隐藏钱包选择通过统一弹窗提供 Host 输入、设备输入和 Attach PIN。Host Passphrase 编码为
-   `{ passphrase, on_device: false }`，仅用于当前阻塞请求，不缓存、记录或写入钱包引用；设备输入
-   编码为 `{ on_device: true }`，不携带明文。Attach PIN 独立使用 `DeviceSessionAskPin`。
+   `{ passphrase, on_device: false, seed_domains }`，仅用于当前阻塞请求，不缓存、记录或写入钱包引用；设备输入
+   编码为 `{ on_device: true, seed_domains }`，不携带明文。Attach PIN 独立使用 `DeviceSessionAskPin`；
+   需要 Cardano 时再发送空 Host passphrase 的 `AskPassphrase`，不弹出 UI。
 9. Pro2 固件返回 `DeviceSession`：`session_id` 和 `btc_test_address`，SDK 将 `btc_test_address` 映射为上层 `passphraseState`。
 10. Pro V1 仍走 `GetPassphraseState -> PassphraseState`，返回 `passphrase_state/session_id/unlocked_attach_pin`。
 11. 如果 features 显示未开启 passphrase 但现在拿到了 state，会按需刷新设备状态。

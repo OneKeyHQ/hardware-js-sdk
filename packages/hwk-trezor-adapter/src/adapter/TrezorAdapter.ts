@@ -11,9 +11,12 @@ import {
   runAllNetworkGetAddress,
   success,
 } from '@onekeyfe/hwk-adapter-core';
+import { randomBytes } from '@noble/hashes/utils';
 
+import { authenticateDeviceFromProof } from '../deviceAuthenticity';
 import { debugLog } from '../utils/debugLog';
 
+import type { AuthenticityProof } from '../deviceAuthenticity';
 import type {
   AllNetworkAddressParams,
   AllNetworkAddressResponse,
@@ -34,6 +37,8 @@ import type {
   ConnectorCallResult,
   ConnectorDevice,
   ConnectorUiEvent,
+  DeviceAuthenticityParams,
+  DeviceAuthenticityResult,
   DeviceEventListener,
   DeviceInfo,
   EvmAddress,
@@ -449,6 +454,19 @@ export class TrezorAdapter implements IHardwareWallet {
     );
   }
 
+  private static _isRecoverableProtocolResidueError(error: unknown): boolean {
+    const protocolError = error as {
+      name?: unknown;
+      code?: unknown;
+      message?: unknown;
+    };
+    return (
+      protocolError.name === 'TrezorProtocolError' &&
+      protocolError.code === 'Malformed protocol format' &&
+      protocolError.message === 'Malformed protocol format'
+    );
+  }
+
   /**
    * Race a promise against an abort signal. Copied from LedgerAdapter:
    * IConnector.call() can't actually be cancelled at the protocol level, but
@@ -480,8 +498,8 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   private async _connectSession(connectId: string, signal?: AbortSignal): Promise<string> {
-    const connectPromise = this._connector.connect(connectId);
-    const session = await (async () => {
+    const connectOnce = async () => {
+      const connectPromise = this._connector.connect(connectId);
       if (!signal) return connectPromise;
       try {
         return await TrezorAdapter._abortable(signal, connectPromise);
@@ -494,7 +512,22 @@ export class TrezorAdapter implements IHardwareWallet {
         );
         throw error;
       }
-    })();
+    };
+    let session;
+    try {
+      session = await connectOnce();
+    } catch (error) {
+      if (signal?.aborted || !TrezorAdapter._isRecoverableProtocolResidueError(error)) {
+        throw error;
+      }
+      // An interrupted THP handshake may leave exactly one v2 frame queued on
+      // the shared USB pipe. The connector intentionally drains it as a loud
+      // v1 malformed-frame failure; retry once now that the residue is gone.
+      debugLog('[TrezorAdapter] retrying connect after draining a stale THP frame', {
+        connectId,
+      });
+      session = await connectOnce();
+    }
     // disconnectDevice() ran mid-connect: tear down the now-unwanted session
     // instead of caching it (else it leaks a limited THP slot).
     if (this._disconnectRequested.delete(connectId)) {
@@ -688,6 +721,74 @@ export class TrezorAdapter implements IHardwareWallet {
 
   getFeatures(connectId: string): Promise<Response<Record<string, unknown>>> {
     return this._callDeviceManagerMethod<Record<string, unknown>>('getFeatures', connectId, {});
+  }
+
+  /**
+   * Device authenticity attestation. Sends a host-generated challenge, has the
+   * device sign it with its secure-element key, then verifies the returned
+   * certificate chain up to a trusted Trezor root CA. On success returns a
+   * `deviceId` that uniquely identifies the physical device, survives wipe, and
+   * cannot be forged from a seed. Only trust the result when `verified` is true
+   * (and `usedDebugKey` is false in production).
+   *
+   * Requires a secure-element model (Safe 3 = T2B1/T3B1, Safe 5 = T3T1, T3W1)
+   * and an on-device confirmation. Older models (T1B1, T2T1) will fail.
+   *
+   * `dangerouslyAllowDebugKeys` accepts simulator / development root keys — NEVER
+   * enable it in a production accounting flow, it lets an emulator mint any id.
+   */
+  async verifyDeviceAuthenticity(
+    connectId: string,
+    params: DeviceAuthenticityParams = {}
+  ): Promise<Response<DeviceAuthenticityResult>> {
+    if (params.challenge && params.dangerouslyAllowDebugKeys) {
+      return failure(
+        HardwareErrorCode.InvalidParams,
+        'Debug attestation roots cannot be used with a server challenge'
+      );
+    }
+    if (params.challenge && !/^[0-9a-fA-F]{64}$/.test(params.challenge)) {
+      return failure(
+        HardwareErrorCode.InvalidParams,
+        'Device authenticity challenge must be exactly 32 bytes encoded as hex'
+      );
+    }
+
+    const featuresRes = await this.getFeatures(connectId);
+    if (!featuresRes.success) return featuresRes;
+
+    const internalModel = (featuresRes.payload as { internal_model?: string }).internal_model;
+    if (!internalModel) {
+      return failure(HardwareErrorCode.UnknownError, 'Device internal_model unavailable');
+    }
+
+    const challengeHex =
+      params.challenge?.toLowerCase() ?? Buffer.from(randomBytes(32)).toString('hex');
+    const challenge = Buffer.from(challengeHex, 'hex');
+    const proofRes = await this._callDeviceManagerMethod<Record<string, unknown>>(
+      'authenticateDevice',
+      connectId,
+      { challenge: challengeHex }
+    );
+    if (!proofRes.success) return proofRes;
+
+    const proof = proofRes.payload as unknown as AuthenticityProof;
+    const verification = authenticateDeviceFromProof({
+      proof,
+      challenge,
+      deviceModel: internalModel,
+      allowDebugKeys: params.dangerouslyAllowDebugKeys,
+    });
+
+    return success({
+      ...verification,
+      vendor: 'trezor' as const,
+      trezorProof: {
+        challenge: challengeHex,
+        deviceModel: internalModel,
+        proof,
+      },
+    });
   }
 
   deviceSettings(

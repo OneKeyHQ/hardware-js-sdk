@@ -4,4 +4,4 @@
 [submodule "submodules/firmware-pro2"]
 	path = submodules/firmware-pro2
 	url = https://github.com/OneKeyHQ/firmware-pro2.git
-	branch = main
+	branch = dev

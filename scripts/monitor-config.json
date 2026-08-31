@@ -29,7 +29,8 @@
       "hwk-trezor-connector-electron-ble"
     ],
     "specialProjects": {
-      "hd-web-sdk": ["dist", "build"]
+      "hd-web-sdk": ["dist", "build"],
+      "hwk-trezor-connector-electron-ble": ["dist", "package.json"]
     },
     "ignoredPaths": [
       "node_modules",

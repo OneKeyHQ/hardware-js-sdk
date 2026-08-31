@@ -160,7 +160,6 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
       const session = isProtocolV2
         ? await getProtocolV2WalletSession(this.device, {
             onlyMainPin: true,
-            deriveCardano: this.payload.deriveCardano,
             selectMainWalletBeforeRestore:
               !hasAuthoritativeProtocolV2WalletStatus(state) ||
               state.status.unlockedAttachPin === true,
@@ -225,7 +224,6 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
       const session = isProtocolV2
         ? await getProtocolV2WalletSession(this.device, {
             expectedPassphraseState: this.params.passphraseState,
-            deriveCardano: this.payload.deriveCardano,
           })
         : await getPassphraseStateWithRefreshDeviceInfo(this.device, {
             expectPassphraseState: this.params.passphraseState,
@@ -257,7 +255,6 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
           ...(readCurrentAttachPinSession
             ? { readCurrentAttachPinSession: true }
             : { forceWalletSelection: true }),
-          deriveCardano: this.payload.deriveCardano,
         })
       : await getPassphraseStateWithRefreshDeviceInfo(this.device, { initSession: true });
     const refreshedState = isProtocolV2

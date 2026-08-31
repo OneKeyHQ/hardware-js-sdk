@@ -1,7 +1,6 @@
+import { AbstractApiTransport, type AbstractTransportParams } from '@onekeyfe/hwk-trezor-transport-common';
 import { type TimerId } from '@onekeyfe/hwk-trezor-type-utils';
 
-import { type AbstractTransportParams } from './abstract';
-import { AbstractApiTransport } from './abstractApi';
 import { UdpApi } from '../api/udp';
 
 export class UdpTransport extends AbstractApiTransport {

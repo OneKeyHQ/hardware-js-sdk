@@ -115,6 +115,8 @@ export type {
   HardwareUiEvent,
   HardwareEventMap,
   DeviceEventListener,
+  DeviceAuthenticityParams,
+  DeviceAuthenticityResult,
 } from './types/wallet';
 
 export { DEVICE_EVENT, DEVICE } from './events/device';
@@ -145,6 +147,7 @@ export type {
   ConnectorCallResult,
   ConnectorSerializedError,
   ConnectorErrorParams,
+  ConnectorConfig,
   IConnector,
   IHardwareBridge,
 } from './types/connector';

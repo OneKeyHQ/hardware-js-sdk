@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-ledger-adapter",
-  "version": "1.2.2-alpha.0",
+  "version": "1.2.2-alpha.6",
   "description": "Ledger hardware wallet adapter for OneKey",
   "author": "OneKey",
   "license": "MIT",
@@ -50,7 +50,7 @@
     "@ledgerhq/device-signer-kit-solana": "^1.7.0",
     "@ledgerhq/hw-app-trx": "^6.34.1",
     "@ledgerhq/hw-transport": "^6.34.1",
-    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.0",
+    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.6",
     "bitcoinjs-lib": "npm:@onekeyfe/bitcoinjs-lib@7.0.1"
   },
   "devDependencies": {

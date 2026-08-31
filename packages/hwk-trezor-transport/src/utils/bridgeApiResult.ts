@@ -1,9 +1,14 @@
 // input checks for high-level transports
 
-import type { Descriptor, Session } from '../types';
+import {
+    type Descriptor,
+    TRANSPORT_ERROR as ERRORS,
+    type Session,
+    error,
+    success,
+} from '@onekeyfe/hwk-trezor-transport-common';
+
 import { validateProtocolMessage } from './bridgeProtocolMessage';
-import { error, success } from './result';
-import * as ERRORS from '../errors';
 
 type UnknownPayload = string | Record<string, unknown>;
 
@@ -19,18 +24,9 @@ export function info(res: UnknownPayload) {
     if (typeof version !== 'string') {
         return error({ code: ERRORS.WRONG_RESULT_TYPE });
     }
-    const configured = !!res.configured;
     const protocolMessages = !!res.protocolMessages;
 
-    return success({ version, configured, protocolMessages });
-}
-
-export function version(res: UnknownPayload) {
-    if (!isString(res)) {
-        return error({ code: ERRORS.WRONG_RESULT_TYPE });
-    }
-
-    return success(res.trim());
+    return success({ version, protocolMessages });
 }
 
 export function devices(res: UnknownPayload) {

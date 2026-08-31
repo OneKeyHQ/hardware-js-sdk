@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-trezor-connector-electron-ble",
-  "version": "1.2.2-alpha.0",
+  "version": "1.2.2-alpha.6",
   "description": "IConnector implementation for Trezor hardware wallets via Electron BLE (noble in main process)",
   "author": "OneKey",
   "license": "MIT",
@@ -26,6 +26,16 @@
       "require": {
         "types": "./dist/main.d.ts",
         "default": "./dist/main.js"
+      }
+    },
+    "./constants": {
+      "import": {
+        "types": "./dist/constants.d.mts",
+        "default": "./dist/constants.mjs"
+      },
+      "require": {
+        "types": "./dist/constants.d.ts",
+        "default": "./dist/constants.js"
       }
     }
   },
@@ -58,9 +68,9 @@
     "connector"
   ],
   "dependencies": {
-    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.0",
-    "@onekeyfe/hwk-trezor-adapter": "1.2.2-alpha.0",
-    "@onekeyfe/hwk-trezor-connector": "1.2.2-alpha.0",
+    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.6",
+    "@onekeyfe/hwk-trezor-adapter": "1.2.2-alpha.6",
+    "@onekeyfe/hwk-trezor-connector": "1.2.2-alpha.6",
     "buffer": "^6.0.3"
   },
   "peerDependencies": {

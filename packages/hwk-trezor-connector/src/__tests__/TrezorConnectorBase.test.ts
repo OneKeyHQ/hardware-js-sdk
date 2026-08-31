@@ -303,6 +303,143 @@ describe('TrezorConnectorBase device settings', () => {
   });
 });
 
+describe('TrezorConnectorBase device authenticity streaming', () => {
+  it('keeps the legacy single-response proof as a firmware fallback', async () => {
+    const proof = {
+      optiga_certificates: ['aabb'],
+      optiga_signature: 'ccdd',
+      tropic_certificates: [],
+      mcu_certificates: [],
+    };
+    const connector = new SessionBackedTestTrezorConnector(
+      [{ connectId: 'safe-3', deviceId: 'safe-3', name: 'Trezor Safe 3', model: 'T2B1' }],
+      trezorFeatures({ internal_model: 'T2B1' }),
+      [{ type: 'AuthenticityProof', message: proof }]
+    );
+
+    const session = await connector.connect('safe-3');
+    await expect(
+      callConnector(connector, session.sessionId, 'authenticateDevice', {
+        challenge: 'ab'.repeat(32),
+      })
+    ).resolves.toEqual(proof);
+    expect(connector.fakeSessions[0].calls).toEqual([
+      {
+        name: 'AuthenticateDevice',
+        data: { challenge: 'ab'.repeat(32), stream: true },
+      },
+    ]);
+  });
+
+  it('assembles every Optiga, Tropic, and MCU proof part from streamed chunks', async () => {
+    const connector = new SessionBackedTestTrezorConnector(
+      [{ connectId: 'safe-7', deviceId: 'safe-7', name: 'Trezor Safe 7', model: 'T3W1' }],
+      trezorFeatures({ internal_model: 'T3W1' }),
+      [
+        {
+          type: 'AuthenticityProofSizes',
+          message: {
+            optiga_certificates: [2],
+            optiga_signature: 2,
+            tropic_certificates: [2],
+            tropic_signature: 2,
+            mcu_certificates: [2],
+            mcu_signature: 2,
+          },
+        },
+        { type: 'AuthenticityProofChunk', message: { chunk: 'aabb' } },
+        { type: 'AuthenticityProofChunk', message: { chunk: 'ccdd' } },
+        { type: 'AuthenticityProofChunk', message: { chunk: '1122' } },
+        { type: 'AuthenticityProofChunk', message: { chunk: '3344' } },
+        { type: 'AuthenticityProofChunk', message: { chunk: '5566' } },
+        { type: 'AuthenticityProofChunk', message: { chunk: '7788' } },
+        { type: 'Success', message: { message: 'Success' } },
+      ]
+    );
+
+    const session = await connector.connect('safe-7');
+    await expect(
+      callConnector(connector, session.sessionId, 'authenticateDevice', {
+        challenge: 'ab'.repeat(32),
+      })
+    ).resolves.toEqual({
+      optiga_certificates: ['aabb'],
+      optiga_signature: 'ccdd',
+      tropic_certificates: ['1122'],
+      tropic_signature: '3344',
+      mcu_certificates: ['5566'],
+      mcu_signature: '7788',
+    });
+    expect(connector.fakeSessions[0].calls).toEqual([
+      {
+        name: 'AuthenticateDevice',
+        data: { challenge: 'ab'.repeat(32), stream: true },
+      },
+      {
+        name: 'GetAuthenticityProofChunk',
+        data: { proof_type: 0, index: 0, offset: 0, size: 2 },
+      },
+      {
+        name: 'GetAuthenticityProofChunk',
+        data: { proof_type: 0, offset: 0, size: 2 },
+      },
+      {
+        name: 'GetAuthenticityProofChunk',
+        data: { proof_type: 1, index: 0, offset: 0, size: 2 },
+      },
+      {
+        name: 'GetAuthenticityProofChunk',
+        data: { proof_type: 1, offset: 0, size: 2 },
+      },
+      {
+        name: 'GetAuthenticityProofChunk',
+        data: { proof_type: 2, index: 0, offset: 0, size: 2 },
+      },
+      {
+        name: 'GetAuthenticityProofChunk',
+        data: { proof_type: 2, offset: 0, size: 2 },
+      },
+      {
+        name: 'GetAuthenticityProofChunk',
+        data: { offset: 0, size: 0 },
+      },
+    ]);
+  });
+
+  it('rejects an oversized certificate chain before requesting proof chunks', async () => {
+    const connector = new SessionBackedTestTrezorConnector(
+      [{ connectId: 'safe-7', deviceId: 'safe-7', name: 'Trezor Safe 7', model: 'T3W1' }],
+      trezorFeatures({ internal_model: 'T3W1' }),
+      [
+        {
+          type: 'AuthenticityProofSizes',
+          message: {
+            optiga_certificates: [1, 1, 1, 1, 1],
+          },
+        },
+        { type: 'Success', message: { message: 'Success' } },
+      ]
+    );
+
+    const session = await connector.connect('safe-7');
+    await expect(
+      callConnector(connector, session.sessionId, 'authenticateDevice', {
+        challenge: 'ab'.repeat(32),
+      })
+    ).rejects.toThrow('too many certificates');
+    expect(connector.fakeSessions[0].calls).toEqual([
+      {
+        name: 'AuthenticateDevice',
+        data: { challenge: 'ab'.repeat(32), stream: true },
+      },
+      {
+        name: 'GetAuthenticityProofChunk',
+        data: { offset: 0, size: 0 },
+      },
+    ]);
+  });
+});
+
 const tronCapableFeatures = () => trezorFeatures({ capabilities: ['Capability_Tron'] });
 
 const numericTronCapableFeatures = () => trezorFeatures({ capabilities: [24] });

@@ -55,6 +55,72 @@ describe('TrezorAdapter', () => {
     });
   });
 
+  it('uses the exact server challenge and returns the raw attestation proof', async () => {
+    const connector = createConnector();
+    const challenge = 'ab'.repeat(32);
+    const proof = {
+      optiga_certificates: ['00'],
+      optiga_signature: '11',
+    };
+    (connector.call as CallMock)
+      .mockResolvedValueOnce({ internal_model: 'T3W1' })
+      .mockResolvedValueOnce(proof);
+    const adapter = new TrezorAdapter(connector);
+
+    const result = await adapter.verifyDeviceAuthenticity('safe-7', { challenge });
+
+    expect(connector.call).toHaveBeenNthCalledWith(2, 'safe-7-session', 'authenticateDevice', {
+      challenge,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.payload).toMatchObject({
+        vendor: 'trezor',
+        trezorProof: {
+          challenge,
+          deviceModel: 'T3W1',
+          proof,
+        },
+      });
+    }
+  });
+
+  it('rejects a malformed server challenge before connecting to the device', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+
+    const result = await adapter.verifyDeviceAuthenticity('safe-7', { challenge: 'abcd' });
+
+    expect(result).toEqual({
+      success: false,
+      payload: {
+        code: HardwareErrorCode.InvalidParams,
+        error: 'Device authenticity challenge must be exactly 32 bytes encoded as hex',
+      },
+    });
+    expect(connector.connect).not.toHaveBeenCalled();
+    expect(connector.call).not.toHaveBeenCalled();
+  });
+
+  it('never allows debug roots in a server-challenge reward flow', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+
+    const result = await adapter.verifyDeviceAuthenticity('safe-7', {
+      challenge: 'ab'.repeat(32),
+      dangerouslyAllowDebugKeys: true,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      payload: {
+        code: HardwareErrorCode.InvalidParams,
+        error: 'Debug attestation roots cannot be used with a server challenge',
+      },
+    });
+    expect(connector.connect).not.toHaveBeenCalled();
+  });
+
   it('maps WebUSB transfer errors during connect to TransportError', async () => {
     const connector = createConnector();
     (connector.connect as ConnectMock).mockRejectedValueOnce(
@@ -69,6 +135,39 @@ describe('TrezorAdapter', () => {
       expect(result.payload.code).toBe(HardwareErrorCode.TransportError);
       expect(result.payload.error).toContain('transferIn');
     }
+  });
+
+  it('retries once when an interrupted THP handshake leaves one malformed frame', async () => {
+    const connector = createConnector();
+    (connector.connect as ConnectMock).mockRejectedValueOnce(
+      Object.assign(new Error('Malformed protocol format'), {
+        name: 'TrezorProtocolError',
+        code: 'Malformed protocol format',
+      })
+    );
+    const adapter = new TrezorAdapter(connector);
+
+    await expect(adapter.connectDevice('safe-7')).resolves.toEqual({
+      success: true,
+      payload: 'safe-7',
+    });
+    expect(connector.connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry unrelated Trezor protocol errors', async () => {
+    const connector = createConnector();
+    (connector.connect as ConnectMock).mockRejectedValueOnce(
+      Object.assign(new Error('Unexpected protocol version'), {
+        name: 'TrezorProtocolError',
+        code: 'Unexpected protocol version',
+      })
+    );
+    const adapter = new TrezorAdapter(connector);
+
+    const result = await adapter.connectDevice('safe-7');
+
+    expect(result.success).toBe(false);
+    expect(connector.connect).toHaveBeenCalledTimes(1);
   });
 
   it('emits request and failed response logs with the device error details', async () => {

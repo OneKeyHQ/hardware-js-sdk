@@ -1,0 +1,52 @@
+{
+  "name": "@onekeyfe/hwk-trezor-transport-common",
+  "version": "1.2.2-alpha.6",
+  "private": true,
+  "description": "Environment-agnostic Trezor transport abstractions vendored from Trezor Suite MIT sources: types, errors, abstract base classes, structural USB interface, sessions backend, THP, utils",
+  "author": "OneKey",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md",
+    "CHANGELOG.md",
+    "TREZOR_SOURCE.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git",
+    "directory": "packages/hwk-trezor-transport-common"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@onekeyfe/hwk-trezor-protobuf": "1.2.2-alpha.6",
+    "@onekeyfe/hwk-trezor-protocol": "1.2.2-alpha.6",
+    "@onekeyfe/hwk-trezor-type-utils": "1.2.2-alpha.6",
+    "@onekeyfe/hwk-trezor-utils": "1.2.2-alpha.6"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "5.1.6"
+  }
+}

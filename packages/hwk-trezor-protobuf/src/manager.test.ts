@@ -19,10 +19,53 @@ describe('protobufManager logging', () => {
 
       expect(logSpy).not.toHaveBeenCalledWith(
         expect.stringContaining('[TREZOR_VERIFY]'),
-        expect.anything(),
+        expect.anything()
       );
     } finally {
       logSpy.mockRestore();
     }
+  });
+
+  it('encodes and decodes the current streamed Trezor authenticity messages', () => {
+    const request = protobufManager.encode('AuthenticateDevice', {
+      challenge: 'ab'.repeat(32),
+      stream: true,
+    });
+    expect(protobufManager.decode('AuthenticateDevice', request.message).message).toEqual({
+      challenge: 'ab'.repeat(32),
+      stream: true,
+    });
+
+    const sizes = protobufManager.encode('AuthenticityProofSizes', {
+      optiga_certificates: [420],
+      optiga_signature: 72,
+      tropic_certificates: [410],
+      tropic_signature: 64,
+      mcu_certificates: [4067],
+      mcu_signature: 2420,
+    });
+    expect(protobufManager.decode('AuthenticityProofSizes', sizes.message).message).toEqual({
+      optiga_certificates: [420],
+      optiga_signature: 72,
+      tropic_certificates: [410],
+      tropic_signature: 64,
+      mcu_certificates: [4067],
+      mcu_signature: 2420,
+    });
+
+    const chunkRequest = protobufManager.encode('GetAuthenticityProofChunk', {
+      proof_type: 2,
+      index: 0,
+      offset: 500,
+      size: 500,
+    });
+    expect(
+      protobufManager.decode('GetAuthenticityProofChunk', chunkRequest.message).message
+    ).toEqual({
+      proof_type: 'MCU',
+      index: 0,
+      offset: 500,
+      size: 500,
+    });
   });
 });

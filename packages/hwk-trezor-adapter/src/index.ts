@@ -1,4 +1,11 @@
 export { TrezorAdapter } from './adapter/TrezorAdapter';
+// Pure verifier for backend/mock-backend attestation validation. It performs
+// no device I/O and never trusts the adapter's client-side `verified` verdict.
+export {
+  authenticateDeviceFromProof,
+  getRequiredDeviceAuthenticityLayers,
+} from './deviceAuthenticity';
+export type { AuthenticateDeviceResult, AuthenticityProof } from './deviceAuthenticity';
 // Opt-in definition-fetch helpers. NOT called by any signing method — callers
 // fetch (through their own `baseUrl` proxy if desired) and inject the bytes into
 // the sign params (`ethereumDefinitions` / `additionalInfo.encodedToken`).

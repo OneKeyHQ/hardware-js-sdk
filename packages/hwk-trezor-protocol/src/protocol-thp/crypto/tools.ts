@@ -36,7 +36,8 @@ export const bigEndianBytesToBigInt = (bytes: Uint8Array): bigint => {
     const result: bigint[] = [];
     const { length } = bytes;
     for (let i = 0; i < length; i++) {
-        result.push(BigInt(bytes[i] * 256 ** (length - (1 + i))));
+        const byte: number = bytes[i];
+        result.push(BigInt(byte * 256 ** (length - (1 + i))));
     }
 
     return result.reduce((prev, curr) => prev + curr, BigInt(0));
@@ -46,7 +47,8 @@ export const bigEndianBytesToBigInt = (bytes: Uint8Array): bigint => {
 export const littleEndianBytesToBigInt = (bytes: Uint8Array): bigint => {
     let result = 0n;
     for (let i = 0; i < bytes.length; i++) {
-        result += BigInt(bytes[i]) << (8n * BigInt(i));
+        const byte: number = bytes[i];
+        result += BigInt(byte) << (8n * BigInt(i));
     }
 
     return result;

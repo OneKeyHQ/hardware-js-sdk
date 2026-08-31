@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-trezor-transport",
-  "version": "1.2.2-alpha.0",
+  "version": "1.2.2-alpha.6",
   "private": true,
   "description": "Low-level Trezor transport helpers vendored from Trezor Suite MIT sources",
   "author": "OneKey",
@@ -49,16 +49,14 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@onekeyfe/hwk-trezor-protobuf": "1.2.2-alpha.0",
-    "@onekeyfe/hwk-trezor-protocol": "1.2.2-alpha.0",
-    "@onekeyfe/hwk-trezor-type-utils": "1.2.2-alpha.0",
-    "@onekeyfe/hwk-trezor-utils": "1.2.2-alpha.0",
+    "@onekeyfe/hwk-trezor-protocol": "1.2.2-alpha.6",
+    "@onekeyfe/hwk-trezor-transport-common": "1.2.2-alpha.6",
+    "@onekeyfe/hwk-trezor-type-utils": "1.2.2-alpha.6",
+    "@onekeyfe/hwk-trezor-utils": "1.2.2-alpha.6",
     "cross-fetch": "^4.1.0",
     "usb": "^2.17.0"
   },
   "devDependencies": {
-    "@types/sharedworker": "^0.0.223",
-    "@types/w3c-web-usb": "^1.0.14",
     "rimraf": "^5.0.0",
     "tsup": "^8.0.0",
     "typescript": "5.1.6"

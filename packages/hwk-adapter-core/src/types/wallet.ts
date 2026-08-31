@@ -54,6 +54,56 @@ export type TrezorChangePinParams = {
   remove?: boolean;
 };
 
+export type DeviceAuthenticityParams = {
+  /**
+   * 32-byte server nonce encoded as hex. Trezor signs the protocol-framed
+   * AuthenticateDevice payload containing these bytes with its factory
+   * attestation key. Omit only for local diagnostics where the SDK may generate
+   * a random nonce itself.
+   */
+  challenge?: string;
+  /**
+   * OneKey relay base returned by a short-lived backend challenge session.
+   * Ledger DMK connects to this URL instead of Ledger directly so the backend
+   * can witness the genuine-check transcript and issue a server-side receipt.
+   */
+  ledgerGenuineCheckWebSocketUrl?: string;
+  /**
+   * Trezor development/simulator roots. Production reward flows must never
+   * enable this.
+   */
+  dangerouslyAllowDebugKeys?: boolean;
+};
+
+export type DeviceAuthenticityResult = {
+  vendor: 'trezor' | 'ledger';
+  verified: boolean;
+  deviceId?: string;
+  deviceCertPubKey?: string;
+  serialNumber?: string;
+  rootPubKey?: string;
+  caPubKey?: string;
+  usedDebugKey?: boolean;
+  error?: string;
+  /**
+   * Trezor-only server-verifiable envelope. The backend must verify this proof
+   * against the nonce stored for the challenge session; it must not trust the
+   * client's `verified` boolean.
+   */
+  trezorProof?: {
+    challenge: string;
+    deviceModel: string;
+    proof: {
+      optiga_certificates: string[];
+      optiga_signature: string;
+      tropic_certificates?: string[];
+      tropic_signature?: string;
+      mcu_certificates?: string[];
+      mcu_signature?: string;
+    };
+  };
+};
+
 /**
  * Cross-chain / cross-vendor options passed alongside any chain method's
  * own params (the optional last argument). Holds operation-level switches
@@ -334,6 +384,12 @@ export interface IDeviceManagerMethods {
     params?: TrezorChangePinParams
   ): Promise<Response<Record<string, unknown>>>;
   wipeDevice?(connectId: string): Promise<Response<Record<string, unknown>>>;
+  // Sends AuthenticateDevice and returns the raw AuthenticityProof message.
+  // The challenge must be generated host-side and passed in.
+  authenticateDevice?(
+    connectId: string,
+    params: { challenge: string }
+  ): Promise<Response<Record<string, unknown>>>;
 }
 
 export interface IWalletStateMethods {
@@ -418,6 +474,11 @@ export interface IHardwareWallet<TConfig = unknown>
     deviceId: string,
     chain: ChainForFingerprint
   ): Promise<Response<string>>;
+
+  verifyDeviceAuthenticity?(
+    connectId: string,
+    params?: DeviceAuthenticityParams
+  ): Promise<Response<DeviceAuthenticityResult>>;
 
   // Events (notifications only: connect, disconnect, button, interaction)
   on<K extends keyof HardwareEventMap>(

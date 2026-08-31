@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-ledger-connector-ble",
-  "version": "1.2.2-alpha.0",
+  "version": "1.2.2-alpha.6",
   "description": "IConnector implementation for Ledger hardware wallets via React Native BLE",
   "author": "OneKey",
   "license": "MIT",
@@ -51,8 +51,8 @@
     "@ledgerhq/device-signer-kit-ethereum": "^1.9.0",
     "@ledgerhq/device-signer-kit-solana": "^1.7.0",
     "@ledgerhq/device-transport-kit-react-native-ble": "^1.0.0",
-    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.0",
-    "@onekeyfe/hwk-ledger-adapter": "1.2.2-alpha.0"
+    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.6",
+    "@onekeyfe/hwk-ledger-adapter": "1.2.2-alpha.6"
   },
   "peerDependencies": {
     "react-native": "*"

@@ -1,17 +1,19 @@
 import UDP from 'dgram';
 
-import { arrayPartition, isNotUndefined, resolveAfter } from '@onekeyfe/hwk-trezor-utils';
-
 import {
     AbstractApi,
+    type AbstractApiArgs,
     type AbstractApiAwaitedResult,
     type AbstractApiConstructorParams,
-} from './abstract';
-import { DEVICE_TYPE } from '../constants';
-import * as ERRORS from '../errors';
-import { type DescriptorApiLevel, PathInternal } from '../types';
-import { readMessageBuffer } from '../utils/readMessageBuffer';
-import { error, success } from '../utils/result';
+    DEVICE_TYPE,
+    type DescriptorApiLevel,
+    TRANSPORT_ERROR as ERRORS,
+    PathInternal,
+    error,
+    readMessageBuffer,
+    success,
+} from '@onekeyfe/hwk-trezor-transport-common';
+import { arrayPartition, isNotUndefined, resolveAfter } from '@onekeyfe/hwk-trezor-utils';
 
 const PING = Buffer.from('PINGPING');
 const PONG = Buffer.from('PONGPONG');
@@ -62,8 +64,11 @@ export class UdpApi extends AbstractApi {
         }
     }
 
-    public write(path: string, buffer: Buffer, signal?: AbortSignal) {
-        const [hostname, port] = path.split(':');
+    public write(...[path, buffer, options]: AbstractApiArgs<'write'>) {
+        const parts = path.split(':');
+        const hostname: string = parts[0];
+        const port: string = parts[1];
+        const signal = options?.signal;
 
         return new Promise<AbstractApiAwaitedResult<'write'>>(resolve => {
             const listener = () => {
@@ -108,12 +113,12 @@ export class UdpApi extends AbstractApi {
         });
     }
 
-    public read(path: string, signal?: AbortSignal) {
-        return this.readBuffer.read(path, signal);
+    public read(...[path, options]: AbstractApiArgs<'read'>) {
+        return this.readBuffer.read(path, options?.signal);
     }
 
-    private async ping(path: string, signal?: AbortSignal) {
-        await this.write(path, PING, signal);
+    private async ping(path: PathInternal, signal?: AbortSignal) {
+        await this.write(path, PING, { signal });
         if (signal?.aborted) {
             throw new Error(ERRORS.ABORTED_BY_SIGNAL);
         }
@@ -191,7 +196,7 @@ export class UdpApi extends AbstractApi {
         // find all disconnected devices and cancel reading (if any)
         const [disconnected] = arrayPartition(
             this.devices,
-            device => !devices.find(d => d.path === device.path),
+            device => !devices.some(d => d.path === device.path),
         );
         disconnected.forEach(d => this.readBuffer.cancelRead(d.path));
 
@@ -203,12 +208,12 @@ export class UdpApi extends AbstractApi {
         }
     }
 
-    public openDevice(_path: string) {
+    public openDevice(...[_path]: AbstractApiArgs<'openDevice'>) {
         // todo: maybe ping?
         return Promise.resolve(success(undefined));
     }
 
-    public closeDevice(path: string) {
+    public closeDevice(...[path]: AbstractApiArgs<'closeDevice'>) {
         this.readBuffer.cancelRead(path);
 
         return Promise.resolve(success(undefined));

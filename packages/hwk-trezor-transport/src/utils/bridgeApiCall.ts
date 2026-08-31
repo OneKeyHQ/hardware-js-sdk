@@ -1,9 +1,8 @@
 import fetch from 'cross-fetch';
 
 import { PROTOCOL_MALFORMED } from '@onekeyfe/hwk-trezor-protocol';
+import { TRANSPORT_ERROR as ERRORS, error, success, unknownError } from '@onekeyfe/hwk-trezor-transport-common';
 
-import { error, success, unknownError } from './result';
-import * as ERRORS from '../errors';
 import { applyBridgeApiCallHeaders } from './applyBridgeApiCallHeaders';
 
 export type HttpRequestOptions = {

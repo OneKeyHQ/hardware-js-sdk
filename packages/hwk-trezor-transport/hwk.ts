@@ -1,3 +1,9 @@
-export { buildMessage, createChunks, sendChunks } from './src/utils/send';
-export { receive, receiveAndParse } from './src/utils/receive';
-export { callThpMessage, parseThpMessage } from './src/thp';
+export {
+  buildMessage,
+  createChunks,
+  sendChunks,
+  receive,
+  receiveAndParse,
+  callThpMessage,
+  parseThpMessage,
+} from '@onekeyfe/hwk-trezor-transport-common';

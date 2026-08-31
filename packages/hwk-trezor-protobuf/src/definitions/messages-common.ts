@@ -79,7 +79,7 @@ export const PinMatrixRequestType = Type.KeyOfEnum(Enum_PinMatrixRequestType, {
 });
 
 export type ButtonAck = Static<typeof ButtonAck>;
-export const ButtonAck = Type.Object({}, { $id: 'ButtonAck' });
+export const ButtonAck = Type.Record(Type.Never(), Type.Never(), { $id: 'ButtonAck' });
 
 export type ButtonRequest = Static<typeof ButtonRequest>;
 export const ButtonRequest = Type.Object(
@@ -101,20 +101,6 @@ export const CoinPurchaseMemo = Type.Object(
         mac: Type.String(),
     },
     { $id: 'CoinPurchaseMemo' },
-);
-
-export type Deprecated_PassphraseStateAck = Static<typeof Deprecated_PassphraseStateAck>;
-export const Deprecated_PassphraseStateAck = Type.Object(
-    {},
-    { $id: 'Deprecated_PassphraseStateAck' },
-);
-
-export type Deprecated_PassphraseStateRequest = Static<typeof Deprecated_PassphraseStateRequest>;
-export const Deprecated_PassphraseStateRequest = Type.Object(
-    {
-        state: Type.Optional(Type.String()),
-    },
-    { $id: 'Deprecated_PassphraseStateRequest' },
 );
 
 export type Failure = Static<typeof Failure>;
@@ -143,19 +129,15 @@ export type PassphraseAck = Static<typeof PassphraseAck>;
 export const PassphraseAck = Type.Object(
     {
         passphrase: Type.Optional(Type.String()),
-        _state: Type.Optional(Type.String()),
         on_device: Type.Optional(Type.Boolean()),
     },
     { $id: 'PassphraseAck' },
 );
 
 export type PassphraseRequest = Static<typeof PassphraseRequest>;
-export const PassphraseRequest = Type.Object(
-    {
-        _on_device: Type.Optional(Type.Boolean()),
-    },
-    { $id: 'PassphraseRequest' },
-);
+export const PassphraseRequest = Type.Record(Type.Never(), Type.Never(), {
+    $id: 'PassphraseRequest',
+});
 
 export type TextMemo = Static<typeof TextMemo>;
 export const TextMemo = Type.Object(

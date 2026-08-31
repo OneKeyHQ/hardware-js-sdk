@@ -9,6 +9,8 @@ const vendoredPackages = [
   'hwk-trezor-protocol',
   'hwk-trezor-schema-utils',
   'hwk-trezor-transport',
+  'hwk-trezor-transport-common',
+  'hwk-trezor-transport-web',
   'hwk-trezor-type-utils',
   'hwk-trezor-utils',
 ];
@@ -61,7 +63,10 @@ describe('vendored Trezor package boundary', () => {
     );
 
     expect(existsSync(resolve(packagesRoot, 'hwk-trezor-transport/hwk-receive.ts'))).toBe(false);
-    expect(transportHwk).toContain('./src/utils/receive');
+    // `receive` moved to hwk-trezor-transport-common as part of mirroring upstream's
+    // v26.7.4 transport -> transport/transport-common/transport-web split; hwk.ts now
+    // forwards from there instead of a local relative path.
+    expect(transportHwk).toContain('@onekeyfe/hwk-trezor-transport-common');
     expect(transportHwk).not.toContain('enum ThpLoopState');
     expect(transportHwk).not.toContain('const thpLoop');
     expect(coreTsup).not.toContain('../utils/receive');

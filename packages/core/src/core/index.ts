@@ -93,7 +93,7 @@ const preWarmDoneAt = new Map<string, number>();
 
 export type CoreContext = ReturnType<Core['getCoreContext']>;
 
-function hasDeriveCardano(method: BaseMethod): boolean {
+function resolveDeriveCardano(method: BaseMethod): boolean | undefined {
   if (
     method.name.startsWith('allNetworkGetAddress') &&
     method.payload &&
@@ -103,15 +103,22 @@ function hasDeriveCardano(method: BaseMethod): boolean {
   ) {
     return true;
   }
-
-  return method.name.startsWith('cardano') || method.payload?.deriveCardano;
+  if (method.name.startsWith('cardano')) {
+    return true;
+  }
+  // V1 Initialize only sends derive_cardano on an explicit true.
+  // V2 AskPassphrase maps true to [Standard, Cardano] and anything else to [Standard].
+  if (method.payload?.deriveCardano === true) {
+    return true;
+  }
+  return undefined;
 }
 
 const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   initSession: method?.payload.initSession,
   passphraseState: method?.payload.useEmptyPassphrase ? undefined : method?.payload.passphraseState,
   deviceId: method?.payload.deviceId,
-  deriveCardano: method && hasDeriveCardano(method),
+  deriveCardano: method ? resolveDeriveCardano(method) : undefined,
   connectProtocol: method?.payload.connectProtocol,
   forceProtocolDetection: method?.payload.forceProtocolDetection,
   protocolV2DeviceInfoTimeoutMs: method?.payload.protocolV2DeviceInfoTimeoutMs,
@@ -652,7 +659,7 @@ const onCallDevice = async (
                 method.payload?.passphraseState,
                 method.payload?.useEmptyPassphrase,
                 method.payload?.skipPassphraseCheck,
-                hasDeriveCardano(method),
+                resolveDeriveCardano(method),
                 method.protocolV2UnlockContext?.preflightMainPinSelected
               );
 
