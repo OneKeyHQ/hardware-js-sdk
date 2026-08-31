@@ -371,7 +371,7 @@ export async function getProtocolV2WalletSession(
     }
   };
 
-  const selectStandardWallet = async () => {
+  const selectStandardWallet = async (forceMainPin = false) => {
     if (device.features?.passphraseProtection === true) {
       // Main PIN authenticates the device; an empty host passphrase selects the standard derivation.
       await selectMainPin();
@@ -387,8 +387,10 @@ export async function getProtocolV2WalletSession(
       standardWalletSelected = true;
     } else if (!standardWalletSelected) {
       // Without passphrase protection there is no empty-passphrase selector.
-      // Main PIN selection is the only authoritative switch back to the standard wallet.
-      await selectMainPin(true);
+      // An unlocked non-Attach-PIN device is already in the only available wallet context.
+      // Force Main PIN only when recovering from a mismatched cached standard session.
+      await selectMainPin(forceMainPin);
+      standardWalletSelected = true;
     }
   };
 
@@ -499,7 +501,7 @@ export async function getProtocolV2WalletSession(
     }
     if (options?.onlyMainPin) {
       device.clearStandardInternalState?.();
-      await selectStandardWallet();
+      await selectStandardWallet(true);
       response = await getDeviceSession(device, sessionGetRequest());
     } else {
       device.clearInternalState();
