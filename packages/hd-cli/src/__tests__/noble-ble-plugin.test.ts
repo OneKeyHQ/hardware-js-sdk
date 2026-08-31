@@ -388,7 +388,7 @@ describe('Noble BLE plugin notification routing', () => {
 
   test('uses the connected peripheral write capacity without padding', async () => {
     const device = createPeripheral('device-a');
-    device.peripheral.mtu = 244;
+    device.peripheral.mtu = process.platform === 'linux' ? 247 : 244;
     const noble = new EventEmitter() as EventEmitter & {
       state: string;
       startScanning: jest.Mock;
