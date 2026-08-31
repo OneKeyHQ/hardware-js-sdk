@@ -154,7 +154,7 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', standardSessionGet);
   });
 
-  test('selects the Main PIN before opening the standard wallet when passphrase is disabled', async () => {
+  test('opens the already-unlocked standard wallet without repeating Main PIN when passphrase is disabled', async () => {
     const typedCall = jest.fn((request: string) => {
       if (request === 'ProtocolInfoRequest') {
         return { message: { version: 2 } };
@@ -173,17 +173,54 @@ describe('openWalletSession', () => {
 
     await getProtocolV2WalletSession(device as any, { onlyMainPin: true });
 
-    expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Main, {
-      source: 'wallet-session-coordinator',
-      reason: 'open-wallet',
-      deviceOnly: true,
-    });
+    expect(device.unlockDevice).not.toHaveBeenCalled();
     expect(typedCall).not.toHaveBeenCalledWith(
       'DeviceSessionAskPassphrase',
       'Success',
       expect.anything()
     );
     expect(typedCall).toHaveBeenCalledWith('DeviceSessionGet', 'DeviceSession', standardSessionGet);
+  });
+
+  test('still requires Main PIN when a cached standard session resolves to another wallet', async () => {
+    let sessionGetCount = 0;
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'ProtocolInfoRequest') {
+        return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionGet') {
+        sessionGetCount += 1;
+        return {
+          message: {
+            btc_test_address:
+              sessionGetCount === 1 ? 'unexpected-wallet-state' : 'cached-standard-state',
+            session_id:
+              sessionGetCount === 1 ? 'unexpected-wallet-session' : 'cached-standard-session',
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const device = createDevice({ passphraseProtection: false, typedCall });
+    device.getStandardInternalState = jest.fn(() => ({
+      passphraseState: 'cached-standard-state',
+      sessionId: 'cached-standard-session',
+    }));
+    device.clearStandardInternalState = jest.fn();
+
+    await expect(
+      getProtocolV2WalletSession(device as any, { onlyMainPin: true })
+    ).resolves.toMatchObject({
+      passphraseState: 'cached-standard-state',
+      newSession: 'cached-standard-session',
+    });
+
+    expect(device.unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Main, {
+      source: 'wallet-session-coordinator',
+      reason: 'session-recovery',
+      deviceOnly: true,
+    });
+    expect(sessionGetCount).toBe(2);
   });
 
   test('reuses a Main PIN selected by the current preflight when passphrase is disabled', async () => {
