@@ -5269,15 +5269,6 @@
   resolved "https://registry.npmjs.org/@onekeyfe/cross-inpage-provider-types/-/cross-inpage-provider-types-2.2.67.tgz#e36a59855a1d781f296d7563a93cac868ae46098"
   integrity sha512-sjTF8kpcxWrZtFfHtdQhJ6KneyLTmg+Z4rnn0acEK5Vwoy07EjmF9xjBTyMoInrNwPc7OIwkaiXX+JYr0ovNgw==
 
-"@onekeyfe/hd-ble-sdk@1.2.2-alpha.0":
-  version "1.2.2-alpha.0"
-  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-ble-sdk/-/hd-ble-sdk-1.2.2-alpha.0.tgz#89ae8593ee77de53d8b2ab409ed0d4023280b647"
-  integrity sha512-IcUYLx++KxrMCMZH3qHZHqU2l7iG5xTjyWLgyCztAOJCMl7SzK0PMYImreZ4FpYaqy/0LVBP7s0dfmSV6G5aKg==
-  dependencies:
-    "@onekeyfe/hd-core" "1.2.2-alpha.0"
-    "@onekeyfe/hd-shared" "1.2.2-alpha.0"
-    "@onekeyfe/hd-transport-react-native" "1.2.2-alpha.0"
-
 "@onekeyfe/hd-common-connect-sdk@1.2.2-alpha.0":
   version "1.2.2-alpha.0"
   resolved "https://registry.yarnpkg.com/@onekeyfe/hd-common-connect-sdk/-/hd-common-connect-sdk-1.2.2-alpha.0.tgz#1d8dfe4d008fe02f3093068dc223588ad89cb35d"
@@ -5350,17 +5341,6 @@
   dependencies:
     "@onekeyfe/hd-shared" "1.2.2-alpha.0"
     "@onekeyfe/hd-transport" "1.2.2-alpha.0"
-
-"@onekeyfe/hd-transport-react-native@1.2.2-alpha.0":
-  version "1.2.2-alpha.0"
-  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-transport-react-native/-/hd-transport-react-native-1.2.2-alpha.0.tgz#e80cc21338b11f5fc98b558a9533f5979a393e34"
-  integrity sha512-gqPVLzGept9XE7cA2LhenXLhIsTXVNSEonIU6KSlhgItax6LV904xZ5DXR7OaVU4nfYKyfGGn/fnFQwcq75vcQ==
-  dependencies:
-    "@onekeyfe/hd-core" "1.2.2-alpha.0"
-    "@onekeyfe/hd-shared" "1.2.2-alpha.0"
-    "@onekeyfe/hd-transport" "1.2.2-alpha.0"
-    "@onekeyfe/react-native-ble-utils" "^0.1.6"
-    react-native-ble-plx "3.5.1"
 
 "@onekeyfe/hd-transport-usb@1.2.2-alpha.0":
   version "1.2.2-alpha.0"
