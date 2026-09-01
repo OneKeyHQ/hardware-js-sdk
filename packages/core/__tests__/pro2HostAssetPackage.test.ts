@@ -1,9 +1,86 @@
+/* eslint-disable no-bitwise -- LZ4 decoding and deterministic test data generation require bitwise operations. */
 import { sha3_512 } from '@noble/hashes/sha3';
 
 import {
   buildPro2HostAssetPackage,
   supportsPro2HostAssetPackage,
 } from '../src/utils/pro2HostAssetPackage';
+
+const decodeRawLz4Block = (compressed: Uint8Array, expectedLength: number) => {
+  const output = new Uint8Array(expectedLength);
+  let inputOffset = 0;
+  let outputOffset = 0;
+
+  const readLength = (initialLength: number) => {
+    let length = initialLength;
+    if (length === 15) {
+      let extension = 255;
+      while (extension === 255) {
+        extension = compressed[inputOffset];
+        inputOffset += 1;
+        length += extension;
+      }
+    }
+    return length;
+  };
+
+  while (inputOffset < compressed.byteLength) {
+    const token = compressed[inputOffset];
+    inputOffset += 1;
+    const literalLength = readLength(token >>> 4);
+    output.set(compressed.subarray(inputOffset, inputOffset + literalLength), outputOffset);
+    inputOffset += literalLength;
+    outputOffset += literalLength;
+    if (inputOffset >= compressed.byteLength) break;
+
+    const matchOffset = compressed[inputOffset] | (compressed[inputOffset + 1] << 8);
+    inputOffset += 2;
+    const matchLength = readLength(token & 0x0f) + 4;
+    for (let index = 0; index < matchLength; index += 1) {
+      output[outputOffset] = output[outputOffset - matchOffset];
+      outputOffset += 1;
+    }
+  }
+
+  expect(outputOffset).toBe(expectedLength);
+  return output;
+};
+
+const decodeFirstPackageEntry = (packageData: Uint8Array, rawLength: number) => {
+  const containerHeaderSize = 0x5f90;
+  const archive = packageData.subarray(containerHeaderSize);
+  const archiveView = new DataView(archive.buffer, archive.byteOffset, archive.byteLength);
+  const compressedOffset = archiveView.getUint32(42 + 0x100, true);
+  const compressed = archive.subarray(compressedOffset);
+  const compressedView = new DataView(
+    compressed.buffer,
+    compressed.byteOffset,
+    compressed.byteLength
+  );
+  const blockCount = compressedView.getUint16(0, true);
+  const blockSize = 1 << compressedView.getUint16(2, true);
+  let blockOffset = 8 + blockCount * 4;
+  const decodedBlocks: Uint8Array[] = [];
+
+  for (let index = 0; index < blockCount; index += 1) {
+    const compressedLength = compressedView.getUint32(8 + index * 4, true);
+    const expectedLength = Math.min(blockSize, rawLength - index * blockSize);
+    decodedBlocks.push(
+      decodeRawLz4Block(
+        compressed.subarray(blockOffset, blockOffset + compressedLength),
+        expectedLength
+      )
+    );
+    blockOffset += compressedLength;
+  }
+
+  const decoded = new Uint8Array(rawLength);
+  decodedBlocks.reduce((offset, block) => {
+    decoded.set(block, offset);
+    return offset + block.byteLength;
+  }, 0);
+  return decoded;
+};
 
 describe('Pro2 host asset package', () => {
   test('builds the unsigned RESOURCE container and LZ4-blocked archive expected by firmware', () => {
@@ -40,10 +117,40 @@ describe('Pro2 host asset package', () => {
 
     const compressedOffset = archiveView.getUint32(42 + 0x100, true);
     expect(archiveView.getUint16(compressedOffset, true)).toBe(1);
-    expect(archiveView.getUint16(compressedOffset + 2, true)).toBe(12);
+    expect(archiveView.getUint16(compressedOffset + 2, true)).toBe(14);
     expect(archiveView.getUint32(compressedOffset + 4, true)).toBe(0);
     expect(archiveView.getUint32(compressedOffset + 8, true)).toBe(10);
     expect(payload.subarray(compressedOffset + 12)).toEqual(new Uint8Array([0x90, ...raw]));
+  });
+
+  test('round-trips multi-block data byte-for-byte with best-match compression', () => {
+    const raw = Uint8Array.from({ length: 16_384 * 3 + 137 }, (_, index) => {
+      const column = index % 604;
+      const row = Math.floor(index / 604);
+      return (column * 31 + row * 17) & 0xff;
+    });
+
+    const packageData = buildPro2HostAssetPackage([{ name: 'wallpaper.bin', data: raw }]);
+
+    expect(decodeFirstPackageEntry(packageData, raw.byteLength)).toEqual(raw);
+  });
+
+  test('falls back to 8 KiB blocks when a compressed 16 KiB block exceeds firmware capacity', () => {
+    let state = 0x12345678;
+    const raw = Uint8Array.from({ length: 16_384 }, () => {
+      state ^= state << 13;
+      state ^= state >>> 17;
+      state ^= state << 5;
+      return state & 0xff;
+    });
+
+    const packageData = buildPro2HostAssetPackage([{ name: 'wallpaper.bin', data: raw }]);
+    const archive = packageData.subarray(0x5f90);
+    const archiveView = new DataView(archive.buffer, archive.byteOffset, archive.byteLength);
+    const compressedOffset = archiveView.getUint32(42 + 0x100, true);
+
+    expect(archiveView.getUint16(compressedOffset + 2, true)).toBe(13);
+    expect(decodeFirstPackageEntry(packageData, raw.byteLength)).toEqual(raw);
   });
 
   test.each([

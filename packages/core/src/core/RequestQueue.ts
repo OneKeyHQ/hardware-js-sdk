@@ -56,17 +56,32 @@ export default class RequestQueue {
     return false;
   }
 
+  private isRequestForConnectId(request: RequestTask, connectId: string) {
+    const { method } = request;
+    return (
+      method.connectId === connectId ||
+      method.device?.mainId === connectId ||
+      method.device?.getConnectId() === connectId
+    );
+  }
+
   // 取消与指定connectId相关的所有请求
   public abortRequestsByConnectId(connectId: string) {
     let count = 0;
     this.requestQueue.forEach((request, _) => {
-      if (request.abortController && request.method.connectId === connectId) {
+      if (request.abortController && this.isRequestForConnectId(request, connectId)) {
         request.abortController.abort();
         request.abortController = undefined;
         count++;
       }
     });
     return count;
+  }
+
+  public getRequestTasksIdByConnectId(connectId: string) {
+    return Array.from(this.requestQueue.values())
+      .filter(request => this.isRequestForConnectId(request, connectId))
+      .map(request => request.id);
   }
 
   // 取消所有请求

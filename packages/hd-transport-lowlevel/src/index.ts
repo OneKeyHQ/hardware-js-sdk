@@ -26,7 +26,8 @@ const { check, ProtocolV1, parseConfigure } = transport;
 
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
-const LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH = 64;
+const LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH_FALLBACK = 192;
+const LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH_MAX = 244;
 const FIRMWARE_UPLOAD_LOG_PERCENT_STEP = 5;
 const FIRMWARE_UPLOAD_LOG_INTERVAL_MS = 10_000;
 
@@ -50,6 +51,13 @@ export function shouldLogFirmwareUploadProgress({
 
 export function getProtocolV1SendOptions(name: string) {
   return name === 'FirmwareUpload' ? { withoutResponse: false } : undefined;
+}
+
+export function resolveLowlevelProtocolV2PacketCapacity(capacity?: number | null) {
+  if (typeof capacity !== 'number' || !Number.isFinite(capacity) || capacity <= 0) {
+    return LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH_FALLBACK;
+  }
+  return Math.min(Math.floor(capacity), LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH_MAX);
 }
 
 function isProtocolV1TransportChunk(data: Uint8Array) {
@@ -83,6 +91,8 @@ export default class LowlevelTransport {
 
   private connectedDevices: Set<string> = new Set();
 
+  private protocolV2PacketCapacities: Map<string, number> = new Map();
+
   private protocolV2Links = new ProtocolV2LinkManager<string>({
     getSchemas: () => {
       if (!this._messages || !this._messagesV2) {
@@ -109,6 +119,7 @@ export default class LowlevelTransport {
           );
         } finally {
           this.connectedDevices.delete(uuid);
+          this.protocolV2PacketCapacities.delete(uuid);
         }
       }
     },
@@ -163,6 +174,7 @@ export default class LowlevelTransport {
     const alreadyConnected = this.connectedDevices.has(input.uuid);
     try {
       await this.plugin.connect(input.uuid);
+      await this.refreshProtocolV2PacketCapacity(input.uuid);
       if (!alreadyConnected) {
         this.connectedDevices.add(input.uuid);
         this.advanceProtocolV2Generation(input.uuid);
@@ -204,6 +216,7 @@ export default class LowlevelTransport {
         this.connectedDevices.delete(input.uuid);
         this.deviceProtocol.delete(input.uuid);
         this.protocolV2Assemblers.delete(input.uuid);
+        this.protocolV2PacketCapacities.delete(input.uuid);
         this.advanceProtocolV2Generation(input.uuid);
       }
       throw error;
@@ -218,6 +231,7 @@ export default class LowlevelTransport {
       this.deviceProtocol.delete(uuid);
       // Confirmed protocol stays on the device endpoint; BLE names are not a probe hint.
       this.protocolV2Assemblers.delete(uuid);
+      this.protocolV2PacketCapacities.delete(uuid);
       return true;
     } catch (error) {
       this.Log.debug('lowlelvel transport disconnect error: ', error);
@@ -428,6 +442,7 @@ export default class LowlevelTransport {
 
     try {
       await this.plugin.connect(uuid);
+      await this.refreshProtocolV2PacketCapacity(uuid);
       this.connectedDevices.add(uuid);
       this.advanceProtocolV2Generation(uuid);
     } catch (error) {
@@ -545,12 +560,30 @@ export default class LowlevelTransport {
   ) {
     await writeProtocolV2BleFrame({
       frame,
-      packetCapacity: LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH,
+      packetCapacity: resolveLowlevelProtocolV2PacketCapacity(
+        this.protocolV2PacketCapacities.get(uuid)
+      ),
       assertActive: assertCurrentGeneration,
       signal: context.signal,
       abortMessage: `Protocol V2 BLE write aborted for ${context.messageName}`,
       writePacket: packet => this.plugin.send(uuid, bytesToHex(packet)),
     });
+  }
+
+  private async refreshProtocolV2PacketCapacity(uuid: string) {
+    let reportedCapacity: number | undefined;
+    try {
+      reportedCapacity = await this.plugin.getProtocolV2PacketCapacity?.(uuid);
+    } catch (error) {
+      this.Log?.debug(
+        `[LowlevelTransport] read Protocol V2 packet capacity failed: ${uuid}`,
+        error
+      );
+    }
+    this.protocolV2PacketCapacities.set(
+      uuid,
+      resolveLowlevelProtocolV2PacketCapacity(reportedCapacity)
+    );
   }
 
   private async callProtocolV2(

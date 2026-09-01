@@ -436,7 +436,8 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       protocolType: 'V2',
     });
     expect(device.requestMTU).toHaveBeenCalledWith(247);
-    expect(writeCharacteristic.writeWithResponse.mock.calls.length).toBeGreaterThan(1);
+    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalled();
 
     await expect(
       transport.call(uuid, 'Ping', { message: 'first-core-command' })
@@ -795,7 +796,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     });
     expect(device.requestMTU).toHaveBeenCalledTimes(3);
     expect((transport as any).getCachedTransport(uuid).mtuSize).toBeUndefined();
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalled();
     await transport.release(uuid, true);
   });
 
@@ -804,6 +805,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     device.mtu = undefined;
 
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
+    const writesBeforeFileWrite = writeCharacteristic.writeWithoutResponse.mock.calls.length;
     device.requestMTU.mockImplementationOnce(() => {
       device.mtu = 247;
       return Promise.resolve(device);
@@ -811,7 +813,9 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
 
     await expect(transport.call(uuid, 'FileWrite', {})).resolves.toBeDefined();
     expect(device.requestMTU).toHaveBeenCalledTimes(4);
-    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(
+      writesBeforeFileWrite + 1
+    );
     await transport.release(uuid, true);
   });
 
@@ -820,12 +824,13 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     device.mtu = undefined;
 
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
+    const writesBeforeFileWrite = writeCharacteristic.writeWithoutResponse.mock.calls.length;
 
     await expect(transport.call(uuid, 'FileWrite', {})).rejects.toMatchObject({
       errorCode: HardwareErrorCode.BleConnectedError,
     });
     expect(device.requestMTU).toHaveBeenCalledTimes(4);
-    expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(writesBeforeFileWrite);
     await transport.release(uuid, true);
   });
 
@@ -945,19 +950,19 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
-  test('uses withResponse for consecutive iOS Protocol V2 control calls without releasing', async () => {
+  test('uses withoutResponse for consecutive iOS Protocol V2 control calls without releasing', async () => {
     const { transport, uuid, writeCharacteristic } = createHarness();
 
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
     const releaseNative = jest.spyOn(transport as any, 'releaseNative');
-    expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
 
     await transport.call(uuid, 'DeviceInfoGet', {});
     await transport.call(uuid, 'ProtocolInfoRequest', {});
 
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(3);
-    expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(3);
+    expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
     expect(releaseNative).not.toHaveBeenCalled();
 
     await transport.release(uuid, true);
@@ -970,8 +975,8 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
 
     await transport.call(uuid, 'FileWrite', {});
     await transport.call(uuid, 'FileWrite', {});
-    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(2);
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(3);
+    expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
     expect(
       logger.debug.mock.calls.filter(
         ([message]) =>
@@ -1004,8 +1009,8 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
 
     await transport.call(uuid, 'FileWrite', {}, { writeWithResponse: true });
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(2);
-    expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
     await transport.release(uuid, true);
   });
 

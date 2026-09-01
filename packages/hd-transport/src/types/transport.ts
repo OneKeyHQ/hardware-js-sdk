@@ -145,6 +145,8 @@ export type LowlevelTransportSharedPlugin = {
   receive: (uuid?: string) => Promise<string>;
   connect: (uuid: string) => Promise<void>;
   disconnect: (uuid: string) => Promise<void>;
+  /** Maximum Protocol V2 bytes accepted by one BLE characteristic write. */
+  getProtocolV2PacketCapacity?: (uuid: string) => number | undefined | Promise<number | undefined>;
 
   init: () => Promise<void>;
   version: string;
