@@ -2786,7 +2786,7 @@ describe('Protocol V2 feature adapter', () => {
     await expect(
       device.checkPassphraseStateSafety('stale-hidden-state', true, false)
     ).resolves.toBe(true);
-    expect(typedCall).toHaveBeenCalledTimes(5);
+    expect(typedCall).toHaveBeenCalledTimes(6);
     expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
       eventless_wallet_session: true,
     });
@@ -2798,7 +2798,7 @@ describe('Protocol V2 feature adapter', () => {
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
     expect(typedCall.mock.calls.filter(([request]) => request === 'DeviceStatusGet')).toHaveLength(
-      2
+      3
     );
     expect(typedCall).not.toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', expect.anything());
   });

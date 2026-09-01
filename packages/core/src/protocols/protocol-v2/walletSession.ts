@@ -273,6 +273,10 @@ export async function getProtocolV2WalletSession(
   const markWalletStatusRefreshed = () => {
     walletStatusRefreshed = true;
   };
+  if (options?.onlyMainPin && options.mainPinSelected !== true) {
+    await refreshProtocolV2DeviceStatus(device);
+    markWalletStatusRefreshed();
+  }
   let mainPinAuthenticated =
     options?.mainPinSelected === true ||
     (options?.onlyMainPin === true &&

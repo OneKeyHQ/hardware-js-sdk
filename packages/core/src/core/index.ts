@@ -1333,7 +1333,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       // cancel callback tasks
       requestQueue.cancelCallbackTasks(connectId);
 
-      const requestIds = requestQueue.getRequestTasksId();
+      const requestIds = requestQueue.getRequestTasksIdByConnectId(connectId);
       Log.debug(
         `Cancel Api connect requestQueues: length:${requestIds.length} requestIds:${requestIds.join(
           ','
@@ -1341,10 +1341,9 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       );
       // Abort before rejecting: rejectRequest releases the task and would make
       // its AbortController unreachable to an in-flight method loop.
-      // This branch rejects every queued request below. Abort the same set first so
-      // methods whose physical connectId is selected internally (for example
-      // Desktop WebUSB firmwareUpdateV4) cannot keep retrying after rejection.
-      requestQueue.abortAllRequests();
+      // Match both the requested connectId and a device selected internally by the
+      // method, such as Desktop WebUSB firmwareUpdateV4.
+      requestQueue.abortRequestsByConnectId(connectId);
       const canceledDevices: Device[] = [];
       const interruptDevice = (device: Device | undefined, deviceConnectId: string) => {
         if (!device || canceledDevices.includes(device)) {
@@ -1360,7 +1359,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
           // During ensureConnected the method has a connectId but device is
           // assigned only after the poll succeeds. Interrupt the cached BLE
           // Device so an in-flight acquire/initialize cannot finish.
-          interruptDevice(task.method?.device, task.method.connectId ?? connectId);
+          interruptDevice(task.method?.device, connectId);
           interruptDevice(deviceCacheMap.get(connectId), connectId);
           requestQueue.rejectRequest(
             requestId,
@@ -1421,8 +1420,10 @@ export const cancel = (context: CoreContext, connectId?: string) => {
     }
   }
 
-  cleanup();
-  closePopup();
+  cleanup(connectId);
+  if (!connectId || _uiPromises.length === 0) {
+    closePopup();
+  }
 };
 
 const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => {
@@ -1460,9 +1461,16 @@ const shouldCheckPassphraseState = (method: BaseMethod, device: Device) => {
   return device.hasUsePassphrase();
 };
 
-const cleanup = () => {
-  const pendingUiPromises = _uiPromises;
-  _uiPromises = [];
+const cleanup = (connectId?: string) => {
+  const pendingUiPromises = connectId
+    ? _uiPromises.filter(
+        uiPromise =>
+          uiPromise.data?.mainId === connectId || uiPromise.data?.getConnectId() === connectId
+      )
+    : _uiPromises;
+  _uiPromises = connectId
+    ? _uiPromises.filter(uiPromise => !pendingUiPromises.includes(uiPromise))
+    : [];
   rejectUiPromises(
     pendingUiPromises,
     ERRORS.TypedError(HardwareErrorCode.ActionCancelled, 'UI request was cancelled')

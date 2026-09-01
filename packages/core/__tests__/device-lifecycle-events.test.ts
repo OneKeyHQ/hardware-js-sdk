@@ -2,6 +2,7 @@ import { EDeviceType, ERRORS, HardwareErrorCode, createDeferred } from '@onekeyf
 import { DeviceType, TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
 
 import {
+  cancel,
   initConnector,
   initCore,
   isMissingDetectedProtocolV2Error,
@@ -118,6 +119,42 @@ describe('public device lifecycle events', () => {
     context.removePrePendingCallPromise('device-a', firstCleanup.promise);
 
     expect(context.getPrePendingCallPromise('device-a')).toBe(replacementCleanup.promise);
+  });
+
+  test('cancels only requests associated with the requested connect id', () => {
+    core = initCore();
+    const context = (core as any).getCoreContext();
+    const deviceA = {
+      mainId: 'transport-session-a',
+      getConnectId: jest.fn(() => 'serial-a'),
+      interruptionFromUser: jest.fn().mockResolvedValue(undefined),
+    };
+    const deviceB = {
+      mainId: 'device-b',
+      getConnectId: jest.fn(() => 'serial-b'),
+      interruptionFromUser: jest.fn().mockResolvedValue(undefined),
+    };
+    const taskA = context.requestQueue.createTask({
+      responseID: 101,
+      connectId: '',
+      device: deviceA,
+    } as never);
+    const taskB = context.requestQueue.createTask({
+      responseID: 102,
+      connectId: 'device-b',
+      device: deviceB,
+    } as never);
+    const signalA = taskA.abortController?.signal;
+    const signalB = taskB.abortController?.signal;
+
+    cancel(context, 'serial-a');
+
+    expect(signalA?.aborted).toBe(true);
+    expect(context.requestQueue.getTask(taskA.id)).toBeUndefined();
+    expect(signalB?.aborted).toBe(false);
+    expect(context.requestQueue.getTask(taskB.id)).toBe(taskB);
+    expect(deviceA.interruptionFromUser).toHaveBeenCalledTimes(1);
+    expect(deviceB.interruptionFromUser).not.toHaveBeenCalled();
   });
 
   test('keeps shared device lifecycle listeners across a device cache reset', () => {
