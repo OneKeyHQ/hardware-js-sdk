@@ -5269,6 +5269,126 @@
   resolved "https://registry.npmjs.org/@onekeyfe/cross-inpage-provider-types/-/cross-inpage-provider-types-2.2.67.tgz#e36a59855a1d781f296d7563a93cac868ae46098"
   integrity sha512-sjTF8kpcxWrZtFfHtdQhJ6KneyLTmg+Z4rnn0acEK5Vwoy07EjmF9xjBTyMoInrNwPc7OIwkaiXX+JYr0ovNgw==
 
+"@onekeyfe/hd-ble-sdk@1.2.2-alpha.6":
+  version "1.2.2-alpha.6"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-ble-sdk/-/hd-ble-sdk-1.2.2-alpha.6.tgz#859c791d10ed22811f7749ed61d7ef1021283c5b"
+  integrity sha512-q/jJTbA3f6AkoUnXsewQvcgeSiL/4Dhf7anZqZKabJRwgxuKDslWrnxNT4Tp1bkKnZYc52fflTyIlx6rgrdZtw==
+  dependencies:
+    "@onekeyfe/hd-core" "1.2.2-alpha.6"
+    "@onekeyfe/hd-shared" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport-react-native" "1.2.2-alpha.6"
+
+"@onekeyfe/hd-common-connect-sdk@1.2.2-alpha.6":
+  version "1.2.2-alpha.6"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-common-connect-sdk/-/hd-common-connect-sdk-1.2.2-alpha.6.tgz#f3c478752e7547f55800e894129b793c8bfb4715"
+  integrity sha512-uHYoz0+oMpC9R+QFIBkm6PSQVtn/+UbqKOrntI55BqeptJp5l6bhewQV29/y6xGUs1l8Ev74svxUKzOwKZUDlA==
+  dependencies:
+    "@onekeyfe/hd-core" "1.2.2-alpha.6"
+    "@onekeyfe/hd-shared" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport-emulator" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport-http" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport-lowlevel" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport-usb" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport-web-device" "1.2.2-alpha.6"
+
+"@onekeyfe/hd-core@1.2.2-alpha.6":
+  version "1.2.2-alpha.6"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-core/-/hd-core-1.2.2-alpha.6.tgz#802a2b97ce3a92f4e95827c73ddb9785e9a85ff5"
+  integrity sha512-qkN2vh6BKCyDsjree0+OXrWd54x+pZqMmyCz+Ww8MkTxIWkAaiRUYkUXQ+8CR2Sv3OuULmeE9Q/D+74u7sc1Jg==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.6"
+    axios "1.15.2"
+    bignumber.js "^9.0.2"
+    buffer "^6.0.3"
+    bytebuffer "^5.0.1"
+    jpeg-js "^0.4.4"
+    jszip "^3.10.1"
+    parse-uri "^1.0.7"
+    semver "^7.3.7"
+
+"@onekeyfe/hd-shared@1.2.2-alpha.6":
+  version "1.2.2-alpha.6"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-shared/-/hd-shared-1.2.2-alpha.6.tgz#6c67a2568c10cb2e0b2c222af4ec04e8b910f732"
+  integrity sha512-DV/tBBI4G61XrXtnolBy9fBuHjalWNnZsudR7qaDX0JJyBez42VubmX2P4X3SqV6B1nf8IHe+4Yk2FC0oNCsEg==
+
+"@onekeyfe/hd-transport-electron@1.2.2-alpha.6":
+  version "1.2.2-alpha.6"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-electron/-/hd-transport-electron-1.2.2-alpha.6.tgz#235855fdd9754858ee09da86b5698ad4f1e0fda5"
+  integrity sha512-4Loqm4TvosyWE92lXc8DxlMHRDeVxJvD97eq+W2d8jaG1Yxf0aAmvgZCaW9kXLbVHZMOGTECO6E0Fox9g+jrRw==
+  dependencies:
+    "@onekeyfe/hd-core" "1.2.2-alpha.6"
+    "@onekeyfe/hd-shared" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.6"
+    "@stoprocent/noble" "2.3.16"
+    p-retry "^4.6.2"
+
+"@onekeyfe/hd-transport-emulator@1.2.2-alpha.6":
+  version "1.2.2-alpha.6"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-emulator/-/hd-transport-emulator-1.2.2-alpha.6.tgz#c73eede8740c966dde43c40b51ddf286dcffdf28"
+  integrity sha512-ArdRbjs2F+6rUOiVpqTA3RUSrJDOhmnwS23W8CABq3eCsXzYLSWQwdoSNsrSOl9iGjQV4z/ZlNDbFO2GAnCmBQ==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.6"
+    axios "1.15.2"
+    secure-json-parse "^4.0.0"
+
+"@onekeyfe/hd-transport-http@1.2.2-alpha.6":
+  version "1.2.2-alpha.6"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-http/-/hd-transport-http-1.2.2-alpha.6.tgz#616a6feddb98509e3f64236bfceec39f620b62b1"
+  integrity sha512-UjgLcXIvoJUZmxO/msh6J3CnPSdTPGHpU/iZJVXFGNad0MTS4wkN2htuM3JArJPmhRFE6rKkNhIVXN6TNVFvqw==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.6"
+    axios "1.15.2"
+    secure-json-parse "^4.0.0"
+
+"@onekeyfe/hd-transport-lowlevel@1.2.2-alpha.6":
+  version "1.2.2-alpha.6"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-lowlevel/-/hd-transport-lowlevel-1.2.2-alpha.6.tgz#18f406ed06415a2b7f1ffc112272b4bdd48c2bf4"
+  integrity sha512-gHniA9YYJAQ7tyCOIpOcTZYcRXsaXk2tGLgEwq4P4jA7XrnjFEnDu/PVImnJexYZO/sUdFqdno3HwYaDkrWoSA==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.6"
+
+"@onekeyfe/hd-transport-react-native@1.2.2-alpha.6":
+  version "1.2.2-alpha.6"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-react-native/-/hd-transport-react-native-1.2.2-alpha.6.tgz#7efac04ab880e3f2a98b3e8e21a6f1fea28be9b5"
+  integrity sha512-Shb656FEuyi8+ZVfkV2BdiCMRCAjAPHtJXrrdtU4ehqXClJS/BT1DKPQkpG/JHnFtYIgitxya2WFC3HT3afu+A==
+  dependencies:
+    "@onekeyfe/hd-core" "1.2.2-alpha.6"
+    "@onekeyfe/hd-shared" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.6"
+    "@onekeyfe/react-native-ble-utils" "^0.1.6"
+    react-native-ble-plx "3.5.1"
+
+"@onekeyfe/hd-transport-usb@1.2.2-alpha.6":
+  version "1.2.2-alpha.6"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-usb/-/hd-transport-usb-1.2.2-alpha.6.tgz#5d0af3b82524498f6304b8292ff1676757808daa"
+  integrity sha512-VUIOeLA7vjCxjLxmFjR6ywudgIk/mYerXxYQSgcpd/aE98vR3SceUCGUzQ8pocg6q/VAblcNWI22naTXPdhxdg==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.6"
+    bytebuffer "^5.0.1"
+    usb "^2.14.0"
+
+"@onekeyfe/hd-transport-web-device@1.2.2-alpha.6":
+  version "1.2.2-alpha.6"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport-web-device/-/hd-transport-web-device-1.2.2-alpha.6.tgz#b9a965c49ee05c8c2d4409a3077668526f2000ae"
+  integrity sha512-lMZnoIYiasJjUZCI1GcTIVEl6exon3dPm0yIkySqJstL0wdta8yePbihfqPku8rWdeR21cJ/082ZWd0+hYln+w==
+  dependencies:
+    "@onekeyfe/hd-shared" "1.2.2-alpha.6"
+    "@onekeyfe/hd-transport" "1.2.2-alpha.6"
+
+"@onekeyfe/hd-transport@1.2.2-alpha.6":
+  version "1.2.2-alpha.6"
+  resolved "https://registry.npmjs.org/@onekeyfe/hd-transport/-/hd-transport-1.2.2-alpha.6.tgz#7430394bbd4f8e2f63ac70bb2f35d99c1bb2ce81"
+  integrity sha512-3sJm1SltTkWWGUF1gpV7zJtC2wHIAWetO6WQ/58sU6W5xwF7dZJa5Q6m+uu68LInbcerMIphYsq6KChL1bRY5w==
+  dependencies:
+    bytebuffer "^5.0.1"
+    long "^4.0.0"
+    protobufjs "^6.11.2"
+
 "@onekeyfe/hwk-adapter-core@1.1.34-alpha.1":
   version "1.1.34-alpha.1"
   resolved "https://registry.npmjs.org/@onekeyfe/hwk-adapter-core/-/hwk-adapter-core-1.1.34-alpha.1.tgz#09f04102d0ea44c2ded40474544a46cacc793d23"
