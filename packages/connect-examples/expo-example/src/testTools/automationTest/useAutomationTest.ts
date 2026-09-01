@@ -4,7 +4,7 @@
 
 import { useCallback, useContext, useEffect, useRef } from 'react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { OpenWalletSessionMode, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
 import { getAllAutomationScenarios, getAutomationScenario } from './scenarioCatalog';
 import { convertTestData, getDeviceExpected } from '../securityCheckTest/blindSignature/utils';
@@ -1393,7 +1393,7 @@ export function useAutomationTest() {
 
   /**
    * Ensure device passphrase_protection matches the need, then obtain passphraseState.
-   * - When passphrase is non-empty: enable passphrase_protection if off, call getPassphraseState
+   * - When passphrase is non-empty: enable passphrase_protection if off, open a hidden wallet
    * - When passphrase is empty/undefined: disable passphrase_protection if on, return undefined
    *
    * Pattern from SLIP39AddressValidation.tsx lines 616-639.
@@ -1424,17 +1424,27 @@ export function useAutomationTest() {
       // Step 2: Get passphraseState — only when passphrase != null
       if (passphrase != null) {
         addLog(`[${label}] Getting passphraseState for 「${passphrase}」`);
-        const passphraseStateRes = await sdk.getPassphraseState(connectId, {
-          initSession: true,
-          useEmptyPassphrase: false,
+        const emptyPassphrase = passphrase.length === 0;
+        const walletSessionRes = await sdk.openWalletSession(connectId, {
+          mode: emptyPassphrase
+            ? OpenWalletSessionMode.Standard
+            : OpenWalletSessionMode.SelectHidden,
         });
 
-        if (!passphraseStateRes.success) {
-          throw new Error(`getPassphraseState failed for passphrase 「${passphrase}」`);
+        const expectedWalletType = emptyPassphrase ? 'standard' : 'hidden';
+        if (
+          !walletSessionRes.success ||
+          walletSessionRes.payload.walletType !== expectedWalletType
+        ) {
+          throw new Error(`openWalletSession failed for passphrase 「${passphrase}」`);
         }
 
-        addLog(`[${label}] Got passphraseState: "${passphraseStateRes.payload}"`);
-        return passphraseStateRes.payload;
+        if (walletSessionRes.payload.walletType === 'standard') {
+          return undefined;
+        }
+
+        addLog(`[${label}] Got passphraseState: "${walletSessionRes.payload.passphraseState}"`);
+        return walletSessionRes.payload.passphraseState;
       }
 
       return undefined;
@@ -2486,23 +2496,22 @@ export function useAutomationTest() {
             currentPassphraseRef.current = passphrase;
             addLog(`Testing special passphrase: 「${passphrase}」`);
 
-            const psResult = await runWithRetry(`getPassphraseState:special`, () =>
-              sdk.getPassphraseState(connectId, {
-                initSession: true,
-                useEmptyPassphrase: false,
+            const psResult = await runWithRetry(`openWalletSession:special`, () =>
+              sdk.openWalletSession(connectId, {
+                mode: OpenWalletSessionMode.SelectHidden,
               })
             );
 
-            if (!psResult.success) {
+            if (!psResult.success || psResult.payload.walletType !== 'hidden') {
               results.push({
-                title: `getPassphraseState for 「${passphrase}」`,
+                title: `openWalletSession for 「${passphrase}」`,
                 passed: false,
-                error: 'getPassphraseState failed',
+                error: 'openWalletSession failed',
                 duration: Date.now() - startedAt,
               });
               notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
             } else {
-              const passphraseState = psResult.payload || '';
+              const { passphraseState } = psResult.payload;
 
               for (const method of methods) {
                 if (!runningRef.current) {

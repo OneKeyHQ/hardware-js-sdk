@@ -1,5 +1,5 @@
 import { useContext, useMemo, useRef, useState } from 'react';
-import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { OpenWalletSessionMode, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Input, Label, Stack, Text, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { get } from 'lodash';
@@ -243,16 +243,24 @@ function ExecuteView() {
             item.passphrase
           }」`
         );
-        const passphraseStateRes = await sdk.getPassphraseState(context.connectId, {
-          initSession: true,
-          useEmptyPassphrase: item.emptyPassphraseState,
+        const walletSessionRes = await sdk.openWalletSession(context.connectId, {
+          mode: item.emptyPassphraseState
+            ? OpenWalletSessionMode.Standard
+            : OpenWalletSessionMode.SelectHidden,
         });
 
-        if (!passphraseStateRes.success) {
+        const expectedWalletType = item.emptyPassphraseState ? 'standard' : 'hidden';
+        if (
+          !walletSessionRes.success ||
+          walletSessionRes.payload.walletType !== expectedWalletType
+        ) {
           return Promise.resolve(undefined);
         }
 
-        const passphraseState = passphraseStateRes.payload;
+        const passphraseState =
+          walletSessionRes.payload.walletType === 'hidden'
+            ? walletSessionRes.payload.passphraseState
+            : undefined;
 
         cacheAddress.set(item.id, {
           passphraseState,

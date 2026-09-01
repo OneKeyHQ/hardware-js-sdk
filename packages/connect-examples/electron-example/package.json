@@ -21,7 +21,7 @@
     "ts:check": "yarn tsc --noEmit"
   },
   "dependencies": {
-    "@onekeyfe/hd-transport-electron": "1.2.2-alpha.0",
+    "@onekeyfe/hd-transport-electron": "1.2.2-alpha.6",
     "@stoprocent/noble": "2.3.16",
     "debug": "4.3.4",
     "electron-is-dev": "^3.0.1",
