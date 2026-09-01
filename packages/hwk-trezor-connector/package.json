@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-trezor-connector",
-  "version": "1.2.2-alpha.8",
+  "version": "1.2.2-alpha.9",
   "description": "Shared Trezor connector base for Hardware Wallet Kit",
   "author": "OneKey",
   "license": "MIT",
@@ -38,13 +38,13 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.8",
-    "@onekeyfe/hwk-trezor-core": "1.2.2-alpha.8"
+    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.9",
+    "@onekeyfe/hwk-trezor-core": "1.2.2-alpha.9"
   },
   "devDependencies": {
-    "@onekeyfe/hwk-trezor-protobuf": "1.2.2-alpha.8",
-    "@onekeyfe/hwk-trezor-protocol": "1.2.2-alpha.8",
-    "@onekeyfe/hwk-trezor-transport": "1.2.2-alpha.8",
+    "@onekeyfe/hwk-trezor-protobuf": "1.2.2-alpha.9",
+    "@onekeyfe/hwk-trezor-protocol": "1.2.2-alpha.9",
+    "@onekeyfe/hwk-trezor-transport": "1.2.2-alpha.9",
     "rimraf": "^5.0.0",
     "tsup": "^8.0.0",
     "typescript": "5.1.6"
