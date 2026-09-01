@@ -157,6 +157,22 @@ describe('public device lifecycle events', () => {
     expect(deviceB.interruptionFromUser).not.toHaveBeenCalled();
   });
 
+  test('aborts every request before cancel-all rejects WebUSB tasks', () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('webusb' as never);
+    core = initCore();
+    const context = (core as any).getCoreContext();
+    const task = context.requestQueue.createTask({
+      responseID: 103,
+      connectId: 'webusb-device',
+    } as never);
+    const signal = task.abortController?.signal;
+
+    cancel(context);
+
+    expect(signal?.aborted).toBe(true);
+    expect(context.requestQueue.getTask(task.id)).toBeUndefined();
+  });
+
   test('keeps shared device lifecycle listeners across a device cache reset', () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
     core = initCore();

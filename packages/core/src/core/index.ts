@@ -1374,10 +1374,11 @@ export const cancel = (context: CoreContext, connectId?: string) => {
     }
   } else {
     const env = DataManager.getSettings('env');
+    // Abort every method before rejecting its queue task. Non-BLE methods also
+    // use the signal to stop recovery loops after the public promise is rejected.
+    requestQueue.abortAllRequests();
     if (DataManager.isBleConnect(env)) {
       Log.debug('Cancel Api all _deviceList: ');
-      // Keep method abort signals observable until every active task is rejected.
-      requestQueue.abortAllRequests();
       const canceledDevices: Device[] = [];
       const interruptDevice = (device?: Device) => {
         if (!device || canceledDevices.includes(device)) {

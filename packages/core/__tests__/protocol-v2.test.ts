@@ -8892,6 +8892,50 @@ describe('Protocol V2 firmware update targets', () => {
     expect(recoverProtocolV2FileTransfer).not.toHaveBeenCalled();
   });
 
+  test('keeps public transfer bytes monotonic when a V4 file retry restarts at zero', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    let writeCount = 0;
+    (method as any).fileWriteChunk = jest.fn(
+      (_path: string, _size: number, offset: number, data: Uint8Array) => {
+        writeCount += 1;
+        if (writeCount === 3) {
+          return Promise.reject(new Error('transport timeout'));
+        }
+        return Promise.resolve({
+          message: { processed_byte: offset + data.byteLength },
+        });
+      }
+    );
+    (method as any).getProtocolV2FirmwareChunkSize = jest.fn().mockReturnValue(1000);
+    (method as any).recoverProtocolV2FileTransfer = jest.fn().mockResolvedValue(undefined);
+    method.postProgressMessage = jest.fn();
+    const source = await openFirmwareByteSource({
+      binary: new Uint8Array(3000).buffer,
+    });
+
+    try {
+      await (method as any).protocolV2SourceUpdateProcess({
+        source,
+        filePath: 'vol1:firmware.bin',
+        processedSize: 0,
+        totalSize: 3000,
+      });
+    } finally {
+      await source?.close();
+    }
+
+    const transferredBytes = (method.postProgressMessage as jest.Mock).mock.calls.map(
+      ([, , metrics]) => metrics.transferredBytes
+    );
+    expect(transferredBytes).toEqual([1000, 2000, 3000]);
+    expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(1);
+  });
+
   test('throttles repeated transfer progress while preserving file completion', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,

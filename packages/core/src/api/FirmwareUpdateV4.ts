@@ -591,6 +591,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private protocolV2LastTransferProgressAt = 0;
 
+  private protocolV2LastTransferredBytes = 0;
+
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
@@ -2121,6 +2123,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
     this.protocolV2LastTransferProgress = undefined;
     this.protocolV2LastTransferProgressAt = 0;
+    this.protocolV2LastTransferredBytes = 0;
     const transferStartedAt = Date.now();
     let processedSize = 0;
     for (const resource of resourcesToSync) {
@@ -2233,13 +2236,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             const elapsedMs = Math.max(now - transferStartedAt, 0);
             const progress = Math.min(Math.ceil((transferredBytes / totalSize) * 100), 99);
             const shouldPostProgress =
-              progress !== this.protocolV2LastTransferProgress ||
-              now - this.protocolV2LastTransferProgressAt >=
-                PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS ||
-              chunkEnd === source.size;
+              transferredBytes >= this.protocolV2LastTransferredBytes &&
+              (progress !== this.protocolV2LastTransferProgress ||
+                now - this.protocolV2LastTransferProgressAt >=
+                  PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS ||
+                chunkEnd === source.size);
             if (shouldPostProgress) {
               this.protocolV2LastTransferProgress = progress;
               this.protocolV2LastTransferProgressAt = now;
+              this.protocolV2LastTransferredBytes = transferredBytes;
               this.postProgressMessage(progress, 'transferData', {
                 transferredBytes,
                 totalBytes: totalSize,
