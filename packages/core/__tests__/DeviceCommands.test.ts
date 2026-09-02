@@ -139,32 +139,6 @@ describe('DeviceCommands failure mapping', () => {
     await expect(commands._commonCall('DeviceInfoGet', {})).rejects.toBe(transportError);
   });
 
-  it('maps an oversized Protocol V2 frame to an actionable hardware error', async () => {
-    const commands = createCommands();
-    commands.mainId = 'main-id';
-    commands.transport = {
-      name: 'ReactNativeBleTransport',
-      call: jest.fn().mockRejectedValue(
-        Object.assign(new Error('Protocol V2 frame too large for transport: 2245 > 2048'), {
-          name: 'ProtocolV2FrameTooLargeError',
-          frameBytes: 2245,
-          maxFrameBytes: 2048,
-        })
-      ),
-    } as any;
-
-    await expect(commands._commonCall('AptosSignTransaction', {} as any)).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.TransportFrameTooLarge,
-      message:
-        'The request is too large for the current connection. Try a smaller transaction or use USB.',
-      params: {
-        frameBytes: 2245,
-        maxFrameBytes: 2048,
-        transport: 'ReactNativeBleTransport',
-      },
-    });
-  });
-
   it('logs canonical DeviceStatus response fields without exposing the device ID', async () => {
     const commands = createCommands();
     const log = getLogger(LoggerNames.DeviceCommands);

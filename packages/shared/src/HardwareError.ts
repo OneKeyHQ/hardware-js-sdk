@@ -504,12 +504,6 @@ export const HardwareErrorCode = {
   NftStorageLimitReached: 832,
 
   /**
-   * The encoded Protocol V2 request exceeds the active transport frame limit.
-   * @params: { frameBytes: number; maxFrameBytes: number; transport?: string }
-   */
-  TransportFrameTooLarge: 833,
-
-  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -668,9 +662,6 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.WalletSessionInvalid]: 'Wallet session is invalid or expired',
   [HardwareErrorCode.NftStorageLimitReached]:
     'NFT storage limit reached. Remove an NFT from the device and try again.',
-  [HardwareErrorCode.TransportFrameTooLarge]:
-    'The request is too large for the current connection. Try a smaller transaction or use USB.',
-
   /**
    * Lowlevel transport
    */
