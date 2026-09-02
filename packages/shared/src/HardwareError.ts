@@ -504,6 +504,12 @@ export const HardwareErrorCode = {
   NftStorageLimitReached: 832,
 
   /**
+   * The encoded Protocol V2 request exceeds the active transport frame limit.
+   * @params: { frameBytes: number; maxFrameBytes: number; transport?: string }
+   */
+  TransportFrameTooLarge: 833,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -534,7 +540,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceInterruptedFromOutside]: 'Device interrupted',
   [HardwareErrorCode.DeviceInterruptedFromUser]: 'Device interrupted',
   [HardwareErrorCode.RequiredButInBootloaderMode]: 'Device should be in bootloader mode',
-  [HardwareErrorCode.DeviceCheckDeviceIdError]: 'Device Id in the features is not same.',
+  [HardwareErrorCode.DeviceCheckDeviceIdError]:
+    'The connected device does not match this wallet. Reconnect the correct device, or add it again after a reset or recovery.',
   [HardwareErrorCode.DeviceNotSupportPassphrase]: 'Device not support passphrase',
   [HardwareErrorCode.DeviceCheckPassphraseStateError]: 'Device passphrase state error',
   [HardwareErrorCode.DeviceNotOpenedPassphrase]: 'Device not opened passphrase',
@@ -542,7 +549,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceDetectInBootloaderMode]: 'Device in bootloader mode',
   [HardwareErrorCode.NotAllowInBootloaderMode]: 'Device not allow in bootloader mode',
   [HardwareErrorCode.DeviceBusy]: 'Device is busy',
-  [HardwareErrorCode.DeviceCheckUnlockTypeError]: 'Device check unlock type not match error',
+  [HardwareErrorCode.DeviceCheckUnlockTypeError]:
+    'The unlocked wallet does not match the selected wallet. Use the corresponding PIN or passphrase and try again.',
   /**
    * Node Errors
    */
@@ -660,6 +668,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.WalletSessionInvalid]: 'Wallet session is invalid or expired',
   [HardwareErrorCode.NftStorageLimitReached]:
     'NFT storage limit reached. Remove an NFT from the device and try again.',
+  [HardwareErrorCode.TransportFrameTooLarge]:
+    'The request is too large for the current connection. Try a smaller transaction or use USB.',
 
   /**
    * Lowlevel transport

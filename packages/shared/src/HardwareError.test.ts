@@ -10,6 +10,34 @@ describe('HardwareErrorCode compatibility', () => {
     expect(HardwareErrorCode).not.toHaveProperty('KaspaPrevTxIdMismatch');
     expect(HardwareErrorCode.DeviceLocked).toBe(830);
     expect(HardwareErrorCode.WalletSessionInvalid).toBe(831);
+    expect(HardwareErrorCode.TransportFrameTooLarge).toBe(833);
+  });
+
+  test('uses actionable wallet-context and transport messages', () => {
+    expect(HardwareErrorCodeMessage[HardwareErrorCode.DeviceCheckDeviceIdError]).toContain(
+      'does not match this wallet'
+    );
+    expect(HardwareErrorCodeMessage[HardwareErrorCode.DeviceCheckUnlockTypeError]).toContain(
+      'corresponding PIN or passphrase'
+    );
+    expect(
+      serializeError({
+        error: TypedError(HardwareErrorCode.TransportFrameTooLarge, undefined, {
+          frameBytes: 2245,
+          maxFrameBytes: 2048,
+          transport: 'ReactNativeBleTransport',
+        }),
+      })
+    ).toEqual({
+      code: 833,
+      error:
+        'The request is too large for the current connection. Try a smaller transaction or use USB.',
+      params: {
+        frameBytes: 2245,
+        maxFrameBytes: 2048,
+        transport: 'ReactNativeBleTransport',
+      },
+    });
   });
 
   test('reserves the BLE and USB conflict code for app error mapping', () => {

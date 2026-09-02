@@ -234,9 +234,9 @@ export async function getProtocolV2WalletSession(
   const forceWalletSelection =
     options?.forceWalletSelection === true || options?.initSession === true;
   const readCurrentAttachPinSession = options?.readCurrentAttachPinSession === true;
-  const sessionIsAttachPinWallet = (session?: { viaAttachPin?: boolean }) =>
+  const sessionIsAttachPinWallet = (session?: unknown) =>
     readCurrentAttachPinSession ||
-    session?.viaAttachPin === true ||
+    (session as { viaAttachPin?: boolean } | undefined)?.viaAttachPin === true ||
     device.features?.unlockedAttachPin === true;
 
   if (forceWalletSelection) {

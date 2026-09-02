@@ -66,6 +66,20 @@ const DEVICE_CONTROL_CALLS = new Set([
   'DeviceMiscUsbMscControl',
 ]);
 
+type ProtocolV2FrameTooLargeError = Error & {
+  frameBytes: number;
+  maxFrameBytes: number;
+};
+
+const isProtocolV2FrameTooLargeError = (error: unknown): error is ProtocolV2FrameTooLargeError => {
+  const candidate = error as Partial<ProtocolV2FrameTooLargeError> | undefined;
+  return (
+    candidate?.name === 'ProtocolV2FrameTooLargeError' &&
+    typeof candidate.frameBytes === 'number' &&
+    typeof candidate.maxFrameBytes === 'number'
+  );
+};
+
 // Older Protocol V2 firmware may omit the cancellation subcode, so retain a
 // narrow message fallback for compatibility.
 const isProtocolV2ActionCancelledMessage = (message: string) =>
@@ -325,6 +339,13 @@ export class DeviceCommands {
         errorCode: error?.errorCode,
         response: getSafeTransportLogPayload(error?.response?.data, type),
       });
+      if (isProtocolV2FrameTooLargeError(error)) {
+        throw ERRORS.TypedError(HardwareErrorCode.TransportFrameTooLarge, undefined, {
+          frameBytes: error.frameBytes,
+          maxFrameBytes: error.maxFrameBytes,
+          transport: this.transport.name,
+        });
+      }
       if (error.errorCode === HardwareErrorCode.BleDeviceBondError) {
         return {
           type: 'BleDeviceBondError',
