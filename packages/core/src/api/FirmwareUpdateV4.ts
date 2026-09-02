@@ -383,6 +383,13 @@ const isProtocolV2InstallResponseTimeout = (error: unknown) => {
   );
 };
 
+const getProtocolV2ErrorCode = (error: unknown): number | string | undefined => {
+  if (!error || typeof error !== 'object') return undefined;
+  const { errorCode, code } = error as { errorCode?: unknown; code?: unknown };
+  const causeCode = errorCode ?? code;
+  return typeof causeCode === 'number' || typeof causeCode === 'string' ? causeCode : undefined;
+};
+
 const isProtocolV2TerminalInstallStatusError = (error: unknown) =>
   isBleStaleBondHardwareError(error) ||
   (error instanceof HardwareError &&
@@ -583,6 +590,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private protocolV2LastTransferProgress?: number;
 
   private protocolV2LastTransferProgressAt = 0;
+
+  private protocolV2LastTransferredBytes = 0;
 
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
@@ -2114,6 +2123,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
     this.protocolV2LastTransferProgress = undefined;
     this.protocolV2LastTransferProgressAt = 0;
+    this.protocolV2LastTransferredBytes = 0;
+    const transferStartedAt = Date.now();
     let processedSize = 0;
     for (const resource of resourcesToSync) {
       // The bootloader keeps its live resource package mounted. FatFs rejects
@@ -2124,6 +2135,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         filePath: writePath,
         processedSize,
         totalSize,
+        transferStartedAt,
       });
       await this.verifyProtocolV2StagedFile(writePath, resource.source.size);
       if (isProtocolV2BootResourcePackagePath(resource.devicePath)) {
@@ -2139,6 +2151,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         filePath,
         processedSize,
         totalSize,
+        transferStartedAt,
       });
       await this.verifyProtocolV2StagedFile(filePath, item.source.size);
       stagedInstallTargets.push({
@@ -2148,7 +2161,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     if (totalSize > 0) {
-      this.postProgressMessage(100, 'transferData');
+      const elapsedMs = Math.max(Date.now() - transferStartedAt, 0);
+      this.postProgressMessage(100, 'transferData', {
+        transferredBytes: totalSize,
+        totalBytes: totalSize,
+        rateBytesPerSecond: elapsedMs > 0 ? Math.round((totalSize / elapsedMs) * 1000) : undefined,
+        elapsedMs,
+      });
     }
     if (stagedInstallTargets.length === 0) {
       return;
@@ -2173,20 +2192,23 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     filePath,
     processedSize,
     totalSize,
+    transferStartedAt = Date.now(),
   }: {
     source: FirmwareByteSource;
     filePath: string;
     processedSize: number;
     totalSize: number;
+    transferStartedAt?: number;
   }) {
     let lastError: unknown;
     for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
+      this.throwIfAborted();
       try {
-        const transferStartedAt = Date.now();
         await writeFirmwareByteSource({
           source,
           chunkSize: this.getProtocolV2FirmwareChunkSize('write', filePath),
           write: async ({ data, sourceOffset, length, first }) => {
+            this.throwIfAborted();
             const chunkEnd = sourceOffset + length;
             const deviceProgress = getProtocolV2DeviceTransferProgress(
               processedSize + sourceOffset,
@@ -2214,18 +2236,20 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             const elapsedMs = Math.max(now - transferStartedAt, 0);
             const progress = Math.min(Math.ceil((transferredBytes / totalSize) * 100), 99);
             const shouldPostProgress =
-              progress !== this.protocolV2LastTransferProgress ||
-              now - this.protocolV2LastTransferProgressAt >=
-                PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS ||
-              chunkEnd === source.size;
+              transferredBytes >= this.protocolV2LastTransferredBytes &&
+              (progress !== this.protocolV2LastTransferProgress ||
+                now - this.protocolV2LastTransferProgressAt >=
+                  PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS ||
+                chunkEnd === source.size);
             if (shouldPostProgress) {
               this.protocolV2LastTransferProgress = progress;
               this.protocolV2LastTransferProgressAt = now;
+              this.protocolV2LastTransferredBytes = transferredBytes;
               this.postProgressMessage(progress, 'transferData', {
                 transferredBytes,
                 totalBytes: totalSize,
                 rateBytesPerSecond:
-                  elapsedMs > 0 ? Math.round((chunkEnd / elapsedMs) * 1000) : undefined,
+                  elapsedMs > 0 ? Math.round((transferredBytes / elapsedMs) * 1000) : undefined,
                 elapsedMs,
               });
             }
@@ -2234,18 +2258,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         });
         return processedSize + source.size;
       } catch (error) {
+        this.throwIfAborted();
         if (isBleStaleBondHardwareError(error)) {
           throw error;
         }
         lastError = error;
         if (attempt < PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT) {
           await this.recoverProtocolV2FileTransfer();
+          this.throwIfAborted();
         }
       }
     }
+    const causeCode = getProtocolV2ErrorCode(lastError);
     throw ERRORS.TypedError(
       HardwareErrorCode.EmmcFileWriteFirmwareError,
-      `transfer data error: ${getProtocolV2UnknownErrorText(lastError)}`
+      `transfer data error: ${getProtocolV2UnknownErrorText(lastError)}`,
+      causeCode === undefined ? undefined : { causeCode }
     );
   }
 
@@ -2705,7 +2733,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           if (!hasCurrentInstallEvidence) {
             // A successful status poll clears DeviceCommands' cancel action. Keep cancellation
             // available while UpdateRequest is still waiting for confirmation on the device.
-            this.device.setCancelableAction(() => this.device.getCommands().cancelDevice());
+            // Bootloader does not register the protocol Cancel message. Keep the
+            // operation locally cancellable; interruptionFromUser() disposes the link.
+            this.device.setCancelableAction(() => Promise.resolve());
           }
 
           if (
@@ -3174,7 +3204,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.protocolV2InstallTerminalSuccessObserved = false;
     const commands = this.device.getCommands();
     await commands.typedCall('DeviceFirmwareUpdateStage', 'Success', { targets });
-    this.device.setCancelableAction(() => this.device.getCommands().cancelDevice());
+    // Bootloader does not register the protocol Cancel message. Keep the
+    // operation locally cancellable; interruptionFromUser() disposes the link.
+    this.device.setCancelableAction(() => Promise.resolve());
     const interaction = this.device.createProtocolV2UiPhaseMetadata('button', 'start');
     this.postMessage(
       createUiMessage(UI_REQUEST.REQUEST_BUTTON, {

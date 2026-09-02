@@ -2,7 +2,11 @@ import semver from 'semver';
 import EventEmitter from 'events';
 import {
   DeviceSessionPinType,
+  type LowlevelTransportSharedPlugin,
+  type OneKeyDeviceInfo,
+  type ProtocolType,
   TRANSPORT_EVENT,
+  type TransportDeviceDisconnectEvent,
   isProtocolV2LinkDisabledError,
 } from '@onekeyfe/hd-transport';
 import {
@@ -74,11 +78,6 @@ import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } fro
 import type { DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import type { SdkTracingContext } from '../utils/tracing';
 import type { Deferred } from '@onekeyfe/hd-shared';
-import type {
-  LowlevelTransportSharedPlugin,
-  OneKeyDeviceInfo,
-  TransportDeviceDisconnectEvent,
-} from '@onekeyfe/hd-transport';
 import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
@@ -1044,6 +1043,7 @@ async function connectDeviceForBle(
       !device.commands ||
       device.commands.disposed;
     if (shouldAcquire) {
+      const connectProtocol = resolveBleConnectProtocol(method);
       // The deadline/abort guards are scoped to the desktop electron
       // transport: its IPC acquire is the only path with a proven
       // never-settling failure mode, while react-native/lowlevel acquire may
@@ -1055,13 +1055,13 @@ async function connectDeviceForBle(
         throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
       }
       if (!useAcquireGuards) {
-        await device.acquire(method.payload.connectProtocol, {
+        await device.acquire(connectProtocol, {
           forceProtocolDetection: method.payload.forceProtocolDetection,
         });
       } else {
         try {
           await raceBleAcquire(
-            device.acquire(method.payload.connectProtocol, {
+            device.acquire(connectProtocol, {
               forceProtocolDetection: method.payload.forceProtocolDetection,
             }),
             abortSignal
@@ -1125,6 +1125,14 @@ async function connectDeviceForBle(
       throw err;
     }
   }
+}
+
+export function resolveBleConnectProtocol(method: BaseMethod): ProtocolType | undefined {
+  if (method.payload.connectProtocol === 'V1' || method.payload.connectProtocol === 'V2') {
+    return method.payload.connectProtocol;
+  }
+  const supportedProtocols = method.getSupportedProtocols();
+  return supportedProtocols.length === 1 && supportedProtocols[0] === 'V2' ? 'V2' : undefined;
 }
 
 type IPollFn<T> = (time?: number) => T;
@@ -1325,7 +1333,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       // cancel callback tasks
       requestQueue.cancelCallbackTasks(connectId);
 
-      const requestIds = requestQueue.getRequestTasksId();
+      const requestIds = requestQueue.getRequestTasksIdByConnectId(connectId);
       Log.debug(
         `Cancel Api connect requestQueues: length:${requestIds.length} requestIds:${requestIds.join(
           ','
@@ -1333,6 +1341,8 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       );
       // Abort before rejecting: rejectRequest releases the task and would make
       // its AbortController unreachable to an in-flight method loop.
+      // Match both the requested connectId and a device selected internally by the
+      // method, such as Desktop WebUSB firmwareUpdateV4.
       requestQueue.abortRequestsByConnectId(connectId);
       const canceledDevices: Device[] = [];
       const interruptDevice = (device: Device | undefined, deviceConnectId: string) => {
@@ -1349,7 +1359,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
           // During ensureConnected the method has a connectId but device is
           // assigned only after the poll succeeds. Interrupt the cached BLE
           // Device so an in-flight acquire/initialize cannot finish.
-          interruptDevice(task.method?.device, task.method.connectId ?? connectId);
+          interruptDevice(task.method?.device, connectId);
           interruptDevice(deviceCacheMap.get(connectId), connectId);
           requestQueue.rejectRequest(
             requestId,
@@ -1364,10 +1374,11 @@ export const cancel = (context: CoreContext, connectId?: string) => {
     }
   } else {
     const env = DataManager.getSettings('env');
+    // Abort every method before rejecting its queue task. Non-BLE methods also
+    // use the signal to stop recovery loops after the public promise is rejected.
+    requestQueue.abortAllRequests();
     if (DataManager.isBleConnect(env)) {
       Log.debug('Cancel Api all _deviceList: ');
-      // Keep method abort signals observable until every active task is rejected.
-      requestQueue.abortAllRequests();
       const canceledDevices: Device[] = [];
       const interruptDevice = (device?: Device) => {
         if (!device || canceledDevices.includes(device)) {
@@ -1410,8 +1421,10 @@ export const cancel = (context: CoreContext, connectId?: string) => {
     }
   }
 
-  cleanup();
-  closePopup();
+  cleanup(connectId);
+  if (!connectId || _uiPromises.length === 0) {
+    closePopup();
+  }
 };
 
 const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => {
@@ -1449,9 +1462,16 @@ const shouldCheckPassphraseState = (method: BaseMethod, device: Device) => {
   return device.hasUsePassphrase();
 };
 
-const cleanup = () => {
-  const pendingUiPromises = _uiPromises;
-  _uiPromises = [];
+const cleanup = (connectId?: string) => {
+  const pendingUiPromises = connectId
+    ? _uiPromises.filter(
+        uiPromise =>
+          uiPromise.data?.mainId === connectId || uiPromise.data?.getConnectId() === connectId
+      )
+    : _uiPromises;
+  _uiPromises = connectId
+    ? _uiPromises.filter(uiPromise => !pendingUiPromises.includes(uiPromise))
+    : [];
   rejectUiPromises(
     pendingUiPromises,
     ERRORS.TypedError(HardwareErrorCode.ActionCancelled, 'UI request was cancelled')

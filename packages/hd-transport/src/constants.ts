@@ -26,7 +26,7 @@ export const PROTOCOL_V2_FRAME_MAX_BYTES = 4200;
 /** FilesystemFileWrite chunk size over WebUSB. */
 export const PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE = 4000;
 
-/** FilesystemFileWrite chunk size over BLE. */
+/** Generic FilesystemFileWrite chunk size over BLE, including support for long filesystem paths. */
 export const PROTOCOL_V2_BLE_FILE_CHUNK_SIZE = 1800;
 
 /**

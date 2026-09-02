@@ -1,5 +1,5 @@
 import { useCallback, useContext, useMemo, useRef, useState } from 'react';
-import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { OpenWalletSessionMode, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
 import { Stack, Text, View, XStack, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
@@ -257,36 +257,35 @@ export default function TestSessionCountView() {
         `「${generatePassphrase(passphraseStateList.current)}」`,
       ]);
 
-      const passphraseStateRes = await SDK.getPassphraseState(connectId, {
-        initSession: true,
+      const walletSessionRes = await SDK.openWalletSession(connectId, {
+        mode: OpenWalletSessionMode.SelectHidden,
       });
-      if (!passphraseStateRes.success) {
+      if (!walletSessionRes.success) {
         hasContinue.current = false;
         testResult.current = {
           done: true,
           payload: `${intl.formatMessage({
             id: 'message__generate_wallet_error',
-          })} ${passphraseStateRes?.payload?.error}`,
+          })} ${walletSessionRes?.payload?.error}`,
         };
 
         appendLastRunnerLog([
           intl.formatMessage({ id: 'message__generate_wallet_error' }),
-          passphraseStateRes?.payload?.error,
+          walletSessionRes?.payload?.error,
         ]);
         break;
       }
-
-      if (!passphraseStateRes.payload) {
+      if (walletSessionRes.payload.walletType !== 'hidden') {
         hasContinue.current = false;
         testResult.current = {
           done: true,
-          payload: 'passphrase is not enabled on the device.',
+          payload: 'openWalletSession did not return a hidden wallet.',
         };
-        stopTest();
+        appendLastRunnerLog(['openWalletSession did not return a hidden wallet.']);
         break;
       }
 
-      const passphraseState: string = passphraseStateRes.payload;
+      const { passphraseState } = walletSessionRes.payload;
 
       appendLastRunnerLog([' PassphraseState: ', passphraseState]);
 
@@ -418,7 +417,6 @@ export default function TestSessionCountView() {
     selectedDevice?.connectId,
     selectedDevice?.connectProtocol,
     showOnOneKey,
-    stopTest,
     testChain,
   ]);
 
