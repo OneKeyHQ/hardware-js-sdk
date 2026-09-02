@@ -13,6 +13,7 @@ const {
 } = require('../src/protocols/v2/session');
 const protocolV2 = require('../src/protocols/v2');
 const {
+  PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
   PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE,
   PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
   PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS,
@@ -452,12 +453,13 @@ describe('Protocol V2 framing and session', () => {
     ).toThrow('Protocol V2 frame too large: 4201 > 4200');
   });
 
-  test('keeps optimized BLE firmware chunks inside the transport frame boundary', () => {
+  test('keeps optimized BLE fixed-path chunks inside the transport frame boundary', () => {
     const productionSchemas = {
       protocolV1: protocolV1Messages,
       protocolV2: productionProtocolV2Messages,
     };
-    const stagingPaths = [
+    const fixedPaths = [
+      'vol1:/wallpapers/wallpaper.okpkg',
       'vol0:/bootloader.bin',
       'vol0:/application_p1.bin',
       'vol0:/application_p2.bin',
@@ -468,7 +470,7 @@ describe('Protocol V2 framing and session', () => {
       'vol0:/se04.bin',
     ];
 
-    for (const path of stagingPaths) {
+    for (const path of fixedPaths) {
       const frame = ProtocolV2.encodeFrame(productionSchemas, 'FilesystemFileWrite', {
         file: {
           path,
@@ -483,6 +485,35 @@ describe('Protocol V2 framing and session', () => {
 
       expect(frame.length).toBeLessThanOrEqual(PROTOCOL_V2_BLE_FRAME_MAX_BYTES);
     }
+  });
+
+  test('keeps the generic BLE chunk safe for the longest valid filesystem path', () => {
+    const productionSchemas = {
+      protocolV1: protocolV1Messages,
+      protocolV2: productionProtocolV2Messages,
+    };
+    const longestValidPath = `vol0:/${'a'.repeat(121)}`;
+    const encodeFileWrite = dataLength =>
+      ProtocolV2.encodeFrame(productionSchemas, 'FilesystemFileWrite', {
+        file: {
+          path: longestValidPath,
+          offset: 0xffffffff,
+          total_size: 0xffffffff,
+          data: new Uint8Array(dataLength),
+        },
+        overwrite: true,
+        append: true,
+        ui_percentage: 100,
+      });
+
+    expect(Buffer.byteLength(longestValidPath, 'utf8')).toBe(127);
+    expect(encodeFileWrite(PROTOCOL_V2_BLE_FILE_CHUNK_SIZE).length).toBeLessThanOrEqual(
+      PROTOCOL_V2_BLE_FRAME_MAX_BYTES
+    );
+    expect(encodeFileWrite(PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE).length).toBeGreaterThan(
+      PROTOCOL_V2_BLE_FRAME_MAX_BYTES
+    );
+    expect(encodeFileWrite(1885)).toHaveLength(PROTOCOL_V2_BLE_FRAME_MAX_BYTES);
   });
 
   test('keeps bytes after the first complete frame for the next read', () => {

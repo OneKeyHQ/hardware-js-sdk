@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { OpenWalletSessionMode, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
 import { Stack, Text } from 'tamagui';
 import { useIntl } from 'react-intl';
@@ -309,16 +309,24 @@ function ExecuteView() {
             item.passphrase
           }」`
         );
-        const passphraseStateRes = await sdk.getPassphraseState(connectId, {
-          initSession: true,
-          useEmptyPassphrase: item.emptyPassphraseState,
+        const walletSessionRes = await sdk.openWalletSession(connectId, {
+          mode: item.emptyPassphraseState
+            ? OpenWalletSessionMode.Standard
+            : OpenWalletSessionMode.SelectHidden,
         });
 
-        if (!passphraseStateRes.success) {
+        const expectedWalletType = item.emptyPassphraseState ? 'standard' : 'hidden';
+        if (
+          !walletSessionRes.success ||
+          walletSessionRes.payload.walletType !== expectedWalletType
+        ) {
           return Promise.resolve(undefined);
         }
 
-        const passphraseState = passphraseStateRes.payload;
+        const passphraseState =
+          walletSessionRes.payload.walletType === 'hidden'
+            ? walletSessionRes.payload.passphraseState
+            : undefined;
 
         const params = {
           ...getRequestParams(item.method),

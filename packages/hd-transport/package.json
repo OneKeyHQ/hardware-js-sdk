@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport",
-  "version": "1.2.2-alpha.6",
+  "version": "1.2.2-alpha.10",
   "description": "Transport layer abstractions and utilities for OneKey hardware SDK.",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",

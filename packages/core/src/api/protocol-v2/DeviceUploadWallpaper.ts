@@ -49,6 +49,7 @@ const SAFE_FILE_NAME = /^[A-Za-z0-9_-]+(?:\.bin)?$/;
 const DEVICE_SETTINGS_SET_MESSAGE_TYPE = 60412;
 const FILESYSTEM_FILE_WRITE_MESSAGE_TYPE = 60805;
 const FILESYSTEM_DIR_MAKE_MESSAGE_TYPE = 60809;
+const WALLPAPER_PACKAGE_BLE_CHUNK_SIZE = 1960;
 const Log = getLogger(LoggerNames.Method);
 
 function normalizeFileName(fileName: string | undefined, data: Uint8Array): string {
@@ -130,7 +131,7 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
     this.directoryReady = true;
   }
 
-  private async upload(path: string, data: Uint8Array) {
+  private async upload(path: string, data: Uint8Array, bleChunkSizeLimit?: number) {
     if (this.uploaded) return;
 
     await writeProtocolV2File({
@@ -139,6 +140,7 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
       data,
       totalSize: data.byteLength,
       chunkSize: this.params.chunkSize,
+      bleChunkSizeLimit,
       maxChunkRetries: 3,
       overwrite: true,
       append: false,
@@ -164,7 +166,11 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
       ? buildPro2HostAssetPackage([{ name: WALLPAPER_PACKAGE_ENTRY, data: encoded.data }])
       : encoded.data;
     if (useHostAssetPackage) this.path = WALLPAPER_PACKAGE_PATH;
-    await this.upload(this.path, data);
+    await this.upload(
+      this.path,
+      data,
+      useHostAssetPackage ? WALLPAPER_PACKAGE_BLE_CHUNK_SIZE : undefined
+    );
     const response = await this.device.commands.typedCall('DeviceSettingsSet', 'Success', {
       settings: { wallpaper_path: this.path },
     });

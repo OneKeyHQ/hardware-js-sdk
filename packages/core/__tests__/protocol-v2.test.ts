@@ -256,6 +256,9 @@ describe('DeviceUploadWallpaper', () => {
   });
 
   test('uploads and applies the fixed wallpaper package on firmware 1.0.1', async () => {
+    const getSettingsSpy = jest
+      .spyOn(DataManager, 'getSettings')
+      .mockReturnValue('react-native' as any);
     const typedCall = jest.fn().mockImplementation((request, _response, params) => {
       if (request === 'FilesystemDirMake') return { message: {} };
       if (request === 'FilesystemFileWrite') {
@@ -283,8 +286,13 @@ describe('DeviceUploadWallpaper', () => {
     (method as any).device = device;
     method.postMessage = jest.fn();
 
-    method.init();
-    const result = await method.run();
+    let result;
+    try {
+      method.init();
+      result = await method.run();
+    } finally {
+      getSettingsSpy.mockRestore();
+    }
 
     const fileWrites = typedCall.mock.calls.filter(call => call[0] === 'FilesystemFileWrite');
     expect(new Set(fileWrites.map(call => call[2].file.path))).toEqual(
@@ -293,6 +301,7 @@ describe('DeviceUploadWallpaper', () => {
     expect(fileWrites[0][2].file.data.subarray(0, 4)).toEqual(
       new Uint8Array([0x4f, 0x4b, 0x50, 0x50])
     );
+    expect(fileWrites[0][2].file.data).toHaveLength(1960);
     expect(typedCall).toHaveBeenLastCalledWith('DeviceSettingsSet', 'Success', {
       settings: { wallpaper_path: 'vol1:/wallpapers/wallpaper.okpkg' },
     });
@@ -2777,7 +2786,7 @@ describe('Protocol V2 feature adapter', () => {
     await expect(
       device.checkPassphraseStateSafety('stale-hidden-state', true, false)
     ).resolves.toBe(true);
-    expect(typedCall).toHaveBeenCalledTimes(5);
+    expect(typedCall).toHaveBeenCalledTimes(6);
     expect(typedCall).toHaveBeenCalledWith('ProtocolInfoRequest', 'ProtocolInfo', {
       eventless_wallet_session: true,
     });
@@ -2789,7 +2798,7 @@ describe('Protocol V2 feature adapter', () => {
     });
     expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
     expect(typedCall.mock.calls.filter(([request]) => request === 'DeviceStatusGet')).toHaveLength(
-      2
+      3
     );
     expect(typedCall).not.toHaveBeenCalledWith('DeviceSessionAskPin', 'Success', expect.anything());
   });
@@ -5654,7 +5663,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postTipMessage).not.toHaveBeenCalled();
     expect(method.postProgressMessage).not.toHaveBeenCalled();
     await cancelableAction?.();
-    expect(cancelDevice).toHaveBeenCalledTimes(1);
+    expect(cancelDevice).not.toHaveBeenCalled();
   });
 
   test('does not send the install request when Protocol V2 staging fails', async () => {
@@ -7175,7 +7184,14 @@ describe('Protocol V2 firmware update targets', () => {
       true
     );
     expect((method as any).exitProtocolV2BootloaderToNormal).not.toHaveBeenCalled();
-    expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'transferData');
+    expect(method.postProgressMessage).toHaveBeenCalledWith(
+      100,
+      'transferData',
+      expect.objectContaining({
+        transferredBytes: 5,
+        totalBytes: 5,
+      })
+    );
     expect((method as any).completeProtocolV2FinalVerification).toHaveBeenCalledTimes(1);
   });
 
@@ -7249,7 +7265,14 @@ describe('Protocol V2 firmware update targets', () => {
       expect.objectContaining({ processedSize: 2, totalSize: 3 })
     );
     expect(method.postProgressMessage).toHaveBeenCalledTimes(1);
-    expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'transferData');
+    expect(method.postProgressMessage).toHaveBeenCalledWith(
+      100,
+      'transferData',
+      expect.objectContaining({
+        transferredBytes: 3,
+        totalBytes: 3,
+      })
+    );
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledTimes(1);
     expect((method as any).protocolV2StartFirmwareUpdate).toHaveBeenCalledWith({
       targets: [{ target_id: 4, path: 'vol0:/application_p1.bin' }],
@@ -8569,26 +8592,43 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
     (method as any).protocolV2StartFirmwareUpdate = jest.fn();
     (method as any).waitForProtocolV2FirmwareUpdateComplete = jest.fn();
+    const dateNowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(5_000);
 
-    await (method as any).executeProtocolV2SourceUpdate({
-      installSources: [],
-      resourceSources: [
-        {
-          name: 'images.okpkg',
-          source: {
-            size: 3,
-            readAt: jest.fn(),
-            close: jest.fn(),
+    try {
+      await (method as any).executeProtocolV2SourceUpdate({
+        installSources: [],
+        resourceSources: [
+          {
+            name: 'images.okpkg',
+            source: {
+              size: 3,
+              readAt: jest.fn(),
+              close: jest.fn(),
+            },
+            devicePath: 'vol0:/bundles/images/images.okpkg',
           },
-          devicePath: 'vol0:/bundles/images/images.okpkg',
-        },
-      ],
-    });
+        ],
+      });
+    } finally {
+      dateNowSpy.mockRestore();
+    }
 
     expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledTimes(1);
     expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledWith(
-      expect.objectContaining({ filePath: 'vol0:/bundles/images/images.okpkg' })
+      expect.objectContaining({
+        filePath: 'vol0:/bundles/images/images.okpkg',
+        transferStartedAt: 1_000,
+      })
     );
+    expect(method.postProgressMessage).toHaveBeenLastCalledWith(100, 'transferData', {
+      transferredBytes: 3,
+      totalBytes: 3,
+      rateBytesPerSecond: 1,
+      elapsedMs: 4_000,
+    });
     expect((method as any).verifyProtocolV2StagedFile).toHaveBeenCalledWith(
       'vol0:/bundles/images/images.okpkg',
       3
@@ -8816,6 +8856,84 @@ describe('Protocol V2 firmware update targets', () => {
       await source?.close();
     }
     expect(recoverProtocolV2FileTransfer).not.toHaveBeenCalled();
+  });
+
+  test('does not recover or wrap a cancelled V4 file transfer', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const abortController = new AbortController();
+    method.abortSignal = abortController.signal;
+    (method as any).fileWriteChunk = jest.fn().mockImplementation(() => {
+      abortController.abort();
+      return Promise.reject(new Error('transport disposed'));
+    });
+    const recoverProtocolV2FileTransfer = jest.fn();
+    (method as any).recoverProtocolV2FileTransfer = recoverProtocolV2FileTransfer;
+    const source = await openFirmwareByteSource({
+      binary: new Uint8Array([1]).buffer,
+    });
+
+    try {
+      await expect(
+        (method as any).protocolV2SourceUpdateProcess({
+          source,
+          filePath: 'vol1:firmware.bin',
+          processedSize: 0,
+          totalSize: 1,
+        })
+      ).rejects.toMatchObject({ errorCode: HardwareErrorCode.CallQueueActionCancelled });
+    } finally {
+      await source?.close();
+    }
+    expect(recoverProtocolV2FileTransfer).not.toHaveBeenCalled();
+  });
+
+  test('keeps public transfer bytes monotonic when a V4 file retry restarts at zero', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    let writeCount = 0;
+    (method as any).fileWriteChunk = jest.fn(
+      (_path: string, _size: number, offset: number, data: Uint8Array) => {
+        writeCount += 1;
+        if (writeCount === 3) {
+          return Promise.reject(new Error('transport timeout'));
+        }
+        return Promise.resolve({
+          message: { processed_byte: offset + data.byteLength },
+        });
+      }
+    );
+    (method as any).getProtocolV2FirmwareChunkSize = jest.fn().mockReturnValue(1000);
+    (method as any).recoverProtocolV2FileTransfer = jest.fn().mockResolvedValue(undefined);
+    method.postProgressMessage = jest.fn();
+    const source = await openFirmwareByteSource({
+      binary: new Uint8Array(3000).buffer,
+    });
+
+    try {
+      await (method as any).protocolV2SourceUpdateProcess({
+        source,
+        filePath: 'vol1:firmware.bin',
+        processedSize: 0,
+        totalSize: 3000,
+      });
+    } finally {
+      await source?.close();
+    }
+
+    const transferredBytes = (method.postProgressMessage as jest.Mock).mock.calls.map(
+      ([, , metrics]) => metrics.transferredBytes
+    );
+    expect(transferredBytes).toEqual([1000, 2000, 3000]);
+    expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(1);
   });
 
   test('throttles repeated transfer progress while preserving file completion', async () => {
@@ -9174,6 +9292,42 @@ describe('Protocol V2 firmware update targets', () => {
     ).rejects.toMatchObject({ errorCode: HardwareErrorCode.EmmcFileWriteFirmwareError });
     await source?.close();
     expect(typedCall).toHaveBeenCalledTimes(6);
+  });
+
+  test('preserves the underlying transport error code after firmware transfer retries', async () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest
+      .fn()
+      .mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.BleTimeoutError, 'response timeout'));
+
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+    method.postProgressMessage = jest.fn();
+    method.postTipMessage = jest.fn();
+    (method as any).recoverProtocolV2FileTransfer = jest.fn().mockResolvedValue(undefined);
+
+    const source = await openFirmwareByteSource({
+      binary: new Uint8Array([1, 2, 3]).buffer,
+    });
+    await expect(
+      (method as any).protocolV2SourceUpdateProcess({
+        source,
+        filePath: 'vol0:/firmware.bin',
+        processedSize: 0,
+        totalSize: 3,
+      })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.EmmcFileWriteFirmwareError,
+      params: { causeCode: HardwareErrorCode.BleTimeoutError },
+    });
+    await source?.close();
+    expect(typedCall).toHaveBeenCalledTimes(3);
   });
 
   // TODO(#850/#855): PR #855 added resume-on-retry and per-chunk retry on the

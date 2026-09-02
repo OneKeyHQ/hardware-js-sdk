@@ -58,8 +58,26 @@ const DEVICE_SCAN_TIMEOUT = 8_000;
 const CONNECTION_TIMEOUT = 8_000;
 const SERVICE_DISCOVERY_TIMEOUT = 10_000;
 const BLE_CLEANUP_TIMEOUT = 100;
-const BLE_PACKET_SIZE = 192;
+const BLE_PACKET_SIZE_FALLBACK = 192;
+const BLE_PACKET_SIZE_MAX = 244;
+const ATT_WRITE_HEADER_SIZE = 3;
 const BLE_ENCRYPTION_ERROR_PATTERNS = [/encryption is insufficient/i, /insufficient encryption/i];
+
+export function resolveNobleProtocolV2PacketCapacity(
+  mtu: number | null | undefined,
+  platform: NodeJS.Platform = process.platform
+) {
+  if (typeof mtu !== 'number' || !Number.isFinite(mtu) || mtu <= 0) {
+    return BLE_PACKET_SIZE_FALLBACK;
+  }
+  const reportedCapacity = Math.floor(mtu);
+  const payloadCapacity =
+    platform === 'linux' ? reportedCapacity - ATT_WRITE_HEADER_SIZE : reportedCapacity;
+  if (payloadCapacity <= 0) {
+    return BLE_PACKET_SIZE_FALLBACK;
+  }
+  return Math.min(payloadCapacity, BLE_PACKET_SIZE_MAX);
+}
 
 let noble: NobleModule | null = null;
 let nobleReadyPromise: Promise<void> | null = null;
@@ -479,6 +497,10 @@ export function createNobleBlePlugin(): LowlevelTransportSharedPlugin {
       await disconnectDevice(uuid);
     },
 
+    getProtocolV2PacketCapacity(uuid: string) {
+      return resolveNobleProtocolV2PacketCapacity(connectedDevices.get(uuid)?.mtu);
+    },
+
     async send(uuid: string, data: string, options?: { withoutResponse?: boolean }) {
       const characteristics = deviceCharacteristics.get(uuid);
       if (!characteristics) {
@@ -490,8 +512,9 @@ export function createNobleBlePlugin(): LowlevelTransportSharedPlugin {
 
       const buffer = Buffer.from(data, 'hex');
       const withoutResponse = options?.withoutResponse ?? true;
-      for (let offset = 0; offset < buffer.length; offset += BLE_PACKET_SIZE) {
-        const chunk = buffer.subarray(offset, Math.min(offset + BLE_PACKET_SIZE, buffer.length));
+      const packetCapacity = resolveNobleProtocolV2PacketCapacity(connectedDevices.get(uuid)?.mtu);
+      for (let offset = 0; offset < buffer.length; offset += packetCapacity) {
+        const chunk = buffer.subarray(offset, Math.min(offset + packetCapacity, buffer.length));
         await writeCharacteristic(characteristics.write, chunk, withoutResponse);
       }
     },
