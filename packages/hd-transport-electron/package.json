@@ -28,7 +28,7 @@
     "@onekeyfe/hd-core": "1.2.2-alpha.10",
     "@onekeyfe/hd-shared": "1.2.2-alpha.10",
     "@onekeyfe/hd-transport": "1.2.2-alpha.10",
-    "@stoprocent/noble": "2.8.0",
+    "@stoprocent/noble": "2.3.16",
     "p-retry": "^4.6.2"
   },
   "devDependencies": {

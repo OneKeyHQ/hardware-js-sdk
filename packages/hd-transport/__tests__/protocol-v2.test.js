@@ -782,12 +782,9 @@ describe('Protocol V2 framing and session', () => {
       readFrame: () => Promise.resolve(rewriteSeq(response, 1)),
     });
 
-    await expect(session.call('Ping', { message: 'x'.repeat(2048) })).rejects.toMatchObject({
-      name: 'ProtocolV2FrameTooLargeError',
-      message: 'Protocol V2 frame too large for transport: 2061 > 2048',
-      frameBytes: 2061,
-      maxFrameBytes: 2048,
-    });
+    await expect(session.call('Ping', { message: 'x'.repeat(2048) })).rejects.toThrow(
+      'Protocol V2 frame too large for transport: 2061 > 2048'
+    );
     expect(writeFrame).not.toHaveBeenCalled();
   });
 

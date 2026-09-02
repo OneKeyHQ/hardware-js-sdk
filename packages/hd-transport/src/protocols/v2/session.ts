@@ -115,17 +115,6 @@ export function bytesToHex(bytes: Uint8Array): string {
     .join('');
 }
 
-function createProtocolV2FrameTooLargeError(frameBytes: number, maxFrameBytes: number): Error {
-  return Object.assign(
-    new Error(`Protocol V2 frame too large for transport: ${frameBytes} > ${maxFrameBytes}`),
-    {
-      name: 'ProtocolV2FrameTooLargeError',
-      frameBytes,
-      maxFrameBytes,
-    }
-  );
-}
-
 const REDUCED_DEBUG_PROTOCOL_V2_CALLS = new Set([
   ...LogBlockCommand,
   'FilesystemFileRead',
@@ -287,7 +276,9 @@ export class ProtocolV2Session {
     });
 
     if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
-      return Promise.reject(createProtocolV2FrameTooLargeError(frame.length, maxFrameBytes));
+      return Promise.reject(
+        new Error(`Protocol V2 frame too large for transport: ${frame.length} > ${maxFrameBytes}`)
+      );
     }
 
     return this.serializeWrite(() => writeFrame(frame, context)).then(() => ({
@@ -352,7 +343,9 @@ export class ProtocolV2Session {
       });
 
       if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
-        throw createProtocolV2FrameTooLargeError(frame.length, maxFrameBytes);
+        throw new Error(
+          `Protocol V2 frame too large for transport: ${frame.length} > ${maxFrameBytes}`
+        );
       }
 
       const writeStartedAt = Date.now();
