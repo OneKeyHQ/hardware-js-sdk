@@ -7,6 +7,7 @@ import FileWrite from './FileWrite';
 export type UploadPortfolioParams = {
   packageBase64: string;
   timeoutMs?: number | string;
+  /** Controls transfer progress UI events. Defaults to `silent`. */
   uiMode?: 'silent' | 'progress';
 };
 

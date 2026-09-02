@@ -555,7 +555,9 @@ describe('UploadPortfolio', () => {
     method.init();
     await method.run();
 
+    expect(method.unlockPolicy).toBe('none');
     expect(method.protocolV2UiMode).toBe('auto');
+    expect(method.protocolV2UiInteraction).toBeUndefined();
     expect(method.payload.emitProgress).toBe(true);
     expect(method.postMessage).toHaveBeenCalledWith({
       event: 'UI_EVENT',

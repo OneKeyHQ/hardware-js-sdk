@@ -247,9 +247,10 @@ requestId/connectId 关联，并在取消、超时、断连和方法结束时清
   固件要求解锁的管理方法显式使用 `unlock-before-run`。不存在 `retry-on-locked`。
 - all-network root 与内部子方法共享一次 Status/Unlock preflight，每个子链仍独立恢复 Wallet Session。
 - bootloader/romloader 跳过 Status/Unlock，Protocol V1 保持原流程。
-- `uploadPortfolio` 关闭钱包 Session 处理、使用 `unlockPolicy='none'`，并通过
-  `protocolV2UiMode='none'` 关闭普通方法交互提示；SDK 不会为该方法主动发送
-  `DeviceSessionAskPin`，文件写入与应用流程只执行一次。
+- `uploadPortfolio` disables wallet Session handling and uses `unlockPolicy='none'`. The default
+  `uiMode='silent'` maps to `protocolV2UiMode='none'`; `uiMode='progress'` maps to
+  `protocolV2UiMode='auto'` only to expose transfer progress and lifecycle close events. Neither mode
+  emits `DeviceSessionAskPin`, and the file-write/apply sequence runs only once.
 
 ## 地址、公钥、签名和设备管理
 

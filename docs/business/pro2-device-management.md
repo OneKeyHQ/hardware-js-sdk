@@ -49,15 +49,16 @@ App 只展示“请在设备上操作”，不调用 `uiResponse()`。API `Succe
 - `packages/core/src/api/protocol-v2/DeviceSettingsSet.ts`
 - `packages/core/src/api/protocol-v2/DeviceSettingsPageShow.ts`
 
-## Portfolio 更新
+## Portfolio update
 
-`uploadPortfolio` 是后台文件同步与应用流程，不需要设备确认：
+`uploadPortfolio` stages and applies a package without device confirmation:
 
-- 调用方传入不带 data URL 前缀的 `packageBase64`；LowLevel SDK 严格校验并解码为设备分片。
-- 文件写入固定关闭分片进度 Event。
-- SDK 不生成 `REQUEST_PIN` 或 `REQUEST_BUTTON`，也不触发钱包解锁。
-- firmware 直接校验 pending package、更新 Portfolio 数据并返回最终 `Success/Failure`。
-- App 以 `PortfolioUpdate` 最终响应为准，不等待设备页面。
+- The caller passes `packageBase64` without a data URL prefix. The LowLevel SDK validates it strictly and decodes it into device chunks.
+- `uiMode` defaults to `silent`, which disables transfer progress events and Protocol V2 UI lifecycle events.
+- `uiMode='progress'` emits `DEVICE_PROGRESS` while staging the file and emits `CLOSE_UI_WINDOW` when the operation ends.
+- Neither mode emits `REQUEST_PIN` or `REQUEST_BUTTON`, and neither mode unlocks the wallet.
+- Firmware validates the pending package, updates Portfolio data, and returns the final `Success/Failure` response.
+- The App treats the final `PortfolioUpdate` response as authoritative; progress events do not determine success.
 
 ## 壁纸上传
 

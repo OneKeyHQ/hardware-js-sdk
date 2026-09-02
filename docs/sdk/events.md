@@ -285,8 +285,11 @@ Pro2 设置页 Event 还会携带 `source='method-lifecycle'`、`reason`、`comp
 `uiResponse()`；安装进度继续通过 `FIRMWARE_TIP` 与 `FIRMWARE_PROGRESS` 通知。
 `completion='page-accepted'` 表示 API 成功只证明设备页面已打开，不代表用户已经完成或确认设置。
 
-`uploadPortfolio` 不属于设备确认流程：SDK 不为它生成 `REQUEST_BUTTON/REQUEST_PIN`，文件写入也关闭
-`DEVICE_PROGRESS`。其成功与失败只以最终 `PortfolioUpdate` 响应为准。
+`uploadPortfolio` is not a device-confirmation flow. Its default `uiMode='silent'` emits no
+`REQUEST_BUTTON`, `REQUEST_PIN`, `DEVICE_PROGRESS`, or Protocol V2 UI lifecycle event. With
+`uiMode='progress'`, it emits `DEVICE_PROGRESS` during file staging and `CLOSE_UI_WINDOW` when the
+operation ends, but still emits no confirmation or unlock request. Only the final `PortfolioUpdate`
+response determines success or failure.
 
 ### `REQUEST_PASSPHRASE_ON_DEVICE`
 
