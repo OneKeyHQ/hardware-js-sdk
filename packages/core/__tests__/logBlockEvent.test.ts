@@ -130,7 +130,7 @@ describe('getLogBlockLabel', () => {
   );
 
   it.each(['evmSignMessage', 'btcSignMessage', 'evmSignTransaction'])(
-    'blocks request and response payload logging for signing method %s',
+    'identifies signing method %s for safe logging',
     method => {
       expect(getLogBlockLabel({ method, message: 'sensitive signing payload' })).toBe(method);
       expect(
@@ -141,6 +141,241 @@ describe('getLogBlockLabel', () => {
       ).toBe(method);
     }
   );
+
+  it('reveals signing request fields in debug logs while redacting red-line secrets', () => {
+    const request = {
+      event: 'iframe-call',
+      type: 'iframe-call',
+      payload: {
+        method: 'btcSignMessage',
+        path: "m/44'/0'/0'/0/0",
+        messageHex: '68656c6c6f',
+        noScriptType: true,
+        coin: 'Bitcoin',
+        passphraseState: 'wallet-identifier-for-qa',
+        useEmptyPassphrase: false,
+        keepSession: true,
+        initSession: false,
+        passphrase: 'hidden-wallet-secret',
+        private_key: 'private-key-secret',
+        privateKeyHex: 'private-key-hex-secret',
+        mnemonic: 'mnemonic-secret',
+        nested: {
+          apiKey: 'api-key-secret',
+          sessionId: 'session-secret',
+        },
+        accounts: [
+          {
+            seed: 'seed-secret',
+            xprv: 'xprv-secret',
+            entropy: 'entropy-secret',
+            password: 'password-secret',
+            token: 'token-secret',
+            credential: 'credential-secret',
+            pin: 'pin-secret',
+            accessToken: 'access-token-secret',
+            auth_token: 'auth-token-secret',
+            bearerToken: 'bearer-token-secret',
+            'refresh-token': 'refresh-token-secret',
+            secret: 'generic-secret',
+            words: 'recovery-words',
+          },
+        ],
+      },
+    };
+
+    expect(getSafeLogPayload(request, 'btcSignMessage', { revealSigningPayload: true })).toEqual({
+      event: 'iframe-call',
+      type: 'iframe-call',
+      payload: {
+        method: 'btcSignMessage',
+        path: "m/44'/0'/0'/0/0",
+        messageHex: '68656c6c6f',
+        noScriptType: true,
+        coin: 'Bitcoin',
+        passphraseState: 'wallet-identifier-for-qa',
+        useEmptyPassphrase: false,
+        keepSession: true,
+        initSession: false,
+        passphrase: '[REDACTED]',
+        private_key: '[REDACTED]',
+        privateKeyHex: '[REDACTED]',
+        mnemonic: '[REDACTED]',
+        nested: {
+          apiKey: '[REDACTED]',
+          sessionId: '[REDACTED]',
+        },
+        accounts: [
+          {
+            seed: '[REDACTED]',
+            xprv: '[REDACTED]',
+            entropy: '[REDACTED]',
+            password: '[REDACTED]',
+            token: '[REDACTED]',
+            credential: '[REDACTED]',
+            pin: '[REDACTED]',
+            accessToken: '[REDACTED]',
+            auth_token: '[REDACTED]',
+            bearerToken: '[REDACTED]',
+            'refresh-token': '[REDACTED]',
+            secret: '[REDACTED]',
+            words: '[REDACTED]',
+          },
+        ],
+      },
+    });
+  });
+
+  it('keeps signing request payloads blocked when debug reveal is not requested', () => {
+    expect(
+      getSafeLogPayload({ method: 'btcSignMessage', messageHex: '68656c6c6f' }, 'btcSignMessage')
+    ).toEqual({
+      method: 'btcSignMessage',
+      payload: '[REDACTED]',
+    });
+  });
+
+  it('handles circular arrays in debug signing payloads', () => {
+    const accounts: unknown[] = [{ secret: 'generic-secret' }];
+    accounts.push(accounts);
+
+    expect(
+      getSafeLogPayload({ method: 'btcSignMessage', accounts }, 'btcSignMessage', {
+        revealSigningPayload: true,
+      })
+    ).toEqual({
+      method: 'btcSignMessage',
+      accounts: [{ secret: '[REDACTED]' }, '[CIRCULAR]'],
+    });
+  });
+
+  it('keeps safe signing request metadata visible without debug reveal', () => {
+    expect(
+      getSafeLogPayload(
+        {
+          event: 'iframe-call',
+          payload: {
+            method: 'evmSignTransaction',
+            path: "m/44'/60'/0'/0/0",
+            transaction: {
+              chainId: 1,
+              txType: 2,
+              to: '0xrecipient',
+              data: '0xcontract-call-data',
+            },
+          },
+        },
+        'evmSignTransaction'
+      )
+    ).toEqual({
+      method: 'evmSignTransaction',
+      chainId: 1,
+      transactionType: 2,
+    });
+
+    expect(
+      getSafeLogPayload(
+        {
+          method: 'btcSignTransaction',
+          coin: 'Bitcoin',
+          inputs: [{ prev_hash: 'input-1' }, { prev_hash: 'input-2' }],
+          outputs: [{ address: 'recipient' }],
+          refTxs: [{ hash: 'previous-transaction' }],
+        },
+        'btcSignTransaction'
+      )
+    ).toEqual({
+      method: 'btcSignTransaction',
+      coin: 'Bitcoin',
+      inputCount: 2,
+      outputCount: 1,
+    });
+  });
+
+  it('keeps signing success responses minimal', () => {
+    expect(
+      getSafeLogPayload(
+        {
+          success: true,
+          payload: {
+            signature: 'signature-secret',
+            address: 'address-for-wallet-correlation',
+          },
+        },
+        'btcSignMessage',
+        { revealSigningPayload: true }
+      )
+    ).toEqual({
+      method: 'btcSignMessage',
+      success: true,
+    });
+  });
+
+  it('keeps the original SDK signing error while omitting error params', () => {
+    expect(
+      getSafeLogPayload(
+        {
+          success: false,
+          payload: {
+            code: 'DeviceBusy',
+            error: 'Original SDK device error',
+            params: {
+              connectId: 'connect-id',
+              deviceId: 'device-id',
+              passphrase: 'hidden-wallet-secret',
+            },
+          },
+        },
+        'btcSignMessage',
+        { revealSigningPayload: true }
+      )
+    ).toEqual({
+      method: 'btcSignMessage',
+      success: false,
+      code: 'DeviceBusy',
+      error: 'Original SDK device error',
+    });
+  });
+
+  it('does not serialize non-string signing error values', () => {
+    expect(
+      getSafeLogPayload(
+        {
+          success: false,
+          payload: {
+            code: 500,
+            error: { passphrase: 'hidden-wallet-secret' },
+          },
+        },
+        'btcSignMessage'
+      )
+    ).toEqual({
+      method: 'btcSignMessage',
+      success: false,
+      code: 500,
+    });
+  });
+
+  it('never reveals sensitive UI or resource upload payloads through debug logging', () => {
+    expect(
+      getSafeLogPayload(
+        { type: UI_RESPONSE.RECEIVE_PIN, payload: '1234' },
+        UI_RESPONSE.RECEIVE_PIN,
+        { revealSigningPayload: true }
+      )
+    ).toEqual({
+      method: UI_RESPONSE.RECEIVE_PIN,
+      payload: '[REDACTED]',
+    });
+    expect(
+      getSafeLogPayload({ method: 'deviceUploadNft', data: 'large-base64' }, 'deviceUploadNft', {
+        revealSigningPayload: true,
+      })
+    ).toEqual({
+      method: 'deviceUploadNft',
+      payload: '[REDACTED]',
+    });
+  });
 
   it('keeps ordinary API requests and responses visible', () => {
     const request = { method: 'getDeviceState', connectId: 'connect-id', scope: 'runtime' };
