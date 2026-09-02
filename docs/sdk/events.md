@@ -7,7 +7,7 @@
 
 This document describes the public events that the OneKey `hd-*` SDK exposes to the App: who generates them, which events pause a call, how the App sends results back, and how device, firmware, and runtime notifications are dispatched.
 
-For Protocol V2 / Pro2, "eventless" means firmware no longer sends UI intermediate messages that wait for a Host ACK. The SDK still collects one wallet-access intent through a Passphrase Event, then actively sends `DeviceSessionAskPin` / `DeviceSessionAskPassphrase` / `DeviceSessionGet`. The current wallet flow follows [SDK Core runtime](./core-runtime.md#钱包-session).
+For Protocol V2 / Pro2, "eventless" means firmware no longer sends UI intermediate messages that wait for a Host ACK. The SDK still collects one wallet-access intent through a Passphrase Event, then actively sends `DeviceSessionAskPin` / `DeviceSessionAskPassphrase` / `DeviceSessionGet`. The current wallet flow follows [SDK Core runtime](./core-runtime.md#wallet-session).
 
 These public events do not all come from hardware. When maintaining events, first distinguish device-protocol intermediate messages, `hd-*` SDK public events, and `hwk-*` Adapter public events.
 
