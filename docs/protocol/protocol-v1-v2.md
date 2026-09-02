@@ -1,263 +1,263 @@
-# Protocol V1/V2 传输协议
+# Protocol V1/V2 Transport Protocol
 
-本文是 SDK 传输协议的唯一维护入口，说明协议探测、Schema、帧格式、Link 生命周期以及 USB/BLE 平台边界。业务字段如何转换为公共 API 不属于本文，见 [SDK Core 运行时](../sdk/core-runtime.md)。
+This document is the single maintained entry point for the SDK transport protocol. It covers protocol detection, schemas, frame format, Link lifecycle, and USB/BLE platform boundaries. How business fields map to the public API is out of scope; see [SDK Core Runtime](../sdk/core-runtime.md).
 
-## 分层与职责
+## Layers and Responsibilities
 
 ```text
 Core / DeviceCommands
-  -> Protocol Session：消息编解码、帧、序列号、超时、调用串行化
-  -> Transport adapter：连接、原生读写、订阅、平台错误映射
+  -> Protocol Session: message encode/decode, frames, sequence numbers, timeouts, call serialization
+  -> Transport adapter: connection, native read/write, subscription, platform error mapping
   -> USB / BLE
   -> Hardware
 ```
 
-传输层的职责终止于：识别设备协议、建立可用 Link、发送一个已编码请求并返回对应响应。Features 映射、钱包 Session、设置、文件上传和固件升级编排由 Core 负责。
+The transport layer's responsibility ends at: identifying the device protocol, establishing a usable Link, sending one encoded request, and returning the corresponding response. Features mapping, wallet Session, settings, file upload, and firmware-upgrade orchestration are Core's responsibility.
 
-## V1 与 V2 核心差异
+## Core Differences Between V1 and V2
 
-| 维度     | Protocol V1                  | Protocol V2                                                                                    |
+| Dimension | Protocol V1 | Protocol V2 |
 | -------- | ---------------------------- | ---------------------------------------------------------------------------------------------- |
-| 当前设备 | Classic、Mini、Touch、Pro 等 | 当前为 Pro2，后续可扩展到 Pro 等机型                                                           |
-| 初始化   | `Initialize -> Features`     | `Ping` 探测，随后读取 `DeviceInfo` 与 `ProtocolInfo`；仅 application 按能力读取 `DeviceStatus` |
-| 消息编号 | protobuf message type        | `MessageType`，按系统模块分组                                                                  |
-| 帧       | V1 分包格式                  | `0x5A` 帧头、长度、序列号、CRC8                                                                |
-| Schema   | 可按固件版本切换             | 独立 `messages-protocol-v2.json`                                                               |
-| 调用模型 | 既有 Transport 调用链        | 每设备 Link、串行队列、持续递增 sequence                                                       |
-| 失败恢复 | 沿用 V1 Transport 语义       | link-fatal 失效 Link，不自动重放业务命令                                                       |
+| Current devices | Classic, Mini, Touch, Pro, and others | Currently Pro2; may later extend to Pro and other models |
+| Initialization | `Initialize -> Features` | Probe with `Ping`, then read `DeviceInfo` and `ProtocolInfo`; only the application reads `DeviceStatus` according to capability |
+| Message numbering | protobuf message type | `MessageType`, grouped by system module |
+| Frame | V1 packetization format | `0x5A` header, length, sequence number, CRC8 |
+| Schema | Can switch by firmware version | Independent `messages-protocol-v2.json` |
+| Call model | Existing Transport call chain | Per-device Link, serial queue, continuously incrementing sequence |
+| Failure recovery | Follows V1 Transport semantics | link-fatal invalidates the Link; does not automatically replay business commands |
 
-V1 与 V2 的判断必须依据连接后的设备响应，不能只依赖 PID、设备名或 USB descriptor。
+Distinguishing V1 from V2 must be based on the device response after connection; it cannot rely only on PID, device name, or USB descriptor.
 
-Protocol V2 的 `ProtocolInfoRequest` 同时承担运行阶段查询和 eventless wallet session 策略协商。
-Core 固定发送 `eventless_wallet_session=true`，同一活动 Link 只在首次使用时协商；并发首次读取合并
-为一个请求，disconnect/reboot/wipe 后重新协商。固件对重复 `true` 请求保持幂等，避免查询能力时
-意外清除钱包 Session。
+Protocol V2's `ProtocolInfoRequest` serves both runtime-phase queries and eventless wallet session policy negotiation.
+Core always sends `eventless_wallet_session=true`, and the same active Link negotiates only on first use; concurrent first reads are merged
+into a single request, and negotiation happens again after disconnect/reboot/wipe. Firmware treats repeated `true` requests as idempotent, so querying capabilities does
+not accidentally clear the wallet Session.
 
-## 自动协议探测
+## Automatic Protocol Detection
 
-Transport 在 `acquire()` 完成物理连接后执行协议探测：
+Transport performs protocol detection after `acquire()` completes the physical connection:
 
-1. 搜索和首次连接不传 `connectProtocol`，由活动响应确认协议；显式
-   `forceProtocolDetection=true` 同样绕过已绑定协议。
-2. 初次探测没有内部 hint 时，默认先验证 V1 `Initialize`；未确认的 hint 只能改变本次探测顺序。
-3. WebUSB 的 V1 probe 失败后必须关闭并重新打开连接，再执行 V2 probe，避免未取消的
-   `transferIn` 消费 V2 响应。
-4. 两者均失败时，清理本次连接资源；WebUSB 公共调用返回 `DeviceNotFound`，具体 probe
-   失败原因仅保留在 Transport 调试日志中。
+1. Search and first connection do not pass `connectProtocol`; the protocol is confirmed by the live response. Explicit
+   `forceProtocolDetection=true` likewise bypasses an already-bound protocol.
+2. On first detection with no internal hint, V1 `Initialize` is verified first by default; an unconfirmed hint can only change the probe order for this attempt.
+3. After a WebUSB V1 probe fails, the connection must be closed and reopened before the V2 probe, so an uncancelled
+   `transferIn` does not consume the V2 response.
+4. If both fail, clean up this connection's resources. WebUSB public calls return `DeviceNotFound`; the specific probe
+   failure reasons are kept only in Transport debug logs.
 
-协议选择输入分为两种语义，二者都不能替代活动响应验证：
+Protocol-selection inputs have two semantics; neither can replace live-response verification:
 
-- 公共请求中的 `connectProtocol` 映射为严格的 `expectedProtocol`。它用于调用方确实要求某一协议的
-  场景，不允许静默回退。
-- 尚未确认的 Transport 内部缓存只能作为非严格 `protocolHint`，只改变首次 probe 顺序，失败后必须
-  尝试另一协议；设备名、PID 或 USB descriptor 不能产生协议结论。
-- 活动响应确认后，Core 把协议记录到设备 descriptor。后续 acquire 将这个已确认值作为严格
-  `expectedProtocol`，不再静默切换协议。
-- App 可通过 `setDeviceConnectProtocol(connectId, protocol)` 恢复持久化结果。绑定按 endpoint 隔离，
-  所有后续公共 SDK 调用都会自动注入；同一物理设备的 USB/BLE connectId 由 App 分别绑定。
+- `connectProtocol` on a public request maps to a strict `expectedProtocol`. It is for cases where the caller truly requires a specific protocol;
+  silent fallback is not allowed.
+- Unconfirmed Transport-internal cache can only serve as a non-strict `protocolHint`. It only changes the first probe order; after failure the other protocol
+  must be tried. Device name, PID, or USB descriptor cannot produce a protocol conclusion.
+- After the live response confirms the protocol, Core records it on the device descriptor. Subsequent acquire uses this confirmed value as a strict
+  `expectedProtocol` and no longer switches protocol silently.
+- The App can restore a persisted result via `setDeviceConnectProtocol(connectId, protocol)`. Binding is isolated per endpoint;
+  all subsequent public SDK calls inject it automatically. The App binds USB/BLE connectIds of the same physical device separately.
 
-严格预期的验证规则：
+Strict-expectation verification rules:
 
-- `connectProtocol='V1'`：必须收到有效的 V1 响应。
-- `connectProtocol='V2'`：必须收到有效的 V2 `Ping` 响应，不能只信任 PID、设备名或未确认的缓存。
-- 唯一例外是已经通过活动响应确认过 V2 的同一 BLE endpoint，在
-  `DeviceFirmwareUpdateRequest` 引发预期断链后的 install polling 重连。部分 loader 在安装期间不响应
-  通用 `Ping`，此时 Transport 只恢复已确认的 V2 路由，Core 必须立即发送幂等的
-  `DeviceFirmwareUpdateStatusGet`；其有效响应才证明新链路可用。该例外不能用于普通 reconnect、首次连接、
-  身份判断或其他业务请求。
+- `connectProtocol='V1'`: a valid V1 response must be received.
+- `connectProtocol='V2'`: a valid V2 `Ping` response must be received; PID, device name, or unconfirmed cache must not be trusted alone.
+- The only exception is the same BLE endpoint that has already been confirmed as V2 by a live response, during
+  install-polling reconnect after `DeviceFirmwareUpdateRequest` caused an expected disconnect. Some loaders do not respond to a generic
+  `Ping` during install; Transport then only restores the already-confirmed V2 route, and Core must immediately send the idempotent
+  `DeviceFirmwareUpdateStatusGet`. Only a valid response to that request proves the new link is usable. This exception must not be used for ordinary reconnect, first connection,
+  identity judgment, or other business requests.
 
-V2 probe 使用 `Ping { message: 'protocol-v2-probe' }`。探测消息只用于确认链路，不等同于查询协议版本或设备信息。
+The V2 probe uses `Ping { message: 'protocol-v2-probe' }`. The probe message is only for confirming the link; it is not equivalent to querying protocol version or device information.
 
-公共设备对象同样使用 `connectProtocol` 字段作为输出，但输出语义是当前连接已经活动探测确认的协议，
-不是原请求值。Core 的方法能力检查只读取该确认结果。设备型号独立来自 V1 `Features` 或 V2
-`DeviceInfo.hw.Device_type`；例如未来 Pro 返回 V2 时仍应识别为 Pro，而不是因为协议为 V2 被改成 Pro2。
+The public device object also uses the `connectProtocol` field as output, but the output semantics are the protocol already confirmed by live detection on the current connection,
+not the original request value. Core method capability checks only read this confirmed result. Device model comes independently from V1 `Features` or V2
+`DeviceInfo.hw.Device_type`; for example, a future Pro that returns V2 should still be identified as Pro, not rewritten as Pro2 because the protocol is V2.
 
-普通 disconnect/reconnect 不清除已确认协议；只有调用方显式要求重新探测，或设备身份被清除时，
-才允许回到无固定协议的探测路径。
+Ordinary disconnect/reconnect does not clear the confirmed protocol. Only when the caller explicitly requests re-detection, or device identity is cleared,
+is it allowed to return to the unbound detection path.
 
-主要实现：
+Primary implementations:
 
 - `packages/hd-transport/src/protocols/v2/session.ts`
-- 各 Transport 的 `detectProtocol()` / `acquire()`
+- Each Transport's `detectProtocol()` / `acquire()`
 - `packages/core/src/device/Device.ts`
 
-## Schema 与消息分类
+## Schema and Message Classification
 
-`TransportManager` 同时加载：
+`TransportManager` loads both:
 
-- V1 默认 Schema：`packages/hd-transport/messages.json`
-- V2 Schema：`packages/hd-transport/messages-protocol-v2.json`
+- V1 default schema: `packages/hd-transport/messages.json`
+- V2 schema: `packages/hd-transport/messages-protocol-v2.json`
 
-V1 可以在 `Initialize` 后根据 Features 和固件版本切换兼容 Schema。V2 不走传统 `GetFeatures`，其 Schema 路由与 V1 版本兼容逻辑保持分离。
+V1 may switch a compatible schema after `Initialize` based on Features and firmware version. V2 does not use the traditional `GetFeatures`; its schema routing stays separate from V1 version-compatibility logic.
 
-V2 消息编号以 firmware-pro2 的 `MessageType` 定义为准，按系统能力分组，例如设备信息、设备状态、Session、设置、文件系统和固件更新。新增消息时的更新顺序是：
+V2 message numbers follow firmware-pro2's `MessageType` definitions and are grouped by system capability, for example device info, device status, Session, settings, filesystem, and firmware update. The update order when adding a message is:
 
-1. 修改 firmware-pro2 protobuf 来源。
-2. 运行 `yarn update-protobuf` 更新 Schema 与生成类型。
-3. 在 `DeviceCommands` 或 Core method 中接入消息。
-4. 若消息改变公共能力，再更新 SDK 文档。
+1. Modify the firmware-pro2 protobuf source.
+2. Run `yarn update-protobuf` to update the schema and generated types.
+3. Wire the message into `DeviceCommands` or a Core method.
+4. If the message changes a public capability, then update the SDK docs.
 
-不要在传输协议文档中重复记录每个业务字段；字段归属见 [Pro2 字段迁移](../sdk/pro2-field-migration.md)。
+Do not duplicate every business field in the transport protocol docs; field ownership is in [Pro2 Field Migration](../sdk/pro2-field-migration.md).
 
-## Protocol V2 帧格式
+## Protocol V2 Frame Format
 
-V2 帧用于承载 protobuf payload。维护时重点关注以下字段：
+V2 frames carry protobuf payloads. When maintaining them, focus on these fields:
 
-| 字段           | 作用                                                 |
+| Field | Role |
 | -------------- | ---------------------------------------------------- |
-| magic          | 固定帧标识 `0x5A`                                    |
-| message type   | 请求或响应的消息编号                                 |
-| payload length | protobuf payload 长度                                |
-| sequence       | 每个发送方向独立、跨 channel/source 递增的全局帧序号 |
-| payload        | protobuf 编码结果                                    |
-| CRC8           | 帧完整性校验                                         |
+| magic | Fixed frame identifier `0x5A` |
+| message type | Message number of the request or response |
+| payload length | Length of the protobuf payload |
+| sequence | Per-send-direction independent global frame sequence that increments across channel/source |
+| payload | Protobuf encoding result |
+| CRC8 | Frame integrity check |
 
-编码、解码和长度校验必须使用同一套公共实现。BLE notification 或 USB 读取可能返回半帧、多帧或旧连接数据，因此原生读取结果不能直接交给 protobuf 解码。
+Encoding, decoding, and length checks must use the same shared implementation. BLE notifications or USB reads may return a partial frame, multiple frames, or data from an old connection, so native read results must not be passed directly to protobuf decoding.
 
-完整 V2 frame 的 SDK 上限与 firmware Proto Link runtime 一致，固定为 **4200 bytes**，
-包含帧头、protobuf message type、payload 和 CRC。业务分片必须在编码前预留 protobuf
-开销；不能把文件 chunk 大小直接当成 frame 上限。
+The SDK upper bound for a complete V2 frame matches the firmware Proto Link runtime and is fixed at **4200 bytes**,
+including the frame header, protobuf message type, payload, and CRC. Business fragmentation must reserve protobuf
+overhead before encoding; file chunk size must not be treated as the frame limit.
 
-主要实现：
+Primary implementations:
 
 - `packages/hd-transport/src/protocols/v2/encode.ts`
 - `packages/hd-transport/src/protocols/v2/decode.ts`
 - `packages/hd-transport/src/protocols/v2/frame-assembler.ts`
 - `packages/hd-transport/src/protocols/v2/session.ts`
 
-## Link、Sequence 与调用队列
+## Link, Sequence, and Call Queue
 
-每个 Transport 实例持有一个 `ProtocolV2LinkManager`：
+Each Transport instance holds one `ProtocolV2LinkManager`:
 
-- Link 按设备 key 隔离。
-- 同一设备的 V2 调用串行执行。
-- Session、frame assembler 与平台 adapter 在活动 Link 内复用。
-- `ProtocolV2SequenceCursor` 的生命周期长于一次连接；普通断开和重连不会把 sequence 重置为 1。
-- Transport `dispose` 时才清除 cursor、队列和全部 Link。
-- ACK 的 sequence 必须回显本次请求 sequence；设备业务响应使用固件全局发送序列，
-  该序列会被其他 channel/source 占用。SDK 必须允许合法间隙，但拒绝当前 Link 中连续收到
-  相同业务响应序号；不能把业务响应 sequence 与请求 sequence 强行比较。
-- 同一个有限 watchdog 覆盖 `prepareCall`、完整 frame 写入和响应读取；调用未指定时使用
-  共享的 5 分钟默认值，超时信号必须传给平台 adapter 以取消当前 generation 的工作。
-- ACK 与业务响应共用同一个调用超时，不设置独立的交付看门狗；未在 5 秒内收到 ACK
-  不能判定链路失败，因为设备可能正在正常等待用户输入。
-- Session 不自动重发请求；文件写入、设置和固件安装等副作用请求的重试只能由了解
-  业务幂等性的 Core 流程决定。
+- Links are isolated by device key.
+- V2 calls on the same device execute serially.
+- Session, frame assembler, and platform adapter are reused within the active Link.
+- The lifetime of `ProtocolV2SequenceCursor` is longer than one connection; ordinary disconnect and reconnect do not reset sequence to 1.
+- Cursor, queue, and all Links are cleared only on Transport `dispose`.
+- An ACK sequence must echo this request's sequence. Device business responses use the firmware global send sequence,
+  which other channel/source traffic may occupy. The SDK must allow legitimate gaps, but must reject consecutive identical
+  business-response sequence numbers on the current Link. It must not forcibly compare business-response sequence with request sequence.
+- A single finite watchdog covers `prepareCall`, complete frame write, and response read. When the call does not specify one,
+  the shared 5-minute default is used. The timeout signal must be passed to the platform adapter so work of the current generation can be cancelled.
+- ACK and business response share the same call timeout; there is no separate delivery watchdog. Not receiving an ACK within 5 seconds
+  must not be treated as link failure, because the device may be waiting for user input normally.
+- Session does not automatically resend requests. Retries of side-effecting requests such as file write, settings, and firmware install can only be decided by Core flows
+  that understand business idempotency.
 
-Link-fatal 错误包括响应超时、断连、I/O、generation 失效和帧错误。发生后必须先使 Link
-失效，再取消读取、清空 assembler、关闭平台连接并清理协议缓存。
+Link-fatal errors include response timeout, disconnect, I/O, generation invalidation, and frame errors. After they occur, first invalidate the Link,
+then cancel reads, clear the assembler, close the platform connection, and clean protocol cache.
 
-protobuf `Failure` 属于设备业务响应，默认不使 Link 失效。Transport 也不得自动重发业务
-命令，因为文件写入、设置和固件安装可能已经在设备端产生副作用。
+protobuf `Failure` is a device business response and does not invalidate the Link by default. Transport also must not automatically resend business
+commands, because file write, settings, and firmware install may already have produced side effects on the device.
 
-## Generation 与旧异步结果隔离
+## Generation and Isolation of Stale Async Results
 
-USB open、claim、reset 或 reconnect 后需要轮换 generation。BLE 重新订阅 notification 时也必须隔离旧订阅回调。
+Generation must be rotated after USB open, claim, reset, or reconnect. When BLE resubscribes to notifications, old subscription callbacks must also be isolated.
 
-任何异步读取在完成时都要确认自己仍属于当前 generation；否则立即丢弃或失败。这个规则用于防止：
+Any async read must confirm it still belongs to the current generation when it completes; otherwise it is discarded or failed immediately. This rule prevents:
 
-- 旧连接的迟到响应被新请求消费。
-- dispose 后仍有读取任务写入 assembler。
-- 重连后旧 notification 继续触发解码。
+- A late response from an old connection being consumed by a new request.
+- A read task still writing into the assembler after dispose.
+- An old notification continuing to trigger decode after reconnect.
 
 ## USB Transport
 
-Node USB 与 WebUSB 共享 `ProtocolV2UsbTransportBase`，差异只存在于原生设备 API：
+Node USB and WebUSB share `ProtocolV2UsbTransportBase`; differences exist only in the native device API:
 
-- 发现 interface 和 IN/OUT endpoint。
-- open、select configuration、claim interface。
-- 按完整 V2 frame 写入 OUT endpoint。
-- 从 IN endpoint 持续读取并交给公共 assembler。
-- 在 reset、reconnect 和 dispose 时轮换 generation 并取消旧读取。
+- Discover the interface and IN/OUT endpoints.
+- open, select configuration, claim interface.
+- Write a complete V2 frame to the OUT endpoint.
+- Continuously read from the IN endpoint and hand data to the shared assembler.
+- Rotate generation and cancel old reads on reset, reconnect, and dispose.
 
-WebUSB 还需要处理浏览器授权、页面生命周期和浏览器返回的 `USBInTransferResult`；Node USB 负责原生设备句柄与 transfer 错误映射。这些差异不能改变公共 Session 的超时和重试语义。
-WebUSB 不得在每次调用前单独清空 assembler；assembler 与响应序列链只随 link generation
-一起失效。router、packet source、ACK/响应 sequence、framing/CRC 和超时统一使用类型化
-Link 错误，并触发 session、assembler、读取状态和平台连接重建。
+WebUSB also needs to handle browser authorization, page lifecycle, and the `USBInTransferResult` returned by the browser; Node USB is responsible for native device handles and transfer error mapping. These differences must not change the public Session timeout and retry semantics.
+WebUSB must not separately clear the assembler before every call; the assembler and response sequence chain become invalid only with the link generation.
+Router, packet source, ACK/response sequence, framing/CRC, and timeout all use typed Link errors and trigger rebuild of
+session, assembler, read state, and platform connection.
 
-主要实现：
+Primary implementations:
 
 - `packages/hd-transport/src/protocols/v2/usb-transport-base.ts`
-- `packages/hd-transport-web-device/src/` 下的 WebUSB 与 Node USB 实现
+- WebUSB and Node USB implementations under `packages/hd-transport-web-device/src/`
 
 ## BLE Transport
 
-BLE 平台实现包括 Electron、React Native 和 lowlevel 插件。公共约束如下：
+BLE platform implementations include Electron, React Native, and the lowlevel plugin. Shared constraints:
 
-- 连接后发现服务和特征，先建立 notification 订阅，再开始协议调用。
-- OneKey 通信服务使用 `0001`，写特征使用 `0002`，notification 特征使用 `0003`；连接后的
-  服务解析和订阅不能选择 Find My/FIDO 的 `fffd` 服务。
-- Protocol V2 完整 frame 统一由 `ProtocolV2BleFrameWriter` 按平台 MTU 或插件上限分包；
-  平台 adapter 只提供单包写入、容量、节流参数和平台错误映射。Protocol V1 保持原有分包协议，
-  不进入该 writer。
-- React Native 的 Protocol V2 大 frame 写入依赖原生 BLE 栈的无响应写背压，不增加固定
-  burst 或 flush pause；只对明确的 `GATT_CONGESTED` 做有界退避重试，断连或 generation
-  变化立即中止，不能跨连接继续写。
-- notification 数据统一进入 `ProtocolV2FrameAssembler`，不能假设一次通知就是一帧。
-- Electron BLE 在 V1/V2 probe 回退时只轮换 renderer notification token 和协议缓冲，不断开或
-  重新订阅 GATT；未配对设备因此只触发一次系统配对流程。
-- 重连或重新订阅后，旧回调必须通过 generation/token 失效。
-- lowlevel 插件只提供连接、读写和订阅能力，不复制协议状态机。
+- After connecting, discover services and characteristics, establish the notification subscription first, then start protocol calls.
+- The OneKey communication service uses `0001`, the write characteristic uses `0002`, and the notification characteristic uses `0003`. After connection,
+  service resolution and subscription must not select the Find My/FIDO `fffd` service.
+- Complete Protocol V2 frames are uniformly packetized by `ProtocolV2BleFrameWriter` according to platform MTU or plugin limits;
+  the platform adapter only provides single-packet write, capacity, throttling parameters, and platform error mapping. Protocol V1 keeps its original packetization protocol
+  and does not enter this writer.
+- React Native Protocol V2 large-frame writes rely on the native BLE stack's write-without-response backpressure and do not add a fixed
+  burst or flush pause. Bounded backoff retry is used only for explicit `GATT_CONGESTED`; disconnect or generation
+  change aborts immediately, and writes must not continue across connections.
+- Notification data uniformly enters `ProtocolV2FrameAssembler`; a single notification must not be assumed to be one frame.
+- On V1/V2 probe fallback, Electron BLE only rotates the renderer notification token and protocol buffers; it does not disconnect or
+  resubscribe GATT. Unpaired devices therefore trigger the system pairing flow only once.
+- After reconnect or resubscribe, old callbacks must be invalidated via generation/token.
+- The lowlevel plugin only provides connect, read/write, and subscribe capabilities; it does not duplicate the protocol state machine.
 
-### Pro2 Find My 广播名称
+### Pro2 Find My Advertisement Name
 
-Pro2 绑定 Find My 后，通信广播的名称会在原 BLE 名称末尾附加 Find My 标记。真机已观察到的
-代表性格式为 `Pro2 <4 位标识> - Find My`，同一通信广播可同时包含 `180a`、`180f`、`fffd`
-和 `0001`。因此设备识别必须遵循以下顺序：
+After Pro2 is bound to Find My, the communication advertisement name appends a Find My marker to the original BLE name. The representative format observed on real devices
+is `Pro2 <4-digit identifier> - Find My`. The same communication advertisement may contain `180a`, `180f`, `fffd`,
+and `0001` at once. Device identification must therefore follow this order:
 
-1. 广播包含 `0001` 通信服务时按 OneKey 通信端点处理，即使名称带 Find My 且同时包含 `fffd`。
-2. 只有 `fffd`、没有 `0001` 的广播不是 OneKey 通信端点，不进入连接和订阅流程。
-3. 名称只用于搜索结果的友好展示和兼容回退，不用于推导协议版本；协议仍由连接后的活动响应确认。
+1. If the advertisement contains the `0001` communication service, treat it as a OneKey communication endpoint even when the name has Find My and also contains `fffd`.
+2. An advertisement that has only `fffd` and no `0001` is not a OneKey communication endpoint and must not enter the connect and subscribe flow.
+3. The name is only for friendly display of search results and compatibility fallback, not for inferring protocol version. Protocol is still confirmed by the live response after connection.
 
-名称格式不得按单个固定字符串严格匹配。SDK 识别时忽略空格和连字符差异，并兼容固件历史拼写
-`Finde My`；例如 `Find My`、`FindMy`、`Find-My` 和 `Finde My` 都视为末尾标记。设备信息字段
-可能受长度限制，把标记截断为 `Fin`、`Find` 或 `FindM`，这些前缀也按末尾标记处理。向上层展示
-时仅移除名称末尾的该标记，保留原设备名前缀和 BLE peripheral id；类似 `Pro2 Griffin` 的普通
-名称不能被误删。Android 无 service UUID 的已配对回退可以把完整 Find My 后缀加名称中的
-`pro2` 视为非通信端点，但不能用这套更宽的规则去剥离展示名。Neo 不具备 Find My，不能把
-这套名称规则用于推导 Neo 能力。
+Name format must not be strictly matched against a single fixed string. SDK recognition ignores space and hyphen differences and is compatible with the historical firmware spelling
+`Finde My`; for example `Find My`, `FindMy`, `Find-My`, and `Finde My` are all treated as the trailing marker. Device-info fields
+may be length-limited and truncate the marker to `Fin`, `Find`, or `FindM`; these prefixes are also treated as the trailing marker. When displaying to upper layers,
+only remove that marker from the end of the name, keeping the original device-name prefix and BLE peripheral id. Ordinary names such as `Pro2 Griffin`
+must not be stripped by mistake. Android paired fallback without a service UUID may treat a full Find My suffix plus `pro2` in the name as
+a non-communication endpoint, but must not use this broader rule to strip the display name. Neo does not have Find My, so this name rule
+must not be used to infer Neo capabilities.
 
-Neo 真机通信广播使用 `Neo <4 位标识>`，例如 `Neo 22D8`；已观察到的服务集合与 Pro2 通信广播
-一致，可同时包含 `180a`、`180f`、`fffd` 和 `0001`。SDK 保留完整 Neo 名称并识别为 Neo，连接
-端点仍以 `0001` 为准，不能因同时存在 `fffd` 而过滤，也不能仅凭 `Neo` 名称推导协议版本。
-最新 firmware-pro2 也可能广播去掉空格的紧凑名称（如 `Pro2A1B2`、`Neo22D8`）；搜索必须把它们
-识别为 OneKey，但不能因此把协议结论从名称推出来。
+Neo real-device communication advertisements use `Neo <4-digit identifier>`, for example `Neo 22D8`. The observed service set matches Pro2 communication advertisements
+and may contain `180a`, `180f`, `fffd`, and `0001` at once. The SDK keeps the full Neo name and identifies it as Neo. The connection
+endpoint is still based on `0001`; it must not be filtered because `fffd` is also present, and protocol version must not be inferred from the `Neo` name alone.
+Latest firmware-pro2 may also advertise compact names without spaces (such as `Pro2A1B2`, `Neo22D8`). Search must recognize them
+as OneKey, but must not infer a protocol conclusion from the name.
 
-最新 firmware-pro2 在 application、bootloader 和 romloader 共用 USB VID/PID `1209:4f4c`，Pro2
-和 Neo 相同。USB 首次探测顺序只根据这个 VID/PID 给 V2 hint，不根据产品名或 BLE 名。`4f4a` /
-`4f4b` 仍与 Pro/Touch 共用，不能当作 V2 hint。协议仍由连接后的活动响应确认。
+Latest firmware-pro2 shares USB VID/PID `1209:4f4c` across application, bootloader, and romloader; Pro2
+and Neo are the same. USB first-probe order only uses this VID/PID as a V2 hint, not product name or BLE name. `4f4a` /
+`4f4b` are still shared with Pro/Touch and must not be treated as a V2 hint. Protocol is still confirmed by the live response after connection.
 
-USB 序列号来自出厂制造信息；槽位已写但序列号为空时，固件省略 `iSerialNumber` 字符串。WebUSB
-不能因此丢弃设备，应使用合成 path 完成搜索和 acquire。
+USB serial numbers come from factory manufacturing information. When the slot is written but the serial number is empty, firmware omits the `iSerialNumber` string. WebUSB
+must not drop the device for this reason; it should use a synthesized path to complete search and acquire.
 
-BLE 分包大小是平台传输参数，不属于 protobuf 或业务 API。性能结论见 [Pro2 BLE 传输测速记录](../testing/pro2-ble-performance.md)。
+BLE packet size is a platform transport parameter; it is not part of protobuf or the business API. Performance conclusions are in [Pro2 BLE Transport Performance Record](../testing/pro2-ble-performance.md).
 
-## 错误与重试边界
+## Error and Retry Boundaries
 
-| 错误类型                            | 处理层                    | 默认行为                     |
+| Error type | Handling layer | Default behavior |
 | ----------------------------------- | ------------------------- | ---------------------------- |
-| BLE USB-priority `link disabled`    | Transport probe / Core    | 立即返回 723，不 reset、不重试 |
-| protobuf `Failure`                  | Core / method             | 保持 Link，根据业务语义处理  |
-| `DeviceLocked`                      | 显式声明解锁策略的 method | 解锁后最多重试一次           |
-| 超时、断连、I/O                     | Protocol Link / Transport | 使 Link 失效并清理平台资源   |
-| CRC、长度、sequence/generation 异常 | Protocol Session          | 拒绝响应并使 Link 失效       |
-| 文件写入、设置、固件更新失败        | Core 业务流程             | 只有确认幂等时才允许上层重试 |
+| BLE USB-priority `link disabled` | Transport probe / Core | Return 723 immediately; no reset, no retry |
+| protobuf `Failure` | Core / method | Keep the Link; handle according to business semantics |
+| `DeviceLocked` | Methods that explicitly declare an unlock policy | Retry at most once after unlock |
+| Timeout, disconnect, I/O | Protocol Link / Transport | Invalidate the Link and clean up platform resources |
+| CRC, length, sequence/generation anomalies | Protocol Session | Reject the response and invalidate the Link |
+| File write, settings, firmware update failure | Core business flow | Upper-layer retry is allowed only when idempotency is confirmed |
 
-## 维护检查清单
+## Maintenance Checklist
 
-修改协议或 Transport 时至少检查：
+When changing the protocol or Transport, at least check:
 
-1. V1 与 V2 探测顺序是否仍能覆盖共享 PID 设备。
-2. 新 Transport 是否只实现平台 adapter，而不是复制 Session 状态机。
-3. sequence 是否跨普通重连保持递增。
-4. 旧 generation 的异步结果是否会被丢弃。
-5. Link-fatal 后是否同时清理读取、assembler、连接和协议缓存。
-6. 是否错误地在 Transport 层重放了可能有副作用的请求。
-7. protobuf 来源、生成 Schema 和 Core 类型是否同步。
+1. Whether V1 and V2 probe order still covers devices that share a PID.
+2. Whether a new Transport only implements the platform adapter, rather than duplicating the Session state machine.
+3. Whether sequence keeps incrementing across ordinary reconnect.
+4. Whether async results from an old generation are discarded.
+5. Whether reads, assembler, connection, and protocol cache are all cleaned up after link-fatal.
+6. Whether a possibly side-effecting request is incorrectly replayed at the Transport layer.
+7. Whether protobuf source, generated schema, and Core types stay in sync.
 
-## 事实来源
+## Sources of Truth
 
-- V2 protobuf：`submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest/`
-- V2 公共实现：`packages/hd-transport/src/protocols/v2/`
-- USB/BLE 实现：各 `packages/hd-transport-*` 包
-- 持续有效的架构约束：[SDK 关键架构决策](../architecture/decisions.md)
+- V2 protobuf: `submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest/`
+- V2 shared implementation: `packages/hd-transport/src/protocols/v2/`
+- USB/BLE implementations: each `packages/hd-transport-*` package
+- Standing architecture constraints: [SDK Key Architecture Decisions](../architecture/decisions.md)

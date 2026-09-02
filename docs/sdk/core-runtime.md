@@ -92,7 +92,7 @@ Settings capability is defined by the current protocol source:
 
 Every actual state change emits `DEVICE.STATE`. Host apps should listen and persist the full state. They do not need separate handmade DB patches for label, language, auto-lock, and similar fields. Protocol V1 also emits compatibility event `DEVICE.FEATURES`. Protocol V2 does not. After a successful Protocol V2 settings write, Core force-refreshes `status` and `settings`. State comes only from device readback, with event sources `device-status` and `settings-read`. Request parameters are not used to generate a `settings-write` patch. Apps may still call `getDeviceState({ scope: 'settings' })` when a settings page opens or refocuses, to discover changes made on-device or by another client.
 
-See [Wallet Session and device security](../device/wallet-session-and-security.md) and [SDK architecture decisions](../architecture/decisions.md#受保护方法的调用前解锁).
+See [Wallet Session and device security](../device/wallet-session-and-security.md) and [SDK architecture decisions](../architecture/decisions.md#pre-call-unlock-for-protected-methods).
 
 ## Wallet Session
 
@@ -221,7 +221,7 @@ New integrations should use `openWalletSession({ mode })` to express intent expl
 
 Neither standard nor hidden results from `openWalletSession()` include firmware `sessionId`. The public projection of legacy `Features.session_id` / `sessionId` stays empty. Existing controlled OS Keychain records from old CLI can still be preloaded through a compatibility entry, but new public wallet responses no longer create those records.
 
-See [Wallet Session and device security](../device/wallet-session-and-security.md) and [SDK architecture decisions](../architecture/decisions.md#钱包-session-所有权与缓存键).
+See [Wallet Session and device security](../device/wallet-session-and-security.md) and [SDK architecture decisions](../architecture/decisions.md#wallet-session-ownership-and-cache-keys).
 
 ## File capability
 
