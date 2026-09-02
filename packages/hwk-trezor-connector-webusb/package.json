@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-trezor-connector-webusb",
-  "version": "1.2.2-alpha.11",
+  "version": "1.2.2-alpha.12",
   "description": "IConnector implementation for Trezor hardware wallets via WebUSB",
   "author": "OneKey",
   "license": "MIT",
@@ -55,8 +55,8 @@
     "connector"
   ],
   "dependencies": {
-    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.11",
-    "@onekeyfe/hwk-trezor-connector": "1.2.2-alpha.11",
+    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.12",
+    "@onekeyfe/hwk-trezor-connector": "1.2.2-alpha.12",
     "buffer": "^6.0.3"
   },
   "devDependencies": {
