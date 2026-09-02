@@ -62,9 +62,7 @@ const CriticalSensitiveLogKeys: Set<string> = new Set([
   'secret',
   'seed',
   'session',
-  'sessionid',
   'token',
-  'walletsessionid',
   'word',
   'words',
   'xprv',
@@ -99,7 +97,6 @@ const isCriticalSensitiveLogKey = (key: string) => {
     normalizedKey.includes('credential') ||
     normalizedKey.endsWith('passphrase') ||
     normalizedKey.endsWith('pin') ||
-    normalizedKey.endsWith('sessionid') ||
     normalizedKey.endsWith('token') ||
     normalizedKey.endsWith('apikey') ||
     normalizedKey.endsWith('word') ||
@@ -111,30 +108,21 @@ const getSigningResponseLogSummary = (
   value: unknown,
   method: string
 ): Record<string, unknown> | undefined => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
-
-  const { success, payload } = value as {
+  const response = value as {
     success?: unknown;
-    payload?: unknown;
+    payload?: { code?: unknown; error?: unknown } | null;
   };
-  if (typeof success !== 'boolean') return undefined;
+  if (typeof response?.success !== 'boolean') return undefined;
 
-  const summary: Record<string, unknown> = { method, success };
-  if (success || !payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return summary;
-  }
+  const summary = { method, success: response.success };
+  if (response.success) return summary;
 
-  const { code, error } = payload as {
-    code?: unknown;
-    error?: unknown;
+  const { code, error } = response.payload ?? {};
+  return {
+    ...summary,
+    ...(typeof code === 'string' || typeof code === 'number' ? { code } : {}),
+    ...(typeof error === 'string' ? { error } : {}),
   };
-  if (typeof code === 'string' || typeof code === 'number') {
-    summary.code = code;
-  }
-  if (typeof error === 'string') {
-    summary.error = error;
-  }
-  return summary;
 };
 
 const getSigningRequestLogSummary = (value: unknown, method: string): Record<string, unknown> => {

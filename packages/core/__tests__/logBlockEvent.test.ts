@@ -162,7 +162,9 @@ describe('getLogBlockLabel', () => {
         mnemonic: 'mnemonic-secret',
         nested: {
           apiKey: 'api-key-secret',
-          sessionId: 'session-secret',
+          session: 'session-secret',
+          sessionId: 'session-id',
+          walletSessionId: 'wallet-session-id',
         },
         accounts: [
           {
@@ -203,7 +205,9 @@ describe('getLogBlockLabel', () => {
         mnemonic: '[REDACTED]',
         nested: {
           apiKey: '[REDACTED]',
-          sessionId: '[REDACTED]',
+          session: '[REDACTED]',
+          sessionId: 'session-id',
+          walletSessionId: 'wallet-session-id',
         },
         accounts: [
           {
