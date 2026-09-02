@@ -8,7 +8,8 @@ export const LogBlockEvent: Set<string> = new Set([
   UI_RESPONSE.RECEIVE_PASSPHRASE,
 ]);
 
-// 1.1.32 没有这些资源/文件 API。整段跳过，避免日志层复制超大 Base64 或二进制。
+// These resource/file APIs did not exist in 1.1.32. Skip the payload so
+// the log layer does not copy huge Base64 or binary data.
 const LogPayloadBlockMethod: Set<string> = new Set([
   'deviceUploadNft',
   'deviceUploadWallpaper',
