@@ -6,6 +6,8 @@ import {
   getSafeLogPayload,
 } from '../src/events';
 
+const debugSigning = { revealSigningPayload: true };
+
 describe('getLogBlockLabel', () => {
   it('blocks evmSignTypedData params before logging large typed data', () => {
     expect(
@@ -142,51 +144,67 @@ describe('getLogBlockLabel', () => {
     }
   );
 
-  it('reveals signing request fields in debug logs while redacting red-line secrets', () => {
-    const request = {
-      event: 'iframe-call',
-      type: 'iframe-call',
-      payload: {
-        method: 'btcSignMessage',
-        path: "m/44'/0'/0'/0/0",
-        messageHex: '68656c6c6f',
-        noScriptType: true,
-        coin: 'Bitcoin',
-        passphraseState: 'wallet-identifier-for-qa',
-        useEmptyPassphrase: false,
-        keepSession: true,
-        initSession: false,
-        passphrase: 'hidden-wallet-secret',
-        private_key: 'private-key-secret',
-        privateKeyHex: 'private-key-hex-secret',
-        mnemonic: 'mnemonic-secret',
-        nested: {
-          apiKey: 'api-key-secret',
-          session: 'session-secret',
-          sessionId: 'session-id',
-          walletSessionId: 'wallet-session-id',
-        },
-        accounts: [
-          {
-            seed: 'seed-secret',
-            xprv: 'xprv-secret',
-            entropy: 'entropy-secret',
-            password: 'password-secret',
-            token: 'token-secret',
-            credential: 'credential-secret',
-            pin: 'pin-secret',
-            accessToken: 'access-token-secret',
-            auth_token: 'auth-token-secret',
-            bearerToken: 'bearer-token-secret',
-            'refresh-token': 'refresh-token-secret',
-            secret: 'generic-secret',
-            words: 'recovery-words',
-          },
-        ],
-      },
-    };
+  it('keeps ordinary API requests and responses visible', () => {
+    const request = { method: 'getDeviceState', connectId: 'connect-id', scope: 'runtime' };
+    const response = { success: true, payload: { protocol: 'V2', initialized: true } };
 
-    expect(getSafeLogPayload(request, 'btcSignMessage', { revealSigningPayload: true })).toEqual({
+    expect(getLogBlockLabel(request)).toBeUndefined();
+    expect(getSafeLogPayload(request)).toEqual(request);
+    expect(getSafeLogPayload(response)).toEqual(response);
+  });
+
+  it('redacts sensitive keys even for ordinary API payloads', () => {
+    expect(
+      getSafeLogPayload({
+        method: 'ordinaryMethod',
+        payload: { session_id: 'session-secret', nested: { pin: '1234' } },
+      })
+    ).toEqual({
+      method: 'ordinaryMethod',
+      payload: { session_id: '[REDACTED]', nested: { pin: '[REDACTED]' } },
+    });
+  });
+
+  it('puts sensitive API method names in the log label', () => {
+    expect(formatLogMethodLabel('response:', 'openWalletSession')).toBe(
+      'response: [openWalletSession]'
+    );
+    expect(formatLogMethodLabel('response:')).toBe('response:');
+  });
+
+  it('does not classify events without an API method as method calls', () => {
+    expect(getLogBlockLabel({ event: 'DEVICE_EVENT', type: 'device-connect' })).toBeUndefined();
+  });
+});
+
+describe('signing log payloads', () => {
+  it('reveals signing request fields in debug logs', () => {
+    expect(
+      getSafeLogPayload(
+        {
+          event: 'iframe-call',
+          type: 'iframe-call',
+          payload: {
+            method: 'btcSignMessage',
+            path: "m/44'/0'/0'/0/0",
+            messageHex: '68656c6c6f',
+            noScriptType: true,
+            coin: 'Bitcoin',
+            passphraseState: 'wallet-identifier-for-qa',
+            useEmptyPassphrase: false,
+            keepSession: true,
+            initSession: false,
+            nested: {
+              session: 'session-secret',
+              sessionId: 'session-id',
+              walletSessionId: 'wallet-session-id',
+            },
+          },
+        },
+        'btcSignMessage',
+        debugSigning
+      )
+    ).toEqual({
       event: 'iframe-call',
       type: 'iframe-call',
       payload: {
@@ -199,34 +217,45 @@ describe('getLogBlockLabel', () => {
         useEmptyPassphrase: false,
         keepSession: true,
         initSession: false,
-        passphrase: '[REDACTED]',
-        private_key: '[REDACTED]',
-        privateKeyHex: '[REDACTED]',
-        mnemonic: '[REDACTED]',
         nested: {
-          apiKey: '[REDACTED]',
           session: '[REDACTED]',
           sessionId: 'session-id',
           walletSessionId: 'wallet-session-id',
         },
-        accounts: [
-          {
-            seed: '[REDACTED]',
-            xprv: '[REDACTED]',
-            entropy: '[REDACTED]',
-            password: '[REDACTED]',
-            token: '[REDACTED]',
-            credential: '[REDACTED]',
-            pin: '[REDACTED]',
-            accessToken: '[REDACTED]',
-            auth_token: '[REDACTED]',
-            bearerToken: '[REDACTED]',
-            'refresh-token': '[REDACTED]',
-            secret: '[REDACTED]',
-            words: '[REDACTED]',
-          },
-        ],
       },
+    });
+  });
+
+  it.each([
+    'accessToken',
+    'apiKey',
+    'auth_token',
+    'bearerToken',
+    'credential',
+    'entropy',
+    'mnemonic',
+    'passphrase',
+    'password',
+    'pin',
+    'privateKeyHex',
+    'private_key',
+    'refresh-token',
+    'secret',
+    'seed',
+    'session',
+    'token',
+    'words',
+    'xprv',
+  ])('redacts %s in debug signing logs', key => {
+    expect(
+      getSafeLogPayload(
+        { method: 'btcSignMessage', [key]: 'secret-value' },
+        'btcSignMessage',
+        debugSigning
+      )
+    ).toEqual({
+      method: 'btcSignMessage',
+      [key]: '[REDACTED]',
     });
   });
 
@@ -244,9 +273,7 @@ describe('getLogBlockLabel', () => {
     accounts.push(accounts);
 
     expect(
-      getSafeLogPayload({ method: 'btcSignMessage', accounts }, 'btcSignMessage', {
-        revealSigningPayload: true,
-      })
+      getSafeLogPayload({ method: 'btcSignMessage', accounts }, 'btcSignMessage', debugSigning)
     ).toEqual({
       method: 'btcSignMessage',
       accounts: [{ secret: '[REDACTED]' }, '[CIRCULAR]'],
@@ -307,7 +334,7 @@ describe('getLogBlockLabel', () => {
           },
         },
         'btcSignMessage',
-        { revealSigningPayload: true }
+        debugSigning
       )
     ).toEqual({
       method: 'btcSignMessage',
@@ -331,7 +358,7 @@ describe('getLogBlockLabel', () => {
           },
         },
         'btcSignMessage',
-        { revealSigningPayload: true }
+        debugSigning
       )
     ).toEqual({
       method: 'btcSignMessage',
@@ -365,51 +392,21 @@ describe('getLogBlockLabel', () => {
       getSafeLogPayload(
         { type: UI_RESPONSE.RECEIVE_PIN, payload: '1234' },
         UI_RESPONSE.RECEIVE_PIN,
-        { revealSigningPayload: true }
+        debugSigning
       )
     ).toEqual({
       method: UI_RESPONSE.RECEIVE_PIN,
       payload: '[REDACTED]',
     });
     expect(
-      getSafeLogPayload({ method: 'deviceUploadNft', data: 'large-base64' }, 'deviceUploadNft', {
-        revealSigningPayload: true,
-      })
+      getSafeLogPayload(
+        { method: 'deviceUploadNft', data: 'large-base64' },
+        'deviceUploadNft',
+        debugSigning
+      )
     ).toEqual({
       method: 'deviceUploadNft',
       payload: '[REDACTED]',
     });
-  });
-
-  it('keeps ordinary API requests and responses visible', () => {
-    const request = { method: 'getDeviceState', connectId: 'connect-id', scope: 'runtime' };
-    const response = { success: true, payload: { protocol: 'V2', initialized: true } };
-
-    expect(getLogBlockLabel(request)).toBeUndefined();
-    expect(getSafeLogPayload(request)).toEqual(request);
-    expect(getSafeLogPayload(response)).toEqual(response);
-  });
-
-  it('redacts sensitive keys even for ordinary API payloads', () => {
-    expect(
-      getSafeLogPayload({
-        method: 'ordinaryMethod',
-        payload: { session_id: 'session-secret', nested: { pin: '1234' } },
-      })
-    ).toEqual({
-      method: 'ordinaryMethod',
-      payload: { session_id: '[REDACTED]', nested: { pin: '[REDACTED]' } },
-    });
-  });
-
-  it('puts sensitive API method names in the log label', () => {
-    expect(formatLogMethodLabel('response:', 'openWalletSession')).toBe(
-      'response: [openWalletSession]'
-    );
-    expect(formatLogMethodLabel('response:')).toBe('response:');
-  });
-
-  it('does not classify events without an API method as method calls', () => {
-    expect(getLogBlockLabel({ event: 'DEVICE_EVENT', type: 'device-connect' })).toBeUndefined();
   });
 });

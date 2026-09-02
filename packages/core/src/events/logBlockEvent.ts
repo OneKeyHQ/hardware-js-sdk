@@ -42,36 +42,24 @@ const SensitiveLogKeys: Set<string> = new Set([
   'xprv',
 ]);
 
-// Debug signing logs intentionally expose transaction and message data for QA.
-// These red-line secrets remain blocked even when SDK debug logging is enabled.
-const CriticalSensitiveLogKeys: Set<string> = new Set([
-  'accesstoken',
-  'apikey',
-  'authtoken',
-  'bearertoken',
+// Debug signing logs may show tx/message fields. These stems still stay redacted.
+// `session` is exact-only so `sessionId` remains visible for QA.
+const CriticalExactLogKeys: Set<string> = new Set(['session']);
+const CriticalSubstringLogKeys = [
   'credential',
-  'credentials',
   'entropy',
   'mnemonic',
-  'mnemonics',
-  'passphrase',
   'password',
-  'pin',
   'privatekey',
-  'refreshtoken',
   'secret',
   'seed',
-  'session',
-  'token',
-  'word',
-  'words',
   'xprv',
-]);
+] as const;
+const CriticalSuffixLogKeys = ['apikey', 'passphrase', 'pin', 'token', 'word', 'words'] as const;
 
+// `useEmptyPassphrase` would otherwise match the passphrase suffix rule.
 const DebugVisibleLogKeys: Set<string> = new Set([
   'expectedpassphrasestate',
-  'initsession',
-  'keepsession',
   'passphrasestate',
   'useemptypassphrase',
 ]);
@@ -86,84 +74,63 @@ const isCriticalSensitiveLogKey = (key: string) => {
   const normalizedKey = normalizeLogKey(key);
   if (DebugVisibleLogKeys.has(normalizedKey)) return false;
   return (
-    CriticalSensitiveLogKeys.has(normalizedKey) ||
-    normalizedKey.includes('privatekey') ||
-    normalizedKey.includes('mnemonic') ||
-    normalizedKey.includes('password') ||
-    normalizedKey.includes('seed') ||
-    normalizedKey.includes('secret') ||
-    normalizedKey.includes('xprv') ||
-    normalizedKey.includes('entropy') ||
-    normalizedKey.includes('credential') ||
-    normalizedKey.endsWith('passphrase') ||
-    normalizedKey.endsWith('pin') ||
-    normalizedKey.endsWith('token') ||
-    normalizedKey.endsWith('apikey') ||
-    normalizedKey.endsWith('word') ||
-    normalizedKey.endsWith('words')
+    CriticalExactLogKeys.has(normalizedKey) ||
+    CriticalSubstringLogKeys.some(stem => normalizedKey.includes(stem)) ||
+    CriticalSuffixLogKeys.some(stem => normalizedKey.endsWith(stem))
   );
 };
+
+const asPlainObject = (value: unknown): Record<string, unknown> | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  return value as Record<string, unknown>;
+};
+
+const isScalar = (value: unknown): value is string | number | boolean =>
+  typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 
 const getSigningResponseLogSummary = (
   value: unknown,
   method: string
 ): Record<string, unknown> | undefined => {
-  const response = value as {
-    success?: unknown;
-    payload?: { code?: unknown; error?: unknown } | null;
-  };
+  const response = asPlainObject(value);
   if (typeof response?.success !== 'boolean') return undefined;
 
-  const summary = { method, success: response.success };
+  const summary: Record<string, unknown> = { method, success: response.success };
   if (response.success) return summary;
 
-  const { code, error } = response.payload ?? {};
-  return {
-    ...summary,
-    ...(typeof code === 'string' || typeof code === 'number' ? { code } : {}),
-    ...(typeof error === 'string' ? { error } : {}),
-  };
+  const payload = asPlainObject(response.payload);
+  if (typeof payload?.code === 'string' || typeof payload?.code === 'number') {
+    summary.code = payload.code;
+  }
+  if (typeof payload?.error === 'string') {
+    summary.error = payload.error;
+  }
+  return summary;
 };
 
 const getSigningRequestLogSummary = (value: unknown, method: string): Record<string, unknown> => {
-  const blockedSummary: Record<string, unknown> = {
-    method,
-    payload: '[REDACTED]',
-  };
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return blockedSummary;
+  const blockedSummary = { method, payload: '[REDACTED]' };
+  const message = asPlainObject(value);
+  if (!message) return blockedSummary;
 
-  const message = value as Record<string, unknown>;
-  const nestedPayload =
-    message.payload && typeof message.payload === 'object' && !Array.isArray(message.payload)
-      ? (message.payload as Record<string, unknown>)
-      : undefined;
+  const nestedPayload = asPlainObject(message.payload);
   const params = nestedPayload?.method === method ? nestedPayload : message;
-  const transaction =
-    params.transaction &&
-    typeof params.transaction === 'object' &&
-    !Array.isArray(params.transaction)
-      ? (params.transaction as Record<string, unknown>)
-      : undefined;
-
+  const transaction = asPlainObject(params.transaction) ?? {};
   const summary: Record<string, unknown> = { method };
-  const copyScalar = (outputKey: string, ...candidates: unknown[]) => {
-    const valueToLog = candidates.find(
-      candidate =>
-        typeof candidate === 'string' ||
-        typeof candidate === 'number' ||
-        typeof candidate === 'boolean'
-    );
+
+  const assign = (outputKey: string, ...candidates: unknown[]) => {
+    const valueToLog = candidates.find(isScalar);
     if (valueToLog !== undefined) summary[outputKey] = valueToLog;
   };
 
-  copyScalar('chainId', params.chainId, transaction?.chainId);
-  copyScalar('transactionType', params.transactionType, params.txType, transaction?.txType);
-  copyScalar('coin', params.coin);
-  copyScalar('coinType', params.coinType);
-  copyScalar('network', params.network);
-  copyScalar('networkId', params.networkId, params.network_id);
-  copyScalar('noScriptType', params.noScriptType);
-  copyScalar('dAppSignType', params.dAppSignType);
+  assign('chainId', params.chainId, transaction.chainId);
+  assign('transactionType', params.transactionType, params.txType, transaction.txType);
+  assign('coin', params.coin);
+  assign('coinType', params.coinType);
+  assign('network', params.network);
+  assign('networkId', params.networkId, params.network_id);
+  assign('noScriptType', params.noScriptType);
+  assign('dAppSignType', params.dAppSignType);
 
   if (Array.isArray(params.inputs)) summary.inputCount = params.inputs.length;
   if (Array.isArray(params.outputs)) summary.outputCount = params.outputs.length;
@@ -176,10 +143,7 @@ const redactLogValue = (
   seen: WeakSet<object>,
   shouldRedactKey: (key: string) => boolean = isSensitiveLogKey
 ): unknown => {
-  if (ArrayBuffer.isView(value)) {
-    return `[BINARY:${value.byteLength}]`;
-  }
-  if (value instanceof ArrayBuffer) {
+  if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) {
     return `[BINARY:${value.byteLength}]`;
   }
   if (Array.isArray(value)) {
@@ -232,16 +196,12 @@ export function getSafeLogPayload(
   options: { revealSigningPayload?: boolean } = {}
 ): unknown {
   if (blockLabel && isSigningMethod(blockLabel)) {
-    const responseSummary = getSigningResponseLogSummary(value, blockLabel);
-    if (responseSummary) return responseSummary;
-  }
-
-  if (blockLabel && isSigningMethod(blockLabel) && options.revealSigningPayload) {
-    return redactLogValue(value, new WeakSet(), isCriticalSensitiveLogKey);
-  }
-
-  if (blockLabel && isSigningMethod(blockLabel)) {
-    return getSigningRequestLogSummary(value, blockLabel);
+    return (
+      getSigningResponseLogSummary(value, blockLabel) ??
+      (options.revealSigningPayload
+        ? redactLogValue(value, new WeakSet(), isCriticalSensitiveLogKey)
+        : getSigningRequestLogSummary(value, blockLabel))
+    );
   }
 
   if (blockLabel && (LogBlockEvent.has(blockLabel) || LogPayloadBlockMethod.has(blockLabel))) {
@@ -249,13 +209,9 @@ export function getSafeLogPayload(
   }
 
   const redactedValue = redactLogValue(value, new WeakSet());
-  if (
-    blockLabel &&
-    redactedValue &&
-    typeof redactedValue === 'object' &&
-    !Array.isArray(redactedValue)
-  ) {
-    return { ...redactedValue, method: blockLabel };
+  const redactedObject = asPlainObject(redactedValue);
+  if (blockLabel && redactedObject) {
+    return { ...redactedObject, method: blockLabel };
   }
   return redactedValue;
 }
