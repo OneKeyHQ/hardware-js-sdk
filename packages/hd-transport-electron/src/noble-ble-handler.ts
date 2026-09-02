@@ -15,6 +15,7 @@ import {
   ONEKEY_WRITE_CHARACTERISTIC_UUID,
   createKnownBleUuidAliases,
   hasOnekeyCommunicationService,
+  isBleStaleBondErrorText,
   isOnekeyBluetoothDevice,
   isPro2FamilyBleName,
   matchesKnownBleUuid,
@@ -38,6 +39,21 @@ import type { CharacteristicPair, DeviceInfo, Logger, NobleModule } from './type
 // Noble will be dynamically imported to avoid bundling issues
 let noble: NobleModule | null = null;
 let logger: Logger | null = null;
+
+export function createNobleBleConnectionError(error: Error, messagePrefix = '') {
+  const errorMessage = error.message;
+  const normalizedErrorMessage = errorMessage.toLowerCase();
+  let errorCode = HardwareErrorCode.BleConnectedError;
+  if (isBleStaleBondErrorText(errorMessage)) {
+    errorCode =
+      normalizedErrorMessage.includes('peer removed pairing information') ||
+      normalizedErrorMessage.includes('cberrordomain:14')
+        ? HardwareErrorCode.BlePeerRemovedPairingInformation
+        : HardwareErrorCode.BleDeviceBondError;
+  }
+
+  return ERRORS.TypedError(errorCode, `${messagePrefix}${errorMessage}`);
+}
 
 // Bluetooth state management
 const bluetoothState: {
@@ -1296,12 +1312,7 @@ async function freshScanAndDiscover(
   await new Promise<void>((resolve, reject) => {
     freshPeripheral.connect((error: Error | undefined) => {
       if (error) {
-        reject(
-          ERRORS.TypedError(
-            HardwareErrorCode.BleConnectedError,
-            `Fresh peripheral connection failed: ${error.message}`
-          )
-        );
+        reject(createNobleBleConnectionError(error, 'Fresh peripheral connection failed: '));
       } else {
         connectedDevices.set(deviceId, freshPeripheral);
         resolve();
@@ -1692,7 +1703,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
 
       if (error) {
         logger?.error('[NobleBLE] Connection failed:', error);
-        reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, error.message));
+        reject(createNobleBleConnectionError(error));
         return;
       }
 

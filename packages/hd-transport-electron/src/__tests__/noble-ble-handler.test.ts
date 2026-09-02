@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { EOneKeyBleMessageKeys } from '@onekeyfe/hd-shared';
+import { EOneKeyBleMessageKeys, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import {
   NOBLE_BLE_CONNECTION_TIMEOUT_MS,
@@ -29,6 +29,24 @@ describe('Electron Noble BLE device discovery', () => {
   test('allows enough time for a slow targeted scan and connection', () => {
     expect(NOBLE_BLE_TARGETED_SCAN_TIMEOUT_MS).toBe(5_000);
     expect(NOBLE_BLE_CONNECTION_TIMEOUT_MS).toBe(10_000);
+  });
+
+  test('maps macOS stale pairing failures without reclassifying generic connection errors', async () => {
+    const { createNobleBleConnectionError } = await import('../noble-ble-handler');
+
+    expect(
+      createNobleBleConnectionError(
+        new Error('CBErrorDomain:14 Peer removed pairing information on the device side')
+      )
+    ).toMatchObject({
+      errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
+    });
+    expect(createNobleBleConnectionError(new Error('Encryption is insufficient'))).toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceBondError,
+    });
+    expect(createNobleBleConnectionError(new Error('connection failed'))).toMatchObject({
+      errorCode: HardwareErrorCode.BleConnectedError,
+    });
   });
 
   test('keeps safe pacing by default and allows an explicit high-throughput bypass', async () => {
