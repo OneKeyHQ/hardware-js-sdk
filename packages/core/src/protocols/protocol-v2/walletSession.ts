@@ -455,6 +455,11 @@ export async function getProtocolV2WalletSession(
         throw error;
       }
       resumed = false;
+      if (device.features?.unlockedAttachPin === true) {
+        // Locking invalidates the old handle, but Attach PIN already selected the wallet.
+        // Read the current session and validate its passphrase state below.
+        response = await getDeviceSession(device, sessionGetRequest());
+      }
     }
   } else if (expectedPassphraseState) {
     try {
