@@ -568,6 +568,37 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
   });
 
+  test('maps macOS CoreBluetooth peer-removed pairing failures to the precise error', async () => {
+    const device = { id: 'reset-pro2-macos-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.connect.mockRejectedValue(
+      new Error('CBErrorDomain:14 Peer removed pairing information on the device side')
+    );
+    const transport = configureTransport(nobleBle);
+
+    await expect(
+      transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
+    });
+  });
+
+  test('does not classify a generic macOS connection failure as a stale bond', async () => {
+    const device = { id: 'offline-pro2-macos-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.connect.mockRejectedValue(new Error('connection failed'));
+    const transport = configureTransport(nobleBle);
+
+    try {
+      await transport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+      throw new Error('Expected acquire to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe('connection failed');
+      expect((error as { errorCode?: unknown }).errorCode).toBeUndefined();
+    }
+  });
+
   test('keeps stale-bond subscribe mapping out of Protocol V1 acquire', async () => {
     const device = { id: 'classic-v1-id', name: 'OneKey Classic' };
     const nobleBle = createNobleBle(device);

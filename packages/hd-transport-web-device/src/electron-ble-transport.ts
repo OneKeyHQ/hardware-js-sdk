@@ -176,7 +176,8 @@ export default class ElectronBleTransport {
     }
     const normalizedErrorMessage = errorMessage.toLowerCase();
     return ERRORS.TypedError(
-      normalizedErrorMessage.includes('peer removed pairing information')
+      normalizedErrorMessage.includes('peer removed pairing information') ||
+        normalizedErrorMessage.includes('cberrordomain:14')
         ? HardwareErrorCode.BlePeerRemovedPairingInformation
         : HardwareErrorCode.BleDeviceBondError,
       errorMessage

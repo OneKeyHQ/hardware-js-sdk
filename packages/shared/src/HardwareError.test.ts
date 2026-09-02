@@ -2,6 +2,7 @@ import {
   HardwareErrorCode,
   HardwareErrorCodeMessage,
   TypedError,
+  isBleStaleBondErrorText,
   serializeError,
 } from './HardwareError';
 
@@ -60,5 +61,14 @@ describe('HardwareErrorCode compatibility', () => {
         firmwareMessage: 'link disabled',
       },
     });
+  });
+
+  test('recognizes the macOS CoreBluetooth stale-pairing error without matching generic failures', () => {
+    expect(
+      isBleStaleBondErrorText(
+        'CBErrorDomain:14 Peer removed pairing information on the device side'
+      )
+    ).toBe(true);
+    expect(isBleStaleBondErrorText('connection failed')).toBe(false);
   });
 });
