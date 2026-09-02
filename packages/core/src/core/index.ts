@@ -1811,9 +1811,7 @@ export default class Core extends EventEmitter {
         const logBlockLabel = getLogBlockLabel(message);
         Log.log(
           formatLogMethodLabel(`[${Date.now()}][CALL_API]`, logBlockLabel),
-          getSafeLogPayload(message, logBlockLabel, {
-            revealSigningPayload: DataManager.getSettings('debug') === true,
-          })
+          getSafeLogPayload(message, logBlockLabel)
         );
         const response = await callAPI(this.getCoreContext(), message);
         const { success, payload } = response;
