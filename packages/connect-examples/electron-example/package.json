@@ -2,7 +2,7 @@
   "name": "hardware-example",
   "productName": "HardwareExample",
   "executableName": "onekey-hardware-example",
-  "version": "1.2.2-alpha.20",
+  "version": "1.2.2-alpha.17",
   "author": "OneKey",
   "description": "OneKey Hardware SDK Electron BLE example",
   "main": "dist/index.js",
@@ -21,7 +21,7 @@
     "ts:check": "yarn tsc --noEmit"
   },
   "dependencies": {
-    "@onekeyfe/hd-transport-electron": "1.2.2-alpha.20",
+    "@onekeyfe/hd-transport-electron": "1.2.2-alpha.17",
     "@stoprocent/noble": "2.3.16",
     "debug": "4.3.4",
     "electron-is-dev": "^3.0.1",
