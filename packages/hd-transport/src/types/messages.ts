@@ -3830,6 +3830,7 @@ export type SolanaSignedTx = {
 
 export enum SolanaOffChainMessageVersion {
   MESSAGE_VERSION_0 = 0,
+  MESSAGE_VERSION_1 = 1,
 }
 
 export enum SolanaOffChainMessageFormat {
@@ -3844,6 +3845,7 @@ export type SolanaSignOffChainMessage = {
   message_version?: SolanaOffChainMessageVersion;
   message_format?: SolanaOffChainMessageFormat;
   application_domain?: string;
+  required_signers: string[];
   source_fingerprint?: number;
 };
 

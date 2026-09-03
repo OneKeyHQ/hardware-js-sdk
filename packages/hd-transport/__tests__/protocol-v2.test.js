@@ -300,6 +300,29 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
+  test('round-trips Solana v1 off-chain required signers with the production schema', () => {
+    const productionSchemas = {
+      protocolV1: protocolV1Messages,
+      protocolV2: productionProtocolV2Messages,
+    };
+    const requiredSigners = ['11'.repeat(32), '22'.repeat(32)];
+    const frame = ProtocolV2.encodeFrame(productionSchemas, 'SolanaSignOffChainMessage', {
+      address_n: [0x8000002c, 0x800001f5, 0x80000000, 0x80000000],
+      message: '01020304',
+      message_version: 1,
+      required_signers: requiredSigners,
+    });
+
+    expect(ProtocolV2.decodeFrame(productionSchemas, frame)).toMatchObject({
+      type: 'SolanaSignOffChainMessage',
+      message: {
+        message: '01020304',
+        message_version: 'MESSAGE_VERSION_1',
+        required_signers: requiredSigners,
+      },
+    });
+  });
+
   test('decodes a two-byte legacy ProtocolInfo at the generic frame boundary', () => {
     const frame = protocolV2.encodeProtobufFrame(60201, new Uint8Array([0x08, 0x01]));
     const productionSchemas = {
