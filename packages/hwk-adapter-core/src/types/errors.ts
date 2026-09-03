@@ -142,16 +142,7 @@ export enum HardwareErrorCode {
    * the mismatch on the device and never return it.
    */
   PinMismatch = 10404,
-  /**
-   * The device is configured to always collect the passphrase on its own
-   * keyboard (Trezor PASSPHRASE_ALWAYS_ON_DEVICE), so the host may not put a
-   * passphrase in the message at all — an empty string included. That makes the
-   * empty-passphrase ("standard") wallet unreachable: `on_device` entry cannot
-   * express it, since nothing stops the user typing something else. Callers
-   * asking for the standard wallet on such a device get this instead of a
-   * silently mismatched wallet; the user must turn the device setting off.
-   * Hidden (passphrase) wallets are unaffected.
-   */
+  /** Standard wallet is unavailable while Trezor enforces on-device passphrase entry. */
   PassphraseAlwaysOnDevice = 10405,
 
   // --- 10500s App lifecycle ---

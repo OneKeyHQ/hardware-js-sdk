@@ -628,7 +628,6 @@ describe('TrezorDeviceSession', () => {
     expect(calls[0].data).toEqual({ passphrase: '', derive_cardano: false });
   });
 
-  // The connection handshake supplies the passphrase policy used for new app sessions.
   const alwaysOnDeviceSession = (calls: CallRecord[], onPassphraseRequest: jest.Mock) => {
     const session = new TrezorDeviceSession({
       transport: new EmptyTransport(),
@@ -653,10 +652,6 @@ describe('TrezorDeviceSession', () => {
     return session;
   };
 
-  // Regression: once PASSPHRASE_ALWAYS_ON_DEVICE is set the firmware rejects
-  // ThpCreateNewSession carrying ANY `passphrase` field with Failure_DataError
-  // (`msg.passphrase is not None`, so an empty string counts). For a hidden
-  // wallet the answer is to let the device collect the passphrase itself.
   test('prompt mode sends on_device and never asks the host for a passphrase', async () => {
     const calls: CallRecord[] = [];
     const onPassphraseRequest = jest.fn(async () => ({ passphrase: 'secret' }));
@@ -664,20 +659,12 @@ describe('TrezorDeviceSession', () => {
 
     await session.createThpAppSession({ passphraseMode: 'prompt' });
 
-    // The device announces the on-device entry over the ordinary ButtonRequest
-    // channel, so the host is never asked for a value.
     expect(onPassphraseRequest).not.toHaveBeenCalled();
     expect(calls.map(call => call.name)).toEqual(['ThpCreateNewSession']);
     expect(calls[0].data).toEqual({ on_device: true, derive_cardano: false });
     expect(calls[0].data).not.toHaveProperty('passphrase');
   });
 
-  // The 'empty' (standard wallet) path deliberately does NOT switch to
-  // `on_device`. That flag means "the user types a passphrase on the device",
-  // which cannot express "the empty-passphrase wallet" — the user is free to
-  // type something else, and the standard-wallet path has no expected identity
-  // to verify against, so binding the wrong wallet would be silent. Keep
-  // sending `passphrase: ''` and let the firmware reject the call instead.
   test('empty mode still sends an empty passphrase and lets the firmware reject it', async () => {
     const calls: CallRecord[] = [];
     const onPassphraseRequest = jest.fn(async () => ({ passphrase: 'secret' }));

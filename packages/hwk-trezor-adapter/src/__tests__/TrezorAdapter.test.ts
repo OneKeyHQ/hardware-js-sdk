@@ -329,17 +329,10 @@ describe('TrezorAdapter', () => {
     });
   });
 
-  // The device is set to always collect the passphrase on its own keyboard, so
-  // the firmware refuses any message carrying one — including the `passphrase:
-  // ''` that a standard-wallet request sends. Without this mapping it lands in
-  // UnknownError together with disconnects and timeouts, and a host cannot tell
-  // "turn this device setting off" apart from a real failure.
   it('maps a device-enforced on-device passphrase failure to PassphraseAlwaysOnDevice', async () => {
     const alwaysOnDevice =
       'Providing passphrase in message is not allowed when PASSPHRASE_ALWAYS_ON_DEVICE is True.';
     const connector = createConnector();
-    // The standard-wallet request is rejected while creating the app session,
-    // before the chain method is ever sent.
     (connector.call as CallMock).mockRejectedValueOnce(
       Object.assign(new Error(alwaysOnDevice), {
         name: 'TrezorFailureError',
@@ -1078,7 +1071,6 @@ describe('TrezorAdapter', () => {
       },
     });
     expect(ORPHAN_ELIGIBLE_ERROR_CODES).toContain(HardwareErrorCode.PassphraseAlwaysOnDevice);
-    // The first failure ends the whole bundle; the Solana item is never sent.
     const callsAfter = (connector.call as CallMock).mock.calls.length;
     expect(callsAfter - callsBefore).toBe(2);
   });

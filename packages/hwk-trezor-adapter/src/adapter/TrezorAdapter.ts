@@ -406,11 +406,7 @@ export class TrezorAdapter implements IHardwareWallet {
     if (failure.code === 'Failure_DataError' && failure.message === 'Forbidden key path') {
       return HardwareErrorCode.DevicePathForbidden;
     }
-    // The device collects the passphrase on its own keyboard, so the firmware
-    // rejects any message carrying one — `passphrase: ''` (the standard-wallet
-    // request) included. Match the setting NAME rather than the full sentence:
-    // the surrounding prose is descriptive and may be reworded, the constant is
-    // part of the device's configuration vocabulary.
+    // Match the stable setting name instead of the full firmware message.
     if (
       failure.code === 'Failure_DataError' &&
       typeof failure.message === 'string' &&

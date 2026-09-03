@@ -821,24 +821,7 @@ export class TrezorDeviceSession {
       passphrase: '',
     };
     if (passphraseAlwaysOnDevice && passphraseMode === 'prompt') {
-      // Firmware raises Failure_DataError for ANY `passphrase` field once
-      // PASSPHRASE_ALWAYS_ON_DEVICE is set: the check is `msg.passphrase is not
-      // None`, so an empty string counts, and it ignores passphrase_protection
-      // entirely (core/src/apps/common/passphrase.py). The host is NOT asked
-      // for a value: the device collects the passphrase on its own keyboard and
-      // announces that over the ordinary ButtonRequest channel
-      // (ButtonRequestType.PassphraseEntry), which already drives the host's
-      // confirm-on-device UI and its matching close event.
-      //
-      // Deliberately NOT applied to `passphraseMode === 'empty'`. `on_device`
-      // means "the user types a passphrase on the device", which cannot express
-      // "the empty-passphrase (standard) wallet" — nothing stops the user from
-      // typing something else, and we would then bind a hidden wallet while the
-      // caller believes it holds the standard one. That path has no wallet
-      // identity to verify against (see TrezorAdapter._createFreshAppSession),
-      // so the mistake would be silent. The standard wallet is simply not
-      // reachable while this device setting is on: let the empty path keep
-      // sending `passphrase: ''` and let the firmware reject it.
+      // `on_device` cannot guarantee the empty passphrase required by standard-wallet mode.
       passphraseArg = { on_device: true };
     } else if (
       passphraseProtected &&
