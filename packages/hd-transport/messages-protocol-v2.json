@@ -8968,7 +8968,8 @@
     },
     "SolanaOffChainMessageVersion": {
       "values": {
-        "MESSAGE_VERSION_0": 0
+        "MESSAGE_VERSION_0": 0,
+        "MESSAGE_VERSION_1": 1
       }
     },
     "SolanaOffChainMessageFormat": {
@@ -9056,10 +9057,7 @@
         },
         "message_format": {
           "type": "SolanaOffChainMessageFormat",
-          "id": 4,
-          "options": {
-            "default": "V0_RESTRICTED_ASCII"
-          }
+          "id": 4
         },
         "application_domain": {
           "type": "bytes",
@@ -9068,6 +9066,11 @@
         "source_fingerprint": {
           "type": "uint32",
           "id": 6
+        },
+        "required_signers": {
+          "rule": "repeated",
+          "type": "bytes",
+          "id": 7
         }
       }
     },
