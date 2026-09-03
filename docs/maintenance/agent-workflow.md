@@ -23,6 +23,7 @@
 | ----------------------------- | --------------------------------------- | -------- |
 | `hardware-architecture`       | 包边界、Device 生命周期、公共兼容面     | 可隐式   |
 | `hardware-transport-protocol` | USB/BLE、V1/V2、帧、超时、重连、Link    | 可隐式   |
+| `hardware-error-handling`     | 错误码、映射、序列化、重试与恢复        | 可隐式   |
 | `hardware-chain-integration`  | 地址派生、签名、链能力和测试向量        | 可隐式   |
 | `hardware-dev-commands`       | 开发、构建、测试和验证命令              | 可隐式   |
 | `hardware-change-plan`        | 实施计划、任务拆分和验证矩阵            | 可隐式   |
