@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport-web-device",
-  "version": "1.2.2-alpha.12",
+  "version": "1.2.2-alpha.13",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "MIT",
@@ -21,11 +21,11 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "1.2.2-alpha.12",
-    "@onekeyfe/hd-transport": "1.2.2-alpha.12"
+    "@onekeyfe/hd-shared": "1.2.2-alpha.13",
+    "@onekeyfe/hd-transport": "1.2.2-alpha.13"
   },
   "devDependencies": {
-    "@onekeyfe/hd-transport-electron": "1.2.2-alpha.12",
+    "@onekeyfe/hd-transport-electron": "1.2.2-alpha.13",
     "@types/w3c-web-usb": "^1.0.6",
     "@types/web-bluetooth": "^0.0.17"
   }

@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-trezor-core",
-  "version": "1.2.2-alpha.12",
+  "version": "1.2.2-alpha.13",
   "description": "Minimal Trezor core call layer for Hardware Wallet Kit",
   "author": "OneKey",
   "license": "MIT",
@@ -41,10 +41,10 @@
   "devDependencies": {
     "@noble/ciphers": "^1.3.0",
     "@noble/hashes": "^1.8.0",
-    "@onekeyfe/hwk-trezor-protobuf": "1.2.2-alpha.12",
-    "@onekeyfe/hwk-trezor-protocol": "1.2.2-alpha.12",
-    "@onekeyfe/hwk-trezor-transport": "1.2.2-alpha.12",
-    "@onekeyfe/hwk-trezor-transport-common": "1.2.2-alpha.12",
+    "@onekeyfe/hwk-trezor-protobuf": "1.2.2-alpha.13",
+    "@onekeyfe/hwk-trezor-protocol": "1.2.2-alpha.13",
+    "@onekeyfe/hwk-trezor-transport": "1.2.2-alpha.13",
+    "@onekeyfe/hwk-trezor-transport-common": "1.2.2-alpha.13",
     "buffer": "^6.0.3",
     "rimraf": "^5.0.0",
     "tsup": "^8.0.0",
