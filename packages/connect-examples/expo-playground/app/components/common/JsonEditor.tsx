@@ -1,9 +1,10 @@
-import { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/Button';
 import { Alert, AlertDescription } from '../ui/Alert';
 import { Save, X } from 'lucide-react';
 import { Textarea } from '../ui/Textarea';
+import { getEditableJsonPreview } from '../../utils/jsonPreview';
 
 interface JsonEditorProps {
   data: Record<string, unknown> | null;
@@ -25,6 +26,8 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
     const [editValue, setEditValue] = useState('');
     const [error, setError] = useState<string | null>(null);
     const { t } = useTranslation();
+    const jsonPreview = useMemo(() => (data ? getEditableJsonPreview(data) : null), [data]);
+    const largePayloadNotice = t('components.jsonEditor.largePayloadNotice');
 
     // 暴露给外部的方法
     useImperativeHandle(ref, () => ({
@@ -35,12 +38,12 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
 
     const handleOpen = useCallback(() => {
       if (data) {
-        setEditValue(JSON.stringify(data, null, 2));
+        setEditValue(jsonPreview?.text ?? '{}');
       } else {
         setEditValue('{}');
       }
-      setError(null);
-    }, [data]);
+      setError(jsonPreview?.truncated ? largePayloadNotice : null);
+    }, [data, jsonPreview, largePayloadNotice]);
 
     const handleCopy = async (): Promise<boolean> => {
       if (data) {
@@ -57,6 +60,11 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
     };
 
     const handleSave = () => {
+      if (jsonPreview?.truncated) {
+        setError(largePayloadNotice);
+        return;
+      }
+
       try {
         const parsed = JSON.parse(editValue);
         onSave(parsed);
@@ -76,13 +84,13 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
     useEffect(() => {
       if (isEditing && !disabled) {
         if (data) {
-          setEditValue(JSON.stringify(data, null, 2));
+          setEditValue(jsonPreview?.text ?? '{}');
         } else {
           setEditValue('{}');
         }
-        setError(null);
+        setError(jsonPreview?.truncated ? largePayloadNotice : null);
       }
-    }, [isEditing, disabled, data]);
+    }, [isEditing, disabled, data, jsonPreview, largePayloadNotice]);
 
     return (
       <>
@@ -90,19 +98,46 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
           data ? (
             <div className="relative">
               <pre className="bg-gradient-to-br from-muted/20 to-muted/40 p-2 rounded-lg text-xs overflow-auto max-h-72 md:max-h-80 border border-border/30 text-foreground font-mono leading-tight shadow-sm">
-                {JSON.stringify(data, null, 2)}
+                {jsonPreview?.text}
               </pre>
               <div className="absolute top-1 right-1 opacity-60 hover:opacity-100 transition-opacity">
                 <span className="text-xs text-muted-foreground bg-background/80 px-1.5 py-0.5 rounded-sm">
                   JSON
                 </span>
               </div>
+              {jsonPreview?.truncated && (
+                <Alert
+                  variant="warning"
+                  className="mt-2 border-orange-200/50 bg-orange-50/50 rounded-lg"
+                >
+                  <X className="h-4 w-4 text-orange-600" />
+                  <AlertDescription className="text-orange-700 font-medium">
+                    {largePayloadNotice}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           ) : (
             <div className="bg-muted/20 p-4 rounded-lg text-center border-2 border-dashed border-border/30">
               <p className="text-muted-foreground text-xs">{t('components.jsonEditor.noData')}</p>
             </div>
           )
+        ) : jsonPreview?.truncated ? (
+          <div className="space-y-3">
+            <Alert variant="warning" className="border-orange-200/50 bg-orange-50/50 rounded-lg">
+              <X className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-700 font-medium">
+                {largePayloadNotice}
+              </AlertDescription>
+            </Alert>
+            <Button
+              variant="outline"
+              onClick={handleCancel}
+              className="border-border text-foreground hover:bg-muted/50 transition-colors duration-200"
+            >
+              {t('common.cancel')}
+            </Button>
+          </div>
         ) : (
           <div className="space-y-3">
             <label htmlFor="json-textarea" className="text-sm font-medium text-foreground">

@@ -10,6 +10,7 @@ import type { ParameterField, SelectOption, UnifiedMethodConfig } from '../../da
 import { useHardwareStore } from '../../store/hardwareStore';
 import { Alert, AlertDescription } from '../ui/Alert';
 import { parseParameterValue } from '../../utils/parameterUtils';
+import { getEditableJsonPreview } from '../../utils/jsonPreview';
 import type { CommonParametersState } from '../../store/hardwareStore';
 import { METHODS_REQUIRING_PASSPHRASE_CHECK } from '../../utils/constants';
 
@@ -93,58 +94,13 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
   // 获取可见的方法参数
   const visibleMethodParameters = useMemo((): ParameterField[] => {
-    console.log('[ParameterInput] 调试信息:', {
-      method: methodConfig.method,
-      hasBundleParam,
-      selectedPreset,
-      presetsLength: presets?.length || 0,
-      presets: presets?.map(p => ({
-        title: p.title,
-        parametersLength: p.parameters?.length || 0,
-        parameters: p.parameters?.map(param => ({
-          name: param.name,
-          type: param.type,
-          visible: param.visible,
-          value: param.value,
-        })),
-      })),
-    });
-
     const commonParamNames = ['useEmptyPassphrase', 'passphraseState', 'deriveCardano'];
 
     // 使用统一的预设方式获取参数
     if (selectedPreset && presets) {
       const preset = presets.find(p => p.title === selectedPreset);
-      console.log('[ParameterInput] 找到的预设:', {
-        preset: preset
-          ? {
-              title: preset.title,
-              parametersLength: preset.parameters?.length || 0,
-              parameters: preset.parameters?.map(param => ({
-                name: param.name,
-                type: param.type,
-                visible: param.visible,
-                value: param.value,
-                shouldFilter:
-                  param.visible === false ||
-                  commonParamNames.includes(param.name) ||
-                  param.name === 'bundle',
-              })),
-            }
-          : null,
-      });
 
       if (preset && preset.parameters) {
-        console.log(
-          '[ParameterInput] 预设参数:',
-          preset.parameters.map(param => ({
-            name: param.name,
-            type: param.type,
-            visible: param.visible,
-            value: param.value,
-          }))
-        );
-
         // 过滤掉通用参数、不可见参数和 bundle 参数
         const filtered = preset.parameters.filter(
           (param: ParameterField) =>
@@ -152,23 +108,12 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             !commonParamNames.includes(param.name) &&
             param.name !== 'bundle' // 排除 bundle 参数
         );
-        console.log(
-          '[ParameterInput] 过滤后的参数:',
-          filtered.map(param => ({
-            name: param.name,
-            type: param.type,
-            visible: param.visible,
-            value: param.value,
-          }))
-        );
-        console.log('[ParameterInput] 使用预设参数:', filtered.length);
         return filtered;
       }
     }
 
-    console.log('[ParameterInput] 无参数可显示');
     return []; // 没有可显示的参数
-  }, [methodConfig, hasBundleParam, selectedPreset, presets]);
+  }, [selectedPreset, presets]);
 
   // 参数变化处理
   const handleParamChange = (paramName: string, value: unknown) => {
@@ -343,14 +288,12 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   const renderInput = (field: ParameterField, type: string = 'text') => {
     const value = getParameterValue(field);
     const isEditable = field.editable !== false;
-
-    // 对于 textarea 类型，如果值是对象，需要序列化为 JSON 字符串显示
-    const getDisplayValue = (val: unknown): string => {
-      if (field.type === 'textarea' && typeof val === 'object' && val !== null) {
-        return JSON.stringify(val, null, 2);
-      }
-      return String(val ?? '');
-    };
+    const jsonPreview =
+      field.type === 'textarea' && typeof value === 'object' && value !== null
+        ? getEditableJsonPreview(value)
+        : null;
+    const displayValue = jsonPreview?.text ?? String(value ?? '');
+    const canEdit = isEditable && !jsonPreview?.truncated;
 
     return (
       <div key={field.name} className="flex items-center gap-2">
@@ -359,13 +302,16 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
           {field.type === 'textarea' ? (
             <textarea
               id={field.name}
-              value={getDisplayValue(value)}
+              value={displayValue}
               onChange={e => {
-                if (!isEditable) return;
+                if (!canEdit) return;
                 handleParamChange(field.name, e.target.value);
               }}
               placeholder={field.placeholder}
-              disabled={!isEditable}
+              readOnly={!canEdit}
+              aria-describedby={
+                jsonPreview?.truncated ? `${field.name}-large-payload-notice` : undefined
+              }
               rows={3}
               className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none disabled:opacity-50 disabled:cursor-not-allowed"
             />
@@ -391,6 +337,14 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
                 maxLength: field.validation.max,
               })}
             />
+          )}
+          {jsonPreview?.truncated && (
+            <p
+              id={`${field.name}-large-payload-notice`}
+              className="mt-1 text-xs text-muted-foreground"
+            >
+              {t('components.parameterInput.largePayloadNotice')}
+            </p>
           )}
         </div>
       </div>

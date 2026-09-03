@@ -66,13 +66,10 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
         };
       }
 
-      console.log('requestParams: ', requestParams);
-
       console.info('[REQUEST] call sdk', {
         method,
-        connectId,
-        deviceId,
-        params: requestParams,
+        hasConnectId: Boolean(connectId),
+        hasDeviceId: Boolean(deviceId),
       });
       let mode: 'no-connection' | 'connection' | 'device' = 'device';
       if (methodPayload.noConnIdReq) {

@@ -211,12 +211,6 @@ function calculateExecutionParameters(
     delete cleanParams.passphraseState;
   }
 
-  console.log('[HardwareStore] 📋 计算执行参数:', {
-    原始通用参数: commonParams,
-    原始方法参数: methodParams,
-    最终执行参数: cleanParams,
-  });
-
   return cleanParams;
 }
 
