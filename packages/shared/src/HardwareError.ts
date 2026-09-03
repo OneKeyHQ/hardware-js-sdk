@@ -346,6 +346,11 @@ export const HardwareErrorCode = {
   BlePoweredOff: 721,
   BleUnsupported: 722,
   BleUnavailableWhileUsbConnected: 723,
+  /**
+   * The host OS still has a stale BLE bond after the device pairing state was reset.
+   * The user must forget the device in system Bluetooth settings and pair it again.
+   */
+  BleBondInvalid: 724,
 
   /**
    * Hardware runtiome errors
@@ -624,6 +629,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleUnsupported]: 'Bluetooth is not supported on this device',
   [HardwareErrorCode.BleUnavailableWhileUsbConnected]:
     'Bluetooth is unavailable while USB is connected. Unplug USB and try again.',
+  [HardwareErrorCode.BleBondInvalid]:
+    'Bluetooth pairing information is no longer valid. Forget the device in system Bluetooth settings and pair it again.',
 
   /**
    * Runtime Error
@@ -687,7 +694,8 @@ export const isBleStaleBondHardwareError = (error: unknown): boolean => {
   const code = (error as { errorCode?: unknown })?.errorCode;
   return (
     code === HardwareErrorCode.BleDeviceBondError ||
-    code === HardwareErrorCode.BlePeerRemovedPairingInformation
+    code === HardwareErrorCode.BlePeerRemovedPairingInformation ||
+    code === HardwareErrorCode.BleBondInvalid
   );
 };
 
@@ -698,6 +706,7 @@ export const isBleStaleBondErrorText = (text: string): boolean => {
     value.includes('insufficient encryption') ||
     value.includes('peer removed pairing information') ||
     value.includes('cberrordomain:14') ||
+    value.includes('cbatterrordomain:14') ||
     value.includes('gatt_insuf_authentication')
   );
 };

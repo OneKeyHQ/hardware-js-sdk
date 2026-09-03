@@ -579,7 +579,40 @@ describe('ElectronBleTransport protocol detection', () => {
     await expect(
       transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
     ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
+      errorCode: HardwareErrorCode.BleBondInvalid,
+      params: {
+        nativeErrorMessage: 'CBErrorDomain:14 Peer removed pairing information on the device side',
+      },
+    });
+  });
+
+  test('rehydrates the native stale-bond code after Electron IPC wraps the error', async () => {
+    const device = { id: 'reset-pro2-ipc-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.connect.mockRejectedValue(
+      new Error(
+        "Error invoking remote method '$onekey-noble-ble-connect': HardwareError: Bluetooth pairing information is no longer valid. Forget the device in system Bluetooth settings and pair it again. (CBErrorDomain:14 Peer removed pairing information on the device side)"
+      )
+    );
+    const transport = configureTransport(nobleBle);
+
+    await expect(
+      transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleBondInvalid,
+    });
+  });
+
+  test('maps a localized macOS CBATT code 14 failure without relying on its description', async () => {
+    const device = { id: 'reset-pro2-localized-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.connect.mockRejectedValue(new Error('CBATTErrorDomain:14 localized native message'));
+    const transport = configureTransport(nobleBle);
+
+    await expect(
+      transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleBondInvalid,
     });
   });
 
