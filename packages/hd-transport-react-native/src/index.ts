@@ -980,15 +980,6 @@ export default class ReactNativeBleTransport {
       throw error;
     }
 
-    if (Platform.OS === 'android') {
-      const bondState = await pairDevice(uuid);
-      if (bondState.bonding) {
-        await onDeviceBondState(uuid);
-      } else if (!bondState.bonded) {
-        throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
-      }
-    }
-
     if (!device) {
       const devices = await blePlxManager.devices([uuid]);
       [device] = devices;
@@ -1070,6 +1061,32 @@ export default class ReactNativeBleTransport {
         } else {
           remapError(e, shouldMapProtocolV2StaleBond);
         }
+      }
+    }
+
+    if (Platform.OS === 'android') {
+      // Establish the LE link before createBond(). Without an existing LE ACL,
+      // Android TRANSPORT_AUTO can choose BR/EDR for a BLE-only device.
+      const connectedDevice = device;
+      try {
+        const bondState = await pairDevice(uuid);
+        if (bondState.bonding) {
+          await onDeviceBondState(uuid);
+        } else if (!bondState.bonded) {
+          throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
+        }
+      } catch (error) {
+        await this.runNativeTeardown(uuid, blePlxManager, async () => {
+          await Promise.all([
+            this.runBestEffortNativeOperation('bond failure: cancel manager connection', () =>
+              blePlxManager.cancelDeviceConnection(uuid)
+            ),
+            this.runBestEffortNativeOperation('bond failure: cancel device connection', () =>
+              connectedDevice.cancelConnection()
+            ),
+          ]);
+        });
+        throw error;
       }
     }
 

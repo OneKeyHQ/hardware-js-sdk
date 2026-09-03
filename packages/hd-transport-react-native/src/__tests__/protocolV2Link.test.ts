@@ -360,6 +360,46 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(new ReactNativeBleTransport({}).scanTimeout).toBe(3000);
   });
 
+  test('connects the Android GATT link before starting system bonding', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device } = createHarness();
+    const operationOrder: string[] = [];
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+
+    device.isConnected.mockResolvedValueOnce(false);
+    device.connect = jest.fn(() => {
+      operationOrder.push('connect');
+      return Promise.resolve(device);
+    });
+    pairDeviceMock.mockImplementationOnce(() => {
+      operationOrder.push('bond');
+      return Promise.resolve({ bonded: true, bonding: false });
+    });
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+
+    expect(operationOrder).toEqual(['connect', 'bond']);
+    await transport.release(uuid, true);
+  });
+
+  test('closes the Android GATT link when system bonding fails', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device, bleManager } = createHarness();
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+
+    pairDeviceMock.mockRejectedValueOnce(new Error('bonding canceled'));
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toThrow(
+      'bonding canceled'
+    );
+
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
+    expect(device.cancelConnection).toHaveBeenCalledTimes(1);
+  });
+
   test('uses withResponse for consecutive iOS Protocol V1 control commands without releasing', async () => {
     const { transport, uuid, writeCharacteristic } = createV1Harness({
       respondOnWriteCount: [1, 2],
