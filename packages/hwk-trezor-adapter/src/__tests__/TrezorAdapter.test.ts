@@ -1,4 +1,10 @@
-import { DEVICE, HardwareErrorCode, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hwk-adapter-core';
+import {
+  DEVICE,
+  HardwareErrorCode,
+  ORPHAN_ELIGIBLE_ERROR_CODES,
+  UI_REQUEST,
+  UI_RESPONSE,
+} from '@onekeyfe/hwk-adapter-core';
 
 import { TrezorAdapter, onSdkEvent } from '../index';
 
@@ -319,6 +325,44 @@ describe('TrezorAdapter', () => {
       payload: {
         code: HardwareErrorCode.DevicePathForbidden,
         error: 'Forbidden key path',
+      },
+    });
+  });
+
+  // The device is set to always collect the passphrase on its own keyboard, so
+  // the firmware refuses any message carrying one — including the `passphrase:
+  // ''` that a standard-wallet request sends. Without this mapping it lands in
+  // UnknownError together with disconnects and timeouts, and a host cannot tell
+  // "turn this device setting off" apart from a real failure.
+  it('maps a device-enforced on-device passphrase failure to PassphraseAlwaysOnDevice', async () => {
+    const alwaysOnDevice =
+      'Providing passphrase in message is not allowed when PASSPHRASE_ALWAYS_ON_DEVICE is True.';
+    const connector = createConnector();
+    // The standard-wallet request is rejected while creating the app session,
+    // before the chain method is ever sent.
+    (connector.call as CallMock).mockRejectedValueOnce(
+      Object.assign(new Error(alwaysOnDevice), {
+        name: 'TrezorFailureError',
+        response: {
+          type: 'Failure',
+          message: { code: 'Failure_DataError', message: alwaysOnDevice },
+        },
+      })
+    );
+    const adapter = new TrezorAdapter(connector);
+
+    const result = await adapter.btcSignMessage('safe-7', 'safe-7', {
+      path: "m/86'/0'/0'/0/0",
+      coin: 'Bitcoin',
+      message: 'hello',
+      useEmptyPassphrase: true,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      payload: {
+        code: HardwareErrorCode.PassphraseAlwaysOnDevice,
+        error: alwaysOnDevice,
       },
     });
   });
@@ -985,6 +1029,56 @@ describe('TrezorAdapter', () => {
     }
     // Only the first item hit the device (THP session + the rejecting call);
     // items 2 and 3 were never requested.
+    const callsAfter = (connector.call as CallMock).mock.calls.length;
+    expect(callsAfter - callsBefore).toBe(2);
+  });
+
+  it('allNetworkGetAddress aborts every bundle on PassphraseAlwaysOnDevice', async () => {
+    const alwaysOnDevice =
+      'Providing passphrase in message is not allowed when PASSPHRASE_ALWAYS_ON_DEVICE is True.';
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    await adapter.connectDevice('safe-7');
+    (connector.call as CallMock)
+      .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty' })
+      .mockRejectedValueOnce(
+        Object.assign(new Error(alwaysOnDevice), {
+          name: 'TrezorFailureError',
+          response: {
+            type: 'Failure',
+            message: { code: 'Failure_DataError', message: alwaysOnDevice },
+          },
+        })
+      );
+
+    const callsBefore = (connector.call as CallMock).mock.calls.length;
+    const result = await adapter.allNetworkGetAddress('safe-7', '', {
+      useEmptyPassphrase: true,
+      bundle: [
+        {
+          network: 'eth',
+          methodName: 'evmGetAddress',
+          path: "m/44'/60'/0'/0/0",
+          showOnDevice: false,
+        },
+        {
+          network: 'sol',
+          methodName: 'solGetAddress',
+          path: "m/44'/501'/0'/0'",
+          showOnDevice: false,
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      success: false,
+      payload: {
+        code: HardwareErrorCode.PassphraseAlwaysOnDevice,
+        error: alwaysOnDevice,
+      },
+    });
+    expect(ORPHAN_ELIGIBLE_ERROR_CODES).toContain(HardwareErrorCode.PassphraseAlwaysOnDevice);
+    // The first failure ends the whole bundle; the Solana item is never sent.
     const callsAfter = (connector.call as CallMock).mock.calls.length;
     expect(callsAfter - callsBefore).toBe(2);
   });

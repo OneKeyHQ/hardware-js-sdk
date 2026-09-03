@@ -406,6 +406,18 @@ export class TrezorAdapter implements IHardwareWallet {
     if (failure.code === 'Failure_DataError' && failure.message === 'Forbidden key path') {
       return HardwareErrorCode.DevicePathForbidden;
     }
+    // The device collects the passphrase on its own keyboard, so the firmware
+    // rejects any message carrying one — `passphrase: ''` (the standard-wallet
+    // request) included. Match the setting NAME rather than the full sentence:
+    // the surrounding prose is descriptive and may be reworded, the constant is
+    // part of the device's configuration vocabulary.
+    if (
+      failure.code === 'Failure_DataError' &&
+      typeof failure.message === 'string' &&
+      failure.message.includes('PASSPHRASE_ALWAYS_ON_DEVICE')
+    ) {
+      return HardwareErrorCode.PassphraseAlwaysOnDevice;
+    }
     // Firmware can't process this request (e.g. EIP-712 typed data the device
     // firmware doesn't support) → surface as "method not supported".
     if (failure.code === 'Failure_FirmwareError') {
@@ -714,7 +726,9 @@ export class TrezorAdapter implements IHardwareWallet {
         // Mixed bundles must not abort — other chains can still derive.
         const isWholeChainForbidden =
           isSingleNetworkBundle && response.payload?.code === HardwareErrorCode.DevicePathForbidden;
-        return isSessionLevelFailure || isWholeChainForbidden;
+        const isPassphrasePolicyFailure =
+          response.payload?.code === HardwareErrorCode.PassphraseAlwaysOnDevice;
+        return isSessionLevelFailure || isWholeChainForbidden || isPassphrasePolicyFailure;
       },
     });
   }
