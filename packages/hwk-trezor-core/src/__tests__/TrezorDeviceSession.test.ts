@@ -628,6 +628,56 @@ describe('TrezorDeviceSession', () => {
     expect(calls[0].data).toEqual({ passphrase: '', derive_cardano: false });
   });
 
+  const alwaysOnDeviceSession = (calls: CallRecord[], onPassphraseRequest: jest.Mock) => {
+    const session = new TrezorDeviceSession({
+      transport: new EmptyTransport(),
+      connectionType: 'ble',
+      coreFactory: createFactory(calls, [{ type: 'Success', message: {} }]),
+      initializedState: {
+        protocol: 'thp',
+        features: {
+          ...features,
+          passphrase_protection: true,
+          passphrase_always_on_device: true,
+        },
+        thpState: new protocolThp.ThpState(),
+      },
+      thp: { onPassphraseRequest } as any,
+    });
+    session.getThpState()?.updateHandshakeCredentials({
+      hostKey: Buffer.alloc(32, 1),
+      trezorKey: Buffer.alloc(32, 2),
+    });
+
+    return session;
+  };
+
+  test('prompt mode sends on_device and never asks the host for a passphrase', async () => {
+    const calls: CallRecord[] = [];
+    const onPassphraseRequest = jest.fn(async () => ({ passphrase: 'secret' }));
+    const session = alwaysOnDeviceSession(calls, onPassphraseRequest);
+
+    await session.createThpAppSession({ passphraseMode: 'prompt' });
+
+    expect(onPassphraseRequest).not.toHaveBeenCalled();
+    expect(calls.map(call => call.name)).toEqual(['ThpCreateNewSession']);
+    expect(calls[0].data).toEqual({ on_device: true, derive_cardano: false });
+    expect(calls[0].data).not.toHaveProperty('passphrase');
+  });
+
+  test('empty mode still sends an empty passphrase and lets the firmware reject it', async () => {
+    const calls: CallRecord[] = [];
+    const onPassphraseRequest = jest.fn(async () => ({ passphrase: 'secret' }));
+    const session = alwaysOnDeviceSession(calls, onPassphraseRequest);
+
+    await session.createThpAppSession({ passphraseMode: 'empty' });
+
+    expect(onPassphraseRequest).not.toHaveBeenCalled();
+    expect(calls.map(call => call.name)).toEqual(['ThpCreateNewSession']);
+    expect(calls[0].data).toEqual({ passphrase: '', derive_cardano: false });
+    expect(calls[0].data).not.toHaveProperty('on_device');
+  });
+
   test('handles Trezor Connect style button and PIN requests before final method response', async () => {
     const calls: CallRecord[] = [];
     const buttonRequests: Record<string, unknown>[] = [];
