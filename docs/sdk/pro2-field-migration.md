@@ -1,294 +1,294 @@
-# Pro2 Protocol V2 字段迁移与职责拆分
+# Pro2 Protocol V2 Field Migration and Responsibility Split
 
-## 1. 文档目的
+## 1. Document Purpose
 
-本文完整说明 OneKey Pro 2 在 Protocol V2 中如何重新组织设备字段，以及 Hardware JS SDK Core 如何读取、转换和对外提供这些字段。
+This document fully explains how OneKey Pro 2 reorganizes device fields in Protocol V2, and how Hardware JS SDK Core reads, transforms, and exposes those fields.
 
-这次调整不是简单地把旧字段改名，而是把过去集中在一次初始化结果中的内容，按照实际用途拆成多组消息：
+This change is not a simple rename of old fields. It splits content that used to live in a single initialization result into multiple message groups by actual use:
 
-1. 设备基本信息：型号、序列号、主控固件、蓝牙芯片、安全芯片等相对稳定的信息。
-2. 设备实时状态：是否初始化、是否解锁、是否需要备份、Passphrase 和 Attach-to-PIN 状态。
-3. 用户设置：语言、设备名称、蓝牙开关、亮度、锁屏时间、振动反馈等可配置内容。
-4. 钱包会话：当前打开的是哪个钱包、钱包 Session 是否可以恢复、PIN 解锁结果。
-5. 设备操作与固件管理：重启、设备证书、固件安装目标和安装状态。
-6. 生产制造信息：生产时间、工厂测试、老化测试、工厂序列号等生产阶段数据。
-7. SDK 字段转换：SDK 将 Protocol V1/V2 响应转换为统一 `DeviceState`，协议原始结构只在 Core 内部保留。
+1. Device basic information: relatively stable data such as model, serial number, main firmware, Bluetooth chip, and secure element.
+2. Device realtime status: whether the device is initialized, unlocked, needs backup, and Passphrase / Attach-to-PIN state.
+3. User settings: configurable content such as language, device name, Bluetooth switch, brightness, lock-screen timeout, and haptic feedback.
+4. Wallet session: which wallet is currently open, whether the wallet session can be resumed, and PIN unlock results.
+5. Device operations and firmware management: reboot, device certificates, firmware install targets, and install status.
+6. Manufacturing information: production-stage data such as manufacture time, factory tests, burn-in tests, and factory serial number.
+7. SDK field conversion: the SDK converts Protocol V1/V2 responses into a unified `DeviceState`; protocol-native structures stay inside Core only.
 
-本文可以独立阅读，是仓库内 Pro2 字段迁移和 SDK 归一化的唯一事实源，也可直接同步到 Confluence。
+This document can be read on its own. It is the single source of truth in the repository for Pro2 field migration and SDK normalization, and can also be synced directly to Confluence.
 
-## 2. 一句话结论
+## 2. One-Sentence Conclusion
 
-Pro 2 不再使用一份不断扩张的设备信息对象承载所有数据，而是按照“基本信息、实时状态、用户设置、钱包会话、设备操作、生产制造”分别提供消息；SDK 在内部聚合协议差异，对外只提供统一 `DeviceState` 读取/刷新接口和对应的业务操作 API。
+Pro 2 no longer uses one ever-growing device-info object to carry all data. It provides messages separately for “basic information, realtime status, user settings, wallet session, device operations, and manufacturing.” The SDK aggregates protocol differences internally and, externally, only exposes a unified `DeviceState` read/refresh interface plus the corresponding business-operation APIs.
 
-## 3. 为什么要拆分
+## 3. Why Split
 
-Protocol V1 常通过 `Initialize -> Features` 一次返回大量信息。这个方式使用方便，但随着设备能力增加，会出现几个问题：
+Protocol V1 often returned a large amount of information in one `Initialize -> Features` round trip. That was convenient, but as device capabilities grew, several problems appeared:
 
-- 设备型号和固件版本很少变化，解锁状态和备份状态却会频繁变化，二者不适合使用同一个刷新周期。
-- label、语言、亮度等是用户设置，不是设备身份。
-- 钱包 Session 代表当前钱包上下文，不代表物理设备本身。
-- 固件安装进度是一次任务的状态，不是设备长期属性。
-- 工厂测试和生产记录具有不同的权限边界，不应出现在普通设备详情中。
-- 每新增一个字段都塞进 `Features`，会让固件、SDK 和 App 之间的兼容成本持续增加。
+- Device model and firmware version rarely change, while unlock state and backup state change frequently. They should not share the same refresh cycle.
+- Label, language, and brightness are user settings, not device identity.
+- A wallet session represents the current wallet context, not the physical device itself.
+- Firmware install progress is the state of one task, not a long-lived device attribute.
+- Factory tests and production records have different permission boundaries and should not appear in ordinary device details.
+- Stuffing every new field into `Features` keeps raising compatibility cost among firmware, SDK, and App.
 
-Protocol V2 因此按字段用途、变化频率和安全边界进行拆分。
+Protocol V2 therefore splits fields by purpose, change frequency, and security boundary.
 
-## 4. 拆分后的整体结构
+## 4. Overall Structure After the Split
 
-可以把旧的集中式设备信息理解成被拆成以下七部分：
+The old centralized device information can be understood as split into the following seven parts:
 
-| 分类               | Protocol V2 消息                                        | 主要内容                                      | 推荐读取方式                                       |
+| Category | Protocol V2 Message | Main Content | Recommended Read Path |
 | ------------------ | ------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------- |
-| 设备基本信息       | `DeviceInfoGet -> DeviceInfo`                           | 型号、序列号、主控、蓝牙芯片、SE 芯片及版本   | `getDeviceState({ scope: 'firmware' })`            |
-| 设备实时状态       | `DeviceStatusGet -> DeviceStatus`                       | 初始化、解锁、备份、Passphrase、Attach-to-PIN | `getDeviceState()`                                 |
-| 用户设置           | `DeviceSettingsGet/Set/PageShow`                        | label、语言、蓝牙、亮度、锁屏、振动等         | `getDeviceState({ scope: 'settings' })` / 高层 API |
-| 钱包会话恢复       | `DeviceSessionGet -> DeviceSession`                     | 按 `session_id` 恢复已有钱包会话              | Core 内部钱包 Session 管理                         |
-| 钱包会话创建       | `DeviceSessionAskPin/AskPassphrase -> DeviceSession`    | 验证并原子返回主钱包或隐藏钱包会话            | 受保护方法与钱包选择流程                           |
-| 设备操作与固件管理 | `DeviceReboot`、`DeviceCertificate*`、`DeviceFirmware*` | 重启、证书、固件安装                          | 对应专用 API 和升级流程                            |
-| 生产制造信息       | `DeviceFactoryInfo*`、`DeviceFactoryTest` 等            | 生产时间、工厂测试、永久锁                    | 生产制造专用 API                                   |
+| Device basic information | `DeviceInfoGet -> DeviceInfo` | Model, serial number, main MCU, Bluetooth chip, SE chips and versions | `getDeviceState({ scope: 'firmware' })` |
+| Device realtime status | `DeviceStatusGet -> DeviceStatus` | Initialization, unlock, backup, Passphrase, Attach-to-PIN | `getDeviceState()` |
+| User settings | `DeviceSettingsGet/Set/PageShow` | label, language, Bluetooth, brightness, lock screen, haptics, and more | `getDeviceState({ scope: 'settings' })` / high-level APIs |
+| Wallet session resume | `DeviceSessionGet -> DeviceSession` | Resume an existing wallet session by `session_id` | Core-internal wallet session management |
+| Wallet session create | `DeviceSessionAskPin/AskPassphrase -> DeviceSession` | Verify and atomically return a main-wallet or hidden-wallet session | Protected methods and wallet-selection flow |
+| Device operations and firmware management | `DeviceReboot`, `DeviceCertificate*`, `DeviceFirmware*` | Reboot, certificates, firmware install | Dedicated APIs and the upgrade flow |
+| Manufacturing information | `DeviceFactoryInfo*`, `DeviceFactoryTest`, and related | Manufacture time, factory tests, permanent lock | Manufacturing-only APIs |
 
-字段流转关系可以简化为：
+Field flow can be simplified as:
 
 ```text
 Protocol V2 protobuf
     ├── DeviceInfo ─────────────────> DeviceState identity / versions / verification
     ├── DeviceStatus ───────────────> DeviceState status
     ├── DeviceSettings ─────────────> DeviceState identity / settings
-    ├── DeviceSession ──────────────> Core 钱包 Session 缓存（不进入公共 DeviceState）
-    ├── DeviceFirmware ─────────────> 固件升级流程
-    └── DeviceFactory ──────────────> 生产制造专用 API
+    ├── DeviceSession ──────────────> Core wallet session cache (does not enter public DeviceState)
+    ├── DeviceFirmware ─────────────> firmware upgrade flow
+    └── DeviceFactory ──────────────> manufacturing-only APIs
 ```
 
-## 5. 设备基本信息
+## 5. Device Basic Information
 
-### 5.1 消息结构
+### 5.1 Message Structure
 
-设备基本信息通过以下请求读取：
+Device basic information is read through the following request:
 
 ```text
 DeviceInfoGet -> DeviceInfo
 ```
 
-`DeviceInfo` 的结构如下：
+The structure of `DeviceInfo` is:
 
 ```text
 DeviceInfo
-├── protocol_version       协议版本
-├── hw                     硬件型号、序列号和硬件版本
-├── fw                     主控各阶段镜像信息
-├── coprocessor            蓝牙/协处理器信息
-├── se1、se2、se3、se4     安全芯片信息
+├── protocol_version       protocol version
+├── hw                     hardware model, serial number, and hardware version
+├── fw                     main MCU image information for each stage
+├── coprocessor            Bluetooth / coprocessor information
+├── se1, se2, se3, se4     secure-element information
 ```
 
-`DeviceInfo` 不再承担实时状态读取。历史 `targets.status` 将被协议删除，SDK 不构造该字段。
+`DeviceInfo` no longer owns realtime status reads. Historical `targets.status` will be removed from the protocol, and the SDK does not construct that field.
 
-### 5.2 硬件信息
+### 5.2 Hardware Information
 
-| Protocol V2 字段              | 含义                | SDK 当前处理                             |
+| Protocol V2 Field | Meaning | Current SDK Handling |
 | ----------------------------- | ------------------- | ---------------------------------------- |
-| `hw.Device_type`              | 设备型号            | SDK 按协议枚举识别 Pro 2、Neo 等真实型号 |
-| `hw.serial_no`                | 设备序列号          | 转换为 `DeviceState.identity.serialNo`   |
-| `hw.hardware_version`         | 可读硬件版本        | 保留在原始 Protocol V2 数据中            |
-| `hw.hardware_version_raw_adc` | 硬件版本 ADC 原始值 | 保留在原始数据中                         |
+| `hw.Device_type` | Device model | SDK identifies real models such as Pro 2 and Neo from the protocol enum |
+| `hw.serial_no` | Device serial number | Converted to `DeviceState.identity.serialNo` |
+| `hw.hardware_version` | Human-readable hardware version | Kept in raw Protocol V2 data |
+| `hw.hardware_version_raw_adc` | Hardware-version ADC raw value | Kept in raw data |
 
-序列号和设备 ID 是两个不同概念：
+Serial number and device ID are two different concepts:
 
-- 序列号来自 `hw.serial_no`。
-- 设备 ID 来自 `DeviceStatus.device_id`。
-- SDK 不允许使用序列号为设备 ID 兜底。
+- Serial number comes from `hw.serial_no`.
+- Device ID comes from `DeviceStatus.device_id`.
+- The SDK must not fall back from serial number to device ID.
 
-### 5.3 主控固件信息
+### 5.3 Main Firmware Information
 
-| Protocol V2 字段      | 含义                         | SDK 当前处理                                |
+| Protocol V2 Field | Meaning | Current SDK Handling |
 | --------------------- | ---------------------------- | ------------------------------------------- |
-| `fw.romloader`        | romloader 镜像信息           | 映射到历史兼容字段 `boardVersion`           |
-| `fw.bootloader`       | bootloader 镜像信息          | `bootloaderVersion` 和 bootloader 校验信息  |
-| `fw.application`      | 主应用镜像信息               | `firmwareVersion` 和固件校验信息            |
-| `fw.application_data` | P2/application data 镜像信息 | 当前保留在原始数据中，尚无独立 Feature 字段 |
+| `fw.romloader` | romloader image information | Mapped to the historical compatibility field `boardVersion` |
+| `fw.bootloader` | bootloader image information | `bootloaderVersion` and bootloader verification information |
+| `fw.application` | main application image information | `firmwareVersion` and firmware verification information |
+| `fw.application_data` | P2 / application data image information | Currently kept in raw data; no independent Feature field yet |
 
-每个镜像都可以包含：
+Each image may include:
 
-| 字段       | 用途               |
+| Field | Purpose |
 | ---------- | ------------------ |
-| `version`  | 版本展示和升级判断 |
-| `build_id` | 定位具体构建       |
-| `hash`     | 镜像完整性校验     |
+| `version` | Version display and upgrade decisions |
+| `build_id` | Identify a specific build |
+| `hash` | Image integrity check |
 
-这里的 SDK `boardVersion` 是历史 boardloader 命名留下的兼容字段，当前对应 `romloader.version`；它不等价于 `hw.hardware_version`。`application_data` 是独立的 P2 数据包，不能映射为 `boardVersion`。
+Here, SDK `boardVersion` is a compatibility field left over from the historical boardloader name. It currently corresponds to `romloader.version`; it is not equivalent to `hw.hardware_version`. `application_data` is an independent P2 data package and must not be mapped to `boardVersion`.
 
-### 5.4 蓝牙与协处理器信息
+### 5.4 Bluetooth and Coprocessor Information
 
-| Protocol V2 字段          | 含义                | SDK 当前处理                          |
+| Protocol V2 Field | Meaning | Current SDK Handling |
 | ------------------------- | ------------------- | ------------------------------------- |
-| `coprocessor.bootloader`  | 协处理器 bootloader | 保留在原始数据中                      |
-| `coprocessor.application` | 协处理器/蓝牙应用   | 转换为 `bleVersion`                   |
-| `coprocessor.bt_adv_name` | 蓝牙广播名称        | 转换为 `DeviceState.identity.bleName` |
-| `coprocessor.bt_mac`      | 蓝牙 MAC 地址       | 保留在原始数据中                      |
+| `coprocessor.bootloader` | Coprocessor bootloader | Kept in raw data |
+| `coprocessor.application` | Coprocessor / Bluetooth application | Converted to `bleVersion` |
+| `coprocessor.bt_adv_name` | Bluetooth advertising name | Converted to `DeviceState.identity.bleName` |
+| `coprocessor.bt_mac` | Bluetooth MAC address | Kept in raw data |
 
-蓝牙广播名称和蓝牙开关是两个不同字段：
+Bluetooth advertising name and Bluetooth switch are two different fields:
 
-- 广播名称来自 `DeviceInfo.coprocessor.bt_adv_name`。
-- 蓝牙是否启用来自 `DeviceSettings.bt_enable`。
+- Advertising name comes from `DeviceInfo.coprocessor.bt_adv_name`.
+- Whether Bluetooth is enabled comes from `DeviceSettings.bt_enable`.
 
-### 5.5 安全芯片信息
+### 5.5 Secure Element Information
 
-Pro 2 最多提供 `se1` 至 `se4` 四组安全芯片信息。每组可以包含：
+Pro 2 provides up to four groups of secure-element information, `se1` through `se4`. Each group may include:
 
-| Protocol V2 字段 | 含义                               | SDK 当前处理                                             |
+| Protocol V2 Field | Meaning | Current SDK Handling |
 | ---------------- | ---------------------------------- | -------------------------------------------------------- |
-| `application`    | SE 应用版本、build ID、hash        | 转换为 `se01Version` 至 `se04Version` 及校验字段         |
-| `bootloader`     | SE bootloader 版本、build ID、hash | 转换为 `se01BootVersion` 至 `se04BootVersion` 及校验字段 |
-| `type`           | SE 芯片类型                        | 保留在原始数据中，Core 提供枚举解析 helper               |
-| `state`          | SE 当前运行状态                    | 保留在原始数据中，Core 提供枚举解析 helper               |
+| `application` | SE application version, build ID, and hash | Converted to `se01Version` through `se04Version` and verification fields |
+| `bootloader` | SE bootloader version, build ID, and hash | Converted to `se01BootVersion` through `se04BootVersion` and verification fields |
+| `type` | SE chip type | Kept in raw data; Core provides an enum-parsing helper |
+| `state` | SE current runtime state | Kept in raw data; Core provides an enum-parsing helper |
 
-### 5.6 查询范围
+### 5.6 Query Scope
 
-`DeviceInfoGet` 不是每次都返回全部内容。请求由两组参数控制：
+`DeviceInfoGet` does not always return everything. The request is controlled by two parameter groups:
 
-- `targets`：要读取哪些静态组件，例如 `hw`、`fw`、`coprocessor`、`se1` 至 `se4`。
-- `types`：镜像信息需要包含 `version`、`build_id`、`hash` 还是组件特有信息 `specific`。
+- `targets`: which static components to read, for example `hw`, `fw`, `coprocessor`, and `se1` through `se4`.
+- `types`: whether image information should include `version`, `build_id`, `hash`, or component-specific information `specific`.
 
-SDK 当前使用的典型范围：
+Typical scopes currently used by the SDK:
 
-| 场景        | 读取内容                                           | 原因                                         |
+| Scenario | Content Read | Reason |
 | ----------- | -------------------------------------------------- | -------------------------------------------- |
-| 初始化      | hw、fw、coprocessor；version、specific             | 建立静态信息，结合 ProtocolInfo 识别运行阶段 |
-| 轻量刷新    | hw、fw、coprocessor；version、specific             | 刷新静态信息，不隐式读取状态                 |
-| versions    | hw、fw、coprocessor、se1 至 se4；version、specific | 展示所有组件版本                             |
-| verify/full | 所有 target；version、build_id、hash、specific     | 设备完整校验                                 |
+| Initialization | hw, fw, coprocessor; version, specific | Establish static information and, together with ProtocolInfo, identify the running stage |
+| Lightweight refresh | hw, fw, coprocessor; version, specific | Refresh static information without implicitly reading status |
+| versions | hw, fw, coprocessor, se1 through se4; version, specific | Display all component versions |
+| verify/full | all targets; version, build_id, hash, specific | Full device verification |
 
-## 6. 设备实时状态
+## 6. Device Realtime Status
 
-运行状态由独立的 `DeviceStatusGet` 提供：
+Runtime status is provided by a dedicated `DeviceStatusGet`:
 
 ```text
 DeviceStatusGet -> DeviceStatus
 ```
 
-`DeviceInfoGet.targets.status` 是即将从底层协议删除的历史字段，SDK 业务流程不再构造或公开它。
-初始化先读取 `ProtocolInfo`：`build_fingerprint` 的 binary 段识别 application、bootloader 或
-romloader，`supported_messages` 判断 `DeviceStatusGet` 是否可调用。application 在声明支持时
-读取运行状态；bootloader/romloader 直接返回可用的身份和版本快照，绝不发送
-`DeviceStatusGet`。每次公共 `getDeviceState()` 也遵循同一规则。
+`DeviceInfoGet.targets.status` is a historical field about to be removed from the underlying protocol. SDK business flows no longer construct or expose it.
+Initialization first reads `ProtocolInfo`: the binary segment of `build_fingerprint` identifies application, bootloader, or
+romloader, and `supported_messages` decides whether `DeviceStatusGet` can be called. Application reads runtime status when
+it declares support; bootloader/romloader return the available identity and version snapshot directly and never send
+`DeviceStatusGet`. Every public `getDeviceState()` follows the same rule.
 
-### 6.1 字段映射
+### 6.1 Field Mapping
 
-| Protocol V2 字段            | 含义                       | SDK 字段                                  |
+| Protocol V2 Field | Meaning | SDK Field |
 | --------------------------- | -------------------------- | ----------------------------------------- |
-| `device_id`                 | 钱包初始化生命周期 ID      | `DeviceState.identity.deviceId`           |
-| `unlocked`                  | 设备是否解锁               | `DeviceState.status.unlocked`             |
-| `init_states`               | 设备是否完成初始化         | `DeviceState.status.initialized`          |
-| `backup_required`           | 是否需要备份               | `DeviceState.status.backupRequired`       |
-| `passphrase_enabled`        | 是否启用 Passphrase 保护   | `DeviceState.status.passphraseProtection` |
-| `attach_to_pin_enabled`     | 是否启用 Attach-to-PIN     | `DeviceState.status.attachToPinEnabled`   |
-| `unlocked_by_attach_to_pin` | 当前是否由 Attach PIN 解锁 | `DeviceState.status.unlockedAttachPin`    |
+| `device_id` | Wallet initialization lifecycle ID | `DeviceState.identity.deviceId` |
+| `unlocked` | Whether the device is unlocked | `DeviceState.status.unlocked` |
+| `init_states` | Whether device initialization is complete | `DeviceState.status.initialized` |
+| `backup_required` | Whether backup is required | `DeviceState.status.backupRequired` |
+| `passphrase_enabled` | Whether Passphrase protection is enabled | `DeviceState.status.passphraseProtection` |
+| `attach_to_pin_enabled` | Whether Attach-to-PIN is enabled | `DeviceState.status.attachToPinEnabled` |
+| `unlocked_by_attach_to_pin` | Whether the current unlock came from Attach PIN | `DeviceState.status.unlockedAttachPin` |
 
-`DeviceState.protocol` 表示 SDK 协议族（`V1`/`V2`），根级
-`DeviceState.protocolVersion` 则保留设备消息中的 `protocol_version`。两者含义不同，
-例如 Pro 2 可以同时返回 `protocol: 'V2'` 与 `protocolVersion: 1`。
+`DeviceState.protocol` is the SDK protocol family (`V1`/`V2`). The root-level
+`DeviceState.protocolVersion` keeps `protocol_version` from the device message. The two mean different things;
+for example, Pro 2 can return both `protocol: 'V2'` and `protocolVersion: 1`.
 
-### 6.2 状态字段可能为空
+### 6.2 Status Fields May Be Empty
 
-`passphrase_enabled`、`attach_to_pin_enabled` 和 `unlocked_by_attach_to_pin` 在 protobuf 中属于解锁后可用的私有状态。
+`passphrase_enabled`, `attach_to_pin_enabled`, and `unlocked_by_attach_to_pin` are private states in protobuf that become available after unlock.
 
-因此：
+Therefore:
 
-- 字段为空不能直接解释为 `false`。
-- 设备锁定时，调用方必须允许这些字段缺失。
-- SDK 更新缓存时应按字段合并，不能因为一次轻量响应缺字段就清空之前的全部信息。
+- An empty field must not be interpreted as `false`.
+- When the device is locked, callers must allow these fields to be missing.
+- When the SDK updates cache, it should merge by field and must not clear all previous information just because one lightweight response omitted fields.
 
-### 6.3 Onboarding 状态
+### 6.3 Onboarding Status
 
-设备初始化过程的具体步骤没有塞进 `DeviceStatus`，而是使用独立消息：
+The concrete steps of device initialization are not stuffed into `DeviceStatus`. They use a dedicated message:
 
 ```text
 OnboardingStatusGet -> OnboardingStatus
 ```
 
-返回内容：
+Returned content:
 
-- `step`：当前 onboarding 粗粒度步骤。
-- `phase`：步骤内的当前页面阶段。
-- `setup`：创建或恢复类型及所选备份介质。
-- `pin_set`：是否已设置 PIN。
-- `wallet_initialized`：钱包是否已完成初始化。
+- `step`: current coarse-grained onboarding step.
+- `phase`: current page phase within the step.
+- `setup`: create-or-restore type and the selected backup medium.
+- `pin_set`: whether PIN has been set.
+- `wallet_initialized`: whether the wallet has finished initialization.
 
-`DeviceStatus.init_states` 只表示最终是否初始化完成，不能替代 onboarding 的详细阶段。
+`DeviceStatus.init_states` only indicates whether initialization is finally complete. It cannot replace the detailed onboarding stages.
 
-## 7. 用户设置
+## 7. User Settings
 
-用户设置通过以下消息处理：
+User settings are handled through the following messages:
 
 ```text
-DeviceSettingsGet      读取设置
-DeviceSettingsSet      修改可以直接写入的设置
-DeviceSettingsPageShow 打开必须在设备端确认的设置页面
+DeviceSettingsGet      read settings
+DeviceSettingsSet      change settings that can be written directly
+DeviceSettingsPageShow open a settings page that must be confirmed on the device
 ```
 
-### 7.1 设置字段
+### 7.1 Settings Fields
 
-| 分类       | Protocol V2 字段              | 说明                         |
+| Category | Protocol V2 Field | Description |
 | ---------- | ----------------------------- | ---------------------------- |
-| 设备展示   | `label`                       | 设备名称                     |
-| 设备展示   | `device_name_display_enabled` | 首页是否显示型号和蓝牙标识   |
-| 连接       | `bt_enable`                   | 蓝牙是否启用                 |
-| 本地化     | `language`                    | 完整 BCP-47 语言标识         |
-| 外观       | `wallpaper_path`              | 设备侧壁纸文件路径           |
-| 外观       | `brightness`                  | 屏幕亮度                     |
-| 外观       | `animation_enable`            | 动画是否启用                 |
-| 唤醒与反馈 | `tap_to_wake`                 | 轻触唤醒                     |
-| 唤醒与反馈 | `haptic_feedback`             | 触觉反馈                     |
-| 电源与锁定 | `autolock_delay_ms`           | 自动锁屏时间                 |
-| 电源与锁定 | `autoshutdown_delay_ms`       | 自动关机时间                 |
-| 电源与锁定 | `usb_lock_enable`             | USB 锁定设置                 |
-| 安全输入   | `random_keypad`               | PIN 键盘是否随机排列         |
-| 能力开关   | `fido_enabled`                | FIDO 功能开关                |
-| 设备端确认 | `passphrase_enable`           | 可读取，修改必须在设备端确认 |
-| 设备端确认 | `airgap_mode`                 | 可读取，修改必须在设备端确认 |
+| Device display | `label` | Device name |
+| Device display | `device_name_display_enabled` | Whether the home screen shows model and Bluetooth identifiers |
+| Connection | `bt_enable` | Whether Bluetooth is enabled |
+| Localization | `language` | Full BCP-47 language identifier |
+| Appearance | `wallpaper_path` | On-device wallpaper file path |
+| Appearance | `brightness` | Screen brightness |
+| Appearance | `animation_enable` | Whether animation is enabled |
+| Wake and feedback | `tap_to_wake` | Tap to wake |
+| Wake and feedback | `haptic_feedback` | Haptic feedback |
+| Power and lock | `autolock_delay_ms` | Auto lock-screen delay |
+| Power and lock | `autoshutdown_delay_ms` | Auto shutdown delay |
+| Power and lock | `usb_lock_enable` | USB lock setting |
+| Secure input | `random_keypad` | Whether the PIN keypad is randomly arranged |
+| Capability switch | `fido_enabled` | FIDO feature switch |
+| On-device confirmation | `passphrase_enable` | Readable; changes must be confirmed on the device |
+| On-device confirmation | `airgap_mode` | Readable; changes must be confirmed on the device |
 
-`autolock_delay_ms` 与 `autoshutdown_delay_ms` 的“永不”值在 Protocol V1/V2 中均为
-`0x10000000`（`268435456`）。应用应从
-`getDeviceSettingsCapabilities(deviceType, 'V2')` 获取可选值。
+The “never” value of `autolock_delay_ms` and `autoshutdown_delay_ms` is
+`0x10000000` (`268435456`) in both Protocol V1 and V2. Apps should get
+allowed values from `getDeviceSettingsCapabilities(deviceType, 'V2')`.
 
-Protocol V2 固件使用完整 BCP-47 语言标识；Core 对外保持与 Protocol V1
-及 `getLanguageConfig()` 一致的公共语言代码。已存在的公共代码（例如
-`en`、`zh_cn`、`pt_br`）在写入时转换为 BCP-47，读取到
-`en-Latn-US`、`zh-Hans-CN`、`pt-Latn-BR` 时再转换回公共代码。
-仅 Pro2 支持且没有历史公共代码的语言继续使用完整 BCP-47 标识。
+Protocol V2 firmware uses full BCP-47 language identifiers. Externally, Core keeps public language codes consistent with Protocol V1
+and `getLanguageConfig()`. Existing public codes (for example
+`en`, `zh_cn`, `pt_br`) are converted to BCP-47 on write, and converted back to public codes when
+`en-Latn-US`, `zh-Hans-CN`, or `pt-Latn-BR` are read.
+Languages that only Pro2 supports and that have no historical public code continue to use the full BCP-47 identifier.
 
-### 7.2 直接修改与设备端确认
+### 7.2 Direct Changes vs On-Device Confirmation
 
-公共调用方只使用统一 `deviceSettings`。Core 内部通过 `DeviceSettingsSet`
-执行可直接修改的部分字段更新。
+Public callers only use unified `deviceSettings`. Inside Core, `DeviceSettingsSet`
+performs partial updates for fields that can be changed directly.
 
-`passphrase_enable` 和 `airgap_mode` 不能通过 `DeviceSettingsSet` 直接修改。
-Core 会根据 `deviceSettings` 的目标布尔值读取当前状态，必要时通过
-`DeviceSettingsPageShow` 打开相应设备页面，并在用户确认后再次读取状态校验结果。
+`passphrase_enable` and `airgap_mode` cannot be changed directly through `DeviceSettingsSet`.
+Core reads the current state from the target boolean in `deviceSettings`, opens the corresponding device page through
+`DeviceSettingsPageShow` when needed, and reads the state again after user confirmation to verify the result.
 
-可打开的页面包括：
+Pages that can be opened include:
 
-| 页面               | 用途            |
+| Page | Purpose |
 | ------------------ | --------------- |
-| `DeviceReset`      | 擦除设备确认    |
-| `DevicePinChange`  | 修改 PIN        |
-| `DevicePassphrase` | Passphrase 设置 |
-| `DeviceAirgap`     | Air Gap 设置    |
+| `DeviceReset` | Confirm device wipe |
+| `DevicePinChange` | Change PIN |
+| `DevicePassphrase` | Passphrase settings |
+| `DeviceAirgap` | Air Gap settings |
 
-底层成功响应只表示页面已经打开；公共 `deviceSettings` 只有在读取确认目标状态后才成功返回。
+A successful low-level response only means the page has been opened. Public `deviceSettings` succeeds only after the target state has been read and confirmed.
 
-### 7.3 为什么这些字段不进入 DeviceInfo
+### 7.3 Why These Fields Do Not Enter DeviceInfo
 
-label、语言、蓝牙开关、自动锁屏和振动反馈都属于用户配置，不属于设备型号、序列号或固件版本。
+Label, language, Bluetooth switch, auto lock screen, and haptic feedback are all user configuration. They are not device model, serial number, or firmware version.
 
-所以：
+Therefore:
 
-- `DeviceInfo` 不提供这些字段是设计结果，不是字段遗漏。
-- `getDeviceState({ scope: 'settings' })` 和成功的高层设置操作都会把字段归一化合并到 `DeviceState`。
-- 设备详情页只消费 `DeviceState`；外部接入方不直接调用原始 `DeviceSettingsGet`。
+- `DeviceInfo` not providing these fields is a design result, not a missing-field bug.
+- `getDeviceState({ scope: 'settings' })` and successful high-level settings operations both normalize and merge the fields into `DeviceState`.
+- The device details page consumes only `DeviceState`; external integrators do not call raw `DeviceSettingsGet` directly.
 
-## 8. 钱包会话
+## 8. Wallet Session
 
-钱包会话通过以下消息建立或恢复：
+Wallet sessions are created or resumed through the following messages:
 
 ```text
 DeviceSessionAskPassphrase({ seed_domains }) -> Success -> DeviceSessionGet() -> DeviceSession
@@ -299,163 +299,163 @@ DeviceSessionAskPin(AttachToPin) -> Success
 DeviceSessionGet({ session_id, btc_test_address }) -> DeviceSession
 ```
 
-### 8.1 字段说明
+### 8.1 Field Notes
 
-| Protocol V2 字段/消息                     | 含义                             | SDK 当前处理                                                                                                                                                                        |
+| Protocol V2 Field/Message | Meaning | Current SDK Handling |
 | ----------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DeviceSessionGet.session_id`             | 尝试恢复之前的钱包 Session       | Core 内部传入当前钱包缓存值                                                                                                                                                         |
-| `DeviceSessionGet.btc_test_address`       | 请求恢复的预期钱包身份           | 从内部 `passphraseState` 映射，和缓存 Session 一起发送                                                                                                                              |
-| `DeviceSessionAskPassphrase.seed_domains` | 本次需要生成的种子域             | 开钱包 / 非 Cardano 为 `[Standard]`；Cardano 为 `[Standard, Cardano]`。Get 不携带该字段。Attach PIN 补 Cardano 发送空 Host passphrase。`DeviceSession` 响应用同一枚举回报已生成的域 |
-| `DeviceSessionPinType`                    | `Any/Main/AttachToPin` PIN 路由  | 标准钱包固定 `Main`，Attach 选择固定对应类型                                                                                                                                        |
-| `DeviceSessionAskPassphrase`              | 创建 Passphrase 隐藏钱包会话     | Host：`{ passphrase, on_device: false, seed_domains }`；设备：`{ on_device: true, seed_domains }`                                                                                   |
-| 响应 `session_id`                         | 当前钱包 Session ID              | 保存到当前钱包缓存                                                                                                                                                                  |
-| 响应 `DeviceSession.btc_test_address`     | 用于确认当前钱包上下文的稳定标识 | 映射为内部 `passphraseState`                                                                                                                                                        |
+| `DeviceSessionGet.session_id` | Attempt to resume a previous wallet session | Core internally passes the current wallet cache value |
+| `DeviceSessionGet.btc_test_address` | Expected wallet identity for the resume request | Mapped from internal `passphraseState` and sent together with the cached session |
+| `DeviceSessionAskPassphrase.seed_domains` | Seed domains that need to be generated this time | Open-wallet / non-Cardano is `[Standard]`; Cardano is `[Standard, Cardano]`. Get does not carry this field. Attach PIN supplements Cardano and sends an empty Host passphrase. The `DeviceSession` response reports generated domains with the same enum |
+| `DeviceSessionPinType` | `Any/Main/AttachToPin` PIN routing | Standard wallet always uses `Main`; Attach selection always uses the corresponding type |
+| `DeviceSessionAskPassphrase` | Create a Passphrase hidden-wallet session | Host: `{ passphrase, on_device: false, seed_domains }`; device: `{ on_device: true, seed_domains }` |
+| Response `session_id` | Current wallet session ID | Saved to the current wallet cache |
+| Response `DeviceSession.btc_test_address` | Stable identifier used to confirm the current wallet context | Mapped to internal `passphraseState` |
 
-这里的 `btc_test_address` 用于确认当前打开的是不是预期钱包，不用于用户资产地址展示。
+Here, `btc_test_address` is used to confirm whether the currently opened wallet is the expected one. It is not used to display user asset addresses.
 
-### 8.2 Session 恢复流程
+### 8.2 Session Resume Flow
 
 ```text
-读取当前隐藏钱包缓存 session_id
+Read the current hidden-wallet cached session_id
     -> DeviceSessionGet({ session_id, btc_test_address })
-    -> 返回 DeviceSession
-    -> 校验 btc_test_address 是否符合预期钱包
+    -> Return DeviceSession
+    -> Verify whether btc_test_address matches the expected wallet
 ```
 
-如果缓存 Session 无效：
+If the cached session is invalid:
 
-1. 固件可能返回 `DeviceSessionError_InvalidSession=2`，也可能返回最终实际 Session。
-2. Core 清除失效句柄，或发现返回的 `btc_test_address` 与预期不一致。
-3. Pro2 的公开 `openWalletSession({ mode: 'resume-hidden' })` 在同一次调用中重新完成
-   PIN/Passphrase/Attach PIN 选择，并再次校验 `passphraseState`；最终不匹配才失败。
-4. SDK 内部要求无交互的签名重试仍使用严格恢复，失效时直接返回
-   `WalletSessionInvalid`，不会弹出钱包选择。
+1. Firmware may return `DeviceSessionError_InvalidSession=2`, or it may return the final actual session.
+2. Core clears the invalid handle, or finds that the returned `btc_test_address` does not match the expected one.
+3. Pro2 public `openWalletSession({ mode: 'resume-hidden' })` re-completes
+   PIN/Passphrase/Attach PIN selection in the same call, then verifies `passphraseState` again; it fails only on a final mismatch.
+4. SDK-internal signing retries that require no interaction still use strict resume. On invalidation they return
+   `WalletSessionInvalid` directly and do not pop wallet selection.
 
-`DeviceSessionGet` 的成功响应必须同时携带非空 `session_id` 和
-`btc_test_address`。缺少任一字段都视为协议响应不完整，Core 不会把它降级解释为标准钱包。
+A successful `DeviceSessionGet` response must carry both a non-empty `session_id` and
+`btc_test_address`. Missing either field is treated as an incomplete protocol response. Core will not downgrade it to a standard wallet.
 
-标准钱包不读取其他钱包的 Session Store 项；它只读取内部标准索引，必要时协商 eventless 模式并
-发送 `DeviceSessionAskPin(Main)`。公共响应中的标准钱包 `passphraseState` 固定为 `null`，
-隐藏钱包返回设备生成的 `passphraseState`；调用方必须以 `walletType` 判断钱包类型。
-SDK 不注册可调用的原始 Session API，接入方不能通过低层 `call()` 绕过公共钱包流程。
+A standard wallet does not read other wallets’ Session Store entries. It only reads the internal standard index, negotiates eventless mode when needed, and
+sends `DeviceSessionAskPin(Main)`. In public responses, a standard wallet’s `passphraseState` is always `null`;
+a hidden wallet returns the device-generated `passphraseState`. Callers must use `walletType` to determine wallet type.
+The SDK does not register callable raw Session APIs. Integrators cannot bypass the public wallet flow through low-level `call()`.
 
-App 不得直接调用原始 Session 请求。现有 App 可继续调用公共
-`getPassphraseState()`，Core 会在 Pro2 上映射到新协议；新代码优先使用
-`openWalletSession()` 的 `standard/select-hidden/resume-hidden` 显式表达意图。
-`openWalletSession()` 必须显式传入 `mode`，且不接受旧的
-`useEmptyPassphrase/initSession` 参数。旧调用继续通过 `getPassphraseState()` 兼容。
+Apps must not call raw Session requests directly. Existing Apps may continue to call public
+`getPassphraseState()`, and Core will map it to the new protocol on Pro2. New code should prefer
+`openWalletSession()` with `standard/select-hidden/resume-hidden` to express intent explicitly.
+`openWalletSession()` must take an explicit `mode` and does not accept the old
+`useEmptyPassphrase/initSession` parameters. Old calls remain compatible through `getPassphraseState()`.
 
-## 9. PIN 解锁结果
+## 9. PIN Unlock Result
 
-PIN 解锁使用：
+PIN unlock uses:
 
 ```text
 DeviceSessionAskPin -> DeviceSession -> DeviceStatusGet -> DeviceStatus
 ```
 
-| `DeviceStatus` 字段         | SDK 字段                                  | 含义                         |
+| `DeviceStatus` Field | SDK Field | Meaning |
 | --------------------------- | ----------------------------------------- | ---------------------------- |
-| `unlocked`                  | `DeviceState.status.unlocked`             | 解锁是否成功                 |
-| `unlocked_by_attach_to_pin` | `DeviceState.status.unlockedAttachPin`    | 是否通过 Attach PIN 解锁     |
-| `passphrase_enabled`        | `DeviceState.status.passphraseProtection` | 解锁后确认的 Passphrase 状态 |
+| `unlocked` | `DeviceState.status.unlocked` | Whether unlock succeeded |
+| `unlocked_by_attach_to_pin` | `DeviceState.status.unlockedAttachPin` | Whether unlock was through Attach PIN |
+| `passphrase_enabled` | `DeviceState.status.passphraseProtection` | Passphrase state confirmed after unlock |
 
-`DeviceSession` 表示设备端解锁及钱包会话创建完成；Core 随后读取 `DeviceStatus`，不从会话响应猜测设备设置状态。
+`DeviceSession` means on-device unlock and wallet-session creation are complete. Core then reads `DeviceStatus` and does not guess device settings state from the session response.
 
-## 10. 设备操作与固件管理
+## 10. Device Operations and Firmware Management
 
-### 10.1 重启
+### 10.1 Reboot
 
-`DeviceReboot.reboot_type` 支持：
+`DeviceReboot.reboot_type` supports:
 
-| 值           | 目标       |
+| Value | Target |
 | ------------ | ---------- |
-| `Normal`     | 正常应用   |
-| `Romloader`  | romloader  |
+| `Normal` | Normal application |
+| `Romloader` | romloader |
 | `Bootloader` | bootloader |
 
-重启命令只负责切换运行阶段。重连后需要重新读取 `DeviceInfo`，不能沿用重启前的运行状态。
+The reboot command only switches the running stage. After reconnect, `DeviceInfo` must be read again. Runtime state from before the reboot must not be reused.
 
-### 10.2 设备证书
+### 10.2 Device Certificates
 
-| 消息                     | 用途                     |
+| Message | Purpose |
 | ------------------------ | ------------------------ |
-| `DeviceCertificateWrite` | 写入证书、公钥和只写私钥 |
-| `DeviceCertificateRead`  | 读取证书和公钥材料       |
-| `DeviceCertificateSign`  | 使用设备证书能力签名数据 |
+| `DeviceCertificateWrite` | Write certificate, public key, and write-only private key |
+| `DeviceCertificateRead` | Read certificate and public-key material |
+| `DeviceCertificateSign` | Sign data using device certificate capability |
 
-证书私钥只能写入、不能读回，也不应进入设备详情、`DeviceState` 或日志。
+The certificate private key can only be written, never read back, and must not enter device details, `DeviceState`, or logs.
 
-### 10.3 固件升级
+### 10.3 Firmware Upgrade
 
-固件升级不再用一个简单的“当前固件字段”表示，而是分为组件信息和安装任务两部分：
+Firmware upgrade is no longer represented by a single “current firmware field.” It is split into component information and an install task:
 
-- 当前已经安装的版本：重新读取 `DeviceInfo`。
-- 本次安装任务的状态：读取 `DeviceFirmwareUpdateStatus`。
+- Currently installed versions: re-read `DeviceInfo`.
+- Status of this install task: read `DeviceFirmwareUpdateStatus`.
 
-主要结构：
+Main structures:
 
-| 消息或结构                      | 字段                                                                               | 用途                     |
+| Message or Structure | Fields | Purpose |
 | ------------------------------- | ---------------------------------------------------------------------------------- | ------------------------ |
-| `DeviceFirmwareTarget`          | `target_id`、`path`                                                                | 指定组件和设备侧固件路径 |
-| `DeviceFirmwareUpdateStage`     | `targets[]`                                                                        | 暂存一组安装目标         |
-| `DeviceFirmwareUpdateRequest`   | `reboot_after_update`                                                              | 触发已暂存目标的安装     |
-| `DeviceFirmwareUpdateRecord`    | `target_id`、`status`、`progress_percent`、`phase_info`、`payload_version`、`path` | 保存每个组件的安装记录   |
-| `DeviceFirmwareUpdateStatusGet` | `fields`                                                                           | 选择需要返回的记录字段   |
-| `DeviceFirmwareUpdateStatus`    | `records[]`                                                                        | 返回所有安装记录         |
+| `DeviceFirmwareTarget` | `target_id`, `path` | Specify the component and on-device firmware path |
+| `DeviceFirmwareUpdateStage` | `targets[]` | Stage a set of install targets |
+| `DeviceFirmwareUpdateRequest` | `reboot_after_update` | Trigger install of already staged targets |
+| `DeviceFirmwareUpdateRecord` | `target_id`, `status`, `progress_percent`, `phase_info`, `payload_version`, `path` | Save the install record for each component |
+| `DeviceFirmwareUpdateStatusGet` | `fields` | Select which record fields to return |
+| `DeviceFirmwareUpdateStatus` | `records[]` | Return all install records |
 
-支持的安装目标包括 crate、romloader、bootloader、application P1、application P2、coprocessor、SE01、SE02、SE03 和 SE04。
+Supported install targets include crate, romloader, bootloader, application P1, application P2, coprocessor, SE01, SE02, SE03, and SE04.
 
-SDK 内部原始 `deviceFirmwareUpdate` 只发送安装请求，不进入公共 `CoreApi`。完整升级流程还需要负责：
+SDK-internal raw `deviceFirmwareUpdate` only sends the install request and does not enter public `CoreApi`. The full upgrade flow still needs to:
 
-1. 校验升级包。
-2. 将固件文件分块写入设备。
-3. 选择安装目标。
-4. 触发安装。
-5. 轮询安装状态。
-6. 处理安装期间断连和重连。
-7. 重连后重新读取 `DeviceInfo` 确认最终版本。
+1. Verify the upgrade package.
+2. Write firmware files to the device in chunks.
+3. Select install targets.
+4. Trigger install.
+5. Poll install status.
+6. Handle disconnect and reconnect during install.
+7. Re-read `DeviceInfo` after reconnect to confirm final versions.
 
-## 11. 生产制造信息
+## 11. Manufacturing Information
 
-生产制造信息使用独立消息，不与普通设备信息混合：
+Manufacturing information uses dedicated messages and is not mixed with ordinary device information:
 
 ```text
 DeviceFactoryInfoGet -> DeviceFactoryInfo
 DeviceFactoryInfoSet -> Success
 ```
 
-### 11.1 当前字段
+### 11.1 Current Fields
 
-| Protocol V2 字段         | 含义                         |
+| Protocol V2 Field | Meaning |
 | ------------------------ | ---------------------------- |
-| `version`                | 工厂数据结构版本             |
-| `serial_number`          | 生产制造流程中的序列号记录   |
-| `burn_in_completed`      | 是否完成老化测试             |
-| `factory_test_completed` | 是否完成工厂功能测试         |
-| `manufacture_time`       | 生产时间，拆分为年月日时分秒 |
+| `version` | Factory data-structure version |
+| `serial_number` | Serial-number record in the manufacturing flow |
+| `burn_in_completed` | Whether burn-in testing is complete |
+| `factory_test_completed` | Whether factory functional testing is complete |
+| `manufacture_time` | Manufacture time, split into year, month, day, hour, minute, and second |
 
-### 11.2 相比旧结构的变化
+### 11.2 Changes Compared With the Old Structure
 
-| 旧内容               | 当前处理                                            |
+| Old Content | Current Handling |
 | -------------------- | --------------------------------------------------- |
-| CPU 描述字符串       | 已移除                                              |
-| SPI Flash 描述字符串 | 已移除                                              |
-| SE 描述字符串        | 已移除，普通 SE 版本改由 `DeviceInfo.se1..se4` 提供 |
-| pre-firmware 描述    | 已移除                                              |
-| NFT voucher          | 当前 `DeviceFactoryInfo` 不再提供                   |
+| CPU description string | Removed |
+| SPI Flash description string | Removed |
+| SE description string | Removed; ordinary SE versions now come from `DeviceInfo.se1..se4` |
+| pre-firmware description | Removed |
+| NFT voucher | No longer provided by current `DeviceFactoryInfo` |
 
-其他生产操作包括：
+Other manufacturing operations include:
 
-- `DeviceFactoryPermanentLock`：执行永久锁定，要求两个固定校验值，降低误操作风险。
-- `DeviceFactoryTest`：选择完整老化测试或功能测试。
+- `DeviceFactoryPermanentLock`: perform a permanent lock. Requires two fixed check values to reduce accidental operation risk.
+- `DeviceFactoryTest`: select full burn-in testing or functional testing.
 
-即使工厂序列号与普通设备序列号值相同，SDK 也不能在两者之间静默兜底，因为它们具有不同的读取和写入权限。
+Even if the factory serial number has the same value as the ordinary device serial number, the SDK must not silently fall back between them, because they have different read and write permissions.
 
-## 12. SDK 如何转换字段
+## 12. How the SDK Converts Fields
 
-SDK 对外只有一条统一设备状态路径。
+Externally, the SDK has only one unified device-state path.
 
-### 12.1 初始化设备
+### 12.1 Initialize Device
 
 ```text
 DeviceInfoGet
@@ -463,27 +463,27 @@ DeviceInfoGet
     -> DeviceStateStore
 ```
 
-用途：建立基础设备身份和版本快照，不隐式读取实时状态。
+Purpose: establish a basic device identity and version snapshot without implicitly reading realtime status.
 
-### 12.2 获取统一设备状态
+### 12.2 Get Unified Device State
 
 ```text
 getDeviceState()
-    -> scope 省略时默认为 runtime
-    -> normal 模式刷新 DeviceStatus；loader 模式跳过
-    -> 返回完整 DeviceState（不含 raw 和钱包 session）
+    -> omitted scope defaults to runtime
+    -> normal mode refreshes DeviceStatus; loader mode skips it
+    -> returns the full DeviceState (without raw and wallet session)
 
 getDeviceState({ scope: 'settings' | 'firmware' })
-    -> 在运行状态基础上按业务范围刷新设置或固件信息
-    -> 合并到 DeviceStateStore
-    -> 返回完整 DeviceState
+    -> on top of runtime status, refresh settings or firmware information by business scope
+    -> merge into DeviceStateStore
+    -> return the full DeviceState
 ```
 
-`scope` 表示“本次主动刷新哪些分区”，不是返回字段过滤器。即使使用默认的 `runtime`，返回结果仍是完整的公共 `DeviceState` 快照，而不是只有 `status`；未在本次刷新的分区使用 `DeviceStateStore` 中已经归一化的当前值。
+`scope` means “which partitions to actively refresh this time,” not a return-field filter. Even with the default `runtime`, the result is still a full public `DeviceState` snapshot, not only `status`. Partitions not refreshed this time use the already-normalized current values in `DeviceStateStore`.
 
-用途：设备详情、版本展示、设置页和运行状态读取。Protocol V1/V2 返回相同结构。
+Purpose: device details, version display, settings pages, and runtime-status reads. Protocol V1/V2 return the same structure.
 
-### 12.3 SDK 内部原始命令
+### 12.3 SDK-Internal Raw Commands
 
 ```text
 DeviceInfoGet / DeviceStatusGet / DeviceSettingsGet
@@ -491,175 +491,175 @@ DeviceInfoGet / DeviceStatusGet / DeviceSettingsGet
     -> DeviceStateStore
 ```
 
-这些命令仅供 SDK 内部流程使用，不属于公共 API。外部接入方不需要选择原始命令、请求范围或缓存策略。
+These commands are for SDK-internal flows only and are not public APIs. External integrators do not need to choose raw commands, request scopes, or cache strategies.
 
-## 13. 进入统一 DeviceState 的字段
+## 13. Fields That Enter Unified DeviceState
 
-| Protocol V2 来源                   | 标准 SDK 字段                 |
+| Protocol V2 Source | Standard SDK Field |
 | ---------------------------------- | ----------------------------- |
-| `protocol_version`                 | `protocol` / 内部 raw         |
-| `hw.serial_no`                     | `identity.serialNo`           |
-| `fw.application.version`           | `versions.firmware`           |
-| `fw.bootloader.version`            | `versions.bootloader`         |
-| `fw.romloader.version`             | `versions.board`              |
-| `coprocessor.application.version`  | `versions.ble`                |
-| `coprocessor.bt_adv_name`          | `identity.bleName`            |
-| `se1..se4.application.version`     | `versions.se01..se04`         |
-| `se1..se4.bootloader.version`      | `versions.se01Boot..se04Boot` |
-| `status.device_id`                 | `identity.deviceId`           |
-| `status.init_states`               | `status.initialized`          |
-| `status.unlocked`                  | `status.unlocked`             |
-| `status.backup_required`           | `status.backupRequired`       |
-| `status.passphrase_enabled`        | `status.passphraseProtection` |
-| `status.attach_to_pin_enabled`     | `status.attachToPinEnabled`   |
-| `status.unlocked_by_attach_to_pin` | `status.unlockedAttachPin`    |
+| `protocol_version` | `protocol` / internal raw |
+| `hw.serial_no` | `identity.serialNo` |
+| `fw.application.version` | `versions.firmware` |
+| `fw.bootloader.version` | `versions.bootloader` |
+| `fw.romloader.version` | `versions.board` |
+| `coprocessor.application.version` | `versions.ble` |
+| `coprocessor.bt_adv_name` | `identity.bleName` |
+| `se1..se4.application.version` | `versions.se01..se04` |
+| `se1..se4.bootloader.version` | `versions.se01Boot..se04Boot` |
+| `status.device_id` | `identity.deviceId` |
+| `status.init_states` | `status.initialized` |
+| `status.unlocked` | `status.unlocked` |
+| `status.backup_required` | `status.backupRequired` |
+| `status.passphrase_enabled` | `status.passphraseProtection` |
+| `status.attach_to_pin_enabled` | `status.attachToPinEnabled` |
+| `status.unlocked_by_attach_to_pin` | `status.unlockedAttachPin` |
 
-build ID 和 hash 只在 `getDeviceState({ scope: 'firmware' })` 中请求，并进入 `DeviceState.verification`。
+Build ID and hash are requested only in `getDeviceState({ scope: 'firmware' })` and enter `DeviceState.verification`.
 
-## 14. 专用来源及其 DeviceState 投影
+## 14. Dedicated Sources and Their DeviceState Projections
 
-下面这些字段仍由专用消息读写，但跨设备通用字段会合并进标准 `DeviceState`：
+The following fields are still read and written by dedicated messages, but cross-device common fields are merged into standard `DeviceState`:
 
-| 内容            | Protocol V2 来源                       | 标准投影/管理方式              |
+| Content | Protocol V2 Source | Standard Projection / Management |
 | --------------- | -------------------------------------- | ------------------------------ |
-| label           | `DeviceSettings.label`                 | `identity.label/displayName`   |
-| language        | `DeviceSettings.language`              | `settings.language`            |
-| 蓝牙开关        | `DeviceSettings.bt_enable`             | `settings.bleEnabled`          |
-| 自动锁屏        | `DeviceSettings.autolock_delay_ms`     | `settings.autoLockDelayMs`     |
-| 自动关机        | `DeviceSettings.autoshutdown_delay_ms` | `settings.autoShutdownDelayMs` |
-| 触觉反馈        | `DeviceSettings.haptic_feedback`       | `settings.hapticFeedback`      |
-| 钱包 Session ID | `DeviceSession.session_id`             | Core 钱包 Session 管理         |
-| 钱包标识        | `DeviceSession.btc_test_address`       | 内部 `passphraseState`         |
-| 固件安装记录    | `DeviceFirmwareUpdateStatus`           | 固件升级 API                   |
-| 生产制造信息    | `DeviceFactoryInfo`                    | 生产制造专用 API               |
+| label | `DeviceSettings.label` | `identity.label/displayName` |
+| language | `DeviceSettings.language` | `settings.language` |
+| Bluetooth switch | `DeviceSettings.bt_enable` | `settings.bleEnabled` |
+| Auto lock screen | `DeviceSettings.autolock_delay_ms` | `settings.autoLockDelayMs` |
+| Auto shutdown | `DeviceSettings.autoshutdown_delay_ms` | `settings.autoShutdownDelayMs` |
+| Haptic feedback | `DeviceSettings.haptic_feedback` | `settings.hapticFeedback` |
+| Wallet session ID | `DeviceSession.session_id` | Core wallet session management |
+| Wallet identifier | `DeviceSession.btc_test_address` | Internal `passphraseState` |
+| Firmware install records | `DeviceFirmwareUpdateStatus` | Firmware upgrade APIs |
+| Manufacturing information | `DeviceFactoryInfo` | Manufacturing-only APIs |
 
-设备详情页读取统一 `DeviceState`，不直接依赖原始 snake_case 设置结构；这些字段仍不应被重复塞回 `DeviceInfo`。
+The device details page reads unified `DeviceState` and does not depend directly on the raw snake_case settings structure. These fields still must not be stuffed back into `DeviceInfo`.
 
-## 15. 当前缺失的 DeviceState 字段
+## 15. Currently Missing DeviceState Fields
 
-必须把“已有独立来源但不合并”和“DeviceState 仍缺字段或稳定来源”区分开。
+Keep “has an independent source but is not merged” separate from “DeviceState still lacks a field or a stable source.”
 
-| 标准字段或能力                        | 当前 Protocol V2 情况                             | SDK 当前处理与需要修改的内容                           |
+| Standard Field or Capability | Current Protocol V2 Situation | Current SDK Handling and Required Changes |
 | ------------------------------------- | ------------------------------------------------- | ------------------------------------------------------ |
-| 显式运行模式                          | `ProtocolInfo.build_fingerprint` 提供 binary 名称 | SDK 映射为 normal/bootloader/romloader                 |
-| `applicationDataVersion/BuildId/Hash` | 已提供 `fw.application_data`                      | 当前只在内部 raw 中；如 App 需要，应新增明确的标准字段 |
-| `safetyChecks`                        | DeviceInfo、DeviceStatus、DeviceSettings 均无来源 | 当前保持 `null`，需要固件提供读取来源                  |
-| `batteryLevel`                        | 当前 Protocol V2 没有来源                         | 无可靠值，不能用于 Pro 2 升级前低电量拦截              |
-| `noBackup` 等 V1 细分状态             | 当前只提供 `backup_required`                      | 不从一个布尔值推导其他状态；需要协议增加明确字段       |
+| Explicit run mode | `ProtocolInfo.build_fingerprint` provides the binary name | SDK maps it to normal/bootloader/romloader |
+| `applicationDataVersion/BuildId/Hash` | `fw.application_data` is already provided | Currently only in internal raw; if the App needs it, add an explicit standard field |
+| `safetyChecks` | No source in DeviceInfo, DeviceStatus, or DeviceSettings | Currently stays `null`; firmware needs to provide a read source |
+| `batteryLevel` | Current Protocol V2 has no source | No reliable value; cannot be used to block Pro 2 upgrades for low battery |
+| V1 fine-grained states such as `noBackup` | Currently only `backup_required` is provided | Do not derive other states from one boolean; the protocol needs explicit fields |
 
-当前 SDK 不再从 `DeviceInfo` 镜像结构猜测主控运行模式。标准 fingerprint 格式为
-`<binary>__<version>__<commit>__<PROD|DEV>__<DEBUG|RELEASE>`，其中 binary 只接受
-`application`、`bootloader`、`romloader`。fingerprint 无法识别时，只有
-`supported_messages` 明确包含 `DeviceStatusGet` 才允许作为旧固件兼容路径读取状态；两者都
-无法确认时初始化安全失败。版本刷新不得覆盖已经由 runtime 或 onboarding 确认的
-`notInitialized/backupMode`。
+The current SDK no longer guesses main-MCU run mode from `DeviceInfo` image structure. The standard fingerprint format is
+`<binary>__<version>__<commit>__<PROD|DEV>__<DEBUG|RELEASE>`, and binary only accepts
+`application`, `bootloader`, and `romloader`. When the fingerprint cannot be identified, status may be read on the old-firmware compatibility path only if
+`supported_messages` explicitly includes `DeviceStatusGet`. If neither can
+confirm it, initialization fails safely. Version refresh must not overwrite
+`notInitialized/backupMode` already confirmed by runtime or onboarding.
 
-## 16. 完整迁移矩阵
+## 16. Complete Migration Matrix
 
-| 过去的集中式语义         | Protocol V2 当前位置                     | SDK 当前处理           | 变化类型               |
+| Former Centralized Semantics | Current Protocol V2 Location | Current SDK Handling | Change Type |
 | ------------------------ | ---------------------------------------- | ---------------------- | ---------------------- |
-| 设备型号                 | `DeviceInfo.hw.Device_type`              | 固定识别为 Pro 2       | 移动                   |
-| 设备序列号               | `DeviceInfo.hw.serial_no`                | `serialNo`             | 移动                   |
-| 设备 ID                  | `DeviceStatus.device_id`                 | `deviceId`             | 从硬件信息拆到实时状态 |
-| 主应用版本               | `DeviceInfo.fw.application`              | `firmwareVersion`      | 结构化                 |
-| bootloader 版本          | `DeviceInfo.fw.bootloader`               | `bootloaderVersion`    | 结构化                 |
-| P2/application data      | `DeviceInfo.fw.application_data`         | 当前仅保留在 raw       | 新增独立组件           |
-| romloader 版本           | `DeviceInfo.fw.romloader`                | `boardVersion`         | 旧 boardloader 重命名  |
-| 蓝牙固件版本             | `DeviceInfo.coprocessor.application`     | `bleVersion`           | 移动                   |
-| 蓝牙广播名               | `DeviceInfo.coprocessor.bt_adv_name`     | `bleName`              | 移动                   |
-| 蓝牙开关                 | `DeviceSettings.bt_enable`               | 专用设置 API           | 从信息拆到设置         |
-| SE1 至 SE4 版本          | `DeviceInfo.se1..se4`                    | 标准 SE 版本和校验字段 | 结构化                 |
-| 初始化状态               | `DeviceStatus.init_states`               | `initialized`          | 移动并改名             |
-| 解锁状态                 | `DeviceStatus.unlocked`                  | `unlocked`             | 移动                   |
-| 备份状态                 | `DeviceStatus.backup_required`           | `backupRequired`       | 移动并改名             |
-| Passphrase 是否启用      | `DeviceStatus.passphrase_enabled`        | `passphraseProtection` | 移动并改名             |
-| Attach-to-PIN 是否启用   | `DeviceStatus.attach_to_pin_enabled`     | `attachToPinEnabled`   | 移动并改名             |
-| Attach PIN 解锁来源      | `DeviceStatus.unlocked_by_attach_to_pin` | `unlockedAttachPin`    | 移动并改名             |
-| label                    | `DeviceSettings.label`                   | 专用设置 API           | 从信息拆到设置         |
-| language                 | `DeviceSettings.language`                | 专用设置 API           | 从状态拆到设置         |
-| 自动锁屏、自动关机、振动 | `DeviceSettings`                         | 专用设置 API           | 独立设置               |
-| 钱包 Session             | `DeviceSession.session_id`               | Core Session 缓存      | 从初始化拆到钱包会话   |
-| 钱包标识                 | `DeviceSession.btc_test_address`         | `passphraseState`      | 独立钱包语义           |
-| PIN 解锁结果             | `Success + DeviceStatus`                 | 合并回标准状态缓存     | 操作后刷新             |
-| 固件安装目标和进度       | `DeviceFirmware*`                        | 高层升级流程           | 独立任务状态           |
-| 工厂生产记录             | `DeviceFactoryInfo`                      | 生产制造专用 API       | 与普通设备信息隔离     |
+| Device model | `DeviceInfo.hw.Device_type` | Identified as Pro 2 | Move |
+| Device serial number | `DeviceInfo.hw.serial_no` | `serialNo` | Move |
+| Device ID | `DeviceStatus.device_id` | `deviceId` | Split from hardware info into realtime status |
+| Main application version | `DeviceInfo.fw.application` | `firmwareVersion` | Structured |
+| bootloader version | `DeviceInfo.fw.bootloader` | `bootloaderVersion` | Structured |
+| P2 / application data | `DeviceInfo.fw.application_data` | Currently kept in raw only | New independent component |
+| romloader version | `DeviceInfo.fw.romloader` | `boardVersion` | Old boardloader renamed |
+| Bluetooth firmware version | `DeviceInfo.coprocessor.application` | `bleVersion` | Move |
+| Bluetooth advertising name | `DeviceInfo.coprocessor.bt_adv_name` | `bleName` | Move |
+| Bluetooth switch | `DeviceSettings.bt_enable` | Dedicated settings API | Split from info into settings |
+| SE1 through SE4 versions | `DeviceInfo.se1..se4` | Standard SE version and verification fields | Structured |
+| Initialization state | `DeviceStatus.init_states` | `initialized` | Move and rename |
+| Unlock state | `DeviceStatus.unlocked` | `unlocked` | Move |
+| Backup state | `DeviceStatus.backup_required` | `backupRequired` | Move and rename |
+| Whether Passphrase is enabled | `DeviceStatus.passphrase_enabled` | `passphraseProtection` | Move and rename |
+| Whether Attach-to-PIN is enabled | `DeviceStatus.attach_to_pin_enabled` | `attachToPinEnabled` | Move and rename |
+| Attach PIN unlock source | `DeviceStatus.unlocked_by_attach_to_pin` | `unlockedAttachPin` | Move and rename |
+| label | `DeviceSettings.label` | Dedicated settings API | Split from info into settings |
+| language | `DeviceSettings.language` | Dedicated settings API | Split from status into settings |
+| Auto lock, auto shutdown, haptics | `DeviceSettings` | Dedicated settings API | Independent settings |
+| Wallet session | `DeviceSession.session_id` | Core session cache | Split from initialization into wallet session |
+| Wallet identifier | `DeviceSession.btc_test_address` | `passphraseState` | Independent wallet semantics |
+| PIN unlock result | `Success + DeviceStatus` | Merged back into the standard status cache | Refresh after operation |
+| Firmware install targets and progress | `DeviceFirmware*` | High-level upgrade flow | Independent task state |
+| Factory production records | `DeviceFactoryInfo` | Manufacturing-only APIs | Isolated from ordinary device information |
 
-## 17. 重要使用原则
+## 17. Important Usage Principles
 
-### 17.1 不要把所有字段重新塞回 DeviceInfo
+### 17.1 Do Not Stuff All Fields Back Into DeviceInfo
 
-如果字段已经有明确来源，例如 `DeviceSettings` 或 `DeviceSession`，应该通过对应 API 获取。为了兼容旧 `Features` 把字段重复加入 `DeviceInfo`，会再次制造多份数据来源。
+If a field already has a clear source, such as `DeviceSettings` or `DeviceSession`, it should be obtained through the corresponding API. Duplicating fields into `DeviceInfo` just to stay compatible with old `Features` would recreate multiple sources of truth.
 
-### 17.2 不要把空值当成 false
+### 17.2 Do Not Treat Empty Values as false
 
-Protocol V2 大量字段是 optional。字段缺失可能表示：
+Many Protocol V2 fields are optional. A missing field may mean:
 
-- 本次请求没有选择对应 target 或 type。
-- 当前运行阶段不提供该字段。
-- 设备锁定，私有状态不可见。
-- 组件不存在或当前无法读取。
+- This request did not select the corresponding target or type.
+- The current running stage does not provide the field.
+- The device is locked, so private state is not visible.
+- The component does not exist or cannot be read right now.
 
-只有字段明确返回 `false` 时，才能解释为关闭或未启用。
+Only when a field explicitly returns `false` can it be interpreted as off or not enabled.
 
-### 17.3 不要使用不相关字段兜底
+### 17.3 Do Not Fall Back to Unrelated Fields
 
-典型禁止项：
+Typical prohibitions:
 
-- 不能用 `serial_no` 代替 `device_id`。
-- 不能用工厂序列号代替普通设备序列号。
-- 不能用 `DeviceSettings.passphrase_enable` 随意覆盖实时 `DeviceStatus.passphrase_enabled`。
-- 不能用固件升级记录中的 `payload_version` 代替重连后实际读取的组件版本。
+- Do not use `serial_no` in place of `device_id`.
+- Do not use the factory serial number in place of the ordinary device serial number.
+- Do not casually overwrite realtime `DeviceStatus.passphrase_enabled` with `DeviceSettings.passphrase_enable`.
+- Do not use `payload_version` from firmware upgrade records in place of the component version actually read after reconnect.
 
-### 17.4 原始消息只在 SDK 内部保留
+### 17.4 Raw Messages Stay Inside the SDK Only
 
-标准 `DeviceState` 用于跨设备统一能力；原始 `protocolV2DeviceInfo` 只保存在 SDK 内部 raw 分区。公共 `getDeviceState()` 不返回 raw；`includeRaw` 仅供 Core 内部 V1 兼容投影使用。
+Standard `DeviceState` is the unified cross-device capability. Raw `protocolV2DeviceInfo` is kept only in the SDK-internal raw partition. Public `getDeviceState()` does not return raw; `includeRaw` is only for Core-internal V1 compatibility projection.
 
-新增字段时需要明确选择：
+When adding a field, choose explicitly:
 
-1. 是否需要进入跨设备标准字段。
-2. 是否只进入 Pro 2 原始数据。
-3. 是否应该使用专用 API。
-4. 是否涉及新的权限或锁定状态。
+1. Whether it needs to enter a cross-device standard field.
+2. Whether it should only enter Pro 2 raw data.
+3. Whether it should use a dedicated API.
+4. Whether it involves new permissions or lock state.
 
-## 18. 新字段的接入流程
+## 18. New-Field Onboarding Flow
 
-新增或迁移 Pro 2 字段时，建议按以下步骤执行：
+When adding or migrating a Pro 2 field, follow these steps:
 
-1. 根据字段用途选择 protobuf 文件。
-   - 静态硬件和组件版本：`messages_device_info.proto`。
-   - 动态运行状态：`messages_device_status.proto`。
-   - 钱包上下文：`messages_device_session.proto`。
-   - 设置、重启、证书和固件操作：`messages_device_control.proto`。
-   - 生产制造信息：`messages_device_factory.proto`。
-2. 更新 firmware-pro2 protobuf 和对应 `.options`。
-3. 运行 `yarn update-protobuf` 更新生成 schema 和 TypeScript 类型。
-4. 检查 hd-transport 是否正确编码和解码新字段。
-5. 决定 Core 的输出方式：标准 `DeviceState` 字段、内部 raw 或业务操作 API。
-6. 如果进入缓存，定义轻量查询缺字段时的合并规则。
-7. 如果字段在锁定状态下不可见，明确 `undefined/null/false` 的区别。
-8. 增加 Core 和 Transport 测试。
-9. 更新字段迁移文档和应用侧使用说明。
+1. Choose the protobuf file by field purpose.
+   - Static hardware and component versions: `messages_device_info.proto`.
+   - Dynamic runtime status: `messages_device_status.proto`.
+   - Wallet context: `messages_device_session.proto`.
+   - Settings, reboot, certificates, and firmware operations: `messages_device_control.proto`.
+   - Manufacturing information: `messages_device_factory.proto`.
+2. Update firmware-pro2 protobuf and the corresponding `.options`.
+3. Run `yarn update-protobuf` to update generated schema and TypeScript types.
+4. Check that hd-transport encodes and decodes the new field correctly.
+5. Decide Core’s output path: a standard `DeviceState` field, internal raw, or a business-operation API.
+6. If it enters cache, define merge rules for missing fields in lightweight queries.
+7. If the field is invisible while locked, make the difference among `undefined/null/false` explicit.
+8. Add Core and Transport tests.
+9. Update the field-migration document and App-side usage notes.
 
-不能只在 SDK 中手写一个尚未进入 protobuf 的字段。TypeScript 即使能够编译，设备实际响应仍不会包含该字段。
+Do not hand-write in the SDK a field that has not entered protobuf. Even if TypeScript compiles, the actual device response still will not include that field.
 
-## 19. 维护检查清单
+## 19. Maintenance Checklist
 
-protobuf 或 SDK 映射变化后，至少检查以下项目：
+After protobuf or SDK mapping changes, at least check the following:
 
-- [ ] firmware-pro2 `latest` proto 中的消息名、字段名和字段编号已经确认。
-- [ ] `.options` 中的字符串长度、bytes 长度和 repeated 数量限制没有遗漏。
-- [ ] `packages/hd-transport/messages-protocol-v2.json` 已更新。
-- [ ] `packages/core/src/data/messages/messages-protocol-v2.json` 已更新。
-- [ ] 初始化、轻量刷新、versions、verify/full 的请求范围符合新字段用途。
-- [ ] `DeviceStateMapper` 的字段映射和 `DeviceStateStore` 的字段级合并正确。
-- [ ] identity、versions、verification、status 和 settings 分区语义正确。
-- [ ] 原始读取命令没有重新暴露为第二套公共状态 API。
-- [ ] 锁定状态和 loader 阶段的字段缺失行为已经覆盖。
-- [ ] 文档中的“已有独立 API”和“当前缺失的 Feature 字段”没有混写。
+- [ ] Message names, field names, and field numbers in firmware-pro2 `latest` proto have been confirmed.
+- [ ] String length, bytes length, and repeated-count limits in `.options` have not been missed.
+- [ ] `packages/hd-transport/messages-protocol-v2.json` has been updated.
+- [ ] `packages/core/src/data/messages/messages-protocol-v2.json` has been updated.
+- [ ] Request scopes for initialization, lightweight refresh, versions, and verify/full match the new field’s purpose.
+- [ ] `DeviceStateMapper` field mapping and `DeviceStateStore` field-level merge are correct.
+- [ ] identity, versions, verification, status, and settings partition semantics are correct.
+- [ ] Raw read commands have not been re-exposed as a second public state API.
+- [ ] Missing-field behavior in locked state and loader stages is covered.
+- [ ] The document does not mix “already has an independent API” with “currently missing Feature fields.”
 
-## 20. 代码事实来源
+## 20. Code Sources of Truth
 
-本文结论基于以下代码位置：
+The conclusions in this document are based on the following code locations:
 
 ```text
 submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest/messages_device_info.proto
@@ -679,12 +679,12 @@ packages/core/src/device/DeviceStateProjector.ts
 packages/core/src/api/protocol-v2/
 ```
 
-## 21. 最终结论
+## 21. Final Conclusion
 
-Pro 2 Protocol V2 的字段迁移可以概括为三个原则：
+Pro 2 Protocol V2 field migration can be summarized in three principles:
 
-1. 按用途拆分：设备基本信息、实时状态、用户设置、钱包会话、设备操作和生产制造信息分别管理。
-2. 统一转换：SDK 把跨设备通用的身份、版本、状态和设置转换为唯一 `DeviceState`。
-3. 单一来源：原始消息只负责生成 patch，不在 `DeviceInfo`、`DeviceStatus` 和 App 模型之间重复保存同一份事实。
+1. Split by purpose: manage device basic information, realtime status, user settings, wallet session, device operations, and manufacturing information separately.
+2. Unified conversion: the SDK converts cross-device identity, versions, status, and settings into a single `DeviceState`.
+3. Single source of truth: raw messages only produce patches. The same fact is not stored repeatedly across `DeviceInfo`, `DeviceStatus`, and App models.
 
-理解这三个原则后，判断一个新字段应该放在哪里会比较直接：先判断它描述的是“设备是什么”“设备现在怎么样”“用户配置了什么”“当前打开哪个钱包”“要设备执行什么操作”，还是“生产阶段记录了什么”，再选择对应的 Protocol V2 消息和 SDK 输出方式。
+Once these three principles are understood, deciding where a new field belongs is relatively direct: first decide whether it describes “what the device is,” “how the device is right now,” “what the user configured,” “which wallet is currently open,” “what operation the device should perform,” or “what the production stage recorded,” then choose the corresponding Protocol V2 message and SDK output path.

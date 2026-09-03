@@ -7,6 +7,8 @@ import FileWrite from './FileWrite';
 export type UploadPortfolioParams = {
   packageBase64: string;
   timeoutMs?: number | string;
+  /** Controls transfer progress UI events. Defaults to `silent`. */
+  uiMode?: 'silent' | 'progress';
 };
 
 const PORTFOLIO_PENDING_PATH = 'vol1:/portfolio/portfolio.okpkg.pending';
@@ -17,7 +19,7 @@ const PORTFOLIO_UPDATE_MESSAGE_TYPE = 61400;
 
 export default class UploadPortfolio extends FileWrite {
   init() {
-    const { packageBase64, timeoutMs } = this.payload as UploadPortfolioParams;
+    const { packageBase64, timeoutMs, uiMode = 'silent' } = this.payload as UploadPortfolioParams;
     const packageBytes = decodeCanonicalBase64({
       value: packageBase64,
       parameterName: 'packageBase64',
@@ -31,13 +33,12 @@ export default class UploadPortfolio extends FileWrite {
       chunkSize: PORTFOLIO_CHUNK_SIZE,
       overwrite: true,
       append: false,
-      emitProgress: false,
+      emitProgress: uiMode === 'progress',
       timeoutMs,
     };
     super.init();
     this.unlockPolicy = 'none';
-    // Portfolio is a background write/apply flow and never synthesizes UI events.
-    this.protocolV2UiMode = 'none';
+    this.protocolV2UiMode = uiMode === 'progress' ? 'auto' : 'none';
   }
 
   async run() {
