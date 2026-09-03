@@ -378,6 +378,16 @@ describe('public device lifecycle events', () => {
     expect(isRetryableBleConnectionError(method, error)).toBe(expected);
   });
 
+  test('does not retry the desktop acquire deadline fallback', () => {
+    const method = { payload: { connectProtocol: 'V2' } } as never;
+    const error = {
+      errorCode: HardwareErrorCode.BleTimeoutError,
+      params: { acquireDeadlineExceeded: true },
+    };
+
+    expect(isRetryableBleConnectionError(method, error)).toBe(false);
+  });
+
   test.each([
     [HardwareErrorCode.BleDeviceBondError, true],
     [HardwareErrorCode.BlePeerRemovedPairingInformation, true],

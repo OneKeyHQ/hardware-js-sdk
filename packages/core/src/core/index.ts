@@ -946,7 +946,16 @@ export function isRetryableBleConnectionError(method: BaseMethod, error: unknown
   if (method.device?.wasInterruptedByUser()) {
     return false;
   }
-  const typedError = error as { errorCode?: unknown };
+  const typedError = error as {
+    errorCode?: unknown;
+    params?: { acquireDeadlineExceeded?: unknown };
+  };
+  if (
+    typedError?.errorCode === HardwareErrorCode.BleTimeoutError &&
+    typedError.params?.acquireDeadlineExceeded === true
+  ) {
+    return false;
+  }
   return (
     typedError?.errorCode === HardwareErrorCode.BleTimeoutError ||
     typedError?.errorCode === HardwareErrorCode.BleConnectedError ||
@@ -998,7 +1007,8 @@ function raceBleAcquire<T>(acquirePromise: Promise<T>, abortSignal?: AbortSignal
           reject(
             ERRORS.TypedError(
               HardwareErrorCode.BleTimeoutError,
-              `BLE acquire exceeded ${BLE_ACQUIRE_DEADLINE_MS}ms deadline`
+              `BLE acquire exceeded ${BLE_ACQUIRE_DEADLINE_MS}ms deadline`,
+              { acquireDeadlineExceeded: true }
             )
           )
         ),
