@@ -10,6 +10,19 @@ export interface NobleBleWriteOptions {
   pacingDelayMs?: number;
 }
 
+export type NobleBleIpcErrorPayload = {
+  name: string;
+  message: string;
+  errorCode: number;
+  params?: unknown;
+};
+
+export type NobleBleIpcErrorResponse = {
+  type: 'NobleBleIpcError';
+  success: false;
+  error: NobleBleIpcErrorPayload;
+};
+
 export interface NobleBleAPI {
   enumerate: () => Promise<{ id: string; name: string }[]>;
   getDevice: (uuid: string) => Promise<{ id: string; name: string; mtu?: number } | null>;

@@ -31,34 +31,87 @@ describe('Electron Noble BLE device discovery', () => {
     expect(NOBLE_BLE_SUBSCRIBE_TIMEOUT_MS).toBe(10_000);
   });
 
-  test('maps macOS stale pairing failures without reclassifying generic connection errors', async () => {
+  test('maps structured macOS stale pairing failures without parsing localized text', async () => {
     const { createNobleBleConnectionError } = await import('../noble-ble-handler');
 
     const staleBondError = createNobleBleConnectionError(
-      new Error('CBErrorDomain:14 Peer removed pairing information on the device side')
+      Object.assign(new Error('Peer removed pairing information on the device side'), {
+        nativeErrorCode: 14,
+        nativeErrorDomain: 'CBErrorDomain',
+      })
     );
     expect(staleBondError).toMatchObject({
       errorCode: HardwareErrorCode.BleBondInvalid,
       params: {
-        nativeErrorMessage: 'CBErrorDomain:14 Peer removed pairing information on the device side',
+        nativeErrorMessage: 'Peer removed pairing information on the device side',
       },
     });
-    expect(staleBondError.message).toContain(
-      'CBErrorDomain:14 Peer removed pairing information on the device side'
-    );
+    expect(staleBondError.message).toContain('Peer removed pairing information on the device side');
     expect(createNobleBleConnectionError(new Error('Encryption is insufficient'))).toMatchObject({
-      errorCode: HardwareErrorCode.BleBondInvalid,
-      params: {
-        nativeErrorMessage: 'Encryption is insufficient',
-      },
+      errorCode: HardwareErrorCode.BleConnectedError,
     });
     expect(
-      createNobleBleConnectionError(new Error('CBATTErrorDomain:14 localized native message'))
+      createNobleBleConnectionError(
+        Object.assign(new Error('localized native message'), {
+          nativeErrorCode: 14,
+          nativeErrorDomain: 'CBATTErrorDomain',
+        })
+      )
     ).toMatchObject({
-      errorCode: HardwareErrorCode.BleBondInvalid,
+      errorCode: HardwareErrorCode.BleConnectedError,
     });
     expect(createNobleBleConnectionError(new Error('connection failed'))).toMatchObject({
       errorCode: HardwareErrorCode.BleConnectedError,
+    });
+  });
+
+  test('serializes HardwareError fields for the Noble IPC boundary', async () => {
+    const { createNobleBleIpcErrorResponse } = await import('../noble-ble-handler');
+
+    expect(
+      createNobleBleIpcErrorResponse({
+        name: 'HardwareError',
+        message: 'Bluetooth pairing information is no longer valid',
+        errorCode: HardwareErrorCode.BleBondInvalid,
+        params: { nativeErrorMessage: 'native message' },
+      })
+    ).toEqual({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: {
+        name: 'HardwareError',
+        message: 'Bluetooth pairing information is no longer valid',
+        errorCode: HardwareErrorCode.BleBondInvalid,
+        params: { nativeErrorMessage: 'native message' },
+      },
+    });
+
+    expect(createNobleBleIpcErrorResponse(new Error('untyped failure'))).toEqual({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: {
+        name: 'Error',
+        message: 'untyped failure',
+        errorCode: HardwareErrorCode.UnknownError,
+      },
+    });
+
+    const circularParams: { self?: unknown } = {};
+    circularParams.self = circularParams;
+    expect(
+      createNobleBleIpcErrorResponse({
+        message: 'failure with unsafe params',
+        errorCode: HardwareErrorCode.BleConnectedError,
+        params: circularParams,
+      })
+    ).toEqual({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: {
+        name: 'Error',
+        message: 'failure with unsafe params',
+        errorCode: HardwareErrorCode.BleConnectedError,
+      },
     });
   });
 
@@ -207,7 +260,15 @@ describe('Electron Noble BLE device discovery', () => {
     expect(peripheral.connect).not.toHaveBeenCalled();
 
     stopScanningCallback?.();
-    await expect(connectPromise).rejects.toThrow('expected test connection failure');
+    await expect(connectPromise).resolves.toEqual({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: {
+        name: 'HardwareError',
+        message: 'expected test connection failure',
+        errorCode: HardwareErrorCode.BleConnectedError,
+      },
+    });
     expect(peripheral.connect).toHaveBeenCalledTimes(1);
   });
 
@@ -232,7 +293,7 @@ describe('Electron Noble BLE device discovery', () => {
 
     peripheral.connect(connectCallback);
     const nativeError = new Error(
-      'CBATTErrorDomain:14 Peer removed pairing information on the device side'
+      'CBErrorDomain:14 Peer removed pairing information on the device side'
     );
     bindings.emit('disconnect', 'aabbccdd', nativeError);
 

@@ -553,14 +553,19 @@ describe('ElectronBleTransport protocol detection', () => {
   test('fails Protocol V2 acquire immediately when subscribe reports insufficient encryption', async () => {
     const device = { id: 'stale-bond-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
-    nobleBle.subscribe.mockRejectedValue(new Error('Encryption is insufficient'));
+    nobleBle.subscribe.mockRejectedValue({
+      name: 'HardwareError',
+      message: 'Bluetooth pairing information is no longer valid',
+      errorCode: HardwareErrorCode.BleBondInvalid,
+      params: { nativeErrorMessage: 'Encryption is insufficient' },
+    });
     const transport = configureTransport(nobleBle);
     const probe = jest.spyOn(transport as any, 'probeProtocolV2');
 
     await expect(
       transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
     ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BleDeviceBondError,
+      errorCode: HardwareErrorCode.BleBondInvalid,
     });
 
     expect(probe).not.toHaveBeenCalled();
@@ -568,52 +573,38 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
   });
 
-  test('maps macOS CoreBluetooth peer-removed pairing failures to the precise error', async () => {
-    const device = { id: 'reset-pro2-macos-id', name: 'OneKey Pro 2' };
+  test('rehydrates a structured stale-bond error before the protocol is known', async () => {
+    const device = { id: 'reset-unknown-protocol-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
-    nobleBle.connect.mockRejectedValue(
-      new Error('CBErrorDomain:14 Peer removed pairing information on the device side')
-    );
+    nobleBle.connect.mockRejectedValue({
+      name: 'HardwareError',
+      message: 'Bluetooth pairing information is no longer valid',
+      errorCode: HardwareErrorCode.BleBondInvalid,
+      params: { nativeErrorMessage: 'CBErrorDomain:14 native message' },
+    });
     const transport = configureTransport(nobleBle);
 
-    await expect(
-      transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
-    ).rejects.toMatchObject({
+    await expect(transport.acquire({ uuid: device.id })).rejects.toMatchObject({
+      name: 'HardwareError',
       errorCode: HardwareErrorCode.BleBondInvalid,
-      params: {
-        nativeErrorMessage: 'CBErrorDomain:14 Peer removed pairing information on the device side',
-      },
+      params: { nativeErrorMessage: 'CBErrorDomain:14 native message' },
     });
   });
 
-  test('rehydrates the native stale-bond code after Electron IPC wraps the error', async () => {
-    const device = { id: 'reset-pro2-ipc-id', name: 'OneKey Pro 2' };
-    const nobleBle = createNobleBle(device);
-    nobleBle.connect.mockRejectedValue(
-      new Error(
-        "Error invoking remote method '$onekey-noble-ble-connect': HardwareError: Bluetooth pairing information is no longer valid. Forget the device in system Bluetooth settings and pair it again. (CBErrorDomain:14 Peer removed pairing information on the device side)"
-      )
-    );
-    const transport = configureTransport(nobleBle);
-
-    await expect(
-      transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
-    ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BleBondInvalid,
-    });
-  });
-
-  test('maps a localized macOS CBATT code 14 failure without relying on its description', async () => {
+  test('does not infer hardware errors from native error text in the renderer', async () => {
     const device = { id: 'reset-pro2-localized-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
     nobleBle.connect.mockRejectedValue(new Error('CBATTErrorDomain:14 localized native message'));
     const transport = configureTransport(nobleBle);
 
-    await expect(
-      transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
-    ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BleBondInvalid,
-    });
+    try {
+      await transport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+      throw new Error('Expected acquire to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe('CBATTErrorDomain:14 localized native message');
+      expect((error as { errorCode?: unknown }).errorCode).toBeUndefined();
+    }
   });
 
   test('does not classify a generic macOS connection failure as a stale bond', async () => {

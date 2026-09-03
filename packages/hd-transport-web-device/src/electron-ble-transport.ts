@@ -18,7 +18,6 @@ import {
   HardwareErrorCode,
   HardwareErrorCodeMessage,
   createDeferred,
-  isBleStaleBondErrorText,
   isBleStaleBondHardwareError,
   isHeaderChunk,
 } from '@onekeyfe/hd-shared';
@@ -163,51 +162,24 @@ export default class ElectronBleTransport {
 
   private nextNotificationToken = 1;
 
-  private toStaleBondError(error: unknown): Error | null {
-    if (isBleStaleBondHardwareError(error)) {
-      return error as Error;
-    }
-    const errorMessage =
-      error && typeof error === 'object' && 'message' in error
-        ? String((error as { message?: unknown }).message ?? '')
-        : String(error ?? '');
-    if (!isBleStaleBondErrorText(errorMessage)) {
-      return null;
-    }
-    const normalizedErrorMessage = errorMessage.toLowerCase();
-    if (
-      normalizedErrorMessage.includes('cberrordomain:14') ||
-      normalizedErrorMessage.includes('cbatterrordomain:14')
-    ) {
-      return ERRORS.TypedError(HardwareErrorCode.BleBondInvalid, undefined, {
-        nativeErrorMessage: errorMessage,
-      });
-    }
-    return ERRORS.TypedError(
-      normalizedErrorMessage.includes('peer removed pairing information')
-        ? HardwareErrorCode.BlePeerRemovedPairingInformation
-        : HardwareErrorCode.BleDeviceBondError,
-      errorMessage
-    );
-  }
-
-  private handleBluetoothError(error: any, mapProtocolV2StaleBond = false): never {
-    if (mapProtocolV2StaleBond) {
-      const staleBondError = this.toStaleBondError(error);
-      if (staleBondError) {
-        throw staleBondError;
-      }
-    }
+  private normalizeBluetoothError(error: any): any {
     if (error && typeof error === 'object') {
+      if (typeof error.errorCode === 'number') {
+        return ERRORS.TypedError(
+          error.errorCode,
+          typeof error.message === 'string' ? error.message : undefined,
+          error.params
+        );
+      }
       if ('code' in error) {
         if (error.code === HardwareErrorCode.BlePoweredOff) {
-          throw ERRORS.TypedError(HardwareErrorCode.BlePoweredOff);
+          return ERRORS.TypedError(HardwareErrorCode.BlePoweredOff);
         }
         if (error.code === HardwareErrorCode.BleUnsupported) {
-          throw ERRORS.TypedError(HardwareErrorCode.BleUnsupported);
+          return ERRORS.TypedError(HardwareErrorCode.BleUnsupported);
         }
         if (error.code === HardwareErrorCode.BlePermissionError) {
-          throw ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
+          return ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
         }
       }
       const errorMessage = error.message || String(error);
@@ -216,16 +188,20 @@ export default class ElectronBleTransport {
       const permissionMessage = HardwareErrorCodeMessage[HardwareErrorCode.BlePermissionError];
 
       if (errorMessage.includes(poweredOffMessage) || errorMessage.includes('poweredOff')) {
-        throw ERRORS.TypedError(HardwareErrorCode.BlePoweredOff);
+        return ERRORS.TypedError(HardwareErrorCode.BlePoweredOff);
       }
       if (errorMessage.includes(unsupportedMessage) || errorMessage.includes('unsupported')) {
-        throw ERRORS.TypedError(HardwareErrorCode.BleUnsupported);
+        return ERRORS.TypedError(HardwareErrorCode.BleUnsupported);
       }
       if (errorMessage.includes(permissionMessage) || errorMessage.includes('unauthorized')) {
-        throw ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
+        return ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
       }
     }
-    throw error;
+    return error;
+  }
+
+  private handleBluetoothError(error: any): never {
+    throw this.normalizeBluetoothError(error);
   }
 
   private cleanupDeviceState(deviceId: string): void {
@@ -358,9 +334,6 @@ export default class ElectronBleTransport {
 
   async acquire(input: BleAcquireInput) {
     const { uuid, forceCleanRunPromise, expectedProtocol } = input;
-    const shouldMapProtocolV2StaleBond = expectedProtocol
-      ? expectedProtocol === 'V2'
-      : this.confirmedProtocolV2.has(uuid);
 
     if (!uuid) {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
@@ -397,7 +370,7 @@ export default class ElectronBleTransport {
         await window.desktopApi.nobleBle.connect(uuid);
         this.connectedDevices.add(uuid);
       } catch (error) {
-        this.handleBluetoothError(error, shouldMapProtocolV2StaleBond);
+        this.handleBluetoothError(error);
       }
 
       const mtuCleanup = this.createMtuSubscription(uuid);
@@ -411,7 +384,7 @@ export default class ElectronBleTransport {
       try {
         await window.desktopApi.nobleBle.subscribe(uuid);
       } catch (error) {
-        this.handleBluetoothError(error, shouldMapProtocolV2StaleBond);
+        this.handleBluetoothError(error);
       }
       await this.refreshBlePacketCapacity(uuid);
 
@@ -442,7 +415,7 @@ export default class ElectronBleTransport {
         this.Log?.debug('[Electron BLE] acquire cleanup failed:', cleanupError);
       }
       this.cleanupDeviceState(uuid);
-      throw error;
+      this.handleBluetoothError(error);
     }
   }
 
@@ -681,11 +654,7 @@ export default class ElectronBleTransport {
     try {
       await nobleBle.write(uuid, hexData, { pacingDelayMs: 0 });
     } catch (error) {
-      const staleBondError = this.toStaleBondError(error);
-      if (staleBondError) {
-        throw staleBondError;
-      }
-      throw error;
+      this.handleBluetoothError(error);
     }
   }
 
@@ -986,7 +955,7 @@ export default class ElectronBleTransport {
           await this.releaseNative(uuid);
         }
       }
-      throw e;
+      throw this.normalizeBluetoothError(e);
     } finally {
       if (timeout) clearTimeout(timeout);
       if (this.runPromise === runPromise) {

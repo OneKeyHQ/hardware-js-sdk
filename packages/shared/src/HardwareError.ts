@@ -706,7 +706,6 @@ export const isBleStaleBondErrorText = (text: string): boolean => {
     value.includes('insufficient encryption') ||
     value.includes('peer removed pairing information') ||
     value.includes('cberrordomain:14') ||
-    value.includes('cbatterrordomain:14') ||
     value.includes('gatt_insuf_authentication')
   );
 };

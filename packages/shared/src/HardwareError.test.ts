@@ -57,7 +57,7 @@ describe('HardwareErrorCode compatibility', () => {
         'CBErrorDomain:14 Peer removed pairing information on the device side'
       )
     ).toBe(true);
-    expect(isBleStaleBondErrorText('CBATTErrorDomain:14 localized native message')).toBe(true);
+    expect(isBleStaleBondErrorText('CBATTErrorDomain:14 localized native message')).toBe(false);
     expect(isBleStaleBondErrorText('connection failed')).toBe(false);
   });
 });

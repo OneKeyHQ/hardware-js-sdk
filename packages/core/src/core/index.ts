@@ -22,6 +22,7 @@ import {
   createNeedUpgradeFirmwareHardwareError,
   createNewFirmwareForceUpdateHardwareError,
   createNewFirmwareUnReleaseHardwareError,
+  isBleStaleBondHardwareError,
 } from '@onekeyfe/hd-shared';
 
 import { LoggerNames, enableLog, getLogger, setLoggerPostMessage, wait } from '../utils';
@@ -964,13 +965,8 @@ export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unkn
   );
 }
 
-export function isProtocolV2PeerRemovedPairingError(method: BaseMethod, error: unknown) {
-  const errorCode = (error as { errorCode?: unknown })?.errorCode;
-  return (
-    method.payload.connectProtocol === 'V2' &&
-    (errorCode === HardwareErrorCode.BlePeerRemovedPairingInformation ||
-      errorCode === HardwareErrorCode.BleBondInvalid)
-  );
+export function isTerminalBleStaleBondError(error: unknown) {
+  return isBleStaleBondHardwareError(error);
 }
 
 /**
@@ -1284,7 +1280,7 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceInterruptedFromUser,
             HardwareErrorCode.CallQueueActionCancelled,
           ].includes(error.errorCode) ||
-          isProtocolV2PeerRemovedPairingError(method, error)
+          isTerminalBleStaleBondError(error)
         ) {
           reject(error);
           return;

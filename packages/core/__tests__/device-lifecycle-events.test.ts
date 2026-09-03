@@ -6,9 +6,9 @@ import {
   initConnector,
   initCore,
   isMissingDetectedProtocolV2Error,
-  isProtocolV2PeerRemovedPairingError,
   isRetryableBleConnectionError,
   isRetryableBleProtocolV2ProbeError,
+  isTerminalBleStaleBondError,
   resolveBleConnectProtocol,
 } from '../src/core';
 import { DataManager } from '../src/data-manager';
@@ -379,21 +379,17 @@ describe('public device lifecycle events', () => {
   });
 
   test.each([
-    ['V2', HardwareErrorCode.BlePeerRemovedPairingInformation, true],
-    ['V2', HardwareErrorCode.BleBondInvalid, true],
-    ['V1', HardwareErrorCode.BleBondInvalid, false],
-    [undefined, HardwareErrorCode.BleBondInvalid, false],
-  ] as const)(
-    'treats stale pairing as terminal for Protocol %s with error code %s: %s',
-    (connectProtocol, errorCode, expected) => {
-      const method = { payload: { connectProtocol } } as never;
-      const error = {
-        errorCode,
-      };
+    [HardwareErrorCode.BleDeviceBondError, true],
+    [HardwareErrorCode.BlePeerRemovedPairingInformation, true],
+    [HardwareErrorCode.BleBondInvalid, true],
+    [HardwareErrorCode.DeviceNotFound, false],
+  ] as const)('treats BLE stale-bond error code %s as terminal: %s', (errorCode, expected) => {
+    const error = {
+      errorCode,
+    };
 
-      expect(isProtocolV2PeerRemovedPairingError(method, error)).toBe(expected);
-    }
-  );
+    expect(isTerminalBleStaleBondError(error)).toBe(expected);
+  });
 
   test('converts an internal transport disconnect into a public KnownDevice snapshot', () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);

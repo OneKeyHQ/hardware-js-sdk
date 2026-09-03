@@ -16,7 +16,6 @@ import {
   ONEKEY_WRITE_CHARACTERISTIC_UUID,
   createKnownBleUuidAliases,
   hasOnekeyCommunicationService,
-  isBleStaleBondErrorText,
   isBleStaleBondHardwareError,
   isOnekeyBluetoothDevice,
   isPro2FamilyBleName,
@@ -35,16 +34,23 @@ import {
 
 import type { IpcMain, IpcMainInvokeEvent, WebContents } from 'electron';
 import type { Characteristic, Peripheral, Service } from '@stoprocent/noble';
-import type { NobleBleWriteOptions } from './types/desktop-api';
+import type { NobleBleIpcErrorResponse, NobleBleWriteOptions } from './types/desktop-api';
 import type { CharacteristicPair, DeviceInfo, Logger, NobleModule } from './types/noble-extended';
 
 // Noble will be dynamically imported to avoid bundling issues
 let noble: NobleModule | null = null;
 let logger: Logger | null = null;
 
-export function createNobleBleConnectionError(error: Error, messagePrefix = '') {
+type NobleBleNativeError = Error & {
+  nativeErrorCode?: number;
+  nativeErrorDomain?: string;
+};
+
+export function createNobleBleConnectionError(error: NobleBleNativeError, messagePrefix = '') {
   const errorMessage = error.message;
-  if (isBleStaleBondErrorText(errorMessage)) {
+  const isInvalidMacOsBond =
+    error.nativeErrorCode === 14 && error.nativeErrorDomain === 'CBErrorDomain';
+  if (isInvalidMacOsBond) {
     const nativeErrorMessage = `${messagePrefix}${errorMessage}`;
     return ERRORS.TypedError(
       HardwareErrorCode.BleBondInvalid,
@@ -56,6 +62,40 @@ export function createNobleBleConnectionError(error: Error, messagePrefix = '') 
   }
 
   return ERRORS.TypedError(HardwareErrorCode.BleConnectedError, `${messagePrefix}${errorMessage}`);
+}
+
+export function createNobleBleIpcErrorResponse(error: unknown): NobleBleIpcErrorResponse {
+  const candidate = error as {
+    errorCode?: unknown;
+    message?: unknown;
+    name?: unknown;
+    params?: unknown;
+  };
+  const errorCode =
+    typeof candidate?.errorCode === 'number' ? candidate.errorCode : HardwareErrorCode.UnknownError;
+  const message =
+    typeof candidate?.message === 'string' ? candidate.message : String(error ?? 'Unknown error');
+  const name = typeof candidate?.name === 'string' ? candidate.name : 'Error';
+  let params: unknown;
+  if (candidate?.params !== undefined) {
+    try {
+      const serializedParams = JSON.stringify(candidate.params);
+      params = serializedParams === undefined ? undefined : JSON.parse(serializedParams);
+    } catch {
+      params = undefined;
+    }
+  }
+
+  return {
+    type: 'NobleBleIpcError',
+    success: false,
+    error: {
+      name,
+      message,
+      errorCode,
+      ...(params !== undefined ? { params } : {}),
+    },
+  };
 }
 
 // Bluetooth state management
@@ -1919,7 +1959,13 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     // Electron throws on duplicate channels and setup re-runs on soft restart.
     const handle: IpcMain['handle'] = (channel, listener) => {
       ipcMain.removeHandler(channel);
-      ipcMain.handle(channel, listener);
+      ipcMain.handle(channel, async (...args) => {
+        try {
+          return await Promise.resolve(listener(...args));
+        } catch (error) {
+          return createNobleBleIpcErrorResponse(error);
+        }
+      });
     };
 
     safeLog(logger, 'info', 'Setting up Noble BLE IPC handlers');
