@@ -3845,8 +3845,8 @@ export type SolanaSignOffChainMessage = {
   message_version?: SolanaOffChainMessageVersion;
   message_format?: SolanaOffChainMessageFormat;
   application_domain?: string;
+  required_signers: string[];
   source_fingerprint?: number;
-  required_signers?: string[];
 };
 
 // SolanaSignUnsafeMessage
