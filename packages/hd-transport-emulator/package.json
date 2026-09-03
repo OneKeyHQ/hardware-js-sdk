@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport-emulator",
-  "version": "1.2.2-alpha.13",
+  "version": "1.2.2-alpha.15",
   "description": "hardware emulator transport",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
@@ -24,8 +24,8 @@
     "url": "https://github.com/OneKeyHQ/hardware-js-sdk/issues"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "1.2.2-alpha.13",
-    "@onekeyfe/hd-transport": "1.2.2-alpha.13",
+    "@onekeyfe/hd-shared": "1.2.2-alpha.15",
+    "@onekeyfe/hd-transport": "1.2.2-alpha.15",
     "axios": "1.15.2",
     "secure-json-parse": "^4.0.0"
   }

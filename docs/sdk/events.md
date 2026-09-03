@@ -1,39 +1,36 @@
-# OneKey `hd-*` SDK 公共事件（SDK → App）
+# OneKey `hd-*` SDK public events (SDK → App)
 
-> - 文档状态：Protocol V1 当前契约 + Protocol V2 通用事件边界
-> - 最后代码核验：2026-08-03
-> - 适用范围：`@onekeyfe/hd-core`、`hd-web-sdk`、`hd-common-connect-sdk`
-> - 事实来源：`packages/core/src/events`、`packages/core/src/core/index.ts` 和 SDK 外层消息转发实现
+> - Status: Protocol V1 current contract + Protocol V2 common event boundary
+> - Last code review: 2026-08-03
+> - Scope: `@onekeyfe/hd-core`, `hd-web-sdk`, `hd-common-connect-sdk`
+> - Source of truth: `packages/core/src/events`, `packages/core/src/core/index.ts`, and outer SDK event forwarding
 
-本文说明 OneKey `hd-*` SDK 对 App 暴露的公共事件：事件由谁生成、哪些事件会暂停调用、应用如何回传结果，以及设备、固件和运行环境通知如何分发。
+This document describes the public events that the OneKey `hd-*` SDK exposes to the App: who generates them, which events pause a call, how the App sends results back, and how device, firmware, and runtime notifications are dispatched.
 
-Protocol V2/Pro2 的“无 Event”表示 firmware 不再发送需要 Host ACK 的 UI 中间消息。
-SDK 继续通过 Passphrase Event 收集一次钱包访问意图，再主动发送
-`DeviceSessionAskPin/DeviceSessionAskPassphrase/DeviceSessionGet`；当前钱包流程以
-[SDK Core 运行时](./core-runtime.md#钱包-session) 为准。
+For Protocol V2 / Pro2, "eventless" means firmware no longer sends UI intermediate messages that wait for a Host ACK. The SDK still collects one wallet-access intent through a Passphrase Event, then actively sends `DeviceSessionAskPin` / `DeviceSessionAskPassphrase` / `DeviceSessionGet`. The current wallet flow follows [SDK Core runtime](./core-runtime.md#wallet-session).
 
-这些公共事件不都来自硬件。维护事件时必须先区分设备协议中间消息、`hd-*` SDK 公共事件和 `hwk-*` Adapter 公共事件。
+These public events do not all come from hardware. When maintaining events, first distinguish device-protocol intermediate messages, `hd-*` SDK public events, and `hwk-*` Adapter public events.
 
-新的 `hwk-*` Adapter 使用另一套事件名、类型和等待机制，不能与本文中的常量混用。
+The new `hwk-*` Adapter uses a different set of event names, types, and wait mechanics. Do not mix those constants with this document.
 
-## 先按事件来源区分
+## Distinguish events by source first
 
-`hd-*` SDK 对 App 暴露的事件来自六类生成方：
+Public `hd-*` events come from six producers:
 
-| 来源                      | 代表事件                                              | 是否由硬件直接发出                        | App 主要动作                           |
-| ------------------------- | ----------------------------------------------------- | ----------------------------------------- | -------------------------------------- |
-| V1 硬件协议消息转换       | `REQUEST_PIN`、`REQUEST_PASSPHRASE`、`REQUEST_BUTTON` | 原始消息来自硬件；公开 Event 由 Core 转换 | 展示设备交互 UI，必要时 `uiResponse()` |
-| V2 Core/协调器合成        | 同一组 `REQUEST_*`                                    | 否；根据参数、Session 状态或错误生成      | 复用同一 UI，按 Event 类型决定是否响应 |
-| Core 业务流程生成         | WebUSB 设备选择、关闭窗口、业务进度、固件提示         | 否                                        | 更新流程 UI，部分请求需要回传          |
-| Transport / 系统环境生成  | 蓝牙、定位、WebUSB 权限通知                           | 否                                        | 申请权限、引导用户或重试               |
-| 设备与 Transport 生命周期 | `CONNECT`、`DISCONNECT`、`FEATURES`                   | 不是硬件中间 Event                        | 更新设备列表和状态                     |
-| SDK 配置与能力计算        | `SUPPORT_FEATURES`、固件 release 元数据               | 否                                        | 更新能力和升级入口                     |
+| Source | Representative events | Emitted directly by hardware? | App action |
+| --- | --- | --- | --- |
+| V1 hardware-protocol conversion | `REQUEST_PIN`, `REQUEST_PASSPHRASE`, `REQUEST_BUTTON` | Raw messages come from hardware; Core converts them to public events | Show device-interaction UI and call `uiResponse()` when needed |
+| V2 Core / coordinator synthesis | The same `REQUEST_*` set | No; generated from params, Session state, or errors | Reuse the same UI; respond only when the event type requires it |
+| Core business flow | WebUSB device selection, close-window, business progress, firmware tips | No | Update flow UI; some requests need a response |
+| Transport / host environment | Bluetooth, location, WebUSB permission notices | No | Request permission, guide the user, or retry |
+| Device and transport lifecycle | `CONNECT`, `DISCONNECT`, `FEATURES` | Not hardware intermediate events | Update the device list and state |
+| SDK config and capability calculation | `SUPPORT_FEATURES`, firmware release metadata | No | Update capabilities and upgrade entry points |
 
-不能只根据常量是否位于 `UI_REQUEST` 中判断它是不是“等待应用响应的事件”。`UI_REQUEST` 还包含设备模式错误标识，部分常量当前也没有实际 emit。
+Do not treat a constant as "an event that waits for the App" only because it lives in `UI_REQUEST`. `UI_REQUEST` also includes device-mode error markers, and some constants currently have no emit path.
 
-## 消息结构与监听方式
+## Message shape and listeners
 
-Core 内部消息统一使用：
+Core internal messages use:
 
 ```ts
 type CoreMessage = {
@@ -43,14 +40,14 @@ type CoreMessage = {
 };
 ```
 
-外层 SDK 对不同事件组采用不同的分发方式：
+The outer SDK dispatches event groups differently:
 
-| 监听方式                                           | listener 收到的数据             | 说明                     |
-| -------------------------------------------------- | ------------------------------- | ------------------------ |
-| `HardwareSDK.on(UI_EVENT, listener)`               | 完整 `{ event, type, payload }` | 监听所有 UI 请求和通知   |
-| `HardwareSDK.on(UI_REQUEST.REQUEST_PIN, listener)` | 事件的 `payload`                | 只监听一个具体 UI 类型   |
-| `HardwareSDK.on(DEVICE.CONNECT, listener)`         | 事件的 `payload`                | 设备事件只按具体类型转发 |
-| `HardwareSDK.on(FIRMWARE_EVENT, listener)`         | 完整 `{ event, type, payload }` | 固件元数据按总事件监听   |
+| Listener | Data received by the listener | Notes |
+| --- | --- | --- |
+| `HardwareSDK.on(UI_EVENT, listener)` | Full `{ event, type, payload }` | All UI requests and notices |
+| `HardwareSDK.on(UI_REQUEST.REQUEST_PIN, listener)` | Event `payload` | One specific UI type |
+| `HardwareSDK.on(DEVICE.CONNECT, listener)` | Event `payload` | Device events are forwarded by concrete type |
+| `HardwareSDK.on(FIRMWARE_EVENT, listener)` | Full `{ event, type, payload }` | Firmware metadata is listened on the aggregate event |
 
 ```ts
 HardwareSDK.on(UI_EVENT, message => {
@@ -66,115 +63,98 @@ HardwareSDK.on(DEVICE.CONNECT, ({ device }) => {
 });
 ```
 
-所有 transport（包括 React Native BLE 和 `lowlevel`）都会把
-`DEVICE.CONNECT` / `DEVICE.DISCONNECT` 中的 `device` 统一为可序列化的
-`KnownDevice` 快照。它不是 SDK 内部的实时 `Device` 实例，业务层不应调用
-`run`、`acquire`、`release`、`commands` 或依赖 `instanceof Device`。需要跟踪连接后的状态变化时，
-应监听 `DEVICE.STATE`；Protocol V1 兼容业务也可以继续监听 `DEVICE.FEATURES`。
+Every transport, including React Native BLE and `lowlevel`, normalizes `device` on `DEVICE.CONNECT` / `DEVICE.DISCONNECT` to a serializable `KnownDevice` snapshot. It is not the SDK's live `Device` instance. Business code must not call `run`, `acquire`, `release`, or `commands`, and must not rely on `instanceof Device`. To track post-connect state changes, listen to `DEVICE.STATE`. Protocol V1 compatibility code may keep listening to `DEVICE.FEATURES`.
 
-快照中的 `connectId` 用于后续 SDK 调用和 transport 路由，`serialNo` 用于识别物理设备；
-`uuid` 仅作为 `serialNo` 的废弃兼容别名保留。`status` 表示当前 transport 使用状态：
-`available` 为已发现且空闲，`used` 为当前 SDK 会话正在使用，`occupied` 为被其他会话占用。
-调用方不应保存事件对象并期待其字段原地更新。
+`connectId` on the snapshot is for later SDK calls and transport routing. `serialNo` identifies the physical device. `uuid` remains only as a deprecated alias of `serialNo`. `status` is the current transport use state: `available` means discovered and idle, `used` means the current SDK session owns it, and `occupied` means another session owns it. Callers must not keep the event object and expect its fields to mutate in place.
 
-`DEVICE_EVENT` 不会像 `UI_EVENT` 一样作为公共聚合监听被外层 SDK 转发。当前外层转发 `DEVICE.CONNECT`、`DEVICE.DISCONNECT`、`DEVICE.STATE`、Protocol V1 的 `DEVICE.FEATURES` 和 `DEVICE.SUPPORT_FEATURES`。
+`DEVICE_EVENT` is not forwarded by the outer SDK as a public aggregate listener the way `UI_EVENT` is. The outer SDK currently forwards `DEVICE.CONNECT`, `DEVICE.DISCONNECT`, `DEVICE.STATE`, Protocol V1 `DEVICE.FEATURES`, and `DEVICE.SUPPORT_FEATURES`.
 
-## 一次调用的事件生命周期
+## Event lifecycle of one call
 
-### Protocol V1 当前流程
+### Protocol V1 current flow
 
 ```mermaid
 sequenceDiagram
-  participant App as 应用
+  participant App
   participant SDK as hd-web/common SDK
   participant Core
-  participant Device as 硬件设备
+  participant Device
 
-  App->>SDK: 调用地址、签名或设备方法
+  App->>SDK: Call address, sign, or device method
   SDK->>Core: IFRAME.CALL
-  Core->>Device: protobuf 请求
-  Device-->>Core: ButtonRequest / PinMatrixRequest 等硬件中间消息
-  Core-->>SDK: 转换后的 UI_EVENT / DEVICE_EVENT
+  Core->>Device: protobuf request
+  Device-->>Core: Intermediate hardware messages such as ButtonRequest / PinMatrixRequest
+  Core-->>SDK: Converted UI_EVENT / DEVICE_EVENT
   SDK-->>App: listener
-  opt 事件需要应用响应
+  opt Event requires an App response
     App->>SDK: uiResponse(UI_RESPONSE.*)
     SDK->>Core: UI_EVENT response
     Core->>Device: Ack
   end
-  Device-->>Core: 最终业务响应
+  Device-->>Core: Final business response
   Core-->>App: CLOSE_UI_WINDOW
-  Core-->>App: API Promise 完成
+  Core-->>App: API Promise settles
 ```
 
-Core 的设备调用通过请求队列串行执行。V1 PIN、V1/V2 Passphrase 和设备选择请求会创建内部等待项；
-API Promise 只有在应用响应、设备流程完成或调用被取消后才会继续。
+Core device calls run through a serial request queue. V1 PIN, V1/V2 Passphrase, and device-selection requests create internal wait items. The API Promise continues only after the App responds, the device flow finishes, or the call is canceled.
 
-### Protocol V2 / Pro2 目标流程
+### Protocol V2 / Pro2 target flow
 
 ```mermaid
 sequenceDiagram
-  participant App as 应用
+  participant App
   participant SDK as hd-web/common SDK
   participant Core
   participant Device as Pro2
 
-  App->>SDK: 调用地址、签名或设备方法
+  App->>SDK: Call address, sign, or device method
   SDK->>Core: IFRAME.CALL
-  Core-->>SDK: 根据方法/Session/错误合成 UI_EVENT
+  Core-->>SDK: Synthesize UI_EVENT from method / Session / error
   SDK-->>App: listener
-  opt 阻塞选择 Event
+  opt Blocking selection event
     App->>SDK: uiResponse(UI_RESPONSE.*)
     SDK->>Core: UI_EVENT response
     Core->>Device: AskPassphrase/AskPin -> Success -> DeviceSessionGet
   end
-  opt 非阻塞提示 Event
-    Core->>Device: 原业务命令
+  opt Non-blocking hint event
+    Core->>Device: Original business command
   end
-  Device-->>Core: 最终业务响应
+  Device-->>Core: Final business response
   Core-->>App: CLOSE_UI_WINDOW
-  Core-->>App: API Promise 完成
+  Core-->>App: API Promise settles
 ```
 
-V2 不伪造硬件 `ButtonRequest/PinMatrixRequest/PassphraseRequest`。阻塞 Event 的 `uiResponse()` 被转换
-为明确业务命令；非阻塞 Event 只提示 App，不建立响应等待项。
+V2 does not forge hardware `ButtonRequest` / `PinMatrixRequest` / `PassphraseRequest`. A blocking event's `uiResponse()` is converted into an explicit business command. A non-blocking event only hints the App and does not create a response wait item.
 
-这里的“转换”不是把协议消息换名：
+This "conversion" is not renaming protocol messages:
 
-- V1 `PassphraseAck` 是对 firmware 中间请求的回复。
-- V2 的设备 Passphrase 使用 `DeviceSessionAskPassphrase`，Attach PIN 使用
-  `DeviceSessionAskPin(AttachToPin)`；两者返回 `Success`，随后用 Get 读取 Session。
-- V2 恢复使用 `DeviceSessionGet({ session_id })`；它没有对应的 `PassphraseAck` 语义。
-- 标准钱包首次或状态错配时调用 `DeviceSessionAskPin(Main)`，随后调用空参数 Get。
-- `ButtonRequest/ButtonAck` 在 V2 被删除，不能解释成任一新 Session 请求的旧名称。
+- V1 `PassphraseAck` replies to a firmware intermediate request.
+- V2 device Passphrase uses `DeviceSessionAskPassphrase`. Attach PIN uses `DeviceSessionAskPin(AttachToPin)`. Both return `Success`, then Get reads the Session.
+- V2 resume uses `DeviceSessionGet({ session_id })`. It has no `PassphraseAck` equivalent.
+- A standard wallet's first open or state mismatch calls `DeviceSessionAskPin(Main)`, then Get with empty params.
+- `ButtonRequest` / `ButtonAck` are removed in V2 and must not be treated as old names for any new Session request.
 
-## 必须回传的 UI 请求
+## UI requests that must be answered
 
-| UI 请求                                         | 协议/来源                   | 主要触发点                         | Core 等待的响应                                | 结果如何回到设备/流程                                       |
-| ----------------------------------------------- | --------------------------- | ---------------------------------- | ---------------------------------------------- | ----------------------------------------------------------- |
-| `REQUEST_PIN`                                   | V1 硬件消息转换             | `PinMatrixRequest`                 | `RECEIVE_PIN`                                  | `PinMatrixAck` 或切换设备输入                               |
-| `REQUEST_PASSPHRASE`                            | V1 硬件消息转换             | `PassphraseRequest`                | `RECEIVE_PASSPHRASE`                           | `PassphraseAck`                                             |
-| `REQUEST_PASSPHRASE`                            | V2 WalletSessionCoordinator | 隐藏钱包首次选择或状态错配恢复     | `RECEIVE_PASSPHRASE`                           | 选择 Host Passphrase 或 Attach PIN；Ask 后由 Get 取 Session |
-| `REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`   | Core 流程生成               | 老 WebUSB 升级重启到 bootloader 后 | `SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`   | 把重新授权的 `deviceId` 交回旧固件流程                      |
-| `REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | Core 流程生成               | 老固件切换或重连阶段               | `SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | 把重新选择的 `deviceId` 交回旧固件流程                      |
+| UI request | Protocol / source | Main trigger | Response Core waits for | How the result returns to the device / flow |
+| --- | --- | --- | --- | --- |
+| `REQUEST_PIN` | V1 hardware-message conversion | `PinMatrixRequest` | `RECEIVE_PIN` | `PinMatrixAck` or switch to on-device input |
+| `REQUEST_PASSPHRASE` | V1 hardware-message conversion | `PassphraseRequest` | `RECEIVE_PASSPHRASE` | `PassphraseAck` |
+| `REQUEST_PASSPHRASE` | V2 WalletSessionCoordinator | First hidden-wallet selection or mismatch recovery | `RECEIVE_PASSPHRASE` | Choose Host Passphrase or Attach PIN; Ask, then Get the Session |
+| `REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE` | Core flow | After a legacy WebUSB update reboots into bootloader | `SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE` | Return the re-authorized `deviceId` to the old firmware flow |
+| `REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | Core flow | Legacy firmware switch or reconnect | `SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE` | Return the re-selected `deviceId` to the old firmware flow |
 
-两个 WebUSB 设备选择请求不是硬件协议消息，Protocol V2 的 `firmwareUpdateV4` 当前也不通过这两个 Event 处理 Pro2 重连。
+The two WebUSB device-selection requests are not hardware protocol messages. Protocol V2 `firmwareUpdateV4` currently does not use these events for Pro2 reconnect.
 
-如果应用不回传，这些阻塞等待不会自行进入下一步。旧 Core 的 UI 等待没有显式超时；V2 合成阻塞
-Event 必须在取消、超时、断连和方法结束时清理。
+If the App does not respond, these blocking waits do not advance on their own. Legacy Core UI waits have no explicit timeout. V2 synthesized blocking events must be cleaned up on cancel, timeout, disconnect, and method end.
 
-### PIN 响应
+### PIN response
 
-以下 `RECEIVE_PIN` 只适用于 Protocol V1。Protocol V2/Pro2 的 `REQUEST_PIN` 是 SDK 在发送
-`DeviceSessionAskPin` 前合成的非阻塞设备操作提示，不接受 PIN 响应。`Main` 映射为
-`ButtonRequest_PinEntry`，`AttachToPin` 映射为 `ButtonRequest_AttachPin`。
+The following `RECEIVE_PIN` path applies to Protocol V1 only. Protocol V2 / Pro2 `REQUEST_PIN` is a non-blocking device-operation hint synthesized before `DeviceSessionAskPin`. It does not accept a PIN response. `Main` maps to `ButtonRequest_PinEntry`. `AttachToPin` maps to `ButtonRequest_AttachPin`.
 
-锁定重试提示由统一交互协调器生成，payload 包含 `source='unlock-coordinator'`、
-`reason='device-locked'`、`deviceOnly=true` 和触发方法名；钱包选择提示由钱包 Session 协调器生成。
-设备解锁后 SDK 在原调用内最多重试一次，App 不重发业务请求。
-`protocolV2UiMode='none'` 只抑制普通方法交互提示；如果实际发送了 `DeviceSessionAskPin`，
-SDK 仍必须生成该 PIN 提示。
+Locked-retry hints come from the unified interaction coordinator. The payload includes `source='unlock-coordinator'`, `reason='device-locked'`, `deviceOnly=true`, and the triggering method name. Wallet-selection hints come from the wallet Session coordinator. After unlock, the SDK retries at most once inside the original call. The App does not resend the business request. `protocolV2UiMode='none'` only suppresses ordinary method-interaction hints. If `DeviceSessionAskPin` is actually sent, the SDK must still synthesize that PIN hint.
 
-软件输入：
+Software input:
 
 ```ts
 HardwareSDK.uiResponse({
@@ -184,7 +164,7 @@ HardwareSDK.uiResponse({
 });
 ```
 
-选择在设备上输入：
+Choose on-device input:
 
 ```ts
 HardwareSDK.uiResponse({
@@ -194,15 +174,13 @@ HardwareSDK.uiResponse({
 });
 ```
 
-V1 的 `ButtonRequest_PinEntry` 和 `ButtonRequest_AttachPin` 会提前触发同一个 `REQUEST_PIN` UI 提示，
-但真正的 PIN 等待在设备返回 `PinMatrixRequest` 时建立。应用应把重复事件视为更新同一个 PIN
-界面，不要把事件次数理解为独立的响应槽位。
+V1 `ButtonRequest_PinEntry` and `ButtonRequest_AttachPin` fire the same `REQUEST_PIN` UI hint early, but the real PIN wait is created when the device returns `PinMatrixRequest`. The App should treat duplicate events as updates to the same PIN UI, not as independent response slots.
 
-响应应由实际用户操作产生，不要在 `REQUEST_PIN` listener 中同步自动回传，避免响应发生在真正等待项建立之前。
+The response must come from a real user action. Do not auto-reply synchronously inside a `REQUEST_PIN` listener, or the response may arrive before the real wait item exists.
 
-### Passphrase 与 Attach PIN 响应
+### Passphrase and Attach PIN response
 
-软件输入 Passphrase：
+Software Passphrase:
 
 ```ts
 HardwareSDK.uiResponse({
@@ -216,7 +194,7 @@ HardwareSDK.uiResponse({
 });
 ```
 
-在设备上输入 Passphrase：
+Enter Passphrase on the device:
 
 ```ts
 HardwareSDK.uiResponse({
@@ -230,7 +208,7 @@ HardwareSDK.uiResponse({
 });
 ```
 
-选择已有 Attach PIN 钱包：
+Choose an existing Attach PIN wallet:
 
 ```ts
 HardwareSDK.uiResponse({
@@ -244,99 +222,70 @@ HardwareSDK.uiResponse({
 });
 ```
 
-V1 中，`attachPinOnDevice` 只有在设备的 `PassphraseRequest.exists_attach_pin_user` 为真时才会转换成
-`PassphraseAck.on_device_attach_pin`。
+In V1, `attachPinOnDevice` converts to `PassphraseAck.on_device_attach_pin` only when the device's `PassphraseRequest.exists_attach_pin_user` is true.
 
-V2 中，SDK 根据 `DeviceStatus.attach_to_pin_enabled` 生成 `existsAttachPinUser`。
-首次选择使用 `reason='open-wallet'`；业务调用缺少本地 Session、需要用户重新确认原钱包时使用
-`reason='session-recovery'` 并携带 `expectedPassphraseState`，最终响应仍必须与该钱包标识一致。
-非空软件值映射为
-`DeviceSessionAskPassphrase({ passphrase, on_device: false })`；`passphraseOnDevice` 映射为
-`DeviceSessionAskPassphrase({ on_device: true })`。两种请求必须互斥，不能同时携带 Host
-Passphrase 与 `on_device: true`。
-Host 值在发送前执行 NFKD 规范化，并且规范化后必须为 1–50 个合法 UTF-8 字节、不得包含
-NUL 或孤立 UTF-16 surrogate；长度不能用 JavaScript `string.length` 代替。
-`REQUEST_PASSPHRASE`、`REQUEST_PASSPHRASE_ON_DEVICE` 以及对应 UI 响应都属于日志阻断事件，
-不得把明文输入、`passphraseState` 或 `expectedPassphraseState` 写入 SDK/Bridge 日志。
-`attachPinOnDevice` 映射为 `DeviceSessionAskPin(AttachToPin)`；Ask 成功后使用空参数
-`DeviceSessionGet` 读取当前实际 Session。
+In V2, the SDK sets `existsAttachPinUser` from `DeviceStatus.attach_to_pin_enabled`. First selection uses `reason='open-wallet'`. When a business call has no local Session and the user must re-confirm the original wallet, it uses `reason='session-recovery'` and carries `expectedPassphraseState`. The final response must still match that wallet identity. A non-empty software value maps to `DeviceSessionAskPassphrase({ passphrase, on_device: false })`. `passphraseOnDevice` maps to `DeviceSessionAskPassphrase({ on_device: true })`. The two requests are mutually exclusive; do not send Host Passphrase together with `on_device: true`. The Host value is NFKD-normalized before send and must be 1–50 valid UTF-8 bytes with no NUL or lone UTF-16 surrogate. Do not use JavaScript `string.length`. `REQUEST_PASSPHRASE`, `REQUEST_PASSPHRASE_ON_DEVICE`, and the matching UI responses are log-blocked events. Do not write plaintext input, `passphraseState`, or `expectedPassphraseState` to SDK/Bridge logs. `attachPinOnDevice` maps to `DeviceSessionAskPin(AttachToPin)`. After Ask succeeds, empty-param `DeviceSessionGet` reads the actual current Session.
 
-## 不需要回传的设备交互
+## Device interaction that does not need a response
 
-V1 的这些 Event 由硬件 `ButtonRequest` 转换；V2 目标中由 SDK 根据方法生命周期和设备状态合成。
+V1 converts these events from hardware `ButtonRequest`. V2 synthesizes them from method lifecycle and device state.
 
 ### `REQUEST_BUTTON`
 
-V1 设备返回 `ButtonRequest` 后，Core 会：
+After a V1 device returns `ButtonRequest`, Core:
 
-1. 发送内部 `DEVICE.BUTTON` 消息，保留设备返回的 Button code。
-2. 对普通确认场景向应用发出 `REQUEST_BUTTON`。
-3. 自动向设备发送 `ButtonAck`。
-4. 等待用户在硬件屏幕上完成确认及设备的最终响应。
+1. Sends an internal `DEVICE.BUTTON` message and keeps the Button code from the device.
+2. Emits `REQUEST_BUTTON` to the App for ordinary confirmation.
+3. Automatically sends `ButtonAck` to the device.
+4. Waits for the user to confirm on the hardware screen and for the device's final response.
 
-V2 中，地址/公钥、签名和设备管理方法在进入设备交互前直接 emit `REQUEST_BUTTON`，不发送
-`ButtonAck`。应用在两个协议版本下都只需展示“请在设备上确认”，不要调用 `uiResponse()`。
+In V2, address/public-key, signing, and device-management methods emit `REQUEST_BUTTON` before entering device interaction and do not send `ButtonAck`. In both protocol versions the App only shows "confirm on device" and must not call `uiResponse()`.
 
-Pro2 设置页 Event 还会携带 `source='method-lifecycle'`、`reason`、`completion` 和 `page`。
+Pro2 settings-page events also carry `source='method-lifecycle'`, `reason`, `completion`, and `page`.
 
-`firmwareUpdateV4` 在 `DeviceFirmwareUpdateStage` 成功后、发送
-`DeviceFirmwareUpdateRequest` 前发出同类非阻塞 `REQUEST_BUTTON`，其中
-`reason='firmware-update'`、`completion='operation-completed'`。App 只展示设备确认提示，不调用
-`uiResponse()`；安装进度继续通过 `FIRMWARE_TIP` 与 `FIRMWARE_PROGRESS` 通知。
-`completion='page-accepted'` 表示 API 成功只证明设备页面已打开，不代表用户已经完成或确认设置。
+`firmwareUpdateV4` emits the same non-blocking `REQUEST_BUTTON` after `DeviceFirmwareUpdateStage` succeeds and before `DeviceFirmwareUpdateRequest`, with `reason='firmware-update'` and `completion='operation-completed'`. The App only shows the device-confirm hint and does not call `uiResponse()`. Install progress continues through `FIRMWARE_TIP` and `FIRMWARE_PROGRESS`. `completion='page-accepted'` means API success only proves the device page opened, not that the user finished or confirmed the setting.
 
-`uploadPortfolio` 不属于设备确认流程：SDK 不为它生成 `REQUEST_BUTTON/REQUEST_PIN`，文件写入也关闭
-`DEVICE_PROGRESS`。其成功与失败只以最终 `PortfolioUpdate` 响应为准。
+`uploadPortfolio` is not a device-confirmation flow. Its default `uiMode='silent'` emits no `REQUEST_BUTTON`, `REQUEST_PIN`, `DEVICE_PROGRESS`, or Protocol V2 UI lifecycle event. With `uiMode='progress'`, it emits `DEVICE_PROGRESS` during file staging and `CLOSE_UI_WINDOW` when the operation ends, but still emits no confirmation or unlock request. Only the final `PortfolioUpdate` response determines success or failure.
 
 ### `REQUEST_PASSPHRASE_ON_DEVICE`
 
-V1 用户选择设备端输入后，设备可能返回 `ButtonRequest_PassphraseEntry`，Core 将其转换为
-`REQUEST_PASSPHRASE_ON_DEVICE`。V2 在 `DeviceSessionAskPassphrase` 发出前由 SDK 合成同名阶段提示。两者都只
-用于更新设备输入 UI，不要求响应。
+In V1, after the user chooses on-device input, the device may return `ButtonRequest_PassphraseEntry`, which Core converts to `REQUEST_PASSPHRASE_ON_DEVICE`. In V2, the SDK synthesizes the same-named stage hint before `DeviceSessionAskPassphrase`. Both only update the on-device input UI and do not require a response.
 
-### 关闭事件
+### Close events
 
-| 事件                  | 来源          | 触发时机                                   | 应用动作            |
-| --------------------- | ------------- | ------------------------------------------ | ------------------- |
-| `CLOSE_UI_WINDOW`     | Core 流程生成 | 调用结束、取消、错误退出或下一次调用初始化 | 收起当前硬件交互 UI |
-| `CLOSE_UI_PIN_WINDOW` | Core 流程生成 | Passphrase 安全检查完成或批量流程结束      | 只收起 PIN 相关 UI  |
+| Event | Source | When | App action |
+| --- | --- | --- | --- |
+| `CLOSE_UI_WINDOW` | Core flow | Call end, cancel, error exit, or next-call init | Dismiss the current hardware-interaction UI |
+| `CLOSE_UI_PIN_WINDOW` | Core flow | Passphrase security check done or a batch flow ends | Dismiss only PIN-related UI |
 
-关闭事件是状态通知，不代表一个新的业务失败，也不需要回传。App 收到关闭通知时只幂等收起 UI，
-不能反向触发第二次 Cancel；只有用户主动关闭/取消交互时才取消当前 SDK 调用。
-用户取消 `firmwareUpdateV4` 的设备确认提示时，Core 先在当前 Protocol V2 link 上发送仅写 `Cancel`
-流控帧，再中断并释放原调用；该帧不排在等待设备确认的业务响应之后。
+Close events are state notices. They are not a new business failure and do not need a response. When the App receives a close notice, it only dismisses UI idempotently and must not fire a second Cancel. Cancel the current SDK call only when the user actively closes or cancels the interaction. If the user cancels the `firmwareUpdateV4` device-confirm hint, Core first sends a write-only `Cancel` flow-control frame on the current Protocol V2 link, then aborts and releases the original call. That frame is not queued behind a business response that is waiting for device confirmation.
 
-## 进度和中间结果
+## Progress and intermediate results
 
-| 事件                      | 事件来源                         | 触发点                     | payload 重点                   | 使用方式                                   |
-| ------------------------- | -------------------------------- | -------------------------- | ------------------------------ | ------------------------------------------ |
-| `DEVICE_PROGRESS`         | SDK 计算                         | 文件写入、批量地址等方法   | `progress`、字节数、速率、耗时 | 展示通用设备任务进度                       |
-| `PREVIOUS_ADDRESS_RESULT` | SDK 生成                         | 每次地址结果返回后         | `device`、`address`、`path`    | 增量展示地址；当前 OneKey App 跳过该事件   |
-| `FIRMWARE_PROCESSING`     | SDK 固件状态机生成               | 固件升级方法               | 当前处理类型                   | 切换 firmware/ble/bootloader/resource 阶段 |
-| `FIRMWARE_PROGRESS`       | SDK 计算；部分由硬件状态消息转换 | 固件传输或安装状态         | `progress`、阶段及可选传输指标 | 更新传输或安装进度条                       |
-| `FIRMWARE_TIP`            | SDK 固件状态机生成               | 下载、重启、确认和安装阶段 | `FirmwareUpdateTipMessage`     | 展示固件升级阶段提示                       |
+| Event | Source | Trigger | Payload focus | How to use it |
+| --- | --- | --- | --- | --- |
+| `DEVICE_PROGRESS` | SDK calculation | File write, batch address, and similar methods | `progress`, bytes, rate, elapsed time | Show generic device-task progress |
+| `PREVIOUS_ADDRESS_RESULT` | SDK | After each address result | `device`, `address`, `path` | Incremental address display; current OneKey App skips this event |
+| `FIRMWARE_PROCESSING` | SDK firmware state machine | Firmware-update methods | Current processing type | Switch firmware / ble / bootloader / resource phase |
+| `FIRMWARE_PROGRESS` | SDK calculation; some conversion from hardware status | Firmware transfer or install status | `progress`, phase, optional transfer metrics | Update transfer or install progress |
+| `FIRMWARE_TIP` | SDK firmware state machine | Download, reboot, confirm, and install stages | `FirmwareUpdateTipMessage` | Show firmware-update stage hints |
 
-`FIRMWARE_PROGRESS` 会进行节流，不能依赖每个底层分片都产生一次事件。During Protocol V2
-installation, SDK maps `DeviceFirmwareUpdateStatus.records[].progress_percent` to the overall
-`progress`. It also exposes `installTargetId`, normalized `installPhase` (`prepare`, `install`, or
-`verify`), and `installPhaseProgress` from the active record's `phase_info`.
-Protocol V2 文件传输阶段还会附带 `transferredBytes`、`totalBytes`、`rateBytesPerSecond` 和
-`elapsedMs`；这些字段在安装阶段及旧协议流程中可能缺省。
+`FIRMWARE_PROGRESS` is throttled. Do not expect one event per underlying chunk. During Protocol V2 installation, the SDK maps `DeviceFirmwareUpdateStatus.records[].progress_percent` to overall `progress`. It also exposes `installTargetId`, normalized `installPhase` (`prepare`, `install`, or `verify`), and `installPhaseProgress` from the active record's `phase_info`. Protocol V2 file-transfer stages also attach `transferredBytes`, `totalBytes`, `rateBytesPerSecond`, and `elapsedMs`. Those fields may be absent during install and on older protocol flows.
 
-## 固件事件的两条通道
+## Two firmware event channels
 
-### 升级过程：`UI_EVENT`
+### Update process: `UI_EVENT`
 
-`FIRMWARE_PROCESSING`、`FIRMWARE_PROGRESS` 和 `FIRMWARE_TIP` 属于 SDK 公共 UI 通知，服务于正在执行的固件升级流程。它们不是一组硬件协议事件。Protocol V2 的 `DeviceFirmwareUpdateStatus` 可以被 SDK 转换成 `FIRMWARE_PROGRESS`，但 App 收到的仍是 SDK 公共事件。
+`FIRMWARE_PROCESSING`, `FIRMWARE_PROGRESS`, and `FIRMWARE_TIP` are public SDK UI notices for an in-flight firmware update. They are not a hardware-protocol event group. Protocol V2 `DeviceFirmwareUpdateStatus` can be converted into `FIRMWARE_PROGRESS`, but the App still receives a public SDK event.
 
-### 版本元数据：`FIRMWARE_EVENT`
+### Version metadata: `FIRMWARE_EVENT`
 
-| 事件                        | 来源                    | 内容                             |
-| --------------------------- | ----------------------- | -------------------------------- |
-| `FIRMWARE.RELEASE_INFO`     | SDK + 远端 release 配置 | 主固件远端版本、状态和设备信息   |
-| `FIRMWARE.BLE_RELEASE_INFO` | SDK + 远端 release 配置 | BLE 固件远端版本、状态和设备信息 |
+| Event | Source | Content |
+| --- | --- | --- |
+| `FIRMWARE.RELEASE_INFO` | SDK + remote release config | Main-firmware remote version, status, and device info |
+| `FIRMWARE.BLE_RELEASE_INFO` | SDK + remote release config | BLE-firmware remote version, status, and device info |
 
-BaseMethod 在业务方法运行前检查并发送这两类元数据。当前该逻辑只覆盖 Protocol V1；Protocol V2/Pro2 会显式跳过，Pro2 固件升级由 `firmwareUpdateV4` 自己管理 release 配置和安装流程。
+BaseMethod checks and sends both metadata events before a business method runs. That logic currently covers Protocol V1 only. Protocol V2 / Pro2 skips it explicitly; Pro2 firmware update is owned by `firmwareUpdateV4`, including release config and install.
 
 ```ts
 HardwareSDK.on(FIRMWARE_EVENT, message => {
@@ -346,148 +295,128 @@ HardwareSDK.on(FIRMWARE_EVENT, message => {
 });
 ```
 
-## 设备事件
+## Device events
 
-| 事件                      | 来源                       | 实际触发点                               | payload                                            |
-| ------------------------- | -------------------------- | ---------------------------------------- | -------------------------------------------------- |
-| `DEVICE.CONNECT`          | Transport / DevicePool     | DevicePool 枚举或初始化出设备            | `{ device: KnownDevice }` 快照                     |
-| `DEVICE.DISCONNECT`       | Transport / DevicePool     | USB 拔出、BLE 断开或 DevicePool 移除设备 | `{ device: KnownDevice }` 快照                     |
-| `DEVICE.STATE`            | 设备响应或已确认设置 patch | DeviceState 实际发生变化                 | `DeviceStateEvent`                                 |
-| `DEVICE.FEATURES`         | Protocol V1 兼容投影       | V1 DeviceState 实际发生变化              | `Features`                                         |
-| `DEVICE.SUPPORT_FEATURES` | SDK 能力计算               | BaseMethod 运行前计算附加能力            | `{ inputPinOnSoftware, modifyHomescreen, device }` |
+| Event | Source | Actual trigger | Payload |
+| --- | --- | --- | --- |
+| `DEVICE.CONNECT` | Transport / DevicePool | DevicePool enumerates or initializes a device | `{ device: KnownDevice }` snapshot |
+| `DEVICE.DISCONNECT` | Transport / DevicePool | USB unplug, BLE drop, or DevicePool removal | `{ device: KnownDevice }` snapshot |
+| `DEVICE.STATE` | Device response or confirmed settings patch | `DeviceState` actually changed | `DeviceStateEvent` |
+| `DEVICE.FEATURES` | Protocol V1 compatibility projection | V1 `DeviceState` actually changed | `Features` |
+| `DEVICE.SUPPORT_FEATURES` | SDK capability calculation | Extra capabilities computed before BaseMethod runs | `{ inputPinOnSoftware, modifyHomescreen, device }` |
 
-`SUPPORT_FEATURES` 不是硬件主动推送。它是 SDK 根据设备型号和 Features 计算出的业务辅助信息。
+`SUPPORT_FEATURES` is not pushed by hardware. It is business helper data computed from device model and Features.
 
-`DEVICE.STATE` 是 V1/V2 的统一状态变更通知。它可能来自设备读取、Protocol V1 设置成功后的
-confirmed patch 或解锁结果；相同 patch 不会重复发送。Protocol V2 设置成功后会强制读回
-`status` 与 `settings`，只发布设备返回的状态。新接入只消费完整 `DeviceState`，无需识别底层协议。
+`DEVICE.STATE` is the unified V1/V2 state-change notice. It may come from a device read, a confirmed Protocol V1 settings patch, or an unlock result. Identical patches are not emitted twice. After a successful Protocol V2 settings write, the SDK force-reads `status` and `settings` and publishes only the device-returned state. New integrations consume the full `DeviceState` and do not need to identify the underlying protocol.
 
-For settings calls, Core updates `DeviceState` and emits `DEVICE.STATE` synchronously before the
-API Promise completes. Protocol V2 APIs normally wait for the post-write `status + settings`
-read-back and fail if that read-back fails, even when the device may already have accepted the
-mutation. Wallpaper upload is the exception: once `DeviceSettingsSet` applies the uploaded file,
-its cache refresh is best-effort so a transient read failure cannot trigger another large upload.
-Apps that persist listener events asynchronously must drain that persistence before reading local
-state. They must not read stale `Features` immediately after the Promise resolves or overwrite
-device state optimistically from request parameters.
+For settings calls, Core updates `DeviceState` and emits `DEVICE.STATE` synchronously before the API Promise completes. Protocol V2 APIs normally wait for the post-write `status + settings` read-back and fail if that read-back fails, even when the device may already have accepted the mutation. Wallpaper upload is the exception: once `DeviceSettingsSet` applies the uploaded file, its cache refresh is best-effort so a transient read failure cannot trigger another large upload. Apps that persist listener events asynchronously must drain that persistence before reading local state. They must not read stale `Features` immediately after the Promise resolves or overwrite device state optimistically from request parameters.
 
-Pro2 的 `status.passphraseProtection` 只在设备已解锁、私有 Status 可验证时具有权威值。关闭
-passphrase 后设备可能主动锁定，此时后续锁定快照允许该字段为 `undefined`；App 应保留最近一次已确认值，
-并在解锁后通过 `getDeviceState({ scope: 'settings' })` 刷新，而不是把锁定快照解释为 `false`。
+Pro2 `status.passphraseProtection` is authoritative only when the device is unlocked and private Status can be verified. After passphrase is turned off, the device may lock itself; later locked snapshots may leave that field `undefined`. The App should keep the last confirmed value and refresh with `getDeviceState({ scope: 'settings' })` after unlock, instead of treating a locked snapshot as `false`.
 
-`DEVICE.FEATURES` 仅用于 Protocol V1 兼容。Protocol V2 不发送该事件，也不支持 `getFeatures()`。
+`DEVICE.FEATURES` is Protocol V1 compatibility only. Protocol V2 does not emit it and does not support `getFeatures()`.
 
-## 运行环境和授权通知
+## Runtime and permission notices
 
-下面这些事件不是硬件 protobuf 消息，而是 transport、宿主系统或浏览器授权流程产生的通知：
+These events are not hardware protobuf messages. They come from transport, the host OS, or browser authorization:
 
-| 事件                                             | 来源                             |
-| ------------------------------------------------ | -------------------------------- |
-| `BLUETOOTH_PERMISSION`                           | React Native / 系统蓝牙权限      |
-| `BLUETOOTH_UNSUPPORTED`                          | 当前运行环境不支持 BLE           |
-| `BLUETOOTH_POWERED_OFF`                          | 系统蓝牙关闭                     |
-| `BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE` | BLE notification 订阅失败        |
-| `LOCATION_PERMISSION`                            | Android BLE 扫描定位权限         |
-| `LOCATION_SERVICE_PERMISSION`                    | Android 系统定位服务             |
-| `WEB_DEVICE_PROMPT_ACCESS_PERMISSION`            | 浏览器需要用户授予 WebUSB 访问权 |
+| Event | Source |
+| --- | --- |
+| `BLUETOOTH_PERMISSION` | React Native / system Bluetooth permission |
+| `BLUETOOTH_UNSUPPORTED` | Current runtime does not support BLE |
+| `BLUETOOTH_POWERED_OFF` | System Bluetooth is off |
+| `BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE` | BLE notification subscribe failed |
+| `LOCATION_PERMISSION` | Android BLE scan location permission |
+| `LOCATION_SERVICE_PERMISSION` | Android location service |
+| `WEB_DEVICE_PROMPT_ACCESS_PERMISSION` | Browser needs the user to grant WebUSB access |
 
-应用应把这一组放在权限、连接引导或环境错误 UI 中，不要当作设备屏幕交互。
+Put this group in permission, connection-guidance, or environment-error UI. Do not treat them as on-device screen interaction.
 
-## 响应匹配和并发边界
+## Response matching and concurrency
 
-当前 Core 使用全局 `_uiPromises` 保存等待项。PIN 和 Passphrase 请求的 payload 会携带
-`responseCorrelation = { interactionId, deviceId }`，应用必须把这两个字段原样放回
-`uiResponse()`；Core 使用以下匹配键：
+Core currently stores wait items in global `_uiPromises`. PIN and Passphrase request payloads carry `responseCorrelation = { interactionId, deviceId }`. The App must echo both fields in `uiResponse()`. Core matches with:
 
 ```text
-RECEIVE_PIN + interactionId + deviceId -> 对应 V1 PIN 等待
-RECEIVE_PASSPHRASE + interactionId + deviceId -> 对应 Passphrase 等待
-SELECT_DEVICE_* -> 当前对应设备选择等待
+RECEIVE_PIN + interactionId + deviceId -> matching V1 PIN wait
+RECEIVE_PASSPHRASE + interactionId + deviceId -> matching Passphrase wait
+SELECT_DEVICE_* -> current matching device-selection wait
 ```
 
-兼容和安全边界如下：
+Compatibility and safety:
 
-- 新接入必须原样回传 correlation；不完整或不匹配的 correlation 会被忽略。
-- 旧接入不带 correlation 时，只在同类型敏感等待项唯一的情况下兼容；存在多个候选时拒绝猜测。
-- `interactionId` 是每个阻塞 UI Promise 的唯一标识，不等同于 V2 页面状态机中跨多个阶段的
-  `interaction.interactionId`。
-- `deviceId` 优先使用公开的钱包生命周期 ID；设备状态尚未提供该 ID 时，Core 使用当前 SDK Device
-  instance ID 作为本次 correlation 的回传值，应用不得自行替换。
-- 没有匹配等待项的 `uiResponse()` 会被忽略。
-- 旧 UI 等待没有独立超时；应用必须确保响应或调用取消路径能够执行。
-- 多设备并发的同类型敏感响应只能解析相同 correlation 的等待项。
-- 取消、超时、断连和方法结束必须删除等待项；迟到响应不能解析下一个调用。
+- New integrations must echo correlation as-is. Incomplete or mismatched correlation is ignored.
+- Legacy integrations without correlation are accepted only when that sensitive wait type is unique. Multiple candidates are not guessed.
+- `interactionId` uniquely identifies one blocking UI Promise. It is not the V2 page-state-machine `interaction.interactionId` that spans multiple stages.
+- `deviceId` prefers the public wallet-lifecycle ID. If device state does not yet provide it, Core uses the current SDK Device instance ID as the correlation echo value. The App must not replace it.
+- `uiResponse()` with no matching wait item is ignored.
+- Legacy UI waits have no independent timeout. The App must ensure a response or cancel path can run.
+- Concurrent same-type sensitive responses across devices can only resolve wait items with the same correlation.
+- Cancel, timeout, disconnect, and method end must delete wait items. A late response must not resolve the next call.
 
-应用仍应避免无业务必要的并发交互，但正确回传 correlation 后，并发本身不会再导致 PIN 或
-Passphrase 命中另一台设备的等待项。
+The App should still avoid concurrent interaction that is not required by the product. After correlation is echoed correctly, concurrency itself no longer routes a PIN or Passphrase to another device's wait item.
 
-## `UI_REQUEST` 中并非事件的常量
+## `UI_REQUEST` constants that are not events
 
-以下常量主要用于 `allowDeviceMode`、`requireDeviceMode` 和错误信息，不会作为普通 UI 事件发送：
+These constants are mainly for `allowDeviceMode`, `requireDeviceMode`, and error messages. They are not sent as ordinary UI events:
 
 - `BOOTLOADER`
 - `NOT_IN_BOOTLOADER`
 - `NOT_INITIALIZE`
 - `SEEDLESS`
 
-`REQUIRE_MODE`、`FIRMWARE_OLD`、`FIRMWARE_NOT_SUPPORTED`、`FIRMWARE_NOT_COMPATIBLE`、`FIRMWARE_NOT_INSTALLED`、`NOT_USE_ONEKEY_DEVICE` 和 `INVALID_PIN` 当前也没有找到实际 emit 入口。接入方不应仅因为它们存在于导出常量中就注册业务 UI。
+`REQUIRE_MODE`, `FIRMWARE_OLD`, `FIRMWARE_NOT_SUPPORTED`, `FIRMWARE_NOT_COMPATIBLE`, `FIRMWARE_NOT_INSTALLED`, `NOT_USE_ONEKEY_DEVICE`, and `INVALID_PIN` currently also have no emit path. Integrators should not register business UI just because they are exported constants.
 
-## 事件矩阵
+## Event matrix
 
-| 来源                       | 当前/目标对外事件                                                                                        |
-| -------------------------- | -------------------------------------------------------------------------------------------------------- |
-| V1 硬件消息转换（当前）    | `REQUEST_PIN`、`REQUEST_PASSPHRASE`、`REQUEST_BUTTON`、`REQUEST_PASSPHRASE_ON_DEVICE`                    |
-| V2 Core/协调器合成（目标） | 同一组 `REQUEST_*`；根据来源分为阻塞选择和非阻塞提示                                                     |
-| Core Host 交互流程         | 两个旧 WebUSB 设备选择请求、`CLOSE_UI_WINDOW`、`CLOSE_UI_PIN_WINDOW`                                     |
-| SDK 业务状态               | `DEVICE_PROGRESS`、`PREVIOUS_ADDRESS_RESULT`、`FIRMWARE_PROCESSING`、`FIRMWARE_PROGRESS`、`FIRMWARE_TIP` |
-| Transport / 系统环境       | 蓝牙、定位、BLE notify 和 WebUSB prompt 相关事件                                                         |
-| Transport / 设备生命周期   | `CONNECT`、`DISCONNECT`、`FEATURES`                                                                      |
-| SDK 能力与配置计算         | `SUPPORT_FEATURES`、`RELEASE_INFO`、`BLE_RELEASE_INFO`                                                   |
+| Source | Current / target public events |
+| --- | --- |
+| V1 hardware-message conversion (current) | `REQUEST_PIN`, `REQUEST_PASSPHRASE`, `REQUEST_BUTTON`, `REQUEST_PASSPHRASE_ON_DEVICE` |
+| V2 Core / coordinator synthesis (target) | The same `REQUEST_*` set; blocking selection vs non-blocking hint by source |
+| Core host-interaction flow | Two legacy WebUSB device-selection requests, `CLOSE_UI_WINDOW`, `CLOSE_UI_PIN_WINDOW` |
+| SDK business state | `DEVICE_PROGRESS`, `PREVIOUS_ADDRESS_RESULT`, `FIRMWARE_PROCESSING`, `FIRMWARE_PROGRESS`, `FIRMWARE_TIP` |
+| Transport / host environment | Bluetooth, location, BLE notify, and WebUSB prompt events |
+| Transport / device lifecycle | `CONNECT`, `DISCONNECT`, `FEATURES` |
+| SDK capability and config calculation | `SUPPORT_FEATURES`, `RELEASE_INFO`, `BLE_RELEASE_INFO` |
 
-## 接入检查清单
+## Integration checklist
 
-1. V1 实现 PIN、Passphrase 和 WebUSB 设备选择的 `uiResponse()`。
-2. V2 只为阻塞钱包选择回传 Passphrase 选择；`REQUEST_PIN/REQUEST_BUTTON` 不响应。
-3. 根据 Event `source/reason` 区分 V1 硬件转换与 V2 SDK 合成来源；Pro2 的
-   `REQUEST_PASSPHRASE` 可回传软件输入值、设备输入或 Attach PIN 三种选择。
-4. Button 和设备端 Passphrase 阶段提示只展示，不发送响应。
-5. 用户主动关闭交互 UI 时取消当前调用；收到 `CLOSE_UI_WINDOW/CLOSE_UI_PIN_WINDOW` 时只幂等关闭。
-6. 不并行启动两个需要同类型 UI 响应的调用。
-7. 固件升级同时监听过程事件，不只等待 API 最终返回。
-8. 将环境权限事件与设备 protobuf 交互分开处理。
-9. 不把 `UI_REQUEST` 中的设备模式常量误当作实际事件。
+1. Implement `uiResponse()` for V1 PIN, Passphrase, and WebUSB device selection.
+2. For V2, only answer blocking wallet selection with a Passphrase choice. Do not respond to `REQUEST_PIN` / `REQUEST_BUTTON`.
+3. Use Event `source/reason` to distinguish V1 hardware conversion from V2 SDK synthesis. Pro2 `REQUEST_PASSPHRASE` may return software input, on-device input, or Attach PIN.
+4. Button and on-device Passphrase stage hints are display-only. Do not send a response.
+5. Cancel the current call when the user actively closes the interaction UI. On `CLOSE_UI_WINDOW` / `CLOSE_UI_PIN_WINDOW`, only dismiss idempotently.
+6. Do not start two calls that need the same UI-response type in parallel.
+7. Listen to firmware-update process events; do not wait only for the final API result.
+8. Handle environment-permission events separately from device protobuf interaction.
+9. Do not treat device-mode constants in `UI_REQUEST` as real events.
 
-## 设备协议中间消息
+## Device-protocol intermediate messages
 
-V1 设备可能在最终响应前返回需要 SDK 消费或确认的中间消息。V2/Pro2 不再允许 UI 类中间消息，但仍保留
-业务数据和状态消息。它们都不是 App 直接监听的公共事件。
+A V1 device may return intermediate messages that the SDK must consume or acknowledge before the final response. V2 / Pro2 no longer allow UI-class intermediate messages, but still keep business-data and status messages. None of these are public events the App listens to directly.
 
-| 中间消息                     | V1 Core 行为                      | V2/Pro2 行为                             | 可能产生的公共事件             |
-| ---------------------------- | --------------------------------- | ---------------------------------------- | ------------------------------ |
-| `ButtonRequest`              | 根据 code 发送 Ack 或等待用户操作 | 协议回归错误；Event 应由 SDK 合成        | `REQUEST_BUTTON`、设备交互提示 |
-| `PinMatrixRequest`           | 创建 PIN 请求并等待 App 回传      | 协议回归错误；使用 `DeviceSessionAskPin` | PIN 类 `UI_REQUEST`            |
-| `PassphraseRequest`          | 选择 App/设备/Attach PIN 路径     | 协议回归错误；使用拆分后的 Session 请求  | Passphrase 类 `UI_REQUEST`     |
-| 签名数据 Request/Ack         | SDK 继续提供业务数据              | 保留并继续响应                           | 通常不产生通用 UI Event        |
-| `DeviceFirmwareUpdateStatus` | 更新升级阶段和进度                | 保留                                     | 固件升级进度事件               |
-| `WordRequest/EntropyRequest` | 按旧协议能力受控处理              | 禁止，不合成兼容 Event                   | 不应伪装为已支持事件           |
+| Intermediate message | V1 Core behavior | V2 / Pro2 behavior | Possible public event |
+| --- | --- | --- | --- |
+| `ButtonRequest` | Send Ack or wait for user action by code | Protocol-regression error; the event should be synthesized by the SDK | `REQUEST_BUTTON`, device-interaction hints |
+| `PinMatrixRequest` | Create a PIN request and wait for the App | Protocol-regression error; use `DeviceSessionAskPin` | PIN `UI_REQUEST` |
+| `PassphraseRequest` | Choose App / device / Attach PIN path | Protocol-regression error; use the split Session requests | Passphrase `UI_REQUEST` |
+| Signing data Request/Ack | SDK continues supplying business data | Keep and continue responding | Usually no generic UI event |
+| `DeviceFirmwareUpdateStatus` | Update upgrade phase and progress | Keep | Firmware-update progress events |
+| `WordRequest` / `EntropyRequest` | Handle under legacy protocol capability | Forbidden; do not synthesize compatibility events | Must not be disguised as supported events |
 
-设备消息的枚举和值以 protobuf 为准，转换行为以 Core handler/协调器为准；只有通过
-`HardwareSDK.on()` 暴露的结果才属于 `hd-*` 公共事件。公共 Event 名称相同不代表来源或后续动作
-相同，接入方应以协议版本和 Event payload 为准。
+Device-message enums and values follow protobuf. Conversion follows Core handlers / coordinators. Only results exposed through `HardwareSDK.on()` are `hd-*` public events. The same public event name does not mean the same source or follow-up action. Integrators should follow protocol version and event payload.
 
-## `hwk-*` Adapter 事件边界
+## `hwk-*` Adapter event boundary
 
-多厂商 Adapter 的事件契约独立于 `hd-*`：
+The multi-vendor Adapter event contract is independent of `hd-*`:
 
-- 设备事件：连接、断开和状态变化。
-- `UI_REQUEST`：等待 App 回传的类型化请求。
-- `ui-event`：不需要回传的交互阶段通知。
-- SDK 状态事件：初始化、权限或 Connector 状态。
+- Device events: connect, disconnect, and state changes.
+- `UI_REQUEST`: typed requests that wait for an App response.
+- `ui-event`: interaction-stage notices that do not need a response.
+- SDK state events: init, permission, or Connector state.
 
-Adapter 在 emit 等待型请求前必须先注册 `UiRequestRegistry`，按请求类型匹配响应，并在超时、取消、任务结束和设备断开时清理。Job Queue 负责业务任务串行化，不能用事件等待机制代替任务队列。
+Before emitting a waiting request, the Adapter must register `UiRequestRegistry`, match responses by request type, and clean up on timeout, cancel, task end, and device disconnect. The Job Queue serializes business tasks. Event waits must not replace the task queue.
 
-## 主要实现来源
+## Main implementation sources
 
-- `packages/core/src/events/` 与各 Core method 的消息处理逻辑
-- `packages/hd-common-connect-sdk/` 的公共事件转发
-- `packages/hwk-*` 中的 Adapter 事件类型、`UiRequestRegistry` 和 Job Queue
+- `packages/core/src/events/` and each Core method's message handling
+- Public event forwarding in `packages/hd-common-connect-sdk/`
+- Adapter event types, `UiRequestRegistry`, and Job Queue in `packages/hwk-*`

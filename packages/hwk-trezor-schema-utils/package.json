@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-trezor-schema-utils",
-  "version": "1.2.2-alpha.13",
+  "version": "1.2.2-alpha.15",
   "private": true,
   "description": "Schema helpers vendored from Trezor Suite MIT sources for HWK Trezor support",
   "author": "OneKey",
@@ -44,8 +44,8 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@onekeyfe/hwk-trezor-type-utils": "1.2.2-alpha.13",
-    "@onekeyfe/hwk-trezor-utils": "1.2.2-alpha.13",
+    "@onekeyfe/hwk-trezor-type-utils": "1.2.2-alpha.15",
+    "@onekeyfe/hwk-trezor-utils": "1.2.2-alpha.15",
     "@sinclair/typebox": "^0.34.49",
     "ts-mixer": "^6.0.4"
   },
