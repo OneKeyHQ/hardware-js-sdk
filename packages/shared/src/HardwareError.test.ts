@@ -44,12 +44,20 @@ describe('HardwareErrorCode compatibility', () => {
     });
   });
 
+  test('reserves a dedicated hd-core code for an invalid OS BLE bond', () => {
+    expect(HardwareErrorCode.BleBondInvalid).toBe(724);
+    expect(HardwareErrorCodeMessage[HardwareErrorCode.BleBondInvalid]).toContain(
+      'pairing information is no longer valid'
+    );
+  });
+
   test('recognizes the macOS CoreBluetooth stale-pairing error without matching generic failures', () => {
     expect(
       isBleStaleBondErrorText(
         'CBErrorDomain:14 Peer removed pairing information on the device side'
       )
     ).toBe(true);
+    expect(isBleStaleBondErrorText('CBATTErrorDomain:14 localized native message')).toBe(true);
     expect(isBleStaleBondErrorText('connection failed')).toBe(false);
   });
 });

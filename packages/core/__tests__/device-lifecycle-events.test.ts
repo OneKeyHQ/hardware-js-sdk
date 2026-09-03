@@ -367,6 +367,7 @@ describe('public device lifecycle events', () => {
     [HardwareErrorCode.PollingTimeout, false],
     [HardwareErrorCode.BleDeviceBondError, false],
     [HardwareErrorCode.BlePeerRemovedPairingInformation, false],
+    [HardwareErrorCode.BleBondInvalid, false],
   ] as const)('retries a BLE connection error with error code %s: %s', (errorCode, expected) => {
     const method = { payload: { connectProtocol: 'V2' } } as never;
     const error = {
@@ -378,15 +379,16 @@ describe('public device lifecycle events', () => {
   });
 
   test.each([
-    ['V2', true],
-    ['V1', false],
-    [undefined, false],
+    ['V2', HardwareErrorCode.BlePeerRemovedPairingInformation, true],
+    ['V2', HardwareErrorCode.BleBondInvalid, true],
+    ['V1', HardwareErrorCode.BleBondInvalid, false],
+    [undefined, HardwareErrorCode.BleBondInvalid, false],
   ] as const)(
-    'treats peer-removed pairing as terminal only for Protocol %s: %s',
-    (connectProtocol, expected) => {
+    'treats stale pairing as terminal for Protocol %s with error code %s: %s',
+    (connectProtocol, errorCode, expected) => {
       const method = { payload: { connectProtocol } } as never;
       const error = {
-        errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
+        errorCode,
       };
 
       expect(isProtocolV2PeerRemovedPairingError(method, error)).toBe(expected);

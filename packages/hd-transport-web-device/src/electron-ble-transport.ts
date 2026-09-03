@@ -175,9 +175,16 @@ export default class ElectronBleTransport {
       return null;
     }
     const normalizedErrorMessage = errorMessage.toLowerCase();
+    if (
+      normalizedErrorMessage.includes('cberrordomain:14') ||
+      normalizedErrorMessage.includes('cbatterrordomain:14')
+    ) {
+      return ERRORS.TypedError(HardwareErrorCode.BleBondInvalid, undefined, {
+        nativeErrorMessage: errorMessage,
+      });
+    }
     return ERRORS.TypedError(
-      normalizedErrorMessage.includes('peer removed pairing information') ||
-        normalizedErrorMessage.includes('cberrordomain:14')
+      normalizedErrorMessage.includes('peer removed pairing information')
         ? HardwareErrorCode.BlePeerRemovedPairingInformation
         : HardwareErrorCode.BleDeviceBondError,
       errorMessage

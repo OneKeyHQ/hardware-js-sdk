@@ -965,10 +965,11 @@ export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unkn
 }
 
 export function isProtocolV2PeerRemovedPairingError(method: BaseMethod, error: unknown) {
+  const errorCode = (error as { errorCode?: unknown })?.errorCode;
   return (
     method.payload.connectProtocol === 'V2' &&
-    (error as { errorCode?: unknown })?.errorCode ===
-      HardwareErrorCode.BlePeerRemovedPairingInformation
+    (errorCode === HardwareErrorCode.BlePeerRemovedPairingInformation ||
+      errorCode === HardwareErrorCode.BleBondInvalid)
   );
 }
 
