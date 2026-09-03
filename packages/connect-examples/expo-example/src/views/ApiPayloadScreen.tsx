@@ -1,11 +1,11 @@
 import React, { memo, useEffect, useMemo, useState } from 'react';
-import { FlatList, Platform } from 'react-native';
+import { FlatList } from 'react-native';
 import { Stack, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
 
 import PageView from '../components/ui/Page';
 import HandleSDKEvents from '../components/HandleSDKEvents';
-import { DeviceProvider } from '../provider/DeviceProvider';
+import { DeviceList } from '../components/DeviceList';
 import { CommonParamsProvider } from '../provider/CommonParamsProvider';
 import CommonParamsView from '../components/CommonParamsView';
 import { UploadScreen } from '../components/UploadScreen';
@@ -196,32 +196,38 @@ const PayloadStack = memo(({ data }: { data: React.JSX.IntrinsicAttributes & Api
 PayloadStack.displayName = 'PayloadStack';
 
 const ApiPayload = () => (
-  <Stack>
+  <Stack flex={1}>
     <HandleSDKEvents />
-    <DeviceProvider>
+    <Stack flex={1} padding="$2">
+      <DeviceList />
       <CommonParamsProvider>
         <CommonParamsView />
         <ExpandModeProvider>
-          <PanelView title="API Payload">
-            <FlatList
-              data={playgroundConfig}
-              renderItem={({ item }) => <ApiPayloadItem item={item} />}
-              keyExtractor={item => item.title}
-              initialNumToRender={5}
-              maxToRenderPerBatch={3}
-            />
-          </PanelView>
+          <FlatList
+            style={{ flex: 1 }}
+            data={playgroundConfig}
+            renderItem={({ item }) => <ApiPayloadItem item={item} />}
+            keyExtractor={item => item.title}
+            ListHeaderComponent={<PanelView title="API Payload" />}
+            ListFooterComponent={
+              <>
+                <UploadScreen />
+                <ChangeScreenComponent />
+              </>
+            }
+            initialNumToRender={1}
+            maxToRenderPerBatch={1}
+            windowSize={5}
+          />
         </ExpandModeProvider>
-        <UploadScreen />
-        <ChangeScreenComponent />
       </CommonParamsProvider>
-    </DeviceProvider>
+    </Stack>
   </Stack>
 );
 
 export default function ApiPayloadScreen() {
   return (
-    <PageView scrollable={!!(Platform.OS === 'ios' || Platform.OS === 'android')}>
+    <PageView scrollable={false}>
       <ApiPayload />
     </PageView>
   );

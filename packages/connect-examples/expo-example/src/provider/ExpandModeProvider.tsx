@@ -21,7 +21,7 @@ export const ExpandModeProvider: React.FC<{ children: ReactNode }> = ({ children
 
   return (
     <ExpandModeContext.Provider value={providerValue}>
-      <Stack>
+      <Stack flex={1}>
         <Button
           id="expand-mode-button"
           zIndex={100}
