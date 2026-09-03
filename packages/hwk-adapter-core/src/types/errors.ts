@@ -142,6 +142,8 @@ export enum HardwareErrorCode {
    * the mismatch on the device and never return it.
    */
   PinMismatch = 10404,
+  /** Standard wallet is unavailable while Trezor enforces on-device passphrase entry. */
+  PassphraseAlwaysOnDevice = 10405,
 
   // --- 10500s App lifecycle ---
   /** Chain app NOT INSTALLED on device. User must install via Ledger Live. */
@@ -209,6 +211,7 @@ export const ORPHAN_ELIGIBLE_ERROR_CODES: number[] = [
   HardwareErrorCode.BleBondInvalid,
   HardwareErrorCode.BleConnectFailed,
   HardwareErrorCode.BlePairingCancelled,
+  HardwareErrorCode.PassphraseAlwaysOnDevice,
 ];
 
 // ---------------------------------------------------------------------------
