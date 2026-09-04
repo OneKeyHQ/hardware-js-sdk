@@ -11,6 +11,9 @@ jest.mock('../src/data/config', () => ({
 
 const signerA = '11'.repeat(32);
 const signerB = '22'.repeat(32);
+const requiredSigners = Array.from({ length: 11 }, (_, index) =>
+  index.toString(16).padStart(64, '0')
+);
 
 const createMethod = (overrides: Record<string, unknown> = {}) =>
   new SolSignOffchainMessage({
@@ -23,13 +26,13 @@ const createMethod = (overrides: Record<string, unknown> = {}) =>
       messageFormat: SolanaOffChainMessageFormat.V0_LIMITED_UTF8,
       applicationDomainHex: `0x${'aa'.repeat(32)}`,
       sourceFingerprint: 0x12345678,
-      requiredSigners: [`0x${signerA.toUpperCase()}`, signerB],
+      requiredSigners,
       ...overrides,
     },
   });
 
 describe('SolSignOffchainMessage', () => {
-  test('maps V1 public parameters to Protocol V2 fields', async () => {
+  test('maps V1 parameters without imposing a host-side signer count limit', async () => {
     const method = createMethod();
     method.init();
 
@@ -46,7 +49,7 @@ describe('SolSignOffchainMessage', () => {
       message_format: SolanaOffChainMessageFormat.V0_LIMITED_UTF8,
       application_domain: 'aa'.repeat(32),
       source_fingerprint: 0x12345678,
-      required_signers: [signerA, signerB],
+      required_signers: requiredSigners,
     });
   });
 
@@ -54,12 +57,6 @@ describe('SolSignOffchainMessage', () => {
     { requiredSigners: ['11'], error: '32-byte hex public key' },
     { requiredSigners: [signerB, signerA], error: 'strictly sorted and unique' },
     { requiredSigners: [signerA, signerA], error: 'strictly sorted and unique' },
-    {
-      requiredSigners: Array.from({ length: 11 }, (_, index) =>
-        index.toString(16).padStart(64, '0')
-      ),
-      error: 'at most 10 entries',
-    },
   ])('rejects invalid required signers: $error', ({ requiredSigners, error }) => {
     expect(() => createMethod({ requiredSigners }).init()).toThrow(error);
   });

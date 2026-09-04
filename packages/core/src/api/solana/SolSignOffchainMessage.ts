@@ -8,15 +8,9 @@ import type { SolanaSignOffChainMessage as HardwareSolSignOffChainMessage } from
 
 const SOLANA_PUBLIC_KEY_LENGTH = 32;
 const SOLANA_APPLICATION_DOMAIN_LENGTH = 32;
-const MAX_REQUIRED_SIGNERS = 10;
 
 const normalizeRequiredSigners = (requiredSigners?: unknown[]): string[] | undefined => {
   if (!requiredSigners) return undefined;
-  if (requiredSigners.length > MAX_REQUIRED_SIGNERS) {
-    throw invalidParameter(
-      `Parameter [requiredSigners] supports at most ${MAX_REQUIRED_SIGNERS} entries.`
-    );
-  }
 
   const normalized = requiredSigners.map((signer, index) => {
     if (
