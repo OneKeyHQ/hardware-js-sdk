@@ -29,6 +29,8 @@ const UNTRUNCATED_PREVIEW_OPTIONS: JsonPreviewOptions = {
   maxStringLength: Number.MAX_SAFE_INTEGER,
 };
 
+export const MAX_EDITABLE_JSON_LENGTH = 100_000;
+
 function normalizeOptions(options: JsonPreviewOptions = {}): Required<JsonPreviewOptions> {
   return {
     ...DEFAULT_PREVIEW_OPTIONS,
@@ -180,6 +182,24 @@ export function getJsonPreview(value: unknown, options?: JsonPreviewOptions): Js
 
 export function formatJsonPreview(value: unknown, options?: JsonPreviewOptions): string {
   return getJsonPreview(value, options).text;
+}
+
+export function getEditableJsonPreview(value: unknown): JsonPreviewResult {
+  if (!isLazyParameterValue(value)) {
+    try {
+      const serializedValue = JSON.stringify(getParameterDisplayValue(value), null, 2);
+      if (
+        typeof serializedValue === 'string' &&
+        serializedValue.length <= MAX_EDITABLE_JSON_LENGTH
+      ) {
+        return { text: serializedValue, truncated: false, value };
+      }
+    } catch {
+      // Fall back to a bounded preview for values that JSON cannot serialize directly.
+    }
+  }
+
+  return getJsonPreview(value);
 }
 
 export function getUntruncatedJsonPreview(

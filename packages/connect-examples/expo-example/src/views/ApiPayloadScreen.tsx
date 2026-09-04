@@ -199,16 +199,20 @@ const ApiPayload = () => (
   <Stack flex={1}>
     <HandleSDKEvents />
     <Stack flex={1} padding="$2">
-      <DeviceList />
       <CommonParamsProvider>
-        <CommonParamsView />
         <ExpandModeProvider>
           <FlatList
             style={{ flex: 1 }}
             data={playgroundConfig}
             renderItem={({ item }) => <ApiPayloadItem item={item} />}
             keyExtractor={item => item.title}
-            ListHeaderComponent={<PanelView title="API Payload" />}
+            ListHeaderComponent={
+              <>
+                <DeviceList />
+                <CommonParamsView />
+                <PanelView title="API Payload" />
+              </>
+            }
             ListFooterComponent={
               <>
                 <UploadScreen />
