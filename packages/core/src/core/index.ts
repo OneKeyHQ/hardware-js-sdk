@@ -978,6 +978,12 @@ export function isTerminalBleStaleBondError(error: unknown) {
   return isBleStaleBondHardwareError(error);
 }
 
+export function isDeviceIdentityMismatchError(error: unknown) {
+  return (
+    (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.DeviceCheckDeviceIdError
+  );
+}
+
 /**
  * If the Bluetooth connection times out, retry up to 6 times
  * @param retryCount - Current retry count (default 0)
@@ -1290,7 +1296,8 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceInterruptedFromUser,
             HardwareErrorCode.CallQueueActionCancelled,
           ].includes(error.errorCode) ||
-          isTerminalBleStaleBondError(error)
+          isTerminalBleStaleBondError(error) ||
+          isDeviceIdentityMismatchError(error)
         ) {
           reject(error);
           return;

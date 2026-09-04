@@ -5,6 +5,7 @@ import {
   cancel,
   initConnector,
   initCore,
+  isDeviceIdentityMismatchError,
   isMissingDetectedProtocolV2Error,
   isRetryableBleConnectionError,
   isRetryableBleProtocolV2ProbeError,
@@ -399,6 +400,13 @@ describe('public device lifecycle events', () => {
     };
 
     expect(isTerminalBleStaleBondError(error)).toBe(expected);
+  });
+
+  test.each([
+    [HardwareErrorCode.DeviceCheckDeviceIdError, true],
+    [HardwareErrorCode.DeviceNotFound, false],
+  ] as const)('treats device identity error code %s as a mismatch: %s', (errorCode, expected) => {
+    expect(isDeviceIdentityMismatchError({ errorCode })).toBe(expected);
   });
 
   test('converts an internal transport disconnect into a public KnownDevice snapshot', () => {

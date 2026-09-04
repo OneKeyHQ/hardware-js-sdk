@@ -385,6 +385,47 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
+  test.each([
+    [
+      'ios',
+      'OneKey Neo',
+      {
+        iosErrorCode: 14,
+        reason: 'Peer removed pairing information',
+      },
+      HardwareErrorCode.BlePeerRemovedPairingInformation,
+    ],
+    [
+      'android',
+      'OneKey Pro 2',
+      {
+        androidErrorCode: 5,
+        reason: 'Connection state changed with status 5',
+      },
+      HardwareErrorCode.BleDeviceBondError,
+    ],
+  ] as const)(
+    'maps a %s %s stale bond during connect before protocol detection',
+    async (platform, deviceName, nativeError, errorCode) => {
+      setPlatformOS(platform);
+      const { transport, uuid, device } = createHarness({ deviceName });
+      const BleErrorMock = jest.requireMock('react-native-ble-plx').BleError as new (
+        message: string
+      ) => Error;
+      const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+      pairDeviceMock.mockClear();
+
+      device.isConnected.mockResolvedValueOnce(false);
+      device.connect = jest
+        .fn()
+        .mockRejectedValue(Object.assign(new BleErrorMock(nativeError.reason), nativeError));
+
+      await expect(transport.acquire({ uuid })).rejects.toMatchObject({ errorCode });
+      expect(pairDeviceMock).not.toHaveBeenCalled();
+      expect(transport.getProtocolType(uuid)).toBeUndefined();
+    }
+  );
+
   test('closes the Android GATT link when system bonding fails', async () => {
     setPlatformOS('android');
     const { transport, uuid, device, bleManager } = createHarness();

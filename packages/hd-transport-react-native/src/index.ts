@@ -320,9 +320,9 @@ const resolveNegotiatedMtu = (device: Device) => requestNegotiatedMtu(device, 'c
 
 type IOBleErrorRemap = Error | BleError | null | undefined;
 
-function remapError(error: IOBleErrorRemap, mapProtocolV2StaleBond: boolean) {
+function remapError(error: IOBleErrorRemap) {
   if (error instanceof BleError) {
-    if (mapProtocolV2StaleBond && isNativeBleStaleBondError(error)) {
+    if (isNativeBleStaleBondError(error)) {
       throw toBleStaleBondHardwareError(error);
     }
 
@@ -1015,7 +1015,7 @@ export default class ReactNativeBleTransport {
           Log?.debug('device already connected');
           throw ERRORS.TypedError(HardwareErrorCode.BleAlreadyConnected);
         } else {
-          remapError(e, shouldMapProtocolV2StaleBond);
+          remapError(e);
         }
       }
     }
@@ -1059,7 +1059,7 @@ export default class ReactNativeBleTransport {
             }
           }
         } else {
-          remapError(e, shouldMapProtocolV2StaleBond);
+          remapError(e);
         }
       }
     }
