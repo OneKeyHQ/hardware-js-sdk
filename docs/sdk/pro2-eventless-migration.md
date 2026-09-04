@@ -1,64 +1,54 @@
-# Pro2 无固件中间 Event：SDK / App / firmware 迁移清单
+# Pro2 eventless firmware UI: SDK / App / firmware migration checklist
 
-> 文档类型：迁移方案
-> 适用读者：firmware、SDK Core 与 App 硬件接入维护者
-> 内容状态：当前实现
-> 代码范围：`submodules/firmware-pro2`、`packages/core`、App Hardware UI
-> 最后代码核验：2026-07-30
-> 前置阅读：[SDK Core 运行时](./core-runtime.md)、[钱包 Session 与安全](../device/wallet-session-and-security.md)
+> Document type: migration plan
+> Audience: firmware, SDK Core, and App hardware-integration maintainers
+> Status: current implementation
+> Code scope: `submodules/firmware-pro2`, `packages/core`, App Hardware UI
+> Last code review: 2026-07-30
+> Read first: [SDK Core runtime](./core-runtime.md), [Wallet Session and security](../device/wallet-session-and-security.md)
 
-> 当前契约：firmware-pro2 `main` 已实现拆分后的
-> `DeviceSessionAskPin/DeviceSessionAskPassphrase/DeviceSessionGet` 与
-> `ProtocolInfoRequest.eventless_wallet_session`。当前实现以
-> [SDK Core 运行时](./core-runtime.md) 和 [Pro2 字段迁移](./pro2-field-migration.md)
-> 为准；本文作为 SDK/App 迁移清单。
+> Current contract: firmware-pro2 `main` already implements the split
+> `DeviceSessionAskPin` / `DeviceSessionAskPassphrase` / `DeviceSessionGet` APIs and
+> `ProtocolInfoRequest.eventless_wallet_session`. Current behavior follows
+> [SDK Core runtime](./core-runtime.md) and [Pro2 field migration](./pro2-field-migration.md).
+> This document is the SDK/App migration checklist.
 
-产品与协议总设计见：
-[Pro2 无固件中间 Event 设计索引](../superpowers/specs/2026-07-16-pro2-eventless-index.md)。
+Product and protocol design index:
+[Pro2 eventless firmware UI design index](../superpowers/specs/2026-07-16-pro2-eventless-index.md).
 
-## 一页结论
+## One-page summary
 
-本次迁移不删除 SDK 与 App 之间的 Event。删除的是 Pro2 firmware 在业务请求中间发送并等待 Host ACK
-的 UI 消息：
+This migration does not remove events between SDK and App. It removes Pro2 firmware UI messages that were sent in the middle of a business request and waited for a Host ACK:
 
-- `PassphraseRequest / PassphraseAck`。
-- `ButtonRequest / ButtonAck`。
-- `PinMatrixRequest / PinMatrixAck`。
+- `PassphraseRequest` / `PassphraseAck`
+- `ButtonRequest` / `ButtonAck`
+- `PinMatrixRequest` / `PinMatrixAck`
 
-当前分层是：
+Current layering:
 
 ```text
 App
-  继续监听 SDK UI Event，并在阻塞选择场景调用 uiResponse()
+  Keep listening to SDK UI events and call uiResponse() for blocking selection
 
 hardware-js-sdk
-  根据 API 参数、Session 状态和 DeviceLocked 合成 Event
-  将用户选择转换为显式 Protocol V2 命令
+  Synthesize events from API params, Session state, and DeviceLocked
+  Convert the user choice into explicit Protocol V2 commands
 
 firmware-pro2
-  收到显式命令后直接显示设备 UI
-  不发送 UI 中间消息，只返回最终业务结果
+  Show device UI after receiving an explicit command
+  Send no UI intermediate messages; return only the final business result
 ```
 
-原 Pro / Protocol V1 保持现有 firmware Event + ACK 流程。App 可以继续使用同一套公共 Event UI，
-SDK 内部根据协议版本选择 Event 来源和后续动作。
+Classic Pro / Protocol V1 keeps the existing firmware Event + ACK flow. The App can keep the same public Event UI. The SDK chooses event source and follow-up action from the protocol version.
 
-### 不是协议消息改名
+### This is not protocol-message renaming
 
-新的 Session 请求不是 `PassphraseAck` 的简单改名：
+The new Session requests are not a rename of `PassphraseAck`:
 
-- `PassphraseAck` 是对 firmware `PassphraseRequest` 的中间回复，只表达 Host Passphrase、设备
-  Passphrase 或 Attach PIN 三种隐藏钱包进入方式。
-- `DeviceSessionAskPassphrase` 与 `DeviceSessionAskPin` 完成验证和钱包切换并返回 `Success`；
-  前者通过必填 `on_device` 区分设备输入与 Host 输入。Host 输入同时携带非空 `passphrase`；
-  设备输入不携带明文。Attach-to-PIN 始终使用 `DeviceSessionAskPin(AttachToPin)`。
-- `DeviceSessionGet({ session_id, btc_test_address })` 承接原
-  `Initialize(session_id, passphrase_state)` 的 Session 恢复语义。V2 只在 AskPassphrase 上携带
-  `seed_domains`：开钱包为 `[Standard]`，Cardano 为 `[Standard, Cardano]`。Get 不携带该字段。
-  Attach PIN 补 Cardano 发送空 Host passphrase 的 AskPassphrase。
-  这不是 `PassphraseAck` 原有能力。
-- `ButtonRequest/ButtonAck` 不改名；它们从 V2 firmware 状态机中删除，设备页面由显式 Ask 命令
-  打开，对 App 的阶段提示由 SDK 合成。
+- `PassphraseAck` replies to firmware `PassphraseRequest` and only encodes three hidden-wallet entry paths: Host Passphrase, on-device Passphrase, or Attach PIN.
+- `DeviceSessionAskPassphrase` and `DeviceSessionAskPin` complete verification and wallet switch and return `Success`. The former uses required `on_device` to distinguish on-device vs Host input. Host input also carries a non-empty `passphrase`. On-device input carries no plaintext. Attach-to-PIN always uses `DeviceSessionAskPin(AttachToPin)`.
+- `DeviceSessionGet({ session_id, btc_test_address })` takes over Session-resume semantics from `Initialize(session_id, passphrase_state)`. V2 carries `seed_domains` only on AskPassphrase: opening a wallet uses `[Standard]`; Cardano uses `[Standard, Cardano]`. Get does not carry that field. Attach PIN plus Cardano sends an empty Host-passphrase AskPassphrase. That is not an original `PassphraseAck` capability.
+- `ButtonRequest` / `ButtonAck` are not renamed. They are removed from the V2 firmware state machine. Device pages are opened by explicit Ask commands. Stage hints to the App are synthesized by the SDK.
 
 ```text
 PassphraseAck(passphrase)                -> DeviceSessionAskPassphrase({ on_device: false, passphrase, seed_domains }) -> Success -> DeviceSessionGet()
@@ -69,39 +59,39 @@ PassphraseAck(on_device_attach_pin)      -> DeviceSessionAskPin(AttachToPin) -> 
 Initialize(session_id, passphrase_state) -> DeviceSessionGet({ session_id, btc_test_address })
 ```
 
-## 不在删除范围
+## Out of deletion scope
 
-- USB/BLE 请求响应与 BLE notification。
-- 文件、固件、资源和 Portfolio 进度。
-- 交易数据分片 Request/Ack。
-- 设备连接、状态和能力事件。
-- SDK 生成的 checking、processing、progress 和 UI Event。
-- `CLOSE_UI_WINDOW/CLOSE_UI_PIN_WINDOW`。
+- USB/BLE request-response and BLE notifications
+- File, firmware, resource, and Portfolio progress
+- Transaction-data fragment Request/Ack
+- Device connect, state, and capability events
+- SDK-generated checking, processing, progress, and UI events
+- `CLOSE_UI_WINDOW` / `CLOSE_UI_PIN_WINDOW`
 
-## 模块迁移总表
+## Module migration table
 
-| 模块         | SDK → App                       | App 响应             | SDK → firmware                                              | firmware 行为                          |
-| ------------ | ------------------------------- | -------------------- | ----------------------------------------------------------- | -------------------------------------- |
-| 钱包 Session | `REQUEST_PASSPHRASE` 阻塞选择   | `RECEIVE_PASSPHRASE` | 切换：`AskPassphrase/AskPin`；获取/恢复：`DeviceSessionGet` | Ask 返回 Success，Get 返回实际 Session |
-| PIN / 解锁   | `REQUEST_PIN` 非阻塞提示        | 无                   | `DeviceSessionAskPin(type)`                                 | 本地按需 PIN/指纹，返回成功或失败      |
-| 地址 / 公钥  | `REQUEST_BUTTON` 非阻塞提示     | 无                   | 原地址/公钥方法                                             | 本地确认，返回最终数据                 |
-| 签名         | `REQUEST_BUTTON` 非阻塞通用提示 | 无                   | 原签名方法 + 数据握手                                       | 本地完成所有确认页                     |
-| 设备管理     | `REQUEST_BUTTON` 非阻塞提示     | 无                   | 页面命令或最终操作命令                                      | 本地设置/危险操作 UI                   |
-| Onboarding   | 可选非阻塞阶段通知              | 无                   | 状态查询/页面命令                                           | 本地流程；状态查询为事实来源           |
-| Cancel       | 关闭 UI 可取消当前调用          | cancel API/调用取消  | `Cancel`                                                    | 关闭当前页面并结束原请求               |
+| Module | SDK → App | App response | SDK → firmware | Firmware behavior |
+| --- | --- | --- | --- | --- |
+| Wallet Session | Blocking `REQUEST_PASSPHRASE` selection | `RECEIVE_PASSPHRASE` | Switch: `AskPassphrase` / `AskPin`; get/resume: `DeviceSessionGet` | Ask returns Success; Get returns the actual Session |
+| PIN / unlock | Non-blocking `REQUEST_PIN` hint | None | `DeviceSessionAskPin(type)` | Local PIN/fingerprint as needed; success or failure |
+| Address / public key | Non-blocking `REQUEST_BUTTON` hint | None | Original address/public-key method | Local confirm; return final data |
+| Signing | Non-blocking generic `REQUEST_BUTTON` hint | None | Original signing method + data handshake | Complete every confirm page locally |
+| Device management | Non-blocking `REQUEST_BUTTON` hint | None | Page command or final operation command | Local settings / dangerous-operation UI |
+| Onboarding | Optional non-blocking stage notice | None | Status query / page command | Local flow; status query is the source of truth |
+| Cancel | Closing UI can cancel the current call | cancel API / call cancel | `Cancel` | Close the current page and end the original request |
 
-## 钱包 Session：兼容现有 App Event UI
+## Wallet Session: keep the existing App Event UI
 
-### App 现有链路
+### Current App path
 
-app-monorepo 已通过以下模块处理硬件钱包选择：
+app-monorepo already handles hardware-wallet selection through:
 
-- `HardwareUiStateContainer.tsx` 监听 `REQUEST_PASSPHRASE`。
-- `HardwareEnterPhase.tsx` 展示 Passphrase/Hidden Wallet PIN 进入方式。
-- `ServiceHardwareUI.ts` 通过 `UI_RESPONSE.RECEIVE_PASSPHRASE` 返回选择。
-- `ServiceAccount.createHWHiddenWallet()` 继续使用 `passphraseState` 标识隐藏钱包。
+- `HardwareUiStateContainer.tsx` listening to `REQUEST_PASSPHRASE`
+- `HardwareEnterPhase.tsx` showing Passphrase / Hidden Wallet PIN entry
+- `ServiceHardwareUI.ts` returning the choice via `UI_RESPONSE.RECEIVE_PASSPHRASE`
+- `ServiceAccount.createHWHiddenWallet()` still identifying hidden wallets with `passphraseState`
 
-Pro2 继续进入这套 Event UI，但 payload 必须声明：
+Pro2 still enters this Event UI, but the payload must declare:
 
 ```ts
 {
@@ -114,23 +104,18 @@ Pro2 继续进入这套 Event UI，但 payload 必须声明：
 }
 ```
 
-App 的 Pro2 分支继续返回现有三种选择形状：
+The App Pro2 branch still returns the existing choice shapes:
 
-- App 输入 Passphrase（通过可选字段发送给 Pro2）。
-- `passphraseOnDevice=true`。
-- `attachPinOnDevice=true`，且 `existsAttachPinUser=true`。
-- 用户取消。
+- App-entered Passphrase (sent to Pro2 through the optional field)
+- `passphraseOnDevice=true`
+- `attachPinOnDevice=true` with `existsAttachPinUser=true`
+- User cancel
 
-SDK 将响应转换为 `DeviceSessionAskPassphrase` 或 `DeviceSessionAskPin(AttachToPin)`；Ask 只返回
-`Success`，之后用空参数 `DeviceSessionGet` 获取实际 Session，不发送 `PassphraseAck`。
-显式 `resume-hidden` 有缓存时先通过带 `session_id` 的 `DeviceSessionGet` 尝试恢复。没有缓存、
-句柄失效或固件返回的实际钱包状态不匹配时，SDK 合成一次 `REQUEST_PASSPHRASE` 让用户重新进入
-目标钱包；最终仍不匹配才报安全错误。`session_id` 只作为恢复提示，钱包身份以
-`deviceId + passphraseState` 校验结果为准。
+The SDK converts the response to `DeviceSessionAskPassphrase` or `DeviceSessionAskPin(AttachToPin)`. Ask returns only `Success`, then empty-param `DeviceSessionGet` reads the actual Session. No `PassphraseAck` is sent. Explicit `resume-hidden` with a cache first tries `DeviceSessionGet` with `session_id`. If there is no cache, the handle is invalid, or firmware's actual wallet state does not match, the SDK synthesizes one `REQUEST_PASSPHRASE` so the user can re-enter the target wallet. A security error is raised only if it still mismatches. `session_id` is only a resume hint. Wallet identity is the `deviceId + passphraseState` check.
 
-### Protocol V2 当前时序
+### Protocol V2 current sequence
 
-标准钱包创建与复用：
+Standard wallet create and reuse:
 
 ```mermaid
 sequenceDiagram
@@ -141,27 +126,26 @@ sequenceDiagram
   App->>SDK: openWalletSession(standard) / useEmptyPassphrase=true
   SDK->>FW: ProtocolInfoRequest(eventless_wallet_session=true)
   FW-->>SDK: ProtocolInfo
-  alt 首次或标准缓存状态错配
+  alt First open or standard-cache mismatch
     SDK->>FW: DeviceSessionAskPin(Main)
-    Note right of FW: 仅设备需要解锁时显示 Main PIN UI
+    Note right of FW: Show Main PIN UI only when the device needs unlock
     FW-->>SDK: Success
     SDK->>FW: DeviceStatusGet
     FW-->>SDK: DeviceStatus
     SDK->>FW: DeviceSessionGet()
     FW-->>SDK: DeviceSession(session_id, btc_test_address)
-    SDK->>SDK: 更新标准钱包内部索引
-  else 设备已解锁且标准缓存有效
+    SDK->>SDK: Update the internal standard-wallet index
+  else Device unlocked and standard cache valid
     SDK->>FW: DeviceSessionGet(cached standard session_id)
     FW-->>SDK: DeviceSession(session_id, btc_test_address)
-    SDK->>SDK: 校验 btc_test_address 并刷新索引
+    SDK->>SDK: Verify btc_test_address and refresh the index
   end
   SDK-->>App: walletType=standard + passphraseState
 ```
 
-这里的标准索引只定位固件真实返回的 Session。先访问隐藏钱包 B、再执行多次标准钱包业务调用，
-不会删除 B 的 `deviceKey + passphraseState` 缓存；之后仍可独立恢复 B。
+The standard index only locates the Session firmware actually returned. Visiting hidden wallet B and then running several standard-wallet business calls does not delete B's `deviceKey + passphraseState` cache. B can still be resumed independently.
 
-隐藏钱包创建与恢复：
+Hidden wallet create and resume:
 
 ```mermaid
 sequenceDiagram
@@ -172,8 +156,8 @@ sequenceDiagram
   App->>SDK: openWalletSession(select-hidden)
   SDK->>FW: ProtocolInfoRequest(eventless_wallet_session=true)
   FW-->>SDK: ProtocolInfo
-  SDK-->>App: REQUEST_PASSPHRASE（SDK 合成）
-  App->>SDK: RECEIVE_PASSPHRASE（Host / Attach PIN）
+  SDK-->>App: REQUEST_PASSPHRASE (SDK synthesized)
+  App->>SDK: RECEIVE_PASSPHRASE (Host / Attach PIN)
   alt Host Passphrase
     SDK->>FW: DeviceSessionAskPassphrase(passphrase)
   else Attach PIN
@@ -186,26 +170,26 @@ sequenceDiagram
   FW-->>SDK: DeviceSession(session_id, btc_test_address)
   SDK-->>App: walletType + passphraseState
 
-  Note over App,FW: 首次恢复不经过 REQUEST_PASSPHRASE
+  Note over App,FW: First resume does not go through REQUEST_PASSPHRASE
   App->>SDK: openWalletSession(resume-hidden, wallet binding)
   SDK->>FW: DeviceSessionGet(session_id)
-  FW-->>SDK: 当前实际 DeviceSession(session_id, btc_test_address)
-  alt passphraseState 不匹配
-    SDK-->>App: REQUEST_PASSPHRASE（session-recovery）
-    App->>SDK: 重新选择目标钱包
+  FW-->>SDK: Current actual DeviceSession(session_id, btc_test_address)
+  alt passphraseState mismatch
+    SDK-->>App: REQUEST_PASSPHRASE (session-recovery)
+    App->>SDK: Re-select the target wallet
     SDK->>FW: AskPassphrase / AskPin
     FW-->>SDK: Success
     SDK->>FW: DeviceSessionGet()
-    FW-->>SDK: 当前实际 DeviceSession
+    FW-->>SDK: Current actual DeviceSession
   end
   SDK-->>App: walletType=hidden + passphraseState
 ```
 
-## SDK 公共 Event 适配
+## SDK public Event adaptation
 
 ### Protocol V1
 
-保留当前 DeviceCommands 和 Core handler：
+Keep the current DeviceCommands and Core handlers:
 
 ```text
 firmware Request -> Core Event -> App uiResponse -> firmware Ack
@@ -213,170 +197,146 @@ firmware Request -> Core Event -> App uiResponse -> firmware Ack
 
 ### Protocol V2
 
-- `_filterCommonTypes()` 不消费 Pro2 `ButtonRequest/PinMatrixRequest/PassphraseRequest`。
-- 收到这些消息时记录协议回归并结束请求，不能静默 ACK。
-- 不删除公共 `REQUEST_PIN/REQUEST_PASSPHRASE/REQUEST_BUTTON` listener。
-- Event 改由 method lifecycle、unlock coordinator 或 wallet session coordinator 发出。
-- Event payload 带 `source/reason`，App 不应依赖“Event 必然来自 firmware”。
+- `_filterCommonTypes()` does not consume Pro2 `ButtonRequest` / `PinMatrixRequest` / `PassphraseRequest`.
+- Receiving those messages is a protocol regression: log it and end the request. Do not silently ACK.
+- Do not remove public `REQUEST_PIN` / `REQUEST_PASSPHRASE` / `REQUEST_BUTTON` listeners.
+- Events are emitted by method lifecycle, the unlock coordinator, or the wallet Session coordinator.
+- Event payloads carry `source/reason`. The App must not assume "the event always comes from firmware".
 
-### 阻塞与非阻塞
-
-```text
-阻塞选择 Event
-  emit -> 建立受控 UI 等待 -> uiResponse -> 显式业务命令
-
-非阻塞提示 Event
-  emit -> 直接发送业务命令 -> 等待最终结果
-```
-
-当前 Core `_uiPromises` 只按 `UI_RESPONSE` 类型匹配。新增合成阻塞 Event 时必须继续串行，或增加
-requestId/connectId 关联，并在取消、超时、断连和方法结束时清理。
-
-## 自动解锁
+### Blocking vs non-blocking
 
 ```text
-业务请求
-  -> 钱包业务或显式受保护管理方法：fresh Status -> 校验设备身份 -> 按需解锁
-  -> Wallet Session -> method.run() 一次
-  -> 业务阶段 DeviceLocked：直接失败，不解锁、不重放
+Blocking selection event
+  emit -> create a controlled UI wait -> uiResponse -> explicit business command
+
+Non-blocking hint event
+  emit -> send the business command immediately -> wait for the final result
 ```
 
-- App 不回传 PIN，也不重发业务请求。
-- Pro2 `REQUEST_PIN` 是非阻塞设备提示。
-- 钱包业务由 `useDevicePassphraseState=true` 自动进入调用前解锁，不维护方法名白名单；非钱包但
-  固件要求解锁的管理方法显式使用 `unlock-before-run`。不存在 `retry-on-locked`。
-- all-network root 与内部子方法共享一次 Status/Unlock preflight，每个子链仍独立恢复 Wallet Session。
-- bootloader/romloader 跳过 Status/Unlock，Protocol V1 保持原流程。
-- `uploadPortfolio` 关闭钱包 Session 处理、使用 `unlockPolicy='none'`，并通过
-  `protocolV2UiMode='none'` 关闭普通方法交互提示；SDK 不会为该方法主动发送
-  `DeviceSessionAskPin`，文件写入与应用流程只执行一次。
+Current Core `_uiPromises` match only by `UI_RESPONSE` type. New synthesized blocking events must stay serial, or add requestId/connectId correlation, and must be cleaned up on cancel, timeout, disconnect, and method end.
 
-## 地址、公钥、签名和设备管理
+## Auto unlock
 
-这些场景统一使用 SDK 合成的非阻塞 `REQUEST_BUTTON`：
+```text
+Business request
+  -> Wallet business or an explicitly protected management method: fresh Status -> verify device identity -> unlock if needed
+  -> Wallet Session -> method.run() once
+  -> DeviceLocked during the business phase: fail immediately; do not unlock or replay
+```
 
-- 地址/公钥：仅 `showOnOneKey=true` 时发送。
-- 签名：进入设备签名交互时发送一次通用提示，不逐页复刻输出/费用/风险 Button code。
-- 设备管理：根据页面导航或危险操作发送；明确区分“页面已接受”和“操作已完成”。
-- Change PIN：公共 `deviceChangePin(remove=false)` 在 Pro2 上路由到
-  `DeviceSettingsPageShow(DevicePinChange)`，成功表示页面已接受；`remove=true` 当前不支持。
-- Wipe：公共 `deviceWipe()` 在 Pro2 上路由到 `DeviceSettingsPageShow(DeviceReset)`，成功表示擦除确认页
-  已打开；V1 仍保留 `WipeDevice` 最终操作语义。
+- The App does not send PIN back and does not resend the business request.
+- Pro2 `REQUEST_PIN` is a non-blocking device hint.
+- Wallet business auto-enters pre-call unlock via `useDevicePassphraseState=true` and does not maintain a method-name allowlist. Non-wallet management methods that firmware requires to unlock use `unlock-before-run` explicitly. There is no `retry-on-locked`.
+- An all-network root and its inner sub-methods share one Status/Unlock preflight. Each child chain still resumes Wallet Session independently.
+- bootloader / romloader skip Status/Unlock. Protocol V1 keeps its original flow.
+- `uploadPortfolio` disables wallet Session handling and uses `unlockPolicy='none'`. The default `uiMode='silent'` maps to `protocolV2UiMode='none'`; `uiMode='progress'` maps to `protocolV2UiMode='auto'` only to expose transfer progress and lifecycle close events. Neither mode emits `DeviceSessionAskPin`, and the file-write/apply sequence runs only once.
 
-App 继续展示现有设备确认 UI，不调用 `uiResponse()`。成功、失败、取消、超时和断连时统一关闭。
+## Address, public key, signing, and device management
 
-Portfolio 是例外：firmware 的 `PortfolioUpdate` 直接校验并应用数据后返回最终结果，不打开确认页面；
-SDK 不合成交互 Event，也不发送文件分片进度 Event。
+These scenes use one SDK-synthesized non-blocking `REQUEST_BUTTON`:
 
-## Onboarding 安全边界
+- Address / public key: emit only when `showOnOneKey=true`.
+- Signing: emit one generic hint when entering device signing interaction. Do not recreate output / fee / risk Button codes page by page.
+- Device management: emit from page navigation or a dangerous operation. Distinguish "page accepted" from "operation completed".
+- Change PIN: public `deviceChangePin(remove=false)` on Pro2 routes to `DeviceSettingsPageShow(DevicePinChange)`. Success means the page was accepted. `remove=true` is not currently supported.
+- Wipe: public `deviceWipe()` on Pro2 routes to `DeviceSettingsPageShow(DeviceReset)`. Success means the wipe confirmation page opened. V1 keeps `WipeDevice` final-operation semantics.
 
-- Pro2 禁止 `WordRequest/WordAck` 与 `EntropyRequest/EntropyAck`。
-- SDK 不得为兼容 App 而合成这些敏感数据请求。
-- `OnboardingStatus` 是事实来源。
-- SDK 可以发不含敏感信息的阶段通知，但 App 必须能通过查询恢复。
+The App keeps showing the existing device-confirm UI and does not call `uiResponse()`. Close uniformly on success, failure, cancel, timeout, and disconnect.
 
-## Cancel 与 UI 生命周期
+Portfolio is the exception: firmware `PortfolioUpdate` validates and applies data, then returns the final result without opening a confirm page. The SDK synthesizes no interaction event. File-chunk progress events are sent only when `uiMode='progress'`.
 
-Event UI 仍是有效取消入口：
+## Onboarding security boundary
 
-- 阻塞钱包选择 UI 关闭：结束 UI Promise；设备命令已开始时同时发送 `Cancel`。
-- 非阻塞设备提示 UI 关闭：取消当前 API 调用并发送 `Cancel`。
-- Onboarding/进度等状态通知普通关闭：不默认取消后台任务。
-- `CLOSE_UI_WINDOW` 是 SDK → App 的关闭通知，App 收到后不得反向触发第二次 Cancel。
+- Pro2 forbids `WordRequest` / `WordAck` and `EntropyRequest` / `EntropyAck`.
+- The SDK must not synthesize these sensitive-data requests for App compatibility.
+- `OnboardingStatus` is the source of truth.
+- The SDK may emit stage notices that contain no sensitive data, but the App must be able to recover by query.
 
-Cancel 必须绑定当前设备和 Transport source；断连时清理请求、UI Promise 和提示状态。
+## Cancel and UI lifecycle
 
-## firmware-pro2 实施清单
+Event UI remains a valid cancel entry:
 
-- 实现 `DeviceSessionAskPassphrase`、带 `Any/Main/AttachToPin` 类型的 `DeviceSessionAskPin`，
-  以及可选 `session_id` 的 `DeviceSessionGet`。
-- Ask 请求只负责切换或建立钱包上下文并返回 `Success`；`DeviceSessionGet` 是唯一返回
-  `session_id + btc_test_address` 的接口。
-- `DeviceSessionGet()` 返回当前实际 Session；`DeviceSessionGet(session_id)` 尝试恢复目标 Session，
-  但无论是否命中，都返回最终实际 Session，不把正常过期或错配编码为 `InvalidSession`。
-- 删除 seed session 中 Passphrase/Button Host ACK 状态。
-- `DeviceSessionAskPin` 直接显示设备 PIN/指纹页面。
-- 地址、公钥、签名、设置和危险操作直接显示本地 UI。
-- locked 错误在方法副作用前返回。
-- 保留签名业务数据 Request/Ack。
-- `Cancel` 能关闭当前 source 的页面并清理敏感状态。
-- 正确维护 `attach_to_pin_enabled`、`unlocked_by_attach_to_pin` 和 onboarding 查询状态。
-- 不发送 `WordRequest/EntropyRequest`。
+- Closing a blocking wallet-selection UI ends the UI Promise and also sends `Cancel` if a device command has already started.
+- Closing a non-blocking device-hint UI cancels the current API call and sends `Cancel`.
+- Ordinary close of onboarding / progress state notices does not cancel background work by default.
+- `CLOSE_UI_WINDOW` is SDK → App. After receiving it, the App must not fire a second Cancel.
 
-## hardware-js-sdk 实施清单
+Cancel must bind the current device and Transport source. On disconnect, clean up requests, UI Promises, and hint state.
 
-- 增加并统一使用钱包 Session coordinator。
-- 标准钱包公共响应固定返回 `passphraseState=null`；隐藏钱包返回非空 `passphraseState`。
-  钱包分类仍只使用 `walletType`，不得根据 `passphraseState` 是否为空反推底层协议。
-- Host Passphrase 映射到
-  `DeviceSessionAskPassphrase({ passphrase, on_device: false, seed_domains })`；设备端 Passphrase 映射到
-  `DeviceSessionAskPassphrase({ on_device: true, seed_domains })`；Attach PIN 映射到
-  `DeviceSessionAskPin(AttachToPin)`。Ask 成功后统一调用空参数 `DeviceSessionGet()`；Get 不携带
-  `seed_domains`。Attach PIN 补 Cardano 再发送空 Host passphrase 的 `AskPassphrase`。
-- Host Passphrase 先做 NFKD 规范化，并校验为 1–50 个 UTF-8 字节且不含 NUL。
-- `DeviceWalletSessionStore` 以 `deviceKey + passphraseState` 保存真实钱包映射，并为每台设备维护
-  一个指向真实标准钱包记录的内部索引；该索引只由显式标准钱包意图读取。
-- Store 不实现 LRU 或固件容量镜像；Session 的创建、容量和淘汰由硬件管理，SDK 只在固件拒绝句柄
-  或钱包身份校验失败时清理对应记录。
-- Get 返回状态与业务预期不匹配时只恢复一次：标准钱包走 AskMain，隐藏钱包走统一钱包选择；
-  第二次仍不匹配才抛出 `DeviceCheckPassphraseStateError`。
-- 复用公共 UI Event 层，不伪造 Transport protobuf Request。
-- V2 收到 firmware UI 中间消息时报告协议错误。
-- 为合成 Event 增加稳定 `source/reason/device` payload。
-- 区分阻塞选择 Event 与非阻塞提示 Event。
-- 设备 Passphrase 必须合成一次 `REQUEST_PASSPHRASE_ON_DEVICE`；Attach PIN 必须合成一次兼容现有
-  App 的设备 PIN 阶段提示。
-- 自动解锁只发生在业务发送前；业务 callback 和已开始的多步骤操作都不重放。
-- 保留签名数据握手、进度、Transport 和生命周期事件。
-- 统一 cancel/timeout/disconnect 的 UI Promise 和 Event 清理。
-- `DeviceSessionGet({ session_id })` 后校验 `btc_test_address`，不匹配时禁止继续业务。
+## firmware-pro2 checklist
 
-## app-monorepo 实施清单
+- Implement `DeviceSessionAskPassphrase`, `DeviceSessionAskPin` with `Any` / `Main` / `AttachToPin`, and `DeviceSessionGet` with optional `session_id`.
+- Ask only switches or establishes wallet context and returns `Success`. `DeviceSessionGet` is the only interface that returns `session_id + btc_test_address`.
+- `DeviceSessionGet()` returns the current actual Session. `DeviceSessionGet(session_id)` tries to resume the target Session, but always returns the final actual Session. Normal expiry or mismatch is not encoded as `InvalidSession`.
+- Remove Passphrase/Button Host ACK state from the seed session.
+- `DeviceSessionAskPin` shows the device PIN/fingerprint page directly.
+- Address, public key, signing, settings, and dangerous operations show local UI directly.
+- Locked errors return before method side effects.
+- Keep signing business-data Request/Ack.
+- `Cancel` can close the current source's page and clear sensitive state.
+- Maintain `attach_to_pin_enabled`, `unlocked_by_attach_to_pin`, and onboarding query state correctly.
+- Do not send `WordRequest` / `EntropyRequest`.
 
-- 保留现有 Hardware UI Event 容器和 `uiResponse()` 通道。
-- `source/reason` 仍只作为可选文案增强。
-- Pro2 主 PIN 与 Hidden Wallet PIN 只在设备端输入；Passphrase 可在 App 或设备端输入。
-- Hidden Wallet PIN 入口由 `existsAttachPinUser` 决定。
-- `REQUEST_BUTTON/REQUEST_PIN` 的 Pro2 非阻塞场景不发送 `uiResponse()`。
-- 用户关闭硬件交互 UI 时取消当前调用；收到 `CLOSE_UI_WINDOW` 时只幂等收起。
-- App 继续保存 `passphraseState`；`openWalletSession()` 不再返回 firmware `session_id`，
-  App 数据库也不得保存该内部值。
-- 现有 App 可继续使用 `getPassphraseState()`；Pro2 的协议分流由 Core 完成。新流程优先使用
-  `openWalletSession()` 显式表达标准、选择隐藏钱包或恢复隐藏钱包。
-- 不把 onboarding 阶段 Event 当成唯一状态来源。
+## hardware-js-sdk checklist
 
-## 回归测试
+- Add and uniformly use a wallet Session coordinator.
+- Standard-wallet public responses always return `passphraseState=null`. Hidden wallets return a non-empty `passphraseState`. Wallet classification still uses only `walletType`. Do not infer the underlying protocol from whether `passphraseState` is empty.
+- Host Passphrase maps to `DeviceSessionAskPassphrase({ passphrase, on_device: false, seed_domains })`. On-device Passphrase maps to `DeviceSessionAskPassphrase({ on_device: true, seed_domains })`. Attach PIN maps to `DeviceSessionAskPin(AttachToPin)`. After Ask succeeds, always call empty-param `DeviceSessionGet()`. Get does not carry `seed_domains`. Attach PIN plus Cardano then sends empty Host-passphrase `AskPassphrase`.
+- NFKD-normalize Host Passphrase first and require 1–50 UTF-8 bytes with no NUL.
+- `DeviceWalletSessionStore` keeps real wallet mappings by `deviceKey + passphraseState` and maintains one internal index per device that points at the real standard-wallet record. That index is read only by explicit standard-wallet intent.
+- The store does not implement LRU or a firmware-capacity mirror. Session create, capacity, and eviction are owned by hardware. The SDK only clears a record when firmware rejects the handle or wallet-identity check fails.
+- If Get state does not match business expectation, recover once: standard wallets go AskMain; hidden wallets go unified wallet selection. A second mismatch throws `DeviceCheckPassphraseStateError`.
+- Reuse the public UI Event layer. Do not forge Transport protobuf Requests.
+- Report a protocol error if V2 receives a firmware UI intermediate message.
+- Give synthesized events a stable `source/reason/device` payload.
+- Distinguish blocking selection events from non-blocking hint events.
+- On-device Passphrase must synthesize one `REQUEST_PASSPHRASE_ON_DEVICE`. Attach PIN must synthesize one device PIN stage hint compatible with the current App.
+- Auto unlock happens only before the business command is sent. Business callbacks and multi-step operations that have already started are not replayed.
+- Keep signing data handshake, progress, Transport, and lifecycle events.
+- Unify UI Promise and Event cleanup for cancel / timeout / disconnect.
+- After `DeviceSessionGet({ session_id })`, verify `btc_test_address`. On mismatch, do not continue the business call.
 
-### Event 来源与兼容
+## app-monorepo checklist
 
-- V1 仍由 firmware UI 消息触发 Event 并完成 ACK。
-- V2 App 收到同类公共 Event，但 firmware 不产生 UI 中间消息。
-- V2 Event payload 能区分 coordinator/method lifecycle 来源。
-- V2 收到意外 firmware UI Request 时以协议错误结束。
+- Keep the existing Hardware UI Event container and `uiResponse()` channel.
+- `source/reason` remains optional copy enhancement.
+- Pro2 main PIN and Hidden Wallet PIN are on-device only. Passphrase may be entered in the App or on the device.
+- The Hidden Wallet PIN entry is gated by `existsAttachPinUser`.
+- Pro2 non-blocking `REQUEST_BUTTON` / `REQUEST_PIN` scenes do not send `uiResponse()`.
+- Closing the hardware-interaction UI cancels the current call. `CLOSE_UI_WINDOW` only dismisses idempotently.
+- The App still stores `passphraseState`. `openWalletSession()` no longer returns firmware `session_id`, and the App database must not persist that internal value.
+- Existing Apps may keep using `getPassphraseState()`. Pro2 protocol split is done in Core. New flows should prefer `openWalletSession()` to express standard, select-hidden, or resume-hidden explicitly.
+- Do not treat onboarding stage events as the only state source.
 
-### 钱包与解锁
+## Regression tests
 
-- 标准钱包先协商 `eventless_wallet_session=true`；首次或缓存错配时调用
-  `AskPin(Main) -> Get()`，缓存存在时调用 `DeviceSessionGet(session_id)`。标准钱包也返回
-  非空 `passphraseState`，但 `sessionId` 只保留在 Core 内部。
-- 标准钱包 Session 更新、失效或地址校验失败不得清除同设备下的隐藏钱包 Session。
-- Host Passphrase、设备 Passphrase、Attach PIN 三种隐藏钱包选择都返回正确钱包标识。
-- 首次隐藏钱包、Session 恢复、Session 失效重选保持原 API 调用不重放。
-- Passphrase 与对应 Attach PIN 返回相同 `btc_test_address`。
-- 钱包标识不一致时终止业务。
-- locked 后提示、AskPin、内部重试最多一次；取消时不重试。
+### Event source and compatibility
 
-### 非阻塞提示
+- V1 still triggers events from firmware UI messages and completes ACK.
+- V2 App receives the same public events, but firmware produces no UI intermediate messages.
+- V2 event payload can distinguish coordinator vs method-lifecycle source.
+- Unexpected firmware UI Requests on V2 end as a protocol error.
 
-- 地址/公钥仅在 `showOnOneKey=true` 时提示。
-- 每次签名只发预期数量的通用提示，数据 Request/Ack 正常。
-- 设置页 accepted 与最终操作 completed 不混淆。
-- 非阻塞 Event 不创建 `uiResponse` 等待项。
+### Wallet and unlock
 
-### 生命周期与安全
+- Standard wallets negotiate `eventless_wallet_session=true` first. First open or cache mismatch calls `AskPin(Main) -> Get()`. A valid cache calls `DeviceSessionGet(session_id)`. Standard wallets also return a non-empty `passphraseState`, but `sessionId` stays inside Core.
+- Standard-wallet Session update, expiry, or address-check failure must not clear hidden-wallet Sessions on the same device.
+- Host Passphrase, on-device Passphrase, and Attach PIN hidden-wallet choices all return the correct wallet identity.
+- First hidden wallet, Session resume, and Session-expiry reselection keep the original API call and do not replay it.
+- Passphrase and the matching Attach PIN return the same `btc_test_address`.
+- Wallet-identity mismatch terminates the business call.
+- After locked: hint, AskPin, and at most one internal retry. Cancel does not retry.
 
-- UI 取消、设备取消、超时和断连都能结束 App 等待状态。
-- `CLOSE_UI_WINDOW` 不触发重复 Cancel。
-- 多设备、USB/BLE 和同类型 UI 响应不串线。
-- PIN、助记词、熵和完整交易不进入 Event payload 或日志；App 输入的 Passphrase 只存在于
-  `RECEIVE_PASSPHRASE` 与当前 Session 打开请求中，不进入日志或持久化状态。
+### Non-blocking hints
+
+- Address / public key hints only when `showOnOneKey=true`.
+- Each signing emits the expected number of generic hints, and data Request/Ack still works.
+- Settings-page accepted is not confused with final-operation completed.
+- Non-blocking events do not create a `uiResponse` wait item.
+
+### Lifecycle and security
+
+- UI cancel, device cancel, timeout, and disconnect all end the App wait state.
+- `CLOSE_UI_WINDOW` does not trigger a duplicate Cancel.
+- Multi-device, USB/BLE, and same-type UI responses do not cross wires.
+- PIN, mnemonic, entropy, and full transactions do not enter event payloads or logs. App-entered Passphrase exists only in `RECEIVE_PASSPHRASE` and the current Session-open request. It does not enter logs or persisted state.

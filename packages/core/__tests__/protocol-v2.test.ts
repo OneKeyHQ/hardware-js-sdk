@@ -536,6 +536,41 @@ describe('UploadPortfolio', () => {
     });
   });
 
+  test('emits transfer progress when progress UI is requested', async () => {
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ message: { processed_byte: 3 } })
+      .mockResolvedValueOnce({ message: { message: 'Portfolio updated' } });
+    const method = new UploadPortfolio({
+      id: 1,
+      payload: {
+        method: 'uploadPortfolio',
+        packageBase64: 'AQID',
+        uiMode: 'progress',
+      },
+    });
+    (method as any).device = stubPortfolioDevice({ commands: { typedCall } });
+    method.postMessage = jest.fn();
+
+    method.init();
+    await method.run();
+
+    expect(method.unlockPolicy).toBe('none');
+    expect(method.protocolV2UiMode).toBe('auto');
+    expect(method.protocolV2UiInteraction).toBeUndefined();
+    expect(method.payload.emitProgress).toBe(true);
+    expect(method.postMessage).toHaveBeenCalledWith({
+      event: 'UI_EVENT',
+      type: UI_REQUEST.DEVICE_PROGRESS,
+      payload: expect.objectContaining({
+        progress: 100,
+        transferredBytes: 3,
+        totalBytes: 3,
+        elapsedMs: expect.any(Number),
+      }),
+    });
+  });
+
   test('does not apply PortfolioUpdate when staging fails', async () => {
     const typedCall = jest.fn().mockRejectedValue(new Error('write failed'));
     const method = new UploadPortfolio({
