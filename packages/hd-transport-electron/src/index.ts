@@ -10,6 +10,7 @@ export type {
   NobleBleIpcErrorResponse,
   NobleBleWriteOptions,
 } from './types/desktop-api';
+export { invokeNobleBleIpc, isNobleBleIpcErrorResponse } from './types/desktop-api';
 
 export async function initNobleBleSupport(webContents: WebContents) {
   const { setupNobleBleHandlers } = await import('./noble-ble-handler');

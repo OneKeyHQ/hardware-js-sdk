@@ -1,4 +1,5 @@
 import transport, { PROTOCOL_V2_CHANNEL_BLE_UART, bytesToHex } from '@onekeyfe/hd-transport';
+import { invokeNobleBleIpc } from '@onekeyfe/hd-transport-electron/src/types/desktop-api';
 import { EBleDisconnectReason, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import EventEmitter from 'events';
 
@@ -180,6 +181,44 @@ describe('ElectronBleTransport protocol detection', () => {
   afterEach(() => {
     delete (global as any).window;
     jest.clearAllMocks();
+  });
+
+  test('does not treat a structured Noble IPC failure as a successful connect', async () => {
+    const device = { id: 'stale-bond-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.connect.mockImplementation(() =>
+      invokeNobleBleIpc<void>(
+        Promise.resolve({
+          type: 'NobleBleIpcError',
+          success: false,
+          error: {
+            name: 'HardwareError',
+            message: 'Bluetooth pairing information is no longer valid',
+            errorCode: HardwareErrorCode.BleBondInvalid,
+          },
+        })
+      )
+    );
+    const bleTransport = configureTransport(nobleBle);
+
+    await expect(
+      bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleBondInvalid,
+    });
+    expect(nobleBle.subscribe).not.toHaveBeenCalled();
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+  });
+
+  test('sends a native disconnect even before acquire marks the device connected', async () => {
+    const device = { id: 'pending-connect-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle) as any;
+
+    await bleTransport.releaseNative(device.id);
+
+    expect(nobleBle.unsubscribe).not.toHaveBeenCalled();
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
   });
 
   test('keeps raw BLE lifecycle payloads off the public device event channel', async () => {

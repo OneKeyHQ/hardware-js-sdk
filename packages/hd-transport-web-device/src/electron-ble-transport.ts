@@ -407,9 +407,14 @@ export default class ElectronBleTransport {
     } catch (error) {
       this.Log?.error('[Electron BLE] acquire failed:', error);
       try {
-        if (window.desktopApi?.nobleBle && this.connectedDevices.has(uuid)) {
-          await window.desktopApi.nobleBle.unsubscribe(uuid);
-          await window.desktopApi.nobleBle.disconnect(uuid);
+        const nobleBle = window.desktopApi?.nobleBle;
+        if (nobleBle) {
+          if (this.connectedDevices.has(uuid)) {
+            await nobleBle.unsubscribe(uuid).catch(cleanupError => {
+              this.Log?.debug('[Electron BLE] acquire unsubscribe failed:', cleanupError);
+            });
+          }
+          await nobleBle.disconnect(uuid);
         }
       } catch (cleanupError) {
         this.Log?.debug('[Electron BLE] acquire cleanup failed:', cleanupError);
@@ -438,13 +443,16 @@ export default class ElectronBleTransport {
   // Hard teardown, error paths only: a link presumed dead must not be reused.
   private async releaseNative(id: string) {
     try {
-      if (this.connectedDevices.has(id)) {
-        if (window.desktopApi?.nobleBle) {
-          await window.desktopApi.nobleBle.unsubscribe(id);
-          await window.desktopApi.nobleBle.disconnect(id);
+      const nobleBle = window.desktopApi?.nobleBle;
+      if (nobleBle) {
+        if (this.connectedDevices.has(id)) {
+          await nobleBle.unsubscribe(id).catch(error => {
+            this.Log?.debug('[Electron BLE] release unsubscribe failed:', error);
+          });
         }
-        this.cleanupDeviceState(id);
+        await nobleBle.disconnect(id);
       }
+      this.cleanupDeviceState(id);
     } catch (error) {
       this.Log?.error('[Electron BLE] release failed:', error);
       this.cleanupDeviceState(id);

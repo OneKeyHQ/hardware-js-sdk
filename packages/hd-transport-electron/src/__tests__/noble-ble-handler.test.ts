@@ -115,6 +115,29 @@ describe('Electron Noble BLE device discovery', () => {
     });
   });
 
+  test('rejects a structured Noble IPC failure at the preload boundary', async () => {
+    const { invokeNobleBleIpc } = await import('../types/desktop-api');
+
+    await expect(
+      invokeNobleBleIpc(
+        Promise.resolve({
+          type: 'NobleBleIpcError' as const,
+          success: false as const,
+          error: {
+            name: 'HardwareError',
+            message: 'Bluetooth pairing information is no longer valid',
+            errorCode: HardwareErrorCode.BleBondInvalid,
+          },
+        })
+      )
+    ).rejects.toMatchObject({
+      name: 'HardwareError',
+      errorCode: HardwareErrorCode.BleBondInvalid,
+    });
+
+    await expect(invokeNobleBleIpc(Promise.resolve('connected'))).resolves.toBe('connected');
+  });
+
   test('keeps safe pacing by default and allows an explicit high-throughput bypass', async () => {
     const { resolveNobleBleWritePacingDelay } = await import('../noble-ble-handler');
 
@@ -270,6 +293,94 @@ describe('Electron Noble BLE device discovery', () => {
       },
     });
     expect(peripheral.connect).toHaveBeenCalledTimes(1);
+  });
+
+  test('disconnects and settles a pending Noble connect before a late callback arrives', async () => {
+    const handlers = new Map<string, IpcHandler>();
+    const ipcMain = {
+      handle: jest.fn((channel: string, handler: IpcHandler) => {
+        handlers.set(channel, handler);
+      }),
+      removeHandler: jest.fn((channel: string) => {
+        handlers.delete(channel);
+      }),
+    };
+    const noble = new EventEmitter() as EventEmitter & {
+      state: string;
+      startScanning: jest.Mock;
+      stopScanning: jest.Mock;
+    };
+    let stopScanningCallback: (() => void) | undefined;
+    let connectCallback: ((error?: Error) => void) | undefined;
+    let resolveConnectStarted = () => undefined;
+    const connectStarted = new Promise<void>(resolve => {
+      resolveConnectStarted = resolve;
+    });
+    const peripheral = Object.assign(
+      new EventEmitter(),
+      createPeripheral('pending-device', 'Pro2 C3D4'),
+      {
+        connect: jest.fn((callback: (error?: Error) => void) => {
+          connectCallback = callback;
+          resolveConnectStarted();
+        }),
+        disconnect: jest.fn((callback: () => void) => {
+          peripheral.state = 'disconnected';
+          callback();
+        }),
+        discoverServices: jest.fn(),
+      }
+    );
+    noble.state = 'poweredOn';
+    noble.startScanning = jest.fn((_services, _duplicates, callback) => {
+      callback?.();
+      noble.emit('discover', peripheral);
+    });
+    noble.stopScanning = jest.fn(callback => {
+      stopScanningCallback = callback;
+    });
+
+    jest.doMock('@stoprocent/noble', () => noble);
+    jest.doMock('electron', () => ({ ipcMain }));
+    jest.doMock('electron-log', () => ({
+      info: jest.fn(),
+      debug: jest.fn(),
+      error: jest.fn(),
+    }));
+
+    const { setupNobleBleHandlers } = await import('../noble-ble-handler');
+    setupNobleBleHandlers({
+      on: jest.fn(),
+      send: jest.fn(),
+    } as unknown as WebContents);
+
+    const connect = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT);
+    const disconnect = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_DISCONNECT);
+    if (!connect || !disconnect) {
+      throw new Error('Electron Noble BLE handlers were not registered');
+    }
+
+    const connectPromise = Promise.resolve(connect(undefined, peripheral.id));
+    await Promise.resolve();
+    stopScanningCallback?.();
+    await connectStarted;
+
+    await expect(Promise.resolve(disconnect(undefined, peripheral.id))).resolves.toBeUndefined();
+    await expect(connectPromise).resolves.toMatchObject({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: {
+        errorCode: HardwareErrorCode.BleDeviceDisconnected,
+      },
+    });
+    expect(peripheral.disconnect).toHaveBeenCalledTimes(1);
+
+    peripheral.state = 'connected';
+    connectCallback?.();
+    await Promise.resolve();
+
+    expect(peripheral.discoverServices).not.toHaveBeenCalled();
+    expect(peripheral.disconnect).toHaveBeenCalledTimes(2);
   });
 
   test('settles a pending Noble connect with the native disconnect error', () => {

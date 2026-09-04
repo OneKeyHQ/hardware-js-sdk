@@ -116,6 +116,13 @@ let persistentDiscoverListener: ((peripheral: Peripheral) => void) | null = null
 // Device cache and connection state
 const discoveredDevices = new Map<string, Peripheral>();
 const connectedDevices = new Map<string, Peripheral>();
+type PendingDeviceConnection = {
+  peripheral: Peripheral;
+  generation: number;
+  cancel: (error: unknown) => void;
+};
+const connectingDevices = new Map<string, PendingDeviceConnection>();
+let nextConnectionGeneration = 0;
 const pairedDevices = new Set<string>(); // Windows BLE device pairing status tracking
 const deviceCharacteristics = new Map<string, CharacteristicPair>();
 const notificationCallbacks = new Map<string, (data: string) => void>();
@@ -544,6 +551,14 @@ function cleanupDevice(
 
   // 1. Clean up connection state
   if (cleanupConnection) {
+    connectingDevices
+      .get(deviceId)
+      ?.cancel(
+        ERRORS.TypedError(
+          HardwareErrorCode.BleDeviceDisconnected,
+          `Device ${deviceId} disconnected while connecting`
+        )
+      );
     const disconnectEntry = deviceDisconnectListeners.get(deviceId);
     if (disconnectEntry) {
       disconnectEntry.peripheral.removeListener('disconnect', disconnectEntry.listener);
@@ -1727,13 +1742,53 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     return;
   }
 
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     // TypeScript type assertion - peripheral is guaranteed to be defined at this point
     const connectedPeripheral = peripheral as Peripheral;
+    const generation = ++nextConnectionGeneration;
+    let settled = false;
+    const settle = (settler: () => void): boolean => {
+      if (settled) return false;
+      settled = true;
+      if (connectingDevices.get(deviceId)?.generation === generation) {
+        connectingDevices.delete(deviceId);
+      }
+      settler();
+      return true;
+    };
+    const pendingConnection: PendingDeviceConnection = {
+      peripheral: connectedPeripheral,
+      generation,
+      cancel: error => {
+        settle(() => reject(error));
+      },
+    };
+    connectingDevices
+      .get(deviceId)
+      ?.cancel(
+        ERRORS.TypedError(
+          HardwareErrorCode.BleDeviceDisconnected,
+          `Device ${deviceId} connect attempt was superseded`
+        )
+      );
+    connectingDevices.set(deviceId, pendingConnection);
+
     connectedPeripheral.connect(async (error: Error | undefined) => {
       if (error) {
         logger?.error('[NobleBLE] Connection failed:', error);
-        reject(createNobleBleConnectionError(error));
+        settle(() => reject(createNobleBleConnectionError(error)));
+        return;
+      }
+
+      if (!settle(() => undefined)) {
+        const activeConnection = connectingDevices.get(deviceId);
+        if (!activeConnection || activeConnection.peripheral !== connectedPeripheral) {
+          try {
+            connectedPeripheral.disconnect(() => undefined);
+          } catch {
+            // Best-effort cleanup for a stale native callback.
+          }
+        }
         return;
       }
 
@@ -1767,10 +1822,18 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
 
 // Disconnect device
 async function disconnectDevice(deviceId: string): Promise<void> {
-  const peripheral = connectedDevices.get(deviceId);
+  const pendingConnection = connectingDevices.get(deviceId);
+  const peripheral = connectedDevices.get(deviceId) ?? pendingConnection?.peripheral;
   if (!peripheral) {
     return;
   }
+
+  pendingConnection?.cancel(
+    ERRORS.TypedError(
+      HardwareErrorCode.BleDeviceDisconnected,
+      `Device ${deviceId} connection cancelled`
+    )
+  );
 
   const disconnectEntry = deviceDisconnectListeners.get(deviceId);
   if (disconnectEntry) {

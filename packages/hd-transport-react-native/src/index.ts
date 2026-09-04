@@ -1046,16 +1046,18 @@ export default class ReactNativeBleTransport {
             device = await this.connectWithTimeout(uuid, () =>
               disconnectedDevice.connect(fallbackConnectOptions)
             );
-          } catch (e) {
-            Log?.debug('last try to reconnect error: ', e);
+          } catch (fallbackError) {
+            Log?.debug('last try to reconnect error: ', fallbackError);
             // last try to reconnect device if this issue exists
             // https://github.com/dotintent/react-native-ble-plx/issues/426
-            if (e.errorCode === BleErrorCode.OperationCancelled) {
+            if (fallbackError.errorCode === BleErrorCode.OperationCancelled) {
               Log?.debug('last try to reconnect');
               await disconnectedDevice.cancelConnection();
               device = await this.connectWithTimeout(uuid, () =>
                 disconnectedDevice.connect(fallbackConnectOptions)
               );
+            } else {
+              remapError(fallbackError);
             }
           }
         } else {
@@ -1065,6 +1067,12 @@ export default class ReactNativeBleTransport {
     }
 
     if (Platform.OS === 'android') {
+      if (!(await device.isConnected().catch(() => false))) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.BleConnectedError,
+          `Device ${uuid} is not connected before bonding`
+        );
+      }
       // Establish the LE link before createBond(). Without an existing LE ACL,
       // Android TRANSPORT_AUTO can choose BR/EDR for a BLE-only device.
       const connectedDevice = device;

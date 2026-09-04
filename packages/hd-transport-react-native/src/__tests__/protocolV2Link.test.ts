@@ -385,6 +385,51 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
+  test('does not start Android bonding when both reconnect attempts fail', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device } = createHarness();
+    const BleErrorMock = jest.requireMock('react-native-ble-plx').BleError as new (
+      message: string
+    ) => Error;
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+    const firstError = Object.assign(new BleErrorMock('MTU change failed'), {
+      errorCode: 206,
+      reason: 'MTU change failed',
+    });
+    const fallbackError = Object.assign(new BleErrorMock('GATT connect failed'), {
+      errorCode: 205,
+      reason: 'GATT connect failed',
+    });
+
+    device.isConnected.mockResolvedValueOnce(false);
+    device.connect = jest
+      .fn()
+      .mockRejectedValueOnce(firstError)
+      .mockRejectedValueOnce(fallbackError);
+    pairDeviceMock.mockClear();
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleConnectedError,
+    });
+    expect(device.connect).toHaveBeenCalledTimes(2);
+    expect(pairDeviceMock).not.toHaveBeenCalled();
+  });
+
+  test('checks that the Android GATT link is connected before bonding', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device } = createHarness();
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+
+    device.isConnected.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+    device.connect = jest.fn().mockResolvedValue(device);
+    pairDeviceMock.mockClear();
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleConnectedError,
+    });
+    expect(pairDeviceMock).not.toHaveBeenCalled();
+  });
+
   test.each([
     [
       'ios',
