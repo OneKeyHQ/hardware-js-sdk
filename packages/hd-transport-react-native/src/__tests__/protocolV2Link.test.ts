@@ -417,7 +417,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
 
   test('checks that the Android GATT link is connected before bonding', async () => {
     setPlatformOS('android');
-    const { transport, uuid, device } = createHarness();
+    const { transport, uuid, device, bleManager } = createHarness();
     const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
 
     device.isConnected.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
@@ -428,6 +428,8 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       errorCode: HardwareErrorCode.BleConnectedError,
     });
     expect(pairDeviceMock).not.toHaveBeenCalled();
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
+    expect(device.cancelConnection).toHaveBeenCalledTimes(1);
   });
 
   test.each([

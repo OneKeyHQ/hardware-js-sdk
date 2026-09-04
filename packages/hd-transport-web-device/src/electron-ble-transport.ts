@@ -25,7 +25,7 @@ import {
 import { resolveBlePacketCapacity } from './ble-packet-capacity';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
-import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
+import type { DesktopAPI, NobleBleIpcErrorResponse } from '@onekeyfe/hd-transport-electron';
 import type {
   OneKeyDeviceInfo,
   ProtocolType,
@@ -67,6 +67,22 @@ const toBleDescriptor = (
     commType: 'electron-ble',
     ...(protocolType ? { protocolType } : {}),
   } as OneKeyDeviceInfo);
+
+const invokeNobleBle = async <T>(request: Promise<T>): Promise<T> => {
+  const response = await (request as Promise<T | NobleBleIpcErrorResponse>);
+  if (
+    response &&
+    typeof response === 'object' &&
+    'type' in response &&
+    response.type === 'NobleBleIpcError' &&
+    'success' in response &&
+    response.success === false &&
+    'error' in response
+  ) {
+    return Promise.reject(response.error);
+  }
+  return response as T;
+};
 
 const BLE_PACKET_SIZE_FALLBACK = 192;
 const BLE_PACKET_SIZE_MAXIMUM = 244;
@@ -320,7 +336,7 @@ export default class ElectronBleTransport {
       if (!window.desktopApi?.nobleBle) {
         throw new Error('Noble BLE API not available');
       }
-      const devices = await window.desktopApi.nobleBle.enumerate();
+      const devices = await invokeNobleBle(window.desktopApi.nobleBle.enumerate());
       this.Log?.debug(`[Electron BLE] enumerate found ${devices.length} device(s):`);
       for (const dev of devices) {
         this.Log?.debug(`[Electron BLE]   id="${dev.id}" name="${dev.name}"`);
@@ -355,7 +371,7 @@ export default class ElectronBleTransport {
         throw new Error('Noble BLE API not available');
       }
 
-      const device = await window.desktopApi.nobleBle.getDevice(uuid);
+      const device = await invokeNobleBle(window.desktopApi.nobleBle.getDevice(uuid));
       if (!device) {
         throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device ${uuid} not found`);
       }
@@ -367,7 +383,7 @@ export default class ElectronBleTransport {
       }
 
       try {
-        await window.desktopApi.nobleBle.connect(uuid);
+        await invokeNobleBle(window.desktopApi.nobleBle.connect(uuid));
         this.connectedDevices.add(uuid);
       } catch (error) {
         this.handleBluetoothError(error);
@@ -382,7 +398,7 @@ export default class ElectronBleTransport {
       this.v2Assemblers.set(uuid, new ProtocolV2FrameAssembler(PROTOCOL_V2_BLE_FRAME_MAX_BYTES));
 
       try {
-        await window.desktopApi.nobleBle.subscribe(uuid);
+        await invokeNobleBle(window.desktopApi.nobleBle.subscribe(uuid));
       } catch (error) {
         this.handleBluetoothError(error);
       }
@@ -410,11 +426,11 @@ export default class ElectronBleTransport {
         const nobleBle = window.desktopApi?.nobleBle;
         if (nobleBle) {
           if (this.connectedDevices.has(uuid)) {
-            await nobleBle.unsubscribe(uuid).catch(cleanupError => {
+            await invokeNobleBle(nobleBle.unsubscribe(uuid)).catch(cleanupError => {
               this.Log?.debug('[Electron BLE] acquire unsubscribe failed:', cleanupError);
             });
           }
-          await nobleBle.disconnect(uuid);
+          await invokeNobleBle(nobleBle.disconnect(uuid));
         }
       } catch (cleanupError) {
         this.Log?.debug('[Electron BLE] acquire cleanup failed:', cleanupError);
@@ -446,11 +462,11 @@ export default class ElectronBleTransport {
       const nobleBle = window.desktopApi?.nobleBle;
       if (nobleBle) {
         if (this.connectedDevices.has(id)) {
-          await nobleBle.unsubscribe(id).catch(error => {
+          await invokeNobleBle(nobleBle.unsubscribe(id)).catch(error => {
             this.Log?.debug('[Electron BLE] release unsubscribe failed:', error);
           });
         }
-        await nobleBle.disconnect(id);
+        await invokeNobleBle(nobleBle.disconnect(id));
       }
       this.cleanupDeviceState(id);
     } catch (error) {
@@ -478,7 +494,7 @@ export default class ElectronBleTransport {
         }
         return;
       }
-      await release(id, keepSession);
+      await invokeNobleBle(release(id, keepSession));
     } catch (error) {
       this.Log?.error('[Electron BLE] logical release failed:', error);
       this.cleanupDeviceState(id);
@@ -660,14 +676,15 @@ export default class ElectronBleTransport {
     }
 
     try {
-      await nobleBle.write(uuid, hexData, { pacingDelayMs: 0 });
+      await invokeNobleBle(nobleBle.write(uuid, hexData, { pacingDelayMs: 0 }));
     } catch (error) {
       this.handleBluetoothError(error);
     }
   }
 
   private async refreshBlePacketCapacity(uuid: string): Promise<void> {
-    const device = await window.desktopApi?.nobleBle?.getDevice(uuid);
+    const nobleBle = window.desktopApi?.nobleBle;
+    const device = nobleBle ? await invokeNobleBle(nobleBle.getDevice(uuid)) : undefined;
     this.updateBlePacketCapacity(uuid, device?.mtu);
   }
 
@@ -925,7 +942,7 @@ export default class ElectronBleTransport {
         if (hexString.length === 0) {
           throw new Error(`Buffer ${i + 1} is empty`);
         }
-        await window.desktopApi.nobleBle.write(uuid, hexString);
+        await invokeNobleBle(window.desktopApi.nobleBle.write(uuid, hexString));
       }
 
       const response = await Promise.race([

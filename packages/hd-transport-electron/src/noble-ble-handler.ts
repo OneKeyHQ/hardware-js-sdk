@@ -49,7 +49,8 @@ type NobleBleNativeError = Error & {
 export function createNobleBleConnectionError(error: NobleBleNativeError, messagePrefix = '') {
   const errorMessage = error.message;
   const isInvalidMacOsBond =
-    error.nativeErrorCode === 14 && error.nativeErrorDomain === 'CBErrorDomain';
+    (error.nativeErrorCode === 14 && error.nativeErrorDomain === 'CBErrorDomain') ||
+    (error.nativeErrorCode === 15 && error.nativeErrorDomain === 'CBATTErrorDomain');
   if (isInvalidMacOsBond) {
     const nativeErrorMessage = `${messagePrefix}${errorMessage}`;
     return ERRORS.TypedError(
@@ -123,6 +124,66 @@ type PendingDeviceConnection = {
 };
 const connectingDevices = new Map<string, PendingDeviceConnection>();
 let nextConnectionGeneration = 0;
+
+function connectPeripheralWithCancellation(
+  peripheral: Peripheral,
+  deviceId: string,
+  messagePrefix = ''
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const generation = ++nextConnectionGeneration;
+    let settled = false;
+    const settle = (settler: () => void): boolean => {
+      if (settled) return false;
+      settled = true;
+      if (connectingDevices.get(deviceId)?.generation === generation) {
+        connectingDevices.delete(deviceId);
+      }
+      settler();
+      return true;
+    };
+    const pendingConnection: PendingDeviceConnection = {
+      peripheral,
+      generation,
+      cancel: error => {
+        settle(() => reject(error));
+      },
+    };
+    connectingDevices
+      .get(deviceId)
+      ?.cancel(
+        ERRORS.TypedError(
+          HardwareErrorCode.BleDeviceDisconnected,
+          `Device ${deviceId} connect attempt was superseded`
+        )
+      );
+    connectingDevices.set(deviceId, pendingConnection);
+
+    peripheral.connect(error => {
+      if (error) {
+        settle(() => reject(createNobleBleConnectionError(error, messagePrefix)));
+        return;
+      }
+
+      if (
+        !settle(() => {
+          connectedDevices.set(deviceId, peripheral);
+          resolve();
+        })
+      ) {
+        const activeConnection = connectingDevices.get(deviceId);
+        if (!activeConnection || activeConnection.peripheral !== peripheral) {
+          try {
+            peripheral.removeAllListeners('disconnect');
+            peripheral.disconnect(() => undefined);
+          } catch {
+            // Best-effort cleanup for a stale native callback.
+          }
+        }
+      }
+    });
+  });
+}
 const pairedDevices = new Set<string>(); // Windows BLE device pairing status tracking
 const deviceCharacteristics = new Map<string, CharacteristicPair>();
 const notificationCallbacks = new Map<string, (data: string) => void>();
@@ -1326,17 +1387,8 @@ async function forceReconnectPeripheral(peripheral: Peripheral, deviceId: string
   }
 
   // Step 3: Re-establish connection
-  await new Promise<void>((resolve, reject) => {
-    peripheral.connect(error => {
-      if (error) {
-        reject(createNobleBleConnectionError(error));
-        return;
-      }
-      resolve();
-    });
-  });
+  await connectPeripheralWithCancellation(peripheral, deviceId);
   logger?.info('[NobleBLE] Force reconnect successful');
-  connectedDevices.set(deviceId, peripheral);
 
   // Wait for connection to stabilize
   await wait(500);
@@ -1372,16 +1424,11 @@ async function freshScanAndDiscover(
   discoveredDevices.set(deviceId, freshPeripheral);
 
   // Connect to fresh peripheral
-  await new Promise<void>((resolve, reject) => {
-    freshPeripheral.connect((error: Error | undefined) => {
-      if (error) {
-        reject(createNobleBleConnectionError(error, 'Fresh peripheral connection failed: '));
-      } else {
-        connectedDevices.set(deviceId, freshPeripheral);
-        resolve();
-      }
-    });
-  });
+  await connectPeripheralWithCancellation(
+    freshPeripheral,
+    deviceId,
+    'Fresh peripheral connection failed: '
+  );
 
   // Setup disconnect listener for fresh peripheral
   setupDisconnectListener(freshPeripheral, deviceId, webContents);
@@ -1488,7 +1535,10 @@ async function setupConnectionAndDiscoverServices(
   try {
     await forceReconnectPeripheral(peripheral, deviceId);
   } catch (resetError) {
-    if (isBleStaleBondHardwareError(resetError)) {
+    if (
+      isBleStaleBondHardwareError(resetError) ||
+      (resetError as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleDeviceDisconnected
+    ) {
       throw resetError;
     }
     // A failed reset must not abort the attempt: discovery on the existing
@@ -1742,82 +1792,24 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     return;
   }
 
-  return new Promise<void>((resolve, reject) => {
-    // TypeScript type assertion - peripheral is guaranteed to be defined at this point
-    const connectedPeripheral = peripheral as Peripheral;
-    const generation = ++nextConnectionGeneration;
-    let settled = false;
-    const settle = (settler: () => void): boolean => {
-      if (settled) return false;
-      settled = true;
-      if (connectingDevices.get(deviceId)?.generation === generation) {
-        connectingDevices.delete(deviceId);
-      }
-      settler();
-      return true;
-    };
-    const pendingConnection: PendingDeviceConnection = {
-      peripheral: connectedPeripheral,
-      generation,
-      cancel: error => {
-        settle(() => reject(error));
-      },
-    };
-    connectingDevices
-      .get(deviceId)
-      ?.cancel(
-        ERRORS.TypedError(
-          HardwareErrorCode.BleDeviceDisconnected,
-          `Device ${deviceId} connect attempt was superseded`
-        )
-      );
-    connectingDevices.set(deviceId, pendingConnection);
+  const connectedPeripheral = peripheral;
+  await connectPeripheralWithCancellation(connectedPeripheral, deviceId);
+  logger?.info('[NobleBLE] Connected to device:', deviceId);
 
-    connectedPeripheral.connect(async (error: Error | undefined) => {
-      if (error) {
-        logger?.error('[NobleBLE] Connection failed:', error);
-        settle(() => reject(createNobleBleConnectionError(error)));
-        return;
-      }
-
-      if (!settle(() => undefined)) {
-        const activeConnection = connectingDevices.get(deviceId);
-        if (!activeConnection || activeConnection.peripheral !== connectedPeripheral) {
-          try {
-            connectedPeripheral.disconnect(() => undefined);
-          } catch {
-            // Best-effort cleanup for a stale native callback.
-          }
-        }
-        return;
-      }
-
-      logger?.info('[NobleBLE] Connected to device:', deviceId);
-      connectedDevices.set(deviceId, connectedPeripheral);
-
-      // Setup connection and discover services
-      try {
-        const characteristics = await setupConnectionAndDiscoverServices(
-          connectedPeripheral,
-          deviceId,
-          webContents
-        );
-        deviceCharacteristics.set(deviceId, characteristics);
-        logger?.info('[NobleBLE] Device ready for communication:', deviceId);
-        resolve();
-      } catch (setupError) {
-        logger?.error('[NobleBLE] Connection setup failed:', setupError);
-        // Never reject from inside a raw disconnect callback: noble only fires
-        // it on a real 'disconnect' event, so a peripheral that is already
-        // down leaves this promise — and the renderer acquire awaiting it —
-        // pending forever. disconnectDevice always settles (it no-ops on an
-        // unknown peripheral and caps the confirm wait).
-        disconnectDevice(deviceId)
-          .catch(() => undefined)
-          .then(() => reject(setupError));
-      }
-    });
-  });
+  // Setup connection and discover services
+  try {
+    const characteristics = await setupConnectionAndDiscoverServices(
+      connectedPeripheral,
+      deviceId,
+      webContents
+    );
+    deviceCharacteristics.set(deviceId, characteristics);
+    logger?.info('[NobleBLE] Device ready for communication:', deviceId);
+  } catch (setupError) {
+    logger?.error('[NobleBLE] Connection setup failed:', setupError);
+    await disconnectDevice(deviceId).catch(() => undefined);
+    throw setupError;
+  }
 }
 
 // Disconnect device
@@ -2002,6 +1994,11 @@ async function subscribeNotifications(
       deviceId,
       ms: Date.now() - subscribeStartedAt,
     });
+  } catch (error) {
+    throw createNobleBleConnectionError(
+      error as NobleBleNativeError,
+      'Notification subscription failed: '
+    );
   } finally {
     // 🔒 CRITICAL: Always clear operation state (even on error)
     subscriptionOperations.set(deviceId, 'idle');

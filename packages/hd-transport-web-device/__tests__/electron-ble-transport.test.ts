@@ -1,5 +1,4 @@
 import transport, { PROTOCOL_V2_CHANNEL_BLE_UART, bytesToHex } from '@onekeyfe/hd-transport';
-import { invokeNobleBleIpc } from '@onekeyfe/hd-transport-electron/src/types/desktop-api';
 import { EBleDisconnectReason, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import EventEmitter from 'events';
 
@@ -183,22 +182,18 @@ describe('ElectronBleTransport protocol detection', () => {
     jest.clearAllMocks();
   });
 
-  test('does not treat a structured Noble IPC failure as a successful connect', async () => {
+  test('does not treat an error envelope from a legacy preload as a successful connect', async () => {
     const device = { id: 'stale-bond-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
-    nobleBle.connect.mockImplementation(() =>
-      invokeNobleBleIpc<void>(
-        Promise.resolve({
-          type: 'NobleBleIpcError',
-          success: false,
-          error: {
-            name: 'HardwareError',
-            message: 'Bluetooth pairing information is no longer valid',
-            errorCode: HardwareErrorCode.BleBondInvalid,
-          },
-        })
-      )
-    );
+    nobleBle.connect.mockResolvedValue({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: {
+        name: 'HardwareError',
+        message: 'Bluetooth pairing information is no longer valid',
+        errorCode: HardwareErrorCode.BleBondInvalid,
+      },
+    } as never);
     const bleTransport = configureTransport(nobleBle);
 
     await expect(

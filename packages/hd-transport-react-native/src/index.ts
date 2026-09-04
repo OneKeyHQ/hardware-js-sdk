@@ -1067,16 +1067,16 @@ export default class ReactNativeBleTransport {
     }
 
     if (Platform.OS === 'android') {
-      if (!(await device.isConnected().catch(() => false))) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.BleConnectedError,
-          `Device ${uuid} is not connected before bonding`
-        );
-      }
       // Establish the LE link before createBond(). Without an existing LE ACL,
       // Android TRANSPORT_AUTO can choose BR/EDR for a BLE-only device.
       const connectedDevice = device;
       try {
+        if (!(await connectedDevice.isConnected().catch(() => false))) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.BleConnectedError,
+            `Device ${uuid} is not connected before bonding`
+          );
+        }
         const bondState = await pairDevice(uuid);
         if (bondState.bonding) {
           await onDeviceBondState(uuid);
