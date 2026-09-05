@@ -40,6 +40,16 @@ import type { CharacteristicPair, DeviceInfo, Logger, NobleModule } from './type
 // Noble will be dynamically imported to avoid bundling issues
 let noble: NobleModule | null = null;
 let logger: Logger | null = null;
+let disposing = false;
+let disposePromise: Promise<void> | undefined;
+let removeIpcHandlers: (() => void) | undefined;
+const pendingCancellations = new Set<() => void>();
+
+function assertBleActive(): void {
+  if (disposing) {
+    throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected, 'Noble BLE is shutting down');
+  }
+}
 
 type NobleBleNativeError = Error & {
   nativeErrorCode?: number;
@@ -130,6 +140,7 @@ function connectPeripheralWithCancellation(
   deviceId: string,
   messagePrefix = ''
 ): Promise<void> {
+  assertBleActive();
   return new Promise<void>((resolve, reject) => {
     const generation = ++nextConnectionGeneration;
     let settled = false;
@@ -388,6 +399,7 @@ function updateBluetoothState(state: string): void {
 
 // Initialize Noble
 async function initializeNoble(): Promise<void> {
+  assertBleActive();
   if (noble) return;
 
   try {
@@ -413,12 +425,14 @@ async function initializeNoble(): Promise<void> {
       }
 
       const timeout = setTimeout(() => {
+        cleanup();
         reject(
           ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Bluetooth initialization timeout')
         );
       }, BLUETOOTH_INIT_TIMEOUT);
 
       const cleanup = () => {
+        pendingCancellations.delete(cancel);
         clearTimeout(timeout);
         if (noble) {
           noble.removeListener('stateChange', onStateChange);
@@ -443,9 +457,17 @@ async function initializeNoble(): Promise<void> {
         }
       };
 
+      const cancel = () => {
+        cleanup();
+        reject(
+          ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected, 'Noble BLE is shutting down')
+        );
+      };
+      pendingCancellations.add(cancel);
       noble.on('stateChange', onStateChange);
     });
 
+    assertBleActive();
     // Set up device discovery
     if (!persistentDiscoverListener) {
       persistentDiscoverListener = (peripheral: Peripheral) => {
@@ -530,6 +552,7 @@ function armIdleDisconnect(
   reason: 'idle' | 'busy-backstop' = 'idle'
 ): void {
   clearIdleDisconnect(deviceId);
+  if (disposing) return;
   idleDisconnectTimers.set(
     deviceId,
     setTimeout(() => {
@@ -729,6 +752,7 @@ async function writeCharacteristicWithoutResponse(
   writeCharacteristic: Characteristic,
   buffer: Buffer
 ): Promise<void> {
+  assertBleActive();
   return new Promise((resolve, reject) => {
     writeCharacteristic.write(buffer, true, (error?: Error) => {
       if (error) {
@@ -1013,6 +1037,7 @@ async function performTargetedScan(
   targetDeviceId: string,
   timeoutMs: number = NOBLE_BLE_TARGETED_SCAN_TIMEOUT_MS
 ): Promise<Peripheral | null> {
+  assertBleActive();
   if (!noble) {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
   }
@@ -1028,6 +1053,7 @@ async function performTargetedScan(
     const finish = async (peripheral: Peripheral | null, error?: Error) => {
       if (settled) return;
       settled = true;
+      pendingCancellations.delete(cancel);
       if (timeoutId) clearTimeout(timeoutId);
       nobleInstance.removeListener('discover', onDiscover);
       await waitForNobleScanStop(nobleInstance);
@@ -1037,6 +1063,7 @@ async function performTargetedScan(
         reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.message));
         return;
       }
+      assertBleActive();
       if (peripheral) {
         discoveredDevices.set(peripheral.id, peripheral);
       }
@@ -1058,6 +1085,11 @@ async function performTargetedScan(
       logger?.info('[NobleBLE] Targeted scan timeout for device:', targetDeviceId);
       finish(null).catch(reject);
     }, timeoutMs);
+
+    const cancel = () => {
+      finish(null, new Error('Noble BLE is shutting down')).catch(reject);
+    };
+    pendingCancellations.add(cancel);
 
     // Add local listener for this scan
     nobleInstance.on('discover', onDiscover);
@@ -1084,6 +1116,7 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
   }
 
+  assertBleActive();
   // Capture noble reference for use in closures (TypeScript narrowing)
   const nobleInstance = noble;
 
@@ -1098,12 +1131,15 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
 
   return new Promise((resolve, reject) => {
     const devices: DeviceInfo[] = [];
+    let settled = false;
     let intervalId: ReturnType<typeof setInterval> | undefined;
 
     // Cleanup function: clears timers and waits until Noble confirms scanning
     // has stopped. Resolving enumerate before this callback creates a race with
     // an immediately-following connection attempt.
     const cleanup = async () => {
+      settled = true;
+      pendingCancellations.delete(cancel);
       clearTimeout(timeoutId);
       if (intervalId) clearInterval(intervalId);
       await waitForNobleScanStop(nobleInstance);
@@ -1127,6 +1163,7 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
 
     // Set timeout for scanning — use longer timeout to catch slow-advertising devices like Pro2
     const timeoutId = setTimeout(async () => {
+      if (settled) return;
       // Final collection before resolving — catches devices discovered near the deadline
       checkDevices();
       await cleanup();
@@ -1134,11 +1171,17 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
       resolve(devices);
     }, DEVICE_SCAN_TIMEOUT);
 
+    const cancel = () => {
+      cleanup().then(() => resolve([]), reject);
+    };
+    pendingCancellations.add(cancel);
+
     // Start scanning without a service UUID filter so Pro2 advertisements with
     // short vendor UUIDs can be found. Repeated advertisements are required when
     // the local name arrives in a later scan response; discoveredDevices handles deduplication.
     logger?.info('[NobleBLE] Scanning for OneKey BLE devices');
     nobleInstance.startScanning([], true, async (error?: Error) => {
+      if (settled) return;
       if (error) {
         await cleanup();
         logger?.error('[NobleBLE] Failed to start scanning:', error);
@@ -1229,13 +1272,17 @@ function getDevice(deviceId: string): DeviceInfo | null {
 async function discoverServicesAndCharacteristics(
   peripheral: Peripheral
 ): Promise<CharacteristicPair> {
+  assertBleActive();
   // Cleanup resources - will be set up and cleaned in try/finally
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   let onDisconnect: (() => void) | undefined;
 
   const cleanup = () => {
     if (timeoutId) clearTimeout(timeoutId);
-    if (onDisconnect) peripheral.removeListener('disconnect', onDisconnect);
+    if (onDisconnect) {
+      peripheral.removeListener('disconnect', onDisconnect);
+      pendingCancellations.delete(onDisconnect);
+    }
   };
 
   // Racing promises for timeout and disconnect
@@ -1256,6 +1303,7 @@ async function discoverServicesAndCharacteristics(
         )
       );
     };
+    pendingCancellations.add(onDisconnect);
     peripheral.once('disconnect', onDisconnect);
   });
 
@@ -1281,6 +1329,7 @@ async function discoverServicesAndCharacteristics(
       });
     });
 
+    assertBleActive();
     if (!services || services.length === 0) {
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found');
     }
@@ -1500,6 +1549,7 @@ async function discoverServicesAndCharacteristicsWithRetry(
       minTimeout: 500,
       maxTimeout: 3000,
       onFailedAttempt: error => {
+        assertBleActive();
         // This runs after each failed attempt
         logger?.error(`[NobleBLE] Service discovery attempt ${error.attemptNumber} failed:`, {
           message: error.message,
@@ -1545,6 +1595,7 @@ async function setupConnectionAndDiscoverServices(
     // link, then the fresh-scan fallback, still have a chance to recover.
     logger?.error('[NobleBLE] Connection reset before discovery failed, continuing', resetError);
   }
+  assertBleActive();
   setupDisconnectListener(peripheral, deviceId, webContents);
 
   try {
@@ -1587,6 +1638,7 @@ const directConnectCooldownUntil = new Map<string, number>();
  * Ported from the Trezor connector, where it is field-proven.
  */
 async function tryDirectConnectById(deviceId: string): Promise<Peripheral | undefined> {
+  assertBleActive();
   const nobleInstance = noble as
     | (typeof noble & {
         connectAsync?: (id: string) => Promise<Peripheral | undefined>;
@@ -1597,16 +1649,20 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
   const cooldownUntil = directConnectCooldownUntil.get(deviceId) ?? 0;
   if (Date.now() < cooldownUntil) return undefined;
 
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancel: (() => void) | undefined;
   try {
     // The late-orphan guard must attach to THIS pending connect.
     const directPromise = nobleInstance.connectAsync(deviceId);
     const raced = await Promise.race([
       directPromise,
       new Promise<'timeout'>(resolve => {
-        setTimeout(() => resolve('timeout'), DIRECT_CONNECT_TIMEOUT_MS);
+        cancel = () => resolve('timeout');
+        pendingCancellations.add(cancel);
+        timer = setTimeout(cancel, DIRECT_CONNECT_TIMEOUT_MS);
       }),
     ]);
-    if (raced === 'timeout') {
+    if (raced === 'timeout' || disposing) {
       directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
       logger?.info('[NobleBLE] Direct connect-by-id timed out, falling back to scan', {
         deviceId,
@@ -1639,6 +1695,9 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
       error: String(error),
     });
     return undefined;
+  } finally {
+    clearTimeout(timer);
+    if (cancel) pendingCancellations.delete(cancel);
   }
 }
 
@@ -1709,6 +1768,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     }
   }
 
+  assertBleActive();
   // At this point, peripheral is guaranteed to be defined
   if (!peripheral) {
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device ${deviceId} not found`);
@@ -1731,6 +1791,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     // Re-bind unconditionally (idempotent): on a kept-alive link the disconnect
     // and MTU listeners may still hold the webContents of a soft-restarted
     // renderer, and the reuse fast path below returns before any other setup.
+    assertBleActive();
     setupDisconnectListener(peripheral, deviceId, webContents);
 
     // Check if we already have characteristics for this device
@@ -1781,6 +1842,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
         deviceId,
         webContents
       );
+      assertBleActive();
       deviceCharacteristics.set(deviceId, characteristics);
       logger?.info('[NobleBLE] Device ready for communication:', deviceId);
     } catch (setupError) {
@@ -1803,6 +1865,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       deviceId,
       webContents
     );
+    assertBleActive();
     deviceCharacteristics.set(deviceId, characteristics);
     logger?.info('[NobleBLE] Device ready for communication:', deviceId);
   } catch (setupError) {
@@ -1881,7 +1944,7 @@ async function unsubscribeNotifications(deviceId: string): Promise<void> {
     subscribedDevices.delete(deviceId);
   } finally {
     // 🔒 CRITICAL: Always clear operation state (even on error)
-    subscriptionOperations.set(deviceId, 'idle');
+    if (!disposing) subscriptionOperations.set(deviceId, 'idle');
   }
 }
 
@@ -1970,11 +2033,13 @@ async function subscribeNotifications(
       timeoutMs: BLE_CLEANUP_TIMEOUT,
       timeoutBehavior: 'resolve',
     });
+    assertBleActive();
     await runBleCallbackOperation(callback => notifyCharacteristic.subscribe(callback), {
       timeoutMs: NOBLE_BLE_SUBSCRIBE_TIMEOUT_MS,
       timeoutBehavior: 'reject',
     });
 
+    assertBleActive();
     notifyCharacteristic.on('data', (data: Buffer) => {
       // Windows BLE pairing detection: receiving any data means device is paired
       if (!pairedDevices.has(deviceId)) {
@@ -1989,6 +2054,7 @@ async function subscribeNotifications(
   const subscribeStartedAt = Date.now();
   try {
     await rebuildAppSubscription(deviceId, notifyCharacteristic);
+    assertBleActive();
     subscribedDevices.set(deviceId, true);
     logger?.info('[NobleBLE] Notification subscription active', {
       deviceId,
@@ -2001,12 +2067,13 @@ async function subscribeNotifications(
     );
   } finally {
     // 🔒 CRITICAL: Always clear operation state (even on error)
-    subscriptionOperations.set(deviceId, 'idle');
+    if (!disposing) subscriptionOperations.set(deviceId, 'idle');
   }
 }
 
 // Setup IPC handlers
 export function setupNobleBleHandlers(webContents: WebContents): void {
+  if (disposing) return;
   try {
     // @ts-ignore – electron-log is only available at runtime
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
@@ -2016,11 +2083,16 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
     const { ipcMain } = require('electron') as { ipcMain: IpcMain };
 
+    const channels = new Set<string>();
+    removeIpcHandlers = () => channels.forEach(channel => ipcMain.removeHandler(channel));
+
     // Electron throws on duplicate channels and setup re-runs on soft restart.
     const handle: IpcMain['handle'] = (channel, listener) => {
+      channels.add(channel);
       ipcMain.removeHandler(channel);
       ipcMain.handle(channel, async (...args) => {
         try {
+          assertBleActive();
           return await Promise.resolve(listener(...args));
         } catch (error) {
           return createNobleBleIpcErrorResponse(error);
@@ -2176,8 +2248,9 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
       }
     });
 
-    // Cleanup on app quit
+    // Window cleanup also runs during renderer soft restart; native release belongs to app quit.
     webContents.on('destroyed', () => {
+      if (disposing) return;
       safeLog(logger, 'info', 'Cleaning up Noble BLE handlers');
       (async () => {
         const deviceIds = Array.from(connectedDevices.keys());
@@ -2206,4 +2279,66 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     console.error('[NobleBLE] Failed to setup IPC handlers:', error);
     throw error;
   }
+}
+
+/**
+ * Terminal, bounded cleanup while the Node environment is still alive.
+ * If Noble is shared with another transport, releaseNoble must queue the instance
+ * and call stop() once after every transport has finished its cleanup.
+ */
+export function disposeNobleBleSupport(
+  releaseNoble: (instance: { stop(): void }) => void = instance => instance.stop()
+): Promise<void> {
+  if (disposePromise) return disposePromise;
+  disposing = true;
+  removeIpcHandlers?.();
+  const instance = noble;
+  const deviceIds = new Set([...connectedDevices.keys(), ...connectingDevices.keys()]);
+  const pendingPeripherals = Array.from(connectingDevices.values(), pending => pending.peripheral);
+  for (const cancel of pendingCancellations) cancel();
+  for (const id of idleDisconnectTimers.keys()) clearIdleDisconnect(id);
+  for (const pending of connectingDevices.values()) {
+    pending.cancel(
+      ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected, 'Noble BLE is shutting down')
+    );
+  }
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  disposePromise = (async () => {
+    try {
+      await Promise.race([
+        Promise.allSettled([
+          stopScanning(),
+          ...pendingPeripherals.map(peripheral =>
+            runBleCallbackOperation(callback => peripheral.disconnect(() => callback()), {
+              timeoutMs: BLE_DISCONNECT_CONFIRM_TIMEOUT_MS,
+              timeoutBehavior: 'resolve',
+            })
+          ),
+          ...Array.from(deviceIds, async id => {
+            await unsubscribeNotifications(id).catch(() => undefined);
+            await disconnectDevice(id).catch(() => undefined);
+          }),
+        ]),
+        new Promise<void>(resolve => {
+          timeout = setTimeout(() => {
+            logger?.warn('[NobleBLE] Process dispose timed out; releasing native manager');
+            resolve();
+          }, 3500);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timeout);
+      cleanupNobleListeners();
+      if (instance && persistentStateListener) {
+        instance.removeListener('stateChange', persistentStateListener);
+        persistentStateListener = null;
+      }
+      for (const id of deviceIds) cleanupDevice(id);
+      discoveredDevices.clear();
+      directConnectCooldownUntil.clear();
+      if (instance) releaseNoble(instance);
+      logger?.info('[NobleBLE] Process dispose completed');
+    }
+  })();
+  return disposePromise;
 }

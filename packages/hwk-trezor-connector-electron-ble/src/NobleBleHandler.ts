@@ -32,6 +32,7 @@ export interface NobleLike {
   removeListener(event: string, handler: (...args: any[]) => void): NobleLike;
   startScanningAsync(serviceUuids: string[], allowDuplicates: boolean): Promise<void>;
   stopScanningAsync(): Promise<void>;
+  stop?(): void;
   /**
    * Connect by id/address with NO scan. Both native backends support this and
    * emit a `discover` for the peripheral as a side effect: Windows synthesizes
@@ -205,8 +206,6 @@ export class NobleBleHandler {
 
   private readonly _connected = new Map<string, DeviceEntry>();
 
-  private _stateChangeHandler?: (state: string) => void;
-
   private _discoverHandler?: (peripheral: NoblePeripheralLike) => void;
 
   private _scanning = false;
@@ -218,6 +217,20 @@ export class NobleBleHandler {
   private _onDeviceDisconnected?: (id: string) => void;
 
   private _initialized = false;
+
+  private _disposed = false;
+
+  private _disposePromise?: Promise<void>;
+
+  private _releasePromise?: Promise<void>;
+
+  private _initPromise?: Promise<void>;
+
+  private readonly _nobleInstances = new Set<NobleLike>();
+
+  private readonly _pendingCancellations = new Set<() => void>();
+
+  private readonly _connectAttempts = new Set<{ id: string; abandon: (error: Error) => void }>();
 
   private _lastNobleRecoverAt?: number;
 
@@ -241,21 +254,35 @@ export class NobleBleHandler {
   }
 
   async init(): Promise<void> {
+    this._assertActive();
     if (this._initialized) return;
-    this._noble = this._factory();
-    this._discoverHandler = peripheral => {
-      this._discovered.set(peripheral.id, peripheral);
-      this._lastSeen.set(peripheral.id, Date.now());
-    };
-    this._noble.on('discover', this._discoverHandler);
-    await this._waitForPoweredOn(TREZOR_BLE_POWER_ON_TIMEOUT_MS);
-    this._initialized = true;
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = (async () => {
+      this._noble ??= this._factory();
+      this._nobleInstances.add(this._noble);
+      this._discoverHandler ??= peripheral => {
+        this._discovered.set(peripheral.id, peripheral);
+        this._lastSeen.set(peripheral.id, Date.now());
+      };
+      this._noble.removeListener('discover', this._discoverHandler);
+      this._noble.on('discover', this._discoverHandler);
+      await this._waitForPoweredOn(TREZOR_BLE_POWER_ON_TIMEOUT_MS);
+      this._assertActive();
+      this._initialized = true;
+    })();
+    try {
+      await this._initPromise;
+    } finally {
+      this._initPromise = undefined;
+    }
   }
 
   async checkAvailability(): Promise<TrezorBleAvailability> {
-    if (!this._initialized) {
+    this._assertActive();
+    if (!this._noble) {
       try {
         this._noble = this._factory();
+        this._nobleInstances.add(this._noble);
       } catch {
         return { available: false, state: 'unsupported', initialized: false };
       }
@@ -304,6 +331,7 @@ export class NobleBleHandler {
         await this._recoverNobleIfStuck(String(error));
       }
     }
+    this._assertActive();
     this._armIdleStop();
     const devices = this._snapshot();
     // raw vs kept. An empty result now has two very different causes and the log
@@ -374,6 +402,7 @@ export class NobleBleHandler {
    * app restart that is otherwise the only cure.
    */
   private async _recoverNobleIfStuck(reason: string): Promise<void> {
+    if (this._disposed) return;
     const state = this._noble?.state;
     if (state === 'poweredOn' || !this._initialized) return;
     // Never tear down bindings out from under a live link.
@@ -402,6 +431,7 @@ export class NobleBleHandler {
       // assumed to already hand back a fresh instance.
       const fresh = this._createFreshNoble();
       this._noble = fresh;
+      this._nobleInstances.add(fresh);
       if (this._discoverHandler) {
         fresh.on('discover', this._discoverHandler);
       }
@@ -417,6 +447,7 @@ export class NobleBleHandler {
   }
 
   private _armIdleStop(): void {
+    if (this._disposed) return;
     this._clearIdleStop();
     this._idleStopTimer = setTimeout(() => {
       void this._stopContinuousScan();
@@ -521,6 +552,7 @@ export class NobleBleHandler {
       const finish = (p?: NoblePeripheralLike) => {
         if (done) return;
         done = true;
+        this._pendingCancellations.delete(cancel);
         clearTimeout(timer);
         noble.removeListener('discover', onDiscover);
         void noble.stopScanningAsync().catch(() => undefined);
@@ -531,10 +563,12 @@ export class NobleBleHandler {
         if (peripheral.id === id) finish(peripheral);
       };
       const timer = setTimeout(() => finish(this._discovered.get(id)), timeoutMs);
+      const cancel = () => finish();
+      this._pendingCancellations.add(cancel);
       noble.on('discover', onDiscover);
       // Unfiltered, for the same reason as `scan()` — a service-UUID filter
       // drops the Safe 7's ADV packets outright on Windows.
-      void noble.startScanningAsync([], false);
+      void noble.startScanningAsync([], false).catch(() => finish());
     });
   }
 
@@ -605,10 +639,17 @@ export class NobleBleHandler {
   // waits for a CoreBluetooth disconnect event that never comes); bound it so a
   // cleanup disconnect can't hang the connect flow.
   private async _safeDisconnect(peripheral: NoblePeripheralLike): Promise<void> {
-    await Promise.race([
-      peripheral.disconnectAsync().catch(() => undefined),
-      delay(BLE_DISCONNECT_TIMEOUT_MS),
-    ]);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        peripheral.disconnectAsync().catch(() => undefined),
+        new Promise<void>(resolve => {
+          timeout = setTimeout(resolve, BLE_DISCONNECT_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   // noble has no connect timeout, so a stale bond hangs anywhere — connectAsync
@@ -617,6 +658,7 @@ export class NobleBleHandler {
   // out` reject (device unreachable) vs a connectAsync `connection failed`
   // reject (link refused / stale bond) — mapped to different error codes there.
   async connect(id: string): Promise<{ id: string; name?: string }> {
+    this._assertActive();
     // Promise.race only times out the CALLER — it cannot cancel the in-flight
     // _connectInner (noble has no abort). Without the claim token a late
     // connectAsync success would still discover services and commit to
@@ -640,6 +682,7 @@ export class NobleBleHandler {
     );
     const attempt = { id, abandon };
     this._activeConnect = attempt;
+    this._connectAttempts.add(attempt);
     try {
       return await Promise.race([this._connectInner(id, claim), abandoned]);
     } catch (error) {
@@ -648,6 +691,7 @@ export class NobleBleHandler {
       throw error;
     } finally {
       if (timer) clearTimeout(timer);
+      this._connectAttempts.delete(attempt);
       if (this._activeConnect === attempt) this._activeConnect = undefined;
     }
   }
@@ -660,6 +704,7 @@ export class NobleBleHandler {
     // Stop scanning (keep the cache) and let the radio settle before connecting.
     await this._pauseScan();
     await delay(BLE_CONNECT_SETTLE_MS);
+    this._assertActive();
     // Which of the three routes got us a peripheral is THE diagnostic for this
     // whole area: a cache hit means the happy path; a scan hit means the device
     // was still advertising; `direct` means it had gone silent and only
@@ -704,7 +749,7 @@ export class NobleBleHandler {
     // rejection thrown here is unobservable (Promise.race already settled) —
     // its only job is to stop the flow before it commits an unowned link.
     const abortIfAbandoned = async (stage: string) => {
-      if (!claim.abandoned) return;
+      if (!claim.abandoned && !this._disposed) return;
       // Tear down only a link nobody owns: if a previous connect still holds
       // this id in _connected, its keep-alive timers manage the link.
       if (peripheral && peripheral.state === 'connected' && !this._connected.has(id)) {
@@ -805,6 +850,7 @@ export class NobleBleHandler {
     if (!entry.writeChar) throw new Error(`Trezor BLE write char missing for ${id}`);
     const buffer = Buffer.from(hexData, 'hex');
     for (let offset = 0; offset < buffer.length; offset += this._chunkSize) {
+      this._assertActive();
       const slice = buffer.subarray(offset, offset + this._chunkSize);
       // Trezor BLE firmware expects FIXED-size packets: every packet must be
       // padded to the full MTU (244) with zeros. A short final packet is
@@ -820,22 +866,94 @@ export class NobleBleHandler {
     }
   }
 
-  /** Tear down all active connections — called on app quit. */
-  async dispose(): Promise<void> {
+  /** Retire a renderer's handler without stopping a process-wide native manager. */
+  dispose(): Promise<void> {
+    if (this._disposePromise) return this._disposePromise;
+    this._disposed = true;
     this._clearIdleStop();
     this._scanning = false;
-    for (const id of Array.from(this._connected.keys())) {
-      await this.disconnect(id);
+    this._onNotification = undefined;
+    this._onDeviceDisconnected = undefined;
+    for (const attempt of this._connectAttempts) {
+      attempt.abandon(new Error('Trezor BLE is shutting down'));
     }
+    for (const cancel of this._pendingCancellations) cancel();
     if (this._noble && this._discoverHandler) {
       this._noble.removeListener('discover', this._discoverHandler);
     }
-    if (this._noble && this._stateChangeHandler) {
-      this._noble.removeListener('stateChange', this._stateChangeHandler);
+    const entries = Array.from(this._connected.entries());
+    for (const [id, entry] of entries) {
+      if (entry.disconnectHandler) {
+        entry.peripheral.removeListener('disconnect', entry.disconnectHandler);
+      }
+      this._cleanupDevice(id, false);
     }
-    this._discovered.clear();
-    this._lastSeen.clear();
-    this._initialized = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    this._disposePromise = (async () => {
+      try {
+        await Promise.race([
+          Promise.allSettled([
+            ...Array.from(this._nobleInstances, async instance => instance.stopScanningAsync()),
+            ...entries.map(async ([, entry]) => {
+              let unsubscribeTimeout: ReturnType<typeof setTimeout> | undefined;
+              try {
+                await Promise.race([
+                  entry.notifyChar?.unsubscribeAsync().catch(() => undefined),
+                  new Promise<void>(resolve => {
+                    unsubscribeTimeout = setTimeout(resolve, 250);
+                  }),
+                ]);
+              } finally {
+                clearTimeout(unsubscribeTimeout);
+                await this._safeDisconnect(entry.peripheral);
+              }
+            }),
+          ]),
+          new Promise<void>(resolve => {
+            timeout = setTimeout(() => {
+              this._log('warn', 'dispose.timeout');
+              resolve();
+            }, 3500);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timeout);
+        this._discovered.clear();
+        this._lastSeen.clear();
+        this._initialized = false;
+      }
+    })();
+    return this._disposePromise;
+  }
+
+  /**
+   * Terminal native release, including instances replaced by adapter recovery.
+   * A host sharing Noble must defer stop() until all transports have disposed,
+   * and deduplicate instances passed to releaseNoble across those transports.
+   */
+  disposeForAppQuit(
+    releaseNoble: (instance: { stop?(): void }) => void = instance => instance.stop?.()
+  ): Promise<void> {
+    if (!this._releasePromise) {
+      this._releasePromise = this.dispose().finally(() => {
+        let releaseError: Error | undefined;
+        for (const instance of this._nobleInstances) {
+          try {
+            releaseNoble(instance);
+          } catch (error) {
+            releaseError = error instanceof Error ? error : new Error(String(error));
+          }
+        }
+        this._nobleInstances.clear();
+        if (releaseError) throw releaseError;
+        this._log('info', 'dispose.native.done');
+      });
+    }
+    return this._releasePromise;
+  }
+
+  private _assertActive(): void {
+    if (this._disposed) throw new Error('Trezor BLE is shutting down');
   }
 
   private _cleanupDevice(id: string, unexpected: boolean): void {
@@ -852,12 +970,14 @@ export class NobleBleHandler {
   }
 
   private _requireEntry(id: string): DeviceEntry {
+    this._assertActive();
     const entry = this._connected.get(id);
     if (!entry) throw new Error(`Trezor BLE device is not connected: ${id}`);
     return entry;
   }
 
   private _requireNoble(): NobleLike {
+    this._assertActive();
     if (!this._noble) throw new Error('Trezor BLE: noble was not initialized');
     return this._noble;
   }
@@ -866,27 +986,33 @@ export class NobleBleHandler {
     const noble = this._requireNoble();
     if (noble.state === 'poweredOn') return;
     await new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        clearTimeout(timer);
+        noble.removeListener('stateChange', handler);
+        this._pendingCancellations.delete(cancel);
+      };
+      const cancel = () => {
+        cleanup();
+        reject(new Error('Trezor BLE is shutting down'));
+      };
       const timer = setTimeout(() => {
-        if (this._stateChangeHandler) noble.removeListener('stateChange', this._stateChangeHandler);
+        cleanup();
         reject(
           new Error(
             `Trezor BLE: noble did not reach poweredOn within ${timeoutMs}ms (last state: ${noble.state})`
           )
         );
       }, timeoutMs);
-
       const handler = (state: string) => {
         if (state === 'poweredOn') {
-          clearTimeout(timer);
+          cleanup();
           resolve();
         } else if (state === 'unsupported' || state === 'unauthorized') {
-          clearTimeout(timer);
-          if (this._stateChangeHandler)
-            noble.removeListener('stateChange', this._stateChangeHandler);
+          cleanup();
           reject(new Error(`Trezor BLE: noble state ${state}`));
         }
       };
-      this._stateChangeHandler = handler;
+      this._pendingCancellations.add(cancel);
       noble.on('stateChange', handler);
     });
   }

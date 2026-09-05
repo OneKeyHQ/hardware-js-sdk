@@ -29,6 +29,7 @@ export interface NobleModule {
     callback?: (error?: Error) => void
   ): void;
   stopScanning(callback?: () => void): void;
+  stop(): void;
   on(event: 'stateChange', listener: (state: string) => void): void;
   on(event: 'discover', listener: (peripheral: Peripheral) => void): void;
   removeListener(event: 'stateChange', listener: (state: string) => void): void;

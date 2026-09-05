@@ -748,3 +748,127 @@ describe('Electron Noble BLE device discovery', () => {
     ]);
   });
 });
+
+describe('Noble BLE process shutdown', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  const setup = async (state = 'poweredOn') => {
+    const handlers = new Map<string, IpcHandler>();
+    const native = Object.assign(new EventEmitter(), {
+      state,
+      startScanning: jest.fn((_uuids, _duplicates, callback) => callback?.()),
+      stopScanning: jest.fn(callback => callback?.()),
+      stop: jest.fn(),
+    });
+    jest.doMock('@stoprocent/noble', () => native);
+    jest.doMock('electron', () => ({
+      ipcMain: {
+        handle: (channel: string, listener: IpcHandler) => handlers.set(channel, listener),
+        removeHandler: (channel: string) => handlers.delete(channel),
+      },
+    }));
+    jest.doMock(
+      'electron-log',
+      () => ({
+        info: jest.fn(),
+        debug: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      }),
+      { virtual: true }
+    );
+    const sdk = await import('../noble-ble-handler');
+    const window = new EventEmitter();
+    sdk.setupNobleBleHandlers(window as unknown as WebContents);
+    return { sdk, native, window, handlers };
+  };
+
+  test('does not initialize native BLE when quitting before first use', async () => {
+    const { sdk, native, handlers } = await setup();
+    await sdk.disposeNobleBleSupport();
+    expect(native.stop).not.toHaveBeenCalled();
+    expect(handlers.size).toBe(0);
+  });
+
+  test('cancels an active scan, ignores its late callback and releases native once', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    const { sdk, native, handlers } = await setup();
+    let completeScan: (() => void) | undefined;
+    native.startScanning.mockImplementation((_uuids, _duplicates, callback) => {
+      completeScan = callback;
+    });
+    const scan = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE)?.({});
+    await Promise.resolve();
+    await Promise.resolve();
+    await sdk.disposeNobleBleSupport();
+    await sdk.disposeNobleBleSupport();
+    await scan;
+    completeScan?.();
+    expect(native.stop).toHaveBeenCalledTimes(1);
+    expect(native.listenerCount('discover')).toBe(0);
+    expect(native.listenerCount('stateChange')).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('cancels power-on waits before releasing native', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    const { sdk, native, handlers } = await setup('unknown');
+    const availability = handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+    await sdk.disposeNobleBleSupport();
+    await availability;
+    expect(native.stop).toHaveBeenCalledTimes(1);
+    expect(native.listenerCount('stateChange')).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('disconnects an in-flight connection and rejects its late success', async () => {
+    const { sdk, native, handlers } = await setup();
+    await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+    let connectCallback: (() => void) | undefined;
+    const peripheral = Object.assign(new EventEmitter(), {
+      ...createPeripheral('pending-device', 'OneKey Pro'),
+      connect: jest.fn(callback => {
+        connectCallback = callback;
+      }),
+      disconnect: jest.fn(callback => callback?.()),
+      discoverServices: jest.fn(),
+    });
+    native.emit('discover', peripheral);
+    const connecting = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT)?.({}, peripheral.id);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(peripheral.connect).toHaveBeenCalledTimes(1);
+    await sdk.disposeNobleBleSupport();
+    expect(peripheral.disconnect).toHaveBeenCalled();
+    expect(native.stop).toHaveBeenCalledTimes(1);
+    connectCallback?.();
+    expect(await connecting).toMatchObject({ success: false });
+    expect(peripheral.discoverServices).not.toHaveBeenCalled();
+  });
+
+  test('allows a host to defer shared native release until both transports are idle', async () => {
+    const { sdk, native, handlers } = await setup();
+    await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+    const releaseNoble = jest.fn();
+    await sdk.disposeNobleBleSupport(releaseNoble);
+    expect(releaseNoble).toHaveBeenCalledWith(native);
+    expect(native.stop).not.toHaveBeenCalled();
+  });
+
+  test('window destruction preserves the native manager for a soft restart', async () => {
+    const { sdk, native, handlers, window } = await setup();
+    await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+    window.emit('destroyed');
+    await Promise.resolve();
+    await Promise.resolve();
+    sdk.setupNobleBleHandlers(new EventEmitter() as unknown as WebContents);
+    await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+    expect(native.stop).not.toHaveBeenCalled();
+    await sdk.disposeNobleBleSupport();
+    expect(native.stop).toHaveBeenCalledTimes(1);
+  });
+});

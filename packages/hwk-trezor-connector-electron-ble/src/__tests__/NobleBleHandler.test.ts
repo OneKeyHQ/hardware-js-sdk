@@ -432,3 +432,93 @@ describe('initTrezorBleSupport', () => {
     await handle.dispose();
   });
 });
+
+describe('Trezor BLE process shutdown', () => {
+  afterEach(() => jest.useRealTimers());
+
+  test('does not create Noble on an unused handler and rejects reuse after dispose', async () => {
+    const factory = jest.fn(() => new FakeNoble());
+    const handler = new NobleBleHandler({ nobleFactory: factory });
+    await handler.disposeForAppQuit();
+    expect(factory).not.toHaveBeenCalled();
+    await expect(handler.scan()).rejects.toThrow('shutting down');
+  });
+
+  test('keeps native alive on renderer disposal and releases every recovered instance on quit', async () => {
+    const original = Object.assign(new FakeNoble(), { stop: jest.fn() });
+    const recovered = Object.assign(new FakeNoble(), { stop: jest.fn() });
+    const factory = jest.fn().mockReturnValueOnce(original).mockReturnValue(recovered);
+    const handler = new NobleBleHandler({ nobleFactory: factory });
+    await handler.init();
+    original.state = 'unsupported';
+    original.startScanningAsync.mockRejectedValueOnce(new Error('adapter unavailable'));
+    await handler.scan();
+    expect(factory).toHaveBeenCalledTimes(2);
+    await handler.dispose();
+    expect(original.stop).not.toHaveBeenCalled();
+    expect(recovered.stop).not.toHaveBeenCalled();
+    await handler.disposeForAppQuit();
+    await handler.disposeForAppQuit();
+    expect(original.stop).toHaveBeenCalledTimes(1);
+    expect(recovered.stop).toHaveBeenCalledTimes(1);
+    expect(original.listenerCount('discover')).toBe(0);
+    expect(recovered.listenerCount('discover')).toBe(0);
+  });
+
+  test('cancels power-on waits without leaving a timer or listener', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    const native = Object.assign(new FakeNoble(), { state: 'unknown', stop: jest.fn() });
+    const handler = new NobleBleHandler({ nobleFactory: () => native });
+    const initializing = handler.init();
+    const rejected = expect(initializing).rejects.toThrow('shutting down');
+    await handler.disposeForAppQuit();
+    await rejected;
+    expect(native.stop).toHaveBeenCalledTimes(1);
+    expect(native.listenerCount('stateChange')).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('does not recover or rearm scanning after a late scan failure during shutdown', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    const native = new FakeNoble();
+    let rejectScan: (error: Error) => void = () => undefined;
+    native.startScanningAsync.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          rejectScan = reject;
+        })
+    );
+    const factory = jest.fn(() => native);
+    const handler = new NobleBleHandler({ nobleFactory: factory });
+    await handler.init();
+    const scanning = handler.scan();
+    const rejected = expect(scanning).rejects.toThrow('shutting down');
+    await Promise.resolve();
+    await handler.disposeForAppQuit();
+    native.state = 'unsupported';
+    rejectScan(new Error('late failure'));
+    await rejected;
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('bounds a missing native stop-scan callback and lets the host release shared native', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    const native = Object.assign(new FakeNoble(), { stop: jest.fn() });
+    const ipcMain = new FakeIpcMain();
+    const support = initTrezorBleSupport(
+      { send: jest.fn() },
+      { nobleFactory: () => native, ipcMain }
+    );
+    await support.handler.checkAvailability();
+    native.stopScanningAsync.mockImplementation(() => new Promise(() => undefined));
+    const releaseNoble = jest.fn();
+    const disposing = support.disposeForAppQuit(releaseNoble);
+    expect(ipcMain.handlers.size).toBe(0);
+    jest.advanceTimersByTime(3500);
+    await disposing;
+    expect(releaseNoble).toHaveBeenCalledWith(native);
+    expect(native.stop).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+});
