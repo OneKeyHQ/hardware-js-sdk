@@ -9,9 +9,7 @@ import type { SolanaSignOffChainMessage as HardwareSolSignOffChainMessage } from
 const SOLANA_PUBLIC_KEY_LENGTH = 32;
 const SOLANA_APPLICATION_DOMAIN_LENGTH = 32;
 
-const normalizeRequiredSigners = (requiredSigners?: unknown[]): string[] | undefined => {
-  if (!requiredSigners) return undefined;
-
+const normalizeRequiredSigners = (requiredSigners: unknown[] = []): string[] => {
   const normalized = requiredSigners.map((signer, index) => {
     if (
       typeof signer !== 'string' ||
@@ -50,7 +48,6 @@ export default class SolSignOffchainMessage extends BaseMethod<HardwareSolSignOf
       { name: 'messageVersion', type: 'number', required: false },
       { name: 'messageFormat', type: 'number', required: false },
       { name: 'applicationDomainHex', type: 'hexString', required: false },
-      { name: 'sourceFingerprint', type: 'number', required: false },
       { name: 'requiredSigners', type: 'array', required: false, allowEmpty: true },
     ]);
 
@@ -60,18 +57,9 @@ export default class SolSignOffchainMessage extends BaseMethod<HardwareSolSignOf
       messageVersion,
       messageFormat,
       applicationDomainHex,
-      sourceFingerprint,
       requiredSigners,
     } = this.payload;
     const addressN = validatePath(path, 3);
-    if (
-      sourceFingerprint !== undefined &&
-      (!Number.isInteger(sourceFingerprint) ||
-        sourceFingerprint < 0 ||
-        sourceFingerprint > 0xffffffff)
-    ) {
-      throw invalidParameter('Parameter [sourceFingerprint] must be a uint32 number.');
-    }
     if (
       applicationDomainHex !== undefined &&
       !isHexString(addHexPrefix(applicationDomainHex), SOLANA_APPLICATION_DOMAIN_LENGTH)
@@ -86,7 +74,6 @@ export default class SolSignOffchainMessage extends BaseMethod<HardwareSolSignOf
       message_version: messageVersion ?? undefined,
       message_format: messageFormat ?? undefined,
       application_domain: applicationDomainHex ? stripHexPrefix(applicationDomainHex) : undefined,
-      source_fingerprint: sourceFingerprint ?? undefined,
       required_signers: normalizeRequiredSigners(requiredSigners),
     };
   }
