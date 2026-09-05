@@ -11,7 +11,7 @@ import {
 } from '@onekeyfe/hd-transport';
 
 import TransportManager from '../data-manager/TransportManager';
-import { LoggerNames, getLogger, patchFeatures } from '../utils';
+import { LoggerNames, getLogger, patchFeatures, wait } from '../utils';
 import { DEVICE, type PassphraseRequestPayload } from '../events';
 import { DeviceModelToTypes } from '../types';
 import {
@@ -439,7 +439,26 @@ export class DeviceCommands {
     msg?: DefaultMessageResponse['message'],
     options?: TransportCallOptions
   ) {
-    const resp = await this.call(type, msg, options);
+    let resp = await this.call(type, msg, options);
+    // Session busy failures precede wallet derivation or reject an occupied flow.
+    // Three retries cover the 240 ms PIN dismissal animation on older V2 firmware.
+    for (
+      let retry = 0;
+      retry < 3 &&
+      this.device.isProtocolV2() &&
+      DEVICE_SESSION_CALLS.has(type) &&
+      resp.type === 'Failure' &&
+      (resp.message.code as string | FailureType) === 'Failure_ProcessError' &&
+      resp.message.subcode === DeviceSessionErrorCode.DeviceSessionError_Busy;
+      retry += 1
+    ) {
+      await wait(100);
+      if (this.device.wasInterruptedByUser()) {
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+      }
+      this.checkDisposed();
+      resp = await this.call(type, msg, options);
+    }
     return this._filterCommonTypes(resp, type, options);
   }
 

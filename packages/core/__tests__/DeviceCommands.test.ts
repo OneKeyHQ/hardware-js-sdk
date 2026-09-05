@@ -1,4 +1,5 @@
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { DeviceSessionErrorCode } from '@onekeyfe/hd-transport';
 
 import { DeviceCommands } from '../src/device/DeviceCommands';
 import { DEVICE } from '../src/events';
@@ -805,6 +806,186 @@ describe('DeviceCommands Protocol V2 interactive response compatibility', () => 
       errorCode: HardwareErrorCode.RuntimeError,
     });
   });
+});
+
+describe('DeviceCommands Protocol V2 session busy retry', () => {
+  const busy = {
+    type: 'Failure',
+    message: {
+      code: 'Failure_ProcessError',
+      subcode: DeviceSessionErrorCode.DeviceSessionError_Busy,
+      message: 'Another flow in progress',
+    },
+  } as const;
+  const success = { type: 'Success', message: {} } as const;
+  const flushCalls = () =>
+    new Promise<void>(resolve => {
+      setImmediate(resolve);
+    });
+
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  const setup = () => {
+    const commands = createCommands();
+    commands.device.wasInterruptedByUser = jest.fn(() => false);
+    commands.mainId = 'main-id';
+    const call = jest.fn();
+    commands.transport = { call } as DeviceCommands['transport'];
+    return { commands, call };
+  };
+
+  it.each(['DeviceSessionGet', 'DeviceSessionAskPin', 'DeviceSessionAskPassphrase'] as const)(
+    'retries %s busy responses at 100 ms intervals without matching their message',
+    async request => {
+      const { commands, call } = setup();
+      const response =
+        request === 'DeviceSessionGet' ? { type: 'DeviceSession' as const, message: {} } : success;
+      call
+        .mockResolvedValueOnce(busy)
+        .mockResolvedValueOnce({
+          type: 'Failure',
+          message: { ...busy.message, message: 'Passphrase entry busy' },
+        })
+        .mockResolvedValueOnce({
+          type: 'Failure',
+          message: { ...busy.message, message: 'Passphrase confirm busy' },
+        })
+        .mockResolvedValue(response);
+      const payload = request === 'DeviceSessionAskPassphrase' ? { on_device: true } : {};
+      const result = commands.typedCall(request, response.type, payload).catch(error => error);
+      await flushCalls();
+
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        jest.advanceTimersByTime(99);
+        await flushCalls();
+        expect(call).toHaveBeenCalledTimes(attempt);
+        jest.advanceTimersByTime(1);
+        await flushCalls();
+        expect(call).toHaveBeenCalledTimes(attempt + 1);
+      }
+
+      await expect(result).resolves.toEqual(response);
+      expect(call.mock.calls).toEqual(
+        Array.from({ length: 4 }, () => [
+          commands.mainId,
+          request,
+          payload,
+          { expectedTypes: [response.type] },
+        ])
+      );
+      expect(jest.getTimerCount()).toBe(0);
+    }
+  );
+
+  it('preserves the final busy error after three retries', async () => {
+    const { commands, call } = setup();
+    call.mockResolvedValue(busy);
+    const result = commands.typedCall('DeviceSessionGet', 'DeviceSession').catch(error => error);
+    await flushCalls();
+    for (let retry = 0; retry < 3; retry += 1) {
+      jest.advanceTimersByTime(100);
+      await flushCalls();
+    }
+
+    expect(call).toHaveBeenCalledTimes(4);
+    await expect(result).resolves.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceBusy,
+      params: {
+        failureCode: 'Failure_ProcessError',
+        subcode: DeviceSessionErrorCode.DeviceSessionError_Busy,
+        firmwareMessage: 'Another flow in progress',
+      },
+    });
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('does not delay a successful session request', async () => {
+    const { commands, call } = setup();
+    call.mockResolvedValue(success);
+    await expect(commands.typedCall('DeviceSessionAskPin', 'Success')).resolves.toEqual(success);
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it.each([
+    ['DeviceSessionAskPin', 'Failure_ProcessError', 0],
+    [
+      'DeviceSessionGet',
+      'Failure_ProcessError',
+      DeviceSessionErrorCode.DeviceSessionError_InvalidSession,
+    ],
+    [
+      'DeviceSessionAskPassphrase',
+      'Failure_ProcessError',
+      DeviceSessionErrorCode.DeviceSessionError_UserCancelled,
+    ],
+    ['DeviceSessionGet', 'Failure_DataError', DeviceSessionErrorCode.DeviceSessionError_Busy],
+    ['DeviceSettingsSet', 'Failure_ProcessError', 5],
+    ['EthereumSignTx', 'Failure_ProcessError', 5],
+  ] as const)('does not retry %s with %s subcode %s', async (request, code, subcode) => {
+    const { commands, call } = setup();
+    call.mockResolvedValue({ type: 'Failure', message: { code, subcode, message: 'Busy' } });
+    await expect(commands.typedCall(request, 'Success')).rejects.toBeInstanceOf(Error);
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('does not retry Protocol V1 busy responses', async () => {
+    const { commands, call } = setup();
+    commands.device.isProtocolV2 = () => false;
+    call.mockResolvedValue(busy);
+    await expect(commands.typedCall('DeviceSessionGet', 'DeviceSession')).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceBusy,
+    });
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('stops retrying when the next attempt fails at the transport layer', async () => {
+    const { commands, call } = setup();
+    const error = ERRORS.TypedError(HardwareErrorCode.BridgeDeviceDisconnected);
+    call.mockResolvedValueOnce(busy).mockRejectedValue(error);
+    const result = commands.typedCall('DeviceSessionGet', 'DeviceSession').catch(err => err);
+    await flushCalls();
+    jest.advanceTimersByTime(100);
+    await flushCalls();
+    await expect(result).resolves.toBe(error);
+    expect(call).toHaveBeenCalledTimes(2);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it.each(['cancelled', 'disposed'] as const)(
+    'does not resend when %s during backoff',
+    async state => {
+      const { commands, call } = setup();
+      call.mockResolvedValueOnce(busy).mockResolvedValue(success);
+      const result = commands.typedCall('DeviceSessionAskPin', 'Success').catch(error => error);
+      await flushCalls();
+      if (state === 'cancelled') {
+        commands.device.wasInterruptedByUser = () => true;
+      } else {
+        commands.disposed = true;
+      }
+      jest.advanceTimersByTime(100);
+      await flushCalls();
+
+      await expect(result).resolves.toMatchObject({
+        errorCode:
+          state === 'cancelled'
+            ? HardwareErrorCode.DeviceInterruptedFromUser
+            : HardwareErrorCode.RuntimeError,
+      });
+      expect(call).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(0);
+    }
+  );
 });
 
 describe('DeviceCommands cancellation', () => {
