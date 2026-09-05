@@ -1044,7 +1044,7 @@ async function connectDeviceForBle(
   retryCount = 0
 ) {
   try {
-    if (device.wasInterruptedByUser()) {
+    if (abortSignal?.aborted || device.wasInterruptedByUser()) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
     }
     if (method.payload.forceProtocolDetection && device.hasDeviceAcquire()) {
@@ -1113,6 +1113,9 @@ async function connectDeviceForBle(
       DevicePool.emitter.emit(DEVICE.CONNECT, device);
     }
   } catch (err) {
+    if (abortSignal?.aborted || device.wasInterruptedByUser()) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
     const requiresColdReconnect = isMissingDetectedProtocolV2Error(method, err);
     // Device.run()'s REQUIRE_DISCONNECT handling never sees acquire/initialize
     // failures, so with keep-alive a wedged link would be reused by every retry
@@ -1286,6 +1289,8 @@ const ensureConnected = async (
             HardwareErrorCode.BleDeviceBondedCanceled,
             HardwareErrorCode.BleCharacteristicNotifyError,
             HardwareErrorCode.BleTimeoutError,
+            // A transport setup reset must also stop this outer poll.
+            HardwareErrorCode.PollingTimeout,
             HardwareErrorCode.BleWriteCharacteristicError,
             HardwareErrorCode.BleAlreadyConnected,
             HardwareErrorCode.FirmwareUpdateLimitOneDevice,

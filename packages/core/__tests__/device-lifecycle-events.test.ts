@@ -389,6 +389,38 @@ describe('public device lifecycle events', () => {
     expect(isRetryableBleConnectionError(method, error)).toBe(false);
   });
 
+  test.each(['V1', 'V2'] as const)(
+    'stops the outer BLE poll after a manager reset for Protocol %s',
+    async connectProtocol => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      jest.spyOn(TransportManager, 'configure').mockResolvedValue(undefined);
+      const acquire = jest
+        .spyOn(Device.prototype, 'acquire')
+        .mockRejectedValue(
+          ERRORS.TypedError(HardwareErrorCode.PollingTimeout, 'BLE setup wedged repeatedly')
+        );
+      core = initCore();
+      const response = await core.handleMessage({
+        id: `manager-reset-${connectProtocol}`,
+        event: IFRAME.CALL,
+        type: IFRAME.CALL,
+        payload: {
+          method: 'getDeviceState',
+          connectId: `manager-reset-device-${connectProtocol}`,
+          connectProtocol,
+          retryCount: 1,
+          pollIntervalTime: 1,
+        },
+      } as CoreMessage);
+
+      expect(response).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.PollingTimeout },
+      });
+      expect(acquire).toHaveBeenCalledTimes(1);
+    }
+  );
+
   test.each([
     [HardwareErrorCode.BleDeviceBondError, true],
     [HardwareErrorCode.BlePeerRemovedPairingInformation, true],
