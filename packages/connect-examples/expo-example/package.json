@@ -48,7 +48,7 @@
     "burnt": "^0.13.0",
     "compressorjs": "^1.1.1",
     "elliptic": "^6.5.5",
-    "expo": "^50.0.20",
+    "expo": "^51.0.0",
     "expo-clipboard": "~5.0.0",
     "expo-document-picker": "~11.10.1",
     "expo-image-manipulator": "~11.8.0",
