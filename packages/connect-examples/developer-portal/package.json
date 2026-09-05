@@ -20,7 +20,7 @@
     "gsap": "^3.14.2",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.554.0",
-    "next": "16.0.10",
+    "next": "16.2.6",
     "nextra": "4.6.0",
     "nextra-theme-docs": "4.6.0",
     "pagefind": "^1.4.0",
