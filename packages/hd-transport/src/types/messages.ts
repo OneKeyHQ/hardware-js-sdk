@@ -1951,7 +1951,6 @@ export type EthereumSignTxOneKey = {
   chain_id: number;
   tx_type?: number;
   expected_address?: string;
-  source_fingerprint?: number;
 };
 
 // EthereumAccessListOneKey
@@ -1974,7 +1973,6 @@ export type EthereumSignTxEIP1559OneKey = {
   chain_id: number;
   access_list: EthereumAccessListOneKey[];
   expected_address?: string;
-  source_fingerprint?: number;
 };
 
 // EthereumAuthorizationSignature
@@ -2027,7 +2025,6 @@ export type EthereumSignMessageOneKey = {
   address_n: number[];
   message: string;
   chain_id?: number;
-  source_fingerprint?: number;
 };
 
 // EthereumMessageSignatureOneKey
@@ -3820,7 +3817,6 @@ export type SolanaSignTx = {
   address_n: number[];
   raw_tx: string;
   extra_info?: SolanaTxExtraInfo;
-  source_fingerprint?: number;
 };
 
 // SolanaSignedTx
@@ -3846,14 +3842,12 @@ export type SolanaSignOffChainMessage = {
   message_format?: SolanaOffChainMessageFormat;
   application_domain?: string;
   required_signers: string[];
-  source_fingerprint?: number;
 };
 
 // SolanaSignUnsafeMessage
 export type SolanaSignUnsafeMessage = {
   address_n: number[];
   message: string;
-  source_fingerprint?: number;
 };
 
 // SolanaMessageSignature
@@ -4598,7 +4592,6 @@ export type EthereumSignTypedDataQR = {
   chain_id?: number;
   metamask_v4_compat?: boolean;
   request_id?: string;
-  source_fingerprint?: number;
 };
 
 // SetBusy
@@ -4812,15 +4805,19 @@ export type DeviceFactoryInfo = {
   factory_test_completed?: boolean;
   factory_burn_in_completed?: boolean;
   manufacture_time?: DeviceFactoryInfoManufactureTime;
+  data?: string;
 };
 
 // DeviceFactoryInfoSet
 export type DeviceFactoryInfoSet = {
   info: DeviceFactoryInfo;
+  full_data?: boolean;
 };
 
 // DeviceFactoryInfoGet
-export type DeviceFactoryInfoGet = {};
+export type DeviceFactoryInfoGet = {
+  full_data?: boolean;
+};
 
 // DeviceFactoryPermanentLock
 export type DeviceFactoryPermanentLock = {

@@ -300,7 +300,7 @@ describe('Protocol V2 framing and session', () => {
     });
   });
 
-  test('round-trips Solana v1 off-chain required signers with the production schema', () => {
+  test('encodes Solana v1 off-chain required signers as firmware field 6', () => {
     const productionSchemas = {
       protocolV1: protocolV1Messages,
       protocolV2: productionProtocolV2Messages,
@@ -312,6 +312,16 @@ describe('Protocol V2 framing and session', () => {
       message_version: 1,
       required_signers: requiredSigners,
     });
+
+    // Check the wire tag independently of the SDK schema: field 6, wire type 2.
+    const expectedSignersPayload = Buffer.concat(
+      requiredSigners.map(signer =>
+        Buffer.concat([Buffer.from([0x32, 0x20]), Buffer.from(signer, 'hex')])
+      )
+    );
+    expect(
+      Buffer.from(protocolV2.decodeFrame(frame).pbPayload).subarray(-expectedSignersPayload.length)
+    ).toEqual(expectedSignersPayload);
 
     expect(ProtocolV2.decodeFrame(productionSchemas, frame)).toMatchObject({
       type: 'SolanaSignOffChainMessage',
