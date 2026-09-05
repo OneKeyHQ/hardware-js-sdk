@@ -13,6 +13,7 @@ import {
   resolveBleConnectProtocol,
 } from '../src/core';
 import { DataManager } from '../src/data-manager';
+import GetDeviceState from '../src/api/GetDeviceState';
 import TransportManager from '../src/data-manager/TransportManager';
 import { Device } from '../src/device/Device';
 import { cancelDeviceInPrompt, cancelDeviceWithInitialize } from '../src/device/DeviceCommands';
@@ -73,6 +74,51 @@ describe('public device lifecycle events', () => {
     core = undefined;
     jest.restoreAllMocks();
   });
+
+  test.each(['V1', 'V2'] as const)(
+    'preserves the %s acknowledged result and waits for release before the next acquire',
+    async protocol => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      jest.spyOn(DataManager, 'checkAndReloadData').mockResolvedValue(undefined);
+      jest.spyOn(TransportManager, 'configure').mockResolvedValue(undefined);
+      const device = createInitializedDevice(protocol);
+      jest.spyOn(Device, 'fromDescriptor').mockReturnValue(device);
+      const acquire = jest.spyOn(device, 'acquire').mockResolvedValue(undefined);
+      jest.spyOn(device, 'initialize').mockResolvedValue(undefined);
+      jest.spyOn(device, 'hasUnexpectedMode').mockReturnValue(undefined);
+      jest.spyOn(device, 'getCurrentMethodVersionRange').mockReturnValue({} as never);
+      device.commands = { disposed: false, dispose: jest.fn(), checkDisposed: jest.fn() } as never;
+      const methodRun = jest.spyOn(GetDeviceState.prototype, 'run').mockResolvedValue({} as never);
+      const releaseGate = createDeferred<void>();
+      const release = jest.spyOn(device, 'release').mockReturnValue(releaseGate.promise);
+      core = initCore();
+      const call = (id: number) =>
+        core!.handleMessage({
+          id,
+          event: IFRAME.CALL,
+          type: IFRAME.CALL,
+          payload: {
+            method: 'getDeviceState',
+            connectId: 'release-device',
+            connectProtocol: protocol,
+          },
+        } as CoreMessage);
+      await expect(call(301)).resolves.toMatchObject({ success: true });
+      const nextCall = call(302);
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+      try {
+        expect(methodRun).toHaveBeenCalledTimes(1);
+        expect(release).toHaveBeenCalledTimes(1);
+        expect(acquire).toHaveBeenCalledTimes(1);
+      } finally {
+        releaseGate.resolve();
+      }
+      await expect(nextCall).resolves.toMatchObject({ success: true });
+      expect(acquire).toHaveBeenCalledTimes(2);
+    }
+  );
 
   test('prefers Protocol V2 only when the method contract is explicitly V2-only', () => {
     const createMethod = (protocols: readonly ('V1' | 'V2')[], connectProtocol?: 'V1' | 'V2') =>

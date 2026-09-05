@@ -1464,6 +1464,10 @@ export class Device extends EventEmitter {
     this.invalidateProtocolV2RuntimeState();
   }
 
+  waitForRunCleanup(): Promise<void> {
+    return this.runCleanupPromise ?? Promise.resolve();
+  }
+
   async run(fn?: () => Promise<void>, options?: RunOptions) {
     if (this.runPromise) {
       await this.interruptionFromOutside();

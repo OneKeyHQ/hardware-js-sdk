@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
-import { BleErrorCode } from 'react-native-ble-plx';
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { BleErrorCode, BleManager } from 'react-native-ble-plx';
+import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
 import ReactNativeBleTransport, {
   BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD,
@@ -131,6 +131,59 @@ describe('BLE connect timeout', () => {
     jest.restoreAllMocks();
   });
 
+  test('waits for singleton destruction before creating the next manager', async () => {
+    const { transport, bleManager } = createHarness(() => Promise.resolve());
+    const destruction = createDeferred<void>();
+    Object.assign(bleManager, { destroy: jest.fn(() => destruction.promise) });
+    const createManager = jest.mocked(BleManager);
+    createManager.mockClear();
+    (transport as unknown as { resetPlxManager(): void }).resetPlxManager();
+    const first = transport.getPlxManager();
+    const second = transport.getPlxManager();
+    await flush();
+    expect(createManager).not.toHaveBeenCalled();
+    destruction.resolve();
+    expect(await first).toBe(await second);
+    expect(createManager).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not reuse a manager after asynchronous destruction fails', async () => {
+    const { bleManager } = createHarness(() => Promise.resolve());
+    let transport!: ReactNativeBleTransport;
+    jest.isolateModules(() => {
+      const { default: Transport } = jest.requireActual<typeof import('../index')>('../index');
+      transport = new Transport({});
+    });
+    transport.blePlxManager = bleManager as never;
+    const destruction = createDeferred<void>();
+    Object.assign(bleManager, { destroy: jest.fn(() => destruction.promise) });
+    (transport as unknown as { resetPlxManager(): void }).resetPlxManager();
+    const result = transport.getPlxManager();
+    const failure = expect(result).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.PollingTimeout,
+    });
+    destruction.reject(new Error('Native destruction failed'));
+    await failure;
+  });
+
+  test('bounds reset waiting without letting a new transport bypass unfinished destruction', async () => {
+    const { transport, bleManager } = createHarness(() => Promise.resolve());
+    const destruction = createDeferred<void>();
+    Object.assign(bleManager, { destroy: jest.fn(() => destruction.promise) });
+    const createManager = jest.mocked(BleManager);
+    createManager.mockClear();
+    (transport as unknown as { resetPlxManager(): void }).resetPlxManager();
+    const nextTransport = new ReactNativeBleTransport({});
+    const result = nextTransport.getPlxManager().catch(error => error);
+    await flush();
+    jest.advanceTimersByTime(BLE_CONNECT_TIMEOUT_MS);
+    await expect(result).resolves.toMatchObject({ errorCode: HardwareErrorCode.PollingTimeout });
+    expect(createManager).not.toHaveBeenCalled();
+    destruction.resolve();
+    await nextTransport.getPlxManager();
+    expect(createManager).toHaveBeenCalledTimes(1);
+  });
+
   test('a native connect that never settles is bounded instead of blocking forever', async () => {
     // iOS applies its own connect timeout on a serial queue; when that queue is busy
     // the timeout never fires and acquire() blocks until the app-level 60s timeout.
@@ -153,6 +206,61 @@ describe('BLE connect timeout', () => {
 
     expect(errors).toHaveLength(1);
     expect(errors[0]?.errorCode).toBe(HardwareErrorCode.BleConnectedError);
+  });
+
+  test('stop drains its scan and removes the timer before another transport scans', async () => {
+    const { transport, bleManager } = createHarness(() => Promise.resolve());
+    const nativeStop = createDeferred<void>();
+    bleManager.stopDeviceScan.mockImplementation(() => nativeStop.promise);
+    const scanned = transport.enumerate().catch(error => error);
+    await flush();
+    await flush();
+    expect(bleManager.startDeviceScan).toHaveBeenCalledTimes(1);
+    const stopping = transport.stop();
+    expect(transport.stop()).toBe(stopping);
+    let stopped = false;
+    stopping.then(() => {
+      stopped = true;
+    });
+    await flush();
+    expect(stopped).toBe(false);
+    nativeStop.resolve();
+    await stopping;
+    await expect(scanned).resolves.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+    jest.advanceTimersByTime(transport.scanTimeout);
+    await flush();
+    expect(bleManager.stopDeviceScan).toHaveBeenCalledTimes(1);
+    await expect(transport.getPlxManager()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+  });
+
+  test('stop rejects a pending read and waits for native disconnection without destroying the shared manager', async () => {
+    const { transport, bleManager } = createHarness(() => Promise.resolve());
+    const nativeDisconnect = createDeferred<void>();
+    bleManager.cancelDeviceConnection.mockImplementation(() => nativeDisconnect.promise);
+    const destroy = jest.fn();
+    Object.assign(bleManager, { destroy });
+    const read = createDeferred<void>();
+    transport.runPromise = read;
+    Object.assign(transport, { runPromiseDeviceId: UUID });
+    const readResult = read.promise.catch(error => error);
+    let stopped = false;
+    const stopping = transport.stop().then(() => {
+      stopped = true;
+    });
+    await flush();
+    await expect(readResult).resolves.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+    expect(stopped).toBe(false);
+    nativeDisconnect.resolve();
+    await advanceUntil(() => stopped, 1000);
+    await stopping;
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(UUID);
+    expect(destroy).not.toHaveBeenCalled();
   });
 
   test('the connect budget leaves generous headroom over a healthy connect', () => {

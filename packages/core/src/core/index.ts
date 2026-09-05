@@ -686,6 +686,10 @@ const onCallDevice = async (
           },
         });
         messageResponse = createResponseMessage(method.responseID, true, response);
+        // Preserve the acknowledged result while keeping the next acquire behind release.
+        if (method.connectId) {
+          context.setPrePendingCallPromise(method.connectId, device.waitForRunCleanup());
+        }
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method);
       } catch (error) {
@@ -697,6 +701,9 @@ const onCallDevice = async (
         }
         Log.debug(`Call API - Inner Method Run Error`, error);
         messageResponse = createResponseMessage(method.responseID, false, { error });
+        if (method.connectId) {
+          context.setPrePendingCallPromise(method.connectId, device.waitForRunCleanup());
+        }
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method, error);
 
