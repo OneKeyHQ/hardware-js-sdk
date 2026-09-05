@@ -39,6 +39,7 @@ export interface InitTrezorBleSupportOptions extends NobleBleHandlerOptions {
 export interface TrezorBleSupportHandle {
   handler: NobleBleHandler;
   dispose(): Promise<void>;
+  disposeForAppQuit(releaseNoble?: (instance: { stop?(): void }) => void): Promise<void>;
 }
 
 const DEFAULT_IPC_MAIN: () => IpcMainLike = () => {
@@ -52,7 +53,7 @@ const DEFAULT_IPC_MAIN: () => IpcMainLike = () => {
  * via `window.desktopApi.trezorBle`. Call once from the main process after
  * `BrowserWindow` is ready.
  *
- * Returns a disposer the caller should invoke on app quit.
+ * Call dispose() when retiring a renderer and disposeForAppQuit() before Node teardown.
  */
 export function initTrezorBleSupport(
   webContents: WebContentsLike,
@@ -60,6 +61,7 @@ export function initTrezorBleSupport(
 ): TrezorBleSupportHandle {
   const ipcMain = options.ipcMain ?? DEFAULT_IPC_MAIN();
   const handler = new NobleBleHandler(options);
+  let disposed = false;
 
   handler.setNotificationListener((id, hexData) => {
     webContents.send(TREZOR_BLE_CHANNELS.notification, id, hexData);
@@ -69,7 +71,10 @@ export function initTrezorBleSupport(
   });
 
   const handle = <T>(channel: string, fn: (...args: any[]) => Promise<T> | T): void => {
-    ipcMain.handle(channel, async (_event, ...args) => fn(...args));
+    ipcMain.handle(channel, async (_event, ...args) => {
+      if (disposed) throw new Error('Trezor BLE is shutting down');
+      return fn(...args);
+    });
   };
 
   handle(TREZOR_BLE_CHANNELS.scan, (options?: { serviceUuids?: string[]; durationMs?: number }) =>
@@ -86,15 +91,23 @@ export function initTrezorBleSupport(
   handle(TREZOR_BLE_CHANNELS.readRssi, (id: string) => handler.readRssi(id));
   handle(TREZOR_BLE_CHANNELS.cancelPairing, () => handler.cancelPairing());
 
+  const removeHandlers = () => {
+    if (disposed) return;
+    disposed = true;
+    for (const channel of Object.values(TREZOR_BLE_CHANNELS)) {
+      ipcMain.removeHandler(channel);
+    }
+  };
+
   return {
     handler,
-    dispose: async () => {
-      for (const channel of Object.values(TREZOR_BLE_CHANNELS)) {
-        // Only request/response channels were registered with `handle()`; the
-        // two push channels are unregistered noops here, which is fine.
-        ipcMain.removeHandler(channel);
-      }
-      await handler.dispose();
+    dispose: () => {
+      removeHandlers();
+      return handler.dispose();
+    },
+    disposeForAppQuit: releaseNoble => {
+      removeHandlers();
+      return handler.disposeForAppQuit(releaseNoble);
     },
   };
 }
