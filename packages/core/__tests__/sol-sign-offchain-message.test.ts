@@ -25,15 +25,17 @@ const createMethod = (overrides: Record<string, unknown> = {}) =>
       messageVersion: SolanaOffChainMessageVersion.MESSAGE_VERSION_1,
       messageFormat: SolanaOffChainMessageFormat.V0_LIMITED_UTF8,
       applicationDomainHex: `0x${'aa'.repeat(32)}`,
-      sourceFingerprint: 0x12345678,
       requiredSigners,
       ...overrides,
     },
   });
 
 describe('SolSignOffchainMessage', () => {
-  test('maps V1 parameters without imposing a host-side signer count limit', async () => {
-    const method = createMethod();
+  test.each([
+    { description: 'without a host-side signer count limit', requiredSigners },
+    { description: 'with omitted optional signers', requiredSigners: undefined },
+  ])('maps V1 parameters $description', async ({ requiredSigners }) => {
+    const method = createMethod({ requiredSigners });
     method.init();
 
     const typedCall = jest.fn().mockResolvedValue({
@@ -48,8 +50,7 @@ describe('SolSignOffchainMessage', () => {
       message_version: SolanaOffChainMessageVersion.MESSAGE_VERSION_1,
       message_format: SolanaOffChainMessageFormat.V0_LIMITED_UTF8,
       application_domain: 'aa'.repeat(32),
-      source_fingerprint: 0x12345678,
-      required_signers: requiredSigners,
+      required_signers: requiredSigners ?? [],
     });
   });
 
@@ -60,11 +61,4 @@ describe('SolSignOffchainMessage', () => {
   ])('rejects invalid required signers: $error', ({ requiredSigners, error }) => {
     expect(() => createMethod({ requiredSigners }).init()).toThrow(error);
   });
-
-  test.each([-1, 0x100000000, 1.5])(
-    'rejects an invalid source fingerprint: %s',
-    sourceFingerprint => {
-      expect(() => createMethod({ sourceFingerprint }).init()).toThrow('uint32');
-    }
-  );
 });

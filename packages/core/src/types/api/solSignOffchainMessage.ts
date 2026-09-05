@@ -15,7 +15,6 @@ export type SolSignOffchainMessageParams = {
   messageVersion?: SolanaOffChainMessageVersion;
   messageFormat?: SolanaOffChainMessageFormat;
   applicationDomainHex?: string;
-  sourceFingerprint?: number;
   /** 32-byte public keys encoded as hex, strictly sorted and unique. */
   requiredSigners?: string[];
 };

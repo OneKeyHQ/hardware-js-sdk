@@ -4463,10 +4463,6 @@
         "request_id": {
           "type": "bytes",
           "id": 5
-        },
-        "source_fingerprint": {
-          "type": "uint32",
-          "id": 6
         }
       }
     },
@@ -4722,10 +4718,6 @@
         "expected_address": {
           "type": "bytes",
           "id": 12
-        },
-        "source_fingerprint": {
-          "type": "uint32",
-          "id": 13
         }
       }
     },
@@ -4810,10 +4802,6 @@
         "expected_address": {
           "type": "bytes",
           "id": 12
-        },
-        "source_fingerprint": {
-          "type": "uint32",
-          "id": 13
         }
       }
     },
@@ -4961,7 +4949,14 @@
           "type": "EthereumAuthorizationSignature",
           "id": 10
         }
-      }
+      },
+      "reserved": [
+        [5, 5],
+        [6, 6],
+        [7, 7],
+        [8, 8],
+        [9, 9]
+      ]
     },
     "EthereumTxAckOneKey": {
       "fields": {
@@ -4990,10 +4985,6 @@
         "chain_id": {
           "type": "uint64",
           "id": 3
-        },
-        "source_fingerprint": {
-          "type": "uint32",
-          "id": 4
         }
       }
     },
@@ -9017,10 +9008,6 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
-        },
-        "source_fingerprint": {
-          "type": "uint32",
-          "id": 3
         }
       }
     },
@@ -9063,14 +9050,10 @@
           "type": "bytes",
           "id": 5
         },
-        "source_fingerprint": {
-          "type": "uint32",
-          "id": 6
-        },
         "required_signers": {
           "rule": "repeated",
           "type": "bytes",
-          "id": 7
+          "id": 6
         }
       }
     },
@@ -9088,10 +9071,6 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
-        },
-        "source_fingerprint": {
-          "type": "uint32",
-          "id": 3
         }
       }
     },
@@ -11888,6 +11867,10 @@
         "manufacture_time": {
           "type": "DeviceFactoryInfoManufactureTime",
           "id": 5
+        },
+        "data": {
+          "type": "bytes",
+          "id": 100
         }
       }
     },
@@ -11897,11 +11880,20 @@
           "rule": "required",
           "type": "DeviceFactoryInfo",
           "id": 1
+        },
+        "full_data": {
+          "type": "bool",
+          "id": 2
         }
       }
     },
     "DeviceFactoryInfoGet": {
-      "fields": {}
+      "fields": {
+        "full_data": {
+          "type": "bool",
+          "id": 1
+        }
+      }
     },
     "DeviceFactoryPermanentLock": {
       "fields": {
