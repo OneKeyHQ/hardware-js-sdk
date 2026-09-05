@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { TREZOR_BLE_UUIDS } from '@onekeyfe/hwk-trezor-adapter';
 
 import { NobleBleHandler } from '../NobleBleHandler';
+import type { NoblePeripheralLike } from '../NobleBleHandler';
 import { TrezorElectronBleTransport } from '../TrezorElectronBleTransport';
 import { initTrezorBleSupport } from '../main';
 import { TREZOR_BLE_CHANNELS } from '../constants';
@@ -435,6 +436,109 @@ describe('initTrezorBleSupport', () => {
 
 describe('Trezor BLE process shutdown', () => {
   afterEach(() => jest.useRealTimers());
+  const flushCallbacks = () =>
+    new Promise<void>(resolve => {
+      setImmediate(resolve);
+    });
+
+  test('awaits native cancellation and caller disconnect before stopping Noble', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    let rejectConnect: (error: Error) => void = () => undefined;
+    let finishDisconnect: () => void = () => undefined;
+    const peripheral = Object.assign(new FakePeripheral('id-1', { localName: 'Trezor Safe 7' }), {
+      cancelConnect: jest.fn(() => rejectConnect(new Error('connection canceled'))),
+    });
+    peripheral.connectAsync.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          peripheral.state = 'connecting';
+          rejectConnect = reject;
+        })
+    );
+    peripheral.disconnectAsync.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          finishDisconnect = resolve;
+        })
+    );
+    const native = Object.assign(new FakeNoble([peripheral]), { stop: jest.fn() });
+    const handler = new NobleBleHandler({ nobleFactory: () => native });
+    await handler.scan({ durationMs: 0 });
+    const connecting = handler.connect(peripheral.id);
+    const rejected = expect(connecting).rejects.toThrow('shutting down');
+    await flushCallbacks();
+    jest.advanceTimersByTime(300);
+    await flushCallbacks();
+    expect(peripheral.connectAsync).toHaveBeenCalledTimes(1);
+    const disposing = handler.disposeForAppQuit();
+    await flushCallbacks();
+    expect(peripheral.cancelConnect).toHaveBeenCalledTimes(1);
+    expect(peripheral.disconnectAsync).toHaveBeenCalledTimes(1);
+    expect(native.stop).not.toHaveBeenCalled();
+    finishDisconnect();
+    await disposing;
+    await rejected;
+    expect(native.stop).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test.each(['peripheral', 'direct'])(
+    'does not touch native after a timed-out %s connect',
+    async route => {
+      jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+      let finishConnect: () => void = () => undefined;
+      const peripheral = Object.assign(new FakePeripheral('id-1', { localName: 'Trezor Safe 7' }), {
+        cancelConnect: jest.fn(),
+      });
+      peripheral.connectAsync.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            peripheral.state = 'connecting';
+            finishConnect = resolve;
+          })
+      );
+      const connectAsync = jest.fn(
+        () =>
+          new Promise<NoblePeripheralLike>(resolve => {
+            finishConnect = () => resolve(peripheral);
+          })
+      );
+      const native = Object.assign(new FakeNoble(route === 'direct' ? [] : [peripheral]), {
+        stop: jest.fn(),
+        cancelConnect: jest.fn(),
+        connectAsync,
+      });
+      const handler = new NobleBleHandler({ nobleFactory: () => native });
+      await handler.scan({ durationMs: 0 });
+      const connecting = handler.connect(peripheral.id);
+      const rejected = expect(connecting).rejects.toThrow('shutting down');
+      await flushCallbacks();
+      jest.advanceTimersByTime(300);
+      await flushCallbacks();
+      if (route === 'direct') {
+        jest.advanceTimersByTime(5000);
+        await flushCallbacks();
+      }
+      expect(route === 'direct' ? connectAsync : peripheral.connectAsync).toHaveBeenCalledTimes(1);
+      const disposing = handler.disposeForAppQuit();
+      await flushCallbacks();
+      expect(
+        route === 'direct' ? native.cancelConnect : peripheral.cancelConnect
+      ).toHaveBeenCalledTimes(1);
+      expect(native.stop).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(3500);
+      await disposing;
+      const disconnects = peripheral.disconnectAsync.mock.calls.length;
+      peripheral.state = 'connected';
+      finishConnect();
+      await flushCallbacks();
+      await rejected;
+      expect(peripheral.disconnectAsync).toHaveBeenCalledTimes(disconnects);
+      expect(peripheral.discoverSomeServicesAndCharacteristicsAsync).not.toHaveBeenCalled();
+      expect(native.stop).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(0);
+    }
+  );
 
   test('does not create Noble on an unused handler and rejects reuse after dispose', async () => {
     const factory = jest.fn(() => new FakeNoble());

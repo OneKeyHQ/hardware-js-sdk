@@ -750,6 +750,10 @@ describe('Electron Noble BLE device discovery', () => {
 });
 
 describe('Noble BLE process shutdown', () => {
+  const flushCallbacks = () =>
+    new Promise<void>(resolve => {
+      setImmediate(resolve);
+    });
   afterEach(() => {
     jest.useRealTimers();
     jest.resetModules();
@@ -825,16 +829,20 @@ describe('Noble BLE process shutdown', () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  test('disconnects an in-flight connection and rejects its late success', async () => {
+  test('cancels native connects and waits for disconnect before release', async () => {
     const { sdk, native, handlers } = await setup();
     await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
-    let connectCallback: (() => void) | undefined;
+    let connectCallback: ((error?: Error) => void) | undefined;
+    let disconnectCallback: (() => void) | undefined;
     const peripheral = Object.assign(new EventEmitter(), {
       ...createPeripheral('pending-device', 'OneKey Pro'),
       connect: jest.fn(callback => {
         connectCallback = callback;
       }),
-      disconnect: jest.fn(callback => callback?.()),
+      cancelConnect: jest.fn(() => connectCallback?.(new Error('connection canceled'))),
+      disconnect: jest.fn(callback => {
+        disconnectCallback = callback;
+      }),
       discoverServices: jest.fn(),
     });
     native.emit('discover', peripheral);
@@ -842,13 +850,69 @@ describe('Noble BLE process shutdown', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(peripheral.connect).toHaveBeenCalledTimes(1);
-    await sdk.disposeNobleBleSupport();
+    const disposing = sdk.disposeNobleBleSupport();
+    await flushCallbacks();
+    expect(peripheral.cancelConnect).toHaveBeenCalledTimes(1);
     expect(peripheral.disconnect).toHaveBeenCalled();
+    expect(native.stop).not.toHaveBeenCalled();
+    disconnectCallback?.();
+    await disposing;
     expect(native.stop).toHaveBeenCalledTimes(1);
-    connectCallback?.();
     expect(await connecting).toMatchObject({ success: false });
     expect(peripheral.discoverServices).not.toHaveBeenCalled();
   });
+
+  test.each(['peripheral', 'direct'])(
+    'keeps late %s connects inert after the disposal timeout',
+    async route => {
+      jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+      const { sdk, native, handlers } = await setup();
+      await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+      let finishConnect: () => void = () => undefined;
+      const peripheral = Object.assign(new EventEmitter(), {
+        ...createPeripheral('late-device', 'OneKey Pro'),
+        connect: jest.fn(callback => {
+          finishConnect = () => callback();
+        }),
+        cancelConnect: jest.fn(),
+        disconnect: jest.fn(callback => callback?.()),
+        discoverServices: jest.fn(),
+      });
+      const connectAsync = jest.fn(
+        () =>
+          new Promise(resolve => {
+            finishConnect = () => resolve(peripheral);
+          })
+      );
+      const cancelConnect = jest.fn();
+      if (route === 'direct') Object.assign(native, { connectAsync, cancelConnect });
+      else native.emit('discover', peripheral);
+      const connecting = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT)?.({}, peripheral.id);
+      await flushCallbacks();
+      if (route === 'direct') {
+        jest.advanceTimersByTime(1500);
+        await flushCallbacks();
+      }
+      expect(route === 'direct' ? connectAsync : peripheral.connect).toHaveBeenCalledTimes(1);
+      const disposing = sdk.disposeNobleBleSupport();
+      await flushCallbacks();
+      expect(route === 'direct' ? cancelConnect : peripheral.cancelConnect).toHaveBeenCalledTimes(
+        1
+      );
+      expect(native.stop).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(3500);
+      await disposing;
+      const disconnects = peripheral.disconnect.mock.calls.length;
+      peripheral.state = 'connected';
+      finishConnect();
+      await flushCallbacks();
+      expect(peripheral.disconnect).toHaveBeenCalledTimes(disconnects);
+      expect(peripheral.discoverServices).not.toHaveBeenCalled();
+      expect(native.stop).toHaveBeenCalledTimes(1);
+      expect(await connecting).toMatchObject({ success: false });
+      expect(jest.getTimerCount()).toBe(0);
+    }
+  );
 
   test('allows a host to defer shared native release until both transports are idle', async () => {
     const { sdk, native, handlers } = await setup();
@@ -859,14 +923,26 @@ describe('Noble BLE process shutdown', () => {
     expect(native.stop).not.toHaveBeenCalled();
   });
 
-  test('window destruction preserves the native manager for a soft restart', async () => {
+  test('replacement window scanning waits for old cleanup and preserves native', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
     const { sdk, native, handlers, window } = await setup();
     await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+    let finishOldCleanup: (() => void) | undefined;
+    native.stopScanning.mockImplementationOnce(callback => {
+      finishOldCleanup = callback;
+    });
     window.emit('destroyed');
-    await Promise.resolve();
-    await Promise.resolve();
     sdk.setupNobleBleHandlers(new EventEmitter() as unknown as WebContents);
-    await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+    const scan = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE)?.({});
+    await flushCallbacks();
+    expect(native.startScanning).not.toHaveBeenCalled();
+    finishOldCleanup?.();
+    await flushCallbacks();
+    expect(native.startScanning).toHaveBeenCalledTimes(1);
+    expect(native.listenerCount('discover')).toBe(1);
+    native.emit('discover', createPeripheral('replacement-device', 'OneKey Pro'));
+    jest.advanceTimersByTime(5000);
+    expect(await scan).toEqual([expect.objectContaining({ id: 'replacement-device' })]);
     expect(native.stop).not.toHaveBeenCalled();
     await sdk.disposeNobleBleSupport();
     expect(native.stop).toHaveBeenCalledTimes(1);

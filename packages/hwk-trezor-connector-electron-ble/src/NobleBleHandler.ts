@@ -41,6 +41,7 @@ export interface NobleLike {
    * (lib/mac/src/ble_manager.mm). Optional so a stub noble can omit it.
    */
   connectAsync?(idOrAddress: string): Promise<NoblePeripheralLike | undefined>;
+  cancelConnect?(idOrAddress: string): void;
   reset?(): Promise<void>;
 }
 
@@ -64,6 +65,7 @@ export interface NoblePeripheralLike {
   rssi: number;
   state: string;
   connectAsync(): Promise<void>;
+  cancelConnect?(): void;
   disconnectAsync(): Promise<void>;
   discoverSomeServicesAndCharacteristicsAsync(
     serviceUuids: string[],
@@ -230,7 +232,14 @@ export class NobleBleHandler {
 
   private readonly _pendingCancellations = new Set<() => void>();
 
-  private readonly _connectAttempts = new Set<{ id: string; abandon: (error: Error) => void }>();
+  private readonly _connectAttempts = new Set<{
+    id: string;
+    abandon: (error: Error) => void;
+    cancelNative: () => void;
+    settled: Promise<unknown>;
+  }>();
+
+  private _nativeReleased = false;
 
   private _lastNobleRecoverAt?: number;
 
@@ -639,6 +648,7 @@ export class NobleBleHandler {
   // waits for a CoreBluetooth disconnect event that never comes); bound it so a
   // cleanup disconnect can't hang the connect flow.
   private async _safeDisconnect(peripheral: NoblePeripheralLike): Promise<void> {
+    if (this._nativeReleased) return;
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
@@ -660,13 +670,14 @@ export class NobleBleHandler {
   async connect(id: string): Promise<{ id: string; name?: string }> {
     this._assertActive();
     // Promise.race only times out the CALLER — it cannot cancel the in-flight
-    // _connectInner (noble has no abort). Without the claim token a late
+    // _connectInner. Native cancellation is handled separately during disposal.
+    // Without the claim token a late
     // connectAsync success would still discover services and commit to
     // _connected: an open GATT link nobody owns, and since a linked Safe 7
     // stops advertising, every retry then dead-ends until app restart. The
     // token flags the attempt as abandoned so a late success tears the link
     // down instead of committing it.
-    const claim = { abandoned: false };
+    const claim: { abandoned: boolean; cancelNative?: () => void } = { abandoned: false };
     // The timeout is one way to abandon the attempt; cancelPairing is the other,
     // so the rejection is hoisted out of the timer and both share it.
     let abandon!: (error: Error) => void;
@@ -680,25 +691,37 @@ export class NobleBleHandler {
       () => abandon(new Error(`connect timed out after ${this._connectTimeoutMs}ms`)),
       this._connectTimeoutMs
     );
-    const attempt = { id, abandon };
+    const attempt = {
+      id,
+      abandon,
+      cancelNative: () => claim.cancelNative?.(),
+      settled: Promise.resolve<unknown>(undefined),
+    };
     this._activeConnect = attempt;
     this._connectAttempts.add(attempt);
-    try {
-      return await Promise.race([this._connectInner(id, claim), abandoned]);
-    } catch (error) {
-      const peripheral = this._discovered.get(id);
-      if (peripheral) await this._safeDisconnect(peripheral);
-      throw error;
-    } finally {
-      if (timer) clearTimeout(timer);
+    const nativeOperation = this._connectInner(id, claim);
+    const caller = (async () => {
+      try {
+        return await Promise.race([nativeOperation, abandoned]);
+      } catch (error) {
+        const peripheral = this._discovered.get(id);
+        if (peripheral) await this._safeDisconnect(peripheral);
+        throw error;
+      } finally {
+        clearTimeout(timer);
+        if (this._activeConnect === attempt) this._activeConnect = undefined;
+      }
+    })();
+    // A rejected caller can still have a native connect or disconnect in flight.
+    attempt.settled = Promise.allSettled([nativeOperation, caller]).finally(() => {
       this._connectAttempts.delete(attempt);
-      if (this._activeConnect === attempt) this._activeConnect = undefined;
-    }
+    });
+    return caller;
   }
 
   private async _connectInner(
     id: string,
-    claim: { abandoned: boolean }
+    claim: { abandoned: boolean; cancelNative?: () => void }
   ): Promise<{ id: string; name?: string }> {
     await this.init();
     // Stop scanning (keep the cache) and let the radio settle before connecting.
@@ -727,6 +750,8 @@ export class NobleBleHandler {
       // peripheral CoreBluetooth cannot retrieve (it drops the failure on the
       // floor — `NobleMac::Connect`, lib/mac/src/noble_mac.mm), so trying it
       // first would risk hanging where a scan would simply have found the device.
+      const native = this._requireNoble();
+      claim.cancelNative = () => native.cancelConnect?.(id);
       peripheral = await this._directConnect(id);
     }
     if (!peripheral) {
@@ -761,6 +786,15 @@ export class NobleBleHandler {
     await abortIfAbandoned('resolve');
 
     const wasConnected = peripheral.state === 'connected';
+    const connectingPeripheral = peripheral;
+    const native = this._requireNoble();
+    claim.cancelNative = () => {
+      if (connectingPeripheral.state === 'connecting' && connectingPeripheral.cancelConnect) {
+        connectingPeripheral.cancelConnect();
+      } else {
+        native.cancelConnect?.(id);
+      }
+    };
     // The single line that explains any BLE connect after the fact.
     this._log('warn', 'connect.route', {
       id,
@@ -874,8 +908,14 @@ export class NobleBleHandler {
     this._scanning = false;
     this._onNotification = undefined;
     this._onDeviceDisconnected = undefined;
-    for (const attempt of this._connectAttempts) {
+    const connections = Array.from(this._connectAttempts);
+    for (const attempt of connections) {
       attempt.abandon(new Error('Trezor BLE is shutting down'));
+      try {
+        attempt.cancelNative();
+      } catch (error) {
+        this._log('warn', 'dispose.cancelConnect.error', { error: String(error) });
+      }
     }
     for (const cancel of this._pendingCancellations) cancel();
     if (this._noble && this._discoverHandler) {
@@ -893,6 +933,7 @@ export class NobleBleHandler {
       try {
         await Promise.race([
           Promise.allSettled([
+            ...connections.map(attempt => attempt.settled),
             ...Array.from(this._nobleInstances, async instance => instance.stopScanningAsync()),
             ...entries.map(async ([, entry]) => {
               let unsubscribeTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -936,6 +977,7 @@ export class NobleBleHandler {
   ): Promise<void> {
     if (!this._releasePromise) {
       this._releasePromise = this.dispose().finally(() => {
+        this._nativeReleased = true;
         let releaseError: Error | undefined;
         for (const instance of this._nobleInstances) {
           try {
