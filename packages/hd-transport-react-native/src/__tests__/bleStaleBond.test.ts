@@ -13,6 +13,14 @@ describe('native BLE stale bond mapping', () => {
       HardwareErrorCode.BleDeviceBondError,
     ],
     [
+      { androidErrorCode: 5, reason: 'Connection state changed with status 5' },
+      HardwareErrorCode.BleDeviceBondError,
+    ],
+    [
+      { androidErrorCode: 15, reason: 'Connection state changed with status 15' },
+      HardwareErrorCode.BleDeviceBondError,
+    ],
+    [
       { iosErrorCode: 14, reason: 'Peer removed pairing information' },
       HardwareErrorCode.BlePeerRemovedPairingInformation,
     ],

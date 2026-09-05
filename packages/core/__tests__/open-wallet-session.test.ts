@@ -2080,6 +2080,59 @@ describe('openWalletSession', () => {
     expect(deviceWalletSessionStore.get('device-1', 'hidden-state')).toBe('renewed-session');
   });
 
+  test('recovers the current Attach PIN wallet when the cached session is invalid', async () => {
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ message: { version: 2 } })
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Invalid session'), {
+          errorCode: HardwareErrorCode.WalletSessionInvalid,
+        })
+      )
+      .mockResolvedValueOnce({
+        message: {
+          btc_test_address: 'hidden-state',
+          session_id: 'renewed-session',
+        },
+      });
+    const promptPassphrase = jest.fn();
+    const method = new OpenWalletSession({
+      payload: {
+        method: 'openWalletSession',
+        connectId: 'connect-id',
+        mode: 'resume-hidden',
+        deviceId: 'device-1',
+        passphraseState: 'hidden-state',
+      },
+    });
+    method.init();
+    deviceWalletSessionStore.set('device-1', 'hidden-state', 'expired-session');
+    const device = createDevice({ unlockedAttachPin: true, typedCall, promptPassphrase });
+    method.device = device as any;
+
+    await expect(method.run()).resolves.toEqual({
+      protocol: 'V2',
+      walletType: 'hidden',
+      deviceId: 'device-1',
+      passphraseState: 'hidden-state',
+      resumed: false,
+    });
+    expect(typedCall.mock.calls.filter(call => call[0] === 'DeviceSessionGet')).toEqual([
+      [
+        'DeviceSessionGet',
+        'DeviceSession',
+        {
+          session_id: 'expired-session',
+          btc_test_address: 'hidden-state',
+        },
+      ],
+      ['DeviceSessionGet', 'DeviceSession', {}],
+    ]);
+    expect(promptPassphrase).not.toHaveBeenCalled();
+    expect(device.lockDevice).not.toHaveBeenCalled();
+    expect(deviceWalletSessionStore.get('device-1', 'hidden-state')).toBe('renewed-session');
+  });
+
   test('selects the expected hidden wallet when Protocol V2 has no cached session', async () => {
     const typedCall = jest
       .fn()

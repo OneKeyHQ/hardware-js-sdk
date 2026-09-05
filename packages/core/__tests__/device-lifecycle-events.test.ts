@@ -5,10 +5,11 @@ import {
   cancel,
   initConnector,
   initCore,
+  isDeviceIdentityMismatchError,
   isMissingDetectedProtocolV2Error,
-  isProtocolV2PeerRemovedPairingError,
   isRetryableBleConnectionError,
   isRetryableBleProtocolV2ProbeError,
+  isTerminalBleStaleBondError,
   resolveBleConnectProtocol,
 } from '../src/core';
 import { DataManager } from '../src/data-manager';
@@ -367,6 +368,7 @@ describe('public device lifecycle events', () => {
     [HardwareErrorCode.PollingTimeout, false],
     [HardwareErrorCode.BleDeviceBondError, false],
     [HardwareErrorCode.BlePeerRemovedPairingInformation, false],
+    [HardwareErrorCode.BleBondInvalid, false],
   ] as const)('retries a BLE connection error with error code %s: %s', (errorCode, expected) => {
     const method = { payload: { connectProtocol: 'V2' } } as never;
     const error = {
@@ -377,21 +379,35 @@ describe('public device lifecycle events', () => {
     expect(isRetryableBleConnectionError(method, error)).toBe(expected);
   });
 
-  test.each([
-    ['V2', true],
-    ['V1', false],
-    [undefined, false],
-  ] as const)(
-    'treats peer-removed pairing as terminal only for Protocol %s: %s',
-    (connectProtocol, expected) => {
-      const method = { payload: { connectProtocol } } as never;
-      const error = {
-        errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
-      };
+  test('does not retry the desktop acquire deadline fallback', () => {
+    const method = { payload: { connectProtocol: 'V2' } } as never;
+    const error = {
+      errorCode: HardwareErrorCode.BleTimeoutError,
+      params: { acquireDeadlineExceeded: true },
+    };
 
-      expect(isProtocolV2PeerRemovedPairingError(method, error)).toBe(expected);
-    }
-  );
+    expect(isRetryableBleConnectionError(method, error)).toBe(false);
+  });
+
+  test.each([
+    [HardwareErrorCode.BleDeviceBondError, true],
+    [HardwareErrorCode.BlePeerRemovedPairingInformation, true],
+    [HardwareErrorCode.BleBondInvalid, true],
+    [HardwareErrorCode.DeviceNotFound, false],
+  ] as const)('treats BLE stale-bond error code %s as terminal: %s', (errorCode, expected) => {
+    const error = {
+      errorCode,
+    };
+
+    expect(isTerminalBleStaleBondError(error)).toBe(expected);
+  });
+
+  test.each([
+    [HardwareErrorCode.DeviceCheckDeviceIdError, true],
+    [HardwareErrorCode.DeviceNotFound, false],
+  ] as const)('treats device identity error code %s as a mismatch: %s', (errorCode, expected) => {
+    expect(isDeviceIdentityMismatchError({ errorCode })).toBe(expected);
+  });
 
   test('converts an internal transport disconnect into a public KnownDevice snapshot', () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);

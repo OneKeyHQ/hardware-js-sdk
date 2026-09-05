@@ -320,9 +320,9 @@ const resolveNegotiatedMtu = (device: Device) => requestNegotiatedMtu(device, 'c
 
 type IOBleErrorRemap = Error | BleError | null | undefined;
 
-function remapError(error: IOBleErrorRemap, mapProtocolV2StaleBond: boolean) {
+function remapError(error: IOBleErrorRemap) {
   if (error instanceof BleError) {
-    if (mapProtocolV2StaleBond && isNativeBleStaleBondError(error)) {
+    if (isNativeBleStaleBondError(error)) {
       throw toBleStaleBondHardwareError(error);
     }
 
@@ -980,15 +980,6 @@ export default class ReactNativeBleTransport {
       throw error;
     }
 
-    if (Platform.OS === 'android') {
-      const bondState = await pairDevice(uuid);
-      if (bondState.bonding) {
-        await onDeviceBondState(uuid);
-      } else if (!bondState.bonded) {
-        throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
-      }
-    }
-
     if (!device) {
       const devices = await blePlxManager.devices([uuid]);
       [device] = devices;
@@ -1024,7 +1015,7 @@ export default class ReactNativeBleTransport {
           Log?.debug('device already connected');
           throw ERRORS.TypedError(HardwareErrorCode.BleAlreadyConnected);
         } else {
-          remapError(e, shouldMapProtocolV2StaleBond);
+          remapError(e);
         }
       }
     }
@@ -1055,21 +1046,55 @@ export default class ReactNativeBleTransport {
             device = await this.connectWithTimeout(uuid, () =>
               disconnectedDevice.connect(fallbackConnectOptions)
             );
-          } catch (e) {
-            Log?.debug('last try to reconnect error: ', e);
+          } catch (fallbackError) {
+            Log?.debug('last try to reconnect error: ', fallbackError);
             // last try to reconnect device if this issue exists
             // https://github.com/dotintent/react-native-ble-plx/issues/426
-            if (e.errorCode === BleErrorCode.OperationCancelled) {
+            if (fallbackError.errorCode === BleErrorCode.OperationCancelled) {
               Log?.debug('last try to reconnect');
               await disconnectedDevice.cancelConnection();
               device = await this.connectWithTimeout(uuid, () =>
                 disconnectedDevice.connect(fallbackConnectOptions)
               );
+            } else {
+              remapError(fallbackError);
             }
           }
         } else {
-          remapError(e, shouldMapProtocolV2StaleBond);
+          remapError(e);
         }
+      }
+    }
+
+    if (Platform.OS === 'android') {
+      // Establish the LE link before createBond(). Without an existing LE ACL,
+      // Android TRANSPORT_AUTO can choose BR/EDR for a BLE-only device.
+      const connectedDevice = device;
+      try {
+        if (!(await connectedDevice.isConnected().catch(() => false))) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.BleConnectedError,
+            `Device ${uuid} is not connected before bonding`
+          );
+        }
+        const bondState = await pairDevice(uuid);
+        if (bondState.bonding) {
+          await onDeviceBondState(uuid);
+        } else if (!bondState.bonded) {
+          throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
+        }
+      } catch (error) {
+        await this.runNativeTeardown(uuid, blePlxManager, async () => {
+          await Promise.all([
+            this.runBestEffortNativeOperation('bond failure: cancel manager connection', () =>
+              blePlxManager.cancelDeviceConnection(uuid)
+            ),
+            this.runBestEffortNativeOperation('bond failure: cancel device connection', () =>
+              connectedDevice.cancelConnection()
+            ),
+          ]);
+        });
+        throw error;
       }
     }
 

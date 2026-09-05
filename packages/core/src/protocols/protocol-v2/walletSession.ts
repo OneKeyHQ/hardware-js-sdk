@@ -234,9 +234,9 @@ export async function getProtocolV2WalletSession(
   const forceWalletSelection =
     options?.forceWalletSelection === true || options?.initSession === true;
   const readCurrentAttachPinSession = options?.readCurrentAttachPinSession === true;
-  const sessionIsAttachPinWallet = (session?: { viaAttachPin?: boolean }) =>
+  const sessionIsAttachPinWallet = (session?: unknown) =>
     readCurrentAttachPinSession ||
-    session?.viaAttachPin === true ||
+    (session as { viaAttachPin?: boolean } | undefined)?.viaAttachPin === true ||
     device.features?.unlockedAttachPin === true;
 
   if (forceWalletSelection) {
@@ -455,6 +455,11 @@ export async function getProtocolV2WalletSession(
         throw error;
       }
       resumed = false;
+      if (device.features?.unlockedAttachPin === true) {
+        // Locking invalidates the old handle, but Attach PIN already selected the wallet.
+        // Read the current session and validate its passphrase state below.
+        response = await getDeviceSession(device, sessionGetRequest());
+      }
     }
   } else if (expectedPassphraseState) {
     try {

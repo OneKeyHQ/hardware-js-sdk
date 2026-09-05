@@ -2,6 +2,7 @@ import {
   HardwareErrorCode,
   HardwareErrorCodeMessage,
   TypedError,
+  isBleStaleBondErrorText,
   serializeError,
 } from './HardwareError';
 
@@ -10,6 +11,15 @@ describe('HardwareErrorCode compatibility', () => {
     expect(HardwareErrorCode).not.toHaveProperty('KaspaPrevTxIdMismatch');
     expect(HardwareErrorCode.DeviceLocked).toBe(830);
     expect(HardwareErrorCode.WalletSessionInvalid).toBe(831);
+  });
+
+  test('uses actionable wallet-context messages', () => {
+    expect(HardwareErrorCodeMessage[HardwareErrorCode.DeviceCheckDeviceIdError]).toContain(
+      'does not match this wallet'
+    );
+    expect(HardwareErrorCodeMessage[HardwareErrorCode.DeviceCheckUnlockTypeError]).toContain(
+      'corresponding PIN or passphrase'
+    );
   });
 
   test('reserves the BLE and USB conflict code for app error mapping', () => {
@@ -32,5 +42,22 @@ describe('HardwareErrorCode compatibility', () => {
         firmwareMessage: 'link disabled',
       },
     });
+  });
+
+  test('reserves a dedicated hd-core code for an invalid OS BLE bond', () => {
+    expect(HardwareErrorCode.BleBondInvalid).toBe(724);
+    expect(HardwareErrorCodeMessage[HardwareErrorCode.BleBondInvalid]).toContain(
+      'pairing information is no longer valid'
+    );
+  });
+
+  test('recognizes the macOS CoreBluetooth stale-pairing error without matching generic failures', () => {
+    expect(
+      isBleStaleBondErrorText(
+        'CBErrorDomain:14 Peer removed pairing information on the device side'
+      )
+    ).toBe(true);
+    expect(isBleStaleBondErrorText('CBATTErrorDomain:14 localized native message')).toBe(false);
+    expect(isBleStaleBondErrorText('connection failed')).toBe(false);
   });
 });

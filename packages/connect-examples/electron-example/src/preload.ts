@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars,@typescript-eslint/require-await */
 import { contextBridge, ipcRenderer } from 'electron';
 import { EOneKeyBleMessageKeys } from '@onekeyfe/hd-shared';
+import { invokeNobleBleIpc } from '@onekeyfe/hd-transport-electron';
 
 import { ipcMessageKeys } from './config';
 
@@ -47,6 +48,9 @@ const validChannels = [
   ipcMessageKeys.UPDATE_DOWNLOADED,
 ];
 
+const invokeNobleBle = <T>(channel: string, ...args: unknown[]) =>
+  invokeNobleBleIpc<T>(ipcRenderer.invoke(channel, ...args));
+
 const desktopApi = {
   // Generic IPC methods
   invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
@@ -69,18 +73,22 @@ const desktopApi = {
   },
   // Noble BLE specific methods
   nobleBle: {
-    enumerate: () => ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE),
+    enumerate: () =>
+      invokeNobleBle<{ id: string; name: string }[]>(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE),
     getDevice: (uuid: string) =>
-      ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_GET_DEVICE, uuid),
-    connect: (uuid: string) => ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT, uuid),
+      invokeNobleBle<{ id: string; name: string; mtu?: number } | null>(
+        EOneKeyBleMessageKeys.NOBLE_BLE_GET_DEVICE,
+        uuid
+      ),
+    connect: (uuid: string) => invokeNobleBle<void>(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT, uuid),
     disconnect: (uuid: string) =>
-      ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_DISCONNECT, uuid),
+      invokeNobleBle<void>(EOneKeyBleMessageKeys.NOBLE_BLE_DISCONNECT, uuid),
     subscribe: (uuid: string) =>
-      ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_SUBSCRIBE, uuid),
+      invokeNobleBle<void>(EOneKeyBleMessageKeys.NOBLE_BLE_SUBSCRIBE, uuid),
     unsubscribe: (uuid: string) =>
-      ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_UNSUBSCRIBE, uuid),
+      invokeNobleBle<void>(EOneKeyBleMessageKeys.NOBLE_BLE_UNSUBSCRIBE, uuid),
     write: (uuid: string, data: string, options?: NobleBleWriteOptions) =>
-      ipcRenderer.invoke(EOneKeyBleMessageKeys.NOBLE_BLE_WRITE, uuid, data, options),
+      invokeNobleBle<void>(EOneKeyBleMessageKeys.NOBLE_BLE_WRITE, uuid, data, options),
     onNotification: (callback: (deviceId: string, data: string) => void) => {
       const subscription = (_: unknown, deviceId: string, data: string) => {
         callback(deviceId, data);
@@ -108,7 +116,13 @@ const desktopApi = {
         ipcRenderer.removeListener(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, subscription);
       };
     },
-    checkAvailability: () => ipcRenderer.invoke(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK),
+    checkAvailability: () =>
+      invokeNobleBle<{
+        available: boolean;
+        state: string;
+        unsupported: boolean;
+        initialized: boolean;
+      }>(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK),
   },
 
   // Simplified Bluetooth system management

@@ -346,6 +346,11 @@ export const HardwareErrorCode = {
   BlePoweredOff: 721,
   BleUnsupported: 722,
   BleUnavailableWhileUsbConnected: 723,
+  /**
+   * The host OS still has a stale BLE bond after the device pairing state was reset.
+   * The user must forget the device in system Bluetooth settings and pair it again.
+   */
+  BleBondInvalid: 724,
 
   /**
    * Hardware runtiome errors
@@ -534,7 +539,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceInterruptedFromOutside]: 'Device interrupted',
   [HardwareErrorCode.DeviceInterruptedFromUser]: 'Device interrupted',
   [HardwareErrorCode.RequiredButInBootloaderMode]: 'Device should be in bootloader mode',
-  [HardwareErrorCode.DeviceCheckDeviceIdError]: 'Device Id in the features is not same.',
+  [HardwareErrorCode.DeviceCheckDeviceIdError]:
+    'The connected device does not match this wallet. Reconnect the correct device, or add it again after a reset or recovery.',
   [HardwareErrorCode.DeviceNotSupportPassphrase]: 'Device not support passphrase',
   [HardwareErrorCode.DeviceCheckPassphraseStateError]: 'Device passphrase state error',
   [HardwareErrorCode.DeviceNotOpenedPassphrase]: 'Device not opened passphrase',
@@ -542,7 +548,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceDetectInBootloaderMode]: 'Device in bootloader mode',
   [HardwareErrorCode.NotAllowInBootloaderMode]: 'Device not allow in bootloader mode',
   [HardwareErrorCode.DeviceBusy]: 'Device is busy',
-  [HardwareErrorCode.DeviceCheckUnlockTypeError]: 'Device check unlock type not match error',
+  [HardwareErrorCode.DeviceCheckUnlockTypeError]:
+    'The unlocked wallet does not match the selected wallet. Use the corresponding PIN or passphrase and try again.',
   /**
    * Node Errors
    */
@@ -622,6 +629,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleUnsupported]: 'Bluetooth is not supported on this device',
   [HardwareErrorCode.BleUnavailableWhileUsbConnected]:
     'Bluetooth is unavailable while USB is connected. Unplug USB and try again.',
+  [HardwareErrorCode.BleBondInvalid]:
+    'Bluetooth pairing information is no longer valid. Forget the device in system Bluetooth settings and pair it again.',
 
   /**
    * Runtime Error
@@ -660,7 +669,6 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.WalletSessionInvalid]: 'Wallet session is invalid or expired',
   [HardwareErrorCode.NftStorageLimitReached]:
     'NFT storage limit reached. Remove an NFT from the device and try again.',
-
   /**
    * Lowlevel transport
    */
@@ -686,7 +694,8 @@ export const isBleStaleBondHardwareError = (error: unknown): boolean => {
   const code = (error as { errorCode?: unknown })?.errorCode;
   return (
     code === HardwareErrorCode.BleDeviceBondError ||
-    code === HardwareErrorCode.BlePeerRemovedPairingInformation
+    code === HardwareErrorCode.BlePeerRemovedPairingInformation ||
+    code === HardwareErrorCode.BleBondInvalid
   );
 };
 
@@ -696,6 +705,7 @@ export const isBleStaleBondErrorText = (text: string): boolean => {
     value.includes('encryption is insufficient') ||
     value.includes('insufficient encryption') ||
     value.includes('peer removed pairing information') ||
+    value.includes('cberrordomain:14') ||
     value.includes('gatt_insuf_authentication')
   );
 };

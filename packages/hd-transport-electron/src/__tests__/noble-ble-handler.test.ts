@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events';
-import { EOneKeyBleMessageKeys } from '@onekeyfe/hd-shared';
+import { EOneKeyBleMessageKeys, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import {
-  NOBLE_BLE_CONNECTION_TIMEOUT_MS,
+  NOBLE_BLE_SUBSCRIBE_TIMEOUT_MS,
   NOBLE_BLE_TARGETED_SCAN_TIMEOUT_MS,
 } from '../noble-ble-timeouts';
 
@@ -26,9 +26,126 @@ describe('Electron Noble BLE device discovery', () => {
     jest.clearAllMocks();
   });
 
-  test('allows enough time for a slow targeted scan and connection', () => {
+  test('bounds targeted scans and subscription callbacks independently', () => {
     expect(NOBLE_BLE_TARGETED_SCAN_TIMEOUT_MS).toBe(5_000);
-    expect(NOBLE_BLE_CONNECTION_TIMEOUT_MS).toBe(10_000);
+    expect(NOBLE_BLE_SUBSCRIBE_TIMEOUT_MS).toBe(10_000);
+  });
+
+  test('maps structured macOS stale pairing failures without parsing localized text', async () => {
+    const { createNobleBleConnectionError } = await import('../noble-ble-handler');
+
+    const staleBondError = createNobleBleConnectionError(
+      Object.assign(new Error('Peer removed pairing information on the device side'), {
+        nativeErrorCode: 14,
+        nativeErrorDomain: 'CBErrorDomain',
+      })
+    );
+    expect(staleBondError).toMatchObject({
+      errorCode: HardwareErrorCode.BleBondInvalid,
+      params: {
+        nativeErrorMessage: 'Peer removed pairing information on the device side',
+      },
+    });
+    expect(staleBondError.message).toContain('Peer removed pairing information on the device side');
+    expect(createNobleBleConnectionError(new Error('Encryption is insufficient'))).toMatchObject({
+      errorCode: HardwareErrorCode.BleConnectedError,
+    });
+    expect(
+      createNobleBleConnectionError(
+        Object.assign(new Error('localized native message'), {
+          nativeErrorCode: 14,
+          nativeErrorDomain: 'CBATTErrorDomain',
+        })
+      )
+    ).toMatchObject({
+      errorCode: HardwareErrorCode.BleConnectedError,
+    });
+    expect(
+      createNobleBleConnectionError(
+        Object.assign(new Error('Encryption is insufficient'), {
+          nativeErrorCode: 15,
+          nativeErrorDomain: 'CBATTErrorDomain',
+        })
+      )
+    ).toMatchObject({
+      errorCode: HardwareErrorCode.BleBondInvalid,
+    });
+    expect(createNobleBleConnectionError(new Error('connection failed'))).toMatchObject({
+      errorCode: HardwareErrorCode.BleConnectedError,
+    });
+  });
+
+  test('serializes HardwareError fields for the Noble IPC boundary', async () => {
+    const { createNobleBleIpcErrorResponse } = await import('../noble-ble-handler');
+
+    expect(
+      createNobleBleIpcErrorResponse({
+        name: 'HardwareError',
+        message: 'Bluetooth pairing information is no longer valid',
+        errorCode: HardwareErrorCode.BleBondInvalid,
+        params: { nativeErrorMessage: 'native message' },
+      })
+    ).toEqual({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: {
+        name: 'HardwareError',
+        message: 'Bluetooth pairing information is no longer valid',
+        errorCode: HardwareErrorCode.BleBondInvalid,
+        params: { nativeErrorMessage: 'native message' },
+      },
+    });
+
+    expect(createNobleBleIpcErrorResponse(new Error('untyped failure'))).toEqual({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: {
+        name: 'Error',
+        message: 'untyped failure',
+        errorCode: HardwareErrorCode.UnknownError,
+      },
+    });
+
+    const circularParams: { self?: unknown } = {};
+    circularParams.self = circularParams;
+    expect(
+      createNobleBleIpcErrorResponse({
+        message: 'failure with unsafe params',
+        errorCode: HardwareErrorCode.BleConnectedError,
+        params: circularParams,
+      })
+    ).toEqual({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: {
+        name: 'Error',
+        message: 'failure with unsafe params',
+        errorCode: HardwareErrorCode.BleConnectedError,
+      },
+    });
+  });
+
+  test('rejects a structured Noble IPC failure at the preload boundary', async () => {
+    const { invokeNobleBleIpc } = await import('../types/desktop-api');
+
+    await expect(
+      invokeNobleBleIpc(
+        Promise.resolve({
+          type: 'NobleBleIpcError' as const,
+          success: false as const,
+          error: {
+            name: 'HardwareError',
+            message: 'Bluetooth pairing information is no longer valid',
+            errorCode: HardwareErrorCode.BleBondInvalid,
+          },
+        })
+      )
+    ).rejects.toMatchObject({
+      name: 'HardwareError',
+      errorCode: HardwareErrorCode.BleBondInvalid,
+    });
+
+    await expect(invokeNobleBleIpc(Promise.resolve('connected'))).resolves.toBe('connected');
   });
 
   test('keeps safe pacing by default and allows an explicit high-throughput bypass', async () => {
@@ -176,13 +293,19 @@ describe('Electron Noble BLE device discovery', () => {
     expect(peripheral.connect).not.toHaveBeenCalled();
 
     stopScanningCallback?.();
-    await expect(connectPromise).rejects.toThrow('expected test connection failure');
+    await expect(connectPromise).resolves.toEqual({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: {
+        name: 'HardwareError',
+        message: 'expected test connection failure',
+        errorCode: HardwareErrorCode.BleConnectedError,
+      },
+    });
     expect(peripheral.connect).toHaveBeenCalledTimes(1);
   });
 
-  test('disconnects a connection callback that arrives after timeout', async () => {
-    jest.useFakeTimers({ doNotFake: ['performance'] });
-
+  test('disconnects and settles a pending Noble connect before a late callback arrives', async () => {
     const handlers = new Map<string, IpcHandler>();
     const ipcMain = {
       handle: jest.fn((channel: string, handler: IpcHandler) => {
@@ -197,6 +320,7 @@ describe('Electron Noble BLE device discovery', () => {
       startScanning: jest.Mock;
       stopScanning: jest.Mock;
     };
+    let stopScanningCallback: (() => void) | undefined;
     let connectCallback: ((error?: Error) => void) | undefined;
     let resolveConnectStarted = () => undefined;
     const connectStarted = new Promise<void>(resolve => {
@@ -204,13 +328,17 @@ describe('Electron Noble BLE device discovery', () => {
     });
     const peripheral = Object.assign(
       new EventEmitter(),
-      createPeripheral('slow-device', 'Pro2 A1B2'),
+      createPeripheral('pending-device', 'Pro2 C3D4'),
       {
         connect: jest.fn((callback: (error?: Error) => void) => {
           connectCallback = callback;
           resolveConnectStarted();
         }),
-        disconnect: jest.fn((callback: () => void) => callback()),
+        disconnect: jest.fn((callback: () => void) => {
+          peripheral.state = 'disconnected';
+          callback();
+        }),
+        discoverServices: jest.fn(),
       }
     );
     noble.state = 'poweredOn';
@@ -218,7 +346,9 @@ describe('Electron Noble BLE device discovery', () => {
       callback?.();
       noble.emit('discover', peripheral);
     });
-    noble.stopScanning = jest.fn(callback => callback?.());
+    noble.stopScanning = jest.fn(callback => {
+      stopScanningCallback = callback;
+    });
 
     jest.doMock('@stoprocent/noble', () => noble);
     jest.doMock('electron', () => ({ ipcMain }));
@@ -235,20 +365,257 @@ describe('Electron Noble BLE device discovery', () => {
     } as unknown as WebContents);
 
     const connect = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT);
-    if (!connect) {
-      throw new Error('Electron Noble BLE connect handler was not registered');
+    const disconnect = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_DISCONNECT);
+    if (!connect || !disconnect) {
+      throw new Error('Electron Noble BLE handlers were not registered');
     }
 
-    const connectPromise = Promise.resolve(connect(undefined, 'slow-device'));
+    const connectPromise = Promise.resolve(connect(undefined, peripheral.id));
+    await Promise.resolve();
+    stopScanningCallback?.();
     await connectStarted;
-    expect(peripheral.connect).toHaveBeenCalledTimes(1);
 
-    jest.advanceTimersByTime(NOBLE_BLE_CONNECTION_TIMEOUT_MS);
-    await expect(connectPromise).rejects.toThrow('Connection timeout');
+    await expect(Promise.resolve(disconnect(undefined, peripheral.id))).resolves.toBeUndefined();
+    await expect(connectPromise).resolves.toMatchObject({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: {
+        errorCode: HardwareErrorCode.BleDeviceDisconnected,
+      },
+    });
+    expect(peripheral.disconnect).toHaveBeenCalledTimes(1);
 
+    peripheral.state = 'connected';
     connectCallback?.();
     await Promise.resolve();
-    expect(peripheral.disconnect).toHaveBeenCalledTimes(1);
+
+    expect(peripheral.discoverServices).not.toHaveBeenCalled();
+    expect(peripheral.disconnect).toHaveBeenCalledTimes(2);
+  });
+
+  test('disconnects and settles a pending forced reconnect before a late callback arrives', async () => {
+    const handlers = new Map<string, IpcHandler>();
+    const ipcMain = {
+      handle: jest.fn((channel: string, handler: IpcHandler) => {
+        handlers.set(channel, handler);
+      }),
+      removeHandler: jest.fn((channel: string) => {
+        handlers.delete(channel);
+      }),
+    };
+    const noble = new EventEmitter() as EventEmitter & {
+      state: string;
+      startScanning: jest.Mock;
+      stopScanning: jest.Mock;
+    };
+    let stopScanningCallback: (() => void) | undefined;
+    const connectCallbacks: Array<(error?: Error) => void> = [];
+    let resolveInitialConnectStarted = () => undefined;
+    const initialConnectStarted = new Promise<void>(resolve => {
+      resolveInitialConnectStarted = resolve;
+    });
+    let resolveForcedReconnectStarted = () => undefined;
+    const forcedReconnectStarted = new Promise<void>(resolve => {
+      resolveForcedReconnectStarted = resolve;
+    });
+    const peripheral = Object.assign(
+      new EventEmitter(),
+      createPeripheral('forced-reconnect-device', 'Pro2 C3D4'),
+      {
+        connect: jest.fn((callback: (error?: Error) => void) => {
+          connectCallbacks.push(callback);
+          if (connectCallbacks.length === 1) {
+            resolveInitialConnectStarted();
+          } else if (connectCallbacks.length === 2) {
+            resolveForcedReconnectStarted();
+          }
+        }),
+        disconnect: jest.fn((callback: () => void) => {
+          peripheral.state = 'disconnected';
+          callback();
+        }),
+        discoverServices: jest.fn(),
+      }
+    );
+    noble.state = 'poweredOn';
+    noble.startScanning = jest.fn((_services, _duplicates, callback) => {
+      callback?.();
+      noble.emit('discover', peripheral);
+    });
+    noble.stopScanning = jest.fn(callback => {
+      stopScanningCallback = callback;
+    });
+
+    jest.doMock('@stoprocent/noble', () => noble);
+    jest.doMock('electron', () => ({ ipcMain }));
+    jest.doMock('electron-log', () => ({
+      info: jest.fn(),
+      debug: jest.fn(),
+      error: jest.fn(),
+    }));
+
+    const { setupNobleBleHandlers } = await import('../noble-ble-handler');
+    setupNobleBleHandlers({
+      on: jest.fn(),
+      send: jest.fn(),
+    } as unknown as WebContents);
+
+    const connect = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT);
+    const disconnect = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_DISCONNECT);
+    if (!connect || !disconnect) {
+      throw new Error('Electron Noble BLE handlers were not registered');
+    }
+
+    const connectPromise = Promise.resolve(connect(undefined, peripheral.id));
+    await Promise.resolve();
+    stopScanningCallback?.();
+    await initialConnectStarted;
+
+    peripheral.state = 'connected';
+    connectCallbacks[0]?.();
+    await forcedReconnectStarted;
+
+    await expect(Promise.resolve(disconnect(undefined, peripheral.id))).resolves.toBeUndefined();
+    await expect(connectPromise).resolves.toMatchObject({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: {
+        errorCode: HardwareErrorCode.BleDeviceDisconnected,
+      },
+    });
+    expect(peripheral.disconnect).toHaveBeenCalledTimes(2);
+
+    peripheral.state = 'connected';
+    connectCallbacks[1]?.();
+    await Promise.resolve();
+
+    expect(peripheral.discoverServices).not.toHaveBeenCalled();
+    expect(peripheral.disconnect).toHaveBeenCalledTimes(3);
+  });
+
+  test('maps a structured native subscription failure before returning it over IPC', async () => {
+    const handlers = new Map<string, IpcHandler>();
+    const ipcMain = {
+      handle: jest.fn((channel: string, handler: IpcHandler) => {
+        handlers.set(channel, handler);
+      }),
+      removeHandler: jest.fn((channel: string) => {
+        handlers.delete(channel);
+      }),
+    };
+    const nativeError = Object.assign(new Error('Encryption is insufficient'), {
+      nativeErrorCode: 15,
+      nativeErrorDomain: 'CBATTErrorDomain',
+    });
+    const notifyCharacteristic = Object.assign(new EventEmitter(), {
+      uuid: '0003',
+      unsubscribe: jest.fn((callback: (error?: Error) => void) => callback()),
+      subscribe: jest.fn((callback: (error?: Error) => void) => callback(nativeError)),
+    });
+    const writeCharacteristic = Object.assign(new EventEmitter(), {
+      uuid: '0002',
+    });
+    const service = {
+      uuid: '0001',
+      discoverCharacteristics: jest.fn(
+        (
+          _characteristicUuids: string[],
+          callback: (error: Error | null, value: unknown[]) => void
+        ) => callback(null, [writeCharacteristic, notifyCharacteristic])
+      ),
+    };
+    const peripheral = Object.assign(
+      new EventEmitter(),
+      createPeripheral('subscription-device', 'Pro2 E5F6'),
+      {
+        connect: jest.fn((callback: (error?: Error) => void) => {
+          peripheral.state = 'connected';
+          callback();
+        }),
+        disconnect: jest.fn((callback: () => void) => {
+          peripheral.state = 'disconnected';
+          callback();
+        }),
+        discoverServices: jest.fn(
+          (_serviceUuids: string[], callback: (error: Error | null, value: unknown[]) => void) =>
+            callback(null, [service])
+        ),
+      }
+    );
+    const noble = Object.assign(new EventEmitter(), {
+      state: 'poweredOn',
+      startScanning: jest.fn((_services, _duplicates, callback) => {
+        callback?.();
+        noble.emit('discover', peripheral);
+      }),
+      stopScanning: jest.fn(callback => callback?.()),
+    });
+
+    jest.doMock('@stoprocent/noble', () => noble);
+    jest.doMock('electron', () => ({ ipcMain }));
+    jest.doMock('electron-log', () => ({
+      info: jest.fn(),
+      debug: jest.fn(),
+      error: jest.fn(),
+    }));
+
+    const { setupNobleBleHandlers } = await import('../noble-ble-handler');
+    setupNobleBleHandlers({
+      on: jest.fn(),
+      send: jest.fn(),
+    } as unknown as WebContents);
+
+    const connect = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT);
+    const subscribe = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_SUBSCRIBE);
+    const disconnect = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_DISCONNECT);
+    if (!connect || !subscribe || !disconnect) {
+      throw new Error('Electron Noble BLE handlers were not registered');
+    }
+
+    await expect(Promise.resolve(connect(undefined, peripheral.id))).resolves.toBeUndefined();
+    try {
+      await expect(Promise.resolve(subscribe(undefined, peripheral.id))).resolves.toMatchObject({
+        type: 'NobleBleIpcError',
+        success: false,
+        error: {
+          errorCode: HardwareErrorCode.BleBondInvalid,
+          params: {
+            nativeErrorMessage: 'Notification subscription failed: Encryption is insufficient',
+          },
+        },
+      });
+    } finally {
+      await disconnect(undefined, peripheral.id);
+    }
+  });
+
+  test('settles a pending Noble connect with the native disconnect error', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+    const Noble = require('@stoprocent/noble/lib/noble');
+    const bindings = Object.assign(new EventEmitter(), {
+      connect: jest.fn(),
+    });
+    const noble = new Noble(bindings);
+    noble._registerListeners();
+    const peripheral = noble._createPeripheral(
+      'aabbccdd',
+      '',
+      'unknown',
+      true,
+      { localName: 'Pro2 A1B2', serviceUuids: ['0001'] },
+      -50,
+      false
+    );
+    const connectCallback = jest.fn();
+
+    peripheral.connect(connectCallback);
+    const nativeError = new Error(
+      'CBErrorDomain:14 Peer removed pairing information on the device side'
+    );
+    bindings.emit('disconnect', 'aabbccdd', nativeError);
+
+    expect(connectCallback).toHaveBeenCalledWith(nativeError);
+    expect(peripheral.state).toBe('disconnected');
   });
 
   test('enumerates a Pro2 communication advertisement after Find My changes its name', async () => {

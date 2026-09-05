@@ -22,6 +22,7 @@ import {
   createNeedUpgradeFirmwareHardwareError,
   createNewFirmwareForceUpdateHardwareError,
   createNewFirmwareUnReleaseHardwareError,
+  isBleStaleBondHardwareError,
 } from '@onekeyfe/hd-shared';
 
 import { LoggerNames, enableLog, getLogger, setLoggerPostMessage, wait } from '../utils';
@@ -945,7 +946,16 @@ export function isRetryableBleConnectionError(method: BaseMethod, error: unknown
   if (method.device?.wasInterruptedByUser()) {
     return false;
   }
-  const typedError = error as { errorCode?: unknown };
+  const typedError = error as {
+    errorCode?: unknown;
+    params?: { acquireDeadlineExceeded?: unknown };
+  };
+  if (
+    typedError?.errorCode === HardwareErrorCode.BleTimeoutError &&
+    typedError.params?.acquireDeadlineExceeded === true
+  ) {
+    return false;
+  }
   return (
     typedError?.errorCode === HardwareErrorCode.BleTimeoutError ||
     typedError?.errorCode === HardwareErrorCode.BleConnectedError ||
@@ -964,11 +974,13 @@ export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unkn
   );
 }
 
-export function isProtocolV2PeerRemovedPairingError(method: BaseMethod, error: unknown) {
+export function isTerminalBleStaleBondError(error: unknown) {
+  return isBleStaleBondHardwareError(error);
+}
+
+export function isDeviceIdentityMismatchError(error: unknown) {
   return (
-    method.payload.connectProtocol === 'V2' &&
-    (error as { errorCode?: unknown })?.errorCode ===
-      HardwareErrorCode.BlePeerRemovedPairingInformation
+    (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.DeviceCheckDeviceIdError
   );
 }
 
@@ -1001,7 +1013,8 @@ function raceBleAcquire<T>(acquirePromise: Promise<T>, abortSignal?: AbortSignal
           reject(
             ERRORS.TypedError(
               HardwareErrorCode.BleTimeoutError,
-              `BLE acquire exceeded ${BLE_ACQUIRE_DEADLINE_MS}ms deadline`
+              `BLE acquire exceeded ${BLE_ACQUIRE_DEADLINE_MS}ms deadline`,
+              { acquireDeadlineExceeded: true }
             )
           )
         ),
@@ -1283,7 +1296,8 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceInterruptedFromUser,
             HardwareErrorCode.CallQueueActionCancelled,
           ].includes(error.errorCode) ||
-          isProtocolV2PeerRemovedPairingError(method, error)
+          isTerminalBleStaleBondError(error) ||
+          isDeviceIdentityMismatchError(error)
         ) {
           reject(error);
           return;
