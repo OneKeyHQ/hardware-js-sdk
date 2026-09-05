@@ -46,6 +46,7 @@ let disposePromise: Promise<void> | undefined;
 let windowCleanup: Promise<void> | undefined;
 let removeIpcHandlers: (() => void) | undefined;
 const pendingCancellations = new Set<() => void>();
+const pendingEnumerations = new Set<() => Promise<void>>();
 const nativeConnections = new Set<{ cancel: () => void; settled: Promise<void> }>();
 
 function trackNativeConnection(operation: Promise<unknown>, cancel: () => void): void {
@@ -1150,7 +1151,7 @@ async function performTargetedScan(
 }
 
 // Enumerate devices
-async function enumerateDevices(): Promise<DeviceInfo[]> {
+async function enumerateDevices(isWindowDestroyed: () => boolean): Promise<DeviceInfo[]> {
   if (!noble) {
     await initializeNoble();
   }
@@ -1160,6 +1161,7 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
   }
 
   assertBleActive();
+  if (isWindowDestroyed()) return [];
   // Capture noble reference for use in closures (TypeScript narrowing)
   const nobleInstance = noble;
 
@@ -1176,16 +1178,22 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
     const devices: DeviceInfo[] = [];
     let settled = false;
     let intervalId: ReturnType<typeof setInterval> | undefined;
+    let cleanupPromise: Promise<void> | undefined;
 
     // Cleanup function: clears timers and waits until Noble confirms scanning
     // has stopped. Resolving enumerate before this callback creates a race with
     // an immediately-following connection attempt.
-    const cleanup = async () => {
-      settled = true;
-      pendingCancellations.delete(cancel);
-      clearTimeout(timeoutId);
-      if (intervalId) clearInterval(intervalId);
-      await waitForNobleScanStop(nobleInstance);
+    const cleanup = () => {
+      if (!cleanupPromise) {
+        settled = true;
+        pendingCancellations.delete(cancel);
+        clearTimeout(timeoutId);
+        if (intervalId) clearInterval(intervalId);
+        cleanupPromise = waitForNobleScanStop(nobleInstance).finally(() => {
+          pendingEnumerations.delete(cancel);
+        });
+      }
+      return cleanupPromise;
     };
 
     // Collect discovered devices into the devices array
@@ -1214,10 +1222,9 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
       resolve(devices);
     }, DEVICE_SCAN_TIMEOUT);
 
-    const cancel = () => {
-      cleanup().then(() => resolve([]), reject);
-    };
+    const cancel = () => cleanup().then(() => resolve([]), reject);
     pendingCancellations.add(cancel);
+    pendingEnumerations.add(cancel);
 
     // Start scanning without a service UUID filter so Pro2 advertisements with
     // short vendor UUIDs can be found. Repeated advertisements are required when
@@ -2163,7 +2170,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     // Handle enumerate request
     handle(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE, async () => {
       try {
-        const devices = await enumerateDevices();
+        const devices = await enumerateDevices(() => windowDestroyed);
         safeLog(logger, 'debug', 'Enumeration completed', {
           count: devices.length,
           devices: devices.map(device => ({ id: device.id, name: device.name })),
@@ -2312,8 +2319,11 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
       if (disposing) return;
       safeLog(logger, 'info', 'Cleaning up Noble BLE handlers');
       const previousCleanup = windowCleanup;
+      // Cancel before yielding so old timers cannot stop a replacement renderer's scan.
+      const enumerations = Array.from(pendingEnumerations, cancel => cancel());
       windowCleanup = (async () => {
         if (previousCleanup) await previousCleanup;
+        await Promise.allSettled(enumerations);
         if (disposing) return;
         const deviceIds = Array.from(connectedDevices.keys());
         for (const deviceId of deviceIds) {
