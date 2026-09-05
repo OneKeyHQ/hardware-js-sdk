@@ -1,3 +1,5 @@
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { LoggerNames, getLogger } from '../utils';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
@@ -38,6 +40,24 @@ export default class RequestQueue {
 
   public getTask(requestId: number): RequestTask | undefined {
     return this.requestQueue.get(requestId);
+  }
+
+  public async waitForTask<T>(task: RequestTask, pending: () => Promise<T>): Promise<T> {
+    const signal = task.method.abortSignal;
+    const cancellationError = () => ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+    if (signal?.aborted) throw cancellationError();
+    let onAbort: (() => void) | undefined;
+    try {
+      const cancelled = new Promise<never>((_, reject) => {
+        onAbort = () => reject(cancellationError());
+        signal?.addEventListener('abort', onAbort, { once: true });
+      });
+      const result = await Promise.race([pending(), cancelled]);
+      if (signal?.aborted) throw cancellationError();
+      return result;
+    } finally {
+      if (onAbort) signal?.removeEventListener('abort', onAbort);
+    }
   }
 
   // 获取请求的AbortController

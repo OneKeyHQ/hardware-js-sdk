@@ -677,6 +677,8 @@ export default class ReactNativeBleTransport {
    * @returns
    */
   async enumerate() {
+    const scanStartedAt = Date.now();
+    let firstDeviceMs: number | undefined;
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<IOneKeyDevice[]>(async (resolve, reject) => {
       const deviceList: IOneKeyDevice[] = [];
@@ -788,6 +790,7 @@ export default class ReactNativeBleTransport {
 
       const addDevice = (device: Device) => {
         if (deviceList.every(d => d.id !== device.id)) {
+          firstDeviceMs ??= Date.now() - scanStartedAt;
           const displayName = getDeviceDisplayName(device) ?? 'Unknown BLE Device';
 
           deviceList.push({
@@ -805,6 +808,12 @@ export default class ReactNativeBleTransport {
 
       timer.timeout(() => {
         blePlxManager.stopDeviceScan();
+        Log?.debug('[ReactNativeBleTransport] scan completed', {
+          elapsedMs: Date.now() - scanStartedAt,
+          firstDeviceMs,
+          deviceCount: deviceList.length,
+          scanWindowMs: this.scanTimeout,
+        });
         resolve(deviceList);
       }, this.scanTimeout);
     });
@@ -1855,17 +1864,26 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  cancel() {
+  async cancel() {
     Log?.debug('transport-react-native transport cancel');
-    if (this.runPromise) {
-      // this.runPromise.reject(new Error('Transport_CallCanceled'));
+    const pending = this.runPromise;
+    const deviceId = this.runPromiseDeviceId;
+    if (pending) {
+      pending.reject(ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled));
+      if (this.runPromise === pending) {
+        this.runPromise = null;
+        this.runPromiseDeviceId = null;
+      }
+      // A V1 read cannot be safely reused after abandoning its response.
+      // Drain native teardown before DeviceCommands releases the operation.
+      if (deviceId) await this.disconnect(deviceId);
     }
-    this.runPromise = null;
-    this.runPromiseDeviceId = null;
   }
 
   /** Run a native connect under the JS backstop budget. */
   private async connectWithTimeout<T>(uuid: string, connect: () => Promise<T>): Promise<T> {
+    const startedAt = Date.now();
+    let succeeded = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
     const pending = connect();
@@ -1887,6 +1905,7 @@ export default class ReactNativeBleTransport {
           }, BLE_CONNECT_TIMEOUT_MS);
         }),
       ]);
+      succeeded = true;
       return result;
     } catch (error) {
       if (timedOut || isNativeOperationTimeoutError(error)) {
@@ -1901,6 +1920,12 @@ export default class ReactNativeBleTransport {
       throw error;
     } finally {
       if (timer) clearTimeout(timer);
+      Log?.debug('[ReactNativeBleTransport] connect completed', {
+        connectIdSuffix: uuid.slice(-8),
+        elapsedMs: Date.now() - startedAt,
+        succeeded,
+        backstopExpired: timedOut,
+      });
     }
   }
 
@@ -1909,6 +1934,8 @@ export default class ReactNativeBleTransport {
     uuid: string,
     device: Device
   ): Promise<ResolvedBleCharacteristics> {
+    const startedAt = Date.now();
+    let succeeded = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
     const pending = this.resolveCharacteristics(device);
@@ -1929,6 +1956,7 @@ export default class ReactNativeBleTransport {
         }),
       ]);
       this.connectionSetupTimeoutCounts.delete(uuid);
+      succeeded = true;
       return result;
     } catch (error) {
       if (timedOut || isNativeOperationTimeoutError(error)) {
@@ -1943,6 +1971,12 @@ export default class ReactNativeBleTransport {
       throw error;
     } finally {
       if (timer) clearTimeout(timer);
+      Log?.debug('[ReactNativeBleTransport] GATT setup completed', {
+        connectIdSuffix: uuid.slice(-8),
+        elapsedMs: Date.now() - startedAt,
+        succeeded,
+        backstopExpired: timedOut,
+      });
     }
   }
 

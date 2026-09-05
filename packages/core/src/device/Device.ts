@@ -297,6 +297,8 @@ export class Device extends EventEmitter {
   /** Resolves only after the active run has completed its release path. */
   private runCleanupPromise?: Promise<void>;
 
+  private userInterruption?: { attempt: number; promise: Promise<void> };
+
   externalState: string[] = [];
 
   unavailableCapabilities: UnavailableCapabilities = {};
@@ -1596,45 +1598,52 @@ export class Device extends EventEmitter {
     }
   }
 
-  async interruptionFromUser() {
+  interruptionFromUser(): Promise<void> {
+    const attempt = this.connectionAttempt;
+    if (this.userInterruption?.attempt === attempt) {
+      return this.userInterruption.promise;
+    }
     const error = ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
-    this.interruptedAttempt = this.connectionAttempt;
+    this.interruptedAttempt = attempt;
     const cleanupPromise = this.runCleanupPromise;
-    const { cancelableAction } = this;
-    if (cancelableAction) {
-      await cancelableAction(error);
-    } else if (this.shouldSendFallbackProtocolCancel()) {
-      await this.commands?.cancelDevice?.().catch(cancelError => {
-        Log.debug('Protocol V2 fallback cancel error', cancelError);
-      });
-    } else if (!this.hasDeviceAcquire()) {
-      // Pairing / connect-native / probe: drop the physical link only.
-      // Never acquire or send protocol Cancel just to abort setup.
-      if (this.mainId && this.deviceConnector?.disconnect) {
-        await this.deviceConnector.disconnect(this.mainId).catch(disconnectError => {
-          Log.debug('Ignored disconnect during user cancel without acquire', disconnectError);
+    const { cancelableAction, commands, runPromise, deviceConnector, mainId } = this;
+    const sendFallbackCancel = this.shouldSendFallbackProtocolCancel();
+    const acquired = this.hasDeviceAcquire();
+    const promise = (async () => {
+      if (cancelableAction) {
+        await cancelableAction(error);
+      } else if (sendFallbackCancel) {
+        await commands?.cancelDevice?.().catch(cancelError => {
+          Log.debug('Protocol V2 fallback cancel error', cancelError);
         });
+      } else if (!acquired) {
+        // Abort setup without acquiring a session just to send Cancel.
+        if (mainId && deviceConnector?.disconnect) {
+          await deviceConnector.disconnect(mainId);
+        }
+        if (this.connectionAttempt === attempt) this.markTransportDisconnected();
       }
-      this.markTransportDisconnected();
-    }
-    await this.commands?.cancel();
-
-    if (this.runPromise) {
-      this.runPromise.reject(error);
-      this.runPromise = null;
-    }
-    await cleanupPromise?.catch(() => undefined);
+      await commands?.cancel();
+      runPromise?.reject(error);
+      if (this.runPromise === runPromise) this.runPromise = null;
+      await cleanupPromise?.catch(() => undefined);
+    })();
+    // Keep the settled promise for this attempt so a duplicate close/finally
+    // cannot send a second wire Cancel. A new attempt gets its own cleanup.
+    this.userInterruption = { attempt, promise };
+    return promise;
   }
 
   setCancelableAction(callback: (err?: Error) => Promise<unknown>) {
-    this.cancelableAction = (e?: Error) =>
+    const action = (e?: Error) =>
       callback(e)
         .catch(e2 => {
           Log.debug('cancelableAction error', e2);
         })
         .finally(() => {
-          this.clearCancelableAction();
+          if (this.cancelableAction === action) this.clearCancelableAction();
         });
+    this.cancelableAction = action;
   }
 
   clearCancelableAction() {

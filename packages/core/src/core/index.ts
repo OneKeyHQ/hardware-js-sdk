@@ -313,25 +313,25 @@ const waitForPendingPromise = async (
   if (pendingPromise) {
     Log.debug('pre pending call promise before call method, wait for it');
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let timedOut = false;
     try {
       await Promise.race([
         pendingPromise,
-        new Promise<void>(resolve => {
+        new Promise<void>((_, reject) => {
           timer = setTimeout(() => {
-            timedOut = true;
-            resolve();
+            reject(
+              ERRORS.TypedError(
+                HardwareErrorCode.DeviceBusy,
+                'Previous device cancellation is still draining'
+              )
+            );
           }, PRE_PENDING_CALL_TIMEOUT_MS);
         }),
       ]);
-    } catch (error) {
-      // Cancellation is best-effort; the transport teardown owns recovery.
+      // A deadline is not evidence that old I/O is safe to reuse. Keep the
+      // barrier on failure; a later call may proceed only after cleanup settles.
+      removePrePendingCallPromise?.(connectId, pendingPromise);
     } finally {
       if (timer) clearTimeout(timer);
-      removePrePendingCallPromise?.(connectId, pendingPromise);
-    }
-    if (timedOut) {
-      Log.warn('pre pending call promise timed out before call method', { connectId });
     }
     Log.debug('pre pending call promise before call method done');
   }
@@ -367,42 +367,38 @@ const onCallDevice = async (
     DevicePool.clearDeviceCache(method.payload.connectId);
   }
 
-  // wait for previous callback tasks to complete (ensure device does not call concurrently)
-  if (method.connectId) {
-    await context.waitForCallbackTasks(method.connectId);
-  }
-
-  await waitForPendingPromise(
-    method.connectId ?? '',
-    getPrePendingCallPromise,
-    removePrePendingCallPromise
-  );
-
+  // Register before waiting so cancellation also covers queued requests.
   const task = requestQueue.createTask(method);
 
   // Pre-warm holds the device as a per-connectId callback task so a concurrent
   // real call waits (before ensureConnected) instead of racing its Initialize.
   // Only covers pre-warm -> real-call ordering; the reverse is fail-closed.
   let preWarmCallbackTask: Deferred<void> | undefined;
-  if (method.isPreWarmSignal && method.connectId) {
-    preWarmCallbackTask = createDeferred<void>();
-    context.registerCallbackTask(method.connectId, preWarmCallbackTask);
-  }
-
   let device: Device;
   try {
+    const connectId = method.connectId ?? '';
+    if (connectId) {
+      await requestQueue.waitForTask(task, () => context.waitForCallbackTasks(connectId));
+    }
+    await requestQueue.waitForTask(task, () =>
+      waitForPendingPromise(
+        method.connectId ?? '',
+        getPrePendingCallPromise,
+        removePrePendingCallPromise
+      )
+    );
+    if (method.isPreWarmSignal && method.connectId) {
+      preWarmCallbackTask = createDeferred<void>();
+      context.registerCallbackTask(method.connectId, preWarmCallbackTask);
+    }
     /**
      * Polling to ensure successful connection
      */
-    const connectId = method.connectId ?? '';
     const pollingId = pollingManager.start(connectId);
-    device = await ensureConnected(
-      context,
-      method,
-      connectId,
-      pollingId,
-      task.abortController?.signal
-    );
+    device = await ensureConnected(context, method, connectId, pollingId, method.abortSignal);
+    if (method.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+    }
   } catch (e) {
     preWarmCallbackTask?.resolve();
     Log.debug('ensureConnected error: ', e);
@@ -1779,7 +1775,17 @@ export default class Core extends EventEmitter {
           this.prePendingCallPromises.delete(connectId);
           return;
         }
-        this.prePendingCallPromises.set(connectId, promise);
+        const previous = this.prePendingCallPromises.get(connectId);
+        const cleanupPromise =
+          previous && previous !== promise
+            ? Promise.all([previous, promise]).then(() => undefined)
+            : promise;
+        this.prePendingCallPromises.set(connectId, cleanupPromise);
+        // cancel() is fire-and-forget. Observe failures immediately, while
+        // preserving the rejected barrier for the next caller's safety check.
+        cleanupPromise.catch(error => {
+          Log.warn('Device cancellation cleanup failed', { errorCode: error?.errorCode });
+        });
       },
       removePrePendingCallPromise: (connectId: string, promise: Promise<void>) => {
         if (this.prePendingCallPromises.get(connectId) === promise) {

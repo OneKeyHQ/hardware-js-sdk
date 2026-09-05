@@ -56,6 +56,34 @@ function createHarness() {
 }
 
 describe('Protocol V1 stale call timeout', () => {
+  test('settles a cancelled read and waits for native teardown before completing cancel', async () => {
+    const { t, disconnectSpy } = createHarness();
+    let finishDisconnect!: () => void;
+    disconnectSpy.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          finishDisconnect = resolve;
+        })
+    );
+    const call = t.call(UUID, 'Initialize', {}, { timeoutMs: 25000 });
+    const result = call.catch(error => error);
+    await flush();
+    let cancelled = false;
+    const cleanup = t.cancel().then(() => {
+      cancelled = true;
+    });
+    await flush();
+    expect(await result).toMatchObject({ errorCode: HardwareErrorCode.CallQueueActionCancelled });
+    expect(t.runPromise).toBeNull();
+    expect(disconnectSpy).toHaveBeenCalledWith(UUID);
+    expect(cancelled).toBe(false);
+    finishDisconnect();
+    await cleanup;
+    jest.advanceTimersByTime(25000);
+    await flush();
+    expect(disconnectSpy).toHaveBeenCalledTimes(1);
+  });
+
   beforeAll(() => {
     jest.useFakeTimers({ doNotFake: ['setImmediate', 'performance'] });
   });
@@ -172,24 +200,25 @@ describe('Protocol V1 stale call timeout', () => {
     expect(secondErrors).toHaveLength(1);
   });
 
-  test('orphan timer left behind by cancel() must not disconnect the transport', async () => {
+  test('a cancelled read cannot disconnect a later transport when its old deadline passes', async () => {
     const { t, disconnectSpy } = createHarness();
 
-    // cancel() nulls the ownership slot without settling the deferred, so the
-    // call's response timer stays armed (reachable via DeviceCommands.dispose).
     const errors: Array<{ errorCode?: unknown }> = [];
     const p = t.call(UUID, 'GetFeatures', {}, { timeoutMs: 5000 });
     p.catch(e => errors.push(e));
     await flush();
 
-    t.cancel();
+    await t.cancel();
+    await flush();
+    expect(disconnectSpy).toHaveBeenCalledTimes(1);
+    disconnectSpy.mockClear();
 
     jest.advanceTimersByTime(5000);
     await flush();
 
     expect(disconnectSpy).not.toHaveBeenCalled();
     expect(errors).toHaveLength(1);
-    expect(errors[0]?.errorCode).toBe(HardwareErrorCode.BleTimeoutError);
+    expect(errors[0]?.errorCode).toBe(HardwareErrorCode.CallQueueActionCancelled);
   });
 
   test('timeout on the active call still disconnects the transport', async () => {
