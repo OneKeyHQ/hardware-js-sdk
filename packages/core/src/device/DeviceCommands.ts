@@ -198,6 +198,8 @@ export class DeviceCommands {
 
   disposed: boolean;
 
+  private disposalToken?: object;
+
   callPromise?: Promise<DefaultMessageResponse>;
 
   constructor(device: Device, mainId: string) {
@@ -212,6 +214,7 @@ export class DeviceCommands {
 
   async dispose(_cancelRequest: boolean) {
     this.disposed = true;
+    this.disposalToken = {};
     await this.transport.cancel?.();
   }
 
@@ -439,6 +442,7 @@ export class DeviceCommands {
     msg?: DefaultMessageResponse['message'],
     options?: TransportCallOptions
   ) {
+    const { disposalToken } = this;
     let resp = await this.call(type, msg, options);
     // Session busy failures precede wallet derivation or reject an occupied flow.
     // Three retries cover the 240 ms PIN dismissal animation on older V2 firmware.
@@ -457,6 +461,10 @@ export class DeviceCommands {
         throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
       }
       this.checkDisposed();
+      if (this.disposalToken !== disposalToken) {
+        // React Native can revive this instance. A stale retry must not release the new run.
+        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'DeviceCommands lifecycle changed');
+      }
       resp = await this.call(type, msg, options);
     }
     return this._filterCommonTypes(resp, type, options);

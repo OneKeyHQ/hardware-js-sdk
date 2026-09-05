@@ -1,6 +1,9 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { DeviceSessionErrorCode } from '@onekeyfe/hd-transport';
 
+import { DataManager } from '../src/data-manager';
+import TransportManager from '../src/data-manager/TransportManager';
+import { Device } from '../src/device/Device';
 import { DeviceCommands } from '../src/device/DeviceCommands';
 import { DEVICE } from '../src/events';
 import { LoggerNames, getLogger } from '../src/utils';
@@ -958,6 +961,75 @@ describe('DeviceCommands Protocol V2 session busy retry', () => {
     await flushCalls();
     await expect(result).resolves.toBe(error);
     expect(call).toHaveBeenCalledTimes(2);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('stops a superseded retry when a React Native run reuses the commands', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    const call = jest.fn().mockResolvedValueOnce(busy).mockResolvedValueOnce(busy);
+    call.mockResolvedValue(success);
+    const cancel = jest.fn();
+    jest.spyOn(TransportManager, 'getTransport').mockReturnValue({
+      call,
+      cancel,
+    } as DeviceCommands['transport']);
+    const device = Device.fromDescriptor({
+      id: 'ble-device',
+      path: 'ble-device',
+      name: 'OneKey Test',
+      debug: false,
+      commType: 'ble',
+      protocolType: 'V2',
+    });
+    const commands = new DeviceCommands(device, 'ble-device');
+    device.commands = commands;
+    const release = jest.spyOn(device, 'release');
+    const continued = jest.fn();
+    let staleCallResult: Promise<unknown> | undefined;
+    const staleRun = device
+      .run(
+        async () => {
+          const operation = commands.typedCall('DeviceSessionAskPassphrase', 'Success', {
+            on_device: true,
+          });
+          staleCallResult = operation.catch(error => error);
+          await operation;
+          continued();
+        },
+        { keepSession: true }
+      )
+      .catch(error => error);
+    await flushCalls();
+
+    const nextRun = device.run(
+      async () => {
+        await commands.typedCall('DeviceSessionAskPin', 'Success');
+      },
+      { keepSession: true }
+    );
+    await flushCalls();
+    expect(device.commands).toBe(commands);
+    expect(commands.disposed).toBe(false);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(call).toHaveBeenCalledTimes(2);
+
+    jest.advanceTimersByTime(100);
+    await flushCalls();
+
+    await expect(staleRun).resolves.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInterruptedFromOutside,
+    });
+    await expect(staleCallResult).resolves.toMatchObject({
+      errorCode: HardwareErrorCode.RuntimeError,
+    });
+    await expect(nextRun).resolves.toBeUndefined();
+    expect(call.mock.calls.map(([, request]) => request)).toEqual([
+      'DeviceSessionAskPassphrase',
+      'DeviceSessionAskPin',
+      'DeviceSessionAskPin',
+    ]);
+    expect(continued).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
     expect(jest.getTimerCount()).toBe(0);
   });
 
