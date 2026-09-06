@@ -16,3 +16,9 @@ export async function initNobleBleSupport(webContents: WebContents) {
   const { setupNobleBleHandlers } = await import('./noble-ble-handler');
   setupNobleBleHandlers(webContents);
 }
+
+/** Terminal process cleanup. A host sharing Noble can defer native stop until all users are idle. */
+export async function disposeNobleBleSupport(releaseNoble?: (noble: { stop(): void }) => void) {
+  const handler = await import('./noble-ble-handler');
+  await handler.disposeNobleBleSupport(releaseNoble);
+}
