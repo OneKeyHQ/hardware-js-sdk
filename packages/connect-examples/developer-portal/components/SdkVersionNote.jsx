@@ -1,4 +1,4 @@
-import { iframeConnectSrc, SDK_PACKAGE_VERSION } from '../lib/sdkRelease.js'
+import { iframeConnectSrc, SDK_PACKAGE_VERSION } from '../helpers/sdkRelease.js'
 
 export function SdkVersionNote({ locale = 'en' }) {
   const isZh = locale === 'zh'
