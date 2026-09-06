@@ -783,7 +783,6 @@ export default class ReactNativeBleTransport {
               // Android Bluetooth will report an error when the search frequency is too fast,
               // then nothing is processed and an empty array of devices is returned.
               // Then the next search will be back to normal
-              timer.timeout(() => {}, this.scanTimeout);
             } else {
               finishScan(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.reason ?? ''));
             }
