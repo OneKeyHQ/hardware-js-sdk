@@ -34,6 +34,7 @@ const createState = (overrides: Partial<DeviceState> = {}): DeviceState =>
     capabilities: [],
     verification: {
       applicationP1BuildId: 'app-p1',
+      applicationP1Hash: 'a1b2c3d4',
       applicationP2BuildId: 'app-p2',
       se01BuildId: 'se01-app',
       se02BuildId: 'se02-app',
@@ -60,6 +61,11 @@ describe('buildDeviceAdvancedInfo', () => {
       'ble',
     ]);
     expect(info.securityElementGroups.map(group => group.key)).toEqual(['se01', 'se02']);
+    expect(
+      info.deviceGroups
+        .find(group => group.key === 'applicationP1')
+        ?.fields.find(field => field.key === 'applicationP1.hash')?.labelId
+    ).toBe('label__device_component_hash_prefix');
   });
 
   test('旧协议使用 Firmware 分组且不渲染不存在的组件', () => {
@@ -77,12 +83,17 @@ describe('buildDeviceAdvancedInfo', () => {
           board: null,
           ble: null,
         },
-        verification: { firmwareBuildId: 'legacy-firmware' },
+        verification: { firmwareBuildId: 'legacy-firmware', firmwareHash: 'a'.repeat(64) },
         securityElements: undefined,
       })
     );
 
     expect(info.deviceGroups.map(group => group.key)).toEqual(['identity', 'firmware']);
     expect(info.securityElementGroups).toEqual([]);
+    expect(
+      info.deviceGroups
+        .find(group => group.key === 'firmware')
+        ?.fields.find(field => field.key === 'firmware.hash')?.labelId
+    ).toBe('label__device_component_hash');
   });
 });

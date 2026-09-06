@@ -8,13 +8,14 @@ import { useMedia } from '../../provider/MediaProvider';
 interface DeviceFieldProps {
   field: string;
   value?: string | undefined | null;
+  fullWidth?: boolean;
 }
 
 function isNil(value: string | undefined | null) {
   return value == null || value.trim() === '' || value.trim() === 'unknown';
 }
 
-function DeviceFieldView({ field, value }: DeviceFieldProps) {
+function DeviceFieldView({ field, value, fullWidth = false }: DeviceFieldProps) {
   const { features, onekeyFeatures } = useDeviceFieldContext();
   const media = useMedia();
   const resolvedContextValue =
@@ -28,7 +29,7 @@ function DeviceFieldView({ field, value }: DeviceFieldProps) {
   const fieldValue = value !== undefined ? value : resolvedContextValue;
   const displayValue = isNil(fieldValue) ? '—' : fieldValue;
 
-  const width = media.gtLg ? '49%' : '100%';
+  const width = fullWidth || !media.gtLg ? '100%' : '49%';
   return (
     <XStack flexWrap="wrap" width={width}>
       <Text minWidth={260} color="$textSubdued" fontSize={18} fontWeight="bold">
@@ -39,6 +40,7 @@ function DeviceFieldView({ field, value }: DeviceFieldProps) {
           <Text
             flex={1}
             flexWrap="wrap"
+            wordWrap="break-word"
             fontSize={18}
             fontWeight="bold"
             color="$textInfo"
@@ -54,6 +56,8 @@ function DeviceFieldView({ field, value }: DeviceFieldProps) {
           <Text
             flex={1}
             flexWrap="wrap"
+            wordWrap="break-word"
+            selectable={fullWidth}
             fontSize={18}
             fontWeight="bold"
             color={isNil(fieldValue) ? '$textSubdued' : '$text'}
@@ -66,5 +70,6 @@ function DeviceFieldView({ field, value }: DeviceFieldProps) {
 
 export const DeviceField = memo(
   DeviceFieldView,
-  (prev, next) => prev.field === next.field && prev.value === next.value
+  (prev, next) =>
+    prev.field === next.field && prev.value === next.value && prev.fullWidth === next.fullWidth
 );

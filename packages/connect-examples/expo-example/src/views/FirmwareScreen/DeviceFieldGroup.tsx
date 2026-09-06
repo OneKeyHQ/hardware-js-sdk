@@ -30,6 +30,7 @@ function DeviceFieldGroupContainer({ group }: DeviceFieldGroupContainerProps) {
             key={item.key}
             field={intl.formatMessage({ id: item.labelId })}
             value={item.value}
+            fullWidth={item.key.endsWith('.hash') || item.key.endsWith('.bootHash')}
           />
         ))}
       </XStack>

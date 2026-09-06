@@ -107,6 +107,34 @@ type UpdateVersionsResult = {
   bootloaderVersion?: string;
 };
 
+type RemoteHash = {
+  key: string;
+  label: string;
+  packageSha256?: string;
+  payloadHash?: string;
+};
+
+function getRemoteHashes(release: AllFirmwareRelease): RemoteHash[] {
+  const hashes: RemoteHash[] = Object.entries(release.release?.components ?? {})
+    .map(([key, component]) => ({
+      key: `component:${key}`,
+      label: `${component.target} · ${key}`,
+      packageSha256: component.fingerprint,
+      payloadHash: component.payloadHash,
+    }))
+    .filter(item => item.packageSha256 || item.payloadHash);
+
+  if (release.resourceArchive?.archiveSha256) {
+    hashes.push({
+      key: 'resource:archive',
+      label: 'RESOURCE · archive',
+      packageSha256: release.resourceArchive.archiveSha256,
+    });
+  }
+
+  return hashes;
+}
+
 function formatBytes(bytes?: number) {
   if (!bytes || !Number.isFinite(bytes)) return '0 B';
   if (bytes < 1024) return `${bytes} B`;
@@ -253,6 +281,7 @@ export default function Pro2UpdatePage() {
   const [isConnectingLocal, setIsConnectingLocal] = useState(false);
   const [logs, setLogs] = useState<UpdateLog[]>([]);
   const [result, setResult] = useState<UpdateVersionsResult | null>(null);
+  const [remoteHashes, setRemoteHashes] = useState<RemoteHash[]>([]);
   const logIdRef = useRef(0);
 
   const targetFields = useMemo(
@@ -308,6 +337,7 @@ export default function Pro2UpdatePage() {
   const runUpdate = useCallback(async () => {
     setIsRunning(true);
     setResult(null);
+    setRemoteHashes([]);
     resetFirmwareProgress();
     try {
       const device = currentDevice ?? (await connectDevice());
@@ -353,6 +383,7 @@ export default function Pro2UpdatePage() {
           throw new Error(getApiError(checkResponse.payload, 'checkAllFirmwareRelease failed'));
         }
         const release = checkResponse.payload as AllFirmwareRelease;
+        setRemoteHashes(getRemoteHashes(release));
         const plan = release.firmwareUpdatePlan;
         if (!plan || plan.executor !== 'v4') {
           if ((release.targetsToUpdate ?? []).length === 0) {
@@ -402,6 +433,7 @@ export default function Pro2UpdatePage() {
     setFiles({});
     setResourceArchiveFile(undefined);
     setResult(null);
+    setRemoteHashes([]);
   }, []);
 
   const progressPercent = progressData ? Math.min(100, Math.round(progressData.progress)) : 0;
@@ -568,6 +600,37 @@ export default function Pro2UpdatePage() {
             </div>
           </CardContent>
         </Card>
+
+        {remoteHashes.length > 0 ? (
+          <Card>
+            <CardContent className="space-y-3 p-4">
+              <div className="text-base font-semibold text-foreground">
+                Remote firmware hashes
+              </div>
+              {remoteHashes.map(item => (
+                <div key={item.key} className="rounded-md bg-muted/30 p-3">
+                  <div className="text-sm font-semibold text-foreground">{item.label}</div>
+                  {item.packageSha256 ? (
+                    <div className="mt-2">
+                      <div className="text-xs text-muted-foreground">Package SHA-256</div>
+                      <div className="break-all whitespace-normal font-mono text-xs text-foreground">
+                        {item.packageSha256}
+                      </div>
+                    </div>
+                  ) : null}
+                  {item.payloadHash ? (
+                    <div className="mt-2">
+                      <div className="text-xs text-muted-foreground">Payload Hash</div>
+                      <div className="break-all whitespace-normal font-mono text-xs text-foreground">
+                        {item.payloadHash}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
 
         {progressData ? (
           <Card>

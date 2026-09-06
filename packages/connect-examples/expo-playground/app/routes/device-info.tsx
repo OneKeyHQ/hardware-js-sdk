@@ -51,6 +51,7 @@ const componentGroup = ({
   version,
   buildId,
   hash,
+  hashLabel,
   extraFields = [],
 }: {
   key: string;
@@ -58,12 +59,13 @@ const componentGroup = ({
   version: unknown;
   buildId: unknown;
   hash: unknown;
+  hashLabel: string;
   extraFields?: DeviceField[];
 }): DeviceGroup | undefined => {
   const fields = [
     field(`${key}.version`, 'Version', version),
     field(`${key}.buildId`, 'Build ID', buildId),
-    field(`${key}.hash`, 'Hash', hash),
+    field(`${key}.hash`, hashLabel, hash),
     ...extraFields,
   ];
 
@@ -81,15 +83,24 @@ const securityElementGroup = (
   const bootBuildIdKey = `se0${index}BootBuildId` as const;
   const bootHashKey = `se0${index}BootHash` as const;
   const metadata = state.securityElements?.[key];
+  const isProtocolV2 = state.protocol === 'V2';
   const fields = [
     field(`${key}.type`, 'Type', metadata?.type),
     field(`${key}.state`, 'State', metadata?.state),
     field(`${key}.version`, 'Application Version', state.versions[key]),
     field(`${key}.buildId`, 'Application Build ID', state.verification?.[buildIdKey]),
-    field(`${key}.hash`, 'Application Hash', state.verification?.[hashKey]),
+    field(
+      `${key}.hash`,
+      isProtocolV2 ? 'Application Hash Prefix (Device)' : 'Application Hash',
+      state.verification?.[hashKey]
+    ),
     field(`${key}.bootVersion`, 'Boot Version', state.versions[bootKey]),
     field(`${key}.bootBuildId`, 'Boot Build ID', state.verification?.[bootBuildIdKey]),
-    field(`${key}.bootHash`, 'Boot Hash', state.verification?.[bootHashKey]),
+    field(
+      `${key}.bootHash`,
+      isProtocolV2 ? 'Boot Hash Prefix (Device)' : 'Boot Hash',
+      state.verification?.[bootHashKey]
+    ),
   ];
 
   return fields.some(item => hasValue(item.value))
@@ -105,6 +116,7 @@ const buildDeviceSections = (
   if (!state) return [];
 
   const verification = state.verification ?? {};
+  const hashLabel = state.protocol === 'V2' ? 'Hash Prefix (Device)' : 'Hash';
   const hasApplicationP1 = [
     state.versions.applicationP1,
     verification.applicationP1BuildId,
@@ -129,6 +141,7 @@ const buildDeviceSections = (
       version: state.versions.board,
       buildId: verification.boardBuildId,
       hash: verification.boardHash,
+      hashLabel,
     }),
     componentGroup({
       key: 'bootloader',
@@ -136,6 +149,7 @@ const buildDeviceSections = (
       version: state.versions.bootloader,
       buildId: verification.bootloaderBuildId,
       hash: verification.bootloaderHash,
+      hashLabel,
     }),
     componentGroup({
       key: hasApplicationP1 ? 'applicationP1' : 'firmware',
@@ -143,6 +157,7 @@ const buildDeviceSections = (
       version: hasApplicationP1 ? state.versions.applicationP1 : state.versions.firmware,
       buildId: hasApplicationP1 ? verification.applicationP1BuildId : verification.firmwareBuildId,
       hash: hasApplicationP1 ? verification.applicationP1Hash : verification.firmwareHash,
+      hashLabel,
     }),
     componentGroup({
       key: 'applicationP2',
@@ -150,6 +165,7 @@ const buildDeviceSections = (
       version: state.versions.applicationP2,
       buildId: verification.applicationP2BuildId,
       hash: verification.applicationP2Hash,
+      hashLabel,
     }),
     componentGroup({
       key: 'coprocessor',
@@ -157,6 +173,7 @@ const buildDeviceSections = (
       version: state.versions.ble,
       buildId: verification.bleBuildId,
       hash: verification.bleHash,
+      hashLabel,
       extraFields: [field('coprocessor.name', 'BLE Name', state.identity.bleName)],
     }),
   ];
@@ -270,6 +287,7 @@ const DeviceInfoPage: React.FC = () => {
   const renderField = (item: DeviceField) => {
     const value = formatFieldValue(item.value);
     const isEmpty = value === '--';
+    const isHashField = item.key.endsWith('.hash') || item.key.endsWith('.bootHash');
 
     return (
       <div
@@ -282,7 +300,7 @@ const DeviceInfoPage: React.FC = () => {
           isEmpty
             ? 'bg-muted/5 text-muted-foreground cursor-default'
             : 'bg-background hover:bg-accent/30 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50'
-        }`}
+        } ${isHashField ? 'col-span-full' : ''}`}
         title={isEmpty ? `${item.label} - No data` : `${item.label}: ${value} (click to copy)`}
         aria-label={isEmpty ? `${item.label} - No data` : `Copy ${item.label}: ${value}`}
       >
@@ -295,7 +313,7 @@ const DeviceInfoPage: React.FC = () => {
         <div
           className={`text-xs font-mono leading-tight font-medium ${
             isEmpty ? 'text-muted-foreground italic' : 'text-foreground'
-          } ${value.length > 30 ? 'break-all' : ''}`}
+          } ${isHashField || value.length > 30 ? 'break-all whitespace-normal' : ''}`}
         >
           {isEmpty ? 'Not available' : value}
         </div>

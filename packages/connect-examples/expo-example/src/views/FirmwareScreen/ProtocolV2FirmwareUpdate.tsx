@@ -17,6 +17,13 @@ type UpdateState = {
   payload?: string;
 };
 
+export type ProtocolV2RemoteHash = {
+  key: string;
+  label: string;
+  packageSha256?: string;
+  payloadHash?: string;
+};
+
 type RuntimeFirmwarePlatform = Extract<
   NonNullable<FirmwareUpdateV4Params['platform']>,
   'web' | 'native'
@@ -35,6 +42,7 @@ type ProtocolV2FirmwareUpdateProps = {
   onCheckUpdates: (platform: RuntimeFirmwarePlatform) => Promise<
     | (UpdateState & {
         targetsToUpdate?: FirmwareUpdateV4Target[];
+        remoteHashes?: ProtocolV2RemoteHash[];
       })
     | undefined
   >;
@@ -62,6 +70,7 @@ export function ProtocolV2FirmwareUpdate({
   const [resourceArchiveFile, setResourceArchiveFile] = useState<DocumentPickerAsset>();
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateState, setUpdateState] = useState<UpdateState>();
+  const [remoteHashes, setRemoteHashes] = useState<ProtocolV2RemoteHash[]>([]);
 
   const firmwareTargets = useMemo(() => getProtocolV2FirmwareTargets(deviceType), [deviceType]);
   const selectedTargetCount = Object.keys(targetFiles).length;
@@ -75,6 +84,7 @@ export function ProtocolV2FirmwareUpdate({
     if (result.canceled || result.assets.length === 0) return;
     setTargetFiles(current => ({ ...current, [param]: result.assets[0] }));
     setUpdateState(undefined);
+    setRemoteHashes([]);
   };
 
   const pickResourceArchive = async () => {
@@ -85,6 +95,7 @@ export function ProtocolV2FirmwareUpdate({
     if (result.canceled || result.assets.length === 0) return;
     setResourceArchiveFile(result.assets[0]);
     setUpdateState(undefined);
+    setRemoteHashes([]);
   };
 
   const runUpdate = async (useRemoteConfig: boolean) => {
@@ -99,6 +110,7 @@ export function ProtocolV2FirmwareUpdate({
       if (useRemoteConfig) {
         const checkResult = await onCheckUpdates(platform);
         if (!checkResult?.success) {
+          setRemoteHashes([]);
           setUpdateState(
             checkResult ?? {
               success: false,
@@ -107,6 +119,8 @@ export function ProtocolV2FirmwareUpdate({
           );
           return;
         }
+
+        setRemoteHashes(checkResult.remoteHashes ?? []);
 
         const targetsToUpdate = checkResult.targetsToUpdate ?? [];
         if (targetsToUpdate.length === 0) {
@@ -118,6 +132,7 @@ export function ProtocolV2FirmwareUpdate({
         }
         params.targetsToUpdate = targetsToUpdate;
       } else {
+        setRemoteHashes([]);
         for (const target of firmwareTargets) {
           const asset = targetFiles[target.param];
           if (asset) params[target.param] = await readDocumentAsset(asset);
@@ -167,6 +182,45 @@ export function ProtocolV2FirmwareUpdate({
           {deviceType.toUpperCase()} · Protocol V2
         </Text>
       </XStack>
+
+      {remoteHashes.length > 0 ? (
+        <Stack gap="$2">
+          <Text fontSize={18} fontWeight="bold">
+            {intl.formatMessage({ id: 'label__protocol_v2_remote_hashes' })}
+          </Text>
+          {remoteHashes.map(item => (
+            <Stack
+              key={item.key}
+              padding="$2"
+              gap="$2"
+              backgroundColor="$bgHover"
+              borderRadius="$2"
+            >
+              <Text fontWeight="bold">{item.label}</Text>
+              {item.packageSha256 ? (
+                <Stack gap="$1">
+                  <Text color="$textSubdued">
+                    {intl.formatMessage({ id: 'label__protocol_v2_package_sha256' })}
+                  </Text>
+                  <Text selectable wordWrap="break-word">
+                    {item.packageSha256}
+                  </Text>
+                </Stack>
+              ) : null}
+              {item.payloadHash ? (
+                <Stack gap="$1">
+                  <Text color="$textSubdued">
+                    {intl.formatMessage({ id: 'label__protocol_v2_payload_hash' })}
+                  </Text>
+                  <Text selectable wordWrap="break-word">
+                    {item.payloadHash}
+                  </Text>
+                </Stack>
+              ) : null}
+            </Stack>
+          ))}
+        </Stack>
+      ) : null}
 
       <XStack
         padding="$3"
@@ -275,6 +329,7 @@ export function ProtocolV2FirmwareUpdate({
             setTargetFiles({});
             setResourceArchiveFile(undefined);
             setUpdateState(undefined);
+            setRemoteHashes([]);
           }}
         >
           {intl.formatMessage({ id: 'action__clear_selected_files' })}

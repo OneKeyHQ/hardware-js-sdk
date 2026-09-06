@@ -29,6 +29,7 @@ import { ExportDeviceInfo, formatCurrentTime, getDeviceMode } from './ExportDevi
 import {
   ProtocolV2FirmwareUpdate,
   type ProtocolV2FirmwareUpdateRequest,
+  type ProtocolV2RemoteHash,
 } from './ProtocolV2FirmwareUpdate';
 import { loadFirmwareUpdatePlanBinaries } from './firmwareUpdatePlanHost';
 import { buildDeviceAdvancedInfo } from './deviceAdvancedInfo';
@@ -610,9 +611,27 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
           };
         }
         const targetsToUpdate = res.payload.targetsToUpdate ?? [];
+        const remoteHashes: ProtocolV2RemoteHash[] = Object.entries(
+          res.payload.release?.components ?? {}
+        )
+          .map(([key, component]) => ({
+            key: `component:${key}`,
+            label: `${component.target} · ${key}`,
+            packageSha256: component.fingerprint,
+            payloadHash: component.payloadHash,
+          }))
+          .filter(item => item.packageSha256 || item.payloadHash);
+        if (res.payload.resourceArchive?.archiveSha256) {
+          remoteHashes.push({
+            key: 'resource:archive',
+            label: 'RESOURCE · archive',
+            packageSha256: res.payload.resourceArchive.archiveSha256,
+          });
+        }
         return {
           success: true,
           targetsToUpdate,
+          remoteHashes,
         };
       } catch (error) {
         return {
