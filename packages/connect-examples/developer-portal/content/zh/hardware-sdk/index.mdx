@@ -115,14 +115,18 @@ await HardwareSDK.init({
 
 ### 插件端 Iframe
 
-使用 `@onekeyfe/hd-web-sdk`（仅插件端）：
+使用 `@onekeyfe/hd-web-sdk`（仅插件端）。SDK 默认 iframe 地址是 `https://jssdk.onekey.so/<安装包版本>/`，来自 `getSDKVersion()`。除非自建 iframe，否则不要传 `connectSrc`。
+
+import { SdkVersionNote } from '../../../components/SdkVersionNote'
+
+<SdkVersionNote locale="zh" />
 
 ```ts
 import { HardwareSDK } from '@onekeyfe/hd-web-sdk';
 
 await HardwareSDK.init({
   debug: process.env.NODE_ENV !== 'production',
-  connectSrc: 'https://jssdk.onekey.so/1.2.0/', // 必须与安装的 SDK 版本一致
+  // 省略 connectSrc — SDK 会填 https://jssdk.onekey.so/<安装版本>/
 });
 ```
 

@@ -51,7 +51,7 @@ const devices = [
   },
   {
     name: 'OneKey Pro 2',
-    image: '/icons/devices/pro.png',
+    image: '/icons/devices/pro2.png',
     bluetooth: true,
     usb: true,
     airGap: true,
@@ -60,7 +60,7 @@ const devices = [
   },
   {
     name: 'OneKey Neo',
-    image: null,
+    image: '/icons/devices/neo.png',
     bluetooth: true,
     usb: true,
     airGap: false,

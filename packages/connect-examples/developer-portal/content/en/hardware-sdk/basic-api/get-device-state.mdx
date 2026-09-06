@@ -32,11 +32,21 @@ Bootloader / romloader skips unsupported status commands and returns whatever sn
 {
   success: true,
   payload: {
-    // Unified DeviceState snapshot (V1 and V2).
-    // Includes identity, versions, pin/passphrase flags, and runtime lock state.
+    protocol: 'V1' | 'V2',
+    identity: {
+      deviceId: string | null, // seed lifetime — pass as the second SDK argument
+      serialNo: string,
+      deviceType: string,
+      // ...
+    },
+    status: { initialized, unlocked, passphraseProtection, attachToPinEnabled, ... },
+    settings: { language, airgapMode, ... },
+    versions: { firmware, bootloader, ble, applicationP1, applicationP2, ... },
   }
 }
 ```
+
+Read `payload.identity.deviceId` for the second argument of signing calls. Do not persist firmware `session_id` from compatibility Features.
 
 The payload does **not** include firmware wallet `session_id` or raw protocol messages. Wallet identity still comes from [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session) or [`getPassphraseState`](/en/hardware-sdk/basic-api/get-passphrase-state).
 

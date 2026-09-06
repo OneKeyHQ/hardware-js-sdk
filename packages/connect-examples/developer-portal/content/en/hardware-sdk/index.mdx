@@ -115,14 +115,18 @@ await HardwareSDK.init({
 
 ### Plugin Iframe Host
 
-Use `@onekeyfe/hd-web-sdk` (plugin-only):
+Use `@onekeyfe/hd-web-sdk` (plugin-only). The SDK default iframe host is `https://jssdk.onekey.so/<installed-package-version>/` from `getSDKVersion()`. Omit `connectSrc` unless you host the iframe yourself.
+
+import { SdkVersionNote } from '../../../components/SdkVersionNote'
+
+<SdkVersionNote locale="en" />
 
 ```ts
 import { HardwareSDK } from '@onekeyfe/hd-web-sdk';
 
 await HardwareSDK.init({
   debug: process.env.NODE_ENV !== 'production',
-  connectSrc: 'https://jssdk.onekey.so/1.2.0/', // must match the installed SDK version
+  // omit connectSrc — SDK fills https://jssdk.onekey.so/<installed-version>/
 });
 ```
 

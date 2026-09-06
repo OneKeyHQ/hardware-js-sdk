@@ -8,6 +8,7 @@ title: tonSignMessage
 
 * 固件版本要求
   * Touch: 4.10.0
+  * Pro 2 / Neo：Protocol V2（同一公开方法，SDK 负责字段映射）
 
 ### TON：签名消息
 
@@ -91,8 +92,8 @@ const jettonResponse = await HardwareSDK.tonSignMessage(connectId, deviceId, {
     payload: {
         skip_validate: boolean; // 用于在 Classic 1s 中跳过验证
         signature: string;
-        signing_message?: string; // Correct Pro2/Neo field; the SDK also normalizes legacy responses
-        signning_message?: string; // Deprecated; retained only for raw Protocol V1 compatibility
+        signing_message?: string; // 规范字段。Pro2/Neo 返回这个；SDK 也会从 V1 的拼写错误字段拷过来
+        signning_message?: string; // 已废弃的 Protocol V1 拼写。新代码不要读它
     }
 }
 ```

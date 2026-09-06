@@ -8,6 +8,7 @@ title: tonSignMessage
 
 * Firmware version required
   * Touch: 4.10.0
+  * Pro 2 / Neo: Protocol V2 (same public method; SDK maps fields)
 
 ### TON: sign message
 
@@ -91,8 +92,8 @@ Result
     payload: {
         skip_validate: boolean; // Used to skip validation in classic 1s.
         signature: string;
-        signing_message?: string; // Corrected field returned by Pro2/Neo and normalized by the SDK.
-        signning_message?: string; // Deprecated raw Protocol V1 field.
+        signing_message?: string; // Canonical field. Pro2/Neo return this; the SDK also copies it from the legacy V1 typo.
+        signning_message?: string; // Deprecated Protocol V1 typo. Do not read this in new code.
     }
 }
 ```

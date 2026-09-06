@@ -4,7 +4,7 @@ title: 快速开始
 
 # 快速开始
 
-从安装到读出第一个地址，大约五分钟。目标版本是 Hardware SDK **1.2.0**。
+从安装到读出第一个地址，大约五分钟。目标版本是 Hardware SDK **1.2.x**（当前稳定 `1.2.1`）。
 
 本页只覆盖第一次跑通。跑通之后再选 [传输指南](/zh/hardware-sdk/transport/web-usb)，并阅读 [Core API Guide](/zh/hardware-sdk/core-api-guide) 了解 PIN、passphrase、事件和签名。
 
@@ -49,9 +49,9 @@ if (!devices.success || !devices.payload.length) {
 
 const { connectId } = devices.payload[0];
 
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
-const deviceId = features.payload.device_id;
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
 
 const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
@@ -63,6 +63,8 @@ console.log(address.payload.address);
 ```
 
 读取 `payload` 之前必须先看 `success`。`useEmptyPassphrase: true` 把第一次调用钉在标准钱包，避免残留的隐藏钱包会话悄悄改掉地址。
+
+`getDeviceState()` 是 1.2.0 的 V1/V2 读取入口。现有应用可以继续用 `getFeatures(connectId)`，读 `payload.device_id`。
 
 WebUSB 需要 HTTPS 和用户手势。BLE 需要系统蓝牙权限。
 

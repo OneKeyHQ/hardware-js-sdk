@@ -10,82 +10,14 @@ theme:
 ---
 
 import { Package, GitBranch, Tag, ExternalLink, Cpu, Globe, ChevronRight, Calendar } from 'lucide-react'
+import hardwareSdkReleaseData from '../../data/hardware-sdk-releases.json'
 
-export const HardwareSDKReleases = [
-  {
-    version: 'v1.2.0',
-    date: '2026-08-25',
-    type: 'major',
-    changes: [
-      'Stable Protocol V2 line for OneKey Pro 2 and Neo, with Protocol V1 kept for Classic / Mini / Touch / Pro',
-      'Public wallet entry openWalletSession({ mode }) for standard, select-hidden, and resume-hidden',
-      'Unified getDeviceState() snapshot across V1/V2; getFeatures() remains compatibility',
-      'firmwareUpdateV4 for Pro 2 / Neo multi-component firmware and resource ZIP updates',
-      'BLE reconnect, wallet-session recovery, and firmware-install polling hardened for Protocol V2'
-    ]
-  },
-  {
-    version: 'v1.1.21',
-    date: '2024-12-24',
-    type: 'patch',
-    changes: [
-      'Fixed iOS and extension firmware exchange issues',
-      'Improved getFeature retry mechanism during exchange',
-      'Updated firmware switch tips for better UX'
-    ]
-  },
-  {
-    version: 'v1.1.20',
-    date: '2024-12-19',
-    type: 'minor',
-    changes: [
-      'Added configFetcher setting for custom configuration',
-      'Fixed desktop-web transport in Electron',
-      'Optimized error handling and reporting',
-      'Support for connect-only mode'
-    ]
-  },
-  {
-    version: 'v1.1.19',
-    date: '2024-12-01',
-    type: 'minor',
-    changes: [
-      'Added Bitcoin-only firmware support',
-      'New Tron features integration',
-      'WebUSB retry mechanism with 5 attempts',
-      'Fixed skipWebDevicePrompt in web environment',
-      'Improved check update functionality'
-    ]
-  },
-  {
-    version: 'v1.1.18',
-    date: '2024-11-21',
-    type: 'patch',
-    changes: [
-      'Fixed desktop Bluetooth connectivity issues'
-    ]
-  },
-  {
-    version: 'v1.1.17',
-    date: '2024-11-11',
-    type: 'minor',
-    changes: [
-      'Added React Native BLE demo support',
-      'Fixed Classic1s signTypedData for larger data',
-      'Improved bridge status check deletion',
-      'Cleaned up unused BLE SDK logs'
-    ]
-  },
-  {
-    version: 'v1.1.16',
-    date: '2024-10-29',
-    type: 'patch',
-    changes: [
-      'Performance optimizations',
-      'Minor bug fixes'
-    ]
-  }
-]
+export const HardwareSDKReleases = hardwareSdkReleaseData.hardware.map(entry => ({
+  version: entry.version,
+  date: entry.date,
+  type: entry.type,
+  changes: entry.changes.en,
+}))
 
 export const ProviderReleases = [
   {

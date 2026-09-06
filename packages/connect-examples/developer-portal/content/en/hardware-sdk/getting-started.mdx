@@ -4,7 +4,7 @@ title: Getting Started
 
 # Getting Started
 
-Five minutes from install to a first address on Hardware SDK **1.2.0**.
+Five minutes from install to a first address on Hardware SDK **1.2.x** (current stable `1.2.1`).
 
 This page is the first-run path. After it works, pick a [transport guide](/en/hardware-sdk/transport/web-usb) and read the [Core API Guide](/en/hardware-sdk/core-api-guide) for PIN, passphrase, events, and signing.
 
@@ -49,9 +49,9 @@ if (!devices.success || !devices.payload.length) {
 
 const { connectId } = devices.payload[0];
 
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
-const deviceId = features.payload.device_id;
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
 
 const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
@@ -63,6 +63,8 @@ console.log(address.payload.address);
 ```
 
 Always check `success` before reading `payload`. `useEmptyPassphrase: true` keeps this first call on the standard wallet so a leftover hidden-wallet session cannot silently change the address.
+
+`getDeviceState()` is the 1.2.0 V1/V2 read. Existing apps may keep `getFeatures(connectId)` and read `payload.device_id`.
 
 WebUSB requires HTTPS and a user gesture. BLE requires OS Bluetooth permission.
 
