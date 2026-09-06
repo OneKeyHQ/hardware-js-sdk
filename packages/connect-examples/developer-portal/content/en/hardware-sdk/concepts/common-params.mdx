@@ -1,0 +1,93 @@
+---
+title: Common Params
+---
+
+# Common Params
+
+Every `HardwareSDK.method(...)` takes a `params` object. The keys on this page are accepted by **every** method. Chain- and device-specific fields (`path`, `coin`, `tx`, `message`, …) stay on each method page.
+
+This page is the parameter **reference**. For the call lifecycle, see the [Core API Guide](/en/hardware-sdk/core-api-guide). For response IDs (`connectId`, `deviceId`, `uuid`, `session_id`, …), see [Identifiers](/en/hardware-sdk/concepts/identifiers).
+
+<div id="common-params" />
+
+| Param | Type | Purpose | Notes |
+| --- | --- | --- | --- |
+| `passphraseState` | `string` | Bind the call to a specific hidden wallet | Obtain once via `getPassphraseState` or `openWalletSession`; pass on every later call that must stay on that wallet. Cannot be combined with `useEmptyPassphrase`. This is a wallet fingerprint, not firmware `session_id`. |
+| `useEmptyPassphrase` | `boolean` | Force the standard wallet | Prevents a leftover hidden-wallet session from silently changing the address. Cannot be combined with `passphraseState`. |
+| `initSession` | `boolean` | Force session init before the call | Pair with `passphraseState` on the compatibility path. New code should prefer `openWalletSession({ mode })` instead of mixing `mode` with this flag. |
+| `deriveCardano` | `boolean` | Pre-derive the Cardano sub-tree | Set on the first Cardano call in a session. |
+| `retryCount` | `number` | Device-call retries on transport error | Useful on BLE. Do **not** use this to replay firmware update, wipe, or signing after a disconnect. |
+| `pollIntervalTime` | `number` | Polling interval (ms) between retries | Paired with `retryCount`; BLE-oriented. |
+| `timeout` | `number` | Per-call timeout (ms) | Raise for long-running ops (firmware update, large PSBT). |
+| `detectBootloaderDevice` | `boolean` | Fail fast if the device is in Bootloader | Use on signing paths where Bootloader is never valid. |
+| `skipWebDevicePrompt` | `boolean` | Skip the WebUSB chooser on re-entry | **WebUSB only.** Reuses prior WebUSB authorization. |
+| `keepSession` | `boolean` | **Deprecated** | Use `initSession + passphraseState` or `openWalletSession`. |
+
+## Transport-specific notes
+
+| Param | WebUSB | Bridge | node-usb | Android BLE | iOS BLE | Desktop BLE |
+| --- | --- | --- | --- | --- | --- | --- |
+| `skipWebDevicePrompt` | ✅ | — | — | — | — | — |
+| `retryCount` / `pollIntervalTime` / `timeout` | no-op in practice | no-op in practice | no-op in practice | **useful** | **useful** | **useful** |
+| `passphraseState` / `useEmptyPassphrase` / `initSession` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `deriveCardano` / `detectBootloaderDevice` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+## Common combos
+
+**Standard wallet — avoid accidental hidden-wallet prompts**
+
+```ts
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+```
+
+**Hidden wallet — reuse a binding across calls**
+
+```ts
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: 'select-hidden',
+});
+const hiddenWallet = {
+  passphraseState: opened.payload.passphraseState,
+};
+
+await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  ...hiddenWallet,
+});
+```
+
+Compatibility path (existing apps): `getPassphraseState(connectId, { initSession: true })`, then pass `{ initSession: true, passphraseState }` on later calls. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
+
+**BLE conservative retries (discovery / address / signing only)**
+
+```ts
+const bleDefaults = {
+  retryCount: 3,
+  pollIntervalTime: 1000,
+  timeout: 30_000,
+};
+```
+
+Do not spread `bleDefaults` onto `firmwareUpdateV2` / `V3` / `V4`. See [Reconnect and dispose](/en/hardware-sdk/transport/reconnect).
+
+## HD path
+
+<div id="hd-path" />
+
+`path: string | number[]` follows BIP44. ed25519 chains (Solana, NEAR, …) must be fully hardened.
+
+| Chain | Example path | Notes |
+| --- | --- | --- |
+| EVM | `m/44'/60'/0'/0/0` | Standard EVM account |
+| BTC (Nested SegWit) | `m/49'/0'/0'/0/0` | Use `84'` for Native SegWit |
+| Solana | `m/44'/501'/0'/0'` | Fully hardened |
+| NEAR | `m/44'/397'/0'/0'/1'` | Fully hardened |
+| Cardano | `m/1852'/1815'/0'/0/0` | Stake at `.../2/0` |
+| TRON | `m/44'/195'/0'/0/0` | EVM-style path |
+
+Number-array example: `[(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0x80000000, 0, 0]`
+
+Forbidden-path errors: check length and hardening on the chain method page.

@@ -17,6 +17,7 @@ export default {
   },
   transport: 'Transport',
   signers: 'Signer Guides',
+  'firmware-update': 'Firmware Update',
   '---api': { type: 'separator', title: 'APIs' },
   'core-api-guide': 'Core API Guide',
   'basic-api': 'Basic API',

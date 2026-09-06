@@ -20,11 +20,11 @@ const response = await HardwareSDK.nemGetAddress(connectId, deviceId, params)
 
 ### Params
 
-[Optional common params](/en/hardware-sdk/core-api-guide#common-params)
+[Optional common params](/en/hardware-sdk/concepts/common-params)
 
 **Exporting single address**
 
-* `path` - _required_ `string | Array<number>`  minimum length is 5. [more information](/en/hardware-sdk/core-api-guide#hd-path)
+* `path` - _required_ `string | Array<number>`  minimum length is 5. [more information](/en/hardware-sdk/concepts/common-params#hd-path)
 * `network`- _optional_ `number` Network id. The default value is `MAINNET(104)`
 * `showOnOneKey` - _optional_ `boolean` determines if address will be displayed on device. Default is set to `true`
 

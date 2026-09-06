@@ -1,0 +1,26 @@
+---
+title: 传输协议
+---
+
+# 选择传输
+
+Hardware SDK 1.2.0 是同一套 JavaScript API。`init({ env })` 选的是**传输**，不是 Protocol V1 / V2。
+
+| 平台 | 传输 | 包 | `env` | 指南 |
+| --- | --- | --- | --- | --- |
+| 浏览器 / 桌面 WebUSB | WebUSB | `@onekeyfe/hd-common-connect-sdk` | `webusb` | [WebUSB](/zh/hardware-sdk/transport/web-usb) |
+| React Native | BLE | `@onekeyfe/hd-ble-sdk` | （BLE SDK 默认） | [React Native BLE](/zh/hardware-sdk/transport/react-native-ble) |
+| Android 原生宿主 | 底层插件 BLE | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [Android](/zh/hardware-sdk/transport/android) |
+| iOS 原生宿主 | 底层插件 BLE | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [iOS](/zh/hardware-sdk/transport/ios) |
+| Flutter 宿主 | 底层插件 BLE | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [Flutter](/zh/hardware-sdk/transport/flutter) |
+| 原生 BLE 总览 | BLE | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [原生 BLE](/zh/hardware-sdk/transport/native-ble) |
+
+USB 覆盖全部 OneKey 设备。BLE 是 Pro、Pro 2、Neo、Touch、Classic 1s / Pure —— Mini 没有。二维码 Air-Gap 是另一条产品路径：[Air-Gap](/zh/air-gap)。
+
+## 连上之后
+
+1. 第一个地址：[快速开始](/zh/hardware-sdk/getting-started)
+2. PIN / 事件：[Core API Guide](/zh/hardware-sdk/core-api-guide)
+3. 掉线与 `dispose()`：[重连与释放](/zh/hardware-sdk/transport/reconnect)
+4. 固件：[固件升级](/zh/hardware-sdk/firmware-update)
+5. 自定义 64 字节桥：[底层传输](/zh/hardware-sdk/concepts/low-level-plugin)

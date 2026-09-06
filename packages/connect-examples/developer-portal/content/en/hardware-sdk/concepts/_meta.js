@@ -2,6 +2,7 @@ export default {
   devices: 'Devices',
   protocol: 'Protocol V1 and V2',
   identifiers: 'Identifiers',
+  'common-params': 'Common Params',
   'wallet-session': 'Wallet Sessions',
   pin: 'PIN Code',
   passphrase: 'Passphrase',

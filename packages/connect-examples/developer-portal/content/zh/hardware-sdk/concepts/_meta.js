@@ -2,6 +2,7 @@ export default {
   devices: '设备',
   protocol: 'Protocol V1 与 V2',
   identifiers: '标识符',
+  'common-params': '通用参数',
   'wallet-session': '钱包会话',
   pin: 'PIN 码',
   passphrase: 'Passphrase',

@@ -1,0 +1,26 @@
+---
+title: Transport
+---
+
+# Choose a transport
+
+Hardware SDK 1.2.0 uses one JavaScript API. `init({ env })` selects the **transport**, not Protocol V1 vs V2.
+
+| Platform | Transport | Package | `env` | Guide |
+| --- | --- | --- | --- | --- |
+| Browser / desktop WebUSB | WebUSB | `@onekeyfe/hd-common-connect-sdk` | `webusb` | [WebUSB](/en/hardware-sdk/transport/web-usb) |
+| React Native | BLE | `@onekeyfe/hd-ble-sdk` | (BLE SDK default) | [React Native BLE](/en/hardware-sdk/transport/react-native-ble) |
+| Android native host | BLE via low-level plugin | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [Android](/en/hardware-sdk/transport/android) |
+| iOS native host | BLE via low-level plugin | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [iOS](/en/hardware-sdk/transport/ios) |
+| Flutter host | BLE via low-level plugin | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [Flutter](/en/hardware-sdk/transport/flutter) |
+| Native BLE overview | BLE | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [Native BLE](/en/hardware-sdk/transport/native-ble) |
+
+USB covers every OneKey device. BLE is Pro, Pro 2, Neo, Touch, Classic 1s / Pure — not Mini. Air-Gap QR is a separate product path: [Air-Gap](/en/air-gap).
+
+## After you connect
+
+1. First address: [Getting Started](/en/hardware-sdk/getting-started)
+2. PIN / events: [Core API Guide](/en/hardware-sdk/core-api-guide)
+3. Drops and `dispose()`: [Reconnect and dispose](/en/hardware-sdk/transport/reconnect)
+4. Firmware: [Firmware Update](/en/hardware-sdk/firmware-update)
+5. Custom 64-byte bridge: [Low-level transport](/en/hardware-sdk/concepts/low-level-plugin)

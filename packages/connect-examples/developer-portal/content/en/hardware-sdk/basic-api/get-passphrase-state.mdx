@@ -10,18 +10,17 @@ Prompts the user to enter their passphrase (on-device or via software), then ret
 
 New integrations should prefer [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session). This method remains the compatibility entry on Hardware SDK 1.2.0 (Protocol V1 and V2). See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
 
-Pass this value as `passphraseState` in subsequent API calls. The device recognizes the active session and skips the passphrase prompt entirely, so the user only needs to enter their passphrase once per session.
+Pass `passphraseState` on later address / signing calls so they stay on that hidden wallet. It is a **wallet fingerprint**, not firmware `session_id`. Do not persist `session_id`.
 
 ```
-Session flow:
   getPassphraseState(connectId)   ← user enters passphrase once
-    → passphraseState = "abc123"
+    → passphraseState = "<fingerprint>"
 
-  evmGetAddress(..., { passphraseState: "abc123" })  ← no passphrase prompt
-  btcGetAddress(..., { passphraseState: "abc123" })  ← no passphrase prompt
+  evmGetAddress(..., { passphraseState })
+  btcGetAddress(..., { passphraseState })
 ```
 
-> **Error 112 (Device passphrase state error)**: The session has expired (e.g. device was locked and re-unlocked, or seed changed). Call `getPassphraseState` again to obtain a fresh state, then retry. You can prevent error 112 by passing `skipPassphraseCheck: true` in your API calls — in that case, the SDK fires `REQUEST_PASSPHRASE` instead, letting your event handler re-prompt the user.
+> **Error 112 (passphrase state mismatch)**: the binding does not match the wallet currently unlocked (device locked, seed changed, or stale fingerprint). Call `getPassphraseState` / `openWalletSession` again, then retry. `skipPassphraseCheck: true` skips this check and emits `REQUEST_PASSPHRASE` instead.
 
 ```typescript
 const response = await HardwareSDK.getPassphraseState(connectId);
@@ -29,7 +28,7 @@ const response = await HardwareSDK.getPassphraseState(connectId);
 
 ### Params
 
-[**Optional common params**](/en/hardware-sdk/core-api-guide#common-params)
+[**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
 ### Example
 

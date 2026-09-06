@@ -1,0 +1,71 @@
+---
+title: 重连与释放
+---
+
+# 重连与释放
+
+传输断开是常态：拔 USB、BLE 远离、系统蓝牙重置、固件重启。Hardware SDK 1.2.0 会恢复**链路**；**这次调用**还是要你的应用自己收场。
+
+本页是接入契约。不讲 Protocol V2 序号或 Transport generation。
+
+## SDK 已经做的
+
+- 普通断开 / 重连**不会**丢掉已确认的 `connectProtocol`。掉线后不用重新选 V1 / V2。
+- 进行中的调用会失败。SDK **不会**重放签名、擦除或固件升级。
+- Protocol V2 按设备串行。第一条调用还在恢复时，不要叠第二条业务调用。
+
+## 你必须做的
+
+1. 在应用入口订阅一次 `DEVICE_EVENT`。
+2. 收到 `DISCONNECT` 时，把这个 `connectId` 标成无效，结束当前 UI。不要重试同一个有副作用的方法。
+3. 用户准备好后再 `searchDevices`。USB 重插和 BLE 重新配对可能得到**新的** `connectId`。USB 和 BLE 的 ID 要分开缓存。见 [标识符](/zh/hardware-sdk/concepts/identifiers)。
+4. 连上之后用 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)（现有应用可用 `getFeatures`）刷新设备状态。复用已持久化的 `deviceId + passphraseState`；不要存固件 `session_id`。
+5. 下一次调用需要钱包上下文时，用 [`openWalletSession`](/zh/hardware-sdk/basic-api/open-wallet-session)（`resume-hidden` 或 `standard`）恢复钱包。
+
+```ts
+import { DEVICE_EVENT, DEVICE } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(DEVICE_EVENT, (msg) => {
+  if (msg.type === DEVICE.DISCONNECT) {
+    markDisconnected(msg.payload);
+    // 关掉 PIN / 签名弹窗；不要再调 firmwareUpdate*
+  }
+  if (msg.type === DEVICE.CONNECT) {
+    refreshDeviceList();
+  }
+});
+```
+
+## BLE
+
+- 进程被杀后仍要重新拿权限（`BLUETOOTH_SCAN` / `CONNECT`、iOS 蓝牙文案，Android 上常常还要定位）。见 [React Native BLE](/zh/hardware-sdk/transport/react-native-ble)。
+- 地址和签名调用上的 `retryCount` / `timeout` 能扛链路抖动，但不是重连策略。
+- OS 绑定过期时，不要死循环 connect。让用户在系统蓝牙设置里忽略设备再配对。
+- Mini 没有 BLE。Neo 有 BLE 但没有摄像头。见 [设备](/zh/hardware-sdk/concepts/devices)。
+
+## USB
+
+- WebUSB 再次弹出选择器需要用户手势，除非设备仍在授权期内并传了 `skipWebDevicePrompt`。见 [通用参数](/zh/hardware-sdk/concepts/common-params)。
+- 其他标签页或 Bridge 占用设备会变成 `USED_ELSEWHERE`。先关掉占用方，不要把 `dispose()` 当第一反应。
+
+## `dispose()`
+
+```ts
+await HardwareSDK.dispose();
+```
+
+只在拆除 SDK，或切换 `env` / 传输栈（例如 WebUSB → low-level）时调用 `dispose()`。它会丢掉所有链路和 Protocol V2 传输游标。
+
+普通 BLE 掉线或 USB 拔出**不要** `dispose()`。在同一个 `HardwareSDK` 实例上重新 search 再连。
+
+`dispose()` 之后必须重新 `init()` 才能 `searchDevices`。
+
+## 固件重启
+
+`firmwareUpdateV2` / `V3` / `V4` 可能主动断开。等重连，再读版本。不要把这次断开当成失败升级去重放。见 [固件升级](/zh/hardware-sdk/firmware-update)。
+
+## 下一步
+
+- [传输选择](/zh/hardware-sdk/transport)
+- [Core API Guide](/zh/hardware-sdk/core-api-guide)
+- [钱包会话](/zh/hardware-sdk/concepts/wallet-session)

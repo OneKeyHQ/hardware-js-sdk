@@ -17,6 +17,7 @@ export default {
   },
   transport: '传输协议',
   signers: '交易签名指引',
+  'firmware-update': '固件升级',
   '---api': { type: 'separator', title: 'API' },
   'core-api-guide': '开发指南',
   'basic-api': '基础 API',

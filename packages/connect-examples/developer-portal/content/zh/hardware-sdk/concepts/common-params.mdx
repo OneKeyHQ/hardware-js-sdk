@@ -1,0 +1,93 @@
+---
+title: 通用参数
+---
+
+# 通用参数
+
+每次调用 `HardwareSDK.method(...)` 都会传入一个 `params` 对象。本页的字段是**所有方法都接受**的。各链 / 设备方法页面只写自己独有的字段（`path`、`coin`、`tx`、`message` 等）。
+
+本页是参数**参考**。调用生命周期见 [Core API Guide](/zh/hardware-sdk/core-api-guide)。响应里的 ID（`connectId`、`deviceId`、`uuid`、`session_id` 等）见 [标识符](/zh/hardware-sdk/concepts/identifiers)。
+
+<div id="common-params" />
+
+| 参数 | 类型 | 作用 | 说明 |
+| --- | --- | --- | --- |
+| `passphraseState` | `string` | 把这次调用绑定到某个隐藏钱包 | 通过 `getPassphraseState` 或 `openWalletSession` 拿一次；后续要留在同一钱包的调用都带上。**不能**和 `useEmptyPassphrase` 同时传。这是钱包指纹，不是固件 `session_id`。 |
+| `useEmptyPassphrase` | `boolean` | 强制走标准钱包 | 避免残留的隐藏钱包会话悄悄改掉地址。**不能**和 `passphraseState` 同时传。 |
+| `initSession` | `boolean` | 调用前强制初始化 session | 兼容路径上搭配 `passphraseState`。新代码应优先 `openWalletSession({ mode })`，不要把 `mode` 和这个标志混在一次调用里。 |
+| `deriveCardano` | `boolean` | 在设备上预派生 Cardano 子树 | 一个 session 里第一次调 Cardano 方法时设为 `true`。 |
+| `retryCount` | `number` | 传输错误时的重试次数 | 主要用于 BLE。**不要**用它在断开后重放固件升级、擦除或签名。 |
+| `pollIntervalTime` | `number` | 重试间隔（毫秒） | 和 `retryCount` 配合，主要用于 BLE。 |
+| `timeout` | `number` | 单次调用超时（毫秒） | 固件升级、大 PSBT 可以调大。 |
+| `detectBootloaderDevice` | `boolean` | 设备处于 Bootloader 时立刻失败 | 用在签名路径上。 |
+| `skipWebDevicePrompt` | `boolean` | 跳过 WebUSB 设备选择弹窗 | **仅 WebUSB**，复用之前的授权。 |
+| `keepSession` | `boolean` | **已废弃** | 改用 `initSession + passphraseState` 或 `openWalletSession`。 |
+
+## 各传输方式差异
+
+| 参数 | WebUSB | Bridge | node-usb | Android BLE | iOS BLE | Desktop BLE |
+| --- | --- | --- | --- | --- | --- | --- |
+| `skipWebDevicePrompt` | ✅ | — | — | — | — | — |
+| `retryCount` / `pollIntervalTime` / `timeout` | 实际无影响 | 实际无影响 | 实际无影响 | **有用** | **有用** | **有用** |
+| `passphraseState` / `useEmptyPassphrase` / `initSession` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `deriveCardano` / `detectBootloaderDevice` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+## 常见组合
+
+**标准钱包 —— 避免误触发隐藏钱包**
+
+```ts
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+```
+
+**隐藏钱包 —— 多次调用复用绑定**
+
+```ts
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: 'select-hidden',
+});
+const hiddenWallet = {
+  passphraseState: opened.payload.passphraseState,
+};
+
+await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  ...hiddenWallet,
+});
+```
+
+兼容路径（现有应用）：`getPassphraseState(connectId, { initSession: true })`，之后每次带 `{ initSession: true, passphraseState }`。见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
+
+**BLE 保守重试（仅搜设备 / 地址 / 签名）**
+
+```ts
+const bleDefaults = {
+  retryCount: 3,
+  pollIntervalTime: 1000,
+  timeout: 30_000,
+};
+```
+
+不要把 `bleDefaults` 铺到 `firmwareUpdateV2` / `V3` / `V4` 上。见 [重连与释放](/zh/hardware-sdk/transport/reconnect)。
+
+## HD Path
+
+<div id="hd-path" />
+
+`path: string | number[]`，遵循 BIP44。ed25519 链（Solana、NEAR 等）必须全硬化。
+
+| 链 | 示例路径 | 说明 |
+| --- | --- | --- |
+| EVM | `m/44'/60'/0'/0/0` | 标准 EVM |
+| BTC（Nested SegWit） | `m/49'/0'/0'/0/0` | Native SegWit 用 `84'` |
+| Solana | `m/44'/501'/0'/0'` | 全硬化 |
+| NEAR | `m/44'/397'/0'/0'/1'` | 全硬化 |
+| Cardano | `m/1852'/1815'/0'/0/0` | 质押路径 `.../2/0` |
+| TRON | `m/44'/195'/0'/0/0` | EVM 风格路径 |
+
+数组示例：`[(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0x80000000, 0, 0]`
+
+遇到 forbidden path：按对应链文档检查长度和硬化标记。

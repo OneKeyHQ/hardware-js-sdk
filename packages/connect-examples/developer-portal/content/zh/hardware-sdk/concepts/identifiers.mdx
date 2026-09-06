@@ -9,7 +9,7 @@ title: 标识符（Identifiers）
 到底代表什么、何时变化、在不同传输方式下格式差异是什么。
 
 > 找的是**传入 SDK 的参数**（`passphraseState`、`initSession`、
-> `useEmptyPassphrase` 等）？请看 [通用参数](/zh/hardware-sdk/core-api-guide#common-params)。
+> `useEmptyPassphrase` 等）？请看 [通用参数](/zh/hardware-sdk/concepts/common-params)。
 
 ## 四层标识符
 
@@ -21,7 +21,8 @@ title: 标识符（Identifiers）
 | **物理硬件** | 永久（跟硬件本体绑定） | 永不变化 | `uuid`、`onekey_serial`、`serial_no` |
 | **传输连接** | 本次连接 | 重新 `searchDevices()`；换传输方式 | `connectId`、`path`、`name`、`deviceType` |
 | **种子 / 钱包状态** | 恢复出厂 / 擦除 / 恢复助记词之前 | 恢复出厂、重新导入助记词、擦除 | `device_id` / `deviceId`、`label` |
-| **会话** | 设备锁屏之前 | 自动锁屏、手动锁、USB 断开 | `session_id`、`passphraseState` |
+| **隐藏钱包指纹** | 该 passphrase 不变就一直有效 | 更换 passphrase | `passphraseState` |
+| **固件 session（内部）** | 设备锁屏之前 | 锁屏、USB 断开 | 固件 `session_id` —— 只在 Core 内，不要持久化 |
 
 ## 哪些 ID 需要你传进去？
 
@@ -148,35 +149,32 @@ await HardwareSDK.evmSignTransaction(connectId, deviceId, { ... });
 
 两个会话层字段名字类似但作用不同。
 
-### `session_id` —— 短期会话 token
+### `session_id` —— 固件解锁句柄（不是公开绑定）
 
-设备初始化 passphrase session 时临时生成的随机 token。
-`getPassphraseState` 或任何触发 session 初始化的调用之后，会出现在
-`features.session_id` 里。
+设备在钱包已解锁时生成的短期 token。兼容的 `Features` 对象上 Core 仍可能带上它。
 
-- **锁屏即失效**（自动锁、手动锁、USB 断开）。
-- SDK 内部用它维持设备端缓存的 passphrase。
-- 一般不直接暴露给应用代码 —— 大多数应用只需要 `passphraseState`。
+- **不要持久化。** Hardware SDK 1.2.0 把固件 `session_id` 留在 Core 里。
+  `openWalletSession` 不会返回它。
+- 锁屏（自动锁、手动锁、断开）即失效。
+- 第三方应用恢复隐藏钱包用
+  `openWalletSession({ mode: 'resume-hidden', deviceId, passphraseState })`。
 
 ### `passphraseState` —— 隐藏钱包标识
 
-和某个 passphrase 绑定的**确定性**隐藏钱包标识。`getPassphraseState()` 返
-回。**同一个种子 + 同一个 passphrase 永远产生同一个 `passphraseState`**，
-所以你可以用它来判断"这是不是同一个之前看到过的隐藏钱包"，而不必保存
-passphrase 本身。
+和某个 passphrase 绑定的**确定性**指纹。`getPassphraseState()` 以及
+`openWalletSession` 在 `walletType: 'hidden'` 时返回。**同一个种子 + 同一个
+passphrase 永远产生同一个 `passphraseState`。**
 
-- 作为 `passphraseState` 通用参数传给后续所有需要绑在这个隐藏钱包上的 SDK
-  调用。
-- 跨进程复用：持久化 `(deviceId, passphraseState, session_id)` 三元组，进程
-  启动时调 `preloadSessionCache` 恢复 session。
-- 清掉缓存的 `passphraseState` **不会**让隐藏钱包失效 —— 用户再输一次同样的
-  passphrase 就能复现出相同的钱包。
+- 作为 `passphraseState` 通用参数传给后续所有要留在这个隐藏钱包上的调用。
+- 只持久化 `(deviceId, passphraseState)`。不要存固件 `session_id`，也不要存
+  passphrase 明文。
+- 清掉缓存的指纹**不会**毁掉隐藏钱包 —— 用户再输入同样的 passphrase 就能复现。
 
-| | `session_id` | `passphraseState` |
+| | 固件 `session_id` | `passphraseState` |
 | --- | --- | --- |
-| 生命周期 | 锁屏前 | 事实上永久（passphrase 不变就不变）|
-| 是否确定性 | 每次会话随机 | 按 passphrase 确定性 |
-| 角色 | 保持设备侧 session 有效 | 指明"是哪一个隐藏钱包" |
+| 生命周期 | 锁屏前 | passphrase 不变就一直有效 |
+| 能否持久化 | **否** | 可以，和 `deviceId` 一起 |
+| 角色 | Core 内部解锁句柄 | 指明是哪一个隐藏钱包 |
 
 ## 实例拼装
 
@@ -232,11 +230,9 @@ SDK 层暴露给应用用的稳定 ID。**路由始终用 `connectId`**；如果
 
 ### `session_id` vs `passphraseState`
 
-- `session_id` 锁屏即失效；`passphraseState` 不会。
-- `passphraseState` 标识**是哪一个隐藏钱包**；`session_id` 标识**这条还活着
-  的会话**。
-- 跨调用复用会话就一起持久化 `(passphraseState, session_id)`；如果两次调用
-  之间设备锁屏了，就丢掉缓存的 `session_id`、强制重新解锁。
+- `passphraseState` 标识**是哪一个隐藏钱包**。和 `deviceId` 一起持久化。见
+  [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
+- 固件 `session_id` 只在 Core 内部。不要存，也不要当公开入参传。
 
 ### `device_id`（蛇形）vs `deviceId`（驼峰）
 
@@ -248,7 +244,8 @@ SDK 层暴露给应用用的稳定 ID。**路由始终用 `connectId`**；如果
 
 ## 参考
 
-- [通用参数](/zh/hardware-sdk/core-api-guide#common-params) —— 传**进** SDK 的参数
+- [通用参数](/zh/hardware-sdk/concepts/common-params) —— 传**进** SDK 的参数
+- [钱包会话](/zh/hardware-sdk/concepts/wallet-session) —— `openWalletSession` 与 `getPassphraseState`
 - [Passphrase](/zh/hardware-sdk/concepts/passphrase) —— 隐藏钱包流程
 - [PIN 码](/zh/hardware-sdk/concepts/pin) —— PIN 输入流程
 - [Search Devices](/zh/hardware-sdk/basic-api/search-devices) —— 返回 `connectId`、`uuid`、`deviceType`、`deviceId`
