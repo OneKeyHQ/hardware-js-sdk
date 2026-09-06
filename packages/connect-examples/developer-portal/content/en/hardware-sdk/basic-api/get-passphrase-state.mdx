@@ -6,7 +6,9 @@ title: Get Passphrase State
 
 ## Get the passphraseState of the device
 
-Prompts the user to enter their passphrase (on-device or via software), then returns a `passphraseState` string — a device-side session identifier derived from the passphrase.
+Prompts the user to enter their passphrase (on-device or via software), then returns a `passphraseState` string — the public hidden-wallet fingerprint. Persist `deviceId + passphraseState`. Do not persist firmware `session_id`.
+
+New integrations should prefer [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session). This method remains the compatibility entry on Hardware SDK 1.2.0 (Protocol V1 and V2). See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
 
 Pass this value as `passphraseState` in subsequent API calls. The device recognizes the active session and skips the passphrase prompt entirely, so the user only needs to enter their passphrase once per session.
 

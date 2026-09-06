@@ -1,0 +1,55 @@
+---
+title: 获取设备状态
+---
+
+# 获取设备状态
+
+读取 Protocol V1 / V2 统一的设备快照。这是 1.2.0 之后不应再把 `getFeatures()` 当成唯一事实源的入口。
+
+`getFeatures()` 仍是兼容 API，可以继续用。新代码应调用 `getDeviceState()`。
+
+```ts
+const res = await HardwareSDK.getDeviceState(connectId);
+```
+
+### 参数
+
+[可选通用参数](/zh/hardware-sdk/core-api-guide#common-params)
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `scope` | `'runtime' \| 'settings' \| 'firmware'` | 否 | 默认 `'runtime'`。scope 只决定这次刷新哪些分区，返回值仍是完整快照 |
+
+- `runtime` — 实时锁定 / PIN / passphrase 状态（V1 `GetFeatures`，V2 应用模式下的 `DeviceStatusGet`）
+- `settings` — 同时刷新设置
+- `firmware` — 同时刷新身份、版本和校验信息
+
+Bootloader / romloader 会跳过不支持的状态命令，返回当前能拿到的快照。
+
+### 返回结果
+
+```ts
+{
+  success: true,
+  payload: {
+    // 统一 DeviceState 快照（V1 和 V2）。
+    // 包含身份、版本、PIN/passphrase 标志和运行时锁定状态。
+  }
+}
+```
+
+返回值**不包含**固件钱包 `session_id` 或原始协议消息。钱包身份仍然来自 [`openWalletSession`](/zh/hardware-sdk/basic-api/open-wallet-session) 或 [`getPassphraseState`](/zh/hardware-sdk/basic-api/get-passphrase-state)。
+
+### 错误
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code: number,
+  }
+}
+```
+
+与 `getFeatures()` 的分工见 [Protocol V1 与 V2](/zh/hardware-sdk/concepts/protocol)。

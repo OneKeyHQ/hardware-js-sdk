@@ -2,6 +2,7 @@ import { ChainMethodsSidebar } from '../../../components/ChainMethodsSidebar'
 
 export default {
   index: 'Overview',
+  'getting-started': 'Getting Started',
   'agent-integration': {
     title: 'OneKey Agent Wallet',
     display: 'hidden'
@@ -27,6 +28,6 @@ export default {
   },
   chains: { display: 'hidden' },
   '---Reference': { type: 'separator', title: 'Reference' },
-  'legacy-guides': 'Migration Gudie',
-  'concepts': 'concepts'
+  'legacy-guides': 'Migration Guide',
+  concepts: 'Concepts'
 }

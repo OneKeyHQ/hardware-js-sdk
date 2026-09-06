@@ -209,12 +209,7 @@ export function LandingPage({ locale = 'en' }) {
                 <button
                   type="button"
                   onClick={() => {
-                    const section = document.getElementById('hardware-integration')
-                    if (section) {
-                      const offset = 160
-                      const sectionTop = section.getBoundingClientRect().top + window.scrollY
-                      window.scrollTo({ top: sectionTop - offset, behavior: 'smooth' })
-                    }
+                    router.push(`/${locale}/hardware-sdk/getting-started`)
                   }}
                   className="flex min-h-[52px] items-center justify-center rounded-[50px] px-[24px] py-[14px] text-[16px] font-medium transition-opacity hover:opacity-90 sm:px-[32px] sm:py-[18px]"
                   style={{

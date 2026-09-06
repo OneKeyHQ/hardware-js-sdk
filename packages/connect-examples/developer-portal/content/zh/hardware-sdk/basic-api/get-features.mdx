@@ -8,6 +8,8 @@ title: 获取设备特性
 
 获取设备的所有属性。
 
+Hardware SDK 1.2.0 上 `getFeatures()` 仍是兼容 API。新代码应优先使用 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state) 读取 V1/V2 统一快照。在 Protocol V2 上，Core 会做映射，现有应用可以继续调用本方法。
+
 ```typescript
 const response = await HardwareSDK.getFeatures(connectId);
 ```

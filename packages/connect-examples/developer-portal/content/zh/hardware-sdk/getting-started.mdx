@@ -1,0 +1,80 @@
+---
+title: 快速开始
+---
+
+# 快速开始
+
+从安装到读出第一个地址，大约五分钟。目标版本是 Hardware SDK **1.2.0**。
+
+本页只覆盖第一次跑通。跑通之后再选 [传输指南](/zh/hardware-sdk/transport/web-usb)，并阅读 [Core API Guide](/zh/hardware-sdk/core-api-guide) 了解 PIN、passphrase、事件和签名。
+
+Hardware SDK 1.2.0 用**同一套 JavaScript API** 同时支持 Protocol V1（Classic / Mini / Touch / Pro）和 Protocol V2（Pro 2 / Neo）。`init()` 里不需要选择协议。
+
+## 1. 选择 SDK 包
+
+| 运行时 | 包 | 下一步 |
+| --- | --- | --- |
+| 浏览器 / 桌面 WebUSB | `@onekeyfe/hd-common-connect-sdk` | [WebUSB](/zh/hardware-sdk/transport/web-usb) |
+| React Native BLE | `@onekeyfe/hd-ble-sdk` | [React Native BLE](/zh/hardware-sdk/transport/react-native-ble) |
+| Android / iOS / Flutter 原生桥 | `@onekeyfe/hd-common-connect-sdk`（`env: 'lowlevel'`） | [原生 BLE](/zh/hardware-sdk/transport/native-ble) |
+| 仅 iframe 插件宿主 | `@onekeyfe/hd-web-sdk` | 概览 → 插件 iframe |
+
+```bash
+npm i @onekeyfe/hd-common-connect-sdk
+```
+
+请把安装版本钉在当前稳定的 `1.2.x`。如果嵌入 `@onekeyfe/hd-web-sdk`，`connectSrc` 必须和安装的 SDK 版本一致。
+
+## 2. 只初始化一次
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+await HardwareSDK.init({
+  env: 'webusb',
+  debug: process.env.NODE_ENV !== 'production',
+  fetchConfig: true,
+});
+```
+
+在应用入口调用一次 `init()`。不要在同一运行时混用 `@onekeyfe/hd-web-sdk` 和 `@onekeyfe/hd-common-connect-sdk`。
+
+## 3. 搜设备、取身份、读地址
+
+```ts
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success || !devices.payload.length) {
+  throw new Error('No OneKey device found');
+}
+
+const { connectId } = devices.payload[0];
+
+const features = await HardwareSDK.getFeatures(connectId);
+if (!features.success) throw new Error(features.payload.error);
+const deviceId = features.payload.device_id;
+
+const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+
+if (!address.success) throw new Error(address.payload.error);
+console.log(address.payload.address);
+```
+
+读取 `payload` 之前必须先看 `success`。`useEmptyPassphrase: true` 把第一次调用钉在标准钱包，避免残留的隐藏钱包会话悄悄改掉地址。
+
+WebUSB 需要 HTTPS 和用户手势。BLE 需要系统蓝牙权限。
+
+## 1.2.0 帮你做了什么
+
+- SDK 根据设备实时响应识别 Protocol V1 / V2。不要用 USB PID、蓝牙名或产品字符串来分支。见 [Protocol V1 与 V2](/zh/hardware-sdk/concepts/protocol)。
+- Pro 2 和 Neo 使用与 Classic / Pro 相同的方法。机型差异见 [设备](/zh/hardware-sdk/concepts/devices)。
+- 新的开钱包代码应调用 `openWalletSession`。现有应用可以继续用 `getPassphraseState`。见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
+
+## 下一步
+
+1. 接 PIN / passphrase UI 事件：[Core API Guide](/zh/hardware-sdk/core-api-guide)
+2. 按平台真正连上设备：[WebUSB](/zh/hardware-sdk/transport/web-usb) · [React Native BLE](/zh/hardware-sdk/transport/react-native-ble)
+3. 签一笔交易：[交易签名指引](/zh/hardware-sdk/signers)
+4. 没有真机时：[交互演示](/zh/hardware-sdk/playground)

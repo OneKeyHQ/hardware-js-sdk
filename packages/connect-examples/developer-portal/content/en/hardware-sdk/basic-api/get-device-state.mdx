@@ -1,0 +1,55 @@
+---
+title: Get Device State
+---
+
+# Get Device State
+
+Read the unified V1 / V2 device snapshot. This is the 1.2.0 replacement for treating `getFeatures()` as the only source of truth.
+
+`getFeatures()` remains a compatibility API and still works. New code should call `getDeviceState()`.
+
+```ts
+const res = await HardwareSDK.getDeviceState(connectId);
+```
+
+### Params
+
+[Optional common params](/en/hardware-sdk/core-api-guide#common-params)
+
+| Param | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `scope` | `'runtime' \| 'settings' \| 'firmware'` | No | Defaults to `'runtime'`. Scope only chooses which partitions this read refreshes; the payload is still a full snapshot |
+
+- `runtime` — live lock / PIN / passphrase status (V1 `GetFeatures`, V2 `DeviceStatusGet` in application mode)
+- `settings` — also refresh settings
+- `firmware` — also refresh identity, versions, and verification info
+
+Bootloader / romloader skips unsupported status commands and returns whatever snapshot is available.
+
+### Result
+
+```ts
+{
+  success: true,
+  payload: {
+    // Unified DeviceState snapshot (V1 and V2).
+    // Includes identity, versions, pin/passphrase flags, and runtime lock state.
+  }
+}
+```
+
+The payload does **not** include firmware wallet `session_id` or raw protocol messages. Wallet identity still comes from [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session) or [`getPassphraseState`](/en/hardware-sdk/basic-api/get-passphrase-state).
+
+### Error
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code: number,
+  }
+}
+```
+
+See [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol) for when to use this versus `getFeatures()`.

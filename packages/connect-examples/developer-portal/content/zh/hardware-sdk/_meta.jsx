@@ -2,6 +2,7 @@ import { ChainMethodsSidebar } from '../../../components/ChainMethodsSidebar'
 
 export default {
   index: '概览',
+  'getting-started': '快速开始',
   'agent-integration': {
     title: 'OneKey Agent Wallet',
     display: 'hidden'
@@ -28,5 +29,5 @@ export default {
   chains: { display: 'hidden' },
   '---Reference': { type: 'separator', title: '参考' },
   'legacy-guides': '迁移指引',
-  'concepts': '概念'
+  concepts: '概念'
 }

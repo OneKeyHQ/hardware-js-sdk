@@ -13,6 +13,18 @@ import { Package, GitBranch, Tag, ExternalLink, Cpu, Globe, ChevronRight, Calend
 
 export const HardwareSDKReleases = [
   {
+    version: 'v1.2.0',
+    date: '2026-08-25',
+    type: 'major',
+    changes: [
+      '稳定的 Protocol V2 线：OneKey Pro 2 / Neo；Classic / Mini / Touch / Pro 继续走 Protocol V1',
+      '公开开钱包入口 openWalletSession({ mode })：standard / select-hidden / resume-hidden',
+      'V1/V2 统一 getDeviceState()；getFeatures() 仍作兼容',
+      'Pro 2 / Neo 使用 firmwareUpdateV4 做多组件固件和资源 ZIP 升级',
+      'Protocol V2 的 BLE 重连、钱包会话恢复和固件安装轮询加固'
+    ]
+  },
+  {
     version: 'v1.1.21',
     date: '2024-12-24',
     type: 'patch',

@@ -1,0 +1,70 @@
+---
+title: firmwareUpdateV4
+---
+
+# firmwareUpdateV4
+
+Protocol V2 firmware update for **OneKey Pro 2** and **OneKey Neo**.
+
+Do not call this on Classic / Mini / Touch / Pro. Those devices use [`firmwareUpdateV2`](/en/hardware-sdk/device-api/firmwareupdatev2) or [`firmwareUpdateV3`](/en/hardware-sdk/device-api/firmwareupdatev3).
+
+```ts
+const res = await HardwareSDK.firmwareUpdateV4(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+  bootloaderBinary,
+  applicationP1Binary,
+  applicationP2Binary,
+  coprocessorBinary,
+  resourceArchiveBinary,
+});
+```
+
+The method installs the binaries you pass, then reports progress through `FIRMWARE_PROGRESS` / `FIRMWARE_TIP`. After `DeviceFirmwareUpdateRequest` the device may reboot; the SDK reconnects on the same protocol.
+
+### Params
+
+[Optional common params](/en/hardware-sdk/core-api-guide#common-params)
+
+| Param | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `platform` | `'native' \| 'desktop' \| 'ext' \| 'web' \| 'web-embed'` | Yes | Host environment |
+| `bootloaderBinary` | `ArrayBuffer` | No | Bootloader image |
+| `applicationP1Binary` | `ArrayBuffer` | No | Application partition 1 |
+| `applicationP2Binary` | `ArrayBuffer` | No | Application partition 2 |
+| `coprocessorBinary` | `ArrayBuffer` | No | BLE / coprocessor image |
+| `resourceArchiveBinary` | `ArrayBuffer` | No | Complete Protocol V2 resource ZIP. Core writes only changed files |
+| `forcedUpdateRes` | `boolean` | No | Force resource update |
+| `expectedDeviceId` | `string` | No | Refuse to continue if the device identity changed mid-update |
+
+Romloader cannot be installed through `firmwareUpdateV4`. SE images (`se01Binary` … `se04Binary`) are accepted by the type but are not a general integrator path.
+
+OneKey App uses a prepared-plan / host-binding flow for official releases. Third-party hosts should pass the binaries they already verified.
+
+### Result
+
+```ts
+{
+  success: true,
+  payload: {
+    bleVersion: string,
+    firmwareVersion: string,
+    bootloaderVersion: string,
+  }
+}
+```
+
+### Error
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code: number,
+  }
+}
+```
+
+Do **not** automatically retry `firmwareUpdateV4` after a transport timeout or disconnect. The device may already be installing. Re-read device state, then decide.
+
+Button confirmation during update is informational (`REQUEST_BUTTON` with `reason='firmware-update'`). Do not call `uiResponse()` for that hint. If the user cancels the hint, cancel the SDK call; do not send a second Cancel.

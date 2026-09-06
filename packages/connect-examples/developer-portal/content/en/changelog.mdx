@@ -13,6 +13,18 @@ import { Package, GitBranch, Tag, ExternalLink, Cpu, Globe, ChevronRight, Calend
 
 export const HardwareSDKReleases = [
   {
+    version: 'v1.2.0',
+    date: '2026-08-25',
+    type: 'major',
+    changes: [
+      'Stable Protocol V2 line for OneKey Pro 2 and Neo, with Protocol V1 kept for Classic / Mini / Touch / Pro',
+      'Public wallet entry openWalletSession({ mode }) for standard, select-hidden, and resume-hidden',
+      'Unified getDeviceState() snapshot across V1/V2; getFeatures() remains compatibility',
+      'firmwareUpdateV4 for Pro 2 / Neo multi-component firmware and resource ZIP updates',
+      'BLE reconnect, wallet-session recovery, and firmware-install polling hardened for Protocol V2'
+    ]
+  },
+  {
     version: 'v1.1.21',
     date: '2024-12-24',
     type: 'patch',

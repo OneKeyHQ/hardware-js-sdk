@@ -1,0 +1,35 @@
+---
+title: 设备
+---
+
+# 设备
+
+Hardware SDK 1.2.0 在同一套公开 API 上支持两个协议族。这里只看机型约束，方法名不用换。
+
+| 设备 | Code | 协议 | USB | BLE | Air-Gap（二维码） |
+| --- | --- | --- | --- | --- | --- |
+| OneKey Classic | `classic` | V1 | 是 | 是 | 否 |
+| OneKey Classic 1s | `classic1s` | V1 | 是 | 是 | 否 |
+| OneKey Classic 1s Pure | `classicPure` | V1 | 是 | 是 | 否 |
+| OneKey Mini | `mini` | V1 | 是 | **否** | 否 |
+| OneKey Touch | `touch` | V1 | 是 | 是 | 否 |
+| OneKey Pro | `pro` | V1 | 是 | 是 | 是 |
+| OneKey Pro 2 | `pro2` | **V2** | 是 | 是 | 是 |
+| OneKey Neo | `neo` | **V2** | 是 | 是 | **否**（无摄像头） |
+
+SDK 会把当前连接确认后的协议写在设备对象的 `connectProtocol`（`'V1'` 或 `'V2'`）上。这是实时探测结果，不是按型号查表。
+
+## 型号应该用在哪
+
+- 用型号做**能力和 UX**：Mini 没有 BLE，Neo 没有二维码 Air-Gap，Pro / Pro 2 可以 Air-Gap。
+- **不要**用型号判断 Protocol V1 / V2。未来如果 Pro 走 V2，型号仍然是 `pro`。
+- 固件升级 API 跟协议族走：Pro 用 [`firmwareUpdateV3`](/zh/hardware-sdk/device-api/firmwareupdatev3)；Pro 2 / Neo 用 [`firmwareUpdateV4`](/zh/hardware-sdk/device-api/firmwareupdatev4)。
+
+## 接入检查清单
+
+1. 按**传输分别**缓存 `connectId`。同一台设备的 USB 和 BLE ID 不同。
+2. 擦除 / 恢复助记词后要刷新 `deviceId`。见 [标识符](/zh/hardware-sdk/concepts/identifiers)。
+3. 同一设备上的调用必须串行。Protocol V2 强制如此；Protocol V1 重叠 PIN/签名也会卡死。
+4. 传输出错后，不要自动重放固件升级、擦除或其他有副作用的调用。
+
+另见：[Protocol V1 与 V2](/zh/hardware-sdk/concepts/protocol) · [钱包会话](/zh/hardware-sdk/concepts/wallet-session)

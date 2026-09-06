@@ -8,6 +8,8 @@ import { ExternalLink, Play, Monitor } from 'lucide-react'
 
 Developer-focused documentation for integrating OneKey hardware in Web and Native apps.
 
+Hardware SDK **1.2.0** is the current stable line. It speaks Protocol V1 and Protocol V2 through the same JavaScript API. New here? Start with [Getting Started](/en/hardware-sdk/getting-started).
+
 This page is the **orientation layer** — pick the right SDK package for your platform and install it. For the end-to-end walkthrough (search → events → PIN/passphrase → first signing call) plus parameters, events, and error handling, see the [Core API Guide](/en/hardware-sdk/core-api-guide).
 
 ## Choose Your Transport
@@ -19,8 +21,8 @@ USB integrations should use `@onekeyfe/hd-common-connect-sdk`; use `@onekeyfe/hd
 | Method | Description | Supported devices |
 |--------|-------------|-------------------|
 | **USB / WebUSB** | Wired USB; Web via WebUSB, native via low-level plugin | All OneKey devices |
-| **Bluetooth BLE (native)** | Native apps over BLE (not Web Bluetooth); requires OS Bluetooth & permission | OneKey Pro, Touch, Classic 1s / Classic 1s Pure; **Mini does not support BLE** |
-| **Air-Gap (QR)** | Offline QR signing | OneKey Pro only |
+| **Bluetooth BLE (native)** | Native apps over BLE (not Web Bluetooth); requires OS Bluetooth & permission | Pro, Pro 2, Neo, Touch, Classic 1s / Classic 1s Pure; **Mini does not support BLE** |
+| **Air-Gap (QR)** | Offline QR signing | OneKey Pro and Pro 2; **Neo has no camera** |
 
 ### Platform Guide
 
@@ -120,13 +122,17 @@ import { HardwareSDK } from '@onekeyfe/hd-web-sdk';
 
 await HardwareSDK.init({
   debug: process.env.NODE_ENV !== 'production',
-  connectSrc: 'https://jssdk.onekey.so/1.1.19/', // iframe host
+  connectSrc: 'https://jssdk.onekey.so/1.2.0/', // must match the installed SDK version
 });
 ```
 
 ## Next steps
 
-After `HardwareSDK.init(...)` returns, the rest of the flow — device discovery, event wiring, PIN/passphrase handling, signing — is documented end-to-end in the [Core API Guide](/en/hardware-sdk/core-api-guide):
+After `HardwareSDK.init(...)` returns, follow [Getting Started](/en/hardware-sdk/getting-started) for the first address, then the [Core API Guide](/en/hardware-sdk/core-api-guide) for the rest of the flow:
+
+- 1.2.0 device matrix: [Devices](/en/hardware-sdk/concepts/devices)
+- Protocol V1 vs V2 (auto-detected): [Protocol](/en/hardware-sdk/concepts/protocol)
+- Open / resume a wallet: [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session)
 
 - Standard lifecycle (`init → search → getFeatures → subscribe → call + uiResponse → cleanup`): [Core API Guide → Standard lifecycle](/en/hardware-sdk/core-api-guide#standard-lifecycle)
 - Call parameters accepted by every method: [Common params](/en/hardware-sdk/core-api-guide#common-params)

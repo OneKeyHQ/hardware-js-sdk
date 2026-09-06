@@ -1,0 +1,70 @@
+---
+title: firmwareUpdateV4
+---
+
+# firmwareUpdateV4
+
+Protocol V2 固件升级，用于 **OneKey Pro 2** 和 **OneKey Neo**。
+
+不要在 Classic / Mini / Touch / Pro 上调用。那些设备使用 [`firmwareUpdateV2`](/zh/hardware-sdk/device-api/firmwareupdatev2) 或 [`firmwareUpdateV3`](/zh/hardware-sdk/device-api/firmwareupdatev3)。
+
+```ts
+const res = await HardwareSDK.firmwareUpdateV4(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+  bootloaderBinary,
+  applicationP1Binary,
+  applicationP2Binary,
+  coprocessorBinary,
+  resourceArchiveBinary,
+});
+```
+
+方法会安装你传入的二进制，并通过 `FIRMWARE_PROGRESS` / `FIRMWARE_TIP` 报告进度。`DeviceFirmwareUpdateRequest` 之后设备可能重启；SDK 会在同一协议上重连。
+
+### 参数
+
+[可选通用参数](/zh/hardware-sdk/core-api-guide#common-params)
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `platform` | `'native' \| 'desktop' \| 'ext' \| 'web' \| 'web-embed'` | 是 | 宿主环境 |
+| `bootloaderBinary` | `ArrayBuffer` | 否 | Bootloader 镜像 |
+| `applicationP1Binary` | `ArrayBuffer` | 否 | 应用分区 1 |
+| `applicationP2Binary` | `ArrayBuffer` | 否 | 应用分区 2 |
+| `coprocessorBinary` | `ArrayBuffer` | 否 | BLE / 协处理器镜像 |
+| `resourceArchiveBinary` | `ArrayBuffer` | 否 | 完整的 Protocol V2 资源 ZIP。Core 只写入有变化的文件 |
+| `forcedUpdateRes` | `boolean` | 否 | 强制更新资源 |
+| `expectedDeviceId` | `string` | 否 | 升级中途设备身份变化则拒绝继续 |
+
+不能通过 `firmwareUpdateV4` 安装 romloader。类型上接受 SE 镜像（`se01Binary` … `se04Binary`），但这不是通用接入路径。
+
+OneKey App 的官方升级走 prepared-plan / host-binding。第三方宿主应传入自己已经校验过的二进制。
+
+### 返回结果
+
+```ts
+{
+  success: true,
+  payload: {
+    bleVersion: string,
+    firmwareVersion: string,
+    bootloaderVersion: string,
+  }
+}
+```
+
+### 错误
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code: number,
+  }
+}
+```
+
+传输超时或断开后，**不要**自动重试 `firmwareUpdateV4`。设备可能已经在安装。先重新读取设备状态，再决定下一步。
+
+升级过程中的按键确认是提示（`REQUEST_BUTTON`，`reason='firmware-update'`）。不要对这个提示调用 `uiResponse()`。如果用户取消提示，取消这次 SDK 调用即可，不要再发第二次 Cancel。

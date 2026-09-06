@@ -1,0 +1,62 @@
+---
+title: 打开钱包会话
+---
+
+# 打开钱包会话
+
+Protocol V1 / V2 统一入口：打开标准钱包、让用户选择隐藏钱包，或恢复已经绑定过的隐藏钱包。
+
+新接入应在「打开 / 切换钱包」这一步调用本方法。地址和签名仍然带 `deviceId` + `passphraseState`，不要每次签名都重新开 Session。
+
+契约说明见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
+
+```ts
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
+
+const res = await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.Standard,
+});
+```
+
+### 参数
+
+[可选通用参数](/zh/hardware-sdk/core-api-guide#common-params)
+
+这次调用不要把 `mode` 和 `useEmptyPassphrase` / `initSession` 混在一起。
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `mode` | `'standard' \| 'select-hidden' \| 'resume-hidden'` | 是 | 使用 `@onekeyfe/hd-core` 导出的 `OpenWalletSessionMode` |
+| `deviceId` | `string` | 仅 `resume-hidden` | 上次成功打开时的种子生命周期 |
+| `passphraseState` | `string` | 仅 `resume-hidden` | 上次成功打开时的隐藏钱包指纹 |
+
+### 返回结果
+
+```ts
+{
+  success: true,
+  payload: {
+    protocol: 'V1' | 'V2',
+    deviceId: string,
+    resumed: boolean,
+    walletType: 'standard' | 'hidden',
+    passphraseState: string | null, // 标准钱包为 null
+  }
+}
+```
+
+持久化 `deviceId`、`walletType`、`passphraseState`。固件 `session_id` 不会出现在返回值里。
+
+### 错误
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code: number,
+  }
+}
+```
+
+`resume-hidden` 缺少 `deviceId` / `passphraseState` 时返回 `CallMethodInvalidParameter`。隐藏钱包无法安全恢复时，Protocol V1 可能返回 `WalletSessionInvalid`，Protocol V2 可能在同一次调用内重新选择。`DeviceCheckUnlockTypeError` 表示当前 PIN / Attach-to-PIN 上下文到不了目标钱包。

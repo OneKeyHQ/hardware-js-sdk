@@ -8,6 +8,8 @@ title: Get Features
 
 Get all attributes of the device.
 
+`getFeatures()` remains a compatibility API on Hardware SDK 1.2.0. New code should prefer [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state), which returns the unified V1/V2 snapshot. On Protocol V2, `getFeatures()` is mapped by Core and is still valid for existing apps.
+
 ```typescript
 const response = await HardwareSDK.getFeatures(connectId);
 ```
