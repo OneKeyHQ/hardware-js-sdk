@@ -73,9 +73,9 @@ const devices = await HardwareSDK.searchDevices();
 if (!devices.success || !devices.payload.length) throw new Error('No device');
 const { connectId } = devices.payload[0];
 
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
-const deviceId = features.payload.device_id;
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
 
 HardwareSDK.on(UI_REQUEST.REQUEST_PIN, () => {
   // 打开 UI，收集输入，再 uiResponse

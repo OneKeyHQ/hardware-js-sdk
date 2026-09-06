@@ -19,7 +19,7 @@ title: 迁移到 web-sdk + WebUSB
 
 - 使用 `env: 'webusb'` 初始化 SDK
   - （Bridge (env: `web`) → WebUSB (env: `webusb`)）
-- 更新 hd-web-sdk 的 `connectSrc` 到最新 iframe 主机版本（如 `https://jssdk.onekey.so/1.1.16/`）
+- 优先省略 `connectSrc`，让 `@onekeyfe/hd-web-sdk` 填 `https://jssdk.onekey.so/<安装版本>/`。只有自建 iframe 时才覆盖。
 - 通过 `navigator.usb.requestDevice()` 配合官方 OneKey 过滤器请求用户授权 — 由于 Chrome 安全限制，必须由用户手势触发（如按钮点击）；在获得权限前不允许自动设备发现
 - Bridge 相关检查已弃用（如 `checkBridgeStatus()`）
 - 其他 SDK 用法保持不变
@@ -36,8 +36,7 @@ const HardwareSDK = HdWebSdk.HardwareWebSdk;
 
 await HardwareSDK.init({
   env: 'webusb',
-  // hd-web-sdk 使用 iframe 主机；保持 connectSrc 配置
-  connectSrc: 'https://jssdk.onekey.so/1.1.16/',
+  // 省略 connectSrc — SDK 会填 https://jssdk.onekey.so/<安装的 hd-web-sdk 版本>/
   debug: true,
   fetchConfig: true,
 });
@@ -89,6 +88,6 @@ if (r.success) {
 ## 清理和检查清单
 
 - 移除 Bridge 相关检查/CTA（如 `checkBridgeStatus()`）
-- 在 hd-web-sdk 初始化中保持最新的 `connectSrc`（iframe 主机）
+- 除非自建 iframe，否则省略 `connectSrc`；覆盖时必须与安装的 `@onekeyfe/hd-web-sdk` 版本一致
 - 检测 `navigator.usb` 特性，如不支持则显示友好提示
 - 其他 SDK 方法和 UI 流程保持不变

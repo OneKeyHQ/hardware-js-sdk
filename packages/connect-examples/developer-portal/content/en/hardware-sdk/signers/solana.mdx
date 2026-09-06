@@ -36,8 +36,9 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
-const [{ connectId }] = await HardwareSDK.searchDevices();
-const deviceId = (await HardwareSDK.getFeatures(connectId)).payload?.device_id;
+const devices = await HardwareSDK.searchDevices();
+const { connectId } = devices.payload[0];
+const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
 ```
 
 ## Common scenarios
@@ -71,7 +72,7 @@ Promise<{ success, payload: { address, path, publicKey? } }>
 const res = await HardwareSDK.solSignTransaction(connectId, deviceId, {
   path: "m/44'/501'/0'/0'",
   rawTx,
-  keepSession: true,
+  useEmptyPassphrase: true,
 });
 // res.payload.signature
 ```
@@ -80,7 +81,7 @@ const res = await HardwareSDK.solSignTransaction(connectId, deviceId, {
 
 - `path`: required; hardened, length 4.
 - `rawTx`: required; serialized Solana message/tx (base64 or hex).
-- `keepSession?`: optional; reuse session for multiple signatures.
+- `useEmptyPassphrase?`: optional; force the standard wallet. Hidden wallet: pass `passphraseState`.
 
 **Returns**
 
@@ -91,7 +92,7 @@ Promise<{ success, payload: { signature } }>
 ## Interaction & Status
 
 - APIs resolve on completion; user prompts surface via `UI_REQUEST` (unlock device, open Solana app, confirm transaction).
-- Run calls serially per device; `keepSession` helps reduce repeated prompts.
+- Run calls serially per device. Reuse `passphraseState` or `useEmptyPassphrase: true`. `keepSession` is deprecated.
 
 ## Example
 
@@ -100,8 +101,9 @@ import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 
 await HardwareSDK.init({ env: 'webusb', debug: false });
 
-const [{ connectId }] = await HardwareSDK.searchDevices();
-const deviceId = (await HardwareSDK.getFeatures(connectId)).payload?.device_id;
+const devices = await HardwareSDK.searchDevices();
+const { connectId } = devices.payload[0];
+const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
 
 const path = "m/44'/501'/0'/0'";
 await HardwareSDK.solGetAddress(connectId, deviceId, { path, showOnOneKey: true });
@@ -112,7 +114,7 @@ const rawTx =
 const { success, payload } = await HardwareSDK.solSignTransaction(connectId, deviceId, {
   path,
   rawTx,
-  keepSession: true,
+  useEmptyPassphrase: true,
 });
 
 if (success) {

@@ -136,70 +136,55 @@ await HardwareSDK.btcGetAddress(connectId, deviceId, {
 });
 ```
 
-### Cross-process session reuse (CLI / scripts)
+### Cross-process reuse (CLI / scripts)
 
-For short-lived processes (CLI tools, automation scripts), you can persist the session and restore it on the next invocation using `preloadSessionCache`.
-
-```mermaid
-sequenceDiagram
-    participant Process1 as Process 1
-    participant SDK
-    participant Device
-    participant Storage as Keychain / File
-
-    Process1->>SDK: getPassphraseState → passphraseState
-    Process1->>SDK: searchDevices → session_id
-    Process1->>Storage: save(deviceId, passphraseState, session_id)
-
-    Note over Process1: Process exits
-
-    participant Process2 as Process 2
-    Process2->>Storage: load(deviceId) → passphraseState, session_id
-    Process2->>SDK: preloadSessionCache(deviceId, passphraseState, session_id)
-    Process2->>SDK: evmGetAddress(..., passphraseState)
-    SDK->>Device: Initialize with session_id
-    Device-->>SDK: Session recognized → no passphrase prompt
-    SDK-->>Process2: { address }
-```
+Persist only `deviceId + passphraseState`. Do **not** persist firmware `session_id`. Hardware SDK 1.2.x resumes a hidden wallet with `openWalletSession`.
 
 ```ts
-import { preloadSessionCache } from '@onekeyfe/hd-core';
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
 
-// On startup: restore session from persistent storage
-const { deviceId, passphraseState, sessionId } = loadFromStorage();
-preloadSessionCache(deviceId, passphraseState, sessionId);
+// Process 1 — after the user selects the hidden wallet
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.SelectHidden,
+});
+saveBinding({
+  deviceId: opened.payload.deviceId,
+  passphraseState: opened.payload.passphraseState,
+});
 
-// Now SDK calls with this passphraseState skip the passphrase prompt
+// Process 2 — later process, same machine
+const { deviceId, passphraseState } = loadBinding();
+await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.ResumeHidden,
+  deviceId,
+  passphraseState,
+});
+
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
   passphraseState,
 });
 ```
 
-> **Important: device locking invalidates sessions.** All OneKey devices clear passphrase sessions when locked (whether by auto-lock timeout, manual lock, or USB disconnection). Once locked, the cached `session_id` becomes invalid and the user must re-enter their passphrase after unlocking (PIN). Session reuse only works when the device remains unlocked between invocations.
+`preloadSessionCache` is a compatibility entry for old App/CLI Keychain records. New integrations should not call it and should not store `session_id`.
 
-### Unlock-first pattern (recommended for CLI)
+If the device locked between processes, PIN runs again. Protocol V2 can re-select the same hidden wallet inside `resume-hidden`. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
 
-For devices that may auto-lock (Touch/Pro), always unlock before attempting session reuse:
+### Unlock-first pattern (CLI)
 
 ```ts
-// 1. Check if device is locked
-const features = await HardwareSDK.getFeatures(connectId);
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
 
-// 2. Unlock if needed (triggers PIN on device)
-let wasLocked = false;
-if (!features.payload.unlocked) {
-  wasLocked = true;
+if (!state.payload.status.unlocked) {
   await HardwareSDK.deviceUnlock(connectId, {});
 }
 
-// 3. Only reuse cached session if device was already unlocked
-if (!wasLocked) {
-  // Try preloadSessionCache from persistent storage
-  preloadSessionCache(deviceId, savedPassphraseState, savedSessionId);
-} else {
-  // Device was locked → old session is invalid → must re-prompt
-}
+await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.ResumeHidden,
+  deviceId: savedDeviceId,
+  passphraseState: savedPassphraseState,
+});
 ```
 
 ## Security tips

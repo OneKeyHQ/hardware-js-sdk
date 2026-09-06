@@ -39,8 +39,9 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
-const [{ connectId }] = await HardwareSDK.searchDevices();
-const deviceId = (await HardwareSDK.getFeatures(connectId)).payload?.device_id;
+const devices = await HardwareSDK.searchDevices();
+const { connectId } = devices.payload[0];
+const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
 ```
 
 ## 适用场景
@@ -75,7 +76,7 @@ Promise<{ success, payload: { address, path, publicKey? } }>
 const res = await HardwareSDK.solSignTransaction(connectId, deviceId, {
   path: "m/44'/501'/0'/0'",
   rawTx,
-  keepSession: true,
+  useEmptyPassphrase: true,
 });
 // res.payload.signature
 ```
@@ -84,7 +85,7 @@ const res = await HardwareSDK.solSignTransaction(connectId, deviceId, {
 
 - `path`: 必填，同上。
 - `rawTx`: 必填，序列化消息/交易（十六进制字符串，`0x` 可选；如原始值为 `Transaction.serialize()` 的 `Uint8Array`，需自行转 hex）。
-- `keepSession?`: 可选，多次签名复用会话。
+- `useEmptyPassphrase?`: 可选，强制标准钱包。隐藏钱包请带 `passphraseState`。
 
 **返回**
 
@@ -97,7 +98,7 @@ Promise<{ success, payload: { signature } }>
 ## 交互与状态
 
 - 接口以 Promise 结束；用户提示通过 `UI_REQUEST` 事件触发（解锁设备、打开 Solana App、确认交易）。
-- 同一设备串行调用；多次签名可用 `keepSession` 减少重复提示。
+- 同一设备串行调用。复用 `passphraseState` 或 `useEmptyPassphrase: true`。`keepSession` 已废弃。
 
 ## 示例
 
@@ -108,8 +109,9 @@ import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 
 await HardwareSDK.init({ env: 'webusb', debug: false });
 
-const [{ connectId }] = await HardwareSDK.searchDevices();
-const deviceId = (await HardwareSDK.getFeatures(connectId)).payload?.device_id;
+const devices = await HardwareSDK.searchDevices();
+const { connectId } = devices.payload[0];
+const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
 
 const path = "m/44'/501'/0'/0'";
 await HardwareSDK.solGetAddress(connectId, deviceId, { path, showOnOneKey: true });
@@ -123,7 +125,7 @@ const rawTx =
 const { success, payload } = await HardwareSDK.solSignTransaction(connectId, deviceId, {
   path,
   rawTx,
-  keepSession: true,
+  useEmptyPassphrase: true,
 });
 
 if (success) {
@@ -139,7 +141,7 @@ if (success) {
 - 验签：用 `@solana/web3.js` 将签名附加到 `Transaction`，验证签名公钥等于 `solGetAddress` 返回值。
 - 常见问题：
   - 超大消息或不支持的指令：精简指令或拆分交易。
-  - 会话交互：同一设备串行调用，多次签名可启用 `keepSession`。
+  - 会话交互：同一设备串行调用；`openWalletSession` 一次后带上 `passphraseState`。`keepSession` 已废弃。
   - 拒签/超时：提供重试/取消，不要自动重播。
 
 参见方法文档：[solSignTransaction](/zh/hardware-sdk/chains/solana/solsigntransaction)。

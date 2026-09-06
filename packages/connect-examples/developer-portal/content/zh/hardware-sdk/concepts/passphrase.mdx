@@ -136,48 +136,55 @@ await HardwareSDK.btcGetAddress(connectId, deviceId, {
 });
 ```
 
-### 跨进程会话复用（CLI / 脚本）
+### 跨进程复用（CLI / 脚本）
 
-对于短生命周期的进程（CLI 工具、自动化脚本），可以使用 `preloadSessionCache` 持久化并恢复会话。
+只持久化 `deviceId + passphraseState`。**不要**存固件 `session_id`。Hardware SDK 1.2.x 用 `openWalletSession` 恢复隐藏钱包。
 
 ```ts
-import { preloadSessionCache } from '@onekeyfe/hd-core';
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
 
-// 启动时：从持久化存储恢复会话
-const { deviceId, passphraseState, sessionId } = loadFromStorage();
-preloadSessionCache(deviceId, passphraseState, sessionId);
+// 进程 1 — 用户选完隐藏钱包
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.SelectHidden,
+});
+saveBinding({
+  deviceId: opened.payload.deviceId,
+  passphraseState: opened.payload.passphraseState,
+});
 
-// 后续 SDK 调用使用此 passphraseState，跳过 passphrase 提示
+// 进程 2 — 之后另一次进程
+const { deviceId, passphraseState } = loadBinding();
+await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.ResumeHidden,
+  deviceId,
+  passphraseState,
+});
+
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
   passphraseState,
 });
 ```
 
-> **重要：设备锁定会使会话失效。** 所有 OneKey 设备在锁定时（无论是自动锁屏、手动锁定还是 USB 断开）都会清除 passphrase 会话。锁定后缓存的 `session_id` 失效，用户必须在解锁（输入 PIN）后重新输入 passphrase。会话复用仅在设备保持解锁状态时有效。
+`preloadSessionCache` 只给旧 App/CLI Keychain 记录做兼容。新接入不要调用它，也不要存 `session_id`。
 
-### 先解锁模式（CLI 推荐）
+两次进程之间如果设备锁屏了，PIN 会再走一遍。Protocol V2 可以在 `resume-hidden` 里重新选回同一个隐藏钱包。见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
 
-对于可能自动锁屏的设备（Touch/Pro），始终先解锁再尝试会话复用：
+### 先解锁模式（CLI）
 
 ```ts
-// 1. 检查设备是否锁定
-const features = await HardwareSDK.getFeatures(connectId);
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
 
-// 2. 如需要则解锁（设备上输入 PIN）
-let wasLocked = false;
-if (!features.payload.unlocked) {
-  wasLocked = true;
+if (!state.payload.status.unlocked) {
   await HardwareSDK.deviceUnlock(connectId, {});
 }
 
-// 3. 仅在设备原本就是解锁状态时复用缓存会话
-if (!wasLocked) {
-  // 从持久化存储加载 preloadSessionCache
-  preloadSessionCache(deviceId, savedPassphraseState, savedSessionId);
-} else {
-  // 设备曾锁定 → 旧会话失效 → 需要重新输入 passphrase
-}
+await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.ResumeHidden,
+  deviceId: savedDeviceId,
+  passphraseState: savedPassphraseState,
+});
 ```
 
 ## 注意事项
