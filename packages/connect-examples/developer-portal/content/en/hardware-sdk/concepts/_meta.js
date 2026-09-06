@@ -1,5 +1,6 @@
 export default {
   devices: 'Devices',
+  'chain-support': 'Chain Support',
   protocol: 'Protocol V1 and V2',
   identifiers: 'Identifiers',
   'common-params': 'Common Params',

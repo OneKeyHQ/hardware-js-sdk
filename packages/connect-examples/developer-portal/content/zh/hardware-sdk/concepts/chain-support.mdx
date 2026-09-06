@@ -1,0 +1,92 @@
+---
+title: 链支持
+---
+
+# 链支持
+
+本页是 **Hardware SDK 公开方法**矩阵，不是 OneKey App 的币种目录。App 侧「100+ 链、30,000+ 币」是钱包目录数字。接入方只应统计你能在 `HardwareSDK` 上调用的方法。
+
+Pro 2 / Neo 的事实源是每个 Core 方法的 `getSupportedProtocols()`。默认只有 Protocol V1。只有返回 `['V1', 'V2']` 的方法才能在 Pro 2 / Neo 上调用。固件 `min` 版本会过期；去方法页和设备固件上看，不要把版本号抄进本页长期保存。
+
+## Protocol V1 与 V2（Pro 2 / Neo）
+
+| 系列 | 公开方法 | Classic 1s / Touch / Pro | Mini | Pro 2 / Neo |
+| --- | --- | --- | --- | --- |
+| EVM | `evmGetAddress` `evmGetPublicKey` `evmSignMessage` `evmSignTransaction` `evmSignTypedData` `evmVerifyMessage` | 是 | 是 | **V1+V2** |
+| Bitcoin 及分叉 | `btcGetAddress` `btcGetPublicKey` `btcSignMessage` `btcSignTransaction` `btcVerifyMessage` `btcSignPsbt` | 是（见下方注意） | 是 | **V1+V2**（Bitcoin）。**Neurai 仅 V1** |
+| Solana | `solGetAddress` `solSignMessage` `solSignTransaction` `solSignOffchainMessage` | 是 | 是 | **V1+V2** |
+| Aptos | `aptosGetAddress` `aptosGetPublicKey` `aptosSignMessage` `aptosSignTransaction` `aptosSignInMessage` | 是（见下方注意） | 是 | **V1+V2** |
+| Sui | `suiGetAddress` `suiGetPublicKey` `suiSignMessage` `suiSignTransaction` | 是 | 是 | **V1+V2** |
+| Cosmos | `cosmosGetAddress` `cosmosGetPublicKey` `cosmosSignTransaction` | 是 | 是 | **V1+V2** |
+| NEAR | `nearGetAddress` `nearSignTransaction` | 是 | 是 | **V1+V2** |
+| TON | `tonGetAddress` `tonSignMessage` `tonSignProof` `tonSignData` | 是。**Classic（非 1s）：否** | 地址可以；**签名/proof：否** | **V1+V2** |
+| TRON | `tronGetAddress` `tronSignMessage` `tronSignTransaction` | 是 | 地址可以；**消息签名：否** | **V1+V2** |
+| Cardano | `cardanoGetAddress` `cardanoGetPublicKey` `cardanoSignMessage` `cardanoSignTransaction` | 是 | 是 | **V1+V2** |
+| Polkadot | `polkadotGetAddress` `polkadotSignTransaction` | 是 | 是 | **V1+V2** |
+| Ripple (XRP) | `xrpGetAddress` `xrpSignTransaction` | 是 | 是 | **V1+V2** |
+| Filecoin | `filecoinGetAddress` `filecoinSignTransaction` | 是 | 是 | **V1+V2** |
+| Conflux | `confluxGetAddress` `confluxSignMessage` `confluxSignMessageCIP23` `confluxSignTransaction` | 是 | 是 | **V1+V2** |
+| Kaspa | `kaspaGetAddress` `kaspaSignTransaction` | 是 | 是 | **V1+V2** |
+| Algorand | `algoGetAddress` `algoSignTransaction` | 是 | 是 | **V1+V2** |
+| NEM | `nemGetAddress` `nemSignTransaction` | 是 | 是 | **V1+V2** |
+| Nostr | `nostrGetPublicKey` `nostrSignEvent` `nostrSignSchnorr` `nostrEncryptMessage` `nostrDecryptMessage` | 是 | 是 | **V1+V2** |
+| Starcoin | `starcoinGetAddress` `starcoinGetPublicKey` `starcoinSignMessage` `starcoinSignTransaction` `starcoinVerifyMessage` | 是 | 是 | **V1+V2** |
+
+## 目前仅 Protocol V1（Pro 2 / Neo 上不要调）
+
+这些方法在 Core 里仍默认 `['V1']`。Protocol V2 连接上不要调用。
+
+| 系列 | 公开方法 | 说明 |
+| --- | --- | --- |
+| Stellar | `stellarGetAddress` `stellarSignTransaction` | 仅 V1 |
+| Alephium | `alephiumGetAddress` `alephiumSignMessage` `alephiumSignTransaction` | 仅 V1。Classic / Mini / Touch 签名经常失败 |
+| Benfen | `benfenGetAddress` `benfenGetPublicKey` `benfenSignMessage` `benfenSignTransaction` | 仅 V1。Classic 预期失败 |
+| Nexa | `nexaGetAddress` `nexaSignTransaction` | 仅 V1 |
+| Dynex | `dnxGetAddress` `dnxSignTransaction` | 仅 V1。Pro / Classic 1s / Mini / Touch 经常失败 |
+| Nervos | `nervosGetAddress` `nervosSignTransaction` | 仅 V1 |
+| SCDO | `scdoGetAddress` `scdoSignMessage` `scdoSignTransaction` | 仅 V1。Classic / Mini / Touch 经常失败 |
+| Neo（链） | `neoGetAddress` `neoSignTransaction` | 仅 V1。Classic / Mini / Touch 经常失败。不是 OneKey Neo 设备 |
+| Lightning | `lnurlAuth` | 仅 V1 |
+| EVM 额外 | `evmSignMessageEIP712` | 旧 typed-data 路径；优先用 `evmSignTypedData`（V1+V2） |
+
+## 机型注意（兼容性测试）
+
+下面是当前测试**接受失败**的方法。在固件和测试改口之前，按该机型不支持处理。
+
+| 机型 | 不要依赖 |
+| --- | --- |
+| Classic | TON、Alephium、SCDO、Benfen、Neo（链）、`btcSignPsbt`、`aptosSignInMessage` |
+| Classic 1s / Pure | Dynex |
+| Mini | Alephium 签名、Dynex 签名、Neo（链）签名、SCDO 签名、TON 签名/proof、TRON 消息签名。**无 BLE** |
+| Touch | Alephium 签名、Dynex 签名、Neo（链）签名、SCDO 签名 |
+| Pro | Dynex |
+| Pro 2 | 上表 `['V1', 'V2']` 的链方法。**有摄像头**（Air-Gap） |
+| Neo | 与 Pro 2 相同的链方法。**无摄像头、NFC、指纹、Find My** — 无 Air-Gap 二维码 |
+
+Classic 不支持 EIP-7702（`authorizationList`）。
+
+## 批量地址助手
+
+`allNetworkGetAddress` / `allNetworkGetAddressByLoop` 是 V1+V2 助手。某个网络自己的方法如果仍是仅 V1，在 Protocol V2 连接上一样会失败。
+
+## Bitcoin 分叉
+
+`btc*` 方法带 `coin` / `coin_name`。多数分叉跟 Bitcoin 行（V1+V2）。**Neurai 仅 Protocol V1。**
+
+## 运行时怎么判断
+
+`getSupportedProtocols()` 是 Core 方法类上的钩子，不是公开的 `HardwareSDK` 调用。用本页加上现场设备判断：
+
+1. SDK 有没有导出这个方法？
+2. 设备 `connectProtocol` 是 `'V1'` 还是 `'V2'`？
+3. 本页把该方法标成 V1+V2，还是仅 V1？
+4. 该机型是否在注意表里？
+5. 固件是否满足方法页上的版本行？
+
+不要用 USB PID 或蓝牙名分支。见 [Protocol V1 与 V2](/zh/hardware-sdk/concepts/protocol) 和 [设备](/zh/hardware-sdk/concepts/devices)。
+
+## 下一步
+
+- 方法页：用侧栏 Chain Methods 选择器
+- [交易签名指引](/zh/hardware-sdk/signers)
+- [快速开始](/zh/hardware-sdk/getting-started)

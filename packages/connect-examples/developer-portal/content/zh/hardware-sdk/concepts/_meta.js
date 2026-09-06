@@ -1,5 +1,6 @@
 export default {
   devices: '设备',
+  'chain-support': '链支持',
   protocol: 'Protocol V1 与 V2',
   identifiers: '标识符',
   'common-params': '通用参数',
