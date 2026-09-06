@@ -151,7 +151,7 @@ export function LandingPage({ locale = 'en' }) {
     ? {
         heroKicker: 'Hardware SDK 1.2.x',
         heroTitle: '硬件签名，从文档跑通',
-        heroSubtitle: '同一套 JS API 覆盖 Protocol V1 与 V2。WebUSB、BLE、Native，五分钟拿到第一个地址。',
+        heroSubtitle: '同一套 JS API 覆盖 Protocol V1 与 V2。WebUSB、BLE、Native。',
         ctaPrimary: '快速开始',
         ctaSecondary: '更新日志',
         ctaChains: '查看链支持',
@@ -203,7 +203,7 @@ export function LandingPage({ locale = 'en' }) {
     : {
         heroKicker: 'Hardware SDK 1.2.x',
         heroTitle: 'Hardware signing, from the docs',
-        heroSubtitle: 'One JavaScript API for Protocol V1 and V2. WebUSB, BLE, or native — first address in minutes.',
+        heroSubtitle: 'One JavaScript API for Protocol V1 and V2. WebUSB, BLE, or native.',
         ctaPrimary: 'Get Started',
         ctaSecondary: 'Changelog',
         ctaChains: 'Chain support',
@@ -319,7 +319,7 @@ export function LandingPage({ locale = 'en' }) {
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-[#101111] text-white"
+      className="landing-page flex min-h-screen flex-col overflow-x-hidden bg-[#101111] text-white"
       style={{ fontFamily: '"Stabil Grotesk", sans-serif' }}
     >
       <main className="flex flex-col gap-[72px] sm:gap-[96px] lg:gap-[120px]">
@@ -332,15 +332,28 @@ export function LandingPage({ locale = 'en' }) {
           }}
         >
           <div className="relative mx-auto min-h-[560px] w-full max-w-[1440px] lg:h-[810px] lg:min-h-0">
-            <div className="absolute inset-x-[20px] top-[84px] z-10 flex flex-col items-center text-center sm:inset-x-[32px] sm:top-[104px] lg:left-[64px] lg:right-auto lg:top-[169px] lg:w-[711px] lg:items-start lg:text-left">
+            <div className="absolute inset-x-[20px] top-[84px] z-10 flex w-auto min-w-0 flex-col items-stretch text-center sm:inset-x-[32px] sm:top-[104px] lg:left-[64px] lg:right-auto lg:top-[169px] lg:w-[711px] lg:items-start lg:text-left">
               <p className="text-[13px] font-medium uppercase tracking-[0.16em] text-[#00B812]">
                 {copy.heroKicker}
               </p>
-              <h1 className="mt-[12px] max-w-full text-[36px] font-semibold leading-[40px] text-white sm:text-[44px] sm:leading-[48px] lg:text-[52px] lg:leading-[56px]">
+              <h1 className="mt-[12px] w-full max-w-[calc(100vw-40px)] text-balance text-[32px] font-semibold leading-[36px] text-white sm:max-w-full sm:text-[44px] sm:leading-[48px] lg:text-[52px] lg:leading-[56px]">
                 {copy.heroTitle}
               </h1>
-              <p className="mt-[16px] max-w-[620px] text-[16px] leading-[24px] text-white/65">
-                {copy.heroSubtitle}
+              <p className="mt-[16px] w-full max-w-[min(620px,calc(100vw-48px))] px-[8px] text-[15px] leading-[22px] text-white/65 sm:px-0 sm:text-[16px] sm:leading-[24px]">
+                {isZh ? (
+                  <>
+                    同一套 JS API 覆盖 Protocol V1 与 V2。
+                    <br className="sm:hidden" />
+                    WebUSB、BLE、Native。
+                  </>
+                ) : (
+                  <>
+                    One JavaScript API for Protocol V1 and V2.
+                    <br className="sm:hidden" />
+                    {' '}
+                    WebUSB, BLE, or native.
+                  </>
+                )}
               </p>
               <pre
                 className="mt-[24px] hidden max-w-[620px] overflow-x-auto rounded-[12px] border border-white/10 bg-[#141514] p-[16px] text-left text-[12px] leading-[18px] text-[#86EA90] lg:block"
@@ -417,17 +430,17 @@ const { connectId } = devices.payload[0]`}
             >
               <div className="text-[32px] font-semibold leading-[36px] text-white">{item.value}</div>
               <div className="mt-[8px] text-[14px] font-medium text-white/80">{item.label}</div>
-              <div className="mt-[4px] text-[13px] text-white/50">{item.note}</div>
+              <div className="mt-[4px] break-words text-[13px] text-white/50">{item.note}</div>
             </div>
           ))}
         </section>
 
         <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[20px] sm:px-[32px] lg:px-[64px]">
-          <div className="flex w-full flex-col items-center gap-[8px] text-center">
-            <h2 className="text-[32px] font-medium leading-[38px] text-white sm:text-[40px] sm:leading-[46px]">
+          <div className="flex w-full min-w-0 flex-col items-stretch gap-[8px] text-center">
+            <h2 className="mx-auto w-full max-w-[calc(100vw-40px)] text-balance text-[28px] font-medium leading-[34px] text-white sm:max-w-none sm:text-[40px] sm:leading-[46px]">
               {copy.devicesTitle}
             </h2>
-            <span className="max-w-[720px] text-[16px] text-white/60">{copy.devicesSubtitle}</span>
+            <span className="mx-auto w-full max-w-[min(720px,calc(100vw-40px))] text-[16px] text-white/60">{copy.devicesSubtitle}</span>
           </div>
           <div className="mt-[24px] grid w-full grid-cols-2 gap-[12px] sm:grid-cols-3 lg:grid-cols-6">
             {DEVICE_LINEUP.map((device) => (
@@ -462,14 +475,14 @@ const { connectId } = devices.payload[0]`}
           id="hardware-integration"
           className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[20px] sm:px-[32px] lg:px-[64px]"
         >
-          <div className="flex w-full flex-col items-center gap-[8px] text-center">
+          <div className="flex w-full min-w-0 flex-col items-stretch gap-[8px] text-center">
             <h2
-              className="text-[32px] font-medium leading-[38px] sm:text-[40px] sm:leading-[46px]"
+              className="w-full text-[28px] font-medium leading-[34px] sm:text-[40px] sm:leading-[46px]"
               style={{ color: '#FFFFFF' }}
             >
               {copy.hardwareTitle}
             </h2>
-            <span className="text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+            <span className="w-full text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
               {copy.hardwareSubtitle}
             </span>
           </div>
@@ -481,14 +494,14 @@ const { connectId } = devices.payload[0]`}
         </section>
 
         <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[20px] sm:px-[32px] lg:px-[64px]">
-          <div className="flex w-full flex-col items-center gap-[8px] text-center">
+          <div className="flex w-full min-w-0 flex-col items-stretch gap-[8px] text-center">
             <h2
-              className="text-[32px] font-medium leading-[38px] sm:text-[40px] sm:leading-[46px]"
+              className="w-full text-[28px] font-medium leading-[34px] sm:text-[40px] sm:leading-[46px]"
               style={{ color: '#FFFFFF' }}
             >
               {copy.dappTitle}
             </h2>
-            <span className="text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+            <span className="w-full text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
               {copy.dappSubtitle}
             </span>
           </div>
@@ -500,14 +513,14 @@ const { connectId } = devices.payload[0]`}
         </section>
 
         <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[20px] sm:px-[32px] lg:px-[64px]">
-          <div className="flex w-full flex-col items-center gap-[8px] text-center">
+          <div className="flex w-full min-w-0 flex-col items-stretch gap-[8px] text-center">
             <h2
-              className="text-[32px] font-medium leading-[38px] sm:text-[40px] sm:leading-[46px]"
+              className="w-full text-[28px] font-medium leading-[34px] sm:text-[40px] sm:leading-[46px]"
               style={{ color: '#FFFFFF' }}
             >
               {copy.offlineTitle}
             </h2>
-            <span className="text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+            <span className="w-full text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
               {copy.offlineSubtitle}
             </span>
           </div>
@@ -519,11 +532,11 @@ const { connectId } = devices.payload[0]`}
         </section>
 
         <section className="mx-auto flex w-full max-w-[1440px] flex-col px-[20px] sm:px-[32px] lg:px-[64px]">
-          <div className="flex w-full flex-col items-center gap-[8px] text-center">
-            <h2 className="text-[32px] font-medium leading-[38px] text-white sm:text-[40px] sm:leading-[46px]">
+          <div className="flex w-full min-w-0 flex-col items-stretch gap-[8px] text-center">
+            <h2 className="w-full text-[28px] font-medium leading-[34px] text-white sm:text-[40px] sm:leading-[46px]">
               {copy.chainsTitle}
             </h2>
-            <span className="max-w-[720px] text-[16px] text-white/60">{copy.chainsSubtitle}</span>
+            <span className="mx-auto w-full max-w-[720px] text-[16px] text-white/60">{copy.chainsSubtitle}</span>
           </div>
           <div className="mt-[24px] flex flex-wrap justify-center gap-[8px]">
             {V2_CHAIN_CHIPS.map((item) => (
@@ -561,7 +574,7 @@ const { connectId } = devices.payload[0]`}
 
         <section className="mx-auto grid w-full max-w-[1440px] grid-cols-1 gap-[16px] px-[20px] sm:grid-cols-3 sm:px-[32px] lg:px-[64px]">
           <div className="sm:col-span-3">
-            <h2 className="text-center text-[32px] font-medium leading-[38px] text-white sm:text-[40px] sm:leading-[46px]">
+            <h2 className="w-full text-center text-[28px] font-medium leading-[34px] text-white sm:text-[40px] sm:leading-[46px]">
               {copy.benefitsTitle}
             </h2>
           </div>
@@ -579,7 +592,7 @@ const { connectId } = devices.payload[0]`}
         </section>
 
         <section className="mx-auto w-full max-w-[880px] px-[20px] sm:px-[32px]">
-          <h2 className="text-center text-[32px] font-medium leading-[38px] text-white sm:text-[40px] sm:leading-[46px]">
+          <h2 className="w-full text-center text-[28px] font-medium leading-[34px] text-white sm:text-[40px] sm:leading-[46px]">
             {copy.faqTitle}
           </h2>
           <div className="mt-[24px] divide-y divide-white/10 border-y border-white/10">
