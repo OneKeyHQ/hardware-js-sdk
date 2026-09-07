@@ -1,0 +1,160 @@
+---
+title: From 1.1.x to 1.2.x
+---
+
+# Migrate from 1.1.x to 1.2.x
+
+This page is for third-party apps already on Hardware SDK **1.1.x**. Target is the current **1.2.x** line (stable npm `1.2.1`).
+
+You keep the same JavaScript methods. Protocol V2 (Pro 2 / Neo) is handled inside Core. Do not add a second SDK.
+
+New projects should skip this page and use [Getting Started](/en/hardware-sdk/getting-started).
+
+## What stays the same
+
+- Call shape: `HardwareSDK.method(connectId, deviceId?, params)` → `{ success, payload }`
+- Chain methods (`evmGetAddress`, `btcSignTransaction`, …)
+- `init({ env })` still selects **transport** (USB / BLE / low-level), not Protocol V1 vs V2
+- `UI_EVENT` + `uiResponse` for PIN / passphrase / button
+
+## Upgrade
+
+```bash
+npm i @onekeyfe/hd-common-connect-sdk@^1.2.1
+```
+
+Pin every `@onekeyfe/hd-*` package to the same 1.2.x version. If you still embed `@onekeyfe/hd-web-sdk`, **omit `connectSrc`** so the iframe matches the installed package.
+
+Do not mix `@onekeyfe/hd-web-sdk` and `@onekeyfe/hd-common-connect-sdk` in one runtime.
+
+## Replace these APIs
+
+| 1.1.x | 1.2.x | Notes |
+| --- | --- | --- |
+| `getFeatures()` | [`getDeviceState()`](/en/hardware-sdk/basic-api/get-device-state) | Read `payload.identity.deviceId`, not `payload.device_id` |
+| `getOnekeyFeatures()` | `getDeviceState({ scope: 'firmware' })` | Version / identity snapshot |
+| `getPassphraseState()` | [`openWalletSession({ mode })`](/en/hardware-sdk/basic-api/open-wallet-session) | `standard` or `select-hidden` once |
+| `keepSession` | persist `deviceId + passphraseState` | Pass `passphraseState` (or `useEmptyPassphrase: true`) on later calls |
+| firmware `session_id` in your DB | **do not persist** | Core keeps it internally |
+| `env: 'web'` + Bridge | `env: 'webusb'` | See [Bridge → WebUSB](/en/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb) |
+| `firmwareUpdateV2` / `V3` on Pro 2 / Neo | [`firmwareUpdateV4`](/en/hardware-sdk/device-api/firmwareupdatev4) | Classic / Mini / Touch / Pro stay on V2 / V3 |
+
+Deprecated methods still run for existing apps. New code should not call them.
+
+There is no `openWalletSession({ mode: 'resume-hidden' })`. After you have a binding, later address / sign calls that carry `passphraseState` resume inside Core.
+
+## 1. Device snapshot
+
+**1.1.x**
+
+```ts
+const features = await HardwareSDK.getFeatures(connectId);
+if (!features.success) throw new Error(features.payload.error);
+const deviceId = features.payload.device_id;
+```
+
+**1.2.x**
+
+```ts
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+```
+
+`searchDevices` is still `{ success, payload }`. Check `success` before treating `payload` as the device list.
+
+## 2. Wallet session
+
+**1.1.x** — open a hidden wallet, then keep calling with the fingerprint:
+
+```ts
+const ps = await HardwareSDK.getPassphraseState(connectId, {
+  initSession: true,
+});
+const passphraseState = ps.payload;
+
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  passphraseState,
+});
+```
+
+**1.2.x** — open once with an explicit mode, then pass the fingerprint on methods:
+
+```ts
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
+
+// Standard wallet
+await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.Standard,
+});
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+
+// Hidden wallet — user selects on the device
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.SelectHidden,
+});
+const deviceId = opened.payload.deviceId;
+const passphraseState = opened.payload.passphraseState;
+
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  passphraseState,
+});
+```
+
+Do not mix `openWalletSession({ mode })` with `useEmptyPassphrase` / `initSession` on the **same** call.
+
+If you skip `passphraseState` on a hidden wallet, address / sign may succeed on the **standard** wallet with no error.
+
+Contract: [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
+
+## 3. Protocol V1 and V2
+
+Classic / Mini / Touch / Pro stay on Protocol V1. Pro 2 / Neo use Protocol V2. Your app still calls the same methods.
+
+The SDK sets `connectProtocol` from a **live probe**. Do not infer V1/V2 from USB PID, BLE name, or housing.
+
+Passing `connectProtocol` on a call is a strict expectation — the SDK will not silently switch protocol.
+
+V1-only chains (Stellar, Alephium, Nexa, Dynex, Nervos, SCDO, Benfen, Neo chain) are **not supported** on Pro 2 / Neo. See [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol) and [Chain Support](/en/hardware-sdk/concepts/chain-support).
+
+## 4. Firmware
+
+| Device | 1.2.x API |
+| --- | --- |
+| Classic / Mini / Touch | `firmwareUpdateV2` |
+| Pro | `firmwareUpdateV3` |
+| Pro 2 / Neo | `firmwareUpdateV4` |
+
+Do not replay a firmware update, wipe, or sign after a transport drop.
+
+## 5. Transport
+
+If you still use OneKey Bridge (`env: 'web'` + `checkBridgeStatus`), migrate WebUSB:
+
+- Recommended: [Bridge → `@onekeyfe/hd-common-connect-sdk`](/en/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb)
+- Stay on iframe: [Bridge → `@onekeyfe/hd-web-sdk`](/en/hardware-sdk/legacy-guides/migrate-bridge-to-webusb)
+
+WebUSB needs HTTPS and a user gesture. BLE needs OS Bluetooth permission.
+
+## Checklist
+
+1. Bump all `@onekeyfe/hd-*` packages to the same 1.2.x version.
+2. Replace `getFeatures` / `getOnekeyFeatures` with `getDeviceState`.
+3. Replace `getPassphraseState` with `openWalletSession({ mode: 'standard' | 'select-hidden' })`.
+4. Persist only `deviceId + passphraseState`. Stop storing firmware `session_id`.
+5. Pass `passphraseState` or `useEmptyPassphrase: true` on every later address / sign call.
+6. Remove `keepSession`.
+7. Serialize calls per device.
+8. Confirm Pro 2 / Neo chain coverage before shipping those devices.
+
+## Next
+
+- [Getting Started](/en/hardware-sdk/getting-started)
+- [Core API Guide](/en/hardware-sdk/core-api-guide)
+- [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session)
+- [Reconnect and dispose](/en/hardware-sdk/transport/reconnect)
