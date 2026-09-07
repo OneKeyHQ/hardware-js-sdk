@@ -228,6 +228,7 @@ Business request
 - Pro2 `REQUEST_PIN` is a non-blocking device hint.
 - Wallet business auto-enters pre-call unlock via `useDevicePassphraseState=true` and does not maintain a method-name allowlist. Non-wallet management methods that firmware requires to unlock use `unlock-before-run` explicitly. There is no `retry-on-locked`.
 - An all-network root and its inner sub-methods share one Status/Unlock preflight. Each child chain still resumes Wallet Session independently.
+- On Pro2 advertising message 60461, all-network address requests use one `DeviceAnimationControl` session from the fingerprint read through the final chain response. The callback variant stops it before releasing its successful background task. Failed/canceled requests rely on firmware's default 3-second idle timeout, rather than risking a reconnect just to send Stop. Cleanup also skips disposed/replaced connections. Older firmware, Protocol V1, and other device families are unchanged.
 - bootloader / romloader skip Status/Unlock. Protocol V1 keeps its original flow.
 - `uploadPortfolio` disables wallet Session handling and uses `unlockPolicy='none'`. The default `uiMode='silent'` maps to `protocolV2UiMode='none'`; `uiMode='progress'` maps to `protocolV2UiMode='auto'` only to expose transfer progress and lifecycle close events. Neither mode emits `DeviceSessionAskPin`, and the file-write/apply sequence runs only once.
 
