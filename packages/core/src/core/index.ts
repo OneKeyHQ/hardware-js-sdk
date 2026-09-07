@@ -10,6 +10,7 @@ import {
   isProtocolV2LinkDisabledError,
 } from '@onekeyfe/hd-transport';
 import {
+  EDeviceType,
   ERRORS,
   ERROR_CODES_REQUIRE_DISCONNECT,
   ERROR_CODES_REQUIRE_RELEASE,
@@ -84,6 +85,7 @@ import type { BaseMethod } from '../api/BaseMethod';
 const Log = getLogger(LoggerNames.Core);
 const PRE_INITIALIZE_TTL_MS = 60 * 1000;
 const PRE_PENDING_CALL_TIMEOUT_MS = 15 * 1000;
+const PRO2_USB_SIGNING_COOLDOWN_MS = 1000;
 
 // Dedup/coalesce state for "pre-warm signal" methods (isPreWarmSignal),
 // keyed by getPreWarmKey(): coalesce in-flight, skip if warmed within TTL.
@@ -336,6 +338,20 @@ const waitForPendingPromise = async (
     Log.debug('pre pending call promise before call method done');
   }
 };
+
+export function getPostCallPendingPromise(method: BaseMethod, device: Device): Promise<void> {
+  const cleanupPromise = device.waitForRunCleanup();
+  const env = DataManager.getSettings('env');
+  const deviceType = device.getCurrentDeviceType();
+  const requiresSigningCooldown =
+    method.name.includes('Sign') &&
+    (deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo) &&
+    (DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env) || env === 'node-usb');
+
+  return requiresSigningCooldown
+    ? cleanupPromise.then(() => wait(PRO2_USB_SIGNING_COOLDOWN_MS)).then(() => undefined)
+    : cleanupPromise;
+}
 
 const onCallDevice = async (
   context: CoreContext,
@@ -691,9 +707,12 @@ const onCallDevice = async (
           },
         });
         messageResponse = createResponseMessage(method.responseID, true, response);
-        // Preserve the acknowledged result while keeping the next acquire behind release.
+        // Preserve the acknowledged result while the next call waits for cleanup and cooldown.
         if (method.connectId) {
-          context.setPrePendingCallPromise(method.connectId, device.waitForRunCleanup());
+          context.setPrePendingCallPromise(
+            method.connectId,
+            getPostCallPendingPromise(method, device)
+          );
         }
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method);
@@ -707,7 +726,10 @@ const onCallDevice = async (
         Log.debug(`Call API - Inner Method Run Error`, error);
         messageResponse = createResponseMessage(method.responseID, false, { error });
         if (method.connectId) {
-          context.setPrePendingCallPromise(method.connectId, device.waitForRunCleanup());
+          context.setPrePendingCallPromise(
+            method.connectId,
+            getPostCallPendingPromise(method, device)
+          );
         }
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method, error);

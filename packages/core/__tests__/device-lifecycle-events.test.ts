@@ -3,6 +3,7 @@ import { DeviceType, TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
 
 import {
   cancel,
+  getPostCallPendingPromise,
   initConnector,
   initCore,
   isDeviceIdentityMismatchError,
@@ -119,6 +120,59 @@ describe('public device lifecycle events', () => {
       expect(acquire).toHaveBeenCalledTimes(2);
     }
   );
+
+  test.each([
+    ['webusb', EDeviceType.Pro2],
+    ['desktop-webusb', EDeviceType.Pro2],
+    ['node-usb', EDeviceType.Neo],
+  ] as const)('waits one second after %s signing on %s', async (env, deviceType) => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
+    const cooldown = createDeferred<void>();
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((callback, delay) => {
+      cooldown.promise.then(() => callback());
+      return 0 as never;
+    });
+    const cleanup = createDeferred<void>();
+    const pending = getPostCallPendingPromise(
+      { name: 'evmSignTransaction' } as never,
+      {
+        getCurrentDeviceType: () => deviceType,
+        waitForRunCleanup: () => cleanup.promise,
+      } as never
+    );
+    let settled = false;
+    pending.then(() => {
+      settled = true;
+    });
+
+    cleanup.resolve();
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 1000);
+    cooldown.resolve();
+    await pending;
+    expect(settled).toBe(true);
+  });
+
+  test.each([
+    ['react-native', EDeviceType.Pro2, 'evmSignTransaction'],
+    ['webusb', EDeviceType.Classic, 'evmSignTransaction'],
+    ['webusb', EDeviceType.Pro2, 'evmGetAddress'],
+  ] as const)('does not add a signing cooldown for %s, %s, %s', async (env, deviceType, name) => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
+    const cleanup = createDeferred<void>();
+    const pending = getPostCallPendingPromise(
+      { name } as never,
+      {
+        getCurrentDeviceType: () => deviceType,
+        waitForRunCleanup: () => cleanup.promise,
+      } as never
+    );
+
+    expect(pending).toBe(cleanup.promise);
+    cleanup.resolve();
+    await expect(pending).resolves.toBeUndefined();
+  });
 
   test('prefers Protocol V2 only when the method contract is explicitly V2-only', () => {
     const createMethod = (protocols: readonly ('V1' | 'V2')[], connectProtocol?: 'V1' | 'V2') =>
