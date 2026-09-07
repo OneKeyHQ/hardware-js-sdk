@@ -32,21 +32,21 @@ Pro 2 / Neo 的事实源是每个 Core 方法的 `getSupportedProtocols()`。默
 | Nostr | `nostrGetPublicKey` `nostrSignEvent` `nostrSignSchnorr` `nostrEncryptMessage` `nostrDecryptMessage` | 是 | 是 | **V1+V2** |
 | Starcoin | `starcoinGetAddress` `starcoinGetPublicKey` `starcoinSignMessage` `starcoinSignTransaction` `starcoinVerifyMessage` | 是 | 是 | **V1+V2** |
 
-## 目前仅 Protocol V1（Pro 2 / Neo 上不要调）
+## 仅 Protocol V1 — Pro 2 / Neo 不支持
 
-这些方法在 Core 里仍默认 `['V1']`。Protocol V2 连接上不要调用。
+这些方法只声明了 Protocol V1。**不要在 Pro 2 或 Neo 上调用。** Stellar、Alephium、Neo（链，不是 OneKey Neo 设备）明确不在 Pro 2 / Neo 的支持集里。
 
 | 系列 | 公开方法 | 说明 |
 | --- | --- | --- |
-| Stellar | `stellarGetAddress` `stellarSignTransaction` | 仅 V1 |
-| Alephium | `alephiumGetAddress` `alephiumSignMessage` `alephiumSignTransaction` | 仅 V1。Classic / Mini / Touch 签名经常失败 |
-| Benfen | `benfenGetAddress` `benfenGetPublicKey` `benfenSignMessage` `benfenSignTransaction` | 仅 V1。Classic 预期失败 |
-| Nexa | `nexaGetAddress` `nexaSignTransaction` | 仅 V1 |
-| Dynex | `dnxGetAddress` `dnxSignTransaction` | 仅 V1。Pro / Classic 1s / Mini / Touch 经常失败 |
-| Nervos | `nervosGetAddress` `nervosSignTransaction` | 仅 V1 |
-| SCDO | `scdoGetAddress` `scdoSignMessage` `scdoSignTransaction` | 仅 V1。Classic / Mini / Touch 经常失败 |
-| Neo（链） | `neoGetAddress` `neoSignTransaction` | 仅 V1。Classic / Mini / Touch 经常失败。不是 OneKey Neo 设备 |
-| Lightning | `lnurlAuth` | 仅 V1 |
+| Stellar | `stellarGetAddress` `stellarSignTransaction` | **Pro 2 / Neo 不支持** |
+| Alephium | `alephiumGetAddress` `alephiumSignMessage` `alephiumSignTransaction` | **Pro 2 / Neo 不支持**。Classic / Mini / Touch 签名经常失败 |
+| Benfen | `benfenGetAddress` `benfenGetPublicKey` `benfenSignMessage` `benfenSignTransaction` | **Pro 2 / Neo 不支持**。Classic 预期失败 |
+| Nexa | `nexaGetAddress` `nexaSignTransaction` | **Pro 2 / Neo 不支持** |
+| Dynex | `dnxGetAddress` `dnxSignTransaction` | **Pro 2 / Neo 不支持**。Pro / Classic 1s / Mini / Touch 经常失败 |
+| Nervos | `nervosGetAddress` `nervosSignTransaction` | **Pro 2 / Neo 不支持** |
+| SCDO | `scdoGetAddress` `scdoSignMessage` `scdoSignTransaction` | **Pro 2 / Neo 不支持**。Classic / Mini / Touch 经常失败 |
+| Neo（链） | `neoGetAddress` `neoSignTransaction` | **Pro 2 / Neo 不支持**。Classic / Mini / Touch 经常失败。不是 OneKey Neo 设备 |
+| Lightning | `lnurlAuth` | **Pro 2 / Neo 不支持** |
 | EVM 额外 | `evmSignMessageEIP712` | 旧 typed-data 路径；优先用 `evmSignTypedData`（V1+V2） |
 
 ## 机型注意（兼容性测试）

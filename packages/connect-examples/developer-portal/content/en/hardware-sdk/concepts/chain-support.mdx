@@ -32,21 +32,21 @@ Source of truth for Pro 2 / Neo: each Core method's `getSupportedProtocols()`. D
 | Nostr | `nostrGetPublicKey` `nostrSignEvent` `nostrSignSchnorr` `nostrEncryptMessage` `nostrDecryptMessage` | Yes | Yes | **V1+V2** |
 | Starcoin | `starcoinGetAddress` `starcoinGetPublicKey` `starcoinSignMessage` `starcoinSignTransaction` `starcoinVerifyMessage` | Yes | Yes | **V1+V2** |
 
-## Protocol V1 only (not on Pro 2 / Neo today)
+## Protocol V1 only — not supported on Pro 2 / Neo
 
-These methods still default to `['V1']` in Core. Do not call them on a Protocol V2 connection.
+These methods declare Protocol V1 only. **Do not call them on Pro 2 or Neo.** Stellar, Alephium, and Neo (the chain, not the OneKey Neo device) are explicitly out of the Pro 2 / Neo set.
 
 | Family | Public methods | Notes |
 | --- | --- | --- |
-| Stellar | `stellarGetAddress` `stellarSignTransaction` | V1 only |
-| Alephium | `alephiumGetAddress` `alephiumSignMessage` `alephiumSignTransaction` | V1 only. Classic / Mini / Touch signing often fails |
-| Benfen | `benfenGetAddress` `benfenGetPublicKey` `benfenSignMessage` `benfenSignTransaction` | V1 only. Classic expected fail |
-| Nexa | `nexaGetAddress` `nexaSignTransaction` | V1 only |
-| Dynex | `dnxGetAddress` `dnxSignTransaction` | V1 only. Pro / Classic 1s / Mini / Touch often fail |
-| Nervos | `nervosGetAddress` `nervosSignTransaction` | V1 only |
-| SCDO | `scdoGetAddress` `scdoSignMessage` `scdoSignTransaction` | V1 only. Classic / Mini / Touch often fail |
-| Neo (chain) | `neoGetAddress` `neoSignTransaction` | V1 only. Classic / Mini / Touch often fail. Not the OneKey Neo device |
-| Lightning | `lnurlAuth` | V1 only |
+| Stellar | `stellarGetAddress` `stellarSignTransaction` | **Not on Pro 2 / Neo** |
+| Alephium | `alephiumGetAddress` `alephiumSignMessage` `alephiumSignTransaction` | **Not on Pro 2 / Neo**. Classic / Mini / Touch signing often fails |
+| Benfen | `benfenGetAddress` `benfenGetPublicKey` `benfenSignMessage` `benfenSignTransaction` | **Not on Pro 2 / Neo**. Classic expected fail |
+| Nexa | `nexaGetAddress` `nexaSignTransaction` | **Not on Pro 2 / Neo** |
+| Dynex | `dnxGetAddress` `dnxSignTransaction` | **Not on Pro 2 / Neo**. Pro / Classic 1s / Mini / Touch often fail |
+| Nervos | `nervosGetAddress` `nervosSignTransaction` | **Not on Pro 2 / Neo** |
+| SCDO | `scdoGetAddress` `scdoSignMessage` `scdoSignTransaction` | **Not on Pro 2 / Neo**. Classic / Mini / Touch often fail |
+| Neo (chain) | `neoGetAddress` `neoSignTransaction` | **Not on Pro 2 / Neo**. Classic / Mini / Touch often fail. Not the OneKey Neo device |
+| Lightning | `lnurlAuth` | **Not on Pro 2 / Neo** |
 | EVM extra | `evmSignMessageEIP712` | Legacy typed-data path; prefer `evmSignTypedData` (V1+V2) |
 
 ## Device caveats (compatibility tests)
