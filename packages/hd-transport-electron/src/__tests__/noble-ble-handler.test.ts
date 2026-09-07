@@ -748,3 +748,271 @@ describe('Electron Noble BLE device discovery', () => {
     ]);
   });
 });
+
+describe('Noble BLE process shutdown', () => {
+  const flushCallbacks = () =>
+    new Promise<void>(resolve => {
+      setImmediate(resolve);
+    });
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  const setup = async (state = 'poweredOn') => {
+    const handlers = new Map<string, IpcHandler>();
+    const native = Object.assign(new EventEmitter(), {
+      state,
+      startScanning: jest.fn((_uuids, _duplicates, callback) => callback?.()),
+      stopScanning: jest.fn(callback => callback?.()),
+      stop: jest.fn(),
+    });
+    jest.doMock('@stoprocent/noble', () => native);
+    jest.doMock('electron', () => ({
+      ipcMain: {
+        handle: (channel: string, listener: IpcHandler) => handlers.set(channel, listener),
+        removeHandler: (channel: string) => handlers.delete(channel),
+      },
+    }));
+    jest.doMock(
+      'electron-log',
+      () => ({
+        info: jest.fn(),
+        debug: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      }),
+      { virtual: true }
+    );
+    const sdk = await import('../noble-ble-handler');
+    const window = new EventEmitter();
+    sdk.setupNobleBleHandlers(window as unknown as WebContents);
+    return { sdk, native, window, handlers };
+  };
+
+  test('does not initialize native BLE when quitting before first use', async () => {
+    const { sdk, native, handlers } = await setup();
+    await sdk.disposeNobleBleSupport();
+    expect(native.stop).not.toHaveBeenCalled();
+    expect(handlers.size).toBe(0);
+  });
+
+  test('cancels an active scan, ignores its late callback and releases native once', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    const { sdk, native, handlers } = await setup();
+    let completeScan: (() => void) | undefined;
+    native.startScanning.mockImplementation((_uuids, _duplicates, callback) => {
+      completeScan = callback;
+    });
+    const scan = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE)?.({});
+    await Promise.resolve();
+    await Promise.resolve();
+    await sdk.disposeNobleBleSupport();
+    await sdk.disposeNobleBleSupport();
+    await scan;
+    completeScan?.();
+    expect(native.stop).toHaveBeenCalledTimes(1);
+    expect(native.listenerCount('discover')).toBe(0);
+    expect(native.listenerCount('stateChange')).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('cancels power-on waits before releasing native', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    const { sdk, native, handlers } = await setup('unknown');
+    const availability = handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+    await sdk.disposeNobleBleSupport();
+    await availability;
+    expect(native.stop).toHaveBeenCalledTimes(1);
+    expect(native.listenerCount('stateChange')).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('cancels native connects and waits for disconnect before release', async () => {
+    const { sdk, native, handlers } = await setup();
+    await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+    let connectCallback: ((error?: Error) => void) | undefined;
+    let disconnectCallback: (() => void) | undefined;
+    const peripheral = Object.assign(new EventEmitter(), {
+      ...createPeripheral('pending-device', 'OneKey Pro'),
+      connect: jest.fn(callback => {
+        connectCallback = callback;
+      }),
+      cancelConnect: jest.fn(() => connectCallback?.(new Error('connection canceled'))),
+      disconnect: jest.fn(callback => {
+        disconnectCallback = callback;
+      }),
+      discoverServices: jest.fn(),
+    });
+    native.emit('discover', peripheral);
+    const connecting = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT)?.({}, peripheral.id);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(peripheral.connect).toHaveBeenCalledTimes(1);
+    const disposing = sdk.disposeNobleBleSupport();
+    await flushCallbacks();
+    expect(peripheral.cancelConnect).toHaveBeenCalledTimes(1);
+    expect(peripheral.disconnect).toHaveBeenCalled();
+    expect(native.stop).not.toHaveBeenCalled();
+    disconnectCallback?.();
+    await disposing;
+    expect(native.stop).toHaveBeenCalledTimes(1);
+    expect(await connecting).toMatchObject({ success: false });
+    expect(peripheral.discoverServices).not.toHaveBeenCalled();
+  });
+
+  test.each(['peripheral', 'direct'])(
+    'keeps late %s connects inert after the disposal timeout',
+    async route => {
+      jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+      const { sdk, native, handlers } = await setup();
+      await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+      let finishConnect: () => void = () => undefined;
+      const peripheral = Object.assign(new EventEmitter(), {
+        ...createPeripheral('late-device', 'OneKey Pro'),
+        connect: jest.fn(callback => {
+          finishConnect = () => callback();
+        }),
+        cancelConnect: jest.fn(),
+        disconnect: jest.fn(callback => callback?.()),
+        discoverServices: jest.fn(),
+      });
+      const connectAsync = jest.fn(
+        () =>
+          new Promise(resolve => {
+            finishConnect = () => resolve(peripheral);
+          })
+      );
+      const cancelConnect = jest.fn();
+      if (route === 'direct') Object.assign(native, { connectAsync, cancelConnect });
+      else native.emit('discover', peripheral);
+      const connecting = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT)?.({}, peripheral.id);
+      await flushCallbacks();
+      if (route === 'direct') {
+        jest.advanceTimersByTime(1500);
+        await flushCallbacks();
+      }
+      expect(route === 'direct' ? connectAsync : peripheral.connect).toHaveBeenCalledTimes(1);
+      const disposing = sdk.disposeNobleBleSupport();
+      await flushCallbacks();
+      expect(route === 'direct' ? cancelConnect : peripheral.cancelConnect).toHaveBeenCalledTimes(
+        1
+      );
+      expect(native.stop).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(3500);
+      await disposing;
+      const disconnects = peripheral.disconnect.mock.calls.length;
+      peripheral.state = 'connected';
+      finishConnect();
+      await flushCallbacks();
+      expect(peripheral.disconnect).toHaveBeenCalledTimes(disconnects);
+      expect(peripheral.discoverServices).not.toHaveBeenCalled();
+      expect(native.stop).toHaveBeenCalledTimes(1);
+      expect(await connecting).toMatchObject({ success: false });
+      expect(jest.getTimerCount()).toBe(0);
+    }
+  );
+
+  test('allows a host to defer shared native release until both transports are idle', async () => {
+    const { sdk, native, handlers } = await setup();
+    await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+    const releaseNoble = jest.fn();
+    await sdk.disposeNobleBleSupport(releaseNoble);
+    expect(releaseNoble).toHaveBeenCalledWith(native);
+    expect(native.stop).not.toHaveBeenCalled();
+  });
+
+  test('replacement window scanning waits for old cleanup and preserves native', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    const { sdk, native, handlers, window } = await setup();
+    await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+    let finishOldCleanup: (() => void) | undefined;
+    native.stopScanning.mockImplementationOnce(callback => {
+      finishOldCleanup = callback;
+    });
+    window.emit('destroyed');
+    sdk.setupNobleBleHandlers(new EventEmitter() as unknown as WebContents);
+    const scan = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE)?.({});
+    await flushCallbacks();
+    expect(native.startScanning).not.toHaveBeenCalled();
+    finishOldCleanup?.();
+    await flushCallbacks();
+    expect(native.startScanning).toHaveBeenCalledTimes(1);
+    expect(native.listenerCount('discover')).toBe(1);
+    native.emit('discover', createPeripheral('replacement-device', 'OneKey Pro'));
+    jest.advanceTimersByTime(5000);
+    expect(await scan).toEqual([expect.objectContaining({ id: 'replacement-device' })]);
+    expect(native.stop).not.toHaveBeenCalled();
+    await sdk.disposeNobleBleSupport();
+    expect(native.stop).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['started', 'late-start-callback'])(
+    'retires an old enumeration before a shared native scan resumes: %s',
+    async scanState => {
+      jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+      const { sdk, native, handlers, window } = await setup();
+      let lateStart: (() => void) | undefined;
+      if (scanState === 'late-start-callback') {
+        native.startScanning.mockImplementationOnce((_uuids, _duplicates, callback) => {
+          lateStart = callback;
+        });
+      }
+      let oldScanSettled = false;
+      const oldScan = Promise.resolve(
+        handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE)?.({})
+      ).then(result => {
+        oldScanSettled = true;
+        return result;
+      });
+      await flushCallbacks();
+      jest.advanceTimersByTime(1000);
+
+      let finishOldScan: (() => void) | undefined;
+      native.stopScanning.mockImplementationOnce(callback => {
+        finishOldScan = callback;
+      });
+      window.emit('destroyed');
+      sdk.setupNobleBleHandlers(new EventEmitter() as unknown as WebContents);
+      const replacementReady = handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+      let replacementSettled = false;
+      Promise.resolve(replacementReady).then(() => {
+        replacementSettled = true;
+      });
+      await flushCallbacks();
+      expect(replacementSettled).toBe(false);
+      finishOldScan?.();
+      await replacementReady;
+      await flushCallbacks();
+      expect(oldScanSettled).toBe(true);
+      expect(await oldScan).toEqual([]);
+
+      // Another transport can now scan on the same process-wide Noble instance.
+      native.startScanning([], true, () => undefined);
+      const stopCount = native.stopScanning.mock.calls.length;
+      lateStart?.();
+      jest.advanceTimersByTime(5000);
+      await flushCallbacks();
+      expect(native.stopScanning).toHaveBeenCalledTimes(stopCount);
+      expect(jest.getTimerCount()).toBe(0);
+      expect(native.stop).not.toHaveBeenCalled();
+      await sdk.disposeNobleBleSupport();
+    }
+  );
+
+  test('does not start an old window enumeration after Bluetooth becomes ready', async () => {
+    const { sdk, native, handlers, window } = await setup('unknown');
+    const oldScan = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE)?.({});
+    await flushCallbacks();
+    window.emit('destroyed');
+    sdk.setupNobleBleHandlers(new EventEmitter() as unknown as WebContents);
+    await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
+
+    native.state = 'poweredOn';
+    native.emit('stateChange', 'poweredOn');
+    expect(await oldScan).toEqual([]);
+    expect(native.startScanning).not.toHaveBeenCalled();
+    await sdk.disposeNobleBleSupport();
+  });
+});

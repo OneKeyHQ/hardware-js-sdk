@@ -4783,6 +4783,18 @@ export type DeviceFindMyTokenState = {
   burned: boolean;
 };
 
+export enum DeviceAnimationAction {
+  AnimationAction_Unknown = 0,
+  AnimationAction_Start = 1,
+  AnimationAction_Stop = 2,
+}
+
+// DeviceAnimationControl
+export type DeviceAnimationControl = {
+  action: DeviceAnimationAction;
+  timeout_ms?: number;
+};
+
 export enum DeviceFactoryAck {
   FACTORY_ACK_SUCCESS = 0,
   FACTORY_ACK_FAIL = 1,
@@ -5970,6 +5982,7 @@ export type MessageType = {
   DeviceFindMyTokenUpdate: DeviceFindMyTokenUpdate;
   DeviceFindMyTokenStateGet: DeviceFindMyTokenStateGet;
   DeviceFindMyTokenState: DeviceFindMyTokenState;
+  DeviceAnimationControl: DeviceAnimationControl;
   DeviceFactoryInfoManufactureTime: DeviceFactoryInfoManufactureTime;
   DeviceFactoryInfo: DeviceFactoryInfo;
   DeviceFactoryInfoSet: DeviceFactoryInfoSet;
