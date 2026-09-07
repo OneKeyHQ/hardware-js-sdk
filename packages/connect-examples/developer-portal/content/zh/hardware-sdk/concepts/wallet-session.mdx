@@ -24,7 +24,7 @@ title: 钱包会话
 
 <DocFlow variant="wallet" locale="zh" />
 
-新接入请用 [`openWalletSession`](/zh/hardware-sdk/basic-api/open-wallet-session) 打开或切换钱包：
+新接入请用 [`openWalletSession`](/zh/hardware-sdk/basic-api/open-wallet-session) 打开钱包：
 
 ```ts
 import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
@@ -38,16 +38,11 @@ const standard = await HardwareSDK.openWalletSession(connectId, {
 const hidden = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.SelectHidden,
 });
-
-// 重新打开已经绑定过的隐藏钱包
-const resumed = await HardwareSDK.openWalletSession(connectId, {
-  mode: OpenWalletSessionMode.ResumeHidden,
-  deviceId: hidden.payload.deviceId,
-  passphraseState: hidden.payload.passphraseState,
-});
 ```
 
-保存 `payload.deviceId`、`payload.walletType`、`payload.passphraseState`。之后的地址 / 签名调用带上这些值即可。不要在每次签名前都再开一次 Session。
+保存 `payload.deviceId`、`payload.walletType`、`payload.passphraseState`。之后的地址 / 签名调用带上这些值。Core 会在那笔方法里恢复固件 session（`DeviceSessionGet`）。不要在每次签名前都再开一次 Session。
+
+`mode: 'resume-hidden'` 是可选的。它只是同一条固件 Get，不附带链方法。不必调：OneKey App 和推荐的第三方路径都不会调它。后续第一笔带 `passphraseState` 的调用已经会恢复。
 
 ## 已废弃的兼容 API
 

@@ -91,9 +91,9 @@ payload: { passphraseOnDevice: true, value: '' }
 payload: { value: userInput, passphraseOnDevice: false, save: true }
 ```
 
-### 跨进程复用（CLI / 脚本）
+### 之后的进程 / 重连
 
-只持久化 `deviceId + passphraseState`。**不要**存固件 `session_id`。Hardware SDK 1.2.x 用 `openWalletSession` 恢复隐藏钱包。
+只持久化 `deviceId + passphraseState`。**不要**存固件 `session_id`。读出绑定，带到下一笔地址 / 签名即可。Core 会在那笔方法里恢复。不要再调 `openWalletSession({ mode: 'resume-hidden' })`。
 
 ```ts
 import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
@@ -109,11 +109,6 @@ saveBinding({
 
 // 进程 2 — 之后另一次进程
 const { deviceId, passphraseState } = loadBinding();
-await HardwareSDK.openWalletSession(connectId, {
-  mode: OpenWalletSessionMode.ResumeHidden,
-  deviceId,
-  passphraseState,
-});
 
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
@@ -123,7 +118,7 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 
 `preloadSessionCache` 只给旧 App/CLI Keychain 记录做兼容。新接入不要调用它，也不要存 `session_id`。
 
-两次进程之间如果设备锁屏了，PIN 会再走一遍。Protocol V2 可以在 `resume-hidden` 里重新选回同一个隐藏钱包。见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
+两次进程之间如果设备锁屏了，PIN 会在第一笔受保护调用里再走一遍。见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
 
 ### 先解锁模式（CLI）
 
@@ -135,9 +130,8 @@ if (!state.payload.status.unlocked) {
   await HardwareSDK.deviceUnlock(connectId, {});
 }
 
-await HardwareSDK.openWalletSession(connectId, {
-  mode: OpenWalletSessionMode.ResumeHidden,
-  deviceId: savedDeviceId,
+await HardwareSDK.evmGetAddress(connectId, savedDeviceId, {
+  path: "m/44'/60'/0'/0/0",
   passphraseState: savedPassphraseState,
 });
 ```

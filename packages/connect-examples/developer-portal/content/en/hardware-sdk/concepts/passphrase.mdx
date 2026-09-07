@@ -91,9 +91,9 @@ payload: { passphraseOnDevice: true, value: '' }
 payload: { value: userInput, passphraseOnDevice: false, save: true }
 ```
 
-### Cross-process reuse (CLI / scripts)
+### Later process / reconnect
 
-Persist only `deviceId + passphraseState`. Do **not** persist firmware `session_id`. Hardware SDK 1.2.x resumes a hidden wallet with `openWalletSession`.
+Persist only `deviceId + passphraseState`. Do **not** persist firmware `session_id`. Load the binding and pass it on the next address / sign call. Core resumes inside that method. Do not call `openWalletSession({ mode: 'resume-hidden' })`.
 
 ```ts
 import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
@@ -109,11 +109,6 @@ saveBinding({
 
 // Process 2 — later process, same machine
 const { deviceId, passphraseState } = loadBinding();
-await HardwareSDK.openWalletSession(connectId, {
-  mode: OpenWalletSessionMode.ResumeHidden,
-  deviceId,
-  passphraseState,
-});
 
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
@@ -123,7 +118,7 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 
 `preloadSessionCache` is a compatibility entry for old App/CLI Keychain records. New integrations should not call it and should not store `session_id`.
 
-If the device locked between processes, PIN runs again. Protocol V2 can re-select the same hidden wallet inside `resume-hidden`. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
+If the device locked between processes, PIN runs again on the first protected call. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
 
 ### Unlock-first pattern (CLI)
 
@@ -135,9 +130,8 @@ if (!state.payload.status.unlocked) {
   await HardwareSDK.deviceUnlock(connectId, {});
 }
 
-await HardwareSDK.openWalletSession(connectId, {
-  mode: OpenWalletSessionMode.ResumeHidden,
-  deviceId: savedDeviceId,
+await HardwareSDK.evmGetAddress(connectId, savedDeviceId, {
+  path: "m/44'/60'/0'/0/0",
   passphraseState: savedPassphraseState,
 });
 ```

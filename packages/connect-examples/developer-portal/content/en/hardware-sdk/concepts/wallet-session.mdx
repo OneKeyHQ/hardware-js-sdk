@@ -24,7 +24,7 @@ If you skip `passphraseState` on a hidden wallet, address and signing APIs may s
 
 <DocFlow variant="wallet" locale="en" />
 
-New integrations should open or switch wallets with [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session):
+New integrations should open a wallet with [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session):
 
 ```ts
 import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
@@ -38,16 +38,11 @@ const standard = await HardwareSDK.openWalletSession(connectId, {
 const hidden = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.SelectHidden,
 });
-
-// Re-open a hidden wallet you already bound
-const resumed = await HardwareSDK.openWalletSession(connectId, {
-  mode: OpenWalletSessionMode.ResumeHidden,
-  deviceId: hidden.payload.deviceId,
-  passphraseState: hidden.payload.passphraseState,
-});
 ```
 
-Store `payload.deviceId`, `payload.walletType`, and `payload.passphraseState`. Then keep using those values on address / signing calls. Do not call `openWalletSession` before every signer.
+Store `payload.deviceId`, `payload.walletType`, and `payload.passphraseState`. Then pass those values on address / signing calls. Core resumes the firmware session (`DeviceSessionGet`) inside that method. Do not call `openWalletSession` before every signer.
+
+`mode: 'resume-hidden'` is optional. It runs the same firmware Get with no chain method. Skip it: OneKey App and the recommended third-party path never call it. The first later call that carries `passphraseState` already resumes.
 
 ## Deprecated compatibility API
 

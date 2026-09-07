@@ -14,7 +14,7 @@ Parameter tables live in [Common Params](/en/hardware-sdk/concepts/common-params
 - Call shape: `HardwareSDK.method(connectId, deviceId?, params)` → `Promise<{ success, payload }>`; always guard on `success` before touching `payload`.
 - Identifiers: `connectId` from `searchDevices`; `deviceId` from `getDeviceState` (required for BLE, recommended for WebUSB). Refresh `deviceId` after reset/recovery. Full table: [Identifiers](/en/hardware-sdk/concepts/identifiers).
 - UI contract: subscribe `UI_EVENT` once; only call `uiResponse` on input-type `UI_REQUEST` (PIN / Passphrase / Bootloader select). Route per device when several devices are connected.
-- Serialize calls per device. Reuse a hidden wallet with `openWalletSession` (or `initSession + passphraseState` on the compatibility path).
+- Serialize calls per device. Reuse a hidden wallet by passing `passphraseState` on later methods (compatibility path: `initSession + passphraseState`). Do not call `openWalletSession` again for that.
 
 ```ts
 const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {

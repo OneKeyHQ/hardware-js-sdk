@@ -20,7 +20,7 @@ This page is the integrator contract. It does not describe Protocol V2 sequence 
 2. On `DISCONNECT`, mark that `connectId` busy/invalid and fail the current UI flow. Do not retry the same side-effecting method.
 3. Search again (`searchDevices`) when the user is ready. USB replug and BLE re-pair can mint a **new** `connectId`. Cache USB and BLE IDs separately. See [Identifiers](/en/hardware-sdk/concepts/identifiers).
 4. After a new connection, refresh device state with [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state). Reuse persisted `deviceId + passphraseState`; do not persist firmware `session_id`.
-5. Resume the wallet with [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session) (`resume-hidden` or `standard`) if the next call needs a wallet context.
+5. On the next address / sign call, pass the persisted `passphraseState` or `useEmptyPassphrase: true`. Core resumes the firmware session inside that method. Do not call `openWalletSession({ mode: 'resume-hidden' })` just to reconnect.
 
 ```ts
 import { DEVICE_EVENT, DEVICE } from '@onekeyfe/hd-core';

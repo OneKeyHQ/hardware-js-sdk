@@ -14,7 +14,7 @@ title: 核心接口指南
 - 方法签名：`HardwareSDK.method(connectId, deviceId?, params)` → `Promise<{ success, payload }>`，先判断 `success` 再读 `payload`
 - 标识：`connectId` 来自 `searchDevices`；`deviceId` 来自 `getDeviceState`（BLE 必填，WebUSB 建议带）。擦除 / 恢复后刷新 `deviceId`。完整表：[标识符](/zh/hardware-sdk/concepts/identifiers)
 - 事件：入口订一次 `UI_EVENT`，只对输入类 `UI_REQUEST`（PIN / Passphrase / Bootloader 选择）调用 `uiResponse`
-- 同一设备串行调用。隐藏钱包用 `openWalletSession`（兼容路径用 `initSession + passphraseState`）
+- 同一设备串行调用。隐藏钱包之后带 `passphraseState` 即可（兼容路径用 `initSession + passphraseState`）。不要为此再调一次 `openWalletSession`。
 
 ```ts
 const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {

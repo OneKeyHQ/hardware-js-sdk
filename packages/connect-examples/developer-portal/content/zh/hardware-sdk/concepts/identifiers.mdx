@@ -157,8 +157,8 @@ await HardwareSDK.evmSignTransaction(connectId, deviceId, { ... });
 - **不要持久化。** Hardware SDK 1.2.0 把固件 `session_id` 留在 Core 里。
   `openWalletSession` 不会返回它。
 - 锁屏（自动锁、手动锁、断开）即失效。
-- 第三方应用恢复隐藏钱包用
-  `openWalletSession({ mode: 'resume-hidden', deviceId, passphraseState })`。
+- 要留在隐藏钱包上，后续方法带已持久化的 `passphraseState`。Core 会恢复固件
+  session。不要为此再调 `openWalletSession({ mode: 'resume-hidden' })`。
 
 ### `passphraseState` —— 隐藏钱包标识
 

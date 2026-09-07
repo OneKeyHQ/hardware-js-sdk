@@ -6,34 +6,32 @@ const copy = {
       { k: '02', t: 'searchDevices', d: 'Read connectId. Check success.' },
       { k: '03', t: 'getDeviceState', d: 'identity.deviceId. Not getFeatures.' },
       { k: '04', t: 'subscribe UI', d: 'PIN / passphrase / button. uiResponse only on input.' },
-      { k: '05', t: 'openWalletSession', d: 'standard · select-hidden · resume-hidden' },
-      { k: '06', t: 'method', d: 'Serialize per device. Persist deviceId + passphraseState.' },
+      { k: '05', t: 'openWalletSession', d: 'standard or select-hidden. Open once, then persist the binding.' },
+      { k: '06', t: 'address / sign', d: 'Pass passphraseState or useEmptyPassphrase. Core resumes the firmware session inside the method.' },
     ],
     walletTitle: 'Open a wallet once',
     wallet: [
       {
         mode: 'standard',
         title: 'Standard',
-        steps: ['openWalletSession({ mode: standard })', 'address / sign with useEmptyPassphrase: true'],
+        steps: ['openWalletSession({ mode: standard })', 'later address / sign with useEmptyPassphrase: true'],
       },
       {
         mode: 'select-hidden',
         title: 'Select hidden',
-        steps: ['openWalletSession({ mode: select-hidden })', 'UI_EVENT passphrase if asked', 'persist deviceId + passphraseState', 'later calls pass passphraseState'],
-      },
-      {
-        mode: 'resume-hidden',
-        title: 'Resume hidden',
-        steps: ['openWalletSession({ mode: resume-hidden, deviceId, passphraseState })', 'same pair on later address / sign'],
+        steps: ['openWalletSession({ mode: select-hidden })', 'UI_EVENT passphrase if asked', 'persist deviceId + passphraseState', 'later calls pass passphraseState — Core resumes'],
       },
     ],
+    walletNote:
+      'resume-hidden is optional. Skip it: the first later call that carries passphraseState already runs DeviceSessionGet.',
     hiddenTitle: 'Hidden wallet, one prompt',
     hidden: [
       { from: 'App', to: 'SDK', t: 'openWalletSession(select-hidden)' },
       { from: 'SDK', to: 'Device', t: 'Select hidden wallet' },
       { from: 'Device', to: 'App', t: 'REQUEST_PASSPHRASE → uiResponse' },
       { from: 'SDK', to: 'App', t: 'deviceId + passphraseState' },
-      { from: 'App', to: 'SDK', t: 'evmGetAddress / btcGetAddress + passphraseState' },
+      { from: 'App', to: 'SDK', t: 'evmGetAddress / sign + passphraseState' },
+      { from: 'SDK', to: 'Device', t: 'DeviceSessionGet — Core, not your app' },
     ],
     transportTitle: 'Transport is not the protocol',
     layers: [
@@ -51,34 +49,32 @@ const copy = {
       { k: '02', t: 'searchDevices', d: '拿 connectId。先看 success。' },
       { k: '03', t: 'getDeviceState', d: 'identity.deviceId。不要用 getFeatures。' },
       { k: '04', t: '订阅 UI', d: 'PIN / passphrase / 按键。只有输入类才 uiResponse。' },
-      { k: '05', t: 'openWalletSession', d: 'standard · select-hidden · resume-hidden' },
-      { k: '06', t: 'method', d: '按设备串行。只存 deviceId + passphraseState。' },
+      { k: '05', t: 'openWalletSession', d: 'standard 或 select-hidden。开一次，然后存绑定。' },
+      { k: '06', t: '地址 / 签名', d: '带 passphraseState 或 useEmptyPassphrase。Core 在方法里恢复固件 session。' },
     ],
     walletTitle: '钱包只开一次',
     wallet: [
       {
         mode: 'standard',
         title: '标准钱包',
-        steps: ['openWalletSession({ mode: standard })', '地址 / 签名带 useEmptyPassphrase: true'],
+        steps: ['openWalletSession({ mode: standard })', '之后地址 / 签名带 useEmptyPassphrase: true'],
       },
       {
         mode: 'select-hidden',
         title: '选择隐藏钱包',
-        steps: ['openWalletSession({ mode: select-hidden })', '需要时 UI_EVENT 输入 passphrase', '持久化 deviceId + passphraseState', '之后调用带 passphraseState'],
-      },
-      {
-        mode: 'resume-hidden',
-        title: '恢复隐藏钱包',
-        steps: ['openWalletSession({ mode: resume-hidden, deviceId, passphraseState })', '之后地址 / 签名仍带同一对'],
+        steps: ['openWalletSession({ mode: select-hidden })', '需要时 UI_EVENT 输入 passphrase', '持久化 deviceId + passphraseState', '之后调用带 passphraseState — Core 负责恢复'],
       },
     ],
+    walletNote:
+      'resume-hidden 是可选的。不必调：后续第一笔带 passphraseState 的调用里，Core 已经会发 DeviceSessionGet。',
     hiddenTitle: '隐藏钱包，只提示一次',
     hidden: [
       { from: '应用', to: 'SDK', t: 'openWalletSession(select-hidden)' },
       { from: 'SDK', to: '设备', t: '选择隐藏钱包' },
       { from: '设备', to: '应用', t: 'REQUEST_PASSPHRASE → uiResponse' },
       { from: 'SDK', to: '应用', t: 'deviceId + passphraseState' },
-      { from: '应用', to: 'SDK', t: 'evmGetAddress / btcGetAddress + passphraseState' },
+      { from: '应用', to: 'SDK', t: 'evmGetAddress / 签名 + passphraseState' },
+      { from: 'SDK', to: '设备', t: 'DeviceSessionGet — Core 内部，不是应用去调' },
     ],
     transportTitle: '传输不是协议',
     layers: [
@@ -119,19 +115,14 @@ function Lifecycle({ locale }) {
   const t = copy[locale] || copy.en
   return (
     <Shell title={t.lifecycleTitle}>
-      <ol className="m-0 grid list-none gap-2 p-0 sm:grid-cols-2 lg:grid-cols-3">
+      <ol className="m-0 flex list-none flex-col gap-0 p-0">
         {t.lifecycle.map((step, i) => (
-          <li
-            key={step.k}
-            className="relative flex min-h-[108px] flex-col justify-between rounded-[12px] border border-black/[0.06] bg-white px-3 py-3 dark:border-white/10 dark:bg-[#1a1c1b]"
-          >
-            <div className="flex items-baseline justify-between gap-2">
+          <li key={step.k} className="flex gap-3">
+            <div className="flex w-8 flex-col items-center">
               <span className="text-[11px] tabular-nums text-[#00B812]">{step.k}</span>
-              {i < t.lifecycle.length - 1 ? (
-                <span className="hidden text-[11px] text-black/25 sm:inline dark:text-white/25">→</span>
-              ) : null}
+              {i < t.lifecycle.length - 1 ? <span className="mt-1 w-px flex-1 bg-[#00B812]/35" /> : null}
             </div>
-            <div>
+            <div className={`min-w-0 flex-1 ${i < t.lifecycle.length - 1 ? 'pb-4' : ''}`}>
               <div
                 className="text-[13px] font-medium text-black dark:text-white"
                 style={{ fontFamily: '"Geist Mono", ui-monospace, monospace' }}
@@ -151,7 +142,7 @@ function Wallet({ locale }) {
   const t = copy[locale] || copy.en
   return (
     <Shell title={t.walletTitle}>
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {t.wallet.map((col) => (
           <div
             key={col.mode}
@@ -170,6 +161,9 @@ function Wallet({ locale }) {
           </div>
         ))}
       </div>
+      {t.walletNote ? (
+        <p className="mt-3 mb-0 text-[12px] leading-[16px] text-black/45 dark:text-white/40">{t.walletNote}</p>
+      ) : null}
     </Shell>
   )
 }

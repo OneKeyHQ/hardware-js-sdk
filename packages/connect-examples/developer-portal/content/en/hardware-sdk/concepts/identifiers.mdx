@@ -164,8 +164,9 @@ still expose it on compatibility `Features` objects.
 - **Do not persist it.** Hardware SDK 1.2.0 keeps firmware `session_id`
   inside Core. `openWalletSession` does not return it.
 - Invalidated on lock (auto-lock, manual lock, disconnect).
-- Third-party apps resume a hidden wallet with
-  `openWalletSession({ mode: 'resume-hidden', deviceId, passphraseState })`.
+- To stay on a hidden wallet, pass persisted `passphraseState` on later
+  methods. Core resumes the firmware session. Do not call
+  `openWalletSession({ mode: 'resume-hidden' })` for that.
 
 ### `passphraseState` — hidden wallet identifier
 

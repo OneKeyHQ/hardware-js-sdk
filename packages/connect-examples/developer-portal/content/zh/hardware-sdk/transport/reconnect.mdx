@@ -20,7 +20,7 @@ title: 重连与释放
 2. 收到 `DISCONNECT` 时，把这个 `connectId` 标成无效，结束当前 UI。不要重试同一个有副作用的方法。
 3. 用户准备好后再 `searchDevices`。USB 重插和 BLE 重新配对可能得到**新的** `connectId`。USB 和 BLE 的 ID 要分开缓存。见 [标识符](/zh/hardware-sdk/concepts/identifiers)。
 4. 连上之后用 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state) 刷新设备状态。复用已持久化的 `deviceId + passphraseState`；不要存固件 `session_id`。
-5. 下一次调用需要钱包上下文时，用 [`openWalletSession`](/zh/hardware-sdk/basic-api/open-wallet-session)（`resume-hidden` 或 `standard`）恢复钱包。
+5. 下一笔地址 / 签名带上已持久化的 `passphraseState`，或 `useEmptyPassphrase: true`。Core 会在那笔方法里恢复固件 session。不要为了重连去调 `openWalletSession({ mode: 'resume-hidden' })`。
 
 ```ts
 import { DEVICE_EVENT, DEVICE } from '@onekeyfe/hd-core';
