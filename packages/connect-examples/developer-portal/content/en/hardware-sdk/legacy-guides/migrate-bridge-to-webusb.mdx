@@ -64,10 +64,10 @@ const list = await HardwareSDK.searchDevices();
 if (!list.success) throw new Error(list.payload.error);
 const { connectId, deviceId } = list.payload[0] ?? {};
 
-// 2) (Optional) Get features to resolve device_id
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
-const resolvedDeviceId = features.payload.device_id ?? deviceId;
+// 2) Confirm deviceId
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const resolvedDeviceId = state.payload.identity.deviceId ?? deviceId;
 
 // 3) Example: BTC address
 const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {

@@ -48,7 +48,7 @@ Bootloader / romloader skips unsupported status commands and returns whatever sn
 
 Read `payload.identity.deviceId` for the second argument of signing calls. Do not persist firmware `session_id` from compatibility Features.
 
-The payload does **not** include firmware wallet `session_id` or raw protocol messages. Wallet identity still comes from [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session) or [`getPassphraseState`](/en/hardware-sdk/basic-api/get-passphrase-state).
+The payload does **not** include firmware wallet `session_id` or raw protocol messages. Wallet identity comes from [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session).
 
 ### Error
 
@@ -62,4 +62,4 @@ The payload does **not** include firmware wallet `session_id` or raw protocol me
 }
 ```
 
-See [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol) for when to use this versus `getFeatures()`.
+See [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol).

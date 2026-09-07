@@ -77,7 +77,7 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 | `passphraseState` doesn't match the current session | Error 112 (passphrase state mismatch) — session expired or wrong hidden wallet |
 | `passphraseState` + `useEmptyPassphrase: true` combined | `passphraseState` takes precedence (hidden wallet) — the `useEmptyPassphrase` flag is ignored |
 
-> ⚠️ The silent-standard-wallet case is the sneakiest. If you forget `passphraseState` when querying a hidden wallet, you'll get the standard wallet's address back without any error. Always obtain `passphraseState` via `getPassphraseState` once and attach it to every subsequent wallet-level call — or pass `useEmptyPassphrase: true` explicitly if you intend the standard wallet.
+> ⚠️ The silent-standard-wallet case is the sneakiest. If you forget `passphraseState` when querying a hidden wallet, you'll get the standard wallet's address back without any error. Always obtain `passphraseState` via `openWalletSession` once and attach it to every subsequent wallet-level call — or pass `useEmptyPassphrase: true` explicitly if you intend the standard wallet.
 
 ## Physical hardware identifiers
 

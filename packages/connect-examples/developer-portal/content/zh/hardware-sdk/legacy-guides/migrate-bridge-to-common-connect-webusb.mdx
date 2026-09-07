@@ -22,7 +22,7 @@ title: 迁移到 common-connect-sdk
 - 权限流程：调用 `navigator.usb.requestDevice()`（必须由用户手势触发）并使用官方过滤器 `ONEKEY_WEBUSB_FILTER`
 - 事件系统：使用 `@onekeyfe/hd-core` 的 `UI_EVENT / DEVICE` 事件处理用户交互（PIN/Passphrase 等）
 - 移除 Bridge 相关逻辑：删除 `checkBridgeStatus()` 和所有 Bridge 检查/提示
-- 业务 API 基本不变：如 `searchDevices / getFeatures / btcGetAddress`
+- 业务 API 基本不变：如 `searchDevices / getDeviceState / btcGetAddress`
 
 ---
 
@@ -118,10 +118,10 @@ const list = await HardwareSDK.searchDevices();
 if (!list.success) throw new Error(list.payload.error);
 const { connectId, deviceId } = list.payload[0] ?? {};
 
-// 2) (可选) 确认 device_id
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
-const resolvedDeviceId = features.payload.device_id ?? deviceId;
+// 2) 确认 deviceId
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const resolvedDeviceId = state.payload.identity.deviceId ?? deviceId;
 
 // 3) 示例：获取 BTC 地址
 const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {

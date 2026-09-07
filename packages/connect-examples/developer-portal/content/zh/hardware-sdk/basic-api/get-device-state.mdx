@@ -48,7 +48,7 @@ Bootloader / romloader 会跳过不支持的状态命令，返回当前能拿到
 
 签名调用的第二个参数读 `payload.identity.deviceId`。不要把兼容 Features 里的固件 `session_id` 存下来。
 
-返回值**不包含**固件钱包 `session_id` 或原始协议消息。钱包身份仍然来自 [`openWalletSession`](/zh/hardware-sdk/basic-api/open-wallet-session) 或 [`getPassphraseState`](/zh/hardware-sdk/basic-api/get-passphrase-state)。
+返回值**不包含**固件钱包 `session_id` 或原始协议消息。钱包身份来自 [`openWalletSession`](/zh/hardware-sdk/basic-api/open-wallet-session)。
 
 ### 错误
 
@@ -62,4 +62,4 @@ Bootloader / romloader 会跳过不支持的状态命令，返回当前能拿到
 }
 ```
 
-与 `getFeatures()` 的分工见 [Protocol V1 与 V2](/zh/hardware-sdk/concepts/protocol)。
+见 [Protocol V1 与 V2](/zh/hardware-sdk/concepts/protocol)。

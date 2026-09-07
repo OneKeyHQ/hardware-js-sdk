@@ -64,10 +64,10 @@ const list = await HardwareSDK.searchDevices();
 if (!list.success) throw new Error(list.payload.error);
 const { connectId, deviceId } = list.payload[0] ?? {};
 
-// 2) (可选) 获取 features 以解析 device_id
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
-const resolvedDeviceId = features.payload.device_id ?? deviceId;
+// 2) 确认 deviceId
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const resolvedDeviceId = state.payload.identity.deviceId ?? deviceId;
 
 // 3) 示例：获取 BTC 地址
 const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {

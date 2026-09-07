@@ -76,7 +76,7 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 | `passphraseState` 不匹配当前 session | 错误码 112（passphrase state mismatch）—— session 过期或隐藏钱包变了 |
 | `passphraseState` 和 `useEmptyPassphrase: true` 同时传 | `passphraseState` 优先（走隐藏钱包）——`useEmptyPassphrase` 被忽略 |
 
-> ⚠️ 第三行是最坑的：隐藏钱包调用时漏传 `passphraseState`，拿到的是标准钱包的地址/签名，**完全没有报错**。所以隐藏钱包场景里，`getPassphraseState` 拿一次 `passphraseState` 之后必须挂到后续所有钱包级调用上；如果明确就是要走标准钱包，就显式传 `useEmptyPassphrase: true`，别把它留空。
+> ⚠️ 第三行是最坑的：隐藏钱包调用时漏传 `passphraseState`，拿到的是标准钱包的地址/签名，**完全没有报错**。所以隐藏钱包场景里，用 `openWalletSession` 拿一次 `passphraseState` 之后必须挂到后续所有钱包级调用上；如果明确就是要走标准钱包，就显式传 `useEmptyPassphrase: true`，别把它留空。
 
 ## 物理硬件标识符
 
