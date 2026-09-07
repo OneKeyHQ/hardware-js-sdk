@@ -289,7 +289,7 @@ Handle `UI_EVENT` in your JS bundle and respond with `HardwareSDK.uiResponse`. S
 - Nordic BLE library version ≥ 1.1.0 to use `includeStoredBondedDevices`.
 - Register handlers before loading the HTML to avoid race conditions.
 - Request runtime permissions on Android 12+ before scanning/connecting.
-- Persist `connectId` (MAC) and cache `device_id` via `getFeatures(connectId)` after the first connection.
+- Persist `connectId` (MAC) and cache `deviceId` via `getDeviceState(connectId)` after the first connection.
 
 ## References
 

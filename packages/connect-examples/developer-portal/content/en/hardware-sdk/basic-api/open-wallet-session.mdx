@@ -6,7 +6,7 @@ title: Open Wallet Session
 
 Unified Protocol V1 / V2 entry to open the standard wallet, let the user select a hidden wallet, or resume a hidden wallet you already bound.
 
-New integrations should use this method at the "open / switch wallet" step. Address and signing calls still take `deviceId` + `passphraseState` and should not reopen a session every time.
+Use this instead of deprecated [`getPassphraseState`](/en/hardware-sdk/basic-api/get-passphrase-state). Address and signing calls still take `deviceId` + `passphraseState` and should not reopen a session every time.
 
 See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session) for the contract.
 

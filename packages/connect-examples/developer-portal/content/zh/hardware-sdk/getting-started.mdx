@@ -64,7 +64,7 @@ console.log(address.payload.address);
 
 读取 `payload` 之前必须先看 `success`。`useEmptyPassphrase: true` 把第一次调用钉在标准钱包，避免残留的隐藏钱包会话悄悄改掉地址。
 
-`getDeviceState()` 是 1.2.0 的 V1/V2 读取入口。现有应用可以继续用 `getFeatures(connectId)`，读 `payload.device_id`。
+`getDeviceState()` 是 V1/V2 读取入口。`getFeatures()` 已废弃；现有应用可以继续用它，读 `payload.device_id`。
 
 WebUSB 需要 HTTPS 和用户手势。BLE 需要系统蓝牙权限。
 
@@ -72,7 +72,7 @@ WebUSB 需要 HTTPS 和用户手势。BLE 需要系统蓝牙权限。
 
 - SDK 根据设备实时响应识别 Protocol V1 / V2。不要用 USB PID、蓝牙名或产品字符串来分支。见 [Protocol V1 与 V2](/zh/hardware-sdk/concepts/protocol)。
 - Pro 2 和 Neo 使用与 Classic / Pro 相同的方法。机型差异见 [设备](/zh/hardware-sdk/concepts/devices)。
-- 新的开钱包代码应调用 `openWalletSession`。现有应用可以继续用 `getPassphraseState`。见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
+- 打开或切换钱包用 `openWalletSession`。`getPassphraseState` 已废弃。见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
 
 ## 下一步
 

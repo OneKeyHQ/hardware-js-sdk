@@ -47,9 +47,9 @@ const resumed = await HardwareSDK.openWalletSession(connectId, {
 
 Store `payload.deviceId`, `payload.walletType`, and `payload.passphraseState`. Then keep using those values on address / signing calls. Do not call `openWalletSession` before every signer.
 
-## Compatibility API
+## Deprecated compatibility API
 
-Existing apps may keep [`getPassphraseState`](/en/hardware-sdk/basic-api/get-passphrase-state) plus `initSession` / `useEmptyPassphrase` / `passphraseState` on each call. Core maps that path onto Protocol V1 and V2.
+[`getPassphraseState`](/en/hardware-sdk/basic-api/get-passphrase-state) is deprecated. Existing apps may keep it plus `initSession` / `useEmptyPassphrase` / `passphraseState` on each call. Core still maps that path onto Protocol V1 and V2. New code should use `openWalletSession`.
 
 Do not mix `openWalletSession({ mode })` with `useEmptyPassphrase` / `initSession` on the same call.
 

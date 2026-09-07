@@ -87,6 +87,8 @@ HardwareSDK.uiResponse({
 
 ### 隐藏钱包的会话缓存
 
+推荐路径：[`openWalletSession`](/zh/hardware-sdk/basic-api/open-wallet-session)，之后的调用带上 `passphraseState`。下面的 `getPassphraseState` 流程**已废弃**，仅给现有应用保留。
+
 通过会话缓存减少重复的 Passphrase 输入提示。
 
 ```mermaid

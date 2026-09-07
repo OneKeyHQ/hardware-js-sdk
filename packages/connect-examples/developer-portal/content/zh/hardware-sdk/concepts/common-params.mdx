@@ -12,7 +12,7 @@ title: 通用参数
 
 | 参数 | 类型 | 作用 | 说明 |
 | --- | --- | --- | --- |
-| `passphraseState` | `string` | 把这次调用绑定到某个隐藏钱包 | 通过 `getPassphraseState` 或 `openWalletSession` 拿一次；后续要留在同一钱包的调用都带上。**不能**和 `useEmptyPassphrase` 同时传。这是钱包指纹，不是固件 `session_id`。 |
+| `passphraseState` | `string` | 把这次调用绑定到某个隐藏钱包 | 通过 `openWalletSession`（或已废弃的 `getPassphraseState`）拿一次；后续要留在同一钱包的调用都带上。**不能**和 `useEmptyPassphrase` 同时传。这是钱包指纹，不是固件 `session_id`。 |
 | `useEmptyPassphrase` | `boolean` | 强制走标准钱包 | 避免残留的隐藏钱包会话悄悄改掉地址。**不能**和 `passphraseState` 同时传。 |
 | `initSession` | `boolean` | 调用前强制初始化 session | 兼容路径上搭配 `passphraseState`。新代码应优先 `openWalletSession({ mode })`，不要把 `mode` 和这个标志混在一次调用里。 |
 | `deriveCardano` | `boolean` | 在设备上预派生 Cardano 子树 | 一个 session 里第一次调 Cardano 方法时设为 `true`。 |
@@ -59,7 +59,7 @@ await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
 });
 ```
 
-兼容路径（现有应用）：`getPassphraseState(connectId, { initSession: true })`，之后每次带 `{ initSession: true, passphraseState }`。见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
+已废弃的兼容路径：`getPassphraseState(connectId, { initSession: true })`，之后每次带 `{ initSession: true, passphraseState }`。见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
 
 **BLE 保守重试（仅搜设备 / 地址 / 签名）**
 

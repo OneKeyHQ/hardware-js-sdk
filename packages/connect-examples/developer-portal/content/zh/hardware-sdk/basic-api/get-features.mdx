@@ -2,13 +2,17 @@
 title: 获取设备特性
 ---
 
+import { Callout } from 'nextra/components'
+
 # 获取设备特性
+
+<Callout type="warning">
+  **已废弃。** Protocol V1 / V2 请用 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)。现有应用仍可调用本方法。
+</Callout>
 
 ## 获取设备特性
 
-获取设备的所有属性。
-
-Hardware SDK 1.2.0 上 `getFeatures()` 仍是兼容 API。新代码应优先使用 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state) 读取 V1/V2 统一快照。在 Protocol V2 上，Core 会做映射，现有应用可以继续调用本方法。
+获取设备的所有属性。新代码请读 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)（`payload.identity.deviceId`）。
 
 ```typescript
 const response = await HardwareSDK.getFeatures(connectId);

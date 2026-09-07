@@ -289,7 +289,7 @@ webview.registerHandler("disconnect", BridgeHandler { _, cb ->
 - Nordic BLE 库版本 >= 1.1.0 以使用 `includeStoredBondedDevices`。
 - 在加载 HTML 之前注册处理程序以避免竞态条件。
 - 在 Android 12+ 上扫描/连接之前请求运行时权限。
-- 持久化 `connectId`（MAC）并在首次连接后通过 `getFeatures(connectId)` 缓存 `device_id`。
+- 持久化 `connectId`（MAC）并在首次连接后通过 `getDeviceState(connectId)` 缓存 `deviceId`。
 
 ## 参考
 

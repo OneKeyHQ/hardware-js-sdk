@@ -4,9 +4,10 @@ title: 标识符（Identifiers）
 
 # 标识符（Identifiers）
 
-`searchDevices`、`getFeatures`、`getPassphraseState` 以及各链方法的响应里，
+`searchDevices`、`getDeviceState`、`openWalletSession` 以及各链方法的响应里，
 会出现若干个看起来都像"ID"的字段。这一页作为**唯一权威参考**，说明每个字段
-到底代表什么、何时变化、在不同传输方式下格式差异是什么。
+到底代表什么、何时变化、在不同传输方式下格式差异是什么。`getFeatures` 和
+`getPassphraseState` 已废弃，读到的是同一套身份。
 
 > 找的是**传入 SDK 的参数**（`passphraseState`、`initSession`、
 > `useEmptyPassphrase` 等）？请看 [通用参数](/zh/hardware-sdk/concepts/common-params)。
@@ -39,9 +40,9 @@ title: 标识符（Identifiers）
 
 ```ts
 // 设备级 —— 只要 connectId
-HardwareSDK.getFeatures(connectId);
+HardwareSDK.getDeviceState(connectId);
 HardwareSDK.deviceLock(connectId, {});
-HardwareSDK.getPassphraseState(connectId, { initSession: true });
+HardwareSDK.openWalletSession(connectId, { mode: 'standard' });
 
 // 钱包级（标准钱包）—— connectId + deviceId
 HardwareSDK.evmGetAddress(connectId, deviceId, {
@@ -53,7 +54,7 @@ HardwareSDK.evmGetAddress(connectId, deviceId, {
 HardwareSDK.evmSignTransaction(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
   transaction: { /* ... */ },
-  passphraseState, // 由 getPassphraseState 一次性获取
+  passphraseState, // 由 openWalletSession 一次性获取
 });
 ```
 
@@ -61,7 +62,7 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 
 | 类别 | 适用场景 | 代表方法 |
 | --- | --- | --- |
-| 🟡 仅 `connectId` | 设备级操作（不触碰钱包状态）| `searchDevices` · `getFeatures` · `getPassphraseState` · `deviceLock` · `deviceUnlock` · `deviceWipe` · `deviceSettings` · `deviceVerify` · `cancel` · `checkFirmwareRelease` · `checkBootloaderRelease` |
+| 🟡 仅 `connectId` | 设备级操作（不触碰钱包状态）| `searchDevices` · `getDeviceState` · `openWalletSession` · `deviceLock` · `deviceUnlock` · `deviceWipe` · `deviceSettings` · `deviceVerify` · `cancel` · `checkFirmwareRelease` · `checkBootloaderRelease` |
 | 🔵 `connectId` + `deviceId` | 钱包级：地址派生 / 签名 / 加密 | `evmGetAddress` · `evmSignTransaction` · `evmSignMessage` · `btcGetAddress` · `btcSignTransaction` · `btcSignPsbt` · `solGetAddress` · `solSignMessage` · `nostrEncryptMessage` · `allNetworkGetAddress` · 所有其他链方法 |
 | 🟣 `connectId` + `deviceId` + `passphraseState` | 和 🔵 相同，但访问的是带 passphrase 的隐藏钱包 | 🔵 里所有方法，params 里带非空 `passphraseState` |
 

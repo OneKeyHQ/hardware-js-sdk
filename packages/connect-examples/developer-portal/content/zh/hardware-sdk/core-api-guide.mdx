@@ -12,7 +12,7 @@ title: 核心接口指南
 <div id="request-basics" />
 
 - 方法签名：`HardwareSDK.method(connectId, deviceId?, params)` → `Promise<{ success, payload }>`，先判断 `success` 再读 `payload`
-- 标识：`connectId` 来自 `searchDevices`；`deviceId` 来自 `getFeatures` / `getDeviceState`（BLE 必填，WebUSB 建议带）。擦除 / 恢复后刷新 `deviceId`。完整表：[标识符](/zh/hardware-sdk/concepts/identifiers)
+- 标识：`connectId` 来自 `searchDevices`；`deviceId` 来自 `getDeviceState`（BLE 必填，WebUSB 建议带）。擦除 / 恢复后刷新 `deviceId`。完整表：[标识符](/zh/hardware-sdk/concepts/identifiers)
 - 事件：入口订一次 `UI_EVENT`，只对输入类 `UI_REQUEST`（PIN / Passphrase / Bootloader 选择）调用 `uiResponse`
 - 同一设备串行调用。隐藏钱包用 `openWalletSession`（兼容路径用 `initSession + passphraseState`）
 
@@ -40,7 +40,7 @@ console.log(res.payload.address);
 | 标识 | 作用 | 获取来源 | 何时变化 |
 | --- | --- | --- | --- |
 | `connectId` | 哪条连接 | `searchDevices()` | USB 重插、BLE 重新配对、切换传输 |
-| `deviceId` | 哪一次种子生命周期 | `getFeatures` / `getDeviceState` | 擦除、恢复、换种子 |
+| `deviceId` | 哪一次种子生命周期 | `getDeviceState`（`getFeatures` 已废弃） | 擦除、恢复、换种子 |
 
 同一台设备的 USB 和 BLE `connectId` 不同，要分开缓存。见 [标识符](/zh/hardware-sdk/concepts/identifiers) 和 [重连与释放](/zh/hardware-sdk/transport/reconnect)。
 
@@ -56,13 +56,13 @@ console.log(res.payload.address);
 | 要求 | 说明 | 示例 API |
 | :--- | :--- | :--- |
 | 🟢 不需要标识 | 初始化、配置、事件 | `init` `on/off` `searchDevices` `getLogs` `dispose` `uiResponse` |
-| 🟡 只要 `connectId` | 设备管理、状态、固件 | `getFeatures` `getDeviceState` `openWalletSession` `cancel` `deviceSettings` |
+| 🟡 只要 `connectId` | 设备管理、状态、固件 | `getDeviceState` `openWalletSession` `cancel` `deviceSettings` |
 | 🔵 `connectId` + `deviceId` | 链上签名、地址、加密 | `evmSignTransaction` `btcSignTransaction` `solanaSignMessage` `allNetworkGetAddress` |
 
 ## 标准生命周期
 <div id="standard-lifecycle" />
 
-`init → search → getFeatures/getDeviceState → 订阅 UI/DEVICE/FIRMWARE → call + uiResponse → cleanup`
+`init → search → getDeviceState → 订阅 UI/DEVICE/FIRMWARE → call + uiResponse → cleanup`
 
 ```ts
 import HardwareSDK, { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-common-connect-sdk';
@@ -132,7 +132,7 @@ PIN / passphrase 交互见 [PIN](/zh/hardware-sdk/concepts/pin) 和 [Passphrase]
 | `DEVICE_EVENT` | `CONNECT` | 刷新设备列表 |
 | `DEVICE_EVENT` | `DISCONNECT` | 连接作废；不要重放有副作用的调用。[重连](/zh/hardware-sdk/transport/reconnect) |
 | `DEVICE_EVENT` | `ACQUIRE` / `RELEASE` | 卡住并发 |
-| `DEVICE_EVENT` | `CHANGED` | 重新 `getDeviceState` / `getFeatures` |
+| `DEVICE_EVENT` | `CHANGED` | 重新 `getDeviceState` |
 | `DEVICE_EVENT` | `USED_ELSEWHERE` | 关掉占用的 Bridge / 标签页 |
 | `FIRMWARE_EVENT` | `RELEASE_INFO` / `BLE_RELEASE_INFO` | 安全时机提示升级。[固件升级](/zh/hardware-sdk/firmware-update) |
 

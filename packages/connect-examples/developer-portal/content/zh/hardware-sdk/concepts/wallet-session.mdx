@@ -47,9 +47,9 @@ const resumed = await HardwareSDK.openWalletSession(connectId, {
 
 保存 `payload.deviceId`、`payload.walletType`、`payload.passphraseState`。之后的地址 / 签名调用带上这些值即可。不要在每次签名前都再开一次 Session。
 
-## 兼容 API
+## 已废弃的兼容 API
 
-现有应用可以继续用 [`getPassphraseState`](/zh/hardware-sdk/basic-api/get-passphrase-state)，并在每次调用上带 `initSession` / `useEmptyPassphrase` / `passphraseState`。Core 会把它映射到 Protocol V1 和 V2。
+[`getPassphraseState`](/zh/hardware-sdk/basic-api/get-passphrase-state) 已废弃。现有应用可以继续用它，并在每次调用上带 `initSession` / `useEmptyPassphrase` / `passphraseState`。Core 仍会映射到 Protocol V1 和 V2。新代码请用 `openWalletSession`。
 
 不要在同一次调用里混用 `openWalletSession({ mode })` 和 `useEmptyPassphrase` / `initSession`。
 

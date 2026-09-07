@@ -4,9 +4,9 @@ title: Get Device State
 
 # Get Device State
 
-Read the unified V1 / V2 device snapshot. This is the 1.2.0 replacement for treating `getFeatures()` as the only source of truth.
+Read the unified V1 / V2 device snapshot. Use this instead of deprecated [`getFeatures`](/en/hardware-sdk/basic-api/get-features).
 
-`getFeatures()` remains a compatibility API and still works. New code should call `getDeviceState()`.
+`getFeatures()` still runs for existing apps. New code should call `getDeviceState()` and read `payload.identity.deviceId`.
 
 ```ts
 const res = await HardwareSDK.getDeviceState(connectId);

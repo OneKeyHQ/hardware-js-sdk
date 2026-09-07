@@ -2,13 +2,19 @@
 title: Get Passphrase State
 ---
 
+import { Callout } from 'nextra/components'
+
 # Get Passphrase State
+
+<Callout type="warning">
+  **Deprecated.** Use [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session) for Protocol V1 and V2. This method still runs for existing apps.
+</Callout>
 
 ## Get the passphraseState of the device
 
 Prompts the user to enter their passphrase (on-device or via software), then returns a `passphraseState` string — the public hidden-wallet fingerprint. Persist `deviceId + passphraseState`. Do not persist firmware `session_id`.
 
-New integrations should prefer [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session). This method remains the compatibility entry on Hardware SDK 1.2.0 (Protocol V1 and V2). See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
+See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
 
 Pass `passphraseState` on later address / signing calls so they stay on that hidden wallet. It is a **wallet fingerprint**, not firmware `session_id`. Do not persist `session_id`.
 

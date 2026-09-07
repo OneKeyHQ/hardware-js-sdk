@@ -5,9 +5,10 @@ title: Identifiers
 # Identifiers
 
 OneKey hardware APIs return several identifier-looking fields across
-`searchDevices`, `getFeatures`, `getPassphraseState`, and chain method
+`searchDevices`, `getDeviceState`, `openWalletSession`, and chain method
 responses. This page is the single reference for what each one means, when
-it changes, and how its shape varies by transport.
+it changes, and how its shape varies by transport. `getFeatures` and
+`getPassphraseState` are deprecated compatibility reads of the same identities.
 
 > Looking for **call parameters** (`passphraseState`, `initSession`,
 > `useEmptyPassphrase`, …)? See [Common Params](/en/hardware-sdk/concepts/common-params).
@@ -40,9 +41,9 @@ Only three of the identifiers here are **inputs** to SDK calls — the rest are 
 
 ```ts
 // Device-level — just connectId
-HardwareSDK.getFeatures(connectId);
+HardwareSDK.getDeviceState(connectId);
 HardwareSDK.deviceLock(connectId, {});
-HardwareSDK.getPassphraseState(connectId, { initSession: true });
+HardwareSDK.openWalletSession(connectId, { mode: 'standard' });
 
 // Wallet-level (standard wallet) — connectId + deviceId
 HardwareSDK.evmGetAddress(connectId, deviceId, {
@@ -54,7 +55,7 @@ HardwareSDK.evmGetAddress(connectId, deviceId, {
 HardwareSDK.evmSignTransaction(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
   transaction: { /* ... */ },
-  passphraseState, // obtained once from getPassphraseState
+  passphraseState, // obtained once from openWalletSession
 });
 ```
 
@@ -62,7 +63,7 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 
 | Pattern | When | Example methods |
 | --- | --- | --- |
-| 🟡 `connectId` only | Device-level operations (don't touch wallet state) | `searchDevices` · `getFeatures` · `getPassphraseState` · `deviceLock` · `deviceUnlock` · `deviceWipe` · `deviceSettings` · `deviceVerify` · `cancel` · `checkFirmwareRelease` · `checkBootloaderRelease` |
+| 🟡 `connectId` only | Device-level operations (don't touch wallet state) | `searchDevices` · `getDeviceState` · `openWalletSession` · `deviceLock` · `deviceUnlock` · `deviceWipe` · `deviceSettings` · `deviceVerify` · `cancel` · `checkFirmwareRelease` · `checkBootloaderRelease` |
 | 🔵 `connectId` + `deviceId` | Wallet-level — address derivation / signing / encryption | `evmGetAddress` · `evmSignTransaction` · `evmSignMessage` · `btcGetAddress` · `btcSignTransaction` · `btcSignPsbt` · `solGetAddress` · `solSignMessage` · `nostrEncryptMessage` · `allNetworkGetAddress` · all other chain methods |
 | 🟣 `connectId` + `deviceId` + `passphraseState` | Same as 🔵, but against a passphrase-protected hidden wallet | All of 🔵 with a non-empty `passphraseState` in params |
 

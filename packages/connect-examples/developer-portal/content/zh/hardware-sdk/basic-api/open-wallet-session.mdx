@@ -6,7 +6,7 @@ title: 打开钱包会话
 
 Protocol V1 / V2 统一入口：打开标准钱包、让用户选择隐藏钱包，或恢复已经绑定过的隐藏钱包。
 
-新接入应在「打开 / 切换钱包」这一步调用本方法。地址和签名仍然带 `deviceId` + `passphraseState`，不要每次签名都重新开 Session。
+请用本方法，不要再用已废弃的 [`getPassphraseState`](/zh/hardware-sdk/basic-api/get-passphrase-state)。地址和签名仍然带 `deviceId` + `passphraseState`，不要每次签名都重新开 Session。
 
 契约说明见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
 

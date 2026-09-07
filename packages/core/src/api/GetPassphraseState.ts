@@ -6,6 +6,7 @@ import { refreshProtocolV2DeviceStatus } from '../protocols/protocol-v2/walletSe
 import { getPassphraseStateWithRefreshDeviceInfo } from '../utils/deviceFeaturesUtils';
 import { BaseMethod } from './BaseMethod';
 
+/** @deprecated Use OpenWalletSession / HardwareSDK.openWalletSession. */
 export default class GetPassphraseState extends BaseMethod {
   getSupportedProtocols() {
     return ['V1', 'V2'] as const;

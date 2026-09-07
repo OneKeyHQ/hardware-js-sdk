@@ -64,7 +64,7 @@ console.log(address.payload.address);
 
 Always check `success` before reading `payload`. `useEmptyPassphrase: true` keeps this first call on the standard wallet so a leftover hidden-wallet session cannot silently change the address.
 
-`getDeviceState()` is the 1.2.0 V1/V2 read. Existing apps may keep `getFeatures(connectId)` and read `payload.device_id`.
+`getDeviceState()` is the V1/V2 read. `getFeatures()` is deprecated; existing apps may keep it and read `payload.device_id`.
 
 WebUSB requires HTTPS and a user gesture. BLE requires OS Bluetooth permission.
 
@@ -72,7 +72,7 @@ WebUSB requires HTTPS and a user gesture. BLE requires OS Bluetooth permission.
 
 - The SDK detects Protocol V1 vs V2 from the live device. Do not branch on USB PID, BLE name, or product string. See [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol).
 - Pro 2 and Neo use the same methods as Classic / Pro. Device differences are listed in [Devices](/en/hardware-sdk/concepts/devices).
-- New wallet-open code should call `openWalletSession`. Existing apps may keep `getPassphraseState`. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
+- Open or switch a wallet with `openWalletSession`. `getPassphraseState` is deprecated. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
 
 ## Next
 

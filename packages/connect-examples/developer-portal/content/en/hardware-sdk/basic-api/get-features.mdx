@@ -2,13 +2,17 @@
 title: Get Features
 ---
 
+import { Callout } from 'nextra/components'
+
 # Get Features
+
+<Callout type="warning">
+  **Deprecated.** Use [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state) for Protocol V1 and V2. This method still runs for existing apps.
+</Callout>
 
 ## Get device features
 
-Get all attributes of the device.
-
-`getFeatures()` remains a compatibility API on Hardware SDK 1.2.0. New code should prefer [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state), which returns the unified V1/V2 snapshot. On Protocol V2, `getFeatures()` is mapped by Core and is still valid for existing apps.
+Get all attributes of the device. New code should read [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state) (`payload.identity.deviceId`).
 
 ```typescript
 const response = await HardwareSDK.getFeatures(connectId);

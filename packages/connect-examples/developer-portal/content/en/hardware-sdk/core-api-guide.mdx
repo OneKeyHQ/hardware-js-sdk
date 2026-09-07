@@ -12,7 +12,7 @@ Parameter tables live in [Common Params](/en/hardware-sdk/concepts/common-params
 <div id="request-basics" />
 
 - Call shape: `HardwareSDK.method(connectId, deviceId?, params)` → `Promise<{ success, payload }>`; always guard on `success` before touching `payload`.
-- Identifiers: `connectId` from `searchDevices`; `deviceId` from `getFeatures` / `getDeviceState` (required for BLE, recommended for WebUSB). Refresh `deviceId` after reset/recovery. Full table: [Identifiers](/en/hardware-sdk/concepts/identifiers).
+- Identifiers: `connectId` from `searchDevices`; `deviceId` from `getDeviceState` (required for BLE, recommended for WebUSB). Refresh `deviceId` after reset/recovery. Full table: [Identifiers](/en/hardware-sdk/concepts/identifiers).
 - UI contract: subscribe `UI_EVENT` once; only call `uiResponse` on input-type `UI_REQUEST` (PIN / Passphrase / Bootloader select). Route per device when several devices are connected.
 - Serialize calls per device. Reuse a hidden wallet with `openWalletSession` (or `initSession + passphraseState` on the compatibility path).
 
@@ -40,7 +40,7 @@ console.log(res.payload.address);
 | ID | Purpose | Obtain via | Changes when |
 | --- | --- | --- | --- |
 | `connectId` | Which connection | `searchDevices()` | USB re-plug, BLE re-pair, transport switch |
-| `deviceId` | Which seed lifetime | `getFeatures` / `getDeviceState` | Wipe, recovery, seed switch |
+| `deviceId` | Which seed lifetime | `getDeviceState` (`getFeatures` is deprecated) | Wipe, recovery, seed switch |
 
 USB and BLE `connectId` values for the same unit are different — cache them separately. See [Identifiers](/en/hardware-sdk/concepts/identifiers) and [Reconnect and dispose](/en/hardware-sdk/transport/reconnect).
 
@@ -56,13 +56,13 @@ USB and BLE `connectId` values for the same unit are different — cache them se
 | Requirement | Description | Example APIs |
 | :--- | :--- | :--- |
 | 🟢 No identifiers | SDK init, config, event management | `init` `on/off` `searchDevices` `getLogs` `dispose` `uiResponse` |
-| 🟡 `connectId` only | Device management, status, firmware ops | `getFeatures` `getDeviceState` `openWalletSession` `cancel` `deviceSettings` |
+| 🟡 `connectId` only | Device management, status, firmware ops | `getDeviceState` `openWalletSession` `cancel` `deviceSettings` |
 | 🔵 `connectId` + `deviceId` | Blockchain signing, address, encryption | `evmSignTransaction` `btcSignTransaction` `solanaSignMessage` `allNetworkGetAddress` |
 
 ## Standard lifecycle (recommended)
 <div id="standard-lifecycle" />
 
-`init → search → getFeatures/getDeviceState → subscribe UI/DEVICE/FIRMWARE → call + uiResponse → cleanup`
+`init → search → getDeviceState → subscribe UI/DEVICE/FIRMWARE → call + uiResponse → cleanup`
 
 ```ts
 import HardwareSDK, { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-common-connect-sdk';
@@ -132,7 +132,7 @@ Subscribe once near app start. Only call `uiResponse` for input requests.
 | `DEVICE_EVENT` | `CONNECT` | Refresh device list |
 | `DEVICE_EVENT` | `DISCONNECT` | Invalidate the connection; do not replay side-effecting calls. [Reconnect](/en/hardware-sdk/transport/reconnect) |
 | `DEVICE_EVENT` | `ACQUIRE` / `RELEASE` | Gate concurrent calls |
-| `DEVICE_EVENT` | `CHANGED` | Re-read `getDeviceState` / `getFeatures` |
+| `DEVICE_EVENT` | `CHANGED` | Re-read `getDeviceState` |
 | `DEVICE_EVENT` | `USED_ELSEWHERE` | Close the other Bridge / tab |
 | `FIRMWARE_EVENT` | `RELEASE_INFO` / `BLE_RELEASE_INFO` | Offer upgrade when safe. [Firmware Update](/en/hardware-sdk/firmware-update) |
 

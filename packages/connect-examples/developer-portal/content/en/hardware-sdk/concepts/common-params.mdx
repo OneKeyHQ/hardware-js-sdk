@@ -12,7 +12,7 @@ This page is the parameter **reference**. For the call lifecycle, see the [Core 
 
 | Param | Type | Purpose | Notes |
 | --- | --- | --- | --- |
-| `passphraseState` | `string` | Bind the call to a specific hidden wallet | Obtain once via `getPassphraseState` or `openWalletSession`; pass on every later call that must stay on that wallet. Cannot be combined with `useEmptyPassphrase`. This is a wallet fingerprint, not firmware `session_id`. |
+| `passphraseState` | `string` | Bind the call to a specific hidden wallet | Obtain once via `openWalletSession` (or deprecated `getPassphraseState`); pass on every later call that must stay on that wallet. Cannot be combined with `useEmptyPassphrase`. This is a wallet fingerprint, not firmware `session_id`. |
 | `useEmptyPassphrase` | `boolean` | Force the standard wallet | Prevents a leftover hidden-wallet session from silently changing the address. Cannot be combined with `passphraseState`. |
 | `initSession` | `boolean` | Force session init before the call | Pair with `passphraseState` on the compatibility path. New code should prefer `openWalletSession({ mode })` instead of mixing `mode` with this flag. |
 | `deriveCardano` | `boolean` | Pre-derive the Cardano sub-tree | Set on the first Cardano call in a session. |
@@ -59,7 +59,7 @@ await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
 });
 ```
 
-Compatibility path (existing apps): `getPassphraseState(connectId, { initSession: true })`, then pass `{ initSession: true, passphraseState }` on later calls. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
+Deprecated compatibility path: `getPassphraseState(connectId, { initSession: true })`, then pass `{ initSession: true, passphraseState }` on later calls. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
 
 **BLE conservative retries (discovery / address / signing only)**
 

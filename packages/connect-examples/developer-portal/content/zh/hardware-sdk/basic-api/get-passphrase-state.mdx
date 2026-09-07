@@ -2,13 +2,19 @@
 title: 获取密码短语状态
 ---
 
+import { Callout } from 'nextra/components'
+
 # 获取密码短语状态
+
+<Callout type="warning">
+  **已废弃。** Protocol V1 / V2 请用 [`openWalletSession`](/zh/hardware-sdk/basic-api/open-wallet-session)。现有应用仍可调用本方法。
+</Callout>
 
 ## 获取设备的 passphraseState
 
 请求此 API 将提示用户输入密码短语，并返回公开的隐藏钱包指纹 `passphraseState`。请持久化 `deviceId + passphraseState`，不要持久化固件 `session_id`。
 
-新接入应优先使用 [`openWalletSession`](/zh/hardware-sdk/basic-api/open-wallet-session)。本方法在 Hardware SDK 1.2.0 上仍是 Protocol V1 / V2 的兼容入口。见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
+见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
 
 ```typescript
 const response = await HardwareSDK.getPassphraseState(connectId);

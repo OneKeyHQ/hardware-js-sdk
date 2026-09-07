@@ -87,6 +87,8 @@ HardwareSDK.uiResponse({
 
 ### Hidden wallet with session caching
 
+Preferred path: [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session), then pass `passphraseState` on later calls. The `getPassphraseState` flow below is **deprecated** and kept for existing apps.
+
 Reduce repeated passphrase prompts across multiple calls.
 
 ```mermaid
