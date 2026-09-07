@@ -1,6 +1,10 @@
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
 export interface CommonParams {
+  /**
+   * @deprecated Use `useEmptyPassphrase` for the standard wallet, or
+   * `openWalletSession` plus `passphraseState` for a hidden wallet.
+   */
   keepSession?: boolean;
   /**
    * polling connect max retry count
