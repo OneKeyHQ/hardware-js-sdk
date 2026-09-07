@@ -22,6 +22,29 @@ If you skip `passphraseState` on a hidden wallet, address and signing APIs may s
 
 ## Preferred API (1.2.0)
 
+```mermaid
+sequenceDiagram
+  autonumber
+  participant App
+  participant SDK as HardwareSDK
+  participant Device
+
+  App->>SDK: init / searchDevices / getDeviceState
+  alt standard wallet
+    App->>SDK: openWalletSession({ mode: standard })
+    SDK-->>App: walletType standard, passphraseState null
+    App->>SDK: address / sign with useEmptyPassphrase true
+  else hidden wallet
+    App->>SDK: openWalletSession({ mode: select-hidden })
+    SDK-->>App: walletType hidden, passphraseState
+    Note over App: persist deviceId + passphraseState
+    App->>SDK: address / sign with passphraseState
+  end
+  SDK->>Device: DeviceSessionGet
+  Device-->>SDK: session
+  SDK-->>App: result
+```
+
 <DocFlow variant="wallet" locale="en" />
 
 New integrations should open a wallet with [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session):

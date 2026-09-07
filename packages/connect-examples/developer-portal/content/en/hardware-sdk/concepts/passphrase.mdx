@@ -33,7 +33,23 @@ Hardware SDK 1.2.x: `searchDevices` → `getDeviceState` → `openWalletSession`
 
 ### Standard wallet
 
-<DocFlow variant="lifecycle" locale="en" />
+```mermaid
+sequenceDiagram
+  autonumber
+  participant App
+  participant SDK as HardwareSDK
+  participant Device
+
+  App->>SDK: getDeviceState(connectId)
+  SDK-->>App: identity.deviceId
+  App->>SDK: openWalletSession({ mode: standard })
+  SDK->>Device: open standard wallet
+  SDK-->>App: walletType standard
+  App->>SDK: evmGetAddress(..., useEmptyPassphrase true)
+  SDK->>Device: DeviceSessionGet
+  Device-->>SDK: session
+  SDK-->>App: address
+```
 
 ```ts
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -50,7 +66,25 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 
 ### Hidden wallet (open once, reuse fingerprint)
 
-<DocFlow variant="hidden" locale="en" />
+```mermaid
+sequenceDiagram
+  autonumber
+  participant App
+  participant SDK as HardwareSDK
+  participant Device
+
+  App->>SDK: openWalletSession({ mode: select-hidden })
+  SDK->>Device: select hidden wallet
+  Device-->>App: UI_REQUEST.REQUEST_PASSPHRASE
+  App->>SDK: uiResponse(RECEIVE_PASSPHRASE)
+  SDK-->>App: deviceId + passphraseState
+  Note over App: persist deviceId + passphraseState
+  App->>SDK: evmGetAddress(..., passphraseState)
+  SDK->>Device: DeviceSessionGet
+  Note over SDK,Device: Core resumes. App does not call resume-hidden
+  Device-->>SDK: session
+  SDK-->>App: address
+```
 
 ```ts
 import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';

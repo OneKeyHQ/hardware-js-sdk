@@ -22,6 +22,29 @@ title: 钱包会话
 
 ## 1.2.0 推荐 API
 
+```mermaid
+sequenceDiagram
+  autonumber
+  participant App as 应用
+  participant SDK as HardwareSDK
+  participant Device as 设备
+
+  App->>SDK: init / searchDevices / getDeviceState
+  alt 标准钱包
+    App->>SDK: openWalletSession({ mode: standard })
+    SDK-->>App: walletType standard, passphraseState null
+    App->>SDK: 地址 / 签名带 useEmptyPassphrase true
+  else 隐藏钱包
+    App->>SDK: openWalletSession({ mode: select-hidden })
+    SDK-->>App: walletType hidden, passphraseState
+    Note over App: 持久化 deviceId + passphraseState
+    App->>SDK: 地址 / 签名带 passphraseState
+  end
+  SDK->>Device: DeviceSessionGet
+  Device-->>SDK: session
+  SDK-->>App: 结果
+```
+
 <DocFlow variant="wallet" locale="zh" />
 
 新接入请用 [`openWalletSession`](/zh/hardware-sdk/basic-api/open-wallet-session) 打开钱包：

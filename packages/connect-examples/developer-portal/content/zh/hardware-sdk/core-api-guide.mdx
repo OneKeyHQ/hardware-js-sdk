@@ -28,6 +28,27 @@ console.log(res.payload.address);
 
 ### 交互流程
 
+```mermaid
+sequenceDiagram
+  autonumber
+  participant App as 应用
+  participant SDK as HardwareSDK
+  participant Device as 设备
+
+  App->>SDK: init({ env })
+  App->>SDK: searchDevices()
+  SDK-->>App: connectId
+  App->>SDK: getDeviceState(connectId)
+  SDK-->>App: identity.deviceId
+  App->>SDK: 订阅 UI_EVENT
+  App->>SDK: openWalletSession(standard 或 select-hidden)
+  SDK-->>App: deviceId + passphraseState
+  App->>SDK: 地址 / 签名带 passphraseState 或 useEmptyPassphrase
+  SDK->>Device: DeviceSessionGet
+  Device-->>SDK: session
+  SDK-->>App: 结果
+```
+
 <DocFlow variant="lifecycle" locale="zh" />
 
 ## 核心标识与环境

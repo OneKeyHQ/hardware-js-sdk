@@ -28,6 +28,27 @@ console.log(res.payload.address);
 
 ### Interaction flow
 
+```mermaid
+sequenceDiagram
+  autonumber
+  participant App
+  participant SDK as HardwareSDK
+  participant Device
+
+  App->>SDK: init({ env })
+  App->>SDK: searchDevices()
+  SDK-->>App: connectId
+  App->>SDK: getDeviceState(connectId)
+  SDK-->>App: identity.deviceId
+  App->>SDK: subscribe UI_EVENT
+  App->>SDK: openWalletSession(standard or select-hidden)
+  SDK-->>App: deviceId + passphraseState
+  App->>SDK: address / sign with passphraseState or useEmptyPassphrase
+  SDK->>Device: DeviceSessionGet
+  Device-->>SDK: session
+  SDK-->>App: result
+```
+
 <DocFlow variant="lifecycle" locale="en" />
 
 ## Core identifiers & environments

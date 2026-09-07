@@ -33,7 +33,23 @@ Hardware SDK 1.2.x：`searchDevices` → `getDeviceState` → `openWalletSession
 
 ### 标准钱包
 
-<DocFlow variant="lifecycle" locale="zh" />
+```mermaid
+sequenceDiagram
+  autonumber
+  participant App as 应用
+  participant SDK as HardwareSDK
+  participant Device as 设备
+
+  App->>SDK: getDeviceState(connectId)
+  SDK-->>App: identity.deviceId
+  App->>SDK: openWalletSession({ mode: standard })
+  SDK->>Device: 打开标准钱包
+  SDK-->>App: walletType standard
+  App->>SDK: evmGetAddress(..., useEmptyPassphrase true)
+  SDK->>Device: DeviceSessionGet
+  Device-->>SDK: session
+  SDK-->>App: address
+```
 
 ```ts
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -50,7 +66,25 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 
 ### 隐藏钱包（开一次，复用指纹）
 
-<DocFlow variant="hidden" locale="zh" />
+```mermaid
+sequenceDiagram
+  autonumber
+  participant App as 应用
+  participant SDK as HardwareSDK
+  participant Device as 设备
+
+  App->>SDK: openWalletSession({ mode: select-hidden })
+  SDK->>Device: 选择隐藏钱包
+  Device-->>App: UI_REQUEST.REQUEST_PASSPHRASE
+  App->>SDK: uiResponse(RECEIVE_PASSPHRASE)
+  SDK-->>App: deviceId + passphraseState
+  Note over App: 持久化 deviceId + passphraseState
+  App->>SDK: evmGetAddress(..., passphraseState)
+  SDK->>Device: DeviceSessionGet
+  Note over SDK,Device: Core 内部恢复。应用不调 resume-hidden
+  Device-->>SDK: session
+  SDK-->>App: address
+```
 
 ```ts
 import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
