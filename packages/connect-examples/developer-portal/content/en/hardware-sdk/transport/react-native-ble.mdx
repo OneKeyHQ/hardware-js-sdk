@@ -123,13 +123,13 @@ export async function setupBle() {
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 
-// BLE returns id + name; fetch features to obtain device_id
+// BLE returns id + name; read identity via getDeviceState
 const candidate = devices.payload[0];
 const connectId = candidate.connectId;
 
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
-const deviceId = features.payload.device_id;
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
 ```
 
 Persist `connectId` and `deviceId` (most chain APIs require both).
@@ -159,5 +159,5 @@ if (res.success) {
 ## Continue
 
 - [Introduction](/en/hardware-sdk)
-- [Error Code](/en/hardware-sdk/core-api-guide#error-codes), [Common Params](/en/hardware-sdk/core-api-guide#common-params)
+- [Error Code](/en/hardware-sdk/core-api-guide#error-codes), [Common Params](/en/hardware-sdk/concepts/common-params)
 - Protocol framing (64 bytes, for reference only): [See Low-Level Transport Plugin](/en/hardware-sdk/concepts/low-level-plugin#message-protocol-part-of-low-level-transport)

@@ -111,7 +111,7 @@ The App Pro2 branch still returns the existing choice shapes:
 - `attachPinOnDevice=true` with `existsAttachPinUser=true`
 - User cancel
 
-The SDK converts the response to `DeviceSessionAskPassphrase` or `DeviceSessionAskPin(AttachToPin)`. Ask returns only `Success`, then empty-param `DeviceSessionGet` reads the actual Session. No `PassphraseAck` is sent. Explicit `resume-hidden` with a cache first tries `DeviceSessionGet` with `session_id`. If there is no cache, the handle is invalid, or firmware's actual wallet state does not match, the SDK synthesizes one `REQUEST_PASSPHRASE` so the user can re-enter the target wallet. A security error is raised only if it still mismatches. `session_id` is only a resume hint. Wallet identity is the `deviceId + passphraseState` check.
+The SDK converts the response to `DeviceSessionAskPassphrase` or `DeviceSessionAskPin(AttachToPin)`. Ask returns only `Success`, then empty-param `DeviceSessionGet` reads the actual Session. No `PassphraseAck` is sent. A later method that carries `passphraseState` with a cache first tries `DeviceSessionGet` with `session_id`. If there is no cache, the handle is invalid, or firmware's actual wallet state does not match, the SDK synthesizes one `REQUEST_PASSPHRASE` so the user can re-enter the target wallet. A security error is raised only if it still mismatches. `session_id` is only a resume hint. Wallet identity is the `deviceId + passphraseState` check.
 
 ### Protocol V2 current sequence
 
@@ -170,8 +170,8 @@ sequenceDiagram
   FW-->>SDK: DeviceSession(session_id, btc_test_address)
   SDK-->>App: walletType + passphraseState
 
-  Note over App,FW: First resume does not go through REQUEST_PASSPHRASE
-  App->>SDK: openWalletSession(resume-hidden, wallet binding)
+  Note over App,FW: First later method with passphraseState does not go through REQUEST_PASSPHRASE
+  App->>SDK: evmGetAddress(..., passphraseState)
   SDK->>FW: DeviceSessionGet(session_id)
   FW-->>SDK: Current actual DeviceSession(session_id, btc_test_address)
   alt passphraseState mismatch
@@ -306,7 +306,7 @@ Cancel must bind the current device and Transport source. On disconnect, clean u
 - Pro2 non-blocking `REQUEST_BUTTON` / `REQUEST_PIN` scenes do not send `uiResponse()`.
 - Closing the hardware-interaction UI cancels the current call. `CLOSE_UI_WINDOW` only dismisses idempotently.
 - The App still stores `passphraseState`. `openWalletSession()` no longer returns firmware `session_id`, and the App database must not persist that internal value.
-- Existing Apps may keep using `getPassphraseState()`. Pro2 protocol split is done in Core. New flows should prefer `openWalletSession()` to express standard, select-hidden, or resume-hidden explicitly.
+- Existing Apps may keep using `getPassphraseState()`. Pro2 protocol split is done in Core. New flows should prefer `openWalletSession()` to express standard or select-hidden explicitly, then pass `passphraseState` on later methods.
 - Do not treat onboarding stage events as the only state source.
 
 ## Regression tests

@@ -560,26 +560,35 @@ class MainActivity : AppCompatActivity() {
 
     // Device MAC address
     var connectId = ""
-    val deviceId = ""
+    var deviceId = ""
 
-    fun getFeatures(view: View) {
+    fun getDeviceState(view: View) {
         showLoading()
         val dataJson = JsonObject().apply {
             addProperty("connectId", connectId)
         }
         val json = JsonObject().apply {
-            addProperty("name", "getFeatures")
+            addProperty("name", "getDeviceState")
             add("data", dataJson)
         }
         try {
             webview.callHandler("bridgeCommonCall", json.toString()) { value ->
                 hideLoading()
-                Log.d("getFeatures result", value)
-                updateResultText("Features: $value")
+                Log.d("getDeviceState result", value)
+                try {
+                    val parsed = com.google.gson.JsonParser.parseString(value).asJsonObject
+                    val identity = parsed.getAsJsonObject("payload")?.getAsJsonObject("identity")
+                    val nextDeviceId = identity?.get("deviceId")?.asString
+                    if (!nextDeviceId.isNullOrEmpty()) {
+                        deviceId = nextDeviceId
+                    }
+                } catch (_: Exception) {
+                }
+                updateResultText("DeviceState: $value")
             }
         } catch (e: Exception) {
             hideLoading()
-            updateResultText("getFeatures error: ${e.message}")
+            updateResultText("getDeviceState error: ${e.message}")
         }
     }
 
@@ -782,6 +791,7 @@ class MainActivity : AppCompatActivity() {
         deviceAdapter = BleDeviceAdapter { address ->
             selectedDeviceAddress = address
             connectId = address
+            deviceId = ""
             
             // Initialize as unknown type; will update from API response later
             currentDeviceType = DEVICE_TYPE_UNKNOWN

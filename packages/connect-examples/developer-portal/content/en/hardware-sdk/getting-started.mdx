@@ -1,0 +1,86 @@
+---
+title: Getting Started
+---
+
+# Getting Started
+
+Five minutes from install to a first address on Hardware SDK **1.2.x** (current stable `1.2.1`).
+
+This page is the first-run path. After it works, pick a [transport guide](/en/hardware-sdk/transport/web-usb) and read the [Core API Guide](/en/hardware-sdk/core-api-guide) for PIN, passphrase, events, and signing.
+
+Hardware SDK 1.2.0 speaks Protocol V1 (Classic / Mini / Touch / Pro) and Protocol V2 (Pro 2 / Neo) through the **same JavaScript API**. You do not choose the protocol in `init()`.
+
+## 1. Pick a package
+
+| Runtime | Package | Next guide |
+| --- | --- | --- |
+| Browser / desktop WebUSB | `@onekeyfe/hd-common-connect-sdk` | [WebUSB](/en/hardware-sdk/transport/web-usb) |
+| React Native BLE | `@onekeyfe/hd-ble-sdk` | [React Native BLE](/en/hardware-sdk/transport/react-native-ble) |
+| Android / iOS / Flutter native bridge | `@onekeyfe/hd-common-connect-sdk` (`env: 'lowlevel'`) | [Native BLE](/en/hardware-sdk/transport/native-ble) |
+| Browser iframe host only | `@onekeyfe/hd-web-sdk` | Overview → plugin iframe |
+
+```bash
+npm i @onekeyfe/hd-common-connect-sdk
+```
+
+Pin the installed version to the current stable `1.2.x` line. If you embed `@onekeyfe/hd-web-sdk`, omit `connectSrc` so it matches the installed package.
+
+## 2. Initialize once
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+await HardwareSDK.init({
+  env: 'webusb',
+  debug: process.env.NODE_ENV !== 'production',
+  fetchConfig: true,
+});
+```
+
+Call `init()` once at app entry. Do not mix `@onekeyfe/hd-web-sdk` and `@onekeyfe/hd-common-connect-sdk` in the same runtime.
+
+## 3. Search, identify, read an address
+
+```ts
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success || !devices.payload.length) {
+  throw new Error('No OneKey device found');
+}
+
+const { connectId } = devices.payload[0];
+
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+
+const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+
+if (!address.success) throw new Error(address.payload.error);
+console.log(address.payload.address);
+```
+
+Always check `success` before reading `payload`. `useEmptyPassphrase: true` keeps this first call on the standard wallet so a leftover hidden-wallet session cannot silently change the address.
+
+`getDeviceState()` is the V1/V2 read. `getFeatures()` is Protocol V1 only; Pro 2 and Neo must use `getDeviceState()`.
+
+WebUSB requires HTTPS and a user gesture. BLE requires OS Bluetooth permission.
+
+## What 1.2.0 does for you
+
+- The SDK detects Protocol V1 vs V2 from the live device. Do not branch on USB PID, BLE name, or product string. See [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol).
+- Pro 2 and Neo use the same methods as Classic / Pro. Device differences are listed in [Devices](/en/hardware-sdk/concepts/devices).
+- Open or switch a wallet with `openWalletSession`. `getPassphraseState` is deprecated. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
+
+## Next
+
+1. Already on 1.1.x: [From 1.1.x to 1.2.x](/en/hardware-sdk/legacy-guides/from-1x)
+2. Wire PIN / passphrase UI events: [Core API Guide](/en/hardware-sdk/core-api-guide)
+3. Connect for real on your platform: [Transport](/en/hardware-sdk/transport)
+4. Handle drops: [Reconnect and dispose](/en/hardware-sdk/transport/reconnect)
+5. Which chains on which device: [Chain Support](/en/hardware-sdk/concepts/chain-support)
+6. Sign a transaction: [Signer Guides](/en/hardware-sdk/signers)
+7. Firmware: [Firmware Update](/en/hardware-sdk/firmware-update)
+8. Try without hardware: [Playground](/en/hardware-sdk/playground)

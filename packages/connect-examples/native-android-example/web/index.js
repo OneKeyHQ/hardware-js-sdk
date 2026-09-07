@@ -182,8 +182,15 @@ function registerBridgeHandler() {
         throw new Error(`Method ${name} not found`);
       }
 
-      // Handle different parameter patterns
-      response = await SDK[name](connectId, deviceId, params);
+      if (name === 'searchDevices') {
+        response = await SDK.searchDevices();
+      } else if (name === 'getDeviceState' || name === 'getFeatures') {
+        response = await SDK[name](connectId, params);
+      } else if (name === 'openWalletSession') {
+        response = await SDK.openWalletSession(connectId, params);
+      } else {
+        response = await SDK[name](connectId, deviceId, params);
+      }
 
       callback(response);
     } catch (e) {

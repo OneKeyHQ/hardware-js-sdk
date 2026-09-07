@@ -55,16 +55,16 @@ describe('批量测试钱包模式', () => {
     });
   });
 
-  test('恢复隐藏钱包要求输入状态，并且不会再次选择钱包', async () => {
+  test('已知隐藏钱包要求输入状态，并且不会再次选择钱包', async () => {
     const selectHiddenWallet = jest.fn(async () => 'unexpected-state');
 
     expect(
-      getBatchWalletSelectionError({ mode: BatchWalletMode.ResumeHidden })
-    ).toBe('Enter a passphraseState to resume a hidden wallet.');
+      getBatchWalletSelectionError({ mode: BatchWalletMode.KnownHidden })
+    ).toBe('Enter a passphraseState to reuse a hidden wallet.');
 
     const resolvedSelection = await resolveBatchWalletSelection(
       {
-        mode: BatchWalletMode.ResumeHidden,
+        mode: BatchWalletMode.KnownHidden,
         passphraseState: ' cached-hidden-state ',
       },
       selectHiddenWallet
@@ -72,7 +72,7 @@ describe('批量测试钱包模式', () => {
 
     expect(selectHiddenWallet).not.toHaveBeenCalled();
     expect(resolvedSelection).toEqual({
-      mode: BatchWalletMode.ResumeHidden,
+      mode: BatchWalletMode.KnownHidden,
       passphraseState: 'cached-hidden-state',
     });
   });

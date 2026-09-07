@@ -114,8 +114,9 @@ Transport connections, frame sequence numbers, device-side `session_id`, and wal
 - The explicit `mode` of `openWalletSession()` is the sole flow intent. Once `mode` is passed, `useEmptyPassphrase` or `initSession` must not be mixed in. `standard/select-hidden` must also not carry a wallet binding.
 - `openWalletSession()` must take an explicit `mode`. Legacy parameter compatibility stays only at the original
   `getPassphraseState()` entry, so the new API does not have two ways to express intent.
-- `resume-hidden` accepts only `deviceId + passphraseState`; Core looks up `sessionId` from the Store. For V2, the local cache
-  is only a non-authoritative restore hint. When the V2 local cache is missing, the handle is invalid, or the actual wallet returned by firmware does not match, Core
+- `openWalletSession()` has no `resume-hidden` mode. Restore a bound hidden wallet by passing `passphraseState` on later
+  address / signing methods. Core looks up `sessionId` from the Store and issues `DeviceSessionGet` inside that method.
+  For V2, the local cache is only a non-authoritative restore hint. When the V2 local cache is missing, the handle is invalid, or the actual wallet returned by firmware does not match, Core
   allows one explicit wallet reselection and returns `DeviceCheckPassphraseStateError` only if it still does not match. V1 still returns `WalletSessionInvalid` when the cache is missing.
 - Session capacity and eviction are managed by Pro2 firmware. The Core Store does not implement LRU or mirror hardware capacity; it only updates the corresponding mapping when a new handle is obtained,
   firmware rejects an old handle, or wallet identity verification fails.

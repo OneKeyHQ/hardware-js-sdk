@@ -133,13 +133,13 @@ const { connectId, deviceId } = result.payload[0] ?? {};
 - USB results usually include `deviceId` in `searchDevices()`.
 - Persist `connectId`/`deviceId` for subsequent calls.
 
-## Step 6. Get features (confirm device_id when needed)
+## Step 6. Read device state (confirm deviceId when needed)
 
 ```ts
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
 
-const resolvedDeviceId = features.payload.device_id;
+const resolvedDeviceId = state.payload.identity.deviceId;
 ```
 
 ## Step 7. First call example (BTC address)
@@ -268,4 +268,4 @@ function showPassphraseDialog(): Promise<{ mode: 'device'|'software'; value: str
 ## Continue
 
 - [Introduction](/en/hardware-sdk)
-- [Error Code](/en/hardware-sdk/core-api-guide#error-codes), [Common Params](/en/hardware-sdk/core-api-guide#common-params)
+- [Error Code](/en/hardware-sdk/core-api-guide#error-codes), [Common Params](/en/hardware-sdk/concepts/common-params)

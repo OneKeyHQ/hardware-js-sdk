@@ -1,0 +1,156 @@
+{
+  "source": "github.com/OneKeyHQ/hardware-js-sdk/releases",
+  "updatedAt": "2026-09-06",
+  "hardware": [
+    {
+      "version": "v1.2.1",
+      "date": "2026-08-25",
+      "type": "patch",
+      "curated": true,
+      "changes": {
+        "en": [
+          "Latest stable npm line (`@onekeyfe/hd-core@1.2.1`)",
+          "Harden Protocol V2 BLE firmware-install completion after reboot",
+          "Same public API as 1.2.0: V1/V2 auto-detect, openWalletSession, getDeviceState, firmwareUpdateV4"
+        ],
+        "zh": [
+          "当前 npm 稳定线（`@onekeyfe/hd-core@1.2.1`）",
+          "加固 Protocol V2 BLE 固件安装在重启后的完成判定",
+          "公开 API 与 1.2.0 相同：V1/V2 自动识别、openWalletSession、getDeviceState、firmwareUpdateV4"
+        ]
+      }
+    },
+    {
+      "version": "v1.2.0",
+      "date": "2026-08-25",
+      "type": "major",
+      "curated": true,
+      "changes": {
+        "en": [
+          "Stable Protocol V2 line for OneKey Pro 2 and Neo; Classic / Mini / Touch / Pro stay on Protocol V1",
+          "Public wallet entry openWalletSession({ mode }) for standard and select-hidden",
+          "Unified getDeviceState() snapshot across V1/V2; getFeatures() remains compatibility",
+          "firmwareUpdateV4 for Pro 2 / Neo multi-component firmware and resource ZIP updates",
+          "BLE reconnect, wallet-session recovery, and firmware-install polling hardened for Protocol V2"
+        ],
+        "zh": [
+          "稳定的 Protocol V2 线：OneKey Pro 2 / Neo；Classic / Mini / Touch / Pro 继续走 Protocol V1",
+          "公开开钱包入口 openWalletSession({ mode })：standard / select-hidden",
+          "V1/V2 统一 getDeviceState()；getFeatures() 仍作兼容",
+          "Pro 2 / Neo 使用 firmwareUpdateV4 做多组件固件和资源 ZIP 升级",
+          "Protocol V2 的 BLE 重连、钱包会话恢复和固件安装轮询加固"
+        ]
+      }
+    },
+    {
+      "version": "v1.1.21",
+      "date": "2025-12-24",
+      "type": "patch",
+      "curated": true,
+      "changes": {
+        "en": [
+          "Fixed iOS and extension firmware exchange issues",
+          "Improved getFeature retry mechanism during exchange",
+          "Updated firmware switch tips for better UX"
+        ],
+        "zh": [
+          "修复 iOS 和扩展程序的固件交换问题",
+          "改进交换过程中的 getFeature 重试机制",
+          "优化固件切换提示，提升用户体验"
+        ]
+      }
+    },
+    {
+      "version": "v1.1.20",
+      "date": "2025-12-19",
+      "type": "minor",
+      "curated": true,
+      "changes": {
+        "en": [
+          "Added configFetcher setting for custom configuration",
+          "Fixed desktop-web transport in Electron",
+          "Optimized error handling and reporting",
+          "Support for connect-only mode"
+        ],
+        "zh": [
+          "新增 configFetcher 设置，支持自定义配置",
+          "修复 Electron 中的 desktop-web 传输问题",
+          "优化错误处理和报告机制",
+          "支持仅连接模式"
+        ]
+      }
+    },
+    {
+      "version": "v1.1.19",
+      "date": "2025-12-01",
+      "type": "minor",
+      "curated": true,
+      "changes": {
+        "en": [
+          "Added Bitcoin-only firmware support",
+          "New Tron features integration",
+          "WebUSB retry mechanism with 5 attempts",
+          "Fixed skipWebDevicePrompt in web environment",
+          "Improved check update functionality"
+        ],
+        "zh": [
+          "支持 Bitcoin-only 固件",
+          "集成 Tron 新功能",
+          "WebUSB 重试机制支持 5 次尝试",
+          "修复 Web 环境中的 skipWebDevicePrompt",
+          "改进检查更新功能"
+        ]
+      }
+    },
+    {
+      "version": "v1.1.18",
+      "date": "2025-11-21",
+      "type": "patch",
+      "curated": true,
+      "changes": {
+        "en": [
+          "Fixed desktop Bluetooth connectivity issues"
+        ],
+        "zh": [
+          "修复桌面端蓝牙连接问题"
+        ]
+      }
+    },
+    {
+      "version": "v1.1.17",
+      "date": "2025-11-11",
+      "type": "minor",
+      "curated": true,
+      "changes": {
+        "en": [
+          "Added React Native BLE demo support",
+          "Fixed Classic1s signTypedData for larger data",
+          "Improved bridge status check deletion",
+          "Cleaned up unused BLE SDK logs"
+        ],
+        "zh": [
+          "新增 React Native BLE 演示支持",
+          "修复 Classic1s 大数据 signTypedData 问题",
+          "改进桥接状态检查删除逻辑",
+          "清理未使用的 BLE SDK 日志"
+        ]
+      }
+    },
+    {
+      "version": "v1.1.16",
+      "date": "2025-10-29",
+      "type": "patch",
+      "curated": true,
+      "changes": {
+        "en": [
+          "Performance optimizations",
+          "Minor bug fixes"
+        ],
+        "zh": [
+          "性能优化",
+          "小问题修复"
+        ]
+      }
+    }
+  ]
+}

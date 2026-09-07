@@ -1,0 +1,65 @@
+---
+title: Get Device State
+---
+
+# Get Device State
+
+Read the unified V1 / V2 device snapshot. Use this instead of deprecated [`getFeatures`](/en/hardware-sdk/basic-api/get-features).
+
+`getFeatures()` still runs on Protocol V1 only. Pro 2 and Neo must call `getDeviceState()` and read `payload.identity.deviceId`. For firmware/version fields use `scope: 'firmware'` instead of `getOnekeyFeatures`.
+
+```ts
+const res = await HardwareSDK.getDeviceState(connectId);
+```
+
+### Params
+
+[Optional common params](/en/hardware-sdk/concepts/common-params)
+
+| Param | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `scope` | `'runtime' \| 'settings' \| 'firmware'` | No | Defaults to `'runtime'`. Scope only chooses which partitions this read refreshes; the payload is still a full snapshot |
+
+- `runtime` — live lock / PIN / passphrase status (V1 `GetFeatures`, V2 `DeviceStatusGet` in application mode)
+- `settings` — also refresh settings
+- `firmware` — also refresh identity, versions, and verification info
+
+Bootloader / romloader skips unsupported status commands and returns whatever snapshot is available.
+
+### Result
+
+```ts
+{
+  success: true,
+  payload: {
+    protocol: 'V1' | 'V2',
+    identity: {
+      deviceId: string | null, // seed lifetime — pass as the second SDK argument
+      serialNo: string,
+      deviceType: string,
+      // ...
+    },
+    status: { initialized, unlocked, passphraseProtection, attachToPinEnabled, ... },
+    settings: { language, airgapMode, ... },
+    versions: { firmware, bootloader, ble, applicationP1, applicationP2, ... },
+  }
+}
+```
+
+Read `payload.identity.deviceId` for the second argument of signing calls. Do not persist firmware `session_id` from compatibility Features.
+
+The payload does **not** include firmware wallet `session_id` or raw protocol messages. Wallet identity comes from [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session).
+
+### Error
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code: number,
+  }
+}
+```
+
+See [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol).

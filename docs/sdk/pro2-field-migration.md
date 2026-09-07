@@ -326,7 +326,7 @@ If the cached session is invalid:
 
 1. Firmware may return `DeviceSessionError_InvalidSession=2`, or it may return the final actual session.
 2. Core clears the invalid handle, or finds that the returned `btc_test_address` does not match the expected one.
-3. Pro2 public `openWalletSession({ mode: 'resume-hidden' })` re-completes
+3. Pro2 later methods that carry `passphraseState` re-complete
    PIN/Passphrase/Attach PIN selection in the same call, then verifies `passphraseState` again; it fails only on a final mismatch.
 4. SDK-internal signing retries that require no interaction still use strict resume. On invalidation they return
    `WalletSessionInvalid` directly and do not pop wallet selection.
@@ -341,7 +341,7 @@ The SDK does not register callable raw Session APIs. Integrators cannot bypass t
 
 Apps must not call raw Session requests directly. Existing Apps may continue to call public
 `getPassphraseState()`, and Core will map it to the new protocol on Pro2. New code should prefer
-`openWalletSession()` with `standard/select-hidden/resume-hidden` to express intent explicitly.
+`openWalletSession()` with `standard/select-hidden` to express intent explicitly. Resume a bound hidden wallet by passing `passphraseState` on later methods.
 `openWalletSession()` must take an explicit `mode` and does not accept the old
 `useEmptyPassphrase/initSession` parameters. Old calls remain compatible through `getPassphraseState()`.
 

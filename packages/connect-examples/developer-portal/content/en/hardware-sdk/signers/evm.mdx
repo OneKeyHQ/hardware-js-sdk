@@ -41,8 +41,9 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
-const [{ connectId }] = await HardwareSDK.searchDevices();
-const deviceId = (await HardwareSDK.getFeatures(connectId)).payload?.device_id;
+const devices = await HardwareSDK.searchDevices();
+const { connectId } = devices.payload[0];
+const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
 ```
 
 ## Common scenarios
@@ -81,7 +82,7 @@ const { success, payload } = await HardwareSDK.evmSignTransaction(connectId, dev
   path: "m/44'/60'/0'/0/0",
   transaction: tx,
   chainId: 1,
-  keepSession: true,
+  useEmptyPassphrase: true,
   domain: 'ens.example', // optional
 });
 // payload: { v, r, s }
@@ -94,7 +95,7 @@ const { success, payload } = await HardwareSDK.evmSignTransaction(connectId, dev
   - 1559: `to` `value` `data` `nonce` `gasLimit` `maxFeePerGas` `maxPriorityFeePerGas` `chainId` `type: 2`
   - Legacy: `to` `value` `data` `nonce` `gasLimit` `gasPrice` `chainId`
 - `chainId`: required.
-- `keepSession?`: optional; reuse session for multiple calls.
+- `useEmptyPassphrase?`: optional; force the standard wallet. Hidden wallet: pass `passphraseState` from `openWalletSession`.
 - `domain?`: optional; domain label (e.g., ENS) for device display.
 
 **Returns**
@@ -174,7 +175,7 @@ Promise<{ success, payload: { signature } }>
 
 - APIs resolve when the operation finishes; user prompts are surfaced via `UI_REQUEST` events.
 - Common prompts: unlock device, open EVM app, verify address, sign transaction, sign personal message, sign typed data.
-- For repeated calls, use `keepSession` to reduce PIN/passphrase prompts; run calls serially per device.
+- For repeated calls, serialize per device and reuse `passphraseState` (or `useEmptyPassphrase: true`). `keepSession` still holds the transport; it is not a wallet binding.
 
 ## Examples
 
@@ -186,8 +187,9 @@ import { serialize, TransactionTypes } from '@ethersproject/transactions';
 
 await HardwareSDK.init({ env: 'webusb', debug: false });
 
-const [{ connectId }] = await HardwareSDK.searchDevices();
-const deviceId = (await HardwareSDK.getFeatures(connectId)).payload?.device_id;
+const devices = await HardwareSDK.searchDevices();
+const { connectId } = devices.payload[0];
+const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
 
 HardwareSDK.on(UI_REQUEST.REQUEST_PIN, () => {
   // Prompt PIN (prefer on-device); then call uiResponse if needed
@@ -211,7 +213,7 @@ const { success, payload: sig } = await HardwareSDK.evmSignTransaction(connectId
   path: accountPath,
   transaction: tx,
   chainId: 1,
-  keepSession: true,
+  useEmptyPassphrase: true,
 });
 
 const rawTx = serialize({ ...tx, type: TransactionTypes.eip1559 }, {
@@ -309,6 +311,6 @@ const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
   - Path mismatch: default `m/44'/60'/0'/0/0`, increment account/address as needed; confirm once with `showOnOneKey`.
 - ChainId mismatch: must match the target network.
 - Large `data` may be rejected; simplify if necessary.
-- Repeated passphrase prompts: combine `keepSession` with passphrase state and serialize calls per device.
+- Repeated passphrase prompts: call `openWalletSession` once, then pass `passphraseState` on later calls. Serialize per device. `keepSession` still holds the transport; it is not a wallet binding.
 - User reject/timeout: surface retry/cancel; do not auto-replay.
 See chain docs: [evmSignTransaction](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction) · [evmSignMessage](/en/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) · [evmSignTypedData](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata).

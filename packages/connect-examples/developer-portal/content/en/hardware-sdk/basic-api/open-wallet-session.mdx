@@ -1,0 +1,60 @@
+---
+title: Open Wallet Session
+---
+
+# Open Wallet Session
+
+Unified Protocol V1 / V2 entry to open the standard wallet or let the user select a hidden wallet.
+
+Use this instead of deprecated [`getPassphraseState`](/en/hardware-sdk/basic-api/get-passphrase-state). Address and signing calls still take `deviceId` + `passphraseState` and should not reopen a session every time. There is no `resume-hidden` mode. Core already resumes inside the first later method that carries `passphraseState`.
+
+See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session) for the contract.
+
+```ts
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
+
+const res = await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.Standard,
+});
+```
+
+### Params
+
+[Optional common params](/en/hardware-sdk/concepts/common-params)
+
+Do not combine `mode` with `useEmptyPassphrase` or `initSession` on this call.
+
+| Param | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `mode` | `'standard' \| 'select-hidden'` | Yes | Use `OpenWalletSessionMode` from `@onekeyfe/hd-core` |
+
+### Result
+
+```ts
+{
+  success: true,
+  payload: {
+    protocol: 'V1' | 'V2',
+    deviceId: string,
+    resumed: boolean,
+    walletType: 'standard' | 'hidden',
+    passphraseState: string | null, // null on standard wallet
+  }
+}
+```
+
+Persist `deviceId`, `walletType`, and `passphraseState`. The firmware `session_id` is not returned.
+
+### Error
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code: number,
+  }
+}
+```
+
+`mode: 'resume-hidden'` and `deviceId` / `passphraseState` on this call return `CallMethodInvalidParameter`. Resume a bound hidden wallet by passing `passphraseState` on the next address / sign method. `DeviceCheckUnlockTypeError` means the current PIN / Attach-to-PIN context cannot reach the requested wallet.

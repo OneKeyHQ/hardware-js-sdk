@@ -123,13 +123,13 @@ export async function setupBle() {
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 
-// BLE 返回 id + name；获取 features 以获得 device_id
+// BLE 返回 id + name；用 getDeviceState 读 identity
 const candidate = devices.payload[0];
 const connectId = candidate.connectId;
 
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
-const deviceId = features.payload.device_id;
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
 ```
 
 保存 `connectId` 和 `deviceId`（大多数链 API 都需要两者）。
@@ -159,5 +159,5 @@ if (res.success) {
 ## 继续
 
 - [简介](/zh/hardware-sdk)
-- [错误码](/zh/hardware-sdk/core-api-guide#error-codes)、[通用参数](/zh/hardware-sdk/core-api-guide#common-params)
+- [错误码](/zh/hardware-sdk/core-api-guide#error-codes)、[通用参数](/zh/hardware-sdk/concepts/common-params)
 - 协议帧（64 字节，仅供参考）：[见底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin#消息协议包含在底层传输中)

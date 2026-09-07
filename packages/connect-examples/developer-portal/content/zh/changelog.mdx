@@ -10,70 +10,14 @@ theme:
 ---
 
 import { Package, GitBranch, Tag, ExternalLink, Cpu, Globe, ChevronRight, Calendar } from 'lucide-react'
+import hardwareSdkReleaseData from '../../data/hardware-sdk-releases.json'
 
-export const HardwareSDKReleases = [
-  {
-    version: 'v1.1.21',
-    date: '2024-12-24',
-    type: 'patch',
-    changes: [
-      '修复 iOS 和扩展程序的固件交换问题',
-      '改进交换过程中的 getFeature 重试机制',
-      '优化固件切换提示，提升用户体验'
-    ]
-  },
-  {
-    version: 'v1.1.20',
-    date: '2024-12-19',
-    type: 'minor',
-    changes: [
-      '新增 configFetcher 设置，支持自定义配置',
-      '修复 Electron 中的 desktop-web 传输问题',
-      '优化错误处理和报告机制',
-      '支持仅连接模式'
-    ]
-  },
-  {
-    version: 'v1.1.19',
-    date: '2024-12-01',
-    type: 'minor',
-    changes: [
-      '支持 Bitcoin-only 固件',
-      '集成 Tron 新功能',
-      'WebUSB 重试机制支持 5 次尝试',
-      '修复 Web 环境中的 skipWebDevicePrompt',
-      '改进检查更新功能'
-    ]
-  },
-  {
-    version: 'v1.1.18',
-    date: '2024-11-21',
-    type: 'patch',
-    changes: [
-      '修复桌面端蓝牙连接问题'
-    ]
-  },
-  {
-    version: 'v1.1.17',
-    date: '2024-11-11',
-    type: 'minor',
-    changes: [
-      '新增 React Native BLE 演示支持',
-      '修复 Classic1s 大数据 signTypedData 问题',
-      '改进桥接状态检查删除逻辑',
-      '清理未使用的 BLE SDK 日志'
-    ]
-  },
-  {
-    version: 'v1.1.16',
-    date: '2024-10-29',
-    type: 'patch',
-    changes: [
-      '性能优化',
-      '修复若干小问题'
-    ]
-  }
-]
+export const HardwareSDKReleases = hardwareSdkReleaseData.hardware.map(entry => ({
+  version: entry.version,
+  date: entry.date,
+  type: entry.type,
+  changes: entry.changes.zh || entry.changes.en,
+}))
 
 export const ProviderReleases = [
   {

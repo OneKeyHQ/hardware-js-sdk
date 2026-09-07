@@ -1,7 +1,7 @@
 export const BatchWalletMode = {
   Standard: 'standard',
   SelectHidden: 'select-hidden',
-  ResumeHidden: 'resume-hidden',
+  KnownHidden: 'known-hidden',
 } as const;
 
 export type BatchWalletModeValue = (typeof BatchWalletMode)[keyof typeof BatchWalletMode];
@@ -20,10 +20,10 @@ function normalizePassphraseState(value?: string): string | undefined {
 
 export function getBatchWalletSelectionError(selection: BatchWalletSelection): string | null {
   if (
-    selection.mode === BatchWalletMode.ResumeHidden &&
+    selection.mode === BatchWalletMode.KnownHidden &&
     !normalizePassphraseState(selection.passphraseState)
   ) {
-    return 'Enter a passphraseState to resume a hidden wallet.';
+    return 'Enter a passphraseState to reuse a hidden wallet.';
   }
 
   return null;

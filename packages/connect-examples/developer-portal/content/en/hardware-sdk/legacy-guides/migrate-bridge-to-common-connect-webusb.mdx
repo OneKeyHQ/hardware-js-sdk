@@ -22,7 +22,7 @@ Migrate from Bridge to WebUSB and switch SDK entry to `@onekeyfe/hd-common-conne
 - Permission flow: call `navigator.usb.requestDevice()` (must be triggered by a user gesture) with the official filter `ONEKEY_WEBUSB_FILTER`
 - Event system: use `@onekeyfe/hd-core` `UI_EVENT / DEVICE` events for user interaction (PIN/Passphrase, etc.)
 - Bridge-specific logic removed: drop `checkBridgeStatus()` and all Bridge checks/prompts
-- Business APIs mostly unchanged: e.g., `searchDevices / getFeatures / btcGetAddress`
+- Business APIs mostly unchanged: e.g., `searchDevices / getDeviceState / btcGetAddress`
 
 ---
 
@@ -118,10 +118,10 @@ const list = await HardwareSDK.searchDevices();
 if (!list.success) throw new Error(list.payload.error);
 const { connectId, deviceId } = list.payload[0] ?? {};
 
-// 2) (Optional) Confirm device_id
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
-const resolvedDeviceId = features.payload.device_id ?? deviceId;
+// 2) Confirm deviceId
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const resolvedDeviceId = state.payload.identity.deviceId ?? deviceId;
 
 // 3) Example: get a BTC address
 const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
@@ -165,4 +165,4 @@ if (r.success) {
 
 - WebUSB deep dive and full example: [WebUSB Connection Guide](/en/hardware-sdk/transport/web-usb)
 - Events and interactions: [Config Event](/en/hardware-sdk/core-api-guide#events-ui)
-- API references and params: [Hardware SDK API References](/en/hardware-sdk/core-api-guide), [Common Params](/en/hardware-sdk/core-api-guide#common-params), [Error Codes](/en/hardware-sdk/core-api-guide#error-codes)
+- API references and params: [Hardware SDK API References](/en/hardware-sdk/core-api-guide), [Common Params](/en/hardware-sdk/concepts/common-params), [Error Codes](/en/hardware-sdk/core-api-guide#error-codes)
