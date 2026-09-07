@@ -798,6 +798,26 @@ describe('public device lifecycle events', () => {
     expect(cancel).toHaveBeenCalledTimes(1);
   });
 
+  test.each(['V1', 'V2'] as const)(
+    'disconnects and resolves when Protocol %s cancellation cleanup fails',
+    async protocol => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      const device = createInitializedDevice(protocol);
+      const cleanupError = new Error('cancel cleanup failed');
+      const cancel = jest.fn().mockRejectedValue(cleanupError);
+      const disconnect = jest.fn().mockResolvedValue(undefined);
+      device.deviceConnector = { disconnect } as never;
+      device.commands = { cancel } as never;
+      (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+
+      await expect(device.interruptionFromUser()).resolves.toBeUndefined();
+
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(disconnect).toHaveBeenCalledWith(device.mainId);
+      expect(device.hasDeviceAcquire()).toBe(false);
+    }
+  );
+
   test('does not finish acquire after the user already cancelled', async () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
     const device = createInitializedDevice('V2');

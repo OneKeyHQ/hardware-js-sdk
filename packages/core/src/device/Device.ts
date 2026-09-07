@@ -1614,23 +1614,34 @@ export class Device extends EventEmitter {
     const sendFallbackCancel = this.shouldSendFallbackProtocolCancel();
     const acquired = this.hasDeviceAcquire();
     const promise = (async () => {
-      if (cancelableAction) {
-        await cancelableAction(error);
-      } else if (sendFallbackCancel) {
-        await commands?.cancelDevice?.().catch(cancelError => {
-          Log.debug('Protocol V2 fallback cancel error', cancelError);
-        });
-      } else if (!acquired) {
-        // Abort setup without acquiring a session just to send Cancel.
+      try {
+        if (cancelableAction) {
+          await cancelableAction(error);
+        } else if (sendFallbackCancel) {
+          await commands?.cancelDevice?.().catch(cancelError => {
+            Log.debug('Protocol V2 fallback cancel error', cancelError);
+          });
+        } else if (!acquired) {
+          // Abort setup without acquiring a session just to send Cancel.
+          if (mainId && deviceConnector?.disconnect) {
+            await deviceConnector.disconnect(mainId);
+          }
+          if (this.connectionAttempt === attempt) this.markTransportDisconnected();
+        }
+        await commands?.cancel();
+      } catch (cleanupError) {
+        Log.warn('User cancellation cleanup failed; disconnecting device', cleanupError);
         if (mainId && deviceConnector?.disconnect) {
-          await deviceConnector.disconnect(mainId);
+          await deviceConnector.disconnect(mainId).catch(disconnectError => {
+            Log.debug('User cancellation fallback disconnect failed', disconnectError);
+          });
         }
         if (this.connectionAttempt === attempt) this.markTransportDisconnected();
+      } finally {
+        runPromise?.reject(error);
+        if (this.runPromise === runPromise) this.runPromise = null;
+        await cleanupPromise?.catch(() => undefined);
       }
-      await commands?.cancel();
-      runPromise?.reject(error);
-      if (this.runPromise === runPromise) this.runPromise = null;
-      await cleanupPromise?.catch(() => undefined);
     })();
     // Keep the settled promise for this attempt so a duplicate close/finally
     // cannot send a second wire Cancel. A new attempt gets its own cleanup.
