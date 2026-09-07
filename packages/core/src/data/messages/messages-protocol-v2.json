@@ -11483,6 +11483,7 @@
         "MessageType_DeviceFindMyTokenState": 60450,
         "MessageType_DeviceFindMyTokenUpdate": 60451,
         "MessageType_DeviceFindMyTokenStateGet": 60452,
+        "MessageType_DeviceAnimationControl": 60461,
         "MessageType_DeviceInfoGet": 60600,
         "MessageType_DeviceInfo": 60601,
         "MessageType_DeviceStatusGet": 60602,
@@ -11803,6 +11804,26 @@
           "rule": "required",
           "type": "bool",
           "id": 1
+        }
+      }
+    },
+    "DeviceAnimationAction": {
+      "values": {
+        "AnimationAction_Unknown": 0,
+        "AnimationAction_Start": 1,
+        "AnimationAction_Stop": 2
+      }
+    },
+    "DeviceAnimationControl": {
+      "fields": {
+        "action": {
+          "rule": "required",
+          "type": "DeviceAnimationAction",
+          "id": 1
+        },
+        "timeout_ms": {
+          "type": "uint32",
+          "id": 2
         }
       }
     },

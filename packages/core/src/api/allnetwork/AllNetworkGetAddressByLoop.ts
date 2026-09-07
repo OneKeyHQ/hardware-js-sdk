@@ -28,6 +28,7 @@ export default class AllNetworkGetAddressByLoop extends AllNetworkGetAddressBase
     const bundle = this.payload.bundle || [this.payload];
 
     // process callbacks in background
+    this.loadingCleanupInBackground = true;
     const callbackPromise = this.processCallbacksInBackground(
       bundle,
       rootFingerprint,
@@ -95,6 +96,7 @@ export default class AllNetworkGetAddressByLoop extends AllNetworkGetAddressBase
         data: allResults,
       });
     } catch (error: any) {
+      await this.stopAllNetworkLoading(false);
       let errorCode = error.errorCode || error.code;
       let errorMessage = error.message;
 
@@ -121,6 +123,7 @@ export default class AllNetworkGetAddressByLoop extends AllNetworkGetAddressBase
         },
       });
     } finally {
+      await this.stopAllNetworkLoading();
       this.context?.cancelCallbackTasks(this.payload.connectId);
       this.abortController = null;
     }
