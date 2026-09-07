@@ -1,7 +1,6 @@
 import { useMDXComponents as getDocsMDXComponents } from 'nextra-theme-docs'
 import { AgentWalletDisclaimer } from './components/AgentWalletBetaTitle.js'
 import MdxImage from './components/MdxImage.jsx'
-import { DocFlow } from './components/DocFlow.jsx'
 
 const docsComponents = getDocsMDXComponents()
 const docsWrapper = docsComponents.wrapper
@@ -9,7 +8,6 @@ const docsWrapper = docsComponents.wrapper
 export function useMDXComponents(components) {
   return {
     ...docsComponents,
-    DocFlow,
     img: MdxImage,
     wrapper: (props) => {
       const filePath = props?.metadata?.filePath || ''

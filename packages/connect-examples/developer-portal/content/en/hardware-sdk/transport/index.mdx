@@ -17,7 +17,13 @@ Hardware SDK 1.2.0 uses one JavaScript API. `init({ env })` selects the **transp
 
 USB covers every OneKey device. BLE is Pro, Pro 2, Neo, Touch, Classic 1s / Pure — **not Mini**. Air-Gap QR is a separate product path: [Air-Gap](/en/air-gap).
 
-<DocFlow variant="transport" locale="en" />
+```mermaid
+flowchart TB
+  App["Your app"] --> SDK["HardwareSDK"]
+  SDK --> Transport["Transport: USB / BLE / low-level"]
+  Transport --> Protocol["Protocol V1 or V2 — live probe"]
+  Protocol --> Device["Device"]
+```
 
 ## Transport is not the protocol
 

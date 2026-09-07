@@ -34,7 +34,13 @@ USB integrations should use `@onekeyfe/hd-common-connect-sdk`; use `@onekeyfe/hd
 | iOS (Native) | BLE | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [iOS BLE](/en/hardware-sdk/transport/ios) |
 | Flutter | BLE | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [Flutter BLE](/en/hardware-sdk/transport/flutter) |
 
-<DocFlow variant="transport" locale="en" />
+```mermaid
+flowchart TB
+  App["Your app"] --> SDK["HardwareSDK"]
+  SDK --> Transport["Transport: USB / BLE / low-level"]
+  Transport --> Protocol["Protocol V1 or V2 — live probe"]
+  Protocol --> Device["Device"]
+```
 
 Low-level protocol and custom channels: [Low-Level Transport Plugin & Protocol](/en/hardware-sdk/concepts/low-level-plugin)
 

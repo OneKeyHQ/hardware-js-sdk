@@ -34,7 +34,13 @@ USB 场景一律推荐 `@onekeyfe/hd-common-connect-sdk`。`@onekeyfe/hd-web-sdk
 | iOS（原生） | 蓝牙 | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [iOS 蓝牙](/zh/hardware-sdk/transport/ios) |
 | Flutter | 蓝牙 | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [Flutter 蓝牙](/zh/hardware-sdk/transport/flutter) |
 
-<DocFlow variant="transport" locale="zh" />
+```mermaid
+flowchart TB
+  App["你的应用"] --> SDK["HardwareSDK"]
+  SDK --> Transport["传输：USB / BLE / 底层插件"]
+  Transport --> Protocol["协议 V1 或 V2 — 现场探测"]
+  Protocol --> Device["设备"]
+```
 
 低层协议与自定义通道参考：[底层传输插件与协议](/zh/hardware-sdk/concepts/low-level-plugin)
 

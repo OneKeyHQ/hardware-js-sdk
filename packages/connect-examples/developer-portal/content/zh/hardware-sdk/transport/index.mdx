@@ -17,7 +17,13 @@ Hardware SDK 1.2.0 是同一套 JavaScript API。`init({ env })` 选的是**传�
 
 USB 覆盖全部 OneKey 设备。BLE 是 Pro、Pro 2、Neo、Touch、Classic 1s / Pure —— **Mini 没有**。二维码 Air-Gap 是另一条产品路径：[Air-Gap](/zh/air-gap)。
 
-<DocFlow variant="transport" locale="zh" />
+```mermaid
+flowchart TB
+  App["你的应用"] --> SDK["HardwareSDK"]
+  SDK --> Transport["传输：USB / BLE / 底层插件"]
+  Transport --> Protocol["协议 V1 或 V2 — 现场探测"]
+  Protocol --> Device["设备"]
+```
 
 ## 传输不是协议
 
