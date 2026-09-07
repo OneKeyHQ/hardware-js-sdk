@@ -4,6 +4,22 @@ OneKey Hardware JS SDK is a TypeScript monorepo for integrating OneKey and suppo
 hardware wallets across browser, desktop, React Native, Node.js, bridge, low-level, and emulator
 environments.
 
+Hardware SDK **1.2.x** speaks Protocol V1 (Classic / Mini / Touch / Pro) and Protocol V2
+(Pro 2 / Neo) through the **same JavaScript API**. The SDK detects the protocol from the live
+device. Do not branch on USB PID, BLE name, or product string.
+
+## Integrate
+
+| Runtime | Package |
+| ------- | ------- |
+| Web / desktop WebUSB | [`@onekeyfe/hd-common-connect-sdk`](./packages/hd-common-connect-sdk) |
+| React Native BLE | [`@onekeyfe/hd-ble-sdk`](./packages/hd-ble-sdk) |
+| Browser iframe host | [`@onekeyfe/hd-web-sdk`](./packages/hd-web-sdk) — omit `connectSrc` so the installed version fills `https://jssdk.onekey.so/<installed>/` |
+
+Android / iOS / Flutter native bridges use `@onekeyfe/hd-common-connect-sdk` with `env: 'lowlevel'`.
+
+First address, devices, chain support, and wallet sessions: [Getting Started](https://developer.onekey.so/en/hardware-sdk/getting-started).
+
 ## Package families
 
 ### OneKey `hd-*` stack
@@ -42,16 +58,17 @@ architecture boundary.
 
 ## Documentation
 
-- [Developer documentation](https://developer.onekey.so/en/hardware-sdk/getting-started):
-  integration and public API guidance.
-- [Internal documentation index](./docs/README.md): architecture, protocol, device, SDK, business,
-  design, testing, and maintenance facts.
-- [Agent instructions](./AGENTS.md): repository-wide engineering and safety rules.
-- [Agent workflow maintenance](./docs/maintenance/agent-workflow.md): how instructions, skills,
-  commands, and validation fit together.
+| Surface | Reader | Job |
+| ------- | ------ | --- |
+| [Developer portal](https://developer.onekey.so/en/hardware-sdk/getting-started) | Wallet / dApp / native hosts | Public contract: install, connect, call, ship |
+| [`docs/`](./docs/README.md) | SDK maintainers | Architecture, protocol, device, and maintenance internals |
+| Package README | npm / GitHub package consumers | Install and local-dev pointer for that package |
+| [`AGENTS.md`](./AGENTS.md) | Agents working in this repo | Engineering and safety rules |
 
-Package-specific integration details remain in each package README. Historical plans are retained
-in Git, commits, issues, and pull requests rather than treated as current technical facts.
+Do not copy Core/Transport internals into the portal. Historical plans stay in Git, commits,
+issues, and pull requests rather than treated as current technical facts.
+
+Agent workflow: [docs/maintenance/agent-workflow.md](./docs/maintenance/agent-workflow.md).
 
 ## Setup
 
