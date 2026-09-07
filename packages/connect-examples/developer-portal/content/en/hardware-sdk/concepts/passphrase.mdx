@@ -22,14 +22,16 @@ Rules and best practices for handling passphrases (hidden wallets).
 | Mini | Yes | Yes |
 | Touch | Yes (touch keyboard) | Yes |
 | Pro | Yes (touch keyboard) | Yes |
+| Pro 2 | Yes | Yes |
+| Neo | Yes | Yes |
 
-All OneKey devices support passphrase and session caching (`passphraseState`).
+All OneKey devices support passphrase. Persist `deviceId + passphraseState`, not firmware `session_id`.
 
 ## Interaction flow
 
-### Proactive strategy (recommended)
+Hardware SDK 1.2.x: `searchDevices` → `getDeviceState` → `openWalletSession` → address / sign with `deviceId` + `passphraseState` (or `useEmptyPassphrase: true`). Subscribe to `UI_EVENT` before opening a wallet. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
 
-The simplest approach — explicitly choose the standard wallet to avoid accidental hidden wallet prompts.
+### Standard wallet
 
 ```mermaid
 sequenceDiagram
@@ -37,22 +39,32 @@ sequenceDiagram
     participant SDK
     participant Device
 
+    App->>SDK: getDeviceState(connectId)
+    SDK-->>App: identity.deviceId
+    App->>SDK: openWalletSession({ mode: standard })
+    SDK->>Device: Open standard wallet
+    Device-->>SDK: Ready
+    SDK-->>App: deviceId, walletType standard
     App->>SDK: evmGetAddress(..., useEmptyPassphrase: true)
-    SDK->>Device: Initialize session (empty passphrase)
-    Device-->>SDK: Session ready
-    SDK-->>App: { address, path }
+    SDK->>Device: Derive on standard wallet
+    Device-->>SDK: Address
+    SDK-->>App: { address }
 ```
 
 ```ts
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+
+await HardwareSDK.openWalletSession(connectId, { mode: 'standard' });
+
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
-  path: "m/44'/60'/0'",
+  path: "m/44'/60'/0'/0/0",
   useEmptyPassphrase: true,
 });
 ```
 
-### Reactive strategy (event-driven)
-
-Listen for the passphrase request event and let the user choose input method.
+### Hidden wallet (open once, reuse fingerprint)
 
 ```mermaid
 sequenceDiagram
@@ -60,82 +72,61 @@ sequenceDiagram
     participant SDK
     participant Device
 
-    App->>SDK: evmGetAddress(...)
-    SDK->>Device: Initialize session
+    App->>SDK: openWalletSession({ mode: select-hidden })
+    SDK->>Device: Select hidden wallet
     Device-->>SDK: REQUEST_PASSPHRASE
     SDK-->>App: UI_REQUEST.REQUEST_PASSPHRASE
-    Note over App: Show passphrase dialog<br/>(on-device or software input)
+    Note over App: On-device or software input
     App->>SDK: uiResponse(passphrase)
-    SDK->>Device: Send passphrase
-    Device-->>SDK: Session ready
-    SDK-->>App: { address, path }
-```
-
-```ts
-// Option A: On-device input
-HardwareSDK.uiResponse({
-  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-  payload: { passphraseOnDevice: true, value: '' },
-});
-
-// Option B: Software input (optionally cache for this session)
-HardwareSDK.uiResponse({
-  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-  payload: { value: userInput, passphraseOnDevice: false, save: true },
-});
-```
-
-### Hidden wallet with session caching
-
-Preferred path: [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session), then pass `passphraseState` on later calls. The `getPassphraseState` flow below is **deprecated** and kept for existing apps.
-
-Reduce repeated passphrase prompts across multiple calls.
-
-```mermaid
-sequenceDiagram
-    participant App
-    participant SDK
-    participant Device
-
-    App->>SDK: getPassphraseState(connectId)
-    SDK->>Device: Prompt passphrase (once)
-    Device-->>SDK: passphraseState
-    SDK-->>App: passphraseState = "abc"
-
-    Note over App: Subsequent calls use cached state
-
-    App->>SDK: evmGetAddress(..., passphraseState, initSession)
-    SDK->>Device: Reuse session (no prompt)
-    Device-->>SDK: Result
+    SDK->>Device: Confirm hidden wallet
+    Device-->>SDK: Ready
+    SDK-->>App: deviceId + passphraseState
+    Note over App: Persist deviceId + passphraseState only
+    App->>SDK: evmGetAddress(..., passphraseState)
+    SDK->>Device: Same hidden wallet
     SDK-->>App: { address }
-
     App->>SDK: btcGetAddress(..., passphraseState)
-    SDK->>Device: Reuse session (no prompt)
-    Device-->>SDK: Result
+    SDK->>Device: Same hidden wallet, no new prompt
     SDK-->>App: { address }
 ```
 
 ```ts
-// Step 1: Get passphrase state (prompts user once)
-const state = await HardwareSDK.getPassphraseState(connectId);
-const passphraseState = state.payload;
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
-// Step 2: Use passphraseState in subsequent calls (no more prompts)
-const commonParams = {
-  initSession: true,
-  passphraseState,
-};
+HardwareSDK.on(UI_EVENT, async (message) => {
+  if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
+    await HardwareSDK.uiResponse({
+      type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+      payload: { passphraseOnDevice: true, value: '' },
+    });
+  }
+});
+
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: 'select-hidden',
+});
+const deviceId = opened.payload.deviceId;
+const passphraseState = opened.payload.passphraseState;
 
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
-  ...commonParams,
+  passphraseState,
 });
-
 await HardwareSDK.btcGetAddress(connectId, deviceId, {
   path: "m/84'/0'/0'/0/0",
   coin: 'btc',
-  ...commonParams,
+  passphraseState,
 });
+```
+
+On-device vs software passphrase input:
+
+```ts
+// On-device
+payload: { passphraseOnDevice: true, value: '' }
+
+// Software
+payload: { value: userInput, passphraseOnDevice: false, save: true }
 ```
 
 ### Cross-process reuse (CLI / scripts)

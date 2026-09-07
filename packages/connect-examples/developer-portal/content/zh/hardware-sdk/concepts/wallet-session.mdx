@@ -22,6 +22,34 @@ title: 钱包会话
 
 ## 1.2.0 推荐 API
 
+```mermaid
+sequenceDiagram
+    participant App as 应用
+    participant SDK
+    participant Device as 设备
+
+    App->>SDK: searchDevices()
+    SDK-->>App: connectId
+    App->>SDK: getDeviceState(connectId)
+    SDK-->>App: identity.deviceId
+    alt 标准钱包
+        App->>SDK: openWalletSession({ mode: standard })
+        SDK->>Device: 打开标准钱包
+        SDK-->>App: deviceId, walletType standard
+        App->>SDK: 签名/地址(..., useEmptyPassphrase: true)
+    else 选择隐藏钱包
+        App->>SDK: openWalletSession({ mode: select-hidden })
+        SDK->>Device: 用户选择隐藏钱包
+        SDK-->>App: deviceId + passphraseState
+        Note over App: 只持久化这一对
+        App->>SDK: 签名/地址(..., passphraseState)
+    else 恢复隐藏钱包
+        App->>SDK: openWalletSession({ mode: resume-hidden, deviceId, passphraseState })
+        SDK->>Device: 重新打开已绑定的隐藏钱包
+        App->>SDK: 签名/地址(..., passphraseState)
+    end
+```
+
 新接入请用 [`openWalletSession`](/zh/hardware-sdk/basic-api/open-wallet-session) 打开或切换钱包：
 
 ```ts
