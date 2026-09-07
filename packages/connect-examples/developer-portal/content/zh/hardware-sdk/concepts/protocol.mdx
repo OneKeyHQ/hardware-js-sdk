@@ -4,7 +4,15 @@ title: Protocol V1 与 V2
 
 # Protocol V1 与 V2
 
-Hardware SDK 1.2.0 在设备侧使用两套传输协议，对接入方仍然是同一套 JavaScript API。
+Hardware SDK 1.2.0 在设备侧使用两套传输协议，对接入方仍然是同一套 JavaScript API。不要用 USB PID、蓝牙名或产品字符串判断协议。
+
+```mermaid
+flowchart LR
+  App["你的应用"] --> API["同一套 HardwareSDK 方法"]
+  API --> Probe["连接后现场探测"]
+  Probe --> V1["Protocol V1"]
+  Probe --> V2["Protocol V2"]
+```
 
 | | Protocol V1 | Protocol V2 |
 | --- | --- | --- |
@@ -13,7 +21,10 @@ Hardware SDK 1.2.0 在设备侧使用两套传输协议，对接入方仍然是�
 | 公开方法 | 现有 Hardware SDK 方法 | 同样的方法，由 Core 做映射 |
 | 调用规则 | 实践上必须按设备串行 | 必须按设备串行 |
 | 固件升级 | `firmwareUpdateV2` / `firmwareUpdateV3` | `firmwareUpdateV4` |
+| 链方法 | V1+V2 系列 + 仅 V1 系列 | 只有 V1+V2 系列 |
 | 设备快照 | [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)（`getFeatures` 已废弃） | 相同 |
+
+Stellar、Alephium、Nexa、Dynex、Nervos、SCDO、Benfen、Neo 链是仅 V1。Pro 2 / Neo 不支持。完整矩阵：[链支持](/zh/hardware-sdk/concepts/chain-support)。机型 USB / BLE / Air-Gap：[设备](/zh/hardware-sdk/concepts/devices)。
 
 ## 如何识别协议
 

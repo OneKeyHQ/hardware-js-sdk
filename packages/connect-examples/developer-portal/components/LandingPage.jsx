@@ -50,15 +50,6 @@ const V1_CHAIN_CHIPS = [
   { name: 'Neo (chain)' },
 ]
 
-const DEVICE_LINEUP = [
-  { name: 'Classic 1s', src: '/icons/devices/classic1s.png', protocol: 'V1' },
-  { name: 'Mini', src: '/icons/devices/mini.png', protocol: 'V1' },
-  { name: 'Touch', src: '/icons/devices/touch.png', protocol: 'V1' },
-  { name: 'Pro', src: '/icons/devices/pro.png', protocol: 'V1' },
-  { name: 'Pro 2', src: '/icons/devices/pro2.png', protocol: 'V2' },
-  { name: 'Neo', src: '/icons/devices/neo.png', protocol: 'V2' },
-]
-
 const primaryCtaStyle = {
   backgroundColor: '#00B812',
   color: '#101111',
@@ -165,18 +156,6 @@ export function LandingPage({ locale = 'en' }) {
         offlineSubtitle: '二维码 Air-Gap。仅 Pro / Pro 2，Neo 无摄像头。',
         chainsTitle: '公开链方法',
         chainsSubtitle: '按 Core getSupportedProtocols() 统计，不是 App 的 100+ 币种目录。',
-        devicesTitle: '同一套 API，两代协议',
-        devicesSubtitle: 'Classic / Mini / Touch / Pro 走 Protocol V1。Pro 2 / Neo 走 Protocol V2。不要用 PID 判断。',
-        devicesCta: '查看设备矩阵',
-        proofLabel1: '公开链系列',
-        proofValue1: '19',
-        proofNote1: 'V1+V2，含 EVM / BTC / SOL / TON',
-        proofLabel2: '仅 V1 系列',
-        proofValue2: '8',
-        proofNote2: 'Stellar、Alephium、Neo 链 — Pro 2 / Neo 不支持',
-        proofLabel3: '传输',
-        proofValue3: '4',
-        proofNote3: 'WebUSB · RN BLE · Native BLE · Air-Gap',
         v1OnlyLabel: 'Pro 2 / Neo 不支持',
         benefitsTitle: '接入时真正用得到的',
         benefit1Title: '协议自动探测',
@@ -209,9 +188,6 @@ export function LandingPage({ locale = 'en' }) {
         ctaChains: 'Chain support',
         viewDocs: 'View docs',
         recommended: 'Recommended',
-        devicesTitle: 'One API, two protocols',
-        devicesSubtitle: 'Classic / Mini / Touch / Pro speak Protocol V1. Pro 2 / Neo speak Protocol V2. Do not branch on PID.',
-        devicesCta: 'Device matrix',
         hardwareTitle: 'Pick a transport',
         hardwareSubtitle: 'USB through hd-common-connect-sdk. Mobile BLE through hd-ble-sdk.',
         dappTitle: 'dApp integration',
@@ -220,16 +196,7 @@ export function LandingPage({ locale = 'en' }) {
         offlineSubtitle: 'QR Air-Gap on Pro and Pro 2. Neo has no camera.',
         chainsTitle: 'Public chain methods',
         chainsSubtitle: 'Counted from Core getSupportedProtocols(), not the App coin catalog.',
-        proofLabel1: 'V1+V2 families',
-        proofValue1: '19',
-        proofNote1: 'Including EVM, Bitcoin, Solana, TON',
-        proofLabel2: 'V1-only families',
-        proofValue2: '8',
-        proofNote2: 'Stellar, Alephium, Neo chain — not supported on Pro 2 / Neo',
         v1OnlyLabel: 'Not on Pro 2 / Neo',
-        proofLabel3: 'Transports',
-        proofValue3: '4',
-        proofNote3: 'WebUSB · RN BLE · Native BLE · Air-Gap',
         benefitsTitle: 'What actually matters',
         benefit1Title: 'Live protocol detect',
         benefit1Body: 'Do not branch on PID or BLE name. Read connectProtocol after connect.',
@@ -407,59 +374,6 @@ export function LandingPage({ locale = 'en' }) {
                 className="pointer-events-none absolute left-[calc(50%+309.5px)] top-[11px] hidden h-[863px] w-[831px] -translate-x-1/2 object-cover opacity-50 lg:block"
               />
           </div>
-        </section>
-
-        <section className="mx-auto grid w-full max-w-[1440px] grid-cols-1 gap-[16px] px-[20px] sm:grid-cols-3 sm:px-[32px] lg:px-[64px]">
-          {[
-            { value: copy.proofValue1, label: copy.proofLabel1, note: copy.proofNote1 },
-            { value: copy.proofValue2, label: copy.proofLabel2, note: copy.proofNote2 },
-            { value: copy.proofValue3, label: copy.proofLabel3, note: copy.proofNote3 },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="rounded-[16px] border border-white/10 bg-[#161716] px-[24px] py-[20px]"
-            >
-              <div className="text-[32px] font-semibold leading-[36px] text-white">{item.value}</div>
-              <div className="mt-[8px] text-[14px] font-medium text-white/80">{item.label}</div>
-              <div className="mt-[4px] break-words text-[13px] text-white/50">{item.note}</div>
-            </div>
-          ))}
-        </section>
-
-        <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[20px] sm:px-[32px] lg:px-[64px]">
-          <div className="flex w-full min-w-0 flex-col items-stretch gap-[8px] text-center">
-            <h2 className="mx-auto w-full max-w-[calc(100vw-40px)] text-balance text-[28px] font-medium leading-[34px] text-white sm:max-w-none sm:text-[40px] sm:leading-[46px]">
-              {copy.devicesTitle}
-            </h2>
-            <span className="mx-auto w-full max-w-[min(720px,calc(100vw-40px))] text-[16px] text-white/60">{copy.devicesSubtitle}</span>
-          </div>
-          <div className="mt-[24px] grid w-full grid-cols-2 gap-[12px] sm:grid-cols-3 lg:grid-cols-6">
-            {DEVICE_LINEUP.map((device) => (
-              <div
-                key={device.name}
-                className="flex flex-col items-center gap-[10px] rounded-[16px] border border-white/10 bg-[#161716] px-[12px] py-[16px]"
-              >
-                <img src={device.src} alt="" className="h-[72px] w-auto object-contain" />
-                <div className="text-[14px] font-medium text-white">{device.name}</div>
-                <span
-                  className={`rounded-full px-[8px] py-[2px] text-[11px] font-medium ${
-                    device.protocol === 'V2'
-                      ? 'bg-[#00B812]/15 text-[#57E668]'
-                      : 'bg-white/10 text-white/70'
-                  }`}
-                >
-                  {device.protocol}
-                </span>
-              </div>
-            ))}
-          </div>
-          <Link
-            href={`/${locale}/hardware-sdk/concepts/devices`}
-            className="mt-[20px] inline-flex items-center gap-[4px] text-[16px] text-[#00B812] no-underline"
-          >
-            {copy.devicesCta}
-            <ArrowUpRight className="size-[16px]" />
-          </Link>
         </section>
 
         <section

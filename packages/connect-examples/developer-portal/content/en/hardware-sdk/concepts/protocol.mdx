@@ -4,7 +4,15 @@ title: Protocol V1 and V2
 
 # Protocol V1 and V2
 
-Hardware SDK 1.2.0 talks two on-wire protocols. Integrators keep one JavaScript API.
+Hardware SDK 1.2.0 talks two on-wire protocols. Integrators keep one JavaScript API. Do not branch on USB PID, BLE name, or product string.
+
+```mermaid
+flowchart LR
+  App["Your app"] --> API["Same HardwareSDK methods"]
+  API --> Probe["Live probe after connect"]
+  Probe --> V1["Protocol V1"]
+  Probe --> V2["Protocol V2"]
+```
 
 | | Protocol V1 | Protocol V2 |
 | --- | --- | --- |
@@ -13,7 +21,10 @@ Hardware SDK 1.2.0 talks two on-wire protocols. Integrators keep one JavaScript 
 | Public methods | Existing Hardware SDK methods | Same methods, mapped inside Core |
 | Call rule | Serialize per device in practice | Serialize per device; required |
 | Firmware update | `firmwareUpdateV2` / `firmwareUpdateV3` | `firmwareUpdateV4` |
+| Chain methods | V1+V2 families plus V1-only families | V1+V2 families only |
 | Device snapshot | [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state) (`getFeatures` is deprecated) | Same |
+
+Stellar, Alephium, Nexa, Dynex, Nervos, SCDO, Benfen, and Neo chain are V1-only. They are not supported on Pro 2 / Neo. Full matrix: [Chain Support](/en/hardware-sdk/concepts/chain-support). Device USB / BLE / Air-Gap: [Devices](/en/hardware-sdk/concepts/devices).
 
 ## Detection
 
