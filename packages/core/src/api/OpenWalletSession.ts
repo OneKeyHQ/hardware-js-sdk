@@ -1,7 +1,6 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
-import { deviceWalletSessionStore } from '../device/DeviceWalletSessionStore';
 import { getProtocolV2WalletSession } from '../protocols/protocol-v2/walletSession';
 import { getPassphraseStateWithRefreshDeviceInfo } from '../utils/deviceFeaturesUtils';
 import { BaseMethod } from './BaseMethod';
@@ -12,16 +11,6 @@ import type {
   OpenWalletSessionParams,
   OpenWalletSessionPayload,
 } from '../types/api/openWalletSession';
-
-const requiredString = (value: unknown, name: string) => {
-  if (value === undefined || value === null) {
-    throw invalidParameter(`Missing required parameter: ${name}`);
-  }
-  if (typeof value !== 'string' || !value.trim()) {
-    throw invalidParameter(`Parameter [${name}] must be a non-empty string.`);
-  }
-  return value.trim();
-};
 
 const wasResumed = (session: unknown) =>
   !!session &&
@@ -53,34 +42,21 @@ const normalizeParams = (payload: Record<string, unknown>): OpenWalletSessionPar
   }
   if (
     payload.mode !== OpenWalletSessionMode.Standard &&
-    payload.mode !== OpenWalletSessionMode.SelectHidden &&
-    payload.mode !== OpenWalletSessionMode.ResumeHidden
+    payload.mode !== OpenWalletSessionMode.SelectHidden
   ) {
-    throw invalidParameter(
-      'Parameter [mode] must be one of standard, select-hidden, or resume-hidden.'
-    );
+    throw invalidParameter('Parameter [mode] must be one of standard or select-hidden.');
   }
   if (payload.useEmptyPassphrase !== undefined || payload.initSession !== undefined) {
     throw invalidParameter(
       'Legacy parameters [useEmptyPassphrase] and [initSession] are not supported by openWalletSession.'
     );
   }
-  if (
-    payload.mode === OpenWalletSessionMode.Standard ||
-    payload.mode === OpenWalletSessionMode.SelectHidden
-  ) {
-    if (payload.deviceId !== undefined || payload.passphraseState !== undefined) {
-      throw invalidParameter(
-        'Parameters [deviceId] and [passphraseState] are only allowed with mode [resume-hidden].'
-      );
-    }
-    return { mode: payload.mode };
+  if (payload.deviceId !== undefined || payload.passphraseState !== undefined) {
+    throw invalidParameter(
+      'Parameters [deviceId] and [passphraseState] are not supported by openWalletSession. Pass passphraseState on later address and signing calls.'
+    );
   }
-  return {
-    mode: OpenWalletSessionMode.ResumeHidden,
-    deviceId: requiredString(payload.deviceId, 'deviceId'),
-    passphraseState: requiredString(payload.passphraseState, 'passphraseState'),
-  };
+  return { mode: payload.mode };
 };
 
 export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParams> {
@@ -193,52 +169,6 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
         deviceId,
         passphraseState: null,
         resumed: wasResumed(session),
-      };
-    }
-
-    if (this.params.mode === OpenWalletSessionMode.ResumeHidden) {
-      if (isProtocolV2) {
-        await ensureProtocolV2WalletStatus();
-        const refreshedDeviceId = requireDeviceId();
-        if (refreshedDeviceId !== this.params.deviceId) {
-          deviceWalletSessionStore.delete(this.params.deviceId, this.params.passphraseState);
-          throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
-        }
-      } else if (requireDeviceId() !== this.params.deviceId) {
-        throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
-      }
-      this.device.passphraseState = this.params.passphraseState;
-      const cachedSessionId = deviceWalletSessionStore.get(
-        this.params.deviceId,
-        this.params.passphraseState
-      );
-      if (!cachedSessionId && !isProtocolV2) {
-        throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
-      }
-      if (!isProtocolV2) {
-        await this.device.initialize({
-          deviceId: this.params.deviceId,
-          passphraseState: this.params.passphraseState,
-        });
-      }
-      const session = isProtocolV2
-        ? await getProtocolV2WalletSession(this.device, {
-            expectedPassphraseState: this.params.passphraseState,
-          })
-        : await getPassphraseStateWithRefreshDeviceInfo(this.device, {
-            expectPassphraseState: this.params.passphraseState,
-          });
-      const deviceId = requireDeviceId();
-      if (session.passphraseState !== this.params.passphraseState) {
-        this.device.clearInternalState();
-        throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
-      }
-      return {
-        protocol,
-        walletType: 'hidden',
-        deviceId,
-        ...requireHiddenWalletResponse(session),
-        resumed: wasResumed(session) || (!isProtocolV2 && session.newSession === cachedSessionId),
       };
     }
 

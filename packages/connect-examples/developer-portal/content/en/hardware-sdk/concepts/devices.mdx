@@ -1,0 +1,35 @@
+---
+title: Devices
+---
+
+# Devices
+
+Hardware SDK 1.2.0 supports two protocol families on one public API. Pick the device constraints here; keep calling the same methods.
+
+| Device | Code | Protocol | USB | BLE | Air-Gap (QR) |
+| --- | --- | --- | --- | --- | --- |
+| OneKey Classic | `classic` | V1 | Yes | Yes | No |
+| OneKey Classic 1s | `classic1s` | V1 | Yes | Yes | No |
+| OneKey Classic 1s Pure | `classicPure` | V1 | Yes | Yes | No |
+| OneKey Mini | `mini` | V1 | Yes | **No** | No |
+| OneKey Touch | `touch` | V1 | Yes | Yes | No |
+| OneKey Pro | `pro` | V1 | Yes | Yes | Yes |
+| OneKey Pro 2 | `pro2` | **V2** | Yes | Yes | Yes |
+| OneKey Neo | `neo` | **V2** | Yes | Yes | **No** (no camera) |
+
+The SDK reports the connected protocol on the device object as `connectProtocol` (`'V1'` or `'V2'`). That value is the result of a live probe, not a lookup from the model name.
+
+## What you should do with the model
+
+- Use model for **capability and UX**: Mini has no BLE, Neo has no QR Air-Gap, Pro / Pro 2 can do Air-Gap.
+- Do **not** use model to decide Protocol V1 vs V2. A future Pro on V2 would still be `pro`.
+- Firmware update API follows the protocol family: Pro uses [`firmwareUpdateV3`](/en/hardware-sdk/device-api/firmwareupdatev3); Pro 2 / Neo use [`firmwareUpdateV4`](/en/hardware-sdk/device-api/firmwareupdatev4).
+
+## Integrator checklist
+
+1. Cache `connectId` **per transport**. USB and BLE IDs for the same unit are different.
+2. Refresh `deviceId` after wipe / recovery. See [Identifiers](/en/hardware-sdk/concepts/identifiers).
+3. Serialize calls per device. Protocol V2 requires it; Protocol V1 still deadlocks if you overlap PIN/signing.
+4. Never replay a firmware update, wipe, or other side-effecting call after a transport error.
+
+See also: [Chain Support](/en/hardware-sdk/concepts/chain-support) · [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol) · [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session)

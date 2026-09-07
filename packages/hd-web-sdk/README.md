@@ -24,11 +24,11 @@ import { HardwareSDK } from '@onekeyfe/hd-web-sdk';
 function init() {
   HardwareSDK.init({
     debug: false,
-    connectSrc: 'https://jssdk.onekey.so/'
+    // omit connectSrc — SDK fills https://jssdk.onekey.so/<installed-version>/
   });
 }
 ```
 
 ## Docs
 
-Documentation is available [hardware-js-sdk](https://developer.onekey.so/connect-to-hardware/hardware-sdk/start)
+Documentation is available [Hardware SDK Getting Started](https://developer.onekey.so/en/hardware-sdk/getting-started)

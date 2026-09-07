@@ -4,6 +4,7 @@ import { UI_REQUEST } from '../constants/ui-request';
 import { projectFeatures } from '../device/DeviceStateProjector';
 import { BaseMethod } from './BaseMethod';
 
+/** @deprecated Use GetDeviceState / HardwareSDK.getDeviceState. */
 export default class GetFeatures extends BaseMethod {
   init() {
     this.unlockPolicy = 'none';

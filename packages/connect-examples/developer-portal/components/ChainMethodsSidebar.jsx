@@ -42,6 +42,7 @@ const CHAINS = [
     methods: [
       { id: 'solgetaddress', name: 'solGetAddress' },
       { id: 'solsigntransaction', name: 'solSignTransaction' },
+      { id: 'solsignoffchainmessage', name: 'solSignOffchainMessage' },
     ]
   },
   {

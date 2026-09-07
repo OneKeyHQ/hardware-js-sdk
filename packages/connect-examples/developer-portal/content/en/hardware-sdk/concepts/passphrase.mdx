@@ -22,184 +22,152 @@ Rules and best practices for handling passphrases (hidden wallets).
 | Mini | Yes | Yes |
 | Touch | Yes (touch keyboard) | Yes |
 | Pro | Yes (touch keyboard) | Yes |
+| Pro 2 | Yes | Yes |
+| Neo | Yes | Yes |
 
-All OneKey devices support passphrase and session caching (`passphraseState`).
+All OneKey devices support passphrase. Persist `deviceId + passphraseState`, not firmware `session_id`.
 
 ## Interaction flow
 
-### Proactive strategy (recommended)
+Hardware SDK 1.2.x: `searchDevices` → `getDeviceState` → `openWalletSession` → address / sign with `deviceId` + `passphraseState` (or `useEmptyPassphrase: true`). Subscribe to `UI_EVENT` before opening a wallet. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
 
-The simplest approach — explicitly choose the standard wallet to avoid accidental hidden wallet prompts.
+### Standard wallet
 
 ```mermaid
 sequenceDiagram
-    participant App
-    participant SDK
-    participant Device
+  autonumber
+  participant App
+  participant SDK as HardwareSDK
+  participant Device
 
-    App->>SDK: evmGetAddress(..., useEmptyPassphrase: true)
-    SDK->>Device: Initialize session (empty passphrase)
-    Device-->>SDK: Session ready
-    SDK-->>App: { address, path }
+  App->>SDK: getDeviceState(connectId)
+  SDK-->>App: identity.deviceId
+  App->>SDK: openWalletSession({ mode: standard })
+  SDK->>Device: open standard wallet
+  SDK-->>App: walletType standard
+  App->>SDK: evmGetAddress(..., useEmptyPassphrase true)
+  SDK->>Device: DeviceSessionGet
+  Device-->>SDK: session
+  SDK-->>App: address
 ```
 
 ```ts
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+
+await HardwareSDK.openWalletSession(connectId, { mode: 'standard' });
+
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
-  path: "m/44'/60'/0'",
+  path: "m/44'/60'/0'/0/0",
   useEmptyPassphrase: true,
 });
 ```
 
-### Reactive strategy (event-driven)
-
-Listen for the passphrase request event and let the user choose input method.
+### Hidden wallet (open once, reuse fingerprint)
 
 ```mermaid
 sequenceDiagram
-    participant App
-    participant SDK
-    participant Device
+  autonumber
+  participant App
+  participant SDK as HardwareSDK
+  participant Device
 
-    App->>SDK: evmGetAddress(...)
-    SDK->>Device: Initialize session
-    Device-->>SDK: REQUEST_PASSPHRASE
-    SDK-->>App: UI_REQUEST.REQUEST_PASSPHRASE
-    Note over App: Show passphrase dialog<br/>(on-device or software input)
-    App->>SDK: uiResponse(passphrase)
-    SDK->>Device: Send passphrase
-    Device-->>SDK: Session ready
-    SDK-->>App: { address, path }
+  App->>SDK: openWalletSession({ mode: select-hidden })
+  SDK->>Device: select hidden wallet
+  Device-->>App: UI_REQUEST.REQUEST_PASSPHRASE
+  App->>SDK: uiResponse(RECEIVE_PASSPHRASE)
+  SDK-->>App: deviceId + passphraseState
+  Note over App: persist deviceId + passphraseState
+  App->>SDK: evmGetAddress(..., passphraseState)
+  SDK->>Device: DeviceSessionGet
+  Note over SDK,Device: Core resumes. App does not call resume-hidden
+  Device-->>SDK: session
+  SDK-->>App: address
 ```
 
 ```ts
-// Option A: On-device input
-HardwareSDK.uiResponse({
-  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-  payload: { passphraseOnDevice: true, value: '' },
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(UI_EVENT, async (message) => {
+  if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
+    await HardwareSDK.uiResponse({
+      type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+      payload: { passphraseOnDevice: true, value: '' },
+    });
+  }
 });
 
-// Option B: Software input (optionally cache for this session)
-HardwareSDK.uiResponse({
-  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-  payload: { value: userInput, passphraseOnDevice: false, save: true },
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: 'select-hidden',
 });
-```
-
-### Hidden wallet with session caching
-
-Reduce repeated passphrase prompts across multiple calls.
-
-```mermaid
-sequenceDiagram
-    participant App
-    participant SDK
-    participant Device
-
-    App->>SDK: getPassphraseState(connectId)
-    SDK->>Device: Prompt passphrase (once)
-    Device-->>SDK: passphraseState
-    SDK-->>App: passphraseState = "abc"
-
-    Note over App: Subsequent calls use cached state
-
-    App->>SDK: evmGetAddress(..., passphraseState, initSession)
-    SDK->>Device: Reuse session (no prompt)
-    Device-->>SDK: Result
-    SDK-->>App: { address }
-
-    App->>SDK: btcGetAddress(..., passphraseState)
-    SDK->>Device: Reuse session (no prompt)
-    Device-->>SDK: Result
-    SDK-->>App: { address }
-```
-
-```ts
-// Step 1: Get passphrase state (prompts user once)
-const state = await HardwareSDK.getPassphraseState(connectId);
-const passphraseState = state.payload;
-
-// Step 2: Use passphraseState in subsequent calls (no more prompts)
-const commonParams = {
-  initSession: true,
-  passphraseState,
-};
+const deviceId = opened.payload.deviceId;
+const passphraseState = opened.payload.passphraseState;
 
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
-  ...commonParams,
+  passphraseState,
 });
-
 await HardwareSDK.btcGetAddress(connectId, deviceId, {
   path: "m/84'/0'/0'/0/0",
   coin: 'btc',
-  ...commonParams,
+  passphraseState,
 });
 ```
 
-### Cross-process session reuse (CLI / scripts)
-
-For short-lived processes (CLI tools, automation scripts), you can persist the session and restore it on the next invocation using `preloadSessionCache`.
-
-```mermaid
-sequenceDiagram
-    participant Process1 as Process 1
-    participant SDK
-    participant Device
-    participant Storage as Keychain / File
-
-    Process1->>SDK: getPassphraseState → passphraseState
-    Process1->>SDK: searchDevices → session_id
-    Process1->>Storage: save(deviceId, passphraseState, session_id)
-
-    Note over Process1: Process exits
-
-    participant Process2 as Process 2
-    Process2->>Storage: load(deviceId) → passphraseState, session_id
-    Process2->>SDK: preloadSessionCache(deviceId, passphraseState, session_id)
-    Process2->>SDK: evmGetAddress(..., passphraseState)
-    SDK->>Device: Initialize with session_id
-    Device-->>SDK: Session recognized → no passphrase prompt
-    SDK-->>Process2: { address }
-```
+On-device vs software passphrase input:
 
 ```ts
-import { preloadSessionCache } from '@onekeyfe/hd-core';
+// On-device
+payload: { passphraseOnDevice: true, value: '' }
 
-// On startup: restore session from persistent storage
-const { deviceId, passphraseState, sessionId } = loadFromStorage();
-preloadSessionCache(deviceId, passphraseState, sessionId);
+// Software
+payload: { value: userInput, passphraseOnDevice: false, save: true }
+```
 
-// Now SDK calls with this passphraseState skip the passphrase prompt
+### Later process / reconnect
+
+Persist only `deviceId + passphraseState`. Do **not** persist firmware `session_id`. Load the binding and pass it on the next address / sign call. Core resumes inside that method. `openWalletSession` has no resume mode.
+
+```ts
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
+
+// Process 1 — after the user selects the hidden wallet
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.SelectHidden,
+});
+saveBinding({
+  deviceId: opened.payload.deviceId,
+  passphraseState: opened.payload.passphraseState,
+});
+
+// Process 2 — later process, same machine
+const { deviceId, passphraseState } = loadBinding();
+
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
   passphraseState,
 });
 ```
 
-> **Important: device locking invalidates sessions.** All OneKey devices clear passphrase sessions when locked (whether by auto-lock timeout, manual lock, or USB disconnection). Once locked, the cached `session_id` becomes invalid and the user must re-enter their passphrase after unlocking (PIN). Session reuse only works when the device remains unlocked between invocations.
+`preloadSessionCache` is a compatibility entry for old App/CLI Keychain records. New integrations should not call it and should not store `session_id`.
 
-### Unlock-first pattern (recommended for CLI)
+If the device locked between processes, PIN runs again on the first protected call. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
 
-For devices that may auto-lock (Touch/Pro), always unlock before attempting session reuse:
+### Unlock-first pattern (CLI)
 
 ```ts
-// 1. Check if device is locked
-const features = await HardwareSDK.getFeatures(connectId);
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
 
-// 2. Unlock if needed (triggers PIN on device)
-let wasLocked = false;
-if (!features.payload.unlocked) {
-  wasLocked = true;
+if (!state.payload.status.unlocked) {
   await HardwareSDK.deviceUnlock(connectId, {});
 }
 
-// 3. Only reuse cached session if device was already unlocked
-if (!wasLocked) {
-  // Try preloadSessionCache from persistent storage
-  preloadSessionCache(deviceId, savedPassphraseState, savedSessionId);
-} else {
-  // Device was locked → old session is invalid → must re-prompt
-}
+await HardwareSDK.evmGetAddress(connectId, savedDeviceId, {
+  path: "m/44'/60'/0'/0/0",
+  passphraseState: savedPassphraseState,
+});
 ```
 
 ## Security tips
@@ -238,4 +206,4 @@ No. The device accepts any passphrase and derives a wallet from it. If you misty
 - **On-device**: The passphrase is entered directly on the hardware device's screen/keyboard. It never leaves the device.
 - **Software input**: The passphrase is typed in your app and sent to the device via SDK.
 
-See also: [Common Params](/en/hardware-sdk/core-api-guide#common-params), [Events & UI Wiring](/en/hardware-sdk/core-api-guide#events-ui).
+See also: [Common Params](/en/hardware-sdk/concepts/common-params), [Events & UI Wiring](/en/hardware-sdk/core-api-guide#events-ui).

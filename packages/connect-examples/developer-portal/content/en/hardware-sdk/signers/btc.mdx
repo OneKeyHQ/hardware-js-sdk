@@ -37,8 +37,9 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
-const [{ connectId }] = await HardwareSDK.searchDevices();
-const deviceId = (await HardwareSDK.getFeatures(connectId)).payload?.device_id;
+const devices = await HardwareSDK.searchDevices();
+const { connectId } = devices.payload[0];
+const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
 ```
 
 ## Common scenarios
@@ -116,8 +117,9 @@ import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 
 await HardwareSDK.init({ env: 'webusb', debug: false });
 
-const [{ connectId }] = await HardwareSDK.searchDevices();
-const deviceId = (await HardwareSDK.getFeatures(connectId)).payload?.device_id;
+const devices = await HardwareSDK.searchDevices();
+const { connectId } = devices.payload[0];
+const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
 
 const path49 = [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0, 0];
 await HardwareSDK.btcGetAddress(connectId, deviceId, { path: path49, coin: 'btc', showOnOneKey: true });

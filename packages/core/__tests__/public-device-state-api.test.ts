@@ -22,7 +22,6 @@ describe('public device state API boundary', () => {
     expect((publicTypes as Record<string, unknown>).OpenWalletSessionMode).toEqual({
       Standard: 'standard',
       SelectHidden: 'select-hidden',
-      ResumeHidden: 'resume-hidden',
     });
   });
 
@@ -83,9 +82,7 @@ describe('public device state API boundary', () => {
       useEmptyPassphrase: false,
     });
     await api.openWalletSession('device-2', {
-      mode: publicTypes.OpenWalletSessionMode.ResumeHidden,
-      deviceId: 'wallet-device-1',
-      passphraseState: 'wallet-state-1',
+      mode: publicTypes.OpenWalletSessionMode.SelectHidden,
     });
     await api.clearSessionCache({
       deviceId: 'wallet-device-1',
@@ -100,9 +97,7 @@ describe('public device state API boundary', () => {
     });
     expect(call).toHaveBeenNthCalledWith(2, {
       connectId: 'device-2',
-      mode: 'resume-hidden',
-      deviceId: 'wallet-device-1',
-      passphraseState: 'wallet-state-1',
+      mode: 'select-hidden',
       method: 'openWalletSession',
     });
     expect(call).toHaveBeenNthCalledWith(3, {

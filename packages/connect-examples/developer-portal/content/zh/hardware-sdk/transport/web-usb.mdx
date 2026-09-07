@@ -135,13 +135,13 @@ const { connectId, deviceId } = result.payload[0] ?? {};
 - USB 结果通常在 `searchDevices()` 中包含 `deviceId`。
 - 保存 `connectId`/`deviceId` 用于后续调用。
 
-## 步骤 6. 获取特性（需要时确认 device_id）
+## 步骤 6. 读设备状态（需要时确认 deviceId）
 
 ```ts
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
 
-const resolvedDeviceId = features.payload.device_id;
+const resolvedDeviceId = state.payload.identity.deviceId;
 ```
 
 ## 步骤 7. 第一个调用示例（BTC 地址）
@@ -271,4 +271,4 @@ function showPassphraseDialog(): Promise<{ mode: 'device'|'software'; value: str
 ## 继续
 
 - [简介](/zh/hardware-sdk)
-- [错误码](/zh/hardware-sdk/core-api-guide#error-codes)、[通用参数](/zh/hardware-sdk/core-api-guide#common-params)
+- [错误码](/zh/hardware-sdk/core-api-guide#error-codes)、[通用参数](/zh/hardware-sdk/concepts/common-params)

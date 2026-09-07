@@ -1,17 +1,20 @@
 ---
-description: 旧版 OneKey Hardware SDK 集成的迁移指南
+description: OneKey Hardware SDK 迁移指南
 ---
 
-# 旧版迁移指南
+# 迁移指引
 
-这些指南帮助您从旧版基于 Bridge 的集成迁移到现代 WebUSB 连接。
+已经在 Hardware SDK **1.1.x** 上线、要升到 **1.2.x** 的，从这里开始。
 
-## 可用指南
+## 1.1.x → 1.2.x
 
-- [Bridge 迁移到 WebUSB (hd-common-connect-sdk)](./migrate-bridge-to-common-connect-webusb) - 推荐的迁移路径，使用 `@onekeyfe/hd-common-connect-sdk`
-- [Bridge 迁移到 WebUSB (hd-web-sdk)](./migrate-bridge-to-webusb) - 保持使用 `@onekeyfe/hd-web-sdk` 的迁移指南
+- [从 1.1.x 迁到 1.2.x](./from-1x) — `getDeviceState`、`openWalletSession`、Pro 2 / Neo、firmware V4
 
-## 应该使用哪个指南？
+## Bridge → WebUSB
 
-- **新项目**: 使用 `hd-common-connect-sdk`（无 iframe 依赖）
-- **已有使用 hd-web-sdk 的项目**: 根据您的偏好选择 - 完全迁移到 `hd-common-connect-sdk` 或继续使用 `hd-web-sdk` 配合 WebUSB 传输
+只有还在用 OneKey Bridge（`env: 'web'`）时才看这两篇。
+
+- [Bridge 迁到 WebUSB（hd-common-connect-sdk）](./migrate-bridge-to-common-connect-webusb) — 推荐
+- [Bridge 迁到 WebUSB（hd-web-sdk）](./migrate-bridge-to-webusb) — 继续用 iframe
+
+新项目请走 [快速开始](/zh/hardware-sdk/getting-started)，包用 `@onekeyfe/hd-common-connect-sdk`。

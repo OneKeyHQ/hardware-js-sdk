@@ -17,7 +17,7 @@ jest.mock('../src/data-manager/TransportManager', () => ({
 }));
 
 describe('openWalletSession error response', () => {
-  test('returns a structured invalid-parameter response for an incomplete resume request', async () => {
+  test('returns a structured invalid-parameter response for the removed resume-hidden mode', async () => {
     const core = initCore();
 
     const response = await core.handleMessage({
@@ -34,7 +34,7 @@ describe('openWalletSession error response', () => {
     expect(response).toMatchObject({
       success: false,
       payload: {
-        error: 'Missing required parameter: deviceId',
+        error: 'Parameter [mode] must be one of standard or select-hidden.',
         code: HardwareErrorCode.CallMethodInvalidParameter,
       },
     });

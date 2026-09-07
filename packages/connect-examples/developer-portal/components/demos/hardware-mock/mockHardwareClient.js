@@ -28,6 +28,7 @@ export function createMockHardwareClient({ basePath }) {
   };
 
   api.searchDevices = async () => api.sendCommand('searchDevices');
+  api.getDeviceState = async connectId => api.sendCommand('getDeviceState', { connectId });
   api.getFeatures = async connectId => api.sendCommand('getFeatures', { connectId });
 
   api.btcGetAddress = async (connectId, deviceId, params) =>

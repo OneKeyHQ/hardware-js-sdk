@@ -5,12 +5,13 @@ title: Identifiers
 # Identifiers
 
 OneKey hardware APIs return several identifier-looking fields across
-`searchDevices`, `getFeatures`, `getPassphraseState`, and chain method
+`searchDevices`, `getDeviceState`, `openWalletSession`, and chain method
 responses. This page is the single reference for what each one means, when
-it changes, and how its shape varies by transport.
+it changes, and how its shape varies by transport. `getFeatures` and
+`getPassphraseState` are deprecated compatibility reads of the same identities.
 
 > Looking for **call parameters** (`passphraseState`, `initSession`,
-> `useEmptyPassphrase`, …)? See [Common Params](/en/hardware-sdk/core-api-guide#common-params).
+> `useEmptyPassphrase`, …)? See [Common Params](/en/hardware-sdk/concepts/common-params).
 
 ## Four layers of identifiers
 
@@ -22,7 +23,8 @@ tells you when to refresh or persist a value.
 | **Physical hardware** | Forever (per physical unit) | Never | `uuid`, `onekey_serial`, `serial_no` |
 | **Transport connection** | This connection | New `searchDevices()`; different transport | `connectId`, `path`, `name`, `deviceType` |
 | **Seed / wallet state** | Until reset/wipe/recovery | Factory reset, seed recovery, wipe | `device_id` / `deviceId`, `label` |
-| **Session** | Until device is locked | Device lock (auto-lock, manual, USB disconnect) | `session_id`, `passphraseState` |
+| **Hidden-wallet fingerprint** | Until that passphrase changes | Passphrase change | `passphraseState` |
+| **Firmware session (internal)** | Until device is locked | Device lock, USB disconnect | firmware `session_id` — Core-only, do not persist |
 
 ## Which IDs do you pass in?
 
@@ -39,9 +41,9 @@ Only three of the identifiers here are **inputs** to SDK calls — the rest are 
 
 ```ts
 // Device-level — just connectId
-HardwareSDK.getFeatures(connectId);
+HardwareSDK.getDeviceState(connectId);
 HardwareSDK.deviceLock(connectId, {});
-HardwareSDK.getPassphraseState(connectId, { initSession: true });
+HardwareSDK.openWalletSession(connectId, { mode: 'standard' });
 
 // Wallet-level (standard wallet) — connectId + deviceId
 HardwareSDK.evmGetAddress(connectId, deviceId, {
@@ -53,7 +55,7 @@ HardwareSDK.evmGetAddress(connectId, deviceId, {
 HardwareSDK.evmSignTransaction(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
   transaction: { /* ... */ },
-  passphraseState, // obtained once from getPassphraseState
+  passphraseState, // obtained once from openWalletSession
 });
 ```
 
@@ -61,7 +63,7 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 
 | Pattern | When | Example methods |
 | --- | --- | --- |
-| 🟡 `connectId` only | Device-level operations (don't touch wallet state) | `searchDevices` · `getFeatures` · `getPassphraseState` · `deviceLock` · `deviceUnlock` · `deviceWipe` · `deviceSettings` · `deviceVerify` · `cancel` · `checkFirmwareRelease` · `checkBootloaderRelease` |
+| 🟡 `connectId` only | Device-level operations (don't touch wallet state) | `searchDevices` · `getDeviceState` · `openWalletSession` · `deviceLock` · `deviceUnlock` · `deviceWipe` · `deviceSettings` · `deviceVerify` · `cancel` · `checkFirmwareRelease` · `checkBootloaderRelease` |
 | 🔵 `connectId` + `deviceId` | Wallet-level — address derivation / signing / encryption | `evmGetAddress` · `evmSignTransaction` · `evmSignMessage` · `btcGetAddress` · `btcSignTransaction` · `btcSignPsbt` · `solGetAddress` · `solSignMessage` · `nostrEncryptMessage` · `allNetworkGetAddress` · all other chain methods |
 | 🟣 `connectId` + `deviceId` + `passphraseState` | Same as 🔵, but against a passphrase-protected hidden wallet | All of 🔵 with a non-empty `passphraseState` in params |
 
@@ -75,7 +77,7 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 | `passphraseState` doesn't match the current session | Error 112 (passphrase state mismatch) — session expired or wrong hidden wallet |
 | `passphraseState` + `useEmptyPassphrase: true` combined | `passphraseState` takes precedence (hidden wallet) — the `useEmptyPassphrase` flag is ignored |
 
-> ⚠️ The silent-standard-wallet case is the sneakiest. If you forget `passphraseState` when querying a hidden wallet, you'll get the standard wallet's address back without any error. Always obtain `passphraseState` via `getPassphraseState` once and attach it to every subsequent wallet-level call — or pass `useEmptyPassphrase: true` explicitly if you intend the standard wallet.
+> ⚠️ The silent-standard-wallet case is the sneakiest. If you forget `passphraseState` when querying a hidden wallet, you'll get the standard wallet's address back without any error. Always obtain `passphraseState` via `openWalletSession` once and attach it to every subsequent wallet-level call — or pass `useEmptyPassphrase: true` explicitly if you intend the standard wallet.
 
 ## Physical hardware identifiers
 
@@ -154,38 +156,37 @@ update your cached `deviceId`.
 Two session-level identifiers that look similar but serve different
 purposes.
 
-### `session_id` — ephemeral session token
+### `session_id` — firmware unlock handle (not a public binding)
 
-Short-lived random token the device mints when a passphrase session is
-initialised. Returned in `features.session_id` after `getPassphraseState`
-or any call that initialises a session.
+Short-lived token the device mints while a wallet is unlocked. Core may
+still expose it on compatibility `Features` objects.
 
-- **Invalidated on lock** (auto-lock, manual lock, USB disconnect).
-- Used internally by the SDK to keep the device's cached passphrase alive.
-- Rarely surfaced to app code directly — most apps only need
-  `passphraseState`.
+- **Do not persist it.** Hardware SDK 1.2.0 keeps firmware `session_id`
+  inside Core. `openWalletSession` does not return it.
+- Invalidated on lock (auto-lock, manual lock, disconnect).
+- To stay on a hidden wallet, pass persisted `passphraseState` on later
+  methods. Core resumes the firmware session. `openWalletSession` has no
+  resume mode.
 
 ### `passphraseState` — hidden wallet identifier
 
-Deterministic identifier for the hidden wallet bound to a specific
-passphrase. Returned by `getPassphraseState()`. **The same passphrase on
-the same seed always produces the same `passphraseState`**, so you can
-recognise "is this the same hidden wallet I saw last time?" without
-persisting the passphrase itself.
+Deterministic fingerprint for the hidden wallet bound to a passphrase.
+Returned by `getPassphraseState()` and by `openWalletSession` for
+`walletType: 'hidden'`. **The same passphrase on the same seed always
+produces the same `passphraseState`.**
 
-- Pass as the `passphraseState` common-param on every SDK call that must
-  stay on the same hidden wallet.
-- Cache across processes by persisting
-  `(deviceId, passphraseState, session_id)` together and calling
-  `preloadSessionCache` on startup.
-- Clearing the cached `passphraseState` does **not** invalidate the hidden
-  wallet — the wallet is reproducible by re-entering the same passphrase.
+- Pass as the `passphraseState` common-param on every later call that must
+  stay on that hidden wallet.
+- Persist `(deviceId, passphraseState)` only. Never persist firmware
+  `session_id` or the passphrase itself.
+- Clearing the cached fingerprint does **not** destroy the hidden wallet —
+  the user can reproduce it by entering the same passphrase again.
 
-| | `session_id` | `passphraseState` |
+| | firmware `session_id` | `passphraseState` |
 | --- | --- | --- |
-| Lifetime | Until device lock | Effectively forever (until passphrase changes) |
-| Determinism | Random per session | Deterministic per passphrase |
-| Role | Keeps device-side session alive | Identifies which hidden wallet to use |
+| Lifetime | Until device lock | Until that passphrase changes |
+| Persist? | **No** | Yes, with `deviceId` |
+| Role | Core-internal unlock handle | Which hidden wallet |
 
 ## Putting it together — real example
 
@@ -246,12 +247,10 @@ ID across transports.
 
 ### `session_id` vs `passphraseState`
 
-- `session_id` expires when the device locks; `passphraseState` does not.
-- `passphraseState` identifies **which hidden wallet**; `session_id`
-  authenticates **this live session**.
-- Persist `(passphraseState, session_id)` together to reuse a session
-  across invocations; if the device locked between invocations, discard
-  the cached `session_id` and force a fresh unlock.
+- `passphraseState` identifies **which hidden wallet**. Persist it with
+  `deviceId`. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
+- firmware `session_id` is Core-internal. Do not store it, and do not
+  send it on public calls.
 
 ### `device_id` (snake_case) vs `deviceId` (camelCase)
 
@@ -264,7 +263,8 @@ Same value, different contexts:
 
 ## See also
 
-- [Common Params](/en/hardware-sdk/core-api-guide#common-params) — parameters you pass **in** to SDK calls
+- [Common Params](/en/hardware-sdk/concepts/common-params) — parameters you pass **in** to SDK calls
+- [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session) — `openWalletSession` vs `getPassphraseState`
 - [Passphrase](/en/hardware-sdk/concepts/passphrase) — hidden wallet flow
 - [PIN Code](/en/hardware-sdk/concepts/pin) — PIN entry flow
 - [Search Devices](/en/hardware-sdk/basic-api/search-devices) — returns `connectId`, `uuid`, `deviceType`, `deviceId`

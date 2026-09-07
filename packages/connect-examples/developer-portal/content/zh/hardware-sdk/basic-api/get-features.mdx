@@ -2,11 +2,17 @@
 title: 获取设备特性
 ---
 
+import { Callout } from 'nextra/components'
+
 # 获取设备特性
+
+<Callout type="warning">
+  **已废弃，仅 Protocol V1。** Protocol V1 / V2 请用 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)。Classic / Mini / Touch / Pro 仍可调用本方法；Pro 2 / Neo 会被拒绝。
+</Callout>
 
 ## 获取设备特性
 
-获取设备的所有属性。
+获取设备的所有属性。新代码请读 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)（`payload.identity.deviceId`）。
 
 ```typescript
 const response = await HardwareSDK.getFeatures(connectId);
@@ -16,7 +22,7 @@ const response = await HardwareSDK.getFeatures(connectId);
 
 ### 参数
 
-[**可选通用参数**](/zh/hardware-sdk/core-api-guide#common-params)
+[**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
 ### 示例
 

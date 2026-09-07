@@ -99,9 +99,9 @@ const BATCH_WALLET_OPTIONS: Array<{
     description: 'Prompts once at the start of each run, then reuses that wallet.',
   },
   {
-    value: BatchWalletMode.ResumeHidden,
-    label: 'Resume hidden wallet',
-    description: 'Uses an existing passphraseState for every case.',
+    value: BatchWalletMode.KnownHidden,
+    label: 'Use stored passphraseState',
+    description: 'Pass an existing passphraseState on every case. Core resumes inside the method.',
   },
 ];
 
@@ -237,7 +237,7 @@ const MethodBatchTestPage: React.FC = () => {
   const walletSelection = useMemo<BatchWalletSelection>(
     () => ({
       mode: walletMode,
-      ...(walletMode === BatchWalletMode.ResumeHidden
+      ...(walletMode === BatchWalletMode.KnownHidden
         ? { passphraseState: resumePassphraseState }
         : {}),
     }),
@@ -608,7 +608,7 @@ const MethodBatchTestPage: React.FC = () => {
             <div className="mt-3 border-t border-border/70 pt-3">
               <div
                 className={
-                  walletMode === BatchWalletMode.ResumeHidden
+                  walletMode === BatchWalletMode.KnownHidden
                     ? 'grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)] md:items-end'
                     : 'flex items-start gap-2'
                 }
@@ -625,7 +625,7 @@ const MethodBatchTestPage: React.FC = () => {
                   </div>
                 </div>
 
-                {walletMode === BatchWalletMode.ResumeHidden && (
+                {walletMode === BatchWalletMode.KnownHidden && (
                   <div className="space-y-1.5">
                     <Label
                       htmlFor="batch-passphrase-state"

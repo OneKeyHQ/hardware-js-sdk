@@ -51,6 +51,7 @@ export default {
     title: 'Hardware Integration',
     type: 'menu',
     items: {
+      'getting-started': { title: 'Getting Started', href: '/en/hardware-sdk/getting-started' },
       'web-usb': { title: 'WebUSB Connection', href: '/en/hardware-sdk/transport/web-usb' },
       'react-native-ble': { title: 'React Native BLE', href: '/en/hardware-sdk/transport/react-native-ble' },
       'native-ble': { title: 'Native Mobile BLE', href: '/en/hardware-sdk/transport/native-ble' },
