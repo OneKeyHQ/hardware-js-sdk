@@ -355,15 +355,6 @@ export function LandingPage({ locale = 'en' }) {
                   </>
                 )}
               </p>
-              <pre
-                className="mt-[24px] hidden max-w-[620px] overflow-x-auto rounded-[12px] border border-white/10 bg-[#141514] p-[16px] text-left text-[12px] leading-[18px] text-[#86EA90] lg:block"
-                style={{ fontFamily: '"Geist Mono", ui-monospace, monospace' }}
-              >
-{`await HardwareSDK.init({ env: 'webusb', fetchConfig: true })
-const devices = await HardwareSDK.searchDevices()
-if (!devices.success) throw new Error(devices.payload.error)
-const { connectId } = devices.payload[0]`}
-              </pre>
               <div className="mt-[32px] grid w-full max-w-[420px] grid-cols-1 gap-[12px] sm:grid-cols-2 lg:mt-[40px] lg:flex lg:w-auto lg:max-w-none lg:items-center lg:gap-[8px]">
                 <button
                   type="button"
