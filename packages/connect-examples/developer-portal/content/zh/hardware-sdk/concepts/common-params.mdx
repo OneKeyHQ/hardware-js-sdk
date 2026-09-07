@@ -4,7 +4,7 @@ title: 通用参数
 
 # 通用参数
 
-每次调用 `HardwareSDK.method(...)` 都会传入一个 `params` 对象。本页的字段是**所有方法都接受**的。各链 / 设备方法页面只写自己独有的字段（`path`、`coin`、`tx`、`message` 等）。
+每次调用 `HardwareSDK.method(...)` 都会传入一个 `params` 对象。本页是地址、签名、设备方法的共用字段，**不是**每个方法都能收：`openWalletSession` 只要看到 `useEmptyPassphrase`、`initSession`、`deviceId`、`passphraseState`（包括 `false` 或从共用 defaults 展开进来）就会返回 `CallMethodInvalidParameter`。各链 / 设备方法页面只写自己独有的字段（`path`、`coin`、`tx`、`message` 等）。
 
 本页是参数**参考**。调用生命周期见 [Core API Guide](/zh/hardware-sdk/core-api-guide)。响应里的 ID（`connectId`、`deviceId`、`uuid`、`session_id` 等）见 [标识符](/zh/hardware-sdk/concepts/identifiers)。
 
@@ -21,7 +21,7 @@ title: 通用参数
 | `timeout` | `number` | 单次调用超时（毫秒） | 固件升级、大 PSBT 可以调大。 |
 | `detectBootloaderDevice` | `boolean` | 设备处于 Bootloader 时立刻失败 | 用在签名路径上。 |
 | `skipWebDevicePrompt` | `boolean` | 跳过 WebUSB 设备选择弹窗 | **仅 WebUSB**，复用之前的授权。 |
-| `keepSession` | `boolean` | **已废弃** | 改用 `initSession + passphraseState` 或 `openWalletSession`。 |
+| `keepSession` | `boolean` | 调用结束后继续持有传输 | 控制 `Device.run()` 是否 `release()` 链路。这不是钱包身份，也**不能**用 `passphraseState` / `openWalletSession` 替代。USB 连续签名 / 检查后升级、Electron BLE 固件窗口仍需要它。 |
 
 ## 各传输方式差异
 

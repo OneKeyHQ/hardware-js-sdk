@@ -64,7 +64,7 @@ console.log(address.payload.address);
 
 Always check `success` before reading `payload`. `useEmptyPassphrase: true` keeps this first call on the standard wallet so a leftover hidden-wallet session cannot silently change the address.
 
-`getDeviceState()` is the V1/V2 read. `getFeatures()` is deprecated; existing apps may keep it and read `payload.device_id`.
+`getDeviceState()` is the V1/V2 read. `getFeatures()` is Protocol V1 only; Pro 2 and Neo must use `getDeviceState()`.
 
 WebUSB requires HTTPS and a user gesture. BLE requires OS Bluetooth permission.
 

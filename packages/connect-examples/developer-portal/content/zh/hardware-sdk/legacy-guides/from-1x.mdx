@@ -34,7 +34,7 @@ npm i @onekeyfe/hd-common-connect-sdk@^1.2.1
 | `getFeatures()` | [`getDeviceState()`](/zh/hardware-sdk/basic-api/get-device-state) | 读 `payload.identity.deviceId`，不要再用 `payload.device_id` |
 | `getOnekeyFeatures()` | `getDeviceState({ scope: 'firmware' })` | 版本 / 身份快照 |
 | `getPassphraseState()` | [`openWalletSession({ mode })`](/zh/hardware-sdk/basic-api/open-wallet-session) | 只开一次：`standard` 或 `select-hidden` |
-| `keepSession` | 持久化 `deviceId + passphraseState` | 之后调用带 `passphraseState`（或 `useEmptyPassphrase: true`） |
+| `keepSession` | **不要改** | 只控制传输持有。不要删掉，也不要用 `passphraseState` / `openWalletSession` 替换。 |
 | 把固件 `session_id` 存进库 | **不要存** | Core 内部持有 |
 | `env: 'web'` + Bridge | `env: 'webusb'` | 见 [Bridge → WebUSB](/zh/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb) |
 | Pro 2 / Neo 上的 `firmwareUpdateV2` / `V3` | [`firmwareUpdateV4`](/zh/hardware-sdk/device-api/firmwareupdatev4) | Classic / Mini / Touch / Pro 仍用 V2 / V3 |
@@ -148,7 +148,7 @@ WebUSB 需要 HTTPS 和用户手势。BLE 需要系统蓝牙权限。
 3. `getPassphraseState` 换成 `openWalletSession({ mode: 'standard' | 'select-hidden' })`。
 4. 只存 `deviceId + passphraseState`。不要再存固件 `session_id`。
 5. 之后每笔地址 / 签名带 `passphraseState` 或 `useEmptyPassphrase: true`。
-6. 去掉 `keepSession`。
+6. USB 连续签名 / 检查后升级、Electron BLE 固件窗口继续保留 `keepSession`。它不是钱包会话标志。
 7. 按设备串行调用。
 8. 上线 Pro 2 / Neo 前核对链覆盖。
 

@@ -34,7 +34,7 @@ Do not mix `@onekeyfe/hd-web-sdk` and `@onekeyfe/hd-common-connect-sdk` in one r
 | `getFeatures()` | [`getDeviceState()`](/en/hardware-sdk/basic-api/get-device-state) | Read `payload.identity.deviceId`, not `payload.device_id` |
 | `getOnekeyFeatures()` | `getDeviceState({ scope: 'firmware' })` | Version / identity snapshot |
 | `getPassphraseState()` | [`openWalletSession({ mode })`](/en/hardware-sdk/basic-api/open-wallet-session) | `standard` or `select-hidden` once |
-| `keepSession` | persist `deviceId + passphraseState` | Pass `passphraseState` (or `useEmptyPassphrase: true`) on later calls |
+| `keepSession` | **unchanged** | Transport hold only. Do **not** drop it or replace it with `passphraseState` / `openWalletSession`. |
 | firmware `session_id` in your DB | **do not persist** | Core keeps it internally |
 | `env: 'web'` + Bridge | `env: 'webusb'` | See [Bridge → WebUSB](/en/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb) |
 | `firmwareUpdateV2` / `V3` on Pro 2 / Neo | [`firmwareUpdateV4`](/en/hardware-sdk/device-api/firmwareupdatev4) | Classic / Mini / Touch / Pro stay on V2 / V3 |
@@ -148,7 +148,7 @@ WebUSB needs HTTPS and a user gesture. BLE needs OS Bluetooth permission.
 3. Replace `getPassphraseState` with `openWalletSession({ mode: 'standard' | 'select-hidden' })`.
 4. Persist only `deviceId + passphraseState`. Stop storing firmware `session_id`.
 5. Pass `passphraseState` or `useEmptyPassphrase: true` on every later address / sign call.
-6. Remove `keepSession`.
+6. Keep `keepSession` on USB consecutive signing / check-then-upgrade and Electron BLE firmware windows. It is not a wallet-session flag.
 7. Serialize calls per device.
 8. Confirm Pro 2 / Neo chain coverage before shipping those devices.
 

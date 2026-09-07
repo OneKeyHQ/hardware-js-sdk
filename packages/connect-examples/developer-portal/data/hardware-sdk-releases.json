@@ -28,14 +28,14 @@
       "changes": {
         "en": [
           "Stable Protocol V2 line for OneKey Pro 2 and Neo; Classic / Mini / Touch / Pro stay on Protocol V1",
-          "Public wallet entry openWalletSession({ mode }) for standard, select-hidden, and resume-hidden",
+          "Public wallet entry openWalletSession({ mode }) for standard and select-hidden",
           "Unified getDeviceState() snapshot across V1/V2; getFeatures() remains compatibility",
           "firmwareUpdateV4 for Pro 2 / Neo multi-component firmware and resource ZIP updates",
           "BLE reconnect, wallet-session recovery, and firmware-install polling hardened for Protocol V2"
         ],
         "zh": [
           "稳定的 Protocol V2 线：OneKey Pro 2 / Neo；Classic / Mini / Touch / Pro 继续走 Protocol V1",
-          "公开开钱包入口 openWalletSession({ mode })：standard / select-hidden / resume-hidden",
+          "公开开钱包入口 openWalletSession({ mode })：standard / select-hidden",
           "V1/V2 统一 getDeviceState()；getFeatures() 仍作兼容",
           "Pro 2 / Neo 使用 firmwareUpdateV4 做多组件固件和资源 ZIP 升级",
           "Protocol V2 的 BLE 重连、钱包会话恢复和固件安装轮询加固"

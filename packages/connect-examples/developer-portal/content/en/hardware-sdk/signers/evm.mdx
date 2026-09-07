@@ -175,7 +175,7 @@ Promise<{ success, payload: { signature } }>
 
 - APIs resolve when the operation finishes; user prompts are surfaced via `UI_REQUEST` events.
 - Common prompts: unlock device, open EVM app, verify address, sign transaction, sign personal message, sign typed data.
-- For repeated calls, serialize per device and reuse `passphraseState` (or `useEmptyPassphrase: true`). `keepSession` is deprecated.
+- For repeated calls, serialize per device and reuse `passphraseState` (or `useEmptyPassphrase: true`). `keepSession` still holds the transport; it is not a wallet binding.
 
 ## Examples
 
@@ -311,6 +311,6 @@ const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
   - Path mismatch: default `m/44'/60'/0'/0/0`, increment account/address as needed; confirm once with `showOnOneKey`.
 - ChainId mismatch: must match the target network.
 - Large `data` may be rejected; simplify if necessary.
-- Repeated passphrase prompts: call `openWalletSession` once, then pass `passphraseState` on later calls. Serialize per device. `keepSession` is deprecated.
+- Repeated passphrase prompts: call `openWalletSession` once, then pass `passphraseState` on later calls. Serialize per device. `keepSession` still holds the transport; it is not a wallet binding.
 - User reject/timeout: surface retry/cancel; do not auto-replay.
 See chain docs: [evmSignTransaction](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction) · [evmSignMessage](/en/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) · [evmSignTypedData](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata).

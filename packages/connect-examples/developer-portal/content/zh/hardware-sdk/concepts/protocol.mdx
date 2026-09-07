@@ -53,7 +53,7 @@ SDK 只认**当前连接**上的实时响应。不要用下面这些东西判断
 
 ## 设备状态
 
-请用 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)。`getFeatures` 已废弃；现有应用可以继续用。Protocol V2 上 SDK 仍会把实时设备映射成兼容的 Features 对象。
+请用 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)。`getFeatures` 只支持 Protocol V1（Classic / Mini / Touch / Pro）；Pro 2 / Neo 会在兼容投影之前被协议门禁拒绝。`getDeviceState` 在 V1 和 V2 上仍会带一份 Features 形状的快照。
 
 ```ts
 const state = await HardwareSDK.getDeviceState(connectId);

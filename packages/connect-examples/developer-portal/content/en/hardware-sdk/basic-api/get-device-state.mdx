@@ -6,7 +6,7 @@ title: Get Device State
 
 Read the unified V1 / V2 device snapshot. Use this instead of deprecated [`getFeatures`](/en/hardware-sdk/basic-api/get-features).
 
-`getFeatures()` and `getOnekeyFeatures()` still run for existing apps. New code should call `getDeviceState()` and read `payload.identity.deviceId`. For firmware/version fields use `scope: 'firmware'` instead of `getOnekeyFeatures`.
+`getFeatures()` still runs on Protocol V1 only. Pro 2 and Neo must call `getDeviceState()` and read `payload.identity.deviceId`. For firmware/version fields use `scope: 'firmware'` instead of `getOnekeyFeatures`.
 
 ```ts
 const res = await HardwareSDK.getDeviceState(connectId);

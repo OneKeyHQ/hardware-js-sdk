@@ -791,6 +791,7 @@ class MainActivity : AppCompatActivity() {
         deviceAdapter = BleDeviceAdapter { address ->
             selectedDeviceAddress = address
             connectId = address
+            deviceId = ""
             
             // Initialize as unknown type; will update from API response later
             currentDeviceType = DEVICE_TYPE_UNKNOWN

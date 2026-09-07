@@ -92,7 +92,7 @@ Promise<{ success, payload: { signature } }>
 ## Interaction & Status
 
 - APIs resolve on completion; user prompts surface via `UI_REQUEST` (unlock device, open Solana app, confirm transaction).
-- Run calls serially per device. Reuse `passphraseState` or `useEmptyPassphrase: true`. `keepSession` is deprecated.
+- Run calls serially per device. Reuse `passphraseState` or `useEmptyPassphrase: true`. `keepSession` still holds the transport; it is not a wallet binding.
 
 ## Example
 

@@ -313,9 +313,6 @@ export const BleDemoScreen = () => {
       };
       appendLog('info', { evmGetAddress: params });
 
-      const identity = deviceId
-        ? { deviceId, protocol: connectProtocol }
-        : await readDeviceIdentity();
       const opened = await sdkRef.current.openWalletSession(selected.connectId, {
         mode: OpenWalletSessionMode.Standard,
       });
@@ -323,10 +320,16 @@ export const BleDemoScreen = () => {
       if (!opened?.success) {
         throw new Error((opened as any)?.payload?.error || 'openWalletSession failed');
       }
+      const nextDeviceId = opened.payload?.deviceId;
+      if (!nextDeviceId) {
+        throw new Error('openWalletSession did not return deviceId');
+      }
+      setDeviceId(nextDeviceId);
+      setConnectProtocol(opened.payload?.protocol ?? connectProtocol);
 
       const res = await (sdkRef.current as any).evmGetAddress(
         selected.connectId,
-        identity.deviceId,
+        nextDeviceId,
         { ...params, useEmptyPassphrase: true }
       );
       appendLog('info', { evmGetAddressRes: res });
@@ -335,7 +338,7 @@ export const BleDemoScreen = () => {
     } finally {
       setBusy(null);
     }
-  }, [appendLog, connectProtocol, deviceId, readDeviceIdentity, selected?.connectId]);
+  }, [appendLog, connectProtocol, selected?.connectId]);
 
   const onSignMessage = useCallback(async () => {
     if (!sdkRef.current || !selected?.connectId) {
@@ -353,9 +356,6 @@ export const BleDemoScreen = () => {
       };
       appendLog('info', { evmSignMessage: params });
 
-      const identity = deviceId
-        ? { deviceId, protocol: connectProtocol }
-        : await readDeviceIdentity();
       const opened = await sdkRef.current.openWalletSession(selected.connectId, {
         mode: OpenWalletSessionMode.Standard,
       });
@@ -363,10 +363,16 @@ export const BleDemoScreen = () => {
       if (!opened?.success) {
         throw new Error((opened as any)?.payload?.error || 'openWalletSession failed');
       }
+      const nextDeviceId = opened.payload?.deviceId;
+      if (!nextDeviceId) {
+        throw new Error('openWalletSession did not return deviceId');
+      }
+      setDeviceId(nextDeviceId);
+      setConnectProtocol(opened.payload?.protocol ?? connectProtocol);
 
       const res = await (sdkRef.current as any).evmSignMessage(
         selected.connectId,
-        identity.deviceId,
+        nextDeviceId,
         { ...params, useEmptyPassphrase: true }
       );
       appendLog('info', { evmSignMessageRes: res });
@@ -378,7 +384,7 @@ export const BleDemoScreen = () => {
     } finally {
       setBusy(null);
     }
-  }, [appendLog, connectProtocol, deviceId, readDeviceIdentity, selected?.connectId]);
+  }, [appendLog, connectProtocol, selected?.connectId]);
 
   const clearLogs = useCallback(() => setLogs([]), []);
 

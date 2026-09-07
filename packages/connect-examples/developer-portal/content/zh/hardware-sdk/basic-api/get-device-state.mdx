@@ -6,7 +6,7 @@ title: 获取设备状态
 
 读取 Protocol V1 / V2 统一的设备快照。请用本方法，不要再用已废弃的 [`getFeatures`](/zh/hardware-sdk/basic-api/get-features)。
 
-`getFeatures()` 和 `getOnekeyFeatures()` 现有应用仍可调用。新代码应调用 `getDeviceState()`，读 `payload.identity.deviceId`。需要固件 / 版本字段时用 `scope: 'firmware'`，不要再用 `getOnekeyFeatures`。
+`getFeatures()` 只支持 Protocol V1。Pro 2 / Neo 必须调用 `getDeviceState()`，读 `payload.identity.deviceId`。需要固件 / 版本字段时用 `scope: 'firmware'`，不要再用 `getOnekeyFeatures`。
 
 ```ts
 const res = await HardwareSDK.getDeviceState(connectId);

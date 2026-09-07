@@ -53,7 +53,7 @@ Passing `connectProtocol` on a call is a strict expectation: the SDK will not si
 
 ## Device state
 
-Use [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state). `getFeatures` is deprecated; existing apps may keep it. On Protocol V2 the SDK still maps the live device into a compatibility Features object.
+Use [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state). `getFeatures` is Protocol V1 only (Classic / Mini / Touch / Pro); Pro 2 and Neo reject it before any compatibility projection. `getDeviceState` still includes a Features-shaped snapshot for V1 and V2.
 
 ```ts
 const state = await HardwareSDK.getDeviceState(connectId);

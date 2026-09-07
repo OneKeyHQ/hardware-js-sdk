@@ -4,7 +4,7 @@ title: Common Params
 
 # Common Params
 
-Every `HardwareSDK.method(...)` takes a `params` object. The keys on this page are accepted by **every** method. Chain- and device-specific fields (`path`, `coin`, `tx`, `message`, …) stay on each method page.
+Every `HardwareSDK.method(...)` takes a `params` object. The keys on this page are the shared set for address, signing, and device methods. They are **not** universal: `openWalletSession` rejects `useEmptyPassphrase`, `initSession`, `deviceId`, and `passphraseState` even when those values are `false` or spread from a shared defaults object. Chain- and device-specific fields (`path`, `coin`, `tx`, `message`, …) stay on each method page.
 
 This page is the parameter **reference**. For the call lifecycle, see the [Core API Guide](/en/hardware-sdk/core-api-guide). For response IDs (`connectId`, `deviceId`, `uuid`, `session_id`, …), see [Identifiers](/en/hardware-sdk/concepts/identifiers).
 
@@ -21,7 +21,7 @@ This page is the parameter **reference**. For the call lifecycle, see the [Core 
 | `timeout` | `number` | Per-call timeout (ms) | Raise for long-running ops (firmware update, large PSBT). |
 | `detectBootloaderDevice` | `boolean` | Fail fast if the device is in Bootloader | Use on signing paths where Bootloader is never valid. |
 | `skipWebDevicePrompt` | `boolean` | Skip the WebUSB chooser on re-entry | **WebUSB only.** Reuses prior WebUSB authorization. |
-| `keepSession` | `boolean` | **Deprecated** | Use `initSession + passphraseState` or `openWalletSession`. |
+| `keepSession` | `boolean` | Hold the transport after the call | Controls whether `Device.run()` releases the link. Not a wallet binding and **not** replaced by `passphraseState` or `openWalletSession`. Keep it on USB consecutive signing / check-then-upgrade and Electron BLE firmware windows. |
 
 ## Transport-specific notes
 

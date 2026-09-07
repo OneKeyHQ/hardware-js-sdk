@@ -64,7 +64,7 @@ console.log(address.payload.address);
 
 读取 `payload` 之前必须先看 `success`。`useEmptyPassphrase: true` 把第一次调用钉在标准钱包，避免残留的隐藏钱包会话悄悄改掉地址。
 
-`getDeviceState()` 是 V1/V2 读取入口。`getFeatures()` 已废弃；现有应用可以继续用它，读 `payload.device_id`。
+`getDeviceState()` 是 V1/V2 读取入口。`getFeatures()` 只支持 Protocol V1；Pro 2 / Neo 必须用 `getDeviceState()`。
 
 WebUSB 需要 HTTPS 和用户手势。BLE 需要系统蓝牙权限。
 
