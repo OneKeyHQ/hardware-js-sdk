@@ -1296,6 +1296,10 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceInterruptedFromUser,
             HardwareErrorCode.CallQueueActionCancelled,
           ].includes(error.errorCode) ||
+          (DataManager.isBleConnect(env) &&
+            [HardwareErrorCode.BleDeviceDisconnected, HardwareErrorCode.PollingTimeout].includes(
+              error.errorCode
+            )) ||
           isTerminalBleStaleBondError(error) ||
           isDeviceIdentityMismatchError(error)
         ) {

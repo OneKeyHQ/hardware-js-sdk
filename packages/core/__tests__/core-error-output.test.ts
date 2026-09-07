@@ -1,4 +1,8 @@
-import { initCore } from '../src/core';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
+import { initConnector, initCore } from '../src/core';
+import { DataManager } from '../src/data-manager';
+import TransportManager from '../src/data-manager/TransportManager';
 import { IFRAME } from '../src/events';
 
 jest.mock('../src/data/config', () => ({
@@ -9,12 +13,62 @@ jest.mock('../src/data/config', () => ({
 jest.mock('../src/data-manager/TransportManager', () => ({
   __esModule: true,
   default: {
+    load: jest.fn(),
     configure: jest.fn().mockResolvedValue(undefined),
     getTransport: jest.fn(() => undefined),
   },
 }));
 
 describe('Core 错误输出边界', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test.each([
+    HardwareErrorCode.BleDeviceNotBonded,
+    HardwareErrorCode.BleDeviceBondedCanceled,
+    HardwareErrorCode.BleDeviceDisconnected,
+    HardwareErrorCode.PollingTimeout,
+  ])(
+    'preserves terminal BLE error %s in the public response without polling again',
+    async errorCode => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      const error = ERRORS.TypedError(errorCode);
+      const acquire = jest.fn().mockRejectedValue(error);
+      jest.spyOn(TransportManager, 'getTransport').mockReturnValue({
+        acquire,
+        release: jest.fn().mockResolvedValue(true),
+        stop: jest.fn().mockResolvedValue(undefined),
+      } as never);
+      const core = initCore();
+      initConnector();
+
+      try {
+        const response = await core.handleMessage({
+          id: 1,
+          event: IFRAME.CALL,
+          type: IFRAME.CALL,
+          payload: {
+            method: 'getDeviceState',
+            connectId: 'ble-pairing-test',
+            forceProtocolDetection: true,
+            retryCount: 1,
+            pollIntervalTime: 1,
+            timeout: 1000,
+          },
+        } as never);
+
+        expect(response).toMatchObject({
+          success: false,
+          payload: { code: errorCode, error: error.message },
+        });
+        expect(acquire).toHaveBeenCalledTimes(1);
+      } finally {
+        await core.dispose();
+      }
+    }
+  );
+
   test('连接失败只返回结构化错误，不直接写入 stdout', async () => {
     const stdout = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     const core = initCore();
