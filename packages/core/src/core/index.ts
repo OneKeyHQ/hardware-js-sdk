@@ -474,14 +474,19 @@ const onCallDevice = async (
 
   try {
     // Wait for any pending task except our own (self-wait would deadlock).
-    if (method.connectId) {
-      await context.waitForCallbackTasks(method.connectId, preWarmCallbackTask);
+    const { connectId } = method;
+    if (connectId) {
+      await requestQueue.waitForTask(task, () =>
+        context.waitForCallbackTasks(connectId, preWarmCallbackTask)
+      );
     }
 
-    await waitForPendingPromise(
-      method.connectId ?? '',
-      getPrePendingCallPromise,
-      removePrePendingCallPromise
+    await requestQueue.waitForTask(task, () =>
+      waitForPendingPromise(
+        method.connectId ?? '',
+        getPrePendingCallPromise,
+        removePrePendingCallPromise
+      )
     );
 
     const inner = async (): Promise<void> => {
@@ -730,6 +735,9 @@ const onCallDevice = async (
       skipInitialize: canSkipInitialize(method, device),
       ...parseInitOptions(method),
     };
+    if (method.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+    }
     const deviceRun = () => device.run(inner, runOptions);
     task.callPromise = createDeferred<any>(deviceRun);
 
@@ -750,6 +758,7 @@ const onCallDevice = async (
     );
     Log.debug('Call API - Run Error: ', error);
     completeMethodRequestContext(method, error);
+    return messageResponse;
   } finally {
     // Release the pre-warm callback task so the next real call can proceed.
     preWarmCallbackTask?.resolve();

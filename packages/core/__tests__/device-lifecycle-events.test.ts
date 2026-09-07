@@ -250,6 +250,59 @@ describe('public device lifecycle events', () => {
     }
   );
 
+  test.each([
+    ['V1', 'callback'],
+    ['V1', 'cleanup'],
+    ['V2', 'callback'],
+    ['V2', 'cleanup'],
+  ] as const)(
+    'does not run a cancelled %s request waiting for %s after acquire',
+    async (protocol, phase) => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      jest.spyOn(DataManager, 'checkAndReloadData').mockResolvedValue(undefined);
+      jest.spyOn(TransportManager, 'configure').mockResolvedValue(undefined);
+      const device = createInitializedDevice(protocol);
+      jest.spyOn(Device, 'fromDescriptor').mockReturnValue(device);
+      const acquire = jest.spyOn(device, 'acquire').mockResolvedValue(undefined);
+      jest.spyOn(device, 'hasUnexpectedMode').mockReturnValue(undefined);
+      jest.spyOn(device, 'getCurrentMethodVersionRange').mockReturnValue({} as never);
+      device.commands = { disposed: false, dispose: jest.fn(), checkDisposed: jest.fn() } as never;
+      const deviceRun = jest.spyOn(device, 'run');
+      core = initCore();
+      const context = (core as any).getCoreContext();
+      const gate = createDeferred<void>();
+      const connectId = `post-acquire-${protocol}-${phase}`;
+      jest.spyOn(device, 'initialize').mockImplementation(() => {
+        if (phase === 'callback') context.registerCallbackTask(connectId, gate);
+        else context.setPrePendingCallPromise(connectId, gate.promise);
+        return Promise.resolve();
+      });
+
+      const result = core.handleMessage({
+        id: 203,
+        event: IFRAME.CALL,
+        type: IFRAME.CALL,
+        payload: { method: 'getDeviceState', connectId, connectProtocol: protocol },
+      } as CoreMessage);
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+      expect(acquire).toHaveBeenCalledTimes(1);
+      expect(deviceRun).not.toHaveBeenCalled();
+
+      cancel(context, connectId);
+      await expect(result).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.CallQueueActionCancelled },
+      });
+      gate.resolve();
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+      expect(deviceRun).not.toHaveBeenCalled();
+    }
+  );
+
   test('keeps the cleanup barrier when its deadline expires', async () => {
     const realSetTimeout = setTimeout;
     jest

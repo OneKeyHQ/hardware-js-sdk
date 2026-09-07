@@ -2,6 +2,10 @@ import { CORE_EVENT, DEVICE, DEVICE_EVENT, initCore } from '@onekeyfe/hd-core';
 
 import HardwareCommonConnectSdk from '../src';
 
+jest.mock('../../core/src/data/config', () => ({
+  getSDKVersion: jest.fn(() => '1.0.0-test'),
+  DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0-test/',
+}));
 jest.mock('@onekeyfe/hd-core', () => {
   const actual = jest.requireActual('@onekeyfe/hd-core');
   return {

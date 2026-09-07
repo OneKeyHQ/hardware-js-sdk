@@ -2,9 +2,14 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import EventEmitter from 'events';
 import { CORE_EVENT, initCore } from '@onekeyfe/hd-core';
-import sdkExport, { messagePromises } from '../src';
 import { createDeferred } from '@onekeyfe/hd-shared';
 
+import sdkExport, { messagePromises } from '../src';
+
+jest.mock('../../core/src/data/config', () => ({
+  getSDKVersion: jest.fn(() => '1.0.0-test'),
+  DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0-test/',
+}));
 jest.mock('@onekeyfe/hd-core', () => ({
   ...jest.requireActual('@onekeyfe/hd-core'),
   __esModule: true,
