@@ -47,6 +47,7 @@ import {
   getInfosForServiceUuid,
   isSameBleUuid,
 } from './constants';
+import { isNativeBleDisconnectError, toBleDisconnectHardwareError } from './bleNativeDisconnect';
 import {
   isBleStaleBondHardwareError,
   isNativeBleStaleBondError,
@@ -168,6 +169,23 @@ const isWedgedWriteError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleWriteCharacteristicError &&
   typeof (error as { message?: unknown })?.message === 'string' &&
   (error as { message: string }).message.startsWith(WEDGED_WRITE_MESSAGE);
+const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
+  const code = (error as { errorCode?: unknown })?.errorCode;
+  // Bonding and GATT failures are not evidence of a protocol mismatch. Preserve
+  // them instead of probing another protocol on an unusable connection.
+  // Native PLX disconnects (errorCode 201 / iOS 7) must match before they are
+  // mapped: Protocol V2 writes rethrow them unchanged unless normalized first.
+  return (
+    isBleStaleBondHardwareError(error) ||
+    isNativeBleDisconnectError(error) ||
+    code === HardwareErrorCode.BleDeviceNotBonded ||
+    code === HardwareErrorCode.BleDeviceBondedCanceled ||
+    code === HardwareErrorCode.BleDeviceDisconnected ||
+    code === HardwareErrorCode.BleCharacteristicNotifyError ||
+    code === HardwareErrorCode.BleCharacteristicNotifyChangeFailure ||
+    code === HardwareErrorCode.BleWriteCharacteristicError
+  );
+};
 /** Consecutive wedged writes on one device before the BLE manager itself is recreated. */
 export const BLE_WRITE_TIMEOUT_MANAGER_RESET_THRESHOLD = 2;
 const DEVICE_SCAN_TIMEOUT_MS = 3000;
@@ -1170,7 +1188,7 @@ export default class ReactNativeBleTransport {
       this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
       return { uuid, protocolType };
     } catch (error) {
-      if (isBleStaleBondHardwareError(error)) {
+      if (isBleStaleBondHardwareError(error) || shouldRethrowProtocolProbeError(error)) {
         await this.disconnectUnlocked(uuid);
       } else {
         await this.releaseUnlocked(uuid, true);
@@ -2339,9 +2357,7 @@ export default class ReactNativeBleTransport {
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
       Log?.debug('[ReactNativeBleTransport] Protocol V1 GetFeatures probe failed:', error);
-      // A wedged write already dropped the link, so probing another protocol on it
-      // would only fail against a torn-down transport: surface the real cause.
-      if (isWedgedWriteError(error)) {
+      if (shouldRethrowProtocolProbeError(error)) {
         throw error;
       }
       return false;
@@ -2366,7 +2382,7 @@ export default class ReactNativeBleTransport {
         this.protocolV2Assemblers.get(uuid)?.reset();
         this.resetProtocolV2Frames(uuid);
       },
-      shouldRethrow: isBleStaleBondHardwareError,
+      shouldRethrow: shouldRethrowProtocolProbeError,
     });
     if (!detected) {
       this.clearProbeProtocol(uuid, 'V2');
@@ -2512,6 +2528,9 @@ export default class ReactNativeBleTransport {
           const bondError = toBleStaleBondHardwareError(error);
           this.rememberStaleBondError(uuid, bondError);
           throw bondError;
+        }
+        if (isNativeBleDisconnectError(error)) {
+          throw toBleDisconnectHardwareError(error);
         }
         if (
           getFirmwareUploadWriteRetryType(error) !== 'congested' ||
