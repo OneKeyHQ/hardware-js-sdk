@@ -33,23 +33,7 @@ Hardware SDK 1.2.x: `searchDevices` → `getDeviceState` → `openWalletSession`
 
 ### Standard wallet
 
-```mermaid
-sequenceDiagram
-    participant App
-    participant SDK
-    participant Device
-
-    App->>SDK: getDeviceState(connectId)
-    SDK-->>App: identity.deviceId
-    App->>SDK: openWalletSession({ mode: standard })
-    SDK->>Device: Open standard wallet
-    Device-->>SDK: Ready
-    SDK-->>App: deviceId, walletType standard
-    App->>SDK: evmGetAddress(..., useEmptyPassphrase: true)
-    SDK->>Device: Derive on standard wallet
-    Device-->>SDK: Address
-    SDK-->>App: { address }
-```
+<DocFlow variant="lifecycle" locale="en" />
 
 ```ts
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -66,29 +50,7 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 
 ### Hidden wallet (open once, reuse fingerprint)
 
-```mermaid
-sequenceDiagram
-    participant App
-    participant SDK
-    participant Device
-
-    App->>SDK: openWalletSession({ mode: select-hidden })
-    SDK->>Device: Select hidden wallet
-    Device-->>SDK: REQUEST_PASSPHRASE
-    SDK-->>App: UI_REQUEST.REQUEST_PASSPHRASE
-    Note over App: On-device or software input
-    App->>SDK: uiResponse(passphrase)
-    SDK->>Device: Confirm hidden wallet
-    Device-->>SDK: Ready
-    SDK-->>App: deviceId + passphraseState
-    Note over App: Persist deviceId + passphraseState only
-    App->>SDK: evmGetAddress(..., passphraseState)
-    SDK->>Device: Same hidden wallet
-    SDK-->>App: { address }
-    App->>SDK: btcGetAddress(..., passphraseState)
-    SDK->>Device: Same hidden wallet, no new prompt
-    SDK-->>App: { address }
-```
+<DocFlow variant="hidden" locale="en" />
 
 ```ts
 import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';

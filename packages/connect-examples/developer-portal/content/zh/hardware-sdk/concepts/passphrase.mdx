@@ -33,23 +33,7 @@ Hardware SDK 1.2.x：`searchDevices` → `getDeviceState` → `openWalletSession
 
 ### 标准钱包
 
-```mermaid
-sequenceDiagram
-    participant App as 应用
-    participant SDK
-    participant Device as 设备
-
-    App->>SDK: getDeviceState(connectId)
-    SDK-->>App: identity.deviceId
-    App->>SDK: openWalletSession({ mode: standard })
-    SDK->>Device: 打开标准钱包
-    Device-->>SDK: 就绪
-    SDK-->>App: deviceId, walletType standard
-    App->>SDK: evmGetAddress(..., useEmptyPassphrase: true)
-    SDK->>Device: 在标准钱包上派生
-    Device-->>SDK: 地址
-    SDK-->>App: { address }
-```
+<DocFlow variant="lifecycle" locale="zh" />
 
 ```ts
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -66,29 +50,7 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 
 ### 隐藏钱包（开一次，复用指纹）
 
-```mermaid
-sequenceDiagram
-    participant App as 应用
-    participant SDK
-    participant Device as 设备
-
-    App->>SDK: openWalletSession({ mode: select-hidden })
-    SDK->>Device: 选择隐藏钱包
-    Device-->>SDK: REQUEST_PASSPHRASE
-    SDK-->>App: UI_REQUEST.REQUEST_PASSPHRASE
-    Note over App: 设备端或软件端输入
-    App->>SDK: uiResponse(passphrase)
-    SDK->>Device: 确认隐藏钱包
-    Device-->>SDK: 就绪
-    SDK-->>App: deviceId + passphraseState
-    Note over App: 只持久化 deviceId + passphraseState
-    App->>SDK: evmGetAddress(..., passphraseState)
-    SDK->>Device: 同一隐藏钱包
-    SDK-->>App: { address }
-    App->>SDK: btcGetAddress(..., passphraseState)
-    SDK->>Device: 同一隐藏钱包，不再提示
-    SDK-->>App: { address }
-```
+<DocFlow variant="hidden" locale="zh" />
 
 ```ts
 import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
