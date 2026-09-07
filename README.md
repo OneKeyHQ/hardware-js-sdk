@@ -42,7 +42,7 @@ architecture boundary.
 
 ## Documentation
 
-- [Developer documentation](https://developer.onekey.so/connect-to-hardware/hardware-sdk):
+- [Developer documentation](https://developer.onekey.so/en/hardware-sdk/getting-started):
   integration and public API guidance.
 - [Internal documentation index](./docs/README.md): architecture, protocol, device, SDK, business,
   design, testing, and maintenance facts.

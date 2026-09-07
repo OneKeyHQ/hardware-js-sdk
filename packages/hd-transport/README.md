@@ -24,4 +24,4 @@ The same task can be run from the repository root with `yarn update-protobuf`. T
 
 ## Docs
 
-Documentation is available [hardware-js-sdk](https://developer.onekey.so/connect-to-hardware/hardware-sdk/start)
+Documentation is available [Hardware SDK Getting Started](https://developer.onekey.so/en/hardware-sdk/getting-started)
