@@ -11,9 +11,9 @@ import {
   UI_REQUEST,
   DEVICE_EVENT,
   LOG_EVENT,
+  OpenWalletSessionMode,
   type CoreApi,
   type SearchDevice,
-  type Features,
 } from '@onekeyfe/hd-core';
 import { BleManager as BlePlxManager } from 'react-native-ble-plx';
 
@@ -107,10 +107,11 @@ export const BleDemoScreen = () => {
   const [sdkReady, setSdkReady] = useState(false);
   const [initializing, setInitializing] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [busy, setBusy] = useState<null | 'features' | 'address' | 'sign'>(null);
+  const [busy, setBusy] = useState<null | 'state' | 'address' | 'sign'>(null);
   const [devices, setDevices] = useState<SearchDevice[]>([]);
   const [selected, setSelected] = useState<SearchDevice | null>(null);
-  const [deviceFeatures, setDeviceFeatures] = useState<Features | null>(null);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [connectProtocol, setConnectProtocol] = useState<string | null>(null);
   const [logs, setLogs] = useState<LogLine[]>([]);
 
   const sdkRef = useRef<CoreApi | null>(null);
@@ -265,23 +266,39 @@ export const BleDemoScreen = () => {
     }
   }, [appendLog, ensureBleReady]);
 
-  const onGetFeatures = useCallback(async () => {
+  const readDeviceIdentity = useCallback(async () => {
+    if (!sdkRef.current || !selected?.connectId) {
+      throw new Error('Select a device first');
+    }
+    const res = await sdkRef.current.getDeviceState(selected.connectId);
+    appendLog('info', { getDeviceState: res });
+    if (!res?.success) {
+      throw new Error((res as any)?.payload?.error || 'getDeviceState failed');
+    }
+    const nextDeviceId = res.payload?.identity?.deviceId;
+    if (!nextDeviceId) {
+      throw new Error('identity.deviceId missing');
+    }
+    setDeviceId(nextDeviceId);
+    setConnectProtocol(res.payload?.protocol ?? null);
+    return { deviceId: nextDeviceId, protocol: res.payload?.protocol };
+  }, [appendLog, selected?.connectId]);
+
+  const onGetDeviceState = useCallback(async () => {
     if (!sdkRef.current || !selected?.connectId) {
       Alert.alert('Tip', 'Please select a device first');
       return;
     }
     try {
-      setBusy('features');
-      appendLog('info', `Get features connectId=${selected.connectId}`);
-      const res = await sdkRef.current.getFeatures(selected.connectId);
-      appendLog('info', { getFeatures: res });
-      if (res?.success) setDeviceFeatures(res.payload as Features);
+      setBusy('state');
+      appendLog('info', `getDeviceState connectId=${selected.connectId}`);
+      await readDeviceIdentity();
     } catch (e: any) {
-      appendLog('error', `Get features error: ${e?.message || e}`);
+      appendLog('error', `getDeviceState error: ${e?.message || e}`);
     } finally {
       setBusy(null);
     }
-  }, [appendLog, selected?.connectId]);
+  }, [appendLog, readDeviceIdentity, selected?.connectId]);
 
   const onGetAddress = useCallback(async () => {
     if (!sdkRef.current || !selected?.connectId) {
@@ -296,25 +313,29 @@ export const BleDemoScreen = () => {
       };
       appendLog('info', { evmGetAddress: params });
 
-      // ensure deviceId from features
-      let deviceId = deviceFeatures?.device_id as string | undefined;
-      if (!deviceId) {
-        const f = await sdkRef.current.getFeatures(selected.connectId);
-        appendLog('info', { ensureDeviceIdFromFeatures: f });
-        if (!f?.success) throw new Error(f?.payload?.error || 'getFeatures failed');
-        setDeviceFeatures(f.payload as Features);
-        deviceId = (f.payload as any)?.device_id as string | undefined;
+      const identity = deviceId
+        ? { deviceId, protocol: connectProtocol }
+        : await readDeviceIdentity();
+      const opened = await sdkRef.current.openWalletSession(selected.connectId, {
+        mode: OpenWalletSessionMode.Standard,
+      });
+      appendLog('info', { openWalletSession: opened });
+      if (!opened?.success) {
+        throw new Error((opened as any)?.payload?.error || 'openWalletSession failed');
       }
-      if (!deviceId) throw new Error('device_id not found');
 
-      const res = await (sdkRef.current as any).evmGetAddress(selected.connectId, deviceId, params);
+      const res = await (sdkRef.current as any).evmGetAddress(
+        selected.connectId,
+        identity.deviceId,
+        { ...params, useEmptyPassphrase: true }
+      );
       appendLog('info', { evmGetAddressRes: res });
     } catch (e: any) {
       appendLog('error', `Get address error: ${e?.message || e}`);
     } finally {
       setBusy(null);
     }
-  }, [appendLog, selected?.connectId, deviceFeatures]);
+  }, [appendLog, connectProtocol, deviceId, readDeviceIdentity, selected?.connectId]);
 
   const onSignMessage = useCallback(async () => {
     if (!sdkRef.current || !selected?.connectId) {
@@ -332,18 +353,22 @@ export const BleDemoScreen = () => {
       };
       appendLog('info', { evmSignMessage: params });
 
-      // ensure deviceId from features
-      let deviceId = deviceFeatures?.device_id as string | undefined;
-      if (!deviceId) {
-        const f = await sdkRef.current.getFeatures(selected.connectId);
-        appendLog('info', { ensureDeviceIdFromFeatures: f });
-        if (!f?.success) throw new Error(f?.payload?.error || 'getFeatures failed');
-        setDeviceFeatures(f.payload as Features);
-        deviceId = (f.payload as any)?.device_id as string | undefined;
+      const identity = deviceId
+        ? { deviceId, protocol: connectProtocol }
+        : await readDeviceIdentity();
+      const opened = await sdkRef.current.openWalletSession(selected.connectId, {
+        mode: OpenWalletSessionMode.Standard,
+      });
+      appendLog('info', { openWalletSession: opened });
+      if (!opened?.success) {
+        throw new Error((opened as any)?.payload?.error || 'openWalletSession failed');
       }
-      if (!deviceId) throw new Error('device_id not found');
 
-      const res = await (sdkRef.current as any).evmSignMessage(selected.connectId, deviceId, params);
+      const res = await (sdkRef.current as any).evmSignMessage(
+        selected.connectId,
+        identity.deviceId,
+        { ...params, useEmptyPassphrase: true }
+      );
       appendLog('info', { evmSignMessageRes: res });
       if (!res?.success) {
         Alert.alert('Sign failed', res?.payload?.error || 'unknown');
@@ -353,14 +378,16 @@ export const BleDemoScreen = () => {
     } finally {
       setBusy(null);
     }
-  }, [appendLog, selected?.connectId, deviceFeatures]);
+  }, [appendLog, connectProtocol, deviceId, readDeviceIdentity, selected?.connectId]);
 
   const clearLogs = useCallback(() => setLogs([]), []);
 
   const selectedMeta = useMemo(() => {
     if (!selected) return 'Not selected';
-    return `${selected.name} · ${selected.connectId || 'n/a'}`;
-  }, [selected]);
+    return `${selected.name} · ${selected.connectId || 'n/a'}${
+      connectProtocol ? ` · ${connectProtocol}` : ''
+    }${deviceId ? ` · deviceId ${deviceId}` : ''}`;
+  }, [connectProtocol, deviceId, selected]);
 
   return (
     <ScrollView contentContainerStyle={styles.content} style={styles.container}>
@@ -368,7 +395,7 @@ export const BleDemoScreen = () => {
       <View style={styles.header}>
         <Text style={styles.title}>Bluetooth (BLE)</Text>
         <Text style={styles.subtitle}>
-          Initialize SDK, scan and select a device, then call features, address and signing methods. Logs are printed below.
+          Initialize SDK, scan a Classic / Pro / Pro 2 / Neo, then call getDeviceState, address and signing. Protocol V1 and V2 share this path.
         </Text>
       </View>
 
@@ -388,7 +415,15 @@ export const BleDemoScreen = () => {
         </View>
 
         {devices.map((d) => (
-          <TouchableOpacity key={`${d.uuid}-${d.connectId}`} style={styles.listItem} onPress={() => setSelected(d)}>
+          <TouchableOpacity
+            key={`${d.uuid}-${d.connectId}`}
+            style={styles.listItem}
+            onPress={() => {
+              setSelected(d);
+              setDeviceId(null);
+              setConnectProtocol((d as SearchDevice & { connectProtocol?: string }).connectProtocol ?? null);
+            }}
+          >
             <Text style={styles.listName}>{d.name || 'Unnamed device'}</Text>
             <Text style={styles.listHint}>connectId: {d.connectId || 'n/a'}</Text>
           </TouchableOpacity>
@@ -403,10 +438,10 @@ export const BleDemoScreen = () => {
         <Text style={styles.sectionTitle}>Device Actions</Text>
         <TouchableOpacity
           style={styles.btn}
-          onPress={onGetFeatures}
+          onPress={onGetDeviceState}
           disabled={!sdkReady || !selected || scanning || !!busy}
         >
-          <Text style={styles.btnText}>getFeatures</Text>
+          <Text style={styles.btnText}>getDeviceState</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.btn}

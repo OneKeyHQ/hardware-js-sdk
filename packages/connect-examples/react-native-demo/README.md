@@ -1,6 +1,8 @@
 # React Native BLE Demo (Expo Dev Client)
 
-This demo shows how to use `@onekeyfe/hd-ble-sdk` in a React Native (Expo Dev Client) app to connect to a OneKey hardware device via BLE, including scanning, fetching features, getting addresses and signing, with realtime logs.
+This demo shows how to use `@onekeyfe/hd-ble-sdk` **1.2.x** in a React Native (Expo Dev Client) app to connect to a OneKey hardware device via BLE, including scanning, `getDeviceState`, getting addresses and signing, with realtime logs.
+
+Classic / Mini / Touch / Pro (Protocol V1) and Pro 2 / Neo (Protocol V2) share this path. The SDK probes the protocol after connect — do not branch on BLE name.
 
 > Important: You must run a Dev Client built by `expo run:ios|android`. Expo Go does not include required native BLE modules.
 
@@ -84,9 +86,9 @@ Declared in `app.json`:
 
 - `Init SDK`: Initialize BLE SDK (subscribe to UI/DEVICE/LOG events)
 - `Start Scan`: Scan devices (with permission & BLE state checks; 15s timeout + `sdk.cancel()`)
-- `Get Features`: Read device features (includes `device_id`)
-- `Get EVM Address`: Get EVM address
-- `Sign Message (EVM)`: Sign an EVM message
+- `getDeviceState`: Unified V1/V2 snapshot (`identity.deviceId`, `protocol`)
+- `evmGetAddress`: Opens the standard wallet, then reads an EVM address
+- `evmSignMessage`: Opens the standard wallet, then signs an EVM message
 - `Logs`: Realtime SDK & Transport logs
 
 > Buttons are disabled during operations (scanning/busy) and automatically re-enabled when done.

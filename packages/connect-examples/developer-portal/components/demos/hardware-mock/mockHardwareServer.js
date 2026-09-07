@@ -214,6 +214,27 @@ export function createMockHardwareServer() {
         };
       }
 
+      case 'getDeviceState': {
+        const connectId = typeof params?.connectId === 'string' ? params.connectId : null;
+        if (!connectId) throw new Error('connectId 不能为空。');
+
+        session.connected = true;
+        return {
+          success: true,
+          payload: {
+            protocol: session.deviceType === 'pro2' || session.deviceType === 'neo' ? 'V2' : 'V1',
+            identity: {
+              deviceId: 'OK-EMULATOR-001',
+              serialNo: 'OK-EMULATOR-001',
+              deviceType: session.deviceType,
+              label: session.deviceName,
+            },
+            status: { unlocked: session.unlocked },
+            versions: { firmware: '3.0.0-mock' },
+          },
+        };
+      }
+
       case 'getFeatures': {
         const connectId = typeof params?.connectId === 'string' ? params.connectId : null;
         if (!connectId) throw new Error('connectId 不能为空。');

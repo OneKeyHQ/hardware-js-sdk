@@ -223,7 +223,7 @@ class ViewController: UIViewController {
 
         // 配置按钮
         configure(searchDeviceButton, title: "searchDevices", action: #selector(onSearch))
-        configure(getFeaturesButton, title: "getFeatures", action: #selector(onGetFeatures))
+        configure(getFeaturesButton, title: "getDeviceState", action: #selector(onGetDeviceState))
         configure(getBtcAddressButton, title: "btcGetAddress", action: #selector(onGetBitcoinAddress))
         configure(getEvmAddressButton, title: "evmGetAddress", action: #selector(onGetEvmAddress))
         configure(checkFirmwareButton, title: "checkFirmwareRelease", action: #selector(onCheckFirmwareRelease))
@@ -1219,28 +1219,29 @@ extension ViewController: UIGestureRecognizerDelegate {
 
 // MARK: - Button Actions
 extension ViewController {
-    @objc func onGetFeatures() {
-        print("🔵 onGetFeatures called")
+    @objc func onGetDeviceState() {
+        print("🔵 onGetDeviceState called")
         if isGlobalLoading { return }
-        startGlobalLoading("Fetching features...")
+        startGlobalLoading("Fetching device state...")
         let data: [String: Any] = [
-            "name": "getFeatures",
+            "name": "getDeviceState",
             "data": [
                 "connectId": self.device?.getConnectId() ?? "",
-                "deviceId": self.device?.getDeviceId() ?? "",
             ],
         ]
 
         bridge.call(handlerName: "bridgeCommonCall", data: data) { responseData in
-            print("getFeatures response: ", responseData ?? "")
+            print("getDeviceState response: ", responseData ?? "")
             if let responseDictionary = responseData as? [String: Any] {
-                self.updateResultText("Features: \(responseDictionary)")
+                self.updateResultText("DeviceState: \(responseDictionary)")
 
-                if let success = responseDictionary["success"] as? Int,
-                    success == 1,
-                    let payload = responseDictionary["payload"] as? [String: Any],
-                    let deviceId = payload["device_id"] as? String
-                {
+                let successFlag = responseDictionary["success"]
+                let succeeded =
+                    (successFlag as? Bool) == true || (successFlag as? Int) == 1
+                let payload = responseDictionary["payload"] as? [String: Any]
+                let identity = payload?["identity"] as? [String: Any]
+                let deviceId = identity?["deviceId"] as? String
+                if succeeded, let deviceId, !deviceId.isEmpty {
                     self.device = Device(
                         connectId: self.device?.getConnectId()
                             ?? self.peripheral.identifier.uuidString, deviceId: deviceId)
@@ -1252,7 +1253,7 @@ extension ViewController {
                 }
             } else {
                 print("⚠️ Could not parse response as dictionary")
-                self.updateResultText("Failed to get features")
+                self.updateResultText("Failed to get device state")
             }
             // stop loading regardless
             self.stopGlobalLoading()
