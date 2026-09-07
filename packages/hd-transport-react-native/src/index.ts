@@ -47,6 +47,7 @@ import {
   getInfosForServiceUuid,
   isSameBleUuid,
 } from './constants';
+import { isNativeBleDisconnectError, toBleDisconnectHardwareError } from './bleNativeDisconnect';
 import {
   isBleStaleBondHardwareError,
   isNativeBleStaleBondError,
@@ -172,8 +173,11 @@ const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
   const code = (error as { errorCode?: unknown })?.errorCode;
   // Bonding and GATT failures are not evidence of a protocol mismatch. Preserve
   // them instead of probing another protocol on an unusable connection.
+  // Native PLX disconnects (errorCode 201 / iOS 7) must match before they are
+  // mapped: Protocol V2 writes rethrow them unchanged unless normalized first.
   return (
     isBleStaleBondHardwareError(error) ||
+    isNativeBleDisconnectError(error) ||
     code === HardwareErrorCode.BleDeviceNotBonded ||
     code === HardwareErrorCode.BleDeviceBondedCanceled ||
     code === HardwareErrorCode.BleDeviceDisconnected ||
@@ -1184,7 +1188,7 @@ export default class ReactNativeBleTransport {
       this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
       return { uuid, protocolType };
     } catch (error) {
-      if (isBleStaleBondHardwareError(error)) {
+      if (isBleStaleBondHardwareError(error) || shouldRethrowProtocolProbeError(error)) {
         await this.disconnectUnlocked(uuid);
       } else {
         await this.releaseUnlocked(uuid, true);
@@ -2524,6 +2528,9 @@ export default class ReactNativeBleTransport {
           const bondError = toBleStaleBondHardwareError(error);
           this.rememberStaleBondError(uuid, bondError);
           throw bondError;
+        }
+        if (isNativeBleDisconnectError(error)) {
+          throw toBleDisconnectHardwareError(error);
         }
         if (
           getFirmwareUploadWriteRetryType(error) !== 'congested' ||

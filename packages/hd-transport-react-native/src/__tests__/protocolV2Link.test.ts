@@ -848,6 +848,46 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(transport.getProtocolType(uuid)).toBeUndefined();
   });
 
+  test('preserves a native iOS disconnect during an expected Protocol V2 probe', async () => {
+    const { transport, uuid, writeCharacteristic, bleManager } = createHarness({
+      deviceName: 'Neo Test',
+    });
+    const nativeDisconnect = {
+      errorCode: 201,
+      iosErrorCode: 7,
+      reason: 'The specified device has disconnected from us.',
+    };
+    writeCharacteristic.writeWithoutResponse.mockRejectedValueOnce(nativeDisconnect);
+    const probeProtocolV1 = jest.spyOn(transport as any, 'probeProtocolV1');
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+
+    expect(probeProtocolV1).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
+    expect(transport.getProtocolType(uuid)).toBeUndefined();
+  });
+
+  test('preserves a native iOS disconnect during a V2-first probe without falling back to V1', async () => {
+    const { transport, uuid, writeCharacteristic } = createHarness({ deviceName: 'Neo Test' });
+    writeCharacteristic.writeWithoutResponse.mockRejectedValueOnce({
+      errorCode: 201,
+      iosErrorCode: 7,
+      reason: 'The specified device has disconnected from us.',
+    });
+    const probeProtocolV1 = jest.spyOn(transport as any, 'probeProtocolV1');
+
+    await expect(transport.acquire({ uuid, protocolHint: 'V2' })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+
+    expect(probeProtocolV1).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
+    expect(transport.getProtocolType(uuid)).toBeUndefined();
+  });
+
   test.each(['V1', 'V2'] as const)(
     'preserves terminal BLE failures from the %s probe without trying another protocol',
     async protocol => {

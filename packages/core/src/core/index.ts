@@ -1296,7 +1296,7 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceInterruptedFromUser,
             HardwareErrorCode.CallQueueActionCancelled,
           ].includes(error.errorCode) ||
-          (DataManager.isBleConnect(env) &&
+          (env === 'react-native' &&
             [HardwareErrorCode.BleDeviceDisconnected, HardwareErrorCode.PollingTimeout].includes(
               error.errorCode
             )) ||

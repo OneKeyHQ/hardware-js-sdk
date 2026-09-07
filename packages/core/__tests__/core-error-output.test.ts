@@ -69,6 +69,43 @@ describe('Core 错误输出边界', () => {
     }
   );
 
+  test('desktop BLE still polls after a transient disconnect instead of failing immediately', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('desktop-web-ble' as never);
+    const error = ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    const acquire = jest.fn().mockRejectedValue(error);
+    jest.spyOn(TransportManager, 'getTransport').mockReturnValue({
+      acquire,
+      release: jest.fn().mockResolvedValue(true),
+      stop: jest.fn().mockResolvedValue(undefined),
+    } as never);
+    const core = initCore();
+    initConnector();
+
+    try {
+      const response = await core.handleMessage({
+        id: 1,
+        event: IFRAME.CALL,
+        type: IFRAME.CALL,
+        payload: {
+          method: 'getDeviceState',
+          connectId: 'desktop-ble-disconnect-test',
+          forceProtocolDetection: true,
+          retryCount: 1,
+          pollIntervalTime: 1,
+          timeout: 1000,
+        },
+      } as never);
+
+      expect(response).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceNotFound },
+      });
+      expect(acquire.mock.calls.length).toBeGreaterThan(1);
+    } finally {
+      await core.dispose();
+    }
+  });
+
   test('连接失败只返回结构化错误，不直接写入 stdout', async () => {
     const stdout = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     const core = initCore();
