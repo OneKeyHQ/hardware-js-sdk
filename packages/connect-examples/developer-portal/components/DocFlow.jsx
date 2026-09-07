@@ -23,7 +23,7 @@ const copy = {
       },
     ],
     walletNote:
-      'resume-hidden is optional. Skip it: the first later call that carries passphraseState already runs DeviceSessionGet.',
+      'There is no resume-hidden mode. Later calls that carry passphraseState already run DeviceSessionGet inside Core.',
     hiddenTitle: 'Hidden wallet, one prompt',
     hidden: [
       { from: 'App', to: 'SDK', t: 'openWalletSession(select-hidden)' },
@@ -66,7 +66,7 @@ const copy = {
       },
     ],
     walletNote:
-      'resume-hidden 是可选的。不必调：后续第一笔带 passphraseState 的调用里，Core 已经会发 DeviceSessionGet。',
+      '没有 resume-hidden。后续带 passphraseState 的调用里，Core 已经会发 DeviceSessionGet。',
     hiddenTitle: '隐藏钱包，只提示一次',
     hidden: [
       { from: '应用', to: 'SDK', t: 'openWalletSession(select-hidden)' },

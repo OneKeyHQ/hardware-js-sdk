@@ -158,7 +158,7 @@ await HardwareSDK.evmSignTransaction(connectId, deviceId, { ... });
   `openWalletSession` 不会返回它。
 - 锁屏（自动锁、手动锁、断开）即失效。
 - 要留在隐藏钱包上，后续方法带已持久化的 `passphraseState`。Core 会恢复固件
-  session。不要为此再调 `openWalletSession({ mode: 'resume-hidden' })`。
+  session。`openWalletSession` 没有 resume mode。
 
 ### `passphraseState` —— 隐藏钱包标识
 

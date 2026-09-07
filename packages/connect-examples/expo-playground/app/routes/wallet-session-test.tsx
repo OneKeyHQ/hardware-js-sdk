@@ -145,23 +145,13 @@ export default function WalletSessionTestPage() {
       const wallet = wallets[slot];
       if (!wallet) throw new Error(`请先记录钱包 ${slot}`);
 
-      const sdk = await SDKUtils.getInstance();
-      const session = requireWalletSession(
-        await sdk.openWalletSession(requireConnectId(currentDevice), {
-          mode: OpenWalletSessionMode.ResumeHidden,
-          deviceId: wallet.deviceId,
-          passphraseState: wallet.passphraseState,
-        })
-      );
-      if (session.walletType !== 'hidden') throw new Error(`钱包 ${slot} 恢复结果异常`);
-
-      const address = await readAddress(session.deviceId, session.passphraseState);
+      const address = await readAddress(wallet.deviceId, wallet.passphraseState);
       const expectedAddress = addresses[slot];
       if (expectedAddress && address !== expectedAddress) {
         throw new Error(`钱包 ${slot} 切换后地址不一致`);
       }
 
-      setWallets(previous => ({ ...previous, [slot]: session }));
+      setWallets(previous => ({ ...previous, [slot]: wallet }));
       setAddresses(previous => ({ ...previous, [slot]: address }));
       setActiveWallet(slot);
       return `已切换到钱包 ${slot}，地址验证通过`;

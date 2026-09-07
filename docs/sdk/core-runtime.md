@@ -120,7 +120,7 @@ Hidden wallet / Attach-to-PIN
   -> V2: REQUEST_PASSPHRASE selection -> AskPassphrase or AskPin(AttachToPin)
          -> Success -> DeviceStatusGet -> DeviceSessionGet()
 
-Resume hidden wallet
+Resume hidden wallet (later methods with passphraseState, not openWalletSession)
   -> V1: Initialize without wallet-binding fields to verify live deviceId,
          then verify passphraseState and reuse the compatibility Session
   -> V2: DeviceSessionGet({ session_id })
@@ -132,14 +132,15 @@ Explicit calls use only `mode` for intent. Do not mix in legacy params:
 | --- | --- | --- |
 | `standard` | None | Open the standard wallet |
 | `select-hidden` | None | Re-select a hidden wallet |
-| `resume-hidden` | `deviceId + passphraseState` | Resume the specified hidden wallet |
 
-To support App debug migration that still branches by device, omitting `mode` keeps legacy-param normalization, in this order:
+`resume-hidden` is not a public mode. Passing it, or `deviceId` / `passphraseState` on `openWalletSession`, returns `CallMethodInvalidParameter`. Resume a bound hidden wallet by passing `passphraseState` on later address / signing methods.
+
+To support App debug migration that still branches by device, omitting `mode` is invalid on `openWalletSession`. Legacy-param normalization stays on `getPassphraseState()`:
 
 1. `useEmptyPassphrase=true`: enter `standard`, ahead of other legacy fields.
 2. Else `initSession=true`: enter `select-hidden`. If legacy `passphraseState` is also provided, Core only invalidates that wallet's old Session on the current device.
-3. Else a complete `deviceId + passphraseState`: enter `resume-hidden`.
-4. Else no wallet binding: enter `select-hidden`. Incomplete binding fields return a parameter error.
+3. Else a complete `deviceId + passphraseState` on a later method: Core restores the hidden wallet inside that method.
+4. Else no wallet binding on `getPassphraseState()`: enter `select-hidden`. Incomplete binding fields return a parameter error.
 
 `useEmptyPassphrase=false` and `initSession=false` do not select a mode by themselves. Mixing explicit `mode` with `useEmptyPassphrase` / `initSession`, or giving `standard` / `select-hidden` a wallet binding, returns `CallMethodInvalidParameter`, so one request cannot carry two flow intents.
 
@@ -152,19 +153,19 @@ Successful `openWalletSession()` results use `walletType` as the discriminator:
 
 Pro2 standard wallets still use `btc_test_address` from the hardware `DeviceSession` to build an internal index, but that fingerprint is not exposed to the App. Hidden-wallet public `passphraseState` comes from the same hardware response. Core does not invent wallet identity from Features, descriptors, or the Store. Cross-protocol wallet type is only `walletType`. When Pro2 needs unlock, wallet type follows device state after unlock and refresh, not the pre-unlock `passphraseProtection` snapshot.
 
-Parameter-validation failures also use Core's unified response shape and are not exposed as a rejected Promise with a raw exception. For example, `resume-hidden` without `deviceId` returns:
+Parameter-validation failures also use Core's unified response shape and are not exposed as a rejected Promise with a raw exception. For example, `mode: 'resume-hidden'` returns:
 
 ```json
 {
   "success": false,
   "payload": {
-    "error": "Missing required parameter: deviceId",
+    "error": "Parameter [mode] must be one of standard or select-hidden.",
     "code": "CallMethodInvalidParameter"
   }
 }
 ```
 
-`openWalletSession({ mode: 'resume-hidden' })` accepts only `deviceId + passphraseState` on both Protocol V1 and V2. Core reads the internal `sessionId` from the unique Store by that key: V1 resumes through `Initialize.session_id`, V2 through `DeviceSessionGet({ session_id })`. Missing V1 cache returns `HardwareErrorCode.WalletSessionInvalid`. Missing V2 cache, firmware rejecting the cached Session, or a returned wallet fingerprint mismatch causes Core to clear that handle and re-select the target wallet in the same public call. Success requires the final `passphraseState` to match the business binding. A successful `DeviceSessionGet` must return non-empty `session_id + btc_test_address`; otherwise Core treats it as an incomplete response, not a standard wallet.
+Later methods that carry `passphraseState` restore the hidden wallet on both Protocol V1 and V2. Core reads the internal `sessionId` from the unique Store by that key: V1 resumes through `Initialize.session_id`, V2 through `DeviceSessionGet({ session_id })`. Missing V1 cache returns `HardwareErrorCode.WalletSessionInvalid`. Missing V2 cache, firmware rejecting the cached Session, or a returned wallet fingerprint mismatch causes Core to clear that handle and re-select the target wallet in the same public call. Success requires the final `passphraseState` to match the business binding. A successful `DeviceSessionGet` must return non-empty `session_id + btc_test_address`; otherwise Core treats it as an incomplete response, not a standard wallet.
 
 Standard wallets do not require the App to supply a wallet binding. Core keeps a standard-wallet internal index `deviceKey -> { passphraseState, sessionId }` in the same Store. First open or a locked device uses `DeviceSessionAskPin(Main)` to get the standard Session. An unlocked device with a valid index reuses `DeviceSessionGet(session_id)`. Cache expiry rebuilds inside the same explicit standard-wallet call. If the returned address does not match the cache, Core rebuilds once with `AskPin(Main) -> Get()`. If the address still mismatches, it clears the standard index and stops the business call. None of this clears hidden-wallet records on the same device.
 

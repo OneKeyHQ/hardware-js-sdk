@@ -22,7 +22,7 @@ describe('AllNetworkGetAddressBase tracing', () => {
   test('resumes a Protocol V2 hidden wallet before running a nested chain method', async () => {
     const calls: string[] = [];
     const checkPassphraseStateSafety = jest.fn().mockImplementation(() => {
-      calls.push('resume-hidden-session');
+      calls.push('restore-wallet-session');
       return Promise.resolve(true);
     });
     const innerMethod = {
@@ -98,7 +98,7 @@ describe('AllNetworkGetAddressBase tracing', () => {
       undefined,
       undefined
     );
-    expect(calls).toEqual(['resume-hidden-session', 'run-chain-method']);
+    expect(calls).toEqual(['restore-wallet-session', 'run-chain-method']);
     expect(typedCall).not.toHaveBeenCalled();
   });
 

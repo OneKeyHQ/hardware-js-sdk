@@ -165,8 +165,8 @@ still expose it on compatibility `Features` objects.
   inside Core. `openWalletSession` does not return it.
 - Invalidated on lock (auto-lock, manual lock, disconnect).
 - To stay on a hidden wallet, pass persisted `passphraseState` on later
-  methods. Core resumes the firmware session. Do not call
-  `openWalletSession({ mode: 'resume-hidden' })` for that.
+  methods. Core resumes the firmware session. `openWalletSession` has no
+  resume mode.
 
 ### `passphraseState` — hidden wallet identifier
 

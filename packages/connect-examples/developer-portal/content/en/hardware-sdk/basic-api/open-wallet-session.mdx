@@ -6,7 +6,7 @@ title: Open Wallet Session
 
 Unified Protocol V1 / V2 entry to open the standard wallet or let the user select a hidden wallet.
 
-Use this instead of deprecated [`getPassphraseState`](/en/hardware-sdk/basic-api/get-passphrase-state). Address and signing calls still take `deviceId` + `passphraseState` and should not reopen a session every time. `resume-hidden` exists on the type, but the recommended path does not call it — Core already resumes inside the first later method that carries `passphraseState`.
+Use this instead of deprecated [`getPassphraseState`](/en/hardware-sdk/basic-api/get-passphrase-state). Address and signing calls still take `deviceId` + `passphraseState` and should not reopen a session every time. There is no `resume-hidden` mode. Core already resumes inside the first later method that carries `passphraseState`.
 
 See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session) for the contract.
 
@@ -26,9 +26,7 @@ Do not combine `mode` with `useEmptyPassphrase` or `initSession` on this call.
 
 | Param | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `mode` | `'standard' \| 'select-hidden' \| 'resume-hidden'` | Yes | Use `OpenWalletSessionMode` from `@onekeyfe/hd-core`. Daily path: `standard` or `select-hidden`. `resume-hidden` is optional — skip it |
-| `deviceId` | `string` | `resume-hidden` only | Seed lifetime from a previous successful open. Not used on the recommended path |
-| `passphraseState` | `string` | `resume-hidden` only | Hidden-wallet fingerprint from a previous successful open. On later methods this field is enough without `resume-hidden` |
+| `mode` | `'standard' \| 'select-hidden'` | Yes | Use `OpenWalletSessionMode` from `@onekeyfe/hd-core` |
 
 ### Result
 
@@ -59,6 +57,4 @@ Persist `deviceId`, `walletType`, and `passphraseState`. The firmware `session_i
 }
 ```
 
-Missing `deviceId` / `passphraseState` on `resume-hidden` returns `CallMethodInvalidParameter`. A hidden wallet that cannot be resumed safely may return `WalletSessionInvalid` (Protocol V1) or complete a re-select inside the same call (Protocol V2). `DeviceCheckUnlockTypeError` means the current PIN / Attach-to-PIN context cannot reach the requested wallet.
-
-You do not need `resume-hidden` after `select-hidden` or after loading a stored binding. Pass `passphraseState` on the next address / sign call.
+`mode: 'resume-hidden'` and `deviceId` / `passphraseState` on this call return `CallMethodInvalidParameter`. Resume a bound hidden wallet by passing `passphraseState` on the next address / sign method. `DeviceCheckUnlockTypeError` means the current PIN / Attach-to-PIN context cannot reach the requested wallet.

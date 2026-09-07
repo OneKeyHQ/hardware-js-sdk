@@ -93,7 +93,7 @@ payload: { value: userInput, passphraseOnDevice: false, save: true }
 
 ### 之后的进程 / 重连
 
-只持久化 `deviceId + passphraseState`。**不要**存固件 `session_id`。读出绑定，带到下一笔地址 / 签名即可。Core 会在那笔方法里恢复。不要再调 `openWalletSession({ mode: 'resume-hidden' })`。
+只持久化 `deviceId + passphraseState`。**不要**存固件 `session_id`。读出绑定，带到下一笔地址 / 签名即可。Core 会在那笔方法里恢复。`openWalletSession` 没有 resume mode。
 
 ```ts
 import { OpenWalletSessionMode } from '@onekeyfe/hd-core';

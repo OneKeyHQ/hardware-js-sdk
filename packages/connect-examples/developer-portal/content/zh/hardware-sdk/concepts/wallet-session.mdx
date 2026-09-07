@@ -42,7 +42,7 @@ const hidden = await HardwareSDK.openWalletSession(connectId, {
 
 保存 `payload.deviceId`、`payload.walletType`、`payload.passphraseState`。之后的地址 / 签名调用带上这些值。Core 会在那笔方法里恢复固件 session（`DeviceSessionGet`）。不要在每次签名前都再开一次 Session。
 
-`mode: 'resume-hidden'` 是可选的。它只是同一条固件 Get，不附带链方法。不必调：OneKey App 和推荐的第三方路径都不会调它。后续第一笔带 `passphraseState` 的调用已经会恢复。
+`openWalletSession` 没有 `resume-hidden`。传入 `mode: 'resume-hidden'` 会返回 `CallMethodInvalidParameter`。读出已存绑定，带到下一笔地址 / 签名即可。
 
 ## 已废弃的兼容 API
 

@@ -20,10 +20,8 @@ export const normalizeProtocolAwareParams = (
   if (method === 'openWalletSession') {
     delete normalized.useEmptyPassphrase;
     delete normalized.initSession;
-    if (normalized.mode !== 'resume-hidden') {
-      delete normalized.deviceId;
-      delete normalized.passphraseState;
-    }
+    delete normalized.deviceId;
+    delete normalized.passphraseState;
   }
 
   if (method === 'deviceUploadWallpaper') {

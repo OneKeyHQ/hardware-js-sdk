@@ -42,7 +42,7 @@ const hidden = await HardwareSDK.openWalletSession(connectId, {
 
 Store `payload.deviceId`, `payload.walletType`, and `payload.passphraseState`. Then pass those values on address / signing calls. Core resumes the firmware session (`DeviceSessionGet`) inside that method. Do not call `openWalletSession` before every signer.
 
-`mode: 'resume-hidden'` is optional. It runs the same firmware Get with no chain method. Skip it: OneKey App and the recommended third-party path never call it. The first later call that carries `passphraseState` already resumes.
+`openWalletSession` has no `resume-hidden` mode. Passing `mode: 'resume-hidden'` returns `CallMethodInvalidParameter`. Load the stored binding and pass `passphraseState` on the next address / sign call.
 
 ## Deprecated compatibility API
 

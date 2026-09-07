@@ -14,19 +14,15 @@ describe('protocol-aware playground parameters', () => {
     ).toEqual({ mode: 'standard' });
   });
 
-  test('preserves the public identity required to resume a hidden wallet', () => {
+  test('strips wallet-binding fields from openWalletSession', () => {
     expect(
       normalizeProtocolAwareParams('openWalletSession', {
-        mode: 'resume-hidden',
+        mode: 'select-hidden',
         useEmptyPassphrase: false,
         deviceId: 'device-id',
         passphraseState: 'wallet-state',
       })
-    ).toEqual({
-      mode: 'resume-hidden',
-      deviceId: 'device-id',
-      passphraseState: 'wallet-state',
-    });
+    ).toEqual({ mode: 'select-hidden' });
   });
 
   test('converts Pro2 NFT files to the Base64 API contract', () => {

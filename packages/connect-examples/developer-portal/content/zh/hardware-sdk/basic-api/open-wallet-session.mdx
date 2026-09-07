@@ -6,7 +6,7 @@ title: 打开钱包会话
 
 Protocol V1 / V2 统一入口：打开标准钱包，或让用户选择隐藏钱包。
 
-请用本方法，不要再用已废弃的 [`getPassphraseState`](/zh/hardware-sdk/basic-api/get-passphrase-state)。地址和签名仍然带 `deviceId` + `passphraseState`，不要每次签名都重新开 Session。类型上仍有 `resume-hidden`，但推荐路径不要调它 —— 后续第一笔带 `passphraseState` 的方法里，Core 已经会恢复。
+请用本方法，不要再用已废弃的 [`getPassphraseState`](/zh/hardware-sdk/basic-api/get-passphrase-state)。地址和签名仍然带 `deviceId` + `passphraseState`，不要每次签名都重新开 Session。没有 `resume-hidden`。后续第一笔带 `passphraseState` 的方法里，Core 已经会恢复。
 
 契约说明见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
 
@@ -26,9 +26,7 @@ const res = await HardwareSDK.openWalletSession(connectId, {
 
 | 参数 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `mode` | `'standard' \| 'select-hidden' \| 'resume-hidden'` | 是 | 使用 `@onekeyfe/hd-core` 导出的 `OpenWalletSessionMode`。日常：`standard` 或 `select-hidden`。`resume-hidden` 可选，不必调 |
-| `deviceId` | `string` | 仅 `resume-hidden` | 上次成功打开时的种子生命周期。推荐路径用不到 |
-| `passphraseState` | `string` | 仅 `resume-hidden` | 上次成功打开时的隐藏钱包指纹。后续方法带上这个字段就够，不必先 `resume-hidden` |
+| `mode` | `'standard' \| 'select-hidden'` | 是 | 使用 `@onekeyfe/hd-core` 导出的 `OpenWalletSessionMode` |
 
 ### 返回结果
 
@@ -59,6 +57,4 @@ const res = await HardwareSDK.openWalletSession(connectId, {
 }
 ```
 
-`resume-hidden` 缺少 `deviceId` / `passphraseState` 时返回 `CallMethodInvalidParameter`。隐藏钱包无法安全恢复时，Protocol V1 可能返回 `WalletSessionInvalid`，Protocol V2 可能在同一次调用内重新选择。`DeviceCheckUnlockTypeError` 表示当前 PIN / Attach-to-PIN 上下文到不了目标钱包。
-
-`select-hidden` 之后，或读出已存绑定时，不必再调 `resume-hidden`。下一笔地址 / 签名带上 `passphraseState` 即可。
+这次调用传入 `mode: 'resume-hidden'` 或 `deviceId` / `passphraseState` 会返回 `CallMethodInvalidParameter`。恢复已绑定的隐藏钱包：下一笔地址 / 签名带上 `passphraseState`。`DeviceCheckUnlockTypeError` 表示当前 PIN / Attach-to-PIN 上下文到不了目标钱包。

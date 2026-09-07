@@ -93,7 +93,7 @@ payload: { value: userInput, passphraseOnDevice: false, save: true }
 
 ### Later process / reconnect
 
-Persist only `deviceId + passphraseState`. Do **not** persist firmware `session_id`. Load the binding and pass it on the next address / sign call. Core resumes inside that method. Do not call `openWalletSession({ mode: 'resume-hidden' })`.
+Persist only `deviceId + passphraseState`. Do **not** persist firmware `session_id`. Load the binding and pass it on the next address / sign call. Core resumes inside that method. `openWalletSession` has no resume mode.
 
 ```ts
 import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
