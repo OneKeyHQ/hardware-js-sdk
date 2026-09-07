@@ -13,7 +13,7 @@ Hardware SDK 1.2.0 talks two on-wire protocols. Integrators keep one JavaScript 
 | Public methods | Existing Hardware SDK methods | Same methods, mapped inside Core |
 | Call rule | Serialize per device in practice | Serialize per device; required |
 | Firmware update | `firmwareUpdateV2` / `firmwareUpdateV3` | `firmwareUpdateV4` |
-| Device snapshot | `getFeatures()` (legacy) | Prefer `getDeviceState()` |
+| Device snapshot | [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state) (`getFeatures` is deprecated) | Same |
 
 ## Detection
 
@@ -29,8 +29,8 @@ Passing `connectProtocol` on a call is a strict expectation: the SDK will not si
 
 ## What stays the same
 
-- `HardwareSDK.init({ env })` still selects the **transport**, not the protocol.
-- `searchDevices` → `connectId` → `getFeatures` / `getDeviceState` → chain methods still works.
+- `HardwareSDK.init({ env })` still selects the **transport** (USB / BLE / low-level), not Protocol V1 vs V2.
+- `searchDevices` → `connectId` → `getDeviceState` → chain methods.
 - PIN, passphrase, and button confirmation still arrive as `UI_EVENT`. Respond only with `uiResponse` on input requests. See the [Core API Guide](/en/hardware-sdk/core-api-guide).
 
 ## What you must not do
@@ -42,9 +42,7 @@ Passing `connectProtocol` on a call is a strict expectation: the SDK will not si
 
 ## Device state
 
-`getFeatures(connectId)` remains valid for existing apps. On Protocol V2 the SDK maps the live device into a compatibility Features object.
-
-New code should prefer [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state):
+Use [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state). `getFeatures` is deprecated; existing apps may keep it. On Protocol V2 the SDK still maps the live device into a compatibility Features object.
 
 ```ts
 const state = await HardwareSDK.getDeviceState(connectId);

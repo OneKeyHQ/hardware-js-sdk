@@ -15,7 +15,18 @@ Hardware SDK 1.2.0 uses one JavaScript API. `init({ env })` selects the **transp
 | Flutter host | BLE via low-level plugin | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [Flutter](/en/hardware-sdk/transport/flutter) |
 | Native BLE overview | BLE | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [Native BLE](/en/hardware-sdk/transport/native-ble) |
 
-USB covers every OneKey device. BLE is Pro, Pro 2, Neo, Touch, Classic 1s / Pure — not Mini. Air-Gap QR is a separate product path: [Air-Gap](/en/air-gap).
+USB covers every OneKey device. BLE is Pro, Pro 2, Neo, Touch, Classic 1s / Pure — **not Mini**. Air-Gap QR is a separate product path: [Air-Gap](/en/air-gap).
+
+## Transport is not the protocol
+
+| Layer | What it is | How you choose it |
+| --- | --- | --- |
+| **Transport** | How bytes move: USB, BLE, or a native 64-byte plugin | `init({ env })` — `webusb` / BLE SDK / `lowlevel` |
+| **Protocol** | On-wire V1 vs V2 after the link is up | SDK probe. Read `connectProtocol`. Do **not** infer from USB PID or BLE name |
+
+A Pro 2 on USB and a Pro 2 on BLE are both Protocol V2. A Classic on USB is Protocol V1. See [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol) and [Devices](/en/hardware-sdk/concepts/devices).
+
+Do not use OneKey Bridge (`env: 'web'` + `checkBridgeStatus`) for new WebUSB apps. Migration: [Bridge → WebUSB](/en/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb).
 
 ## After you connect
 

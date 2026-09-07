@@ -15,7 +15,18 @@ Hardware SDK 1.2.0 是同一套 JavaScript API。`init({ env })` 选的是**传�
 | Flutter 宿主 | 底层插件 BLE | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [Flutter](/zh/hardware-sdk/transport/flutter) |
 | 原生 BLE 总览 | BLE | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [原生 BLE](/zh/hardware-sdk/transport/native-ble) |
 
-USB 覆盖全部 OneKey 设备。BLE 是 Pro、Pro 2、Neo、Touch、Classic 1s / Pure —— Mini 没有。二维码 Air-Gap 是另一条产品路径：[Air-Gap](/zh/air-gap)。
+USB 覆盖全部 OneKey 设备。BLE 是 Pro、Pro 2、Neo、Touch、Classic 1s / Pure —— **Mini 没有**。二维码 Air-Gap 是另一条产品路径：[Air-Gap](/zh/air-gap)。
+
+## 传输不是协议
+
+| 层 | 是什么 | 怎么选 |
+| --- | --- | --- |
+| **传输** | 字节怎么走：USB、BLE，或原生 64 字节插件 | `init({ env })` — `webusb` / BLE SDK / `lowlevel` |
+| **协议** | 链路起来之后线上的 V1 / V2 | SDK 探测。读 `connectProtocol`。**不要**用 USB PID 或蓝牙名判断 |
+
+Pro 2 插 USB 和走 BLE 都是 Protocol V2。Classic 插 USB 是 Protocol V1。见 [Protocol V1 与 V2](/zh/hardware-sdk/concepts/protocol) 和 [设备](/zh/hardware-sdk/concepts/devices)。
+
+新的 WebUSB 应用不要再用 OneKey Bridge（`env: 'web'` + `checkBridgeStatus`）。迁移：[Bridge → WebUSB](/zh/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb)。
 
 ## 连上之后
 

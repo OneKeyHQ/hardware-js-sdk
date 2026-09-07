@@ -13,7 +13,7 @@ Hardware SDK 1.2.0 在设备侧使用两套传输协议，对接入方仍然是�
 | 公开方法 | 现有 Hardware SDK 方法 | 同样的方法，由 Core 做映射 |
 | 调用规则 | 实践上必须按设备串行 | 必须按设备串行 |
 | 固件升级 | `firmwareUpdateV2` / `firmwareUpdateV3` | `firmwareUpdateV4` |
-| 设备快照 | `getFeatures()`（兼容） | 优先 `getDeviceState()` |
+| 设备快照 | [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)（`getFeatures` 已废弃） | 相同 |
 
 ## 如何识别协议
 
@@ -29,8 +29,8 @@ SDK 只认**当前连接**上的实时响应。不要用下面这些东西判断
 
 ## 什么没变
 
-- `HardwareSDK.init({ env })` 选的是**传输**，不是协议。
-- `searchDevices` → `connectId` → `getFeatures` / `getDeviceState` → 链方法，这条路径仍然成立。
+- `HardwareSDK.init({ env })` 选的是**传输**（USB / BLE / 底层插件），不是 Protocol V1 / V2。
+- `searchDevices` → `connectId` → `getDeviceState` → 链方法。
 - PIN、passphrase、按键确认仍然走 `UI_EVENT`。只有输入类请求才调用 `uiResponse`。见 [Core API Guide](/zh/hardware-sdk/core-api-guide)。
 
 ## 不要做的事
@@ -42,9 +42,7 @@ SDK 只认**当前连接**上的实时响应。不要用下面这些东西判断
 
 ## 设备状态
 
-现有应用可以继续用 `getFeatures(connectId)`。在 Protocol V2 上，SDK 会把实时设备映射成兼容的 Features 对象。
-
-新代码应优先使用 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)：
+请用 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)。`getFeatures` 已废弃；现有应用可以继续用。Protocol V2 上 SDK 仍会把实时设备映射成兼容的 Features 对象。
 
 ```ts
 const state = await HardwareSDK.getDeviceState(connectId);
