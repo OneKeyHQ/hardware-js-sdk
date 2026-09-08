@@ -63,32 +63,41 @@ const negotiateEventlessWalletSession = async (device: Device) => {
 const getDeviceSession = async (device: Device, request: DeviceSessionGet) =>
   device.commands.typedCall('DeviceSessionGet', 'DeviceSession', request);
 
+const STANDARD_SEED_DOMAINS = [DeviceSessionSeedDomain.SeedDomain_Standard];
+const CARDANO_SEED_DOMAINS = [
+  DeviceSessionSeedDomain.SeedDomain_Standard,
+  DeviceSessionSeedDomain.SeedDomain_Cardano,
+];
+
+const buildDeviceSessionSeedDomains = (deriveCardano?: boolean): DeviceSessionSeedDomain[] =>
+  deriveCardano === true ? CARDANO_SEED_DOMAINS : STANDARD_SEED_DOMAINS;
+
+const deviceSessionHasCardano = (message: { seed_domains?: DeviceSessionSeedDomain[] }) =>
+  Array.isArray(message.seed_domains) &&
+  message.seed_domains.includes(DeviceSessionSeedDomain.SeedDomain_Cardano);
+
+// DeviceSessionGet only reads or resumes a session; AskPassphrase generates seed domains.
 const buildDeviceSessionGetRequest = ({
   sessionId,
   expectedPassphraseState,
-  deriveCardano,
 }: {
   sessionId?: string;
   expectedPassphraseState?: string;
-  deriveCardano?: boolean;
 } = {}): DeviceSessionGet => ({
   ...(sessionId ? { session_id: sessionId } : {}),
   ...(expectedPassphraseState ? { btc_test_address: expectedPassphraseState } : {}),
-  seed_domains:
-    deriveCardano === undefined
-      ? []
-      : [
-          DeviceSessionSeedDomain.SeedDomain_Standard,
-          ...(deriveCardano ? [DeviceSessionSeedDomain.SeedDomain_Cardano] : []),
-        ],
 });
 
 const askDevicePassphrase = async (
   device: Device,
-  requestPayload: DeviceSessionAskPassphrase,
+  requestPayload: Omit<DeviceSessionAskPassphrase, 'seed_domains'>,
+  deriveCardano?: boolean,
   onStatusRefreshed?: () => void
 ) => {
-  await device.commands.typedCall('DeviceSessionAskPassphrase', 'Success', requestPayload);
+  await device.commands.typedCall('DeviceSessionAskPassphrase', 'Success', {
+    ...requestPayload,
+    seed_domains: buildDeviceSessionSeedDomains(deriveCardano),
+  });
   await refreshProtocolV2DeviceStatus(device);
   onStatusRefreshed?.();
 };
@@ -160,7 +169,22 @@ const selectDeviceSession = async (
       interaction: attachPinInteraction,
     });
     onStatusRefreshed?.();
-    return getDeviceSession(device, buildDeviceSessionGetRequest({ deriveCardano }));
+    if (deriveCardano === true) {
+      await askDevicePassphrase(
+        device,
+        { passphrase: '', on_device: false },
+        true,
+        onStatusRefreshed
+      );
+      // Firmware AskPassphrase Success clears unlocked_by_attach_to_pin.
+      // Identity is still the Attach PIN wallet; keep the SDK flag so a later
+      // passphrase picker still locks instead of prompting.
+      if (device.features) {
+        device.features.unlockedAttachPin = true;
+      }
+    }
+    const attachPinSession = await getDeviceSession(device, buildDeviceSessionGetRequest());
+    return Object.assign(attachPinSession, { viaAttachPin: true as const });
   }
 
   if (hasHostPassphrase) {
@@ -170,9 +194,10 @@ const selectDeviceSession = async (
         passphrase: hostPassphrase,
         on_device: false,
       },
+      deriveCardano,
       onStatusRefreshed
     );
-    return getDeviceSession(device, buildDeviceSessionGetRequest({ deriveCardano }));
+    return getDeviceSession(device, buildDeviceSessionGetRequest());
   }
 
   const passphraseOnDeviceInteraction = device.createProtocolV2UiPhaseMetadata?.(
@@ -183,8 +208,8 @@ const selectDeviceSession = async (
     ...metadata,
     ...(passphraseOnDeviceInteraction ? { interaction: passphraseOnDeviceInteraction } : {}),
   });
-  await askDevicePassphrase(device, { on_device: true }, onStatusRefreshed);
-  return getDeviceSession(device, buildDeviceSessionGetRequest({ deriveCardano }));
+  await askDevicePassphrase(device, { on_device: true }, deriveCardano, onStatusRefreshed);
+  return getDeviceSession(device, buildDeviceSessionGetRequest());
 };
 
 export async function getProtocolV2WalletSession(
@@ -209,6 +234,10 @@ export async function getProtocolV2WalletSession(
   const forceWalletSelection =
     options?.forceWalletSelection === true || options?.initSession === true;
   const readCurrentAttachPinSession = options?.readCurrentAttachPinSession === true;
+  const sessionIsAttachPinWallet = (session?: { viaAttachPin?: boolean }) =>
+    readCurrentAttachPinSession ||
+    session?.viaAttachPin === true ||
+    device.features?.unlockedAttachPin === true;
 
   if (forceWalletSelection) {
     if (options.onlyMainPin) {
@@ -244,6 +273,10 @@ export async function getProtocolV2WalletSession(
   const markWalletStatusRefreshed = () => {
     walletStatusRefreshed = true;
   };
+  if (options?.onlyMainPin && options.mainPinSelected !== true) {
+    await refreshProtocolV2DeviceStatus(device);
+    markWalletStatusRefreshed();
+  }
   let mainPinAuthenticated =
     options?.mainPinSelected === true ||
     (options?.onlyMainPin === true &&
@@ -257,6 +290,26 @@ export async function getProtocolV2WalletSession(
     } else {
       device.clearInternalState();
     }
+  };
+
+  const askEmptyPassphraseAndGet = async ({
+    deriveCardano,
+    keepAttachPin,
+  }: {
+    deriveCardano?: boolean;
+    keepAttachPin?: boolean;
+  } = {}) => {
+    await askDevicePassphrase(
+      device,
+      { passphrase: '', on_device: false },
+      deriveCardano,
+      markWalletStatusRefreshed
+    );
+    if (keepAttachPin && device.features) {
+      device.features.unlockedAttachPin = true;
+    }
+    const session = await getDeviceSession(device, buildDeviceSessionGetRequest());
+    return keepAttachPin ? Object.assign(session, { viaAttachPin: true as const }) : session;
   };
 
   const rejectMismatchedAttachPinWallet = async () => {
@@ -280,6 +333,19 @@ export async function getProtocolV2WalletSession(
     throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError);
   };
 
+  // The passphrase picker would prompt. Empty host AskPassphrase does not;
+  // that path is Attach PIN / standard Cardano. Switching to a different
+  // passphrase wallet still locks first.
+  const lockAttachPinBeforePassphraseSelection = async () => {
+    if (readCurrentAttachPinSession || options?.onlyMainPin) {
+      return;
+    }
+    if (device.features?.unlockedAttachPin !== true) {
+      return;
+    }
+    await rejectMismatchedAttachPinWallet();
+  };
+
   if (options?.onlyMainPin && options.rejectAttachPinForMainWallet) {
     await rejectMismatchedAttachPinWallet();
   }
@@ -297,7 +363,7 @@ export async function getProtocolV2WalletSession(
     }
   };
 
-  const selectStandardWallet = async () => {
+  const selectStandardWallet = async (forceMainPin = false) => {
     if (device.features?.passphraseProtection === true) {
       // Main PIN authenticates the device; an empty host passphrase selects the standard derivation.
       await selectMainPin();
@@ -307,13 +373,16 @@ export async function getProtocolV2WalletSession(
           passphrase: '',
           on_device: false,
         },
+        options?.deriveCardano,
         markWalletStatusRefreshed
       );
       standardWalletSelected = true;
     } else if (!standardWalletSelected) {
       // Without passphrase protection there is no empty-passphrase selector.
-      // Main PIN selection is the only authoritative switch back to the standard wallet.
-      await selectMainPin(true);
+      // An unlocked non-Attach-PIN device is already in the only available wallet context.
+      // Force Main PIN only when recovering from a mismatched cached standard session.
+      await selectMainPin(forceMainPin);
+      standardWalletSelected = true;
     }
   };
 
@@ -329,10 +398,7 @@ export async function getProtocolV2WalletSession(
       device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError);
     }
-    response = await getDeviceSession(
-      device,
-      buildDeviceSessionGetRequest({ deriveCardano: options?.deriveCardano })
-    );
+    response = await getDeviceSession(device, buildDeviceSessionGetRequest());
   } else if (options?.onlyMainPin) {
     expectedPassphraseState = cachedStandardSession?.passphraseState;
     if (cachedStandardSession) {
@@ -345,7 +411,6 @@ export async function getProtocolV2WalletSession(
           buildDeviceSessionGetRequest({
             sessionId: cachedStandardSession.sessionId,
             expectedPassphraseState,
-            deriveCardano: options?.deriveCardano,
           })
         );
         resumed = true;
@@ -360,10 +425,7 @@ export async function getProtocolV2WalletSession(
 
     if (!response) {
       await selectStandardWallet();
-      response = await getDeviceSession(
-        device,
-        buildDeviceSessionGetRequest({ deriveCardano: options?.deriveCardano })
-      );
+      response = await getDeviceSession(device, buildDeviceSessionGetRequest());
     }
   } else if (cachedSessionId && expectedPassphraseState) {
     try {
@@ -372,7 +434,6 @@ export async function getProtocolV2WalletSession(
         buildDeviceSessionGetRequest({
           sessionId: cachedSessionId,
           expectedPassphraseState,
-          deriveCardano: options?.deriveCardano,
         })
       );
       resumed = true;
@@ -389,7 +450,6 @@ export async function getProtocolV2WalletSession(
         device,
         buildDeviceSessionGetRequest({
           expectedPassphraseState,
-          deriveCardano: options?.deriveCardano,
         })
       );
     } catch (error) {
@@ -404,6 +464,7 @@ export async function getProtocolV2WalletSession(
       device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
     }
+    await lockAttachPinBeforePassphraseSelection();
     response = await selectDeviceSession(
       device,
       expectedPassphraseState,
@@ -432,13 +493,11 @@ export async function getProtocolV2WalletSession(
     }
     if (options?.onlyMainPin) {
       device.clearStandardInternalState?.();
-      await selectStandardWallet();
-      response = await getDeviceSession(
-        device,
-        buildDeviceSessionGetRequest({ deriveCardano: options?.deriveCardano })
-      );
+      await selectStandardWallet(true);
+      response = await getDeviceSession(device, buildDeviceSessionGetRequest());
     } else {
       device.clearInternalState();
+      await lockAttachPinBeforePassphraseSelection();
       response = await selectDeviceSession(
         device,
         expectedPassphraseState,
@@ -464,6 +523,54 @@ export async function getProtocolV2WalletSession(
     }
   }
 
+  // Firmware generates Cardano on AskPassphrase, not Get. Empty host
+  // passphrase is the Attach PIN / standard-wallet secret. Hidden wallets
+  // still need a real passphrase Ask. Passphrase-off Get auto-requests Cardano.
+  if (options?.deriveCardano === true && !deviceSessionHasCardano(message)) {
+    if (options?.resumeOnly) {
+      device.clearInternalState();
+      throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
+    }
+    resumed = false;
+    const previousAddress = message.btc_test_address;
+    if (sessionIsAttachPinWallet(response)) {
+      response = await askEmptyPassphraseAndGet({ deriveCardano: true, keepAttachPin: true });
+    } else if (device.features?.passphraseProtection === false) {
+      response = await getDeviceSession(device, buildDeviceSessionGetRequest());
+    } else if (options?.onlyMainPin) {
+      await selectMainPin();
+      response = await askEmptyPassphraseAndGet({ deriveCardano: true });
+    } else {
+      await lockAttachPinBeforePassphraseSelection();
+      response = await selectDeviceSession(
+        device,
+        expectedPassphraseState,
+        true,
+        markWalletStatusRefreshed
+      );
+    }
+    message = response.message;
+    try {
+      assertCompleteDeviceSession(message);
+    } catch (error) {
+      if (options?.onlyMainPin) {
+        device.clearStandardInternalState?.();
+      } else {
+        device.clearInternalState();
+      }
+      throw error;
+    }
+    if (previousAddress && previousAddress !== message.btc_test_address) {
+      await rejectMismatchedAttachPinWallet();
+      clearCurrentWalletSession();
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
+    }
+    if (!deviceSessionHasCardano(message)) {
+      clearCurrentWalletSession();
+      throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
+    }
+  }
+
   const internalStateArgs = [
     true,
     message.btc_test_address,
@@ -478,7 +585,7 @@ export async function getProtocolV2WalletSession(
   }
 
   let unlockedAttachPin: boolean | undefined;
-  if (readCurrentAttachPinSession) {
+  if (readCurrentAttachPinSession || sessionIsAttachPinWallet(response)) {
     unlockedAttachPin = true;
   } else if (mainPinAuthenticated) {
     unlockedAttachPin = false;
