@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-common-connect-sdk",
-  "version": "1.2.2-alpha.105",
+  "version": "1.2.2-alpha.106",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "ISC",
@@ -16,16 +16,17 @@
   "scripts": {
     "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
     "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "test": "jest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-core": "1.2.2-alpha.105",
-    "@onekeyfe/hd-shared": "1.2.2-alpha.105",
-    "@onekeyfe/hd-transport-emulator": "1.2.2-alpha.105",
-    "@onekeyfe/hd-transport-http": "1.2.2-alpha.105",
-    "@onekeyfe/hd-transport-lowlevel": "1.2.2-alpha.105",
-    "@onekeyfe/hd-transport-usb": "1.2.2-alpha.105",
-    "@onekeyfe/hd-transport-web-device": "1.2.2-alpha.105"
+    "@onekeyfe/hd-core": "1.2.2-alpha.106",
+    "@onekeyfe/hd-shared": "1.2.2-alpha.106",
+    "@onekeyfe/hd-transport-emulator": "1.2.2-alpha.106",
+    "@onekeyfe/hd-transport-http": "1.2.2-alpha.106",
+    "@onekeyfe/hd-transport-lowlevel": "1.2.2-alpha.106",
+    "@onekeyfe/hd-transport-usb": "1.2.2-alpha.106",
+    "@onekeyfe/hd-transport-web-device": "1.2.2-alpha.106"
   }
 }

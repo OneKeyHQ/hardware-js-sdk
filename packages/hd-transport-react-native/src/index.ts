@@ -77,6 +77,8 @@ const { check, ProtocolV1, parseConfigure } = transport;
 const Log = bleLogger;
 
 const transportCache: Record<string, BleTransport> = {};
+// ble-plx shares one manager across transport instances in this JS runtime.
+let bleManagerResetPromise: Promise<void> | undefined;
 const FIRMWARE_UPLOAD_WRITE_BURST_SIZE = Platform.OS === 'ios' ? 4 : 5;
 const FIRMWARE_UPLOAD_WRITE_PAUSE_MS = Platform.OS === 'ios' ? 8 : 10;
 const FIRMWARE_UPLOAD_WRITE_FLUSH_DELAY_MS = Platform.OS === 'ios' ? 24 : 30;
@@ -468,6 +470,10 @@ export default class ReactNativeBleTransport {
   /** Serializes transport lifecycle changes for the same physical device. */
   private lifecycleOperations: Map<string, Promise<void>> = new Map();
 
+  private stopPromise?: Promise<void>;
+
+  private scanCleanups = new Set<() => Promise<void>>();
+
   constructor(options: TransportOptions) {
     this.scanTimeout = options.scanTimeout ?? DEVICE_SCAN_TIMEOUT_MS;
   }
@@ -503,10 +509,34 @@ export default class ReactNativeBleTransport {
     // empty
   }
 
-  getPlxManager(): Promise<BlePlxManager> {
-    if (this.blePlxManager) return Promise.resolve(this.blePlxManager);
-    this.blePlxManager = new BlePlxManager();
-    return Promise.resolve(this.blePlxManager);
+  async getPlxManager(): Promise<BlePlxManager> {
+    while (bleManagerResetPromise) {
+      await this.waitForManagerReset();
+    }
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    if (!this.blePlxManager) this.blePlxManager = new BlePlxManager();
+    return this.blePlxManager;
+  }
+
+  private async waitForManagerReset(): Promise<void> {
+    if (!bleManagerResetPromise) return;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        bleManagerResetPromise,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(
+            () => reject(this.createWedgedBleSetupError()),
+            BLE_CONNECT_TIMEOUT_MS
+          );
+        }),
+      ]);
+    } catch {
+      // A timeout or failed destroy is not permission to reuse the old singleton.
+      throw this.createWedgedBleSetupError();
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
   }
 
   async resolveCharacteristics(device: Device): Promise<ResolvedBleCharacteristics> {
@@ -695,35 +725,58 @@ export default class ReactNativeBleTransport {
    * @returns
    */
   async enumerate() {
-    // eslint-disable-next-line no-async-promise-executor
-    return new Promise<IOneKeyDevice[]>(async (resolve, reject) => {
+    const scanStartedAt = Date.now();
+    let firstDeviceMs: number | undefined;
+    const blePlxManager = await this.getPlxManager();
+    await subscribeBleOn(blePlxManager);
+    if (Platform.OS === 'android' && Platform.Version >= 31) {
+      Log?.debug('requesting permissions, please wait...');
+
+      const resultConnect = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+      ]);
+
+      Log?.debug('requesting permissions, result: ', resultConnect);
+      if (
+        resultConnect[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT] !== 'granted' ||
+        resultConnect[PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN] !== 'granted'
+      ) {
+        throw ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
+      }
+    }
+
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    return new Promise<IOneKeyDevice[]>((resolve, reject) => {
       const deviceList: IOneKeyDevice[] = [];
-      const blePlxManager = await this.getPlxManager();
-      try {
-        await subscribeBleOn(blePlxManager);
-      } catch (error) {
-        Log?.debug('subscribeBleOn error: ', error);
-        reject(error);
-        return;
-      }
+      let finished = false;
+      let scanCleanup: Promise<void> | undefined;
+      const finishScan = (error?: unknown) => {
+        if (scanCleanup) return scanCleanup;
+        finished = true;
+        clearScanTimer();
+        scanCleanup = this.runNativeTeardown('scan', blePlxManager, async () => {
+          await blePlxManager.stopDeviceScan();
+        }).then(() => {
+          this.scanCleanups.delete(cancelScan);
+          if (error) reject(error);
+          else resolve(deviceList);
+        });
+        return scanCleanup;
+      };
+      const cancelScan = () =>
+        finishScan(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+      this.scanCleanups.add(cancelScan);
 
-      if (Platform.OS === 'android' && Platform.Version >= 31) {
-        Log?.debug('requesting permissions, please wait...');
-
-        const resultConnect = await PermissionsAndroid.requestMultiple([
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-        ]);
-
-        Log?.debug('requesting permissions, result: ', resultConnect);
-        if (
-          resultConnect[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT] !== 'granted' ||
-          resultConnect[PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN] !== 'granted'
-        ) {
-          reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
-          return;
-        }
-      }
+      const clearScanTimer = timer.timeout(() => {
+        Log?.debug('[ReactNativeBleTransport] scan completed', {
+          elapsedMs: Date.now() - scanStartedAt,
+          firstDeviceMs,
+          deviceCount: deviceList.length,
+          scanWindowMs: this.scanTimeout,
+        });
+        finishScan();
+      }, this.scanTimeout);
 
       blePlxManager.startDeviceScan(
         getBluetoothServiceUuids(),
@@ -739,18 +792,17 @@ export default class ReactNativeBleTransport {
                 error.errorCode
               )
             ) {
-              reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
+              finishScan(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
             } else if (error.errorCode === BleErrorCode.BluetoothUnauthorized) {
-              reject(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
+              finishScan(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
             } else if (error.errorCode === BleErrorCode.LocationServicesDisabled) {
-              reject(ERRORS.TypedError(HardwareErrorCode.BleLocationServicesDisabled));
+              finishScan(ERRORS.TypedError(HardwareErrorCode.BleLocationServicesDisabled));
             } else if (error.errorCode === BleErrorCode.ScanStartFailed) {
               // Android Bluetooth will report an error when the search frequency is too fast,
               // then nothing is processed and an empty array of devices is returned.
               // Then the next search will be back to normal
-              timer.timeout(() => {}, this.scanTimeout);
             } else {
-              reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.reason ?? ''));
+              finishScan(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.reason ?? ''));
             }
             return;
           }
@@ -782,6 +834,7 @@ export default class ReactNativeBleTransport {
         }
       );
 
+      if (finished) return;
       getConnectedDeviceIds(Platform.OS === 'ios' ? getBluetoothServiceUuids() : []).then(
         devices => {
           for (const device of devices) {
@@ -801,11 +854,13 @@ export default class ReactNativeBleTransport {
               addDevice(device as unknown as Device);
             }
           }
-        }
+        },
+        error => Log?.debug('search connected peripheral failed:', error)
       );
 
       const addDevice = (device: Device) => {
-        if (deviceList.every(d => d.id !== device.id)) {
+        if (!finished && deviceList.every(d => d.id !== device.id)) {
+          firstDeviceMs ??= Date.now() - scanStartedAt;
           const displayName = getDeviceDisplayName(device) ?? 'Unknown BLE Device';
 
           deviceList.push({
@@ -820,11 +875,6 @@ export default class ReactNativeBleTransport {
           });
         }
       };
-
-      timer.timeout(() => {
-        blePlxManager.stopDeviceScan();
-        resolve(deviceList);
-      }, this.scanTimeout);
     });
   }
 
@@ -912,6 +962,7 @@ export default class ReactNativeBleTransport {
   }
 
   private async acquireUnlocked(input: FirmwareInstallBleAcquireInput) {
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     const { uuid, forceCleanRunPromise, expectedProtocol, skipProtocolProbe } = input;
     const shouldMapProtocolV2StaleBond = expectedProtocol
       ? expectedProtocol === 'V2'
@@ -1721,7 +1772,34 @@ export default class ReactNativeBleTransport {
   }
 
   stop() {
+    if (this.stopPromise) return this.stopPromise;
     this.stopped = true;
+    const deviceIds = new Set([
+      ...this.monitorTokens.keys(),
+      ...this.sessionProtocols.keys(),
+      ...this.lifecycleOperations.keys(),
+      ...(this.runPromiseDeviceId ? [this.runPromiseDeviceId] : []),
+    ]);
+    const scans = Array.from(this.scanCleanups, cleanup => cleanup());
+    this.androidPriorityResetTimers.forEach(timeout => clearTimeout(timeout));
+    this.androidPriorityResetTimers.clear();
+    this.androidHighPriorityDevices.clear();
+    const error = ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    this.runPromise?.reject(error);
+    this.runPromise = null;
+    this.runPromiseDeviceId = null;
+    deviceIds.forEach(uuid => this.rejectProtocolV2Frames(uuid, error));
+    // Release only this transport's endpoints; other connectors may share ble-plx.
+    this.stopPromise = Promise.all([
+      ...scans,
+      ...Array.from(deviceIds, uuid => this.disconnect(uuid)),
+    ]).then(async () => {
+      await this.protocolV2Links.invalidateAllLinks('React Native BLE transport stopped');
+      await this.waitForManagerReset();
+      this.blePlxManager = undefined;
+      this.emitter = undefined;
+    });
+    return this.stopPromise;
   }
 
   async disconnect(session: string) {
@@ -1873,17 +1951,26 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  cancel() {
+  async cancel() {
     Log?.debug('transport-react-native transport cancel');
-    if (this.runPromise) {
-      // this.runPromise.reject(new Error('Transport_CallCanceled'));
+    const pending = this.runPromise;
+    const deviceId = this.runPromiseDeviceId;
+    if (pending) {
+      pending.reject(ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled));
+      if (this.runPromise === pending) {
+        this.runPromise = null;
+        this.runPromiseDeviceId = null;
+      }
+      // A V1 read cannot be safely reused after abandoning its response.
+      // Drain native teardown before DeviceCommands releases the operation.
+      if (deviceId) await this.disconnect(deviceId);
     }
-    this.runPromise = null;
-    this.runPromiseDeviceId = null;
   }
 
   /** Run a native connect under the JS backstop budget. */
   private async connectWithTimeout<T>(uuid: string, connect: () => Promise<T>): Promise<T> {
+    const startedAt = Date.now();
+    let succeeded = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
     const pending = connect();
@@ -1905,6 +1992,7 @@ export default class ReactNativeBleTransport {
           }, BLE_CONNECT_TIMEOUT_MS);
         }),
       ]);
+      succeeded = true;
       return result;
     } catch (error) {
       if (timedOut || isNativeOperationTimeoutError(error)) {
@@ -1919,6 +2007,12 @@ export default class ReactNativeBleTransport {
       throw error;
     } finally {
       if (timer) clearTimeout(timer);
+      Log?.debug('[ReactNativeBleTransport] connect completed', {
+        connectIdSuffix: uuid.slice(-8),
+        elapsedMs: Date.now() - startedAt,
+        succeeded,
+        backstopExpired: timedOut,
+      });
     }
   }
 
@@ -1927,6 +2021,8 @@ export default class ReactNativeBleTransport {
     uuid: string,
     device: Device
   ): Promise<ResolvedBleCharacteristics> {
+    const startedAt = Date.now();
+    let succeeded = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
     const pending = this.resolveCharacteristics(device);
@@ -1947,6 +2043,7 @@ export default class ReactNativeBleTransport {
         }),
       ]);
       this.connectionSetupTimeoutCounts.delete(uuid);
+      succeeded = true;
       return result;
     } catch (error) {
       if (timedOut || isNativeOperationTimeoutError(error)) {
@@ -1961,6 +2058,12 @@ export default class ReactNativeBleTransport {
       throw error;
     } finally {
       if (timer) clearTimeout(timer);
+      Log?.debug('[ReactNativeBleTransport] GATT setup completed', {
+        connectIdSuffix: uuid.slice(-8),
+        elapsedMs: Date.now() - startedAt,
+        succeeded,
+        backstopExpired: timedOut,
+      });
     }
   }
 
@@ -2104,6 +2207,7 @@ export default class ReactNativeBleTransport {
   }
 
   private resetPlxManager() {
+    if (bleManagerResetPromise) return;
     const manager = this.blePlxManager;
     this.blePlxManager = undefined;
     const reason = 'React Native BLE manager reset';
@@ -2150,11 +2254,21 @@ export default class ReactNativeBleTransport {
     this.connectionSetupTimeoutCounts.clear();
     this.monitorTokens.clear();
     this.protocolV2Assemblers.clear();
+    let reset: Promise<void>;
     try {
-      manager?.destroy();
+      reset = Promise.resolve(manager?.destroy());
     } catch (error) {
-      Log?.debug('[ReactNativeBleTransport] BLE manager destroy failed (ignored):', error);
+      reset = Promise.reject(error);
     }
+    bleManagerResetPromise = reset;
+    reset.then(
+      () => {
+        if (bleManagerResetPromise === reset) bleManagerResetPromise = undefined;
+      },
+      error => {
+        Log?.error('[ReactNativeBleTransport] BLE manager destroy failed:', error);
+      }
+    );
   }
 
   private createProtocolMismatchError(expected: ProtocolType) {

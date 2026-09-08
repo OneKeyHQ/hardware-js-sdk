@@ -132,11 +132,13 @@ async function postMessage(message: CoreMessage, usePromise = true) {
 
   if (usePromise) {
     _messageID++;
-    messagePromises[_messageID] = createDeferred();
-    // const { promise } = messagePromises[_messageID];
-    const response = await _core.handleMessage({ ...message, id: `${_messageID}` });
-    // return promise;
-    return response;
+    const messageId = _messageID;
+    messagePromises[messageId] = createDeferred();
+    try {
+      return await _core.handleMessage({ ...message, id: `${messageId}` });
+    } finally {
+      delete messagePromises[messageId];
+    }
   }
 
   _core.handleMessage(message);

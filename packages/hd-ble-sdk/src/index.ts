@@ -33,9 +33,15 @@ let _settings = parseConnectSettings();
 let _messageID = 0;
 export const messagePromises: { [key: number]: Deferred<any> } = {};
 
-const dispose = () => {
+const dispose = async () => {
+  const core = _core;
+  _core = undefined;
   eventEmitter.removeAllListeners();
+  Object.keys(messagePromises).forEach(key => {
+    delete messagePromises[Number(key)];
+  });
   _settings = parseConnectSettings();
+  await core?.dispose?.();
 };
 
 const uiResponse = (response: UiResponseEvent) => {
@@ -114,11 +120,13 @@ async function postMessage(message: CoreMessage, usePromise = true) {
 
   if (usePromise) {
     _messageID++;
-    messagePromises[_messageID] = createDeferred();
-    // const { promise } = messagePromises[_messageID];
-    const response = await _core.handleMessage({ ...message, id: `${_messageID}` });
-    // return promise;
-    return response;
+    const messageId = _messageID;
+    messagePromises[messageId] = createDeferred();
+    try {
+      return await _core.handleMessage({ ...message, id: `${messageId}` });
+    } finally {
+      delete messagePromises[messageId];
+    }
   }
 
   _core.handleMessage(message);
