@@ -1167,8 +1167,7 @@ async function enumerateDevices(isWindowDestroyed: () => boolean): Promise<Devic
 
   logger?.info('[NobleBLE] Starting device enumeration');
 
-  // Clear previous discoveries
-  discoveredDevices.clear();
+  // Keep prior discoveries when a polling round misses an advertisement.
 
   // Ensure discover listener is properly set up before scanning
   // This is crucial to fix the issue where devices are not found after web-usb failures
@@ -1766,7 +1765,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     totalConnected: connectedDevices.size,
   });
 
-  // enumerate clears the discovery map; a kept-alive link outlives it.
+  // A kept-alive link can outlive the discovery cache.
   let peripheral = discoveredDevices.get(deviceId) ?? connectedDevices.get(deviceId);
 
   if (!peripheral) {

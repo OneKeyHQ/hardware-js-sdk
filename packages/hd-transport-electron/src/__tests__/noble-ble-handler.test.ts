@@ -225,6 +225,80 @@ describe('Electron Noble BLE device discovery', () => {
     ]);
   });
 
+  test.each(['Pro A1B2', 'Pro2 A1B2'])(
+    'retains %s across scan rounds until Bluetooth is powered off',
+    async name => {
+      jest.useFakeTimers({ doNotFake: ['performance'] });
+
+      const handlers = new Map<string, IpcHandler>();
+      const ipcMain = {
+        handle: jest.fn((channel: string, handler: IpcHandler) => {
+          handlers.set(channel, handler);
+        }),
+        removeHandler: jest.fn((channel: string) => {
+          handlers.delete(channel);
+        }),
+      };
+      const noble = Object.assign(new EventEmitter(), {
+        state: 'poweredOn',
+        startScanning: jest.fn(),
+        stopScanning: jest.fn(callback => callback?.()),
+      });
+
+      jest.doMock('@stoprocent/noble', () => noble);
+      jest.doMock('electron', () => ({ ipcMain }));
+      jest.doMock('electron-log', () => ({
+        info: jest.fn(),
+        debug: jest.fn(),
+        error: jest.fn(),
+      }));
+
+      const { setupNobleBleHandlers } = await import('../noble-ble-handler');
+      setupNobleBleHandlers({
+        on: jest.fn(),
+        send: jest.fn(),
+      } as unknown as WebContents);
+
+      const enumerate = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE);
+      if (!enumerate) {
+        throw new Error('Electron Noble BLE enumerate handler was not registered');
+      }
+
+      const scan = async (peripherals: ReturnType<typeof createPeripheral>[]) => {
+        let resolveScanStarted = () => undefined;
+        const scanStarted = new Promise<void>(resolve => {
+          resolveScanStarted = resolve;
+        });
+        noble.startScanning.mockImplementationOnce((_services, _duplicates, callback) => {
+          callback?.();
+          peripherals.forEach(peripheral => noble.emit('discover', peripheral));
+          resolveScanStarted();
+        });
+        const devices = Promise.resolve(enumerate());
+        await scanStarted;
+        jest.advanceTimersByTime(5_000);
+        return devices;
+      };
+
+      const firstDevice = createPeripheral('first-device', name);
+      const secondDevice = createPeripheral('second-device', 'Pro2 C3D4');
+      await expect(scan([firstDevice])).resolves.toEqual([
+        expect.objectContaining({ id: 'first-device', name }),
+      ]);
+      await expect(scan([secondDevice, secondDevice])).resolves.toEqual([
+        expect.objectContaining({ id: 'first-device', name }),
+        expect.objectContaining({ id: 'second-device', name: 'Pro2 C3D4' }),
+      ]);
+      await expect(scan([])).resolves.toHaveLength(2);
+
+      noble.state = 'poweredOff';
+      noble.emit('stateChange', 'poweredOff');
+      noble.state = 'poweredOn';
+      noble.emit('stateChange', 'poweredOn');
+      await expect(scan([])).resolves.toEqual([]);
+    }
+  );
+
   test('waits for a targeted scan to stop before connecting', async () => {
     jest.useFakeTimers({ doNotFake: ['performance'] });
 
