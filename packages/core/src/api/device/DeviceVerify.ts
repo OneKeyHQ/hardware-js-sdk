@@ -22,6 +22,14 @@ export default class DeviceVerify extends BaseMethod<BixinVerifyDeviceRequest> {
     // the main PIN or an Attach PIN may authorize them.
     this.protocolV2PreUnlockPinType = DeviceSessionPinType.Any;
     this.useDevicePassphraseState = false;
+    this.protocolV2UiInteraction = {
+      request: 'button',
+      source: 'method-lifecycle',
+      reason: 'device-management',
+      completion: 'operation-completed',
+      deviceOnly: true,
+      operation: 'deviceVerify',
+    };
 
     // check payload
     validateParams(this.payload, [{ name: 'dataHex', type: 'hexString' }]);

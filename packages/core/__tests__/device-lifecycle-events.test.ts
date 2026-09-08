@@ -15,12 +15,17 @@ import {
 } from '../src/core';
 import { DataManager } from '../src/data-manager';
 import GetDeviceState from '../src/api/GetDeviceState';
+import DeviceVerify from '../src/api/device/DeviceVerify';
 import TransportManager from '../src/data-manager/TransportManager';
 import { Device } from '../src/device/Device';
 import { cancelDeviceInPrompt, cancelDeviceWithInitialize } from '../src/device/DeviceCommands';
 import { DevicePool } from '../src/device/DevicePool';
 import { CORE_EVENT, DEVICE, IFRAME } from '../src/events';
 import { PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE } from '../src/protocols/protocol-v2';
+import {
+  ProtocolV2UiInteractionCoordinator,
+  resolveProtocolV2UiInteraction,
+} from '../src/protocols/protocol-v2/uiInteraction';
 
 import type Core from '../src/core';
 import type { CoreMessage } from '../src/events';
@@ -773,6 +778,38 @@ describe('public device lifecycle events', () => {
       }
       expect(cancel).toHaveBeenCalledTimes(1);
       expect(device.hasDeviceAcquire()).toBe(true);
+    }
+  );
+
+  test.each(['react-native', 'desktop-web-ble', 'webusb', 'desktop-webusb'] as const)(
+    'sends Cancel once for device verification on an already unlocked Protocol V2 %s device',
+    async env => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
+      const device = createInitializedDevice('V2');
+      device.originalDescriptor.session = device.mainId;
+      jest.spyOn(device, 'hasDeviceAcquire').mockReturnValue(true);
+      const post = jest.fn().mockResolvedValue(undefined);
+      const cancel = jest.fn().mockResolvedValue(undefined);
+      device.commands = {
+        transport: { post },
+        cancelDevice: () => cancelDeviceInPrompt(device, false),
+        cancel,
+      } as never;
+      const method = new DeviceVerify({
+        payload: { method: 'deviceVerify', dataHex: '00' },
+      });
+      method.init();
+      const postMessage = jest.fn();
+      const coordinator = new ProtocolV2UiInteractionCoordinator(device, postMessage);
+      device.beginProtocolV2UiInteraction();
+      coordinator.enterMethodInteraction(resolveProtocolV2UiInteraction(method));
+
+      await device.interruptionFromUser();
+      await device.interruptionFromUser();
+
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(post).toHaveBeenCalledWith(device.mainId, 'Cancel', {});
+      expect(cancel).toHaveBeenCalledTimes(1);
     }
   );
 

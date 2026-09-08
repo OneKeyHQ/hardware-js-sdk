@@ -268,6 +268,7 @@ export async function getProtocolV2WalletSession(
       ? device.getInternalState()
       : undefined;
   let response;
+  let walletSelectionRequested = false;
   let resumed = false;
   let walletStatusRefreshed = false;
   const markWalletStatusRefreshed = () => {
@@ -482,6 +483,7 @@ export async function getProtocolV2WalletSession(
       throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
     }
     await lockAttachPinBeforePassphraseSelection();
+    walletSelectionRequested = true;
     response = await selectDeviceSession(
       device,
       expectedPassphraseState,
@@ -507,6 +509,11 @@ export async function getProtocolV2WalletSession(
     if (options?.resumeOnly) {
       device.clearInternalState();
       throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
+    }
+    // Report a fresh selection mismatch before asking for input again.
+    if (walletSelectionRequested) {
+      clearCurrentWalletSession();
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
     }
     if (options?.onlyMainPin) {
       device.clearStandardInternalState?.();
