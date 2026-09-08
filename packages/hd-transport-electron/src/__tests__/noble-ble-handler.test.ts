@@ -299,6 +299,59 @@ describe('Electron Noble BLE device discovery', () => {
     }
   );
 
+  test.each(['Pro A1B2', 'Pro2 A1B2'])(
+    'refreshes a retained disconnected %s peripheral before cold connecting',
+    async name => {
+      const handlers = new Map<string, IpcHandler>();
+      const stalePeripheral = Object.assign(new EventEmitter(), createPeripheral('device', name), {
+        connect: jest.fn(),
+      });
+      const freshPeripheral = Object.assign(new EventEmitter(), createPeripheral('device', name), {
+        connect: jest.fn((callback: (error?: Error) => void) => {
+          callback(new Error('expected fresh connection failure'));
+        }),
+      });
+      const noble = Object.assign(new EventEmitter(), {
+        state: 'poweredOn',
+        startScanning: jest.fn((_services, _duplicates, callback) => {
+          callback?.();
+          noble.emit('discover', freshPeripheral);
+        }),
+        stopScanning: jest.fn(callback => callback?.()),
+        connectAsync: jest.fn(() => Promise.resolve(undefined)),
+      });
+      jest.doMock('@stoprocent/noble', () => noble);
+      jest.doMock('electron', () => ({
+        ipcMain: {
+          handle: (channel: string, handler: IpcHandler) => handlers.set(channel, handler),
+          removeHandler: (channel: string) => handlers.delete(channel),
+        },
+      }));
+      jest.doMock('electron-log', () => ({
+        info: jest.fn(),
+        debug: jest.fn(),
+        error: jest.fn(),
+      }));
+      const { setupNobleBleHandlers } = await import('../noble-ble-handler');
+      setupNobleBleHandlers({ on: jest.fn(), send: jest.fn() } as unknown as WebContents);
+      const availability = handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK);
+      const connect = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT);
+      if (!availability || !connect) throw new Error('Noble handlers were not registered');
+      await availability();
+      noble.emit('discover', stalePeripheral);
+
+      await expect(Promise.resolve(connect(undefined, stalePeripheral.id))).resolves.toMatchObject({
+        success: false,
+        error: { message: 'expected fresh connection failure' },
+      });
+
+      expect(stalePeripheral.connect).not.toHaveBeenCalled();
+      expect(freshPeripheral.connect).toHaveBeenCalledTimes(1);
+      expect(noble.startScanning).toHaveBeenCalledTimes(1);
+      expect(noble.connectAsync).toHaveBeenCalledTimes(name.startsWith('Pro2') ? 1 : 0);
+    }
+  );
+
   test('waits for a targeted scan to stop before connecting', async () => {
     jest.useFakeTimers({ doNotFake: ['performance'] });
 
@@ -920,9 +973,12 @@ describe('Noble BLE process shutdown', () => {
       discoverServices: jest.fn(),
     });
     native.emit('discover', peripheral);
+    native.startScanning.mockImplementationOnce((_uuids, _duplicates, callback) => {
+      callback?.();
+      native.emit('discover', peripheral);
+    });
     const connecting = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT)?.({}, peripheral.id);
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushCallbacks();
     expect(peripheral.connect).toHaveBeenCalledTimes(1);
     const disposing = sdk.disposeNobleBleSupport();
     await flushCallbacks();
@@ -960,7 +1016,13 @@ describe('Noble BLE process shutdown', () => {
       );
       const cancelConnect = jest.fn();
       if (route === 'direct') Object.assign(native, { connectAsync, cancelConnect });
-      else native.emit('discover', peripheral);
+      else {
+        native.emit('discover', peripheral);
+        native.startScanning.mockImplementationOnce((_uuids, _duplicates, callback) => {
+          callback?.();
+          native.emit('discover', peripheral);
+        });
+      }
       const connecting = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT)?.({}, peripheral.id);
       await flushCallbacks();
       if (route === 'direct') {

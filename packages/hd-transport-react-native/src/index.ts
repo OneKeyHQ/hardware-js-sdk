@@ -380,6 +380,8 @@ export default class ReactNativeBleTransport {
 
   stopped = false;
 
+  private readonly bondAbortController = new AbortController();
+
   scanTimeout = DEVICE_SCAN_TIMEOUT_MS;
 
   runPromise: Deferred<any> | null = null;
@@ -1061,7 +1063,7 @@ export default class ReactNativeBleTransport {
       try {
         const bondState = await pairDevice(uuid);
         if (bondState.bonding) {
-          await onDeviceBondState(uuid);
+          await onDeviceBondState(uuid, this.bondAbortController.signal);
         } else if (!bondState.bonded) {
           throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
         }
@@ -1788,6 +1790,8 @@ export default class ReactNativeBleTransport {
   stop() {
     if (this.stopPromise) return this.stopPromise;
     this.stopped = true;
+    // Bonding precedes GATT, so cancelDeviceConnection cannot end this wait.
+    this.bondAbortController.abort();
     const deviceIds = new Set([
       ...this.monitorTokens.keys(),
       ...this.sessionProtocols.keys(),

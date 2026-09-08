@@ -1765,8 +1765,12 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     totalConnected: connectedDevices.size,
   });
 
-  // A kept-alive link can outlive the discovery cache.
-  let peripheral = discoveredDevices.get(deviceId) ?? connectedDevices.get(deviceId);
+  // Retained discoveries are display metadata, not proof of a reusable native link.
+  // Prefer the live connection when an older discovery exists for the same device.
+  let peripheral = connectedDevices.get(deviceId) ?? discoveredDevices.get(deviceId);
+  if (peripheral?.state !== 'connected') {
+    peripheral = undefined;
+  }
 
   if (!peripheral) {
     // Initialize Noble if not already done

@@ -127,6 +127,32 @@ describe('Android bond failure reasons', () => {
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
+  test('aborts the bond wait and removes its listener and deadline', async () => {
+    const controller = new AbortController();
+    const result = onDeviceBondState(UUID, controller.signal);
+    const rejection = expect(result).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+
+    controller.abort();
+
+    await rejection;
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('does not subscribe when the transport stopped before the bond wait starts', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const subscribe = jest.spyOn(BleUtils, 'onDeviceBondState').mockClear();
+
+    await expect(onDeviceBondState(UUID, controller.signal)).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
   test('ignores other devices and clears the deadline after bonding succeeds', async () => {
     const result = onDeviceBondState(UUID);
     const otherPeripheral = {
@@ -335,6 +361,41 @@ describe('BLE connect timeout', () => {
       errorCode: HardwareErrorCode.BleDeviceDisconnected,
     });
   });
+
+  test.each(['V1', 'V2'] as const)(
+    'stop completes while Android %s bonding remains pending',
+    async expectedProtocol => {
+      Object.assign(Platform, { OS: 'android' });
+      const { transport, bleManager, connect } = createHarness(() => Promise.resolve());
+      jest.spyOn(BleUtils, 'pairDevice').mockResolvedValueOnce({ bonded: false, bonding: true });
+      const listening = createDeferred<void>();
+      const cleanup = jest.fn();
+      jest.spyOn(BleUtils, 'onDeviceBondState').mockImplementationOnce(() => {
+        listening.resolve();
+        return cleanup;
+      });
+      const acquiring = transport.acquire({ uuid: UUID, expectedProtocol });
+      const rejection = expect(acquiring).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleDeviceDisconnected,
+      });
+      await listening.promise;
+
+      // Advance only the existing 100ms disconnect drain, not the bond deadline.
+      let stopped = false;
+      const stopping = transport.stop().then(() => {
+        stopped = true;
+      });
+      await advanceUntil(() => stopped, 1000);
+      expect(stopped).toBe(true);
+      await stopping;
+
+      await rejection;
+      expect(cleanup).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(0);
+      expect(bleManager.devices).not.toHaveBeenCalled();
+      expect(connect).not.toHaveBeenCalled();
+    }
+  );
 
   test('stop rejects a pending read and waits for native disconnection without destroying the shared manager', async () => {
     const { transport, bleManager } = createHarness(() => Promise.resolve());

@@ -32,14 +32,28 @@ export const getBondedDevices = () => BleUtils.getBondedPeripherals();
 
 export const pairDevice = (macAddress: string) => BleUtils.pairDevice(macAddress);
 
-export const onDeviceBondState = (bleMacAddress: string): Promise<Peripheral | undefined> =>
+export const onDeviceBondState = (
+  bleMacAddress: string,
+  signal?: AbortSignal
+): Promise<Peripheral | undefined> =>
   new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+      return;
+    }
     const cleanup = () => {
       if (timeout) {
         clearTimeout(timeout);
       }
       if (cleanupListener) cleanupListener();
+      signal?.removeEventListener('abort', onAbort);
     };
+    const onAbort = () => {
+      cleanup();
+      reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+    };
+
+    signal?.addEventListener('abort', onAbort, { once: true });
 
     const timeout = setTimeout(() => {
       cleanup();
