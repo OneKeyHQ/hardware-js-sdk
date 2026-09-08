@@ -2,14 +2,19 @@ import { EDeviceType, ERRORS, HardwareErrorCode, createDeferred } from '@onekeyf
 import { DeviceType, TRANSPORT_EVENT } from '@onekeyfe/hd-transport';
 
 import {
+  cancel,
+  getPostCallPendingPromise,
   initConnector,
   initCore,
+  isDeviceIdentityMismatchError,
   isMissingDetectedProtocolV2Error,
-  isProtocolV2PeerRemovedPairingError,
   isRetryableBleConnectionError,
   isRetryableBleProtocolV2ProbeError,
+  isTerminalBleStaleBondError,
+  resolveBleConnectProtocol,
 } from '../src/core';
 import { DataManager } from '../src/data-manager';
+import GetDeviceState from '../src/api/GetDeviceState';
 import TransportManager from '../src/data-manager/TransportManager';
 import { Device } from '../src/device/Device';
 import { cancelDeviceInPrompt, cancelDeviceWithInitialize } from '../src/device/DeviceCommands';
@@ -71,6 +76,117 @@ describe('public device lifecycle events', () => {
     jest.restoreAllMocks();
   });
 
+  test.each(['V1', 'V2'] as const)(
+    'preserves the %s acknowledged result and waits for release before the next acquire',
+    async protocol => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      jest.spyOn(DataManager, 'checkAndReloadData').mockResolvedValue(undefined);
+      jest.spyOn(TransportManager, 'configure').mockResolvedValue(undefined);
+      const device = createInitializedDevice(protocol);
+      jest.spyOn(Device, 'fromDescriptor').mockReturnValue(device);
+      const acquire = jest.spyOn(device, 'acquire').mockResolvedValue(undefined);
+      jest.spyOn(device, 'initialize').mockResolvedValue(undefined);
+      jest.spyOn(device, 'hasUnexpectedMode').mockReturnValue(undefined);
+      jest.spyOn(device, 'getCurrentMethodVersionRange').mockReturnValue({} as never);
+      device.commands = { disposed: false, dispose: jest.fn(), checkDisposed: jest.fn() } as never;
+      const methodRun = jest.spyOn(GetDeviceState.prototype, 'run').mockResolvedValue({} as never);
+      const releaseGate = createDeferred<void>();
+      const release = jest.spyOn(device, 'release').mockReturnValue(releaseGate.promise);
+      core = initCore();
+      const call = (id: number) =>
+        core!.handleMessage({
+          id,
+          event: IFRAME.CALL,
+          type: IFRAME.CALL,
+          payload: {
+            method: 'getDeviceState',
+            connectId: 'release-device',
+            connectProtocol: protocol,
+          },
+        } as CoreMessage);
+      await expect(call(301)).resolves.toMatchObject({ success: true });
+      const nextCall = call(302);
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+      try {
+        expect(methodRun).toHaveBeenCalledTimes(1);
+        expect(release).toHaveBeenCalledTimes(1);
+        expect(acquire).toHaveBeenCalledTimes(1);
+      } finally {
+        releaseGate.resolve();
+      }
+      await expect(nextCall).resolves.toMatchObject({ success: true });
+      expect(acquire).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  test.each([
+    ['webusb', EDeviceType.Pro2],
+    ['desktop-webusb', EDeviceType.Pro2],
+    ['node-usb', EDeviceType.Neo],
+  ] as const)('waits one second after %s signing on %s', async (env, deviceType) => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
+    const cooldown = createDeferred<void>();
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((callback, delay) => {
+      cooldown.promise.then(() => callback());
+      return 0 as never;
+    });
+    const cleanup = createDeferred<void>();
+    const pending = getPostCallPendingPromise(
+      { name: 'evmSignTransaction' } as never,
+      {
+        getCurrentDeviceType: () => deviceType,
+        waitForRunCleanup: () => cleanup.promise,
+      } as never
+    );
+    let settled = false;
+    pending.then(() => {
+      settled = true;
+    });
+
+    cleanup.resolve();
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 1000);
+    cooldown.resolve();
+    await pending;
+    expect(settled).toBe(true);
+  });
+
+  test.each([
+    ['react-native', EDeviceType.Pro2, 'evmSignTransaction'],
+    ['webusb', EDeviceType.Classic, 'evmSignTransaction'],
+    ['webusb', EDeviceType.Pro2, 'evmGetAddress'],
+  ] as const)('does not add a signing cooldown for %s, %s, %s', async (env, deviceType, name) => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
+    const cleanup = createDeferred<void>();
+    const pending = getPostCallPendingPromise(
+      { name } as never,
+      {
+        getCurrentDeviceType: () => deviceType,
+        waitForRunCleanup: () => cleanup.promise,
+      } as never
+    );
+
+    expect(pending).toBe(cleanup.promise);
+    cleanup.resolve();
+    await expect(pending).resolves.toBeUndefined();
+  });
+
+  test('prefers Protocol V2 only when the method contract is explicitly V2-only', () => {
+    const createMethod = (protocols: readonly ('V1' | 'V2')[], connectProtocol?: 'V1' | 'V2') =>
+      ({
+        payload: { connectProtocol },
+        getSupportedProtocols: () => protocols,
+      } as never);
+
+    expect(resolveBleConnectProtocol(createMethod(['V2']))).toBe('V2');
+    expect(resolveBleConnectProtocol(createMethod(['V1']))).toBeUndefined();
+    expect(resolveBleConnectProtocol(createMethod(['V1', 'V2']))).toBeUndefined();
+    expect(resolveBleConnectProtocol(createMethod(['V2'], 'V1'))).toBe('V1');
+  });
+
   test('registers the shared device lifecycle listeners exactly once', async () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
     core = initCore();
@@ -89,7 +205,7 @@ describe('public device lifecycle events', () => {
     expect(DevicePool.emitter.listenerCount(DEVICE.DISCONNECT)).toBe(1);
   });
 
-  test('isolates pending cancellation cleanup by connect id', () => {
+  test('isolates pending cancellation cleanup by connect id and waits for every cleanup', async () => {
     core = initCore();
     const context = (core as any).getCoreContext();
     const firstCleanup = createDeferred<void>();
@@ -101,9 +217,220 @@ describe('public device lifecycle events', () => {
     expect(context.getPrePendingCallPromise('device-b')).toBeUndefined();
 
     context.setPrePendingCallPromise('device-a', replacementCleanup.promise);
+    const combined = context.getPrePendingCallPromise('device-a');
     context.removePrePendingCallPromise('device-a', firstCleanup.promise);
 
-    expect(context.getPrePendingCallPromise('device-a')).toBe(replacementCleanup.promise);
+    expect(context.getPrePendingCallPromise('device-a')).toBe(combined);
+    let drained = false;
+    combined.then(() => {
+      drained = true;
+    });
+    replacementCleanup.resolve();
+    await Promise.resolve();
+    expect(drained).toBe(false);
+    firstCleanup.resolve();
+    await combined;
+    expect(drained).toBe(true);
+  });
+
+  test('cancels only requests associated with the requested connect id', () => {
+    core = initCore();
+    const context = (core as any).getCoreContext();
+    const deviceA = {
+      mainId: 'transport-session-a',
+      getConnectId: jest.fn(() => 'serial-a'),
+      interruptionFromUser: jest.fn().mockResolvedValue(undefined),
+    };
+    const deviceB = {
+      mainId: 'device-b',
+      getConnectId: jest.fn(() => 'serial-b'),
+      interruptionFromUser: jest.fn().mockResolvedValue(undefined),
+    };
+    const taskA = context.requestQueue.createTask({
+      responseID: 101,
+      connectId: '',
+      device: deviceA,
+    } as never);
+    const taskB = context.requestQueue.createTask({
+      responseID: 102,
+      connectId: 'device-b',
+      device: deviceB,
+    } as never);
+    const signalA = taskA.abortController?.signal;
+    const signalB = taskB.abortController?.signal;
+
+    cancel(context, 'serial-a');
+
+    expect(signalA?.aborted).toBe(true);
+    expect(context.requestQueue.getTask(taskA.id)).toBeUndefined();
+    expect(signalB?.aborted).toBe(false);
+    expect(context.requestQueue.getTask(taskB.id)).toBe(taskB);
+    expect(deviceA.interruptionFromUser).toHaveBeenCalledTimes(1);
+    expect(deviceB.interruptionFromUser).not.toHaveBeenCalled();
+  });
+
+  test.each(['callback', 'cleanup'] as const)(
+    'cancels a request waiting for %s before acquire',
+    async phase => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      const acquire = jest.spyOn(Device.prototype, 'acquire').mockResolvedValue(undefined);
+      core = initCore();
+      const context = (core as any).getCoreContext();
+      const gate = createDeferred<void>();
+      const connectId = `queued-${phase}`;
+      if (phase === 'callback') context.registerCallbackTask(connectId, gate);
+      else context.setPrePendingCallPromise(connectId, gate.promise);
+      const result = core.handleMessage({
+        id: 201,
+        event: IFRAME.CALL,
+        type: IFRAME.CALL,
+        payload: { method: 'getDeviceState', connectId, connectProtocol: 'V2' },
+      } as CoreMessage);
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+      expect(context.requestQueue.getRequestTasksIdByConnectId(connectId)).toHaveLength(1);
+      cancel(context, connectId);
+      await expect(result).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.CallQueueActionCancelled },
+      });
+      gate.resolve();
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+      expect(acquire).not.toHaveBeenCalled();
+      expect(context.requestQueue.getRequestTasksId()).toHaveLength(0);
+    }
+  );
+
+  test.each([
+    ['V1', 'callback'],
+    ['V1', 'cleanup'],
+    ['V2', 'callback'],
+    ['V2', 'cleanup'],
+  ] as const)(
+    'does not run a cancelled %s request waiting for %s after acquire',
+    async (protocol, phase) => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      jest.spyOn(DataManager, 'checkAndReloadData').mockResolvedValue(undefined);
+      jest.spyOn(TransportManager, 'configure').mockResolvedValue(undefined);
+      const device = createInitializedDevice(protocol);
+      jest.spyOn(Device, 'fromDescriptor').mockReturnValue(device);
+      const acquire = jest.spyOn(device, 'acquire').mockResolvedValue(undefined);
+      jest.spyOn(device, 'hasUnexpectedMode').mockReturnValue(undefined);
+      jest.spyOn(device, 'getCurrentMethodVersionRange').mockReturnValue({} as never);
+      device.commands = { disposed: false, dispose: jest.fn(), checkDisposed: jest.fn() } as never;
+      const deviceRun = jest.spyOn(device, 'run');
+      core = initCore();
+      const context = (core as any).getCoreContext();
+      const gate = createDeferred<void>();
+      const connectId = `post-acquire-${protocol}-${phase}`;
+      jest.spyOn(device, 'initialize').mockImplementation(() => {
+        if (phase === 'callback') context.registerCallbackTask(connectId, gate);
+        else context.setPrePendingCallPromise(connectId, gate.promise);
+        return Promise.resolve();
+      });
+
+      const result = core.handleMessage({
+        id: 203,
+        event: IFRAME.CALL,
+        type: IFRAME.CALL,
+        payload: { method: 'getDeviceState', connectId, connectProtocol: protocol },
+      } as CoreMessage);
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+      expect(acquire).toHaveBeenCalledTimes(1);
+      expect(deviceRun).not.toHaveBeenCalled();
+
+      cancel(context, connectId);
+      await expect(result).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.CallQueueActionCancelled },
+      });
+      gate.resolve();
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+      expect(deviceRun).not.toHaveBeenCalled();
+    }
+  );
+
+  test('keeps the cleanup barrier when its deadline expires', async () => {
+    const realSetTimeout = setTimeout;
+    jest
+      .spyOn(global, 'setTimeout')
+      .mockImplementation((callback, delay, ...args) =>
+        realSetTimeout(callback, delay === 15_000 ? 0 : delay, ...args)
+      );
+    {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      const acquire = jest.spyOn(Device.prototype, 'acquire').mockResolvedValue(undefined);
+      core = initCore();
+      const context = (core as any).getCoreContext();
+      const gate = createDeferred<void>();
+      context.setPrePendingCallPromise('draining-device', gate.promise);
+      const result = core.handleMessage({
+        id: 202,
+        event: IFRAME.CALL,
+        type: IFRAME.CALL,
+        payload: { method: 'getDeviceState', connectId: 'draining-device', connectProtocol: 'V2' },
+      } as CoreMessage);
+      await expect(result).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceBusy },
+      });
+      expect(acquire).not.toHaveBeenCalled();
+      expect(context.getPrePendingCallPromise('draining-device')).toBe(gate.promise);
+      gate.resolve();
+    }
+  });
+
+  test.each(['V1', 'V2'] as const)(
+    'keeps repeated and late %s cancellation scoped to the old commands',
+    async protocol => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      const device = createInitializedDevice(protocol);
+      const gate = createDeferred<void>();
+      const oldCancel = jest.fn().mockResolvedValue(undefined);
+      device.commands = { cancel: oldCancel } as never;
+      device.setCancelableAction(() => gate.promise);
+      const first = device.interruptionFromUser();
+      expect(device.interruptionFromUser()).toBe(first);
+      device.beginConnectionAttempt();
+      const newCancel = jest.fn();
+      const newRun = createDeferred<void>();
+      const rejected = jest.spyOn(newRun, 'reject');
+      device.commands = { cancel: newCancel } as never;
+      device.runPromise = newRun;
+      const newAction = jest.fn().mockResolvedValue(undefined);
+      device.setCancelableAction(newAction);
+      gate.resolve();
+      await first;
+      expect(oldCancel).toHaveBeenCalledTimes(1);
+      expect(newCancel).not.toHaveBeenCalled();
+      expect(rejected).not.toHaveBeenCalled();
+      newRun.promise.catch(() => undefined);
+      await device.interruptionFromUser();
+      expect(newAction).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  test('aborts every request before cancel-all rejects WebUSB tasks', () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('webusb' as never);
+    core = initCore();
+    const context = (core as any).getCoreContext();
+    const task = context.requestQueue.createTask({
+      responseID: 103,
+      connectId: 'webusb-device',
+    } as never);
+    const signal = task.abortController?.signal;
+
+    cancel(context);
+
+    expect(signal?.aborted).toBe(true);
+    expect(context.requestQueue.getTask(task.id)).toBeUndefined();
   });
 
   test('keeps shared device lifecycle listeners across a device cache reset', () => {
@@ -300,6 +627,7 @@ describe('public device lifecycle events', () => {
     [HardwareErrorCode.PollingTimeout, false],
     [HardwareErrorCode.BleDeviceBondError, false],
     [HardwareErrorCode.BlePeerRemovedPairingInformation, false],
+    [HardwareErrorCode.BleBondInvalid, false],
   ] as const)('retries a BLE connection error with error code %s: %s', (errorCode, expected) => {
     const method = { payload: { connectProtocol: 'V2' } } as never;
     const error = {
@@ -310,21 +638,67 @@ describe('public device lifecycle events', () => {
     expect(isRetryableBleConnectionError(method, error)).toBe(expected);
   });
 
-  test.each([
-    ['V2', true],
-    ['V1', false],
-    [undefined, false],
-  ] as const)(
-    'treats peer-removed pairing as terminal only for Protocol %s: %s',
-    (connectProtocol, expected) => {
-      const method = { payload: { connectProtocol } } as never;
-      const error = {
-        errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
-      };
+  test('does not retry the desktop acquire deadline fallback', () => {
+    const method = { payload: { connectProtocol: 'V2' } } as never;
+    const error = {
+      errorCode: HardwareErrorCode.BleTimeoutError,
+      params: { acquireDeadlineExceeded: true },
+    };
 
-      expect(isProtocolV2PeerRemovedPairingError(method, error)).toBe(expected);
+    expect(isRetryableBleConnectionError(method, error)).toBe(false);
+  });
+
+  test.each(['V1', 'V2'] as const)(
+    'stops the outer BLE poll after a manager reset for Protocol %s',
+    async connectProtocol => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      jest.spyOn(TransportManager, 'configure').mockResolvedValue(undefined);
+      const acquire = jest
+        .spyOn(Device.prototype, 'acquire')
+        .mockRejectedValue(
+          ERRORS.TypedError(HardwareErrorCode.PollingTimeout, 'BLE setup wedged repeatedly')
+        );
+      core = initCore();
+      const response = await core.handleMessage({
+        id: `manager-reset-${connectProtocol}`,
+        event: IFRAME.CALL,
+        type: IFRAME.CALL,
+        payload: {
+          method: 'getDeviceState',
+          connectId: `manager-reset-device-${connectProtocol}`,
+          connectProtocol,
+          retryCount: 1,
+          pollIntervalTime: 1,
+        },
+      } as CoreMessage);
+
+      expect(response).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.PollingTimeout },
+      });
+      expect(acquire).toHaveBeenCalledTimes(1);
     }
   );
+
+  test.each([
+    [HardwareErrorCode.BleDeviceBondError, true],
+    [HardwareErrorCode.BlePeerRemovedPairingInformation, true],
+    [HardwareErrorCode.BleBondInvalid, true],
+    [HardwareErrorCode.DeviceNotFound, false],
+  ] as const)('treats BLE stale-bond error code %s as terminal: %s', (errorCode, expected) => {
+    const error = {
+      errorCode,
+    };
+
+    expect(isTerminalBleStaleBondError(error)).toBe(expected);
+  });
+
+  test.each([
+    [HardwareErrorCode.DeviceCheckDeviceIdError, true],
+    [HardwareErrorCode.DeviceNotFound, false],
+  ] as const)('treats device identity error code %s as a mismatch: %s', (errorCode, expected) => {
+    expect(isDeviceIdentityMismatchError({ errorCode })).toBe(expected);
+  });
 
   test('converts an internal transport disconnect into a public KnownDevice snapshot', () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
@@ -477,6 +851,26 @@ describe('public device lifecycle events', () => {
     expect(device.wasInterruptedByUser()).toBe(true);
     expect(cancel).toHaveBeenCalledTimes(1);
   });
+
+  test.each(['V1', 'V2'] as const)(
+    'disconnects and resolves when Protocol %s cancellation cleanup fails',
+    async protocol => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      const device = createInitializedDevice(protocol);
+      const cleanupError = new Error('cancel cleanup failed');
+      const cancel = jest.fn().mockRejectedValue(cleanupError);
+      const disconnect = jest.fn().mockResolvedValue(undefined);
+      device.deviceConnector = { disconnect } as never;
+      device.commands = { cancel } as never;
+      (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+
+      await expect(device.interruptionFromUser()).resolves.toBeUndefined();
+
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(disconnect).toHaveBeenCalledWith(device.mainId);
+      expect(device.hasDeviceAcquire()).toBe(false);
+    }
+  );
 
   test('does not finish acquire after the user already cancelled', async () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);

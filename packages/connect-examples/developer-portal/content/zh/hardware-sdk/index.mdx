@@ -8,6 +8,8 @@ import { ExternalLink, Play, Monitor } from 'lucide-react'
 
 面向开发者的 OneKey 硬件钱包集成文档，适用于 Web 和原生应用。
 
+当前稳定线是 Hardware SDK **1.2.1**。Protocol V1 和 Protocol V2 走同一套 JavaScript API。第一次接入请先看 [快速开始](/zh/hardware-sdk/getting-started)。
+
 本页是**入门层** —— 帮你选对 SDK 包并装上。端到端流程（搜设备 → 事件 → PIN/passphrase → 首次签名）和参数、事件、错误处理的完整说明，请看 [Core API Guide](/zh/hardware-sdk/core-api-guide)。
 
 ## 选择传输协议
@@ -19,8 +21,8 @@ USB 场景一律推荐 `@onekeyfe/hd-common-connect-sdk`。`@onekeyfe/hd-web-sdk
 | 方式 | 描述 | 支持机型 |
 |------|------|----------|
 | **USB / WebUSB** | 有线 USB；Web 使用 WebUSB，原生使用底层插件 | 所有 OneKey 设备 |
-| **Bluetooth BLE（原生）** | 原生 App 的 BLE；不支持 Web Bluetooth | Pro、Touch、Classic 1s / Classic 1s Pure；**Mini 不支持 BLE** |
-| **Air-Gap（二维码）** | 离线扫码签名 | 仅 OneKey Pro |
+| **Bluetooth BLE（原生）** | 原生 App 的 BLE；不支持 Web Bluetooth | Pro、Pro 2、Neo、Touch、Classic 1s / Classic 1s Pure；**Mini 不支持 BLE** |
+| **Air-Gap（二维码）** | 离线扫码签名 | OneKey Pro 和 Pro 2；**Neo 无摄像头** |
 
 ### 平台指南
 
@@ -32,7 +34,13 @@ USB 场景一律推荐 `@onekeyfe/hd-common-connect-sdk`。`@onekeyfe/hd-web-sdk
 | iOS（原生） | 蓝牙 | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [iOS 蓝牙](/zh/hardware-sdk/transport/ios) |
 | Flutter | 蓝牙 | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [Flutter 蓝牙](/zh/hardware-sdk/transport/flutter) |
 
-![传输架构](https://raw.githubusercontent.com/OneKeyHQ/hardware-js-sdk/onekey/packages/connect-examples/developer-portal/public/images/transport/transport-architecture-zh.svg)
+```mermaid
+flowchart TB
+  App["你的应用"] --> SDK["HardwareSDK"]
+  SDK --> Transport["传输：USB / BLE / 底层插件"]
+  Transport --> Protocol["协议 V1 或 V2 — 现场探测"]
+  Protocol --> Device["设备"]
+```
 
 低层协议与自定义通道参考：[底层传输插件与协议](/zh/hardware-sdk/concepts/low-level-plugin)
 
@@ -113,23 +121,33 @@ await HardwareSDK.init({
 
 ### 插件端 Iframe
 
-使用 `@onekeyfe/hd-web-sdk`（仅插件端）：
+使用 `@onekeyfe/hd-web-sdk`（仅插件端）。SDK 默认 iframe 地址是 `https://jssdk.onekey.so/<安装包版本>/`，来自 `getSDKVersion()`。除非自建 iframe，否则不要传 `connectSrc`。
+
+import { SdkVersionNote } from '../../../components/SdkVersionNote'
+
+<SdkVersionNote locale="zh" />
 
 ```ts
 import { HardwareSDK } from '@onekeyfe/hd-web-sdk';
 
 await HardwareSDK.init({
   debug: process.env.NODE_ENV !== 'production',
-  connectSrc: 'https://jssdk.onekey.so/1.1.19/', // iframe host
+  // 省略 connectSrc — SDK 会填 https://jssdk.onekey.so/<安装版本>/
 });
 ```
 
 ## 下一步
 
-`HardwareSDK.init(...)` 完成之后，剩下的流程 —— 设备发现、事件绑定、PIN/passphrase 处理、签名 —— 都在 [Core API Guide](/zh/hardware-sdk/core-api-guide) 里端到端讲清楚了：
+`HardwareSDK.init(...)` 完成之后，先用 [快速开始](/zh/hardware-sdk/getting-started) 读出第一个地址，其余流程在 [Core API Guide](/zh/hardware-sdk/core-api-guide) 里端到端讲清楚：
 
-- 标准生命周期（`init → search → getFeatures → subscribe → call + uiResponse → cleanup`）：[Core API Guide → 标准生命周期](/zh/hardware-sdk/core-api-guide#standard-lifecycle)
-- 所有方法都接受的调用参数：[通用参数](/zh/hardware-sdk/core-api-guide#common-params)
+- 1.2.0 机型矩阵：[设备](/zh/hardware-sdk/concepts/devices)
+- Pro 2 / Neo 支持哪些链：[链支持](/zh/hardware-sdk/concepts/chain-support)
+- Protocol V1 / V2（自动识别）：[协议](/zh/hardware-sdk/concepts/protocol)
+- 打开 / 恢复钱包：[钱包会话](/zh/hardware-sdk/concepts/wallet-session)
+- 传输选择和重连：[传输](/zh/hardware-sdk/transport) · [重连](/zh/hardware-sdk/transport/reconnect)
+- 固件 V2 / V3 / V4：[固件升级](/zh/hardware-sdk/firmware-update)
+- 标准生命周期（`init → search → getDeviceState → subscribe → call + uiResponse → cleanup`）：[Core API Guide → 标准生命周期](/zh/hardware-sdk/core-api-guide#standard-lifecycle)
+- 所有方法都接受的调用参数：[通用参数](/zh/hardware-sdk/concepts/common-params)
 - 标识符参考（`connectId` / `deviceId` / `passphraseState` / …）：[Identifiers](/zh/hardware-sdk/concepts/identifiers)
 - PIN 输入流程：[PIN 码](/zh/hardware-sdk/concepts/pin)
 - Passphrase / 隐藏钱包流程：[Passphrase](/zh/hardware-sdk/concepts/passphrase)

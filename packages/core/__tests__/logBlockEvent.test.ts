@@ -7,36 +7,6 @@ import {
 } from '../src/events';
 
 describe('getLogBlockLabel', () => {
-  it('blocks evmSignTypedData params before logging large typed data', () => {
-    expect(
-      getLogBlockLabel({
-        method: 'evmSignTypedData',
-        data: {
-          message: {
-            data: `0x${'ab'.repeat(4096)}`,
-          },
-        },
-      })
-    ).toBe('evmSignTypedData');
-  });
-
-  it('blocks evmSignTypedData iframe call payload before bridge logging', () => {
-    expect(
-      getLogBlockLabel({
-        event: 'iframe-call',
-        type: 'iframe-call',
-        payload: {
-          method: 'evmSignTypedData',
-          data: {
-            message: {
-              data: `0x${'ab'.repeat(4096)}`,
-            },
-          },
-        },
-      })
-    ).toBe('evmSignTypedData');
-  });
-
   it('keeps existing sensitive UI response blocking', () => {
     expect(getLogBlockLabel({ type: UI_RESPONSE.RECEIVE_PIN })).toBe(UI_RESPONSE.RECEIVE_PIN);
   });
@@ -53,61 +23,27 @@ describe('getLogBlockLabel', () => {
           },
         })
       ).toBe(type);
+      expect(
+        getSafeLogPayload(
+          {
+            type,
+            payload: {
+              passphraseState: 'wallet-identifier',
+            },
+          },
+          type
+        )
+      ).toEqual({
+        method: type,
+        payload: '[REDACTED]',
+      });
     }
   );
 
-  it('blocks openWalletSession wallet identifiers in direct and iframe call logging', () => {
-    const payload = {
-      method: 'openWalletSession',
-      mode: 'resume-hidden',
-      deviceId: 'device-id',
-      passphraseState: 'wallet-identifier',
-    };
-
-    expect(getLogBlockLabel(payload)).toBe('openWalletSession');
-    expect(
-      getLogBlockLabel({
-        event: 'iframe-call',
-        type: 'iframe-call',
-        payload,
-      })
-    ).toBe('openWalletSession');
-  });
-
-  it('keeps openWalletSession metadata while redacting wallet session identifiers', () => {
-    const safeResponse = getSafeLogPayload(
-      {
-        success: true,
-        payload: {
-          protocol: 'V2',
-          walletType: 'hidden',
-          deviceId: 'device-id',
-          passphraseState: 'wallet-identifier',
-          sessionId: 'wallet-session-id',
-          resumed: false,
-        },
-      },
-      'openWalletSession'
-    );
-
-    expect(safeResponse).toEqual({
-      method: 'openWalletSession',
-      success: true,
-      payload: {
-        protocol: 'V2',
-        walletType: 'hidden',
-        deviceId: 'device-id',
-        passphraseState: '[REDACTED]',
-        sessionId: '[REDACTED]',
-        resumed: false,
-      },
-    });
-  });
-
-  it.each(['deviceUploadNft', 'deviceUploadWallpaper', 'uploadPortfolio'])(
-    'skips large Base64 resource payload logging for %s',
+  it.each(['deviceUploadNft', 'deviceUploadWallpaper', 'uploadPortfolio', 'fileWrite', 'fileRead'])(
+    'skips large resource or binary payload logging for %s',
     method => {
-      const request = { method, path: 'resource.bin', data: 'A'.repeat(1024 * 1024) };
+      const request = { method, path: 'resource.bin', data: 'A'.repeat(1024) };
       expect(getLogBlockLabel(request)).toBe(method);
       expect(getSafeLogPayload(request, method)).toEqual({
         method,
@@ -116,56 +52,43 @@ describe('getLogBlockLabel', () => {
     }
   );
 
-  it.each(['fileWrite', 'fileRead'])(
-    'keeps metadata and replaces binary payloads with their size for %s',
-    method => {
-      const request = { method, path: 'resource.bin', data: new Uint8Array(1024) };
-      expect(getLogBlockLabel(request)).toBe(method);
-      expect(getSafeLogPayload(request, method)).toEqual({
-        method,
-        path: 'resource.bin',
-        data: '[BINARY:1024]',
-      });
-    }
-  );
+  it('logs signing requests and responses as-is', () => {
+    const request = {
+      method: 'btcSignMessage',
+      path: "m/44'/0'/0'/0/0",
+      messageHex: '68656c6c6f',
+      coin: 'Bitcoin',
+    };
+    const iframeRequest = {
+      event: 'iframe-call',
+      payload: request,
+    };
+    const response = {
+      success: true,
+      payload: {
+        signature: 'signature-bytes',
+        address: 'bc1qexample',
+      },
+    };
 
-  it.each(['evmSignMessage', 'btcSignMessage', 'evmSignTransaction'])(
-    'blocks request and response payload logging for signing method %s',
-    method => {
-      expect(getLogBlockLabel({ method, message: 'sensitive signing payload' })).toBe(method);
-      expect(
-        getLogBlockLabel({
-          event: 'iframe-call',
-          payload: { method, message: 'sensitive signing payload' },
-        })
-      ).toBe(method);
-    }
-  );
+    expect(getLogBlockLabel(request)).toBeUndefined();
+    expect(getLogBlockLabel(iframeRequest)).toBeUndefined();
+    expect(getSafeLogPayload(request)).toBe(request);
+    expect(getSafeLogPayload(response)).toBe(response);
+  });
 
   it('keeps ordinary API requests and responses visible', () => {
     const request = { method: 'getDeviceState', connectId: 'connect-id', scope: 'runtime' };
     const response = { success: true, payload: { protocol: 'V2', initialized: true } };
 
     expect(getLogBlockLabel(request)).toBeUndefined();
-    expect(getSafeLogPayload(request)).toEqual(request);
-    expect(getSafeLogPayload(response)).toEqual(response);
+    expect(getSafeLogPayload(request)).toBe(request);
+    expect(getSafeLogPayload(response)).toBe(response);
   });
 
-  it('redacts sensitive keys even for ordinary API payloads', () => {
-    expect(
-      getSafeLogPayload({
-        method: 'ordinaryMethod',
-        payload: { session_id: 'session-secret', nested: { pin: '1234' } },
-      })
-    ).toEqual({
-      method: 'ordinaryMethod',
-      payload: { session_id: '[REDACTED]', nested: { pin: '[REDACTED]' } },
-    });
-  });
-
-  it('puts sensitive API method names in the log label', () => {
-    expect(formatLogMethodLabel('response:', 'openWalletSession')).toBe(
-      'response: [openWalletSession]'
+  it('puts blocked method names in the log label', () => {
+    expect(formatLogMethodLabel('response:', 'deviceUploadNft')).toBe(
+      'response: [deviceUploadNft]'
     );
     expect(formatLogMethodLabel('response:')).toBe('response:');
   });

@@ -918,6 +918,8 @@ export const en = {
         enterJsonData: 'Please enter JSON formatted data...',
         jsonFormatError: 'JSON format is incorrect, please check syntax',
         noData: 'No data available',
+        largePayloadNotice:
+          'This payload is too large to edit here. The complete value will still be sent to the SDK.',
       },
       listBoundary: {
         preparingData: 'Preparing data...',
@@ -971,6 +973,8 @@ export const en = {
         passphraseStateDesc: 'Use passphraseState for hidden wallet',
         deriveCardano: 'deriveCardano',
         deriveCardanoDesc: 'Enable Cardano address derivation',
+        largePayloadNotice:
+          'This value is shown as a read-only preview. The complete value will still be sent to the SDK.',
       },
       unifiedLogger: {
         executionLogs: 'Execution Logs',

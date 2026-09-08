@@ -8,8 +8,9 @@ title: firmwareUpdateV3
 
 All‑new update flow (Pro only). Supports updating Bootloader, Main firmware, BLE firmware and the resource package in a single flow as needed.
 
-- Device: OneKey Pro only
+- Device: OneKey Pro (Protocol V1) only
 - Boot requirement: Boot version ≥ 4.8.0
+- Pro 2 / Neo: use [firmwareUpdateV4](/en/hardware-sdk/device-api/firmwareupdatev4)
 
 ```typescript
 const res = await HardwareSDK.firmwareUpdateV3(connectId, {
@@ -33,7 +34,7 @@ const res = await HardwareSDK.firmwareUpdateV3(connectId, {
 
 ### Params
 
-[Optional common params](/en/hardware-sdk/core-api-guide#common-params)
+[Optional common params](/en/hardware-sdk/concepts/common-params)
 
 - `platform` - required `"native" | "desktop" | "ext" | "web" | "web-embed"` execution environment
 - `firmwareVersion` - optional `number[]` target main firmware version

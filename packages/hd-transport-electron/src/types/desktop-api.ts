@@ -10,6 +10,50 @@ export interface NobleBleWriteOptions {
   pacingDelayMs?: number;
 }
 
+export type NobleBleIpcErrorPayload = {
+  name: string;
+  message: string;
+  errorCode: number;
+  params?: unknown;
+};
+
+export type NobleBleIpcErrorResponse = {
+  type: 'NobleBleIpcError';
+  success: false;
+  error: NobleBleIpcErrorPayload;
+};
+
+export function isNobleBleIpcErrorResponse(
+  response: unknown
+): response is NobleBleIpcErrorResponse {
+  if (!response || typeof response !== 'object') {
+    return false;
+  }
+  const candidate = response as Partial<NobleBleIpcErrorResponse>;
+  return (
+    candidate.type === 'NobleBleIpcError' &&
+    candidate.success === false &&
+    Boolean(candidate.error) &&
+    typeof candidate.error?.name === 'string' &&
+    typeof candidate.error.message === 'string' &&
+    typeof candidate.error.errorCode === 'number'
+  );
+}
+
+/**
+ * Keeps structured Noble errors intact across Electron's IPC and contextBridge
+ * boundaries. Every preload implementation must use this for Noble invokes.
+ */
+export async function invokeNobleBleIpc<T>(
+  request: Promise<T | NobleBleIpcErrorResponse>
+): Promise<T> {
+  const response = await request;
+  if (isNobleBleIpcErrorResponse(response)) {
+    return Promise.reject(response.error);
+  }
+  return response;
+}
+
 export interface NobleBleAPI {
   enumerate: () => Promise<{ id: string; name: string }[]>;
   getDevice: (uuid: string) => Promise<{ id: string; name: string; mtu?: number } | null>;

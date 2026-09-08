@@ -1,24 +1,24 @@
-# OneKey Hardware SDK 架构概览
+# OneKey Hardware SDK Architecture Overview
 
-## 核心分层
+## Core Layers
 
-Hardware SDK 的目标是让应用层只感知统一 API，不需要关心设备型号、传输介质或底层协议版本。
+The Hardware SDK's goal is to let the application layer see only a unified API, without needing to care about device model, transport medium, or underlying protocol version.
 
 ```mermaid
 flowchart TD
   App["Application / DApp"]
-  Api["SDK API 层 (@onekeyfe/hd-core)"]
+  Api["SDK API Layer (@onekeyfe/hd-core)"]
   Device["Device / Protocol V2 feature adapter / DeviceCommands"]
   Manager["TransportManager"]
   Session["Protocol Session"]
-  Transport["Transport 实现层"]
+  Transport["Transport Implementation Layer"]
   WebUSB["WebUSB"]
   ElectronBLE["Electron BLE"]
   RNBLE["React Native BLE"]
   NodeUSB["Node USB"]
   Bridge["HTTP Bridge"]
   Other["Lowlevel / Emulator"]
-  Hardware["OneKey 设备"]
+  Hardware["OneKey Device"]
 
   App --> Api --> Device --> Manager --> Session --> Transport
   Transport --> WebUSB
@@ -35,69 +35,69 @@ flowchart TD
   Other --> Hardware
 ```
 
-## 协议分层
+## Protocol Layers
 
-当前 SDK 同时维护两套设备通信协议：
+The current SDK maintains two device communication protocols at the same time:
 
-| 协议        | 设备范围                                | 传输方式            | 主要能力                                                    |
-| ----------- | --------------------------------------- | ------------------- | ----------------------------------------------------------- |
-| Protocol V1 | Classic / Mini / Touch / Pro 等现有设备 | USB、BLE、Bridge 等 | 钱包业务能力，`Initialize -> Features` 握手，签名和地址派生 |
-| Protocol V2 | Pro2、Neo，后续可扩展到 Pro 等机型      | USB、BLE            | 设备信息、钱包 Session、文件系统、设置、固件更新和协议探测  |
+| Protocol    | Device Range                                        | Transport           | Main Capabilities                                                   |
+| ----------- | --------------------------------------------------- | ------------------- | ------------------------------------------------------------------- |
+| Protocol V1 | Existing devices such as Classic / Mini / Touch / Pro | USB, BLE, Bridge, etc. | Wallet business capabilities, `Initialize -> Features` handshake, signing and address derivation |
+| Protocol V2 | Pro2, Neo; later extendable to models such as Pro   | USB, BLE            | Device info, wallet Session, filesystem, settings, firmware update, and protocol probing |
 
-协议选择是传输层内部职责。外部调用方不需要显式选择 V1 或 V2，也不应该依赖 PID、设备名或 USB descriptor 来判断协议。
+Protocol selection is an internal transport-layer responsibility. External callers do not need to choose V1 or V2 explicitly, and should not rely on PID, device name, or USB descriptor to determine the protocol.
 
-协议公共逻辑集中在 `packages/hd-transport` 的 Protocol Session 层：
+Shared protocol logic is concentrated in the Protocol Session layer of `packages/hd-transport`:
 
-- `ProtocolV2Session`：负责 V2 encode、frame 写入、frame 读取、decode、超时和统一日志。
-- `ProtocolV2FrameAssembler`：负责 BLE/USB 分片后的 `0x5A` frame 重组和长度校验。
-- `ProtocolV2LinkManager`：按设备复用 Session、串行调用，并在致命错误后使 Link 失效。
-- `ProtocolV2SequenceCursor`：让普通断开和重连后的帧序号继续递增，Transport dispose 时再清除。
-- `probeProtocolV2()`：公共 V2 probe helper，发送 `Ping { message: 'protocol-v2-probe' }` 并执行失败清理钩子。
+- `ProtocolV2Session`: handles V2 encode, frame write, frame read, decode, timeout, and unified logging.
+- `ProtocolV2FrameAssembler`: reassembles BLE/USB-fragmented `0x5A` frames and validates length.
+- `ProtocolV2LinkManager`: reuses Sessions per device, serializes calls, and invalidates the Link after a fatal error.
+- `ProtocolV2SequenceCursor`: keeps frame sequence numbers incrementing across ordinary disconnects and reconnects, and clears them only when Transport is disposed.
+- `probeProtocolV2()`: shared V2 probe helper that sends `Ping { message: 'protocol-v2-probe' }` and runs failure cleanup hooks.
 
-各 transport 的 `detectProtocol()` 根据尚未确认的内部 hint 选择首次 V1/V2 probe 顺序。调用方显式传入的
-`connectProtocol` 是严格预期，必须通过对应协议的活动响应验证；初次活动探测确认后，descriptor 和 App
-持久化结果都作为后续连接的严格预期，不再回退到另一协议。只有显式 `forceProtocolDetection` 会让单次
-调用忽略绑定并重新探测。
+Each transport's `detectProtocol()` chooses the first V1/V2 probe order from as-yet-unconfirmed internal hints. A caller-supplied
+`connectProtocol` is a strict expectation and must be verified by an active response of the corresponding protocol; after the first live
+probe confirms a protocol, both the descriptor and App-persisted results become strict expectations for later connections and no longer
+fall back to the other protocol. Only an explicit `forceProtocolDetection` causes a single call to ignore the binding and probe again.
 
-WebUSB、Electron BLE、React Native BLE 和 lowlevel BLE 只负责各自的物理连接、读写、订阅/桥接和平台错误映射，不再各自复制 V2 协议会话逻辑。
+WebUSB, Electron BLE, React Native BLE, and lowlevel BLE are responsible only for their own physical connection, read/write, subscribe/bridge, and platform error mapping; they no longer each duplicate V2 protocol session logic.
 
-长期有效的设计约束集中记录在 [SDK 关键架构决策](./decisions.md)。
+Long-lived design constraints are recorded in [SDK Key Architecture Decisions](./decisions.md).
 
-## 统一 DeviceState
+## Unified DeviceState
 
-`DeviceStateStore` 是设备身份、版本、设置和运行状态的唯一状态源。V1/V2 Mapper 只负责把协议响应转换为统一 patch；旧版 `Features` 仅由统一状态即时投影：
+`DeviceStateStore` is the single source of truth for device identity, version, settings, and runtime status. V1/V2 Mappers only convert protocol responses into unified patches; legacy `Features` are a live projection of the unified state:
 
-| 协议 | 数据来源                                                 | 标准输出      | 兼容输出                      |
-| ---- | -------------------------------------------------------- | ------------- | ----------------------------- |
-| V1   | `Initialize -> Features`                                 | `DeviceState` | `getFeatures()` 投影（仅 V1） |
-| V2   | `Ping` probe + `DeviceInfoGet/ProtocolInfo/DeviceStatus` | `DeviceState` | 不支持 `getFeatures()`        |
+| Protocol | Data Source                                              | Standard Output | Compatibility Output              |
+| -------- | -------------------------------------------------------- | --------------- | --------------------------------- |
+| V1       | `Initialize -> Features`                                 | `DeviceState`   | `getFeatures()` projection (V1 only) |
+| V2       | `Ping` probe + `DeviceInfoGet/ProtocolInfo/DeviceStatus` | `DeviceState`   | `getFeatures()` is not supported  |
 
-`getDeviceState()` 和 `DEVICE.STATE` 共享同一份完整快照。normal 模式下只有明确请求 runtime/status
-刷新时才读取 `DeviceStatus`；bootloader/romloader 模式自动跳过该命令。
+`getDeviceState()` and `DEVICE.STATE` share the same complete snapshot. In normal mode, `DeviceStatus` is read only when a runtime/status
+refresh is explicitly requested; bootloader/romloader modes skip that command automatically.
 
-公共刷新范围按业务语义定义，调用方不需要理解底层协议命令：
+Public refresh scopes are defined by business semantics; callers do not need to understand the underlying protocol commands:
 
-| scope      | V1 数据来源                       | V2 数据来源                                                 |
+| scope      | V1 Data Source                    | V2 Data Source                                              |
 | ---------- | --------------------------------- | ----------------------------------------------------------- |
-| `runtime`  | `GetFeatures`                     | normal 模式 `DeviceStatusGet`                               |
-| `settings` | `GetFeatures`                     | normal 模式 `DeviceStatusGet + DeviceSettingsGet`           |
-| `firmware` | `GetFeatures + OnekeyGetFeatures` | `DeviceInfoGet` 全组件 version/build ID/hash；normal 加状态 |
+| `runtime`  | `GetFeatures`                     | `DeviceStatusGet` in normal mode                            |
+| `settings` | `GetFeatures`                     | `DeviceStatusGet + DeviceSettingsGet` in normal mode        |
+| `firmware` | `GetFeatures + OnekeyGetFeatures` | `DeviceInfoGet` for all-component version/build ID/hash; plus status in normal mode |
 
-统一字段遵循以下语义：
+Unified fields follow these semantics:
 
-- `identity.label` 只保存用户设置的真实 label，不使用 BLE 名称或型号兜底。
-- `identity.bleName` 只保存广播/连接名称。
-- 面向用户的展示名称继续使用兼容设备对象的 `name`；`DeviceState.identity` 不保存派生展示字段。
-- V1 原始 `model` 只用于协议兼容，不作为产品展示名。
-- Protocol V2 的设备型号来自 `DeviceInfo.hw.Device_type`，不得根据 V2 协议反推为 Pro2。
-- Protocol V2 的 SE 镜像存在与否不决定主控运行模式；应用镜像存在时保持 normal 或已确认的 onboarding mode。
-- `raw` 按协议来源键字段级合并，只供 SDK 内部兼容逻辑使用；钱包 session 也只用于 Core 运行时恢复。公共 `getDeviceState()` 和 `DEVICE.STATE` 均不暴露二者。
+- `identity.label` stores only the user-set real label; it does not fall back to BLE name or model.
+- `identity.bleName` stores only the advertised/connected name.
+- The user-facing display name continues to use the compatibility device object's `name`; `DeviceState.identity` does not store derived display fields.
+- The V1 raw `model` is used only for protocol compatibility, not as a product display name.
+- Protocol V2 device model comes from `DeviceInfo.hw.Device_type` and must not be inferred as Pro2 merely from the V2 protocol.
+- Whether a Protocol V2 SE image exists does not determine the main MCU run mode; when an application image exists, keep normal or the already-confirmed onboarding mode.
+- `raw` is merged field-by-field by protocol source key and is used only by SDK-internal compatibility logic; wallet session is used only for Core runtime recovery. Public `getDeviceState()` and `DEVICE.STATE` expose neither.
 
-## 自动协议探测
+## Automatic Protocol Detection
 
-支持 Protocol V2 的传输实现会在 `acquire()` 后主动探测协议。没有 V2 hint 时默认先验证 V1，V1
-失败后再 probe V2；有 V2 hint 或 V2 连接缓存时会先验证 V2，失败后仍会回退验证 V1。显式
-`connectProtocol='V1'` 或 `'V2'` 都是严格预期，只验证指定协议并在不匹配时失败：
+Transport implementations that support Protocol V2 actively probe the protocol after `acquire()`. With no V2 hint, they verify V1 first and, after V1
+fails, then probe V2; with a V2 hint or V2 connection cache they verify V2 first and still fall back to verifying V1 on failure. Explicit
+`connectProtocol='V1'` or `'V2'` is a strict expectation: only the specified protocol is verified, and a mismatch fails:
 
 ```mermaid
 flowchart TD
@@ -105,10 +105,10 @@ flowchart TD
   Acquire["acquire()"]
   Connect["connect / subscribe"]
   ProbeV1["Protocol V1 Initialize"]
-  V1["Initialize 成功: 标记 Protocol V1"]
+  V1["Initialize succeeded: mark Protocol V1"]
   ProbeV2["Protocol V2 Ping probe"]
-  V2["V2 probe 成功: 标记 Protocol V2"]
-  DetectionError["V1/V2 均失败: 抛出协议探测错误"]
+  V2["V2 probe succeeded: mark Protocol V2"]
+  DetectionError["Both V1 and V2 failed: throw protocol detection error"]
   Init["Device.initialize()"]
   InitV1["V1: Initialize -> Features"]
   InitV2["V2: DeviceInfoGet -> DeviceState"]
@@ -122,33 +122,33 @@ flowchart TD
   Init --> InitV2
 ```
 
-这样可以解决共享 PID 或 descriptor 不稳定带来的误判问题，并避免把没有响应的未知设备错误归类为 V1。
+This avoids misclassification caused by shared PIDs or unstable descriptors, and avoids treating an unresponsive unknown device as V1.
 
-## TransportManager 职责
+## TransportManager Responsibilities
 
-`TransportManager` 负责初始化当前运行环境对应的 transport，并在初始化时同时配置：
+`TransportManager` initializes the transport for the current runtime environment and, at initialization, also configures:
 
-- 默认 V1 protobuf schema：`messages.json`
-- Protocol V2 protobuf schema：`messages-protocol-v2.json`
+- Default V1 protobuf schema: `messages.json`
+- Protocol V2 protobuf schema: `messages-protocol-v2.json`
 
-V1 设备仍可在 `Initialize` 后通过 `TransportManager.reconfigure(features)` 切换到适配固件版本的 schema。V2 设备不走 `Initialize/GetFeatures`，因此不依赖 features 重新选择协议；协议选择由 transport 的 `getProtocolType(path)` 返回。
+V1 devices can still switch to a firmware-version-matched schema after `Initialize` via `TransportManager.reconfigure(features)`. V2 devices do not go through `Initialize/GetFeatures`, so they do not reselect protocol based on features; protocol selection is returned by the transport's `getProtocolType(path)`.
 
-## Device 层职责
+## Device Layer Responsibilities
 
-`Device.acquire()` 完成后会从 transport 读取检测到的协议类型，并写回
-`originalDescriptor.protocolType`。该字段在下一次连接时只作为 hint，在当前活动连接中则是能力判断的
-唯一协议结果。后续 `Device.initialize()` 基于该字段选择初始化路径：
+After `Device.acquire()` completes, the detected protocol type is read from the transport and written back to
+`originalDescriptor.protocolType`. That field is only a hint on the next connection; on the current live connection it is the sole protocol
+result used for capability checks. Subsequent `Device.initialize()` chooses the initialization path from this field:
 
-- V1：发送 `Initialize`，使用真实 `Features`
-- V2：Transport acquire 已用 `Ping` probe 确认链路；初始化依次读取不含 status target 的
-  `DeviceInfoGet`、固定启用 eventless wallet session 的 `ProtocolInfoRequest`，并仅在 normal
-  模式且能力已声明时读取 `DeviceStatusGet`
+- V1: send `Initialize` and use the real `Features`
+- V2: Transport acquire has already confirmed the link with a `Ping` probe; initialization then reads, in order, `DeviceInfoGet` without a status
+  target, a `ProtocolInfoRequest` with eventless wallet session always enabled, and `DeviceStatusGet` only in normal
+  mode when the capability has been declared
 
-Protocol V2 没有传统 `GetFeatures`。公共调用方统一读取 `getDeviceState()`；原始 `DeviceInfoGet`、`DeviceStatusGet` 和 `DeviceSettingsGet` 只保留在 SDK 内部。设备身份以 `serialNo/deviceId` 的语义区分为准。
+Protocol V2 has no traditional `GetFeatures`. Public callers uniformly read `getDeviceState()`; raw `DeviceInfoGet`, `DeviceStatusGet`, and `DeviceSettingsGet` remain SDK-internal only. Device identity is based on the semantic distinction of `serialNo/deviceId`.
 
-## Protocol V2 文件和固件更新链路
+## Protocol V2 File and Firmware Update Path
 
-Protocol V2 固件更新使用系统消息：
+Protocol V2 firmware update uses system messages:
 
 ```mermaid
 flowchart TD
@@ -170,52 +170,52 @@ flowchart TD
   Install -->|resource files only| Done
 ```
 
-Application 模式只允许宿主访问 `vol1:/wallpapers`、`vol1:/portfolio` 和 `vol1:/nft`，读取
-`vol0:/bundles/**` 会返回 `Path not allowed`。因此普通模式下的版本检查把资源状态保留为
-`unknown`；`FirmwareUpdateV4` 先切换到 Bootloader，再通过 `FilesystemPathInfoQuery` 和
-`FilesystemFileRead` 比较资源大小及文件头哈希，最后只下载和写入有差异的资源。设备已经在
-Bootloader 或 Romloader 时复用当前 loader 连接，不重复 reboot。
+Application mode only allows the host to access `vol1:/wallpapers`, `vol1:/portfolio`, and `vol1:/nft`; reading
+`vol0:/bundles/**` returns `Path not allowed`. Therefore version checks in normal mode leave resource status as
+`unknown`; `FirmwareUpdateV4` first switches to Bootloader, then compares resource size and file-header hashes via `FilesystemPathInfoQuery` and
+`FilesystemFileRead`, and finally downloads and writes only resources that differ. If the device is already in
+Bootloader or Romloader, the current loader connection is reused and reboot is not repeated.
 
-`DeviceFirmwareUpdate.targets` 只包含需要安装的固件。资源 ZIP 中的每个 `RESC .okpkg` 都通过
-OKPP header 的 `flexible_metadata` 携带完整设备路径，并通过 `FilesystemFileWrite` 同步。普通资源
-header 指向最终路径；boot resource header 直接指向 `.staging` 路径，由下次启动在挂载前完成替换，
-避免 FatFs 因文件已打开而拒绝覆盖。
-资源单独更新时不发送空的安装请求。SDK 不假设固件端会隐式扫描其他已写入路径。
+`DeviceFirmwareUpdate.targets` contains only firmware that needs to be installed. Each `RESC .okpkg` in the resource ZIP carries the
+full device path in the OKPP header's `flexible_metadata` and is synced via `FilesystemFileWrite`. Ordinary resource
+headers point to the final path; boot resource headers point directly at the `.staging` path so the next boot can replace them before mount,
+avoiding FatFs refusing overwrite because the file is already open.
+When resources are updated alone, an empty install request is not sent. The SDK does not assume the firmware will implicitly scan other already-written paths.
 
-远程正式升级必须先通过最新配置生成 `FirmwareUpdatePlan`，宿主下载后再生成带完整收据的
-`PreparedPlan`；文件大小和 SHA-256 必须与远程 Plan 完全一致。执行阶段以 `PreparedPlan` 为唯一事实源，
-组件引用、升级目标和预期版本不需要调用方重复传入，也不重新依赖可能已变化的在线 release 记录。
-`hostBindingGeneration` 只允许与完整 `preparedPlan` 同时提交；不再接受把已注册 generation 用于
-非 Prepared 组件更新的旧调用方式。
+A remote production upgrade must first generate a `FirmwareUpdatePlan` from the latest config; after the host downloads, it then generates a
+`PreparedPlan` with a complete receipt. File size and SHA-256 must match the remote Plan exactly. The execution stage treats `PreparedPlan` as the single source of truth;
+component references, upgrade targets, and expected versions need not be passed again by the caller, and must not re-depend on online release records that may have changed.
+`hostBindingGeneration` may only be submitted together with a complete `preparedPlan`; the old calling style that reused a registered generation for
+non-Prepared component updates is no longer accepted.
 
-本地开发升级与远程 Plan 严格分离：组件可以继续通过 `firmwareUpdateV4` 的各组件 `ArrayBuffer` 字段传入；
-完整资源 ZIP 通过 `resourceArchiveBinary` 传入。Core 直接解析 ZIP 并比对设备上的 RESC header，
-只写入有差异的包；该路径不读取远程配置，也不再包装成内存 PreparedPlan。Core 遍历 ZIP 内所有
-`.okpkg`，忽略其他条目，并在修改设备前校验每个包的 `RESC` header、包大小、自描述路径及路径唯一性；
-设备端继续负责签名包的最终验证与启用。
-旧的 `resourceFiles` 与 `resourceBundleArtifacts` 裸文件参数已在 Protocol V2 alpha 阶段删除。新调用方必须
-迁移到 `resourceArchiveBinary` 或完整 `PreparedPlan`；SDK 不再维护第二套逐文件资源输入和远程 release 绑定流程。
-不得把本地文件作为远程 Plan 的 override 来绕过远程收据校验。
+Local development upgrades are strictly separated from remote Plans: components can still be passed via the per-component `ArrayBuffer` fields of `firmwareUpdateV4`;
+the full resource ZIP is passed via `resourceArchiveBinary`. Core parses the ZIP directly, compares RESC headers on the device,
+and writes only packages that differ; this path does not read remote config and is no longer wrapped into an in-memory PreparedPlan. Core walks all
+`.okpkg` entries in the ZIP, ignores other entries, and before modifying the device validates each package's `RESC` header, package size, self-described path, and path uniqueness;
+the device still performs final verification and enablement of signed packages.
+The old bare-file parameters `resourceFiles` and `resourceBundleArtifacts` were removed in the Protocol V2 alpha stage. New callers must
+migrate to `resourceArchiveBinary` or a complete `PreparedPlan`; the SDK no longer maintains a second per-file resource input and remote-release binding flow.
+Local files must not be used as a remote Plan override to bypass remote receipt verification.
 
-## 包职责速查
+## Package Responsibility Quick Reference
 
-| 包                                   | 职责                                                           |
+| Package                              | Responsibility                                                 |
 | ------------------------------------ | -------------------------------------------------------------- |
-| `packages/core`                      | SDK API、Device 生命周期、固件更新流程、事件输出               |
-| `packages/hd-transport`              | protobuf 加载、V1/V2 encode/decode、Protocol Session、类型定义 |
-| `packages/hd-transport-web-device`   | WebUSB 和 Electron BLE transport                               |
+| `packages/core`                      | SDK API, Device lifecycle, firmware update flow, event output  |
+| `packages/hd-transport`              | protobuf loading, V1/V2 encode/decode, Protocol Session, type definitions |
+| `packages/hd-transport-web-device`   | WebUSB and Electron BLE transport                              |
 | `packages/hd-transport-react-native` | React Native BLE transport                                     |
-| `packages/hd-common-connect-sdk`     | 根据 env 选择 transport，向桌面/Web 示例暴露统一入口           |
-| `submodules/firmware-pro2`           | Pro2 protobuf schema 来源                                      |
+| `packages/hd-common-connect-sdk`     | Select transport by env and expose a unified entry to desktop/Web examples |
+| `submodules/firmware-pro2`           | Source of Pro2 protobuf schema                                 |
 
-## 设计原则
+## Design Principles
 
-- 协议判断必须基于连接后的设备响应，而不是静态 PID、名称或 descriptor。
-- 当前 Pro2 支持 USB 和 BLE；WebUSB、Electron BLE 和 React Native BLE 都应通过活动响应选择
-  Protocol V2，且不得假设 Pro 永远使用 V1。
-- 协议探测、V2 frame 重组和 V2 call 路由应复用 Protocol Session 层，避免在具体 transport 中重复实现。
-- Electron BLE 默认入口是 `desktop-web-ble`，不再提供按设备型号拆分的 env alias。
-- V1 schema 兼容逻辑和 V2 schema 路由逻辑分离，避免为了新协议改动现有设备的初始化路径。
-- Device 层通过 Protocol Mapper 暴露统一 `DeviceState`；`Features` 只保留给 Protocol V1 兼容，业务方法不直接消费 Protocol V2 原始 `DeviceInfo`。
+- Protocol decisions must be based on post-connect device responses, not static PID, name, or descriptor.
+- Current Pro2 supports USB and BLE; WebUSB, Electron BLE, and React Native BLE should all select
+  Protocol V2 from live responses, and must not assume Pro always uses V1.
+- Protocol probing, V2 frame reassembly, and V2 call routing should reuse the Protocol Session layer, avoiding duplicated implementations in concrete transports.
+- The default Electron BLE entry is `desktop-web-ble`; env aliases split by device model are no longer provided.
+- V1 schema compatibility logic and V2 schema routing logic are separated, avoiding changes to existing-device initialization paths for a new protocol.
+- The Device layer exposes a unified `DeviceState` through Protocol Mappers; `Features` is retained only for Protocol V1 compatibility, and business methods do not consume Protocol V2 raw `DeviceInfo` directly.
 
-传输协议细节见 [Protocol V1/V2 传输协议](../protocol/protocol-v1-v2.md)；Core 的运行时和字段适配见 [SDK Core 运行时](../sdk/core-runtime.md) 与 [Pro2 字段迁移](../sdk/pro2-field-migration.md)。
+See [Protocol V1/V2 Transport Protocol](../protocol/protocol-v1-v2.md) for transport protocol details; see [SDK Core Runtime](../sdk/core-runtime.md) and [Pro2 Field Migration](../sdk/pro2-field-migration.md) for Core runtime and field adaptation.

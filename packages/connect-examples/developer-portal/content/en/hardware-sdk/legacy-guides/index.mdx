@@ -1,17 +1,20 @@
 ---
-description: Migration guides for legacy OneKey Hardware SDK integrations
+description: Migration guides for OneKey Hardware SDK integrations
 ---
 
-# Legacy Migration Guides
+# Migration Guide
 
-These guides help you migrate from legacy Bridge-based integrations to modern WebUSB connections.
+Start here if you already ship Hardware SDK **1.1.x** and need **1.2.x**.
 
-## Available Guides
+## 1.1.x → 1.2.x
 
-- [Bridge to WebUSB (hd-common-connect-sdk)](./migrate-bridge-to-common-connect-webusb) - Recommended migration path using `@onekeyfe/hd-common-connect-sdk`
-- [Bridge to WebUSB (hd-web-sdk)](./migrate-bridge-to-webusb) - Migration guide keeping `@onekeyfe/hd-web-sdk`
+- [From 1.1.x to 1.2.x](./from-1x) — `getDeviceState`, `openWalletSession`, Pro 2 / Neo, firmware V4
 
-## Which Guide Should I Use?
+## Bridge → WebUSB
 
-- **New projects**: Use `hd-common-connect-sdk` (no iframe dependency)
-- **Existing projects with hd-web-sdk**: Choose based on your preference - either migrate fully to `hd-common-connect-sdk` or keep using `hd-web-sdk` with WebUSB transport
+Only if you still use OneKey Bridge (`env: 'web'`).
+
+- [Bridge to WebUSB (hd-common-connect-sdk)](./migrate-bridge-to-common-connect-webusb) — recommended
+- [Bridge to WebUSB (hd-web-sdk)](./migrate-bridge-to-webusb) — keep the iframe host
+
+New projects: [Getting Started](/en/hardware-sdk/getting-started) with `@onekeyfe/hd-common-connect-sdk`.

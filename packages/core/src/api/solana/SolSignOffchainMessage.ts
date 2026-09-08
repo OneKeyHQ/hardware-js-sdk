@@ -1,10 +1,35 @@
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
-import { stripHexPrefix } from '../helpers/hexUtils';
+import { invalidParameter, validateParams } from '../helpers/paramsValidator';
+import { addHexPrefix, isHexString, stripHexPrefix } from '../helpers/hexUtils';
 
 import type { SolanaSignOffChainMessage as HardwareSolSignOffChainMessage } from '@onekeyfe/hd-transport';
+
+const SOLANA_PUBLIC_KEY_LENGTH = 32;
+const SOLANA_APPLICATION_DOMAIN_LENGTH = 32;
+
+const normalizeRequiredSigners = (requiredSigners: unknown[] = []): string[] => {
+  const normalized = requiredSigners.map((signer, index) => {
+    if (
+      typeof signer !== 'string' ||
+      !isHexString(addHexPrefix(signer), SOLANA_PUBLIC_KEY_LENGTH)
+    ) {
+      throw invalidParameter(
+        `Parameter [requiredSigners][${index}] must be a ${SOLANA_PUBLIC_KEY_LENGTH}-byte hex public key.`
+      );
+    }
+    return stripHexPrefix(signer).toLowerCase();
+  });
+
+  for (let index = 1; index < normalized.length; index += 1) {
+    if (normalized[index - 1] >= normalized[index]) {
+      throw invalidParameter('Parameter [requiredSigners] must be strictly sorted and unique.');
+    }
+  }
+
+  return normalized;
+};
 
 export default class SolSignOffchainMessage extends BaseMethod<HardwareSolSignOffChainMessage> {
   getSupportedProtocols() {
@@ -23,10 +48,24 @@ export default class SolSignOffchainMessage extends BaseMethod<HardwareSolSignOf
       { name: 'messageVersion', type: 'number', required: false },
       { name: 'messageFormat', type: 'number', required: false },
       { name: 'applicationDomainHex', type: 'hexString', required: false },
+      { name: 'requiredSigners', type: 'array', required: false, allowEmpty: true },
     ]);
 
-    const { path, messageHex, messageVersion, messageFormat, applicationDomainHex } = this.payload;
+    const {
+      path,
+      messageHex,
+      messageVersion,
+      messageFormat,
+      applicationDomainHex,
+      requiredSigners,
+    } = this.payload;
     const addressN = validatePath(path, 3);
+    if (
+      applicationDomainHex !== undefined &&
+      !isHexString(addHexPrefix(applicationDomainHex), SOLANA_APPLICATION_DOMAIN_LENGTH)
+    ) {
+      throw invalidParameter('Parameter [applicationDomainHex] must be 32 bytes.');
+    }
 
     // init params
     this.params = {
@@ -34,7 +73,8 @@ export default class SolSignOffchainMessage extends BaseMethod<HardwareSolSignOf
       message: stripHexPrefix(messageHex),
       message_version: messageVersion ?? undefined,
       message_format: messageFormat ?? undefined,
-      application_domain: applicationDomainHex ?? undefined,
+      application_domain: applicationDomainHex ? stripHexPrefix(applicationDomainHex) : undefined,
+      required_signers: normalizeRequiredSigners(requiredSigners),
     };
   }
 

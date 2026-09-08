@@ -1,6 +1,6 @@
 import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
-import { getDeviceType } from '@onekeyfe/hd-core';
+import { OpenWalletSessionMode, getDeviceType } from '@onekeyfe/hd-core';
 
 import { selectDeviceAtom } from '../../atoms/deviceAtoms';
 import { executeProtocolAwareMethod } from '../../utils/protocolAwareMethod';
@@ -284,19 +284,24 @@ export const addHiddenWalletAtom = atom(
     const deviceConnectId = device?.connectId ?? '';
     set(requestStatusAtom, { state: 'loading' });
 
-    const res = await sdk.getPassphraseState(deviceConnectId, {
-      initSession: true,
-      useEmptyPassphrase: false,
-      passphraseState: undefined,
+    const res = await sdk.openWalletSession(deviceConnectId, {
+      mode: OpenWalletSessionMode.SelectHidden,
     });
     if (!res.success) {
       set(requestStatusAtom, {
         state: 'error',
-        error: `get passphrase state failed: ${res.payload?.code} ${res.payload?.error}`,
+        error: `open wallet session failed: ${res.payload?.code} ${res.payload?.error}`,
+      });
+      return;
+    }
+    if (res.payload.walletType !== 'hidden') {
+      set(requestStatusAtom, {
+        state: 'error',
+        error: 'open wallet session failed: expected a hidden wallet',
       });
       return;
     }
 
-    return set(addWalletAtom, sdk, name, false, res.payload);
+    return set(addWalletAtom, sdk, name, false, res.payload.passphraseState);
   }
 );

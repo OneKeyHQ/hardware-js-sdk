@@ -26,4 +26,4 @@ yarn update:protobuf to generate new ./messages.json and ./src/types/messages.ts
 
 ## Docs
 
-Documentation is available [hardware-js-sdk](https://developer.onekey.so/connect-to-hardware/hardware-sdk/start)
+Documentation is available [Hardware SDK Getting Started](https://developer.onekey.so/en/hardware-sdk/getting-started)

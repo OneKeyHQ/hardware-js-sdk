@@ -2,10 +2,15 @@ import semver from 'semver';
 import EventEmitter from 'events';
 import {
   DeviceSessionPinType,
+  type LowlevelTransportSharedPlugin,
+  type OneKeyDeviceInfo,
+  type ProtocolType,
   TRANSPORT_EVENT,
+  type TransportDeviceDisconnectEvent,
   isProtocolV2LinkDisabledError,
 } from '@onekeyfe/hd-transport';
 import {
+  EDeviceType,
   ERRORS,
   ERROR_CODES_REQUIRE_DISCONNECT,
   ERROR_CODES_REQUIRE_RELEASE,
@@ -18,6 +23,7 @@ import {
   createNeedUpgradeFirmwareHardwareError,
   createNewFirmwareForceUpdateHardwareError,
   createNewFirmwareUnReleaseHardwareError,
+  isBleStaleBondHardwareError,
 } from '@onekeyfe/hd-shared';
 
 import { LoggerNames, enableLog, getLogger, setLoggerPostMessage, wait } from '../utils';
@@ -74,16 +80,12 @@ import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } fro
 import type { DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import type { SdkTracingContext } from '../utils/tracing';
 import type { Deferred } from '@onekeyfe/hd-shared';
-import type {
-  LowlevelTransportSharedPlugin,
-  OneKeyDeviceInfo,
-  TransportDeviceDisconnectEvent,
-} from '@onekeyfe/hd-transport';
 import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
 const PRE_INITIALIZE_TTL_MS = 60 * 1000;
 const PRE_PENDING_CALL_TIMEOUT_MS = 15 * 1000;
+const PRO2_USB_SIGNING_COOLDOWN_MS = 1000;
 
 // Dedup/coalesce state for "pre-warm signal" methods (isPreWarmSignal),
 // keyed by getPreWarmKey(): coalesce in-flight, skip if warmed within TTL.
@@ -92,7 +94,7 @@ const preWarmDoneAt = new Map<string, number>();
 
 export type CoreContext = ReturnType<Core['getCoreContext']>;
 
-function hasDeriveCardano(method: BaseMethod): boolean {
+function resolveDeriveCardano(method: BaseMethod): boolean | undefined {
   if (
     method.name.startsWith('allNetworkGetAddress') &&
     method.payload &&
@@ -102,15 +104,22 @@ function hasDeriveCardano(method: BaseMethod): boolean {
   ) {
     return true;
   }
-
-  return method.name.startsWith('cardano') || method.payload?.deriveCardano;
+  if (method.name.startsWith('cardano')) {
+    return true;
+  }
+  // V1 Initialize only sends derive_cardano on an explicit true.
+  // V2 AskPassphrase maps true to [Standard, Cardano] and anything else to [Standard].
+  if (method.payload?.deriveCardano === true) {
+    return true;
+  }
+  return undefined;
 }
 
 const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   initSession: method?.payload.initSession,
   passphraseState: method?.payload.useEmptyPassphrase ? undefined : method?.payload.passphraseState,
   deviceId: method?.payload.deviceId,
-  deriveCardano: method && hasDeriveCardano(method),
+  deriveCardano: method ? resolveDeriveCardano(method) : undefined,
   connectProtocol: method?.payload.connectProtocol,
   forceProtocolDetection: method?.payload.forceProtocolDetection,
   protocolV2DeviceInfoTimeoutMs: method?.payload.protocolV2DeviceInfoTimeoutMs,
@@ -306,29 +315,43 @@ const waitForPendingPromise = async (
   if (pendingPromise) {
     Log.debug('pre pending call promise before call method, wait for it');
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let timedOut = false;
     try {
       await Promise.race([
         pendingPromise,
-        new Promise<void>(resolve => {
+        new Promise<void>((_, reject) => {
           timer = setTimeout(() => {
-            timedOut = true;
-            resolve();
+            reject(
+              ERRORS.TypedError(
+                HardwareErrorCode.DeviceBusy,
+                'Previous device cancellation is still draining'
+              )
+            );
           }, PRE_PENDING_CALL_TIMEOUT_MS);
         }),
       ]);
-    } catch (error) {
-      // Cancellation is best-effort; the transport teardown owns recovery.
+      // A deadline is not evidence that old I/O is safe to reuse. Keep the
+      // barrier on failure; a later call may proceed only after cleanup settles.
+      removePrePendingCallPromise?.(connectId, pendingPromise);
     } finally {
       if (timer) clearTimeout(timer);
-      removePrePendingCallPromise?.(connectId, pendingPromise);
-    }
-    if (timedOut) {
-      Log.warn('pre pending call promise timed out before call method', { connectId });
     }
     Log.debug('pre pending call promise before call method done');
   }
 };
+
+export function getPostCallPendingPromise(method: BaseMethod, device: Device): Promise<void> {
+  const cleanupPromise = device.waitForRunCleanup();
+  const env = DataManager.getSettings('env');
+  const deviceType = device.getCurrentDeviceType();
+  const requiresSigningCooldown =
+    method.name.includes('Sign') &&
+    (deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo) &&
+    (DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env) || env === 'node-usb');
+
+  return requiresSigningCooldown
+    ? cleanupPromise.then(() => wait(PRO2_USB_SIGNING_COOLDOWN_MS)).then(() => undefined)
+    : cleanupPromise;
+}
 
 const onCallDevice = async (
   context: CoreContext,
@@ -360,42 +383,38 @@ const onCallDevice = async (
     DevicePool.clearDeviceCache(method.payload.connectId);
   }
 
-  // wait for previous callback tasks to complete (ensure device does not call concurrently)
-  if (method.connectId) {
-    await context.waitForCallbackTasks(method.connectId);
-  }
-
-  await waitForPendingPromise(
-    method.connectId ?? '',
-    getPrePendingCallPromise,
-    removePrePendingCallPromise
-  );
-
+  // Register before waiting so cancellation also covers queued requests.
   const task = requestQueue.createTask(method);
 
   // Pre-warm holds the device as a per-connectId callback task so a concurrent
   // real call waits (before ensureConnected) instead of racing its Initialize.
   // Only covers pre-warm -> real-call ordering; the reverse is fail-closed.
   let preWarmCallbackTask: Deferred<void> | undefined;
-  if (method.isPreWarmSignal && method.connectId) {
-    preWarmCallbackTask = createDeferred<void>();
-    context.registerCallbackTask(method.connectId, preWarmCallbackTask);
-  }
-
   let device: Device;
   try {
+    const connectId = method.connectId ?? '';
+    if (connectId) {
+      await requestQueue.waitForTask(task, () => context.waitForCallbackTasks(connectId));
+    }
+    await requestQueue.waitForTask(task, () =>
+      waitForPendingPromise(
+        method.connectId ?? '',
+        getPrePendingCallPromise,
+        removePrePendingCallPromise
+      )
+    );
+    if (method.isPreWarmSignal && method.connectId) {
+      preWarmCallbackTask = createDeferred<void>();
+      context.registerCallbackTask(method.connectId, preWarmCallbackTask);
+    }
     /**
      * Polling to ensure successful connection
      */
-    const connectId = method.connectId ?? '';
     const pollingId = pollingManager.start(connectId);
-    device = await ensureConnected(
-      context,
-      method,
-      connectId,
-      pollingId,
-      task.abortController?.signal
-    );
+    device = await ensureConnected(context, method, connectId, pollingId, method.abortSignal);
+    if (method.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+    }
   } catch (e) {
     preWarmCallbackTask?.resolve();
     Log.debug('ensureConnected error: ', e);
@@ -471,14 +490,19 @@ const onCallDevice = async (
 
   try {
     // Wait for any pending task except our own (self-wait would deadlock).
-    if (method.connectId) {
-      await context.waitForCallbackTasks(method.connectId, preWarmCallbackTask);
+    const { connectId } = method;
+    if (connectId) {
+      await requestQueue.waitForTask(task, () =>
+        context.waitForCallbackTasks(connectId, preWarmCallbackTask)
+      );
     }
 
-    await waitForPendingPromise(
-      method.connectId ?? '',
-      getPrePendingCallPromise,
-      removePrePendingCallPromise
+    await requestQueue.waitForTask(task, () =>
+      waitForPendingPromise(
+        method.connectId ?? '',
+        getPrePendingCallPromise,
+        removePrePendingCallPromise
+      )
     );
 
     const inner = async (): Promise<void> => {
@@ -651,7 +675,7 @@ const onCallDevice = async (
                 method.payload?.passphraseState,
                 method.payload?.useEmptyPassphrase,
                 method.payload?.skipPassphraseCheck,
-                hasDeriveCardano(method),
+                resolveDeriveCardano(method),
                 method.protocolV2UnlockContext?.preflightMainPinSelected
               );
 
@@ -683,6 +707,13 @@ const onCallDevice = async (
           },
         });
         messageResponse = createResponseMessage(method.responseID, true, response);
+        // Preserve the acknowledged result while the next call waits for cleanup and cooldown.
+        if (method.connectId) {
+          context.setPrePendingCallPromise(
+            method.connectId,
+            getPostCallPendingPromise(method, device)
+          );
+        }
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method);
       } catch (error) {
@@ -694,6 +725,12 @@ const onCallDevice = async (
         }
         Log.debug(`Call API - Inner Method Run Error`, error);
         messageResponse = createResponseMessage(method.responseID, false, { error });
+        if (method.connectId) {
+          context.setPrePendingCallPromise(
+            method.connectId,
+            getPostCallPendingPromise(method, device)
+          );
+        }
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method, error);
 
@@ -720,6 +757,9 @@ const onCallDevice = async (
       skipInitialize: canSkipInitialize(method, device),
       ...parseInitOptions(method),
     };
+    if (method.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+    }
     const deviceRun = () => device.run(inner, runOptions);
     task.callPromise = createDeferred<any>(deviceRun);
 
@@ -740,6 +780,7 @@ const onCallDevice = async (
     );
     Log.debug('Call API - Run Error: ', error);
     completeMethodRequestContext(method, error);
+    return messageResponse;
   } finally {
     // Release the pre-warm callback task so the next real call can proceed.
     preWarmCallbackTask?.resolve();
@@ -939,7 +980,16 @@ export function isRetryableBleConnectionError(method: BaseMethod, error: unknown
   if (method.device?.wasInterruptedByUser()) {
     return false;
   }
-  const typedError = error as { errorCode?: unknown };
+  const typedError = error as {
+    errorCode?: unknown;
+    params?: { acquireDeadlineExceeded?: unknown };
+  };
+  if (
+    typedError?.errorCode === HardwareErrorCode.BleTimeoutError &&
+    typedError.params?.acquireDeadlineExceeded === true
+  ) {
+    return false;
+  }
   return (
     typedError?.errorCode === HardwareErrorCode.BleTimeoutError ||
     typedError?.errorCode === HardwareErrorCode.BleConnectedError ||
@@ -958,11 +1008,13 @@ export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unkn
   );
 }
 
-export function isProtocolV2PeerRemovedPairingError(method: BaseMethod, error: unknown) {
+export function isTerminalBleStaleBondError(error: unknown) {
+  return isBleStaleBondHardwareError(error);
+}
+
+export function isDeviceIdentityMismatchError(error: unknown) {
   return (
-    method.payload.connectProtocol === 'V2' &&
-    (error as { errorCode?: unknown })?.errorCode ===
-      HardwareErrorCode.BlePeerRemovedPairingInformation
+    (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.DeviceCheckDeviceIdError
   );
 }
 
@@ -995,7 +1047,8 @@ function raceBleAcquire<T>(acquirePromise: Promise<T>, abortSignal?: AbortSignal
           reject(
             ERRORS.TypedError(
               HardwareErrorCode.BleTimeoutError,
-              `BLE acquire exceeded ${BLE_ACQUIRE_DEADLINE_MS}ms deadline`
+              `BLE acquire exceeded ${BLE_ACQUIRE_DEADLINE_MS}ms deadline`,
+              { acquireDeadlineExceeded: true }
             )
           )
         ),
@@ -1025,7 +1078,7 @@ async function connectDeviceForBle(
   retryCount = 0
 ) {
   try {
-    if (device.wasInterruptedByUser()) {
+    if (abortSignal?.aborted || device.wasInterruptedByUser()) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
     }
     if (method.payload.forceProtocolDetection && device.hasDeviceAcquire()) {
@@ -1037,6 +1090,7 @@ async function connectDeviceForBle(
       !device.commands ||
       device.commands.disposed;
     if (shouldAcquire) {
+      const connectProtocol = resolveBleConnectProtocol(method);
       // The deadline/abort guards are scoped to the desktop electron
       // transport: its IPC acquire is the only path with a proven
       // never-settling failure mode, while react-native/lowlevel acquire may
@@ -1048,13 +1102,13 @@ async function connectDeviceForBle(
         throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
       }
       if (!useAcquireGuards) {
-        await device.acquire(method.payload.connectProtocol, {
+        await device.acquire(connectProtocol, {
           forceProtocolDetection: method.payload.forceProtocolDetection,
         });
       } else {
         try {
           await raceBleAcquire(
-            device.acquire(method.payload.connectProtocol, {
+            device.acquire(connectProtocol, {
               forceProtocolDetection: method.payload.forceProtocolDetection,
             }),
             abortSignal
@@ -1093,6 +1147,9 @@ async function connectDeviceForBle(
       DevicePool.emitter.emit(DEVICE.CONNECT, device);
     }
   } catch (err) {
+    if (abortSignal?.aborted || device.wasInterruptedByUser()) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
     const requiresColdReconnect = isMissingDetectedProtocolV2Error(method, err);
     // Device.run()'s REQUIRE_DISCONNECT handling never sees acquire/initialize
     // failures, so with keep-alive a wedged link would be reused by every retry
@@ -1118,6 +1175,14 @@ async function connectDeviceForBle(
       throw err;
     }
   }
+}
+
+export function resolveBleConnectProtocol(method: BaseMethod): ProtocolType | undefined {
+  if (method.payload.connectProtocol === 'V1' || method.payload.connectProtocol === 'V2') {
+    return method.payload.connectProtocol;
+  }
+  const supportedProtocols = method.getSupportedProtocols();
+  return supportedProtocols.length === 1 && supportedProtocols[0] === 'V2' ? 'V2' : undefined;
 }
 
 type IPollFn<T> = (time?: number) => T;
@@ -1258,6 +1323,8 @@ const ensureConnected = async (
             HardwareErrorCode.BleDeviceBondedCanceled,
             HardwareErrorCode.BleCharacteristicNotifyError,
             HardwareErrorCode.BleTimeoutError,
+            // A transport setup reset must also stop this outer poll.
+            HardwareErrorCode.PollingTimeout,
             HardwareErrorCode.BleWriteCharacteristicError,
             HardwareErrorCode.BleAlreadyConnected,
             HardwareErrorCode.FirmwareUpdateLimitOneDevice,
@@ -1268,7 +1335,12 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceInterruptedFromUser,
             HardwareErrorCode.CallQueueActionCancelled,
           ].includes(error.errorCode) ||
-          isProtocolV2PeerRemovedPairingError(method, error)
+          (env === 'react-native' &&
+            [HardwareErrorCode.BleDeviceDisconnected, HardwareErrorCode.PollingTimeout].includes(
+              error.errorCode
+            )) ||
+          isTerminalBleStaleBondError(error) ||
+          isDeviceIdentityMismatchError(error)
         ) {
           reject(error);
           return;
@@ -1318,7 +1390,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       // cancel callback tasks
       requestQueue.cancelCallbackTasks(connectId);
 
-      const requestIds = requestQueue.getRequestTasksId();
+      const requestIds = requestQueue.getRequestTasksIdByConnectId(connectId);
       Log.debug(
         `Cancel Api connect requestQueues: length:${requestIds.length} requestIds:${requestIds.join(
           ','
@@ -1326,6 +1398,8 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       );
       // Abort before rejecting: rejectRequest releases the task and would make
       // its AbortController unreachable to an in-flight method loop.
+      // Match both the requested connectId and a device selected internally by the
+      // method, such as Desktop WebUSB firmwareUpdateV4.
       requestQueue.abortRequestsByConnectId(connectId);
       const canceledDevices: Device[] = [];
       const interruptDevice = (device: Device | undefined, deviceConnectId: string) => {
@@ -1342,7 +1416,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
           // During ensureConnected the method has a connectId but device is
           // assigned only after the poll succeeds. Interrupt the cached BLE
           // Device so an in-flight acquire/initialize cannot finish.
-          interruptDevice(task.method?.device, task.method.connectId ?? connectId);
+          interruptDevice(task.method?.device, connectId);
           interruptDevice(deviceCacheMap.get(connectId), connectId);
           requestQueue.rejectRequest(
             requestId,
@@ -1357,10 +1431,11 @@ export const cancel = (context: CoreContext, connectId?: string) => {
     }
   } else {
     const env = DataManager.getSettings('env');
+    // Abort every method before rejecting its queue task. Non-BLE methods also
+    // use the signal to stop recovery loops after the public promise is rejected.
+    requestQueue.abortAllRequests();
     if (DataManager.isBleConnect(env)) {
       Log.debug('Cancel Api all _deviceList: ');
-      // Keep method abort signals observable until every active task is rejected.
-      requestQueue.abortAllRequests();
       const canceledDevices: Device[] = [];
       const interruptDevice = (device?: Device) => {
         if (!device || canceledDevices.includes(device)) {
@@ -1403,8 +1478,10 @@ export const cancel = (context: CoreContext, connectId?: string) => {
     }
   }
 
-  cleanup();
-  closePopup();
+  cleanup(connectId);
+  if (!connectId || _uiPromises.length === 0) {
+    closePopup();
+  }
 };
 
 const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => {
@@ -1442,9 +1519,16 @@ const shouldCheckPassphraseState = (method: BaseMethod, device: Device) => {
   return device.hasUsePassphrase();
 };
 
-const cleanup = () => {
-  const pendingUiPromises = _uiPromises;
-  _uiPromises = [];
+const cleanup = (connectId?: string) => {
+  const pendingUiPromises = connectId
+    ? _uiPromises.filter(
+        uiPromise =>
+          uiPromise.data?.mainId === connectId || uiPromise.data?.getConnectId() === connectId
+      )
+    : _uiPromises;
+  _uiPromises = connectId
+    ? _uiPromises.filter(uiPromise => !pendingUiPromises.includes(uiPromise))
+    : [];
   rejectUiPromises(
     pendingUiPromises,
     ERRORS.TypedError(HardwareErrorCode.ActionCancelled, 'UI request was cancelled')
@@ -1733,7 +1817,17 @@ export default class Core extends EventEmitter {
           this.prePendingCallPromises.delete(connectId);
           return;
         }
-        this.prePendingCallPromises.set(connectId, promise);
+        const previous = this.prePendingCallPromises.get(connectId);
+        const cleanupPromise =
+          previous && previous !== promise
+            ? Promise.all([previous, promise]).then(() => undefined)
+            : promise;
+        this.prePendingCallPromises.set(connectId, cleanupPromise);
+        // cancel() is fire-and-forget. Observe failures immediately, while
+        // preserving the rejected barrier for the next caller's safety check.
+        cleanupPromise.catch(error => {
+          Log.warn('Device cancellation cleanup failed', { errorCode: error?.errorCode });
+        });
       },
       removePrePendingCallPromise: (connectId: string, promise: Promise<void>) => {
         if (this.prePendingCallPromises.get(connectId) === promise) {

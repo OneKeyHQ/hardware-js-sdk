@@ -885,6 +885,7 @@ export const zh = {
         enterJsonData: '请输入JSON格式的数据...',
         jsonFormatError: 'JSON格式不正确，请检查语法',
         noData: '暂无数据',
+        largePayloadNotice: 'Payload 过大，无法在此编辑；完整数据仍会传给 SDK。',
       },
       listBoundary: {
         preparingData: '准备数据...',
@@ -933,6 +934,7 @@ export const zh = {
         passphraseStateDesc: '使用passphraseState隐藏钱包',
         deriveCardano: 'deriveCardano',
         deriveCardanoDesc: '启用Cardano地址派生',
+        largePayloadNotice: '此处仅显示只读摘要，完整数据仍会传给 SDK。',
       },
       unifiedLogger: {
         executionLogs: '执行日志',

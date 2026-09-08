@@ -26,7 +26,7 @@ import Core from '@onekeyfe/hd-core';
 
 ## Docs
 
-Documentation is available [hardware-js-sdk](https://developer.onekey.so/connect-to-hardware/hardware-sdk/start)
+Documentation is available [Hardware SDK Getting Started](https://developer.onekey.so/en/hardware-sdk/getting-started)
 
 ## Examples
 // TODO: add example url

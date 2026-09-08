@@ -1,0 +1,71 @@
+---
+title: Reconnect and dispose
+---
+
+# Reconnect and dispose
+
+Transport drops are normal: USB unplug, BLE range, OS Bluetooth reset, firmware reboot. Hardware SDK 1.2.0 recovers the **link**. Your app still has to recover the **call**.
+
+This page is the integrator contract. It does not describe Protocol V2 sequence numbers or Transport generation.
+
+## What the SDK already does
+
+- Ordinary disconnect / reconnect does **not** forget the confirmed `connectProtocol`. You do not re-pick V1 vs V2 after a drop.
+- In-flight calls fail. The SDK does **not** replay signing, wipe, or firmware update.
+- Protocol V2 keeps per-device call ordering. Do not overlap a second business call while the first is recovering.
+
+## What you must do
+
+1. Subscribe to `DEVICE_EVENT` once at app start.
+2. On `DISCONNECT`, mark that `connectId` busy/invalid and fail the current UI flow. Do not retry the same side-effecting method.
+3. Search again (`searchDevices`) when the user is ready. USB replug and BLE re-pair can mint a **new** `connectId`. Cache USB and BLE IDs separately. See [Identifiers](/en/hardware-sdk/concepts/identifiers).
+4. After a new connection, refresh device state with [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state). Reuse persisted `deviceId + passphraseState`; do not persist firmware `session_id`.
+5. On the next address / sign call, pass the persisted `passphraseState` or `useEmptyPassphrase: true`. Core resumes the firmware session inside that method. Do not reopen a wallet session just to reconnect.
+
+```ts
+import { DEVICE_EVENT, DEVICE } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(DEVICE_EVENT, (msg) => {
+  if (msg.type === DEVICE.DISCONNECT) {
+    markDisconnected(msg.payload);
+    // fail the open PIN / sign modal; do not call firmwareUpdate* again
+  }
+  if (msg.type === DEVICE.CONNECT) {
+    refreshDeviceList();
+  }
+});
+```
+
+## BLE-specific
+
+- Permissions (`BLUETOOTH_SCAN` / `CONNECT`, iOS Bluetooth usage strings, often location on Android) must still be granted after process death. See [React Native BLE](/en/hardware-sdk/transport/react-native-ble).
+- `retryCount` / `timeout` on **address and signing** calls help a flaky link. They are not a reconnect strategy.
+- If the OS bond is stale, stop looping connect. Ask the user to forget the device in system Bluetooth settings and pair again.
+- Mini has no BLE. Neo has BLE but no camera. See [Devices](/en/hardware-sdk/concepts/devices).
+
+## USB-specific
+
+- WebUSB needs a user gesture to show the chooser again unless you pass `skipWebDevicePrompt` on a still-authorized device. See [Common Params](/en/hardware-sdk/concepts/common-params).
+- Another tab or Bridge holding the device surfaces as `USED_ELSEWHERE`. Close the other owner; do not `dispose()` as a first reaction.
+
+## `dispose()`
+
+```ts
+await HardwareSDK.dispose();
+```
+
+Call `dispose()` only when you are tearing down the SDK or switching `env` / transport stack (for example WebUSB → low-level). It drops every link and Protocol V2 transport cursor.
+
+Do **not** call `dispose()` on a routine BLE drop or USB unplug. Search and connect again on the same `HardwareSDK` instance.
+
+After `dispose()`, you must `init()` again before `searchDevices`.
+
+## Firmware reboot
+
+`firmwareUpdateV2` / `V3` / `V4` may disconnect on purpose. Wait, reconnect, then read versions. Do not treat that drop as a failed update to replay. See [Firmware Update](/en/hardware-sdk/firmware-update).
+
+## Next
+
+- [Transport chooser](/en/hardware-sdk/transport)
+- [Core API Guide](/en/hardware-sdk/core-api-guide)
+- [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session)

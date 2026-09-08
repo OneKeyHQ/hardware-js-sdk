@@ -1,6 +1,13 @@
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
 export interface CommonParams {
+  /**
+   * Keep the transport session after this call instead of releasing it.
+   * This is a Device.run() hold flag, not a wallet identity. It does not replace
+   * `useEmptyPassphrase`, `passphraseState`, or `openWalletSession`.
+   * USB multi-step flows and Electron BLE firmware windows still need this to
+   * avoid dropping the link between calls.
+   */
   keepSession?: boolean;
   /**
    * polling connect max retry count

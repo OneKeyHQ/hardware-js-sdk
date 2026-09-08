@@ -15,6 +15,8 @@ export type SolSignOffchainMessageParams = {
   messageVersion?: SolanaOffChainMessageVersion;
   messageFormat?: SolanaOffChainMessageFormat;
   applicationDomainHex?: string;
+  /** 32-byte public keys encoded as hex, strictly sorted and unique. */
+  requiredSigners?: string[];
 };
 
 export declare function solSignOffchainMessage(

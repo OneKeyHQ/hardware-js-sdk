@@ -154,6 +154,14 @@ OneKey 硬件钱包通过一组可复用的密码学原语和链专属协议支�
 - 特殊路径: 多账户支持 m/44'/501'/0'/0', m/44'/501'/1'/0', ...
 - 特性: 程序派生地址(PDA), 关联代币账户(ATA), 租金豁免
 
+For Pro2, regenerate the protocol schema from the `firmware-pro2` submodule's `main`
+branch with `yarn update-protobuf`. `SolanaSignOffChainMessage.required_signers` uses
+protobuf field 6; the former field 7 layout and `source_fingerprint` have been
+removed. The SDK accepts `requiredSigners` as sorted, unique 32-byte hex public keys
+and no longer exposes `sourceFingerprint`. App callers already using
+`requiredSigners` only need the updated SDK schema. Signer-count limits remain
+firmware-owned; the SDK does not impose a host-side limit.
+
 **Cardano 生态：**
 
 - **ADA (Cardano):** SLIP-44: 1815, 标准: CIP-1852

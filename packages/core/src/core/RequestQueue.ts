@@ -1,3 +1,5 @@
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { LoggerNames, getLogger } from '../utils';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
@@ -40,6 +42,24 @@ export default class RequestQueue {
     return this.requestQueue.get(requestId);
   }
 
+  public async waitForTask<T>(task: RequestTask, pending: () => Promise<T>): Promise<T> {
+    const signal = task.method.abortSignal;
+    const cancellationError = () => ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+    if (signal?.aborted) throw cancellationError();
+    let onAbort: (() => void) | undefined;
+    try {
+      const cancelled = new Promise<never>((_, reject) => {
+        onAbort = () => reject(cancellationError());
+        signal?.addEventListener('abort', onAbort, { once: true });
+      });
+      const result = await Promise.race([pending(), cancelled]);
+      if (signal?.aborted) throw cancellationError();
+      return result;
+    } finally {
+      if (onAbort) signal?.removeEventListener('abort', onAbort);
+    }
+  }
+
   // 获取请求的AbortController
   public getAbortController(requestId: number) {
     return this.requestQueue.get(requestId)?.abortController;
@@ -56,17 +76,32 @@ export default class RequestQueue {
     return false;
   }
 
+  private isRequestForConnectId(request: RequestTask, connectId: string) {
+    const { method } = request;
+    return (
+      method.connectId === connectId ||
+      method.device?.mainId === connectId ||
+      method.device?.getConnectId() === connectId
+    );
+  }
+
   // 取消与指定connectId相关的所有请求
   public abortRequestsByConnectId(connectId: string) {
     let count = 0;
     this.requestQueue.forEach((request, _) => {
-      if (request.abortController && request.method.connectId === connectId) {
+      if (request.abortController && this.isRequestForConnectId(request, connectId)) {
         request.abortController.abort();
         request.abortController = undefined;
         count++;
       }
     });
     return count;
+  }
+
+  public getRequestTasksIdByConnectId(connectId: string) {
+    return Array.from(this.requestQueue.values())
+      .filter(request => this.isRequestForConnectId(request, connectId))
+      .map(request => request.id);
   }
 
   // 取消所有请求

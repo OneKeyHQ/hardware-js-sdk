@@ -1,0 +1,41 @@
+---
+title: solSignOffchainMessage
+---
+
+# solSignOffchainMessage
+
+签 Solana 链下消息。Hardware SDK 1.2.x 在 **Protocol V1 和 V2**（Classic / Pro / Pro 2 / Neo）上用同一套公开 API。
+
+```ts
+const response = await HardwareSDK.solSignOffchainMessage(connectId, deviceId, {
+  path: "m/44'/501'/0'/0'",
+  messageHex: '68656c6c6f', // 链下 payload 的 hex
+});
+```
+
+### 参数
+
+[可选通用参数](/zh/hardware-sdk/concepts/common-params)
+
+* `path` - _必填_ `string | number[]` Solana 路径，全硬化
+* `messageHex` - _必填_ `string` hex 编码的链下消息
+* `messageVersion` - _可选_ `number`
+* `messageFormat` - _可选_ `number`
+* `applicationDomainHex` - _可选_ `string` 32 字节 hex 的 application domain
+* `requiredSigners` - _可选_ `string[]` 32 字节 hex 公钥，**必须严格排序且不重复**
+
+### 返回结果
+
+```ts
+{
+  success: true,
+  payload: {
+    signature: string,
+    pub?: string,
+  }
+}
+```
+
+Pro 2 / Neo 在内部走 Protocol V2。不要按型号给这个调用做分支。
+
+另见：[solSignTransaction](/zh/hardware-sdk/chains/solana/solsigntransaction)

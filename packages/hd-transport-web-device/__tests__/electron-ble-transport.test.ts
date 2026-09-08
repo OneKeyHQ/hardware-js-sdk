@@ -182,6 +182,40 @@ describe('ElectronBleTransport protocol detection', () => {
     jest.clearAllMocks();
   });
 
+  test('does not treat an error envelope from a legacy preload as a successful connect', async () => {
+    const device = { id: 'stale-bond-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.connect.mockResolvedValue({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: {
+        name: 'HardwareError',
+        message: 'Bluetooth pairing information is no longer valid',
+        errorCode: HardwareErrorCode.BleBondInvalid,
+      },
+    } as never);
+    const bleTransport = configureTransport(nobleBle);
+
+    await expect(
+      bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleBondInvalid,
+    });
+    expect(nobleBle.subscribe).not.toHaveBeenCalled();
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+  });
+
+  test('sends a native disconnect even before acquire marks the device connected', async () => {
+    const device = { id: 'pending-connect-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle) as any;
+
+    await bleTransport.releaseNative(device.id);
+
+    expect(nobleBle.unsubscribe).not.toHaveBeenCalled();
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+  });
+
   test('keeps raw BLE lifecycle payloads off the public device event channel', async () => {
     const device = { id: 'lifecycle-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
@@ -553,19 +587,74 @@ describe('ElectronBleTransport protocol detection', () => {
   test('fails Protocol V2 acquire immediately when subscribe reports insufficient encryption', async () => {
     const device = { id: 'stale-bond-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
-    nobleBle.subscribe.mockRejectedValue(new Error('Encryption is insufficient'));
+    nobleBle.subscribe.mockRejectedValue({
+      name: 'HardwareError',
+      message: 'Bluetooth pairing information is no longer valid',
+      errorCode: HardwareErrorCode.BleBondInvalid,
+      params: { nativeErrorMessage: 'Encryption is insufficient' },
+    });
     const transport = configureTransport(nobleBle);
     const probe = jest.spyOn(transport as any, 'probeProtocolV2');
 
     await expect(
       transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
     ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BleDeviceBondError,
+      errorCode: HardwareErrorCode.BleBondInvalid,
     });
 
     expect(probe).not.toHaveBeenCalled();
     expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
     expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+  });
+
+  test('rehydrates a structured stale-bond error before the protocol is known', async () => {
+    const device = { id: 'reset-unknown-protocol-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.connect.mockRejectedValue({
+      name: 'HardwareError',
+      message: 'Bluetooth pairing information is no longer valid',
+      errorCode: HardwareErrorCode.BleBondInvalid,
+      params: { nativeErrorMessage: 'CBErrorDomain:14 native message' },
+    });
+    const transport = configureTransport(nobleBle);
+
+    await expect(transport.acquire({ uuid: device.id })).rejects.toMatchObject({
+      name: 'HardwareError',
+      errorCode: HardwareErrorCode.BleBondInvalid,
+      params: { nativeErrorMessage: 'CBErrorDomain:14 native message' },
+    });
+  });
+
+  test('does not infer hardware errors from native error text in the renderer', async () => {
+    const device = { id: 'reset-pro2-localized-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.connect.mockRejectedValue(new Error('CBATTErrorDomain:14 localized native message'));
+    const transport = configureTransport(nobleBle);
+
+    try {
+      await transport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+      throw new Error('Expected acquire to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe('CBATTErrorDomain:14 localized native message');
+      expect((error as { errorCode?: unknown }).errorCode).toBeUndefined();
+    }
+  });
+
+  test('does not classify a generic macOS connection failure as a stale bond', async () => {
+    const device = { id: 'offline-pro2-macos-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.connect.mockRejectedValue(new Error('connection failed'));
+    const transport = configureTransport(nobleBle);
+
+    try {
+      await transport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+      throw new Error('Expected acquire to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe('connection failed');
+      expect((error as { errorCode?: unknown }).errorCode).toBeUndefined();
+    }
   });
 
   test('keeps stale-bond subscribe mapping out of Protocol V1 acquire', async () => {

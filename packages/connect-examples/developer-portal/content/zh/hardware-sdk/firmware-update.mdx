@@ -1,0 +1,101 @@
+---
+title: 固件升级
+---
+
+# 固件升级
+
+按**协议族**选升级 API，不要只看产品名。Hardware SDK 1.2.0 仍是同一套 JavaScript 接口，设备协议决定哪一个方法合法。
+
+| 当前机型 | 协议 | 方法 | 升级内容 |
+| --- | --- | --- | --- |
+| Classic、Mini、Touch | V1 | [`firmwareUpdateV2`](/zh/hardware-sdk/device-api/firmwareupdatev2) | 主固件和/或 BLE |
+| OneKey Pro | V1 | [`firmwareUpdateV3`](/zh/hardware-sdk/device-api/firmwareupdatev3) | 一次流程里 Bootloader + 主固件 + BLE + 资源 |
+| OneKey Pro 2、Neo | V2 | [`firmwareUpdateV4`](/zh/hardware-sdk/device-api/firmwareupdatev4) | Bootloader、应用分区、协处理器、资源 ZIP |
+
+用设备对象上的 `connectProtocol`，或 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state) 确认实时协议。不要用 USB PID 或蓝牙名分支。见 [设备](/zh/hardware-sdk/concepts/devices) 和 [Protocol V1 与 V2](/zh/hardware-sdk/concepts/protocol)。
+
+## 1. 先检查要不要升级
+
+```ts
+const release = await HardwareSDK.checkFirmwareRelease(connectId);
+if (!release.success) throw new Error(release.payload.error);
+
+// payload.status: 'valid' | 'outdated' | 'required' | 'unknown' | 'none'
+if (release.payload.status === 'valid') return;
+```
+
+BLE 协处理器用 [`checkBLEFirmwareRelease`](/zh/hardware-sdk/device-api/checkblefirmwarerelease)。如果想连上以后再提示，订阅 `FIRMWARE_EVENT`（`RELEASE_INFO` / `BLE_RELEASE_INFO`）。
+
+## 2. 调用升级前先订进度
+
+```ts
+import { UI_EVENT, UI_REQUEST } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(UI_EVENT, (msg) => {
+  if (
+    msg.type === UI_REQUEST.FIRMWARE_PROGRESS ||
+    msg.type === UI_REQUEST.FIRMWARE_TIP ||
+    msg.type === UI_REQUEST.FIRMWARE_PROCESSING
+  ) {
+    renderFirmwareProgress(msg.payload);
+  }
+  // firmwareUpdateV4 可能发出 REQUEST_BUTTON，reason 为 'firmware-update'。
+  // 展示「请在设备确认」。不要对这个提示调用 uiResponse()。
+});
+```
+
+## 3. 调用对应方法
+
+Classic / Mini / Touch：
+
+```ts
+await HardwareSDK.firmwareUpdateV2(connectId, {
+  platform: 'web',
+  updateType: 'firmware',
+  version: [2, 10, 0],
+});
+```
+
+Pro：
+
+```ts
+await HardwareSDK.firmwareUpdateV3(connectId, {
+  platform: 'desktop',
+  firmwareVersion: [4, 10, 0],
+});
+```
+
+Pro 2 / Neo —— 传入你已经校验过的二进制：
+
+```ts
+await HardwareSDK.firmwareUpdateV4(connectId, {
+  platform: 'desktop',
+  bootloaderBinary,
+  applicationP1Binary,
+  applicationP2Binary,
+  coprocessorBinary,
+  resourceArchiveBinary,
+});
+```
+
+三个方法都要传 `platform`：`'native' | 'desktop' | 'ext' | 'web' | 'web-embed'`。
+
+## 4. 调用之后
+
+1. 设备可能重启。等 `DEVICE_EVENT` 的 `CONNECT`（或重新 search）。普通重连会保持已确认的协议。见 [重连与释放](/zh/hardware-sdk/transport/reconnect)。
+2. 相信新版本之前，重新读 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)（需要版本时用 `scope: 'firmware'`）。
+3. 如果是安装请求发出之后的传输超时，**不要重放**同一次升级。先重连、读状态，再决定。
+
+## 不要做的事
+
+- 在 Pro 2 / Neo 上调 `firmwareUpdateV3`，或在 Classic / Pro 上调 `firmwareUpdateV4`。
+- 断开或超时后自动重试升级。
+- 把 BLE 的 `retryCount` 助手铺到升级调用上。
+- 用 `firmwareUpdateV4` 安装 romloader。
+
+## 下一步
+
+- [firmwareUpdateV2](/zh/hardware-sdk/device-api/firmwareupdatev2)
+- [firmwareUpdateV3](/zh/hardware-sdk/device-api/firmwareupdatev3)
+- [firmwareUpdateV4](/zh/hardware-sdk/device-api/firmwareupdatev4)
+- [Core API Guide → 事件](/zh/hardware-sdk/core-api-guide#events-ui)

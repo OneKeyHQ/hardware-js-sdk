@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { OpenWalletSessionMode, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Input, Label, Stack, Text, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { get, isEmpty } from 'lodash';
@@ -303,17 +303,16 @@ function ExecuteView() {
             usePassphrase: true,
           });
         }
-        const passphraseStateRes = await sdk.getPassphraseState(connectId, {
-          initSession: true,
-          useEmptyPassphrase: false,
+        const walletSessionRes = await sdk.openWalletSession(connectId, {
+          mode: OpenWalletSessionMode.SelectHidden,
         });
 
-        if (!passphraseStateRes.success) {
+        if (!walletSessionRes.success || walletSessionRes.payload.walletType !== 'hidden') {
           alert('获取 passphraseState 失败');
           return Promise.reject();
         }
 
-        currentPassphraseState.current = passphraseStateRes.payload;
+        currentPassphraseState.current = walletSessionRes.payload.passphraseState;
       }
     },
     initTestCase: async (context, sdk) => {

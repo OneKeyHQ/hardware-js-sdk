@@ -1625,6 +1625,13 @@ hr {
   min-height: calc(100vh - 64px);
 }
 
+@media (max-width: 767px) {
+  .landing-page {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 /* Footer always at bottom */
 .landing-page > footer {
   margin-top: auto;

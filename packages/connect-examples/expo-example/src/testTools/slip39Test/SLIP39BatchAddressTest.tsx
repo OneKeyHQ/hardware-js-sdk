@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { OpenWalletSessionMode, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
 import { Separator, Stack, Text, View, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
@@ -400,17 +400,26 @@ function ExecuteView({
       }
 
       if (testCase?.extra?.passphrase != null) {
-        const passphraseStateRes = await sdk.getPassphraseState(connectId, {
-          initSession: true,
-          useEmptyPassphrase: false,
+        const emptyPassphrase = testCase.extra.passphrase.length === 0;
+        const walletSessionRes = await sdk.openWalletSession(connectId, {
+          mode: emptyPassphrase
+            ? OpenWalletSessionMode.Standard
+            : OpenWalletSessionMode.SelectHidden,
         });
 
-        if (!passphraseStateRes.success) {
+        const expectedWalletType = emptyPassphrase ? 'standard' : 'hidden';
+        if (
+          !walletSessionRes.success ||
+          walletSessionRes.payload.walletType !== expectedWalletType
+        ) {
           console.error('SLIP39 Bundle Test Error: Failed to get passphraseState');
           return Promise.reject();
         }
 
-        currentPassphraseState.current = passphraseStateRes.payload;
+        currentPassphraseState.current =
+          walletSessionRes.payload.walletType === 'hidden'
+            ? walletSessionRes.payload.passphraseState
+            : undefined;
       }
     },
     generateRequestParams: item => {

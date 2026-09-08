@@ -7,6 +7,7 @@ import PlaygroundExecutor, { type MethodPayload } from './PlaygroundExecutor';
 import { useExpandMode } from '../provider/ExpandModeProvider';
 import { Button } from './ui/Button';
 import AutoWrapperTextArea from './ui/AutoWrapperTextArea';
+import { acquireEditorParams, preparePresetEditor } from '../utils/presetEditor';
 
 export interface PresupposeProps {
   title: string;
@@ -30,8 +31,10 @@ const Playground = ({
   const intl = useIntl();
   const [isExpanded, setIsExpanded] = useState(false);
   const [params, setParams] = useState('');
+  const [hasOversizedPreset, setHasOversizedPreset] = useState(false);
   const [response, setResponse] = useState('');
   const paramsRef = useRef(params);
+  const oversizedPresetRef = useRef<object | null>(null);
   const isExpandMode = useExpandMode();
 
   useEffect(() => {
@@ -40,10 +43,24 @@ const Playground = ({
 
   const fillParameterCallback = useCallback(
     (index: number) => () => {
-      setParams(JSON.stringify(presupposes?.[index].value, null, 2));
+      const preset = presupposes?.[index];
+      if (!preset) return;
+
+      const preparedPreset = preparePresetEditor(preset);
+      oversizedPresetRef.current = preparedPreset.oversizedPreset;
+      paramsRef.current = preparedPreset.editorValue;
+      setHasOversizedPreset(preparedPreset.isOversized);
+      setParams(preparedPreset.editorValue);
     },
     [presupposes]
   );
+
+  const handleParamsChange = useCallback((value: string) => {
+    oversizedPresetRef.current = null;
+    paramsRef.current = value;
+    setHasOversizedPreset(false);
+    setParams(value);
+  }, []);
 
   // Fill the first parameter by default
   useEffect(() => {
@@ -103,12 +120,13 @@ const Playground = ({
           minHeight={presupposes && presupposes.length > 0 ? 140 : 40}
           maxHeight={320}
           value={params}
-          onChangeText={setParams}
+          onChangeText={handleParamsChange}
           placeholder={intl.formatMessage({ id: 'label__enter_parameters_tip' })}
+          editable={!hasOversizedPreset}
         />
       </>
     ),
-    [intl, params, presupposes]
+    [handleParamsChange, hasOversizedPreset, intl, params, presupposes]
   );
 
   const copyResponse = useCallback(() => {
@@ -141,13 +159,7 @@ const Playground = ({
   );
 
   const onAcquireParams = useCallback(
-    () => () => {
-      try {
-        return Promise.resolve(JSON.parse(paramsRef.current));
-      } catch (error) {
-        return Promise.resolve({});
-      }
-    },
+    () => () => Promise.resolve(acquireEditorParams(paramsRef.current, oversizedPresetRef.current)),
     []
   );
 

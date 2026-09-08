@@ -13,6 +13,7 @@ const IOS_PEER_REMOVED_PAIRING_INFORMATION = 14;
 
 type NativeBleErrorFields = {
   attErrorCode?: unknown;
+  androidErrorCode?: unknown;
   iosErrorCode?: unknown;
   reason?: unknown;
   message?: unknown;
@@ -32,6 +33,8 @@ export const isNativeBleStaleBondError = (error: unknown): boolean => {
   if (
     nativeError.attErrorCode === ATT_INSUFFICIENT_AUTHENTICATION ||
     nativeError.attErrorCode === ATT_INSUFFICIENT_ENCRYPTION ||
+    nativeError.androidErrorCode === ATT_INSUFFICIENT_AUTHENTICATION ||
+    nativeError.androidErrorCode === ATT_INSUFFICIENT_ENCRYPTION ||
     nativeError.iosErrorCode === IOS_PEER_REMOVED_PAIRING_INFORMATION
   ) {
     return true;

@@ -808,14 +808,22 @@ export class TrezorDeviceSession {
     const { deriveCardano, passphraseMode } = normalizeCreateAppSessionOptions(options);
     this.passphraseMode = passphraseMode;
     this.log('info', 'thp.appSession.create.start', { deriveCardano, passphraseMode });
+    const passphraseProtected = this.currentFeatures?.passphrase_protection === true;
+    const passphraseAlwaysOnDevice = this.currentFeatures?.passphrase_always_on_device === true;
+    this.log('info', 'thp.appSession.create.passphrasePolicy', {
+      passphraseProtected,
+      passphraseAlwaysOnDevice,
+    });
     const sessionId = this.thpState.createNewSessionId();
     // Resolve passphrase proactively (mirrors trezor-suite createThpSession):
     // standard wallet (passphrase_protection off) → empty; else ask the host.
-    const passphraseProtected = this.currentFeatures?.passphrase_protection === true;
     let passphraseArg: { passphrase?: string; on_device?: boolean } = {
       passphrase: '',
     };
-    if (
+    if (passphraseAlwaysOnDevice && passphraseMode === 'prompt') {
+      // `on_device` cannot guarantee the empty passphrase required by standard-wallet mode.
+      passphraseArg = { on_device: true };
+    } else if (
       passphraseProtected &&
       passphraseMode === 'prompt' &&
       this.thpOptions?.onPassphraseRequest

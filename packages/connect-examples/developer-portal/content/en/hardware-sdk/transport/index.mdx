@@ -1,0 +1,45 @@
+---
+title: Transport
+---
+
+# Choose a transport
+
+Hardware SDK 1.2.0 uses one JavaScript API. `init({ env })` selects the **transport**, not Protocol V1 vs V2.
+
+| Platform | Transport | Package | `env` | Guide |
+| --- | --- | --- | --- | --- |
+| Browser / desktop WebUSB | WebUSB | `@onekeyfe/hd-common-connect-sdk` | `webusb` | [WebUSB](/en/hardware-sdk/transport/web-usb) |
+| React Native | BLE | `@onekeyfe/hd-ble-sdk` | (BLE SDK default) | [React Native BLE](/en/hardware-sdk/transport/react-native-ble) |
+| Android native host | BLE via low-level plugin | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [Android](/en/hardware-sdk/transport/android) |
+| iOS native host | BLE via low-level plugin | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [iOS](/en/hardware-sdk/transport/ios) |
+| Flutter host | BLE via low-level plugin | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [Flutter](/en/hardware-sdk/transport/flutter) |
+| Native BLE overview | BLE | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [Native BLE](/en/hardware-sdk/transport/native-ble) |
+
+USB covers every OneKey device. BLE is Pro, Pro 2, Neo, Touch, Classic 1s / Pure — **not Mini**. Air-Gap QR is a separate product path: [Air-Gap](/en/air-gap).
+
+```mermaid
+flowchart TB
+  App["Your app"] --> SDK["HardwareSDK"]
+  SDK --> Transport["Transport: USB / BLE / low-level"]
+  Transport --> Protocol["Protocol V1 or V2 — live probe"]
+  Protocol --> Device["Device"]
+```
+
+## Transport is not the protocol
+
+| Layer | What it is | How you choose it |
+| --- | --- | --- |
+| **Transport** | How bytes move: USB, BLE, or a native 64-byte plugin | `init({ env })` — `webusb` / BLE SDK / `lowlevel` |
+| **Protocol** | On-wire V1 vs V2 after the link is up | SDK probe. Read `connectProtocol`. Do **not** infer from USB PID or BLE name |
+
+A Pro 2 on USB and a Pro 2 on BLE are both Protocol V2. A Classic on USB is Protocol V1. See [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol) and [Devices](/en/hardware-sdk/concepts/devices).
+
+Do not use OneKey Bridge (`env: 'web'` + `checkBridgeStatus`) for new WebUSB apps. Migration: [Bridge → WebUSB](/en/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb).
+
+## After you connect
+
+1. First address: [Getting Started](/en/hardware-sdk/getting-started)
+2. PIN / events: [Core API Guide](/en/hardware-sdk/core-api-guide)
+3. Drops and `dispose()`: [Reconnect and dispose](/en/hardware-sdk/transport/reconnect)
+4. Firmware: [Firmware Update](/en/hardware-sdk/firmware-update)
+5. Custom 64-byte bridge: [Low-level transport](/en/hardware-sdk/concepts/low-level-plugin)

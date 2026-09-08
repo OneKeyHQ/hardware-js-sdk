@@ -269,7 +269,7 @@ In JS, you would call these handlers from your adapter to mirror the demo's beha
 
 - Register handlers before loading the HTML to avoid race conditions.
 - Scan with service UUID filter and stop within a reasonable time window.
-- Persist `connectId` (peripheral UUID) and fetch `device_id` with `getFeatures(connectId)` after the first connection.
+- Persist `connectId` (peripheral UUID) and fetch `deviceId` with `getDeviceState(connectId)` after the first connection.
 - Always subscribe to `UI_EVENT` in JS to avoid stalled requests (see [Config Event](/en/hardware-sdk/core-api-guide#events-ui)).
 - Keep `web/web_dist/` in your app bundle and adjust the `load` path accordingly.
 

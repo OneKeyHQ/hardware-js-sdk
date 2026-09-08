@@ -8,8 +8,9 @@ title: firmwareUpdateV3
 
 全新的更新流程（仅限 Pro 系列）。支持在单个流程中根据需要更新引导加载程序、主固件、蓝牙固件和资源包。
 
-- 设备：仅限 OneKey Pro
+- 设备：仅限 OneKey Pro（Protocol V1）
 - 引导要求：Boot 版本 >= 4.8.0
+- Pro 2 / Neo：使用 [firmwareUpdateV4](/zh/hardware-sdk/device-api/firmwareupdatev4)
 
 ```typescript
 const res = await HardwareSDK.firmwareUpdateV3(connectId, {
@@ -33,7 +34,7 @@ const res = await HardwareSDK.firmwareUpdateV3(connectId, {
 
 ### 参数
 
-[可选通用参数](/zh/hardware-sdk/core-api-guide#common-params)
+[可选通用参数](/zh/hardware-sdk/concepts/common-params)
 
 - `platform` - 必需 `"native" | "desktop" | "ext" | "web" | "web-embed"` 执行环境
 - `firmwareVersion` - 可选 `number[]` 目标主固件版本

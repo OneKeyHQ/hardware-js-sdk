@@ -1,6 +1,8 @@
 # OneKey Hardware SDK 内部维护文档
 
-`docs/` 面向 Hardware JS SDK 内部开发维护者，目标是帮助维护者快速理解架构、定位实现和判断修改边界。接入方使用说明优先维护在各 package README 或对外 API 文档中。
+`docs/` 面向 Hardware JS SDK 内部开发维护者，目标是帮助维护者快速理解架构、定位实现和判断修改边界。接入方使用说明优先维护在对外开发者文档 [developer-portal](../packages/connect-examples/developer-portal/)（当前稳定线 Hardware SDK 1.2.0）和各 package README。
+
+公开文档的信息架构与 1.2.0 缺口见 [developer-portal 1.2.0 IA](../packages/connect-examples/developer-portal/docs/1.2.0-information-architecture.md)。内部机制文档不要直接复制进 portal；只翻译接入方必须遵守的公开契约。
 
 当前事实的优先级为：验证后的代码与生成源 > 本索引列出的长期维护文档 > package README
 中的接入说明。阶段性设计和实施计划由 Git、提交记录、Issue 和 PR 保留，不作为当前事实源。
@@ -30,6 +32,12 @@
 2. [钱包 Session 与设备安全](./device/wallet-session-and-security.md)
 3. 对应 Core method、事件常量和 UI response registry 源码
 
+### 新增或排查 SDK 错误
+
+1. [Hardware SDK Error Contract](./sdk/error-contract.md)
+2. [Protocol V1/V2 传输协议](./protocol/protocol-v1-v2.md#错误与重试边界)
+3. 对应 Transport、Core method、vendor adapter 与 App error mapping
+
 ### 开发链与签名能力
 
 1. [多链集成概览](./business/chains-overview.md)
@@ -51,6 +59,7 @@
 | 协议 | [Protocol V1/V2 传输协议](./protocol/protocol-v1-v2.md)            | 探测、Schema、帧、Link、USB/BLE、错误恢复       |
 | SDK  | [SDK Core 运行时](./sdk/core-runtime.md)                           | Core adapter、Features、Profile、文件和升级入口 |
 | SDK  | [SDK 事件](./sdk/events.md)                                        | 设备中间消息、`hd-*` 与 `hwk-*` 事件边界        |
+| SDK  | [Hardware SDK Error Contract](./sdk/error-contract.md)             | 错误分类、映射、传输、恢复与兼容约束            |
 | SDK  | [Pro2 无固件中间 Event 迁移](./sdk/pro2-eventless-migration.md)    | 当前钱包 Session 拆分请求迁移与兼容清单         |
 | SDK  | [Pro2 字段迁移](./sdk/pro2-field-migration.md)                     | Protocol V2 字段拆分、SDK 映射和 Feature 缺口   |
 | 设备 | [钱包 Session 与设备安全](./device/wallet-session-and-security.md) | 初始化、Passphrase、Attach-to-PIN、Session 缓存 |

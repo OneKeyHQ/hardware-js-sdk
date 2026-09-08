@@ -1,5 +1,6 @@
 import semver from 'semver';
 import {
+  EDeviceType,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
@@ -15,6 +16,7 @@ import { DEVICE, IFRAME, createUiMessage } from '../../events';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { onDeviceButtonHandler } from '../../core';
 import { runMethodWithUnlockPolicy } from '../../protocols/protocol-v2/unlockPolicyRunner';
+import { supportsProtocolV2Message } from '../../protocols/protocol-v2/features';
 import {
   completeRequestContext,
   createRequestContext,
@@ -22,6 +24,7 @@ import {
 } from '../../utils/tracing';
 
 import type { Device, DeviceEvents } from '../../device/Device';
+import type { DeviceCommands } from '../../device/DeviceCommands';
 import type { CoreApi } from '../../types';
 import type {
   AllNetworkAddress,
@@ -266,6 +269,10 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
 
   abortController: AbortController | null = null;
 
+  protected loadingCleanupInBackground = false;
+
+  private loadingCommands?: DeviceCommands;
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
@@ -393,7 +400,9 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
           // the root fingerprint, so each nested chain method must resume the
           // requested standard or hidden wallet before sending its device command.
           const useEmptyPassphrase = this.payload.useEmptyPassphrase === true;
-          const deriveCardano = method.name.startsWith('cardano');
+          // Nested Cardano methods opt in to [Standard, Cardano] if Ask rebuilds.
+          // Other chains stay Standard-only.
+          const deriveCardano = method.name.startsWith('cardano') ? true : undefined;
           const shouldResumeWalletSession = useEmptyPassphrase || !!this.payload.passphraseState;
           if (this.device.isProtocolV2() && shouldResumeWalletSession) {
             const passphraseStateSafety = await this.device.checkPassphraseStateSafety(
@@ -455,30 +464,64 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
 
   abstract getAllNetworkAddress(rootFingerprint: number): Promise<AllNetworkAddress[]>;
 
+  protected async stopAllNetworkLoading(canSend = true) {
+    const commands = this.loadingCommands;
+    this.loadingCommands = undefined;
+    // Never send cleanup through a replacement or disposed connection.
+    if (!canSend || !commands || commands.disposed || commands !== this.device.commands) return;
+    try {
+      await commands.typedCall('DeviceAnimationControl', 'Success', {
+        action: PROTO.DeviceAnimationAction.AnimationAction_Stop,
+      });
+    } catch {
+      // Cleanup must not mask the operation result. Firmware also has an idle timeout.
+    }
+  }
+
   async run() {
-    const res = await this.device.commands.typedCall('GetPublicKey', 'PublicKey', {
-      address_n: [toHardened(44), toHardened(1), toHardened(0)],
-      coin_name: 'Testnet',
-      script_type: 'SPENDADDRESS',
-      show_display: false,
-    });
+    this.loadingCleanupInBackground = false;
+    try {
+      if (this.device.isProtocolV2() && this.device.getCurrentDeviceType() === EDeviceType.Pro2) {
+        const protocolInfo = await this.device.ensureProtocolV2RuntimeContext();
+        if (supportsProtocolV2Message(protocolInfo, 60461)) {
+          const { commands } = this.device;
+          await commands.typedCall('DeviceAnimationControl', 'Success', {
+            action: PROTO.DeviceAnimationAction.AnimationAction_Start,
+          });
+          this.loadingCommands = commands;
+        }
+      }
 
-    if (!this.device.isProtocolV2()) {
-      this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
-    }
+      const res = await this.device.commands.typedCall('GetPublicKey', 'PublicKey', {
+        address_n: [toHardened(44), toHardened(1), toHardened(0)],
+        coin_name: 'Testnet',
+        script_type: 'SPENDADDRESS',
+        show_display: false,
+      });
 
-    if (res.message.root_fingerprint == null) {
-      throw ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter);
-    }
+      if (!this.device.isProtocolV2()) {
+        this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
+      }
 
-    this.abortController = new AbortController();
+      if (res.message.root_fingerprint == null) {
+        throw ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter);
+      }
 
-    return this.getAllNetworkAddress(res.message.root_fingerprint).catch(e => {
+      this.abortController = new AbortController();
+
+      return await this.getAllNetworkAddress(res.message.root_fingerprint);
+    } catch (e) {
+      // A failed call may have invalidated the transport link without disposing
+      // DeviceCommands. Let firmware time out instead of reconnecting for Stop.
+      await this.stopAllNetworkLoading(false);
       if (e instanceof HardwareError && e.errorCode === HardwareErrorCode.RepeatUnlocking) {
         throw ERRORS.TypedError(HardwareErrorCode.RepeatUnlocking, e.message);
       }
       throw e;
-    });
+    } finally {
+      // The callback API returns before its chain requests finish.
+      if (!this.loadingCleanupInBackground) await this.stopAllNetworkLoading();
+    }
   }
 }
 

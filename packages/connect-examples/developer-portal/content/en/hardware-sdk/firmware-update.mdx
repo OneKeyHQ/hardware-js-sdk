@@ -1,0 +1,101 @@
+---
+title: Firmware Update
+---
+
+# Firmware Update
+
+Pick the update API from the **protocol family**, not from the marketing name alone. Hardware SDK 1.2.0 keeps one JavaScript surface; the device protocol decides which method is valid.
+
+| Device today | Protocol | Method | What it updates |
+| --- | --- | --- | --- |
+| Classic, Mini, Touch | V1 | [`firmwareUpdateV2`](/en/hardware-sdk/device-api/firmwareupdatev2) | Main firmware and/or BLE |
+| OneKey Pro | V1 | [`firmwareUpdateV3`](/en/hardware-sdk/device-api/firmwareupdatev3) | Bootloader + main + BLE + resource in one flow |
+| OneKey Pro 2, Neo | V2 | [`firmwareUpdateV4`](/en/hardware-sdk/device-api/firmwareupdatev4) | Bootloader, app partitions, coprocessor, resource ZIP |
+
+Confirm the live protocol with `connectProtocol` on the device object or via [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state). Do not branch on USB PID or BLE name. See [Devices](/en/hardware-sdk/concepts/devices) and [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol).
+
+## 1. Check whether an update is needed
+
+```ts
+const release = await HardwareSDK.checkFirmwareRelease(connectId);
+if (!release.success) throw new Error(release.payload.error);
+
+// payload.status: 'valid' | 'outdated' | 'required' | 'unknown' | 'none'
+if (release.payload.status === 'valid') return;
+```
+
+BLE coprocessor: [`checkBLEFirmwareRelease`](/en/hardware-sdk/device-api/checkblefirmwarerelease). Subscribe to `FIRMWARE_EVENT` (`RELEASE_INFO` / `BLE_RELEASE_INFO`) if you want to prompt later instead of blocking the first connection.
+
+## 2. Subscribe to progress before you call update
+
+```ts
+import { UI_EVENT, UI_REQUEST } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(UI_EVENT, (msg) => {
+  if (
+    msg.type === UI_REQUEST.FIRMWARE_PROGRESS ||
+    msg.type === UI_REQUEST.FIRMWARE_TIP ||
+    msg.type === UI_REQUEST.FIRMWARE_PROCESSING
+  ) {
+    renderFirmwareProgress(msg.payload);
+  }
+  // firmwareUpdateV4 may emit REQUEST_BUTTON with reason 'firmware-update'.
+  // Show "confirm on device". Do not uiResponse() that hint.
+});
+```
+
+## 3. Call the matching method
+
+Classic / Mini / Touch:
+
+```ts
+await HardwareSDK.firmwareUpdateV2(connectId, {
+  platform: 'web',
+  updateType: 'firmware',
+  version: [2, 10, 0],
+});
+```
+
+Pro:
+
+```ts
+await HardwareSDK.firmwareUpdateV3(connectId, {
+  platform: 'desktop',
+  firmwareVersion: [4, 10, 0],
+});
+```
+
+Pro 2 / Neo — pass binaries you already verified:
+
+```ts
+await HardwareSDK.firmwareUpdateV4(connectId, {
+  platform: 'desktop',
+  bootloaderBinary,
+  applicationP1Binary,
+  applicationP2Binary,
+  coprocessorBinary,
+  resourceArchiveBinary,
+});
+```
+
+`platform` is required on all three methods: `'native' | 'desktop' | 'ext' | 'web' | 'web-embed'`.
+
+## 4. After the call
+
+1. The device may reboot. Wait for `DEVICE_EVENT` `CONNECT` (or search again). Ordinary reconnect keeps the confirmed protocol. See [Reconnect and dispose](/en/hardware-sdk/transport/reconnect).
+2. Re-read [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state) (`scope: 'firmware'` if you need versions) before trusting the new build.
+3. If the call failed with a transport timeout **after** the install request was sent, **do not replay** the same update. Reconnect, read status, then decide.
+
+## Do not
+
+- Call `firmwareUpdateV3` on Pro 2 / Neo, or `firmwareUpdateV4` on Classic / Pro.
+- Automatically retry an update after disconnect or timeout.
+- Spread BLE `retryCount` helpers onto update calls.
+- Install romloader through `firmwareUpdateV4`.
+
+## Next
+
+- [firmwareUpdateV2](/en/hardware-sdk/device-api/firmwareupdatev2)
+- [firmwareUpdateV3](/en/hardware-sdk/device-api/firmwareupdatev3)
+- [firmwareUpdateV4](/en/hardware-sdk/device-api/firmwareupdatev4)
+- [Core API Guide → events](/en/hardware-sdk/core-api-guide#events-ui)

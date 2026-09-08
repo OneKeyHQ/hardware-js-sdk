@@ -34,8 +34,6 @@ export function shouldRefreshNegotiatedMtu(mtu?: number | null) {
 }
 
 export function shouldWriteProtocolV2WithResponse({
-  platform,
-  highThroughput,
   requestedWithResponse,
   characteristic,
 }: {
@@ -46,5 +44,5 @@ export function shouldWriteProtocolV2WithResponse({
 }) {
   if (!characteristic.isWritableWithResponse) return false;
   if (!characteristic.isWritableWithoutResponse) return true;
-  return requestedWithResponse === true || (platform === 'ios' && !highThroughput);
+  return requestedWithResponse === true;
 }

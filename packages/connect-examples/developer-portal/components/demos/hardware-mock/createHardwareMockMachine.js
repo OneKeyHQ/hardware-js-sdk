@@ -48,6 +48,7 @@ function resolveSuccessTitle(output) {
 
   const payload = output?.payload;
   if (Array.isArray(payload) && payload[0]?.connectId) return 'RESULT searchDevices';
+  if (payload?.identity?.deviceId) return 'RESULT getDeviceState';
   if (payload?.device_id) return 'RESULT getFeatures';
   if (payload?.address) return 'RESULT btcGetAddress';
   if (payload?.signature) return 'RESULT btcSignMessage';
@@ -395,26 +396,26 @@ export function createHardwareMockMachine({ basePath }) {
           const devices = await client.searchDevices();
           const first = Array.isArray(devices?.payload) ? devices.payload[0] : null;
           const connectId = first?.connectId ?? first?.connect_id ?? 'mock-connect-001';
-          const features = await client.getFeatures(connectId);
-          const deviceId =
-            features?.payload?.device_id ?? features?.payload?.deviceId ?? 'OK-EMULATOR-001';
+          const state = await client.getDeviceState(connectId);
+          const deviceId = state?.payload?.identity?.deviceId ?? 'OK-EMULATOR-001';
 
           return {
             connectId,
             deviceId,
-            model: features?.payload?.model ?? 'OneKey Pro',
-            deviceName:
-              features?.payload?.device_name ?? features?.payload?.deviceName ?? 'OneKey Pro',
-            bleName: features?.payload?.ble_name ?? features?.payload?.bleName ?? 'ONEKEY-EMULATOR',
-            firmware: features?.payload?.firmware ?? '3.0.0-mock',
-            transport: features?.payload?.transport ?? 'mock',
-            unlocked: Boolean(features?.payload?.unlocked),
-            deviceType: features?.payload?.deviceType ?? first?.deviceType ?? 'pro',
+            model: state?.payload?.identity?.label ?? 'OneKey Pro',
+            deviceName: state?.payload?.identity?.label ?? 'OneKey Pro',
+            bleName: 'ONEKEY-EMULATOR',
+            firmware: state?.payload?.versions?.firmware ?? '3.0.0-mock',
+            transport: 'mock',
+            unlocked: Boolean(state?.payload?.status?.unlocked),
+            deviceType: state?.payload?.identity?.deviceType ?? first?.deviceType ?? 'pro',
           };
         }),
 
         sendCommand: fromPromise(async ({ input }) => {
           if (input.command === 'searchDevices') return client.searchDevices();
+          if (input.command === 'getDeviceState')
+            return client.getDeviceState(input.params?.connectId ?? input.connectId);
           if (input.command === 'getFeatures')
             return client.getFeatures(input.params?.connectId ?? input.connectId);
 

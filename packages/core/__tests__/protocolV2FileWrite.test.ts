@@ -10,6 +10,46 @@ jest.mock('../src/data/config', () => ({
 }));
 
 describe('writeProtocolV2File', () => {
+  test('allows a verified caller-specific BLE chunk limit', async () => {
+    const getSettingsSpy = jest
+      .spyOn(DataManager, 'getSettings')
+      .mockReturnValue('react-native' as any);
+    const isBleConnectSpy = jest.spyOn(DataManager, 'isBleConnect').mockReturnValue(true);
+    const data = new Uint8Array(1961);
+    const typedCall = jest.fn().mockResolvedValue({ message: {} });
+
+    try {
+      await writeProtocolV2File({
+        commands: { typedCall } as any,
+        path: 'vol1:/wallpapers/wallpaper.okpkg',
+        data,
+        bleChunkSizeLimit: 1960,
+      });
+    } finally {
+      getSettingsSpy.mockRestore();
+      isBleConnectSpy.mockRestore();
+    }
+
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall.mock.calls[0][2].file.data).toEqual(data.slice(0, 1960));
+    expect(typedCall.mock.calls[1][2].file.data).toEqual(data.slice(1960));
+  });
+
+  test('does not apply the BLE-only limit to WebUSB', async () => {
+    const data = new Uint8Array(1961);
+    const typedCall = jest.fn().mockResolvedValue({ message: {} });
+
+    await writeProtocolV2File({
+      commands: { typedCall } as any,
+      path: 'vol1:/wallpapers/wallpaper.okpkg',
+      data,
+      bleChunkSizeLimit: 1960,
+    });
+
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall.mock.calls[0][2].file.data).toEqual(data);
+  });
+
   test('按分片写入并只在首片设置 overwrite', async () => {
     const data = new Uint8Array(4097);
     const typedCall = jest.fn().mockResolvedValue({ message: {} });

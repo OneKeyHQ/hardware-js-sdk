@@ -2,11 +2,17 @@
 title: Get Features
 ---
 
+import { Callout } from 'nextra/components'
+
 # Get Features
+
+<Callout type="warning">
+  **Deprecated. Protocol V1 only.** Use [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state) for Protocol V1 and V2. Classic / Mini / Touch / Pro can still call this method; Pro 2 and Neo reject it.
+</Callout>
 
 ## Get device features
 
-Get all attributes of the device.
+Get all attributes of the device. New code should read [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state) (`payload.identity.deviceId`).
 
 ```typescript
 const response = await HardwareSDK.getFeatures(connectId);
@@ -16,7 +22,7 @@ const response = await HardwareSDK.getFeatures(connectId);
 
 ### Params
 
-[**Optional common params**](/en/hardware-sdk/core-api-guide#common-params)
+[**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
 ### Example
 

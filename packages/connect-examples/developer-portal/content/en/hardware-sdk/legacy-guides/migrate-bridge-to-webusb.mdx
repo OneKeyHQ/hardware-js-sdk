@@ -19,7 +19,7 @@ Replace Bridge with WebUSB while keeping `@onekeyfe/hd-web-sdk` as your SDK entr
 
 - Initialize the SDK with `env: 'webusb'`
   - (Bridge (env: `web`) → WebUSB (env: `webusb`).)
-- Update hd-web-sdk `connectSrc` to the latest iframe host version (e.g., `https://jssdk.onekey.so/1.1.16/`)
+- Prefer omitting `connectSrc` so `@onekeyfe/hd-web-sdk` fills `https://jssdk.onekey.so/<installed-version>/`. Override only if you host the iframe yourself.
 - Ask for user authorization via `navigator.usb.requestDevice()` with official OneKey filters — must be triggered by a user gesture (e.g., a button click) due to Chrome security restrictions; automatic device discovery is not allowed before permission
 - Bridge-specific checks are deprecated (e.g., `checkBridgeStatus()`)
 - All other SDK usage remains the same
@@ -36,8 +36,7 @@ const HardwareSDK = HdWebSdk.HardwareWebSdk;
 
 await HardwareSDK.init({
   env: 'webusb',
-  // hd-web-sdk uses an iframe host; keep connectSrc configured
-  connectSrc: 'https://jssdk.onekey.so/1.1.16/',
+  // omit connectSrc — SDK fills https://jssdk.onekey.so/<installed-hd-web-sdk-version>/
   debug: true,
   fetchConfig: true,
 });
@@ -65,10 +64,10 @@ const list = await HardwareSDK.searchDevices();
 if (!list.success) throw new Error(list.payload.error);
 const { connectId, deviceId } = list.payload[0] ?? {};
 
-// 2) (Optional) Get features to resolve device_id
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
-const resolvedDeviceId = features.payload.device_id ?? deviceId;
+// 2) Confirm deviceId
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const resolvedDeviceId = state.payload.identity.deviceId ?? deviceId;
 
 // 3) Example: BTC address
 const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
@@ -89,6 +88,6 @@ if (r.success) {
 ## Cleanup and Checklist
 
 - Remove Bridge-specific checks/CTAs (e.g., `checkBridgeStatus()`)
-- Keep latest `connectSrc` in hd-web-sdk init (the iframe host)
+- Omit `connectSrc` unless you host the iframe; it must match the installed `@onekeyfe/hd-web-sdk` version
 - Feature-detect `navigator.usb` and show a friendly notice if unsupported
 - All other SDK methods and UI flows are unchanged

@@ -343,9 +343,9 @@ function buildExampleCode({ locale, command, btcPath, addressShowOnOneKey, messa
     'if (!devicesRes.success) throw new Error(devicesRes.payload.error)',
     'const connectId = devicesRes.payload[0].connectId',
     '',
-    'const featuresRes = await HardwareSDK.getFeatures(connectId)',
-    'if (!featuresRes.success) throw new Error(featuresRes.payload.error)',
-    'const deviceId = featuresRes.payload.device_id',
+    'const stateRes = await HardwareSDK.getDeviceState(connectId)',
+    'if (!stateRes.success) throw new Error(stateRes.payload.error)',
+    'const deviceId = stateRes.payload.identity.deviceId',
     ''
   ]
 

@@ -1,6 +1,7 @@
 import type { CommonParams, Response } from '../params';
 import type { OnboardingStatus, Success } from '@onekeyfe/hd-transport';
 import type { DeviceRebootParams } from '../../api/protocol-v2/helpers';
+import type { UploadPortfolioParams } from '../../api/UploadPortfolio';
 import type {
   DeviceUploadWallpaperParams,
   DeviceUploadWallpaperResponse,
@@ -12,6 +13,7 @@ import type {
 
 // Re-export implementation parameter types as the single source of truth.
 export type { DeviceRebootParams, RebootTypeInput } from '../../api/protocol-v2/helpers';
+export type { UploadPortfolioParams } from '../../api/UploadPortfolio';
 export type {
   DeviceUploadWallpaperParams,
   DeviceUploadWallpaperResponse,
@@ -67,8 +69,5 @@ export declare function deviceUploadNft(
 
 export declare function uploadPortfolio(
   connectId: string,
-  params: {
-    packageBase64: string;
-    timeoutMs?: number | string;
-  }
+  params: UploadPortfolioParams
 ): Response<FileInfo & { portfolioUpdated: true }>;

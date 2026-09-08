@@ -1,0 +1,6 @@
+interface:
+  display_name: "Hardware Error Handling"
+  short_description: "Standardize Hardware SDK error contracts"
+  default_prompt: "Use $hardware-error-handling to add or review a Hardware SDK error safely."
+policy:
+  allow_implicit_invocation: true

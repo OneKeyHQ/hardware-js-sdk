@@ -4,7 +4,7 @@ import transportPackage, {
   ProtocolV2,
   TRANSPORT_EVENT,
 } from '@onekeyfe/hd-transport';
-import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
 import ReactNativeBleTransport, {
   BLE_NATIVE_TEARDOWN_TIMEOUT_MS,
@@ -28,7 +28,7 @@ jest.mock('react-native-ble-plx', () => ({
   BleError: class BleError extends Error {},
   BleErrorCode: {
     DeviceAlreadyConnected: 203,
-    DeviceDisconnected: 205,
+    DeviceDisconnected: 201,
     DeviceMTUChangeFailed: 206,
     OperationCancelled: 2,
     CharacteristicNotFound: 404,
@@ -360,6 +360,134 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(new ReactNativeBleTransport({}).scanTimeout).toBe(3000);
   });
 
+  test('connects the Android GATT link before starting system bonding', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device } = createHarness();
+    const operationOrder: string[] = [];
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+
+    device.isConnected.mockResolvedValueOnce(false);
+    device.connect = jest.fn(() => {
+      operationOrder.push('connect');
+      return Promise.resolve(device);
+    });
+    pairDeviceMock.mockImplementationOnce(() => {
+      operationOrder.push('bond');
+      return Promise.resolve({ bonded: true, bonding: false });
+    });
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+
+    expect(operationOrder).toEqual(['connect', 'bond']);
+    await transport.release(uuid, true);
+  });
+
+  test('does not start Android bonding when both reconnect attempts fail', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device } = createHarness();
+    const BleErrorMock = jest.requireMock('react-native-ble-plx').BleError as new (
+      message: string
+    ) => Error;
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+    const firstError = Object.assign(new BleErrorMock('MTU change failed'), {
+      errorCode: 206,
+      reason: 'MTU change failed',
+    });
+    const fallbackError = Object.assign(new BleErrorMock('GATT connect failed'), {
+      errorCode: 205,
+      reason: 'GATT connect failed',
+    });
+
+    device.isConnected.mockResolvedValueOnce(false);
+    device.connect = jest
+      .fn()
+      .mockRejectedValueOnce(firstError)
+      .mockRejectedValueOnce(fallbackError);
+    pairDeviceMock.mockClear();
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleConnectedError,
+    });
+    expect(device.connect).toHaveBeenCalledTimes(2);
+    expect(pairDeviceMock).not.toHaveBeenCalled();
+  });
+
+  test('checks that the Android GATT link is connected before bonding', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device, bleManager } = createHarness();
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+
+    device.isConnected.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+    device.connect = jest.fn().mockResolvedValue(device);
+    pairDeviceMock.mockClear();
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleConnectedError,
+    });
+    expect(pairDeviceMock).not.toHaveBeenCalled();
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
+    expect(device.cancelConnection).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    [
+      'ios',
+      'OneKey Neo',
+      {
+        iosErrorCode: 14,
+        reason: 'Peer removed pairing information',
+      },
+      HardwareErrorCode.BlePeerRemovedPairingInformation,
+    ],
+    [
+      'android',
+      'OneKey Pro 2',
+      {
+        androidErrorCode: 5,
+        reason: 'Connection state changed with status 5',
+      },
+      HardwareErrorCode.BleDeviceBondError,
+    ],
+  ] as const)(
+    'maps a %s %s stale bond during connect before protocol detection',
+    async (platform, deviceName, nativeError, errorCode) => {
+      setPlatformOS(platform);
+      const { transport, uuid, device } = createHarness({ deviceName });
+      const BleErrorMock = jest.requireMock('react-native-ble-plx').BleError as new (
+        message: string
+      ) => Error;
+      const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+      pairDeviceMock.mockClear();
+
+      device.isConnected.mockResolvedValueOnce(false);
+      device.connect = jest
+        .fn()
+        .mockRejectedValue(Object.assign(new BleErrorMock(nativeError.reason), nativeError));
+
+      await expect(transport.acquire({ uuid })).rejects.toMatchObject({ errorCode });
+      expect(pairDeviceMock).not.toHaveBeenCalled();
+      expect(transport.getProtocolType(uuid)).toBeUndefined();
+    }
+  );
+
+  test('closes the Android GATT link when system bonding fails', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device, bleManager } = createHarness();
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+
+    pairDeviceMock.mockRejectedValueOnce(new Error('bonding canceled'));
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toThrow(
+      'bonding canceled'
+    );
+
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
+    expect(device.cancelConnection).toHaveBeenCalledTimes(1);
+  });
+
   test('uses withResponse for consecutive iOS Protocol V1 control commands without releasing', async () => {
     const { transport, uuid, writeCharacteristic } = createV1Harness({
       respondOnWriteCount: [1, 2],
@@ -436,7 +564,8 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       protocolType: 'V2',
     });
     expect(device.requestMTU).toHaveBeenCalledWith(247);
-    expect(writeCharacteristic.writeWithResponse.mock.calls.length).toBeGreaterThan(1);
+    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalled();
 
     await expect(
       transport.call(uuid, 'Ping', { message: 'first-core-command' })
@@ -701,6 +830,116 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     BLE_NATIVE_TEARDOWN_TIMEOUT_MS + 5_000
   );
 
+  test('preserves the unpaired error when iOS disconnects during the first V1 probe', async () => {
+    const { transport, uuid, writeCharacteristic } = createHarness({ deviceName: 'Neo Test' });
+    writeCharacteristic.writeWithResponse.mockRejectedValueOnce({
+      errorCode: 201,
+      iosErrorCode: 7,
+      reason: 'The specified device has disconnected from us.',
+    });
+    const probeProtocolV2 = jest.spyOn(transport as any, 'probeProtocolV2');
+
+    await expect(transport.acquire({ uuid })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceNotBonded,
+    });
+
+    expect(probeProtocolV2).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(transport.getProtocolType(uuid)).toBeUndefined();
+  });
+
+  test('preserves a native iOS disconnect during an expected Protocol V2 probe', async () => {
+    const { transport, uuid, writeCharacteristic, bleManager } = createHarness({
+      deviceName: 'Neo Test',
+    });
+    const nativeDisconnect = {
+      errorCode: 201,
+      iosErrorCode: 7,
+      reason: 'The specified device has disconnected from us.',
+    };
+    writeCharacteristic.writeWithoutResponse.mockRejectedValueOnce(nativeDisconnect);
+    const probeProtocolV1 = jest.spyOn(transport as any, 'probeProtocolV1');
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+
+    expect(probeProtocolV1).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
+    expect(transport.getProtocolType(uuid)).toBeUndefined();
+  });
+
+  test('preserves a native iOS disconnect during a V2-first probe without falling back to V1', async () => {
+    const { transport, uuid, writeCharacteristic } = createHarness({ deviceName: 'Neo Test' });
+    writeCharacteristic.writeWithoutResponse.mockRejectedValueOnce({
+      errorCode: 201,
+      iosErrorCode: 7,
+      reason: 'The specified device has disconnected from us.',
+    });
+    const probeProtocolV1 = jest.spyOn(transport as any, 'probeProtocolV1');
+
+    await expect(transport.acquire({ uuid, protocolHint: 'V2' })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+
+    expect(probeProtocolV1).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
+    expect(transport.getProtocolType(uuid)).toBeUndefined();
+  });
+
+  test.each(['V1', 'V2'] as const)(
+    'preserves terminal BLE failures from the %s probe without trying another protocol',
+    async protocol => {
+      for (const errorCode of [
+        HardwareErrorCode.BleDeviceNotBonded,
+        HardwareErrorCode.BleDeviceBondedCanceled,
+        HardwareErrorCode.BlePeerRemovedPairingInformation,
+        HardwareErrorCode.BleDeviceDisconnected,
+        HardwareErrorCode.BleCharacteristicNotifyError,
+        HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
+        HardwareErrorCode.BleWriteCharacteristicError,
+      ]) {
+        const { transport, uuid } = createHarness();
+        const error = ERRORS.TypedError(errorCode);
+        const call = jest
+          .spyOn(transport as any, protocol === 'V1' ? 'callProtocolV1' : 'callProtocolV2')
+          .mockRejectedValue(error);
+        const otherProbe = jest.spyOn(
+          transport as any,
+          protocol === 'V1' ? 'probeProtocolV2' : 'probeProtocolV1'
+        );
+
+        await expect(transport.acquire({ uuid, protocolHint: protocol })).rejects.toBe(error);
+
+        expect(call).toHaveBeenCalledTimes(1);
+        expect(otherProbe).not.toHaveBeenCalled();
+        expect(transport.getProtocolType(uuid)).toBeUndefined();
+      }
+    }
+  );
+
+  test.each(['V1', 'V2'] as const)(
+    'still falls back after a silent %s probe timeout',
+    async protocol => {
+      const { transport, uuid } = createHarness();
+      jest
+        .spyOn(transport as any, protocol === 'V1' ? 'callProtocolV1' : 'callProtocolV2')
+        .mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.BleTimeoutError));
+      const otherProbe = jest
+        .spyOn(transport as any, protocol === 'V1' ? 'probeProtocolV2' : 'probeProtocolV1')
+        .mockResolvedValue(true);
+
+      await expect(transport.acquire({ uuid, protocolHint: protocol })).resolves.toEqual({
+        uuid,
+        protocolType: protocol === 'V1' ? 'V2' : 'V1',
+      });
+
+      expect(otherProbe).toHaveBeenCalledTimes(1);
+      await transport.release(uuid, true);
+    }
+  );
+
   test('falls back to the other active probe on iOS when protocol metadata is absent', async () => {
     const { transport, uuid } = createHarness({ deviceName: 'OneKey' });
     const probeProtocolV1 = jest
@@ -795,7 +1034,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     });
     expect(device.requestMTU).toHaveBeenCalledTimes(3);
     expect((transport as any).getCachedTransport(uuid).mtuSize).toBeUndefined();
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalled();
     await transport.release(uuid, true);
   });
 
@@ -804,6 +1043,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     device.mtu = undefined;
 
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
+    const writesBeforeFileWrite = writeCharacteristic.writeWithoutResponse.mock.calls.length;
     device.requestMTU.mockImplementationOnce(() => {
       device.mtu = 247;
       return Promise.resolve(device);
@@ -811,7 +1051,9 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
 
     await expect(transport.call(uuid, 'FileWrite', {})).resolves.toBeDefined();
     expect(device.requestMTU).toHaveBeenCalledTimes(4);
-    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(
+      writesBeforeFileWrite + 1
+    );
     await transport.release(uuid, true);
   });
 
@@ -820,12 +1062,13 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     device.mtu = undefined;
 
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
+    const writesBeforeFileWrite = writeCharacteristic.writeWithoutResponse.mock.calls.length;
 
     await expect(transport.call(uuid, 'FileWrite', {})).rejects.toMatchObject({
       errorCode: HardwareErrorCode.BleConnectedError,
     });
     expect(device.requestMTU).toHaveBeenCalledTimes(4);
-    expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(writesBeforeFileWrite);
     await transport.release(uuid, true);
   });
 
@@ -945,19 +1188,19 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
-  test('uses withResponse for consecutive iOS Protocol V2 control calls without releasing', async () => {
+  test('uses withoutResponse for consecutive iOS Protocol V2 control calls without releasing', async () => {
     const { transport, uuid, writeCharacteristic } = createHarness();
 
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
     const releaseNative = jest.spyOn(transport as any, 'releaseNative');
-    expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
 
     await transport.call(uuid, 'DeviceInfoGet', {});
     await transport.call(uuid, 'ProtocolInfoRequest', {});
 
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(3);
-    expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(3);
+    expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
     expect(releaseNative).not.toHaveBeenCalled();
 
     await transport.release(uuid, true);
@@ -970,8 +1213,8 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
 
     await transport.call(uuid, 'FileWrite', {});
     await transport.call(uuid, 'FileWrite', {});
-    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(2);
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(3);
+    expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
     expect(
       logger.debug.mock.calls.filter(
         ([message]) =>
@@ -1004,8 +1247,8 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
 
     await transport.call(uuid, 'FileWrite', {}, { writeWithResponse: true });
-    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(2);
-    expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
+    expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
+    expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(1);
     await transport.release(uuid, true);
   });
 

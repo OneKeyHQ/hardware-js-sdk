@@ -1951,7 +1951,6 @@ export type EthereumSignTxOneKey = {
   chain_id: number;
   tx_type?: number;
   expected_address?: string;
-  source_fingerprint?: number;
 };
 
 // EthereumAccessListOneKey
@@ -1974,7 +1973,6 @@ export type EthereumSignTxEIP1559OneKey = {
   chain_id: number;
   access_list: EthereumAccessListOneKey[];
   expected_address?: string;
-  source_fingerprint?: number;
 };
 
 // EthereumAuthorizationSignature
@@ -2027,7 +2025,6 @@ export type EthereumSignMessageOneKey = {
   address_n: number[];
   message: string;
   chain_id?: number;
-  source_fingerprint?: number;
 };
 
 // EthereumMessageSignatureOneKey
@@ -3820,7 +3817,6 @@ export type SolanaSignTx = {
   address_n: number[];
   raw_tx: string;
   extra_info?: SolanaTxExtraInfo;
-  source_fingerprint?: number;
 };
 
 // SolanaSignedTx
@@ -3830,6 +3826,7 @@ export type SolanaSignedTx = {
 
 export enum SolanaOffChainMessageVersion {
   MESSAGE_VERSION_0 = 0,
+  MESSAGE_VERSION_1 = 1,
 }
 
 export enum SolanaOffChainMessageFormat {
@@ -3844,14 +3841,13 @@ export type SolanaSignOffChainMessage = {
   message_version?: SolanaOffChainMessageVersion;
   message_format?: SolanaOffChainMessageFormat;
   application_domain?: string;
-  source_fingerprint?: number;
+  required_signers: string[];
 };
 
 // SolanaSignUnsafeMessage
 export type SolanaSignUnsafeMessage = {
   address_n: number[];
   message: string;
-  source_fingerprint?: number;
 };
 
 // SolanaMessageSignature
@@ -4558,12 +4554,6 @@ export enum CommandFlags {
   Factory_Only = 1,
 }
 
-// experimental_message
-export type experimental_message = {};
-
-// experimental_field
-export type experimental_field = {};
-
 export type TextMemo = {
   text: string;
 };
@@ -4602,7 +4592,6 @@ export type EthereumSignTypedDataQR = {
   chain_id?: number;
   metamask_v4_compat?: boolean;
   request_id?: string;
-  source_fingerprint?: number;
 };
 
 // SetBusy
@@ -4668,6 +4657,12 @@ export type UiAnimationRequest = {
   command: UiAnimationCommand;
   type?: UiAnimationType;
 };
+
+// experimental_message
+export type experimental_message = {};
+
+// experimental_field
+export type experimental_field = {};
 
 // ProtocolInfoRequest
 export type ProtocolInfoRequest = {
@@ -4788,6 +4783,18 @@ export type DeviceFindMyTokenState = {
   burned: boolean;
 };
 
+export enum DeviceAnimationAction {
+  AnimationAction_Unknown = 0,
+  AnimationAction_Start = 1,
+  AnimationAction_Stop = 2,
+}
+
+// DeviceAnimationControl
+export type DeviceAnimationControl = {
+  action: DeviceAnimationAction;
+  timeout_ms?: number;
+};
+
 export enum DeviceFactoryAck {
   FACTORY_ACK_SUCCESS = 0,
   FACTORY_ACK_FAIL = 1,
@@ -4810,15 +4817,19 @@ export type DeviceFactoryInfo = {
   factory_test_completed?: boolean;
   factory_burn_in_completed?: boolean;
   manufacture_time?: DeviceFactoryInfoManufactureTime;
+  data?: string;
 };
 
 // DeviceFactoryInfoSet
 export type DeviceFactoryInfoSet = {
   info: DeviceFactoryInfo;
+  full_data?: boolean;
 };
 
 // DeviceFactoryInfoGet
-export type DeviceFactoryInfoGet = {};
+export type DeviceFactoryInfoGet = {
+  full_data?: boolean;
+};
 
 // DeviceFactoryPermanentLock
 export type DeviceFactoryPermanentLock = {
@@ -5032,13 +5043,13 @@ export enum DeviceSessionSeedDomain {
 export type DeviceSessionGet = {
   session_id?: string;
   btc_test_address?: string;
-  seed_domains: DeviceSessionSeedDomain[];
 };
 
 // DeviceSession
 export type DeviceSession = {
   session_id?: string;
   btc_test_address?: string;
+  seed_domains: DeviceSessionSeedDomain[];
 };
 
 export enum DeviceSessionPinType {
@@ -5056,6 +5067,7 @@ export type DeviceSessionAskPin = {
 export type DeviceSessionAskPassphrase = {
   passphrase?: string;
   on_device: boolean;
+  seed_domains: DeviceSessionSeedDomain[];
 };
 
 export enum DeviceSessionAskPin_FailureSubCodes {
@@ -5247,6 +5259,12 @@ export type ViewDetail = {
   has_icon: boolean;
 };
 
+// ViewCustomField
+export type ViewCustomField = {
+  key: string;
+  value: string;
+};
+
 export enum ViewTipType {
   Default = 0,
   Highlight = 1,
@@ -5263,10 +5281,30 @@ export type ViewTip = {
   text_arg?: string;
 };
 
-// ViewRawData
-export type ViewRawData = {
+// ViewActionCard
+export type ViewActionCard = {
   initial_data: string;
-  placeholder: number;
+};
+
+// ViewContentPreview
+export type ViewContentPreview = {
+  content_key: number;
+  preview: string;
+  total_bytes?: number;
+};
+
+// ViewContentEntry
+export type ViewContentEntry = {
+  entry_key: number;
+  value: string;
+};
+
+// ViewContentPage
+export type ViewContentPage = {
+  page_index: number;
+  page_count: number;
+  chunk?: string;
+  entry?: ViewContentEntry;
 };
 
 export enum ViewSignLayout {
@@ -5284,11 +5322,21 @@ export type ViewSignPage = {
   amount?: UintType;
   general: ViewDetail[];
   tip?: ViewTip;
-  raw_data?: ViewRawData;
+  action_card?: ViewActionCard;
   slide_to_confirm?: boolean;
   layout?: ViewSignLayout;
   title_id?: number;
   title_arg?: string;
+  content?: ViewContentPreview;
+  custom_field?: ViewCustomField;
+};
+
+// ViewWarningPage
+export type ViewWarningPage = {
+  title_id: number;
+  text_id: number;
+  text_arg?: string;
+  cancellable?: boolean;
 };
 
 // ViewVerifyPage
@@ -5301,6 +5349,7 @@ export type ViewVerifyPage = {
   value_key?: number;
   title_id?: number;
   chain_id?: number;
+  content?: ViewContentPreview;
 };
 
 export enum ProtocolV2FailureType {
@@ -5900,8 +5949,6 @@ export type MessageType = {
   TronSignMessage: TronSignMessage;
   TronMessageSignature: TronMessageSignature;
   facotry: facotry;
-  experimental_message: experimental_message;
-  experimental_field: experimental_field;
   TextMemo: TextMemo;
   RefundMemo: RefundMemo;
   CoinPurchaseMemo: CoinPurchaseMemo;
@@ -5917,6 +5964,8 @@ export type MessageType = {
   UnlockPath: UnlockPath;
   UnlockedPathRequest: UnlockedPathRequest;
   UiAnimationRequest: UiAnimationRequest;
+  experimental_message: experimental_message;
+  experimental_field: experimental_field;
   ProtocolInfoRequest: ProtocolInfoRequest;
   ProtocolInfo: ProtocolInfo;
   DeviceReboot: DeviceReboot;
@@ -5933,6 +5982,7 @@ export type MessageType = {
   DeviceFindMyTokenUpdate: DeviceFindMyTokenUpdate;
   DeviceFindMyTokenStateGet: DeviceFindMyTokenStateGet;
   DeviceFindMyTokenState: DeviceFindMyTokenState;
+  DeviceAnimationControl: DeviceAnimationControl;
   DeviceFactoryInfoManufactureTime: DeviceFactoryInfoManufactureTime;
   DeviceFactoryInfo: DeviceFactoryInfo;
   DeviceFactoryInfoSet: DeviceFactoryInfoSet;
@@ -5981,9 +6031,14 @@ export type MessageType = {
   PortfolioUpdate: PortfolioUpdate;
   ViewAmount: ViewAmount;
   ViewDetail: ViewDetail;
+  ViewCustomField: ViewCustomField;
   ViewTip: ViewTip;
-  ViewRawData: ViewRawData;
+  ViewActionCard: ViewActionCard;
+  ViewContentPreview: ViewContentPreview;
+  ViewContentEntry: ViewContentEntry;
+  ViewContentPage: ViewContentPage;
   ViewSignPage: ViewSignPage;
+  ViewWarningPage: ViewWarningPage;
   ViewVerifyPage: ViewVerifyPage;
 };
 

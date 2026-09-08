@@ -1,9 +1,10 @@
-import { getMethodSupportedProtocols } from '@onekeyfe/hd-core';
+import { getMethodSupportedProtocols, projectDeviceStateFeatures } from '@onekeyfe/hd-core';
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import { getProtocolAwareFeatures } from './protocolAwareFeatures';
 
-import type { CoreApi } from '@onekeyfe/hd-core';
+import type { CoreApi, DeviceState } from '@onekeyfe/hd-core';
 
 export type ConnectProtocol = 'V1' | 'V2';
 export type MethodCallMode = 'no-connection' | 'connection' | 'device';
@@ -19,6 +20,20 @@ type ProtocolAwareMethodOptions = {
 };
 
 const protocolV2FeatureAdapters = new Set(['getFeatures', 'getOnekeyFeatures']);
+
+function isProtocolV2UnlockSatisfied(state: DeviceState, pinType: unknown) {
+  if (state.status.unlocked !== true) return false;
+
+  if (pinType === DeviceSessionPinType.Any) return true;
+  if (pinType === DeviceSessionPinType.AttachToPin) {
+    return state.status.unlockedAttachPin === true;
+  }
+
+  return (
+    (pinType === undefined || pinType === DeviceSessionPinType.Main) &&
+    state.status.unlockedAttachPin === false
+  );
+}
 
 export function isMethodSupportedOnProtocol(
   method: string,
@@ -88,6 +103,18 @@ export async function executeProtocolAwareMethod({
 
   if (!isMethodSupportedOnProtocol(method, protocol, params)) {
     return createProtocolUnsupportedResponse(method, protocol);
+  }
+
+  if (protocol === 'V2' && mode === 'connection' && method === 'deviceUnlock') {
+    const stateResponse = await sdk.getDeviceState(connectId, { scope: 'runtime' });
+    if (!stateResponse.success) return stateResponse;
+
+    if (isProtocolV2UnlockSatisfied(stateResponse.payload, params.pinType)) {
+      return {
+        ...stateResponse,
+        payload: projectDeviceStateFeatures(stateResponse.payload),
+      };
+    }
   }
 
   if (mode === 'connection') {

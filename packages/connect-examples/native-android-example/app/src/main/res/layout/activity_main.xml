@@ -29,8 +29,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:onClick="getFeatures"
-                android:text="getFeatures"
+                android:onClick="getDeviceState"
+                android:text="getDeviceState"
                 style="@style/Widget.Material3.Button.OutlinedButton" />
 
             <com.google.android.material.button.MaterialButton

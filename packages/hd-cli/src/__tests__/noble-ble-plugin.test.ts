@@ -31,6 +31,7 @@ const createPeripheral = (id: string) => {
   const peripheral = Object.assign(new EventEmitter(), {
     id,
     state: 'connected',
+    mtu: null as number | null,
     advertisement: {
       localName: `OneKey Pro 2 ${id}`,
       serviceUuids: ['0001'],
@@ -52,6 +53,15 @@ describe('Noble BLE plugin notification routing', () => {
     jest.useRealTimers();
     jest.resetModules();
     jest.clearAllMocks();
+  });
+
+  test('normalizes the platform-specific Noble MTU to a safe write capacity', async () => {
+    const { resolveNobleProtocolV2PacketCapacity } = await import('../transports/nobleBlePlugin');
+
+    expect(resolveNobleProtocolV2PacketCapacity(null, 'darwin')).toBe(192);
+    expect(resolveNobleProtocolV2PacketCapacity(244, 'darwin')).toBe(244);
+    expect(resolveNobleProtocolV2PacketCapacity(247, 'linux')).toBe(244);
+    expect(resolveNobleProtocolV2PacketCapacity(512, 'win32')).toBe(244);
   });
 
   test('does not enumerate Find My advertisements that expose FFFD', async () => {
@@ -374,6 +384,33 @@ describe('Noble BLE plugin notification routing', () => {
 
     expect(device.write.write).toHaveBeenCalledTimes(2);
     expect(wait).not.toHaveBeenCalled();
+  });
+
+  test('uses the connected peripheral write capacity without padding', async () => {
+    const device = createPeripheral('device-a');
+    device.peripheral.mtu = process.platform === 'linux' ? 247 : 244;
+    const noble = new EventEmitter() as EventEmitter & {
+      state: string;
+      startScanning: jest.Mock;
+      stopScanning: jest.Mock;
+    };
+    noble.state = 'poweredOn';
+    noble.startScanning = jest.fn((_services, _duplicates, callback) => {
+      callback?.();
+      noble.emit('discover', device.peripheral);
+    });
+    noble.stopScanning = jest.fn(callback => callback?.());
+    jest.doMock('@stoprocent/noble', () => noble);
+
+    const { createNobleBlePlugin } = await import('../transports/nobleBlePlugin');
+    const plugin = createNobleBlePlugin();
+    await plugin.init();
+    await plugin.connect('device-a');
+
+    await plugin.send('device-a', 'aa'.repeat(245));
+
+    expect(plugin.getProtocolV2PacketCapacity?.('device-a')).toBe(244);
+    expect(device.write.write.mock.calls.map(([packet]) => packet.length)).toEqual([244, 1]);
   });
 
   test('preserves a short final BLE packet without padding', async () => {
