@@ -194,4 +194,6 @@ export declare function firmwareUpdateV4(
   bleVersion: string;
   firmwareVersion: string;
   bootloaderVersion: string;
+  /** Requested resource headers match; does not attest payload read-back or runtime mounting. */
+  resourceVerification?: 'header-verified';
 }>;

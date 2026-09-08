@@ -1838,19 +1838,22 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
   }
 
-  /** Compare the downloaded and installed okpkg headers before transferring a resource. */
+  /** Compare package headers before transfer or read back the written resource. */
   private async isProtocolV2ResourceBundleUpToDate(
     bundle: Pick<
       ProtocolV2ResourceBundleSource,
       'name' | 'source' | 'devicePath' | 'version' | 'payloadHash' | 'headerHash'
-    >
+    >,
+    verifyWrittenFile = false
   ): Promise<boolean> {
-    if (this.params?.forcedUpdateRes) return false;
+    if (!verifyWrittenFile && this.params?.forcedUpdateRes) return false;
     if (!bundle.payloadHash || !bundle.headerHash) return false;
 
     try {
       const header = await this.readProtocolV2DeviceFileHeader(
-        this.getProtocolV2ResourceComparePath(bundle.devicePath),
+        verifyWrittenFile
+          ? bundle.devicePath
+          : this.getProtocolV2ResourceComparePath(bundle.devicePath),
         bundle.source.size
       );
       if (!header) return false;
@@ -2040,7 +2043,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         resourceSources,
       });
     }
-    return this.completeProtocolV2FinalVerification();
+    const versions = await this.completeProtocolV2FinalVerification();
+    return {
+      ...versions,
+      ...(resourceSources.length > 0 ? { resourceVerification: 'header-verified' as const } : {}),
+    };
   }
 
   private async ensureProtocolV2BootResourceStagingIsEmpty() {
@@ -2130,14 +2137,33 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       // The bootloader keeps its live resource package mounted. FatFs rejects
       // replacing an open file, so early boot promotes this staging file before mounting it.
       const writePath = resource.devicePath;
-      processedSize = await this.protocolV2SourceUpdateProcess({
-        source: resource.source,
-        filePath: writePath,
-        processedSize,
-        totalSize,
-        transferStartedAt,
-      });
-      await this.verifyProtocolV2StagedFile(writePath, resource.source.size);
+      try {
+        processedSize = await this.protocolV2SourceUpdateProcess({
+          source: resource.source,
+          filePath: writePath,
+          processedSize,
+          totalSize,
+          transferStartedAt,
+        });
+        await this.verifyProtocolV2StagedFile(writePath, resource.source.size);
+        // Read the written file, including bootloader staging, even for forced updates.
+        if (!(await this.isProtocolV2ResourceBundleUpToDate(resource, true))) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.EmmcFileWriteFirmwareError,
+            'Protocol V2 written resource header does not match the update package'
+          );
+        }
+      } catch (error) {
+        const failure =
+          error instanceof HardwareError
+            ? error
+            : ERRORS.TypedError(
+                HardwareErrorCode.EmmcFileWriteFirmwareError,
+                getProtocolV2UnknownErrorText(error)
+              );
+        failure.params = { ...failure.params, resourceVerification: 'failed' };
+        throw failure;
+      }
       if (isProtocolV2BootResourcePackagePath(resource.devicePath)) {
         this.protocolV2BootResourceStagingSafe = true;
       }

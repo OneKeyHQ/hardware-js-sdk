@@ -7256,7 +7256,10 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
       .fn()
       .mockResolvedValue(undefined);
-    (method as any).isProtocolV2ResourceBundleUpToDate = jest.fn().mockResolvedValue(false);
+    (method as any).isProtocolV2ResourceBundleUpToDate = jest
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValue(true);
 
     await (method as any).executeProtocolV2SourceUpdate({
       resourceSources: [
@@ -8618,6 +8621,10 @@ describe('Protocol V2 firmware update targets', () => {
 
     method.postTipMessage = jest.fn();
     method.postProgressMessage = jest.fn();
+    (method as any).isProtocolV2ResourceBundleUpToDate = jest
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValue(true);
     (method as any).protocolV2SourceUpdateProcess = jest.fn().mockResolvedValue(3);
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
     (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest
@@ -8682,6 +8689,10 @@ describe('Protocol V2 firmware update targets', () => {
 
     method.postTipMessage = jest.fn();
     method.postProgressMessage = jest.fn();
+    (method as any).isProtocolV2ResourceBundleUpToDate = jest
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValue(true);
     (method as any).protocolV2SourceUpdateProcess = jest.fn().mockResolvedValue(3);
     (method as any).enterProtocolV2BootloaderMode = jest.fn().mockResolvedValue(undefined);
     (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest
@@ -9060,7 +9071,10 @@ describe('Protocol V2 firmware update targets', () => {
     method.postMessage = jest.fn();
     method.postTipMessage = jest.fn();
     method.postProgressMessage = jest.fn();
-    (method as any).isProtocolV2ResourceBundleUpToDate = jest.fn().mockResolvedValue(false);
+    (method as any).isProtocolV2ResourceBundleUpToDate = jest
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValue(true);
     (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
     (method as any).protocolV2StartFirmwareUpdate = jest.fn().mockResolvedValue(undefined);
     (method as any).waitForProtocolV2FirmwareUpdateComplete = jest
@@ -10109,6 +10123,72 @@ describe('Protocol V2 firmware reconnect identity', () => {
     });
     expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
   });
+
+  test.each([true, false])(
+    'requires matching resource read-back after writing (matches=%s)',
+    async matches => {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: { method: 'firmwareUpdateV4', platform: 'web', forcedUpdateRes: true },
+      });
+      method.init();
+      const installed = new Uint8Array(createProtocolV2OkppBinary());
+      const expected = installed.slice();
+      expected.fill(0x33, 0x200, 0x240);
+      expected.fill(0x44, 0x240, 0x280);
+      let written = false;
+      const typedCall = jest.fn(
+        (name: string, _type: string, request: { file: { offset: number }; chunk_len: number }) => {
+          const data = written && matches ? expected : installed;
+          if (name === 'FilesystemPathInfoQuery') {
+            return Promise.resolve({ message: { exist: true, size: data.length } });
+          }
+          if (name === 'FilesystemFileRead') {
+            return Promise.resolve({
+              message: {
+                data: data.slice(request.file.offset, request.file.offset + request.chunk_len),
+              },
+            });
+          }
+          throw new Error(`Unexpected request: ${name}`);
+        }
+      );
+      (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
+      method.postTipMessage = jest.fn();
+      method.postProgressMessage = jest.fn();
+      (method as any).enterProtocolV2BootloaderMode = jest.fn();
+      (method as any).ensureProtocolV2BootResourceStagingIsEmpty = jest.fn();
+      const complete = jest.fn().mockResolvedValue({ firmwareVersion: '1.0.1' });
+      (method as any).completeProtocolV2FinalVerification = complete;
+      (method as any).protocolV2SourceUpdateProcess = jest.fn(() => {
+        written = true;
+        return Promise.resolve(expected.length);
+      });
+      const result = (method as any).executeProtocolV2SourceUpdate({
+        installSources: [],
+        resourceSources: [
+          {
+            name: 'bootloader_params.okpkg',
+            source: { size: expected.length },
+            devicePath: 'vol0:/loaders/bootloader_params.okpkg.staging',
+            version: [1, 2, 3],
+            payloadHash: '33'.repeat(64),
+            headerHash: '44'.repeat(64),
+          },
+        ],
+      });
+      if (matches) {
+        await expect(result).resolves.toMatchObject({ resourceVerification: 'header-verified' });
+      } else {
+        await expect(result).rejects.toMatchObject({ params: { resourceVerification: 'failed' } });
+        expect(complete).not.toHaveBeenCalled();
+      }
+      expect(typedCall).toHaveBeenCalledWith('FilesystemPathInfoQuery', 'FilesystemPathInfo', {
+        path: 'vol0:/loaders/bootloader_params.okpkg.staging',
+      });
+      expect(typedCall.mock.calls.some(([name]) => name === 'FilesystemFileRead')).toBe(true);
+    }
+  );
 
   test('updates a resource when the installed file size differs despite matching headers', async () => {
     const method = new FirmwareUpdateV4({

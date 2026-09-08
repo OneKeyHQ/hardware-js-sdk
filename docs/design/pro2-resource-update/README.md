@@ -26,6 +26,15 @@ vol0:/loaders/bootloader/boot_resource.okpkg.staging
 A ZIP cannot contain two packages that declare the same device path. ZIP entry names are only used
 for logs and display; they do not derive the device path.
 
+## Verification result
+
+When resources are requested, `firmwareUpdateV4` returns `resourceVerification: "header-verified"`
+after successful completion. Unchanged files must match the target header; written files are read
+back in loader mode and must match size, version, payload-hash and header-hash fields, including
+forced updates and staging files. Resource write or read-back failures carry
+`params.resourceVerification: "failed"`. Absence of the result field is not verification evidence.
+This verifies package headers, not a fresh hash of the entire on-device payload or runtime mounting.
+
 ## Data flow
 
 ```mermaid
