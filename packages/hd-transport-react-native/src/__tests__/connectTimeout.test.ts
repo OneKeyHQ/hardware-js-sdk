@@ -1,7 +1,10 @@
 import { EventEmitter } from 'events';
+import { Platform } from 'react-native';
 import { BleErrorCode, BleManager } from 'react-native-ble-plx';
-import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
+import BleUtils from '@onekeyfe/react-native-ble-utils';
+import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
+import { onDeviceBondState } from '../BleManager';
 import ReactNativeBleTransport, {
   BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD,
   BLE_CONNECT_TIMEOUT_MS,
@@ -9,6 +12,8 @@ import ReactNativeBleTransport, {
   BLE_SETUP_WEDGED_MESSAGE,
 } from '../index';
 import protocolV1Schema from './protocolV1SchemaFixture';
+
+import type { Peripheral } from '@onekeyfe/react-native-ble-utils';
 
 jest.mock(
   'react-native',
@@ -44,11 +49,130 @@ jest.mock('@onekeyfe/react-native-ble-utils', () => ({
   default: {
     getConnectedPeripherals: jest.fn(() => Promise.resolve([])),
     getBondedPeripherals: jest.fn(() => Promise.resolve([])),
-    pairDevice: jest.fn(() => Promise.resolve()),
+    pairDevice: jest.fn(() => Promise.resolve({ bonded: true, bonding: false })),
+    onDeviceBondState: jest.fn(),
   },
 }));
 
 const UUID = 'stalled-connect-device';
+
+describe('Android bond failure reasons', () => {
+  let emitBondState: (peripheral: Peripheral) => void;
+  const cleanup = jest.fn();
+
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    cleanup.mockClear();
+    jest.spyOn(BleUtils, 'onDeviceBondState').mockImplementation(listener => {
+      emitBondState = listener;
+      return cleanup;
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
+  test.each([
+    [6, 'timeout', HardwareErrorCode.BleDeviceNotBonded, 'Bluetooth pairing timed out'],
+    [3, 'canceled', HardwareErrorCode.BleDeviceBondedCanceled, 'Bluetooth pairing canceled'],
+    [1, 'authentication_failed', HardwareErrorCode.BleDeviceNotBonded, 'Bluetooth pairing failed'],
+    [2, 'rejected', HardwareErrorCode.BleDeviceNotBonded, 'Bluetooth pairing failed'],
+    [4, 'device_unreachable', HardwareErrorCode.BleDeviceNotBonded, 'Bluetooth pairing failed'],
+    [5, 'discovery_in_progress', HardwareErrorCode.BleDeviceNotBonded, 'Bluetooth pairing failed'],
+    [7, 'repeated_attempts', HardwareErrorCode.BleDeviceNotBonded, 'Bluetooth pairing failed'],
+    [8, 'remote_canceled', HardwareErrorCode.BleDeviceNotBonded, 'Bluetooth pairing failed'],
+    [9, 'removed', HardwareErrorCode.BleDeviceNotBonded, 'Bluetooth pairing failed'],
+    [undefined, 'unknown', HardwareErrorCode.BleDeviceNotBonded, 'Bluetooth pairing failed'],
+    [999, 'unknown', HardwareErrorCode.BleDeviceNotBonded, 'Bluetooth pairing failed'],
+  ] as const)(
+    'preserves Android reason %s as %s across serialization',
+    async (nativeReason, reason, code, message) => {
+      const result = onDeviceBondState(UUID).catch(error =>
+        JSON.parse(JSON.stringify(ERRORS.serializeError({ error })))
+      );
+      emitBondState({
+        id: UUID,
+        advertising: {},
+        bondState: {
+          preState: 'BOND_BONDING',
+          state: 'BOND_NONE',
+          ...(nativeReason === undefined ? {} : { reason: nativeReason }),
+        },
+      });
+
+      await expect(result).resolves.toEqual({
+        code,
+        error: message,
+        params: {
+          phase: 'bond',
+          reason,
+          ...(nativeReason === undefined ? {} : { nativeReason }),
+        },
+      });
+      expect(cleanup).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(0);
+    }
+  );
+
+  test('reports a timeout if no bond event arrives within the SDK deadline', async () => {
+    const result = onDeviceBondState(UUID);
+    const rejection = expect(result).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceNotBonded,
+      params: { phase: 'bond', reason: 'timeout' },
+    });
+    jest.advanceTimersByTime(60_000);
+    await rejection;
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  test('aborts the bond wait and removes its listener and deadline', async () => {
+    const controller = new AbortController();
+    const result = onDeviceBondState(UUID, controller.signal);
+    const rejection = expect(result).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+
+    controller.abort();
+
+    await rejection;
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('does not subscribe when the transport stopped before the bond wait starts', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const subscribe = jest.spyOn(BleUtils, 'onDeviceBondState').mockClear();
+
+    await expect(onDeviceBondState(UUID, controller.signal)).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('ignores other devices and clears the deadline after bonding succeeds', async () => {
+    const result = onDeviceBondState(UUID);
+    const otherPeripheral = {
+      id: 'another-device',
+      advertising: {},
+      bondState: { preState: 'BOND_BONDING', state: 'BOND_NONE', reason: 6 },
+    };
+    emitBondState(otherPeripheral);
+    expect(cleanup).not.toHaveBeenCalled();
+    const peripheral: Peripheral = {
+      id: UUID.toUpperCase(),
+      advertising: {},
+      bondState: { preState: 'BOND_BONDING', state: 'BOND_BONDED' },
+    };
+    emitBondState(peripheral);
+    await expect(result).resolves.toBe(peripheral);
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+});
 
 const flush = () =>
   new Promise(resolve => {
@@ -129,6 +253,7 @@ describe('BLE connect timeout', () => {
   afterEach(() => {
     jest.clearAllTimers();
     jest.restoreAllMocks();
+    Object.assign(Platform, { OS: 'ios' });
   });
 
   test('waits for singleton destruction before creating the next manager', async () => {
@@ -237,6 +362,41 @@ describe('BLE connect timeout', () => {
     });
   });
 
+  test.each(['V1', 'V2'] as const)(
+    'stop completes while Android %s bonding remains pending',
+    async expectedProtocol => {
+      Object.assign(Platform, { OS: 'android' });
+      const { transport, bleManager, connect } = createHarness(() => Promise.resolve());
+      jest.spyOn(BleUtils, 'pairDevice').mockResolvedValueOnce({ bonded: false, bonding: true });
+      const listening = createDeferred<void>();
+      const cleanup = jest.fn();
+      jest.spyOn(BleUtils, 'onDeviceBondState').mockImplementationOnce(() => {
+        listening.resolve();
+        return cleanup;
+      });
+      const acquiring = transport.acquire({ uuid: UUID, expectedProtocol });
+      const rejection = expect(acquiring).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleDeviceDisconnected,
+      });
+      await listening.promise;
+
+      // Advance only the existing 100ms disconnect drain, not the bond deadline.
+      let stopped = false;
+      const stopping = transport.stop().then(() => {
+        stopped = true;
+      });
+      await advanceUntil(() => stopped, 1000);
+      expect(stopped).toBe(true);
+      await stopping;
+
+      await rejection;
+      expect(cleanup).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(0);
+      expect(bleManager.devices).not.toHaveBeenCalled();
+      expect(connect).not.toHaveBeenCalled();
+    }
+  );
+
   test('stop rejects a pending read and waits for native disconnection without destroying the shared manager', async () => {
     const { transport, bleManager } = createHarness(() => Promise.resolve());
     const nativeDisconnect = createDeferred<void>();
@@ -269,6 +429,78 @@ describe('BLE connect timeout', () => {
     expect(BLE_CONNECT_TIMEOUT_MS).toBeGreaterThanOrEqual(6000);
     expect(BLE_CONNECT_TIMEOUT_MS).toBeLessThanOrEqual(12000);
   });
+
+  test.each(
+    (['ios', 'android'] as const).flatMap(platform =>
+      (['connect', 'mtu', 'gatt'] as const).flatMap(stage =>
+        (['reject', 'resolve'] as const).map(completion => ({ platform, stage, completion }))
+      )
+    )
+  )(
+    'stop cancels $platform $stage before draining a late $completion',
+    async ({ platform, stage, completion }) => {
+      Object.assign(Platform, { OS: platform });
+      const { transport, device, bleManager, connect } = createHarness(
+        () => nativeOperation.promise
+      );
+      const nativeOperation = createDeferred<typeof device>();
+      const nativeDisconnect = createDeferred<void>();
+      const requestMtu = jest.fn(() => Promise.resolve(device));
+      Object.assign(device, { mtu: 247, requestMTU: requestMtu });
+      device.isConnected.mockResolvedValue(true);
+      if (stage === 'connect') device.isConnected.mockResolvedValueOnce(false);
+      if (stage === 'mtu') requestMtu.mockImplementationOnce(() => nativeOperation.promise);
+      if (stage === 'gatt') {
+        device.discoverAllServicesAndCharacteristics.mockImplementationOnce(() =>
+          nativeOperation.promise.then(() => undefined)
+        );
+      }
+      const destroy = jest.fn();
+      Object.assign(bleManager, { destroy });
+      const monitor = jest.spyOn(transport, '_monitorCharacteristic');
+      const acquire = transport.acquire({ uuid: UUID }).catch(error => error);
+      await flush();
+      await flush();
+      const pending = {
+        connect,
+        mtu: requestMtu,
+        gatt: device.discoverAllServicesAndCharacteristics,
+      }[stage];
+      expect(pending).toHaveBeenCalledTimes(1);
+
+      bleManager.cancelDeviceConnection.mockImplementation(() => nativeDisconnect.promise);
+      let stopped = false;
+      const stopping = transport.stop().then(() => {
+        stopped = true;
+      });
+      try {
+        await flush();
+        expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(UUID);
+        expect(stopped).toBe(false);
+      } finally {
+        // Native completion can race cancellation; neither outcome may restart setup.
+        if (completion === 'resolve') nativeOperation.resolve(device);
+        else
+          nativeOperation.reject(
+            Object.assign(new Error('Operation was cancelled'), {
+              errorCode: BleErrorCode.OperationCancelled,
+            })
+          );
+        nativeDisconnect.resolve();
+        await advanceUntil(() => stopped, BLE_CONNECT_TIMEOUT_MS + BLE_GATT_SETUP_TIMEOUT_MS);
+        await stopping;
+      }
+      await expect(acquire).resolves.toBeInstanceOf(Error);
+      expect(connect).toHaveBeenCalledTimes(stage === 'connect' ? 1 : 0);
+      expect(monitor).not.toHaveBeenCalled();
+      if (stage === 'mtu')
+        expect(device.discoverAllServicesAndCharacteristics).not.toHaveBeenCalled();
+      expect(bleManager.cancelDeviceConnection.mock.calls).toEqual(
+        Array.from({ length: bleManager.cancelDeviceConnection.mock.calls.length }, () => [UUID])
+      );
+      expect(destroy).not.toHaveBeenCalled();
+    }
+  );
 
   test('a stalled connect is abandoned natively so the next attempt is not cancelled by it', async () => {
     const { transport, bleManager } = createHarness(
