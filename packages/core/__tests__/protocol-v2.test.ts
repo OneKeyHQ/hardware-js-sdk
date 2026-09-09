@@ -1,4 +1,5 @@
 import { Buffer } from 'buffer';
+import { randomBytes } from 'crypto';
 import { EDeviceType, EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
@@ -1823,6 +1824,56 @@ describe('Protocol V2 feature adapter', () => {
       ['DeviceSessionGet', 'DeviceSession', {}],
     ]);
   });
+
+  test.each([false, true])(
+    'rejects the first incorrect passphrase after a missing or expired session (cached: %s)',
+    async cached => {
+      const deviceId = `first-passphrase-error-${String(cached)}`;
+      const device = Device.fromDescriptor({
+        id: deviceId,
+        path: deviceId,
+        protocolType: 'V2',
+      } as never);
+      device.features = normalizeProtocolV2Features(
+        { ...descriptor, protocolType: 'V2' } as never,
+        {
+          status: { device_id: deviceId, unlocked: true, passphrase_enabled: true },
+        }
+      );
+      device.passphraseState = 'expected-public-address';
+      if (cached) {
+        preloadSessionCache(deviceId, device.passphraseState, randomBytes(32).toString('hex'));
+      }
+      let reads = 0;
+      const typedCall = createWalletSessionTypedCall(
+        jest.fn((request: string) => {
+          if (request === 'DeviceSessionAskPassphrase') return { message: {} };
+          if (request === 'DeviceSessionGet') {
+            reads += 1;
+            if (reads === 1) {
+              throw ERRORS.TypedError(HardwareErrorCode.WalletSessionInvalid);
+            }
+            return {
+              message: {
+                session_id: randomBytes(32).toString('hex'),
+                btc_test_address: 'different-public-address',
+              },
+            };
+          }
+          throw new Error(`Unexpected request: ${request}`);
+        })
+      );
+      const promptPassphrase = jest.fn().mockResolvedValue({ passphraseOnDevice: true });
+      device.commands = { typedCall, promptPassphrase } as never;
+
+      await expect(getProtocolV2WalletSession(device)).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.DeviceCheckPassphraseStateError,
+      });
+      expect(promptPassphrase).toHaveBeenCalledTimes(1);
+      expect(reads).toBe(2);
+      expect(device.getInternalState()).toBeUndefined();
+    }
+  );
 
   test('reselects a hidden wallet when the cached Pro2 session resolves to another wallet', async () => {
     const device = Device.fromDescriptor({
