@@ -380,6 +380,8 @@ export default class ReactNativeBleTransport {
 
   stopped = false;
 
+  private readonly bondAbortController = new AbortController();
+
   scanTimeout = DEVICE_SCAN_TIMEOUT_MS;
 
   runPromise: Deferred<any> | null = null;
@@ -885,6 +887,7 @@ export default class ReactNativeBleTransport {
   ) {
     const { writeCharacteristic, notifyCharacteristic } =
       characteristics ?? (await this.resolveCharacteristicsWithTimeout(uuid, device));
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     const transport = new BleTransport(device, writeCharacteristic, notifyCharacteristic);
     transport.mtuSize = typeof device.mtu === 'number' ? device.mtu : undefined;
     const monitorToken = this.nextMonitorToken;
@@ -913,6 +916,7 @@ export default class ReactNativeBleTransport {
     } else if (Platform.OS === 'android') {
       await delay(ANDROID_NOTIFY_READY_DELAY_MS);
     }
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
 
     const initialMtu = transport.mtuSize;
     let refreshAttempts = 0;
@@ -926,12 +930,14 @@ export default class ReactNativeBleTransport {
         'servicesAndNotifyReady',
         1
       );
+      if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
       transport.device = refreshedDevice;
       transport.mtuSize =
         typeof refreshedDevice.mtu === 'number' ? refreshedDevice.mtu : transport.mtuSize;
 
       if (shouldRefreshNegotiatedMtu(transport.mtuSize)) {
         await delay(BLE_MTU_REFRESH_RETRY_DELAY_MS);
+        if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
         refreshAttempts += 1;
         refreshedDevice = await requestNegotiatedMtu(transport.device, 'servicesAndNotifyReady', 2);
         transport.device = refreshedDevice;
@@ -940,6 +946,7 @@ export default class ReactNativeBleTransport {
       }
     }
 
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     Log?.debug('[ReactNativeBleTransport] BLE MTU ready', {
       platform: Platform.OS,
       requested: getRequestedBleMtu(),
@@ -1018,6 +1025,7 @@ export default class ReactNativeBleTransport {
           cachedProtocol &&
           (!expectedProtocol || cachedProtocol === expectedProtocol)
         ) {
+          if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
           Log?.debug('[ReactNativeBleTransport] reuse cached BLE transport:', uuid, cachedProtocol);
           return { uuid, protocolType: cachedProtocol };
         }
@@ -1048,6 +1056,27 @@ export default class ReactNativeBleTransport {
       Log?.debug('subscribeBleOn error: ', error);
       throw error;
     }
+
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    if (Platform.OS === 'android') {
+      // Initiate bonding locally before GATT can trigger peripheral-initiated pairing.
+      try {
+        const bondState = await pairDevice(uuid);
+        if (bondState.bonding) {
+          await onDeviceBondState(uuid, this.bondAbortController.signal);
+        } else if (!bondState.bonded) {
+          throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
+        }
+      } catch (error) {
+        await this.runNativeTeardown(uuid, blePlxManager, async () => {
+          await this.runBestEffortNativeOperation('bond failure: cancel manager connection', () =>
+            blePlxManager.cancelDeviceConnection(uuid)
+          );
+        });
+        throw error;
+      }
+    }
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
 
     if (!device) {
       const devices = await blePlxManager.devices([uuid]);
@@ -1135,42 +1164,28 @@ export default class ReactNativeBleTransport {
       }
     }
 
-    if (Platform.OS === 'android') {
-      // Establish the LE link before createBond(). Without an existing LE ACL,
-      // Android TRANSPORT_AUTO can choose BR/EDR for a BLE-only device.
-      const connectedDevice = device;
-      try {
-        if (!(await connectedDevice.isConnected().catch(() => false))) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.BleConnectedError,
-            `Device ${uuid} is not connected before bonding`
-          );
-        }
-        const bondState = await pairDevice(uuid);
-        if (bondState.bonding) {
-          await onDeviceBondState(uuid);
-        } else if (!bondState.bonded) {
-          throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
-        }
-      } catch (error) {
-        await this.runNativeTeardown(uuid, blePlxManager, async () => {
-          await Promise.all([
-            this.runBestEffortNativeOperation('bond failure: cancel manager connection', () =>
-              blePlxManager.cancelDeviceConnection(uuid)
-            ),
-            this.runBestEffortNativeOperation('bond failure: cancel device connection', () =>
-              connectedDevice.cancelConnection()
-            ),
-          ]);
-        });
-        throw error;
-      }
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    if (Platform.OS === 'android' && !(await device.isConnected().catch(() => false))) {
+      const disconnectedDevice = device;
+      await this.runNativeTeardown(uuid, blePlxManager, async () => {
+        await Promise.all([
+          this.runBestEffortNativeOperation('connect failure: cancel manager connection', () =>
+            blePlxManager.cancelDeviceConnection(uuid)
+          ),
+          this.runBestEffortNativeOperation('connect failure: cancel device connection', () =>
+            disconnectedDevice.cancelConnection()
+          ),
+        ]);
+      });
+      throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'device is not connected');
     }
-
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     device = await resolveNegotiatedMtu(device);
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     const acquiredDevice = device;
     const { writeCharacteristic, notifyCharacteristic } =
       await this.resolveCharacteristicsWithTimeout(uuid, acquiredDevice);
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
 
     const protocolHint = expectedProtocol
       ? undefined
@@ -1232,6 +1247,7 @@ export default class ReactNativeBleTransport {
           await this.installTransportForAcquire(uuid, acquiredDevice);
         }
       );
+      if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
       const currentTransport = transportCache[uuid];
       if (!currentTransport) {
         throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
@@ -1774,6 +1790,8 @@ export default class ReactNativeBleTransport {
   stop() {
     if (this.stopPromise) return this.stopPromise;
     this.stopped = true;
+    // Bonding precedes GATT, so cancelDeviceConnection cannot end this wait.
+    this.bondAbortController.abort();
     const deviceIds = new Set([
       ...this.monitorTokens.keys(),
       ...this.sessionProtocols.keys(),
@@ -1789,9 +1807,22 @@ export default class ReactNativeBleTransport {
     this.runPromise = null;
     this.runPromiseDeviceId = null;
     deviceIds.forEach(uuid => this.rejectProtocolV2Frames(uuid, error));
+    const manager = this.blePlxManager;
+    // Cancel native setup before waiting for its lifecycle lock. Otherwise stop
+    // waits for the very connect/MTU/GATT operation it needs to interrupt.
+    const pendingConnections = manager
+      ? Array.from(this.lifecycleOperations.keys(), uuid =>
+          this.runNativeTeardown(uuid, manager, async () => {
+            await this.runBestEffortNativeOperation('stop: cancel pending device connection', () =>
+              manager.cancelDeviceConnection(uuid)
+            );
+          })
+        )
+      : [];
     // Release only this transport's endpoints; other connectors may share ble-plx.
     this.stopPromise = Promise.all([
       ...scans,
+      ...pendingConnections,
       ...Array.from(deviceIds, uuid => this.disconnect(uuid)),
     ]).then(async () => {
       await this.protocolV2Links.invalidateAllLinks('React Native BLE transport stopped');
@@ -1969,6 +2000,7 @@ export default class ReactNativeBleTransport {
 
   /** Run a native connect under the JS backstop budget. */
   private async connectWithTimeout<T>(uuid: string, connect: () => Promise<T>): Promise<T> {
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     const startedAt = Date.now();
     let succeeded = false;
     let timer: ReturnType<typeof setTimeout> | undefined;

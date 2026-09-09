@@ -121,9 +121,6 @@ export default class ElectronBleTransport {
 
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
 
-  /** Endpoints that answered a V2 probe in this transport lifetime. Survives disconnect. */
-  private confirmedProtocolV2 = new Set<string>();
-
   private deviceMtus: Map<string, number> = new Map();
 
   private devicePacketCapacities: Map<string, number> = new Map();
@@ -501,12 +498,9 @@ export default class ElectronBleTransport {
     }
   }
 
-  private createProtocolMismatchError(expected: ProtocolType, uuid: string) {
-    // A generic Ping miss is not a bond failure. Only a later miss after this
-    // endpoint already answered V2, or a native encryption/pairing error, is.
-    const isStaleV2Bond = expected === 'V2' && this.confirmedProtocolV2.has(uuid);
+  private createProtocolMismatchError(expected: ProtocolType) {
     return ERRORS.TypedError(
-      isStaleV2Bond ? HardwareErrorCode.BleDeviceBondError : HardwareErrorCode.RuntimeError,
+      HardwareErrorCode.RuntimeError,
       `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
     );
   }
@@ -546,13 +540,12 @@ export default class ElectronBleTransport {
     }
 
     if (expectedProtocol === 'V2') {
-      if (await this.probeProtocolV2(uuid)) {
+      if (await this.probeProtocolV2(uuid, expectedProtocol)) {
         this.deviceProtocol.set(uuid, 'V2');
-        this.confirmedProtocolV2.add(uuid);
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> V2 (expected)`);
         return 'V2';
       }
-      throw this.createProtocolMismatchError(expectedProtocol, uuid);
+      throw this.createProtocolMismatchError(expectedProtocol);
     }
 
     // Protocol must be actively probed after connection. Name, PID, and descriptors only
@@ -571,9 +564,6 @@ export default class ElectronBleTransport {
         protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
-        if (protocol === 'V2') {
-          this.confirmedProtocolV2.add(uuid);
-        }
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> ${protocol}`);
         return protocol;
       }
@@ -644,7 +634,7 @@ export default class ElectronBleTransport {
     }
   }
 
-  private async probeProtocolV2(uuid: string) {
+  private async probeProtocolV2(uuid: string, expectedProtocol?: ProtocolType) {
     if (!this._messages || !this._messagesV2) {
       return false;
     }
@@ -660,8 +650,11 @@ export default class ElectronBleTransport {
         this.v2Assemblers.get(uuid)?.reset();
         this.resetProtocolV2Frames(uuid);
       },
+      // A declared V2 protocol needs no fallback; preserve the actual link failure.
       shouldRethrow: error =>
-        isBleStaleBondHardwareError(error) || isProtocolV2LinkDisabledError(error),
+        expectedProtocol === 'V2' ||
+        isBleStaleBondHardwareError(error) ||
+        isProtocolV2LinkDisabledError(error),
     });
     if (!detected) {
       this.clearProbeProtocol(uuid, 'V2');

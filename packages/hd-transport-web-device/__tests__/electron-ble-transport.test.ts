@@ -673,7 +673,7 @@ describe('ElectronBleTransport protocol detection', () => {
     }
   });
 
-  test('reports a stale bond when a previously confirmed Protocol V2 device stops responding', async () => {
+  test('keeps a probe miss retryable after a previously confirmed Protocol V2 connection', async () => {
     const device = { id: 'reset-pro2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
     const transport = configureTransport(nobleBle);
@@ -686,12 +686,58 @@ describe('ElectronBleTransport protocol detection', () => {
     await expect(
       transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
     ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BleDeviceBondError,
+      errorCode: HardwareErrorCode.RuntimeError,
     });
 
     expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
     expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
     expect(transport.getProtocolType(device.id)).toBeUndefined();
+  });
+
+  test.each([false, true])(
+    'preserves an expected Protocol V2 Ping timeout with a prior successful connection: %s',
+    async previouslyConnected => {
+      const device = { id: 'timeout-pro2-id', name: 'OneKey Pro 2' };
+      const nobleBle = createNobleBle(device);
+      const transport = configureTransport(nobleBle);
+
+      if (previouslyConnected) {
+        echoProtocolV2(nobleBle, device.id);
+        await transport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+        await transport.release(device.id);
+      }
+      // Keep the real probe and response timer, but drop its notification.
+      nobleBle.write.mockImplementation(() => Promise.resolve());
+
+      await expect(
+        transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+      ).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleTimeoutError,
+        message: 'BLE response timeout after 5000ms for Ping',
+      });
+
+      expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+      expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+      expect(transport.getProtocolType(device.id)).toBeUndefined();
+    }
+  );
+
+  test('preserves a native stale-bond error during an expected Protocol V2 probe', async () => {
+    const device = { id: 'stale-bond-probe-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.write.mockRejectedValue({
+      name: 'HardwareError',
+      message: 'Bluetooth pairing information is no longer valid',
+      errorCode: HardwareErrorCode.BleBondInvalid,
+    });
+    const transport = configureTransport(nobleBle);
+
+    await expect(
+      transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+    ).rejects.toMatchObject({ errorCode: HardwareErrorCode.BleBondInvalid });
+
+    expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
   });
 
   test('does not take a Protocol V2 hint from the BLE name', async () => {
