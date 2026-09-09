@@ -5032,13 +5032,13 @@ export enum DeviceSessionSeedDomain {
 export type DeviceSessionGet = {
   session_id?: string;
   btc_test_address?: string;
-  seed_domains: DeviceSessionSeedDomain[];
 };
 
 // DeviceSession
 export type DeviceSession = {
   session_id?: string;
   btc_test_address?: string;
+  seed_domains: DeviceSessionSeedDomain[];
 };
 
 export enum DeviceSessionPinType {
@@ -5056,6 +5056,7 @@ export type DeviceSessionAskPin = {
 export type DeviceSessionAskPassphrase = {
   passphrase?: string;
   on_device: boolean;
+  seed_domains: DeviceSessionSeedDomain[];
 };
 
 export enum DeviceSessionAskPin_FailureSubCodes {

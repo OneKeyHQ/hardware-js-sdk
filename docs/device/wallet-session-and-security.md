@@ -60,9 +60,19 @@
   校验原始 `DeviceStatus`，然后直接用空参数 `DeviceSessionGet()` 读取当前隐藏钱包，不重新发起
   Passphrase 选择、`DeviceSessionAskPassphrase` 或 `DeviceSessionAskPin`。复核状态不一致时失败关闭，
   不回退到钱包重选。
-- Core 把现有 `deriveCardano` 意图映射为 `DeviceSessionGet.seed_domains`：普通业务请求
-  `[Standard]`，Cardano 业务请求 `[Standard, Cardano]`。调用链没有提供派生意图时省略该字段，
-  保持固件“派生全部支持域”的兼容行为。
+- Protocol V2 maps `deriveCardano` to `DeviceSessionAskPassphrase.seed_domains`: ordinary requests
+  use `[Standard]`, and explicit Cardano requests use `[Standard, Cardano]`. `DeviceSessionGet`
+  only reads or resumes a session; `DeviceSession.seed_domains` reports the generated domains.
+  This replaces the firmware contract used by SDK 1.2.1, which sent the field on `DeviceSessionGet`.
+- When a reused session lacks Cardano, Core requests the missing derivation and verifies that the
+  returned wallet identity is unchanged. Standard and Attach PIN wallets use an empty host
+  passphrase; other hidden wallets request their passphrase again. With passphrase protection
+  disabled, firmware generates Cardano through `DeviceSessionGet`. Missing Cardano or a changed
+  identity fails closed. Attach PIN context is retained after the empty host request.
+- Before skipping Main PIN selection, Core refreshes device status. An unlocked standard wallet
+  with passphrase protection disabled does not request Main PIN again. Locked devices, Attach PIN
+  contexts, and mismatched cached standard wallets still require the existing authentication flow.
+  Existing PIN, passphrase, and Attach PIN UI events and Protocol V1 behavior remain unchanged.
 - `DeviceSessionAskPin` 的类型按业务意图选择：标准钱包和安全操作使用 `Main`；普通业务调用已携带目标
   `passphraseState` 时，预解锁使用 `Any`，允许主 PIN 或 Attach PIN 进入，随后仍以返回的
   `btc_test_address` 校验目标隐藏钱包；用户明确选择 Attach PIN 打开隐藏钱包时使用 `AttachToPin`。

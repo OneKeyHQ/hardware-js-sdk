@@ -12322,11 +12322,6 @@
         "btc_test_address": {
           "type": "string",
           "id": 2
-        },
-        "seed_domains": {
-          "rule": "repeated",
-          "type": "DeviceSessionSeedDomain",
-          "id": 3
         }
       }
     },
@@ -12339,6 +12334,11 @@
         "btc_test_address": {
           "type": "string",
           "id": 2
+        },
+        "seed_domains": {
+          "rule": "repeated",
+          "type": "DeviceSessionSeedDomain",
+          "id": 3
         }
       }
     },
@@ -12367,6 +12367,11 @@
           "rule": "required",
           "type": "bool",
           "id": 2
+        },
+        "seed_domains": {
+          "rule": "repeated",
+          "type": "DeviceSessionSeedDomain",
+          "id": 3
         }
       }
     },
