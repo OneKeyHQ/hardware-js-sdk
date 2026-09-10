@@ -55,6 +55,10 @@ export enum HardwareErrorCode {
   DevicePathForbidden = 10110,
   /** Busy with our own in-flight request (queue guard / firmware Failure_Busy), not another app — wait and retry, don't close other apps. */
   DeviceBusyInternal = 10111,
+  /** The supplied runtime-only interaction id is unknown to this adapter instance. */
+  InteractionNotFound = 10112,
+  /** The supplied interaction ended and can never be resumed. */
+  InteractionEnded = 10113,
 
   // --- 10200s Firmware ---
   FirmwareTooOld = 10200,
@@ -212,6 +216,8 @@ export const ORPHAN_ELIGIBLE_ERROR_CODES: number[] = [
   HardwareErrorCode.UserRejected,
   HardwareErrorCode.DeviceNotFound,
   HardwareErrorCode.DeviceDisconnected,
+  HardwareErrorCode.InteractionNotFound,
+  HardwareErrorCode.InteractionEnded,
   HardwareErrorCode.DeviceMismatch,
   HardwareErrorCode.DeviceAppStuck,
   HardwareErrorCode.DeviceOneDeviceOnly,
@@ -230,16 +236,248 @@ export const ORPHAN_ELIGIBLE_ERROR_CODES: number[] = [
 // Standard throwable for HWK adapters
 // ---------------------------------------------------------------------------
 
+/**
+ * Where a failure came from. The distinction the numeric code ranges cannot
+ * make reliably (UserRejected=10001 sits in the general range but is the
+ * device speaking; DevicePermissionDenied=10303 sits in the transport range
+ * but is the browser speaking), and the one recovery logic actually needs:
+ *
+ * - `device`    the firmware ANSWERED: rejection, locked screen, wrong
+ *               wallet, bad PIN. It is a result, not a malfunction — surface
+ *               it to the user verbatim; never auto-reconnect, never switch
+ *               channels, never drop a healthy session over it.
+ * - `transport` the pipe failed: cable pulled, bus reset, bridge gone.
+ *               Reconnecting or falling back to another channel is fair game.
+ * - `host`      the host environment refused: browser permission, picker
+ *               dismissed, bad parameters. Fix the environment, not the link.
+ *
+ * Optional on purpose: a mapper that cannot tell MUST leave it unset rather
+ * than guess — consumers fall back to their existing code-based tables, so an
+ * unset origin degrades to today's behavior instead of mislabeling.
+ */
+export type HwkErrorOrigin = 'device' | 'transport' | 'host';
+
+/**
+ * Smallest runtime resource a consumer must replace before retrying a failed
+ * operation. This is connection-lifecycle metadata, not UI navigation and not
+ * permission to replay a signing command automatically.
+ *
+ * - `operation`: the interaction and selected target are still eligible for an
+ *   explicit retry, usually after the user fixes device state.
+ * - `interaction`: the interaction is no longer usable; the selected target may
+ *   be used to establish a new one when its identity is persistent.
+ * - `search-target`: the selected discovery result is stale or untrusted;
+ *   rediscover on the same transport and let the user select again.
+ * - `transport`: the selected transport is unavailable or unsuitable; repair
+ *   it or choose another transport.
+ * - `not-recoverable`: retrying the same operation/context cannot succeed.
+ * - `unknown`: the SDK cannot make a safe recovery claim.
+ */
+export type HwkRecoveryScope =
+  | 'operation'
+  | 'interaction'
+  | 'search-target'
+  | 'transport'
+  | 'not-recoverable'
+  | 'unknown';
+
+export interface HwkRecoveryHint {
+  scope: HwkRecoveryScope;
+}
+
+const RECOVERY_SCOPES = new Set<HwkRecoveryScope>([
+  'operation',
+  'interaction',
+  'search-target',
+  'transport',
+  'not-recoverable',
+  'unknown',
+]);
+
+export function isHwkRecoveryHint(value: unknown): value is HwkRecoveryHint {
+  if (!value || typeof value !== 'object') return false;
+  const { scope } = value as { scope?: unknown };
+  return typeof scope === 'string' && RECOVERY_SCOPES.has(scope as HwkRecoveryScope);
+}
+
+const RECOVERY_OPERATION: HwkRecoveryHint = Object.freeze({ scope: 'operation' });
+const RECOVERY_INTERACTION: HwkRecoveryHint = Object.freeze({ scope: 'interaction' });
+const RECOVERY_SEARCH_TARGET: HwkRecoveryHint = Object.freeze({ scope: 'search-target' });
+const RECOVERY_TRANSPORT: HwkRecoveryHint = Object.freeze({ scope: 'transport' });
+const RECOVERY_NOT_RECOVERABLE: HwkRecoveryHint = Object.freeze({
+  scope: 'not-recoverable',
+});
+const RECOVERY_UNKNOWN: HwkRecoveryHint = Object.freeze({ scope: 'unknown' });
+
+/**
+ * Vendor-neutral fallback used when an adapter has no more precise runtime
+ * knowledge. Adapters may stamp a narrower hint when transport/session state
+ * makes the correct scope unambiguous.
+ */
+export function defaultRecoveryForCode(code: HardwareErrorCode): HwkRecoveryHint {
+  switch (code) {
+    case HardwareErrorCode.UserRejected:
+    case HardwareErrorCode.UserAborted:
+    case HardwareErrorCode.DeviceBusy:
+    case HardwareErrorCode.DeviceLocked:
+    case HardwareErrorCode.DeviceNotInitialized:
+    case HardwareErrorCode.DeviceInBootloader:
+    case HardwareErrorCode.DeviceAppStuck:
+    case HardwareErrorCode.DeviceBusyInternal:
+    case HardwareErrorCode.NetworkError:
+    case HardwareErrorCode.PinInvalid:
+    case HardwareErrorCode.PinCancelled:
+    case HardwareErrorCode.PassphraseRejected:
+    case HardwareErrorCode.PassphraseStateMismatch:
+    case HardwareErrorCode.PinMismatch:
+    case HardwareErrorCode.FirmwareTooOld:
+    case HardwareErrorCode.FirmwareUpdateRequired:
+    case HardwareErrorCode.AppNotInstalled:
+    case HardwareErrorCode.WrongApp:
+    case HardwareErrorCode.AppTooOld:
+    case HardwareErrorCode.DeviceOutOfMemory:
+    case HardwareErrorCode.EvmBlindSigningRequired:
+    case HardwareErrorCode.EvmClearSignPluginMissing:
+    case HardwareErrorCode.EvmDataTooLarge:
+    case HardwareErrorCode.EvmTxTypeNotSupported:
+    case HardwareErrorCode.SolanaBlindSigningRequired:
+    case HardwareErrorCode.TronCustomContractRequired:
+    case HardwareErrorCode.TronDataSigningRequired:
+    case HardwareErrorCode.TronSignByHashRequired:
+    case HardwareErrorCode.BtcWalletPolicyHmacMismatch:
+    case HardwareErrorCode.BtcUnexpectedState:
+      return RECOVERY_OPERATION;
+    case HardwareErrorCode.DeviceNotFound:
+    case HardwareErrorCode.DeviceDisconnected:
+    case HardwareErrorCode.InteractionNotFound:
+    case HardwareErrorCode.InteractionEnded:
+    case HardwareErrorCode.TransportError:
+    case HardwareErrorCode.BlePairingTimeout:
+    case HardwareErrorCode.ThpPairingFailed:
+    case HardwareErrorCode.ThpPairingRequired:
+    case HardwareErrorCode.BleConnectFailed:
+    case HardwareErrorCode.BlePairingCancelled:
+      return RECOVERY_INTERACTION;
+    case HardwareErrorCode.DeviceMismatch:
+    case HardwareErrorCode.DeviceOneDeviceOnly:
+    case HardwareErrorCode.BleBondInvalid:
+      return RECOVERY_SEARCH_TARGET;
+    case HardwareErrorCode.BridgeNotFound:
+    case HardwareErrorCode.TransportNotAvailable:
+    case HardwareErrorCode.DevicePermissionDenied:
+    case HardwareErrorCode.PayloadTooLarge:
+      return RECOVERY_TRANSPORT;
+    case HardwareErrorCode.InvalidParams:
+    case HardwareErrorCode.MethodNotSupported:
+    case HardwareErrorCode.ChainNotSupported:
+    case HardwareErrorCode.DevicePathForbidden:
+      return RECOVERY_NOT_RECOVERABLE;
+    case HardwareErrorCode.UnknownError:
+    case HardwareErrorCode.OperationTimeout:
+    default:
+      return RECOVERY_UNKNOWN;
+  }
+}
+
+/**
+ * The authoritative code→origin table. Most codes imply their origin by
+ * definition (UserRejected IS the device speaking; BridgeNotFound IS the
+ * pipe). Vendors use this as the default and override only where their
+ * mapping context knows better. Codes whose origin genuinely depends on
+ * context (UnknownError, OperationTimeout — the device may be waiting for a
+ * human, or the pipe may be dead — and DeviceBusy) return undefined: an
+ * honest "can't tell" beats a plausible mislabel, because consumers fall
+ * back to their existing behavior instead of taking the wrong recovery.
+ */
+export function defaultOriginForCode(code: HardwareErrorCode): HwkErrorOrigin | undefined {
+  // Chain APDU blocks (11000+) are, without exception, the chain app on the
+  // device answering a request it understood and refused/qualified.
+  if (code >= 11_000) return 'device';
+  switch (code) {
+    case HardwareErrorCode.UserRejected:
+    case HardwareErrorCode.DeviceLocked:
+    case HardwareErrorCode.DeviceNotInitialized:
+    case HardwareErrorCode.DeviceInBootloader:
+    case HardwareErrorCode.DeviceMismatch:
+    case HardwareErrorCode.DeviceAppStuck:
+    case HardwareErrorCode.DevicePathForbidden:
+    case HardwareErrorCode.DeviceBusyInternal:
+    case HardwareErrorCode.ChainNotSupported:
+    case HardwareErrorCode.FirmwareTooOld:
+    case HardwareErrorCode.FirmwareUpdateRequired:
+    case HardwareErrorCode.PinInvalid:
+    case HardwareErrorCode.PinMismatch:
+    case HardwareErrorCode.PassphraseRejected:
+    case HardwareErrorCode.PassphraseStateMismatch:
+    case HardwareErrorCode.ThpPairingFailed:
+    case HardwareErrorCode.ThpPairingRequired:
+    case HardwareErrorCode.WrongApp:
+    case HardwareErrorCode.AppNotInstalled:
+    case HardwareErrorCode.AppTooOld:
+    case HardwareErrorCode.DeviceOutOfMemory:
+      return 'device';
+    case HardwareErrorCode.DeviceNotFound:
+    case HardwareErrorCode.DeviceDisconnected:
+    case HardwareErrorCode.TransportError:
+    case HardwareErrorCode.BridgeNotFound:
+    case HardwareErrorCode.TransportNotAvailable:
+    case HardwareErrorCode.BlePairingTimeout:
+    case HardwareErrorCode.NetworkError:
+    case HardwareErrorCode.BleBondInvalid:
+    case HardwareErrorCode.BleConnectFailed:
+      return 'transport';
+    case HardwareErrorCode.DevicePermissionDenied:
+    case HardwareErrorCode.UserAborted:
+    case HardwareErrorCode.InvalidParams:
+    case HardwareErrorCode.MethodNotSupported:
+    case HardwareErrorCode.PinCancelled:
+    case HardwareErrorCode.BlePairingCancelled:
+    case HardwareErrorCode.PayloadTooLarge:
+    case HardwareErrorCode.DeviceOneDeviceOnly:
+      return 'host';
+    default:
+      return undefined;
+  }
+}
+
 export interface IHwkErrorPayload {
   code: HardwareErrorCode;
   message: string;
+  origin?: HwkErrorOrigin;
+  recovery?: HwkRecoveryHint;
   appName?: string;
   _tag?: string;
   params?: Record<string, unknown>;
 }
 
+export interface IOperationMayHaveCompletedParams extends Record<string, unknown> {
+  operationMayHaveCompleted: true;
+  method: string;
+}
+
+/**
+ * Marks an unsafe hardware request whose response was lost after dispatch.
+ * Callers must not interpret the resulting transport error as proof that the
+ * device rejected or did not execute the operation.
+ */
+export function operationMayHaveCompletedParams(
+  method: string,
+  params?: Record<string, unknown>
+): IOperationMayHaveCompletedParams {
+  return {
+    ...params,
+    operationMayHaveCompleted: true,
+    method,
+  };
+}
+
 export type HwkError = Error & {
   code: HardwareErrorCode;
+  /** See {@link HwkErrorOrigin}. Survives serializeConnectorError/rehydrate
+   *  automatically (own fields outside the top-level whitelist travel via
+   *  `params` and are lifted back). */
+  origin?: HwkErrorOrigin;
+  recovery?: HwkRecoveryHint;
   appName?: string;
   _tag?: string;
   params?: Record<string, unknown>;
@@ -253,8 +491,11 @@ export type HwkError = Error & {
  * with `Object.assign` — construct a fresh one via this factory.
  */
 export function createHwkError(payload: IHwkErrorPayload): HwkError {
+  const recovery = payload.recovery ?? defaultRecoveryForCode(payload.code);
   return Object.assign(new Error(payload.message), {
     code: payload.code,
+    ...(payload.origin !== undefined && { origin: payload.origin }),
+    recovery,
     ...(payload._tag !== undefined && { _tag: payload._tag }),
     ...(payload.appName !== undefined && { appName: payload.appName }),
     ...(payload.params !== undefined && { params: payload.params }),

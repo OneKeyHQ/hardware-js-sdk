@@ -161,6 +161,29 @@ const device = (connectId: string, extra: Partial<ConnectorDevice> = {}): Connec
 });
 
 describe('createCombinedConnector', () => {
+  test('USB-only discovery never starts BLE scanning', async () => {
+    const usb = new FakeConnector('usb', [device('usb-1')]);
+    const ble = new FakeConnector('ble', [device('ble-1')]);
+    const combined = createCombinedConnector([usb, ble]);
+    expect(combined.availableTransports).toEqual(['usb', 'ble']);
+    await expect(combined.searchDevices({ transportType: 'usb' })).resolves.toEqual([
+      expect.objectContaining({ connectId: 'usb-1', connectionType: 'usb' }),
+    ]);
+    expect(usb.searchCalls).toBe(1);
+    expect(ble.searchCalls).toBe(0);
+  });
+
+  test('a known BLE locator connects directly without scanning or attempting USB', async () => {
+    const usb = new FakeConnector('usb', [device('usb-1')]);
+    const ble = new FakeConnector('ble', [device('ble-1')]);
+    const combined = createCombinedConnector([usb, ble]);
+    await combined.connect('ble-1', { transportType: 'ble' });
+    expect(ble.connectCalls).toEqual(['ble-1']);
+    expect(usb.connectCalls).toEqual([]);
+    expect(usb.searchCalls).toBe(0);
+    expect(ble.searchCalls).toBe(0);
+  });
+
   test('merges devices from every transport and stamps connectionType', async () => {
     const usb = new FakeConnector('usb', [device('usb-1')]);
     const ble = new FakeConnector('ble', [device('ble-1')]);
@@ -246,6 +269,17 @@ describe('createCombinedConnector', () => {
     expect(session.sessionId).toBe('usb-1');
     expect(usb.connectCalls).toEqual(['usb-1']);
     expect(ble.connectCalls).toEqual([]);
+  });
+
+  test('an explicit transport remains authoritative without a locator', async () => {
+    const usb = new FakeConnector('usb', [device('usb-1')]);
+    const ble = new FakeConnector('ble', [device('ble-1')]);
+    const combined = createCombinedConnector([usb, ble]);
+    const session = await combined.connect(undefined, { transportType: 'ble' });
+    expect(session.sessionId).toBe('ble-1');
+    expect(usb.searchCalls).toBe(0);
+    expect(usb.connectCalls).toEqual([]);
+    expect(ble.connectCalls).toEqual(['ble-1']);
   });
 
   test('connect with no devices keeps DeviceNotFound', async () => {

@@ -7,7 +7,18 @@
  * adapter core (events, connector glue, chain-specific types) into their
  * bundle. Same values as the main entry — backward compatible.
  */
-export { HardwareErrorCode, ORPHAN_ELIGIBLE_ERROR_CODES, createHwkError } from '../types/errors';
-export type { HwkError, IHwkErrorPayload } from '../types/errors';
+export {
+  HardwareErrorCode,
+  ORPHAN_ELIGIBLE_ERROR_CODES,
+  createHwkError,
+  defaultRecoveryForCode,
+  isHwkRecoveryHint,
+} from '../types/errors';
+export type {
+  HwkError,
+  HwkRecoveryHint,
+  HwkRecoveryScope,
+  IHwkErrorPayload,
+} from '../types/errors';
 
 export { enrichErrorMessage } from '../utils/errorMessages';

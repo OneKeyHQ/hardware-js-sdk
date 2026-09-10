@@ -1,5 +1,20 @@
-export { HardwareErrorCode, ORPHAN_ELIGIBLE_ERROR_CODES, createHwkError } from './types/errors';
-export type { HwkError, IHwkErrorPayload } from './types/errors';
+export {
+  HardwareErrorCode,
+  ORPHAN_ELIGIBLE_ERROR_CODES,
+  createHwkError,
+  defaultOriginForCode,
+  defaultRecoveryForCode,
+  isHwkRecoveryHint,
+  operationMayHaveCompletedParams,
+} from './types/errors';
+export type {
+  HwkError,
+  HwkErrorOrigin,
+  HwkRecoveryHint,
+  HwkRecoveryScope,
+  IHwkErrorPayload,
+  IOperationMayHaveCompletedParams,
+} from './types/errors';
 
 export type { Success, Failure, Response } from './types/response';
 export { success, failure } from './types/response';
@@ -11,7 +26,12 @@ export type {
   DeviceInfo,
   DeviceTarget,
   DeviceCapabilities,
+  ConnectionTarget,
+  DeviceSearchTarget,
+  SearchTargetReusePolicy,
+  WalletIdentity,
 } from './types/device';
+export { resolveSearchTargetReusePolicy } from './types/device';
 
 export type {
   EvmGetAddressParams,
@@ -57,6 +77,7 @@ export type {
   SolSignTxParams,
   SolSignedTx,
   SolSignMsgParams,
+  SolOffchainMessageV1Params,
   SolSignature,
   ISolMethods,
 } from './types/chain-sol';
@@ -80,12 +101,25 @@ export type {
   ITronMethods,
 } from './types/chain-tron';
 
+export type {
+  ZcashFullViewingKeyMode,
+  ZcashGetFullViewingKeyParams,
+  ZcashFullViewingKey,
+  ZcashGetShieldedAddressParams,
+  ZcashShieldedAddress,
+} from './types/chain-zcash';
+
 export type { PassphraseStateAware } from './types/passphrase';
 
 export type { QrDisplayData, QrResponseData } from './types/qr';
 
 export type { ChainForFingerprint } from './types/fingerprint';
-export { CHAIN_FINGERPRINT_PATHS, deriveDeviceFingerprint } from './types/fingerprint';
+export {
+  CHAIN_FINGERPRINT_PATHS,
+  deriveDeviceFingerprint,
+  deriveWalletId,
+  parseBip32MasterFingerprint,
+} from './types/fingerprint';
 
 export type {
   IHardwareWallet,
@@ -100,6 +134,12 @@ export type {
   TrezorDisplayRotation,
   TrezorSafetyCheckLevel,
   ICommonCallParams,
+  IHardwareConnectionContext,
+  KnownDeviceConnection,
+  HardwareCallExtra,
+  DeviceSelectionContext,
+  DeviceSelectionRequest,
+  IDeviceManagerOperationContext,
   IPassphraseCallParams,
   IHardwareCommonCallParams,
   IHardwareCallParams,
@@ -108,6 +148,7 @@ export type {
   AllNetworkGetAddressParams,
   AllNetworkAddressResponsePayload,
   AllNetworkAddressResponse,
+  AllNetworkDeviceIdentity,
   DeviceEvent,
   UiRequestEvent,
   SdkEvent,
@@ -137,10 +178,26 @@ export type {
 
 export { DeviceJobQueue } from './utils/DeviceJobQueue';
 export type { JobOptions, ActiveJobInfo } from './utils/DeviceJobQueue';
+export { InteractionRegistry, INTERACTION_DEFAULT_TTL_MS } from './utils/InteractionRegistry';
+export type { HardwareInteraction, InteractionEndReason } from './utils/InteractionRegistry';
+export {
+  HARDWARE_RUNTIME_ID_PREFIX,
+  createHardwareConnectorSessionId,
+  createHardwareInteractionId,
+  createHardwareSearchTargetId,
+  hasHardwareRuntimeIdPrefix,
+  isHardwareInteractionId,
+  isHardwareSearchTargetId,
+  parseHardwareRuntimeId,
+} from './utils/hardwareRuntimeId';
+export type { HardwareRuntimeId } from './utils/hardwareRuntimeId';
+export { resolveHardwareOperationTarget } from './utils/hardwareOperationTarget';
+export type { HardwareOperationTarget } from './utils/hardwareOperationTarget';
 
 export type {
   ConnectorDevice,
   ConnectorSession,
+  ConnectorConnectTarget,
   ConnectorEventType,
   ConnectorEventMap,
   ConnectorUiEvent,
@@ -170,6 +227,11 @@ export {
 } from './utils/UiRequestRegistry';
 export { compareSemver } from './utils/semver';
 export { ensure0x, stripHex, padHex64, hexToBytes, bytesToHex } from './utils/hex';
+export { prepareSolanaOffchainMessageV1 } from './utils/solanaOffchainMessage';
+export type {
+  PreparedSolanaOffchainMessageV1,
+  PrepareSolanaOffchainMessageV1Params,
+} from './utils/solanaOffchainMessage';
 export { enrichErrorMessage } from './utils/errorMessages';
 export {
   detectHardwareVendorFromDescriptor,
@@ -182,6 +244,7 @@ export {
   HARDWARE_METHOD_CATALOG,
   getAllNetworkMethodChain,
   getHardwareMethodMetadata,
+  canReplayHardwareMethodAfterTransportFailure,
   isAllNetworkMethodName,
 } from './utils/methodCatalog';
 export type {

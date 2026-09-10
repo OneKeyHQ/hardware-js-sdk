@@ -43,15 +43,18 @@
     "crypto"
   ],
   "dependencies": {
-    "@ledgerhq/context-module": "^1.0.0",
-    "@ledgerhq/device-management-kit": "^1.1.0",
-    "@ledgerhq/device-signer-kit-bitcoin": "^1.0.0",
-    "@ledgerhq/device-signer-kit-ethereum": "^1.9.0",
-    "@ledgerhq/device-signer-kit-solana": "^1.7.0",
+    "@ledgerhq/context-module": "2.2.0",
+    "@ledgerhq/device-management-kit": "1.9.0",
+    "@ledgerhq/device-signer-kit-bitcoin": "1.3.3",
+    "@ledgerhq/device-signer-kit-ethereum": "1.16.0",
+    "@ledgerhq/device-signer-kit-solana": "1.10.0",
+    "@ledgerhq/device-signer-kit-zcash": "0.7.1",
     "@ledgerhq/hw-app-trx": "^6.34.1",
     "@ledgerhq/hw-transport": "^6.34.1",
     "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.104",
-    "bitcoinjs-lib": "npm:@onekeyfe/bitcoinjs-lib@7.0.1"
+    "bitcoinjs-lib": "npm:@onekeyfe/bitcoinjs-lib@7.0.1",
+    "bs58": "6.0.0",
+    "rxjs": "7.8.2"
   },
   "devDependencies": {
     "rimraf": "^5.0.0",
