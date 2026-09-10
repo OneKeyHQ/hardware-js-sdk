@@ -1954,10 +1954,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
         const features = await this.device.probeProtocolV2RuntimeState(
           deviceInfo,
-          PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
-          // An early reply can still come from App before the reboot completes.
-          // Re-read the runtime mode instead of retaining that reply across polls.
-          { forceRuntimeContextRefresh: true }
+          PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
         );
         if (features?.mode === 'bootloader') {
           return features;
