@@ -1,14 +1,10 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
+require('dotenv').config();
 const chokidar = require('chokidar');
-const dotenv = require('dotenv');
 const fs = require('fs-extra');
 const path = require('path');
 
 const config = require('./monitor-config.json');
-
-if (!process.env[config.targetEnvVar]) {
-  dotenv.config();
-}
 
 const targetDir = process.env[config.targetEnvVar];
 

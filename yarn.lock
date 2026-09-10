@@ -4167,7 +4167,7 @@
     ripple-binary-codec "^1.4.3"
     uuid "^9.0.0"
 
-"@ledgerhq/context-module@2.2.0", "@ledgerhq/context-module@^1.0.0", "@ledgerhq/context-module@^2.2.0", "@ledgerhq/context-module@^2.5.0":
+"@ledgerhq/context-module@2.2.0", "@ledgerhq/context-module@^2.2.0":
   version "2.2.0"
   resolved "https://registry.yarnpkg.com/@ledgerhq/context-module/-/context-module-2.2.0.tgz#a9883c0971b17f765f7c76b2cad5e3eb8c4837d2"
   integrity sha512-nRJqEhsA83v4MSsBTCUwpiswdzc9wj+oKv57o7CMF7DeQzdGlITlKhDV1SixLXp7YxoVH7ovAMkCYcTdB4sZeA==
@@ -4179,19 +4179,7 @@
     purify-ts "2.1.0"
     reflect-metadata "0.2.2"
 
-"@ledgerhq/device-contacts-kit@^0.4.0":
-  version "0.4.0"
-  resolved "https://registry.yarnpkg.com/@ledgerhq/device-contacts-kit/-/device-contacts-kit-0.4.0.tgz#a3c7fecc076cf7f48dad3c83563f80a286849be2"
-  integrity sha512-Mq6HaXlPi5d08s2RRmCABkIfLT7uoxc/JdoIo3e9IWayimoMfQb7UhgiTL5Dwck//oXrV+66ID6nkjiSu4Auzg==
-  dependencies:
-    "@ledgerhq/signer-utils" "^1.3.0"
-    inversify "7.5.1"
-    purify-ts "2.1.0"
-    reflect-metadata "0.2.2"
-    semver "7.7.2"
-    xstate "5.19.2"
-
-"@ledgerhq/device-management-kit@1.9.0", "@ledgerhq/device-management-kit@^1.1.0":
+"@ledgerhq/device-management-kit@1.9.0":
   version "1.9.0"
   resolved "https://registry.yarnpkg.com/@ledgerhq/device-management-kit/-/device-management-kit-1.9.0.tgz#0bdfd96610139310994c9ba1304d9aeff93ff74d"
   integrity sha512-M9M8Uy8c6diJ0pdK/85oP1u2+S6iO8WQcQ8V5FCWu/LyjXKrmTakQ9GRwWYNOp79nbcO+oXcLxJpvZtvpgquIg==
@@ -4207,7 +4195,7 @@
     ws "^8.18.0"
     xstate "5.19.2"
 
-"@ledgerhq/device-signer-kit-bitcoin@1.3.3", "@ledgerhq/device-signer-kit-bitcoin@^1.0.0":
+"@ledgerhq/device-signer-kit-bitcoin@1.3.3":
   version "1.3.3"
   resolved "https://registry.yarnpkg.com/@ledgerhq/device-signer-kit-bitcoin/-/device-signer-kit-bitcoin-1.3.3.tgz#096ed7b9e10af613da0697fd7b2d29733c6eb440"
   integrity sha512-jLdZsq3eQKli7zOYsP4NxETY40FzA3WlMP7aMWsrajOShVNJmj/p8RLoURA77zM8Fxhr88qMz8ziJm3XuzIjkA==
@@ -4233,42 +4221,12 @@
     semver "7.7.2"
     xstate "5.19.2"
 
-"@ledgerhq/device-signer-kit-ethereum@^1.9.0":
-  version "1.18.0"
-  resolved "https://registry.yarnpkg.com/@ledgerhq/device-signer-kit-ethereum/-/device-signer-kit-ethereum-1.18.0.tgz#387b89d79045c034b0b365823efbcf89934ca245"
-  integrity sha512-qMfQF9+idZ8bjWF2GmKZh9TkmT5viAZnL91/837qZq5QAdGn/4DmROvxUnM6mzuwcB5pg5C/QBGj4dF+EGj+bQ==
-  dependencies:
-    "@ledgerhq/device-contacts-kit" "^0.4.0"
-    "@ledgerhq/signer-utils" "^1.3.0"
-    ethers "6.14.1"
-    inversify "7.5.1"
-    purify-ts "2.1.0"
-    reflect-metadata "0.2.2"
-    semver "7.7.2"
-    xstate "5.19.2"
-
 "@ledgerhq/device-signer-kit-solana@1.10.0":
   version "1.10.0"
   resolved "https://registry.yarnpkg.com/@ledgerhq/device-signer-kit-solana/-/device-signer-kit-solana-1.10.0.tgz#166cc83c7f979caa3a6beda4c50d27fdfc3c0e74"
   integrity sha512-re2EundpA6vqroXIZMs9uWOqmAYeODOiKkYT9WsNE/mbDHfX2ketFOqqh/1MD0sjtE3dq3YHMZTDj+bTHV22Mg==
   dependencies:
     "@ledgerhq/context-module" "^2.2.0"
-    "@ledgerhq/signer-utils" "^1.3.0"
-    "@solana/web3.js" "^1.98.2"
-    bs58 "^6.0.0"
-    buffer "^6.0.3"
-    inversify "7.5.1"
-    purify-ts "2.1.0"
-    reflect-metadata "0.2.2"
-    semver "7.7.2"
-    xstate "5.19.2"
-
-"@ledgerhq/device-signer-kit-solana@^1.7.0":
-  version "1.13.0"
-  resolved "https://registry.yarnpkg.com/@ledgerhq/device-signer-kit-solana/-/device-signer-kit-solana-1.13.0.tgz#54717117c87278f0088cdb1829498d0a6738a57e"
-  integrity sha512-rP1entTQsavEbhsOuKhsB5hS4JTs0BM5U1jdD+6iVbgghxy4NYESjS0Szq+iq7JI48EdyX65JE4rhz6WAoRHOQ==
-  dependencies:
-    "@ledgerhq/context-module" "^2.5.0"
     "@ledgerhq/signer-utils" "^1.3.0"
     "@solana/web3.js" "^1.98.2"
     bs58 "^6.0.0"
@@ -4407,7 +4365,7 @@
   resolved "https://registry.yarnpkg.com/@ledgerhq/logs/-/logs-6.17.0.tgz#370840b915a0b44fc867fc4e6afc68d26a2055dd"
   integrity sha512-yra33g5q/AU7+PwAws+GaVpQGUuxnDREjVBnviJjcaJLVKuLzI4pnj8Bd3nY3fypM5k1yZEYKEXfUuGFUjP2+w==
 
-"@ledgerhq/signer-utils@1.3.0", "@ledgerhq/signer-utils@^1.2.0", "@ledgerhq/signer-utils@^1.3.0":
+"@ledgerhq/signer-utils@^1.2.0", "@ledgerhq/signer-utils@^1.3.0":
   version "1.3.0"
   resolved "https://registry.yarnpkg.com/@ledgerhq/signer-utils/-/signer-utils-1.3.0.tgz#074b6ac8697db5744f470183dc777cd43a610cce"
   integrity sha512-qe+HQMgZxq6SPv8ghvlq4c33RchUwlf1qE/qp7MtUGPbKGAqD/0PKNyzx05sKLpmA8m6YZdtndHH4CEkikzqSQ==
@@ -5591,98 +5549,6 @@
   version "2.2.67"
   resolved "https://registry.npmjs.org/@onekeyfe/cross-inpage-provider-types/-/cross-inpage-provider-types-2.2.67.tgz#e36a59855a1d781f296d7563a93cac868ae46098"
   integrity sha512-sjTF8kpcxWrZtFfHtdQhJ6KneyLTmg+Z4rnn0acEK5Vwoy07EjmF9xjBTyMoInrNwPc7OIwkaiXX+JYr0ovNgw==
-
-"@onekeyfe/hwk-adapter-core@1.2.2-alpha.100", "@onekeyfe/hwk-adapter-core@1.2.2-alpha.15":
-  version "1.2.2-alpha.15"
-  resolved "https://registry.yarnpkg.com/@onekeyfe/hwk-adapter-core/-/hwk-adapter-core-1.2.2-alpha.15.tgz#32e06a1f7b1d4006e8ce8f1172e0d61409ef56f8"
-  integrity sha512-NBs+Rn3JcRJpjMXgkgHqIRvx/f7dJXhIHrBC2cmbvsqfQanqtdlUI7RrmqsJSajYdFBY7k8+XAQHqMfxbevrJA==
-  dependencies:
-    "@noble/hashes" "^1.7.1"
-
-"@onekeyfe/hwk-ledger-adapter@1.2.2-alpha.15":
-  version "1.2.2-alpha.15"
-  resolved "https://registry.yarnpkg.com/@onekeyfe/hwk-ledger-adapter/-/hwk-ledger-adapter-1.2.2-alpha.15.tgz#d3977ed07e821be5307d591084417bbc2e54e49b"
-  integrity sha512-kv8q87oCIccKmos72yEiHzZc/gnICQGuPOn0DdQaUHq6hh8veNwi2y4F00HQFElZeQ5VpgPK721Ub8ZUhtK0Ow==
-  dependencies:
-    "@ledgerhq/context-module" "^1.0.0"
-    "@ledgerhq/device-management-kit" "^1.1.0"
-    "@ledgerhq/device-signer-kit-bitcoin" "^1.0.0"
-    "@ledgerhq/device-signer-kit-ethereum" "^1.9.0"
-    "@ledgerhq/device-signer-kit-solana" "^1.7.0"
-    "@ledgerhq/hw-app-trx" "^6.34.1"
-    "@ledgerhq/hw-transport" "^6.34.1"
-    "@onekeyfe/hwk-adapter-core" "1.2.2-alpha.15"
-    bitcoinjs-lib "npm:@onekeyfe/bitcoinjs-lib@7.0.1"
-
-"@onekeyfe/hwk-ledger-connector-ble@1.2.2-alpha.15":
-  version "1.2.2-alpha.15"
-  resolved "https://registry.yarnpkg.com/@onekeyfe/hwk-ledger-connector-ble/-/hwk-ledger-connector-ble-1.2.2-alpha.15.tgz#1d529f0b046370d0bfdfdd711fa90c885719a92b"
-  integrity sha512-0fESGqn/w1yUhEgn674kNiwgsmjZv4fbAmRhVse9fsV1XXBdOPa8dgD7yOYl9JgFPyOoZJlTtarM7aJCIoo/dA==
-  dependencies:
-    "@ledgerhq/device-management-kit" "^1.1.0"
-    "@ledgerhq/device-signer-kit-bitcoin" "^1.0.0"
-    "@ledgerhq/device-signer-kit-ethereum" "^1.9.0"
-    "@ledgerhq/device-signer-kit-solana" "^1.7.0"
-    "@ledgerhq/device-transport-kit-react-native-ble" "^1.0.0"
-    "@onekeyfe/hwk-adapter-core" "1.2.2-alpha.15"
-    "@onekeyfe/hwk-ledger-adapter" "1.2.2-alpha.15"
-
-"@onekeyfe/hwk-ledger-connector-webhid@1.2.2-alpha.15":
-  version "1.2.2-alpha.15"
-  resolved "https://registry.yarnpkg.com/@onekeyfe/hwk-ledger-connector-webhid/-/hwk-ledger-connector-webhid-1.2.2-alpha.15.tgz#39871f1155bc946a503ad0fa6d6f0954f7ea5356"
-  integrity sha512-8u5RdqTdlJgvMAQiK4vHm7SErxYJgieGAZfPmzE/skCDxq1me0Y/B5kuhNC/JXzvdRKSaM1dAEX2nsdrwhGr8A==
-  dependencies:
-    "@ledgerhq/device-management-kit" "^1.1.0"
-    "@ledgerhq/device-signer-kit-bitcoin" "^1.0.0"
-    "@ledgerhq/device-signer-kit-ethereum" "^1.9.0"
-    "@ledgerhq/device-signer-kit-solana" "^1.7.0"
-    "@ledgerhq/device-transport-kit-web-hid" "^1.0.0"
-    "@onekeyfe/hwk-adapter-core" "1.2.2-alpha.15"
-    "@onekeyfe/hwk-ledger-adapter" "1.2.2-alpha.15"
-
-"@onekeyfe/hwk-trezor-adapter@1.2.2-alpha.15":
-  version "1.2.2-alpha.15"
-  resolved "https://registry.yarnpkg.com/@onekeyfe/hwk-trezor-adapter/-/hwk-trezor-adapter-1.2.2-alpha.15.tgz#948a61ec48fd99f275824df53f9b78a944ab9aec"
-  integrity sha512-OfeTwH8MsSuGm9ayAyvTdApVIRrO6VwMcSU4t/n7T4rtKXm4L1PO33ae/wST6ssJtwyy9Gh9uxMdMR49vhWirw==
-  dependencies:
-    "@noble/curves" "^1.9.7"
-    "@noble/hashes" "^1.3.3"
-    "@onekeyfe/hwk-adapter-core" "1.2.2-alpha.15"
-    "@onekeyfe/hwk-trezor-core" "1.2.2-alpha.15"
-    tslib "^2.6.2"
-
-"@onekeyfe/hwk-trezor-connector-rn-ble@1.2.2-alpha.15":
-  version "1.2.2-alpha.15"
-  resolved "https://registry.yarnpkg.com/@onekeyfe/hwk-trezor-connector-rn-ble/-/hwk-trezor-connector-rn-ble-1.2.2-alpha.15.tgz#aacc44593eea7e51c219b6d07980a08df1c0a2fd"
-  integrity sha512-T3pDy/l6txdcLhj1pU0f80iz7KvxetbkIa5UZMyT8NhF/OLRExwTAsjv5l7ibd63fklLUUv8ULcZXg6G2oz7Cw==
-  dependencies:
-    "@onekeyfe/hwk-adapter-core" "1.2.2-alpha.15"
-    "@onekeyfe/hwk-trezor-adapter" "1.2.2-alpha.15"
-    "@onekeyfe/hwk-trezor-connector" "1.2.2-alpha.15"
-    buffer "^6.0.3"
-    react-native-ble-plx "^3.5.1"
-
-"@onekeyfe/hwk-trezor-connector-webusb@1.2.2-alpha.15":
-  version "1.2.2-alpha.15"
-  resolved "https://registry.yarnpkg.com/@onekeyfe/hwk-trezor-connector-webusb/-/hwk-trezor-connector-webusb-1.2.2-alpha.15.tgz#38ec6776fe911d29588c0d1d1fac6ece317bc5bf"
-  integrity sha512-gIRm/tIV8p11Ms0iu0quOOvoEE//CWfSFQssjPKQJ3YN1FnkkvP0kYNf22nxhcJ4BsiFXQSrTepwuJc0YjUZMw==
-  dependencies:
-    "@onekeyfe/hwk-adapter-core" "1.2.2-alpha.15"
-    "@onekeyfe/hwk-trezor-connector" "1.2.2-alpha.15"
-    buffer "^6.0.3"
-
-"@onekeyfe/hwk-trezor-connector@1.2.2-alpha.15":
-  version "1.2.2-alpha.15"
-  resolved "https://registry.yarnpkg.com/@onekeyfe/hwk-trezor-connector/-/hwk-trezor-connector-1.2.2-alpha.15.tgz#0fc88d7e8484960fb779192864e7d41f10dfbc45"
-  integrity sha512-Rr7LHSz1XoPUDVJuJPWmUxWb0/+hZ683uP2fvbOF5E4LMtnZvXYRY84ZPnMZbogBxyxhpvCXGBm/qO9QFlT2/A==
-  dependencies:
-    "@onekeyfe/hwk-adapter-core" "1.2.2-alpha.15"
-    "@onekeyfe/hwk-trezor-core" "1.2.2-alpha.15"
-
-"@onekeyfe/hwk-trezor-core@1.2.2-alpha.15":
-  version "1.2.2-alpha.15"
-  resolved "https://registry.yarnpkg.com/@onekeyfe/hwk-trezor-core/-/hwk-trezor-core-1.2.2-alpha.15.tgz#69bbf679f04e48c39a07b20a34881d2f5ace8c50"
-  integrity sha512-GMGwvsD5M3pK6MbjckDtXyG+8693xGetEk54j8ylhlurQxOAdlRbmJbPpeAM9xlVcpRnF+l61PHWH+j27PkLMg==
 
 "@onekeyfe/react-native-ble-utils@^0.1.3":
   version "0.1.3"

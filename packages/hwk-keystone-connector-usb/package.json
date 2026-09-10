@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-keystone-connector-usb",
-  "version": "1.2.2-alpha.100",
+  "version": "1.2.3-alpha.1",
   "description": "IConnector implementation for Keystone hardware wallets via USB (WebUSB + Node USB)",
   "author": "OneKey",
   "license": "MIT",
@@ -69,7 +69,7 @@
     "@keystonehq/hw-transport-usb": "0.2.0",
     "@keystonehq/hw-transport-webusb": "0.5.3",
     "@ngraveio/bc-ur": "1.1.13",
-    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.100"
+    "@onekeyfe/hwk-adapter-core": "1.2.3-alpha.1"
   },
   "devDependencies": {
     "@keystonehq/bc-ur-registry-eth": "0.22.1",

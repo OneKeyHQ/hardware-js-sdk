@@ -65,15 +65,9 @@ function requireBip32MasterFingerprint(value: unknown): string {
 }
 
 /**
- * Thin wrapper around `@keystonehq/keystone-sdk`. Owns every touch point with the
- * vendor SDK so the rest of the adapter never imports it directly: same UR
- * construction/parsing serves both the QR and USB channels (USB carries the
- * identical UR payloads inside EAPDU framing — see the Keystone USB SDK's
- * `sendURRequest`), so this engine has no channel awareness at all.
- *
- * Deliberately uses the bare constructor, never `KeystoneSDK.create()` — `create()`
- * fetches remote fragment-size config from keyst.one at call time, which this SDK
- * must not depend on.
+ * Single touch point with `@keystonehq/keystone-sdk`; the same UR building
+ * and parsing serves QR and USB. Uses the bare constructor, not
+ * `KeystoneSDK.create()`, which fetches remote config at call time.
  */
 export class KeystoneUrEngine {
   private readonly sdk: KeystoneSDK;
