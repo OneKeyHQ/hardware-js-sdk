@@ -1,13 +1,17 @@
+import { deriveWalletId } from '@onekeyfe/hwk-adapter-core';
+
 import { normalizePath } from './pathUtils';
 
 import type { KeystoneParsedAccount } from '../urEngine/types';
 import type { ChainCapability, DeviceCapabilities, DeviceInfo } from '@onekeyfe/hwk-adapter-core';
 
-/** `keystone-qr:<mfp>` is the QR-only connectId; a merged USB session gets its own (phase 4). */
-export const QR_CONNECT_ID_PREFIX = 'keystone-qr:';
+export const KEYSTONE_WALLET_CONNECT_ID_PREFIX = 'keystone-wallet:';
 
-export function qrConnectId(masterFingerprint: string): string {
-  return `${QR_CONNECT_ID_PREFIX}${masterFingerprint}`;
+/** Fixed public source used to derive a collision-resistant wallet id. */
+export const KEYSTONE_WALLET_ID_PATH = "m/44'/60'/0'";
+
+export function walletConnectId(walletId: string): string {
+  return `${KEYSTONE_WALLET_CONNECT_ID_PREFIX}${walletId}`;
 }
 
 export interface KeystoneAccountEntry extends KeystoneParsedAccount {
@@ -19,23 +23,30 @@ export function accountKey(hwkChain: ChainCapability, path: string): string {
 }
 
 export interface KeystoneDeviceRecord {
-  /** Lowercase hex BIP32 master fingerprint — the cross-channel wallet identity; doubles as `deviceId`. */
+  /** SHA-256 id derived from the fixed account-level identity xpub. */
+  walletId: string;
+  /** Lowercase 8-char BIP32 fingerprint used by BC-UR as xfp, never as identity. */
   masterFingerprint: string;
   connectId: string;
+  /** Optional physical-device id exposed by some Keystone QR export menus. */
+  hardwareDeviceId?: string;
   /** Model string from the device (e.g. "Keystone 3 Pro"); not unique per unit. */
   model?: string;
   deviceVersion?: string;
-  /** Keyed by `accountKey(hwkChain, path)`. Holds whatever was directly synced — usually account-level (3-segment) entries for EVM, exact leaf entries for SOL. */
-  accounts: Map<string, KeystoneAccountEntry>;
   importedAt: number;
   /**
-   * Set to the connector's `sessionId` (== this record's own mfp, per
-   * `KeystoneUsbConnectorBase.connect`) once a live USB session exists for
-   * this wallet. Cleared by `disconnectDevice`. Presence of this field is
+   * Set to the connector's process-local `sessionId` once a live USB session exists for
+   * this wallet. Cleared by `releaseInteraction`. Presence of this field is
    * what `KeystoneAdapter._resolveUr` uses to route a call over USB instead
    * of QR.
    */
   usbSessionId?: string;
+  /**
+   * Remains true after a live USB session is lost. It allows the adapter to
+   * wait through the device's short USB re-enumeration window without making
+   * wallets that have only ever used QR pay the same retry delay.
+   */
+  hadUsbSession?: boolean;
   /**
    * True once this wallet has completed at least one QR round trip.
    * Distinguishes "USB session dropped but this wallet was also QR-synced —
@@ -45,11 +56,28 @@ export interface KeystoneDeviceRecord {
   qrSynced?: boolean;
 }
 
-export function createDeviceRecord(masterFingerprint: string): KeystoneDeviceRecord {
+export function deriveKeystoneWalletId(accounts: KeystoneParsedAccount[]): string {
+  const identityAccount = accounts.find(
+    account => normalizePath(account.path) === KEYSTONE_WALLET_ID_PATH
+  );
+  if (!identityAccount?.extendedPublicKey) {
+    throw new Error(
+      `Keystone identity response is missing the extended public key at ${KEYSTONE_WALLET_ID_PATH}`
+    );
+  }
+  return deriveWalletId(
+    `keystone:secp256k1:${KEYSTONE_WALLET_ID_PATH}:${identityAccount.extendedPublicKey.trim()}`
+  );
+}
+
+export function createDeviceRecord(
+  walletId: string,
+  masterFingerprint: string
+): KeystoneDeviceRecord {
   return {
+    walletId,
     masterFingerprint,
-    connectId: qrConnectId(masterFingerprint),
-    accounts: new Map(),
+    connectId: walletConnectId(walletId),
     importedAt: Date.now(),
   };
 }
@@ -71,11 +99,15 @@ export function toDeviceInfo(record: KeystoneDeviceRecord): DeviceInfo {
     model: record.model ?? 'unknown',
     modelName: record.model,
     firmwareVersion: record.deviceVersion ?? '0.0.0',
-    deviceId: record.masterFingerprint,
+    deviceId: record.walletId,
     connectId: record.connectId,
     connectionType: record.usbSessionId ? 'usb' : 'qr',
     capabilities: CAPABILITIES,
-    raw: { availableChannels },
+    raw: {
+      availableChannels,
+      masterFingerprint: record.masterFingerprint,
+      hardwareDeviceId: record.hardwareDeviceId,
+    },
   };
 }
 
