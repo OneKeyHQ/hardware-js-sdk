@@ -1255,11 +1255,9 @@ export default class ReactNativeBleTransport {
       this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
       return { uuid, protocolType };
     } catch (error) {
-      if (isBleStaleBondHardwareError(error) || shouldRethrowProtocolProbeError(error)) {
-        await this.disconnectUnlocked(uuid);
-      } else {
-        await this.releaseUnlocked(uuid, true);
-      }
+      // A failed acquire must retire the physical link before Core retries. Logical
+      // release leaves GATT connected even when neither protocol receives a response.
+      await this.disconnectUnlocked(uuid);
       throw error;
     } finally {
       this.acquiringProtocolV2.delete(uuid);

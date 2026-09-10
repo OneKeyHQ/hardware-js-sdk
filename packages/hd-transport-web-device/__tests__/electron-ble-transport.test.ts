@@ -498,7 +498,7 @@ describe('ElectronBleTransport protocol detection', () => {
     await expect(result).resolves.toBe('rejected');
   });
 
-  test('throws when both protocol probes fail', async () => {
+  test('disconnects when both protocol probes fail and reconnects for the next acquire', async () => {
     const device = { id: 'dead-device-id', name: 'Unknown Device' };
     const nobleBle = createNobleBle(device);
 
@@ -510,7 +510,25 @@ describe('ElectronBleTransport protocol detection', () => {
     await expect(transport.acquire({ uuid: device.id })).rejects.toThrow(
       /Unable to detect BLE protocol/
     );
+    expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
     expect(transport.getProtocolType(device.id)).toBeUndefined();
+
+    echoProtocolV2(nobleBle, device.id);
+    await expect(
+      transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+    ).resolves.toMatchObject({ uuid: device.id });
+    expect(nobleBle.connect).toHaveBeenCalledTimes(2);
+    expect(nobleBle.disconnect.mock.invocationCallOrder.at(-1)).toBeLessThan(
+      nobleBle.connect.mock.invocationCallOrder[1]
+    );
+    await expect(
+      transport.call(device.id, 'Ping', { message: 'after-reconnect' })
+    ).resolves.toMatchObject({
+      type: 'Success',
+      message: { message: 'ok' },
+    });
+    await transport.release(device.id);
   });
 
   test('surfaces Protocol V2 link disabled while the initial V1 probe is active', async () => {

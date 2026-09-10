@@ -714,7 +714,72 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   });
 
   test.each(['ios', 'android'] as const)(
-    'keeps a first expected Protocol V2 probe miss retryable on %s',
+    'waits for native disconnect after failed protocol detection before reconnecting on %s',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid, device, bleManager } = createHarness();
+      const probes = transport as unknown as {
+        probeProtocolV1(uuid: string): Promise<boolean>;
+        probeProtocolV2(uuid: string): Promise<boolean>;
+        releaseNative(uuid: string, onclose: boolean): Promise<void>;
+      };
+      jest.spyOn(probes, 'probeProtocolV1').mockResolvedValueOnce(false);
+      const probesFinished = createDeferred<void>();
+      const probeProtocolV2 = jest
+        .spyOn(probes, 'probeProtocolV2')
+        .mockImplementationOnce(async () => {
+          // A link-fatal V2 timeout removes the cached transport before acquire fails.
+          await probes.releaseNative(uuid, true);
+          probesFinished.resolve();
+          return false;
+        });
+      let connected = true;
+      device.isConnected.mockImplementation(() => Promise.resolve(connected));
+      device.connect = jest.fn(() => {
+        connected = true;
+        return Promise.resolve(device);
+      });
+      const disconnectGate = createDeferred<void>();
+      bleManager.cancelDeviceConnection.mockImplementation(async () => {
+        await disconnectGate.promise;
+        connected = false;
+      });
+
+      const acquiring = transport.acquire({ uuid });
+      const failure = expect(acquiring).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleTimeoutError,
+      });
+      const reconnecting = transport.acquire({ uuid, expectedProtocol: 'V2' });
+
+      try {
+        await probesFinished.promise;
+        await new Promise(resolve => {
+          setImmediate(resolve);
+        });
+        expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
+        expect(device.connect).not.toHaveBeenCalled();
+        expect(probeProtocolV2).toHaveBeenCalledTimes(1);
+
+        disconnectGate.resolve();
+        await failure;
+        await expect(reconnecting).resolves.toEqual({ uuid, protocolType: 'V2' });
+        expect(device.connect).toHaveBeenCalledTimes(1);
+        await expect(
+          transport.call(uuid, 'Ping', { message: 'after-reconnect' })
+        ).resolves.toMatchObject({
+          type: 'Success',
+          message: { message: 'ok' },
+        });
+      } finally {
+        disconnectGate.resolve();
+        await Promise.allSettled([failure, reconnecting]);
+        await transport.release(uuid, true);
+      }
+    }
+  );
+
+  test.each(['ios', 'android'] as const)(
+    'disconnects after a first expected Protocol V2 probe miss while keeping it retryable on %s',
     async platform => {
       setPlatformOS(platform);
       const { transport, uuid, device } = createHarness();
@@ -724,13 +789,13 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
         errorCode: HardwareErrorCode.RuntimeError,
       });
 
-      expect(device.cancelConnection).not.toHaveBeenCalled();
+      expect(device.cancelConnection).toHaveBeenCalledTimes(1);
       expect(transport.getProtocolType(uuid)).toBeUndefined();
     }
   );
 
   test.each(['ios', 'android'] as const)(
-    'keeps a second expected Protocol V2 probe miss retryable on %s',
+    'disconnects after each expected Protocol V2 probe miss while keeping it retryable on %s',
     async platform => {
       setPlatformOS(platform);
       const { transport, uuid, device } = createHarness();
@@ -743,7 +808,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
         errorCode: HardwareErrorCode.RuntimeError,
       });
 
-      expect(device.cancelConnection).not.toHaveBeenCalled();
+      expect(device.cancelConnection).toHaveBeenCalledTimes(2);
       expect(transport.getProtocolType(uuid)).toBeUndefined();
     }
   );
@@ -778,7 +843,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   );
 
   test.each(['ios', 'android'] as const)(
-    'keeps a confirmed Protocol V2 probe miss retryable on %s without native bond evidence',
+    'disconnects after a confirmed Protocol V2 probe miss on %s without reporting a bond error',
     async platform => {
       setPlatformOS(platform);
       const { transport, uuid, device } = createHarness();
@@ -790,7 +855,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
         errorCode: HardwareErrorCode.RuntimeError,
       });
 
-      expect(device.cancelConnection).not.toHaveBeenCalled();
+      expect(device.cancelConnection).toHaveBeenCalledTimes(1);
       expect(transport.getProtocolType(uuid)).toBeUndefined();
     }
   );
@@ -974,7 +1039,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   test.each(['V1', 'V2'] as const)(
     'still falls back after a silent %s probe timeout',
     async protocol => {
-      const { transport, uuid } = createHarness();
+      const { transport, uuid, device, bleManager } = createHarness();
       jest
         .spyOn(transport as any, protocol === 'V1' ? 'callProtocolV1' : 'callProtocolV2')
         .mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.BleTimeoutError));
@@ -988,6 +1053,8 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       });
 
       expect(otherProbe).toHaveBeenCalledTimes(1);
+      expect(bleManager.cancelDeviceConnection).not.toHaveBeenCalled();
+      expect(device.cancelConnection).not.toHaveBeenCalled();
       await transport.release(uuid, true);
     }
   );
@@ -1173,6 +1240,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(notifySubscriptionRemovers[0]).toHaveBeenCalledTimes(1);
     expect(notifySubscriptionRemovers[1]).toHaveBeenCalledTimes(1);
     expect(bleManager.cancelTransaction).toHaveBeenCalled();
+    expect(device.cancelConnection).toHaveBeenCalledTimes(1);
     expect(transport.getProtocolType(uuid)).toBeUndefined();
   });
 
