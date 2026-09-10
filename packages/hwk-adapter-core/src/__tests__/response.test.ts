@@ -19,6 +19,7 @@ describe('response helpers', () => {
       expect(result.success).toBe(false);
       expect(result.payload.code).toBe(HardwareErrorCode.DeviceNotFound);
       expect(result.payload.error).toBe('No device detected');
+      expect(result.payload.recovery).toEqual({ scope: 'interaction' });
     });
 
     it('should create a failure response for user rejection', () => {
@@ -32,7 +33,19 @@ describe('response helpers', () => {
     it('should keep Failure payload vendor-agnostic (no appName / Ledger fields)', () => {
       const result = failure(HardwareErrorCode.DeviceNotFound, 'msg');
       expect('appName' in result.payload).toBe(false);
-      expect(Object.keys(result.payload).sort()).toEqual(['code', 'error']);
+      expect(Object.keys(result.payload).sort()).toEqual(['code', 'error', 'recovery']);
+    });
+
+    it('allows an adapter to override the default recovery scope', () => {
+      const result = failure(
+        HardwareErrorCode.TransportError,
+        'Transient transport error',
+        undefined,
+        undefined,
+        { scope: 'operation' }
+      );
+
+      expect(result.payload.recovery).toEqual({ scope: 'operation' });
     });
   });
 

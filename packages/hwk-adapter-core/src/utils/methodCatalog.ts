@@ -3,25 +3,57 @@ import type { ChainForFingerprint } from '../types/fingerprint';
 export type HardwareMethodMetadata = {
   chain: ChainForFingerprint;
   allNetwork: boolean;
+  /** Whether repeating the method after an ambiguous transport failure is safe. */
+  replayAfterTransportFailure: 'safe' | 'unsafe';
 };
 
 export const HARDWARE_METHOD_CATALOG = {
-  evmGetAddress: { chain: 'evm', allNetwork: true },
-  evmSignTransaction: { chain: 'evm', allNetwork: false },
-  evmSignMessage: { chain: 'evm', allNetwork: false },
-  evmSignTypedData: { chain: 'evm', allNetwork: false },
-  btcGetAddress: { chain: 'btc', allNetwork: true },
-  btcGetPublicKey: { chain: 'btc', allNetwork: true },
-  btcSignTransaction: { chain: 'btc', allNetwork: false },
-  btcSignPsbt: { chain: 'btc', allNetwork: false },
-  btcSignMessage: { chain: 'btc', allNetwork: false },
-  btcGetMasterFingerprint: { chain: 'btc', allNetwork: false },
-  solGetAddress: { chain: 'sol', allNetwork: true },
-  solSignTransaction: { chain: 'sol', allNetwork: false },
-  solSignMessage: { chain: 'sol', allNetwork: false },
-  tronGetAddress: { chain: 'tron', allNetwork: true },
-  tronSignTransaction: { chain: 'tron', allNetwork: false },
-  tronSignMessage: { chain: 'tron', allNetwork: false },
+  evmGetAddress: { chain: 'evm', allNetwork: true, replayAfterTransportFailure: 'safe' },
+  evmSignTransaction: {
+    chain: 'evm',
+    allNetwork: false,
+    replayAfterTransportFailure: 'unsafe',
+  },
+  evmSignMessage: { chain: 'evm', allNetwork: false, replayAfterTransportFailure: 'unsafe' },
+  evmSignTypedData: { chain: 'evm', allNetwork: false, replayAfterTransportFailure: 'unsafe' },
+  btcGetAddress: { chain: 'btc', allNetwork: true, replayAfterTransportFailure: 'safe' },
+  btcGetPublicKey: { chain: 'btc', allNetwork: true, replayAfterTransportFailure: 'safe' },
+  btcSignTransaction: {
+    chain: 'btc',
+    allNetwork: false,
+    replayAfterTransportFailure: 'unsafe',
+  },
+  btcSignPsbt: { chain: 'btc', allNetwork: false, replayAfterTransportFailure: 'unsafe' },
+  btcSignMessage: { chain: 'btc', allNetwork: false, replayAfterTransportFailure: 'unsafe' },
+  btcGetMasterFingerprint: {
+    chain: 'btc',
+    allNetwork: false,
+    replayAfterTransportFailure: 'safe',
+  },
+  solGetAddress: { chain: 'sol', allNetwork: true, replayAfterTransportFailure: 'safe' },
+  solSignTransaction: {
+    chain: 'sol',
+    allNetwork: false,
+    replayAfterTransportFailure: 'unsafe',
+  },
+  solSignMessage: { chain: 'sol', allNetwork: false, replayAfterTransportFailure: 'unsafe' },
+  tronGetAddress: { chain: 'tron', allNetwork: true, replayAfterTransportFailure: 'safe' },
+  tronSignTransaction: {
+    chain: 'tron',
+    allNetwork: false,
+    replayAfterTransportFailure: 'unsafe',
+  },
+  tronSignMessage: { chain: 'tron', allNetwork: false, replayAfterTransportFailure: 'unsafe' },
+  zcashGetFullViewingKey: {
+    chain: 'zcash',
+    allNetwork: false,
+    replayAfterTransportFailure: 'safe',
+  },
+  zcashGetShieldedAddress: {
+    chain: 'zcash',
+    allNetwork: false,
+    replayAfterTransportFailure: 'safe',
+  },
 } as const satisfies Record<string, HardwareMethodMetadata>;
 
 export type HardwareMethodName = keyof typeof HARDWARE_METHOD_CATALOG;
@@ -40,6 +72,19 @@ const ALL_NETWORK_METHOD_SET = new Set<string>(ALL_NETWORK_METHOD_NAMES);
 
 export function getHardwareMethodMetadata(method: string): HardwareMethodMetadata | undefined {
   return HARDWARE_METHOD_CATALOG[method as HardwareMethodName];
+}
+
+const SAFE_NON_CHAIN_METHODS = new Set(['getFeatures', 'authenticateDevice']);
+
+/**
+ * Conservative replay gate used only after a call may have reached hardware.
+ * Unknown methods and device mutations are unsafe by default.
+ */
+export function canReplayHardwareMethodAfterTransportFailure(method: string): boolean {
+  return (
+    getHardwareMethodMetadata(method)?.replayAfterTransportFailure === 'safe' ||
+    SAFE_NON_CHAIN_METHODS.has(method)
+  );
 }
 
 export function isAllNetworkMethodName(method: string): method is AllNetworkMethodName {
