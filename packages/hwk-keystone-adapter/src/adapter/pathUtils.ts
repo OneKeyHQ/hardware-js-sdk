@@ -56,3 +56,21 @@ export function btcScriptTypeFromPath(path: string): BtcScriptType | undefined {
       return undefined;
   }
 }
+
+/**
+ * Keystone firmware signs BTC only against account-0 xpubs
+ * (gui_btc.c PreparePublicKeys: 44'/49'/84'/86', coin 0'/1', account 0').
+ */
+export function isKeystoneSignableBtcAccountPath(accountPath: string): boolean {
+  const segments = normalizePath(accountPath).slice(2).split('/');
+  if (segments.length !== 3) return false;
+  const [purpose, coin, account] = segments;
+  return (
+    ["44'", "49'", "84'", "86'"].includes(purpose) &&
+    ["0'", "1'"].includes(coin) &&
+    account === "0'"
+  );
+}
+
+export const KEYSTONE_BTC_ACCOUNT_FORBIDDEN_MESSAGE =
+  "Keystone can only sign BTC for account 0 (m/44'|49'|84'|86'/0'/0'); other account indexes are not supported by the firmware";
