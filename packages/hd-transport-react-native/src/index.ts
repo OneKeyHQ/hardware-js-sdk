@@ -454,7 +454,11 @@ export default class ReactNativeBleTransport {
       if (reason.startsWith('Protocol V2 link-fatal error:')) {
         if (this.probingProtocols.get(uuid) !== 'V2') {
           const transport = transportCache[uuid];
-          this.emitDeviceDisconnect(uuid, transport?.device?.name, transport?.monitorToken);
+          try {
+            this.emitDeviceDisconnect(uuid, transport?.device?.name, transport?.monitorToken);
+          } catch {
+            Log?.error('[ReactNativeBleTransport] Protocol V2 disconnect listener failed');
+          }
         }
         await this.releaseNative(uuid, true);
       }

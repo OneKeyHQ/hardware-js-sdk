@@ -1296,12 +1296,14 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   });
 
   test.each(['ios', 'android'] as const)(
-    'disconnects after an active Protocol V2 response timeout and reconnects on %s',
+    'disconnects after an active V2 timeout and reconnects even if a listener fails on %s',
     async platform => {
       setPlatformOS(platform);
       const harness = createHarness();
       const { transport, uuid, device, bleManager, sentSeqs, emitter } = harness;
-      const disconnected = jest.fn();
+      const disconnected = jest.fn(() => {
+        throw new Error('Disconnect listener failed');
+      });
       emitter.on(TRANSPORT_EVENT.DEVICE_DISCONNECT, disconnected);
       let connected = true;
       device.isConnected.mockImplementation(() => Promise.resolve(connected));
