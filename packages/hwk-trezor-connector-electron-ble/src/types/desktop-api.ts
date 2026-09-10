@@ -1,3 +1,5 @@
+import type { ElectronBleConnectOptions } from '@onekeyfe/hwk-adapter-core';
+
 /**
  * Shape of the API the renderer process talks to. In a real Electron app
  * this is normally exposed via `contextBridge.exposeInMainWorld('desktopApi',
@@ -39,6 +41,7 @@ export interface TrezorBleAvailability {
 }
 
 export interface TrezorBleScanOptions {
+  vendor?: 'trezor' | 'ledger';
   /**
    * DEPRECATED and ignored by the handler: a native service-UUID filter drops
    * Safe 7 ADV packets on Windows, so the scan is always unfiltered and Trezor
@@ -51,7 +54,7 @@ export interface TrezorBleScanOptions {
 export interface TrezorBleApi {
   scan(options?: TrezorBleScanOptions): Promise<TrezorBleDeviceInfo[]>;
   stopScan(): Promise<void>;
-  connect(id: string): Promise<{ id: string; name?: string }>;
+  connect(id: string, options?: ElectronBleConnectOptions): Promise<{ id: string; name?: string }>;
   disconnect(id: string): Promise<void>;
   /** Subscribe to the BLE notify characteristic for `id`. */
   subscribe(id: string): Promise<void>;

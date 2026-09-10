@@ -220,6 +220,16 @@ describe('createCombinedConnector', () => {
     expect(devices.map(d => d.connectId)).toEqual(['usb-1']);
   });
 
+  test('does not disguise a transport-specific discovery error as an empty result', async () => {
+    const usb = new FakeConnector('usb', [], { scanError: new Error('USB unavailable') });
+    const ble = new FakeConnector('ble', [device('ble-1')]);
+    const combined = createCombinedConnector([usb, ble]);
+    await expect(combined.searchDevices({ transportType: 'usb' })).rejects.toThrow(
+      'USB unavailable'
+    );
+    expect(ble.searchCalls).toBe(0);
+  });
+
   test('returns shortly after USB transport finds devices', async () => {
     const usb = new FakeConnector('usb', [device('usb-1')]);
     const ble = new FakeConnector('ble', [device('ble-1')], {

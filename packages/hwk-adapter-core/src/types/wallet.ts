@@ -146,6 +146,25 @@ export interface DeviceSelectionRequest {
   requestId: string;
   context: DeviceSelectionContext;
   extra?: HardwareCallExtra;
+  /** Repeated snapshots with this requestId update one SDK-owned binding scan. */
+  scanning?: boolean;
+  bindingSessionId?: string;
+  /** A candidate rejected by SDK identity verification in this binding session. */
+  rejectedConnectId?: string;
+}
+
+/** The SDK has verified this endpoint; the host must persist it before acknowledging. */
+export interface SaveDeviceBindingRequest {
+  requestId: string;
+  selectionRequestId: string;
+  connection: { transport: 'ble'; connectId: string };
+  identity: Extract<WalletIdentity, { vendor: 'ledger' | 'trezor' }>;
+  extra?: HardwareCallExtra;
+}
+
+export interface DeviceBindingStatus {
+  selectionRequestId: string;
+  status: 'verifying' | 'saved' | 'failed' | 'cancelled';
 }
 
 export interface ICommonCallParams extends IHardwareConnectionContext {
@@ -271,6 +290,8 @@ export type UiRequestEvent =
       payload: { transportType: TransportType; connectId?: string; deviceId?: string };
     }
   | { type: typeof UI_REQUEST.REQUEST_SELECT_DEVICE; payload: DeviceSelectionRequest }
+  | { type: typeof UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING; payload: SaveDeviceBindingRequest }
+  | { type: typeof UI_REQUEST.DEVICE_BINDING_STATUS; payload: DeviceBindingStatus }
   | {
       type: typeof UI_REQUEST.REQUEST_DEVICE_CONNECT;
       payload: {
@@ -330,6 +351,14 @@ export type DeviceEventListener = (event: HardwareEvent) => void;
  * and the value is the narrowed event object the listener will receive.
  */
 export interface HardwareEventMap {
+  [UI_REQUEST.DEVICE_BINDING_STATUS]: {
+    type: typeof UI_REQUEST.DEVICE_BINDING_STATUS;
+    payload: DeviceBindingStatus;
+  };
+  [UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING]: {
+    type: typeof UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING;
+    payload: SaveDeviceBindingRequest;
+  };
   // Low-level connector UI event (forwarded from IConnector 'ui-event').
   // Carries every EConnectorInteraction variant — interaction prompts
   // (ConfirmOnDevice / ConfirmOpenApp / UnlockDevice / InteractionComplete /
