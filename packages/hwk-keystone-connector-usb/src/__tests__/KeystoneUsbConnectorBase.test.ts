@@ -588,6 +588,39 @@ describe('KeystoneUsbConnectorBase', () => {
       ]);
     });
 
+    it('asks a different wallet for its own public-data approval', async () => {
+      let walletMFP = FAKE_MFP;
+      const transport = fakeTransport({
+        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP }),
+        [Actions.CMD_RESOLVE_UR]: () => ({ payload: encodeUrString('bytes', 'deadbeef') }),
+      });
+      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
+        timeoutMs: 1000,
+      });
+      const confirmations: string[] = [];
+      connector.on('ui-event', e => {
+        const { type } = e as { type: string };
+        if (type === EConnectorInteraction.ConfirmOnDevice) confirmations.push(type);
+      });
+
+      const first = await connector.connect();
+      await connector.call(first.sessionId, 'resolveUr', {
+        urType: 'qr-hardware-call',
+        urData: 'de',
+      });
+      expect(confirmations).toHaveLength(1);
+
+      await connector.disconnect(first.sessionId);
+      walletMFP = 'aabbccdd';
+      const other = await connector.connect();
+      await connector.call(other.sessionId, 'resolveUr', {
+        urType: 'qr-hardware-call',
+        urData: 'ad',
+      });
+
+      expect(confirmations).toHaveLength(2);
+    });
+
     it('shows public-data confirmation only once across internal USB session recovery', async () => {
       const transport = fakeTransport({
         [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),

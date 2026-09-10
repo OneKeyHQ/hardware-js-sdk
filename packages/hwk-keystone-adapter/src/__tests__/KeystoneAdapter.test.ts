@@ -825,6 +825,29 @@ describe('KeystoneAdapter', () => {
   });
 
   describe('BTC account index guard (firmware signs account 0 only)', () => {
+    it('refuses a testnet account, which this package can only derive as mainnet', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+      const result = await adapter.btcGetAddress(null, null, { path: "m/84'/1'/0'/0/0" });
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.payload.code).toBe(HardwareErrorCode.DevicePathForbidden);
+      expect(fake.requests).toHaveLength(0);
+    });
+
+    it('btcSignMessage refuses a non-zero account before any round trip', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+      const result = await adapter.btcSignMessage(null, null, {
+        path: "m/84'/0'/1'/0/0",
+        message: 'hello',
+      });
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.payload.code).toBe(HardwareErrorCode.DevicePathForbidden);
+      expect(fake.requests).toHaveLength(0);
+    });
+
     it('btcGetPublicKey refuses a non-zero account without touching the device', async () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
@@ -895,7 +918,7 @@ describe('KeystoneAdapter', () => {
   });
 
   describe('btcGetAddress', () => {
-    it('requests the exact leaf path when showOnDevice is enabled', async () => {
+    it('always derives from the account xpub; showOnDevice adds no device request', async () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
       const path = "m/84'/0'/0'/0/7";
@@ -911,7 +934,10 @@ describe('KeystoneAdapter', () => {
       const requestedPaths = (request.getParams() as KeyDerivation)
         .getSchemas()
         .map(schema => `m/${schema.getKeypath().getPath()}`);
-      expect(requestedPaths).toEqual([KEYSTONE_WALLET_ID_PATH, path]);
+      // Keystone answers account-level KeyDerivation requests; nothing is
+      // displayed on the device for this call, so a leaf-path request would
+      // only cost an extra round trip.
+      expect(requestedPaths).toEqual([KEYSTONE_WALLET_ID_PATH, "m/84'/0'/0'"]);
       expect(result.payload.path).toBe(path);
       expect(result.payload.address).toMatch(/^bc1q[0-9a-z]{38}$/);
     });
@@ -982,7 +1008,8 @@ describe('KeystoneAdapter', () => {
       expect(result.payload.signature).toBe('06'.repeat(65));
       const signRequest = fake.requests.find(r => r.data.urType === 'tron-sign-request');
       expect(signRequest).toBeDefined();
-      const decoded = TronSignRequest.fromCBOR(Buffer.from(signRequest!.data.urData, 'hex'));
+      if (!signRequest) return;
+      const decoded = TronSignRequest.fromCBOR(Buffer.from(signRequest.data.urData, 'hex'));
       expect(decoded.getSignType()).toBe(TronSignType.PersonalMessage);
       expect(decoded.getSignData().toString('utf8')).toBe('hello tron');
     });

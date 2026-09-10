@@ -25,26 +25,10 @@ const CLIENT_STATUS_MAP: Partial<Record<number, HardwareErrorCode>> = {
 };
 
 /**
- * Maps a Keystone USB SDK failure to the shared `HardwareErrorCode`
- * vocabulary. Every device-side rejection and client-side transport failure
- * the SDK produces is a *thrown* `TransportError` with a numeric
- * `transportErrorCode` (see `@keystonehq/hw-transport-error`) — this is
- * called from every `catch` in `KeystoneUsbConnectorBase` to build the
- * `ConnectorCallResult` data-not-exception shape `IConnector.call` requires.
- *
- * Idempotent: an error `KeystoneUsbConnectorBase` already built via
- * `createHwkError` (e.g. its own `DeviceMismatch`/`DeviceNotFound` checks)
- * carries a numeric `.code` already and passes straight through unchanged —
- * without this it would fall through to the generic `TransportError`
- * fallback below and silently lose the real code, since `HwkError` uses
- * `.code`, not the raw SDK's `.transportErrorCode`.
- *
- * Reads `transportErrorCode` duck-typed rather than `instanceof
- * TransportError` — cheap defense against the exact-same class of
- * cross-package duplicate-module-instance bug already hit once in this
- * integration (see docs/design/keystone-integration), where two copies of a
- * `@keystonehq/*` package resolve to different physical files and
- * `instanceof` silently fails across them.
+ * Maps a Keystone USB SDK failure to `HardwareErrorCode`. Errors that already
+ * carry a numeric `.code` pass through unchanged. `transportErrorCode` is read
+ * duck-typed because duplicate `@keystonehq/*` module instances break
+ * `instanceof`.
  */
 export function mapKeystoneUsbError(err: unknown): HwkError {
   const domName =
