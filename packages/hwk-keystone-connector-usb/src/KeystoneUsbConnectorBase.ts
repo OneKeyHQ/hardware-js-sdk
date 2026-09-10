@@ -30,13 +30,8 @@ import type {
 import type { TransportConfig, TransportHID } from '@keystonehq/hw-transport-usb';
 
 /**
- * The static surface both `TransportWebUSB` and `TransportNodeUSB` expose
- * (verified against their real `.d.ts`/`.js` — both implement `TransportHID`
- * identically, differing only in how they enumerate/open the underlying
- * device). Parametrizing on this instead of importing either transport
- * package directly is what lets `KeystoneUsbConnectorBase` stay
- * platform-agnostic; `_subpath/webusb.ts` and `_subpath/nodeusb.ts` are the
- * only files that actually import a concrete transport.
+ * Static surface shared by `TransportWebUSB` and `TransportNodeUSB`; the
+ * platform-specific transport is injected by `_subpath/*`.
  */
 /**
  * What enumeration can see before the device is opened. WebUSB hands back a
@@ -60,25 +55,6 @@ export interface KeystoneUsbDeviceDescriptor {
   deviceClass?: number;
   deviceSubclass?: number;
   deviceProtocol?: number;
-}
-
-interface KeystoneUsbRuntimeDevice extends KeystoneUsbDeviceDescriptor {
-  configuration?: unknown;
-  opened?: boolean;
-}
-
-interface KeystoneUsbRuntimeTransport {
-  device?: KeystoneUsbRuntimeDevice;
-}
-
-interface KeystoneUsbTransportDebugState {
-  enumeratedCount?: number;
-  hasSessionDevice: boolean;
-  sessionDevicePresent?: boolean;
-  sessionDeviceOpened?: boolean;
-  sessionDeviceConfigured?: boolean;
-  enumerationFailed?: boolean;
-  enumerationErrorName?: string;
 }
 
 /**
@@ -130,51 +106,7 @@ type KeystoneUsbConnectInput =
 
 const DEFAULT_TIMEOUT_MS = 100_000; // SDK's own raw default is 15s ("may need users' action on the device") — too short for real confirmation.
 
-const KEYSTONE_USB_DEBUG_PREFIX = '[KEYSTONE-USB-DEBUG]';
 const KEYSTONE_PUBLIC_DATA_UR_TYPE = 'qr-hardware-call';
-const KEYSTONE_USB_DEBUG_ENABLED = process.env.NODE_ENV !== 'production';
-
-function stringifyKeystoneUsbDebugValue(value: unknown): string {
-  try {
-    return JSON.stringify(value);
-  } catch (error) {
-    return JSON.stringify({
-      stringifyError: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
-
-function debugKeystoneUsb(label: string, value?: unknown): void {
-  if (!KEYSTONE_USB_DEBUG_ENABLED) return;
-  const valueText = value === undefined ? '' : ` ${stringifyKeystoneUsbDebugValue(value)}`;
-  // eslint-disable-next-line no-console
-  console.log(`${KEYSTONE_USB_DEBUG_PREFIX} sdk-connector trace-v1 ${label}${valueText}`);
-}
-
-let usbDebugSequence = 0;
-
-async function traceUsbWait<T>(label: string, task: () => Promise<T>): Promise<T> {
-  if (!KEYSTONE_USB_DEBUG_ENABLED) return task();
-  const operation = ++usbDebugSequence;
-  const started = Date.now();
-  const state = () => ({ operation, elapsedMs: Date.now() - started });
-  debugKeystoneUsb(`${label}-start`, state());
-  // Observe pending work without cancelling or changing transport timeouts.
-  const timer = setInterval(() => debugKeystoneUsb(`${label}-pending`, state()), 5000);
-  try {
-    const result = await task();
-    debugKeystoneUsb(`${label}-complete`, state());
-    return result;
-  } catch (error) {
-    debugKeystoneUsb(`${label}-failed`, {
-      ...state(),
-      errorName: error instanceof Error ? error.name : typeof error,
-    });
-    throw error;
-  } finally {
-    clearInterval(timer);
-  }
-}
 
 function toUrEncoded(ur: KeystoneUr): string {
   return new UREncoder(new UR(Buffer.from(ur.urData, 'hex'), ur.urType), Infinity)
@@ -209,20 +141,9 @@ function fromUrEncoded(encoded: unknown): KeystoneUr {
 }
 
 /**
- * `IConnector` implementation for Keystone over USB. Every `TransportHID`
- * call the underlying SDK exposes is its own self-contained
- * open→claim→transfer→release→close cycle (verified in `TransportWebUSB`/
- * `TransportNodeUSB` source — there is no persistent USB claim to hold
- * across calls), so `connect()` just resolves one `TransportHID` instance
- * and caches it; each `call()` reuses that same JS object, and the
- * underlying SDK's own per-command open/close still happens on every send.
- *
- * USB carries the exact same UR payloads the QR channel does — `call()`'s
- * `'resolveUr'` method is a generic `{urType, urData}` (hex CBOR, matching
- * `hwk-keystone-adapter`'s `KeystoneUr` shape) in, `{urType, urData}` out.
- * The caller (a future dual-channel `KeystoneAdapter`) can build the UR once
- * via the same `KeystoneUrEngine` used for QR and send it down either
- * channel — this connector has no chain-specific knowledge at all.
+ * `IConnector` for Keystone over USB. Each transport call is its own
+ * open/claim/transfer/close cycle, so `connect()` only caches the transport
+ * object. `resolveUr` carries the same UR payloads as the QR channel.
  */
 export class KeystoneUsbConnectorBase implements IConnector {
   readonly connectionType = 'usb' as const;
@@ -247,12 +168,12 @@ export class KeystoneUsbConnectorBase implements IConnector {
   // which replaces the physical transport session without starting a new
   // user operation. Keep this UI-only state at connector lifetime scope so
   // an internal recovery does not look like another first connection.
-  private publicDataConfirmationShown = false;
+  /** Wallets that already approved a public-data export, keyed by master fingerprint. */
+  private readonly publicDataConfirmedWallets = new Set<string>();
 
   constructor(transportClass: KeystoneUsbTransportStatic, options?: { timeoutMs?: number }) {
     this.transportClass = transportClass;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    debugKeystoneUsb('runtime-ready', { timeoutMs: this.timeoutMs });
   }
 
   private _invalidateDiscoverySnapshot(): void {
@@ -263,43 +184,6 @@ export class KeystoneUsbConnectorBase implements IConnector {
   private _invalidateAvailabilitySnapshot(): void {
     this.activeAvailabilityGeneration = undefined;
     this.availabilityDevices.clear();
-  }
-
-  /**
-   * Capture object-lifetime facts without exposing USB serials or wallet data.
-   * A device can remain physically connected while WebUSB replaces the
-   * `USBDevice` object after re-enumeration; in that case enumeration succeeds
-   * but the transport cached in this session points at a stale object.
-   */
-  private async _getTransportDebugState(
-    transport: TransportHID
-  ): Promise<KeystoneUsbTransportDebugState | undefined> {
-    if (!KEYSTONE_USB_DEBUG_ENABLED) return undefined;
-
-    const sessionDevice = (transport as unknown as KeystoneUsbRuntimeTransport).device;
-    const sessionDeviceOpened =
-      typeof sessionDevice?.opened === 'boolean' ? sessionDevice.opened : undefined;
-    const sessionDeviceConfigured = sessionDevice ? sessionDevice.configuration != null : undefined;
-    try {
-      const enumeratedDevices = await this.transportClass.getKeystoneDevices();
-      return {
-        enumeratedCount: enumeratedDevices.length,
-        hasSessionDevice: Boolean(sessionDevice),
-        sessionDevicePresent: sessionDevice
-          ? enumeratedDevices.some(device => device === sessionDevice)
-          : undefined,
-        sessionDeviceOpened,
-        sessionDeviceConfigured,
-      };
-    } catch (error) {
-      return {
-        hasSessionDevice: Boolean(sessionDevice),
-        sessionDeviceOpened,
-        sessionDeviceConfigured,
-        enumerationFailed: true,
-        enumerationErrorName: error instanceof Error ? error.name : typeof error,
-      };
-    }
   }
 
   async searchDevices(options?: ConnectorSearchDevicesOptions): Promise<ConnectorDevice[]> {
@@ -314,10 +198,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
       this._invalidateDiscoverySnapshot();
       this.activeDiscoveryGeneration = discoveryGeneration;
     }
-    const devices = await traceUsbWait('search-enumerate', () =>
-      this.transportClass.getKeystoneDevices()
-    );
-    debugKeystoneUsb('search-result', { count: devices.length, isAvailabilitySearch });
+    const devices = await this.transportClass.getKeystoneDevices();
     // No mfp is available without opening+claiming the device. The target id
     // therefore identifies only this discovery snapshot; wallet identity is
     // learned and verified after connect. WebUSB can reopen the exact cached
@@ -377,7 +258,6 @@ export class KeystoneUsbConnectorBase implements IConnector {
   }
 
   async connectTarget(target: ConnectorConnectTarget): Promise<ConnectorSession> {
-    debugKeystoneUsb('connect-target-kind', { kind: target.type });
     switch (target.type) {
       case 'default':
         return this._connectResolved({});
@@ -405,10 +285,6 @@ export class KeystoneUsbConnectorBase implements IConnector {
     searchTargetId,
     expectedMasterFingerprint,
   }: KeystoneUsbConnectInput): Promise<ConnectorSession> {
-    debugKeystoneUsb('connect-start', {
-      hasSearchTargetId: Boolean(searchTargetId),
-      hasExpectedMasterFingerprint: Boolean(expectedMasterFingerprint),
-    });
     this.emitter.emit('ui-event', {
       type: EConnectorInteraction.Searching,
       payload: { sessionId: '' },
@@ -417,7 +293,6 @@ export class KeystoneUsbConnectorBase implements IConnector {
       ? this.discoveredDevices.get(searchTargetId) ?? this.availabilityDevices.get(searchTargetId)
       : undefined;
     if (searchTargetId && !selectedDevice) {
-      debugKeystoneUsb('connect-target-rejected', { reason: 'descriptor-snapshot-expired' });
       throw createHwkError({
         code: HardwareErrorCode.DeviceNotFound,
         message: `Keystone USB search target is no longer available: ${searchTargetId}`,
@@ -425,11 +300,6 @@ export class KeystoneUsbConnectorBase implements IConnector {
       });
     }
     let openedTransport: OpenedUsbTransport | undefined;
-    debugKeystoneUsb('connect-device-selection', {
-      descriptorFound: Boolean(selectedDevice),
-      supportsExactDevice: typeof this.transportClass.connectDevice === 'function',
-      matchExpectedFingerprint: Boolean(expectedMasterFingerprint),
-    });
     try {
       let config: Awaited<ReturnType<KeystoneUsbConnectorBase['_readAppConfig']>>;
 
@@ -522,11 +392,6 @@ export class KeystoneUsbConnectorBase implements IConnector {
       }
       const activeOpenedTransport = openedTransport;
       const { transport } = activeOpenedTransport;
-      debugKeystoneUsb('connect-transport-created');
-      debugKeystoneUsb('connect-app-config-read', {
-        hasMasterFingerprint: Boolean(config.mfp),
-        hasFirmwareVersion: Boolean(config.version),
-      });
       if (
         expectedMasterFingerprint &&
         config.mfp &&
@@ -559,25 +424,12 @@ export class KeystoneUsbConnectorBase implements IConnector {
         raw: { masterFingerprint: config.mfp },
       };
       this.emitter.emit('device-connect', { device });
-      debugKeystoneUsb('connect-complete');
       return {
         sessionId,
         deviceInfo: this._toDeviceInfo(device, config.version, config.mfp),
       };
     } catch (err) {
       openedTransport?.dispose();
-      const errorShape = err as {
-        code?: unknown;
-        message?: unknown;
-        stack?: unknown;
-        transportErrorCode?: unknown;
-        name?: unknown;
-      };
-      debugKeystoneUsb('connect-failed', {
-        name: errorShape?.name,
-        code: errorShape?.code,
-        transportErrorCode: errorShape?.transportErrorCode,
-      });
       throw mapKeystoneUsbError(err);
     }
   }
@@ -588,18 +440,12 @@ export class KeystoneUsbConnectorBase implements IConnector {
     let connectedSessionId: string | undefined;
     const transportConfig: TransportConfig = {
       timeout: this.timeoutMs,
-      disconnectListener: () => {
-        debugKeystoneUsb('transport-disconnect-event', {
-          sessionEstablished: Boolean(connectedSessionId),
-        });
-        return connectedSessionId ? this.disconnect(connectedSessionId) : undefined;
-      },
+      disconnectListener: () =>
+        connectedSessionId ? this.disconnect(connectedSessionId) : undefined,
     };
-    const transport = await traceUsbWait('transport-open', () =>
-      device && this.transportClass.connectDevice
-        ? this.transportClass.connectDevice(device, transportConfig)
-        : this.transportClass.connect(transportConfig)
-    );
+    const transport = await (device && this.transportClass.connectDevice
+      ? this.transportClass.connectDevice(device, transportConfig)
+      : this.transportClass.connect(transportConfig));
     let disposed = false;
     return {
       transport,
@@ -609,9 +455,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
       dispose: () => {
         if (disposed) return;
         disposed = true;
-        debugKeystoneUsb('transport-dispose-start');
         this.transportClass.disposeTransport?.(transport);
-        debugKeystoneUsb('transport-dispose-complete');
       },
     };
   }
@@ -661,10 +505,6 @@ export class KeystoneUsbConnectorBase implements IConnector {
   disconnect(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     this.sessions.delete(sessionId);
-    debugKeystoneUsb('session-disconnect', {
-      sessionFound: Boolean(session),
-      remainingSessionCount: this.sessions.size,
-    });
     if (session) {
       session.dispose();
       // No persistent claim to release (see class doc) — nothing to await
@@ -677,33 +517,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
 
   /** Keep the vendor transport as the EAPDU framing authority. */
   private async _sendResolveUr(transport: TransportHID, encodedUr: string): Promise<KeystoneUr> {
-    debugKeystoneUsb('resolve-send-start');
-    const response = await traceUsbWait('resolve-send', () =>
-      transport.send<{ payload: string }>(Actions.CMD_RESOLVE_UR, encodedUr)
-    );
-    const text = typeof response.payload === 'string' ? response.payload.trim() : '';
-    const firstPart = text.split(/\s+/).find(Boolean);
-    let urType: string | undefined;
-    let sequenceNumber: number | undefined;
-    let sequenceLength: number | undefined;
-    if (firstPart) {
-      try {
-        const [type, components] = URDecoder.parse(firstPart);
-        urType = type;
-        if (components.length === 2) {
-          [sequenceNumber, sequenceLength] = URDecoder.parseSequenceComponent(components[0]);
-        }
-      } catch {
-        // The decoder below owns validation; this block only produces safe diagnostics.
-      }
-    }
-    debugKeystoneUsb('resolve-response-received', {
-      payloadLength: text.length,
-      payloadPartCount: text ? text.split(/\s+/).filter(Boolean).length : 0,
-      urType,
-      sequenceNumber,
-      sequenceLength,
-    });
+    const response = await transport.send<{ payload: string }>(Actions.CMD_RESOLVE_UR, encodedUr);
     return fromUrEncoded(response.payload);
   }
 
@@ -724,11 +538,15 @@ export class KeystoneUsbConnectorBase implements IConnector {
     try {
       switch (method) {
         case 'resolveUr': {
-          debugKeystoneUsb('resolve-call-start');
           const { urType, urData } = params as KeystoneUr;
           const encoded = toUrEncoded({ urType, urData });
           const isPublicDataRequest = urType === KEYSTONE_PUBLIC_DATA_UR_TYPE;
-          const shouldShowConfirmation = !isPublicDataRequest || !this.publicDataConfirmationShown;
+          // Public-data export asks for approval once per wallet: internal USB
+          // re-enumeration must not reopen the toast, but a different device
+          // has not approved anything yet. Signing always confirms.
+          const publicDataKey = session.mfp?.toLowerCase() ?? sessionId;
+          const shouldShowConfirmation =
+            !isPublicDataRequest || !this.publicDataConfirmedWallets.has(publicDataKey);
           if (shouldShowConfirmation) {
             this.emitter.emit('ui-event', {
               type: EConnectorInteraction.ConfirmOnDevice,
@@ -736,21 +554,9 @@ export class KeystoneUsbConnectorBase implements IConnector {
             });
           }
           try {
-            debugKeystoneUsb(
-              'resolve-transport-before',
-              await traceUsbWait('resolve-state-before', () =>
-                this._getTransportDebugState(session.transport)
-              )
-            );
             const response = await this._sendResolveUr(session.transport, encoded);
-            debugKeystoneUsb(
-              'resolve-transport-after',
-              await traceUsbWait('resolve-state-after', () =>
-                this._getTransportDebugState(session.transport)
-              )
-            );
             if (isPublicDataRequest) {
-              this.publicDataConfirmationShown = true;
+              this.publicDataConfirmedWallets.add(publicDataKey);
             }
             return success(response);
           } finally {
@@ -788,22 +594,6 @@ export class KeystoneUsbConnectorBase implements IConnector {
           };
       }
     } catch (err) {
-      const errorShape = err as {
-        code?: unknown;
-        message?: unknown;
-        stack?: unknown;
-        transportErrorCode?: unknown;
-        name?: unknown;
-      };
-      debugKeystoneUsb('call-failed', {
-        method,
-        name: errorShape?.name,
-        code: errorShape?.code,
-        transportErrorCode: errorShape?.transportErrorCode,
-        transportState: await traceUsbWait('error-state', () =>
-          this._getTransportDebugState(session.transport)
-        ),
-      });
       return { success: false, error: serializeConnectorError(mapKeystoneUsbError(err)) };
     }
   }
@@ -835,14 +625,15 @@ export class KeystoneUsbConnectorBase implements IConnector {
     this.sessions.clear();
     this._invalidateDiscoverySnapshot();
     this._invalidateAvailabilitySnapshot();
-    this.publicDataConfirmationShown = false;
+    this.publicDataConfirmedWallets.clear();
   }
 
   private async _readAppConfig(
     transport: TransportHID
   ): Promise<{ version?: string; mfp?: string }> {
-    const response = await traceUsbWait('device-version-send', () =>
-      transport.send<Record<string, unknown>>(Actions.CMD_GET_DEVICE_VERSION, '')
+    const response = await transport.send<Record<string, unknown>>(
+      Actions.CMD_GET_DEVICE_VERSION,
+      ''
     );
     const rawMasterFingerprint = response.walletMFP;
     const masterFingerprint = parseBip32MasterFingerprint(rawMasterFingerprint);
