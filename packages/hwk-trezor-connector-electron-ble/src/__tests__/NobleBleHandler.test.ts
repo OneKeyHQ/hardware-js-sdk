@@ -45,7 +45,10 @@ class FakePeripheral extends EventEmitter {
     characteristics: [this.writeChar, this.notifyChar],
   }));
 
-  constructor(public readonly id: string, public readonly advertisement: { localName?: string }) {
+  constructor(
+    public readonly id: string,
+    public readonly advertisement: { localName?: string; serviceUuids?: string[] }
+  ) {
     super();
   }
 }
@@ -90,6 +93,37 @@ class FakeIpcMain {
 }
 
 describe('NobleBleHandler', () => {
+  test('keeps Ledger GATT and unpadded frames separate from the default Trezor profile', async () => {
+    const serviceUuid = '13d63400-2c97-0004-0000-4c6564676572';
+    const writeUuid = '13d63400-2c97-0004-0002-4c6564676572';
+    const notifyUuid = '13d63400-2c97-0004-0001-4c6564676572';
+    const ledger = new FakePeripheral('ledger-fixture', {
+      localName: 'Ledger fixture',
+      serviceUuids: [serviceUuid],
+    });
+    ledger.writeChar = new FakeCharacteristic(writeUuid);
+    ledger.notifyChar = new FakeCharacteristic(notifyUuid);
+    const trezor = new FakePeripheral('trezor-fixture', { localName: 'Trezor Safe 7' });
+    const noble = new FakeNoble([ledger, trezor]);
+    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    expect((await handler.scan()).map(device => device.id)).toEqual(['trezor-fixture']);
+    expect(
+      (await handler.scan({ vendor: 'ledger', serviceUuids: [serviceUuid] })).map(
+        device => device.id
+      )
+    ).toEqual(['ledger-fixture']);
+    await handler.connect(ledger.id, { vendor: 'ledger', serviceUuid, writeUuid, notifyUuid });
+    await handler.write(ledger.id, '0800000000');
+    expect(ledger.writeChar.writeAsync).toHaveBeenCalledWith(
+      Buffer.from('0800000000', 'hex'),
+      false
+    );
+    await expect(handler.write(ledger.id, '00'.repeat(21))).rejects.toThrow(
+      'Invalid Ledger BLE frame'
+    );
+    await handler.dispose();
+  });
+
   test('scan starts a continuous scan and returns the current snapshot', async () => {
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
     const noble = new FakeNoble([peripheral]);
