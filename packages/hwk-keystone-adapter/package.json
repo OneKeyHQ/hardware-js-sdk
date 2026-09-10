@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-keystone-adapter",
-  "version": "1.2.2-alpha.100",
+  "version": "1.2.3-alpha.1",
   "description": "Keystone hardware wallet adapter (QR + USB) for OneKey",
   "author": "OneKey",
   "license": "MIT",
@@ -47,7 +47,7 @@
     "@keystonehq/bc-ur-registry": "0.8.0",
     "@keystonehq/bc-ur-registry-eth": "0.22.1",
     "@keystonehq/keystone-sdk": "0.12.3",
-    "@onekeyfe/hwk-adapter-core": "1.2.2-alpha.100",
+    "@onekeyfe/hwk-adapter-core": "1.2.3-alpha.1",
     "bitcoinjs-lib": "npm:@onekeyfe/bitcoinjs-lib@7.0.1",
     "bs58": "5.0.0",
     "bs58check": "3.0.1",
