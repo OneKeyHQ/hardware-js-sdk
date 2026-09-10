@@ -1295,6 +1295,113 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     });
   });
 
+  test.each(['ios', 'android'] as const)(
+    'disconnects after an active Protocol V2 response timeout and reconnects on %s',
+    async platform => {
+      setPlatformOS(platform);
+      const harness = createHarness();
+      const { transport, uuid, device, bleManager, sentSeqs, emitter } = harness;
+      const disconnected = jest.fn();
+      emitter.on(TRANSPORT_EVENT.DEVICE_DISCONNECT, disconnected);
+      let connected = true;
+      device.isConnected.mockImplementation(() => Promise.resolve(connected));
+      device.connect = jest.fn(() => {
+        connected = true;
+        return Promise.resolve(device);
+      });
+      bleManager.cancelDeviceConnection.mockImplementation(() => {
+        connected = false;
+        return Promise.resolve();
+      });
+
+      await transport.acquire({ uuid, expectedProtocol: 'V2' });
+      harness.setShouldRespond(false);
+      await expect(transport.call(uuid, 'Ping', {}, { timeoutMs: 10 })).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleTimeoutError,
+      });
+
+      expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
+      expect(connected).toBe(false);
+      expect(transport.getProtocolType(uuid)).toBeUndefined();
+      expect(disconnected).toHaveBeenCalledTimes(1);
+      expect(disconnected).toHaveBeenCalledWith({
+        id: uuid,
+        connectId: uuid,
+        name: device.name,
+      });
+
+      harness.setShouldRespond(true);
+      await transport.acquire({ uuid, expectedProtocol: 'V2' });
+      await expect(transport.call(uuid, 'Ping', {})).resolves.toMatchObject({ type: 'Success' });
+      expect(device.connect).toHaveBeenCalledTimes(1);
+      expect(sentSeqs).toEqual([1, 2, 3, 4]);
+      await transport.release(uuid, true);
+    }
+  );
+
+  test('does not disconnect an active Protocol V2 call when a queued call times out', async () => {
+    const harness = createHarness();
+    const { transport, uuid, bleManager } = harness;
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
+    harness.setShouldRespond(false);
+    const active = transport.call(uuid, 'Ping', {}, { timeoutMs: 1000 }).catch(error => error);
+    await new Promise(resolve => {
+      setImmediate(resolve);
+    });
+
+    try {
+      await expect(transport.call(uuid, 'Ping', {}, { timeoutMs: 10 })).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleTimeoutError,
+      });
+      expect(bleManager.cancelDeviceConnection).not.toHaveBeenCalled();
+      expect(transport.getProtocolType(uuid)).toBe('V2');
+    } finally {
+      await transport.disconnect(uuid);
+      await active;
+    }
+  });
+
+  test('does not disconnect a newer acquire when V2 timeout cleanup waits for the lifecycle lock', async () => {
+    const harness = createHarness();
+    const { transport, uuid, bleManager } = harness;
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
+    const lifecycle = transport as unknown as {
+      runLifecycleOperation(id: string, operation: () => Promise<void>): Promise<void>;
+      releaseNative(id: string, onclose: boolean): Promise<boolean>;
+    };
+    const gate = createDeferred<void>();
+    const holding = lifecycle.runLifecycleOperation(uuid, () => gate.promise);
+    const reacquiring = transport.acquire({ uuid, expectedProtocol: 'V2' });
+    const invalidated = createDeferred<void>();
+    const releaseNative = lifecycle.releaseNative.bind(lifecycle);
+    jest.spyOn(lifecycle, 'releaseNative').mockImplementationOnce(async (id, onclose) => {
+      const result = await releaseNative(id, onclose);
+      invalidated.resolve();
+      return result;
+    });
+    harness.setShouldRespond(false);
+    const failure = expect(
+      transport.call(uuid, 'Ping', {}, { timeoutMs: 10 })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleTimeoutError,
+    });
+
+    try {
+      await invalidated.promise;
+      harness.setShouldRespond(true);
+      gate.resolve();
+      await holding;
+      await reacquiring;
+      await failure;
+      expect(bleManager.cancelDeviceConnection).not.toHaveBeenCalled();
+      await expect(transport.call(uuid, 'Ping', {})).resolves.toMatchObject({ type: 'Success' });
+    } finally {
+      gate.resolve();
+      await Promise.allSettled([holding, reacquiring, failure]);
+      await transport.release(uuid, true);
+    }
+  });
+
   test('retains the sequence cursor when a new monitor generation is acquired', async () => {
     const { transport, uuid, sentSeqs } = createHarness();
 
