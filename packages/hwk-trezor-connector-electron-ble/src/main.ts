@@ -2,6 +2,7 @@ import { TREZOR_BLE_CHANNELS } from './constants';
 import { NobleBleHandler } from './NobleBleHandler';
 
 import type { NobleBleHandlerOptions } from './NobleBleHandler';
+import type { ElectronBleConnectOptions, ElectronBleScanOptions } from '@onekeyfe/hwk-adapter-core';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -77,11 +78,11 @@ export function initTrezorBleSupport(
     });
   };
 
-  handle(TREZOR_BLE_CHANNELS.scan, (options?: { serviceUuids?: string[]; durationMs?: number }) =>
-    handler.scan(options)
-  );
+  handle(TREZOR_BLE_CHANNELS.scan, (options?: ElectronBleScanOptions) => handler.scan(options));
   handle(TREZOR_BLE_CHANNELS.stopScan, () => handler.stopScan());
-  handle(TREZOR_BLE_CHANNELS.connect, (id: string) => handler.connect(id));
+  handle(TREZOR_BLE_CHANNELS.connect, (id: string, options?: ElectronBleConnectOptions) =>
+    handler.connect(id, options)
+  );
   handle(TREZOR_BLE_CHANNELS.disconnect, (id: string) => handler.disconnect(id));
   handle(TREZOR_BLE_CHANNELS.write, (id: string, hexData: string) => handler.write(id, hexData));
   handle(TREZOR_BLE_CHANNELS.subscribe, (id: string) => handler.subscribe(id));

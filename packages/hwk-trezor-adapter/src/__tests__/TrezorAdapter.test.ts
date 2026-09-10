@@ -159,6 +159,42 @@ describe('TrezorAdapter', () => {
     expect(connector.connect).toHaveBeenCalledWith('safe-7', { transportType: 'ble' });
   });
 
+  it.each([true, false])('requires persistence before the wallet call (saved=%s)', async saved => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    (connector.call as CallMock).mockImplementation(async (_session, method) => {
+      if (method === 'createAppSession') return { protocol: 'v1' };
+      return { address: 'verified-address' };
+    });
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+        payload: { requestId: event.payload.requestId, sdkConnectId: 'safe-7' },
+      });
+    });
+    const save = jest.fn();
+    adapter.on(UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING, event => {
+      save(event.payload);
+      expect(
+        (connector.call as CallMock).mock.calls.some(([, method]) => method === 'evmGetAddress')
+      ).toBe(false);
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING,
+        payload: { requestId: event.payload.requestId, saved },
+      });
+    });
+    const result = await adapter.evmGetAddress('', 'safe-7', {
+      path: "m/44'/60'/0'/0/0",
+      useEmptyPassphrase: true,
+      extra: { dbDeviceId: 'binding-record' },
+    });
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(result.success).toBe(saved);
+    expect(
+      (connector.call as CallMock).mock.calls.some(([, method]) => method === 'evmGetAddress')
+    ).toBe(saved);
+  });
+
   it('carries opaque context through explicit binding only after the wallet call succeeds', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
@@ -486,7 +522,55 @@ describe('TrezorAdapter', () => {
     expect(connector.connect).toHaveBeenCalledWith('safe-7', { transportType: 'ble' });
   });
 
-  it('falls back to a known BLE endpoint when USB disappears after discovery', async () => {
+  it('does not rebind an unavailable saved BLE endpoint', async () => {
+    const connector = createConnector();
+    (connector.connect as ConnectMock).mockRejectedValueOnce(
+      Object.assign(new Error('Not advertising'), { code: HardwareErrorCode.DeviceNotFound })
+    );
+    const adapter = new TrezorAdapter(connector);
+    const selection = jest.fn();
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, selection);
+    const result = await adapter.evmGetAddress('', 'safe-7', {
+      path: "m/44'/60'/0'/0/0",
+      useEmptyPassphrase: true,
+      knownConnections: [{ transport: 'ble', connectId: 'safe-7' }],
+    });
+    expect(result).toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.DeviceNotFound },
+    });
+    expect(selection).not.toHaveBeenCalled();
+    expect(connector.searchDevices).not.toHaveBeenCalled();
+    expect(connector.call).not.toHaveBeenCalled();
+  });
+
+  it('terminates binding UI when a selected BLE endpoint fails to connect', async () => {
+    const connector = createConnector();
+    (connector.connect as ConnectMock).mockRejectedValueOnce(
+      Object.assign(new Error('Not advertising'), { code: HardwareErrorCode.DeviceNotFound })
+    );
+    const adapter = new TrezorAdapter(connector);
+    const status = jest.fn();
+    adapter.on(UI_REQUEST.DEVICE_BINDING_STATUS, status);
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+        payload: { requestId: event.payload.requestId, sdkConnectId: 'safe-7' },
+      });
+    });
+    const result = await adapter.evmGetAddress('', 'safe-7', {
+      path: "m/44'/60'/0'/0/0",
+      useEmptyPassphrase: true,
+      knownConnections: [],
+    });
+    expect(result.success).toBe(false);
+    expect(status).toHaveBeenLastCalledWith({
+      type: UI_REQUEST.DEVICE_BINDING_STATUS,
+      payload: { selectionRequestId: expect.any(String), status: 'failed' },
+    });
+  });
+
+  it('does not fall back to BLE when a discovered USB endpoint disappears', async () => {
     const connector: IConnector = { ...createConnector(), availableTransports: ['usb', 'ble'] };
     (connector.searchDevices as SearchDevicesMock).mockResolvedValue([
       { connectId: 'usb-unplugged', connectionType: 'usb', name: 'Trezor USB' },
@@ -506,9 +590,12 @@ describe('TrezorAdapter', () => {
       useEmptyPassphrase: true,
     });
 
-    expect(result.success).toBe(true);
+    expect(result).toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.DeviceNotFound },
+    });
     expect(connector.connect).toHaveBeenNthCalledWith(1, 'usb-unplugged', { transportType: 'usb' });
-    expect(connector.connect).toHaveBeenNthCalledWith(2, 'safe-7', { transportType: 'ble' });
+    expect(connector.connect).toHaveBeenCalledTimes(1);
   });
 
   it('prefers identity-matched USB over a known BLE binding', async () => {
@@ -562,6 +649,15 @@ describe('TrezorAdapter', () => {
     const verified = jest.fn();
     adapter.on(DEVICE.TREZOR_CONNECTION_VERIFIED, verified);
     adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+      if (event.payload.rejectedConnectId) {
+        expect(event.payload.rejectedConnectId).toBe('safe-7');
+        expect(event.payload.devices).toEqual([]);
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+          payload: { cancelled: true, requestId: event.payload.requestId },
+        });
+        return;
+      }
       adapter.uiResponse({
         type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
         payload: { sdkConnectId: 'safe-7', requestId: event.payload.requestId },
@@ -575,7 +671,7 @@ describe('TrezorAdapter', () => {
 
     expect(result).toMatchObject({
       success: false,
-      payload: { code: HardwareErrorCode.DeviceMismatch },
+      payload: { code: HardwareErrorCode.UserAborted },
     });
     expect(connector.call).not.toHaveBeenCalled();
     expect(connector.disconnect).toHaveBeenCalledWith('safe-7-session');

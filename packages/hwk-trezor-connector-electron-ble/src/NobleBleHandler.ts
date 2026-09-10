@@ -19,6 +19,7 @@ import {
 } from './constants';
 
 import type { TrezorBleAvailability, TrezorBleDeviceInfo } from './types/desktop-api';
+import type { ElectronBleConnectOptions, ElectronBleScanOptions } from '@onekeyfe/hwk-adapter-core';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -102,6 +103,7 @@ const DEFAULT_NOBLE_FACTORY: NobleFactory = () => {
 };
 
 interface DeviceEntry {
+  vendor?: 'ledger';
   peripheral: NoblePeripheralLike;
   writeChar?: NobleCharacteristicLike;
   notifyChar?: NobleCharacteristicLike;
@@ -317,11 +319,7 @@ export class NobleBleHandler {
    * own devices do advertise their service UUID, which is why the same filter is
    * safe in `hd-transport-electron` and was copied here by mistake.)
    */
-  async scan(options?: {
-    /** Accepted for IPC compatibility with older renderers, but ALWAYS ignored — see the doc comment above. */
-    serviceUuids?: string[];
-    durationMs?: number;
-  }): Promise<TrezorBleDeviceInfo[]> {
+  async scan(options?: ElectronBleScanOptions): Promise<TrezorBleDeviceInfo[]> {
     await this.init();
     if (!this._scanning) {
       this._scanning = true;
@@ -342,7 +340,7 @@ export class NobleBleHandler {
     }
     this._assertActive();
     this._armIdleStop();
-    const devices = this._snapshot();
+    const devices = this._snapshot(options);
     // raw vs kept. An empty result now has two very different causes and the log
     // must say which: raw=0 means nothing is on air at all (radio, or the device
     // simply is not advertising); raw>0 with kept=0 means WE are dropping it —
@@ -369,7 +367,7 @@ export class NobleBleHandler {
    * the source of truth for reachability — a device missing from here can still
    * be connected to by id (`_directConnect`).
    */
-  private _snapshot(): TrezorBleDeviceInfo[] {
+  private _snapshot(options?: ElectronBleScanOptions): TrezorBleDeviceInfo[] {
     const now = Date.now();
     const result: TrezorBleDeviceInfo[] = [];
     for (const [id, peripheral] of this._discovered) {
@@ -378,7 +376,13 @@ export class NobleBleHandler {
         this._lastSeen.delete(id);
         continue;
       }
-      if (!isTrezorPeripheral(peripheral)) continue;
+      const matches =
+        options?.vendor === 'ledger'
+          ? (peripheral.advertisement.serviceUuids ?? []).some(uuid =>
+              options.serviceUuids?.some(service => normalizeUuid(service) === normalizeUuid(uuid))
+            )
+          : isTrezorPeripheral(peripheral);
+      if (!matches) continue;
       result.push(peripheralToInfo(peripheral));
     }
     // A device WE hold a link to stops advertising (standard BLE), so it ages
@@ -388,6 +392,7 @@ export class NobleBleHandler {
     // pairing/THP handshake alone does NOT silence a Safe 7; holding the
     // connection does.
     for (const [id, entry] of this._connected) {
+      if ((entry.vendor === 'ledger') !== (options?.vendor === 'ledger')) continue;
       if (result.some(info => info.id === id)) continue;
       result.push(peripheralToInfo(entry.peripheral));
     }
@@ -667,7 +672,19 @@ export class NobleBleHandler {
   // covers the whole flow. Two distinct failures reach the connector: a `timed
   // out` reject (device unreachable) vs a connectAsync `connection failed`
   // reject (link refused / stale bond) — mapped to different error codes there.
-  async connect(id: string): Promise<{ id: string; name?: string }> {
+  async connect(
+    id: string,
+    options?: ElectronBleConnectOptions
+  ): Promise<{ id: string; name?: string }> {
+    if (
+      options &&
+      (options.vendor !== 'ledger' ||
+        ![options.serviceUuid, options.writeUuid, options.notifyUuid].every(
+          uuid => typeof uuid === 'string' && /^[0-9a-f]{32}$/i.test(normalizeUuid(uuid))
+        ))
+    ) {
+      throw new Error('Invalid Ledger BLE GATT profile');
+    }
     this._assertActive();
     // Promise.race only times out the CALLER — it cannot cancel the in-flight
     // _connectInner. Native cancellation is handled separately during disposal.
@@ -699,7 +716,7 @@ export class NobleBleHandler {
     };
     this._activeConnect = attempt;
     this._connectAttempts.add(attempt);
-    const nativeOperation = this._connectInner(id, claim);
+    const nativeOperation = this._connectInner(id, claim, options);
     const caller = (async () => {
       try {
         return await Promise.race([nativeOperation, abandoned]);
@@ -721,7 +738,8 @@ export class NobleBleHandler {
 
   private async _connectInner(
     id: string,
-    claim: { abandoned: boolean; cancelNative?: () => void }
+    claim: { abandoned: boolean; cancelNative?: () => void },
+    options?: ElectronBleConnectOptions
   ): Promise<{ id: string; name?: string }> {
     await this.init();
     // Stop scanning (keep the cache) and let the radio settle before connecting.
@@ -808,12 +826,19 @@ export class NobleBleHandler {
     }
 
     try {
+      const uuids = options
+        ? {
+            service: options.serviceUuid,
+            write: options.writeUuid,
+            notify: options.notifyUuid,
+          }
+        : this._uuids;
       const { characteristics } = await peripheral.discoverSomeServicesAndCharacteristicsAsync(
-        [this._uuids.service],
-        [this._uuids.write, this._uuids.notify]
+        [uuids.service],
+        [uuids.write, uuids.notify]
       );
-      const writeUuid = normalizeUuid(this._uuids.write);
-      const notifyUuid = normalizeUuid(this._uuids.notify);
+      const writeUuid = normalizeUuid(uuids.write);
+      const notifyUuid = normalizeUuid(uuids.notify);
       const writeChar = characteristics.find(c => normalizeUuid(c.uuid) === writeUuid);
       const notifyChar = characteristics.find(c => normalizeUuid(c.uuid) === notifyUuid);
       if (!writeChar || !notifyChar) {
@@ -827,7 +852,13 @@ export class NobleBleHandler {
       };
       peripheral.on('disconnect', disconnectHandler);
 
-      this._connected.set(id, { peripheral, writeChar, notifyChar, disconnectHandler });
+      this._connected.set(id, {
+        peripheral,
+        writeChar,
+        notifyChar,
+        disconnectHandler,
+        vendor: options?.vendor,
+      });
       this._log('info', 'connect.done', { id, name: peripheral.advertisement.localName });
       return { id, name: peripheral.advertisement.localName };
     } catch (error) {
@@ -883,6 +914,14 @@ export class NobleBleHandler {
     const entry = this._requireEntry(id);
     if (!entry.writeChar) throw new Error(`Trezor BLE write char missing for ${id}`);
     const buffer = Buffer.from(hexData, 'hex');
+    if (entry.vendor === 'ledger') {
+      // Ledger frames carry their own length and sequence; Trezor padding corrupts them.
+      if (!/^(?:[0-9a-f]{2})+$/i.test(hexData) || buffer.length > 20) {
+        throw new Error('Invalid Ledger BLE frame');
+      }
+      await entry.writeChar.writeAsync(buffer, false);
+      return;
+    }
     for (let offset = 0; offset < buffer.length; offset += this._chunkSize) {
       this._assertActive();
       const slice = buffer.subarray(offset, offset + this._chunkSize);

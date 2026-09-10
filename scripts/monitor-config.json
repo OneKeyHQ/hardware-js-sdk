@@ -18,6 +18,7 @@
       "hwk-adapter-core",
       "hwk-ledger-adapter",
       "hwk-ledger-connector-ble",
+      "hwk-ledger-connector-electron-ble",
       "hwk-ledger-connector-webhid",
       "hwk-trezor-protobuf",
       "hwk-trezor-protocol",
