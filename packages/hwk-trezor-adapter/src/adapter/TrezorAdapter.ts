@@ -16,6 +16,8 @@ import {
   isHwkRecoveryHint,
   operationMayHaveCompletedParams,
   rehydrateConnectorError,
+  requestBleDeviceSelection,
+  requestSaveDeviceBinding,
   resolveHardwareOperationTarget,
   resolveSearchTargetReusePolicy,
   runAllNetworkGetAddress,
@@ -1339,14 +1341,15 @@ export class TrezorAdapter implements IHardwareWallet {
               interactionId
             );
             if (result.success && expectedIdentity?.value) {
-              verified = true;
-              this._rememberVerifiedConnection(expectedIdentity.value, resolvedConnectId);
-              this._emitVerifiedBinding(
+              await this._emitVerifiedBinding(
                 expectedIdentity.value,
                 resolvedConnectId,
                 selectionRequestId,
-                operationContext
+                operationContext,
+                signal
               );
+              verified = true;
+              this._rememberVerifiedConnection(expectedIdentity.value, resolvedConnectId);
             }
             return result;
           } finally {
@@ -1916,6 +1919,17 @@ export class TrezorAdapter implements IHardwareWallet {
       } else if (useEmptyPassphrase === true) {
         await TrezorAdapter._abortable(signal, this._createFreshAppSession(sessionId, signal));
       }
+      const saveBeforeCall =
+        this._emitter.listenerCount(UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING) > 0;
+      if (expectedDeviceId && saveBeforeCall) {
+        await this._emitVerifiedBinding(
+          expectedDeviceId,
+          connectId,
+          selectionRequestId,
+          connectionContext,
+          signal
+        );
+      }
       businessCallStarted = true;
       const result = await TrezorAdapter._abortable(
         signal,
@@ -1923,20 +1937,41 @@ export class TrezorAdapter implements IHardwareWallet {
       );
       if (expectedDeviceId) {
         this._rememberVerifiedConnection(expectedDeviceId, connectId);
-        this._emitVerifiedBinding(
-          expectedDeviceId,
-          connectId,
-          selectionRequestId,
-          connectionContext
-        );
+        if (!saveBeforeCall) {
+          await this._emitVerifiedBinding(
+            expectedDeviceId,
+            connectId,
+            selectionRequestId,
+            connectionContext,
+            signal
+          );
+        }
       }
       return success(result as T);
     } catch (error) {
       // If we were aborted, surface as-is — don't take the retry/recovery path.
       if (signal.aborted) {
+        if (selectionRequestId)
+          this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
+            type: UI_REQUEST.DEVICE_BINDING_STATUS,
+            payload: { selectionRequestId, status: 'cancelled' },
+          });
         return this._errorToFailure(error);
       }
       const code = TrezorAdapter._errorCode(error);
+      if (
+        selectionRequestId &&
+        !(
+          allowRetry &&
+          (passphraseState || useEmptyPassphrase === true) &&
+          TrezorAdapter._isStaleSessionError(code)
+        )
+      ) {
+        this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
+          type: UI_REQUEST.DEVICE_BINDING_STATUS,
+          payload: { selectionRequestId, status: 'failed' },
+        });
+      }
       const ambiguousTransportFailure =
         code === HardwareErrorCode.DeviceDisconnected ||
         code === HardwareErrorCode.OperationTimeout ||
@@ -2135,34 +2170,36 @@ export class TrezorAdapter implements IHardwareWallet {
       }
     }
 
-    for (const knownBleConnectId of knownBleIds) {
-      if (!availableTransports.includes('ble')) break;
-      try {
-        // eslint-disable-next-line no-await-in-loop
-        await TrezorAdapter._abortable(
-          signal,
-          this._ensureDevicePermission(knownBleConnectId, expectedDeviceId, 'ble')
-        );
-        // eslint-disable-next-line no-await-in-loop
-        await this._ensureSession(knownBleConnectId, signal, 'ble');
-        const actualDeviceId = this._devices.get(knownBleConnectId)?.deviceId;
-        if (actualDeviceId === expectedDeviceId) return { connectId: knownBleConnectId };
-        const sessionId = this._sessions.get(knownBleConnectId);
-        this._sessions.delete(knownBleConnectId);
-        this._verifiedPassphraseSessionsByConnectId.delete(knownBleConnectId);
-        if (sessionId) {
-          // eslint-disable-next-line no-await-in-loop
-          await this._runConnectorTeardown(() => this._connector.disconnect(sessionId));
-        }
-        throw createHwkError({
-          code: HardwareErrorCode.DeviceMismatch,
-          message: 'The bound Trezor Bluetooth device has a different identity',
-        });
-      } catch (error) {
-        // Only an unavailable endpoint permits fresh discovery. Pairing,
-        // permission, protocol, and identity failures require user resolution.
-        if (signal.aborted || !TrezorAdapter._isConnectionUnavailableError(error)) throw error;
+    if (usbCandidates.length > 0) {
+      throw createHwkError({
+        code: mismatchedDeviceIds.length
+          ? HardwareErrorCode.DeviceMismatch
+          : HardwareErrorCode.DeviceNotFound,
+        message:
+          'No discovered USB Trezor could be verified; Bluetooth binding requires empty USB discovery',
+      });
+    }
+
+    const [knownBleConnectId] = knownBleIds;
+    if (knownBleConnectId && availableTransports.includes('ble')) {
+      // A saved endpoint never opens a new binding session after failure.
+      await TrezorAdapter._abortable(
+        signal,
+        this._ensureDevicePermission(knownBleConnectId, expectedDeviceId, 'ble')
+      );
+      await this._ensureSession(knownBleConnectId, signal, 'ble');
+      const actualDeviceId = this._devices.get(knownBleConnectId)?.deviceId;
+      if (actualDeviceId === expectedDeviceId) return { connectId: knownBleConnectId };
+      const sessionId = this._sessions.get(knownBleConnectId);
+      this._sessions.delete(knownBleConnectId);
+      this._verifiedPassphraseSessionsByConnectId.delete(knownBleConnectId);
+      if (sessionId) {
+        await this._runConnectorTeardown(() => this._connector.disconnect(sessionId));
       }
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceMismatch,
+        message: 'The bound Trezor Bluetooth device has a different identity',
+      });
     }
 
     if (context?.allowDeviceSelection === false) {
@@ -2184,24 +2221,30 @@ export class TrezorAdapter implements IHardwareWallet {
       )
     ).filter(device => device.connectionType === 'ble' && !knownBleIds.includes(device.connectId));
     if (signal.aborted) throw signal.reason;
-    if (bleCandidates.length > 0) {
-      if (!this._emitter.listenerCount(UI_REQUEST.REQUEST_SELECT_DEVICE)) {
-        throw createHwkError({
-          code: HardwareErrorCode.DeviceNotFound,
-          message: 'Select a Trezor Bluetooth device before continuing',
-        });
-      }
-      const requestId = this._uiRegistry.createRequestId();
-      const waitPromise = this._uiRegistry.wait<{ sdkConnectId: string }>(
-        UI_REQUEST.REQUEST_SELECT_DEVICE,
-        { requestId }
-      );
-      const selectionPromise = TrezorAdapter._abortable(signal, waitPromise);
-      this._emitter.emit(UI_REQUEST.REQUEST_SELECT_DEVICE, {
-        type: UI_REQUEST.REQUEST_SELECT_DEVICE,
-        payload: {
-          devices: bleCandidates,
-          requestId,
+    const rejectedConnectIds = new Set<string>();
+    const bindingSessionId = this._uiRegistry.createRequestId();
+    let rejectedConnectId: string | undefined;
+    while (
+      availableTransports.includes('ble') &&
+      this._emitter.listenerCount(UI_REQUEST.REQUEST_SELECT_DEVICE)
+    ) {
+      const { device: selected, requestId } = await requestBleDeviceSelection({
+        emitter: this._emitter,
+        registry: this._uiRegistry,
+        signal,
+        scan: async () =>
+          (
+            await this._searchDevices({ transportType: 'ble', waitForAllTransports: true }, signal)
+          ).filter(
+            device =>
+              device.connectionType === 'ble' &&
+              !knownBleIds.includes(device.connectId) &&
+              !rejectedConnectIds.has(device.connectId)
+          ),
+        request: {
+          devices: bleCandidates.filter(device => !rejectedConnectIds.has(device.connectId)),
+          bindingSessionId,
+          rejectedConnectId,
           context: {
             kind: 'bind-connection',
             transport: 'ble',
@@ -2210,15 +2253,18 @@ export class TrezorAdapter implements IHardwareWallet {
           extra: context?.extra,
         },
       });
-      const { sdkConnectId } = await selectionPromise;
-      const selected = bleCandidates.find(device => device.connectId === sdkConnectId);
-      if (!selected) {
-        throw createHwkError({
-          code: HardwareErrorCode.DeviceNotFound,
-          message: 'Selected Trezor is no longer available',
+      try {
+        await this._ensureSession(selected.connectId, signal, 'ble');
+      } catch (error) {
+        this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
+          type: UI_REQUEST.DEVICE_BINDING_STATUS,
+          payload: {
+            selectionRequestId: requestId,
+            status: signal.aborted ? 'cancelled' : 'failed',
+          },
         });
+        throw error;
       }
-      await this._ensureSession(selected.connectId, signal, 'ble');
       if (this._devices.get(selected.connectId)?.deviceId !== expectedDeviceId) {
         const sessionId = this._sessions.get(selected.connectId);
         this._sessions.delete(selected.connectId);
@@ -2226,10 +2272,9 @@ export class TrezorAdapter implements IHardwareWallet {
         if (sessionId) {
           await this._runConnectorTeardown(() => this._connector.disconnect(sessionId));
         }
-        throw createHwkError({
-          code: HardwareErrorCode.DeviceMismatch,
-          message: 'Selected Trezor has a different identity',
-        });
+        rejectedConnectId = selected.connectId;
+        rejectedConnectIds.add(selected.connectId);
+        continue;
       }
       return { connectId: selected.connectId, selectionRequestId: requestId };
     }
@@ -2262,15 +2307,28 @@ export class TrezorAdapter implements IHardwareWallet {
     this._knownDeviceConnections.set(deviceId, known);
   }
 
-  private _emitVerifiedBinding(
+  private async _emitVerifiedBinding(
     deviceId: string,
     connectId: string,
     selectionRequestId: string | undefined,
-    context?: IHardwareConnectionContext
-  ): void {
+    context?: IHardwareConnectionContext,
+    signal?: AbortSignal
+  ): Promise<void> {
     if (!selectionRequestId) return;
     const device = this._devices.get(connectId);
     if (!device || device.deviceId !== deviceId || device.connectionType !== 'ble') return;
+    const acknowledged = await requestSaveDeviceBinding(
+      this._emitter,
+      this._uiRegistry,
+      {
+        selectionRequestId,
+        connection: { transport: 'ble', connectId },
+        identity: { vendor: 'trezor', type: 'deviceId', value: deviceId },
+        extra: context?.extra,
+      },
+      signal
+    );
+    if (acknowledged) return;
     this._emitter.emit(DEVICE.TREZOR_CONNECTION_VERIFIED, {
       type: DEVICE.TREZOR_CONNECTION_VERIFIED,
       payload: {
