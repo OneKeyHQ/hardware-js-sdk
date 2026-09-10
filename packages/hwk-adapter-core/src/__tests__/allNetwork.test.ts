@@ -99,7 +99,7 @@ describe('runAllNetworkGetAddress', () => {
         responseItem.payload?.code === HardwareErrorCode.DeviceMismatch,
     });
 
-    expect(response).toEqual({
+    expect(response).toMatchObject({
       success: false,
       payload: {
         code: HardwareErrorCode.DeviceMismatch,

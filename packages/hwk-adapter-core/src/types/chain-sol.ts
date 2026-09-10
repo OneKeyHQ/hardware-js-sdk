@@ -34,11 +34,27 @@ export interface SolSignedTx {
   signature: string;
 }
 
-export interface SolSignMsgParams extends PassphraseStateAware {
+interface SolSignMessageBaseParams extends PassphraseStateAware {
   path: string;
   /** Message bytes as hex string (no 0x prefix) */
   message: string;
 }
+
+export interface SolOffchainMessageV1Params {
+  /** Finalized Solana off-chain message format. */
+  messageVersion: 1;
+  /** Complete signer set as 32-byte hex public keys. */
+  requiredSigners: string[];
+}
+
+export type SolSignMsgParams = SolSignMessageBaseParams &
+  (
+    | {
+        messageVersion?: undefined;
+        requiredSigners?: undefined;
+      }
+    | SolOffchainMessageV1Params
+  );
 
 export interface SolSignature {
   /** Hex-encoded Ed25519 signature (no 0x prefix) */

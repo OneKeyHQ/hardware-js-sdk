@@ -278,9 +278,9 @@ export abstract class TrezorConnectorBase implements IConnector {
   private readonly thp?: TrezorThpSessionOptions;
 
   // Single owned array — passed by reference into every TrezorThpSession via
-  // `createThpOptions`. setKnownCredentials() and the auto-merge inside
-  // onPairingCredentialsChanged both mutate this array in-place so the next
-  // handshake sees fresh credentials without a connector rebuild.
+  // `createThpOptions`. Both host updates and authoritative device updates
+  // replace its contents in-place so the next handshake sees fresh credentials
+  // without a connector rebuild.
   private readonly knownCredentials: TrezorThpCredentials[] = [];
 
   private readonly deviceSessionFactory: NonNullable<
@@ -330,22 +330,6 @@ export abstract class TrezorConnectorBase implements IConnector {
     this.knownCredentials.length = 0;
     if (credentials?.length) {
       this.knownCredentials.push(...credentials);
-    }
-  }
-
-  /**
-   * Push new credentials minted during pairing into the in-memory array.
-   * Deduplicates by the device-minted `credential` blob — the host has no
-   * other stable identity for a credential.
-   */
-  private mergeKnownCredentials(incoming: ReadonlyArray<TrezorThpCredentials>): void {
-    for (const cred of incoming) {
-      const blob = (cred as { credential?: string }).credential;
-      if (!blob) continue;
-      const exists = this.knownCredentials.some(
-        existing => (existing as { credential?: string }).credential === blob
-      );
-      if (!exists) this.knownCredentials.push(cred);
     }
   }
 
@@ -870,11 +854,9 @@ export abstract class TrezorConnectorBase implements IConnector {
         return res?.passphraseOnDevice ? { on_device: true } : { passphrase: res?.value ?? '' };
       },
       onPairingCredentialsChanged: async payload => {
-        // Auto-merge into our internal array first so the very next
-        // handshake (e.g. host calls another chain method right after
-        // pairing) sees the credential — the host doesn't have to
-        // round-trip through storage to get autoconnect.
-        this.mergeKnownCredentials(payload.credentials);
+        // Core reports the complete authoritative list. Replacing it removes
+        // credentials rejected by the device instead of retrying them forever.
+        this.setKnownCredentials(payload.credentials);
         await this.thp?.onPairingCredentialsChanged?.(payload);
         this.emit('device-trezor-thp-credentials-changed', {
           connectId: device.connectId,
