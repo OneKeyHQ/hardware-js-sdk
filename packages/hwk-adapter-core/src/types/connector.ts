@@ -52,6 +52,11 @@ export interface ConnectorSession {
   deviceInfo: DeviceInfo;
 }
 
+export type ConnectorConnectTarget =
+  | { type: 'default' }
+  | { type: 'search-target'; searchTargetId: string }
+  | { type: 'expected-device-identity'; deviceIdentity: string };
+
 // =====================================================================
 // Connector call result — device errors travel as DATA, not exceptions
 //
@@ -167,12 +172,16 @@ export interface ConnectorEventMap {
 }
 
 export interface ConnectorSearchDevicesOptions {
+  /** Select a child transport without waking/scanning the others. */
+  transportType?: ConnectionType;
   /**
    * Wait for every child transport in a fused connector. Default discovery can
    * return shortly after USB appears so BLE does not slow down USB flows;
    * binding pickers can opt in when they need BLE candidates too.
    */
   waitForAll?: boolean;
+  /** Availability probes must not invalidate user-selectable discovery targets. */
+  purpose?: 'selection' | 'availability';
 }
 
 export interface ConnectorConfig {
@@ -189,9 +198,19 @@ export interface ConnectorConfig {
 export interface IConnector {
   /** Physical connection type this connector uses. Fixed at construction. */
   readonly connectionType: ConnectionType;
+  readonly availableTransports?: readonly ConnectionType[];
 
   searchDevices(options?: ConnectorSearchDevicesOptions): Promise<ConnectorDevice[]>;
-  connect(deviceId?: string): Promise<ConnectorSession>;
+  connect(
+    deviceId?: string,
+    options?: { transportType: ConnectionType }
+  ): Promise<ConnectorSession>;
+  /**
+   * Structured form for connectors where a discovery handle and a stable
+   * device identity are different concepts. The string form remains for
+   * bridge and legacy compatibility.
+   */
+  connectTarget?(target: ConnectorConnectTarget): Promise<ConnectorSession>;
   disconnect(sessionId: string): Promise<void>;
   // `call` resolves a discriminated result; device-level failures are returned
   // as data, never thrown (see ConnectorCallResult). Only `call` uses this
@@ -244,7 +263,11 @@ export interface IHardwareBridge {
     vendor: VendorType;
     options?: ConnectorSearchDevicesOptions;
   }): Promise<ConnectorDevice[]>;
-  connect(params: { vendor: VendorType; deviceId?: string }): Promise<ConnectorSession>;
+  connect(params: {
+    vendor: VendorType;
+    deviceId?: string;
+    options?: { transportType: ConnectionType };
+  }): Promise<ConnectorSession>;
   disconnect(params: { vendor: VendorType; sessionId: string }): Promise<void>;
   call(params: {
     vendor: VendorType;
@@ -303,7 +326,8 @@ export function createBridgedConnector(
   return {
     connectionType,
     searchDevices: options => bridge.searchDevices({ vendor, options }),
-    connect: deviceId => bridge.connect({ vendor, deviceId }),
+    connect: (deviceId, options) =>
+      bridge.connect({ vendor, deviceId, ...(options ? { options } : {}) }),
     disconnect: sessionId => bridge.disconnect({ vendor, sessionId }),
     call: (sessionId, method, callParams) => bridge.call({ vendor, sessionId, method, callParams }),
     cancel: sessionId => bridge.cancel({ vendor, sessionId }),
@@ -532,8 +556,14 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
   }
 
   const searchDevices = async (
-    options: { waitForAll?: boolean } = {}
+    options: ConnectorSearchDevicesOptions = {}
   ): Promise<ConnectorDevice[]> => {
+    const selectedConnectors = connectors
+      .map((child, index) => ({ child, index }))
+      .filter(
+        ({ child }) => !options.transportType || child.connectionType === options.transportType
+      );
+    if (!selectedConnectors.length) return [];
     const perConnector: Array<{
       index: number;
       devices: ConnectorDevice[];
@@ -541,7 +571,7 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
 
     await new Promise<void>(resolve => {
       let finished = false;
-      let remaining = connectors.length;
+      let remaining = selectedConnectors.length;
       let settleTimer: ReturnType<typeof setTimeout> | undefined;
 
       const finish = () => {
@@ -551,9 +581,9 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
         resolve();
       };
 
-      connectors.forEach((child, index) => {
+      selectedConnectors.forEach(({ child, index }) => {
         void child
-          .searchDevices()
+          .searchDevices(options.purpose ? { purpose: options.purpose } : undefined)
           .then(devices =>
             devices.map(device => ({
               ...device,
@@ -585,7 +615,12 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
 
     perConnector.sort((a, b) => a.index - b.index);
 
-    deviceOwner.clear();
+    if (!options.transportType) deviceOwner.clear();
+    else {
+      for (const [id, owner] of deviceOwner) {
+        if (owner.connectionType === options.transportType) deviceOwner.delete(id);
+      }
+    }
     const merged: ConnectorDevice[] = [];
     perConnector.forEach(({ index, devices }) => {
       for (const device of devices) {
@@ -597,13 +632,18 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
   };
 
   const resolveOwner = async (
-    deviceId?: string
+    deviceId?: string,
+    transportType?: ConnectionType
   ): Promise<{ owner: IConnector; deviceId?: string }> => {
-    if (deviceId && deviceOwner.has(deviceId)) {
+    if (
+      deviceId &&
+      deviceOwner.has(deviceId) &&
+      (!transportType || deviceOwner.get(deviceId)?.connectionType === transportType)
+    ) {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       return { owner: deviceOwner.get(deviceId)!, deviceId };
     }
-    const devices = await searchDevices({ waitForAll: Boolean(deviceId) });
+    const devices = await searchDevices({ waitForAll: Boolean(deviceId), transportType });
     if (deviceId) {
       const owner = deviceOwner.get(deviceId);
       if (!owner)
@@ -617,15 +657,17 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
   };
 
   const connectByExplicitId = async (
-    deviceId: string
+    deviceId: string,
+    transportType?: ConnectionType
   ): Promise<{ session: ConnectorSession; owner: IConnector }> => {
     const cachedOwner = deviceOwner.get(deviceId);
-    if (cachedOwner) {
+    if (cachedOwner && (!transportType || cachedOwner.connectionType === transportType)) {
       return { session: await cachedOwner.connect(deviceId), owner: cachedOwner };
     }
 
     let lastError: unknown;
     for (const child of connectors) {
+      if (transportType && child.connectionType !== transportType) continue;
       try {
         const session = await child.connect(deviceId);
         deviceOwner.set(deviceId, child);
@@ -651,16 +693,17 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
     // Nominal value only — the per-device `connectionType` is authoritative
     // for a fused connector.
     connectionType: connectors[0].connectionType,
+    availableTransports: [...new Set(connectors.map(child => child.connectionType))],
 
-    searchDevices: options => searchDevices({ waitForAll: options?.waitForAll }),
+    searchDevices: options => searchDevices(options),
 
-    connect: async deviceId => {
+    connect: async (deviceId, options) => {
       let owner: IConnector;
       let session: ConnectorSession;
       if (deviceId) {
-        ({ session, owner } = await connectByExplicitId(deviceId));
+        ({ session, owner } = await connectByExplicitId(deviceId, options?.transportType));
       } else {
-        const resolved = await resolveOwner();
+        const resolved = await resolveOwner(undefined, options?.transportType);
         owner = resolved.owner;
         session = await owner.connect(resolved.deviceId);
       }

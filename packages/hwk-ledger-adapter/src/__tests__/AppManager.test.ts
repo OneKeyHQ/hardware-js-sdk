@@ -55,6 +55,10 @@ describe('AppManager', () => {
       expect(AppManager.getAppName('TRX')).toBe('Tron');
     });
 
+    it('maps ZEC to Zcash', () => {
+      expect(AppManager.getAppName('ZEC')).toBe('Zcash');
+    });
+
     it('maps XRP to XRP', () => {
       expect(AppManager.getAppName('XRP')).toBe('XRP');
     });
