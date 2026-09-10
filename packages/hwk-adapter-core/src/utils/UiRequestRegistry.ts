@@ -8,6 +8,7 @@ const RESPONSE_TO_REQUEST: Record<string, string> = {
   [UI_RESPONSE.RECEIVE_PIN]: UI_REQUEST.REQUEST_PIN,
   [UI_RESPONSE.RECEIVE_PASSPHRASE]: UI_REQUEST.REQUEST_PASSPHRASE,
   [UI_RESPONSE.RECEIVE_SELECT_DEVICE]: UI_REQUEST.REQUEST_SELECT_DEVICE,
+  [UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING]: UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING,
   [UI_RESPONSE.RECEIVE_DEVICE_CONNECT]: UI_REQUEST.REQUEST_DEVICE_CONNECT,
   [UI_RESPONSE.RECEIVE_DEVICE_PERMISSION]: UI_REQUEST.REQUEST_DEVICE_PERMISSION,
   [UI_RESPONSE.RECEIVE_BTC_HIGH_INDEX_CONFIRM]: UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM,
@@ -124,10 +125,11 @@ export class UiRequestRegistry {
     entry.resolve(payload);
   }
 
-  cancel(requestType?: string): void {
+  cancel(requestType?: string, requestId?: string): void {
     if (requestType) {
       const entry = this.pending.get(requestType);
       if (!entry) return;
+      if (requestId !== undefined && entry.requestId !== requestId) return;
       clearTimeout(entry.timer);
       this.pending.delete(requestType);
       entry.reject(

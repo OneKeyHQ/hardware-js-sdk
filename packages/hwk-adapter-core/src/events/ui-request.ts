@@ -13,6 +13,8 @@ export const UI_REQUEST = {
   REQUEST_QR_SCAN: 'ui-request-qr-scan',
   REQUEST_DEVICE_PERMISSION: 'ui-request-device-permission',
   REQUEST_SELECT_DEVICE: 'ui-request-select-device',
+  REQUEST_SAVE_DEVICE_BINDING: 'ui-request-save-device-binding',
+  DEVICE_BINDING_STATUS: 'ui-device-binding-status',
   REQUEST_DEVICE_CONNECT: 'ui-request-device-connect',
   // Ledger BTC App: account index >= 100 requires display=true. Adapter asks
   // the user once per session before promoting the call.
@@ -33,6 +35,7 @@ export const UI_RESPONSE = {
   RECEIVE_PASSPHRASE: 'receive-passphrase',
   RECEIVE_QR_RESPONSE: 'receive-qr-response',
   RECEIVE_SELECT_DEVICE: 'receive-select-device',
+  RECEIVE_SAVE_DEVICE_BINDING: 'receive-save-device-binding',
   RECEIVE_DEVICE_CONNECT: 'receive-device-connect',
   RECEIVE_DEVICE_PERMISSION: 'receive-device-permission',
   RECEIVE_BTC_HIGH_INDEX_CONFIRM: 'receive-btc-high-index-confirm',
@@ -54,6 +57,10 @@ export type DevicePermissionResponse = {
 };
 
 export type UiResponseEvent =
+  | {
+      type: typeof UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING;
+      payload: { requestId: string; saved: boolean };
+    }
   | {
       type: typeof UI_RESPONSE.RECEIVE_PIN;
       payload: string;

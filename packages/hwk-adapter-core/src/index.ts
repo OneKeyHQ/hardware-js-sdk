@@ -139,6 +139,8 @@ export type {
   HardwareCallExtra,
   DeviceSelectionContext,
   DeviceSelectionRequest,
+  SaveDeviceBindingRequest,
+  DeviceBindingStatus,
   IDeviceManagerOperationContext,
   IPassphraseCallParams,
   IHardwareCommonCallParams,
@@ -218,6 +220,14 @@ export {
 } from './types/connector';
 
 export { TypedEventEmitter } from './utils/TypedEventEmitter';
+export type {
+  ElectronBleApi,
+  ElectronBleDeviceInfo,
+  ElectronBleScanOptions,
+  ElectronBleConnectOptions,
+} from './types/electronBle';
+export { requestSaveDeviceBinding } from './utils/requestSaveDeviceBinding';
+export { requestBleDeviceSelection } from './utils/requestBleDeviceSelection';
 export {
   UiRequestRegistry,
   UI_REQUEST_DEFAULT_TIMEOUT_MS,

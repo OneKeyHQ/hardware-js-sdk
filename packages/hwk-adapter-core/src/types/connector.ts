@@ -569,7 +569,7 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
       devices: ConnectorDevice[];
     }> = [];
 
-    await new Promise<void>(resolve => {
+    await new Promise<void>((resolve, reject) => {
       let finished = false;
       let remaining = selectedConnectors.length;
       let settleTimer: ReturnType<typeof setTimeout> | undefined;
@@ -590,12 +590,16 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
               connectionType: device.connectionType ?? child.connectionType,
             }))
           )
-          .catch(
-            () =>
-              // A transport that can't scan (powered off, unauthorized, absent)
-              // must not fail the whole fused search.
-              [] as ConnectorDevice[]
-          )
+          .catch((error: unknown): ConnectorDevice[] => {
+            // A transport-specific probe must not turn failure into "no USB",
+            // otherwise the adapter could silently switch to a different channel.
+            if (options.transportType) {
+              finished = true;
+              if (settleTimer) clearTimeout(settleTimer);
+              reject(error);
+            }
+            return [];
+          })
           .then(devices => {
             remaining -= 1;
             if (!finished) {
