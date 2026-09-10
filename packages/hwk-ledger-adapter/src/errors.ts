@@ -1,6 +1,11 @@
-import { HardwareErrorCode, enrichErrorMessage } from '@onekeyfe/hwk-adapter-core';
+import {
+  HardwareErrorCode,
+  defaultOriginForCode,
+  defaultRecoveryForCode,
+  enrichErrorMessage,
+} from '@onekeyfe/hwk-adapter-core';
 
-import type { Failure } from '@onekeyfe/hwk-adapter-core';
+import type { Failure, HwkErrorOrigin, HwkRecoveryHint } from '@onekeyfe/hwk-adapter-core';
 
 export const MULTIPLE_USB_LEDGER_DEVICES_ERROR_MESSAGE =
   'Multiple Ledger USB devices are connected. Please connect only one Ledger device and try again.';
@@ -26,12 +31,17 @@ export function ledgerFailure(
   error: string,
   appName?: string,
   tag?: string,
-  params?: Record<string, unknown>
+  params?: Record<string, unknown>,
+  origin?: HwkErrorOrigin,
+  recovery?: HwkRecoveryHint
 ): LedgerFailure {
   const payload: LedgerFailure['payload'] = { error, code };
   if (appName !== undefined) payload.appName = appName;
   if (tag !== undefined) payload._tag = tag;
   if (params !== undefined) payload.params = params;
+  const resolvedOrigin = origin ?? defaultOriginForCode(code);
+  if (resolvedOrigin !== undefined) payload.origin = resolvedOrigin;
+  payload.recovery = recovery ?? defaultRecoveryForCode(code);
   return { success: false, payload };
 }
 
@@ -301,7 +311,6 @@ export function isBlePairingFailureError(err: unknown): boolean {
 // "Connection is broken" — next call can't reuse the session. Used by
 // Layer 2 fail-closed gate.
 const CONNECTION_LEVEL_TAGS: Set<string> = new Set([
-  ERROR_TAG.DeviceLocked,
   ERROR_TAG.DeviceNotAdvertising,
   ERROR_TAG.BlePairingTimeout,
   ERROR_TAG.BleGattBondingFailed,
@@ -560,6 +569,7 @@ export function mapLedgerError(
 ): {
   code: HardwareErrorCode;
   message: string;
+  origin?: HwkErrorOrigin;
   appName?: string;
 } {
   // Order matters: check more specific errors first
@@ -624,5 +634,16 @@ export function mapLedgerError(
       : undefined;
   const appName = errAppName ?? opts?.defaultAppName;
 
-  return { code, message: enrichErrorMessage(code, originalMessage), appName };
+  // Origin rides on the shared code→origin table — every branch above maps to
+  // a code whose origin is unambiguous by definition (a rejection IS the
+  // device, a disconnect IS the pipe). The two context-dependent outcomes
+  // (OperationTimeout, UnknownError) come back undefined from the table, which
+  // is the honest answer here too: at this point the classifier chain has
+  // already failed to see anything more specific.
+  return {
+    code,
+    message: enrichErrorMessage(code, originalMessage),
+    origin: defaultOriginForCode(code),
+    appName,
+  };
 }

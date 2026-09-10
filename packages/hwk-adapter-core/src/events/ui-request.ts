@@ -75,7 +75,10 @@ export type UiResponseEvent =
       // the REQUEST_SELECT_DEVICE event's `devices` list. Scope is the current
       // search session; may be ephemeral (e.g. Ledger USB DMK UUID).
       type: typeof UI_RESPONSE.RECEIVE_SELECT_DEVICE;
-      payload: { sdkConnectId: string };
+      payload: { requestId?: string } & (
+        | { sdkConnectId: string; cancelled?: false }
+        | { cancelled: true }
+      );
     }
   | {
       type: typeof UI_RESPONSE.RECEIVE_DEVICE_CONNECT;
