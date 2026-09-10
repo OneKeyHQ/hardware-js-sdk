@@ -2,6 +2,61 @@
 
 This document records architecture decisions that still constrain the current implementation. It is not an archive of the design process; obsolete discussions are preserved in Git history and PRs.
 
+## HWK Interaction 生命周期
+
+HWK 对外只保留一组设备选择生命周期：`searchDeviceTargets()` 发现候选，
+`connectDevice(searchTargetId)` 连接或建立逻辑关联并返回不透明的 `interactionId`，业务方法可在公共参数中携带
+该 ID，最后由 `releaseInteraction(interactionId)` 释放。`openWallet()`/`WalletContext` 不再属于 HWK 公共契约。
+
+采用以下规则：
+
+- `DeviceSearchTarget` 只表示当前发现轮次中可选择的通讯入口；它的 `searchTargetId` 是不透明搜索句柄，
+  不证明物理设备或钱包身份。Ledger USB 的
+  search target 可以是临时句柄；Keystone QR 的 search target 可以是需要扫码才能解析的交互入口。
+- `interactionId` 只存在于当前 Adapter 运行时，绑定已选 search target、实际 connect/session key 和连接通道。
+  它不是 `connectId`、钱包身份或固件 session，不得写入 App 数据库，也不得跨 Adapter reset 或进程重启恢复。
+  同一次活跃业务中的受控重连可以更新它的底层 session 绑定，但不能改变已选设备或钱包身份。
+- 再次对同一 search target 调用 `connectDevice()` 表示开始新的业务生命周期。若连接实现需要替换现有 session，
+  旧 session 对应的 Interaction 必须先终止，旧 ID 不能借用新 session 继续执行。
+- 携带 `interactionId` 的业务调用是严格路由路径：只复用其已连接 session/逻辑 QR 关联和既定通道；不得
+  使用 ambient session、改选未经验证的设备或切换通道。关联无法恢复后返回 `InteractionEnded`；从未属于
+  本 Adapter 实例的 ID 返回 `InteractionNotFound`。
+- Ledger 保留原有的有界 session 恢复：`DeviceLocked` 在原 session 等待解锁，`0x6901` 在原 session
+  延迟重试一次；disconnect、not-advertising 和 timeout 可重新搜索原目标。BLE 必须匹配原 connectId；USB
+  临时 search target 变化时，只有业务调用携带钱包 fingerprint 才可连接唯一候选，并必须在重发业务 APDU 前验证
+  fingerprint。验证成功后更新该 interaction 的 connect/session 绑定，验证失败则终止 interaction。
+- 不携带 `interactionId` 的调用是 operation-first 路径。Adapter 可在真正执行业务前发现候选；单个可验证
+  候选可继续，多个候选必须等待宿主通过 `REQUEST_SELECT_DEVICE` 返回本轮的 `sdkConnectId`。选择只是路由
+  决策，业务仍须按厂商能力验证物理设备或钱包身份。
+- 空闲超时、运行时 reset，以及连接恢复失败会终止对应 Interaction，并发出 `interaction-ended` 通知；活跃
+  device job 持有 Interaction 时暂停空闲计时。活跃 Ledger job 的瞬时 disconnect 先交给上述恢复链，只有
+  恢复耗尽或身份不符才终止。`cancel()` 只中止当前 job，不隐式结束 Interaction，生命周期 owner 仍须调用
+  `releaseInteraction()`。
+- `releaseInteraction()` 是显式释放；底层不可恢复的 disconnect 是同一状态转换的被动来源。恢复链重发业务
+  方法前必须重新完成该厂商可提供的设备或钱包身份验证；禁止在缺少身份依据时把 USB 临时候选当作原设备。
+- Core method catalog 明确区分可重放的只读方法与不可重放的签名、设备修改及未知方法。不可重放方法一旦
+  已进入 connector，丢失响应时不得自动重发；错误必须携带 `operationMayHaveCompleted` 和方法名，交由宿主
+  提示用户核对状态。`PayloadTooLarge` 等明确发生在发送前的错误不属于未知结果。
+- Adapter reset/dispose 是 teardown barrier：先终止 runtime interaction、取消 UI/job 等待，再等待已经进入
+  connector 的原始调用退出，最后断开捕获的 session 并 reset connector。新 Adapter 不得与旧实例遗留调用并行。
+- Keystone USB 的 UI selection snapshot 与 operation-first availability snapshot 分代隔离。selection token 只可
+  exact-open 对应 descriptor；冷启动只有持久 wallet identity 时可逐个 exact-open 候选并读取固定身份 xpub，
+  full wallet id 匹配后才可执行业务。过期 token 返回 `search-target` recovery，不得退化为默认第一台。
+- Trezor Core 的 `onPairingCredentialsChanged` payload 是完整权威列表。Connector 必须原地替换其内存列表，
+  不能做增量 merge；否则设备拒绝的 stale credential 会在当前 Adapter 生命周期内被再次优先选择。
+
+厂商差异保留在 Adapter 内：OneKey/Trezor 的宿主可以明确选择 USB/BLE；Ledger 与 Keystone 可以由其 SDK
+管理协议/通道选择；Keystone QR 的 connect 是逻辑钱包关联而不是持续物理连接。无论哪种实现，
+Interaction 的严格复用与终止语义一致。
+
+主要实现：
+
+- `packages/hwk-adapter-core/src/utils/InteractionRegistry.ts`
+- `packages/hwk-adapter-core/src/types/wallet.ts`
+- `packages/hwk-ledger-adapter/src/adapter/LedgerAdapter.ts`
+- `packages/hwk-trezor-adapter/src/adapter/TrezorAdapter.ts`
+- `packages/hwk-keystone-adapter/src/adapter/KeystoneAdapter.ts`
+
 ## Protocol V2 Link and Sequence Number Lifecycle
 
 Protocol V2 responses rely on serial calls, message types, and frame sequence numbers to maintain request boundaries. The current rules are:

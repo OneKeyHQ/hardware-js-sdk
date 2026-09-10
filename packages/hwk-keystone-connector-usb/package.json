@@ -66,7 +66,6 @@
   ],
   "dependencies": {
     "@keystonehq/hw-transport-error": "0.0.2",
-    "@keystonehq/hw-transport-nodeusb": "0.2.0",
     "@keystonehq/hw-transport-usb": "0.2.0",
     "@keystonehq/hw-transport-webusb": "0.5.3",
     "@ngraveio/bc-ur": "1.1.13",
@@ -74,8 +73,17 @@
   },
   "devDependencies": {
     "@keystonehq/bc-ur-registry-eth": "0.22.1",
+    "@keystonehq/hw-transport-nodeusb": "0.2.0",
     "rimraf": "^5.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0"
+  },
+  "peerDependencies": {
+    "@keystonehq/hw-transport-nodeusb": "0.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@keystonehq/hw-transport-nodeusb": {
+      "optional": true
+    }
   }
 }

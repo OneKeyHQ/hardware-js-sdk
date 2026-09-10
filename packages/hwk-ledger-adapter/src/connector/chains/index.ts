@@ -31,6 +31,9 @@ export type {
   SolSignMessageCallParams,
 } from './sol';
 
+export { zcashGetFullViewingKey, zcashGetShieldedAddress } from './zcash';
+export type { ZcashGetFullViewingKeyCallParams, ZcashGetShieldedAddressCallParams } from './zcash';
+
 export { tronGetAddress, tronSignTransaction, tronSignMessage } from './tron';
 export type {
   TronGetAddressCallParams,

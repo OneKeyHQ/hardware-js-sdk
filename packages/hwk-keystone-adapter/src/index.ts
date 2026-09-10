@@ -23,12 +23,14 @@ export type {
 export { KeystoneAdapter } from './adapter/KeystoneAdapter';
 export type { ImportFromQrOptions } from './adapter/KeystoneAdapter';
 export {
+  KEYSTONE_WALLET_CONNECT_ID_PREFIX,
+  KEYSTONE_WALLET_ID_PATH,
   accountKey,
   createDeviceRecord,
+  deriveKeystoneWalletId,
   placeholderDeviceInfo,
-  qrConnectId,
   toDeviceInfo,
-  QR_CONNECT_ID_PREFIX,
+  walletConnectId,
 } from './adapter/deviceTable';
 export type { KeystoneAccountEntry, KeystoneDeviceRecord } from './adapter/deviceTable';
 export { btcScriptTypeFromPath, normalizePath, splitAccountPath } from './adapter/pathUtils';

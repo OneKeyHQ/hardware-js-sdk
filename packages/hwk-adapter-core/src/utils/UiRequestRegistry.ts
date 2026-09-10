@@ -1,4 +1,5 @@
 import { UI_REQUEST, UI_RESPONSE } from '../events/ui-request';
+import { createHwkError, HardwareErrorCode } from '../types/errors';
 
 /** 10 min — every UI request is human-in-the-loop; bias toward "wait long". */
 export const UI_REQUEST_DEFAULT_TIMEOUT_MS = 600_000;
@@ -20,7 +21,10 @@ export const UI_REQUEST_PREEMPTED_TAG = 'UiRequestPreempted';
 export const UI_REQUEST_CANCELLED_TAG = 'UiRequestCancelled';
 export const UI_REQUEST_TIMEOUT_TAG = 'UiRequestTimeout';
 
+let requestSequence = 0;
+
 type PendingEntry = {
+  requestId?: string;
   resolve: (payload: unknown) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
@@ -39,7 +43,15 @@ type PendingEntry = {
 export class UiRequestRegistry {
   private pending = new Map<string, PendingEntry>();
 
-  wait<T = unknown>(requestType: string, options?: { timeoutMs?: number }): Promise<T> {
+  createRequestId(): string {
+    requestSequence += 1;
+    return `hwk-ui-${Date.now()}-${requestSequence}`;
+  }
+
+  wait<T = unknown>(
+    requestType: string,
+    options?: { timeoutMs?: number; requestId?: string }
+  ): Promise<T> {
     const existing = this.pending.get(requestType);
     if (existing) {
       clearTimeout(existing.timer);
@@ -66,6 +78,7 @@ export class UiRequestRegistry {
       }, timeoutMs);
 
       this.pending.set(requestType, {
+        requestId: options?.requestId,
         resolve: resolve as (payload: unknown) => void,
         reject,
         timer,
@@ -86,6 +99,25 @@ export class UiRequestRegistry {
 
     const entry = this.pending.get(requestType);
     if (!entry) return;
+
+    const response =
+      payload && typeof payload === 'object'
+        ? (payload as { requestId?: unknown; cancelled?: unknown })
+        : undefined;
+    // A late response must not resolve (or cancel) a newer request of the same type.
+    if (entry.requestId !== undefined && response?.requestId !== entry.requestId) return;
+    if (requestType === UI_REQUEST.REQUEST_SELECT_DEVICE && response?.cancelled === true) {
+      clearTimeout(entry.timer);
+      this.pending.delete(requestType);
+      entry.reject(
+        createHwkError({
+          code: HardwareErrorCode.UserAborted,
+          message: 'Device selection was cancelled',
+          _tag: UI_REQUEST_CANCELLED_TAG,
+        })
+      );
+      return;
+    }
 
     clearTimeout(entry.timer);
     this.pending.delete(requestType);

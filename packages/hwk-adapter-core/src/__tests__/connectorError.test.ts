@@ -65,6 +65,21 @@ describe('serializeConnectorError / rehydrateConnectorError', () => {
     expect(wire.params.statusCode).toBe(0x6985);
   });
 
+  it('preserves recovery metadata across connector serialization', () => {
+    const error = Object.assign(new Error('disconnected'), {
+      code: 10101,
+      recovery: { scope: 'interaction' },
+    });
+
+    const serialized = serializeConnectorError(error);
+    const transported = JSON.parse(JSON.stringify(serialized));
+    const rehydrated = rehydrateConnectorError(transported) as Error & {
+      recovery?: { scope?: string };
+    };
+
+    expect(rehydrated.recovery).toEqual({ scope: 'interaction' });
+  });
+
   it('survives the bridge error whitelist that drops top-level custom fields', () => {
     // The regression: appName lived on the raw Error top-level and the bridge
     // whitelist stripped it. As DATA, appName rides inside `params` which the
