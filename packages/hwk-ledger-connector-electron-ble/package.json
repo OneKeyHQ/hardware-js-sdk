@@ -1,0 +1,62 @@
+{
+  "name": "@onekeyfe/hwk-ledger-connector-electron-ble",
+  "version": "1.2.3-alpha.1",
+  "description": "IConnector implementation for Ledger hardware wallets via Electron BLE",
+  "author": "OneKey",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist",
+    "test": "jest",
+    "verify:types": "node scripts/verify-package-types.js",
+    "prepack": "yarn build && yarn verify:types"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git",
+    "directory": "packages/hwk-ledger-connector-electron-ble"
+  },
+  "keywords": [
+    "ledger",
+    "electron",
+    "ble",
+    "bluetooth",
+    "hardware-wallet",
+    "onekey",
+    "connector"
+  ],
+  "dependencies": {
+    "@ledgerhq/device-management-kit": "1.9.0",
+    "@onekeyfe/hwk-adapter-core": "1.2.3-alpha.1",
+    "@onekeyfe/hwk-ledger-adapter": "1.2.3-alpha.1",
+    "purify-ts": "2.1.0",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "5.1.6"
+  }
+}
