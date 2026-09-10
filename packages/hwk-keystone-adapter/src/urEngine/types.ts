@@ -1,3 +1,5 @@
+import type { TronSignType } from './TronSignRequest';
+
 /**
  * A UR payload in the wire shape the reserved `QrDisplayData`/`QrResponseData`
  * (from `@onekeyfe/hwk-adapter-core`) already commit to: `urType` + `urData`.
@@ -25,7 +27,7 @@ export interface KeystoneParsedAccount {
 }
 
 export interface KeystoneParsedMultiAccounts {
-  /** BIP32 master fingerprint of the seed (lowercase hex, 8 chars) — the cross-channel wallet identity. */
+  /** BIP32 master fingerprint of the seed (lowercase hex, 8 chars) used as BC-UR xfp metadata. */
   masterFingerprint: string;
   /** Model string (e.g. "Keystone 3 Pro"), present on both channels but not unique per unit. */
   device?: string;
@@ -113,13 +115,16 @@ export interface KeystoneKeyDerivationRequestInput {
 export interface KeystoneTronSignRequestInput {
   requestId: string;
   /**
-   * Hex, no 0x prefix — a standard TRON protobuf `Transaction.raw` message
-   * (the same bytes `TronSignTxParams.rawTxHex` already carries for Ledger).
+   * Hex, no 0x prefix. For a transaction: the TRON protobuf `Transaction.raw`
+   * bytes (same as `TronSignTxParams.rawTxHex`). For a personal message:
+   * the raw message bytes; the device applies the TIP-191 prefix itself.
    */
   rawTxHex: string;
   path: string;
   xfp: string;
   origin?: string;
+  /** Defaults to Transaction. */
+  signType?: TronSignType;
 }
 
 export interface KeystoneTronSignatureResult {

@@ -4,6 +4,7 @@ import bs58check from 'bs58check';
 import * as bitcoin from 'bitcoinjs-lib';
 import HDKey from 'hdkey';
 import { parse as uuidParse, stringify as uuidStringify } from 'uuid';
+import { parseBip32MasterFingerprint } from '@onekeyfe/hwk-adapter-core';
 
 import { TronSignRequest, TronSignType } from './TronSignRequest';
 import { TronSignature } from './TronSignature';
@@ -55,6 +56,14 @@ function splitSignature65(hex: string): { r: string; s: string; v: string } {
   return { r: hex.slice(0, 64), s: hex.slice(64, 128), v: hex.slice(128) };
 }
 
+function requireBip32MasterFingerprint(value: unknown): string {
+  const fingerprint = parseBip32MasterFingerprint(value);
+  if (!fingerprint) {
+    throw new Error('Keystone master fingerprint must be exactly 4 bytes (8 hex characters)');
+  }
+  return fingerprint;
+}
+
 /**
  * Thin wrapper around `@keystonehq/keystone-sdk`. Owns every touch point with the
  * vendor SDK so the rest of the adapter never imports it directly: same UR
@@ -79,7 +88,7 @@ export class KeystoneUrEngine {
   parseMultiAccounts(ur: KeystoneUr): KeystoneParsedMultiAccounts {
     const parsed = this.sdk.parseMultiAccounts(toSdkUr(ur));
     return {
-      masterFingerprint: parsed.masterFingerprint.toLowerCase(),
+      masterFingerprint: requireBip32MasterFingerprint(parsed.masterFingerprint),
       device: parsed.device,
       deviceId: parsed.deviceId,
       deviceVersion: parsed.deviceVersion,
@@ -89,7 +98,7 @@ export class KeystoneUrEngine {
           path: key.path,
           publicKey: key.publicKey,
           extendedPublicKey: key.extendedPublicKey,
-          xfp: key.xfp,
+          xfp: key.xfp ? requireBip32MasterFingerprint(key.xfp) : undefined,
           name: key.name,
         })
       ),
@@ -103,7 +112,7 @@ export class KeystoneUrEngine {
       path: key.path,
       publicKey: key.publicKey,
       extendedPublicKey: key.extendedPublicKey,
-      xfp: key.xfp,
+      xfp: key.xfp ? requireBip32MasterFingerprint(key.xfp) : undefined,
       name: key.name,
     };
   }
@@ -154,7 +163,10 @@ export class KeystoneUrEngine {
       if (!account.xfp) {
         throw new Error('Keystone crypto-hdkey response is missing its source fingerprint');
       }
-      return { masterFingerprint: account.xfp.toLowerCase(), accounts: [account] };
+      return {
+        masterFingerprint: requireBip32MasterFingerprint(account.xfp),
+        accounts: [account],
+      };
     }
     return this.parseMultiAccounts(ur);
   }
@@ -216,13 +228,20 @@ export class KeystoneUrEngine {
   ): string {
     const node = HDKey.fromExtendedKey(xpub).derive(`m/${relativeDerivePath.replace(/^m\//i, '')}`);
     if (!node.publicKey) throw new Error('HDKey derivation did not produce a public key');
-    const pubkey = Buffer.from(node.publicKey);
+    return this.deriveBtcAddressFromPublicKey(
+      Buffer.from(node.publicKey).toString('hex'),
+      scriptType
+    );
+  }
+
+  deriveBtcAddressFromPublicKey(publicKeyHex: string, scriptType: BtcScriptType): string {
+    const pubkey = Buffer.from(stripHexPrefix(publicKeyHex), 'hex');
     const network = bitcoin.networks.bitcoin;
 
     switch (scriptType) {
       case 'p2pkh': {
         const { address } = bitcoin.payments.p2pkh({ pubkey, network });
-        if (!address) throw new Error('Failed to derive a P2PKH address from this xpub');
+        if (!address) throw new Error('Failed to derive a P2PKH address from this public key');
         return address;
       }
       case 'p2sh-p2wpkh': {
@@ -230,12 +249,13 @@ export class KeystoneUrEngine {
           redeem: bitcoin.payments.p2wpkh({ pubkey, network }),
           network,
         });
-        if (!address) throw new Error('Failed to derive a P2SH-P2WPKH address from this xpub');
+        if (!address)
+          throw new Error('Failed to derive a P2SH-P2WPKH address from this public key');
         return address;
       }
       case 'p2wpkh': {
         const { address } = bitcoin.payments.p2wpkh({ pubkey, network });
-        if (!address) throw new Error('Failed to derive a P2WPKH address from this xpub');
+        if (!address) throw new Error('Failed to derive a P2WPKH address from this public key');
         return address;
       }
       case 'p2tr':
@@ -308,21 +328,14 @@ export class KeystoneUrEngine {
   // --- TRON ---
 
   /**
-   * `@keystonehq/keystone-sdk`'s own bundled `sdk.tron` module is
-   * deliberately NOT used here — see `TronSignRequest.ts`'s doc comment for
-   * why: it's a different (gzip/protobuf) protocol with response semantics
-   * this package has no way to verify, whereas `TronSignRequest`/
-   * `TronSignature` are a direct port of OneKey's own already-proven
-   * production QR-wallet TRON implementation (a plain CBOR-native
-   * sign-request/signature pair, same shape as eth/sol). The device decodes
-   * `rawTxHex` itself — no client-side contract-type pre-parsing or
-   * `tokenInfo` needed, unlike the public SDK's module.
+   * Keystone's native tron-sign-request/tron-signature pair (bare signature).
+   * `sdk.tron` from keystone-sdk is the older protobuf envelope; not used.
    */
   buildTronSignRequest(input: KeystoneTronSignRequestInput): KeystoneUr {
     const request = new TronSignRequest({
       requestId: Buffer.from(uuidParse(input.requestId) as Uint8Array),
       signData: Buffer.from(stripHexPrefix(input.rawTxHex), 'hex'),
-      signType: TronSignType.Transaction,
+      signType: input.signType ?? TronSignType.Transaction,
       derivationPath: TronSignRequest.parsePath(input.path, input.xfp),
       origin: input.origin,
     });
@@ -360,5 +373,37 @@ export class KeystoneUrEngine {
       Buffer.from(evmStyleHex.replace(/^0x/i, ''), 'hex'),
     ]);
     return bs58check.encode(addressBytes);
+  }
+
+  /**
+   * Split an account-level xpub back into the BIP-32 fields a host needs to
+   * treat it as a real extended key (`BtcPublicKey`). Everything here is
+   * carried inside the xpub's own serialization — depth, the PARENT key
+   * fingerprint (not the seed's master fingerprint), the chain code and the
+   * compressed public key — so this is a pure decode with no device round
+   * trip; the xpub itself was already device-verified when it was synced.
+   */
+  parseXpubMeta(xpub: string): {
+    publicKey: string;
+    chainCode: string;
+    depth: number;
+    parentFingerprint: number;
+  } {
+    // Decoded straight off the wire format rather than through HDKey: the
+    // `@types/hdkey` surface only declares publicKey/privateKey/chainCode, so
+    // depth and parentFingerprint would need an undeclared-field cast. BIP-32
+    // serialization is fixed-width, so reading it here is exact:
+    //   [0..4) version | [4] depth | [5..9) parentFingerprint
+    //   [9..13) childNumber | [13..45) chainCode | [45..78) publicKey
+    const raw = Buffer.from(bs58check.decode(xpub));
+    if (raw.length !== 78) {
+      throw new Error(`Keystone xpub did not decode to a 78-byte BIP-32 key (got ${raw.length})`);
+    }
+    return {
+      publicKey: raw.subarray(45, 78).toString('hex'),
+      chainCode: raw.subarray(13, 45).toString('hex'),
+      depth: raw.readUInt8(4),
+      parentFingerprint: raw.readUInt32BE(5),
+    };
   }
 }
