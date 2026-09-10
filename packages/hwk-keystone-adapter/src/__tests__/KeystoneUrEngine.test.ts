@@ -26,7 +26,7 @@ import type { KeystoneUr } from '../urEngine/types';
 
 // Every buffer below is a fixed, clearly-synthetic byte pattern chosen only to
 // exercise CBOR/UR framing — none of it is derived from or resembles real key
-// material. See docs/design/keystone-integration for why mfp is the identity key.
+// material. The 4-byte MFP is protocol metadata, not a wallet identity key.
 const FAKE_MFP_HEX = '52a5d0d1';
 
 function urFromSdk(ur: { type: string; cbor: Buffer }): KeystoneUr {
@@ -63,7 +63,7 @@ describe('KeystoneUrEngine', () => {
   const engine = new KeystoneUrEngine('OneKey-test');
 
   describe('parseMultiAccounts', () => {
-    it('extracts the master fingerprint as the cross-channel identity key', () => {
+    it('extracts the master fingerprint as cross-channel protocol metadata', () => {
       const parsed = engine.parseMultiAccounts(buildMultiAccountsUr());
 
       expect(parsed.masterFingerprint).toBe(FAKE_MFP_HEX);
@@ -74,7 +74,7 @@ describe('KeystoneUrEngine', () => {
       expect(parsed.accounts[0]).toMatchObject({ chain: 'ETH', path: "m/44'/60'/0'" });
     });
 
-    it('lowercases the master fingerprint for stable dedup keys', () => {
+    it('lowercases the master fingerprint for consistent protocol comparisons', () => {
       const upper = new CryptoMultiAccounts(Buffer.from('AABBCCDD', 'hex'), []);
       const parsedUpper = engine.parseMultiAccounts(urFromSdk(upper.toUR()));
       expect(parsedUpper.masterFingerprint).toBe('aabbccdd');
@@ -262,6 +262,39 @@ describe('KeystoneUrEngine', () => {
 
       expect(parsed.signature).toBe('09'.repeat(65));
       expect(parsed.requestId).toBe('2b5893f2-52e2-4ba8-9d5e-6c2b6f5f1c11');
+    });
+  });
+
+  describe('TRON UR byte-exact against keystone-sdk-rust vectors', () => {
+    // libs/ur-registry/src/tron/tron_sign_request.rs + tron_signature.rs
+    // test vectors: the CBOR the Keystone firmware actually decodes.
+    const SIGN_DATA_HEX =
+      '0a0207902208e1b9de559665c6714080c49789bb2c5aae01081f12a9010a31747970652e676f6f676c65617069732e636f6d2f70726f746f636f6c2e54726967676572536d617274436f6e747261637412740a1541c79f045e4d48ad8dae00e6a6714dae1e000adfcd1215410d292c98a5eca06c2085fff993996423cf66c93b2244a9059cbb0000000000000000000000009bbce520d984c3b95ad10cb4e32a9294e6338da300000000000000000000000000000000000000000000000000000000000f424070c0b6e087bb2c90018094ebdc03';
+    const EXPECTED_REQUEST_CBOR_HEX = `a501d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d0258d4${SIGN_DATA_HEX}030104d90130a2018a182cf518c3f500f500f400f4021a12121212066b74726f6e2077616c6c6574`;
+    const SIGNATURE_CBOR_HEX =
+      'a201d825509b1deb4d3b7d4bad9bdd2b0d7b3dcb6d02584147b1f77b3e30cfbbfa41d795dd34475865240617dd1c5a7bad526f5fd89e52cd057c80b665cc2431efab53520e2b1b92a0425033baee915df858ca1c588b0a1800';
+
+    it('encodes tron-sign-request exactly like keystone-sdk-rust', () => {
+      const ur = engine.buildTronSignRequest({
+        requestId: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+        rawTxHex: SIGN_DATA_HEX,
+        path: "m/44'/195'/0'/0/0",
+        xfp: '12121212',
+        origin: 'tron wallet',
+      });
+      expect(ur.urType).toBe('tron-sign-request');
+      expect(ur.urData.toLowerCase()).toBe(EXPECTED_REQUEST_CBOR_HEX);
+    });
+
+    it('decodes the keystone-sdk-rust tron-signature vector', () => {
+      const parsed = engine.parseTronSignature({
+        urType: 'tron-signature',
+        urData: SIGNATURE_CBOR_HEX,
+      });
+      expect(parsed.requestId).toBe('9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d');
+      expect(parsed.signature).toBe(
+        '47b1f77b3e30cfbbfa41d795dd34475865240617dd1c5a7bad526f5fd89e52cd057c80b665cc2431efab53520e2b1b92a0425033baee915df858ca1c588b0a1800'
+      );
     });
   });
 
