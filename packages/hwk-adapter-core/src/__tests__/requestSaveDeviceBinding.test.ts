@@ -34,7 +34,7 @@ describe('acknowledged device binding', () => {
       requestId: requests[0].requestId,
       saved: true,
     });
-    await expect(pending).resolves.toBe(true);
+    await expect(pending).resolves.toBeUndefined();
     expect(registry.hasPending()).toBe(false);
   });
 
@@ -46,6 +46,34 @@ describe('acknowledged device binding', () => {
       saved,
     });
     await expect(pending).rejects.toMatchObject({ code: HardwareErrorCode.UnknownError });
+  });
+
+  it('reports a host-declined mismatch as a device mismatch, not an unknown error', async () => {
+    const { emitter, registry, requests } = setup();
+    const pending = requestSaveDeviceBinding(emitter, registry, binding);
+    registry.resolve(UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING, {
+      requestId: requests[0].requestId,
+      saved: false,
+      reason: 'mismatch',
+    });
+    await expect(pending).rejects.toMatchObject({
+      code: HardwareErrorCode.DeviceMismatch,
+      origin: 'device',
+    });
+  });
+
+  it('keeps a host-side skip an unknown host error', async () => {
+    const { emitter, registry, requests } = setup();
+    const pending = requestSaveDeviceBinding(emitter, registry, binding);
+    registry.resolve(UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING, {
+      requestId: requests[0].requestId,
+      saved: false,
+      reason: 'skipped',
+    });
+    await expect(pending).rejects.toMatchObject({
+      code: HardwareErrorCode.UnknownError,
+      origin: 'host',
+    });
   });
 
   it('cancels the pending wait when the operation is aborted', async () => {
@@ -68,13 +96,21 @@ describe('acknowledged device binding', () => {
       requestId: requests[1].requestId,
       saved: true,
     });
-    await expect(second).resolves.toBe(true);
+    await expect(second).resolves.toBeUndefined();
   });
 
-  it('preserves the legacy notification path when the host has not migrated', async () => {
+  it('refuses to bind when the host has no persistence listener', async () => {
     const emitter = new TypedEventEmitter<HardwareEventMap>();
     const registry = new UiRequestRegistry();
-    await expect(requestSaveDeviceBinding(emitter, registry, binding)).resolves.toBe(false);
+    const status = jest.fn();
+    emitter.on(UI_REQUEST.DEVICE_BINDING_STATUS, status);
+    await expect(requestSaveDeviceBinding(emitter, registry, binding)).rejects.toMatchObject({
+      code: HardwareErrorCode.InvalidParams,
+    });
+    expect(status).toHaveBeenCalledWith({
+      type: UI_REQUEST.DEVICE_BINDING_STATUS,
+      payload: { selectionRequestId: 'selection-fixture', status: 'failed' },
+    });
     expect(registry.hasPending()).toBe(false);
   });
 
