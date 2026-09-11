@@ -6,10 +6,6 @@ export const DEVICE = {
   DISCONNECT: 'device-disconnect',
   CHANGED: 'device-changed',
   FEATURES: 'features',
-  /** Trezor transport binding, emitted only after matching the expected firmware device_id. */
-  TREZOR_CONNECTION_VERIFIED: 'device-trezor-connection-verified',
-  /** Ledger BLE address repair, emitted only after matching the stored chain fingerprint. */
-  LEDGER_CONNECTION_VERIFIED: 'device-ledger-connection-verified',
   /**
    * Trezor-only. Emitted after a successful THP handshake that minted or
    * refreshed pairing credentials. The host should persist `credentials`

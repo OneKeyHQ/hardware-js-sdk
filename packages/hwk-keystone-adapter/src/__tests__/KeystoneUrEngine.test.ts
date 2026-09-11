@@ -151,6 +151,19 @@ describe('KeystoneUrEngine', () => {
       expect(parsed.requestId).toBe('2b5893f2-52e2-4ba8-9d5e-6c2b6f5f1c11');
     });
 
+    it('refuses a short eth-signature instead of handing back an empty v', () => {
+      // 64 bytes: r|s with no recovery byte. Slicing it blindly used to yield
+      // `v: ''`, which reaches a dApp as a malformed but "successful" signature.
+      const short = new ETHSignature(
+        Buffer.from('aa'.repeat(32) + 'bb'.repeat(32), 'hex'),
+        Buffer.from('2b5893f252e24ba89d5e6c2b6f5f1c11', 'hex')
+      );
+
+      expect(() => engine.parseEthSignature(urFromSdk(short.toUR()))).toThrow(
+        /expected 65 bytes/
+      );
+    });
+
     it('round-trips a requestId the engine itself minted, byte for byte', () => {
       const requestId = '11223344-5566-4788-9baa-bbccddeeff00';
       const ur = engine.buildEthSignRequest({

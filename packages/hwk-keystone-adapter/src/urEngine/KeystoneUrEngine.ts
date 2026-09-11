@@ -52,7 +52,13 @@ function fromSdkUr(ur: UR): KeystoneUr {
   return { urType: ur.type, urData: ur.cbor.toString('hex') };
 }
 
+/** r(32) | s(32) | v(1). A short answer must fail here, not reach a caller as `v: ''`. */
 function splitSignature65(hex: string): { r: string; s: string; v: string } {
+  if (hex.length !== 130) {
+    throw new Error(
+      `Keystone returned a ${hex.length / 2}-byte signature; expected 65 bytes (r|s|v)`
+    );
+  }
   return { r: hex.slice(0, 64), s: hex.slice(64, 128), v: hex.slice(128) };
 }
 
