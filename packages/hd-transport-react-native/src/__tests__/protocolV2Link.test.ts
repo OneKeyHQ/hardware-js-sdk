@@ -615,7 +615,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       uuid,
       protocolType: 'V2',
     });
-    expect(device.requestMTU).toHaveBeenCalledWith(247);
+    expect(device.requestMTU).not.toHaveBeenCalled();
     expect(writeCharacteristic.writeWithResponse).toHaveBeenCalledTimes(1);
     expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalled();
 
@@ -1079,56 +1079,68 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
-  test('continues with the current MTU when the connected snapshot refresh fails', async () => {
+  test('does not renegotiate an already usable MTU during acquire', async () => {
     const { transport, uuid, device } = createHarness();
-    const mtuError = new Error('MTU refresh failed');
-    device.requestMTU.mockRejectedValueOnce(mtuError);
+
+    await expect(transport.acquire({ uuid })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(device.requestMTU).not.toHaveBeenCalled();
+    expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(247);
+    await transport.release(uuid, true);
+  });
+
+  test('requests a low MTU once before protocol probing', async () => {
+    const { transport, uuid, device } = createHarness();
+    device.mtu = 23;
+    device.requestMTU.mockImplementationOnce(() => {
+      device.mtu = 247;
+      return Promise.resolve(device);
+    });
 
     await expect(transport.acquire({ uuid })).resolves.toEqual({
       uuid,
       protocolType: 'V2',
     });
     expect(device.requestMTU).toHaveBeenCalledTimes(1);
+    expect(device.requestMTU).toHaveBeenCalledWith(
+      247,
+      expect.stringContaining(`${uuid}:mtu:connected:0:`)
+    );
     expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(247);
     await transport.release(uuid, true);
   });
 
-  test('refreshes a transient bootloader MTU after notifications are ready', async () => {
+  test('continues with a low MTU when the single negotiation fails', async () => {
     const { transport, uuid, device } = createHarness();
     device.mtu = 23;
-    device.requestMTU
-      .mockResolvedValueOnce(device)
-      .mockResolvedValueOnce(device)
-      .mockImplementationOnce(() => {
-        device.mtu = 247;
-        return Promise.resolve(device);
-      });
+    device.requestMTU.mockRejectedValueOnce(new Error('MTU negotiation failed'));
 
     await expect(transport.acquire({ uuid })).resolves.toEqual({
       uuid,
       protocolType: 'V2',
     });
-    expect(device.requestMTU).toHaveBeenCalledTimes(3);
-    expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(247);
-    await transport.release(uuid, true);
-  });
-
-  test('continues with a low bootloader MTU when the bounded retry fails', async () => {
-    const { transport, uuid, device } = createHarness();
-    device.mtu = 23;
-    device.requestMTU
-      .mockResolvedValueOnce(device)
-      .mockResolvedValueOnce(device)
-      .mockRejectedValueOnce(new Error('bootloader MTU retry failed'));
-
-    await expect(transport.acquire({ uuid })).resolves.toEqual({
-      uuid,
-      protocolType: 'V2',
-    });
-    expect(device.requestMTU).toHaveBeenCalledTimes(3);
+    expect(device.requestMTU).toHaveBeenCalledTimes(1);
     expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(23);
     await transport.release(uuid, true);
   });
+
+  test('bounds a stalled MTU negotiation and continues protocol probing', async () => {
+    const { transport, uuid, device, bleManager } = createHarness();
+    device.mtu = 23;
+    device.requestMTU.mockImplementationOnce(() => new Promise(() => {}));
+
+    await expect(transport.acquire({ uuid })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    const transactionId = device.requestMTU.mock.calls[0]?.[1];
+    expect(transactionId).toEqual(expect.stringContaining(`${uuid}:mtu:connected:0:`));
+    expect(bleManager.cancelTransaction).toHaveBeenCalledWith(transactionId);
+    expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(23);
+    await transport.release(uuid, true);
+  }, 10_000);
 
   test('accepts a stable low MTU without the delayed refresh loop', async () => {
     const { transport, uuid, device } = createHarness();
@@ -1138,7 +1150,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       uuid,
       protocolType: 'V2',
     });
-    expect(device.requestMTU).toHaveBeenCalledTimes(1);
+    expect(device.requestMTU).not.toHaveBeenCalled();
     expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(185);
     await transport.release(uuid, true);
   });
@@ -1151,7 +1163,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       uuid,
       protocolType: 'V2',
     });
-    expect(device.requestMTU).toHaveBeenCalledTimes(3);
+    expect(device.requestMTU).toHaveBeenCalledTimes(1);
     expect((transport as any).getCachedTransport(uuid).mtuSize).toBeUndefined();
     expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalled();
     await transport.release(uuid, true);
@@ -1169,7 +1181,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     });
 
     await expect(transport.call(uuid, 'FileWrite', {})).resolves.toBeDefined();
-    expect(device.requestMTU).toHaveBeenCalledTimes(4);
+    expect(device.requestMTU).toHaveBeenCalledTimes(2);
     expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(
       writesBeforeFileWrite + 1
     );
@@ -1186,7 +1198,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await expect(transport.call(uuid, 'FileWrite', {})).rejects.toMatchObject({
       errorCode: HardwareErrorCode.BleConnectedError,
     });
-    expect(device.requestMTU).toHaveBeenCalledTimes(4);
+    expect(device.requestMTU).toHaveBeenCalledTimes(2);
     expect(writeCharacteristic.writeWithoutResponse).toHaveBeenCalledTimes(writesBeforeFileWrite);
     await transport.release(uuid, true);
   });
@@ -1456,9 +1468,17 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   test('uses Android 517 MTU and high connection priority during Protocol V2 high-volume calls', async () => {
     setPlatformOS('android');
     const { transport, uuid, device } = createHarness();
+    device.mtu = 23;
+    device.requestMTU.mockImplementationOnce(() => {
+      device.mtu = 517;
+      return Promise.resolve(device);
+    });
 
     await transport.acquire({ uuid, expectedProtocol: 'V2' });
-    expect(device.requestMTU).toHaveBeenCalledWith(517);
+    expect(device.requestMTU).toHaveBeenCalledWith(
+      517,
+      expect.stringContaining(`${uuid}:mtu:connected:0:`)
+    );
 
     await transport.call(uuid, 'FileWrite', {});
     await transport.call(uuid, 'FileWrite', {});
