@@ -129,6 +129,60 @@ jobs:
             echo "✅ Release $TAG_NAME does not exist, will create"
           fi
 
+      - name: Generate release notes
+        if: steps.check-release.outputs.release_exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ steps.version-info.outputs.tag_name }}
+          VERSION: ${{ steps.version-info.outputs.version }}
+        run: |
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
+          python3 <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          tag = os.environ['TAG_NAME']
+          version = os.environ['VERSION'].split('-', 1)[0].split('+', 1)[0]
+          current = tuple(map(int, version.split('.')))
+          temp = Path(os.environ['RUNNER_TEMP'])
+          pages = json.loads((temp / 'releases.json').read_text())
+
+          # A release tag can be outside the next release's ancestry after a squash merge.
+          # Pick the preceding published stable version, including for maintenance releases.
+          candidates = []
+          for page in pages:
+              for release in page:
+                  match = re.fullmatch(r'v(\d+)\.(\d+)\.(\d+)', release['tag_name'])
+                  if release['draft'] or release['prerelease'] or not match:
+                      continue
+                  candidate = tuple(map(int, match.groups()))
+                  if candidate < current:
+                      candidates.append((candidate, release['tag_name']))
+          previous = max(candidates)[1] if candidates else None
+
+          # Include direct commits omitted by GitHub's PR-based notes, while excluding
+          # patch-equivalent commits already shipped before a squash merge or cherry-pick.
+          revision = f'{previous}...{tag}' if previous else tag
+          log = subprocess.check_output([
+              'git', 'log', '--reverse', '--cherry-pick', '--right-only', '--no-merges',
+              '--format=%H%x09%s', revision, '--',
+          ], text=True)
+          repository = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}"
+          lines = ["## What's Changed", '']
+          for commit in log.splitlines():
+              sha, subject = commit.split('\t', 1)
+              lines.append(f'* {subject} ([{sha[:8]}]({repository}/commit/{sha}))')
+          if not log.strip():
+              lines.append('* No new commits.')
+          if previous:
+              lines.extend(['', f'**Full Changelog**: {repository}/compare/{previous}...{tag}'])
+          (temp / 'release-notes.md').write_text('\n'.join(lines) + '\n')
+          print(f"Release notes: {previous or '(initial release)'} -> {tag}")
+          PY
+
       - name: Create GitHub Release
         if: steps.check-release.outputs.release_exists == 'false'
         env:
@@ -145,7 +199,7 @@ jobs:
           sleep 3
 
           # Build release command
-          RELEASE_CMD="gh release create \"$TAG_NAME\" --title \"Release $TAG_NAME\" --generate-notes --verify-tag"
+          RELEASE_CMD="gh release create \"$TAG_NAME\" --title \"Release $TAG_NAME\" --notes-file \"$RUNNER_TEMP/release-notes.md\" --verify-tag"
 
           if [ "$IS_PRERELEASE" = "true" ]; then
             RELEASE_CMD="$RELEASE_CMD --prerelease"
