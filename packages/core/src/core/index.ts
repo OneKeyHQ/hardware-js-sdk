@@ -322,6 +322,7 @@ const waitForPendingPromise = async (
     Log.debug('pre pending call promise before call method, wait for it');
     let timer: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
+    let completed = false;
     try {
       await Promise.race([
         pendingPromise,
@@ -332,11 +333,12 @@ const waitForPendingPromise = async (
           }, PRE_PENDING_CALL_TIMEOUT_MS);
         }),
       ]);
+      completed = !timedOut;
     } finally {
       if (timer) clearTimeout(timer);
-      // Match the legacy behavior: a stuck cleanup must not permanently poison
-      // this connectId. The next request will reacquire the device if needed.
-      removePrePendingCallPromise?.(connectId, pendingPromise);
+      // Keep a rejected cleanup barrier for the next caller's safety check;
+      // only a completed cleanup or a timeout may clear it.
+      if (timedOut || completed) removePrePendingCallPromise?.(connectId, pendingPromise);
     }
     if (timedOut) {
       Log.warn('pre pending call promise timed out before call method', { connectId });
@@ -432,7 +434,7 @@ const onCallDevice = async (
         }
         return connect();
       }, 'webusb-discovery');
-      void connectPromise.catch(() => undefined);
+      connectPromise.catch(() => undefined);
       device = await requestQueue.waitForTask(task, () => connectPromise);
     } else {
       device = await connect();
@@ -1225,6 +1227,7 @@ const ensureConnected = async (
   const POLL_INTERVAL_TIME = (method.payload && method.payload.pollIntervalTime) || 1000;
   const TIME_OUT = (method.payload && method.payload.timeout) || 10000;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let lastInitializeError: any;
   Log.debug(
     `EnsureConnected function start, MAX_RETRY_COUNT=${MAX_RETRY_COUNT}, POLL_INTERVAL_TIME=${POLL_INTERVAL_TIME}  `
   );
@@ -1265,7 +1268,9 @@ const ensureConnected = async (
       Log.debug('EnsureConnected function try count: ', tryCount, ' poll interval time: ', time);
       try {
         await initDeviceList(method);
+        lastInitializeError = undefined;
       } catch (error) {
+        lastInitializeError = error;
         Log.debug('device list error: ', error);
         if (
           [
@@ -1280,15 +1285,7 @@ const ensureConnected = async (
         }
         if (error.errorCode === HardwareErrorCode.TransportNotConfigured) {
           await TransportManager.configure();
-        } else {
-          const env = DataManager.getSettings('env');
-          if (DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env)) {
-            // Enumeration succeeded far enough to attempt initialization. Do not
-            // replace its failure with a lookup against the now-empty DeviceList.
-            if (timer) clearTimeout(timer);
-            reject(error);
-            return;
-          }
+          lastInitializeError = undefined;
         }
       }
 
@@ -1390,9 +1387,12 @@ const ensureConnected = async (
         // skipWebDevicePrompt can override this behavior for special cases
         if (DataManager.isBrowserWebUsb(env) && !method.payload?.skipWebDevicePrompt) {
           postMessage(createUiMessage(UI_REQUEST.WEB_DEVICE_PROMPT_ACCESS_PERMISSION));
-          reject(ERRORS.TypedError(HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission));
+          reject(
+            lastInitializeError ??
+              ERRORS.TypedError(HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission)
+          );
         } else {
-          reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
+          reject(lastInitializeError ?? ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
         }
         return;
       }

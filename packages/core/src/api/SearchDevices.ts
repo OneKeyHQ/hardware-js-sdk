@@ -24,8 +24,11 @@ export default class SearchDevices extends BaseMethod {
     const useCachedWebUsbDevices =
       (env === 'webusb' || env === 'desktop-webusb') &&
       (this.context?.requestQueue.getRequestTasksId().length ?? 0) > 0;
-    // Core serializes WebUSB discovery with connection setup. A registered
-    // business request owns the connection, including its initialization phase.
+    // Bring up WebUSB even when schema configuration is deferred while a
+    // business request owns the discovery lock.
+    if (env === 'webusb' || env === 'desktop-webusb') {
+      await TransportManager.ensureInitialized();
+    }
     if (!useCachedWebUsbDevices) await TransportManager.configure();
     const deviceDiff = await this.connector?.enumerate();
     const devicesDescriptor = deviceDiff?.descriptors ?? [];
@@ -63,7 +66,14 @@ export default class SearchDevices extends BaseMethod {
     if (useCachedWebUsbDevices) {
       return devicesDescriptor.flatMap(descriptor => {
         const device = DevicePool.getDeviceByPath(descriptor.path);
-        return device?.features ? [device.toMessageObject()] : [];
+        const previousDescriptor = DevicePool.connectedPool?.find(
+          connected => connected.path === descriptor.path
+        );
+        // A descriptor can arrive before its Device cache entry is populated;
+        // retain the last known descriptor instead of reporting a truncated scan.
+        if (device?.features) return [device.toMessageObject()];
+        if (previousDescriptor) return [previousDescriptor];
+        return [];
       });
     }
 

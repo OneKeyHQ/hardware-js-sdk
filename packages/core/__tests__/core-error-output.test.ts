@@ -62,7 +62,7 @@ describe('Core 错误输出边界', () => {
         const request = core.handleMessage({
           id: 11,
           type: IFRAME.CALL,
-          payload: { method: 'getDeviceState', connectId: 'serial-V2' },
+          payload: { method: 'getDeviceState', connectId: 'serial-V2', retryCount: 0 },
         } as never);
         await new Promise(resolve => {
           setTimeout(resolve, 0);

@@ -33,6 +33,8 @@ export default class TransportManager {
 
   static reactNativeInit = false;
 
+  static webUsbInit = false;
+
   static protocolV1MessageSchema: ProtocolV1MessageSchema = 'v1CurrentSchema';
 
   static plugin: LowlevelTransportSharedPlugin | null = null;
@@ -42,6 +44,17 @@ export default class TransportManager {
     this.defaultMessages = DataManager.getProtobufMessages();
     this.currentMessages = this.defaultMessages;
     this.protocolV1MessageSchema = 'v1CurrentSchema';
+    this.webUsbInit = false;
+  }
+
+  static async ensureInitialized() {
+    const env = DataManager.getSettings('env');
+    if (env !== 'webusb' && env !== 'desktop-webusb') return;
+    if (this.webUsbInit) return;
+    // The emitter registers USB disconnect events; this must happen even when
+    // schema configuration is intentionally deferred during discovery.
+    await this.transport.init(WebUsbLogger, DevicePool.emitter);
+    this.webUsbInit = true;
   }
 
   static async configure() {
@@ -69,9 +82,7 @@ export default class TransportManager {
       } else if (env === 'desktop-web-ble') {
         await this.transport.init(WebBleLogger, DevicePool.emitter);
       } else if (env === 'webusb' || env === 'desktop-webusb') {
-        // The emitter is what turns a navigator.usb 'disconnect' into a
-        // DEVICE.DISCONNECT; without it WebUSB never reports device removal.
-        await this.transport.init(WebUsbLogger, DevicePool.emitter);
+        await this.ensureInitialized();
       } else {
         await this.transport.init(HttpLogger);
       }
