@@ -452,6 +452,14 @@ export default class ReactNativeBleTransport {
       this.rejectProtocolV2Frames(uuid, new Error(reason));
       Log?.debug('[ReactNativeBleTransport] Protocol V2 link invalidated:', uuid, reason);
       if (reason.startsWith('Protocol V2 link-fatal error:')) {
+        if (this.probingProtocols.get(uuid) !== 'V2') {
+          const transport = transportCache[uuid];
+          try {
+            this.emitDeviceDisconnect(uuid, transport?.device?.name, transport?.monitorToken);
+          } catch {
+            Log?.error('[ReactNativeBleTransport] Protocol V2 disconnect listener failed');
+          }
+        }
         await this.releaseNative(uuid, true);
       }
     },
@@ -1255,11 +1263,9 @@ export default class ReactNativeBleTransport {
       this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
       return { uuid, protocolType };
     } catch (error) {
-      if (isBleStaleBondHardwareError(error) || shouldRethrowProtocolProbeError(error)) {
-        await this.disconnectUnlocked(uuid);
-      } else {
-        await this.releaseUnlocked(uuid, true);
-      }
+      // A failed acquire must retire the physical link before Core retries. Logical
+      // release leaves GATT connected even when neither protocol receives a response.
+      await this.disconnectUnlocked(uuid);
       throw error;
     } finally {
       this.acquiringProtocolV2.delete(uuid);
@@ -2738,6 +2744,7 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
+    const isProtocolProbe = this.probingProtocols.get(uuid) === 'V2';
     const callOptions = options;
     const highThroughputWrite = isProtocolV2HighThroughputCall(name);
 
@@ -2789,6 +2796,19 @@ export default class ReactNativeBleTransport {
       );
     } catch (e) {
       Log?.error('[ReactNativeBleTransport] Protocol V2 call error:', e);
+      if (
+        !isProtocolProbe &&
+        e?.errorCode === HardwareErrorCode.BleTimeoutError &&
+        !this.monitorTokens.has(uuid)
+      ) {
+        // The failed link has finished invalidating. Disconnect outside that
+        // callback to avoid waiting on its own invalidation or acquire lock.
+        await this.runLifecycleOperation(uuid, async () => {
+          // A queued timeout leaves its active monitor intact; a newer acquire
+          // may also have installed one while cleanup waited for the lifecycle lock.
+          if (!this.monitorTokens.has(uuid)) await this.disconnectUnlocked(uuid);
+        });
+      }
       throw e;
     } finally {
       if (highThroughputWrite) {
