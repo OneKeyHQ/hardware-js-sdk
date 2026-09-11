@@ -183,6 +183,7 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
       }
     };
     method.setContext?.(context);
+    method.context = context;
 
     method.requestContext = createRequestContext(method.responseID, method.name, {
       sdkInstanceId: context.sdkInstanceId,
@@ -203,7 +204,12 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   if (!method.useDevice) {
     updateMethodRequestContext(method, { status: 'running' });
     try {
-      const response = await method.run();
+      const env = DataManager.getSettings('env');
+      const response =
+        method.name === 'searchDevices' &&
+        (DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env))
+          ? await context.methodSynchronize(() => method.run(), 'webusb-discovery')
+          : await method.run();
       completeMethodRequestContext(method);
       return createResponseMessage(method.responseID, true, response);
     } catch (error) {
@@ -411,7 +417,17 @@ const onCallDevice = async (
      * Polling to ensure successful connection
      */
     const pollingId = pollingManager.start(connectId);
-    device = await ensureConnected(context, method, connectId, pollingId, method.abortSignal);
+    const env = DataManager.getSettings('env');
+    const connect = () =>
+      ensureConnected(context, method, connectId, pollingId, method.abortSignal);
+    // Discovery may acquire USB endpoints. Finish it before initializing a public
+    // request; once registered, that request makes discovery use cached state only.
+    device =
+      DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env)
+        ? await requestQueue.waitForTask(task, () =>
+            context.methodSynchronize(connect, 'webusb-discovery')
+          )
+        : await connect();
     if (method.abortSignal?.aborted) {
       throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
     }
@@ -1255,6 +1271,15 @@ const ensureConnected = async (
         }
         if (error.errorCode === HardwareErrorCode.TransportNotConfigured) {
           await TransportManager.configure();
+        } else {
+          const env = DataManager.getSettings('env');
+          if (DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env)) {
+            // Enumeration succeeded far enough to attempt initialization. Do not
+            // replace its failure with a lookup against the now-empty DeviceList.
+            if (timer) clearTimeout(timer);
+            reject(error);
+            return;
+          }
         }
       }
 

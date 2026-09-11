@@ -20,11 +20,15 @@ export default class SearchDevices extends BaseMethod {
   }
 
   async run() {
-    await TransportManager.configure();
+    const env = DataManager.getSettings('env');
+    const useCachedWebUsbDevices =
+      (env === 'webusb' || env === 'desktop-webusb') &&
+      (this.context?.requestQueue.getRequestTasksId().length ?? 0) > 0;
+    // Core serializes WebUSB discovery with connection setup. A registered
+    // business request owns the connection, including its initialization phase.
+    if (!useCachedWebUsbDevices) await TransportManager.configure();
     const deviceDiff = await this.connector?.enumerate();
     const devicesDescriptor = deviceDiff?.descriptors ?? [];
-
-    const env = DataManager.getSettings('env');
 
     /**
      * No need to call features during Bluetooth scaning
@@ -54,6 +58,13 @@ export default class SearchDevices extends BaseMethod {
         }
       }
       return devices;
+    }
+
+    if (useCachedWebUsbDevices) {
+      return devicesDescriptor.flatMap(descriptor => {
+        const device = DevicePool.getDeviceByPath(descriptor.path);
+        return device?.features ? [device.toMessageObject()] : [];
+      });
     }
 
     const deviceList = [];

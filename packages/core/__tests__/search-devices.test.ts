@@ -17,15 +17,16 @@ jest.mock('../src/data-manager', () => ({
 jest.mock('../src/device/DevicePool', () => ({
   DevicePool: {
     getDevices: jest.fn(),
+    getDeviceByPath: jest.fn(),
   },
 }));
 
 const transportManagerMock: { default: { configure: jest.Mock } } = jest.requireMock(
   '../src/data-manager/TransportManager'
 );
-const devicePoolMock: { DevicePool: { getDevices: jest.Mock } } = jest.requireMock(
-  '../src/device/DevicePool'
-);
+const devicePoolMock: {
+  DevicePool: { getDevices: jest.Mock; getDeviceByPath: jest.Mock };
+} = jest.requireMock('../src/device/DevicePool');
 const dataManagerMock: {
   DataManager: {
     getSettings: jest.Mock;
@@ -40,7 +41,42 @@ describe('SearchDevices', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsBleConnect.mockReturnValue(false);
+    dataManagerMock.DataManager.getSettings.mockReturnValue('webusb');
   });
+
+  test.each(['webusb', 'desktop-webusb'])(
+    '%s discovery leaves active V1/V2 requests and their schemas untouched',
+    async env => {
+      dataManagerMock.DataManager.getSettings.mockReturnValue(env);
+      const devices = ['V1', 'V2'].map(protocol => ({
+        features: { protocol },
+        toMessageObject: () => ({ connectId: `serial-${protocol}` }),
+      }));
+      devicePoolMock.DevicePool.getDeviceByPath.mockImplementation(
+        (path: string) => devices[['usb-V1', 'usb-V2'].indexOf(path)]
+      );
+      const method = new SearchDevices({
+        id: 1,
+        payload: { method: 'searchDevices' },
+      } as never);
+      method.init();
+      method.context = {
+        requestQueue: { getRequestTasksId: () => [2] },
+      } as never;
+      method.connector = {
+        enumerate: jest.fn().mockResolvedValue({
+          descriptors: [{ path: 'usb-V1' }, { path: 'usb-V2' }, { path: 'not-initialized' }],
+        }),
+      } as never;
+
+      await expect(method.run()).resolves.toEqual([
+        { connectId: 'serial-V1' },
+        { connectId: 'serial-V2' },
+      ]);
+      expect(mockGetDevices).not.toHaveBeenCalled();
+      expect(mockConfigureTransport).not.toHaveBeenCalled();
+    }
+  );
 
   test('搜索忽略调用方协议并主动探测，单个无响应设备不阻断后续结果', async () => {
     const unresponsiveDescriptor = {

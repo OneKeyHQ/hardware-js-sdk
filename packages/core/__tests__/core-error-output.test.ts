@@ -4,6 +4,8 @@ import { initConnector, initCore } from '../src/core';
 import { DataManager } from '../src/data-manager';
 import TransportManager from '../src/data-manager/TransportManager';
 import { IFRAME } from '../src/events';
+import SearchDevices from '../src/api/SearchDevices';
+import { DeviceList } from '../src/device/DeviceList';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0-test'),
@@ -23,6 +25,75 @@ describe('Core 错误输出边界', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
+
+  test.each([
+    ['webusb', false],
+    ['desktop-webusb', false],
+    ['desktop-webusb', true],
+  ] as const)(
+    '%s waits for discovery without masking initialization or cancellation (cancel=%s)',
+    async (env, shouldCancel) => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
+      const error = ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed, 'probe failed');
+      let finishSearch!: () => void;
+      let searchStarted!: () => void;
+      const started = new Promise<void>(resolve => {
+        searchStarted = resolve;
+      });
+      const search = jest.spyOn(SearchDevices.prototype, 'run').mockImplementation(async () => {
+        searchStarted();
+        await new Promise<void>(resolve => {
+          finishSearch = resolve;
+        });
+        return [];
+      });
+      const initialize = jest
+        .spyOn(DeviceList.prototype, 'getDeviceLists')
+        .mockRejectedValue(error);
+      const core = initCore();
+      initConnector();
+      try {
+        const discovery = core.handleMessage({
+          id: 10,
+          type: IFRAME.CALL,
+          payload: { method: 'searchDevices' },
+        } as never);
+        await started;
+        const request = core.handleMessage({
+          id: 11,
+          type: IFRAME.CALL,
+          payload: { method: 'getDeviceState', connectId: 'serial-V2' },
+        } as never);
+        await new Promise(resolve => {
+          setTimeout(resolve, 0);
+        });
+        expect(initialize).not.toHaveBeenCalled();
+        if (shouldCancel) {
+          await core.handleMessage({
+            type: IFRAME.CANCEL,
+            payload: { connectId: 'serial-V2' },
+          } as never);
+        }
+        finishSearch();
+        await expect(discovery).resolves.toMatchObject({ success: true });
+        const expectedError = shouldCancel
+          ? ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)
+          : error;
+        await expect(request).resolves.toMatchObject({
+          success: false,
+          payload: { code: expectedError.errorCode, error: expectedError.message },
+        });
+        await new Promise(resolve => {
+          setTimeout(resolve, 0);
+        });
+        expect(search).toHaveBeenCalledTimes(1);
+        expect(initialize).toHaveBeenCalledTimes(shouldCancel ? 0 : 1);
+      } finally {
+        finishSearch?.();
+        await core.dispose();
+      }
+    }
+  );
 
   test.each([
     HardwareErrorCode.BleDeviceNotBonded,
