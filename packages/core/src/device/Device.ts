@@ -1568,6 +1568,8 @@ export class Device extends EventEmitter {
           e instanceof HardwareError &&
           ERROR_CODES_REQUIRE_RELEASE.includes(e.errorCode as any)
         ) {
+          // A failed PIN/session must not let the next call skip Initialize.
+          this.clearPreInitialized();
           if (ERROR_CODES_REQUIRE_DISCONNECT.includes(e.errorCode as any)) {
             await this.deviceConnector?.disconnect(this.mainId);
           }
