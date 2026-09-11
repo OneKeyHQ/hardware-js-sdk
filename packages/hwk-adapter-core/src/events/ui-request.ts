@@ -56,10 +56,23 @@ export type DevicePermissionResponse = {
   message?: string;
 };
 
+/**
+ * Why a host refused to persist a binding.
+ * - `mismatch`: the selected device is not the one this operation belongs to —
+ *   a user-facing outcome, surfaced as `DeviceMismatch`.
+ * - `skipped`: the host had nothing to bind (no record for this call). A host
+ *   contract problem, not something the user did.
+ */
+export type SaveDeviceBindingDeclineReason = 'mismatch' | 'skipped';
+
 export type UiResponseEvent =
   | {
       type: typeof UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING;
-      payload: { requestId: string; saved: boolean };
+      payload: {
+        requestId: string;
+        saved: boolean;
+        reason?: SaveDeviceBindingDeclineReason;
+      };
     }
   | {
       type: typeof UI_RESPONSE.RECEIVE_PIN;

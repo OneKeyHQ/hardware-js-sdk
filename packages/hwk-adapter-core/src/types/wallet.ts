@@ -138,7 +138,7 @@ export type DeviceSelectionContext =
   | {
       kind: 'bind-connection';
       transport: 'ble';
-      reason: 'missing-binding' | 'known-connection-unavailable';
+      reason: 'missing-binding' | 'known-connection-unavailable' | 'manual-rebind';
     };
 
 export interface DeviceSelectionRequest {
@@ -161,6 +161,8 @@ export interface SaveDeviceBindingRequest {
   identity: Extract<WalletIdentity, { vendor: 'ledger' | 'trezor' }>;
   extra?: HardwareCallExtra;
 }
+
+export type BindBleDeviceParams = Pick<SaveDeviceBindingRequest, 'identity' | 'extra'>;
 
 export interface DeviceBindingStatus {
   selectionRequestId: string;
@@ -241,27 +243,6 @@ export type DeviceEvent =
   | { type: typeof DEVICE.CONNECT; payload: DeviceInfo }
   | { type: typeof DEVICE.DISCONNECT; payload: { connectId: string } }
   | { type: typeof DEVICE.CHANGED; payload: DeviceInfo }
-  | {
-      type: typeof DEVICE.LEDGER_CONNECTION_VERIFIED;
-      payload: {
-        previousConnectId: string;
-        connectId: string;
-        chain: ChainForFingerprint;
-        fingerprint: string;
-        extra?: HardwareCallExtra;
-        selectionRequestId?: string;
-      };
-    }
-  | {
-      type: typeof DEVICE.TREZOR_CONNECTION_VERIFIED;
-      payload: {
-        deviceId: string;
-        connectId: string;
-        connectionType: TransportType;
-        extra?: HardwareCallExtra;
-        selectionRequestId?: string;
-      };
-    }
   | {
       type: typeof DEVICE.FEATURES;
       device: DeviceInfo & { features: Record<string, unknown> };
@@ -371,27 +352,6 @@ export interface HardwareEventMap {
   [DEVICE.CONNECT]: { type: typeof DEVICE.CONNECT; payload: DeviceInfo };
   [DEVICE.DISCONNECT]: { type: typeof DEVICE.DISCONNECT; payload: { connectId: string } };
   [DEVICE.CHANGED]: { type: typeof DEVICE.CHANGED; payload: DeviceInfo };
-  [DEVICE.LEDGER_CONNECTION_VERIFIED]: {
-    type: typeof DEVICE.LEDGER_CONNECTION_VERIFIED;
-    payload: {
-      previousConnectId: string;
-      connectId: string;
-      chain: ChainForFingerprint;
-      fingerprint: string;
-      extra?: HardwareCallExtra;
-      selectionRequestId?: string;
-    };
-  };
-  [DEVICE.TREZOR_CONNECTION_VERIFIED]: {
-    type: typeof DEVICE.TREZOR_CONNECTION_VERIFIED;
-    payload: {
-      deviceId: string;
-      connectId: string;
-      connectionType: TransportType;
-      extra?: HardwareCallExtra;
-      selectionRequestId?: string;
-    };
-  };
   [DEVICE.FEATURES]: {
     type: typeof DEVICE.FEATURES;
     device: DeviceInfo & { features: Record<string, unknown> };
@@ -585,6 +545,8 @@ export interface IHardwareWallet<TConfig = unknown>
   listConnectionTargets(options?: SearchDevicesOptions): Promise<ConnectionTarget[]>;
   /** Connect or logically bind a selected search result and return a runtime-only interaction id. */
   connectDevice(searchTargetId: string): Promise<Response<string>>;
+  /** Explicit Device Manager binding: verify the existing identity before replacing its BLE locator. */
+  bindBleDevice?(params: BindBleDeviceParams): Promise<Response<string>>;
   /** Resolve operation-first routing/selection and pin it. The caller must verify wallet identity before business calls. */
   acquireInteraction?(
     connectId: string,

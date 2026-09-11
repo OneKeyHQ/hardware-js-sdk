@@ -219,6 +219,23 @@ describe('DeviceJobQueue', () => {
     expect(started).toEqual(['A']);
   });
 
+  it('targeted cancellation preserves queued jobs for other interactions', async () => {
+    const queue = new DeviceJobQueue();
+    const reason = new Error('Interaction cancelled');
+    const cancelledJob = jest.fn(async () => 'cancelled');
+    const otherJob = jest.fn(async () => 'other');
+    const first = queue.enqueue('old-interaction', cancelledJob);
+    const second = queue.enqueue('new-interaction', otherJob);
+
+    expect(queue.cancelActiveAndPending('old-interaction', reason)).toBe(true);
+    expect(await Promise.allSettled([first, second])).toEqual([
+      { status: 'rejected', reason },
+      { status: 'fulfilled', value: 'other' },
+    ]);
+    expect(cancelledJob).not.toHaveBeenCalled();
+    expect(otherJob).toHaveBeenCalledTimes(1);
+  });
+
   it('clear() during running job does not clobber successor _active (identity guard)', async () => {
     const queue = new DeviceJobQueue();
 

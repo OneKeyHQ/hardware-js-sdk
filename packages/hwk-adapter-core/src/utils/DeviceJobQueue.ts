@@ -33,7 +33,7 @@ export class DeviceJobQueue {
 
   private _active: ActiveJob | null = null;
 
-  private readonly _jobs = new Map<object, { deviceId: string }>();
+  private readonly _jobs = new Map<object, ActiveJob>();
 
   /** Incremented on clear() so queued-but-not-yet-running jobs detect invalidation. */
   private _generation = 0;
@@ -63,7 +63,7 @@ export class DeviceJobQueue {
       abortController: ac,
       startedAt: Date.now(),
     };
-    this._jobs.set(jobToken, { deviceId });
+    this._jobs.set(jobToken, activeJob);
 
     const next = prev
       .catch(() => {})
@@ -73,6 +73,7 @@ export class DeviceJobQueue {
             this._generationCancelReasons.get(gen) ?? new Error('Job cancelled: queue was cleared')
           );
         }
+        if (ac.signal.aborted) throw ac.signal.reason;
         this._active = activeJob;
         try {
           return await job(ac.signal);
@@ -116,10 +117,18 @@ export class DeviceJobQueue {
 
   /** Cancel the active job and invalidate queued jobs that have not started. */
   cancelActiveAndPending(deviceId?: string, reason?: Error): boolean {
-    if (deviceId && this._active && this._active.deviceId !== deviceId) {
-      return false;
+    const cancelReason = reason ?? new Error('Cancelled by cancelActiveAndPending');
+    if (deviceId) {
+      let cancelled = false;
+      for (const job of this._jobs.values()) {
+        if (job.deviceId === deviceId) {
+          job.abortController.abort(cancelReason);
+          cancelled = true;
+        }
+      }
+      return cancelled;
     }
-    this.clear(reason ?? new Error('Cancelled by cancelActiveAndPending'));
+    this.clear(cancelReason);
     return true;
   }
 

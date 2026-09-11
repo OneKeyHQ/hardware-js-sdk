@@ -17,8 +17,8 @@ import type {
   ConnectorDevice,
   ConnectorEventMap,
   ConnectorEventType,
-  ConnectorSession,
   ConnectorSearchDevicesOptions,
+  ConnectorSession,
   IConnector,
 } from '@onekeyfe/hwk-adapter-core';
 
@@ -131,6 +131,191 @@ describe('LedgerAdapter', () => {
     });
   });
 
+  /** Hosts must acknowledge every binding; return the payloads the SDK asked to save. */
+  function acknowledgeBindings(): jest.Mock {
+    const save = jest.fn();
+    adapter.on(UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING, event => {
+      save(event.payload);
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING,
+        payload: { requestId: event.payload.requestId, saved: true },
+      });
+    });
+    return save;
+  }
+
+  it.each([true, false])(
+    'explicit BLE binding verifies identity and waits for saving (saved=%s)',
+    async saved => {
+      Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+      const fingerprint = deriveDeviceFingerprint('original-wallet');
+      connector.callImpl.mockResolvedValue({ address: 'original-wallet' });
+      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+        if (!event.payload.devices.length) return;
+        expect(event.payload.context).toMatchObject({ reason: 'manual-rebind' });
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+          payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
+        });
+      });
+      let saveRequestId: string | undefined;
+      adapter.on(UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING, event => {
+        expect(event.payload.identity).toEqual({
+          vendor: 'ledger',
+          type: 'chainFingerprint',
+          chain: 'evm',
+          value: fingerprint,
+        });
+        expect(event.payload.extra).toEqual({ dbDeviceId: 'db-ledger' });
+        saveRequestId = event.payload.requestId;
+      });
+      const pending = adapter.bindBleDevice({
+        identity: { vendor: 'ledger', type: 'chainFingerprint', chain: 'evm', value: fingerprint },
+        extra: { dbDeviceId: 'db-ledger' },
+      });
+      await waitForCondition(() => Boolean(saveRequestId));
+      expect(saveRequestId).toBeDefined();
+      expect(connector.callImpl).toHaveBeenCalledTimes(1);
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING,
+        payload: { requestId: saveRequestId, saved },
+      });
+      expect((await pending).success).toBe(saved);
+      expect(connector.disconnect).toHaveBeenCalledTimes(saved ? 0 : 1);
+    }
+  );
+
+  it('drains the raw fingerprint call before disconnecting a cancelled manual binding', async () => {
+    Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+      if (!event.payload.devices.length) return;
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+        payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
+      });
+    });
+    let finishCall!: (value: unknown) => void;
+    connector.callImpl.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          finishCall = resolve;
+        })
+    );
+    const pending = adapter.bindBleDevice({
+      identity: {
+        vendor: 'ledger',
+        type: 'chainFingerprint',
+        chain: 'evm',
+        value: 'expected-wallet',
+      },
+    });
+    await waitForCondition(() => Boolean(finishCall));
+    expect(finishCall).toBeDefined();
+    adapter.cancel();
+    expect((await pending).success).toBe(false);
+    expect(connector.disconnect).not.toHaveBeenCalled();
+    finishCall({ address: 'original-wallet' });
+    await waitForCondition(() => connector.disconnect.mock.calls.length > 0);
+    expect(connector.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not treat a legacy target without transport metadata as a missing BLE binding', async () => {
+    Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
+    connector.searchDevices.mockResolvedValue([]);
+    const select = jest.fn();
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, select);
+    const result = await adapter.evmGetAddress('old-ble-id', 'expected-wallet', {
+      path: "m/44'/60'/0'/0/0",
+    });
+    expect(result).toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.DeviceNotFound },
+    });
+    expect(select).not.toHaveBeenCalled();
+    expect(connector.connect).not.toHaveBeenCalled();
+  });
+
+  it('does not save a different wallet during manual BLE binding', async () => {
+    Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+    connector.callImpl.mockResolvedValue({ address: 'different-wallet' });
+    const save = acknowledgeBindings();
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+      if (event.payload.rejectedConnectId) {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+          payload: { requestId: event.payload.requestId, cancelled: true },
+        });
+      } else if (event.payload.devices.length) {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+          payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
+        });
+      }
+    });
+    const result = await adapter.bindBleDevice({
+      identity: {
+        vendor: 'ledger',
+        type: 'chainFingerprint',
+        chain: 'evm',
+        value: deriveDeviceFingerprint('original-wallet'),
+      },
+    });
+    expect(result.success).toBe(false);
+    expect(save).not.toHaveBeenCalled();
+    expect(connector.callImpl).toHaveBeenCalledTimes(1);
+    expect(connector.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['empty', 'legacy', 'interaction'])(
+    'does not reuse a connection whose binding failed to save (%s)',
+    async targetKind => {
+      Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
+      connector.searchDevices.mockImplementation(async (options?: ConnectorSearchDevicesOptions) =>
+        options?.transportType === 'usb'
+          ? []
+          : [
+              {
+                connectId: 'dev-1',
+                deviceId: 'dev-1',
+                name: 'Nano X',
+                model: 'nanoX',
+                connectionType: 'ble',
+              },
+            ]
+      );
+      connector.callImpl.mockResolvedValue({ address: 'original-wallet' });
+      const save = jest.fn();
+      adapter.on(UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING, event => {
+        save();
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING,
+          payload: { requestId: event.payload.requestId, saved: false },
+        });
+      });
+      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+        if (!event.payload.devices.length) return;
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+          payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
+        });
+      });
+      let target = targetKind === 'legacy' ? 'previous-usb-id' : '';
+      if (targetKind === 'interaction') {
+        const acquired = await adapter.acquireInteraction('', { knownConnections: [] });
+        if (!acquired.success) throw new Error('Fixture acquire failed');
+        target = acquired.payload;
+      }
+      const params = { path: "m/44'/60'/0'/0/1", knownConnections: [] };
+      const fingerprint = deriveDeviceFingerprint('original-wallet');
+      expect((await adapter.evmGetAddress(target, fingerprint, params)).success).toBe(false);
+      expect((await adapter.evmGetAddress(target, fingerprint, params)).success).toBe(false);
+      const attempts = targetKind === 'interaction' ? 1 : 2;
+      expect(save).toHaveBeenCalledTimes(attempts);
+      expect(connector.callImpl).toHaveBeenCalledTimes(attempts);
+      expect(connector.disconnect).toHaveBeenCalledTimes(attempts);
+    }
+  );
+
   it('should have vendor set to "ledger"', () => {
     expect(adapter.vendor).toBe('ledger');
   });
@@ -175,6 +360,99 @@ describe('LedgerAdapter', () => {
       expect(picker).not.toHaveBeenCalled();
     }
   );
+
+  it.each(['match', 'mismatch', 'business-disconnect'])(
+    'returns to USB during automatic BLE discovery without bypassing business guards (%s)',
+    async outcome => {
+      Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
+      let usbPresent = false;
+      connector.searchDevices.mockImplementation(
+        async (options?: ConnectorSearchDevicesOptions) => {
+          if (options?.transportType === 'usb') {
+            return usbPresent
+              ? [{ connectId: 'dev-1', connectionType: 'usb', name: 'Ledger USB' }]
+              : [];
+          }
+          return [{ connectId: 'ble-1', connectionType: 'ble', name: 'Ledger BLE' }];
+        }
+      );
+      connector.callImpl.mockResolvedValue({
+        address: outcome === 'mismatch' ? 'different-wallet' : 'original-wallet',
+      });
+      if (outcome === 'business-disconnect') {
+        connector.callImpl
+          .mockResolvedValueOnce({ address: 'original-wallet' })
+          .mockRejectedValueOnce(
+            Object.assign(new Error('USB disconnected during business call'), {
+              code: HardwareErrorCode.DeviceDisconnected,
+            })
+          );
+      }
+      const save = acknowledgeBindings();
+      const status = jest.fn();
+      adapter.on(UI_REQUEST.DEVICE_BINDING_STATUS, status);
+      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, () => {
+        usbPresent = true;
+      });
+      let settled = false;
+      const pending = adapter
+        .evmGetAddress('dev-1', deriveDeviceFingerprint('original-wallet'), {
+          path: "m/44'/60'/0'/0/1",
+          knownConnections: [{ transport: 'usb', connectId: 'dev-1' }],
+        })
+        .finally(() => {
+          settled = true;
+        });
+      await waitForCondition(() => settled);
+      if (!settled) adapter.cancel();
+      const result = await pending;
+      expect(result.success).toBe(outcome === 'match');
+      if (outcome === 'mismatch')
+        expect(result).toMatchObject({ payload: { code: HardwareErrorCode.DeviceMismatch } });
+      expect(connector.connect).toHaveBeenCalledWith('dev-1', { transportType: 'usb' });
+      expect(connector.connect).toHaveBeenCalledTimes(1);
+      expect(save).not.toHaveBeenCalled();
+      expect(status).toHaveBeenCalledWith({
+        type: UI_REQUEST.DEVICE_BINDING_STATUS,
+        payload: { selectionRequestId: expect.any(String), status: 'cancelled' },
+      });
+      expect(connector.callImpl).toHaveBeenCalledTimes(outcome === 'mismatch' ? 1 : 2);
+    }
+  );
+
+  it('keeps a manual BLE rebind in BLE discovery even when USB is available', async () => {
+    Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
+    connector.searchDevices.mockImplementation(async (options?: ConnectorSearchDevicesOptions) => [
+      {
+        connectId: options?.transportType === 'usb' ? 'usb-other' : 'dev-1',
+        connectionType: options?.transportType === 'usb' ? 'usb' : 'ble',
+        name: 'Ledger',
+      },
+    ]);
+    connector.callImpl.mockResolvedValue({ address: 'original-wallet' });
+    const save = acknowledgeBindings();
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+      if (!event.payload.devices.length) return;
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+        payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
+      });
+    });
+    const result = await adapter.bindBleDevice({
+      identity: {
+        vendor: 'ledger',
+        type: 'chainFingerprint',
+        chain: 'evm',
+        value: deriveDeviceFingerprint('original-wallet'),
+      },
+    });
+    expect(result.success).toBe(true);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(
+      connector.searchDevices.mock.calls.every(([options]) => options?.transportType === 'ble')
+    ).toBe(true);
+    expect(connector.connect).toHaveBeenCalledWith('dev-1', { transportType: 'ble' });
+  });
 
   it('does not use BLE when USB discovery fails', async () => {
     Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
@@ -239,6 +517,7 @@ describe('LedgerAdapter', () => {
   it.each(['known-ble', 'stale-ble', 'unbound-ble', 'targeted-usb'])(
     'acquires and pins an operation target without probing the wallet (%s)',
     async scenario => {
+      acknowledgeBindings();
       const isBle = scenario !== 'targeted-usb';
       if (isBle) Object.defineProperty(connector, 'connectionType', { value: 'ble' });
       connector.searchDevices.mockResolvedValue([
@@ -308,8 +587,6 @@ describe('LedgerAdapter', () => {
         const address = '0x1111111111111111111111111111111111111111';
         connector.callImpl.mockResolvedValue({ address });
         let requestId: string | undefined;
-        const legacyNotification = jest.fn();
-        adapter.on(DEVICE.LEDGER_CONNECTION_VERIFIED, legacyNotification);
         adapter.on(UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING, event => {
           requestId = event.payload.requestId;
           expect(event.payload.identity).toEqual({
@@ -332,7 +609,6 @@ describe('LedgerAdapter', () => {
         });
         expect((await operation).success).toBe(saved);
         expect(connector.callImpl).toHaveBeenCalledTimes(saved ? 2 : 1);
-        expect(legacyNotification).not.toHaveBeenCalled();
         await adapter.releaseInteraction(interactionId);
       }
     );
@@ -354,10 +630,9 @@ describe('LedgerAdapter', () => {
     }
 
     it.each(['business', 'fingerprint'] as const)(
-      'publishes the original selection once after %s verification',
+      'saves the original selection once after %s verification',
       async method => {
-        const verified = jest.fn();
-        adapter.on(DEVICE.LEDGER_CONNECTION_VERIFIED, verified);
+        const verified = acknowledgeBindings();
         const interactionId = await acquireBinding();
         expect(verified).not.toHaveBeenCalled();
         const address = '0x1111111111111111111111111111111111111111';
@@ -374,23 +649,23 @@ describe('LedgerAdapter', () => {
         expect((await verify()).success).toBe(true);
         expect(verified).toHaveBeenCalledTimes(1);
         expect(verified).toHaveBeenCalledWith({
-          type: DEVICE.LEDGER_CONNECTION_VERIFIED,
-          payload: {
-            previousConnectId: expect.any(String),
-            connectId: 'dev-1',
+          requestId: expect.any(String),
+          selectionRequestId: expect.any(String),
+          connection: { transport: 'ble', connectId: 'dev-1' },
+          identity: {
+            vendor: 'ledger',
+            type: 'chainFingerprint',
             chain: 'evm',
-            fingerprint,
-            extra: { dbDeviceId: 'binding-record' },
-            selectionRequestId: expect.any(String),
+            value: fingerprint,
           },
+          extra: { dbDeviceId: 'binding-record' },
         });
         await adapter.releaseInteraction(interactionId);
       }
     );
 
     it('does not bind on an unchecked fingerprint read or mismatch', async () => {
-      const verified = jest.fn();
-      adapter.on(DEVICE.LEDGER_CONNECTION_VERIFIED, verified);
+      const verified = acknowledgeBindings();
       const interactionId = await acquireBinding();
       connector.callImpl.mockResolvedValue({ address: 'synthetic-address' });
       expect((await adapter.getChainFingerprint(interactionId, '', 'evm')).success).toBe(true);
@@ -404,9 +679,8 @@ describe('LedgerAdapter', () => {
     it.each(['cancel', 'release', 'reset', 'disconnect'] as const)(
       'discards a pending binding after %s',
       async action => {
-        const verified = jest.fn();
+        const verified = acknowledgeBindings();
         const status = jest.fn();
-        adapter.on(DEVICE.LEDGER_CONNECTION_VERIFIED, verified);
         adapter.on(UI_REQUEST.DEVICE_BINDING_STATUS, status);
         const interactionId = await acquireBinding();
         if (action === 'cancel') adapter.cancel(interactionId);
@@ -2324,6 +2598,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('selects an unbound BLE device before verifying the wallet fingerprint', async () => {
+      acknowledgeBindings();
       Object.defineProperty(connector, 'connectionType', { value: 'ble' });
       const expectedAddress = '0x1111111111111111111111111111111111111111';
       connector.callImpl
@@ -2415,8 +2690,7 @@ describe('LedgerAdapter', () => {
       });
       adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, unlock);
       const select = jest.fn();
-      const verified = jest.fn();
-      adapter.on(DEVICE.LEDGER_CONNECTION_VERIFIED, verified);
+      const verified = acknowledgeBindings();
       adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
         select();
         adapter.uiResponse({
@@ -2436,14 +2710,11 @@ describe('LedgerAdapter', () => {
       expect(connector.connect).toHaveBeenCalledTimes(1);
       expect(unlock).toHaveBeenCalledTimes(1);
       expect(verified).toHaveBeenCalledWith({
-        type: DEVICE.LEDGER_CONNECTION_VERIFIED,
-        payload: {
-          previousConnectId: '',
-          connectId: 'dev-1',
-          chain: 'evm',
-          fingerprint,
-          selectionRequestId: expect.any(String),
-        },
+        requestId: expect.any(String),
+        selectionRequestId: expect.any(String),
+        connection: { transport: 'ble', connectId: 'dev-1' },
+        identity: { vendor: 'ledger', type: 'chainFingerprint', chain: 'evm', value: fingerprint },
+        extra: undefined,
       });
     });
 
@@ -2521,8 +2792,7 @@ describe('LedgerAdapter', () => {
 
     it('never treats a wrong-app fingerprint failure as successful wallet verification', async () => {
       Object.defineProperty(connector, 'connectionType', { value: 'ble' });
-      const verified = jest.fn();
-      adapter.on(DEVICE.LEDGER_CONNECTION_VERIFIED, verified);
+      const verified = acknowledgeBindings();
       adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
         adapter.uiResponse({
           type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,

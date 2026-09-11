@@ -13,6 +13,7 @@ export async function requestBleDeviceSelection({
   request,
   scan,
   signal,
+  allowUsbFallback = false,
   pollIntervalMs = 1500,
 }: {
   emitter: TypedEventEmitter<HardwareEventMap>;
@@ -20,6 +21,8 @@ export async function requestBleDeviceSelection({
   request: Omit<DeviceSelectionRequest, 'requestId' | 'scanning'>;
   scan: () => Promise<DeviceInfo[]>;
   signal: AbortSignal;
+  /** The adapter must verify a returned USB candidate before dispatching any business call. */
+  allowUsbFallback?: boolean;
   pollIntervalMs?: number;
 }): Promise<{ device: DeviceInfo; requestId: string }> {
   const type = UI_REQUEST.REQUEST_SELECT_DEVICE;
@@ -31,7 +34,10 @@ export async function requestBleDeviceSelection({
     });
   }
   const requestId = registry.createRequestId();
-  let { devices } = request;
+  let devices = allowUsbFallback
+    ? request.devices.filter(device => device.connectionType === 'ble')
+    : request.devices;
+  const publishedDevices = new Map<string, DeviceInfo>();
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let wake: (() => void) | undefined;
@@ -49,13 +55,16 @@ export async function requestBleDeviceSelection({
   const cancel = () => registry.cancel(type, requestId);
   const reply = registry.wait<{ sdkConnectId: string }>(type, { requestId }).finally(stop);
   void reply.catch(() => undefined);
-  const publish = () =>
+  const publish = () => {
+    // UI replies can refer to a displayed snapshot while the next scan completes.
+    for (const device of devices) publishedDevices.set(device.connectId, device);
     emitter.emit(type, {
       type,
       payload: { ...request, devices, requestId, scanning: true },
     });
+  };
   signal.addEventListener('abort', cancel, { once: true });
-  let polling: Promise<void> | undefined;
+  let polling: Promise<DeviceInfo | undefined> | undefined;
   try {
     publish();
     polling = (async () => {
@@ -64,17 +73,24 @@ export async function requestBleDeviceSelection({
       while (!stopped) {
         const snapshot = await scan();
         if (stopped || signal.aborted) return;
+        const usbFallback = allowUsbFallback
+          ? snapshot.find(device => device.connectionType === 'usb')
+          : undefined;
+        if (usbFallback) return usbFallback;
         devices = snapshot;
         publish();
         if (stopped) return;
         await waitForNextScan();
       }
     })();
-    const selected = await Promise.race([reply, polling.then(() => reply)]);
+    const userSelection = reply.then(selected => publishedDevices.get(selected.sdkConnectId));
+    const device = await Promise.race([
+      userSelection,
+      polling.then(usbFallback => usbFallback ?? userSelection),
+    ]);
     stop();
     await polling;
     if (signal.aborted) throw signal.reason;
-    const device = devices.find(candidate => candidate.connectId === selected.sdkConnectId);
     if (!device) {
       throw createHwkError({
         code: HardwareErrorCode.DeviceNotFound,
