@@ -328,6 +328,10 @@ const requestNegotiatedMtu = async (
     // iOS ignores the requested value but react-native-ble-plx returns a fresh
     // Device snapshot whose MTU is derived from CoreBluetooth's maximum write length.
     const request = device.requestMTU(getRequestedBleMtu(), transactionId);
+    // The timeout race may settle before the native request does. Attach a
+    // rejection handler so a late native cancellation cannot become an
+    // unhandled rejection after we continue with the current MTU.
+    void request.catch(() => undefined);
     const mtuDevice = await Promise.race([
       request,
       new Promise<never>((_, reject) => {

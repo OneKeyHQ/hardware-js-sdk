@@ -422,12 +422,21 @@ const onCallDevice = async (
       ensureConnected(context, method, connectId, pollingId, method.abortSignal);
     // Discovery may acquire USB endpoints. Finish it before initializing a public
     // request; once registered, that request makes discovery use cached state only.
-    device =
-      DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env)
-        ? await requestQueue.waitForTask(task, () =>
-            context.methodSynchronize(connect, 'webusb-discovery')
-          )
-        : await connect();
+    if (DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env)) {
+      // Synchronization can keep the connect action queued after the caller is
+      // cancelled. Observe that promise so a late device-not-found error does
+      // not become an unhandled rejection.
+      const connectPromise = context.methodSynchronize(async () => {
+        if (method.abortSignal?.aborted) {
+          throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+        }
+        return connect();
+      }, 'webusb-discovery');
+      void connectPromise.catch(() => undefined);
+      device = await requestQueue.waitForTask(task, () => connectPromise);
+    } else {
+      device = await connect();
+    }
     if (method.abortSignal?.aborted) {
       throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
     }
