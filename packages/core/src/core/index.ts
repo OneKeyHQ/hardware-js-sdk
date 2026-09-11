@@ -321,25 +321,25 @@ const waitForPendingPromise = async (
   if (pendingPromise) {
     Log.debug('pre pending call promise before call method, wait for it');
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
     try {
       await Promise.race([
         pendingPromise,
-        new Promise<void>((_, reject) => {
+        new Promise<void>(resolve => {
           timer = setTimeout(() => {
-            reject(
-              ERRORS.TypedError(
-                HardwareErrorCode.DeviceBusy,
-                'Previous device cancellation is still draining'
-              )
-            );
+            timedOut = true;
+            resolve();
           }, PRE_PENDING_CALL_TIMEOUT_MS);
         }),
       ]);
-      // A deadline is not evidence that old I/O is safe to reuse. Keep the
-      // barrier on failure; a later call may proceed only after cleanup settles.
-      removePrePendingCallPromise?.(connectId, pendingPromise);
     } finally {
       if (timer) clearTimeout(timer);
+      // Match the legacy behavior: a stuck cleanup must not permanently poison
+      // this connectId. The next request will reacquire the device if needed.
+      removePrePendingCallPromise?.(connectId, pendingPromise);
+    }
+    if (timedOut) {
+      Log.warn('pre pending call promise timed out before call method', { connectId });
     }
     Log.debug('pre pending call promise before call method done');
   }
