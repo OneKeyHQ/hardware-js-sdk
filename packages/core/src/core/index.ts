@@ -84,7 +84,7 @@ import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
 const PRE_INITIALIZE_TTL_MS = 60 * 1000;
-const PRE_PENDING_CALL_TIMEOUT_MS = 15 * 1000;
+const PRE_PENDING_CALL_TIMEOUT_MS = 5 * 1000;
 const PRO2_USB_SIGNING_COOLDOWN_MS = 1000;
 
 // Dedup/coalesce state for "pre-warm signal" methods (isPreWarmSignal),

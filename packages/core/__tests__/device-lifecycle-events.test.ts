@@ -367,7 +367,7 @@ describe('public device lifecycle events', () => {
     jest
       .spyOn(global, 'setTimeout')
       .mockImplementation((callback, delay, ...args) =>
-        realSetTimeout(callback, delay === 15_000 ? 0 : delay, ...args)
+        realSetTimeout(callback, delay === 5_000 ? 0 : delay, ...args)
       );
     {
       jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
@@ -385,7 +385,9 @@ describe('public device lifecycle events', () => {
       setImmediate(() => cancel(context, 'draining-device'));
       await expect(result).resolves.toBeDefined();
       gate.resolve();
-      await new Promise(resolve => setImmediate(resolve));
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
       expect(context.getPrePendingCallPromise('draining-device')).toBeUndefined();
     }
   });
