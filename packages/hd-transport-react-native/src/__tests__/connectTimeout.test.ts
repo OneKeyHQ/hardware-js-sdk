@@ -446,7 +446,7 @@ describe('BLE connect timeout', () => {
       const nativeOperation = createDeferred<typeof device>();
       const nativeDisconnect = createDeferred<void>();
       const requestMtu = jest.fn(() => Promise.resolve(device));
-      Object.assign(device, { mtu: 247, requestMTU: requestMtu });
+      Object.assign(device, { mtu: stage === 'mtu' ? 23 : 247, requestMTU: requestMtu });
       device.isConnected.mockResolvedValue(true);
       if (stage === 'connect') device.isConnected.mockResolvedValueOnce(false);
       if (stage === 'mtu') requestMtu.mockImplementationOnce(() => nativeOperation.promise);
