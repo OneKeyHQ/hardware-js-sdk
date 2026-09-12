@@ -1383,17 +1383,22 @@ const ensureConnected = async (
           clearTimeout(timer);
         }
         Log.debug('EnsureConnected get to max try count, will return: ', tryCount);
-        // Browser WebUSB needs permission prompt, desktop WebUSB doesn't
-        // skipWebDevicePrompt can override this behavior for special cases
-        if (DataManager.isBrowserWebUsb(env) && !method.payload?.skipWebDevicePrompt) {
+        const preserveWebUsbInitError =
+          DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env);
+        const needsPermissionPrompt =
+          DataManager.isBrowserWebUsb(env) && !method.payload?.skipWebDevicePrompt;
+        const fallbackError = needsPermissionPrompt
+          ? ERRORS.TypedError(HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission)
+          : ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
+        const errorToReject =
+          preserveWebUsbInitError && lastInitializeError ? lastInitializeError : fallbackError;
+        // Only ask the host for a WebUSB grant when the failure is actually
+        // "not found / needs permission". A preserved initialize error must
+        // not fire that prompt with a different public code.
+        if (needsPermissionPrompt && errorToReject === fallbackError) {
           postMessage(createUiMessage(UI_REQUEST.WEB_DEVICE_PROMPT_ACCESS_PERMISSION));
-          reject(
-            lastInitializeError ??
-              ERRORS.TypedError(HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission)
-          );
-        } else {
-          reject(lastInitializeError ?? ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
         }
+        reject(errorToReject);
         return;
       }
 
