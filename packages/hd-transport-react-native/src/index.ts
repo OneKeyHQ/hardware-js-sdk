@@ -300,6 +300,15 @@ const shouldRethrowBleSetupError = (error: unknown): boolean =>
   isConnectTimeoutError(error) || isWedgedBleSetupError(error);
 const isNativeOperationTimeoutError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === BleErrorCode.OperationTimedOut;
+const isMtuOrCancelledConnectError = (error: unknown): boolean => {
+  const errorCode = (error as { errorCode?: unknown })?.errorCode;
+  return (
+    errorCode === BleErrorCode.DeviceMTUChangeFailed ||
+    errorCode === BleErrorCode.OperationCancelled
+  );
+};
+
+type NegotiatedMtuResult = { device: Device; timedOut: boolean };
 
 export type IOneKeyDevice = OneKeyDeviceInfoBase & Device;
 
@@ -317,8 +326,8 @@ const requestNegotiatedMtu = async (
   stage: 'connected' | 'highThroughput',
   attempt: number,
   cancelTransaction?: (transactionId: string) => Promise<void> | void
-) => {
-  if (Platform.OS !== 'ios' && Platform.OS !== 'android') return device;
+): Promise<NegotiatedMtuResult> => {
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android') return { device, timedOut: false };
 
   const transactionId = `${device.id}:mtu:${stage}:${attempt}:${Date.now()}`;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -331,7 +340,7 @@ const requestNegotiatedMtu = async (
     // The timeout race may settle before the native request does. Attach a
     // rejection handler so a late native cancellation cannot become an
     // unhandled rejection after we continue with the current MTU.
-    void request.catch(() => undefined);
+    request.catch(() => undefined);
     const mtuDevice = await Promise.race([
       request,
       new Promise<never>((_, reject) => {
@@ -341,7 +350,7 @@ const requestNegotiatedMtu = async (
         }, BLE_MTU_REQUEST_TIMEOUT_MS);
       }),
     ]);
-    return mtuDevice;
+    return { device: mtuDevice, timedOut: false };
   } catch (error) {
     if (timedOut && cancelTransaction) {
       try {
@@ -367,9 +376,10 @@ const requestNegotiatedMtu = async (
       stage,
       attempt,
       actual: device.mtu,
+      timedOut,
       error: error instanceof Error ? error.message : String(error),
     });
-    return device;
+    return { device, timedOut };
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
   }
@@ -378,10 +388,10 @@ const requestNegotiatedMtu = async (
 const resolveNegotiatedMtu = (
   device: Device,
   cancelTransaction?: (transactionId: string) => Promise<void> | void
-) =>
+): Promise<NegotiatedMtuResult> =>
   shouldRefreshNegotiatedMtu(device.mtu)
     ? requestNegotiatedMtu(device, 'connected', 0, cancelTransaction)
-    : Promise.resolve(device);
+    : Promise.resolve({ device, timedOut: false });
 
 type IOBleErrorRemap = Error | BleError | null | undefined;
 
@@ -1072,6 +1082,7 @@ export default class ReactNativeBleTransport {
     }
 
     const blePlxManager = await this.getPlxManager();
+    let skipPostConnectMtu = false;
     try {
       await subscribeBleOn(blePlxManager);
     } catch (error) {
@@ -1123,10 +1134,8 @@ export default class ReactNativeBleTransport {
         if (shouldRethrowBleSetupError(e)) {
           throw e;
         }
-        if (
-          e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
-          e.errorCode === BleErrorCode.OperationCancelled
-        ) {
+        if (isMtuOrCancelledConnectError(e)) {
+          skipPostConnectMtu = true;
           Log?.debug('first try to reconnect without params');
           device = await this.connectWithTimeout(uuid, () =>
             blePlxManager.connectToDevice(uuid, fallbackConnectOptions)
@@ -1157,10 +1166,8 @@ export default class ReactNativeBleTransport {
         if (shouldRethrowBleSetupError(e)) {
           throw e;
         }
-        if (
-          e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
-          e.errorCode === BleErrorCode.OperationCancelled
-        ) {
+        if (isMtuOrCancelledConnectError(e)) {
+          skipPostConnectMtu = true;
           Log?.debug('second try to reconnect without params');
           try {
             device = await this.connectWithTimeout(uuid, () =>
@@ -1202,9 +1209,29 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'device is not connected');
     }
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-    device = await resolveNegotiatedMtu(device, transactionId =>
-      blePlxManager.cancelTransaction(transactionId)
-    );
+    // Match 1.1.31: MTU is a connect() best-effort. If connect already fell back
+    // without requestMTU, do not put another requestMTU on the native serial
+    // queue — that is what wedges GATT after Account#2 reconnect.
+    if (!skipPostConnectMtu) {
+      const mtuResult = await resolveNegotiatedMtu(device, transactionId =>
+        blePlxManager.cancelTransaction(transactionId)
+      );
+      device = mtuResult.device;
+      if (mtuResult.timedOut) {
+        if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+        Log?.debug(
+          '[ReactNativeBleTransport] post-connect MTU timed out, reconnecting without requesting MTU'
+        );
+        const timedOutDevice = device;
+        await this.runBestEffortNativeOperation('mtu timeout: cancel device connection', () =>
+          timedOutDevice.cancelConnection()
+        );
+        if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+        device = await this.connectWithTimeout(uuid, () =>
+          timedOutDevice.connect(fallbackConnectOptions)
+        );
+      }
+    }
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     const acquiredDevice = device;
     const { writeCharacteristic, notifyCharacteristic } =
@@ -2837,7 +2864,7 @@ export default class ReactNativeBleTransport {
     const transport = this.getCachedTransport(uuid);
     if (!shouldRefreshNegotiatedMtu(transport.mtuSize)) return;
 
-    const refreshedDevice = await requestNegotiatedMtu(
+    const { device: refreshedDevice } = await requestNegotiatedMtu(
       transport.device,
       'highThroughput',
       1,

@@ -169,11 +169,13 @@ const createHarness = ({
     serviceUUIDs: ['00000001-0000-1000-8000-00805f9b34fb'],
     isConnected: jest.fn(() => Promise.resolve(true)),
     cancelConnection: jest.fn(() => Promise.resolve()),
+    connect: jest.fn(),
     onDisconnected: jest.fn(callback => {
       disconnectCallback = callback;
       return { remove: jest.fn() };
     }),
   } as any;
+  device.connect.mockResolvedValue(device);
   device.requestMTU = jest.fn(() => Promise.resolve(device));
   device.requestConnectionPriority = jest.fn(() => Promise.resolve(device));
   const bleManager = {
@@ -1138,9 +1140,40 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     const transactionId = device.requestMTU.mock.calls[0]?.[1];
     expect(transactionId).toEqual(expect.stringContaining(`${uuid}:mtu:connected:0:`));
     expect(bleManager.cancelTransaction).toHaveBeenCalledWith(transactionId);
+    expect(device.cancelConnection).toHaveBeenCalled();
+    expect(device.connect).toHaveBeenCalledWith(
+      expect.objectContaining({ timeout: expect.any(Number) })
+    );
+    expect(device.connect.mock.calls.at(-1)?.[0]).not.toHaveProperty('requestMTU');
+    expect(device.requestMTU).toHaveBeenCalledTimes(1);
     expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(23);
     await transport.release(uuid, true);
   }, 10_000);
+
+  test('does not request MTU again after connect falls back without requestMTU', async () => {
+    const { BleError: BleErrorMock, BleErrorCode } = jest.requireMock('react-native-ble-plx');
+    const { transport, uuid, device } = createHarness();
+    device.mtu = 23;
+    device.isConnected.mockResolvedValueOnce(false).mockResolvedValue(true);
+    device.connect
+      .mockRejectedValueOnce(
+        Object.assign(new BleErrorMock('Operation was cancelled'), {
+          errorCode: BleErrorCode.OperationCancelled,
+        })
+      )
+      .mockResolvedValue(device);
+
+    await expect(transport.acquire({ uuid })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(device.connect).toHaveBeenCalledTimes(2);
+    expect(device.connect.mock.calls[0][0]).toEqual(expect.objectContaining({ requestMTU: 247 }));
+    expect(device.connect.mock.calls[1][0]).not.toHaveProperty('requestMTU');
+    expect(device.requestMTU).not.toHaveBeenCalled();
+    expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(23);
+    await transport.release(uuid, true);
+  });
 
   test('accepts a stable low MTU without the delayed refresh loop', async () => {
     const { transport, uuid, device } = createHarness();
