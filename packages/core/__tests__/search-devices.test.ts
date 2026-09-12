@@ -22,9 +22,8 @@ jest.mock('../src/device/DevicePool', () => ({
   },
 }));
 
-const transportManagerMock: { default: { configure: jest.Mock; ensureInitialized: jest.Mock } } = jest.requireMock(
-  '../src/data-manager/TransportManager'
-);
+const transportManagerMock: { default: { configure: jest.Mock; ensureInitialized: jest.Mock } } =
+  jest.requireMock('../src/data-manager/TransportManager');
 const devicePoolMock: {
   DevicePool: { getDevices: jest.Mock; getDeviceByPath: jest.Mock };
 } = jest.requireMock('../src/device/DevicePool');
