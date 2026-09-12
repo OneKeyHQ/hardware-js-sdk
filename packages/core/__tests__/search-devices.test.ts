@@ -22,8 +22,9 @@ jest.mock('../src/device/DevicePool', () => ({
   },
 }));
 
-const transportManagerMock: { default: { configure: jest.Mock; ensureInitialized: jest.Mock } } =
-  jest.requireMock('../src/data-manager/TransportManager');
+const transportManagerMock: {
+  default: { configure: jest.Mock; ensureInitialized: jest.Mock };
+} = jest.requireMock('../src/data-manager/TransportManager');
 const devicePoolMock: {
   DevicePool: { getDevices: jest.Mock; getDeviceByPath: jest.Mock };
 } = jest.requireMock('../src/device/DevicePool');
@@ -33,8 +34,10 @@ const dataManagerMock: {
     isBleConnect: jest.Mock;
   };
 } = jest.requireMock('../src/data-manager');
-const { configure: mockConfigureTransport } = transportManagerMock.default;
-const { getDevices: mockGetDevices } = devicePoolMock.DevicePool;
+const { configure: mockConfigureTransport, ensureInitialized: mockEnsureInitialized } =
+  transportManagerMock.default;
+const { getDevices: mockGetDevices, getDeviceByPath: mockGetDeviceByPath } =
+  devicePoolMock.DevicePool;
 const { isBleConnect: mockIsBleConnect } = dataManagerMock.DataManager;
 
 describe('SearchDevices', () => {
@@ -52,31 +55,115 @@ describe('SearchDevices', () => {
         features: { protocol },
         toMessageObject: () => ({ connectId: `serial-${protocol}` }),
       }));
-      devicePoolMock.DevicePool.getDeviceByPath.mockImplementation(
+      mockGetDeviceByPath.mockImplementation(
         (path: string) => devices[['usb-V1', 'usb-V2'].indexOf(path)]
       );
+      const extraDevice = {
+        toMessageObject: () => ({ connectId: 'not-initialized' }),
+      };
+      mockGetDevices.mockResolvedValue({
+        devices: { 'not-initialized': extraDevice },
+        deviceList: [extraDevice],
+      });
       const method = new SearchDevices({
         id: 1,
         payload: { method: 'searchDevices' },
       } as never);
       method.init();
       method.context = {
-        requestQueue: { getRequestTasksId: () => [2] },
+        requestQueue: {
+          getRequestTasksId: () => [2],
+          getRequestTasksIdByConnectId: (connectId: string) =>
+            connectId === 'usb-V1' || connectId === 'usb-V2' ? [2] : [],
+        },
       } as never;
       method.connector = {
         enumerate: jest.fn().mockResolvedValue({
-          descriptors: [{ path: 'usb-V1' }, { path: 'usb-V2' }, { path: 'not-initialized' }],
+          descriptors: [
+            { path: 'usb-V1', commType: 'webusb' },
+            { path: 'usb-V2', commType: 'webusb' },
+            { path: 'not-initialized', commType: 'webusb' },
+          ],
         }),
       } as never;
 
       await expect(method.run()).resolves.toEqual([
         { connectId: 'serial-V1' },
         { connectId: 'serial-V2' },
+        { connectId: 'not-initialized' },
       ]);
-      expect(mockGetDevices).not.toHaveBeenCalled();
+      expect(mockGetDevices).toHaveBeenCalledTimes(1);
+      expect(mockGetDevices).toHaveBeenCalledWith(
+        [{ path: 'not-initialized', commType: 'webusb' }],
+        'not-initialized',
+        {
+          connectProtocol: undefined,
+          forceProtocolDetection: true,
+          refreshRuntimeState: true,
+        }
+      );
       expect(mockConfigureTransport).not.toHaveBeenCalled();
     }
   );
+
+  test('owned WebUSB cache miss still reports a SearchDevice without probing', async () => {
+    mockGetDeviceByPath.mockReturnValue(undefined);
+    const usbDevice = { vendorId: 0x1209, productId: 0x4f4c };
+    const method = new SearchDevices({
+      id: 1,
+      payload: { method: 'searchDevices' },
+    } as never);
+    method.init();
+    method.context = {
+      requestQueue: {
+        getRequestTasksId: () => [2],
+        getRequestTasksIdByConnectId: (connectId: string) => (connectId === 'serial-V2' ? [2] : []),
+      },
+    } as never;
+    method.connector = {
+      enumerate: jest.fn().mockResolvedValue({
+        descriptors: [
+          {
+            path: 'serial-V2',
+            device: usbDevice,
+            commType: 'webusb',
+          },
+        ],
+      }),
+    } as never;
+
+    await expect(method.run()).resolves.toEqual([
+      {
+        connectId: 'serial-V2',
+        uuid: 'serial-V2',
+        serialNo: 'serial-V2',
+        deviceId: null,
+        deviceType: 'unknown',
+        name: 'serial-V2',
+        commType: 'webusb',
+      },
+    ]);
+    expect(mockGetDevices).not.toHaveBeenCalled();
+    expect(mockConfigureTransport).not.toHaveBeenCalled();
+  });
+
+  test('searchDevices resolves empty when WebUSB bring-up is unavailable', async () => {
+    mockEnsureInitialized.mockRejectedValueOnce(
+      new Error('WebUSB is not supported by current browsers')
+    );
+    const method = new SearchDevices({
+      id: 1,
+      payload: { method: 'searchDevices' },
+    } as never);
+    method.init();
+    method.connector = {
+      enumerate: jest.fn().mockResolvedValue({ descriptors: [] }),
+    } as never;
+
+    await expect(method.run()).resolves.toEqual([]);
+    expect(mockEnsureInitialized).toHaveBeenCalled();
+    expect(mockConfigureTransport).toHaveBeenCalledTimes(1);
+  });
 
   test('搜索忽略调用方协议并主动探测，单个无响应设备不阻断后续结果', async () => {
     const unresponsiveDescriptor = {

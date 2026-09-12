@@ -62,7 +62,13 @@ describe('Core 错误输出边界', () => {
         const request = core.handleMessage({
           id: 11,
           type: IFRAME.CALL,
-          payload: { method: 'getDeviceState', connectId: 'serial-V2', retryCount: 0 },
+          payload: {
+            method: 'getDeviceState',
+            connectId: 'serial-V2',
+            retryCount: 1,
+            pollIntervalTime: 1,
+            timeout: 1000,
+          },
         } as never);
         await new Promise(resolve => {
           setTimeout(resolve, 0);
@@ -87,7 +93,7 @@ describe('Core 错误输出边界', () => {
           setTimeout(resolve, 0);
         });
         expect(search).toHaveBeenCalledTimes(1);
-        expect(initialize).toHaveBeenCalledTimes(shouldCancel ? 0 : 1);
+        expect(initialize).toHaveBeenCalledTimes(shouldCancel ? 0 : 2);
       } finally {
         finishSearch?.();
         await core.dispose();
