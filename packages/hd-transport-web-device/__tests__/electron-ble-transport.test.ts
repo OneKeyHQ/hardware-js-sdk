@@ -205,12 +205,52 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
   });
 
-  test('sends a native disconnect even before acquire marks the device connected', async () => {
+  test('cancels a pending native connect acquire has not registered yet', async () => {
     const device = { id: 'pending-connect-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    // Never calls back: the field case the Core acquire deadline has to break.
+    nobleBle.connect.mockImplementation(
+      () =>
+        new Promise<void>(() => {
+          // intentionally never settles
+        })
+    );
+    const bleTransport = configureTransport(nobleBle) as any;
+
+    const pendingAcquire = bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    pendingAcquire.catch(() => undefined);
+    await new Promise(resolve => {
+      setTimeout(resolve, 10);
+    });
+
+    // What the deadline / user abort calls. connectedDevices is still empty
+    // here, so this only works because the acquire is tracked as in flight.
+    await bleTransport.disconnect(device.id);
+
+    expect(nobleBle.unsubscribe).not.toHaveBeenCalled();
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+  });
+
+  test('leaves a kept-alive link up when a released device is disconnected', async () => {
+    const device = { id: 'kept-alive-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
     const bleTransport = configureTransport(nobleBle) as any;
 
-    await bleTransport.releaseNative(device.id);
+    // No acquire in flight and nothing in connectedDevices: the link was
+    // released logically and belongs to the main-process keep-alive timer.
+    // The routine post-call cancel must not cost the next call a cold connect.
+    await bleTransport.disconnect(device.id);
+
+    expect(nobleBle.disconnect).not.toHaveBeenCalled();
+    expect(nobleBle.unsubscribe).not.toHaveBeenCalled();
+  });
+
+  test('forceNative disconnects a device the renderer no longer tracks', async () => {
+    const device = { id: 'presumed-dead-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle) as any;
+
+    await bleTransport.releaseNative(device.id, { forceNative: true });
 
     expect(nobleBle.unsubscribe).not.toHaveBeenCalled();
     expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
