@@ -169,13 +169,11 @@ const createHarness = ({
     serviceUUIDs: ['00000001-0000-1000-8000-00805f9b34fb'],
     isConnected: jest.fn(() => Promise.resolve(true)),
     cancelConnection: jest.fn(() => Promise.resolve()),
-    connect: jest.fn(),
     onDisconnected: jest.fn(callback => {
       disconnectCallback = callback;
       return { remove: jest.fn() };
     }),
   } as any;
-  device.connect.mockResolvedValue(device);
   device.requestMTU = jest.fn(() => Promise.resolve(device));
   device.requestConnectionPriority = jest.fn(() => Promise.resolve(device));
   const bleManager = {
@@ -1128,51 +1126,84 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
-  test('bounds a stalled MTU negotiation and continues protocol probing', async () => {
+  test('drops the link when a stalled MTU negotiation is abandoned', async () => {
     const { transport, uuid, device, bleManager } = createHarness();
     device.mtu = 23;
     device.requestMTU.mockImplementationOnce(() => new Promise(() => {}));
+    const { resolveCharacteristics } = transport as any;
 
-    await expect(transport.acquire({ uuid })).resolves.toEqual({
-      uuid,
-      protocolType: 'V2',
+    // cancelTransaction only disposes the JS subscription: RxAndroidBle releases the
+    // connection's serial queue from onComplete/onError alone, so the abandoned exchange
+    // keeps it until its own native timeout. Service discovery must not queue behind it.
+    await expect(transport.acquire({ uuid })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleConnectedError,
     });
     const transactionId = device.requestMTU.mock.calls[0]?.[1];
     expect(transactionId).toEqual(expect.stringContaining(`${uuid}:mtu:connected:0:`));
     expect(bleManager.cancelTransaction).toHaveBeenCalledWith(transactionId);
-    expect(device.cancelConnection).toHaveBeenCalled();
-    expect(device.connect).toHaveBeenCalledWith(
-      expect.objectContaining({ timeout: expect.any(Number) })
-    );
-    expect(device.connect.mock.calls.at(-1)?.[0]).not.toHaveProperty('requestMTU');
-    expect(device.requestMTU).toHaveBeenCalledTimes(1);
-    expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(23);
-    await transport.release(uuid, true);
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
+    expect(resolveCharacteristics).not.toHaveBeenCalled();
   }, 10_000);
 
-  test('does not request MTU again after connect falls back without requestMTU', async () => {
-    const { BleError: BleErrorMock, BleErrorCode } = jest.requireMock('react-native-ble-plx');
+  test('skips the MTU refresh after an MTU-bearing connect was cancelled', async () => {
     const { transport, uuid, device } = createHarness();
     device.mtu = 23;
-    device.isConnected.mockResolvedValueOnce(false).mockResolvedValue(true);
-    device.connect
-      .mockRejectedValueOnce(
-        Object.assign(new BleErrorMock('Operation was cancelled'), {
-          errorCode: BleErrorCode.OperationCancelled,
-        })
-      )
-      .mockResolvedValue(device);
+    let connected = false;
+    device.isConnected.mockImplementation(() => Promise.resolve(connected));
+    const cancelled = Object.assign(new Error('Operation was cancelled'), { errorCode: 2 });
+    device.connect = jest
+      .fn()
+      .mockRejectedValueOnce(cancelled)
+      .mockImplementation(() => {
+        connected = true;
+        return Promise.resolve(device);
+      });
 
     await expect(transport.acquire({ uuid })).resolves.toEqual({
       uuid,
       protocolType: 'V2',
     });
+
+    // ble-plx applies the connect timeout to establishConnection -> refreshGatt ->
+    // requestMtu as one chain, so the fallback means this peripheral did not finish the
+    // MTU exchange. Asking again would only park a second abandoned exchange.
     expect(device.connect).toHaveBeenCalledTimes(2);
-    expect(device.connect.mock.calls[0][0]).toEqual(expect.objectContaining({ requestMTU: 247 }));
-    expect(device.connect.mock.calls[1][0]).not.toHaveProperty('requestMTU');
     expect(device.requestMTU).not.toHaveBeenCalled();
     expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(23);
     await transport.release(uuid, true);
+  });
+
+  test('cleans up a cancelled native GATT setup, not only a timed-out one', async () => {
+    const { transport, uuid, bleManager } = createHarness();
+    const cancelled = Object.assign(new Error('Operation was cancelled'), { errorCode: 2 });
+    (transport as any).resolveCharacteristics = jest.fn(() => Promise.reject(cancelled));
+
+    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
+  });
+
+  test('spends one Initialize wake on the detection after a fully silent one', async () => {
+    const { transport, uuid } = createHarness();
+    const probes = transport as any;
+    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+    jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({});
+
+    // Nothing has gone silent yet, so the device keeps whatever session it has.
+    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+    expect(callProtocolV1).not.toHaveBeenCalled();
+
+    // The previous detection answered on no protocol, which is what a sleeping Classic
+    // looks like, so this one wakes on the fresh link before probing.
+    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+    expect(callProtocolV1).toHaveBeenCalledTimes(1);
+    expect(callProtocolV1.mock.calls[0]?.[1]).toBe('Initialize');
+
+    // Still silent: the wake is not repeated, so a device that is simply away is not
+    // pushed into a fresh wallet session on every poll.
+    callProtocolV1.mockClear();
+    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+    expect(callProtocolV1).not.toHaveBeenCalled();
   });
 
   test('accepts a stable low MTU without the delayed refresh loop', async () => {

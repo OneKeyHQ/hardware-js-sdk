@@ -117,6 +117,15 @@ export default class ElectronBleTransport {
 
   private connectedDevices: Set<string> = new Set();
 
+  /**
+   * Devices whose acquire() is still in flight.
+   *
+   * A native connect that never calls back has not reached `connectedDevices`
+   * yet, so this is the only record that the renderer is still trying to own
+   * the link; `releaseNative()` needs it to cancel that pending connect.
+   */
+  private acquiringDevices: Set<string> = new Set();
+
   private deviceProtocol: Map<string, ProtocolType> = new Map();
 
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
@@ -149,7 +158,7 @@ export default class ElectronBleTransport {
       this.rejectProtocolV2Frames(uuid, new Error(reason));
       this.Log?.debug('[Electron BLE] Protocol V2 link invalidated:', uuid, reason);
       if (reason.startsWith('Protocol V2 link-fatal error:')) {
-        await this.releaseNative(uuid);
+        await this.releaseNative(uuid, { forceNative: true });
       }
     },
   });
@@ -363,6 +372,7 @@ export default class ElectronBleTransport {
       this.runPromiseDeviceId = null;
     }
 
+    this.acquiringDevices.add(uuid);
     try {
       if (!window.desktopApi?.nobleBle) {
         throw new Error('Noble BLE API not available');
@@ -434,6 +444,8 @@ export default class ElectronBleTransport {
       }
       this.cleanupDeviceState(uuid);
       this.handleBluetoothError(error);
+    } finally {
+      this.acquiringDevices.delete(uuid);
     }
   }
 
@@ -454,10 +466,23 @@ export default class ElectronBleTransport {
   }
 
   // Hard teardown, error paths only: a link presumed dead must not be reused.
-  private async releaseNative(id: string) {
+  //
+  // The native disconnect is sent while the renderer still owns the link, or is
+  // still trying to get it: a stuck acquire has not reached `connectedDevices`
+  // yet, and its pending native connect can only be cancelled from here, so the
+  // Core acquire deadline would otherwise be unable to terminate it.
+  //
+  // It is NOT sent for a device the renderer has already released logically.
+  // That link belongs to the main-process keep-alive timer, and dropping it on
+  // the routine post-call `cancel()` (Device.interruptionFromUser, no acquire
+  // held, empty request queue) costs a full cold reconnect on the very next
+  // operation — measured 2.93s on Pro and 17-26s on Pro 2.
+  private async releaseNative(id: string, options?: { forceNative?: boolean }) {
+    const rendererOwnsLink = this.connectedDevices.has(id) || this.acquiringDevices.has(id);
+    const shouldDisconnect = options?.forceNative === true || rendererOwnsLink;
     try {
       const nobleBle = window.desktopApi?.nobleBle;
-      if (nobleBle) {
+      if (nobleBle && shouldDisconnect) {
         if (this.connectedDevices.has(id)) {
           await invokeNobleBle(nobleBle.unsubscribe(id)).catch(error => {
             this.Log?.debug('[Electron BLE] release unsubscribe failed:', error);
@@ -970,7 +995,7 @@ export default class ElectronBleTransport {
         this.notificationCleanups.delete(uuid);
         this.notificationTokens.delete(uuid);
         if (!isProbeTimeout) {
-          await this.releaseNative(uuid);
+          await this.releaseNative(uuid, { forceNative: true });
         }
       }
       throw this.normalizeBluetoothError(e);

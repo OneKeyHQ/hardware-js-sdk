@@ -1624,6 +1624,13 @@ export class Device extends EventEmitter {
         } else if (!acquired) {
           // Abort setup without acquiring a session just to send Cancel.
           if (mainId && deviceConnector?.disconnect) {
+            // The connector drops the link silently, so without this line a
+            // user-cancel teardown is indistinguishable in field logs from an
+            // idle keep-alive release or a device that left on its own.
+            Log.debug(
+              'interruptionFromUser: disconnecting device without acquire, mainId:',
+              mainId
+            );
             await deviceConnector.disconnect(mainId);
           }
           if (this.connectionAttempt === attempt) this.markTransportDisconnected();
