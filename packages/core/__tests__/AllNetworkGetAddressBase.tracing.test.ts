@@ -424,7 +424,147 @@ describe('AllNetworkGetAddressBase tracing', () => {
     expect(typedCall).not.toHaveBeenCalled();
   });
 
-  test('runs Protocol V2 addresses one at a time so each command receives a wallet session', async () => {
+  function createV2NestedHarness(payload: Record<string, unknown>) {
+    const calls: string[] = [];
+    const checkPassphraseStateSafety = jest
+      .fn()
+      .mockImplementation((_state, _empty, _skip, deriveCardano) => {
+        calls.push(deriveCardano ? 'resume-cardano-session' : 'restore-wallet-session');
+        return Promise.resolve(true);
+      });
+    const method = new TestAllNetworkMethod({
+      id: 10,
+      payload: {
+        method: 'allNetworkGetAddress',
+        connectId: 'connect-id',
+        deviceId: 'device-id',
+        bundle: [],
+        ...payload,
+      },
+    });
+    method.protocolV2UnlockContext = { preflightCompleted: true };
+    method.device = {
+      checkPassphraseStateSafety,
+      commands: {
+        typedCall: jest.fn(),
+      },
+      getCurrentFirmwareType: jest.fn(),
+      getProtocol: jest.fn().mockReturnValue('V2'),
+      getCurrentFirmwareVersionString: jest.fn().mockReturnValue('1.0.0'),
+      getCurrentMethodVersionRange: jest
+        .fn()
+        .mockImplementation((getRange: (type: string) => unknown) => getRange('pro2')),
+      instanceId: 'device-instance',
+      isProtocolV2: jest.fn().mockReturnValue(true),
+      isBootloader: jest.fn().mockReturnValue(false),
+      isRomloader: jest.fn().mockReturnValue(false),
+      off: jest.fn(),
+      on: jest.fn(),
+      state: { status: { unlocked: true } },
+      updateProtocolV2Status: jest.fn(),
+    } as any;
+    return { calls, checkPassphraseStateSafety, method };
+  }
+
+  function mockInnerChainMethod(name: string, onRun: () => void) {
+    return {
+      checkSafetyLevelOnTestNet: jest.fn().mockResolvedValue(false),
+      connectId: 'connect-id',
+      deviceId: 'device-id',
+      getVersionRange: jest.fn().mockReturnValue({}),
+      assertProtocolSupported: jest.fn(),
+      init: jest.fn(),
+      name,
+      responseID: 50,
+      unlockPolicy: 'unlock-before-run',
+      run: jest.fn().mockImplementation(() => {
+        onRun();
+        return Promise.resolve([{ address: `${name}-address` }]);
+      }),
+      setDevice: jest.fn(),
+      strictCheckDeviceSupport: false,
+    };
+  }
+
+  test('reuses a Protocol V2 hidden-wallet session across later nested chain methods', async () => {
+    const { calls, checkPassphraseStateSafety, method } = createV2NestedHarness({
+      passphraseState: 'hidden-state',
+    });
+    (findMethod as jest.Mock)
+      .mockReturnValueOnce(mockInnerChainMethod('evmGetAddress', () => calls.push('run-evm')))
+      .mockReturnValueOnce(mockInnerChainMethod('solGetAddress', () => calls.push('run-sol')));
+
+    await method.callMethod(
+      'evmGetAddress',
+      {
+        bundle: [{ _originRequestParams: { network: 'evm', path: "m/44'/60'/0'/0/0" } }],
+      },
+      0
+    );
+    await method.callMethod(
+      'solGetAddress',
+      {
+        bundle: [{ _originRequestParams: { network: 'sol', path: "m/44'/501'/0'" } }],
+      },
+      0
+    );
+
+    expect(checkPassphraseStateSafety).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual(['restore-wallet-session', 'run-evm', 'run-sol']);
+  });
+
+  test('resumes Cardano after a Protocol V2 standard-domain session, then reuses it', async () => {
+    const { calls, checkPassphraseStateSafety, method } = createV2NestedHarness({
+      passphraseState: 'hidden-state',
+    });
+    (findMethod as jest.Mock)
+      .mockReturnValueOnce(mockInnerChainMethod('evmGetAddress', () => calls.push('run-evm')))
+      .mockReturnValueOnce(
+        mockInnerChainMethod('cardanoGetAddress', () => calls.push('run-cardano'))
+      )
+      .mockReturnValueOnce(mockInnerChainMethod('solGetAddress', () => calls.push('run-sol')));
+
+    await method.callMethod(
+      'evmGetAddress',
+      {
+        bundle: [{ _originRequestParams: { network: 'evm', path: "m/44'/60'/0'/0/0" } }],
+      },
+      0
+    );
+    await method.callMethod(
+      'cardanoGetAddress',
+      {
+        bundle: [{ _originRequestParams: { network: 'ada', path: "m/1852'/1815'/0'/0/0" } }],
+      },
+      0
+    );
+    await method.callMethod(
+      'solGetAddress',
+      {
+        bundle: [{ _originRequestParams: { network: 'sol', path: "m/44'/501'/0'" } }],
+      },
+      0
+    );
+
+    expect(checkPassphraseStateSafety).toHaveBeenCalledTimes(2);
+    expect(checkPassphraseStateSafety).toHaveBeenNthCalledWith(
+      2,
+      'hidden-state',
+      false,
+      undefined,
+      true,
+      undefined
+    );
+    expect(calls).toEqual([
+      'restore-wallet-session',
+      'run-evm',
+      'resume-cardano-session',
+      'run-cardano',
+      'run-sol',
+    ]);
+  });
+
+  test('batches Protocol V2 same-method addresses onto one nested chain call', async () => {
     const method = new AllNetworkGetAddress({
       id: 3,
       payload: {
@@ -442,10 +582,48 @@ describe('AllNetworkGetAddressBase tracing', () => {
       isProtocolV2: jest.fn().mockReturnValue(true),
     } as any;
     method.postMessage = jest.fn();
+    const callMethod = jest.fn().mockResolvedValue([
+      { payload: { address: '0x1' }, success: true },
+      { payload: { address: '0x2' }, success: true },
+    ]);
+    method.callMethod = callMethod;
+
+    await method.getAllNetworkAddress(7);
+
+    expect(callMethod).toHaveBeenCalledTimes(1);
+    expect(callMethod).toHaveBeenCalledWith(
+      'evmGetAddress',
+      expect.objectContaining({ bundle: [expect.any(Object), expect.any(Object)] }),
+      7
+    );
+  });
+
+  test('batches Protocol V2 hidden-wallet same-method addresses onto one nested chain call', async () => {
+    const method = new AllNetworkGetAddress({
+      id: 6,
+      payload: {
+        method: 'allNetworkGetAddress',
+        connectId: 'connect-id',
+        deviceId: 'device-id',
+        passphraseState: 'hidden-state',
+        bundle: [
+          { network: 'evm', path: "m/44'/60'/0'/0/0" },
+          { network: 'evm', path: "m/44'/60'/0'/0/1" },
+          { network: 'sol', path: "m/44'/501'/0'" },
+        ],
+      },
+    });
+    method.device = {
+      isProtocolV2: jest.fn().mockReturnValue(true),
+    } as any;
+    method.postMessage = jest.fn();
     const callMethod = jest
       .fn()
-      .mockResolvedValueOnce([{ payload: { address: '0x1' }, success: true }])
-      .mockResolvedValueOnce([{ payload: { address: '0x2' }, success: true }]);
+      .mockResolvedValueOnce([
+        { payload: { address: '0x1' }, success: true },
+        { payload: { address: '0x2' }, success: true },
+      ])
+      .mockResolvedValueOnce([{ payload: { address: 'sol1' }, success: true }]);
     method.callMethod = callMethod;
 
     await method.getAllNetworkAddress(7);
@@ -454,12 +632,12 @@ describe('AllNetworkGetAddressBase tracing', () => {
     expect(callMethod).toHaveBeenNthCalledWith(
       1,
       'evmGetAddress',
-      expect.objectContaining({ bundle: [expect.any(Object)] }),
+      expect.objectContaining({ bundle: [expect.any(Object), expect.any(Object)] }),
       7
     );
     expect(callMethod).toHaveBeenNthCalledWith(
       2,
-      'evmGetAddress',
+      'solGetAddress',
       expect.objectContaining({ bundle: [expect.any(Object)] }),
       7
     );

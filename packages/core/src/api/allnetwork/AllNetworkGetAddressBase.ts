@@ -273,6 +273,12 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
 
   private loadingCommands?: DeviceCommands;
 
+  // DeviceSessionGet selects the SE wallet like Initialize(session_id). Nested
+  // all-network methods skip callAPI, so the first chain call still resumes;
+  // later same-domain calls reuse that session. Cardano may Ask [Standard,
+  // Cardano] once, which also covers later non-Cardano commands.
+  private protocolV2ResumedSeedDomains = new Set<'standard' | 'cardano'>();
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
@@ -318,6 +324,23 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
       _originRequestParams: payload,
       _originalIndex: originalIndex,
     };
+  }
+
+  private hasProtocolV2WalletResume(deriveCardano?: boolean) {
+    if (deriveCardano) {
+      return this.protocolV2ResumedSeedDomains.has('cardano');
+    }
+    return (
+      this.protocolV2ResumedSeedDomains.has('standard') ||
+      this.protocolV2ResumedSeedDomains.has('cardano')
+    );
+  }
+
+  private markProtocolV2WalletResumed(deriveCardano?: boolean) {
+    this.protocolV2ResumedSeedDomains.add('standard');
+    if (deriveCardano) {
+      this.protocolV2ResumedSeedDomains.add('cardano');
+    }
   }
 
   async callMethod(
@@ -395,16 +418,17 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
             }
           }
 
-          // Protocol V2 hands a wallet session to exactly one blockchain request.
-          // The parent all-network call consumes its first handoff while fetching
-          // the root fingerprint, so each nested chain method must resume the
-          // requested standard or hidden wallet before sending its device command.
+          // Nested chain methods skip callAPI's session gate. Resume the requested
+          // wallet once per seed domain; DeviceSessionGet is sticky like V1
+          // Initialize, so later addresses and chains reuse it.
           const useEmptyPassphrase = this.payload.useEmptyPassphrase === true;
-          // Nested Cardano methods opt in to [Standard, Cardano] if Ask rebuilds.
-          // Other chains stay Standard-only.
           const deriveCardano = method.name.startsWith('cardano') ? true : undefined;
           const shouldResumeWalletSession = useEmptyPassphrase || !!this.payload.passphraseState;
-          if (this.device.isProtocolV2() && shouldResumeWalletSession) {
+          if (
+            this.device.isProtocolV2() &&
+            shouldResumeWalletSession &&
+            !this.hasProtocolV2WalletResume(deriveCardano)
+          ) {
             const passphraseStateSafety = await this.device.checkPassphraseStateSafety(
               this.payload.passphraseState,
               useEmptyPassphrase,
@@ -415,6 +439,7 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
             if (!passphraseStateSafety) {
               throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError);
             }
+            this.markProtocolV2WalletResumed(deriveCardano);
           }
         },
       });

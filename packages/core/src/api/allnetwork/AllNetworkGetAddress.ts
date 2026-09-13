@@ -31,22 +31,20 @@ export default class AllNetworkGetAddress extends AllNetworkGetAddressBase {
         originalIndex: index,
       })
     );
-    const groupedMethodParams = methodParams.reduce((groups, param) => {
+    // Protocol V2 DeviceSessionGet is the Initialize(session_id) equivalent: the
+    // SE wallet stays selected until the next Ask/Get or lock. Nested chain
+    // methods still resume once in callMethod; same-method addresses can share
+    // that session the way Protocol V1 bundles do.
+    const methodGroups = methodParams.reduce((groups, param) => {
       const group = groups.get(param.methodName) ?? [];
       group.push(param);
       groups.set(param.methodName, group);
       return groups;
     }, new Map<keyof CoreApi, MethodParams[]>());
-    const requiresProtocolV2WalletHandoff =
-      this.device.isProtocolV2() &&
-      (this.payload.useEmptyPassphrase === true || !!this.payload.passphraseState);
-    const methodGroups: [keyof CoreApi, MethodParams[]][] = requiresProtocolV2WalletHandoff
-      ? methodParams.map(param => [param.methodName, [param]])
-      : Array.from(groupedMethodParams.entries());
 
-    let i = 0;
-    for (const [methodName, params] of methodGroups) {
-      const methodParams = {
+    let processed = 0;
+    for (const [methodName, params] of methodGroups.entries()) {
+      const methodCallParams = {
         bundle: params.map(param => ({
           ...param.params,
         })),
@@ -55,27 +53,25 @@ export default class AllNetworkGetAddress extends AllNetworkGetAddressBase {
       if (this.abortController?.signal.aborted) {
         throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
       }
-      // call method
-      const response = await this.callMethod(methodName, methodParams, rootFingerprint);
+      const response = await this.callMethod(methodName, methodCallParams, rootFingerprint);
 
       if (this.abortController?.signal.aborted) {
         throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
       }
 
-      for (let i = 0; i < params.length; i++) {
-        const { _originRequestParams, _originalIndex } = params[i];
-        const responseKey = `${_originalIndex}`;
-        resultMap[responseKey] = {
+      for (let index = 0; index < params.length; index++) {
+        const { _originRequestParams, _originalIndex } = params[index];
+        resultMap[`${_originalIndex}`] = {
           ..._originRequestParams,
-          ...response[i],
+          ...response[index],
         };
       }
 
-      if (this.payload?.bundle?.length > 1) {
-        const progress = Math.round(((i + 1) / this.payload.bundle.length) * 100);
+      processed += params.length;
+      if (bundle.length > 1) {
+        const progress = Math.round((processed / bundle.length) * 100);
         this.postMessage(createUiMessage(UI_REQUEST.DEVICE_PROGRESS, { progress }));
       }
-      i++;
     }
 
     for (let i = 0; i < bundle.length; i++) {
