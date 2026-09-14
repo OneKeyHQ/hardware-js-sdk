@@ -37,7 +37,7 @@ const response = await HardwareSDK.confluxGetAddress(connectId, deviceId, params
 显示第一个 Conflux 账户的地址：
 
 ```typescript
-HardwareSDK.confluxGetAddress({
+HardwareSDK.confluxGetAddress(connectId, deviceId, {
     path: "m/44'/503'/0'/0/0",
     chainId: 1029
 });

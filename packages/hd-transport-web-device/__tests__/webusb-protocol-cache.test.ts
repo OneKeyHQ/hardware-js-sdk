@@ -31,6 +31,39 @@ function buildAcquirableTransport(path = 'pro-webusb') {
 }
 
 describe('WebUsbTransport protocol probe cache', () => {
+  test.each([
+    ['V1', false, 0],
+    ['V1', true, 1],
+    ['V2', false, 1],
+    [undefined, false, 1],
+  ] as const)(
+    'reconnect protocol=%s first=%s resets USB %s times',
+    async (protocol, first, resets) => {
+      const webusb = new WebUsbTransport();
+      const path = 'connected-usb-device';
+      const device = {
+        opened: true,
+        configuration: { configurationValue: 1 },
+        configurations: [],
+        reset: jest.fn().mockResolvedValue(undefined),
+        selectConfiguration: jest.fn().mockResolvedValue(undefined),
+        claimInterface: jest.fn().mockResolvedValue(undefined),
+        clearHalt: jest.fn().mockResolvedValue(undefined),
+      };
+      jest.spyOn(webusb, 'findDevice').mockResolvedValue(device as unknown as USBDevice);
+      jest.spyOn(webusb, 'getConnectedDevices').mockResolvedValue([]);
+      if (protocol) {
+        const state = webusb as unknown as { deviceProtocol: Map<string, 'V1' | 'V2'> };
+        state.deviceProtocol.set(path, protocol);
+      }
+
+      await webusb.connectToDevice(path, first);
+
+      expect(device.reset).toHaveBeenCalledTimes(resets);
+      expect(device.claimInterface).toHaveBeenCalledWith(0);
+    }
+  );
+
   test('acquire skips the wire probe when the protocol is already cached', async () => {
     const webusb = buildAcquirableTransport();
     const path = 'pro-webusb';
