@@ -42,6 +42,63 @@ export function createBootloaderDeviceTestCase(
   };
 }
 
+export function isBootloaderDevice(features: Features) {
+  return features.protocol === 'V2'
+    ? features.mode === 'bootloader'
+    : features.bootloader_mode === true;
+}
+
+export function validateDeviceState(
+  features: Features,
+  state: 'uninitialized' | TestCaseDataType['type']
+): string {
+  const isV2 = features.protocol === 'V2';
+  if (state === 'uninitialized') {
+    if (features.initialized !== false) {
+      return `actual: ${features.initialized}, 预期: 设备未初始化`;
+    }
+    // V2 onboarding may remain locked and does not expose legacy PIN protection.
+    if (isV2) {
+      return features.mode === 'notInitialized'
+        ? ''
+        : `actual: ${features.mode}, 预期: notInitialized 模式`;
+    }
+    if (features.unlocked !== true) {
+      return `actual: ${features.unlocked}, 预期: 设备已解锁`;
+    }
+    if (features.passphrase_protection !== false) {
+      return `actual: ${features.passphrase_protection}, 预期: Passphrase 未启用`;
+    }
+    if (features.pin_protection !== false) {
+      return `actual: ${features.pin_protection}, 预期: pin 未设置`;
+    }
+  } else if (state === 'lock') {
+    if (features.unlocked !== false) {
+      return `actual: ${features.unlocked}, 预期: 设备未解锁`;
+    }
+  } else if (state === 'unlock') {
+    if (features.unlocked !== true) {
+      return `actual: ${features.unlocked}, 预期: 设备已解锁`;
+    }
+    if (features.initialized !== true) {
+      return `actual: ${features.initialized}, 预期: 设备已初始化`;
+    }
+    if (isV2 ? features.mode !== 'normal' : features.bootloader_mode !== false) {
+      return `actual: ${isV2 ? features.mode : features.bootloader_mode}, 预期: 正常固件模式`;
+    }
+    if (!isV2 && features.pin_protection !== true) {
+      return `actual: ${features.pin_protection}, 预期: pin 已设置`;
+    }
+  } else if (state === 'passphraseOpened' || state === 'passphraseClosed') {
+    const protection = isV2 ? features.passphraseProtection : features.passphrase_protection;
+    const expected = state === 'passphraseOpened';
+    if (protection !== expected) {
+      return `actual: ${protection}, 预期: Passphrase ${expected ? '启用' : '未启用'}`;
+    }
+  }
+  return '';
+}
+
 /**
  * 重启进入 Bootloader 后，原连接可能暂时不可用，也可能以新的传输 ID 重新枚举。
  * 轮询时优先复用原连接，并把搜索到的同一物理设备加入候选连接。
@@ -89,13 +146,14 @@ export async function waitForBootloaderFeatures({
           const isExpectedDevice = actualSerial === expectedSerial;
           foundExpectedDevice ||= isExpectedDevice;
 
-          if (isExpectedDevice && response.payload.bootloader_mode === true) {
+          if (isExpectedDevice && isBootloaderDevice(response.payload)) {
             return response;
           }
 
           if (isExpectedDevice) {
+            const legacyMode = response.payload.bootloader_mode ? 'Bootloader' : 'Normal';
             lastError = `设备仍处于 ${
-              response.payload.bootloader_mode ? 'Bootloader' : 'Normal'
+              response.payload.protocol === 'V2' ? response.payload.mode : legacyMode
             } 模式`;
           }
         }

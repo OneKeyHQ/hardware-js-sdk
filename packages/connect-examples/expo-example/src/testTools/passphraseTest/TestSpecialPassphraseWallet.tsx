@@ -9,6 +9,7 @@ import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
+import { getRunnerReportResult } from '../../components/BaseTestRunner/runnerResultUtils';
 import { Button } from '../../components/ui/Button';
 import { CommonInput } from '../../components/CommonInput';
 import PanelView from '../../components/ui/Panel';
@@ -74,9 +75,9 @@ function ExportReportView() {
         const caseItem = item;
         const { id, $key, method, path, address, passphrase, passphraseState } = caseItem;
 
-        const state = itemVerifyState?.[$key].verify;
+        const state = itemVerifyState?.[$key]?.verify ?? 'none';
 
-        const runnerResult = state === 'fail' ? itemVerifyState?.[$key].error : address;
+        const runnerResult = getRunnerReportResult(itemVerifyState?.[$key], address);
         markdown.push(
           `| ${state} | ${id} | ${method} | ${path} | ${passphrase} | ${passphraseState} | ${runnerResult} |`
         );

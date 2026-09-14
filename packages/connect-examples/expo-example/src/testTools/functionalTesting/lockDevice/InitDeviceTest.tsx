@@ -7,10 +7,11 @@ import { get } from 'lodash';
 import { TestRunnerView } from '../../../components/BaseTestRunner/TestRunnerView';
 import { useRunnerTest } from '../../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../../components/BaseTestRunner/useExportReport';
+import { getRunnerReportResult } from '../../../components/BaseTestRunner/runnerResultUtils';
 import { Button } from '../../../components/ui/Button';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
-import { isPassphraseProtectionEnabled } from '../../../utils/protocolAwareFeatures';
+import { validateDeviceState } from './deviceStateTestUtils';
 
 import type { CoreMessage, Features } from '@onekeyfe/hd-core';
 import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
@@ -53,9 +54,9 @@ function ExportReportView() {
         const caseItem = item;
         const { $key, method } = caseItem;
 
-        const state = itemVerifyState?.[$key].verify;
+        const state = itemVerifyState?.[$key]?.verify ?? 'none';
 
-        const runnerResult = state === 'fail' ? itemVerifyState?.[$key].error : 'success';
+        const runnerResult = getRunnerReportResult(itemVerifyState?.[$key], 'success');
         markdown.push(`| ${state} | ${method} | ${runnerResult} |`);
       });
 
@@ -136,8 +137,6 @@ function ExecuteView() {
       });
     },
     processResponse: (_, item, __, res) => {
-      const error = '';
-
       const responseError = get(res, 'payload.error', '');
 
       if (!res.success) {
@@ -146,31 +145,8 @@ function ExecuteView() {
         });
       }
 
-      const payload = res.payload as Features;
-
-      if (payload.unlocked !== true) {
-        return Promise.resolve({
-          error: `actual: ${payload.unlocked}, 预期: 设备已解锁`,
-        });
-      }
-      if (isPassphraseProtectionEnabled(payload)) {
-        return Promise.resolve({
-          error: 'actual: Passphrase 已启用，预期: Passphrase 未启用',
-        });
-      }
-      if (payload.initialized !== false) {
-        return Promise.resolve({
-          error: `actual: ${payload.initialized}, 预期: 设备未初始化`,
-        });
-      }
-      if (payload.pin_protection !== false) {
-        return Promise.resolve({
-          error: `actual: ${payload.pin_protection}, 预期: pin 未设置`,
-        });
-      }
-
       return Promise.resolve({
-        error: '',
+        error: validateDeviceState(res.payload as Features, 'uninitialized'),
       });
     },
     removeHardwareListener: sdk => {

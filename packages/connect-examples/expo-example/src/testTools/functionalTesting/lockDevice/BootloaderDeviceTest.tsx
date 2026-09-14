@@ -7,10 +7,15 @@ import { get, isEmpty } from 'lodash';
 import { TestRunnerView } from '../../../components/BaseTestRunner/TestRunnerView';
 import { useRunnerTest } from '../../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../../components/BaseTestRunner/useExportReport';
+import { getRunnerReportResult } from '../../../components/BaseTestRunner/runnerResultUtils';
 import { Button } from '../../../components/ui/Button';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
-import { createBootloaderDeviceTestCase, waitForBootloaderFeatures } from './deviceStateTestUtils';
+import {
+  createBootloaderDeviceTestCase,
+  isBootloaderDevice,
+  waitForBootloaderFeatures,
+} from './deviceStateTestUtils';
 
 import type { CoreMessage, Features } from '@onekeyfe/hd-core';
 import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
@@ -53,9 +58,9 @@ function ExportReportView() {
         const caseItem = item;
         const { $key, method } = caseItem;
 
-        const state = itemVerifyState?.[$key].verify;
+        const state = itemVerifyState?.[$key]?.verify ?? 'none';
 
-        const runnerResult = state === 'fail' ? itemVerifyState?.[$key].error : 'success';
+        const runnerResult = getRunnerReportResult(itemVerifyState?.[$key], 'success');
         markdown.push(`| ${state} | ${method} | ${runnerResult} |`);
       });
 
@@ -165,9 +170,11 @@ function ExecuteView() {
           error: `actual: ${payload.vendor}, 预期: onekey.so`,
         });
       }
-      if (payload.bootloader_mode !== true) {
+      if (!isBootloaderDevice(payload)) {
         return Promise.resolve({
-          error: `actual: ${payload.bootloader_mode}, 预期: bootloader 模式`,
+          error: `actual: ${
+            payload.protocol === 'V2' ? payload.mode : payload.bootloader_mode
+          }, 预期: bootloader 模式`,
         });
       }
       const uuid = getDeviceUUID(payload);

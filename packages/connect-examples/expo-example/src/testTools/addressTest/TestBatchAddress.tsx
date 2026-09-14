@@ -9,6 +9,7 @@ import passphraseTestCase from './data/count24_two/passphrase_empty';
 import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
+import { getRunnerReportResult } from '../../components/BaseTestRunner/runnerResultUtils';
 import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
@@ -57,10 +58,9 @@ function ExportReportView() {
         const caseItem = item;
         const { result, $key } = caseItem;
         const title = caseItem?.name || caseItem?.title || caseItem?.method;
-        const state = itemVerifyState?.[$key].verify;
+        const state = itemVerifyState?.[$key]?.verify ?? 'none';
 
-        const runnerResult =
-          state === 'fail' ? itemVerifyState?.[$key].error : JSON.stringify(result);
+        const runnerResult = getRunnerReportResult(itemVerifyState?.[$key], JSON.stringify(result));
         markdown.push(`| ${state} | ${title} | ${runnerResult} |`);
       });
 
@@ -209,7 +209,7 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
           );
 
           if (!address) {
-            console.log(`⚠️ 未找到路径 ${key} 的响应数据`);
+            error += `(${key}) 未找到响应数据\n`;
           } else {
             // 🎯 检查预期结果是否为空对象
             const expectedFields = Object.keys(item.result[key] || {});

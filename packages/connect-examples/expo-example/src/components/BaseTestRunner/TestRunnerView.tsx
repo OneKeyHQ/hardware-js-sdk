@@ -11,8 +11,10 @@ import type { TestRunnerResultViewProps } from './TestRunnerResultView';
 // 自定义状态管理器类型
 type CustomStateManager = ReturnType<typeof createTestRunnerAtoms>;
 
-function TestRunnerPrepareDataLogView() {
-  const { runnerLogs } = useContext(TestRunnerContext);
+function TestRunnerPrepareDataLogView({ showDetails }: { showDetails: boolean }) {
+  const { runnerLogs, runnerState } = useContext(TestRunnerContext);
+
+  if (!showDetails && runnerState !== 'stopped') return null;
 
   if (runnerLogs === undefined || runnerLogs.length === 0) {
     return null;
@@ -44,7 +46,7 @@ export function TestRunnerView<T, TExt = unknown>({
           </Text>
         )}
         {renderExecuteView()}
-        {isShowLogDetail && <TestRunnerPrepareDataLogView />}
+        <TestRunnerPrepareDataLogView showDetails={isShowLogDetail} />
         <TestRunnerResultView renderResultView={renderResultView} stateManager={stateManager} />
       </YStack>
     </TestRunnerProvider>

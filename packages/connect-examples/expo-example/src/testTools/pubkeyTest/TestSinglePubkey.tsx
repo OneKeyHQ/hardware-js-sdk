@@ -8,6 +8,7 @@ import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
+import { getRunnerReportResult } from '../../components/BaseTestRunner/runnerResultUtils';
 import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { stripHexPrefix } from '../../utils/hexstring';
@@ -40,11 +41,10 @@ function ExportReportView() {
         const caseItem = item;
         const { result, $key } = caseItem;
         const title = caseItem?.name || caseItem?.title || caseItem?.method;
-        const state = itemVerifyState?.[$key].verify;
+        const state = itemVerifyState?.[$key]?.verify ?? 'none';
         const path = caseItem?.params?.path;
 
-        const runnerResult =
-          state === 'fail' ? itemVerifyState?.[$key].error : JSON.stringify(result);
+        const runnerResult = getRunnerReportResult(itemVerifyState?.[$key], JSON.stringify(result));
         markdown.push(`| ${state} | ${title} | ${path} | ${runnerResult} |`);
       });
 
