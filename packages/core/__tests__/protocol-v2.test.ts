@@ -8656,6 +8656,113 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
+  test.each([3801088, 3800000, 0])(
+    'stops the firmware batch without retrying when device storage stops at byte %i',
+    async stoppedAt => {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: { method: 'firmwareUpdateV4' },
+      });
+      const filePath = 'vol0:/resource/images/images.okpkg';
+      const source = {
+        size: 3_808_000,
+        readAt: (_offset: number, length: number) => Promise.resolve(new ArrayBuffer(length)),
+        close: () => Promise.resolve(),
+      };
+      const fileWriteChunk = jest.fn(
+        (_path: string, _size: number, offset: number, data: ArrayBuffer | Buffer) =>
+          Promise.resolve({
+            type: 'FilesystemFile' as const,
+            message: { processed_byte: Math.min(offset + data.byteLength, stoppedAt) },
+          })
+      );
+      const recover = jest.fn().mockResolvedValue(undefined);
+      const startInstall = jest.fn();
+      (method as any).fileWriteChunk = fileWriteChunk;
+      (method as any).recoverProtocolV2FileTransfer = recover;
+      (method as any).isProtocolV2ResourceBundleUpToDate = jest.fn().mockResolvedValue(false);
+      (method as any).protocolV2StartFirmwareUpdate = startInstall;
+      method.postTipMessage = jest.fn();
+      method.postProgressMessage = jest.fn();
+
+      const failedOffset = Math.floor(stoppedAt / 4000) * 4000;
+      await expect(
+        (method as any).executeProtocolV2TransferPhase({
+          resourceSources: [{ name: 'images.okpkg', source, devicePath: filePath }],
+          installSources: [
+            { fileName: 'application_p1.bin', source, targetId: 4, kind: 'firmware' },
+          ],
+        })
+      ).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.EmmcFileWriteFirmwareError,
+        message: expect.stringContaining(
+          `Device storage write incomplete for ${filePath}: wrote ${
+            stoppedAt - failedOffset
+          } of 4000 bytes at offset ${failedOffset} (processed_byte ${stoppedAt})`
+        ),
+      });
+
+      expect(fileWriteChunk).toHaveBeenCalledTimes(failedOffset / 4000 + 1);
+      expect(fileWriteChunk.mock.calls.every(([path]) => path === filePath)).toBe(true);
+      expect(recover).not.toHaveBeenCalled();
+      expect(startInstall).not.toHaveBeenCalled();
+      expect(method.postProgressMessage).not.toHaveBeenCalledWith(100, 'transferData');
+    }
+  );
+
+  test.each([1, 3])(
+    'preserves bounded whole-file retries after %i connection failures during firmware transfer',
+    async failures => {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: { method: 'firmwareUpdateV4' },
+      });
+      let remainingFailures = failures;
+      const fileWriteChunk = jest.fn(
+        (_path: string, _size: number, offset: number, data: ArrayBuffer | Buffer) => {
+          if (offset === 4000 && remainingFailures > 0) {
+            remainingFailures -= 1;
+            return Promise.reject(new Error('device disconnected before write confirmation'));
+          }
+          return Promise.resolve({
+            type: 'FilesystemFile' as const,
+            message: { processed_byte: offset + data.byteLength },
+          });
+        }
+      );
+      const recover = jest.fn().mockResolvedValue(undefined);
+      (method as any).fileWriteChunk = fileWriteChunk;
+      (method as any).recoverProtocolV2FileTransfer = recover;
+      method.postProgressMessage = jest.fn();
+
+      const transfer = (method as any).protocolV2SourceUpdateProcess({
+        source: {
+          size: 8001,
+          readAt: (_offset: number, length: number) => Promise.resolve(new ArrayBuffer(length)),
+          close: () => Promise.resolve(),
+        },
+        filePath: 'vol0:/application_p1.bin',
+        processedSize: 0,
+        totalSize: 8001,
+      });
+      if (failures === 1) {
+        await expect(transfer).resolves.toBe(8001);
+        expect(fileWriteChunk.mock.calls.map(([, , offset]) => offset)).toEqual([
+          0, 4000, 0, 4000, 8000,
+        ]);
+        expect(recover).toHaveBeenCalledTimes(1);
+      } else {
+        await expect(transfer).rejects.toMatchObject({
+          errorCode: HardwareErrorCode.EmmcFileWriteFirmwareError,
+        });
+        expect(fileWriteChunk.mock.calls.map(([, , offset]) => offset)).toEqual([
+          0, 4000, 0, 4000, 0, 4000,
+        ]);
+        expect(recover).toHaveBeenCalledTimes(2);
+      }
+    }
+  );
+
   test('throttles repeated transfer progress while preserving file completion', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -10662,20 +10769,194 @@ describe('Protocol V2 current low-level methods', () => {
     expect(typedCall).toHaveBeenCalledWith('FilesystemPermissionFix', 'Success', {});
   });
 
-  test('sends required FilesystemFormat partition flags', async () => {
-    const typedCall = jest.fn().mockResolvedValue({ message: {} });
-    const method = new FilesystemFormat({
-      id: 1,
-      payload: { method: 'filesystemFormat' },
+  describe('factory filesystem recovery', () => {
+    const setup = (mode = 'bootloader', deviceType = EDeviceType.Pro2) => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('desktop-webusb');
+      const files = new Map<string, Buffer>();
+      const typedCall = jest.fn((name, _response, params) =>
+        Promise.resolve(
+          (() => {
+            if (name === 'FilesystemFormat') {
+              files.clear();
+              return { message: {} };
+            }
+            if (name === 'FilesystemFileWrite') {
+              const { file } = params;
+              if (params.overwrite) files.set(file.path, Buffer.alloc(file.total_size));
+              Buffer.from(file.data).copy(files.get(file.path)!, file.offset);
+              return {
+                message: { processed_byte: Number(file.offset) + Number(file.data.length) },
+              };
+            }
+            if (name === 'FilesystemPathInfoQuery') {
+              return {
+                message: { exist: true, directory: false, size: files.get(params.path)!.length },
+              };
+            }
+            if (name === 'FilesystemFileRead') {
+              const { file } = params;
+              return {
+                message: {
+                  path: file.path,
+                  offset: file.offset,
+                  data: files
+                    .get(file.path)!
+                    .subarray(file.offset, Number(file.offset) + Number(params.chunk_len))
+                    .toString('hex'),
+                },
+              };
+            }
+            if (name === 'FilesystemFileDelete') {
+              files.delete(params.path);
+              return { message: {} };
+            }
+            throw new Error(`Unexpected call: ${name}`);
+          })()
+        )
+      );
+      const device = stubDevice({
+        commands: { typedCall },
+        getCurrentDeviceType: () => deviceType,
+        keepSession: true,
+        release: jest.fn().mockResolvedValue(undefined),
+        acquire: jest.fn().mockResolvedValue(undefined),
+        ensureProtocolV2RuntimeContext: jest.fn().mockResolvedValue({
+          version: 1,
+          build_fingerprint: `${mode}__1.0.0__abcdef0__PROD__RELEASE`,
+          supported_messages: [60802, 60804, 60805, 60806, 60811],
+        }),
+      });
+      const method = new FilesystemFormat({
+        id: 1,
+        payload: { method: 'deviceFactoryRebuildFilesystem', connectId: 'device', confirm: true },
+      });
+      method.init();
+      (method as any).device = device;
+      return { method, device, typedCall, files };
+    };
+
+    afterEach(() => jest.restoreAllMocks());
+
+    test.each([
+      ['bootloader', EDeviceType.Pro2],
+      ['romloader', EDeviceType.Neo],
+    ])('formats once and verifies both volumes on %s %s', async (mode, type) => {
+      const { method, device, typedCall, files } = setup(mode, type);
+      await expect(method.run()).resolves.toMatchObject({
+        message: expect.stringContaining('verified'),
+      });
+      expect(typedCall).toHaveBeenCalledWith(
+        'FilesystemFormat',
+        'Success',
+        { data: true, user: true },
+        { timeoutMs: 60_000 }
+      );
+      expect(typedCall.mock.calls.filter(([name]) => name === 'FilesystemFormat')).toHaveLength(1);
+      expect(device.keepSession).toBe(false);
+      expect(device.release).toHaveBeenCalledTimes(1);
+      expect(device.acquire).toHaveBeenCalledWith('V2', { throwOnRunPromiseError: true });
+      expect(device.ensureProtocolV2RuntimeContext).toHaveBeenCalledTimes(2);
+      for (const volume of ['vol0', 'vol1']) {
+        expect(typedCall).toHaveBeenCalledWith(
+          'FilesystemFileWrite',
+          'FilesystemFile',
+          expect.objectContaining({
+            file: expect.objectContaining({
+              path: `${volume}:/factory-fs-check.bin`,
+              offset: 64000,
+              total_size: 68000,
+            }),
+          }),
+          { timeoutMs: 15_000 }
+        );
+      }
+      expect(files.size).toBe(0);
     });
-    method.init();
-    (method as any).device = stubDevice({ commands: { typedCall } });
 
-    await method.run();
+    test.each([{ connectId: 'device' }, { confirm: true }])(
+      'requires explicit target and erase confirmation: %j',
+      payload => {
+        const method = new FilesystemFormat({
+          id: 1,
+          payload: { method: 'deviceFactoryRebuildFilesystem', ...payload },
+        });
+        expect(() => method.init()).toThrow('connectId and confirm: true');
+      }
+    );
 
-    expect(typedCall).toHaveBeenCalledWith('FilesystemFormat', 'Success', {
-      data: true,
-      user: true,
+    test.each(['application', 'unknown'])('rejects %s mode before erasing', async mode => {
+      const { method, typedCall } = setup(mode);
+      await expect(method.run()).rejects.toThrow('Enter bootloader or romloader');
+      expect(typedCall).not.toHaveBeenCalled();
+    });
+
+    test('requires every verification command before erasing', async () => {
+      const { method, device, typedCall } = setup();
+      device.ensureProtocolV2RuntimeContext.mockResolvedValue({
+        ...protocolV2BootloaderInfo,
+        supported_messages: [60811],
+      });
+      await expect(method.run()).rejects.toThrow('does not support');
+      expect(typedCall).not.toHaveBeenCalled();
+    });
+
+    test('does not erase while the loader rejects the fresh probe', async () => {
+      const { method, device, typedCall } = setup();
+      device.ensureProtocolV2RuntimeContext.mockRejectedValue(new Error('updating'));
+      await expect(method.run()).rejects.toThrow('updating');
+      expect(typedCall).not.toHaveBeenCalled();
+    });
+
+    test('never repeats format after losing its response', async () => {
+      const { method, device, typedCall } = setup();
+      typedCall.mockRejectedValueOnce(new Error('USB disconnected'));
+      await expect(method.run()).rejects.toThrow('volumes may already be erased');
+      expect(typedCall).toHaveBeenCalledTimes(1);
+      expect(device.acquire).not.toHaveBeenCalled();
+    });
+
+    test.each(['short-write', 'corrupt-read', 'reconnect'])(
+      'does not report success or reformat on %s failure',
+      async fault => {
+        const { method, device, typedCall } = setup();
+        const original = typedCall.getMockImplementation()!;
+        if (fault === 'reconnect') device.acquire.mockRejectedValue(new Error('USB disconnected'));
+        else
+          typedCall.mockImplementation(async (...args) => {
+            const [name, , params] = args;
+            if (
+              fault === 'short-write' &&
+              name === 'FilesystemFileWrite' &&
+              params.file.offset === 64000
+            ) {
+              return { message: { processed_byte: 65536 } };
+            }
+            if (fault === 'corrupt-read' && name === 'FilesystemFileRead') {
+              return {
+                message: { path: params.file.path, offset: params.file.offset, data: '00' },
+              };
+            }
+            return original(...args);
+          });
+        await expect(method.run()).rejects.toThrow('recovery verification failed');
+        expect(typedCall.mock.calls.filter(([name]) => name === 'FilesystemFormat')).toHaveLength(
+          1
+        );
+        expect(
+          typedCall.mock.calls.filter(([name]) => name === 'FilesystemFileDelete')
+        ).toHaveLength(0);
+      }
+    );
+
+    test('stops before formatting when cancelled', async () => {
+      const { method, typedCall } = setup();
+      const controller = new AbortController();
+      method.abortSignal = controller.signal;
+      controller.abort();
+      await expect(method.run()).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.CallQueueActionCancelled,
+      });
+      expect(typedCall).not.toHaveBeenCalled();
     });
   });
 });
