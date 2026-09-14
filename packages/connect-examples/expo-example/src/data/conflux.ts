@@ -73,7 +73,7 @@ const api: PlaygroundProps[] = [
         value: {
           path: "m/44'/503'/0'/0/0",
           transaction: {
-            to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+            to: '0x1386b4185a223ef49592233b69291bbe5a80c527',
             value: '0xf4240',
             data: '0x01',
             chainId: 1,
@@ -90,7 +90,7 @@ const api: PlaygroundProps[] = [
         value: {
           path: "m/44'/503'/0'/0/0",
           transaction: {
-            to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+            to: '0x1386b4185a223ef49592233b69291bbe5a80c527',
             value: '0xf4240',
             data: `0x${'01'.repeat(3072)}`,
             chainId: 1,
