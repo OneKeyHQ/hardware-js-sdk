@@ -15,25 +15,59 @@ const Log = getLogger(LoggerNames.DevicePool);
 
 type RequestQueueLookup = {
   getRequestTasksIdByConnectId: (connectId: string) => number[];
+  getTask: (requestId: number) => { method: { device?: Device } } | undefined;
 };
+
+const getDescriptorKeys = (descriptor: DeviceDescriptor) =>
+  [descriptor.path, descriptor.id].filter(
+    (key): key is string => typeof key === 'string' && key.length > 0
+  );
 
 const isOwnedByActiveWebUsbRequest = (
   descriptor: DeviceDescriptor,
   requestQueue?: RequestQueueLookup
 ) => {
   if (!requestQueue) return false;
-  const keys = [descriptor.path, descriptor.id].filter(
-    (key): key is string => typeof key === 'string' && key.length > 0
+  return getDescriptorKeys(descriptor).some(
+    key => requestQueue.getRequestTasksIdByConnectId(key).length > 0
   );
-  return keys.some(key => requestQueue.getRequestTasksIdByConnectId(key).length > 0);
 };
 
+const getUsbHandle = (descriptor?: DeviceDescriptor) =>
+  (descriptor as { device?: unknown } | undefined)?.device;
+
+const getOwningRequestDevice = (
+  descriptor: DeviceDescriptor,
+  requestQueue?: RequestQueueLookup
+) => {
+  if (!requestQueue) return undefined;
+  const usbHandle = getUsbHandle(descriptor);
+  // A path alone can be shared (the all-zero bootloader path, a synthesized serial-less
+  // path), so the owner's identity is only reported for the USB handle it actually bound.
+  if (usbHandle === undefined) return undefined;
+  for (const key of getDescriptorKeys(descriptor)) {
+    for (const requestId of requestQueue.getRequestTasksIdByConnectId(key)) {
+      const device = requestQueue.getTask(requestId)?.method.device;
+      if (
+        device?.features &&
+        (device.mainId === key || device.originalDescriptor?.path === key) &&
+        getUsbHandle(device.originalDescriptor) === usbHandle
+      ) {
+        return device;
+      }
+    }
+  }
+  return undefined;
+};
+
+// A USB path is a routing key (the USB serial, a synthesized usb-vid-pid-name, or the
+// bootloader placeholder), not a hardware identity, so it never fills uuid/serialNo.
 const toSearchDeviceFromDescriptor = (descriptor: DeviceDescriptor): SearchDevice => {
   const connectId = descriptor.path || descriptor.id || null;
   return {
     connectId,
-    uuid: connectId ?? '',
-    serialNo: connectId,
+    uuid: '',
+    serialNo: null,
     deviceId: null,
     deviceType: EDeviceType.Unknown,
     name: descriptor.name || connectId || '',
@@ -108,9 +142,10 @@ export default class SearchDevices extends BaseMethod {
     for (const descriptor of devicesDescriptor) {
       if (hasActiveWebUsbRequest && isOwnedByActiveWebUsbRequest(descriptor, requestQueue)) {
         const cached = DevicePool.getDeviceByPath(descriptor.path);
-        const message = cached?.features ? toSearchDevice(cached) : null;
-        // Do not probe a path an in-flight request already owns. A cache miss
-        // (passphrase switch / initSession) is still a connected device.
+        const known = cached?.features ? cached : getOwningRequestDevice(descriptor, requestQueue);
+        const message = known ? toSearchDevice(known) : null;
+        // Do not probe a path an in-flight request already owns. A cache miss is still a
+        // connected device: report the owning request's device, or the path with no identity.
         deviceList.push(message ?? toSearchDeviceFromDescriptor(descriptor));
       } else {
         try {

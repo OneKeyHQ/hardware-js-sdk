@@ -106,9 +106,13 @@ describe('SearchDevices', () => {
     }
   );
 
-  test('owned WebUSB cache miss still reports a SearchDevice without probing', async () => {
-    mockGetDeviceByPath.mockReturnValue(undefined);
-    const usbDevice = { vendorId: 0x1209, productId: 0x4f4c };
+  const BOOTLOADER_PATH = '00000000000000000000000000000000';
+
+  const runOwnedSearch = (
+    path: string,
+    ownerDevice?: unknown,
+    usbHandles: unknown[] = [{ vendorId: 0x1209, productId: 0x4f4c }]
+  ) => {
     const method = new SearchDevices({
       id: 1,
       payload: { method: 'searchDevices' },
@@ -117,34 +121,95 @@ describe('SearchDevices', () => {
     method.context = {
       requestQueue: {
         getRequestTasksId: () => [2],
-        getRequestTasksIdByConnectId: (connectId: string) => (connectId === 'serial-V2' ? [2] : []),
+        getRequestTasksIdByConnectId: (connectId: string) => (connectId === path ? [2] : []),
+        getTask: (requestId: number) =>
+          requestId === 2 ? { method: { device: ownerDevice } } : undefined,
       },
     } as never;
     method.connector = {
       enumerate: jest.fn().mockResolvedValue({
-        descriptors: [
-          {
-            path: 'serial-V2',
-            device: usbDevice,
-            commType: 'webusb',
-          },
-        ],
+        descriptors: usbHandles.map(device => ({ path, device, commType: 'webusb' })),
       }),
     } as never;
+    return method.run();
+  };
 
-    await expect(method.run()).resolves.toEqual([
-      {
-        connectId: 'serial-V2',
-        uuid: 'serial-V2',
-        serialNo: 'serial-V2',
-        deviceId: null,
-        deviceType: 'unknown',
-        name: 'serial-V2',
-        commType: 'webusb',
-      },
+  const createOwnerDevice = (path: string, usbHandle: unknown, serialNo: string) => ({
+    mainId: path,
+    features: { serial_no: serialNo },
+    originalDescriptor: { path, device: usbHandle },
+    toMessageObject: () => ({ connectId: serialNo, serialNo, uuid: serialNo }),
+  });
+
+  test.each(['serial-V2', 'usb-1209-4f4c-onekey', BOOTLOADER_PATH])(
+    'owned WebUSB cache miss on %s reports the path without inventing an identity or probing',
+    async path => {
+      mockGetDeviceByPath.mockReturnValue(undefined);
+
+      await expect(runOwnedSearch(path)).resolves.toEqual([
+        {
+          connectId: path,
+          uuid: '',
+          serialNo: null,
+          deviceId: null,
+          deviceType: 'unknown',
+          name: path,
+          commType: 'webusb',
+        },
+      ]);
+      expect(mockGetDevices).not.toHaveBeenCalled();
+      expect(mockConfigureTransport).not.toHaveBeenCalled();
+    }
+  );
+
+  test('owned WebUSB cache miss reports the owning request device identity', async () => {
+    mockGetDeviceByPath.mockReturnValue(undefined);
+    const usbHandle = { vendorId: 0x1209, productId: 0x4f4c };
+    const ownerDevice = createOwnerDevice(BOOTLOADER_PATH, usbHandle, 'PRO2SERIAL');
+
+    await expect(runOwnedSearch(BOOTLOADER_PATH, ownerDevice, [usbHandle])).resolves.toEqual([
+      { connectId: 'PRO2SERIAL', serialNo: 'PRO2SERIAL', uuid: 'PRO2SERIAL' },
     ]);
     expect(mockGetDevices).not.toHaveBeenCalled();
-    expect(mockConfigureTransport).not.toHaveBeenCalled();
+  });
+
+  test('owned WebUSB cache miss ignores an owning request device bound to another path', async () => {
+    mockGetDeviceByPath.mockReturnValue(undefined);
+    const usbHandle = { vendorId: 0x1209, productId: 0x4f4c };
+    const ownerDevice = createOwnerDevice('other-path', usbHandle, 'OTHERSERIAL');
+
+    await expect(runOwnedSearch('usb-1209-4f4c-onekey', ownerDevice, [usbHandle])).resolves.toEqual(
+      [expect.objectContaining({ connectId: 'usb-1209-4f4c-onekey', uuid: '', serialNo: null })]
+    );
+  });
+
+  test('a second device on the shared bootloader path does not take the owner identity', async () => {
+    mockGetDeviceByPath.mockReturnValue(undefined);
+    const ownerHandle = { vendorId: 0x1209, productId: 0x4f4c };
+    const otherHandle = { vendorId: 0x1209, productId: 0x4f4c };
+    const ownerDevice = createOwnerDevice(BOOTLOADER_PATH, ownerHandle, 'MINISERIAL');
+
+    await expect(
+      runOwnedSearch(BOOTLOADER_PATH, ownerDevice, [ownerHandle, otherHandle])
+    ).resolves.toEqual([
+      { connectId: 'MINISERIAL', serialNo: 'MINISERIAL', uuid: 'MINISERIAL' },
+      expect.objectContaining({ connectId: BOOTLOADER_PATH, uuid: '', serialNo: null }),
+    ]);
+  });
+
+  test('a device swapped onto the bound bootloader path does not take the owner identity', async () => {
+    mockGetDeviceByPath.mockReturnValue(undefined);
+    const ownerDevice = createOwnerDevice(
+      BOOTLOADER_PATH,
+      { vendorId: 0x1209, productId: 0x4f4c },
+      'MINISERIAL'
+    );
+
+    await expect(
+      runOwnedSearch(BOOTLOADER_PATH, ownerDevice, [{ vendorId: 0x1209, productId: 0x4f4c }])
+    ).resolves.toEqual([
+      expect.objectContaining({ connectId: BOOTLOADER_PATH, uuid: '', serialNo: null }),
+    ]);
   });
 
   test('searchDevices resolves empty when WebUSB bring-up is unavailable', async () => {
