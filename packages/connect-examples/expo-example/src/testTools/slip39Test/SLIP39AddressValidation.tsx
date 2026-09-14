@@ -9,6 +9,7 @@ import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
+import { getRunnerReportResult } from '../../components/BaseTestRunner/runnerResultUtils';
 import { Button } from '../../components/ui/Button';
 import { ADDRESS_INDEX_MARK, CHANGE_MARK, INDEX_MARK, baseParams } from '../addressTest/baseParams';
 import { replaceTemplate } from '../addressTest/data/utils';
@@ -318,9 +319,9 @@ function ExportReportView() {
         const { $key, method, path, addressA, addressB, addressC, validationResult, backupShares } =
           caseItem;
 
-        const state = itemVerifyState?.[$key].verify;
+        const state = itemVerifyState?.[$key]?.verify ?? 'none';
         const validationStatus = validationResult?.isValid ? '✅ Pass' : '❌ Fail';
-        const runnerResult = state === 'fail' ? itemVerifyState?.[$key].error : validationStatus;
+        const runnerResult = getRunnerReportResult(itemVerifyState?.[$key], validationStatus);
 
         markdown.push(
           `| ${state} | ${method} | ${path} | ${addressA} | ${addressB} | ${addressC} | ${runnerResult} |`

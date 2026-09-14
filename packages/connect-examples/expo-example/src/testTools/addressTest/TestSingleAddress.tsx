@@ -8,6 +8,7 @@ import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
+import { getRunnerReportResult } from '../../components/BaseTestRunner/runnerResultUtils';
 import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
@@ -55,10 +56,10 @@ function ExportReportView() {
         const caseItem = item;
         const { result, $key } = caseItem;
         const title = caseItem?.name || caseItem?.title || caseItem?.method;
-        const state = itemVerifyState?.[$key].verify;
+        const state = itemVerifyState?.[$key]?.verify ?? 'none';
         const path = caseItem?.params?.addressParameters?.path || caseItem?.params?.path;
 
-        const runnerResult = state === 'fail' ? itemVerifyState?.[$key].error : result.address;
+        const runnerResult = getRunnerReportResult(itemVerifyState?.[$key], result.address);
         markdown.push(`| ${state} | ${title} | ${path} | ${runnerResult} |`);
       });
 

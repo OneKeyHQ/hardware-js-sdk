@@ -4,6 +4,7 @@ import { useAtomValue } from 'jotai';
 import { downloadFile } from '../../utils/downloadUtils';
 import { TestRunnerContext } from './Context/TestRunnerProvider';
 import { itemVerifyStateAtom } from './Context/TestRunnerVerifyProvider';
+import { getRunnerReportStatus } from './runnerResultUtils';
 import { getDeviceInfo } from '../../utils/deviceUtils';
 
 import type { ItemVerifyState } from './Context/TestRunnerVerifyProvider';
@@ -48,16 +49,13 @@ export default function useExportReport<T>({
     const beginTime = new Date(timestampBeginTest).toLocaleString();
     const endTime = new Date(timestampEndTest).toLocaleString();
 
-    const allSuccess = itemValues.every(item => {
-      const caseItem = item as TestCaseDataWithKey<T>;
-      const { $key } = caseItem;
-      const state = itemVerifyState?.[$key].verify;
-      return state === 'success';
-    });
+    const status = getRunnerReportStatus(
+      itemValues.map(item => itemVerifyState[item.$key]?.verify)
+    );
 
     const markdown = [];
     markdown.push(`# ${reportTitle} (${runnerTestCaseTitle})`);
-    markdown.push(`Status: ${allSuccess ? 'Success' : 'Fail'}\n`);
+    markdown.push(`Status: ${status}\n`);
     markdown.push(`Begin Time: ${beginTime}\n`);
     markdown.push(`End Time: ${endTime}\n`);
     markdown.push(``);
