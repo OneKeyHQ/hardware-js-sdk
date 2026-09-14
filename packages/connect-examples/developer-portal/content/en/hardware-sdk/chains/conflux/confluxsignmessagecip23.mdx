@@ -25,9 +25,9 @@ Asks device to sign a message using the private key derived by given BIP32 path.
 ### Example
 
 ```typescript
-HardwareSDK.confluxSignMessage(connectId, deviceId, {
+HardwareSDK.confluxSignMessageCIP23(connectId, deviceId, {
     path: "m/44'/503'/0'/0/0",
-    messageHash: "0x07bc1c4f3268fc74b60587e9bb7e01e38a7d8a9a3f51202bf25332aa2c75c64"
+    messageHash: "0x07bc1c4f3268fc74b60587e9bb7e01e38a7d8a9a3f51202bf25332aa2c75c644",
     domainHash: "7c872d109a4e735dc1886c72af47e9b4888a1507557e0f49c85b570019163373"
 });
 ```

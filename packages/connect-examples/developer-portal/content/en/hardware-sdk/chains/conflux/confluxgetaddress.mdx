@@ -37,7 +37,7 @@ const response = await HardwareSDK.confluxGetAddress(connectId, deviceId, params
 Display address of first conflux account:
 
 ```typescript
-HardwareSDK.confluxGetAddress({
+HardwareSDK.confluxGetAddress(connectId, deviceId, {
     path: "m/44'/503'/0'/0/0",
     chainId: 1029
 });
