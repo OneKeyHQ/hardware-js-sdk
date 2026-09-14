@@ -256,10 +256,62 @@ const connectOptions: Record<string, unknown> = {
   refreshGatt: 'OnConnected',
 };
 
-/** Fallback connect options: drops requestMTU (the thing being worked around) but keeps the native budget. */
+/** Connect options without requestMTU: the iOS fallback and every bare Android connect. */
 const fallbackConnectOptions: Record<string, unknown> = {
   timeout: BLE_NATIVE_CONNECT_TIMEOUT_MS,
 };
+
+/**
+ * Android never requests the MTU inside the native connect budget: refreshGatt makes the stack
+ * rediscover first, and a budget that expires with the MTU request unsent parks every later MTU
+ * request on that LE link. refreshGatt itself is only added after a firmware install or a
+ * stale-table symptom, and discovery finishes before the MTU exchange.
+ */
+const androidRefreshGattConnectOptions: Record<string, unknown> = {
+  timeout: BLE_NATIVE_CONNECT_TIMEOUT_MS,
+  refreshGatt: 'OnConnected',
+};
+
+/**
+ * With no cached GATT table the stack runs its own discovery (up to ~8s) before the MTU
+ * exchange, so the bound sits above that; a stuck exchange never completes.
+ */
+export const ANDROID_MTU_EXCHANGE_TIMEOUT_MS = 12_000;
+
+/**
+ * Android keeps an LE link, with per-link ATT state such as a pending MTU exchange, for its
+ * 4s GATT link idle timer after the last client closes; a reconnect inside it reuses the link.
+ */
+export const ANDROID_LINK_DROP_QUIET_MS = 5000;
+const ANDROID_LINK_DROP_POLL_MS = 250;
+
+/**
+ * Android cannot use a link at the default 23-byte ATT MTU: Protocol V1 writes 192-byte
+ * packets regardless, and a Pro 2 sends only the first ATT_MTU-3 bytes of a V2 reply.
+ * An unknown MTU is not treated as default.
+ */
+const isKnownDefaultMtu = (mtu: unknown): boolean =>
+  typeof mtu === 'number' && Number.isFinite(mtu) && mtu <= 23;
+
+/** Discovery found no OneKey service, or a characteristic of the wrong shape: the cached GATT table may be stale. */
+const isMissingGattShapeError = (error: unknown): boolean => {
+  const code = (error as { errorCode?: unknown })?.errorCode;
+  const message = (error as { message?: unknown })?.message;
+  return (
+    code === HardwareErrorCode.BleServiceNotFound ||
+    code === HardwareErrorCode.BleCharacteristicNotFound ||
+    (typeof message === 'string' &&
+      (message.includes('BLECharacteristicNotFound') ||
+        message.includes('BLECharacteristicNotWritable') ||
+        message.includes('BLECharacteristicNotNotifiable')))
+  );
+};
+const isStaleGattTableNotifyReason = (reason: string | null | undefined): boolean =>
+  !!reason &&
+  (reason.includes('Cannot write client characteristic config descriptor') ||
+    reason.includes('Cannot find client characteristic config descriptor') || // pro firmware 2.3.0 upgrade
+    reason.includes('The handle is invalid') ||
+    reason.includes('Writing is not permitted')); // pro firmware 2.3.4 upgrade
 
 /**
  * JS backstop for connect. The native adapter applies its own 3s budget, but it
@@ -300,21 +352,15 @@ const shouldRethrowBleSetupError = (error: unknown): boolean =>
   isConnectTimeoutError(error) || isWedgedBleSetupError(error);
 const isNativeOperationTimeoutError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === BleErrorCode.OperationTimedOut;
-/**
- * ble-plx reports its own expired budget as OperationCancelled, not OperationTimedOut:
- * safeConnectToDevice disposes the operation chain and its doFinally reports a
- * cancellation. Either code means the native layer abandoned work that still owned
- * connection/GATT state, so both have to go through the stalled-connection cleanup.
- * Only used where nothing else recovers the link — the connect path does its own
- * ordered teardown before retrying, and routing it here too would both duplicate that
- * and spend the manager-reset budget on a connect that is about to be retried.
- */
-const isAbandonedNativeOperationError = (error: unknown): boolean => {
+const isMtuOrCancelledConnectError = (error: unknown): boolean => {
   const errorCode = (error as { errorCode?: unknown })?.errorCode;
   return (
-    errorCode === BleErrorCode.OperationTimedOut || errorCode === BleErrorCode.OperationCancelled
+    errorCode === BleErrorCode.DeviceMTUChangeFailed ||
+    errorCode === BleErrorCode.OperationCancelled
   );
 };
+
+type NegotiatedMtuResult = { device: Device; timedOut: boolean };
 
 export type IOneKeyDevice = OneKeyDeviceInfoBase & Device;
 
@@ -327,26 +373,13 @@ const tryToGetConfiguration = (device: Device) => {
   return infos;
 };
 
-type NegotiatedMtuResult = {
-  device: Device;
-  /**
-   * True when the bounded wait gave up while the native MTU exchange was still
-   * outstanding. `cancelTransaction` only disposes the JS-side subscription:
-   * RxAndroidBle releases a connection's serial operation queue from onComplete /
-   * onError alone, so an abandoned exchange keeps that queue until its own native
-   * timeout. Any GATT work issued before then — service discovery above all —
-   * queues behind it and cannot settle inside its own budget.
-   */
-  abandoned: boolean;
-};
-
 const requestNegotiatedMtu = async (
   device: Device,
   stage: 'connected' | 'highThroughput',
   attempt: number,
   cancelTransaction?: (transactionId: string) => Promise<void> | void
 ): Promise<NegotiatedMtuResult> => {
-  if (Platform.OS !== 'ios' && Platform.OS !== 'android') return { device, abandoned: false };
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android') return { device, timedOut: false };
 
   const transactionId = `${device.id}:mtu:${stage}:${attempt}:${Date.now()}`;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -369,7 +402,7 @@ const requestNegotiatedMtu = async (
         }, BLE_MTU_REQUEST_TIMEOUT_MS);
       }),
     ]);
-    return { device: mtuDevice, abandoned: false };
+    return { device: mtuDevice, timedOut: false };
   } catch (error) {
     if (timedOut && cancelTransaction) {
       try {
@@ -395,9 +428,10 @@ const requestNegotiatedMtu = async (
       stage,
       attempt,
       actual: device.mtu,
+      timedOut,
       error: error instanceof Error ? error.message : String(error),
     });
-    return { device, abandoned: timedOut };
+    return { device, timedOut };
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
   }
@@ -409,7 +443,7 @@ const resolveNegotiatedMtu = (
 ): Promise<NegotiatedMtuResult> =>
   shouldRefreshNegotiatedMtu(device.mtu)
     ? requestNegotiatedMtu(device, 'connected', 0, cancelTransaction)
-    : Promise.resolve({ device, abandoned: false });
+    : Promise.resolve({ device, timedOut: false });
 
 type IOBleErrorRemap = Error | BleError | null | undefined;
 
@@ -493,16 +527,11 @@ export default class ReactNativeBleTransport {
   /** Consecutive detections that failed while trusting sessionProtocols. */
   private protocolReprobeFailures: Map<string, number> = new Map();
 
-  /** Endpoints whose last detection got no answer on any protocol. */
-  private silentDetections = new Set<string>();
+  /** Endpoints whose last detection got no answer; 'woken' once their Initialize wake is spent. */
+  private silentDetections = new Map<string, 'silent' | 'woken'>();
 
-  /**
-   * Endpoints already sent a Protocol V1 wake. The wake starts a fresh wallet session
-   * on the device, and a failed detection tears the link down and reconnects on every
-   * poll, so neither set is cleared on teardown: one wake is spent per endpoint until a
-   * detection succeeds, which re-arms it for the next time the device sleeps.
-   */
-  private protocolWakeAttempts = new Set<string>();
+  /** Android endpoints whose cached GATT table is suspect; the next connect refreshes it. */
+  private androidGattCacheRefreshes = new Set<string>();
 
   /**
    * Native encryption/pairing failures seen before Protocol V2 probe starts.
@@ -1081,8 +1110,12 @@ export default class ReactNativeBleTransport {
         const isCachedDeviceConnected = await cachedTransport.device
           .isConnected()
           .catch(() => false);
+        // A suspect GATT table is only refreshed through a new connect.
+        const isCachedAndroidLinkUsable =
+          Platform.OS !== 'android' || !this.androidGattCacheRefreshes.has(uuid);
         if (
           isCachedDeviceConnected &&
+          isCachedAndroidLinkUsable &&
           cachedProtocol &&
           (!expectedProtocol || cachedProtocol === expectedProtocol)
         ) {
@@ -1101,14 +1134,18 @@ export default class ReactNativeBleTransport {
     }
 
     let device: Device | null = null;
-    /**
-     * Set when an MTU-bearing connect had to fall back to `fallbackConnectOptions`.
-     * ble-plx applies `connectOptions.timeout` to the whole establishConnection ->
-     * refreshGatt -> requestMtu chain, so that fallback means the peripheral did not
-     * finish the MTU exchange on this link. Asking again below would only park a
-     * second abandoned exchange on the connection's serial queue.
-     */
-    let mtuHandshakeRefused = false;
+    const isAndroid = Platform.OS === 'android';
+    // A firmware-install reconnect always refreshes: the new firmware may expose a different table.
+    const refreshAndroidGattCache =
+      isAndroid && (!!skipProtocolProbe || this.androidGattCacheRefreshes.has(uuid));
+    let nativeConnectOptions = connectOptions;
+    if (isAndroid) {
+      nativeConnectOptions = refreshAndroidGattCache
+        ? androidRefreshGattConnectOptions
+        : fallbackConnectOptions;
+    }
+    // Only a connect that carried refreshGatt clears the marker; the fallback connects drop it.
+    let androidRefreshConnectRan = false;
 
     if (forceCleanRunPromise && this.runPromise) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
@@ -1119,6 +1156,7 @@ export default class ReactNativeBleTransport {
     }
 
     const blePlxManager = await this.getPlxManager();
+    let skipPostConnectMtu = false;
     try {
       await subscribeBleOn(blePlxManager);
     } catch (error) {
@@ -1163,25 +1201,17 @@ export default class ReactNativeBleTransport {
       Log?.debug('try to connect to device: ', uuid);
       try {
         device = await this.connectWithTimeout(uuid, () =>
-          blePlxManager.connectToDevice(uuid, connectOptions)
+          blePlxManager.connectToDevice(uuid, nativeConnectOptions)
         );
+        androidRefreshConnectRan = refreshAndroidGattCache;
       } catch (e) {
         Log?.debug('try to connect to device has error: ', e);
         if (shouldRethrowBleSetupError(e)) {
           throw e;
         }
-        if (
-          e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
-          e.errorCode === BleErrorCode.OperationCancelled
-        ) {
+        if (isMtuOrCancelledConnectError(e)) {
+          skipPostConnectMtu = true;
           Log?.debug('first try to reconnect without params');
-          mtuHandshakeRefused = true;
-          // The disposed chain can still own native connection state, and the retry
-          // would otherwise run on top of a half-open GATT client.
-          await this.runBestEffortNativeOperation(
-            'connect cancelled: cancel manager connection',
-            () => blePlxManager.cancelDeviceConnection(uuid)
-          );
           device = await this.connectWithTimeout(uuid, () =>
             blePlxManager.connectToDevice(uuid, fallbackConnectOptions)
           );
@@ -1198,31 +1228,34 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'unable to connect to device');
     }
 
+    if (
+      refreshAndroidGattCache &&
+      !androidRefreshConnectRan &&
+      (await device.isConnected().catch(() => false))
+    ) {
+      // refreshGatt only reaches the stack through a connect. A link that is still up would
+      // skip the connect below and keep serving the stale table, so it is dropped first.
+      await this.dropAndroidLink(uuid, blePlxManager, device, 'gatt cache refresh');
+      if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    }
+
     if (!(await device.isConnected())) {
       Log?.debug('not connected, try to connect to device: ', uuid);
       const disconnectedDevice = device;
 
       try {
         device = await this.connectWithTimeout(uuid, () =>
-          disconnectedDevice.connect(connectOptions)
+          disconnectedDevice.connect(nativeConnectOptions)
         );
+        androidRefreshConnectRan = refreshAndroidGattCache;
       } catch (e) {
         Log?.debug('not connected, try to connect to device has error: ', e);
         if (shouldRethrowBleSetupError(e)) {
           throw e;
         }
-        if (
-          e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
-          e.errorCode === BleErrorCode.OperationCancelled
-        ) {
+        if (isMtuOrCancelledConnectError(e)) {
+          skipPostConnectMtu = true;
           Log?.debug('second try to reconnect without params');
-          mtuHandshakeRefused = true;
-          // The disposed chain can still own native connection state, and the retry
-          // would otherwise run on top of a half-open GATT client.
-          await this.runBestEffortNativeOperation(
-            'connect cancelled: cancel device connection',
-            () => disconnectedDevice.cancelConnection()
-          );
           try {
             device = await this.connectWithTimeout(uuid, () =>
               disconnectedDevice.connect(fallbackConnectOptions)
@@ -1263,34 +1296,43 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'device is not connected');
     }
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-    if (mtuHandshakeRefused) {
-      Log?.debug('[ReactNativeBleTransport] skipping MTU refresh after cancelled MTU connect', {
-        connectIdSuffix: uuid.slice(-8),
-        actual: device.mtu,
-      });
-    } else {
-      const negotiatedMtu = await resolveNegotiatedMtu(device, transactionId =>
+    let characteristics: ResolvedBleCharacteristics | undefined;
+    if (isAndroid) {
+      if (refreshAndroidGattCache) {
+        // refreshGatt has already started a full rediscovery; let it finish before the MTU
+        // exchange so the request is not queued behind it.
+        characteristics = await this.resolveCharacteristicsWithTimeout(uuid, device);
+        if (androidRefreshConnectRan) this.androidGattCacheRefreshes.delete(uuid);
+        if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+      }
+      device = await this.negotiateAndroidMtu(uuid, blePlxManager, device);
+    } else if (!skipPostConnectMtu) {
+      // Match 1.1.31: MTU is a connect() best-effort. If connect already fell back
+      // without requestMTU, do not put another requestMTU on the native serial
+      // queue — that is what wedges GATT after Account#2 reconnect.
+      const mtuResult = await resolveNegotiatedMtu(device, transactionId =>
         blePlxManager.cancelTransaction(transactionId)
       );
-      device = negotiatedMtu.device;
-      if (negotiatedMtu.abandoned) {
-        // Service discovery would queue behind the abandoned exchange and miss its own
-        // budget. Drop the link so the next attempt starts on a queue nothing holds.
-        await this.runNativeTeardown(uuid, blePlxManager, async () => {
-          await this.runBestEffortNativeOperation('mtu abandoned: cancel manager connection', () =>
-            blePlxManager.cancelDeviceConnection(uuid)
-          );
-        });
-        throw ERRORS.TypedError(
-          HardwareErrorCode.BleConnectedError,
-          'BLE MTU negotiation abandoned, reconnecting'
+      device = mtuResult.device;
+      if (mtuResult.timedOut) {
+        if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+        Log?.debug(
+          '[ReactNativeBleTransport] post-connect MTU timed out, reconnecting without requesting MTU'
+        );
+        const timedOutDevice = device;
+        await this.runBestEffortNativeOperation('mtu timeout: cancel device connection', () =>
+          timedOutDevice.cancelConnection()
+        );
+        if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+        device = await this.connectWithTimeout(uuid, () =>
+          timedOutDevice.connect(fallbackConnectOptions)
         );
       }
     }
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     const acquiredDevice = device;
     const { writeCharacteristic, notifyCharacteristic } =
-      await this.resolveCharacteristicsWithTimeout(uuid, acquiredDevice);
+      characteristics ?? (await this.resolveCharacteristicsWithTimeout(uuid, acquiredDevice));
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
 
     const protocolHint = expectedProtocol
@@ -1401,6 +1443,9 @@ export default class ReactNativeBleTransport {
           this.rememberStaleBondError(uuid, toBleStaleBondHardwareError(error));
           return;
         }
+        if (Platform.OS === 'android' && isStaleGattTableNotifyReason(error.reason)) {
+          this.androidGattCacheRefreshes.add(uuid);
+        }
         if (this.getActiveProtocol(uuid) === 'V2') {
           let errorCode:
             | typeof HardwareErrorCode.BleCharacteristicNotifyError
@@ -1410,10 +1455,7 @@ export default class ReactNativeBleTransport {
           if (error.reason?.includes('The connection has timed out unexpectedly')) {
             errorCode = HardwareErrorCode.BleTimeoutError;
           } else if (
-            error.reason?.includes('Cannot write client characteristic config descriptor') ||
-            error.reason?.includes('Cannot find client characteristic config descriptor') ||
-            error.reason?.includes('The handle is invalid') ||
-            error.reason?.includes('Writing is not permitted') ||
+            isStaleGattTableNotifyReason(error.reason) ||
             error.reason?.includes('notify change failed for device')
           ) {
             errorCode = HardwareErrorCode.BleCharacteristicNotifyChangeFailure;
@@ -1430,10 +1472,7 @@ export default class ReactNativeBleTransport {
             ERROR = HardwareErrorCode.BleTimeoutError;
           }
           if (
-            error.reason?.includes('Cannot write client characteristic config descriptor') ||
-            error.reason?.includes('Cannot find client characteristic config descriptor') || // pro firmware 2.3.0 upgrade
-            error.reason?.includes('The handle is invalid') ||
-            error.reason?.includes('Writing is not permitted') || // pro firmware 2.3.4 upgrade
+            isStaleGattTableNotifyReason(error.reason) ||
             error.reason?.includes('notify change failed for device')
           ) {
             const notifyError = ERRORS.TypedError(
@@ -1863,13 +1902,14 @@ export default class ReactNativeBleTransport {
       const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
-      if (name === 'GetFeatures' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS) {
-        Log?.debug('[ReactNativeBleTransport] Protocol V1 GetFeatures probe call failed:', e);
+      const isProbeTimeout =
+        options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS &&
+        (name === 'GetFeatures' || name === 'Initialize');
+      if (isProbeTimeout) {
+        Log?.debug(`[ReactNativeBleTransport] Protocol V1 ${name} probe call failed:`, e);
       } else {
         Log?.error('call error: ', e);
       }
-      const isProbeTimeout =
-        name === 'GetFeatures' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS;
       // A call that has been superseded (forceRun) or cleaned up no longer owns the
       // transport; its late timeout must not tear down the connection the current
       // call is actively using.
@@ -2102,6 +2142,98 @@ export default class ReactNativeBleTransport {
     }
   }
 
+  /**
+   * Android: request the MTU with nothing queued ahead and never close the client while it is
+   * outstanding; a link that times out or stays at MTU 23 is dropped.
+   */
+  private async negotiateAndroidMtu(
+    uuid: string,
+    manager: BlePlxManager,
+    device: Device
+  ): Promise<Device> {
+    if (!shouldRefreshNegotiatedMtu(device.mtu)) return device;
+
+    const startedAt = Date.now();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    let negotiated = device;
+    let failure: string | undefined;
+    try {
+      negotiated = await Promise.race([
+        device.requestMTU(ANDROID_REQUEST_MTU, `${device.id}:mtu:connected:0:${startedAt}`),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            timedOut = true;
+            reject(
+              new Error(`BLE MTU exchange timeout after ${ANDROID_MTU_EXCHANGE_TIMEOUT_MS}ms`)
+            );
+          }, ANDROID_MTU_EXCHANGE_TIMEOUT_MS);
+        }),
+      ]);
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    Log?.debug(`[ReactNativeBleTransport] BLE MTU exchange ${failure ? 'failed' : 'completed'}`, {
+      connectIdSuffix: uuid.slice(-8),
+      elapsedMs: Date.now() - startedAt,
+      timedOut,
+      actual: negotiated.mtu,
+      error: failure,
+    });
+    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    if (!timedOut && !isKnownDefaultMtu(negotiated.mtu)) return negotiated;
+
+    // Counted like a setup timeout so a link that keeps failing reaches the wedged-link guard.
+    const resetManager = this.abandonStalledConnection(
+      uuid,
+      timedOut ? 'mtu-backstop' : 'mtu-default'
+    );
+    await this.dropAndroidLink(
+      uuid,
+      manager,
+      negotiated,
+      timedOut ? 'mtu exchange timeout' : 'default mtu'
+    );
+    if (resetManager) throw this.createWedgedBleSetupError();
+    throw ERRORS.TypedError(
+      HardwareErrorCode.BleConnectedError,
+      timedOut
+        ? 'BLE MTU exchange did not complete, reconnecting on a fresh link'
+        : `BLE link stayed at the default MTU ${negotiated.mtu}, reconnecting on a fresh link`
+    );
+  }
+
+  /** Close the client and wait out the link idle timer so the next connect gets a fresh link. */
+  private async dropAndroidLink(
+    uuid: string,
+    manager: BlePlxManager,
+    device: Device,
+    reason: string
+  ) {
+    await this.runNativeTeardown(uuid, manager, async () => {
+      await Promise.all([
+        this.runBestEffortNativeOperation(`${reason}: cancel manager connection`, () =>
+          manager.cancelDeviceConnection(uuid)
+        ),
+        this.runBestEffortNativeOperation(`${reason}: cancel device connection`, () =>
+          device.cancelConnection()
+        ),
+      ]);
+    });
+
+    const startedAt = Date.now();
+    while (!this.stopped && Date.now() - startedAt < ANDROID_LINK_DROP_QUIET_MS) {
+      await delay(ANDROID_LINK_DROP_POLL_MS);
+    }
+    Log?.debug('[ReactNativeBleTransport] Android BLE link drop', {
+      connectIdSuffix: uuid.slice(-8),
+      reason,
+      stopped: this.stopped,
+    });
+  }
+
   /** Run a native connect under the JS backstop budget. */
   private async connectWithTimeout<T>(uuid: string, connect: () => Promise<T>): Promise<T> {
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
@@ -2182,7 +2314,7 @@ export default class ReactNativeBleTransport {
       succeeded = true;
       return result;
     } catch (error) {
-      if (timedOut || isAbandonedNativeOperationError(error)) {
+      if (timedOut || isNativeOperationTimeoutError(error)) {
         const resetManager = this.abandonStalledConnection(
           uuid,
           timedOut ? 'gatt-backstop' : 'gatt-native'
@@ -2190,6 +2322,9 @@ export default class ReactNativeBleTransport {
         if (resetManager) {
           throw this.createWedgedBleSetupError();
         }
+      }
+      if (Platform.OS === 'android' && isMissingGattShapeError(error)) {
+        this.androidGattCacheRefreshes.add(uuid);
       }
       throw error;
     } finally {
@@ -2211,7 +2346,13 @@ export default class ReactNativeBleTransport {
    */
   private abandonStalledConnection(
     uuid: string,
-    stage: 'connect-backstop' | 'connect-native' | 'gatt-backstop' | 'gatt-native'
+    stage:
+      | 'connect-backstop'
+      | 'connect-native'
+      | 'gatt-backstop'
+      | 'gatt-native'
+      | 'mtu-backstop'
+      | 'mtu-default'
   ): boolean {
     const timeouts = (this.connectionSetupTimeoutCounts.get(uuid) ?? 0) + 1;
     this.connectionSetupTimeoutCounts.set(uuid, timeouts);
@@ -2387,7 +2528,6 @@ export default class ReactNativeBleTransport {
     // firmware reconnect after the native BLE manager is recreated.
     this.protocolReprobeFailures.clear();
     this.silentDetections.clear();
-    this.protocolWakeAttempts.clear();
     this.writeTimeoutCounts.clear();
     this.connectionSetupTimeoutCounts.clear();
     this.monitorTokens.clear();
@@ -2523,7 +2663,6 @@ export default class ReactNativeBleTransport {
         }
         this.protocolReprobeFailures.delete(uuid);
         this.silentDetections.delete(uuid);
-        this.protocolWakeAttempts.delete(uuid);
         Log?.debug('[ReactNativeBleTransport] protocol detected', {
           deviceId: uuid,
           protocol,
@@ -2533,9 +2672,8 @@ export default class ReactNativeBleTransport {
       }
     }
 
-    // Nothing answered on any probed protocol. Remember it so the next detection, which
-    // the caller reaches on a freshly reconnected link, can spend a wake first.
-    this.silentDetections.add(uuid);
+    // Arms the wake for the next detection.
+    if (!this.silentDetections.has(uuid)) this.silentDetections.set(uuid, 'silent');
 
     if (trustSessionProtocol) {
       // Still silent on its own protocol: count it, and let the streak expire the
@@ -2551,29 +2689,19 @@ export default class ReactNativeBleTransport {
   }
 
   /**
-   * Sent once before probing when the previous detection on this endpoint got no answer
-   * at all. On Classic-family firmware that silence is also what a sleeping device looks
-   * like: its BLE co-processor keeps serving connect, GATT and MTU while the main MCU
-   * sits in the screensaver loop, whose host-message filter accepts only Initialize and
-   * the *Ack messages. GetFeatures and Ping are dropped there without a reply, so no
-   * amount of probing can bring the device back.
-   *
-   * Initialize is the one message that breaks that loop, but it also starts a fresh
-   * wallet session, which is why it is not the probe itself — a bare Initialize on every
-   * acquire would drop a hidden-wallet session before Core can restore it. Requiring a
-   * fully silent previous detection keeps it to devices with no session left to protect.
-   *
-   * The firmware consumes the wake to leave its loop and does not reliably answer it, so
-   * the result is ignored: the probes that follow are what decide the protocol.
+   * A sleeping Classic drops GetFeatures/Ping and only leaves its screensaver on Initialize, which
+   * resets the wallet session, so it is sent once after a fully silent detection. The firmware does
+   * not reliably answer it, so its timeout must not drop the link.
    */
   private async wakeSilentProtocolV1Device(uuid: string, probeOrder: ProtocolType[]) {
-    if (!this._messages) return;
-    if (!probeOrder.includes('V1')) return;
-    if (!this.silentDetections.has(uuid)) return;
-    if (this.protocolWakeAttempts.has(uuid)) return;
-    if (!transportCache[uuid]) return;
-    this.protocolWakeAttempts.add(uuid);
-
+    if (
+      Platform.OS !== 'android' ||
+      !probeOrder.includes('V1') ||
+      this.silentDetections.get(uuid) !== 'silent'
+    ) {
+      return;
+    }
+    this.silentDetections.set(uuid, 'woken');
     Log?.debug('[ReactNativeBleTransport] sending Protocol V1 Initialize wake', {
       connectIdSuffix: uuid.slice(-8),
     });
@@ -2581,11 +2709,7 @@ export default class ReactNativeBleTransport {
       this.probingProtocols.set(uuid, 'V1');
       await this.callProtocolV1(uuid, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
     } catch (error) {
-      if (shouldRethrowProtocolProbeError(error)) {
-        this.clearProbeProtocol(uuid, 'V1');
-        throw error;
-      }
-      Log?.debug('[ReactNativeBleTransport] Protocol V1 Initialize wake did not answer:', error);
+      if (shouldRethrowProtocolProbeError(error)) throw error;
     } finally {
       this.clearProbeProtocol(uuid, 'V1');
     }
@@ -2970,7 +3094,7 @@ export default class ReactNativeBleTransport {
     const transport = this.getCachedTransport(uuid);
     if (!shouldRefreshNegotiatedMtu(transport.mtuSize)) return;
 
-    const { device: refreshedDevice, abandoned } = await requestNegotiatedMtu(
+    const { device: refreshedDevice } = await requestNegotiatedMtu(
       transport.device,
       'highThroughput',
       1,
@@ -2980,7 +3104,7 @@ export default class ReactNativeBleTransport {
     transport.mtuSize =
       typeof refreshedDevice.mtu === 'number' ? refreshedDevice.mtu : transport.mtuSize;
 
-    if (abandoned || shouldRefreshNegotiatedMtu(transport.mtuSize)) {
+    if (shouldRefreshNegotiatedMtu(transport.mtuSize)) {
       throw ERRORS.TypedError(
         HardwareErrorCode.BleConnectedError,
         `Protocol V2 high-throughput BLE MTU unavailable: ${String(transport.mtuSize)}`

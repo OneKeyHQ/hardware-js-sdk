@@ -6,6 +6,8 @@ import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
 import { onDeviceBondState } from '../BleManager';
 import ReactNativeBleTransport, {
+  ANDROID_LINK_DROP_QUIET_MS,
+  ANDROID_MTU_EXCHANGE_TIMEOUT_MS,
   BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD,
   BLE_CONNECT_TIMEOUT_MS,
   BLE_GATT_SETUP_TIMEOUT_MS,
@@ -608,6 +610,19 @@ describe('BLE connect timeout', () => {
     expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(UUID);
   });
 
+  test('a native GATT timeout abandons the native connection', async () => {
+    const { transport, device, bleManager } = createHarness(() => Promise.resolve());
+    const nativeTimeout = Object.assign(new Error('Operation timed out'), {
+      errorCode: BleErrorCode.OperationTimedOut,
+    });
+    device.discoverAllServicesAndCharacteristics.mockRejectedValueOnce(nativeTimeout);
+
+    await expect((transport as any).resolveCharacteristicsWithTimeout(UUID, device)).rejects.toBe(
+      nativeTimeout
+    );
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(UUID);
+  });
+
   test('a successful GATT retry clears the timeout budget before an abandoned call settles', async () => {
     const { transport, device, bleManager } = createHarness(() => Promise.resolve());
     let resolveAbandonedDiscovery: (() => void) | undefined;
@@ -639,5 +654,74 @@ describe('BLE connect timeout', () => {
 
     expect(bleManager.cancelDeviceConnection).toHaveBeenCalledTimes(1);
     expect((transport as any).connectionSetupTimeoutCounts.has(UUID)).toBe(false);
+  });
+
+  test('holds an unusable link past the idle timer', async () => {
+    Object.assign(Platform, { OS: 'android' });
+    const { transport, device, bleManager } = createHarness(() => Promise.resolve(device));
+    device.isConnected.mockResolvedValue(true);
+    Object.assign(device, { mtu: 23, requestMTU: jest.fn(() => new Promise(() => {})) });
+    let settled: Error | undefined;
+    const acquire = transport.acquire({ uuid: UUID, expectedProtocol: 'V1' }).catch(error => {
+      settled = error;
+    });
+    await flush();
+    await flush();
+    expect(device.requestMTU).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(ANDROID_MTU_EXCHANGE_TIMEOUT_MS);
+    await flush();
+    await flush();
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(UUID);
+
+    jest.advanceTimersByTime(4000);
+    await flush();
+    await flush();
+    expect(settled).toBeUndefined();
+
+    await advanceUntil(() => !!settled, ANDROID_LINK_DROP_QUIET_MS);
+    await acquire;
+    expect(settled).toMatchObject({ errorCode: HardwareErrorCode.BleConnectedError });
+    expect(device.discoverAllServicesAndCharacteristics).not.toHaveBeenCalled();
+  });
+
+  test('a slow but successful MTU exchange completes inside the bound', async () => {
+    Object.assign(Platform, { OS: 'android' });
+    const { transport, device } = createHarness(() => Promise.resolve(device));
+    device.isConnected.mockResolvedValue(true);
+    const negotiated = { ...device, mtu: 247 };
+    Object.assign(device, {
+      mtu: 23,
+      // A cold cache makes the stack discover first; the exchange then completes late.
+      requestMTU: jest.fn(
+        () =>
+          new Promise(resolve => {
+            setTimeout(() => resolve(negotiated), 10_000);
+          })
+      ),
+    });
+    const [, notifyCharacteristic] = await device.characteristicsForService();
+    Object.assign(notifyCharacteristic, { monitor: jest.fn(() => ({ remove: jest.fn() })) });
+    let result: unknown;
+    let failure: Error | undefined;
+    const acquire = transport.acquire({ uuid: UUID, expectedProtocol: 'V1' }).then(
+      value => {
+        result = value;
+      },
+      error => {
+        failure = error;
+      }
+    );
+    await flush();
+    await flush();
+    expect(device.discoverAllServicesAndCharacteristics).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(10_000);
+    await advanceUntil(() => result !== undefined || failure !== undefined, 5000);
+    await acquire;
+    expect(failure).toBeUndefined();
+    expect(result).toEqual({ uuid: UUID, protocolType: 'V1' });
+    expect(device.discoverAllServicesAndCharacteristics).toHaveBeenCalledTimes(1);
+    await transport.release(UUID, true);
   });
 });
