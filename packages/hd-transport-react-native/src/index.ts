@@ -256,28 +256,16 @@ const connectOptions: Record<string, unknown> = {
   refreshGatt: 'OnConnected',
 };
 
-/** Fallback connect options: drops requestMTU (the thing being worked around) but keeps the native budget. */
+/** Connect options without requestMTU: the iOS fallback and every bare Android connect. */
 const fallbackConnectOptions: Record<string, unknown> = {
   timeout: BLE_NATIVE_CONNECT_TIMEOUT_MS,
 };
 
 /**
- * Android connects with the bare native budget: no MTU request and no GATT cache refresh
- * inside that timer. ble-plx runs establishConnection -> refreshGatt -> requestMtu under one
- * timeout, and refreshGatt makes the Android stack rediscover every service at the default
- * 23-byte MTU before the MTU request can leave the ATT queue. A Pro 2 needs 2-5s for that
- * rediscovery, so the budget expired with the request still unsent. Closing the client then
- * left the exchange marked in progress for the whole LE link, and the stack parked every
- * later MTU request on it ("Put conn_id on wait list"; btsnoop showed no Exchange MTU
- * Request on the air). The MTU is negotiated as a separate first step instead.
- */
-const androidConnectOptions: Record<string, unknown> = {
-  timeout: BLE_NATIVE_CONNECT_TIMEOUT_MS,
-};
-
-/**
- * Only used when the cached GATT table is known or likely to be stale; the rediscovery it
- * starts is then allowed to finish before the MTU exchange instead of racing it.
+ * Android never requests the MTU inside the native connect budget: refreshGatt makes the stack
+ * rediscover first, and a budget that expires with the MTU request unsent parks every later MTU
+ * request on that LE link. refreshGatt itself is only added after a firmware install or a
+ * stale-table symptom, and discovery finishes before the MTU exchange.
  */
 const androidRefreshGattConnectOptions: Record<string, unknown> = {
   timeout: BLE_NATIVE_CONNECT_TIMEOUT_MS,
@@ -285,12 +273,8 @@ const androidRefreshGattConnectOptions: Record<string, unknown> = {
 };
 
 /**
- * Bound for the Android MTU exchange. A healthy exchange with a Pro 2 completes in ~50ms.
- * When the phone has no cached GATT table (first connect after bonding, or a connect after
- * an aborted discovery) the stack runs its own discovery first and only executes the MTU
- * request after it; single passes on a Pro 2 at MTU 23 measured 1.7-4.8s and a refresh
- * plus restart 7.7s, so the bound has to sit well above those. An exchange the stack holds
- * as already in progress never completes, so a longer bound costs nothing on that link.
+ * With no cached GATT table the stack runs its own discovery (up to ~8s) before the MTU
+ * exchange, so the bound sits above that; a stuck exchange never completes.
  */
 export const ANDROID_MTU_EXCHANGE_TIMEOUT_MS = 12_000;
 
@@ -302,20 +286,14 @@ export const ANDROID_LINK_DROP_QUIET_MS = 5000;
 const ANDROID_LINK_DROP_POLL_MS = 250;
 
 /**
- * Nothing works at the default 23-byte ATT MTU on Android. Protocol V1 writes 192-byte
- * packets whatever the MTU, and a Pro 2 answers Protocol V2 with a single ATT_MTU-3
- * notification and never sends the rest of the frame, so the 29-byte reply to a probe Ping
- * arrives as 20 bytes declaring 29 and the call hangs. Only a known default MTU counts; an
- * unknown value keeps the existing conservative-packet behaviour.
+ * Android cannot use a link at the default 23-byte ATT MTU: Protocol V1 writes 192-byte
+ * packets regardless, and a Pro 2 sends only the first ATT_MTU-3 bytes of a V2 reply.
+ * An unknown MTU is not treated as default.
  */
 const isKnownDefaultMtu = (mtu: unknown): boolean =>
   typeof mtu === 'number' && Number.isFinite(mtu) && mtu <= 23;
 
-/**
- * Symptoms of a cached GATT table that no longer matches the device. The UUIDs still
- * resolve from the cache in the firmware-upgrade case, so the stale handles surface at
- * discovery (missing or mis-typed characteristic) or when notifications are enabled.
- */
+/** Discovery found no OneKey service, or a characteristic of the wrong shape: the cached GATT table may be stale. */
 const isMissingGattShapeError = (error: unknown): boolean => {
   const code = (error as { errorCode?: unknown })?.errorCode;
   const message = (error as { message?: unknown })?.message;
@@ -549,20 +527,11 @@ export default class ReactNativeBleTransport {
   /** Consecutive detections that failed while trusting sessionProtocols. */
   private protocolReprobeFailures: Map<string, number> = new Map();
 
-  /** Endpoints whose last detection got no answer; 'woken' once the single Initialize wake is spent. */
+  /** Endpoints whose last detection got no answer; 'woken' once their Initialize wake is spent. */
   private silentDetections = new Map<string, 'silent' | 'woken'>();
 
-  /**
-   * Android endpoints whose cached GATT table is suspect and must be rediscovered on the
-   * next connect. The cache is no longer refreshed on every connect, so a missing OneKey
-   * service or characteristic marks the endpoint instead.
-   */
+  /** Android endpoints whose cached GATT table is suspect; the next connect refreshes it. */
   private androidGattCacheRefreshes = new Set<string>();
-
-  /** Instance copies of the Android timing bounds so tests can shorten real-time waits. */
-  androidMtuExchangeTimeoutMs = ANDROID_MTU_EXCHANGE_TIMEOUT_MS;
-
-  androidLinkDropQuietMs = ANDROID_LINK_DROP_QUIET_MS;
 
   /**
    * Native encryption/pairing failures seen before Protocol V2 probe starts.
@@ -1166,19 +1135,16 @@ export default class ReactNativeBleTransport {
 
     let device: Device | null = null;
     const isAndroid = Platform.OS === 'android';
-    // A firmware-install reconnect keeps the per-connect GATT refresh it always had: the
-    // install loader may expose a different table than the firmware that was cached.
+    // A firmware-install reconnect always refreshes: the new firmware may expose a different table.
     const refreshAndroidGattCache =
       isAndroid && (!!skipProtocolProbe || this.androidGattCacheRefreshes.has(uuid));
     let nativeConnectOptions = connectOptions;
     if (isAndroid) {
       nativeConnectOptions = refreshAndroidGattCache
         ? androidRefreshGattConnectOptions
-        : androidConnectOptions;
+        : fallbackConnectOptions;
     }
-    // Only a connect that actually carried refreshGatt consumes a pending refresh; the
-    // fallback connects below drop that option, so the marker then survives for the next
-    // attempt instead of being cleared by a connect that never reached the cache.
+    // Only a connect that carried refreshGatt clears the marker; the fallback connects drop it.
     let androidRefreshConnectRan = false;
 
     if (forceCleanRunPromise && this.runPromise) {
@@ -2199,9 +2165,9 @@ export default class ReactNativeBleTransport {
           timer = setTimeout(() => {
             timedOut = true;
             reject(
-              new Error(`BLE MTU exchange timeout after ${this.androidMtuExchangeTimeoutMs}ms`)
+              new Error(`BLE MTU exchange timeout after ${ANDROID_MTU_EXCHANGE_TIMEOUT_MS}ms`)
             );
-          }, this.androidMtuExchangeTimeoutMs);
+          }, ANDROID_MTU_EXCHANGE_TIMEOUT_MS);
         }),
       ]);
     } catch (error) {
@@ -2235,9 +2201,7 @@ export default class ReactNativeBleTransport {
       HardwareErrorCode.BleConnectedError,
       timedOut
         ? 'BLE MTU exchange did not complete, reconnecting on a fresh link'
-        : `BLE link stayed at the default MTU ${String(
-            negotiated.mtu
-          )}, reconnecting on a fresh link`
+        : `BLE link stayed at the default MTU ${negotiated.mtu}, reconnecting on a fresh link`
     );
   }
 
@@ -2260,7 +2224,7 @@ export default class ReactNativeBleTransport {
     });
 
     const startedAt = Date.now();
-    while (!this.stopped && Date.now() - startedAt < this.androidLinkDropQuietMs) {
+    while (!this.stopped && Date.now() - startedAt < ANDROID_LINK_DROP_QUIET_MS) {
       await delay(ANDROID_LINK_DROP_POLL_MS);
     }
     Log?.debug('[ReactNativeBleTransport] Android BLE link drop', {
