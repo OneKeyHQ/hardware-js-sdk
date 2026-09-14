@@ -7,7 +7,6 @@ import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import { onDeviceBondState } from '../BleManager';
 import ReactNativeBleTransport, {
   ANDROID_LINK_DROP_QUIET_MS,
-  ANDROID_LINK_DROP_TIMEOUT_MS,
   ANDROID_MTU_EXCHANGE_TIMEOUT_MS,
   BLE_CONNECT_TIMEOUT_MANAGER_RESET_THRESHOLD,
   BLE_CONNECT_TIMEOUT_MS,
@@ -611,6 +610,19 @@ describe('BLE connect timeout', () => {
     expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(UUID);
   });
 
+  test('a native GATT timeout abandons the native connection', async () => {
+    const { transport, device, bleManager } = createHarness(() => Promise.resolve());
+    const nativeTimeout = Object.assign(new Error('Operation timed out'), {
+      errorCode: BleErrorCode.OperationTimedOut,
+    });
+    device.discoverAllServicesAndCharacteristics.mockRejectedValueOnce(nativeTimeout);
+
+    await expect((transport as any).resolveCharacteristicsWithTimeout(UUID, device)).rejects.toBe(
+      nativeTimeout
+    );
+    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(UUID);
+  });
+
   test('a successful GATT retry clears the timeout budget before an abandoned call settles', async () => {
     const { transport, device, bleManager } = createHarness(() => Promise.resolve());
     let resolveAbandonedDiscovery: (() => void) | undefined;
@@ -643,35 +655,8 @@ describe('BLE connect timeout', () => {
     expect(bleManager.cancelDeviceConnection).toHaveBeenCalledTimes(1);
     expect((transport as any).connectionSetupTimeoutCounts.has(UUID)).toBe(false);
   });
-});
 
-describe('Android MTU and link-drop bounds', () => {
-  beforeAll(() => {
-    jest.useFakeTimers({ doNotFake: ['setImmediate', 'performance'] });
-  });
-
-  afterAll(() => {
-    jest.useRealTimers();
-  });
-
-  afterEach(() => {
-    jest.clearAllTimers();
-    jest.restoreAllMocks();
-    Object.assign(Platform, { OS: 'ios' });
-  });
-
-  test('the bounds sit above a cold-cache discovery and the 4s GATT link idle timer', () => {
-    // Single discovery passes on a Pro 2 at MTU 23 measured up to 4.8s, a refresh plus
-    // restart 7.7s; a stuck exchange never completes, so the bound only has to clear those.
-    expect(ANDROID_MTU_EXCHANGE_TIMEOUT_MS).toBeGreaterThanOrEqual(10_000);
-    expect(ANDROID_MTU_EXCHANGE_TIMEOUT_MS).toBeLessThanOrEqual(20_000);
-    // Android keeps the LE link for 4s after the last GATT client closes.
-    expect(ANDROID_LINK_DROP_QUIET_MS).toBeGreaterThan(4000);
-    expect(ANDROID_LINK_DROP_QUIET_MS).toBeLessThanOrEqual(ANDROID_LINK_DROP_TIMEOUT_MS);
-    expect(ANDROID_LINK_DROP_TIMEOUT_MS).toBeLessThanOrEqual(10_000);
-  });
-
-  test('holds an unusable link past the idle timer even when the GATT registry is already empty', async () => {
+  test('holds an unusable link past the idle timer', async () => {
     Object.assign(Platform, { OS: 'android' });
     const { transport, device, bleManager } = createHarness(() => Promise.resolve(device));
     device.isConnected.mockResolvedValue(true);
@@ -689,20 +674,15 @@ describe('Android MTU and link-drop bounds', () => {
     await flush();
     expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(UUID);
 
-    // BluetoothManager.getConnectedDevices(GATT) reports this app's GATT client, which is
-    // already closed; the LE link itself stays up for the idle timer, so the wait must not
-    // release on that signal alone.
-    expect(
-      (BleUtils as unknown as { getConnectedPeripherals: jest.Mock }).getConnectedPeripherals
-    ).toHaveBeenCalled();
     jest.advanceTimersByTime(4000);
     await flush();
     await flush();
     expect(settled).toBeUndefined();
 
-    await advanceUntil(() => !!settled, ANDROID_LINK_DROP_TIMEOUT_MS);
+    await advanceUntil(() => !!settled, ANDROID_LINK_DROP_QUIET_MS);
     await acquire;
     expect(settled).toMatchObject({ errorCode: HardwareErrorCode.BleConnectedError });
+    expect(device.discoverAllServicesAndCharacteristics).not.toHaveBeenCalled();
   });
 
   test('a slow but successful MTU exchange completes inside the bound', async () => {
@@ -716,7 +696,7 @@ describe('Android MTU and link-drop bounds', () => {
       requestMTU: jest.fn(
         () =>
           new Promise(resolve => {
-            setTimeout(() => resolve(negotiated), 8000);
+            setTimeout(() => resolve(negotiated), 10_000);
           })
       ),
     });
@@ -736,7 +716,7 @@ describe('Android MTU and link-drop bounds', () => {
     await flush();
     expect(device.discoverAllServicesAndCharacteristics).not.toHaveBeenCalled();
 
-    jest.advanceTimersByTime(8000);
+    jest.advanceTimersByTime(10_000);
     await advanceUntil(() => result !== undefined || failure !== undefined, 5000);
     await acquire;
     expect(failure).toBeUndefined();

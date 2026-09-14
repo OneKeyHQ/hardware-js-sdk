@@ -111,18 +111,10 @@ const createHarness = ({
   deviceName = 'OneKey Pro 2',
   isWritableWithResponse = true,
   monitorError,
-  pro2BleReplies = false,
 }: {
   deviceName?: string;
   isWritableWithResponse?: boolean;
   monitorError?: (Error & { reason?: string; attErrorCode?: number; iosErrorCode?: number }) | null;
-  /**
-   * Answer like a real Pro 2 over BLE: reassemble a frame split across ATT writes, echo the
-   * 17-character probe message so the reply is 29 bytes, and send it as one notification of
-   * at most ATT_MTU-3 bytes. A reply that does not fit is cut, never continued (btsnoop:
-   * 20 bytes declaring 29 at the default MTU).
-   */
-  pro2BleReplies?: boolean;
 } = {}) => {
   const uuid = 'rn-pro2-id';
   const sentSeqs: number[] = [];
@@ -147,31 +139,18 @@ const createHarness = ({
       return { remove: jest.fn() };
     }),
   };
-  let pendingPro2Frame: Buffer | undefined;
-  let negotiatedMtu = () => 23;
   const handleWrite = (base64: string) => {
-    let frame = Buffer.from(base64, 'base64');
-    if (pro2BleReplies) {
-      if (frame[0] !== 0x5a && !pendingPro2Frame) return Promise.resolve();
-      pendingPro2Frame =
-        pendingPro2Frame && frame[0] !== 0x5a ? Buffer.concat([pendingPro2Frame, frame]) : frame;
-      const declaredLength =
-        pendingPro2Frame.length >= 3 ? pendingPro2Frame[1] + pendingPro2Frame[2] * 256 : Infinity;
-      if (pendingPro2Frame.length < declaredLength) return Promise.resolve();
-      frame = pendingPro2Frame;
-      pendingPro2Frame = undefined;
-    }
+    const frame = Buffer.from(base64, 'base64');
     sentSeqs.push(frame[6]);
     if (shouldRespond) {
       responseSeq += 1;
       const response = ProtocolV2.encodeFrame(
         schemas,
         'Success',
-        { message: pro2BleReplies ? 'protocol-v2-probe' : 'ok' },
+        { message: 'ok' },
         { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: responseSeq }
       );
-      const notification = pro2BleReplies ? response.subarray(0, negotiatedMtu() - 3) : response;
-      notifyCallback?.(null, { value: Buffer.from(notification).toString('base64') });
+      notifyCallback?.(null, { value: Buffer.from(response).toString('base64') });
     }
     return Promise.resolve();
   };
@@ -191,11 +170,13 @@ const createHarness = ({
     serviceUUIDs: ['00000001-0000-1000-8000-00805f9b34fb'],
     isConnected: jest.fn(() => Promise.resolve(true)),
     cancelConnection: jest.fn(() => Promise.resolve()),
+    connect: jest.fn(),
     onDisconnected: jest.fn(callback => {
       disconnectCallback = callback;
       return { remove: jest.fn() };
     }),
   } as any;
+  device.connect.mockResolvedValue(device);
   device.requestMTU = jest.fn(() => Promise.resolve(device));
   device.requestConnectionPriority = jest.fn(() => Promise.resolve(device));
   const bleManager = {
@@ -215,14 +196,6 @@ const createHarness = ({
   transport.init(logger, emitter);
   transport.configure(protocolV1Schema);
   transport.configureProtocolV2(protocolV2Schema);
-  // The Pro 2 sizes replies to the MTU of the link, i.e. the one the transport adopted.
-  negotiatedMtu = () => {
-    try {
-      return (transport as any).getCachedTransport(uuid).mtuSize ?? device.mtu;
-    } catch {
-      return device.mtu;
-    }
-  };
 
   return {
     transport,
@@ -233,7 +206,6 @@ const createHarness = ({
     bleManager,
     sentSeqs,
     writeCharacteristic,
-    notifyCharacteristic,
     setShouldRespond(value: boolean) {
       shouldRespond = value;
     },
@@ -1157,42 +1129,79 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
-  test('drops the link when a stalled MTU negotiation is abandoned', async () => {
+  test('bounds a stalled MTU negotiation and continues protocol probing', async () => {
     const { transport, uuid, device, bleManager } = createHarness();
     device.mtu = 23;
     device.requestMTU.mockImplementationOnce(() => new Promise(() => {}));
-    const { resolveCharacteristics } = transport as any;
 
-    // cancelTransaction only disposes the JS subscription: RxAndroidBle releases the
-    // connection's serial queue from onComplete/onError alone, so the abandoned exchange
-    // keeps it until its own native timeout. Service discovery must not queue behind it.
-    await expect(transport.acquire({ uuid })).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BleConnectedError,
+    await expect(transport.acquire({ uuid })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
     });
     const transactionId = device.requestMTU.mock.calls[0]?.[1];
     expect(transactionId).toEqual(expect.stringContaining(`${uuid}:mtu:connected:0:`));
     expect(bleManager.cancelTransaction).toHaveBeenCalledWith(transactionId);
-    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
-    expect(resolveCharacteristics).not.toHaveBeenCalled();
+    expect(device.cancelConnection).toHaveBeenCalled();
+    expect(device.connect).toHaveBeenCalledWith(
+      expect.objectContaining({ timeout: expect.any(Number) })
+    );
+    expect(device.connect.mock.calls.at(-1)?.[0]).not.toHaveProperty('requestMTU');
+    expect(device.requestMTU).toHaveBeenCalledTimes(1);
+    expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(23);
+    await transport.release(uuid, true);
   }, 10_000);
 
-  describe('Android MTU before service discovery', () => {
-    const connectedPeripherals = () => jest.requireMock('../BleManager').getConnectedDeviceIds;
+  test('does not request MTU again after connect falls back without requestMTU', async () => {
+    const { BleError: BleErrorMock, BleErrorCode } = jest.requireMock('react-native-ble-plx');
+    const { transport, uuid, device } = createHarness();
+    device.mtu = 23;
+    device.isConnected.mockResolvedValueOnce(false).mockResolvedValue(true);
+    device.connect
+      .mockRejectedValueOnce(
+        Object.assign(new BleErrorMock('Operation was cancelled'), {
+          errorCode: BleErrorCode.OperationCancelled,
+        })
+      )
+      .mockResolvedValue(device);
 
+    await expect(transport.acquire({ uuid })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(device.connect).toHaveBeenCalledTimes(2);
+    expect(device.connect.mock.calls[0][0]).toEqual(expect.objectContaining({ requestMTU: 247 }));
+    expect(device.connect.mock.calls[1][0]).not.toHaveProperty('requestMTU');
+    expect(device.requestMTU).not.toHaveBeenCalled();
+    expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(23);
+    await transport.release(uuid, true);
+  });
+
+  test('keeps the iOS connect chain unchanged', async () => {
+    const { transport, uuid, device } = createHarness();
+    device.isConnected.mockResolvedValueOnce(false);
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(device.connect).toHaveBeenCalledWith({
+      requestMTU: 247,
+      timeout: expect.any(Number),
+      refreshGatt: 'OnConnected',
+    });
+    expect(device.requestMTU).not.toHaveBeenCalled();
+    await transport.release(uuid, true);
+  });
+
+  describe('Android MTU before service discovery', () => {
     beforeEach(() => {
       setPlatformOS('android');
-      connectedPeripherals().mockClear();
-    });
-
-    afterEach(() => {
-      connectedPeripherals().mockImplementation(() => Promise.resolve([]));
     });
 
     /** Production bounds are seconds long; behaviour tests shorten the real-time waits. */
     const fastAndroidWaits = (transport: ReactNativeBleTransport) => {
       transport.androidMtuExchangeTimeoutMs = 200;
       transport.androidLinkDropQuietMs = 120;
-      transport.androidLinkDropTimeoutMs = 600;
     };
 
     /**
@@ -1218,11 +1227,6 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       const negotiated = { ...device, mtu };
       device.requestMTU.mockImplementation(() => Promise.resolve(negotiated));
       return negotiated;
-    };
-
-    const defaultMtuError = {
-      errorCode: HardwareErrorCode.BleConnectedError,
-      message: expect.stringContaining('BLE link stayed at the default MTU'),
     };
 
     test('negotiates the MTU after a bare connect and before service discovery, adopting the returned device', async () => {
@@ -1253,111 +1257,49 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       await transport.release(uuid, true);
     });
 
-    test('keeps the iOS connect chain unchanged', async () => {
-      setPlatformOS('ios');
-      const { transport, uuid, device } = createHarness();
-      reconnectingDevice(device);
-
-      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).resolves.toEqual({
-        uuid,
-        protocolType: 'V2',
-      });
-      expect(device.connect).toHaveBeenCalledWith({
-        requestMTU: 247,
-        timeout: expect.any(Number),
-        refreshGatt: 'OnConnected',
-      });
-      expect(device.requestMTU).not.toHaveBeenCalled();
-      await transport.release(uuid, true);
-    });
-
     test.each([
       { expectedProtocol: 'V2' as const, label: 'an expected Protocol V2 device' },
       { expectedProtocol: 'V1' as const, label: 'an expected Protocol V1 device' },
       { expectedProtocol: undefined, label: 'a device of unknown protocol' },
     ])('drops a link that stays at the default MTU for $label', async ({ expectedProtocol }) => {
-      const { transport, uuid, device, bleManager, writeCharacteristic, notifyCharacteristic } =
-        createHarness({ pro2BleReplies: true });
+      const { transport, uuid, device } = createHarness();
       fastAndroidWaits(transport);
       device.mtu = 23;
-      // The exchange completes without raising the MTU.
-      device.requestMTU.mockImplementation(() => Promise.resolve(device));
 
-      // Protocol V1 writes 192-byte packets whatever the MTU, and the fake Pro 2 would
-      // answer the 29-byte probe with 20 bytes and stop, so the link is useless to either.
-      await expect(transport.acquire({ uuid, expectedProtocol })).rejects.toMatchObject(
-        defaultMtuError
-      );
-      // Refused before a transport exists, i.e. by acquire itself: no discovery, no
-      // notification subscription, no write of any protocol.
+      await expect(transport.acquire({ uuid, expectedProtocol })).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleConnectedError,
+      });
       expect((transport as any).resolveCharacteristics).not.toHaveBeenCalled();
-      expect(notifyCharacteristic.monitor).not.toHaveBeenCalled();
-      expect(writeCharacteristic.writeWithoutResponse).not.toHaveBeenCalled();
-      expect(writeCharacteristic.writeWithResponse).not.toHaveBeenCalled();
-      expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
       expect(device.cancelConnection).toHaveBeenCalled();
     });
 
-    test('treats a fast native MTU rejection as a default-MTU link, not as a timeout', async () => {
-      const { transport, uuid, device, bleManager } = createHarness();
-      fastAndroidWaits(transport);
-      device.mtu = 23;
-      device.requestMTU.mockImplementation(() => Promise.reject(new Error('MTU request failed')));
+    test.each([
+      ['never completes', () => new Promise(() => {})],
+      ['completes at the default MTU', undefined],
+      ['is rejected', () => Promise.reject(new Error('MTU request failed'))],
+    ])(
+      'a second consecutive MTU failure that %s trips the wedged-link guard',
+      async (_label, requestMTU) => {
+        const { transport, uuid, device, bleManager } = createHarness();
+        fastAndroidWaits(transport);
+        device.mtu = 23;
+        if (requestMTU) device.requestMTU.mockImplementation(requestMTU);
 
-      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject(
-        defaultMtuError
-      );
-      // No bounded wait ran, so nothing was abandoned mid-flight.
-      expect(bleManager.cancelTransaction).not.toHaveBeenCalled();
-      expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
-    });
-
-    test('drops a link whose MTU exchange never completes and holds it past the quiet period', async () => {
-      const { transport, uuid, device, bleManager } = createHarness();
-      fastAndroidWaits(transport);
-      device.mtu = 23;
-      device.requestMTU.mockImplementation(() => new Promise(() => {}));
-      // The GATT registry empties as soon as this client closes; that alone must not
-      // release the wait, because the LE link outlives the client by the idle timer.
-      connectedPeripherals().mockImplementation(() => Promise.resolve([]));
-
-      const startedAt = Date.now();
-      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.BleConnectedError,
-        message: expect.stringContaining('BLE MTU exchange did not complete'),
-      });
-      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(
-        transport.androidMtuExchangeTimeoutMs + transport.androidLinkDropQuietMs
-      );
-      expect(bleManager.cancelTransaction).toHaveBeenCalledWith(
-        expect.stringContaining(`${uuid}:mtu:connected:0:`)
-      );
-      expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
-      expect(device.cancelConnection).toHaveBeenCalled();
-      expect((transport as any).resolveCharacteristics).not.toHaveBeenCalled();
-    });
-
-    test('a second consecutive MTU timeout trips the wedged-link guard', async () => {
-      const { transport, uuid, device, bleManager } = createHarness();
-      fastAndroidWaits(transport);
-      device.mtu = 23;
-      device.requestMTU.mockImplementation(() => new Promise(() => {}));
-
-      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.BleConnectedError,
-      });
-      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.PollingTimeout,
-        message: expect.stringContaining(BLE_SETUP_WEDGED_MESSAGE),
-      });
-      expect(bleManager.destroy).toHaveBeenCalled();
-    });
+        await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+          errorCode: HardwareErrorCode.BleConnectedError,
+        });
+        await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
+          errorCode: HardwareErrorCode.PollingTimeout,
+          message: expect.stringContaining(BLE_SETUP_WEDGED_MESSAGE),
+        });
+        expect(bleManager.destroy).toHaveBeenCalled();
+      }
+    );
 
     test('stop() during the link-drop wait releases it promptly', async () => {
       const { transport, uuid, device } = createHarness();
       fastAndroidWaits(transport);
       transport.androidLinkDropQuietMs = 3000;
-      transport.androidLinkDropTimeoutMs = 6000;
       device.mtu = 23;
       device.requestMTU.mockImplementation(() => new Promise(() => {}));
 
@@ -1370,71 +1312,6 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       await expect(acquiring).resolves.toBeInstanceOf(Error);
       expect(Date.now() - stoppedAt).toBeLessThan(1500);
     }, 10_000);
-
-    test('does not reuse a cached transport that reports the default MTU', async () => {
-      const { transport, uuid, device } = createHarness();
-      fastAndroidWaits(transport);
-      device.mtu = 23;
-      negotiatedSnapshot(device, 247);
-
-      await transport.acquire({ uuid, expectedProtocol: 'V2' });
-      expect(device.requestMTU).toHaveBeenCalledTimes(1);
-      (transport as any).getCachedTransport(uuid).mtuSize = 23;
-
-      await expect(transport.call(uuid, 'Ping', { message: 'x' })).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.BleConnectedError,
-        message: expect.stringContaining('Protocol V2 needs a negotiated BLE MTU'),
-      });
-      // The next acquire goes through the full path and negotiates again instead of
-      // handing the same unusable link back to every retry.
-      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).resolves.toEqual({
-        uuid,
-        protocolType: 'V2',
-      });
-      expect(device.requestMTU).toHaveBeenCalledTimes(2);
-      expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(247);
-      await transport.release(uuid, true);
-    });
-
-    test('reassembles a Protocol V2 frame split across ATT writes at a negotiated MTU', async () => {
-      const { transport, uuid, device, writeCharacteristic } = createHarness({
-        pro2BleReplies: true,
-      });
-      device.mtu = 23;
-      negotiatedSnapshot(device, 247);
-
-      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).resolves.toEqual({
-        uuid,
-        protocolType: 'V2',
-      });
-      const writesBefore = writeCharacteristic.writeWithoutResponse.mock.calls.length;
-      // Longer than one 244-byte packet, so the fake Pro 2 only answers once it has
-      // reassembled both writes by the declared frame length.
-      await expect(
-        transport.call(uuid, 'Ping', { message: 'x'.repeat(300) })
-      ).resolves.toMatchObject({ type: 'Success' });
-      expect(writeCharacteristic.writeWithoutResponse.mock.calls.length - writesBefore).toBe(2);
-      await transport.release(uuid, true);
-    });
-
-    test('a reply larger than ATT_MTU-3 is cut by the fake Pro 2 and the call never completes', async () => {
-      const { transport, uuid, device } = createHarness({ pro2BleReplies: true });
-      fastAndroidWaits(transport);
-      (transport as any).sessionProtocols.set(uuid, 'V2');
-      reconnectingDevice(device);
-      device.mtu = 23;
-      // 30 passes the default-MTU check but only carries 27-byte notifications, short of
-      // the 29-byte reply — the truncation seen in the capture at MTU 23.
-      negotiatedSnapshot(device, 30);
-
-      await expect(
-        transport.acquire({ uuid, expectedProtocol: 'V2', skipProtocolProbe: true })
-      ).resolves.toEqual({ uuid, protocolType: 'V2' });
-      await expect(
-        transport.call(uuid, 'Ping', { message: 'protocol-v2-probe' }, { timeoutMs: 300 })
-      ).rejects.toBeDefined();
-      await transport.release(uuid, true);
-    });
 
     test.each([
       {
@@ -1451,7 +1328,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
           ERRORS.TypedError('BLECharacteristicNotWritable: write characteristic not writable'),
       },
     ])(
-      'drops the link on $label and rediscovers the GATT table on the next connect, before the MTU exchange',
+      'marks the endpoint on $label and refreshes the GATT table on the next connect, before the MTU exchange',
       async ({ error }) => {
         const { transport, uuid, device } = createHarness();
         fastAndroidWaits(transport);
@@ -1462,10 +1339,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
         resolveCharacteristics.mockImplementationOnce(() => Promise.reject(error()));
 
         await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toBeDefined();
-        expect(device.connect).toHaveBeenLastCalledWith({ timeout: expect.any(Number) });
-        // The stale table is only refreshed through a connect, so the link must be down.
-        expect(device.cancelConnection).toHaveBeenCalled();
-        expect(link.connected).toBe(false);
+        expect(link.connected).toBe(true);
 
         await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).resolves.toEqual({
           uuid,
@@ -1475,6 +1349,11 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
           timeout: expect.any(Number),
           refreshGatt: 'OnConnected',
         });
+        // The stale table is only refreshed through a connect, so the live link is dropped first.
+        const connectOrders: number[] = device.connect.mock.invocationCallOrder;
+        expect(device.cancelConnection.mock.invocationCallOrder[0]).toBeLessThan(
+          connectOrders[connectOrders.length - 1]
+        );
         const discoveryOrders = resolveCharacteristics.mock.invocationCallOrder;
         const mtuOrders: number[] = device.requestMTU.mock.invocationCallOrder;
         expect(discoveryOrders[discoveryOrders.length - 1]).toBeLessThan(
@@ -1510,7 +1389,6 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
         uuid,
         protocolType: 'V2',
       });
-      expect(device.connect).toHaveBeenLastCalledWith({ timeout: expect.any(Number) });
 
       await transport.release(uuid, true);
       link.connected = false;
@@ -1566,46 +1444,6 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       });
       await transport.release(uuid, true);
     });
-
-    test('a firmware upload reconnect refreshes the table, discovers, then negotiates the MTU', async () => {
-      const { transport, uuid, device } = createHarness();
-      fastAndroidWaits(transport);
-      const link = reconnectingDevice(device);
-      device.mtu = 23;
-      const negotiated = negotiatedSnapshot(device, 247);
-      await transport.acquire({ uuid, expectedProtocol: 'V2' });
-      const cached = (transport as any).getCachedTransport(uuid);
-      const resolveCharacteristics = (transport as any).resolveCharacteristics as jest.Mock;
-      device.connect.mockClear();
-      device.requestMTU.mockClear();
-      resolveCharacteristics.mockClear();
-
-      link.connected = false;
-      cached.mtuSize = 23;
-      await transport.reconnectFirmwareUploadTransport(uuid, cached);
-
-      expect(device.connect).toHaveBeenCalledWith({
-        timeout: expect.any(Number),
-        refreshGatt: 'OnConnected',
-      });
-      const [connectOrder] = device.connect.mock.invocationCallOrder;
-      const [discoveryOrder] = resolveCharacteristics.mock.invocationCallOrder;
-      const [mtuOrder] = device.requestMTU.mock.invocationCallOrder;
-      expect(connectOrder).toBeLessThan(discoveryOrder);
-      expect(discoveryOrder).toBeLessThan(mtuOrder);
-      expect(cached.device).toBe(negotiated);
-      expect(cached.mtuSize).toBe(247);
-      await transport.release(uuid, true);
-    });
-  });
-
-  test('cleans up a cancelled native GATT setup, not only a timed-out one', async () => {
-    const { transport, uuid, bleManager } = createHarness();
-    const cancelled = Object.assign(new Error('Operation was cancelled'), { errorCode: 2 });
-    (transport as any).resolveCharacteristics = jest.fn(() => Promise.reject(cancelled));
-
-    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
-    expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(uuid);
   });
 
   test('spends one Initialize wake on the detection after a fully silent one', async () => {
