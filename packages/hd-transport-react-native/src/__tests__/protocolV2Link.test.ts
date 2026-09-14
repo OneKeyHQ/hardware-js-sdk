@@ -1400,29 +1400,99 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       await transport.release(uuid, true);
     });
 
-    test('arms a GATT refresh from a stale-table notify failure', async () => {
-      const harness = createHarness();
-      const { transport, uuid, device } = harness;
+    test('does not drop a link it has just connected with refreshGatt', async () => {
+      const { transport, uuid, device, bleManager } = createHarness();
       fastAndroidWaits(transport);
-      const link = reconnectingDevice(device);
-      device.mtu = 23;
-      negotiatedSnapshot(device, 247);
-
-      await transport.acquire({ uuid, expectedProtocol: 'V2' });
-      expect(device.connect).toHaveBeenLastCalledWith({ timeout: expect.any(Number) });
-      // The symptom recorded after Pro firmware upgrades: the UUIDs still resolve from the
-      // cached table, the stale CCCD handle fails when notifications are enabled.
-      harness.emitMonitorError(
-        Object.assign(new Error('notify failed'), {
-          reason: 'Cannot find client characteristic config descriptor',
-        })
-      );
+      bleManager.devices.mockResolvedValue([]);
+      const connectToDevice = jest.fn(() => Promise.resolve(device));
+      Object.assign(bleManager, { connectToDevice });
+      (transport as any).androidGattCacheRefreshes.add(uuid);
 
       await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).resolves.toEqual({
         uuid,
         protocolType: 'V2',
       });
-      expect(link.connected).toBe(true);
+      expect(connectToDevice).toHaveBeenCalledTimes(1);
+      expect(connectToDevice).toHaveBeenCalledWith(uuid, {
+        timeout: expect.any(Number),
+        refreshGatt: 'OnConnected',
+      });
+      expect(device.cancelConnection).not.toHaveBeenCalled();
+      expect(device.connect).not.toHaveBeenCalled();
+      await transport.release(uuid, true);
+    });
+
+    test('still refreshes after a connect-by-id refresh fell back without refreshGatt', async () => {
+      const { transport, uuid, device, bleManager } = createHarness();
+      fastAndroidWaits(transport);
+      const link = reconnectingDevice(device);
+      bleManager.devices.mockResolvedValue([]);
+      const cancelled = Object.assign(new Error('Operation was cancelled'), { errorCode: 2 });
+      const connectToDevice = jest
+        .fn()
+        .mockImplementationOnce(() => Promise.reject(cancelled))
+        .mockImplementation(() => {
+          link.connected = true;
+          return Promise.resolve(device);
+        });
+      Object.assign(bleManager, { connectToDevice });
+      (transport as any).androidGattCacheRefreshes.add(uuid);
+
+      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).resolves.toEqual({
+        uuid,
+        protocolType: 'V2',
+      });
+      expect(connectToDevice).toHaveBeenLastCalledWith(uuid, { timeout: expect.any(Number) });
+      expect(device.connect).toHaveBeenLastCalledWith({
+        timeout: expect.any(Number),
+        refreshGatt: 'OnConnected',
+      });
+      expect((transport as any).androidGattCacheRefreshes.has(uuid)).toBe(false);
+      await transport.release(uuid, true);
+    });
+
+    test.each([
+      'Cannot write client characteristic config descriptor',
+      'Cannot find client characteristic config descriptor',
+      'The handle is invalid',
+      'Writing is not permitted',
+    ])('arms a GATT refresh from the notify failure "%s"', async reason => {
+      const harness = createHarness();
+      const { transport, uuid, device } = harness;
+      fastAndroidWaits(transport);
+      reconnectingDevice(device);
+      device.mtu = 23;
+      negotiatedSnapshot(device, 247);
+
+      await transport.acquire({ uuid, expectedProtocol: 'V2' });
+      harness.emitMonitorError(Object.assign(new Error('notify failed'), { reason }));
+
+      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).resolves.toEqual({
+        uuid,
+        protocolType: 'V2',
+      });
+      expect(device.connect).toHaveBeenLastCalledWith({
+        timeout: expect.any(Number),
+        refreshGatt: 'OnConnected',
+      });
+      await transport.release(uuid, true);
+    });
+
+    test('arms a GATT refresh from a notify failure while notifications are being enabled', async () => {
+      const { transport, uuid, device } = createHarness({
+        monitorError: Object.assign(new Error('notify failed'), {
+          reason: 'Cannot write client characteristic config descriptor',
+        }),
+      });
+      fastAndroidWaits(transport);
+      const link = reconnectingDevice(device);
+      device.mtu = 23;
+      negotiatedSnapshot(device, 247);
+
+      await transport.acquire({ uuid, expectedProtocol: 'V2' }).catch(error => error);
+      await transport.release(uuid, true);
+      link.connected = false;
+      await transport.acquire({ uuid, expectedProtocol: 'V2' }).catch(error => error);
       expect(device.connect).toHaveBeenLastCalledWith({
         timeout: expect.any(Number),
         refreshGatt: 'OnConnected',

@@ -331,9 +331,9 @@ const isMissingGattShapeError = (error: unknown): boolean => {
 const isStaleGattTableNotifyReason = (reason: string | null | undefined): boolean =>
   !!reason &&
   (reason.includes('Cannot write client characteristic config descriptor') ||
-    reason.includes('Cannot find client characteristic config descriptor') ||
+    reason.includes('Cannot find client characteristic config descriptor') || // pro firmware 2.3.0 upgrade
     reason.includes('The handle is invalid') ||
-    reason.includes('Writing is not permitted'));
+    reason.includes('Writing is not permitted')); // pro firmware 2.3.4 upgrade
 
 /**
  * JS backstop for connect. The native adapter applies its own 3s budget, but it
@@ -1262,7 +1262,11 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'unable to connect to device');
     }
 
-    if (isAndroid && refreshAndroidGattCache && (await device.isConnected().catch(() => false))) {
+    if (
+      refreshAndroidGattCache &&
+      !androidRefreshConnectRan &&
+      (await device.isConnected().catch(() => false))
+    ) {
       // refreshGatt only reaches the stack through a connect. A link that is still up would
       // skip the connect below and keep serving the stale table, so it is dropped first.
       await this.dropAndroidLink(uuid, blePlxManager, device, 'gatt cache refresh');
@@ -1473,6 +1477,9 @@ export default class ReactNativeBleTransport {
           this.rememberStaleBondError(uuid, toBleStaleBondHardwareError(error));
           return;
         }
+        if (Platform.OS === 'android' && isStaleGattTableNotifyReason(error.reason)) {
+          this.androidGattCacheRefreshes.add(uuid);
+        }
         if (this.getActiveProtocol(uuid) === 'V2') {
           let errorCode:
             | typeof HardwareErrorCode.BleCharacteristicNotifyError
@@ -1482,16 +1489,10 @@ export default class ReactNativeBleTransport {
           if (error.reason?.includes('The connection has timed out unexpectedly')) {
             errorCode = HardwareErrorCode.BleTimeoutError;
           } else if (
-            error.reason?.includes('Cannot write client characteristic config descriptor') ||
-            error.reason?.includes('Cannot find client characteristic config descriptor') ||
-            error.reason?.includes('The handle is invalid') ||
-            error.reason?.includes('Writing is not permitted') ||
+            isStaleGattTableNotifyReason(error.reason) ||
             error.reason?.includes('notify change failed for device')
           ) {
             errorCode = HardwareErrorCode.BleCharacteristicNotifyChangeFailure;
-          }
-          if (Platform.OS === 'android' && isStaleGattTableNotifyReason(error.reason)) {
-            this.androidGattCacheRefreshes.add(uuid);
           }
           this.rejectProtocolV2Frames(uuid, ERRORS.TypedError(errorCode));
           return;
@@ -1505,18 +1506,12 @@ export default class ReactNativeBleTransport {
             ERROR = HardwareErrorCode.BleTimeoutError;
           }
           if (
-            error.reason?.includes('Cannot write client characteristic config descriptor') ||
-            error.reason?.includes('Cannot find client characteristic config descriptor') || // pro firmware 2.3.0 upgrade
-            error.reason?.includes('The handle is invalid') ||
-            error.reason?.includes('Writing is not permitted') || // pro firmware 2.3.4 upgrade
+            isStaleGattTableNotifyReason(error.reason) ||
             error.reason?.includes('notify change failed for device')
           ) {
             const notifyError = ERRORS.TypedError(
               HardwareErrorCode.BleCharacteristicNotifyChangeFailure
             );
-            if (Platform.OS === 'android' && isStaleGattTableNotifyReason(error.reason)) {
-              this.androidGattCacheRefreshes.add(uuid);
-            }
             this.runPromise.reject(notifyError);
             Log?.debug(
               `${HardwareErrorCode.BleCharacteristicNotifyChangeFailure} ${error.message}    ${error.reason}`
