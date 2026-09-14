@@ -1320,13 +1320,33 @@ export default class ReactNativeBleTransport {
           '[ReactNativeBleTransport] post-connect MTU timed out, reconnecting without requesting MTU'
         );
         const timedOutDevice = device;
-        await this.runBestEffortNativeOperation('mtu timeout: cancel device connection', () =>
-          timedOutDevice.cancelConnection()
-        );
+        let mtuTeardownSettled = false;
+        await this.runNativeTeardown(uuid, blePlxManager, async () => {
+          await this.runBestEffortNativeOperation('mtu timeout: cancel device connection', () =>
+            timedOutDevice.cancelConnection()
+          );
+          mtuTeardownSettled = true;
+        });
         if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-        device = await this.connectWithTimeout(uuid, () =>
-          timedOutDevice.connect(fallbackConnectOptions)
-        );
+        if (!mtuTeardownSettled || this.blePlxManager !== blePlxManager) {
+          // The teardown budget expired and the manager that owned timedOutDevice was reset.
+          throw ERRORS.TypedError(HardwareErrorCode.BleTimeoutError, 'BLE MTU cleanup timed out');
+        }
+        try {
+          device = await this.connectWithTimeout(uuid, () =>
+            timedOutDevice.connect(fallbackConnectOptions)
+          );
+        } catch (error) {
+          if (shouldRethrowBleSetupError(error)) throw error;
+          if (
+            (error as { errorCode?: unknown })?.errorCode === BleErrorCode.DeviceAlreadyConnected
+          ) {
+            // GATT resolution and the protocol probe below still validate the retained link.
+            device = timedOutDevice;
+          } else {
+            remapError(error);
+          }
+        }
       }
     }
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
@@ -2691,12 +2711,13 @@ export default class ReactNativeBleTransport {
   /**
    * A sleeping Classic drops GetFeatures/Ping and only leaves its screensaver on Initialize, which
    * resets the wallet session, so it is sent once after a fully silent detection. The firmware does
-   * not reliably answer it, so its timeout must not drop the link.
+   * not reliably answer it, so its timeout must not drop the link. It only runs when V1 is probed
+   * first, so a late reply lands on the V1 probe rather than on a V2 one.
    */
   private async wakeSilentProtocolV1Device(uuid: string, probeOrder: ProtocolType[]) {
     if (
       Platform.OS !== 'android' ||
-      !probeOrder.includes('V1') ||
+      probeOrder[0] !== 'V1' ||
       this.silentDetections.get(uuid) !== 'silent'
     ) {
       return;

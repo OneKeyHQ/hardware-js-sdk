@@ -1151,6 +1151,99 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   }, 10_000);
 
+  test('keeps the iOS link when the MTU-timeout reconnect reports it is still connected', async () => {
+    const { BleError: BleErrorMock, BleErrorCode } = jest.requireMock('react-native-ble-plx');
+    const { transport, uuid, device, bleManager } = createHarness();
+    device.mtu = 23;
+    device.requestMTU.mockImplementationOnce(() => new Promise(() => {}));
+    device.connect.mockRejectedValueOnce(
+      Object.assign(new BleErrorMock('Device already connected'), {
+        errorCode: BleErrorCode.DeviceAlreadyConnected,
+      })
+    );
+
+    await expect(transport.acquire({ uuid })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(device.cancelConnection).toHaveBeenCalledTimes(1);
+    expect(device.connect).toHaveBeenCalledTimes(1);
+    expect(device.requestMTU).toHaveBeenCalledTimes(1);
+    expect(bleManager.destroy).not.toHaveBeenCalled();
+    expect((transport as any).getCachedTransport(uuid).mtuSize).toBe(23);
+    await transport.release(uuid, true);
+  }, 10_000);
+
+  test('reconnects after an iOS MTU timeout when cancelling the timed-out link fails', async () => {
+    const { BleError: BleErrorMock, BleErrorCode } = jest.requireMock('react-native-ble-plx');
+    const { transport, uuid, device, bleManager } = createHarness();
+    device.mtu = 23;
+    device.requestMTU.mockImplementationOnce(() => new Promise(() => {}));
+    device.cancelConnection.mockRejectedValueOnce(
+      Object.assign(new BleErrorMock('Operation was cancelled'), {
+        errorCode: BleErrorCode.OperationCancelled,
+      })
+    );
+
+    await expect(transport.acquire({ uuid })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(device.connect).toHaveBeenCalledTimes(1);
+    expect(device.connect.mock.calls[0]?.[0]).not.toHaveProperty('requestMTU');
+    expect(bleManager.destroy).not.toHaveBeenCalled();
+    await transport.release(uuid, true);
+  }, 10_000);
+
+  test('maps a stale bond from the iOS MTU-timeout reconnect', async () => {
+    const { BleError: BleErrorMock } = jest.requireMock('react-native-ble-plx');
+    const { transport, uuid, device } = createHarness();
+    device.mtu = 23;
+    device.requestMTU.mockImplementationOnce(() => new Promise(() => {}));
+    device.connect.mockRejectedValueOnce(
+      Object.assign(new BleErrorMock('Peer removed pairing information'), {
+        errorCode: 200,
+        iosErrorCode: 14,
+      })
+    );
+
+    await expect(transport.acquire({ uuid })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
+    });
+    await transport.release(uuid, true).catch(() => undefined);
+  }, 10_000);
+
+  test('bounds a hung iOS MTU-timeout teardown and resets the BLE manager without reconnecting', async () => {
+    const { transport, uuid, device, bleManager } = createHarness();
+    device.mtu = 23;
+    device.requestMTU.mockImplementationOnce(() => new Promise(() => {}));
+    device.cancelConnection.mockImplementationOnce(() => new Promise(() => {}));
+
+    await expect(transport.acquire({ uuid })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleTimeoutError,
+      message: expect.stringContaining('BLE MTU cleanup timed out'),
+    });
+    expect(bleManager.destroy).toHaveBeenCalledTimes(1);
+    expect(transport.blePlxManager).toBeUndefined();
+    expect(device.connect).not.toHaveBeenCalled();
+    expect((transport as any).lifecycleOperations.has(uuid)).toBe(false);
+  }, 15_000);
+
+  test('does not reconnect after a hung iOS MTU-timeout teardown when the manager reset is already pending', async () => {
+    const { transport, uuid, device, bleManager } = createHarness();
+    device.mtu = 23;
+    device.requestMTU.mockImplementationOnce(() => new Promise(() => {}));
+    device.cancelConnection.mockImplementationOnce(() => new Promise(() => {}));
+    // Another device's reset is still draining, so this teardown timeout cannot swap the manager.
+    jest.spyOn(transport as any, 'resetPlxManager').mockImplementation(() => undefined);
+
+    await expect(transport.acquire({ uuid })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleTimeoutError,
+    });
+    expect(transport.blePlxManager).toBe(bleManager);
+    expect(device.connect).not.toHaveBeenCalled();
+  }, 15_000);
+
   test('does not request MTU again after connect falls back without requestMTU', async () => {
     const { BleError: BleErrorMock, BleErrorCode } = jest.requireMock('react-native-ble-plx');
     const { transport, uuid, device } = createHarness();
@@ -1557,6 +1650,21 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     // pushed into a fresh wallet session on every poll.
     callProtocolV1.mockClear();
     await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+    expect(callProtocolV1).not.toHaveBeenCalled();
+  });
+
+  test('does not send the Initialize wake before a V2-first probe', async () => {
+    setPlatformOS('android');
+    const { transport, uuid } = createHarness();
+    const probes = transport as any;
+    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+    jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({});
+
+    await expect(transport.acquire({ uuid, protocolHint: 'V2' })).rejects.toBeDefined();
+    // Silent now, but the next detection probes V2 first: a late V1 reply would land on
+    // the V2 probe, so no Initialize is sent.
+    await expect(transport.acquire({ uuid, protocolHint: 'V2' })).rejects.toBeDefined();
     expect(callProtocolV1).not.toHaveBeenCalled();
   });
 
