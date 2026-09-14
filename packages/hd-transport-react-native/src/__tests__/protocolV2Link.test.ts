@@ -1609,6 +1609,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   });
 
   test('spends one Initialize wake on the detection after a fully silent one', async () => {
+    setPlatformOS('android');
     const { transport, uuid } = createHarness();
     const probes = transport as any;
     jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
@@ -1631,6 +1632,35 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await expect(transport.acquire({ uuid })).rejects.toBeDefined();
     expect(callProtocolV1).not.toHaveBeenCalled();
   });
+
+  test('does not send the Initialize wake on iOS', async () => {
+    const { transport, uuid } = createHarness();
+    const probes = transport as any;
+    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+    jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({});
+
+    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+    expect(callProtocolV1).not.toHaveBeenCalled();
+  });
+
+  test('an unanswered Initialize wake settles the acquire and frees the lifecycle lock', async () => {
+    setPlatformOS('android');
+    const harness = createHarness();
+    const { transport, uuid } = harness;
+    const probes = transport as any;
+    harness.setShouldRespond(false);
+    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+    jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+
+    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+    await expect(transport.acquire({ uuid })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleTimeoutError,
+    });
+    await transport.disconnect(uuid);
+    await transport.stop();
+  }, 10_000);
 
   test('accepts a stable low MTU without the delayed refresh loop', async () => {
     const { transport, uuid, device } = createHarness();

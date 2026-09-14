@@ -594,8 +594,8 @@ export default class ReactNativeBleTransport {
   /** Consecutive detections that failed while trusting sessionProtocols. */
   private protocolReprobeFailures: Map<string, number> = new Map();
 
-  /** Endpoints whose last detection got no answer on any protocol. */
-  private silentDetections = new Set<string>();
+  /** Endpoints whose last detection got no answer; 'woken' once the single Initialize wake is spent. */
+  private silentDetections = new Map<string, 'silent' | 'woken'>();
 
   /**
    * Android endpoints whose cached GATT table is suspect and must be rediscovered on the
@@ -610,14 +610,6 @@ export default class ReactNativeBleTransport {
   androidLinkDropQuietMs = ANDROID_LINK_DROP_QUIET_MS;
 
   androidLinkDropTimeoutMs = ANDROID_LINK_DROP_TIMEOUT_MS;
-
-  /**
-   * Endpoints already sent a Protocol V1 wake. The wake starts a fresh wallet session
-   * on the device, and a failed detection tears the link down and reconnects on every
-   * poll, so neither set is cleared on teardown: one wake is spent per endpoint until a
-   * detection succeeds, which re-arms it for the next time the device sleeps.
-   */
-  private protocolWakeAttempts = new Set<string>();
 
   /**
    * Native encryption/pairing failures seen before Protocol V2 probe starts.
@@ -2033,13 +2025,14 @@ export default class ReactNativeBleTransport {
       const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
-      if (name === 'GetFeatures' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS) {
-        Log?.debug('[ReactNativeBleTransport] Protocol V1 GetFeatures probe call failed:', e);
+      const isProbeTimeout =
+        options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS &&
+        (name === 'GetFeatures' || name === 'Initialize');
+      if (isProbeTimeout) {
+        Log?.debug(`[ReactNativeBleTransport] Protocol V1 ${name} probe call failed:`, e);
       } else {
         Log?.error('call error: ', e);
       }
-      const isProbeTimeout =
-        name === 'GetFeatures' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS;
       // A call that has been superseded (forceRun) or cleaned up no longer owns the
       // transport; its late timeout must not tear down the connection the current
       // call is actively using.
@@ -2699,7 +2692,6 @@ export default class ReactNativeBleTransport {
     // firmware reconnect after the native BLE manager is recreated.
     this.protocolReprobeFailures.clear();
     this.silentDetections.clear();
-    this.protocolWakeAttempts.clear();
     this.writeTimeoutCounts.clear();
     this.connectionSetupTimeoutCounts.clear();
     this.monitorTokens.clear();
@@ -2835,7 +2827,6 @@ export default class ReactNativeBleTransport {
         }
         this.protocolReprobeFailures.delete(uuid);
         this.silentDetections.delete(uuid);
-        this.protocolWakeAttempts.delete(uuid);
         Log?.debug('[ReactNativeBleTransport] protocol detected', {
           deviceId: uuid,
           protocol,
@@ -2845,9 +2836,8 @@ export default class ReactNativeBleTransport {
       }
     }
 
-    // Nothing answered on any probed protocol. Remember it so the next detection, which
-    // the caller reaches on a freshly reconnected link, can spend a wake first.
-    this.silentDetections.add(uuid);
+    // Arms the wake for the next detection.
+    if (!this.silentDetections.has(uuid)) this.silentDetections.set(uuid, 'silent');
 
     if (trustSessionProtocol) {
       // Still silent on its own protocol: count it, and let the streak expire the
@@ -2863,29 +2853,19 @@ export default class ReactNativeBleTransport {
   }
 
   /**
-   * Sent once before probing when the previous detection on this endpoint got no answer
-   * at all. On Classic-family firmware that silence is also what a sleeping device looks
-   * like: its BLE co-processor keeps serving connect, GATT and MTU while the main MCU
-   * sits in the screensaver loop, whose host-message filter accepts only Initialize and
-   * the *Ack messages. GetFeatures and Ping are dropped there without a reply, so no
-   * amount of probing can bring the device back.
-   *
-   * Initialize is the one message that breaks that loop, but it also starts a fresh
-   * wallet session, which is why it is not the probe itself — a bare Initialize on every
-   * acquire would drop a hidden-wallet session before Core can restore it. Requiring a
-   * fully silent previous detection keeps it to devices with no session left to protect.
-   *
-   * The firmware consumes the wake to leave its loop and does not reliably answer it, so
-   * the result is ignored: the probes that follow are what decide the protocol.
+   * A sleeping Classic drops GetFeatures/Ping and only leaves its screensaver on Initialize, which
+   * resets the wallet session, so it is sent once after a fully silent detection. The firmware does
+   * not reliably answer it, so its timeout must not drop the link.
    */
   private async wakeSilentProtocolV1Device(uuid: string, probeOrder: ProtocolType[]) {
-    if (!this._messages) return;
-    if (!probeOrder.includes('V1')) return;
-    if (!this.silentDetections.has(uuid)) return;
-    if (this.protocolWakeAttempts.has(uuid)) return;
-    if (!transportCache[uuid]) return;
-    this.protocolWakeAttempts.add(uuid);
-
+    if (
+      Platform.OS !== 'android' ||
+      !probeOrder.includes('V1') ||
+      this.silentDetections.get(uuid) !== 'silent'
+    ) {
+      return;
+    }
+    this.silentDetections.set(uuid, 'woken');
     Log?.debug('[ReactNativeBleTransport] sending Protocol V1 Initialize wake', {
       connectIdSuffix: uuid.slice(-8),
     });
@@ -2893,11 +2873,7 @@ export default class ReactNativeBleTransport {
       this.probingProtocols.set(uuid, 'V1');
       await this.callProtocolV1(uuid, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
     } catch (error) {
-      if (shouldRethrowProtocolProbeError(error)) {
-        this.clearProbeProtocol(uuid, 'V1');
-        throw error;
-      }
-      Log?.debug('[ReactNativeBleTransport] Protocol V1 Initialize wake did not answer:', error);
+      if (shouldRethrowProtocolProbeError(error)) throw error;
     } finally {
       this.clearProbeProtocol(uuid, 'V1');
     }
