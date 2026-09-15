@@ -91,7 +91,7 @@ HardwareSDK.tronSignTransaction(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```
@@ -133,6 +133,8 @@ const result = await HardwareSDK.tronSignTransaction(connectId, deviceId, {
 });
 
 // 原始交易数据
+if (!result.success) throw new Error(result.payload.error);
+
 const rawTx = JSON.stringify({
     txID: txid,
     raw_data: encodedTx.raw_data,

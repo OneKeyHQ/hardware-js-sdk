@@ -38,9 +38,8 @@ const response = await HardwareSDK.starcoinSignTransaction(
 {
   success: true,
   payload: {
-    path: "m/44'/101010'/0'/0'/0'",
     public_key: string,
-    signature: string.
+    signature: string,
   }
 }
 ```
@@ -52,7 +51,7 @@ const response = await HardwareSDK.starcoinSignTransaction(
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

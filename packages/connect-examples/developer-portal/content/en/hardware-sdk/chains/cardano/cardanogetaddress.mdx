@@ -28,8 +28,8 @@ const response = await HardwareSDK.cardanoGetAddress(connectId, deviceId, params
 * `protocolMagic` - _required_ `Integer` 764824073 for Mainnet, 1 for Preprod Testnet, 2 for Preview Testnet
 * `networkId` - _required_ `Integer` 1 for Mainnet, 0 for Testnet
 * `address` - _optional_ `string` address for validation (read `Handle button request` section below)
-* `showOnOneKey` - _optional_ `boolean` determines if address will be displayed on device. Default is set to `true`
-* `derivationType` - _optional_ `CardanoDerivationType` enum. determines used derivation type. Default is set to ICARUS=1
+* `showOnOneKey` - _required_ `boolean` determines if address will be displayed on device. Default is set to `true`
+* `derivationType` - _required_ `CardanoDerivationType` enum. determines used derivation type. Default is set to ICARUS=1
 * `isCheck` - _optional_ `boolean` checks only the base address
 
 **Exporting bundle of addresses**
@@ -38,9 +38,9 @@ const response = await HardwareSDK.cardanoGetAddress(connectId, deviceId, params
 
 **Address Parameters**
 
-* `addressType` - _required_ `CardanoAddressType`/`number` - you can use the flow `CARDANO.ADDRESS_TYPE` object or typescript `CardanoAddressType` enum. Supports all address types.
-* `path` - _required_ `string | Array<number>` minimum length is `5`.
-* `stakingPath` - _optional_ `string | Array<number>` minimum length is `5`. Used for base and reward address derivation
+* `addressType` - _required_ `CardanoAddressType`/`number` - you can use the flow `PROTO.CardanoAddressType` object or typescript `CardanoAddressType` enum. Supports all address types.
+* `path` - `string | Array<number>` Required for key-based payment addresses; omit for script payment/reward addresses. SDK minimum length when present is `3`.
+* `stakingPath` - _optional_ `string | Array<number>` SDK minimum length is `3`. Used for base and reward address derivation
 * `stakingKeyHash` - _optional_ `string` hex string of staking key hash. Used for base address derivation (as an alternative to `stakingPath`)
 * `certificatePointer` - _optional_ CardanoCertificatePointer object. Must contain `number`s `blockIndex`, `txIndex` and `certificateIndex`. Used for pointer address derivation.
 * `paymentScriptHash` - _optional_ `string` hex string of payment script hash.
@@ -48,83 +48,107 @@ const response = await HardwareSDK.cardanoGetAddress(connectId, deviceId, params
 
 
 
+The current TypeScript API requires these fields explicitly even though the runtime defaults to ICARUS and `showOnOneKey: true`.
+
 ### Example
 
 Display byron address of first cardano account:
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.BYRON,
+        addressType: PROTO.CardanoAddressType.BYRON,
         path: "m/44'/1815'/0'/0/0",
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 Display base address of first cardano account:
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.BASE,
+        addressType: PROTO.CardanoAddressType.BASE,
         path: "m/1852'/1815'/0'/0/0",
         stakingPath: "m/1852'/1815'/0'/2/0",
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 Display base address with script payment part:
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.BASE_SCRIPT_KEY,
+        addressType: PROTO.CardanoAddressType.BASE_SCRIPT_KEY,
         paymentScriptHash: '0d5acbf6a1dfb0c8724e60df314987315ccbf78bb6c0f9b6f3d568fe',
         stakingPath: "m/1852'/1815'/0'/2/0",
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 Display base address with script staking part:
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.BASE_KEY_SCRIPT,
+        addressType: PROTO.CardanoAddressType.BASE_KEY_SCRIPT,
         path: "m/1852'/1815'/0'/0/0",
         stakingScriptHash: '8d7bebc7a58f1c7b5fb7c9391071ecd3b51b032695522f8c555343a9',
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 Display base address with both payment and staking part being a script:
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.BASE_SCRIPT_SCRIPT,
+        addressType: PROTO.CardanoAddressType.BASE_SCRIPT_SCRIPT,
         paymentScriptHash: '0d5acbf6a1dfb0c8724e60df314987315ccbf78bb6c0f9b6f3d568fe',
         stakingScriptHash: '8d7bebc7a58f1c7b5fb7c9391071ecd3b51b032695522f8c555343a9',
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 Display pointer address of first cardano account:
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.POINTER,
+        addressType: PROTO.CardanoAddressType.POINTER,
         path: "m/1852'/1815'/0'/0/0",
         certificatePointer: {
             blockIndex: 1,
@@ -134,15 +158,19 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 Display pointer script address:
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.POINTER_SCRIPT,
+        addressType: PROTO.CardanoAddressType.POINTER_SCRIPT,
         paymentScriptHash: '0d5acbf6a1dfb0c8724e60df314987315ccbf78bb6c0f9b6f3d568fe',
         certificatePointer: {
             blockIndex: 1,
@@ -152,64 +180,84 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 Display enterprise address of first cardano account:
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.ENTERPRISE,
+        addressType: PROTO.CardanoAddressType.ENTERPRISE,
         path: "m/1852'/1815'/0'/0/0",
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 Display enterprise script address:
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.ENTERPRISE_SCRIPT,
+        addressType: PROTO.CardanoAddressType.ENTERPRISE_SCRIPT,
         paymentScriptHash: '0d5acbf6a1dfb0c8724e60df314987315ccbf78bb6c0f9b6f3d568fe',
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 Display reward address of first cardano account:
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.REWARD,
+        addressType: PROTO.CardanoAddressType.REWARD,
         stakingPath: "m/1852'/1815'/0'/0/0",
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 Display reward script address:
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.REWARD_SCRIPT,
+        addressType: PROTO.CardanoAddressType.REWARD_SCRIPT,
         stakingScriptHash: '8d7bebc7a58f1c7b5fb7c9391071ecd3b51b032695522f8c555343a9',
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 Return a bundle of cardano addresses without displaying them on device:
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     bundle: [
         // byron address, account 1, address 1
@@ -220,6 +268,7 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
             },
             protocolMagic: 764824073,
             networkId: 1,
+            derivationType: PROTO.CardanoDerivationType.ICARUS,
             showOnOneKey: false,
         },
         // base address with staking key hash, account 1, address 1
@@ -231,6 +280,7 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
             },
             protocolMagic: 764824073,
             networkId: 1,
+            derivationType: PROTO.CardanoDerivationType.ICARUS,
             showOnOneKey: false,
         },
         // byron address, account 2, address 3, testnet
@@ -241,6 +291,7 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
             },
             protocolMagic: 1,
             networkId: 0,
+            derivationType: PROTO.CardanoDerivationType.ICARUS,
             showOnOneKey: false,
         },
     ],
@@ -263,7 +314,7 @@ Result with only one address
             certificatePointer?: {
                 blockIndex: number,
                 txIndex: number,
-                certificatePointer: number,
+                certificateIndex: number,
             },
             paymentScriptHash?: string,
             stakingScriptHash?: string,
@@ -273,8 +324,8 @@ Result with only one address
         protocolMagic: number,
         networkId: number,
         address: string,
-        xpub: string,
-        stakeAddress: string, // If a base address is created, the stake address is created together
+        xpub?: string,
+        stakeAddress?: string, // If a base address is created, the stake address is created together
     }
 }
 ```
@@ -294,7 +345,7 @@ Result with bundle of addresses
                 certificatePointer?: {
                     blockIndex: number,
                     txIndex: number,
-                    certificatePointer: number,
+                    certificateIndex: number,
                 },
                 paymentScriptHash?: string,
                 stakingScriptHash?: string,
@@ -314,7 +365,7 @@ Result with bundle of addresses
                 certificatePointer?: {
                     blockIndex: number,
                     txIndex: number,
-                    certificatePointer: number,
+                    certificateIndex: number,
                 },
                 paymentScriptHash?: string,
                 stakingScriptHash?: string,
@@ -334,7 +385,7 @@ Result with bundle of addresses
                 certificatePointer?: {
                     blockIndex: number,
                     txIndex: number,
-                    certificatePointer: number,
+                    certificateIndex: number,
                 },
                 paymentScriptHash?: string,
                 stakingScriptHash?: string,

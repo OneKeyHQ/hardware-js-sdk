@@ -30,7 +30,7 @@ const messageHex = Buffer.from(message).toString('hex');
 
 HardwareSDK.starcoinSignMessage(connectId, deviceId, {
     path: "m/44'/101010'/0'/0/0",
-    message: messageHex
+    messageHex
 });
 ```
 
@@ -41,7 +41,7 @@ HardwareSDK.starcoinSignMessage(connectId, deviceId, {
     success: true,
     payload: {
         signature: string;
-        address: string;
+        public_key: string;
     }
 }
 ```
@@ -53,7 +53,7 @@ HardwareSDK.starcoinSignMessage(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

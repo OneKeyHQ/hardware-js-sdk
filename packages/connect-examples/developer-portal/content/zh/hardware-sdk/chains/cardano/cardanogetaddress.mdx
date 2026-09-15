@@ -28,8 +28,8 @@ const response = await HardwareSDK.cardanoGetAddress(connectId, deviceId, params
 * `protocolMagic` - _必需_ `Integer` 主网为 764824073，Preprod 测试网为 1，Preview 测试网为 2
 * `networkId` - _必需_ `Integer` 主网为 1，测试网为 0
 * `address` - _可选_ `string` 用于验证的地址（请阅读下方 `处理按钮请求` 部分）
-* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
-* `derivationType` - _可选_ `CardanoDerivationType` 枚举。决定使用的派生类型。默认设置为 ICARUS=1
+* `showOnOneKey` - _必需_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `derivationType` - _必需_ `CardanoDerivationType` 枚举。决定使用的派生类型。默认设置为 ICARUS=1
 * `isCheck` - _可选_ `boolean` 仅检查基础地址
 
 **导出批量地址**
@@ -38,9 +38,9 @@ const response = await HardwareSDK.cardanoGetAddress(connectId, deviceId, params
 
 **地址参数**
 
-* `addressType` - _必需_ `CardanoAddressType`/`number` - 可以使用 flow `CARDANO.ADDRESS_TYPE` 对象或 typescript `CardanoAddressType` 枚举。支持所有地址类型。
-* `path` - _必需_ `string | Array<number>` 最小长度为 `5`。
-* `stakingPath` - _可选_ `string | Array<number>` 最小长度为 `5`。用于基础地址和奖励地址派生
+* `addressType` - _必需_ `CardanoAddressType`/`number` - 可以使用 flow `PROTO.CardanoAddressType` 对象或 typescript `CardanoAddressType` 枚举。支持所有地址类型。
+* `path` - `string | Array<number>` 使用密钥支付地址时必填；脚本支付地址或奖励地址省略。提供时 SDK 校验至少 `3` 级。
+* `stakingPath` - _可选_ `string | Array<number>` SDK 校验至少 `3` 级，用于基础地址和奖励地址派生
 * `stakingKeyHash` - _可选_ `string` 质押密钥哈希的十六进制字符串。用于基础地址派生（作为 `stakingPath` 的替代）
 * `certificatePointer` - _可选_ CardanoCertificatePointer 对象。必须包含 `number` 类型的 `blockIndex`、`txIndex` 和 `certificateIndex`。用于指针地址派生。
 * `paymentScriptHash` - _可选_ `string` 支付脚本哈希的十六进制字符串。
@@ -48,83 +48,107 @@ const response = await HardwareSDK.cardanoGetAddress(connectId, deviceId, params
 
 
 
+当前 TypeScript 接口要求显式提供这些字段；运行时默认值为 ICARUS 和 `showOnOneKey: true`。
+
 ### 示例
 
 显示第一个 Cardano 账户的 Byron 地址：
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.BYRON,
+        addressType: PROTO.CardanoAddressType.BYRON,
         path: "m/44'/1815'/0'/0/0",
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 显示第一个 Cardano 账户的基础地址：
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.BASE,
+        addressType: PROTO.CardanoAddressType.BASE,
         path: "m/1852'/1815'/0'/0/0",
         stakingPath: "m/1852'/1815'/0'/2/0",
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 显示带有脚本支付部分的基础地址：
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.BASE_SCRIPT_KEY,
+        addressType: PROTO.CardanoAddressType.BASE_SCRIPT_KEY,
         paymentScriptHash: '0d5acbf6a1dfb0c8724e60df314987315ccbf78bb6c0f9b6f3d568fe',
         stakingPath: "m/1852'/1815'/0'/2/0",
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 显示带有脚本质押部分的基础地址：
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.BASE_KEY_SCRIPT,
+        addressType: PROTO.CardanoAddressType.BASE_KEY_SCRIPT,
         path: "m/1852'/1815'/0'/0/0",
         stakingScriptHash: '8d7bebc7a58f1c7b5fb7c9391071ecd3b51b032695522f8c555343a9',
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 显示支付和质押部分都是脚本的基础地址：
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.BASE_SCRIPT_SCRIPT,
+        addressType: PROTO.CardanoAddressType.BASE_SCRIPT_SCRIPT,
         paymentScriptHash: '0d5acbf6a1dfb0c8724e60df314987315ccbf78bb6c0f9b6f3d568fe',
         stakingScriptHash: '8d7bebc7a58f1c7b5fb7c9391071ecd3b51b032695522f8c555343a9',
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 显示第一个 Cardano 账户的指针地址：
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.POINTER,
+        addressType: PROTO.CardanoAddressType.POINTER,
         path: "m/1852'/1815'/0'/0/0",
         certificatePointer: {
             blockIndex: 1,
@@ -134,15 +158,19 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 显示指针脚本地址：
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.POINTER_SCRIPT,
+        addressType: PROTO.CardanoAddressType.POINTER_SCRIPT,
         paymentScriptHash: '0d5acbf6a1dfb0c8724e60df314987315ccbf78bb6c0f9b6f3d568fe',
         certificatePointer: {
             blockIndex: 1,
@@ -152,64 +180,84 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 显示第一个 Cardano 账户的企业地址：
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.ENTERPRISE,
+        addressType: PROTO.CardanoAddressType.ENTERPRISE,
         path: "m/1852'/1815'/0'/0/0",
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 显示企业脚本地址：
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.ENTERPRISE_SCRIPT,
+        addressType: PROTO.CardanoAddressType.ENTERPRISE_SCRIPT,
         paymentScriptHash: '0d5acbf6a1dfb0c8724e60df314987315ccbf78bb6c0f9b6f3d568fe',
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 显示第一个 Cardano 账户的奖励地址：
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.REWARD,
+        addressType: PROTO.CardanoAddressType.REWARD,
         stakingPath: "m/1852'/1815'/0'/0/0",
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 显示奖励脚本地址：
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
-        addressType: CardanoAddressType.REWARD_SCRIPT,
+        addressType: PROTO.CardanoAddressType.REWARD_SCRIPT,
         stakingScriptHash: '8d7bebc7a58f1c7b5fb7c9391071ecd3b51b032695522f8c555343a9',
     },
     protocolMagic: 764824073,
     networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS,
+    showOnOneKey: true,
 });
 ```
 
 返回一批 Cardano 地址而不在设备上显示：
 
 ```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     bundle: [
         // Byron 地址，账户 1，地址 1
@@ -220,6 +268,7 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
             },
             protocolMagic: 764824073,
             networkId: 1,
+            derivationType: PROTO.CardanoDerivationType.ICARUS,
             showOnOneKey: false,
         },
         // 带有质押密钥哈希的基础地址，账户 1，地址 1
@@ -231,6 +280,7 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
             },
             protocolMagic: 764824073,
             networkId: 1,
+            derivationType: PROTO.CardanoDerivationType.ICARUS,
             showOnOneKey: false,
         },
         // Byron 地址，账户 2，地址 3，测试网
@@ -241,6 +291,7 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
             },
             protocolMagic: 1,
             networkId: 0,
+            derivationType: PROTO.CardanoDerivationType.ICARUS,
             showOnOneKey: false,
         },
     ],
@@ -263,7 +314,7 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
             certificatePointer?: {
                 blockIndex: number,
                 txIndex: number,
-                certificatePointer: number,
+                certificateIndex: number,
             },
             paymentScriptHash?: string,
             stakingScriptHash?: string,
@@ -273,8 +324,8 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
         protocolMagic: number,
         networkId: number,
         address: string,
-        xpub: string,
-        stakeAddress: string, // 如果创建了基础地址，则会一起创建质押地址
+        xpub?: string,
+        stakeAddress?: string, // 如果创建了基础地址，则会一起创建质押地址
     }
 }
 ```
@@ -294,7 +345,7 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
                 certificatePointer?: {
                     blockIndex: number,
                     txIndex: number,
-                    certificatePointer: number,
+                    certificateIndex: number,
                 },
                 paymentScriptHash?: string,
                 stakingScriptHash?: string,
@@ -314,7 +365,7 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
                 certificatePointer?: {
                     blockIndex: number,
                     txIndex: number,
-                    certificatePointer: number,
+                    certificateIndex: number,
                 },
                 paymentScriptHash?: string,
                 stakingScriptHash?: string,
@@ -334,7 +385,7 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
                 certificatePointer?: {
                     blockIndex: number,
                     txIndex: number,
-                    certificatePointer: number,
+                    certificateIndex: number,
                 },
                 paymentScriptHash?: string,
                 stakingScriptHash?: string,

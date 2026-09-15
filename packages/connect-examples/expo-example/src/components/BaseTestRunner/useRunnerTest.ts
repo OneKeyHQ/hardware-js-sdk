@@ -224,6 +224,10 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
 
           await initHardwareListener?.(SDK);
 
+          stableContext.setTimestampBeginTest?.(Date.now());
+          stableContext.setTimestampEndTest?.(undefined);
+          stableContext.setRunningDeviceFeatures?.(undefined);
+          stableContext.setRunningOneKeyDeviceFeatures?.(undefined);
           running.current = true;
           stableContext.setRunnerState?.('running');
           stableContext.callbacks?.onRunnerStateChange?.('running');
@@ -236,8 +240,7 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
             selectedDevice?.connectProtocol
           );
           if (!featuresRes.success) {
-            endTestRunner();
-            return;
+            throw new Error(`读取设备状态失败：${featuresRes.payload?.error || 'Unknown error'}`);
           }
 
           const deviceId = featuresRes.payload?.device_id ?? '';
@@ -267,7 +270,6 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
           };
 
           await prepareRunner?.(connectId, deviceId, deviceFeatures, SDK);
-          stableContext.setTimestampBeginTest?.(Date.now());
 
           let initTestCaseRes = await initTestCase(context, SDK);
 
@@ -286,7 +288,9 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
           // When not retrying (normal start), always use the full test case data
           // and ignore any existing failed tasks
 
-          if (!initTestCaseRes) return;
+          if (!initTestCaseRes) {
+            throw new Error('未生成测试用例，请检查测试配置');
+          }
 
           const { title, data: currentTestCases } = initTestCaseRes;
           stableContext.setRunnerTestCaseTitle?.(title);
@@ -388,9 +392,7 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
                 }
               } else if (!res.success && !skipVerify) {
                 verifyState = classifyRunnerFailure(res.payload?.code);
-                if (verifyState !== 'skip') {
-                  error = res.payload?.error;
-                }
+                error = res.payload?.error;
               } else {
                 const result = await processResponse(res.payload, item, itemIndex, res);
                 error = result.error;
@@ -441,7 +443,9 @@ export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) 
 
           endTestRunner();
         } catch (e) {
-          console.log('error', e);
+          const message = e instanceof Error ? e.message : String(e);
+          stableContext.setRunnerLogs?.(prev => [...prev, `测试中止：${message}`]);
+          stableContext.setTimestampEndTest?.(Date.now());
           stopTest();
         } finally {
           testExecutionRef.current = null;

@@ -4,7 +4,7 @@ title: 底层传输插件
 
 # 底层传输插件（Low-level Transport Plugin）
 
-> 仅在 WebUSB / React Native BLE 无法满足需求时使用。你需要自管设备生命周期和消息帧处理，维护成本更高。
+> 仅在 WebUSB / React Native BLE 无法满足需求时使用。你需要自管原生 BLE 生命周期和有序收发，维护成本更高。
 
 > **注意：** `lowlevel` 环境和 `LowlevelTransportSharedPlugin` 仅用于 **BLE（蓝牙）** 通信。对于 Node.js/CLI 环境下的 **USB** 通信，请使用 `NodeUsbTransport`（env 为 `node-usb`）—— 它通过 libusb 直接处理协议编解码和 USB I/O，不需要插件。
 
@@ -20,9 +20,9 @@ title: 底层传输插件
 | 写入特征 | `00000002-0000-1000-8000-00805f9b34fb` |
 | 通知特征 | `00000003-0000-1000-8000-00805f9b34fb` |
 
-### BLE 头部数据示例
+### Protocol V1 BLE 头部数据示例
 
-收到的第一个 BLE 数据包（头部包）示例：
+以下帧头仅适用于 Protocol V1，不能用于解析 Protocol V2 通知。
 
 ```
 原始数据: 3F 23 23 00 02 00 00 00 0A 12 08 ...
@@ -43,32 +43,35 @@ title: 底层传输插件
 ## LowlevelTransportSharedPlugin 接口
 
 ```typescript
-export type LowLevelDevice = { id: string; name: string };
+import type { OneKeyDeviceInfoBase } from '@onekeyfe/hd-transport';
+
+export type LowLevelDevice = OneKeyDeviceInfoBase & { id: string; name: string };
 export type LowlevelTransportSharedPlugin = {
   enumerate: () => Promise<LowLevelDevice[]>;
-  send: (uuid: string, data: string) => Promise<void>;
-  receive: () => Promise<string>;
+  send: (uuid: string, data: string, options?: { withoutResponse?: boolean }) => Promise<void>;
+  receive: (uuid?: string) => Promise<string>;
   connect: (uuid: string) => Promise<void>;
   disconnect: (uuid: string) => Promise<void>;
+  getProtocolV2PacketCapacity?: (uuid: string) => number | undefined | Promise<number | undefined>;
   init: () => Promise<void>;
   version: string;
 };
 ```
 
-## WebUSB vs BLE：协议差异
+## WebUSB vs BLE：Protocol V1 帧格式
 
-**重要：** WebUSB（桌面端）和 BLE（移动端）的传输协议不同：
+下表描述 Protocol V1。低层插件是 BLE 适配器；协议探测、编码和重组由 SDK 负责。
 
 | | WebUSB (桌面端) | BLE (原生移动端) |
 |---|---|---|
 | 数据包大小 | 固定 64 字节 | 可变长度 (取决于 MTU) |
 | 每个包前缀 | 所有包都有 `0x3F` | 仅头部包有 `0x3F 0x23 0x23` |
 | 填充 | 零填充到 64 字节 | 无需填充 |
-| `receive()` 返回 | 每次一个 64 字节帧 | **完整重组后的消息** |
+| `receive()` 返回 | 每次一个 64 字节帧 | 原始 BLE 通知数据块（hex） |
 
 ---
 
-## WebUSB 协议（桌面端）
+## WebUSB Protocol V1（桌面端）
 
 传输使用固定 64 字节帧，SDK 负责消息组装。
 
@@ -94,133 +97,38 @@ export type LowlevelTransportSharedPlugin = {
 
 ## BLE 协议（原生移动端）
 
-BLE 使用可变长度块，**插件必须自行重组完整消息**。
+每次 `receive(uuid)` 从队列返回一个未经修改的 BLE 通知数据块，编码为 hex。保留通知顺序，并缓存早于读取请求到达的数据。插件不要删除协议头、填充为 USB 的 64 字节包或解码 protobuf。
 
-### 数据包格式
-
-**头部块（消息第一个包）：**
-
-```
-┌─────────┬──────────────┬──────────┬──────────────┬─────────────┐
-│ Byte 0  │  Byte 1-2    │ Byte 3-4 │  Byte 5-8    │  Byte 9+    │
-├─────────┼──────────────┼──────────┼──────────────┼─────────────┤
-│  0x3F   │  0x23 0x23   │  Type    │   Length     │  Payload... │
-│ (Magic) │   (Magic)    │ (大端u16)│  (大端u32)   │             │
-└─────────┴──────────────┴──────────┴──────────────┴─────────────┘
-```
-
-**后续块：** 仅包含原始载荷数据，无任何前缀。
-
-### 头部检测
-
-```typescript
-function isHeaderChunk(data: Uint8Array): boolean {
-  return data.length >= 9 &&
-         data[0] === 0x3F &&  // '?'
-         data[1] === 0x23 &&  // '#'
-         data[2] === 0x23     // '#'
-}
-```
-
-### 读取载荷长度（大端序）
-
-```typescript
-function readUint32BE(buffer: Uint8Array, offset: number): number {
-  return (
-    (buffer[offset] << 24) |
-    (buffer[offset + 1] << 16) |
-    (buffer[offset + 2] << 8) |
-    buffer[offset + 3]
-  ) >>> 0
-}
-
-// 用法: payloadLength = readUint32BE(data, 5)
-```
-
-### 消息重组示例
-
-```typescript
-class BleMessageAssembler {
-  private buffer: number[] = []
-  private expectedLength = 0
-  private resolve: ((hex: string) => void) | null = null
-
-  onNotification(data: Uint8Array): void {
-    if (this.isHeader(data)) {
-      this.expectedLength = this.readUint32BE(data, 5)
-      this.buffer = [...data.subarray(3)]  // 跳过 3F 23 23
-    } else {
-      this.buffer.push(...data)
-    }
-
-    // 检查完成: buffer = Type(2) + Length(4) + Payload
-    if (this.buffer.length - 6 >= this.expectedLength) {
-      const hex = this.toHex(new Uint8Array(this.buffer))
-      this.buffer = []
-      this.expectedLength = 0
-      if (this.resolve) {
-        this.resolve(hex)
-        this.resolve = null
-      }
-    }
-  }
-
-  receive(): Promise<string> {
-    return new Promise(resolve => { this.resolve = resolve })
-  }
-
-  private isHeader(d: Uint8Array): boolean {
-    return d.length >= 9 && d[0] === 0x3F && d[1] === 0x23 && d[2] === 0x23
-  }
-
-  private readUint32BE(b: Uint8Array, o: number): number {
-    return ((b[o] << 24) | (b[o+1] << 16) | (b[o+2] << 8) | b[o+3]) >>> 0
-  }
-
-  private toHex(arr: Uint8Array): string {
-    return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
-  }
-}
-```
-
-### 常见错误
-
-```typescript
-// ❌ 错误: 重新分片成 64 字节包
-receive() { return this.messageQueue.shift() }
-
-// ✅ 正确: 返回完整重组后的消息
-receive() { return this.completeMessagePromise }
-```
-
-```typescript
-// ❌ 低效: 字符串拼接
-let buffer = ''
-buffer += dataViewToHex(chunk)
-
-// ✅ 更好: 使用数组
-let buffer: number[] = []
-buffer.push(...chunk)
-```
-
----
+- **Protocol V1：** SDK 识别 `3F2323` 帧头、读取载荷长度并收集后续数据块。为兼容旧插件，V1 也接受预先重组的 `type + length + payload` 消息。
+- **Protocol V2：** SDK 将原始数据块组装为帧，处理 CRC、序号和消息重组。不能用仅支持 V1 的帧头检测或重组逻辑处理这些数据。
+- `send(uuid, data, options)` 接收 SDK 准备好的 hex 数据，按顺序写入字节，传递 I/O 错误，并在提供 `withoutResponse` 时遵循该选项。
+- 通过 `getProtocolV2PacketCapacity` 返回单次 BLE 特征写入实际支持的最大字节数。SDK 默认使用 192 字节，V2 包上限为 244 字节。返回可写入容量，不是包含协议开销的 ATT MTU。
+- 断开时拒绝待处理的读取并清除旧连接的通知队列，不要在重连后继续交付旧数据。
 
 ## 初始化示例
 
+以下适配片段委托给实现上述接口的原生桥接层。各方法应在对应操作完成后 resolve，失败时 reject。
+
 ```typescript
-import HardwareSDK from '@onekeyfe/hd-common-connect-sdk'
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 
-const plugin = {
-  enumerate: () => Promise.resolve([{ id: 'foo', name: 'bar' }]),
-  send: (uuid, data) => { /* 发送 hex 数据 */ },
-  receive: () => { /* WebUSB: 64字节帧 / BLE: 完整消息 */ },
-  connect: (uuid) => { /* BLE Android: 先配对! */ },
-  disconnect: (uuid) => { /* 清理连接 */ },
-  init: () => { /* 初始化 BLE 栈 */ },
-  version: 'OneKey-1.0'
-}
+// Implement these methods in your native BLE bridge before initialization.
+declare const nativeBle: LowlevelTransportSharedPlugin;
 
-HardwareSDK.init({ env: 'lowlevel', debug: true }, undefined, plugin)
+const plugin: LowlevelTransportSharedPlugin = {
+  enumerate: () => nativeBle.enumerate(),
+  send: (uuid, data, options) => nativeBle.send(uuid, data, options),
+  receive: uuid => nativeBle.receive(uuid),
+  connect: uuid => nativeBle.connect(uuid),
+  disconnect: uuid => nativeBle.disconnect(uuid),
+  getProtocolV2PacketCapacity: uuid => nativeBle.getProtocolV2PacketCapacity?.(uuid),
+  init: () => nativeBle.init(),
+  version: nativeBle.version,
+};
+
+const result = await HardwareSDK.init({ env: 'lowlevel', debug: false }, undefined, plugin);
+if (!result) throw new Error('SDK initialization failed');
 ```
 
 ## 下一步

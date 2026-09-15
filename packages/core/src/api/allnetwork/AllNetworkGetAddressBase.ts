@@ -506,7 +506,11 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
   async run() {
     this.loadingCleanupInBackground = false;
     try {
-      if (this.device.isProtocolV2() && this.device.getCurrentDeviceType() === EDeviceType.Pro2) {
+      if (
+        this.device.isProtocolV2() &&
+        (this.device.getCurrentDeviceType() === EDeviceType.Pro2 ||
+          this.device.getCurrentDeviceType() === EDeviceType.Neo)
+      ) {
         const protocolInfo = await this.device.ensureProtocolV2RuntimeContext();
         if (supportsProtocolV2Message(protocolInfo, 60461)) {
           const { commands } = this.device;

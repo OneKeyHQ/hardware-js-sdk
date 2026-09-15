@@ -9,7 +9,11 @@ title: 响应 UI 事件
 向设备传输数据，目前支持 PIN 和密码短语的数据传输。
 
 ```typescript
-const response = await HardwareSDK.uiResponse(response);
+import type { UiResponseEvent } from "@onekeyfe/hd-core";
+
+// Construct a response for the current input request using your UI.
+declare const uiResponse: UiResponseEvent;
+HardwareSDK.uiResponse(uiResponse);
 
 ```
 
@@ -23,21 +27,31 @@ const response = await HardwareSDK.uiResponse(response);
 #### 返回 PIN 码结果
 
 ```typescript
+import { UI_RESPONSE } from "@onekeyfe/hd-core";
+
+// Value collected by the host PIN input UI.
+declare const pinValue: string;
+
 HardwareSDK.uiResponse({
   type: UI_RESPONSE.RECEIVE_PIN,
-  payload: ${pin_value},
+  payload: pinValue,
 });
 ```
 
-* 如果在软件端输入 PIN，替换 `pin_value` 的内容。如果需要在硬件端输入 PIN，将 `pin_value` 设置为 `@@ONEKEY_INPUT_PIN_IN_DEVICE`。
+* 如果在软件端输入 PIN，替换 `pinValue` 的内容。如果需要在硬件端输入 PIN，将 `pinValue` 设置为 `@@ONEKEY_INPUT_PIN_IN_DEVICE`。
 
 #### 返回密码短语结果
 
 ```typescript
+import { UI_RESPONSE } from "@onekeyfe/hd-core";
+
+// Value collected by the host passphrase input UI.
+declare const passphraseValue: string;
+
 HardwareSDK.uiResponse({
   type: UI_RESPONSE.RECEIVE_PASSPHRASE,
   payload: {
-    value: ${passphrase_value},
+    value: passphraseValue,
     passphraseOnDevice: false,
     save: false,
   },
@@ -45,3 +59,5 @@ HardwareSDK.uiResponse({
 ```
 
 * 如果需要在设备上输入密码短语，将 value 设置为 '' 并将 passphraseOnDevice 设置为 true。
+
+只回复输入请求。`REQUEST_PASSPHRASE_ON_DEVICE` 和仅在设备输入 PIN 的提示是通知，参见 [UI 事件处理](/zh/hardware-sdk/core-api-guide#events-ui)。

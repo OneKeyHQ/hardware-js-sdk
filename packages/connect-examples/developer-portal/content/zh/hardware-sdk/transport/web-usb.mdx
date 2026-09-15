@@ -142,6 +142,7 @@ const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 
 const resolvedDeviceId = state.payload.identity.deviceId;
+if (!resolvedDeviceId) throw new Error("Device has no wallet identity");
 ```
 
 ## 步骤 7. 第一个调用示例（BTC 地址）

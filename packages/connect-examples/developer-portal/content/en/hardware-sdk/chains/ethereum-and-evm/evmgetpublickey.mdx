@@ -24,7 +24,7 @@ const result = await HardwareSDK.evmGetPublicKey(connectId, deviceId, params);
 
 #### Exporting bundle of public keys
 
-* `bundle` - `Array` of Objects with `path`, `coin` fields
+* `bundle` - `Array` of Objects with `path`, `chainId`, `showOnOneKey` fields
 
 ### Example
 
@@ -58,8 +58,9 @@ Result with only one public key
 {
     success: true,
     payload: {
-        path: Array<number>, // hardended path
+        path: string, // serialized BIP32 path
         xpub: string,        // xpub in legacy format
+        pub: string,
         publicKey: string,   // BIP32 serialization format
     }
 }
@@ -87,7 +88,9 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```
+
+For `bundle` requests with `useBatch: true`, a supported batch route returns `{ path, pub, publicKey }` without `xpub` or `node`. The ordinary route returns the extended public key and node; do not require these fields in a batch response.

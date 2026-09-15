@@ -6,7 +6,7 @@ title: deviceVerify
 
 ## Verify device
 
-Get the hardware signature information cert and signature fields from the device and submit them to the OneKey server to verify the reliability of the device. Reading signature data requires confirmation at the device.
+Retrieve `cert` and `signature` from the device for a verification challenge. The host must submit them to its verification service; this API does not perform server verification. Reading signature data requires confirmation at the device.
 
 ```typescript
 const result = await HardwareSDK.deviceVerify(connectId, params);
@@ -17,13 +17,16 @@ const result = await HardwareSDK.deviceVerify(connectId, params);
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)\
 
 
-* `dataHex` - _optional_ `string` A random string of hex string, such as a timestamp passed in hex string.
+* `dataHex` - _required_ `string` Non-empty hex-encoded verification challenge supplied by your verification flow.
 
 ## Example
 
 ```typescript
+// Obtain a fresh challenge from your verification flow.
+declare const challengeHex: string;
+
 HardwareSDK.deviceVerify(connectId, {
-    dataHex: '183533a058f'
+    dataHex: challengeHex
 });
 ```
 
@@ -46,7 +49,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

@@ -57,7 +57,7 @@ const response = await HardwareSDK.cosmosSignTransaction(
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

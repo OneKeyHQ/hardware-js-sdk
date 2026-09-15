@@ -45,7 +45,8 @@ const response = await HardwareSDK.nervosGetAddress('connect1', 'device1', {
     network: "ckb"
 });
 
-console.log(response.address);
+if (!response.success) throw new Error(response.payload.error);
+console.log(response.payload.address);
 ```
 
 #### Returns
@@ -69,7 +70,7 @@ Error response:
     success: false,
     payload: {
         error: string,  // Error message
-        code: number    // Error code
+        code?: string | number    // Error code
     }
 }
 ```

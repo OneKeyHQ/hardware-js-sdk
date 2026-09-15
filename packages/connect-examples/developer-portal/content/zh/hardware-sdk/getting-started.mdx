@@ -30,16 +30,19 @@ npm i @onekeyfe/hd-common-connect-sdk
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 
-await HardwareSDK.init({
+const initialized = await HardwareSDK.init({
   env: 'webusb',
   debug: process.env.NODE_ENV !== 'production',
   fetchConfig: true,
 });
+if (!initialized) throw new Error('SDK initialization failed');
 ```
 
 在应用入口调用一次 `init()`。不要在同一运行时混用 `@onekeyfe/hd-web-sdk` 和 `@onekeyfe/hd-common-connect-sdk`。
 
 ## 3. 搜设备、取身份、读地址
+
+受保护调用前先注册 [UI 事件处理器](/zh/hardware-sdk/core-api-guide#events-ui)，以便锁定设备完成 PIN 输入。
 
 ```ts
 const devices = await HardwareSDK.searchDevices();
@@ -48,10 +51,12 @@ if (!devices.success || !devices.payload.length) {
 }
 
 const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
 
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
 
 const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",

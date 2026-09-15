@@ -55,8 +55,10 @@ sequenceDiagram
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
 
-await HardwareSDK.openWalletSession(connectId, { mode: 'standard' });
+const standard = await HardwareSDK.openWalletSession(connectId, { mode: 'standard' });
+if (!standard.success) throw new Error(standard.payload.error);
 
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
@@ -101,6 +103,10 @@ HardwareSDK.on(UI_EVENT, async (message) => {
 const opened = await HardwareSDK.openWalletSession(connectId, {
   mode: 'select-hidden',
 });
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden') {
+  throw new Error('A hidden wallet was not opened');
+}
 const deviceId = opened.payload.deviceId;
 const passphraseState = opened.payload.passphraseState;
 
@@ -136,6 +142,10 @@ import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
 const opened = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.SelectHidden,
 });
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden') {
+  throw new Error('A hidden wallet was not opened');
+}
 saveBinding({
   deviceId: opened.payload.deviceId,
   passphraseState: opened.payload.passphraseState,
@@ -190,7 +200,7 @@ await HardwareSDK.evmGetAddress(connectId, savedDeviceId, {
 |---|-----|-----------|
 | 用途 | 设备访问保护 | 隐藏钱包创建 |
 | 恢复 | 可通过擦除设备 + 恢复助记词重置 | 无法恢复 |
-| 存储 | 存储在设备上 | 不存储在任何地方 |
+| 存储 | 存储在设备上 | 不要持久化明文；SDK 缓存取决于输入流程与 `save` |
 | 区分大小写 | 不适用（纯数字） | 是 |
 
 ### 可以有多个隐藏钱包吗？
@@ -199,7 +209,7 @@ await HardwareSDK.evmGetAddress(connectId, savedDeviceId, {
 
 ### 设备会验证我的 Passphrase 吗？
 
-不会。设备接受任何 Passphrase 并从中派生钱包。如果你输入了错误的 Passphrase，你会得到一个有效但不同的（空的）钱包。不会出现"Passphrase 错误"的提示。
+首次输入不同的 Passphrase 可以派生不同钱包。后续调用如果传入预期的 `passphraseState`，SDK 会校验绑定并在不匹配时失败；不要将输错后派生的钱包当作目标钱包。
 
 ### `passphraseOnDevice` 和软件输入有什么区别？
 
@@ -207,3 +217,5 @@ await HardwareSDK.evmGetAddress(connectId, savedDeviceId, {
 - **软件输入**：Passphrase 在你的应用中输入后通过 SDK 发送到设备。
 
 另请参阅：[通用参数](/zh/hardware-sdk/concepts/common-params)，[事件配置](/zh/hardware-sdk/core-api-guide#events-ui)。
+
+Protocol V1 在关闭 passphrase 保护时，`select-hidden` 可能返回标准钱包。保存或使用 `passphraseState` 前先检查 `walletType`。

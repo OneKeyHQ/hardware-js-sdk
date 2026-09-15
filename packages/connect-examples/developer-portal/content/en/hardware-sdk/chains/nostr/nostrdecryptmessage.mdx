@@ -23,7 +23,7 @@ const result = await HardwareSDK.nostrDecryptMessage(connectId, deviceId, params
 
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
-* `path` - _required_ `string | Array<number>` minimum length is `3`. [read more](/en/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _required_ `string | Array<number>` SDK minimum length is `5`. [read more](/en/hardware-sdk/concepts/common-params#hd-path)
 * `pubkey` - _required_ `string` public key .
 * `ciphertext` - _required_ `string` encrypted message.
 * `showOnOneKey` - _optional_ `boolean` determines if address will be displayed on device. Default is set to `true` .
@@ -66,7 +66,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

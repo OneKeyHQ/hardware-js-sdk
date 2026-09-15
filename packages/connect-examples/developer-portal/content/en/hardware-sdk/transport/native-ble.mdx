@@ -25,6 +25,6 @@ Need a cross-platform React Native experience? Use the [React Native BLE](/en/ha
 
 ## Core concepts
 
-- Read [Low-Level Transport Plugin & Protocol](/en/hardware-sdk/concepts/low-level-plugin) before wiring native BLE to understand the 64-byte payload structure and message framing.
+- Read [Low-Level Transport Plugin & Protocol](/en/hardware-sdk/concepts/low-level-plugin) before wiring native BLE to understand raw BLE notification forwarding and SDK-owned V1/V2 framing.
 - Subscribe early to `UI_EVENT` so PIN/Passphrase confirmations and prompts do not stall the request queue.
 - Reuse the same `HardwareSDK` adapter used in the Web guide; the native code simply forwards BLE packets instead of WebUSB.

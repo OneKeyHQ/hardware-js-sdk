@@ -43,7 +43,8 @@ const response = await HardwareSDK.nervosGetAddress('connect1', 'device1', {
     network: "ckb"
 });
 
-console.log(response.address);
+if (!response.success) throw new Error(response.payload.error);
+console.log(response.payload.address);
 ```
 
 #### 返回结果
@@ -67,7 +68,7 @@ console.log(response.address);
     success: false,
     payload: {
         error: string,  // 错误信息
-        code: number    // 错误码
+        code?: string | number    // 错误码
     }
 }
 ```

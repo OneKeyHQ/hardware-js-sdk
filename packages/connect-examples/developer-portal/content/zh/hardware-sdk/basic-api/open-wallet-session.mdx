@@ -52,7 +52,7 @@ const res = await HardwareSDK.openWalletSession(connectId, {
   success: false,
   payload: {
     error: string,
-    code: number,
+    code?: string | number,
   }
 }
 ```

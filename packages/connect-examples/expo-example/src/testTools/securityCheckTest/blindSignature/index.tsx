@@ -6,7 +6,10 @@ import { get } from 'lodash';
 
 import { TestRunnerView } from '../../../components/BaseTestRunner/TestRunnerView';
 import { useRunnerTest } from '../../../components/BaseTestRunner/useRunnerTest';
-import { classifyRunnerFailure } from '../../../components/BaseTestRunner/runnerResultUtils';
+import {
+  classifyRunnerFailure,
+  getRunnerReportResult,
+} from '../../../components/BaseTestRunner/runnerResultUtils';
 import useExportReport from '../../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../../components/ui/Button';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
@@ -123,9 +126,9 @@ function ExportReportView() {
         const caseItem = item;
         const { $key, method, path } = caseItem;
 
-        const state = itemVerifyState?.[$key].verify;
+        const state = itemVerifyState?.[$key]?.verify ?? 'none';
 
-        const runnerResult = state === 'fail' ? itemVerifyState?.[$key].error : 'success';
+        const runnerResult = getRunnerReportResult(itemVerifyState?.[$key], 'success');
         markdown.push(`| ${state} | ${method} | ${path} | ${runnerResult} |`);
       });
 

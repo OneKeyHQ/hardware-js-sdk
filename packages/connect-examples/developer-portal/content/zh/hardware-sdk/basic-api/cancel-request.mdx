@@ -6,116 +6,77 @@ title: 取消请求
 
 ## 概述
 
-取消当前正在执行的 SDK 方法调用，并触发 `ui-close_window` 事件。用于中止长时间等待的操作（例如等待用户在设备上确认）或关闭待处理的 UI 提示（PIN / Passphrase 对话框）。
-
-> **重要：** `cancel()` 仅中止正在进行的 SDK 调用 — 它**不会**断开传输连接（USB 或 BLE）。设备连接保持活跃，取消后可立即发起新的调用。
+`cancel(connectId)` 取消该连接关联的排队中和执行中请求，并关闭待处理的 SDK UI。省略 `connectId` 会取消所有待处理请求。可在用户取消 PIN/passphrase 输入、退出流程或达到应用超时时调用。
 
 ## 方法
 
 ```typescript
-HardwareSDK.cancel(connectId?: string): void;
+HardwareSDK.cancel(connectId);
+// Cancel all pending requests:
+HardwareSDK.cancel();
 ```
 
 ### 参数
 
-| 参数 | 类型 | 是否必填 | 描述 |
-|------|------|----------|------|
-| `connectId` | `string` | 否 | 目标设备的 `connectId`。不传时，SDK 会取消当前正在使用的设备上的活动调用。 |
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `connectId` | `string` | 否 | 目标连接；省略时取消所有待处理请求。 |
 
 ### 返回值
 
-`undefined` — 方法立即返回。挂起的 SDK 调用将以错误拒绝（错误码 `801`，"User cancelled the action"）。
-
-## 使用场景
-
-| 场景 | 示例 |
-|------|------|
-| 用户在 PIN / Passphrase 对话框中点击"取消" | 中止挂起的 `uiResponse` 等待 |
-| 超时 — 设备确认等待过久 | 在自定义计时器触发后取消 |
-| 页面导航 — 用户离开页面或关闭弹窗 | 在组件卸载前清理 |
-| 重试 — 需要从头重新发起调用 | 先取消，再重新发起调用 |
+`cancel()` 返回 `void`。需要等待原方法的 Promise 才能观察结果。公共 SDK 通常将被取消的请求解析为 `success: false`；队列取消使用 `HardwareErrorCode.CallQueueActionCancelled`（`822`）。设备端拒绝，或与取消同时发生且先完成的错误，可能返回其他错误码。不要匹配错误文案，也不要假设所有取消都返回相同错误码。
 
 ## 示例
 
 ### 基本取消
 
 ```typescript
-// 发起一个长时间运行的调用
-const signPromise = HardwareSDK.evmSignTransaction(connectId, deviceId, {
-  path: "m/44'/60'/0'/0/0",
-  transaction: { /* ... */ },
-});
+import type { EVMSignTransactionParams } from '@onekeyfe/hd-core';
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
-// 用户点击"取消"
+// Use a fully prepared transaction from your application's transaction builder.
+declare const params: EVMSignTransactionParams;
+const signPromise = HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+
+// Invoke from the user's Cancel action.
 HardwareSDK.cancel(connectId);
 
-// Promise 会被拒绝
 const result = await signPromise;
-// result.success === false
-// result.payload.code === 801
-```
-
-### 组件卸载时取消（React）
-
-```tsx
-import { useEffect, useRef } from 'react';
-
-function SignTransaction({ connectId, deviceId }) {
-  const connectIdRef = useRef(connectId);
-
-  useEffect(() => {
-    connectIdRef.current = connectId;
-    return () => {
-      // 组件卸载时中止挂起的设备调用
-      HardwareSDK.cancel(connectIdRef.current);
-    };
-  }, [connectId]);
-
-  // ...
+if (!result.success) {
+  if (result.payload.code === HardwareErrorCode.CallQueueActionCancelled) {
+    // Close the cancelled operation's UI.
+  } else {
+    throw new Error(result.payload.error);
+  }
 }
 ```
 
 ### 超时取消
 
-```typescript
-async function signWithTimeout(connectId: string, deviceId: string, params: any, timeoutMs = 60_000) {
-  const timer = setTimeout(() => {
-    HardwareSDK.cancel(connectId);
-  }, timeoutMs);
+此计时器会取消指定连接的所有待处理请求，因此同一设备的操作应串行执行。
 
+```typescript
+import type { EVMSignTransactionParams } from '@onekeyfe/hd-core';
+
+async function signWithTimeout(
+  connectId: string,
+  deviceId: string,
+  params: EVMSignTransactionParams,
+  timeoutMs = 60_000,
+) {
+  const timer = setTimeout(() => HardwareSDK.cancel(connectId), timeoutMs);
   try {
-    const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+    return await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+  } finally {
     clearTimeout(timer);
-    return result;
-  } catch (err) {
-    clearTimeout(timer);
-    throw err;
   }
 }
 ```
 
-## Cancel 与 Disconnect 的区别
+## 取消与释放传输
 
-| | `cancel(connectId)` | 物理断开（拔线 / BLE 超出范围） |
-|---|---|---|
-| **行为** | 中止挂起的 SDK 调用；设备保持连接 | 传输层触发 `DEVICE.DISCONNECT` 事件；所有挂起的调用被拒绝 |
-| **连接状态** | 活跃 — 可立即调用 SDK 方法 | 已断开 — 需要重新发现并连接 |
-| **使用场景** | 用户主动取消、超时、页面导航清理 | 硬件事件（拔线、BLE 信号丢失） |
+取消会中断操作，并可能触发设备或连接清理，不保证连接保持可用或立即接受新调用。先等待原请求结果；如果连接已断开，重新发现设备并刷新 `getDeviceState`，再处理新的用户操作。不要自动重放签名或固件升级。
 
-> SDK 不提供编程式的 "disconnect" 方法。传输层的清理在设备物理断开或页面/应用关闭时自动发生。如需释放会话而不断开连接，只需停止发起 SDK 调用 — 会话将在内部超时后自动释放。
+拆除 SDK 或切换传输时使用 `HardwareSDK.dispose()`，后续使用前重新 `init()`。物理断开通过 `DEVICE.DISCONNECT` 通知，待处理的公共方法调用返回失败结果。
 
-## 错误码参考
-
-调用被取消时，拒绝的结果结构如下：
-
-```typescript
-{
-  success: false,
-  payload: {
-    error: "User cancelled the action",
-    code: 801  // ACTION_CANCELLED
-  }
-}
-```
-
-完整错误码列表请参见 [错误码](/zh/hardware-sdk/core-api-guide#error-codes)。
+参见[重连与释放](/zh/hardware-sdk/transport/reconnect)和[错误码](/zh/hardware-sdk/core-api-guide#error-codes)。

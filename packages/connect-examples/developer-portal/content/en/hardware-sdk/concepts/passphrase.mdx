@@ -55,8 +55,10 @@ sequenceDiagram
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
 
-await HardwareSDK.openWalletSession(connectId, { mode: 'standard' });
+const standard = await HardwareSDK.openWalletSession(connectId, { mode: 'standard' });
+if (!standard.success) throw new Error(standard.payload.error);
 
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
@@ -101,6 +103,10 @@ HardwareSDK.on(UI_EVENT, async (message) => {
 const opened = await HardwareSDK.openWalletSession(connectId, {
   mode: 'select-hidden',
 });
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden') {
+  throw new Error('A hidden wallet was not opened');
+}
 const deviceId = opened.payload.deviceId;
 const passphraseState = opened.payload.passphraseState;
 
@@ -136,6 +142,10 @@ import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
 const opened = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.SelectHidden,
 });
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden') {
+  throw new Error('A hidden wallet was not opened');
+}
 saveBinding({
   deviceId: opened.payload.deviceId,
   passphraseState: opened.payload.passphraseState,
@@ -190,7 +200,7 @@ No. The PIN protects physical access to the device. The passphrase creates an en
 |---|-----|-----------|
 | Purpose | Device access protection | Hidden wallet creation |
 | Recovery | Can be reset via device wipe + seed recovery | Cannot be recovered |
-| Storage | Stored on device | Never stored anywhere |
+| Storage | Stored on device | Do not persist plaintext; SDK caching depends on the input flow and `save` |
 | Case-sensitive | N/A (numeric) | Yes |
 
 ### Can I have multiple hidden wallets?
@@ -199,7 +209,7 @@ Yes. Each unique passphrase creates a distinct hidden wallet. You can have as ma
 
 ### Does the device validate my passphrase?
 
-No. The device accepts any passphrase and derives a wallet from it. If you mistype your passphrase, you'll get a valid but different (empty) wallet. There is no "wrong passphrase" error.
+A newly entered passphrase can derive a different wallet. When a later call supplies an expected `passphraseState`, the SDK checks that binding and fails on a mismatch; do not treat a mistyped passphrase as the intended wallet.
 
 ### What's the difference between `passphraseOnDevice` and software input?
 
@@ -207,3 +217,5 @@ No. The device accepts any passphrase and derives a wallet from it. If you misty
 - **Software input**: The passphrase is typed in your app and sent to the device via SDK.
 
 See also: [Common Params](/en/hardware-sdk/concepts/common-params), [Events & UI Wiring](/en/hardware-sdk/core-api-guide#events-ui).
+
+On Protocol V1, `select-hidden` can return a standard wallet when passphrase protection is disabled. Check `walletType` before saving or using `passphraseState`.

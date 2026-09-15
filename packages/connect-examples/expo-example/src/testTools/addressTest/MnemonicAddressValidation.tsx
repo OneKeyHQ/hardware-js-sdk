@@ -7,7 +7,10 @@ import { get, isEmpty } from 'lodash';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
-import { classifyRunnerFailure } from '../../components/BaseTestRunner/runnerResultUtils';
+import {
+  classifyRunnerFailure,
+  getRunnerReportResult,
+} from '../../components/BaseTestRunner/runnerResultUtils';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
 import { ADDRESS_INDEX_MARK, CHANGE_MARK, INDEX_MARK, baseParams } from './baseParams';
@@ -195,9 +198,9 @@ function ExportReportView() {
         const caseItem = item;
         const { $key, method, path, address } = caseItem;
 
-        const state = itemVerifyState?.[$key].verify;
+        const state = itemVerifyState?.[$key]?.verify ?? 'none';
 
-        const runnerResult = state === 'fail' ? itemVerifyState?.[$key].error : address;
+        const runnerResult = getRunnerReportResult(itemVerifyState?.[$key], address);
         markdown.push(`| ${state} | ${method} | ${path} | ${runnerResult} |`);
       });
 

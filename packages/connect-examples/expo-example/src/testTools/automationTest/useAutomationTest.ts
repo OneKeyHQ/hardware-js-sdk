@@ -44,6 +44,7 @@ import {
   getProtocolAwareFeatures,
   isPassphraseProtectionEnabled,
 } from '../../utils/protocolAwareFeatures';
+import { classifyRunnerFailure } from '../../components/BaseTestRunner/runnerResultUtils';
 import { executeProtocolAwareMethod } from '../../utils/protocolAwareMethod';
 import { generateAptosPublicKeyFromSeed } from '../../utils/mockDevice/method/aptosGetPublicKey';
 import { generateEvmAddressFromSeed } from '../../utils/mockDevice/method/evmGetAddress';
@@ -1627,8 +1628,11 @@ export function useAutomationTest() {
         if (!result.success) {
           const errorMsg =
             (result.payload as { error?: string } | undefined)?.error || 'Unknown error';
-          // Check device compatibility: if expected=false, treat failure as expected
-          if (deviceFeaturesRef.current) {
+          const skipped =
+            classifyRunnerFailure((result.payload as { code?: number } | undefined)?.code) ===
+            'skip';
+          // Protocol-unsupported calls are skipped, even if an override expects failure.
+          if (!skipped && deviceFeaturesRef.current) {
             const expectedOverride = compatibilityManager.getExpectedOverride(
               deviceFeaturesRef.current,
               methodData.method,
@@ -1659,6 +1663,7 @@ export function useAutomationTest() {
             expected,
             actual: '',
             passed: false,
+            skipped,
             error: errorMsg,
             duration: Date.now() - startedAt,
           };
@@ -1837,8 +1842,11 @@ export function useAutomationTest() {
         if (!result.success) {
           const errorMsg =
             (result.payload as { error?: string } | undefined)?.error || 'Unknown error';
-          // Check device compatibility: if expected=false, treat failure as expected
-          if (deviceFeaturesRef.current) {
+          const skipped =
+            classifyRunnerFailure((result.payload as { code?: number } | undefined)?.code) ===
+            'skip';
+          // Protocol-unsupported calls are skipped, even if an override expects failure.
+          if (!skipped && deviceFeaturesRef.current) {
             const expectedOverride = compatibilityManager.getExpectedOverride(
               deviceFeaturesRef.current,
               methodCase.method,
@@ -1867,6 +1875,7 @@ export function useAutomationTest() {
             expected,
             actual: '',
             passed: false,
+            skipped,
             error: errorMsg,
             duration: Date.now() - startedAt,
           };
@@ -2105,6 +2114,10 @@ export function useAutomationTest() {
                       expected,
                       actual: '',
                       passed: false,
+                      skipped:
+                        classifyRunnerFailure(
+                          (result.payload as { code?: number } | undefined)?.code
+                        ) === 'skip',
                       error:
                         (result.payload as { error?: string } | undefined)?.error ||
                         'Unknown error',
@@ -2357,6 +2370,10 @@ export function useAutomationTest() {
                         expected,
                         actual: '',
                         passed: false,
+                        skipped:
+                          classifyRunnerFailure(
+                            (sdkResult.payload as { code?: number } | undefined)?.code
+                          ) === 'skip',
                         error:
                           (sdkResult.payload as { error?: string } | undefined)?.error ||
                           'Unknown error',
@@ -2555,9 +2572,25 @@ export function useAutomationTest() {
                           },
                           protocol: getFeaturesProtocol(deviceFeaturesRef.current),
                         })
-                      )) as { success: boolean; payload?: { address?: string; error?: string } };
+                      )) as {
+                        success: boolean;
+                        payload?: { address?: string; error?: string; code?: number };
+                      };
 
-                      if (!sdkResult.success) {
+                      if (
+                        !sdkResult.success &&
+                        classifyRunnerFailure(sdkResult.payload?.code) === 'skip'
+                      ) {
+                        results.push({
+                          title: caseTitle,
+                          method,
+                          expected,
+                          passed: false,
+                          skipped: true,
+                          error: sdkResult.payload?.error,
+                          duration: Date.now() - caseStart,
+                        });
+                      } else if (!sdkResult.success) {
                         // Check device compatibility
                         let handledAsExpectedFail = false;
                         if (deviceFeaturesRef.current) {
@@ -2843,7 +2876,7 @@ export function useAutomationTest() {
                     : []
                 );
 
-                let sdkResult: { success: boolean; payload?: { error?: string } };
+                let sdkResult: { success: boolean; payload?: { error?: string; code?: number } };
                 try {
                   const resultOrTimeout = await Promise.race([
                     executeProtocolAwareMethod({
@@ -2892,7 +2925,9 @@ export function useAutomationTest() {
                 });
 
                 const actualSuccess = sdkResult.success;
-                const passed = expected ? actualSuccess : !actualSuccess;
+                const skipped =
+                  !actualSuccess && classifyRunnerFailure(sdkResult.payload?.code) === 'skip';
+                const passed = !skipped && (expected ? actualSuccess : !actualSuccess);
                 const expectedLabel = expected ? 'success' : 'failure';
                 const actualLabel = actualSuccess
                   ? 'success'
@@ -2904,6 +2939,8 @@ export function useAutomationTest() {
                   expected: expectedLabel,
                   actual: actualLabel,
                   passed,
+                  skipped,
+                  error: skipped ? sdkResult.payload?.error : undefined,
                   duration: Date.now() - caseStart,
                 });
               } // end else (typeof sdkMethod !== 'function')
@@ -3013,6 +3050,7 @@ export function useAutomationTest() {
                         title: caseTitle,
                         method: entry.method,
                         passed: false,
+                        skipped: classifyRunnerFailure(sdkResult.payload?.code) === 'skip',
                         error: sdkResult.payload?.error ?? 'unknown error',
                         duration: Date.now() - caseStart,
                       });
@@ -3138,7 +3176,7 @@ export function useAutomationTest() {
             duration: Date.now() - startTime,
           });
         } else {
-          let sdkResult: { success: boolean; payload?: { error?: string } };
+          let sdkResult: { success: boolean; payload?: { error?: string; code?: number } };
           try {
             const resultOrTimeout = await Promise.race([
               executeProtocolAwareMethod({
@@ -3160,7 +3198,10 @@ export function useAutomationTest() {
               await getProtocolAwareFeatures(SDK, ctx.connectId, { retryCount: 1 });
               sdkResult = { success: false, payload: { error: 'timeout after 45s' } };
             } else {
-              sdkResult = resultOrTimeout as { success: boolean; payload?: { error?: string } };
+              sdkResult = resultOrTimeout as {
+                success: boolean;
+                payload?: { error?: string; code?: number };
+              };
             }
           } catch (callError) {
             sdkResult = {
@@ -3190,12 +3231,16 @@ export function useAutomationTest() {
           );
 
           const actualSuccess = sdkResult.success;
+          const skipped =
+            !actualSuccess && classifyRunnerFailure(sdkResult.payload?.code) === 'skip';
           results.push({
             title: testCase.title,
             method: testCase.method,
             expected: expected ? 'success' : 'failure',
             actual: actualSuccess ? 'success' : `failure(${sdkResult.payload?.error ?? ''})`,
-            passed: expected ? actualSuccess : !actualSuccess,
+            passed: !skipped && (expected ? actualSuccess : !actualSuccess),
+            skipped,
+            error: skipped ? sdkResult.payload?.error : undefined,
             duration: Date.now() - startTime,
           });
         }
@@ -3273,6 +3318,8 @@ export function useAutomationTest() {
             title: testCase.title,
             method: testCase.method,
             passed: sdkResult.success,
+            skipped:
+              !sdkResult.success && classifyRunnerFailure(sdkResult.payload?.code) === 'skip',
             error: sdkResult.success ? undefined : sdkResult.payload?.error ?? 'unknown error',
             duration: Date.now() - startTime,
           });

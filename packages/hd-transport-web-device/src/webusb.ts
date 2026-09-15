@@ -566,10 +566,14 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     if (!device.opened) {
       await device.open();
     }
-    try {
-      await device.reset();
-    } catch (error) {
-      this.Log?.debug('[WebUsbTransport] reset before claim failed, continuing:', error);
+    // A V1 packet retry continues an in-flight exchange. Preserve its endpoint
+    // state as in the legacy transport; probing and V2 recovery still reset.
+    if (first || this.deviceProtocol.get(path) !== 'V1') {
+      try {
+        await device.reset();
+      } catch (error) {
+        this.Log?.debug('[WebUsbTransport] reset before claim failed, continuing:', error);
+      }
     }
     await this.getConnectedDevices();
     device = await this.findDevice(path);

@@ -36,7 +36,7 @@ const messageHex = Buffer.from(message).toString('hex');
 
 HardwareSDK.confluxSignMessage(connectId, deviceId, {
     path: "m/44'/503'/0'/0/0",
-    message: messageHex
+    messageHex
 });
 ```
 
@@ -59,7 +59,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

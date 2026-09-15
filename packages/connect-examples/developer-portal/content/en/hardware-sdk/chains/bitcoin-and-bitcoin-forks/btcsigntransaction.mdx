@@ -107,15 +107,24 @@ private buildPrevTx = (rawTx: string): RefTransaction => {
 
 ## Example
 
+The snippets below illustrate parameter shapes. Use actual spendable UTXOs, matching amounts and complete previous transactions; the static data is not a ready-to-broadcast transaction.
+
 ### PAYTOADDRESS
 
 ```typescript
+import type { BTCSignTransactionParams } from "@onekeyfe/hd-core";
+
+// Load the actual previous transactions for the UTXOs below.
+declare const refTxs: BTCSignTransactionParams["refTxs"];
+declare const previousOutputAmount: string;
+
 HardwareSDK.btcSignTransaction(connectId, deviceId, {
     inputs: [
         {
             address_n: [(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (2 | 0x80000000) >>> 0, 1, 0],
             prev_index: 0,
             prev_hash: 'b035d89d4543ce5713c553d69431698116a822c57c03ddacf3f04b763d1999ac',
+            amount: previousOutputAmount,
         }
     ],
     outputs: [
@@ -129,6 +138,7 @@ HardwareSDK.btcSignTransaction(connectId, deviceId, {
             script_type: 'PAYTOADDRESS',
         }
     ],
+    refTxs,
     coin: 'btc'
 });
 ```
@@ -136,7 +146,13 @@ HardwareSDK.btcSignTransaction(connectId, deviceId, {
 ### SPENDP2SHWITNESS
 
 ```typescript
-HardwareSDK.btcSignTransaction({
+import type { BTCSignTransactionParams } from "@onekeyfe/hd-core";
+
+// Load the actual previous transactions for the UTXOs below.
+declare const refTxs: BTCSignTransactionParams["refTxs"];
+declare const previousOutputAmount: string;
+
+HardwareSDK.btcSignTransaction(connectId, deviceId, {
     inputs: [
         {
             address_n: [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (2 | 0x80000000) >>> 0, 1, 0],
@@ -157,6 +173,7 @@ HardwareSDK.btcSignTransaction({
             script_type: 'PAYTOADDRESS',
         }
     ],
+    refTxs,
     coin: 'btc'
 });
 ```
@@ -164,12 +181,13 @@ HardwareSDK.btcSignTransaction({
 ### PAYTOADDRESS with refTxs (transaction data provided from custom backend)
 
 ```typescript
-HardwareSDK.btcSignTransaction({
+HardwareSDK.btcSignTransaction(connectId, deviceId, {
     inputs: [
         {
             address_n: [(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (2 | 0x80000000) >>> 0, 1, 0],
             prev_index: 0,
             prev_hash: 'b035d89d4543ce5713c553d69431698116a822c57c03ddacf3f04b763d1999ac',
+            amount: '3431747',
         }
     ],
     outputs: [
@@ -232,7 +250,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

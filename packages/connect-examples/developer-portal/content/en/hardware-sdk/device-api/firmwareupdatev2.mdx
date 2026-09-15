@@ -51,7 +51,7 @@ const res = await HardwareSDK.firmwareUpdateV2(connectId, {
   success: false,
   payload: {
     error: string, // error message
-    code: number   // error code
+    code?: string | number   // error code
   }
 }
 ```

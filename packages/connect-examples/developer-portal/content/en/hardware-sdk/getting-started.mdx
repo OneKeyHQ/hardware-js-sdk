@@ -30,16 +30,19 @@ Pin the installed version to the current stable `1.2.x` line. If you embed `@one
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 
-await HardwareSDK.init({
+const initialized = await HardwareSDK.init({
   env: 'webusb',
   debug: process.env.NODE_ENV !== 'production',
   fetchConfig: true,
 });
+if (!initialized) throw new Error('SDK initialization failed');
 ```
 
 Call `init()` once at app entry. Do not mix `@onekeyfe/hd-web-sdk` and `@onekeyfe/hd-common-connect-sdk` in the same runtime.
 
 ## 3. Search, identify, read an address
+
+Register the [UI event handler](/en/hardware-sdk/core-api-guide#events-ui) before protected calls so locked devices can complete PIN input.
 
 ```ts
 const devices = await HardwareSDK.searchDevices();
@@ -48,10 +51,12 @@ if (!devices.success || !devices.payload.length) {
 }
 
 const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
 
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
 
 const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
