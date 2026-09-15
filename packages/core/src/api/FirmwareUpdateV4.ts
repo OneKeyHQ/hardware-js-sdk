@@ -2134,6 +2134,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }) {
     let lastError: unknown;
     for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
+      let shortWriteError: HardwareError | undefined;
       try {
         const transferStartedAt = Date.now();
         await writeFirmwareByteSource({
@@ -2156,6 +2157,21 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             );
             const rawProcessedByte = response.message.processed_byte;
             const nextOffset = rawProcessedByte === undefined ? chunkEnd : Number(rawProcessedByte);
+            if (
+              Number.isSafeInteger(nextOffset) &&
+              nextOffset >= sourceOffset &&
+              nextOffset < chunkEnd
+            ) {
+              // FatFs can acknowledge a partial write when it cannot allocate more space.
+              // Restarting the file cannot resolve this confirmed device-side write failure.
+              shortWriteError = ERRORS.TypedError(
+                HardwareErrorCode.EmmcFileWriteFirmwareError,
+                `Device storage write incomplete for ${filePath}: wrote ${
+                  nextOffset - sourceOffset
+                } of ${length} bytes at offset ${sourceOffset} (processed_byte ${nextOffset}). Check available storage space and filesystem state.`
+              );
+              throw shortWriteError;
+            }
             if (!Number.isFinite(nextOffset) || nextOffset !== chunkEnd) {
               throw ERRORS.TypedError(
                 HardwareErrorCode.EmmcFileWriteFirmwareError,
@@ -2187,6 +2203,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         });
         return processedSize + source.size;
       } catch (error) {
+        if (shortWriteError && error === shortWriteError) {
+          throw error;
+        }
         lastError = error;
         if (attempt < PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT) {
           await this.recoverProtocolV2FileTransfer();

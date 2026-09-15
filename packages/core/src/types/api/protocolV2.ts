@@ -1,4 +1,5 @@
 import type { CommonParams, Response } from '../params';
+import type { FactoryFilesystemRebuildParams } from '../../api/protocol-v2/FilesystemFormat';
 import type {
   DeviceCertificate,
   DeviceCertificateSignature,
@@ -80,6 +81,15 @@ export declare function deviceFactoryPermanentLock(
   connectId: string,
   params?: CommonParams
 ): Response<Success>;
+
+/**
+ * Destructively rebuild both volumes on a Pro2/Neo loader and verify read/write access.
+ * formatConfirmed requires the format reply.
+ */
+export declare function deviceFactoryRebuildFilesystem(
+  connectId: string,
+  params: CommonParams & FactoryFilesystemRebuildParams
+): Response<Success & { formatConfirmed: boolean }>;
 
 export declare function deviceReadFactoryInfo(
   connectId: string,

@@ -1,6 +1,7 @@
 import * as publicMethods from '../src/api';
 import { findMethod } from '../src/api/utils';
 import { createCoreApi } from '../src/inject';
+import { UI_REQUEST } from '../src/constants/ui-request';
 
 import type { CoreApi } from '../src/types/api';
 
@@ -49,6 +50,7 @@ describe('public factory and Protocol V2 API boundary', () => {
 
     expect(api.deviceGetOnboardingStatus).toBeInstanceOf(Function);
     expect(api.deviceFactoryPermanentLock).toBeInstanceOf(Function);
+    expect(api.deviceFactoryRebuildFilesystem).toBeInstanceOf(Function);
     expect(api.deviceProvisionFactoryInfo).toBeInstanceOf(Function);
     expect(api.deviceReadFactoryInfo).toBeInstanceOf(Function);
     expect(api.deviceWriteFactoryCertificate).toBeInstanceOf(Function);
@@ -146,6 +148,24 @@ describe('public factory and Protocol V2 API boundary', () => {
       digest: '22'.repeat(32),
       connectProtocol: 'V2',
     });
+  });
+
+  test('routes the confirmed factory filesystem recovery through the dispatcher', async () => {
+    const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
+    const api = createCoreApi(call as CoreApi['call']) as CoreApi;
+    await api.deviceFactoryRebuildFilesystem('neo', { confirm: true, connectProtocol: 'V2' });
+    const payload = {
+      method: 'deviceFactoryRebuildFilesystem',
+      connectId: 'neo',
+      confirm: true,
+      connectProtocol: 'V2',
+    };
+    expect(call).toHaveBeenCalledWith(payload);
+    const method = findMethod({ id: 1, payload } as any);
+    method.init();
+    expect(method.getSupportedProtocols()).toEqual(['V2']);
+    expect(method.allowDeviceMode).toContain(UI_REQUEST.BOOTLOADER);
+    expect(method.unlockPolicy).toBe('none');
   });
 
   test('routes Pro Protocol V1 factory APIs', async () => {
