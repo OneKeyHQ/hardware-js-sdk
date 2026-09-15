@@ -58,15 +58,13 @@ export interface KeystoneUsbDeviceDescriptor {
 }
 
 /**
- * Enumeration-time display name. Every Keystone shares one vid/pid and reports
- * the same `productName`, so the name alone cannot tell two attached units
- * apart — the serial's suffix is the only discriminator available before the
- * device is opened. `M-76AB5599` -> `Keystone 76AB5599`.
+ * Enumeration-time display name. The serial is the only other field readable
+ * before a device is opened, but it is not printed on the unit or shown in its
+ * UI, so appending it cannot help anyone tell two Keystones apart — it only
+ * makes the model harder to read.
  */
 function usbDisplayName(device: KeystoneUsbDeviceDescriptor): string {
-  const base = device.productName?.trim() || 'Keystone';
-  const suffix = device.serialNumber?.split('-').pop()?.trim();
-  return suffix ? `${base} ${suffix}` : base;
+  return device.productName?.trim() || 'Keystone';
 }
 
 export interface KeystoneUsbTransportStatic {
