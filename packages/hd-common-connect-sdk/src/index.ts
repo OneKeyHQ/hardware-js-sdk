@@ -1,5 +1,6 @@
 import EventEmitter from 'events';
 import HardwareSdk, {
+  HardwareSDKLowLevel as HardwareLowLevelSdk,
   CORE_EVENT,
   DEVICE,
   DEVICE_EVENT,
@@ -18,6 +19,7 @@ import HardwareSdk, {
   initCore,
   parseConnectSettings,
   setLoggerPostMessage,
+  switchTransport as switchCoreTransport,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import HttpTransport from '@onekeyfe/hd-transport-http';
@@ -55,6 +57,7 @@ const getTransport = async (env: ConnectSettings['env']) => {
 };
 
 let _core: Core | undefined;
+let _plugin: LowlevelTransportSharedPlugin | undefined;
 let _settings = parseConnectSettings();
 
 let _messageID = 0;
@@ -63,6 +66,7 @@ export const messagePromises: { [key: number]: Deferred<any> } = {};
 const dispose = async () => {
   const core = _core;
   _core = undefined;
+  _plugin = undefined;
   eventEmitter.removeAllListeners();
   Object.keys(messagePromises).forEach(key => {
     delete messagePromises[Number(key)];
@@ -158,6 +162,7 @@ const init = async (
   try {
     const Transport = await getTransport(_settings.env);
     _core = await initCore(_settings, Transport, plugin);
+    _plugin = plugin;
     _core?.on(CORE_EVENT, handleMessage);
     setLoggerPostMessage(handleMessage);
 
@@ -202,6 +207,54 @@ const call = async (params: any) => {
 
 const updateSettings = () => Promise.resolve(true);
 const switchTransport = () => Promise.resolve({ success: true });
+
+const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void) => {
+  [
+    UI_EVENT,
+    LOG_EVENT,
+    FIRMWARE_EVENT,
+    DEVICE.CONNECT,
+    DEVICE.DISCONNECT,
+    DEVICE.FEATURES,
+    DEVICE.STATE,
+    DEVICE.SUPPORT_FEATURES,
+    UI_REQUEST.FIRMWARE_PROGRESS,
+    UI_REQUEST.FIRMWARE_TIP,
+    UI_REQUEST.PREVIOUS_ADDRESS_RESULT,
+  ].forEach(eventName => {
+    eventEmitter.on(eventName, (message: CoreMessage) => {
+      // Match the Web SDK envelope for device events emitted as payloads.
+      const envelope: { event?: string; type?: string } = message;
+      let emitMessage = message;
+      if (!envelope.event && !envelope.type) {
+        emitMessage = { ...message };
+        Object.assign(emitMessage, { event: eventName, type: eventName });
+      }
+      listener(emitMessage);
+    });
+  });
+};
+
+export const HardwareSDKLowLevel = HardwareLowLevelSdk({
+  eventEmitter,
+  init: (settings, sdk, plugin) => init({ ..._settings, ...settings }, sdk, plugin),
+  call,
+  cancel,
+  dispose,
+  addHardwareGlobalEventListener,
+  uiResponse,
+  updateSettings: (settings: Partial<ConnectSettings>) => {
+    if (_core) throw ERRORS.TypedError(HardwareErrorCode.IFrameAleradyInitialized);
+    _settings = parseConnectSettings({ ..._settings, ...settings });
+    return Promise.resolve(true);
+  },
+  switchTransport: async (env: ConnectSettings['env']) => {
+    if (!_core) throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
+    const Transport = await getTransport(env);
+    switchCoreTransport({ env, Transport, plugin: _plugin });
+    return { success: true, payload: {} };
+  },
+});
 
 const HardwareCommonConnectSdk = HardwareSdk({
   eventEmitter,
