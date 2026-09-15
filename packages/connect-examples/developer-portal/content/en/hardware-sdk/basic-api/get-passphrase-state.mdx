@@ -47,7 +47,7 @@ Result
 ```
 {
     success: true,
-    payload: string
+    payload: string | null | undefined
 }
 ```
 
@@ -58,7 +58,9 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```
+
+A hidden-wallet fingerprint is a non-empty string. Compatibility flows can return `undefined` on V1 when protection is disabled, or `null` for a standard V2 wallet; do not persist these as a hidden-wallet binding.

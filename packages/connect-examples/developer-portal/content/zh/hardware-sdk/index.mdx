@@ -128,7 +128,9 @@ import { SdkVersionNote } from '../../../components/SdkVersionNote'
 <SdkVersionNote locale="zh" />
 
 ```ts
-import { HardwareSDK } from '@onekeyfe/hd-web-sdk';
+import HdWebSdk from '@onekeyfe/hd-web-sdk';
+
+const HardwareSDK = HdWebSdk.HardwareWebSdk;
 
 await HardwareSDK.init({
   debug: process.env.NODE_ENV !== 'production',

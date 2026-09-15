@@ -66,7 +66,7 @@ HardwareSDK.filecoinGetAddress(connectId, deviceId, {
 {
     success: true,
     payload: {
-        path: Array<number>, // 强化路径
+        path: string, // 序列化 BIP32 路径
         address: string,   // 地址
     }
 }
@@ -92,7 +92,7 @@ HardwareSDK.filecoinGetAddress(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

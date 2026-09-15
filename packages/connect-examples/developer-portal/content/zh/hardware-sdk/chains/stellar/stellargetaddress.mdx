@@ -56,7 +56,7 @@ HardwareSDK.stellarGetAddress(connectId, deviceId, {
     success: true,
     payload: {
         address: string,     // 显示的地址
-        path: Array<number> // 强化路径
+        path: string // 序列化 BIP32 路径
     }
 }
 ```
@@ -67,9 +67,9 @@ HardwareSDK.stellarGetAddress(connectId, deviceId, {
 {
     success: true,
     payload: [
-        { address: string, path: Array<number> }, // 账户 1
-        { address: string, path: Array<number> }, // 账户 2
-        { address: string, path: Array<number> }  // 账户 3
+        { address: string, path: string }, // 账户 1
+        { address: string, path: string }, // 账户 2
+        { address: string, path: string }  // 账户 3
     ]
 }
 ```
@@ -81,7 +81,7 @@ HardwareSDK.stellarGetAddress(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

@@ -70,7 +70,7 @@ const response = await HardwareSDK.alephiumSignMessage(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

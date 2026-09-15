@@ -35,7 +35,7 @@ const response = await HardwareSDK.getPassphraseState(connectId);
 ```
 {
     success: true,
-    payload: string
+    payload: string | null | undefined
 }
 ```
 
@@ -46,7 +46,9 @@ const response = await HardwareSDK.getPassphraseState(connectId);
     success: false,
     payload: {
         error: string, // 错误消息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```
+
+隐藏钱包指纹为非空字符串。兼容流程中，V1 关闭保护时可能返回 `undefined`，V2 标准钱包可能返回 `null`；不要将这些结果保存为隐藏钱包绑定。

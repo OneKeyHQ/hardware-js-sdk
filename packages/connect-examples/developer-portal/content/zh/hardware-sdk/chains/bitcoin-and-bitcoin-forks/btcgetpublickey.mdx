@@ -58,14 +58,17 @@ HardwareSDK.btcGetPublicKey(connectId, deviceId, {
 {
     success: true,
     payload: {
-        path: Array<number>, // 强化路径
+        path: string, // 序列化 BIP32 路径
         xpub: string,        // 传统格式的 xpub
         xpubSegwit?: string, // segwit 账户可选：segwit 格式的 xpub
-        chainCode: string,   // BIP32 序列化格式
-        childNum: number,    // BIP32 序列化格式
-        publicKey: string,   // BIP32 序列化格式
-        fingerprint: number, // BIP32 序列化格式
-        depth: number,       // BIP32 序列化格式
+        root_fingerprint?: number,
+        node: {
+            depth: number,
+            fingerprint: number,
+            child_num: number,
+            chain_code: string,
+            public_key: string,
+        },
     }
 }
 ```
@@ -78,9 +81,9 @@ HardwareSDK.btcGetPublicKey(connectId, deviceId, {
 {
     success: true,
     payload: [
-        { path, serializedPath, xpub, xpubSegwit?, chainCode, childNum, publicKey, fingerprint, depth }, // 账户 1
-        { path, serializedPath, xpub, xpubSegwit?, chainCode, childNum, publicKey, fingerprint, depth }, // 账户 2
-        { path, serializedPath, xpub, xpubSegwit?, chainCode, childNum, publicKey, fingerprint, depth }  // 账户 3
+        { path, xpub, xpubSegwit, root_fingerprint, node }, // 账户 1
+        { path, xpub, xpubSegwit, root_fingerprint, node }, // 账户 2
+        { path, xpub, xpubSegwit, root_fingerprint, node }  // 账户 3
     ]
 }
 ```
@@ -92,7 +95,7 @@ HardwareSDK.btcGetPublicKey(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

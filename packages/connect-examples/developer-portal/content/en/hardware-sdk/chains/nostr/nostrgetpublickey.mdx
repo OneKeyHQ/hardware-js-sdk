@@ -25,14 +25,14 @@ const result = await HardwareSDK.nostrGetPublicKey(connectId, deviceId, params);
 
 ### Exporting single public key
 
-* `path` - _required_ `string | Array<number>` minimum length is `3`. [read more](/en/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _required_ `string | Array<number>` SDK minimum length is `1`. [read more](/en/hardware-sdk/concepts/common-params#hd-path)
 * `showOnOneKey` - _optional_ `boolean` determines if address will be displayed on device. Default is set to `true`
 
 
 
 #### Exporting bundle of public keys
 
-* `bundle` - `Array` of Objects with `path`, `coin` fields
+* `bundle` - `Array` of Objects with `path`, `showOnOneKey` fields
 
 ### Example
 
@@ -65,7 +65,8 @@ Result with only one public key
 {
     success: true,
     payload: {
-        path: Array<number>, // hardended path
+        path: string, // serialized BIP32 path
+        pub: string,
         publickey: string,   // publickey
         npub: string,        // npub
     }
@@ -78,9 +79,9 @@ Result with bundle of public keys
 {
     success: true,
     payload: [
-        { path, publickey, npub }, // account 1
-        { path, publickey, npub }, // account 2
-        { path, publickey, npub }, // account 3
+        { path, pub, publickey, npub }, // account 1
+        { path, pub, publickey, npub }, // account 2
+        { path, pub, publickey, npub }, // account 3
     ]
 }
 ```
@@ -92,7 +93,9 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```
+
+Use `pub` for the public key. The runtime also returns the legacy `publickey` alias; the current declaration's optional `publicKey` spelling does not describe that alias.

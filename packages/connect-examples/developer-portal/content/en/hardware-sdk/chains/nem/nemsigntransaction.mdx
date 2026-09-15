@@ -9,7 +9,7 @@ title: nemSignTransaction
 Asks device to sign given transaction. User is asked to confirm all transaction details on OneKey.
 
 ```typescript
-const response = await HardwareSDK.nvmSignTransaction(connectId, deviceId, params)
+const response = await HardwareSDK.nemSignTransaction(connectId, deviceId, params)
 ```
 
 ### Params
@@ -133,7 +133,7 @@ export type NEMTransaction = Transaction | NEMMultisigTransaction;
 #### NEMTransferTransaction
 
 ```typescript
-HardwareSDK.confluxSignMessage(connectId, deviceId, {
+HardwareSDK.nemSignTransaction(connectId, deviceId, {
     path: "m/44'/43'/0'/0'/0",
     transaction: {
         type: 0x0101,
@@ -165,7 +165,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

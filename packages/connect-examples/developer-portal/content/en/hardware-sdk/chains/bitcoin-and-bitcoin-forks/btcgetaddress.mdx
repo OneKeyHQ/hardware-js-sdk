@@ -18,7 +18,7 @@ const result = await HardwareSDK.btcGetAddress(connectId, deviceId, params);
 
 #### Exporting single address
 
-* `path` - _required_ `string | Array<number>` minimum length is 3. [read more](/en/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _required_ `string | Array<number>` SDK minimum length is `1`. [read more](/en/hardware-sdk/concepts/common-params#hd-path)
 * `showOnOneKey` - _optional_ `boolean` determines if address will be displayed on device. Default is set to `true`
 * `coin` - _optional_ `string` determines network definition specified in [coins.json](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/data/coins/bitcoin.json) file. Coin `shortcut`, `name` or `label` can be used. If `coin` is not set API will try to get network definition from `path`.
 * `multisig` - _optional_ MultisigRedeemScriptType, redeem script information (multisig addresses only)
@@ -71,7 +71,7 @@ Result with only one address
     success: true,
     payload: {
         address: string,     // displayed address
-        path: Array<number> // hardended path
+        path: string // serialized BIP32 path
     }
 }
 ```
@@ -82,9 +82,9 @@ Result with bundle of addresses
 {
     success: true,
     payload: [
-        { address: string, path: Array<number> }, // address 1
-        { address: string, path: Array<number> }, // address 2
-        { address: string, path: Array<number> }, // address 3
+        { address: string, path: string }, // address 1
+        { address: string, path: string }, // address 2
+        { address: string, path: string }, // address 3
     ]
 }
 ```
@@ -96,7 +96,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

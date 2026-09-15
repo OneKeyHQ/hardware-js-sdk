@@ -18,7 +18,7 @@ const response = await HardwareSDK.xrpGetAddress(connectId, deviceId, params)
 
 **导出单个地址**
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 5。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
 * `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
 
 **导出批量地址**
@@ -57,7 +57,7 @@ HardwareSDK.xrpGetAddress(connectId, deviceId, {
     payload: {
         address: string,     // 显示的地址
         publicKey: string,   // 账户公钥
-        path: Array<number>  // 强化路径
+        path: string  // 序列化 BIP32 路径
     }
 }
 ```
@@ -68,9 +68,9 @@ HardwareSDK.xrpGetAddress(connectId, deviceId, {
 {
     success: true,
     payload: [
-        { address: string, publicKey: string, path: Array<number> }, // 账户 1
-        { address: string, publicKey: string, path: Array<number> }, // 账户 2
-        { address: string, publicKey: string, path: Array<number> }  // 账户 3
+        { address: string, publicKey: string, path: string }, // 账户 1
+        { address: string, publicKey: string, path: string }, // 账户 2
+        { address: string, publicKey: string, path: string }  // 账户 3
     ]
 }
 ```
@@ -82,7 +82,7 @@ HardwareSDK.xrpGetAddress(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

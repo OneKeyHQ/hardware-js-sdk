@@ -116,12 +116,14 @@ await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
 // 1) Enumerate
 const list = await HardwareSDK.searchDevices();
 if (!list.success) throw new Error(list.payload.error);
-const { connectId, deviceId } = list.payload[0] ?? {};
+const { connectId } = list.payload[0] ?? {};
+if (!connectId) throw new Error("No device connection");
 
 // 2) Confirm deviceId
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
-const resolvedDeviceId = state.payload.identity.deviceId ?? deviceId;
+const resolvedDeviceId = state.payload.identity.deviceId;
+if (!resolvedDeviceId) throw new Error("Device has no wallet identity");
 
 // 3) Example: get a BTC address
 const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {

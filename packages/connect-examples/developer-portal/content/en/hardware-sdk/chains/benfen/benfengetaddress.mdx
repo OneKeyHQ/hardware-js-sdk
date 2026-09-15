@@ -69,8 +69,8 @@ Result with only one address
     success: true,
     payload: {
         address: string,     // displayed address
-        pub: string,
-        path: Array<number> // hardended path
+        pub?: string,
+        path: string // serialized BIP32 path
     }
 }
 ```
@@ -81,9 +81,9 @@ Result with bundle of addresses sorted by FIFO
 {
     success: true,
     payload: [
-        { address: string, pub: string, path: Array<number> }, // account 1
-        { address: string, pub: string, path: Array<number> }, // account 2
-        { address: string, pub: string, path: Array<number> }  // account 3
+        { address: string, pub?: string, path: string }, // account 1
+        { address: string, pub?: string, path: string }, // account 2
+        { address: string, pub?: string, path: string }  // account 3
     ]
 }
 ```
@@ -95,7 +95,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

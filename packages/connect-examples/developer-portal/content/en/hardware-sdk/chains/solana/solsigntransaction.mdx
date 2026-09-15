@@ -16,8 +16,8 @@ const result = await HardwareSDK.solSignTransaction(connectId, deviceId, params)
 
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
-* `path` - _required_ `string | Array<number>` **length is `4`, Here's a special chain.**. read more
-* `rawTx` - _required_ `string` type of serialized transaction string.
+* `path` - _required_ `string | Array<number>` SDK minimum length is `3`. read more
+* `rawTx` - _required_ `string` hex-encoded serialized Solana message bytes, excluding the transaction signature envelope.
 
 ### Examples
 
@@ -39,7 +39,7 @@ Result
   success: true,
   payload: {
     path: "m/44'/501'/0'/0'",
-    signature: string.
+    signature: string
   }
 }
 ```
@@ -51,7 +51,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

@@ -62,7 +62,7 @@ USB and BLE `connectId` values for the same unit are different — cache them se
 
 - `webusb` — HTTPS + user gesture.
 - `react-native` — BLE entitlement + (commonly) location permission.
-- `lowlevel` — 64-byte frame adapter on the host.
+- `lowlevel` — host BLE adapter forwarding raw notification chunks.
 - Firmware — some APIs fail in Bootloader.
 
 ### Which identifiers are required?
@@ -71,7 +71,7 @@ USB and BLE `connectId` values for the same unit are different — cache them se
 | :--- | :--- | :--- |
 | 🟢 No identifiers | SDK init, config, event management | `init` `on/off` `searchDevices` `getLogs` `dispose` `uiResponse` |
 | 🟡 `connectId` only | Device management, status, firmware ops | `getDeviceState` `openWalletSession` `cancel` `deviceSettings` |
-| 🔵 `connectId` + `deviceId` | Blockchain signing, address, encryption | `evmSignTransaction` `btcSignTransaction` `solanaSignMessage` `allNetworkGetAddress` |
+| 🔵 `connectId` + `deviceId` | Blockchain signing, address, encryption | `evmSignTransaction` `btcSignTransaction` `solSignMessage` `allNetworkGetAddress` |
 
 ## Standard lifecycle (recommended)
 <div id="standard-lifecycle" />
@@ -79,30 +79,33 @@ USB and BLE `connectId` values for the same unit are different — cache them se
 `init → search → getDeviceState → subscribe UI/DEVICE/FIRMWARE → call + uiResponse → cleanup`
 
 ```ts
-import HardwareSDK, { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-common-connect-sdk';
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
-await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
 
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success || !devices.payload.length) throw new Error('No device');
 const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
 
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
 
-HardwareSDK.on(UI_REQUEST.REQUEST_PIN, () => {
-  // open UI, collect input, then uiResponse
-});
-HardwareSDK.on(UI_REQUEST.REQUEST_PASSPHRASE, () => {});
+// Register the UI_EVENT handler shown below before any protected call.
+HardwareSDK.on(UI_EVENT, handleUiEvent);
 
-await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
   useEmptyPassphrase: true,
 });
+if (!address.success) throw new Error(address.payload.error);
 ```
 
-Serialize per device. Refresh features after a device switch. Remove listeners on unmount. Call `HardwareSDK.dispose()` only when tearing down the transport — see [Reconnect and dispose](/en/hardware-sdk/transport/reconnect).
+Serialize per device. Refresh `getDeviceState` after a device switch. Remove listeners on unmount. Call `HardwareSDK.dispose()` only when tearing down the transport — see [Reconnect and dispose](/en/hardware-sdk/transport/reconnect).
 
 ## Common params
 <div id="common-params" />
@@ -124,15 +127,15 @@ Subscribe once near app start. Only call `uiResponse` for input requests.
 
 | UI_REQUEST | When it fires | Respond with |
 | --- | --- | --- |
-| `REQUEST_PIN` | Protected call on a locked device | `UI_RESPONSE.RECEIVE_PIN` |
-| `REQUEST_PASSPHRASE` | Hidden wallet via software input | `UI_RESPONSE.RECEIVE_PASSPHRASE` |
-| `REQUEST_PASSPHRASE_ON_DEVICE` | Hidden wallet on device | `UI_RESPONSE.RECEIVE_PASSPHRASE` (`passphraseOnDevice: true`) |
+| `REQUEST_PIN` | Host PIN input request; device-only prompts need no reply | `UI_RESPONSE.RECEIVE_PIN` |
+| `REQUEST_PASSPHRASE` | Select host or device input (`value: ""`, `passphraseOnDevice: true` for device input) | `UI_RESPONSE.RECEIVE_PASSPHRASE` |
 | `REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE` | Web Bootloader chooser | `UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE` |
 
 **UI notifications (no `uiResponse`)**
 
 | UI_REQUEST | Purpose |
 | --- | --- |
+| `REQUEST_PASSPHRASE_ON_DEVICE` | Enter the passphrase on the device; notification only |
 | `REQUEST_BUTTON` | Confirm on device. Firmware update uses `reason='firmware-update'` — still no `uiResponse` |
 | `DEVICE_PROGRESS` | Long-running task progress |
 | `FIRMWARE_PROCESSING` / `FIRMWARE_PROGRESS` / `FIRMWARE_TIP` | Firmware upgrade states |
@@ -143,28 +146,44 @@ Subscribe once near app start. Only call `uiResponse` for input requests.
 
 | Channel | Event | Typical handling |
 | --- | --- | --- |
-| `DEVICE_EVENT` | `CONNECT` | Refresh device list |
-| `DEVICE_EVENT` | `DISCONNECT` | Invalidate the connection; do not replay side-effecting calls. [Reconnect](/en/hardware-sdk/transport/reconnect) |
-| `DEVICE_EVENT` | `ACQUIRE` / `RELEASE` | Gate concurrent calls |
-| `DEVICE_EVENT` | `CHANGED` | Re-read `getDeviceState` |
-| `DEVICE_EVENT` | `USED_ELSEWHERE` | Close the other Bridge / tab |
+| `DEVICE.CONNECT` | direct payload | Refresh device list |
+| `DEVICE.DISCONNECT` | direct payload | Invalidate the connection; do not replay side-effecting calls. [Reconnect](/en/hardware-sdk/transport/reconnect) |
+| `DEVICE.STATE` / `DEVICE.FEATURES` / `DEVICE.SUPPORT_FEATURES` | direct payload | Update device state / features / supported features |
 | `FIRMWARE_EVENT` | `RELEASE_INFO` / `BLE_RELEASE_INFO` | Offer upgrade when safe. [Firmware Update](/en/hardware-sdk/firmware-update) |
 
 ```ts
-import HardwareSDK, { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-common-connect-sdk';
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
-const handleUiEvent = (msg) => {
+import type { UiEventMessage } from '@onekeyfe/hd-core';
+
+// These modal functions are provided by your application's UI.
+declare function openPinModal(submit: (input: { value: string }) => void): void;
+declare function openPassphraseModal(submit: (input: { value: string; onDevice: boolean; save: boolean }) => void): void;
+
+const handleUiEvent = (msg: UiEventMessage) => {
   switch (msg.type) {
     case UI_REQUEST.REQUEST_PIN:
+      if (msg.payload.deviceOnly || msg.payload.type === 'ButtonRequest_PinEntry' || msg.payload.type === 'ButtonRequest_AttachPin') {
+        // Display an on-device prompt; no uiResponse is needed.
+        return;
+      }
       openPinModal(({ value }) =>
         HardwareSDK.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload: value })
       );
       return;
     case UI_REQUEST.REQUEST_PASSPHRASE:
+      if (msg.payload.deviceOnly) {
+        HardwareSDK.uiResponse({
+          type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+          payload: { value: '', passphraseOnDevice: true, save: false },
+        });
+        return;
+      }
       openPassphraseModal(({ value, onDevice, save }) =>
         HardwareSDK.uiResponse({
           type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-          payload: { value, passphraseOnDevice: onDevice, attachPinOnDevice: false, save },
+          payload: { value: onDevice ? "" : value, passphraseOnDevice: onDevice, attachPinOnDevice: false, save },
         })
       );
       return;
@@ -186,7 +205,7 @@ HardwareSDK.on(UI_EVENT, handleUiEvent);
 | Method/Firmware (400–418) | Bad params, firmware required, forbidden path | Validate HD path; [Firmware Update](/en/hardware-sdk/firmware-update) |
 | Transport (600–603) | Transport not configured, concurrent call | Check `env`, serialize calls |
 | Bluetooth (700–722) | Scan/permission/connect/timeout | Permission, proximity; do not loop on a stale bond |
-| Runtime/Bridge (800–821) | PIN cancelled, Bridge timeout | Retry or start Bridge |
+| Runtime/Bridge (800–822) | PIN cancelled, Bridge timeout | Retry or start Bridge |
 | Web device (901–902) | WebUSB not authorized | HTTPS + user gesture |
 
 Map `payload.code`, not `payload.error` text. Definitions: [`HardwareError.ts`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/shared/src/HardwareError.ts).

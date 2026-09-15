@@ -59,6 +59,7 @@ const deviceId = features.payload.device_id;
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
 ```
 
 `searchDevices` 仍然是 `{ success, payload }`。先看 `success`，再把 `payload` 当设备列表。
@@ -71,6 +72,8 @@ const deviceId = state.payload.identity.deviceId;
 const ps = await HardwareSDK.getPassphraseState(connectId, {
   initSession: true,
 });
+if (!ps.success) throw new Error(ps.payload.error);
+if (typeof ps.payload !== "string" || !ps.payload) throw new Error("No hidden wallet fingerprint");
 const passphraseState = ps.payload;
 
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
@@ -85,9 +88,10 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
 
 // 标准钱包
-await HardwareSDK.openWalletSession(connectId, {
+const standard = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.Standard,
 });
+if (!standard.success) throw new Error(standard.payload.error);
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
   useEmptyPassphrase: true,
@@ -97,10 +101,14 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 const opened = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.SelectHidden,
 });
-const deviceId = opened.payload.deviceId;
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden') {
+  throw new Error('A hidden wallet was not opened');
+}
+const hiddenDeviceId = opened.payload.deviceId;
 const passphraseState = opened.payload.passphraseState;
 
-await HardwareSDK.evmGetAddress(connectId, deviceId, {
+await HardwareSDK.evmGetAddress(connectId, hiddenDeviceId, {
   path: "m/44'/60'/0'/0/0",
   passphraseState,
 });
@@ -158,3 +166,5 @@ WebUSB 需要 HTTPS 和用户手势。BLE 需要系统蓝牙权限。
 - [核心接口指南](/zh/hardware-sdk/core-api-guide)
 - [钱包会话](/zh/hardware-sdk/concepts/wallet-session)
 - [重连与释放](/zh/hardware-sdk/transport/reconnect)
+
+Protocol V1 在关闭 passphrase 保护时，`select-hidden` 可能返回标准钱包。保存或使用 `passphraseState` 前先检查 `walletType`。

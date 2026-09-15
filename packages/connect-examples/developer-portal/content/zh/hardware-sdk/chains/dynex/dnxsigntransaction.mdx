@@ -86,7 +86,7 @@ const response = await HardwareSDK.dnxSignTransaction('connect1', 'device1', {
     success: false,
     payload: {
         error: string,
-        code: number
+        code?: string | number
     }
 }
 ```

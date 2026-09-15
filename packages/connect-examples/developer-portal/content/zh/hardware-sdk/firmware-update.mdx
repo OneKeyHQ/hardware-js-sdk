@@ -21,7 +21,9 @@ const release = await HardwareSDK.checkFirmwareRelease(connectId);
 if (!release.success) throw new Error(release.payload.error);
 
 // payload.status: 'valid' | 'outdated' | 'required' | 'unknown' | 'none'
-if (release.payload.status === 'valid') return;
+const updateAvailable = release.payload !== null &&
+  (release.payload.status === 'outdated' || release.payload.status === 'required');
+// Offer an update only when updateAvailable is true and release metadata exists.
 ```
 
 BLE 协处理器用 [`checkBLEFirmwareRelease`](/zh/hardware-sdk/device-api/checkblefirmwarerelease)。如果想连上以后再提示，订阅 `FIRMWARE_EVENT`（`RELEASE_INFO` / `BLE_RELEASE_INFO`）。
@@ -82,7 +84,7 @@ await HardwareSDK.firmwareUpdateV4(connectId, {
 
 ## 4. 调用之后
 
-1. 设备可能重启。等 `DEVICE_EVENT` 的 `CONNECT`（或重新 search）。普通重连会保持已确认的协议。见 [重连与释放](/zh/hardware-sdk/transport/reconnect)。
+1. 设备可能重启。等 `DEVICE.CONNECT`（或重新 search）。普通重连会保持已确认的协议。见 [重连与释放](/zh/hardware-sdk/transport/reconnect)。
 2. 相信新版本之前，重新读 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)（需要版本时用 `scope: 'firmware'`）。
 3. 如果是安装请求发出之后的传输超时，**不要重放**同一次升级。先重连、读状态，再决定。
 

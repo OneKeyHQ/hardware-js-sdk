@@ -4,7 +4,7 @@ title: 通用参数
 
 # 通用参数
 
-每次调用 `HardwareSDK.method(...)` 都会传入一个 `params` 对象。本页是地址、签名、设备方法的共用字段，**不是**每个方法都能收：`openWalletSession` 只要看到 `useEmptyPassphrase`、`initSession`、`deviceId`、`passphraseState`（包括 `false` 或从共用 defaults 展开进来）就会返回 `CallMethodInvalidParameter`。各链 / 设备方法页面只写自己独有的字段（`path`、`coin`、`tx`、`message` 等）。
+大多数链和设备方法接收 `params` 对象；初始化、事件与生命周期方法有各自的签名。本页是地址、签名、设备方法的共用字段，**不是**每个方法都能收：`openWalletSession` 只要看到 `useEmptyPassphrase`、`initSession`、`deviceId`、`passphraseState`（包括 `false` 或从共用 defaults 展开进来）就会返回 `CallMethodInvalidParameter`。各链 / 设备方法页面只写自己独有的字段（`path`、`coin`、`tx`、`message` 等）。
 
 本页是参数**参考**。调用生命周期见 [Core API Guide](/zh/hardware-sdk/core-api-guide)。响应里的 ID（`connectId`、`deviceId`、`uuid`、`session_id` 等）见 [标识符](/zh/hardware-sdk/concepts/identifiers)。
 
@@ -16,9 +16,9 @@ title: 通用参数
 | `useEmptyPassphrase` | `boolean` | 强制走标准钱包 | 避免残留的隐藏钱包会话悄悄改掉地址。**不能**和 `passphraseState` 同时传。 |
 | `initSession` | `boolean` | 调用前强制初始化 session | 兼容路径上搭配 `passphraseState`。新代码应优先 `openWalletSession({ mode })`，不要把 `mode` 和这个标志混在一次调用里。 |
 | `deriveCardano` | `boolean` | 在设备上预派生 Cardano 子树 | 一个 session 里第一次调 Cardano 方法时设为 `true`。 |
-| `retryCount` | `number` | 传输错误时的重试次数 | 主要用于 BLE。**不要**用它在断开后重放固件升级、擦除或签名。 |
-| `pollIntervalTime` | `number` | 重试间隔（毫秒） | 和 `retryCount` 配合，主要用于 BLE。 |
-| `timeout` | `number` | 单次调用超时（毫秒） | 固件升级、大 PSBT 可以调大。 |
+| `retryCount` | `number` | 建立连接的重试上限 | Core 在连接/初始化阶段使用，不会重放已完成或失败的签名操作。 |
+| `pollIntervalTime` | `number` | 连接重试的轮询间隔（毫秒） | 在连接阶段配合 `retryCount` 使用。 |
+| `timeout` | `number` | 单次连接尝试超时（毫秒） | 不设置签名或固件传输的超时。 |
 | `detectBootloaderDevice` | `boolean` | 设备处于 Bootloader 时立刻失败 | 用在签名路径上。 |
 | `skipWebDevicePrompt` | `boolean` | 跳过 WebUSB 设备选择弹窗 | **仅 WebUSB**，复用之前的授权。 |
 | `keepSession` | `boolean` | 调用结束后继续持有传输 | 控制 `Device.run()` 是否 `release()` 链路。这不是钱包身份，也**不能**用 `passphraseState` / `openWalletSession` 替代。USB 连续签名 / 检查后升级、Electron BLE 固件窗口仍需要它。 |
@@ -28,7 +28,7 @@ title: 通用参数
 | 参数 | WebUSB | Bridge | node-usb | Android BLE | iOS BLE | Desktop BLE |
 | --- | --- | --- | --- | --- | --- | --- |
 | `skipWebDevicePrompt` | ✅ | — | — | — | — | — |
-| `retryCount` / `pollIntervalTime` / `timeout` | 实际无影响 | 实际无影响 | 实际无影响 | **有用** | **有用** | **有用** |
+| `retryCount` | `number` | 建立连接的重试上限 | Core 在连接/初始化阶段使用，不会重放已完成或失败的签名操作。 |
 | `passphraseState` / `useEmptyPassphrase` / `initSession` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `deriveCardano` / `detectBootloaderDevice` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
@@ -49,6 +49,10 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 const opened = await HardwareSDK.openWalletSession(connectId, {
   mode: 'select-hidden',
 });
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden') {
+  throw new Error('A hidden wallet was not opened');
+}
 const hiddenWallet = {
   passphraseState: opened.payload.passphraseState,
 };
@@ -77,6 +81,8 @@ const bleDefaults = {
 
 <div id="hd-path" />
 
+方法文档中的最小路径长度是 SDK 输入校验，不代表该长度的任意路径都受支持。固件还会校验各链的派生与硬化规则。
+
 `path: string | number[]`，遵循 BIP44。ed25519 链（Solana、NEAR 等）必须全硬化。
 
 | 链 | 示例路径 | 说明 |
@@ -91,3 +97,5 @@ const bleDefaults = {
 数组示例：`[(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0x80000000, 0, 0]`
 
 遇到 forbidden path：按对应链文档检查长度和硬化标记。
+
+Protocol V1 在关闭 passphrase 保护时，`select-hidden` 可能返回标准钱包。保存或使用 `passphraseState` 前先检查 `walletType`。

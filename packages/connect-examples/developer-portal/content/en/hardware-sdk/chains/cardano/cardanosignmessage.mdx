@@ -25,11 +25,15 @@ const result = await HardwareSDK.cardanoSignMessage(connectId, deviceId, params)
 * `path` - _required_ `string | Array<number>` minimum length is `3`. read more
 * `message` - _required_ `string` message to sign in hex text
 * `networkId` - _required_ `Integer` 1 for Mainnet, 0 for Testnet
-* `derivationType` - _optional_ `CardanoDerivationType` enum. determines used derivation type. Default is set to ICARUS=1
+* `derivationType` - _required_ `CardanoDerivationType` enum. determines used derivation type. Default is set to ICARUS=1
+
+The current TypeScript API requires `derivationType` explicitly even though the runtime defaults to ICARUS.
 
 ### Example
 
 ```typescript
+import { PROTO } from "@onekeyfe/hd-core";
+
 // Original message
 const message = "Hello World";
 
@@ -39,7 +43,8 @@ const messageHex = Buffer.from(message).toString('hex');
 HardwareSDK.cardanoSignMessage(connectId, deviceId, {
     path: "m/1852'/1815'/0'/0/0",
     message: messageHex,
-    networkId: 1
+    networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS
 });
 ```
 
@@ -62,7 +67,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

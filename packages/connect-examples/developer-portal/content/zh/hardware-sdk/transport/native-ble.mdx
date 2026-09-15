@@ -25,6 +25,6 @@ description: "面向 Android/iOS/Flutter 的 Bluetooth Low Energy 传输"
 
 ## 核心概念
 
-- 先阅读 [底层传输插件与协议](/zh/hardware-sdk/concepts/low-level-plugin)，掌握 64 字节协议与消息封装结构。
+- 先阅读 [底层传输插件与协议](/zh/hardware-sdk/concepts/low-level-plugin)，掌握 原始 BLE 通知转发与 SDK 负责的 V1/V2 帧处理。
 - 尽早订阅 `UI_EVENT`，避免 PIN/密码短语/确认对话阻塞消息队列。
 - 与 Web 方案共用同一套 `HardwareSDK` 适配器，原生代码只需将 BLE 数据包转发给 JavaScript。

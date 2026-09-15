@@ -18,7 +18,7 @@ const result = await HardwareSDK.suiGetPublicKey(connectId, deviceId, params);
 
 ### Exporting single public key
 
-* `path` - _required_ `string | Array<number>` minimum length is `1`. read more
+* `path` - _required_ `string | Array<number>` SDK minimum length is `3`. read more
 * `showOnOneKey` - _optional_ `boolean` determines if address will be displayed on device. Default is set to `true`
 
 #### Exporting bundle of public keys
@@ -56,7 +56,7 @@ Result with only one public key
 {
     success: true,
     payload: {
-        path: string, // hardended path
+        path: string, // serialized BIP32 path
         publicKey: string
     }
 }
@@ -84,7 +84,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

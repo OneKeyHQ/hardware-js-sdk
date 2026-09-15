@@ -31,15 +31,15 @@ const result = await HardwareSDK.polkadotGetAddress(connectId, deviceId, params)
 ### 导出单个公钥
 
 * `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `prefix` - _必需_ `string` 地址前缀。默认设置为 `nexatest`
-* `network` - _必需_ `string` 网络名称，默认设置为 `polkadot`
+* `prefix` - _必需_ `number` SS58 地址前缀，Polkadot 使用 `0`
+* `network` - _必需_ `string` 网络名称，例如 `polkadot`
 * `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
 
 
 
 #### 导出批量公钥
 
-* `bundle` - 包含 `path`、`coin` 字段的对象 `Array`
+* `bundle` - 包含 `path`、`prefix`、`network`、`showOnOneKey` 字段的对象 `Array`
 
 ### 示例
 
@@ -49,7 +49,8 @@ const result = await HardwareSDK.polkadotGetAddress(connectId, deviceId, params)
 HardwareSDK.polkadotGetAddress(connectId, deviceId, {
     path: "m/44'/354'/0'/0'/0'",
     showOnOneKey: true,
-    isTestnet: false
+    network: "polkadot",
+    prefix: 0
 });
 ```
 
@@ -58,9 +59,9 @@ HardwareSDK.polkadotGetAddress(connectId, deviceId, {
 ```typescript
 HardwareSDK.polkadotGetAddress(connectId, deviceId, {
     bundle: [
-        { path: "m/44'/354'/0'/0'/1'" }, // 账户 1
-        { path: "m/44'/354'/0'/0'/2'" }, // 账户 2
-        { path: "m/44'/354'/0'/0'/3'" }  // 账户 3
+        { path: "m/44'/354'/0'/0'/1'", network: "polkadot", prefix: 0 }, // 账户 1
+        { path: "m/44'/354'/0'/0'/2'", network: "polkadot", prefix: 0 }, // 账户 2
+        { path: "m/44'/354'/0'/0'/3'", network: "polkadot", prefix: 0 }  // 账户 3
     ]
 });
 ```
@@ -73,7 +74,7 @@ HardwareSDK.polkadotGetAddress(connectId, deviceId, {
 {
     success: true,
     payload: {
-        path: Array<number>, // 强化路径
+        path: string, // 序列化 BIP32 路径
         address: string,   // 地址
         publicKey: string, // 公钥
     }
@@ -100,7 +101,7 @@ HardwareSDK.polkadotGetAddress(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

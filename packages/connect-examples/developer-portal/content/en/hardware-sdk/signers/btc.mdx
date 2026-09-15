@@ -20,10 +20,10 @@ Bitcoin UTXO signing guide. Covers address confirmation and P2PKH / P2SH-P2WPKH 
 
 ## How it works
 
-OneKey BTC signer talks to the device app via `HardwareSDK`, wraps APDUs into UTXO review and signing tasks.
+OneKey BTC signer uses `HardwareSDK` and the OneKey protocol to request UTXO review and signing on the device.
 
 - Paths must match script purpose (44/49/84/86).
-- Each input needs a full previous transaction (`refTxs`), otherwise the device rejects.
+- Provide complete previous transactions requested by the signing flow in `refTxs`; the requirements depend on input type and firmware.
 - The device shows inputs, outputs, change, and fee; after confirmation it returns signatures or a serialized tx.
 
 ## Installation
@@ -36,10 +36,17 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
-await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
 const { connectId } = devices.payload[0];
-const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
 ```
 
 ## Common scenarios
@@ -52,19 +59,22 @@ const res = await HardwareSDK.btcGetAddress(connectId, deviceId, {
   coin: 'btc',
   showOnOneKey: true,
 });
-// res.payload.address, publicKey?, path
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.address and res.payload.path are strings.
 ```
 
 **Parameters**
 
-- `path` / `address_n`: required; must match purpose.
-- `coin`: required; e.g., `btc`, `test`.
+- `path`: required; must match purpose.
+- `coin`: optional for address requests; e.g., `btc`, `test`.
 - `showOnOneKey?`: optional; display and confirm on device.
 
 **Returns**
 
 ```ts
-Promise<{ success, payload: { address, path, publicKey?, chainCode? } }>
+type AddressResult =
+  | { success: true; payload: { address: string; path: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
 ```
 
 ---
@@ -79,7 +89,8 @@ const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, dev
   refTxs,
   locktime: 0,
 });
-// payload.serializedTx (ready to broadcast)
+if (!success) throw new Error(payload.error);
+// Verify payload.serializedTx and payload.signatures before broadcasting.
 ```
 
 **Parameters**
@@ -94,37 +105,49 @@ const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, dev
 - `outputs`: required array with:
   - Recipient: `address` + `amount` + `script_type` (e.g., `PAYTOADDRESS`)
   - Change: `address_n` + `amount` + `script_type` aligned to purpose
-- `refTxs`: required; full previous transactions for every input.
+- `refTxs`: required array; supply all previous transactions requested by firmware. Use an empty array only when the signing flow needs none.
 - `locktime?`: optional.
 
 **Returns**
 
 ```ts
-Promise<{ success, payload: { serializedTx, signatures?: any } }>
+type SignResult =
+  | { success: true; payload: { serializedTx: string; signatures: string[]; txid?: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
 ```
 
 ## Interaction & Status
 
-- APIs resolve on completion; user prompts arrive via `UI_REQUEST` (unlock device, open BTC app, confirm inputs/outputs/change/fee).
+- APIs resolve on completion; user prompts arrive via `UI_REQUEST` (unlock device, confirm inputs/outputs/change/fee).
 - Run calls serially per device; use `showOnOneKey` to confirm receive/change paths before signing.
 
 ## Examples
 
 ### P2SH-P2WPKH transaction
 
+This is a preparation fragment. Replace the illustrative UTXO/output data with your transaction and load matching complete `refTxs` before calling the SDK.
+
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import type { BTCSignTransactionParams } from '@onekeyfe/hd-core';
 
-await HardwareSDK.init({ env: 'webusb', debug: false });
+const initialized = await HardwareSDK.init({ env: 'webusb', debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
 
 const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
 const { connectId } = devices.payload[0];
-const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
 
 const path49 = [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0, 0];
 await HardwareSDK.btcGetAddress(connectId, deviceId, { path: path49, coin: 'btc', showOnOneKey: true });
 
-const inputs = [
+const inputs: BTCSignTransactionParams['inputs'] = [
   {
     address_n: path49,
     prev_index: 0,
@@ -134,7 +157,7 @@ const inputs = [
   },
 ];
 
-const outputs = [
+const outputs: BTCSignTransactionParams['outputs'] = [
   {
     address_n: [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 1, 1],
     amount: '3181747',
@@ -147,15 +170,8 @@ const outputs = [
   },
 ];
 
-const refTxs = [
-  {
-    hash: 'b035d89d4543ce5713c553d69431698116a822c57c03ddacf3f04b763d1999ac',
-    version: 1,
-    lock_time: 0,
-    inputs: [/* previous tx inputs */],
-    bin_outputs: [/* previous tx outputs */],
-  },
-];
+// Load complete previous transactions matching each requested prev_hash.
+declare const refTxs: BTCSignTransactionParams['refTxs'];
 
 const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, deviceId, {
   coin: 'btc',
@@ -166,14 +182,14 @@ const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, dev
 });
 
 if (success) {
-  console.info('signed tx:', payload.serializedTx); // ready to broadcast
+  // Verify the signed transaction, then submit it through your Bitcoin client.
 }
 ```
 
 ## Validation & Troubleshooting
 
 - Path ↔ script: `44'`→P2PKH, `49'`→P2SH-P2WPKH, `84'`→P2WPKH, `86'`→P2TR.
-- `refTxs` must cover every input; missing data is rejected.
+- `refTxs` must contain every previous transaction requested by the firmware; missing requested data is rejected.
 - Change output should stay within the same account path.
 - Verify on device: inputs, outputs, change, fee must match your UI.
 - Host verify: rebuild with `bitcoinjs-lib` / `@scure/btc-signer`, check `serializedTx`/txid and signatures.
