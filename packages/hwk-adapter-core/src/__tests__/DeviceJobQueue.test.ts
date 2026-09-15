@@ -219,15 +219,15 @@ describe('DeviceJobQueue', () => {
     expect(started).toEqual(['A']);
   });
 
-  it('targeted cancellation preserves queued jobs for other interactions', async () => {
+  it('targeted cancellation preserves queued jobs for other operations', async () => {
     const queue = new DeviceJobQueue();
-    const reason = new Error('Interaction cancelled');
+    const reason = new Error('Operation cancelled');
     const cancelledJob = jest.fn(async () => 'cancelled');
     const otherJob = jest.fn(async () => 'other');
-    const first = queue.enqueue('old-interaction', cancelledJob);
-    const second = queue.enqueue('new-interaction', otherJob);
+    const first = queue.enqueue('old-operation', cancelledJob);
+    const second = queue.enqueue('new-operation', otherJob);
 
-    expect(queue.cancelActiveAndPending('old-interaction', reason)).toBe(true);
+    expect(queue.cancelActiveAndPending('old-operation', reason)).toBe(true);
     expect(await Promise.allSettled([first, second])).toEqual([
       { status: 'rejected', reason },
       { status: 'fulfilled', value: 'other' },
@@ -268,9 +268,9 @@ describe('DeviceJobQueue', () => {
     await expect(j2).resolves.toBe('j2');
   });
 
-  it('isBusy reflects the active slot', async () => {
+  it('getActiveJob reflects the active slot', async () => {
     const queue = new DeviceJobQueue();
-    expect(queue.isBusy()).toBe(false);
+    expect(queue.getActiveJob()).toBeNull();
 
     let release: () => void = () => {};
     const j = queue.enqueue(
@@ -282,10 +282,10 @@ describe('DeviceJobQueue', () => {
     );
 
     await new Promise(r => setTimeout(r, 5));
-    expect(queue.isBusy()).toBe(true);
+    expect(queue.getActiveJob()).toMatchObject({ deviceId: 'd' });
 
     release();
     await j;
-    expect(queue.isBusy()).toBe(false);
+    expect(queue.getActiveJob()).toBeNull();
   });
 });

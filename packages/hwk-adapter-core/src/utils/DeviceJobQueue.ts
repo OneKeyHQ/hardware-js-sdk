@@ -1,12 +1,16 @@
 /**
- * Pure FIFO job queue. Every enqueue chains onto the tail; jobs run one at
- * a time across all devices. The queue is intentionally passive — it does
- * NOT decide whether to interrupt or ask the user. Those are application-
- * layer concerns owned by the caller (e.g. a UI button handler that wants
- * to ask "device is busy, interrupt current?" before submitting). The
- * queue exposes inspection (`getActiveJob`) and explicit cancellation
- * (`cancelActive` / `cancelAll`) so callers can implement those policies
- * synchronously, without racing against in-flight enqueues.
+ * Serializes every device call and gives callers one handle to cancel them.
+ *
+ * Ordering is the lesser half of the job: calls already await each other, and
+ * nothing in the app issues two device operations at once. What this buys is
+ * the rest — an AbortController per job so a cancel has something to pull, a
+ * busy check so a double-submit is refused rather than queued, and generation
+ * tracking so a job that was queued before a teardown does not start after it.
+ * Those races exist in a perfectly sequential caller, because cleanup is async.
+ *
+ * The queue never decides whether to interrupt or ask the user; the caller owns
+ * that. `getActiveJob()` reads synchronously so a UI handler can look, decide,
+ * and submit in one turn without racing an in-flight enqueue.
  */
 
 export interface JobOptions {
@@ -93,26 +97,12 @@ export class DeviceJobQueue {
     return next;
   }
 
-  /** Cancel the active job. If `deviceId` is given, only cancels when it matches. */
-  cancelActive(deviceId?: string): boolean {
+  /** Cancel the running job. `reason` becomes signal.reason. */
+  cancelActive(deviceId?: string, reason?: Error): boolean {
     if (!this._active) return false;
     if (deviceId && this._active.deviceId !== deviceId) return false;
-    this._active.abortController.abort(new Error('Manually cancelled'));
+    this._active.abortController.abort(reason ?? new Error('Cancelled'));
     return true;
-  }
-
-  /** Force cancel the active job. `reason` becomes signal.reason. */
-  forceCancelActive(deviceId?: string, reason?: Error): boolean {
-    if (!this._active) return false;
-    if (deviceId && this._active.deviceId !== deviceId) return false;
-    this._active.abortController.abort(reason ?? new Error('Force cancelled for recovery'));
-    return true;
-  }
-
-  /** Cancel the active job (alias for callers that previously needed multi-device cancel). */
-  cancelAllActive(reason?: Error): void {
-    if (!this._active) return;
-    this._active.abortController.abort(reason ?? new Error('Cancelled by cancelAllActive'));
   }
 
   /** Cancel the active job and invalidate queued jobs that have not started. */
@@ -141,11 +131,6 @@ export class DeviceJobQueue {
       label: this._active.label,
       startedAt: this._active.startedAt,
     };
-  }
-
-  /** True if any job is currently running. */
-  isBusy(): boolean {
-    return this._jobs.size > 0;
   }
 
   clear(reason?: Error): void {
