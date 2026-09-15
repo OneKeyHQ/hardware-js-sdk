@@ -187,7 +187,7 @@ function assertAllowedLedgerRelayUrl(rawUrl: string): void {
  * Metro (React Native) can't resolve these; pass a custom importer that
  * uses CJS paths (e.g. `@ledgerhq/device-signer-kit-ethereum/lib/cjs/index.js`).
  */
-async function defaultLedgerKitImporter(pkg: string): Promise<any> {
+export async function defaultLedgerKitImporter(pkg: string): Promise<any> {
   switch (pkg) {
     case '@ledgerhq/device-management-kit':
       return import('@ledgerhq/device-management-kit');
@@ -197,6 +197,8 @@ async function defaultLedgerKitImporter(pkg: string): Promise<any> {
       return import('@ledgerhq/device-signer-kit-bitcoin');
     case '@ledgerhq/device-signer-kit-solana':
       return import('@ledgerhq/device-signer-kit-solana');
+    case '@ledgerhq/device-signer-kit-tron':
+      return import('@ledgerhq/device-signer-kit-tron');
     case '@ledgerhq/device-signer-kit-zcash':
       return import('@ledgerhq/device-signer-kit-zcash');
     case '@ledgerhq/context-module':
