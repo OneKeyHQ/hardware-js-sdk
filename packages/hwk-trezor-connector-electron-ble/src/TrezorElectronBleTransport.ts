@@ -6,11 +6,13 @@ import {
   filterTrezorDebugLogEntry,
 } from '@onekeyfe/hwk-trezor-connector';
 
-import type { TrezorBleApi, TrezorBleDeviceInfo } from './types/desktop-api';
+import { TREZOR_BLE_CONNECT_PROFILE, TREZOR_BLE_MATCH, TREZOR_BLE_VENDOR } from './bleProfile';
+
+import type { ThirdPartyBleApi, ThirdPartyBleDeviceInfo } from '@onekeyfe/hwk-desktop-noble-ble';
 
 export interface TrezorElectronBleTransportOptions {
   /** The IPC bridge exposed by the main process (typically `window.desktopApi.trezorBle`). */
-  bridge?: TrezorBleApi;
+  bridge?: ThirdPartyBleApi;
   logger?: TrezorDebugLogger;
 }
 
@@ -20,11 +22,11 @@ const disconnectError = (message: string): Error =>
 const notConnectedError = (id: string): Error =>
   disconnectError(`Trezor Electron BLE device is not connected: ${id}`);
 
-const resolveBridge = (options?: TrezorElectronBleTransportOptions): TrezorBleApi => {
+const resolveBridge = (options?: TrezorElectronBleTransportOptions): ThirdPartyBleApi => {
   if (options?.bridge) return options.bridge;
   const win =
     typeof window !== 'undefined'
-      ? (window as unknown as { desktopApi?: { trezorBle?: TrezorBleApi } })
+      ? (window as unknown as { desktopApi?: { trezorBle?: ThirdPartyBleApi } })
       : undefined;
   const bridge = win?.desktopApi?.trezorBle;
   if (!bridge) {
@@ -48,7 +50,7 @@ interface PendingRead {
  * sequentially without missing chunks that arrive between reads.
  */
 export class TrezorElectronBleTransport {
-  private readonly _bridge: TrezorBleApi;
+  private readonly _bridge: ThirdPartyBleApi;
 
   private readonly _connected = new Set<string>();
 
@@ -70,14 +72,16 @@ export class TrezorElectronBleTransport {
     this._wireGlobalListeners();
   }
 
-  async scan(durationMs?: number): Promise<TrezorBleDeviceInfo[]> {
-    // No serviceUuids filter: a native service-UUID scan filter drops a
-    // Safe 7's ADV packets on Windows (its UUID travels in the scan response,
-    // not the ADV packet), so the handler scans unfiltered and does the Trezor
-    // matching itself in JS. Passing a filter here would at best be ignored by
-    // a current handler and at worst re-break discovery on an older one.
+  async scan(durationMs?: number): Promise<ThirdPartyBleDeviceInfo[]> {
+    // `match` is applied in JS, after an unfiltered radio scan — it is not a
+    // native scan filter. That distinction matters: a native service-UUID
+    // filter drops a Safe 7's ADV packets on Windows, because its UUID travels
+    // in the scan response rather than the ADV packet. Hence the name patterns,
+    // which match what the ADV packet does carry.
     try {
       return await this._bridge.scan({
+        vendor: TREZOR_BLE_VENDOR,
+        match: TREZOR_BLE_MATCH,
         durationMs,
       });
     } catch (error) {
@@ -99,7 +103,9 @@ export class TrezorElectronBleTransport {
 
   async connect(connectId: string): Promise<void> {
     if (this._connected.has(connectId)) return;
-    await this._bridge.connect(connectId);
+    // The shared handler holds no vendor defaults: every GATT uuid and the
+    // padded-write framing travel with the call.
+    await this._bridge.connect(connectId, TREZOR_BLE_CONNECT_PROFILE);
     try {
       await this._bridge.subscribe(connectId);
     } catch (error) {

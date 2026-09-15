@@ -9,6 +9,12 @@ import {
 } from '@ledgerhq/device-management-kit';
 import { Left, Right } from 'purify-ts';
 import { defer, from, mergeMap } from 'rxjs';
+import {
+  LEDGER_BLE_MIN_FRAME_SIZE,
+  LEDGER_BLE_VENDOR,
+  ledgerBleConnectProfile,
+  ledgerBleMatch,
+} from './bleProfile';
 import { hexToBytes } from '@onekeyfe/hwk-adapter-core';
 
 import type {
@@ -21,8 +27,9 @@ import type {
 import type { ElectronBleApi, ElectronBleDeviceInfo } from '@onekeyfe/hwk-adapter-core';
 
 const TRANSPORT_ID = 'ELECTRON_BLE';
-// The ATT default is safe on both native backends; never split a Ledger frame in main.
-const FRAME_SIZE = 20;
+// Ledger's own transports open at the ATT default and then raise it from the
+// device's answer to the 0x08 handshake below. Keep the same floor so a device
+// that reports nothing useful still works.
 const normalizeUuid = (uuid: string) => uuid.replace(/-/g, '').toLowerCase();
 const toHex = (bytes: Uint8Array) =>
   Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
@@ -88,8 +95,8 @@ export class LedgerElectronBleTransport implements Transport {
       const availability = await this.bridge.checkAvailability();
       if (!availability.available) throw new Error(`Bluetooth unavailable: ${availability.state}`);
       const infos = await this.bridge.scan({
-        vendor: 'ledger',
-        serviceUuids: this.args.deviceModelDataSource.getBluetoothServices(),
+        vendor: LEDGER_BLE_VENDOR,
+        match: ledgerBleMatch(this.args.deviceModelDataSource.getBluetoothServices()),
       });
       const devices: TransportDiscoveredDevice[] = [];
       for (const info of infos) {
@@ -162,12 +169,14 @@ export class LedgerElectronBleTransport implements Transport {
         release();
         return Left(new UnknownDeviceError());
       }
-      await this.bridge.connect(deviceId, {
-        vendor: 'ledger',
-        serviceUuid: known.profile.serviceUuid,
-        writeUuid: known.profile.writeUuid,
-        notifyUuid: known.profile.notifyUuid,
-      });
+      await this.bridge.connect(
+        deviceId,
+        ledgerBleConnectProfile({
+          serviceUuid: known.profile.serviceUuid,
+          writeUuid: known.profile.writeUuid,
+          notifyUuid: known.profile.notifyUuid,
+        })
+      );
       removeDisconnect = this.bridge.onDeviceDisconnected(id => {
         if (id !== deviceId) return;
         if (close()) {
@@ -224,7 +233,13 @@ export class LedgerElectronBleTransport implements Transport {
         (bytes, resolve, reject) => {
           if (bytes.length < 6 || bytes[0] !== 0x08 || bytes[5] < 6) {
             reject(new Error('Invalid Ledger BLE MTU response'));
-          } else resolve(Math.min(FRAME_SIZE, bytes[5]));
+          } else {
+            // Matches @ledgerhq/hw-transport-web-ble inferMTU: the device
+            // reports the frame size it can take, and it is only ever used to
+            // raise the floor. Capping it here would negotiate and then throw
+            // the answer away, leaving every transfer at ~7x the frame count.
+            resolve(Math.max(LEDGER_BLE_MIN_FRAME_SIZE, bytes[5]));
+          }
         },
         30_000
       );

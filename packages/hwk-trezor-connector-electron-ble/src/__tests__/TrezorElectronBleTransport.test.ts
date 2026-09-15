@@ -3,15 +3,16 @@ import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 import { TREZOR_BLE_UUIDS } from '@onekeyfe/hwk-trezor-adapter';
 
 import { TrezorElectronBleConnector } from '../TrezorElectronBleConnector';
+import { TREZOR_BLE_CONNECT_PROFILE } from '../bleProfile';
 import { TrezorElectronBleTransport } from '../TrezorElectronBleTransport';
 
-import type { TrezorBleApi } from '../types/desktop-api';
+import type { ThirdPartyBleApi } from '../types/desktop-api';
 
 type NotificationHandler = (id: string, hex: string) => void;
 type DisconnectHandler = (id: string) => void;
 
 /** Fake `window.desktopApi.trezorBle` for unit tests. */
-class FakeBridge implements TrezorBleApi {
+class FakeBridge implements ThirdPartyBleApi {
   scan = jest.fn(async (_durationMs?: number) => [
     {
       id: 'BLE-1',
@@ -81,7 +82,9 @@ describe('TrezorElectronBleTransport', () => {
     const transport = new TrezorElectronBleTransport({ bridge });
 
     await transport.connect('BLE-1');
-    expect(bridge.connect).toHaveBeenCalledWith('BLE-1');
+    // The shared handler has no Trezor defaults left, so the GATT uuids and the
+    // padded-write framing must travel with every connect.
+    expect(bridge.connect).toHaveBeenCalledWith('BLE-1', TREZOR_BLE_CONNECT_PROFILE);
     expect(bridge.subscribe).toHaveBeenCalledWith('BLE-1');
 
     await transport.disconnect('BLE-1');

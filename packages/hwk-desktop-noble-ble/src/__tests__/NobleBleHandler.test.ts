@@ -1,15 +1,37 @@
 import { EventEmitter } from 'events';
-import { TREZOR_BLE_UUIDS } from '@onekeyfe/hwk-trezor-adapter';
 
 import { NobleBleHandler } from '../NobleBleHandler';
 import type { NoblePeripheralLike } from '../NobleBleHandler';
-import { TrezorElectronBleTransport } from '../TrezorElectronBleTransport';
-import { initTrezorBleSupport } from '../main';
-import { TREZOR_BLE_CHANNELS } from '../constants';
+import { initThirdPartyBleSupport } from '../main';
+import { THIRD_PARTY_BLE_CHANNELS } from '../constants';
 
-import type { TrezorBleApi } from '../types/desktop-api';
+import type { ThirdPartyBleApi } from '../types/desktop-api';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+// A stand-in vendor. The handler holds no vendor knowledge, so these tests
+// supply the same shape a real connector would send over IPC.
+const TREZOR_BLE_UUIDS = {
+  service: '8c000001-a59b-4d58-a9ad-073df69fa1b1',
+  write: '8c000002-a59b-4d58-a9ad-073df69fa1b1',
+  notify: '8c000003-a59b-4d58-a9ad-073df69fa1b1',
+};
+
+const PADDED_VENDOR = {
+  vendor: 'padded-vendor',
+  match: {
+    serviceUuids: [TREZOR_BLE_UUIDS.service],
+    namePatterns: ['\\bTrezor\\b', '\\bSafe\\s*7\\b|\\bT3W1\\b'],
+  },
+};
+
+const PADDED_PROFILE = {
+  vendor: PADDED_VENDOR.vendor,
+  serviceUuid: TREZOR_BLE_UUIDS.service,
+  writeUuid: TREZOR_BLE_UUIDS.write,
+  notifyUuid: TREZOR_BLE_UUIDS.notify,
+  write: { mode: 'padded' as const, chunkSize: 244, chunkDelayMs: 5 },
+};
 
 class FakeCharacteristic extends EventEmitter {
   subscribeAsync = jest.fn(async () => undefined);
@@ -93,7 +115,7 @@ class FakeIpcMain {
 }
 
 describe('NobleBleHandler', () => {
-  test('keeps Ledger GATT and unpadded frames separate from the default Trezor profile', async () => {
+  test('keeps one vendor GATT and unpadded frames separate from another padded profile', async () => {
     const serviceUuid = '13d63400-2c97-0004-0000-4c6564676572';
     const writeUuid = '13d63400-2c97-0004-0002-4c6564676572';
     const notifyUuid = '13d63400-2c97-0004-0001-4c6564676572';
@@ -106,21 +128,37 @@ describe('NobleBleHandler', () => {
     const trezor = new FakePeripheral('trezor-fixture', { localName: 'Trezor Safe 7' });
     const noble = new FakeNoble([ledger, trezor]);
     const handler = new NobleBleHandler({ nobleFactory: () => noble });
-    expect((await handler.scan()).map(device => device.id)).toEqual(['trezor-fixture']);
+    expect((await handler.scan(PADDED_VENDOR)).map(device => device.id)).toEqual([
+      'trezor-fixture',
+    ]);
     expect(
-      (await handler.scan({ vendor: 'ledger', serviceUuids: [serviceUuid] })).map(
+      (await handler.scan({ vendor: 'ledger', match: { serviceUuids: [serviceUuid] } })).map(
         device => device.id
       )
     ).toEqual(['ledger-fixture']);
-    await handler.connect(ledger.id, { vendor: 'ledger', serviceUuid, writeUuid, notifyUuid });
+    await handler.connect(ledger.id, {
+      vendor: 'ledger',
+      serviceUuid,
+      writeUuid,
+      notifyUuid,
+      write: { mode: 'raw', maxLength: 255 },
+    });
     await handler.write(ledger.id, '0800000000');
     expect(ledger.writeChar.writeAsync).toHaveBeenCalledWith(
       Buffer.from('0800000000', 'hex'),
       false
     );
-    await expect(handler.write(ledger.id, '00'.repeat(21))).rejects.toThrow(
-      'Invalid Ledger BLE frame'
+    // The renderer negotiates the frame size per connection, so anything the
+    // single-byte MTU field can express has to get through unpadded.
+    await handler.write(ledger.id, '00'.repeat(21));
+    expect(ledger.writeChar.writeAsync).toHaveBeenLastCalledWith(
+      Buffer.from('00'.repeat(21), 'hex'),
+      false
     );
+    await expect(handler.write(ledger.id, '00'.repeat(256))).rejects.toThrow(
+      'Invalid BLE frame for ledger'
+    );
+    await expect(handler.write(ledger.id, '0')).rejects.toThrow('Invalid BLE frame for ledger');
     await handler.dispose();
   });
 
@@ -129,7 +167,7 @@ describe('NobleBleHandler', () => {
     const noble = new FakeNoble([peripheral]);
     const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
 
-    const devices = await handler.scan({ durationMs: 0 });
+    const devices = await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
     expect(devices).toEqual([
       expect.objectContaining({ id: 'id-1', name: 'Trezor Safe 7', rssi: -55 }),
     ]);
@@ -141,7 +179,7 @@ describe('NobleBleHandler', () => {
     expect(noble.startScanningAsync).toHaveBeenCalledWith([], true);
 
     // A second poll reuses the running scan rather than restarting it.
-    await handler.scan({ durationMs: 0 });
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
     expect(noble.startScanningAsync).toHaveBeenCalledTimes(1);
 
     // Clear the idle-stop timer so it doesn't outlive the test.
@@ -156,7 +194,7 @@ describe('NobleBleHandler', () => {
     const noble = new FakeNoble([trezor, other]);
     const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
 
-    const devices = await handler.scan({ durationMs: 0 });
+    const devices = await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
     expect(devices.map(d => d.id)).toEqual(['id-trezor']);
 
     await handler.stopScan();
@@ -172,15 +210,15 @@ describe('NobleBleHandler', () => {
     const noble = new FakeNoble([peripheral]);
     const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
 
-    await handler.scan({ durationMs: 0 });
-    await handler.connect('id-1');
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+    await handler.connect('id-1', PADDED_PROFILE);
 
     // The link is up: the device no longer advertises...
     (noble as any).peripherals.length = 0;
     // ...and the discovery cache from the earlier scan is gone.
     await handler.stopScan();
 
-    const devices = await handler.scan({ durationMs: 0 });
+    const devices = await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
     expect(devices.map(d => ({ id: d.id, state: d.state }))).toEqual([
       { id: 'id-1', state: 'connected' },
     ]);
@@ -189,11 +227,30 @@ describe('NobleBleHandler', () => {
     await handler.stopScan();
   });
 
-  test('an explicitly passed serviceUuids filter is ignored, not forwarded to noble', async () => {
-    // serviceUuids survives on the IPC options only so an older renderer stays
-    // compatible; honouring it would reintroduce the Windows ADV-drop bug, so
-    // the handler must discard it rather than pass it to startScanningAsync.
+  test('match criteria never reach noble as a native scan filter', async () => {
+    // Honouring a native service-UUID filter would reintroduce the Windows
+    // ADV-drop bug, so the radio scan always runs unfiltered and `match` is
+    // applied afterwards in JS. This fixture advertises no service UUID at
+    // all — it survives only because the name patterns are matched here.
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    const noble = new FakeNoble([peripheral]);
+    const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
+
+    const devices = await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+
+    expect(devices.map(d => d.id)).toEqual(['id-1']);
+    expect(noble.startScanningAsync).toHaveBeenCalledWith([], true);
+
+    await handler.stopScan();
+  });
+
+  test('a legacy serviceUuids-only scan still matches on the advertised uuid', async () => {
+    // Older renderers send `serviceUuids` with no `match`. They keep working,
+    // but only for devices that actually advertise the uuid.
+    const peripheral = new FakePeripheral('id-1', {
+      localName: 'anything',
+      serviceUuids: [TREZOR_BLE_UUIDS.service],
+    });
     const noble = new FakeNoble([peripheral]);
     const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
 
@@ -203,8 +260,6 @@ describe('NobleBleHandler', () => {
     });
 
     expect(devices.map(d => d.id)).toEqual(['id-1']);
-    expect(noble.startScanningAsync).toHaveBeenCalledWith([], true);
-
     await handler.stopScan();
   });
 
@@ -222,7 +277,7 @@ describe('NobleBleHandler', () => {
     });
     const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
 
-    const result = await handler.connect('id-1');
+    const result = await handler.connect('id-1', PADDED_PROFILE);
 
     expect(result).toEqual({ id: 'id-1', name: 'Trezor Safe 7' });
     expect((noble as any).connectAsync).toHaveBeenCalledWith('id-1');
@@ -250,9 +305,9 @@ describe('NobleBleHandler', () => {
       nobleFactory: () => noble as any,
       connectTimeoutMs: 60_000,
     });
-    await handler.scan({ durationMs: 0 });
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
 
-    const pending = handler.connect('id-1');
+    const pending = handler.connect('id-1', PADDED_PROFILE);
     const settled = pending.then(
       () => 'resolved',
       (error: Error) => error.message
@@ -287,9 +342,9 @@ describe('NobleBleHandler', () => {
       // the settle delay first, and connectAsync itself takes 400ms more.
       connectTimeoutMs: 400,
     });
-    await handler.scan({ durationMs: 0 }); // put the peripheral in the cache
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 }); // put the peripheral in the cache
 
-    await expect(handler.connect('id-1')).rejects.toThrow(/timed out/);
+    await expect(handler.connect('id-1', PADDED_PROFILE)).rejects.toThrow(/timed out/);
 
     // Let the late connectAsync success and the abandoned-path teardown settle.
     await new Promise(resolve => {
@@ -308,10 +363,14 @@ describe('NobleBleHandler', () => {
   test('connect discovers chars and write splits into chunks', async () => {
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
     const noble = new FakeNoble([peripheral]);
-    const handler = new NobleBleHandler({ nobleFactory: () => noble as any, chunkSize: 100 });
-    await handler.scan({ durationMs: 0 });
+    const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
 
-    await handler.connect('id-1');
+    // chunkSize now travels with the connect profile, not the handler.
+    await handler.connect('id-1', {
+      ...PADDED_PROFILE,
+      write: { ...PADDED_PROFILE.write, chunkSize: 100 },
+    });
     expect(peripheral.connectAsync).toHaveBeenCalled();
     expect(peripheral.discoverSomeServicesAndCharacteristicsAsync).toHaveBeenCalled();
 
@@ -333,8 +392,8 @@ describe('NobleBleHandler', () => {
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
     const noble = new FakeNoble([peripheral]);
     const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
-    await handler.scan({ durationMs: 0 });
-    await handler.connect('id-1');
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+    await handler.connect('id-1', PADDED_PROFILE);
 
     const received: Array<[string, string]> = [];
     handler.setNotificationListener((id, hex) => received.push([id, hex]));
@@ -348,8 +407,8 @@ describe('NobleBleHandler', () => {
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
     const noble = new FakeNoble([peripheral]);
     const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
-    await handler.scan({ durationMs: 0 });
-    await handler.connect('id-1');
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+    await handler.connect('id-1', PADDED_PROFILE);
 
     const onDisc = jest.fn();
     handler.setDisconnectedListener(onDisc);
@@ -362,8 +421,8 @@ describe('NobleBleHandler', () => {
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
     const noble = new FakeNoble([peripheral]);
     const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
-    await handler.scan({ durationMs: 0 });
-    await handler.connect('id-1');
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+    await handler.connect('id-1', PADDED_PROFILE);
 
     const onDisc = jest.fn();
     handler.setDisconnectedListener(onDisc);
@@ -375,7 +434,7 @@ describe('NobleBleHandler', () => {
   });
 });
 
-describe('initTrezorBleSupport', () => {
+describe('initThirdPartyBleSupport', () => {
   test('registers all request/response IPC channels and forwards push events', async () => {
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
     const noble = new FakeNoble([peripheral]);
@@ -385,86 +444,38 @@ describe('initTrezorBleSupport', () => {
       send: (channel: string, ...args: unknown[]) => sent.push([channel, args]),
     };
 
-    const handle = initTrezorBleSupport(webContents, {
+    const handle = initThirdPartyBleSupport(webContents, {
       ipcMain,
       nobleFactory: () => noble as any,
     });
 
     // All request channels were registered.
     for (const ch of [
-      TREZOR_BLE_CHANNELS.scan,
-      TREZOR_BLE_CHANNELS.stopScan,
-      TREZOR_BLE_CHANNELS.connect,
-      TREZOR_BLE_CHANNELS.disconnect,
-      TREZOR_BLE_CHANNELS.write,
-      TREZOR_BLE_CHANNELS.subscribe,
-      TREZOR_BLE_CHANNELS.unsubscribe,
-      TREZOR_BLE_CHANNELS.availability,
+      THIRD_PARTY_BLE_CHANNELS.scan,
+      THIRD_PARTY_BLE_CHANNELS.stopScan,
+      THIRD_PARTY_BLE_CHANNELS.connect,
+      THIRD_PARTY_BLE_CHANNELS.disconnect,
+      THIRD_PARTY_BLE_CHANNELS.write,
+      THIRD_PARTY_BLE_CHANNELS.subscribe,
+      THIRD_PARTY_BLE_CHANNELS.unsubscribe,
+      THIRD_PARTY_BLE_CHANNELS.availability,
     ]) {
       expect(ipcMain.handlers.has(ch)).toBe(true);
     }
 
     // Drive the handlers through IPC.
-    await ipcMain.invoke(TREZOR_BLE_CHANNELS.scan, { durationMs: 0 });
-    await ipcMain.invoke(TREZOR_BLE_CHANNELS.connect, 'id-1');
-    await ipcMain.invoke(TREZOR_BLE_CHANNELS.subscribe, 'id-1');
+    await ipcMain.invoke(THIRD_PARTY_BLE_CHANNELS.scan, { durationMs: 0 });
+    await ipcMain.invoke(THIRD_PARTY_BLE_CHANNELS.connect, 'id-1', PADDED_PROFILE);
+    await ipcMain.invoke(THIRD_PARTY_BLE_CHANNELS.subscribe, 'id-1');
 
     peripheral.notifyChar.emit('data', Buffer.from([0x01]), true);
-    expect(sent).toContainEqual([TREZOR_BLE_CHANNELS.notification, ['id-1', '01']]);
+    expect(sent).toContainEqual([THIRD_PARTY_BLE_CHANNELS.notification, ['id-1', '01']]);
 
     peripheral.emit('disconnect');
-    expect(sent).toContainEqual([TREZOR_BLE_CHANNELS.disconnected, ['id-1']]);
+    expect(sent).toContainEqual([THIRD_PARTY_BLE_CHANNELS.disconnected, ['id-1']]);
 
     await handle.dispose();
     expect(ipcMain.handlers.size).toBe(0);
-  });
-
-  test('renderer transport → IPC → handler scan stays unfiltered end to end', async () => {
-    // The regression this guards: the renderer transport used to send a
-    // service-UUID filter over IPC, and the handler forwarded it to
-    // noble.startScanningAsync. On Windows noble applies that filter per
-    // received packet, and a Safe 7's ADV packet carries only its name — so
-    // the JS-side Trezor filter never even saw the device. The full production
-    // path must reach noble with NO native filter.
-    const safe7 = new FakePeripheral('id-safe7', { localName: 'Trezor Safe 7' });
-    const noble = new FakeNoble([safe7]);
-    const ipcMain = new FakeIpcMain();
-    const webContents = { send: () => undefined };
-
-    const handle = initTrezorBleSupport(webContents, {
-      ipcMain,
-      nobleFactory: () => noble as any,
-    });
-
-    // Renderer-side bridge exactly as a preload would wire it: every call goes
-    // through the IPC channel, nothing shortcuts to the handler.
-    const invoke = (channel: string, ...args: any[]) => ipcMain.invoke(channel, ...args);
-    const bridge = {
-      scan: (options?: unknown) => invoke(TREZOR_BLE_CHANNELS.scan, options),
-      stopScan: () => invoke(TREZOR_BLE_CHANNELS.stopScan),
-      connect: (id: string) => invoke(TREZOR_BLE_CHANNELS.connect, id),
-      disconnect: (id: string) => invoke(TREZOR_BLE_CHANNELS.disconnect, id),
-      subscribe: (id: string) => invoke(TREZOR_BLE_CHANNELS.subscribe, id),
-      unsubscribe: (id: string) => invoke(TREZOR_BLE_CHANNELS.unsubscribe, id),
-      write: (id: string, hexData: string) => invoke(TREZOR_BLE_CHANNELS.write, id, hexData),
-      checkAvailability: () => invoke(TREZOR_BLE_CHANNELS.availability),
-      getDevice: (id: string) => invoke(TREZOR_BLE_CHANNELS.getDevice, id),
-      readRssi: (id: string) => invoke(TREZOR_BLE_CHANNELS.readRssi, id),
-      cancelPairing: () => invoke(TREZOR_BLE_CHANNELS.cancelPairing),
-      onNotification: () => () => undefined,
-      onDeviceDisconnected: () => () => undefined,
-    } as unknown as TrezorBleApi;
-
-    const transport = new TrezorElectronBleTransport({ bridge });
-    const devices = await transport.scan(0);
-
-    // The Safe 7 advertises no service UUID (name only), so it survives the
-    // trip iff the native scan really ran unfiltered.
-    expect(devices.map(d => d.id)).toEqual(['id-safe7']);
-    expect(noble.startScanningAsync).toHaveBeenCalledWith([], true);
-
-    await transport.stopScan();
-    await handle.dispose();
   });
 });
 
@@ -497,8 +508,8 @@ describe('Trezor BLE process shutdown', () => {
     );
     const native = Object.assign(new FakeNoble([peripheral]), { stop: jest.fn() });
     const handler = new NobleBleHandler({ nobleFactory: () => native });
-    await handler.scan({ durationMs: 0 });
-    const connecting = handler.connect(peripheral.id);
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+    const connecting = handler.connect(peripheral.id, PADDED_PROFILE);
     const rejected = expect(connecting).rejects.toThrow('shutting down');
     await flushCallbacks();
     jest.advanceTimersByTime(300);
@@ -543,8 +554,8 @@ describe('Trezor BLE process shutdown', () => {
         connectAsync,
       });
       const handler = new NobleBleHandler({ nobleFactory: () => native });
-      await handler.scan({ durationMs: 0 });
-      const connecting = handler.connect(peripheral.id);
+      await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+      const connecting = handler.connect(peripheral.id, PADDED_PROFILE);
       const rejected = expect(connecting).rejects.toThrow('shutting down');
       await flushCallbacks();
       jest.advanceTimersByTime(300);
@@ -579,7 +590,7 @@ describe('Trezor BLE process shutdown', () => {
     const handler = new NobleBleHandler({ nobleFactory: factory });
     await handler.disposeForAppQuit();
     expect(factory).not.toHaveBeenCalled();
-    await expect(handler.scan()).rejects.toThrow('shutting down');
+    await expect(handler.scan(PADDED_VENDOR)).rejects.toThrow('shutting down');
   });
 
   test('keeps native alive on renderer disposal and releases every recovered instance on quit', async () => {
@@ -590,7 +601,7 @@ describe('Trezor BLE process shutdown', () => {
     await handler.init();
     original.state = 'unsupported';
     original.startScanningAsync.mockRejectedValueOnce(new Error('adapter unavailable'));
-    await handler.scan();
+    await handler.scan(PADDED_VENDOR);
     expect(factory).toHaveBeenCalledTimes(2);
     await handler.dispose();
     expect(original.stop).not.toHaveBeenCalled();
@@ -629,7 +640,7 @@ describe('Trezor BLE process shutdown', () => {
     const factory = jest.fn(() => native);
     const handler = new NobleBleHandler({ nobleFactory: factory });
     await handler.init();
-    const scanning = handler.scan();
+    const scanning = handler.scan(PADDED_VENDOR);
     const rejected = expect(scanning).rejects.toThrow('shutting down');
     await Promise.resolve();
     await handler.disposeForAppQuit();
@@ -644,7 +655,7 @@ describe('Trezor BLE process shutdown', () => {
     jest.useFakeTimers({ doNotFake: ['performance'] });
     const native = Object.assign(new FakeNoble(), { stop: jest.fn() });
     const ipcMain = new FakeIpcMain();
-    const support = initTrezorBleSupport(
+    const support = initThirdPartyBleSupport(
       { send: jest.fn() },
       { nobleFactory: () => native, ipcMain }
     );
