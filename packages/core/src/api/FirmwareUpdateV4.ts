@@ -96,6 +96,8 @@ const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
 const PROTOCOL_V2_CONNECT_SINGLE_TIMEOUT = 75 * 1000;
 const PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT = 30 * 1000;
 const PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT = 3;
+const PROTOCOL_V2_WEBUSB_FIRMWARE_CHUNK_SIZE = 2048;
+const PROTOCOL_V2_WEBUSB_FIRMWARE_WRITE_DELAY_MS = 10;
 const PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS = 1000;
 const PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE = 'FirmwareInstallStatusConflict';
 const PROTOCOL_V2_INSTALL_FAILED_CODE = 'FirmwareInstallFailed';
@@ -2132,6 +2134,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     processedSize: number;
     totalSize: number;
   }) {
+    const env = DataManager.getSettings('env');
+    const deviceType = this.device?.getCurrentDeviceType();
+    const paceWebUsbWrites =
+      (deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo) &&
+      this.params?.platform !== 'native' &&
+      (DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env));
+    const chunkSize = this.getProtocolV2FirmwareChunkSize('write', filePath);
     let lastError: unknown;
     for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
       let shortWriteError: HardwareError | undefined;
@@ -2139,7 +2148,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         const transferStartedAt = Date.now();
         await writeFirmwareByteSource({
           source,
-          chunkSize: this.getProtocolV2FirmwareChunkSize('write', filePath),
+          chunkSize: paceWebUsbWrites
+            ? Math.min(chunkSize, PROTOCOL_V2_WEBUSB_FIRMWARE_CHUNK_SIZE)
+            : chunkSize,
           write: async ({ data, sourceOffset, length, first }) => {
             const chunkEnd = sourceOffset + length;
             const deviceProgress = getProtocolV2DeviceTransferProgress(
@@ -2197,6 +2208,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
                   elapsedMs > 0 ? Math.round((chunkEnd / elapsedMs) * 1000) : undefined,
                 elapsedMs,
               });
+            }
+            if (paceWebUsbWrites) {
+              await wait(PROTOCOL_V2_WEBUSB_FIRMWARE_WRITE_DELAY_MS);
             }
             return length;
           },

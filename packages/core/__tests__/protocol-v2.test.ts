@@ -8657,6 +8657,76 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
+  test.each([
+    [EDeviceType.Pro2, 'webusb', 'vol0:/application_p1.bin'],
+    [EDeviceType.Neo, 'webusb', 'vol0:/resource/images/images.okpkg'],
+    [EDeviceType.Pro2, 'desktop-webusb', 'vol0:/resource/images/images.okpkg'],
+    [EDeviceType.Neo, 'desktop-webusb', 'vol0:/application_p1.bin'],
+  ] as const)(
+    'paces %s firmware/resource writes over %s after each successful acknowledgement',
+    async (deviceType, env, filePath) => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue(env);
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: { method: 'firmwareUpdateV4' },
+      });
+      const fileWriteChunk = jest.fn(
+        (_path: string, _size: number, offset: number, data: ArrayBuffer | Buffer) =>
+          Promise.resolve({ message: { processed_byte: offset + data.byteLength } })
+      );
+      let acknowledgeFirstWrite = () => {};
+      fileWriteChunk.mockImplementationOnce(
+        (_path, _size, offset, data) =>
+          new Promise(resolve => {
+            acknowledgeFirstWrite = () =>
+              resolve({ message: { processed_byte: offset + data.byteLength } });
+          })
+      );
+      (method as any).device = stubDevice({ getCurrentDeviceType: () => deviceType });
+      (method as any).fileWriteChunk = fileWriteChunk;
+      (method as any).postProgressMessage = jest.fn();
+      const binary = Uint8Array.from({ length: 4097 }, (_, index) => index % 256);
+      const source = await openFirmwareByteSource({ binary: binary.buffer });
+      const flushPromises = () =>
+        new Promise<void>(resolve => {
+          setImmediate(resolve);
+        });
+
+      jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+      try {
+        const transfer = (method as any).protocolV2SourceUpdateProcess({
+          source,
+          filePath,
+          processedSize: 0,
+          totalSize: binary.byteLength,
+        });
+        await flushPromises();
+        expect(fileWriteChunk).toHaveBeenCalledTimes(1);
+        expect(jest.getTimerCount()).toBe(0);
+        acknowledgeFirstWrite();
+        await flushPromises();
+
+        for (let writeCount = 1; writeCount <= 3; writeCount += 1) {
+          jest.advanceTimersByTime(9);
+          await flushPromises();
+          expect(fileWriteChunk).toHaveBeenCalledTimes(writeCount);
+          jest.advanceTimersByTime(1);
+          await flushPromises();
+          expect(fileWriteChunk).toHaveBeenCalledTimes(Math.min(writeCount + 1, 3));
+        }
+        await expect(transfer).resolves.toBe(binary.byteLength);
+        expect(fileWriteChunk.mock.calls.map(call => call[2])).toEqual([0, 2048, 4096]);
+        expect(fileWriteChunk.mock.calls.map(call => call[3].byteLength)).toEqual([2048, 2048, 1]);
+        expect(Buffer.concat(fileWriteChunk.mock.calls.map(call => Buffer.from(call[3])))).toEqual(
+          Buffer.from(binary)
+        );
+      } finally {
+        jest.useRealTimers();
+        await source?.close();
+      }
+    }
+  );
+
   test.each([3801088, 3800000, 0])(
     'stops the firmware batch without retrying when device storage stops at byte %i',
     async stoppedAt => {
