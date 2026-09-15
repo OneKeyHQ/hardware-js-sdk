@@ -6,8 +6,8 @@ This document records architecture decisions that still constrain the current im
 
 HWK exposes a single device-selection lifecycle: `searchDeviceTargets()` discovers candidates,
 `connectDevice(searchTargetId)` connects or establishes a logical association and returns an opaque
-`interactionId`, business methods may carry that ID in their common params, and
-`releaseInteraction(interactionId)` releases it. `openWallet()` / `WalletContext` are no longer part of
+`operationId`, business methods may carry that ID in their common params, and
+`releaseOperation(operationId)` releases it. `openWallet()` / `WalletContext` are no longer part of
 the HWK public contract.
 
 The following rules apply:
@@ -16,16 +16,16 @@ The following rules apply:
   discovery round. Its `searchTargetId` is an opaque search handle and proves neither a physical device
   nor a wallet identity. A Ledger USB search target may be an ephemeral handle; a Keystone QR search
   target may be an entry point that only a scan can resolve.
-- An `interactionId` exists only inside the current adapter runtime and binds the selected search
+- An `operationId` exists only inside the current adapter runtime and binds the selected search
   target, the actual connect/session key, and the connection channel. It is not a `connectId`, a wallet
   identity, or a firmware session; it must not be written to the host database and must not survive an
   adapter reset or a process restart. A controlled reconnect inside one active operation may update its
   underlying session binding, but must not change the selected device or wallet identity.
 - Calling `connectDevice()` again for the same search target starts a new business lifecycle. When the
-  connection implementation has to replace an existing session, the interaction that owned the old
+  connection implementation has to replace an existing session, the operation that owned the old
   session is terminated first; the old ID must not borrow the new session.
-- A business call carrying an `interactionId` is a strict routing path: it reuses only that
-  interaction's connected session or logical QR association and its established channel. It must not
+- A business call carrying an `operationId` is a strict routing path: it reuses only that
+  operation's connected session or logical QR association and its established channel. It must not
   use an ambient session, reselect an unverified device, or switch channels. It returns
   `InteractionEnded` once the association cannot be restored, and `InteractionNotFound` for an ID that
   never belonged to this adapter instance.
@@ -34,24 +34,24 @@ The following rules apply:
   not-advertising, and timeout may re-search the original target. BLE must match the original
   `connectId`. When a USB ephemeral search target changes, only a business call carrying the wallet
   fingerprint may connect to a single candidate, and that fingerprint must be verified before the
-  business APDU is resent. On success the interaction's connect/session binding is updated; on failure
-  the interaction is terminated.
-- A call without an `interactionId` is an operation-first path. The adapter may discover candidates
+  business APDU is resent. On success the operation's connect/session binding is updated; on failure
+  the operation is terminated.
+- A call without an `operationId` is an operation-first path. The adapter may discover candidates
   before it runs the business call; a single verifiable candidate proceeds, while multiple candidates
   wait for the host to return this round's `sdkConnectId` through `REQUEST_SELECT_DEVICE`. Selection is
   only a routing decision; the business call must still verify the physical device or wallet identity
   according to vendor capability.
 - Idle timeout, a runtime reset, and a failed connection recovery all terminate the matching
-  interaction and emit `interaction-ended`. The idle timer pauses while an active device job holds the
-  interaction. A transient disconnect during an active Ledger job goes through the recovery chain above
+  operation and emit `operation-ended`. The idle timer pauses while an active device job holds the
+  operation. A transient disconnect during an active Ledger job goes through the recovery chain above
   first, and terminates only once recovery is exhausted or the identity does not match. `cancel()`
-  aborts the current job only; it does not implicitly end the interaction, and the lifecycle owner must
-  still call `releaseInteraction()`. The reverse holds too: `releaseInteraction()` ends the
+  aborts the current job only; it does not implicitly end the operation, and the lifecycle owner must
+  still call `releaseOperation()`. The reverse holds too: `releaseOperation()` ends the
   association and does not abort a job that is already running. A call that has entered the
   connector runs to its own conclusion and its result stays valid. `cancel` governs the job,
   `release` governs the association, and neither implies the other.
 - Cancelling by name and cancelling everything are different instructions. `cancel(id)` for an
-  interaction that has already ended has nothing left to cancel and must do nothing at all: it must
+  operation that has already ended has nothing left to cancel and must do nothing at all: it must
   not fall through to the untargeted form and tear down whatever unrelated operation happens to be
   running. `cancel()` with no argument keeps its existing meaning.
 - A command must not reach the connector once its signal is aborted. Wrapping the call in an abort
@@ -59,7 +59,7 @@ The following rules apply:
   operation was aborted while the device acts on it. Check before dispatch, so "aborted" keeps
   meaning "this did not happen".
 - Any public entry point that moves the adapter from "no chosen device" to "one chosen device" runs
-  through the device job queue. `connectDevice` and `acquireInteraction` both evict the existing
+  through the device job queue. `connectDevice` and `acquireOperation` both evict the existing
   session before connecting, so two of them in flight leave two live sessions behind the
   single-session invariant.
 - Which chains a vendor supports is declared by the host, per chain, next to that chain's own
@@ -73,7 +73,7 @@ The following rules apply:
   not save a binding closes the binding request it opened, under the original selection id. Prefer
   one place that covers all exits over one emit per failure path, because the next failure added
   will be the one that forgets.
-- `releaseInteraction()` is the explicit release; an unrecoverable disconnect underneath is the passive
+- `releaseOperation()` is the explicit release; an unrecoverable disconnect underneath is the passive
   source of the same state transition. Before the recovery chain resends a business method it must redo
   whatever device or wallet identity verification the vendor can provide; a USB ephemeral candidate must
   never be treated as the original device without identity evidence.
@@ -82,7 +82,7 @@ The following rules apply:
   resent automatically when the response is lost; the error carries `operationMayHaveCompleted` and the
   method name so the host can ask the user to check state. Errors that provably happen before the send,
   such as `PayloadTooLarge`, are not unknown outcomes.
-- Adapter reset/dispose is a teardown barrier: terminate runtime interactions, cancel UI and job waits,
+- Adapter reset/dispose is a teardown barrier: terminate runtime operations, cancel UI and job waits,
   wait for calls that already entered the connector to exit, then disconnect captured sessions and reset
   the connector. A new adapter must not run in parallel with calls left over from the old instance.
 - Keystone USB keeps the UI selection snapshot and the operation-first availability snapshot in separate
@@ -97,11 +97,11 @@ The following rules apply:
 Vendor differences stay inside the adapters: OneKey and Trezor let the host choose USB or BLE
 explicitly; Ledger and Keystone let their own SDK manage protocol and channel selection; a Keystone QR
 connect is a logical wallet association rather than a persistent physical connection. The strict reuse
-and termination semantics of an interaction are the same in every implementation.
+and termination semantics of an operation are the same in every implementation.
 
 Primary implementation:
 
-- `packages/hwk-adapter-core/src/utils/InteractionRegistry.ts`
+- `packages/hwk-adapter-core/src/utils/OperationRegistry.ts`
 - `packages/hwk-adapter-core/src/types/wallet.ts`
 - `packages/hwk-ledger-adapter/src/adapter/LedgerAdapter.ts`
 - `packages/hwk-trezor-adapter/src/adapter/TrezorAdapter.ts`
