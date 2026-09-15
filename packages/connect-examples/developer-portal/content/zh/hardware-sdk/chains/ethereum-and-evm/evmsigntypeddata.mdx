@@ -8,7 +8,7 @@ title: evmSignTypedData
 
 使用指定 BIP32 路径派生的私钥对 [EIP-712](https://eips.ethereum.org/EIPS/eip-712) 类型化数据消息进行签名。
 
-用户需要在 OneKey 设备上确认所有签名详情。
+设备请求用户确认签名；展示的详情取决于使用解析签名还是哈希签名。
 
 * **支持 EIP-712（v3 和 v4）**
 * **使用 `evmSignTypedData` 来签名类型化结构数据**
@@ -24,29 +24,40 @@ const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, params);
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
 * `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `data` - _必需_ `Object` 类型为 `EthereumSignTypedDataMessage`。JSON Schema 定义可在 EIP-712 规范中找到。
+* `data` - _必需_ `Object` 类型为 `EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>`。JSON Schema 定义可在 EIP-712 规范中找到。
 * `metamaskV4Compat` - _必需_ `boolean` 设置为 `true` 以兼容 [MetaMask 的 signTypedData_v4](https://docs.metamask.io/guide/signing-data.html#sign-typed-data-v4)。
 * `chainId` - _可选_ `number` ETH 中的 ChainId 是特定以太坊网络的唯一标识符，用于区分不同版本的区块链。[参考](https://github.com/ethereum-lists/chains/tree/master/_data/chains)
 
-### 盲签
+### 解析签名
 
-你也可以使用不同的库自行构建哈希。
+传入完整的 EIP-712 对象（包括 `types.EIP712Domain`），并让 `metamaskV4Compat` 与原始请求一致。在解析流程中，设备向 SDK 请求类型定义和字段值。可展示的详情取决于机型与固件，参见 [Clear Signing 指南](/zh/hardware-sdk/signers/evm#clear-signing)。
 
-* `domainHash` - _必需_ `string` EIP-712 域的十六进制编码 32 字节哈希。
-* `messageHash` - _可选_ `string` EIP-712 消息的十六进制编码 32 字节哈希。对于 `primaryType` 为 `EIP712Domain` 的仅域哈希，此项是可选的。
+### Hash signing fallback
 
-#### 什么情况下使用盲签
+SDK 选择哈希签名时，设备收到的是预先计算的哈希，而不是结构化消息。这属于盲签，不能提供结构化 Clear Signing。哈希必须使用相同编码模式从**完全相同的数据**计算；SDK 不会代为计算，也不会交叉校验传入的哈希与 `data` 是否一致。
 
-* 使用 Mini 或 Classic 设备。
-* Classic1s / ClassicPure 的自定义类型数量超过 8 个（不含 `primaryType`）。
-* Classic1s / ClassicPure 存在任意 `bytes` 字段，且数据大小大于 1.5KB。
-* 数据中存在嵌套数组。
-* 固件版本低于 4.4.0，且 `message.data` 大小大于 1KB。
-* 固件版本大于或等于 4.4.0，且 `message.data` 大小大于 1.5KB。
+- `domainHash`：解析签名时可选，退回哈希签名时必需。十六进制编码的 32 字节 EIP-712 域哈希。
+- `messageHash`：公开类型中可选，但当前自动退回分支要求提供。它是 32 字节 EIP-712 消息结构哈希，不是最终带 `0x1901` 前缀计算的签名摘要。仅域请求（`primaryType: 'EIP712Domain'`）在解析签名时可以省略；当前退回分支的校验仍要求两个哈希。
+
+当前 SDK 在以下情况下选择哈希签名：
+
+| 条件 | 适用范围 |
+| --- | --- |
+| 设备未报告 EIP-712 解析能力，或数据超过格式限制 | Classic、Mini、Classic1s、Classic Pure；不能把 Classic1s/Pure 一概视为只能盲签 |
+| 传入数据包含嵌套数组 | 所有设备系列 |
+| `message.data` 的十六进制字节数超过对应上限 | Classic1s/Pure、Pro2/Neo 为 1,536 字节；Touch/Pro 固件 4.4.0 及以上为 1,536 字节；其余为 1,024 字节 |
+
+上述大小检查针对 `message.data`，不是整个 JSON 文档。Classic/Mini 系列另有格式限制：每个结构最多 16 个字段、类型名/字段名最多 63 字符、数组类型字段最多 24 个、访问路径深度最多 6 层、自定义依赖结构最多 8 个（不含主类型和域）、每个 string/bytes 值最多 1,536 字节。基础类型数组最多 24 个元素；v4 模式下结构数组也有此限制。类型循环依赖同样会触发退回。
+
+提供哈希不会在解析签名可用时强制切换到哈希路径。需要退回但缺少哈希时，调用会失败。应用应明确处理此情况，不应自动替换原始请求，也不能用签名成功证明所有字段都已展示。
 
 ### 示例
 
+以下片段使用 `ethers` v6 准备 v4 编码的备用哈希，复用已初始化的 SDK 和选定的钱包。提供哈希不会跳过设备确认。
+
 ```typescript
+import { TypedDataEncoder } from 'ethers';
+
 const eip712Data = {
     types: {
         EIP712Domain: [
@@ -54,14 +65,15 @@ const eip712Data = {
                 name: 'name',
                 type: 'string',
             },
+            { name: 'chainId', type: 'uint256' },
         ],
         Message: [
             {
-                name: "Best Wallet",
+                name: "wallet",
                 type: "string"
             },
             {
-                name: "Number",
+                name: "number",
                 type: "uint64"
             }
         ]
@@ -69,25 +81,83 @@ const eip712Data = {
     primaryType: 'Message',
     domain: {
         name: 'example.onekey.io',
+        chainId: 1,
     },
     message: {
-        "Best Wallet": "OneKey Wallet",
+        "wallet": "OneKey Wallet",
         // 注意 JavaScript 数字：MAX_SAFE_INTEGER 相当低
-        "Number": `${2n ** 55n}`,
+        "number": `${2n ** 55n}`,
     },
 };
 
-const {domainHash, messageHash} = transformTypedDataPlugin(eip712Data, true);
+const { EIP712Domain, ...messageTypes } = eip712Data.types;
+const domainHash = TypedDataEncoder.hashDomain(eip712Data.domain);
+const messageHash = TypedDataEncoder.from(messageTypes).hash(eip712Data.message);
 
-HardwareSDK.evmSignTypedData(connectId, deviceId, {
-    path: "m/44'/60'/0'",
+const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+    path: "m/44'/60'/0'/0/0",
     data: eip712Data,
     metamaskV4Compat: true,
     domainHash,
     messageHash,
-    chainId: 1
+    chainId: eip712Data.domain.chainId,
 });
+if (!result.success) throw new Error(result.payload.error);
 ```
+
+### Safe Tx
+
+在支持的固件上使用下方标准 Safe v1.3.0 `SafeTx` schema。`domain.verifyingContract` 为 Safe 地址，网络必须真实，并提供全部十个消息字段。`operation` 为 `0` 表示 CALL，`1` 表示 DELEGATECALL。示例地址和 Safe Nonce 为占位值，接入时应替换为应用准备提交的完整交易。示例未提供备用哈希，因此需要哈希签名的请求会失败。
+
+```typescript
+const safeTypedData = {
+  types: {
+    EIP712Domain: [
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' },
+    ],
+    SafeTx: [
+      { name: 'to', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'data', type: 'bytes' },
+      { name: 'operation', type: 'uint8' },
+      { name: 'safeTxGas', type: 'uint256' },
+      { name: 'baseGas', type: 'uint256' },
+      { name: 'gasPrice', type: 'uint256' },
+      { name: 'gasToken', type: 'address' },
+      { name: 'refundReceiver', type: 'address' },
+      { name: 'nonce', type: 'uint256' },
+    ],
+  },
+  primaryType: 'SafeTx',
+  domain: {
+    chainId: 1,
+    verifyingContract: '0x1111111111111111111111111111111111111111',
+  },
+  message: {
+    to: '0x2222222222222222222222222222222222222222',
+    value: '0',
+    data: '0x',
+    operation: '0',
+    safeTxGas: '0',
+    baseGas: '0',
+    gasPrice: '0',
+    gasToken: '0x0000000000000000000000000000000000000000',
+    refundReceiver: '0x0000000000000000000000000000000000000000',
+    nonce: '0',
+  },
+};
+
+const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  data: safeTypedData,
+  metamaskV4Compat: true,
+  chainId: safeTypedData.domain.chainId,
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+这里返回 owner 签名，不会广播交易。验签和收集签名时必须保留相同 Typed Data。与链上 Safe 调用的区别见 [Safe Tx 接入](/zh/hardware-sdk/signers/evm#eip-712-与-safe-tx)。
 
 #### 返回结果
 

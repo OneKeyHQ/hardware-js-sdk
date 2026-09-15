@@ -9,7 +9,7 @@ title: evmSignTransaction
 * Use `evmSignTransaction` for signing transactions
 * Supports both EIP-1559 and Legacy transactions. (But make sure that the RPC node you are using supports the type you are using)
 
-Asks device to sign given transaction using the private key derived by given BIP32 path. User is asked to confirm all transaction details on OneKey.
+Asks device to sign given transaction using the private key derived by given BIP32 path. The device asks the user to confirm the transaction; decoded detail depends on the firmware and calldata.
 
 ```typescript
 const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
@@ -20,10 +20,21 @@ const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params)
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
 * `path` - _required_ `string | Array<number>` minimum length is `3`. [read more](/en/hardware-sdk/concepts/common-params#hd-path)
-* `transaction` - _required_ `Object` type of `EthereumTransactionEIP1559|EthereumSignTransaction` "0x" prefix for each field is optional
-* `chainId` - _optional_ `number` The ChainId in ETH is a unique identifier for a specific Ethereum network, used to distinguish different versions of the blockchain. [Reference](https://github.com/ethereum-lists/chains/tree/master/_data/chains).&#x20;
+* `transaction` - _required_ `Object` type of `EVMTransaction | EVMTransactionEIP1559 | EVMTransactionEIP7702`. Numeric transaction quantities are hex strings; `transaction.chainId` is a number
+* `transaction.chainId` - _required_ `number`. Must match the network used to construct and broadcast the transaction. It is not a top-level parameter.
+* `transaction.data` - _optional_ `string`. Full hex-encoded calldata; use `0x` for an empty payload.
+
+EIP-1559 requires both fee fields; Legacy uses `gasPrice`. Do not pass `type: 2` to the SDK; select the type when serializing the signed transaction.
+
+### Clear Signing
+
+Use this same method for native transfers, ERC-20 transfers, approvals/revocations, and contract calls. For ERC-20 calls, `to` is the token contract and `value` is zero; calldata carries the recipient/spender and token amount. Supporting firmware decodes recognized formats automatically. There is no `clearSigning`, token-metadata, or contract-label parameter.
+
+See the [Clear Signing guide](/en/hardware-sdk/signers/evm#clear-signing) for the input/display matrix and unknown-contract behavior. For EIP-712 and Safe owner signatures, use [evmSignTypedData](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata).
 
 ### Examples
+
+The fragments below assume an initialized SDK and selected wallet. Replace the sample recipient and fetch nonce, gas, and fees from the target network before signing.
 
 #### EIP1559 ([after The London Upgrade](https://ethereum.org/en/developers/docs/gas/#post-london))
 
@@ -31,18 +42,17 @@ If both parameters `maxFeePerGas` and `maxPriorityFeePerGas` are defined, transa
 
 ```typescript
 HardwareSDK.evmSignTransaction(connectId, deviceId, {
-    path: "m/44'/60'/0'",
+    path: "m/44'/60'/0'/0/0",
     transaction: {
         to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
         value: '0xf4240',
-        data: '0xa',
+        data: '0x',
         chainId: 1,
         nonce: '0x0',
-        maxFeePerGas: '0x14',
-        maxPriorityFeePerGas: '0x0',
-        gasLimit: '0x14',
+        maxFeePerGas: '0x77359400',
+        maxPriorityFeePerGas: '0x3b9aca00',
+        gasLimit: '0x5208',
     },
-    chainId: 1
 });
 
 ```
@@ -51,17 +61,16 @@ Legacy
 
 ```typescript
 HardwareSDK.evmSignTransaction(connectId, deviceId, {
-    path: "m/44'/60'/0'",
+    path: "m/44'/60'/0'/0/0",
     transaction: {
         to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
         value: "0xf4240",
-        data: "0x01",
+        data: "0x",
         chainId: 1,
         nonce: "0x0",
         gasLimit: "0x5208",
         gasPrice: "0xbebc200"
     },
-    chainId: 1
 });
 ```
 
@@ -94,8 +103,12 @@ Error
 
 ### Transaction Signing and Broadcasting example
 
+This example uses `@ethersproject/*` v5 and the initialized SDK. Verify the recovered signer against the selected account before broadcasting.
+
 ```typescript
+import type { EVMTransactionEIP1559 } from '@onekeyfe/hd-core';
 import type { UnsignedTransaction } from '@ethersproject/transactions';
+import { splitSignature } from '@ethersproject/bytes';
 import { TransactionTypes, serialize } from '@ethersproject/transactions';
 import { keccak256 } from '@ethersproject/keccak256';
 function buildSignedTxFromSignatureEvm({
@@ -111,7 +124,7 @@ function buildSignedTxFromSignatureEvm({
 }) {
   const { r, s, v } = signature;
   /**
-   * sdk legacy return {v,r,s}; eip1559 return {recoveryParam,r,s}
+   * The SDK returns {v,r,s} for both Legacy and EIP-1559.
    * splitSignature auto convert v to recoveryParam
    */
   const sig = splitSignature({
@@ -128,50 +141,39 @@ function buildSignedTxFromSignatureEvm({
 }
 
 // 1. Create transaction parameters
-const txParams = {
+const txParams: EVMTransactionEIP1559 = {
     to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
     value: '0x0', // Default to 0 if no value
     data: '0x', // Empty data
     chainId: 1,
     nonce: '0x0',
     // For EIP-1559 transaction
-    maxFeePerGas: '0x14', // 20
-    maxPriorityFeePerGas: '0x0', // 0
+    maxFeePerGas: '0x77359400', // 2 gwei
+    maxPriorityFeePerGas: '0x3b9aca00', // 1 gwei
     gasLimit: '0x5208', // 21000
-    // For legacy transaction
-    // gasPrice: '0x14', // 
 };
 
 // 2. Sign the transaction
 const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
-    path: "m/44'/60'/0'",
+    path: "m/44'/60'/0'/0/0",
     transaction: txParams,
-    ...deviceCommonParams
+    // Add the same wallet common params used when confirming the account.
 });
 
 // 3. Build signed transaction
-const baseTx = {
+if (!result.success) throw new Error(result.payload.error);
+
+const baseTx: UnsignedTransaction = {
     to: txParams.to,
     nonce: parseInt(txParams.nonce, 16),
-    gasLimit: txParams.gasLimit
+    gasLimit: txParams.gasLimit,
     data: txParams.data,
     value: txParams.value,
     chainId: txParams.chainId,
+    type: TransactionTypes.eip1559,
+    maxFeePerGas: txParams.maxFeePerGas,
+    maxPriorityFeePerGas: txParams.maxPriorityFeePerGas,
 };
-
-// Add EIP-1559 specific fields
-const isEIP1559 = txParams?.maxFeePerGas || txParams?.maxPriorityFeePerGas;
-if (isEIP1559) {
-    Object.assign(baseTx, {
-      type: TransactionTypes.eip1559,
-      maxFeePerGas: txParams?.maxFeePerGas
-      maxPriorityFeePerGas: txParams?.maxPriorityFeePerGas
-    });
-} else {
-    Object.assign(baseTx, {
-      gasPrice: txParams.gasPrice,
-    });
-}
 
 // 4. Build final transaction with signature
 const { rawTx, txid } = buildSignedTxFromSignatureEvm({

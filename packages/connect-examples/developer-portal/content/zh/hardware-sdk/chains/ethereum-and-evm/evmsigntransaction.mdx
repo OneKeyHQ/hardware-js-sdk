@@ -9,7 +9,7 @@ title: evmSignTransaction
 * 使用 `evmSignTransaction` 来签名交易
 * 支持 EIP-1559 和 Legacy 交易。（但请确保你使用的 RPC 节点支持你所使用的类型）
 
-使用指定 BIP32 路径派生的私钥对交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+使用指定 BIP32 路径派生的私钥对交易进行签名。设备请求用户确认交易；可解析展示的详情取决于固件与 calldata。
 
 ```typescript
 const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
@@ -20,10 +20,21 @@ const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params)
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
 * `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `transaction` - _必需_ `Object` 类型为 `EthereumTransactionEIP1559|EthereumSignTransaction`，每个字段的 "0x" 前缀是可选的
-* `chainId` - _可选_ `number` ETH 中的 ChainId 是特定以太坊网络的唯一标识符，用于区分不同版本的区块链。[参考](https://github.com/ethereum-lists/chains/tree/master/_data/chains)
+* `transaction` - _必需_ `Object` 类型为 `EVMTransaction | EVMTransactionEIP1559 | EVMTransactionEIP7702`。交易数值使用十六进制字符串，`transaction.chainId` 使用数字
+* `transaction.chainId` - _必需_ `number`。必须与构造及广播交易的网络一致，不是顶层参数。
+* `transaction.data` - _可选_ `string`。完整的十六进制 calldata；空数据使用 `0x`。
+
+EIP-1559 必须同时提供两个费率字段，Legacy 使用 `gasPrice`。无需向 SDK 传入 `type: 2`，该类型在序列化已签名交易时指定。
+
+### Clear Signing
+
+原生币转账、ERC-20 转账、授权/撤销和合约调用均使用此方法。ERC-20 调用的 `to` 是代币合约，`value` 为零，calldata 中包含收款人/spender 和代币金额。支持的固件自动解析已识别格式；没有 `clearSigning`、代币元数据或合约标签参数。
+
+输入与展示对照、未知合约行为见 [Clear Signing 指南](/zh/hardware-sdk/signers/evm#clear-signing)。EIP-712 和 Safe owner 签名使用 [evmSignTypedData](/zh/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata)。
 
 ### 示例
+
+下列片段假设已初始化 SDK 并选定钱包。签名前请替换示例收款人，并从目标网络获取 Nonce、Gas 和费率。
 
 #### EIP1559（[伦敦升级后](https://ethereum.org/en/developers/docs/gas/#post-london)）
 
@@ -31,18 +42,17 @@ const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params)
 
 ```typescript
 HardwareSDK.evmSignTransaction(connectId, deviceId, {
-    path: "m/44'/60'/0'",
+    path: "m/44'/60'/0'/0/0",
     transaction: {
         to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
         value: '0xf4240',
-        data: '0xa',
+        data: '0x',
         chainId: 1,
         nonce: '0x0',
-        maxFeePerGas: '0x14',
-        maxPriorityFeePerGas: '0x0',
-        gasLimit: '0x14',
+        maxFeePerGas: '0x77359400',
+        maxPriorityFeePerGas: '0x3b9aca00',
+        gasLimit: '0x5208',
     },
-    chainId: 1
 });
 
 ```
@@ -51,17 +61,16 @@ Legacy
 
 ```typescript
 HardwareSDK.evmSignTransaction(connectId, deviceId, {
-    path: "m/44'/60'/0'",
+    path: "m/44'/60'/0'/0/0",
     transaction: {
         to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
         value: "0xf4240",
-        data: "0x01",
+        data: "0x",
         chainId: 1,
         nonce: "0x0",
         gasLimit: "0x5208",
         gasPrice: "0xbebc200"
     },
-    chainId: 1
 });
 ```
 
@@ -94,8 +103,12 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 
 ### 交易签名和广播示例
 
+此示例使用 `@ethersproject/*` v5 和已初始化的 SDK。广播前应恢复签名者并与选定账户核对。
+
 ```typescript
+import type { EVMTransactionEIP1559 } from '@onekeyfe/hd-core';
 import type { UnsignedTransaction } from '@ethersproject/transactions';
+import { splitSignature } from '@ethersproject/bytes';
 import { TransactionTypes, serialize } from '@ethersproject/transactions';
 import { keccak256 } from '@ethersproject/keccak256';
 function buildSignedTxFromSignatureEvm({
@@ -111,7 +124,7 @@ function buildSignedTxFromSignatureEvm({
 }) {
   const { r, s, v } = signature;
   /**
-   * sdk legacy 返回 {v,r,s}; eip1559 返回 {recoveryParam,r,s}
+   * SDK 的 Legacy 和 EIP-1559 均返回 {v,r,s}。
    * splitSignature 自动将 v 转换为 recoveryParam
    */
   const sig = splitSignature({
@@ -128,50 +141,39 @@ function buildSignedTxFromSignatureEvm({
 }
 
 // 1. 创建交易参数
-const txParams = {
+const txParams: EVMTransactionEIP1559 = {
     to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
     value: '0x0', // 如果没有值则默认为 0
     data: '0x', // 空数据
     chainId: 1,
     nonce: '0x0',
     // 对于 EIP-1559 交易
-    maxFeePerGas: '0x14', // 20
-    maxPriorityFeePerGas: '0x0', // 0
+    maxFeePerGas: '0x77359400', // 2 gwei
+    maxPriorityFeePerGas: '0x3b9aca00', // 1 gwei
     gasLimit: '0x5208', // 21000
-    // 对于 legacy 交易
-    // gasPrice: '0x14', //
 };
 
 // 2. 签名交易
 const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
-    path: "m/44'/60'/0'",
+    path: "m/44'/60'/0'/0/0",
     transaction: txParams,
-    ...deviceCommonParams
+    // Add the same wallet common params used when confirming the account.
 });
 
 // 3. 构建已签名交易
-const baseTx = {
+if (!result.success) throw new Error(result.payload.error);
+
+const baseTx: UnsignedTransaction = {
     to: txParams.to,
     nonce: parseInt(txParams.nonce, 16),
-    gasLimit: txParams.gasLimit
+    gasLimit: txParams.gasLimit,
     data: txParams.data,
     value: txParams.value,
     chainId: txParams.chainId,
+    type: TransactionTypes.eip1559,
+    maxFeePerGas: txParams.maxFeePerGas,
+    maxPriorityFeePerGas: txParams.maxPriorityFeePerGas,
 };
-
-// 添加 EIP-1559 特定字段
-const isEIP1559 = txParams?.maxFeePerGas || txParams?.maxPriorityFeePerGas;
-if (isEIP1559) {
-    Object.assign(baseTx, {
-      type: TransactionTypes.eip1559,
-      maxFeePerGas: txParams?.maxFeePerGas
-      maxPriorityFeePerGas: txParams?.maxPriorityFeePerGas
-    });
-} else {
-    Object.assign(baseTx, {
-      gasPrice: txParams.gasPrice,
-    });
-}
 
 // 4. 使用签名构建最终交易
 const { rawTx, txid } = buildSignedTxFromSignatureEvm({
