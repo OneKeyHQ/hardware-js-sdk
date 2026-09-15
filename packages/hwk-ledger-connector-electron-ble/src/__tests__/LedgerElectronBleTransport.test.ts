@@ -6,6 +6,7 @@ import {
 import { Nothing } from 'purify-ts';
 import { firstValueFrom } from 'rxjs';
 
+import { LEDGER_BLE_MAX_FRAME_SIZE, LEDGER_BLE_VENDOR } from '../bleProfile';
 import { LedgerElectronBleTransport } from '../LedgerElectronBleTransport';
 
 import type {
@@ -110,8 +111,8 @@ describe('Ledger Electron BLE lifecycle', () => {
     expect(first[0]).toMatchObject({ id: 'ledger-test', transport: 'ELECTRON_BLE' });
     expect(bridge.scan).toHaveBeenCalledTimes(1);
     expect(bridge.scan).toHaveBeenCalledWith({
-      vendor: 'ledger',
-      serviceUuids: [profile.serviceUuid],
+      vendor: LEDGER_BLE_VENDOR,
+      match: { serviceUuids: [profile.serviceUuid] },
     });
   });
 
@@ -120,11 +121,14 @@ describe('Ledger Electron BLE lifecycle', () => {
     const result = await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() });
     expect(result.isRight()).toBe(true);
     expect(bridge.scan).not.toHaveBeenCalled();
+    // The shared handler has no per-vendor write rule of its own: `raw` and the
+    // 255-byte bound travel with the connect.
     expect(bridge.connect).toHaveBeenCalledWith('ledger-test', {
-      vendor: 'ledger',
+      vendor: LEDGER_BLE_VENDOR,
       serviceUuid: profile.serviceUuid,
       writeUuid: profile.writeUuid,
       notifyUuid: profile.notifyUuid,
+      write: { mode: 'raw', maxLength: LEDGER_BLE_MAX_FRAME_SIZE },
     });
     expect(senderFactory).toHaveBeenCalledWith({ frameSize: 20 });
     await transport.disconnect({ connectedDevice: result.unsafeCoerce() });

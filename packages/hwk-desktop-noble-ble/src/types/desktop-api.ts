@@ -1,4 +1,4 @@
-import type { ElectronBleConnectOptions } from '@onekeyfe/hwk-adapter-core';
+import type { ElectronBleConnectOptions, ElectronBleScanOptions } from '@onekeyfe/hwk-adapter-core';
 
 /**
  * Shape of the API the renderer process talks to. In a real Electron app
@@ -6,7 +6,7 @@ import type { ElectronBleConnectOptions } from '@onekeyfe/hwk-adapter-core';
  * { trezorBle: ... })`, but the transport accepts the bridge directly so
  * non-Electron hosts (and unit tests) can plug in their own implementation.
  */
-export interface TrezorBleDeviceInfo {
+export interface ThirdPartyBleDeviceInfo {
   /** Stable id (noble peripheral.id) used as connectId. */
   id: string;
   name?: string;
@@ -33,28 +33,20 @@ export interface TrezorBleDeviceInfo {
   state?: string;
 }
 
-export interface TrezorBleAvailability {
+export interface ThirdPartyBleAvailability {
   available: boolean;
   /** noble state: `poweredOn` / `poweredOff` / `unauthorized` / `unsupported` / `resetting` / `unknown`. */
   state: string;
   initialized: boolean;
 }
 
-export interface TrezorBleScanOptions {
-  vendor?: 'trezor' | 'ledger';
-  /**
-   * DEPRECATED and ignored by the handler: a native service-UUID filter drops
-   * Safe 7 ADV packets on Windows, so the scan is always unfiltered and Trezor
-   * matching happens in JS. Kept only so older renderers remain IPC-compatible.
-   */
-  serviceUuids?: string[];
-  durationMs?: number;
-}
+/** One definition of the scan contract; the IPC shape lives in adapter-core. */
+export type ThirdPartyBleScanOptions = ElectronBleScanOptions;
 
-export interface TrezorBleApi {
-  scan(options?: TrezorBleScanOptions): Promise<TrezorBleDeviceInfo[]>;
+export interface ThirdPartyBleApi {
+  scan(options?: ThirdPartyBleScanOptions): Promise<ThirdPartyBleDeviceInfo[]>;
   stopScan(): Promise<void>;
-  connect(id: string, options?: ElectronBleConnectOptions): Promise<{ id: string; name?: string }>;
+  connect(id: string, options: ElectronBleConnectOptions): Promise<{ id: string; name?: string }>;
   disconnect(id: string): Promise<void>;
   /** Subscribe to the BLE notify characteristic for `id`. */
   subscribe(id: string): Promise<void>;
@@ -65,9 +57,9 @@ export interface TrezorBleApi {
    * chunks before handing it to noble.
    */
   write(id: string, hexData: string): Promise<void>;
-  checkAvailability(): Promise<TrezorBleAvailability>;
+  checkAvailability(): Promise<ThirdPartyBleAvailability>;
   /** Look up a previously-scanned device by id without re-scanning. */
-  getDevice(id: string): Promise<TrezorBleDeviceInfo | null>;
+  getDevice(id: string): Promise<ThirdPartyBleDeviceInfo | null>;
   /** Read current RSSI (dBm) of a *connected* peripheral. */
   readRssi(id: string): Promise<number>;
   /** Stop scan + disconnect every in-flight connection. */
