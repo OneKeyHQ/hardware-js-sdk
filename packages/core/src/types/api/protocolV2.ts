@@ -82,11 +82,14 @@ export declare function deviceFactoryPermanentLock(
   params?: CommonParams
 ): Response<Success>;
 
-/** Destructively rebuild both volumes on a Pro2/Neo loader and verify read/write access. */
+/**
+ * Destructively rebuild both volumes on a Pro2/Neo loader and verify read/write access.
+ * formatConfirmed requires the format reply.
+ */
 export declare function deviceFactoryRebuildFilesystem(
   connectId: string,
   params: CommonParams & FactoryFilesystemRebuildParams
-): Response<Success>;
+): Response<Success & { formatConfirmed: boolean }>;
 
 export declare function deviceReadFactoryInfo(
   connectId: string,

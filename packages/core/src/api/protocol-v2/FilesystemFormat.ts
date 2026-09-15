@@ -1,5 +1,5 @@
-import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE } from '@onekeyfe/hd-transport';
+import { EDeviceType, ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
+import { PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE, isProtocolV2LinkError } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
 import { DataManager } from '../../data-manager';
@@ -44,6 +44,10 @@ export default class FilesystemFormat extends BaseMethod {
     }
     await this.checkLoader();
     this.throwIfAborted();
+    const { path } = this.device.originalDescriptor;
+    const serialNo = this.device.getCurrentSerialNo();
+    let formatSent = false;
+    let formatConfirmed = false;
 
     // Never replay format: losing its reply does not mean the erase did not happen.
     try {
@@ -51,33 +55,82 @@ export default class FilesystemFormat extends BaseMethod {
         'FilesystemFormat',
         'Success',
         { data: true, user: true },
-        { timeoutMs: 60_000 }
+        {
+          timeoutMs: 60_000,
+          onWriteCompleted: () => {
+            formatSent = true;
+          },
+        }
       );
+      formatConfirmed = true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw ERRORS.TypedError(
-        HardwareErrorCode.EmmcFileWriteFirmwareError,
-        `Filesystem format did not complete successfully; volumes may already be erased. No automatic retry: ${message}`
-      );
+      this.throwIfAborted();
+      if (!formatSent || !isProtocolV2LinkError(error)) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw ERRORS.TypedError(
+          HardwareErrorCode.EmmcFileWriteFirmwareError,
+          `Filesystem format did not complete successfully; volumes may already be erased. No automatic retry: ${message}`
+        );
+      }
     }
 
     try {
       this.device.keepSession = false;
       await this.device.release();
-      this.throwIfAborted();
-      await this.device.acquire('V2', { throwOnRunPromiseError: true });
-      await this.checkLoader();
+      await this.reconnect(path);
+      if (
+        this.device.getCurrentDeviceType() !== type ||
+        (serialNo && this.device.getCurrentSerialNo() !== serialNo)
+      ) {
+        throw new Error('Filesystem recovery device identity changed');
+      }
       for (const volume of ['vol0', 'vol1']) {
         await this.verifyVolume(volume);
       }
     } catch (error) {
+      this.throwIfAborted();
       const message = error instanceof Error ? error.message : String(error);
       throw ERRORS.TypedError(
         HardwareErrorCode.EmmcFileWriteFirmwareError,
-        `Filesystem was formatted, but recovery verification failed: ${message}`
+        `${
+          formatConfirmed ? 'Filesystem was formatted' : 'Filesystem format was not confirmed'
+        }, but recovery verification failed: ${message}`
       );
     }
-    return { message: 'Both filesystem volumes rebuilt and read/write verified.' };
+    return {
+      formatConfirmed,
+      message: formatConfirmed
+        ? 'Both filesystem volumes rebuilt and read/write verified.'
+        : 'Both filesystem volumes passed read/write verification; filesystem format was not confirmed.',
+    };
+  }
+
+  private async reconnect(path: string) {
+    const deadline = Date.now() + 15_000;
+    for (;;) {
+      this.throwIfAborted();
+      try {
+        const diff = await this.device.deviceConnector?.enumerate();
+        const descriptors = diff?.descriptors ?? [];
+        if (descriptors.length === 0) throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
+        if (descriptors.length !== 1 || descriptors[0].path !== path) {
+          throw new Error('Filesystem recovery device identity changed');
+        }
+        this.device.updateDescriptor({ ...descriptors[0], protocolType: 'V2' }, true);
+        await this.device.acquire('V2', { throwOnRunPromiseError: true });
+        await this.device.initialize();
+        await this.checkLoader();
+        return;
+      } catch (error) {
+        this.throwIfAborted();
+        const disconnected =
+          isProtocolV2LinkError(error) ||
+          (error instanceof HardwareError && error.errorCode === HardwareErrorCode.DeviceNotFound);
+        if (!disconnected || Date.now() >= deadline) throw error;
+        await this.device.release();
+        await wait(500);
+      }
+    }
   }
 
   private async checkLoader() {
@@ -99,6 +152,14 @@ export default class FilesystemFormat extends BaseMethod {
     const expected = Buffer.alloc(68_000);
     for (let i = 0; i < expected.length; i += 1) expected[i] = (i * 31 + Math.floor(i / 256)) % 256;
     const typedCall = this.device.commands.typedCall.bind(this.device.commands);
+    const existing = await typedCall(
+      'FilesystemPathInfoQuery',
+      'FilesystemPathInfo',
+      { path },
+      CALL_OPTIONS
+    );
+    if (existing.message.exist)
+      throw new Error(`Recovery verification file already exists: ${path}`);
 
     for (let offset = 0; offset < expected.length; offset += PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE) {
       this.throwIfAborted();

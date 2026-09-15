@@ -9,6 +9,7 @@ import {
   DeviceSessionPinType,
   DeviceSettingsPage,
   DeviceType,
+  ProtocolV2LinkError,
 } from '@onekeyfe/hd-transport';
 
 import * as firmwareBinaryApi from '../src/api/firmware/getBinary';
@@ -122,7 +123,7 @@ import {
 
 import type { DeviceCommands } from '../src/device/DeviceCommands';
 import type { Features } from '../src/types';
-import type { DeviceStatus, ProtocolInfo } from '@onekeyfe/hd-transport';
+import type { DeviceStatus, ProtocolInfo, TransportCallOptions } from '@onekeyfe/hd-transport';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -10773,10 +10774,11 @@ describe('Protocol V2 current low-level methods', () => {
     const setup = (mode = 'bootloader', deviceType = EDeviceType.Pro2) => {
       jest.spyOn(DataManager, 'getSettings').mockReturnValue('desktop-webusb');
       const files = new Map<string, Buffer>();
-      const typedCall = jest.fn((name, _response, params) =>
+      const typedCall = jest.fn((name, _response, params, options?: TransportCallOptions) =>
         Promise.resolve(
           (() => {
             if (name === 'FilesystemFormat') {
+              options?.onWriteCompleted?.({ elapsedMs: 1, frameBytes: 20 });
               files.clear();
               return { message: {} };
             }
@@ -10790,7 +10792,11 @@ describe('Protocol V2 current low-level methods', () => {
             }
             if (name === 'FilesystemPathInfoQuery') {
               return {
-                message: { exist: true, directory: false, size: files.get(params.path)!.length },
+                message: {
+                  exist: files.has(params.path),
+                  directory: false,
+                  size: files.get(params.path)?.length,
+                },
               };
             }
             if (name === 'FilesystemFileRead') {
@@ -10816,6 +10822,12 @@ describe('Protocol V2 current low-level methods', () => {
       );
       const device = stubDevice({
         commands: { typedCall },
+        originalDescriptor: { path: 'device' },
+        deviceConnector: {
+          enumerate: jest.fn().mockResolvedValue({ descriptors: [{ path: 'device' }] }),
+        },
+        updateDescriptor: jest.fn(),
+        initialize: jest.fn().mockResolvedValue(undefined),
         getCurrentDeviceType: () => deviceType,
         keepSession: true,
         release: jest.fn().mockResolvedValue(undefined),
@@ -10844,12 +10856,13 @@ describe('Protocol V2 current low-level methods', () => {
       const { method, device, typedCall, files } = setup(mode, type);
       await expect(method.run()).resolves.toMatchObject({
         message: expect.stringContaining('verified'),
+        formatConfirmed: true,
       });
       expect(typedCall).toHaveBeenCalledWith(
         'FilesystemFormat',
         'Success',
         { data: true, user: true },
-        { timeoutMs: 60_000 }
+        { timeoutMs: 60_000, onWriteCompleted: expect.any(Function) }
       );
       expect(typedCall.mock.calls.filter(([name]) => name === 'FilesystemFormat')).toHaveLength(1);
       expect(device.keepSession).toBe(false);
@@ -10907,12 +10920,79 @@ describe('Protocol V2 current low-level methods', () => {
       expect(typedCall).not.toHaveBeenCalled();
     });
 
-    test('never repeats format after losing its response', async () => {
+    test.each(['io', 'response-timeout'] as const)(
+      'verifies after a sent format loses its reply (%s), without claiming confirmed erasure',
+      async code => {
+        const { method, device, typedCall, files } = setup();
+        typedCall.mockImplementationOnce((_name, _response, _params, options) => {
+          options?.onWriteCompleted?.({ elapsedMs: 1, frameBytes: 20 });
+          return Promise.reject(new ProtocolV2LinkError(code, 'Protocol V2 USB read failed'));
+        });
+        await expect(method.run()).resolves.toMatchObject({
+          formatConfirmed: false,
+          message: expect.stringContaining('not confirmed'),
+        });
+        expect(typedCall.mock.calls.filter(([name]) => name === 'FilesystemFormat')).toHaveLength(
+          1
+        );
+        expect(device.acquire).toHaveBeenCalledTimes(1);
+        expect(files.size).toBe(0);
+      }
+    );
+
+    test.each([
+      new ProtocolV2LinkError('io', 'USB write failed'),
+      ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Failure_ProcessError,Format failed'),
+      ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser),
+    ])('does not recover when format was not sent or was rejected: %s', async error => {
       const { method, device, typedCall } = setup();
-      typedCall.mockRejectedValueOnce(new Error('USB disconnected'));
+      typedCall.mockRejectedValueOnce(error);
       await expect(method.run()).rejects.toThrow('volumes may already be erased');
       expect(typedCall).toHaveBeenCalledTimes(1);
       expect(device.acquire).not.toHaveBeenCalled();
+    });
+
+    test('does not hide an explicit device rejection after sending format', async () => {
+      const { method, device, typedCall } = setup();
+      typedCall.mockImplementationOnce((_name, _response, _params, options) => {
+        options?.onWriteCompleted?.({ elapsedMs: 1, frameBytes: 20 });
+        return Promise.reject(
+          ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Failure_ProcessError,Format failed')
+        );
+      });
+      await expect(method.run()).rejects.toThrow('Format failed');
+      expect(device.acquire).not.toHaveBeenCalled();
+    });
+
+    test('waits for the same device to reappear without resending format', async () => {
+      const { method, device, typedCall } = setup();
+      device.deviceConnector.enumerate.mockResolvedValueOnce({ descriptors: [] });
+      await expect(method.run()).resolves.toMatchObject({ formatConfirmed: true });
+      expect(device.deviceConnector.enumerate).toHaveBeenCalledTimes(2);
+      expect(typedCall.mock.calls.filter(([name]) => name === 'FilesystemFormat')).toHaveLength(1);
+    });
+
+    test('does not verify a different device after reconnect', async () => {
+      const { method, device, typedCall } = setup();
+      device.initialize.mockImplementation(() => {
+        device.getCurrentDeviceType = () => EDeviceType.Neo;
+        return Promise.resolve();
+      });
+      await expect(method.run()).rejects.toThrow('identity changed');
+      expect(typedCall.mock.calls.filter(([name]) => name === 'FilesystemFileWrite')).toHaveLength(
+        0
+      );
+    });
+
+    test('does not overwrite an existing diagnostic path after an unconfirmed format', async () => {
+      const { method, typedCall, files } = setup();
+      files.set('vol0:/factory-fs-check.bin', Buffer.from('existing'));
+      typedCall.mockImplementationOnce((_name, _response, _params, options) => {
+        options?.onWriteCompleted?.({ elapsedMs: 1, frameBytes: 20 });
+        return Promise.reject(new ProtocolV2LinkError('io', 'Protocol V2 USB read failed'));
+      });
+      await expect(method.run()).rejects.toThrow('already exists');
+      expect(files.get('vol0:/factory-fs-check.bin')?.toString()).toBe('existing');
     });
 
     test.each(['short-write', 'corrupt-read', 'reconnect'])(
