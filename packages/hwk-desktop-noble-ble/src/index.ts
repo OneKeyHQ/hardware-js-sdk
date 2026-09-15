@@ -22,3 +22,6 @@ export type {
   ThirdPartyBleAvailability,
   ThirdPartyBleDeviceInfo,
 } from './types/desktop-api';
+
+export type { BleDebugLogEntry, BleDebugLogLevel, BleDebugLogger } from './debugLog';
+export { redactBleDebugLogData } from './debugLog';
