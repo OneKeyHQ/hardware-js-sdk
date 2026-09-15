@@ -9,7 +9,11 @@ title: Response UI Event
 Transfer data to the device, currently supporting data transfer for PIN and passphrase.
 
 ```typescript
-const response = await HardwareSDK.uiResponse(response);
+import type { UiResponseEvent } from "@onekeyfe/hd-core";
+
+// Construct a response for the current input request using your UI.
+declare const uiResponse: UiResponseEvent;
+HardwareSDK.uiResponse(uiResponse);
 
 ```
 
@@ -23,21 +27,31 @@ const response = await HardwareSDK.uiResponse(response);
 #### Return the PIN code result
 
 ```typescript
+import { UI_RESPONSE } from "@onekeyfe/hd-core";
+
+// Value collected by the host PIN input UI.
+declare const pinValue: string;
+
 HardwareSDK.uiResponse({
   type: UI_RESPONSE.RECEIVE_PIN,
-  payload: ${pin_value},
+  payload: pinValue,
 });
 ```
 
-* If entering the PIN on the software side, replace the content of `pin_value`. If the PIN needs to be entered on the hardware side, set `pin_value` as `@@ONEKEY_INPUT_PIN_IN_DEVICE`.
+* If entering the PIN on the software side, replace the content of `pinValue`. If the PIN needs to be entered on the hardware side, set `pinValue` as `@@ONEKEY_INPUT_PIN_IN_DEVICE`.
 
 #### Return the Passphrase result
 
 ```typescript
+import { UI_RESPONSE } from "@onekeyfe/hd-core";
+
+// Value collected by the host passphrase input UI.
+declare const passphraseValue: string;
+
 HardwareSDK.uiResponse({
   type: UI_RESPONSE.RECEIVE_PASSPHRASE,
   payload: {
-    value: ${passphrase_value},
+    value: passphraseValue,
     passphraseOnDevice: false,
     save: false,
   },
@@ -45,3 +59,5 @@ HardwareSDK.uiResponse({
 ```
 
 * If the passphrase needs to be entered on the device, set value to '' and set passphraseOnDevice to true.
+
+Only reply to input requests. `REQUEST_PASSPHRASE_ON_DEVICE` and device-only PIN prompts are notifications; see [UI wiring](/en/hardware-sdk/core-api-guide#events-ui).

@@ -24,7 +24,7 @@ const result = await HardwareSDK.cardanoGetPublicKey(connectId, deviceId, params
 
 ### Exporting single public key
 
-* `path` - _required_ `string | Array<number>` minimum length is `1`. read more
+* `path` - _required_ `string | Array<number>` SDK minimum length is `3`. read more
 * `showOnOneKey` - _optional_ `boolean` determines if address will be displayed on device. Default is set to `true`
 * `derivationType` - _optional_ `CardanoDerivationType` enum. determines used derivation type. Default is set to ICARUS=1
 
@@ -37,7 +37,7 @@ const result = await HardwareSDK.cardanoGetPublicKey(connectId, deviceId, params
 Return public key of first cardano account:
 
 ```typescript
-HardwareSDK.aptosGetPublicKey(connectId, deviceId, {
+HardwareSDK.cardanoGetPublicKey(connectId, deviceId, {
     path: "m/1852'/1815'/0'/0/0",
     showOnOneKey: true
 });
@@ -65,7 +65,7 @@ Result with only one public key
     payload: {
         path: Array<number>, // hardended path
         serializedPath: string,
-        publicKey: string,
+        xpub: string,
         node: HDPubNode,
     }
 }
@@ -78,7 +78,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

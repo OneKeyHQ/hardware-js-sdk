@@ -58,14 +58,17 @@ Result with only one public key
 {
     success: true,
     payload: {
-        path: Array<number>, // hardended path
+        path: string, // serialized BIP32 path
         xpub: string,        // xpub in legacy format
         xpubSegwit?: string, // optional for segwit accounts: xpub in segwit format
-        chainCode: string,   // BIP32 serialization format
-        childNum: number,    // BIP32 serialization format
-        publicKey: string,   // BIP32 serialization format
-        fingerprint: number, // BIP32 serialization format
-        depth: number,       // BIP32 serialization format
+        root_fingerprint?: number,
+        node: {
+            depth: number,
+            fingerprint: number,
+            child_num: number,
+            chain_code: string,
+            public_key: string,
+        },
     }
 }
 ```
@@ -78,9 +81,9 @@ Result with bundle of public keys
 {
     success: true,
     payload: [
-        { path, serializedPath, xpub, xpubSegwit?, chainCode, childNum, publicKey, fingerprint, depth }, // account 1
-        { path, serializedPath, xpub, xpubSegwit?, chainCode, childNum, publicKey, fingerprint, depth }, // account 2
-        { path, serializedPath, xpub, xpubSegwit?, chainCode, childNum, publicKey, fingerprint, depth }  // account 3
+        { path, xpub, xpubSegwit, root_fingerprint, node }, // account 1
+        { path, xpub, xpubSegwit, root_fingerprint, node }, // account 2
+        { path, xpub, xpubSegwit, root_fingerprint, node }  // account 3
     ]
 }
 ```
@@ -92,7 +95,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

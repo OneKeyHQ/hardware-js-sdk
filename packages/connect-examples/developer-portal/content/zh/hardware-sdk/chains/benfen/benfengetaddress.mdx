@@ -69,8 +69,8 @@ const batchResponse = await HardwareSDK.benfenGetAddress(connectId, deviceId, ba
     success: true,
     payload: {
         address: string,     // 显示的地址
-        pub: string,
-        path: Array<number> // 强化路径
+        pub?: string,
+        path: string // 序列化 BIP32 路径
     }
 }
 ```
@@ -81,9 +81,9 @@ const batchResponse = await HardwareSDK.benfenGetAddress(connectId, deviceId, ba
 {
     success: true,
     payload: [
-        { address: string, pub: string, path: Array<number> }, // 账户 1
-        { address: string, pub: string, path: Array<number> }, // 账户 2
-        { address: string, pub: string, path: Array<number> }  // 账户 3
+        { address: string, pub?: string, path: string }, // 账户 1
+        { address: string, pub?: string, path: string }, // 账户 2
+        { address: string, pub?: string, path: string }  // 账户 3
     ]
 }
 ```
@@ -95,7 +95,7 @@ const batchResponse = await HardwareSDK.benfenGetAddress(connectId, deviceId, ba
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

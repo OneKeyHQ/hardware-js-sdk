@@ -23,7 +23,7 @@ const result = await HardwareSDK.nostrSignSchnorr(connectId, deviceId, params);
 
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
-* `path` - _required_ `string | Array<number>` minimum length is `3`. [read more](/en/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _required_ `string | Array<number>` SDK minimum length is `5`. [read more](/en/hardware-sdk/concepts/common-params#hd-path)
 * `hash` - _required_ `string` schnorr hash.
 
 
@@ -61,7 +61,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

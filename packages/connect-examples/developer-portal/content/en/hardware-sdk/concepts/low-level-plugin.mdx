@@ -4,7 +4,7 @@ title: Low-level transport plugin
 
 # Low-level transport plugin
 
-> Use this only when WebUSB / React Native BLE / official native adapters cannot meet your scenario. You will own device lifecycle and message frame handling, so expect higher maintenance cost.
+> Use this only when WebUSB / React Native BLE / official native adapters cannot meet your scenario. You will own native BLE lifecycle and ordered I/O, so expect higher maintenance cost.
 
 > **Note:** The `lowlevel` env and `LowlevelTransportSharedPlugin` are designed for **BLE (Bluetooth)** communication only. For **USB** communication in Node.js/CLI environments, use `NodeUsbTransport` (env `node-usb`) instead — it handles protocol encoding and USB I/O directly via libusb without needing a plugin.
 
@@ -22,9 +22,9 @@ We provide a new communication method where you can use the LowlevelTransportSha
 | Write Characteristic | `00000002-0000-1000-8000-00805f9b34fb` |
 | Notify Characteristic | `00000003-0000-1000-8000-00805f9b34fb` |
 
-### BLE Header Data Example
+### Protocol V1 BLE Header Data Example
 
-Example of the first BLE packet received (header packet):
+The following header is specific to Protocol V1; do not use it to parse Protocol V2 notifications.
 
 ```
 Raw data: 3F 23 23 00 02 00 00 00 0A 12 08 ...
@@ -45,32 +45,35 @@ Native examples (all based on the Low-Level Transport Plugin):
 ## LowlevelTransportSharedPlugin Interface
 
 ```typescript
-export type LowLevelDevice = { id: string; name: string };
+import type { OneKeyDeviceInfoBase } from '@onekeyfe/hd-transport';
+
+export type LowLevelDevice = OneKeyDeviceInfoBase & { id: string; name: string };
 export type LowlevelTransportSharedPlugin = {
   enumerate: () => Promise<LowLevelDevice[]>;
-  send: (uuid: string, data: string) => Promise<void>;
-  receive: () => Promise<string>;
+  send: (uuid: string, data: string, options?: { withoutResponse?: boolean }) => Promise<void>;
+  receive: (uuid?: string) => Promise<string>;
   connect: (uuid: string) => Promise<void>;
   disconnect: (uuid: string) => Promise<void>;
+  getProtocolV2PacketCapacity?: (uuid: string) => number | undefined | Promise<number | undefined>;
   init: () => Promise<void>;
   version: string;
 };
 ```
 
-## WebUSB vs BLE: Protocol Differences
+## WebUSB vs BLE: Protocol V1 framing
 
-**Important:** The transport protocol differs between WebUSB (Desktop) and BLE (Mobile):
+These are Protocol V1 transport details. The low-level plugin is a BLE adapter; the SDK owns protocol detection, encoding and reassembly.
 
 | | WebUSB (Desktop) | BLE (Native Mobile) |
 |---|---|---|
 | Packet size | Fixed 64 bytes | Variable (MTU-dependent) |
 | Packet prefix | `0x3F` on every packet | `0x3F 0x23 0x23` only on header |
 | Padding | Zero-pad to 64 bytes | No padding needed |
-| `receive()` returns | One 64-byte frame at a time | **Complete reassembled message** |
+| `receive()` returns | One 64-byte frame at a time | Raw BLE notification chunk (hex) |
 
 ---
 
-## WebUSB Protocol (Desktop)
+## WebUSB Protocol V1 (Desktop)
 
 Transport uses fixed 64-byte frames; the SDK handles message assembly.
 
@@ -96,133 +99,38 @@ Transport uses fixed 64-byte frames; the SDK handles message assembly.
 
 ## BLE Protocol (Native Mobile)
 
-BLE uses variable-length chunks. **Your plugin must reassemble complete messages.**
+Return one queued, unmodified BLE notification chunk as hex from each `receive(uuid)` call. Keep notification order and preserve chunks received before a reader is waiting. Do not strip protocol headers, pad to USB's 64-byte packets, or decode protobuf in the plugin.
 
-### Packet Format
-
-**Header chunk (first packet of a message):**
-
-```
-┌─────────┬──────────────┬──────────┬──────────────┬─────────────┐
-│ Byte 0  │  Byte 1-2    │ Byte 3-4 │  Byte 5-8    │  Byte 9+    │
-├─────────┼──────────────┼──────────┼──────────────┼─────────────┤
-│  0x3F   │  0x23 0x23   │  Type    │   Length     │  Payload... │
-│ (magic) │   (magic)    │ (BE u16) │  (BE u32)    │             │
-└─────────┴──────────────┴──────────┴──────────────┴─────────────┘
-```
-
-**Continuation chunks:** Raw payload data only, no prefix.
-
-### Header Detection
-
-```typescript
-function isHeaderChunk(data: Uint8Array): boolean {
-  return data.length >= 9 &&
-         data[0] === 0x3F &&  // '?'
-         data[1] === 0x23 &&  // '#'
-         data[2] === 0x23     // '#'
-}
-```
-
-### Reading Payload Length (Big Endian)
-
-```typescript
-function readUint32BE(buffer: Uint8Array, offset: number): number {
-  return (
-    (buffer[offset] << 24) |
-    (buffer[offset + 1] << 16) |
-    (buffer[offset + 2] << 8) |
-    buffer[offset + 3]
-  ) >>> 0
-}
-
-// Usage: payloadLength = readUint32BE(data, 5)
-```
-
-### Message Reassembly Example
-
-```typescript
-class BleMessageAssembler {
-  private buffer: number[] = []
-  private expectedLength = 0
-  private resolve: ((hex: string) => void) | null = null
-
-  onNotification(data: Uint8Array): void {
-    if (this.isHeader(data)) {
-      this.expectedLength = this.readUint32BE(data, 5)
-      this.buffer = [...data.subarray(3)]  // Skip 3F 23 23
-    } else {
-      this.buffer.push(...data)
-    }
-
-    // Check completion: buffer = Type(2) + Length(4) + Payload
-    if (this.buffer.length - 6 >= this.expectedLength) {
-      const hex = this.toHex(new Uint8Array(this.buffer))
-      this.buffer = []
-      this.expectedLength = 0
-      if (this.resolve) {
-        this.resolve(hex)
-        this.resolve = null
-      }
-    }
-  }
-
-  receive(): Promise<string> {
-    return new Promise(resolve => { this.resolve = resolve })
-  }
-
-  private isHeader(d: Uint8Array): boolean {
-    return d.length >= 9 && d[0] === 0x3F && d[1] === 0x23 && d[2] === 0x23
-  }
-
-  private readUint32BE(b: Uint8Array, o: number): number {
-    return ((b[o] << 24) | (b[o+1] << 16) | (b[o+2] << 8) | b[o+3]) >>> 0
-  }
-
-  private toHex(arr: Uint8Array): string {
-    return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
-  }
-}
-```
-
-### Common Mistakes
-
-```typescript
-// ❌ WRONG: Re-fragmenting into 64-byte packets
-receive() { return this.messageQueue.shift() }
-
-// ✅ CORRECT: Return complete reassembled message
-receive() { return this.completeMessagePromise }
-```
-
-```typescript
-// ❌ Inefficient: String concatenation
-let buffer = ''
-buffer += dataViewToHex(chunk)
-
-// ✅ Better: Use arrays
-let buffer: number[] = []
-buffer.push(...chunk)
-```
-
----
+- **Protocol V1:** the SDK recognizes the `3F2323` header, reads the payload length and collects continuation chunks. It also accepts the legacy preassembled `type + length + payload` message for V1 compatibility.
+- **Protocol V2:** the SDK assembles raw chunks into frames and handles CRC, sequence and message reassembly. A V1-only header detector or assembler must not process this data.
+- `send(uuid, data, options)` receives hex prepared by the SDK. Write bytes in order, propagate I/O failures and honor `withoutResponse` when supplied.
+- Report the actual maximum bytes accepted by one BLE characteristic write through `getProtocolV2PacketCapacity`. The SDK uses a 192-byte fallback and caps V2 packets at 244 bytes. Return the write capacity, not the ATT MTU including its overhead.
+- On disconnect, reject pending reads and discard queued notifications from the old connection. Do not deliver them after reconnecting.
 
 ## Initialization Example
 
+This adapter fragment delegates to a native bridge that must implement the interface above. Its methods must resolve only after the corresponding operation completes, or reject on failure.
+
 ```typescript
-import HardwareSDK from '@onekeyfe/hd-common-connect-sdk'
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 
-const plugin = {
-  enumerate: () => Promise.resolve([{ id: 'foo', name: 'bar' }]),
-  send: (uuid, data) => { /* Send hex data */ },
-  receive: () => { /* WebUSB: 64-byte frame / BLE: Complete message */ },
-  connect: (uuid) => { /* BLE Android: Bond first! */ },
-  disconnect: (uuid) => { /* Clean up connection */ },
-  init: () => { /* Initialize BLE stack */ },
-  version: 'OneKey-1.0'
-}
+// Implement these methods in your native BLE bridge before initialization.
+declare const nativeBle: LowlevelTransportSharedPlugin;
 
-HardwareSDK.init({ env: 'lowlevel', debug: true }, undefined, plugin)
+const plugin: LowlevelTransportSharedPlugin = {
+  enumerate: () => nativeBle.enumerate(),
+  send: (uuid, data, options) => nativeBle.send(uuid, data, options),
+  receive: uuid => nativeBle.receive(uuid),
+  connect: uuid => nativeBle.connect(uuid),
+  disconnect: uuid => nativeBle.disconnect(uuid),
+  getProtocolV2PacketCapacity: uuid => nativeBle.getProtocolV2PacketCapacity?.(uuid),
+  init: () => nativeBle.init(),
+  version: nativeBle.version,
+};
+
+const result = await HardwareSDK.init({ env: 'lowlevel', debug: false }, undefined, plugin);
+if (!result) throw new Error('SDK initialization failed');
 ```
 
 ## Next Steps

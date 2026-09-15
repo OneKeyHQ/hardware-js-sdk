@@ -91,7 +91,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```
@@ -133,6 +133,8 @@ const result = await HardwareSDK.tronSignTransaction(connectId, deviceId, {
 });
 
 // rawTx
+if (!result.success) throw new Error(result.payload.error);
+
 const rawTx = JSON.stringify({
     txID: txid,
     raw_data: encodedTx.raw_data,

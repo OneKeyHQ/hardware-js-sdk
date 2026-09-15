@@ -37,8 +37,7 @@ const result = await HardwareSDK.benfenSignTransaction(connectId, deviceId, {
 * success: boolean - True if successful
 * payload:
   * signature: string - Transaction signature in hex format
-  * path: string - BIP32 path used
-  * coinType?: string - Coin type if provided,(e.g. 0x2::bfc::BFC,  0xc8::busd::BUSD)
+  * public_key: string - Signing public key in hex format
 
 #### Example
 
@@ -60,7 +59,7 @@ Result
   success: true,
   payload: {
     signature: string,
-    address: string.
+    public_key: string,
   }
 }
 ```
@@ -72,7 +71,9 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```
+
+The runtime returns `public_key` and `signature`. Although the current SDK declaration also lists `path` and `coinType`, they are not included in this response; retain them from the request if needed.

@@ -37,8 +37,7 @@ const result = await HardwareSDK.benfenSignTransaction(connectId, deviceId, {
 * success: boolean - 成功时为 true
 * payload:
   * signature: string - 十六进制格式的交易签名
-  * path: string - 使用的 BIP32 路径
-  * coinType?: string - 代币类型（如果提供），例如 0x2::bfc::BFC、0xc8::busd::BUSD
+  * public_key: string - 十六进制格式的签名公钥
 
 #### 示例
 
@@ -60,7 +59,7 @@ const response = await HardwareSDK.benfenSignTransaction(connectId, deviceId, pa
   success: true,
   payload: {
     signature: string,
-    address: string.
+    public_key: string,
   }
 }
 ```
@@ -72,7 +71,9 @@ const response = await HardwareSDK.benfenSignTransaction(connectId, deviceId, pa
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```
+
+运行时返回 `public_key` 和 `signature`。当前 SDK 声明虽然还列出 `path` 和 `coinType`，响应实际不包含这两个字段；需要时从原请求保留。

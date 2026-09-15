@@ -62,7 +62,7 @@ sequenceDiagram
 
 - `webusb` — HTTPS + 用户手势
 - `react-native` — BLE 权限（Android 上常常还要定位）
-- `lowlevel` — 宿主侧 64 字节帧适配器
+- `lowlevel` — 宿主侧 BLE 适配器，转发原始通知数据块
 - 固件 — Bootloader 下部分 API 会失败
 
 ### 哪些标识是必填的？
@@ -71,7 +71,7 @@ sequenceDiagram
 | :--- | :--- | :--- |
 | 🟢 不需要标识 | 初始化、配置、事件 | `init` `on/off` `searchDevices` `getLogs` `dispose` `uiResponse` |
 | 🟡 只要 `connectId` | 设备管理、状态、固件 | `getDeviceState` `openWalletSession` `cancel` `deviceSettings` |
-| 🔵 `connectId` + `deviceId` | 链上签名、地址、加密 | `evmSignTransaction` `btcSignTransaction` `solanaSignMessage` `allNetworkGetAddress` |
+| 🔵 `connectId` + `deviceId` | 链上签名、地址、加密 | `evmSignTransaction` `btcSignTransaction` `solSignMessage` `allNetworkGetAddress` |
 
 ## 标准生命周期
 <div id="standard-lifecycle" />
@@ -79,30 +79,33 @@ sequenceDiagram
 `init → search → getDeviceState → 订阅 UI/DEVICE/FIRMWARE → call + uiResponse → cleanup`
 
 ```ts
-import HardwareSDK, { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-common-connect-sdk';
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
-await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
 
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success || !devices.payload.length) throw new Error('No device');
 const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
 
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
 
-HardwareSDK.on(UI_REQUEST.REQUEST_PIN, () => {
-  // 打开 UI，收集输入，再 uiResponse
-});
-HardwareSDK.on(UI_REQUEST.REQUEST_PASSPHRASE, () => {});
+// Register the UI_EVENT handler shown below before any protected call.
+HardwareSDK.on(UI_EVENT, handleUiEvent);
 
-await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
   useEmptyPassphrase: true,
 });
+if (!address.success) throw new Error(address.payload.error);
 ```
 
-同一设备串行。切换设备后刷新 features。卸载时移除监听。只有拆除传输时才 `HardwareSDK.dispose()` —— 见 [重连与释放](/zh/hardware-sdk/transport/reconnect)。
+同一设备串行。切换设备后重新读取 `getDeviceState`。卸载时移除监听。只有拆除传输时才 `HardwareSDK.dispose()` —— 见 [重连与释放](/zh/hardware-sdk/transport/reconnect)。
 
 ## 通用参数
 <div id="common-params" />
@@ -124,15 +127,15 @@ PIN / passphrase 交互见 [PIN](/zh/hardware-sdk/concepts/pin) 和 [Passphrase]
 
 | UI_REQUEST | 触发时机 | 应答 |
 | --- | --- | --- |
-| `REQUEST_PIN` | 受保护调用且设备锁定 | `UI_RESPONSE.RECEIVE_PIN` |
-| `REQUEST_PASSPHRASE` | 软件输入隐藏钱包 | `UI_RESPONSE.RECEIVE_PASSPHRASE` |
-| `REQUEST_PASSPHRASE_ON_DEVICE` | 设备输入隐藏钱包 | `UI_RESPONSE.RECEIVE_PASSPHRASE`（`passphraseOnDevice: true`） |
+| `REQUEST_PIN` | 请求宿主输入 PIN；设备输入提示无需回复 | `UI_RESPONSE.RECEIVE_PIN` |
+| `REQUEST_PASSPHRASE` | 选择软件或设备输入；设备输入回复 `value: ""`、`passphraseOnDevice: true` | `UI_RESPONSE.RECEIVE_PASSPHRASE` |
 | `REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE` | Web Bootloader 选择 | `UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE` |
 
 **仅展示（不要 `uiResponse`）**
 
 | UI_REQUEST | 作用 |
 | --- | --- |
+| `REQUEST_PASSPHRASE_ON_DEVICE` | 在设备输入 passphrase，仅通知，无需回复 |
 | `REQUEST_BUTTON` | 请在设备确认。固件升级的 `reason='firmware-update'` 同样不要 `uiResponse` |
 | `DEVICE_PROGRESS` | 长耗时进度 |
 | `FIRMWARE_PROCESSING` / `FIRMWARE_PROGRESS` / `FIRMWARE_TIP` | 固件升级状态 |
@@ -143,28 +146,44 @@ PIN / passphrase 交互见 [PIN](/zh/hardware-sdk/concepts/pin) 和 [Passphrase]
 
 | 通道 | 事件 | 建议动作 |
 | --- | --- | --- |
-| `DEVICE_EVENT` | `CONNECT` | 刷新设备列表 |
-| `DEVICE_EVENT` | `DISCONNECT` | 连接作废；不要重放有副作用的调用。[重连](/zh/hardware-sdk/transport/reconnect) |
-| `DEVICE_EVENT` | `ACQUIRE` / `RELEASE` | 卡住并发 |
-| `DEVICE_EVENT` | `CHANGED` | 重新 `getDeviceState` |
-| `DEVICE_EVENT` | `USED_ELSEWHERE` | 关掉占用的 Bridge / 标签页 |
+| `DEVICE.CONNECT` | 直接 payload | 刷新设备列表 |
+| `DEVICE.DISCONNECT` | 直接 payload | 连接作废；不要重放有副作用的调用。[重连](/zh/hardware-sdk/transport/reconnect) |
+| `DEVICE.STATE` / `DEVICE.FEATURES` / `DEVICE.SUPPORT_FEATURES` | 直接 payload | 更新状态、features 或支持能力 |
 | `FIRMWARE_EVENT` | `RELEASE_INFO` / `BLE_RELEASE_INFO` | 安全时机提示升级。[固件升级](/zh/hardware-sdk/firmware-update) |
 
 ```ts
-import HardwareSDK, { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-common-connect-sdk';
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
-const handleUiEvent = (msg) => {
+import type { UiEventMessage } from '@onekeyfe/hd-core';
+
+// These modal functions are provided by your application's UI.
+declare function openPinModal(submit: (input: { value: string }) => void): void;
+declare function openPassphraseModal(submit: (input: { value: string; onDevice: boolean; save: boolean }) => void): void;
+
+const handleUiEvent = (msg: UiEventMessage) => {
   switch (msg.type) {
     case UI_REQUEST.REQUEST_PIN:
+      if (msg.payload.deviceOnly || msg.payload.type === 'ButtonRequest_PinEntry' || msg.payload.type === 'ButtonRequest_AttachPin') {
+        // Display an on-device prompt; no uiResponse is needed.
+        return;
+      }
       openPinModal(({ value }) =>
         HardwareSDK.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload: value })
       );
       return;
     case UI_REQUEST.REQUEST_PASSPHRASE:
+      if (msg.payload.deviceOnly) {
+        HardwareSDK.uiResponse({
+          type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+          payload: { value: '', passphraseOnDevice: true, save: false },
+        });
+        return;
+      }
       openPassphraseModal(({ value, onDevice, save }) =>
         HardwareSDK.uiResponse({
           type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-          payload: { value, passphraseOnDevice: onDevice, attachPinOnDevice: false, save },
+          payload: { value: onDevice ? "" : value, passphraseOnDevice: onDevice, attachPinOnDevice: false, save },
         })
       );
       return;
@@ -186,7 +205,7 @@ HardwareSDK.on(UI_EVENT, handleUiEvent);
 | Method/Firmware (400–418) | 参数错误、必须升级、forbidden path | 校验 HD Path；[固件升级](/zh/hardware-sdk/firmware-update) |
 | Transport (600–603) | 传输未配置、并发调用 | 检查 `env`，串行调用 |
 | Bluetooth (700–722) | 扫描/权限/连接/超时 | 权限与距离；绑定过期不要死循环 |
-| Runtime/Bridge (800–821) | PIN 取消、Bridge 超时 | 重试或启动 Bridge |
+| Runtime/Bridge (800–822) | PIN 取消、Bridge 超时 | 重试或启动 Bridge |
 | Web device (901–902) | WebUSB 未授权 | HTTPS + 用户手势 |
 
 认 `payload.code`，不要解析 `payload.error` 文案。定义见 [`HardwareError.ts`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/shared/src/HardwareError.ts)。

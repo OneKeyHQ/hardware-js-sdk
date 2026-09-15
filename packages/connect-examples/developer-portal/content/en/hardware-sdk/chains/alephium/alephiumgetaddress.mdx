@@ -29,7 +29,8 @@ const result = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
 **Exporting single address**
 
 * `path` - _required_ `string | Array<number>` minimum length is 3
-* `group` - _optional_ `number | undefined | null`
+* `group` - _required_ `number | undefined | null`. Pass `undefined` for group 0, or `null` to omit the target group.
+* `includePublicKey` - _optional_ `boolean` Return `pub` and its `publicKey` alias; default `false`.
 * `showOnOneKey` - _optional_ `boolean` determines if address will be displayed on device. Default is set to `true`
 
 **Exporting bundle of addresses**
@@ -42,7 +43,8 @@ const result = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
 // Get single address
 const response = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
     path: "m/44'/1234'/0'/0/0",
-    showOnOneKey: true
+    showOnOneKey: true,
+    group: undefined
 });
 
 // Get multiple addresses
@@ -50,11 +52,13 @@ const batchResponse = await HardwareSDK.alephiumGetAddress(connectId, deviceId, 
     bundle: [
         {
             path: "m/44'/1234'/0'/0/0",
-            showOnOneKey: false
+            showOnOneKey: false,
+            group: undefined
         },
         {
             path: "m/44'/1234'/1'/0/0",
-            showOnOneKey: false
+            showOnOneKey: false,
+            group: undefined
         }
     ]
 });
@@ -70,8 +74,8 @@ Result with only one address
     payload: {
         address: string,     // displayed address
         derivedPath: string,
-        publicKey: string,
-        path: Array<number> // hardended path
+        publicKey?: string,
+        path: string // serialized BIP32 path
     }
 }
 ```
@@ -82,9 +86,9 @@ Result with bundle of addresses sorted by FIFO
 {
     success: true,
     payload: [
-        { address: string, derivedPath: string, publicKey: string, path: Array<number> }, // account 1
-        { address: string, derivedPath: string, publicKey: string, path: Array<number> }, // account 2
-        { address: string, derivedPath: string, publicKey: string, path: Array<number> }  // account 3
+        { address: string, derivedPath: string, publicKey?: string, path: string }, // account 1
+        { address: string, derivedPath: string, publicKey?: string, path: string }, // account 2
+        { address: string, derivedPath: string, publicKey?: string, path: string }  // account 3
     ]
 }
 ```
@@ -96,7 +100,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

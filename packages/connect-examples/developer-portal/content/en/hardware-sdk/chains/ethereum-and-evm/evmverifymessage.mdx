@@ -26,7 +26,7 @@ const result = await HardwareSDK.evmVerifyMessage(connectId, deviceId, params);
 ```typescript
 HardwareSDK.evmVerifyMessage(connectId, deviceId, {
     address: "0xdA0b608bdb1a4A154325C854607c68950b4F1a34",
-    message: "Example message",
+    messageHex: "4578616d706c65206d657373616765",
     signature: "11dc86c631ef5d9388c5e245501d571b864af1a717cbbb3ca1f6dacbf330742957242aa52b36bbe7bb46dce6ff0ead0548cc5a5ce76d0aaed166fd40cb3fc6e51c",
     chainId: 1
 });
@@ -50,7 +50,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

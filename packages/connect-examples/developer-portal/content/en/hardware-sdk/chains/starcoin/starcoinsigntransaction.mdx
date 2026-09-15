@@ -38,9 +38,8 @@ Result
 {
   success: true,
   payload: {
-    path: "m/44'/101010'/0'/0'/0'",
     public_key: string,
-    signature: string.
+    signature: string,
   }
 }
 ```
@@ -52,7 +51,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

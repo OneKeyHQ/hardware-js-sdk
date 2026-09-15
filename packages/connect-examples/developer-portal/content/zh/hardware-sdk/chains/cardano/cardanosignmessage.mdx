@@ -25,11 +25,15 @@ const result = await HardwareSDK.cardanoSignMessage(connectId, deviceId, params)
 * `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
 * `message` - _必需_ `string` 要签名的十六进制文本消息
 * `networkId` - _必需_ `Integer` 主网为 1，测试网为 0
-* `derivationType` - _可选_ `CardanoDerivationType` 枚举。决定使用的派生类型。默认设置为 ICARUS=1
+* `derivationType` - _必需_ `CardanoDerivationType` 枚举。决定使用的派生类型。默认设置为 ICARUS=1
+
+当前 TypeScript 接口要求显式提供 `derivationType`，运行时默认值为 ICARUS。
 
 ### 示例
 
 ```typescript
+import { PROTO } from "@onekeyfe/hd-core";
+
 // 原始消息
 const message = "Hello World";
 
@@ -39,7 +43,8 @@ const messageHex = Buffer.from(message).toString('hex');
 HardwareSDK.cardanoSignMessage(connectId, deviceId, {
     path: "m/1852'/1815'/0'/0/0",
     message: messageHex,
-    networkId: 1
+    networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS
 });
 ```
 
@@ -62,7 +67,7 @@ HardwareSDK.cardanoSignMessage(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

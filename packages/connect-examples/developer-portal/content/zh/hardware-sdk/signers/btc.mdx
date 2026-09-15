@@ -11,7 +11,7 @@ title: BTC Signer
 1. [工作原理](#工作原理)
 2. [安装](#安装)
 3. [初始化](#初始化)
-4. [适用场景](#适用场景--use-cases)
+4. [适用场景](#适用场景)
    - [获取地址](#场景-1获取地址)
    - [签名交易](#场景-2签名交易)
 5. [交互与状态](#交互与状态)
@@ -20,10 +20,10 @@ title: BTC Signer
 
 ## 工作原理
 
-OneKey BTC signer 通过 `HardwareSDK` 与设备交互，将 APDU 封装为 UTXO 审核与签名任务。核心要点：
+OneKey BTC signer 通过 `HardwareSDK` 与设备交互，通过 OneKey 协议请求 UTXO 审核与签名。核心要点：
 
 - 路径必须与脚本 purpose 对应（44/49/84/86）。
-- 每个输入都需要完整前序交易（`refTxs`）。
+- 在 `refTxs` 中提供签名流程请求的完整前序交易；具体要求取决于输入类型与固件。
 - 设备逐条展示输入/输出/找零/手续费，确认后返回签名或序列化交易。
 
 ## 安装
@@ -36,10 +36,17 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
-await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
 const { connectId } = devices.payload[0];
-const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
 ```
 
 ## 适用场景
@@ -53,19 +60,22 @@ const res = await HardwareSDK.btcGetAddress(connectId, deviceId, {
   coin: 'btc',
   showOnOneKey: true,
 });
-// res.payload.address, publicKey?, path
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.address and res.payload.path are strings.
 ```
 
 **参数**
 
-- `path` / `address_n`: 必填，BIP44 路径或数组；需与脚本 purpose 对应。
-- `coin`: 必填，网络标识（如 `btc` / `test`）。
+- `path`: 必填，BIP44 路径或数组；需与脚本 purpose 对应。
+- `coin`: 获取地址时可选，网络标识（如 `btc` / `test`）。
 - `showOnOneKey?`: 可选，是否在设备上展示并确认。
 
 **返回**
 
 ```ts
-Promise<{ success, payload: { address, path, publicKey?, chainCode? } }>
+type AddressResult =
+  | { success: true; payload: { address: string; path: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
 ```
 
 ---
@@ -80,13 +90,14 @@ const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, dev
   refTxs,
   locktime: 0,
 });
-// payload: { serializedTx, signatures?, txid? }
+if (!success) throw new Error(payload.error);
+// Verify payload.serializedTx and payload.signatures before broadcasting.
 ```
 
 **参数**
 
 - `coin`: 必填，决定网络规则与前缀。
-- `inputs`: 必填，数组，字段包含（SegWit/Taproot 必填 `amount`，Legacy 可选但建议填写）：
+- `inputs`: 必填，数组，字段包含（当前公共类型要求每个输入提供 `amount`）：
   - `address_n`（路径，与脚本匹配）
   - `prev_hash`（UTXO txid，hex）
   - `prev_index`（UTXO vout）
@@ -95,37 +106,49 @@ const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, dev
 - `outputs`: 必填，数组，字段包含：
   - 收款地址输出：`address` + `amount` + `script_type`（如 `PAYTOADDRESS`）
   - 找零输出：`address_n` + `amount` + `script_type` 对应脚本
-- `refTxs`: 必填，覆盖所有输入的完整前序交易（需包含 `hash`、`version`、`lock_time`、`inputs`、`bin_outputs` 或 `outputs`，按前序交易实际结构填写）
+- `refTxs`: 必填数组，包含固件请求的完整前序交易；仅在签名流程不请求前序交易时可为空（需包含 `hash`、`version`、`lock_time`、`inputs`、`bin_outputs` 或 `outputs`，按前序交易实际结构填写）
 - `locktime?`: 可选，数字
 
 **返回**
 
 ```ts
-Promise<{ success, payload: { serializedTx, signatures?: string[], txid?: string } }>
+type SignResult =
+  | { success: true; payload: { serializedTx: string; signatures: string[]; txid?: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
 ```
 
 ## 交互与状态
 
-- 接口以 Promise 结束；用户提示通过 `UI_REQUEST` 事件触发（解锁设备、打开 BTC App、确认输入/输出/找零/手续费）。
+- 接口以 Promise 结束；用户提示通过 `UI_REQUEST` 事件触发（解锁设备、确认输入/输出/找零/手续费）。
 - 同一设备请串行调用；签名前用 `showOnOneKey` 确认收款/找零路径。
 
 ## 示例
 
 ### 示例：P2SH-P2WPKH 交易（嵌套 SegWit）
 
+以下是准备参数的片段。调用前须将示意 UTXO/输出替换为实际交易，并加载与之匹配的完整 `refTxs`。
+
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import type { BTCSignTransactionParams } from '@onekeyfe/hd-core';
 
-await HardwareSDK.init({ env: 'webusb', debug: false });
+const initialized = await HardwareSDK.init({ env: 'webusb', debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
 
 const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
 const { connectId } = devices.payload[0];
-const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
 
 const path49 = [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0, 0];
 await HardwareSDK.btcGetAddress(connectId, deviceId, { path: path49, coin: 'btc', showOnOneKey: true });
 
-const inputs = [
+const inputs: BTCSignTransactionParams['inputs'] = [
   {
     address_n: path49,
     prev_index: 0,
@@ -135,7 +158,7 @@ const inputs = [
   },
 ];
 
-const outputs = [
+const outputs: BTCSignTransactionParams['outputs'] = [
   {
     address_n: [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 1, 1],
     amount: '3181747',
@@ -148,15 +171,8 @@ const outputs = [
   },
 ];
 
-const refTxs = [
-  {
-    hash: 'b035d89d4543ce5713c553d69431698116a822c57c03ddacf3f04b763d1999ac',
-    version: 1,
-    lock_time: 0,
-    inputs: [/* 前序交易的 inputs */],
-    bin_outputs: [/* 前序交易的 outputs */],
-  },
-];
+// Load complete previous transactions matching each requested prev_hash.
+declare const refTxs: BTCSignTransactionParams['refTxs'];
 
 const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, deviceId, {
   coin: 'btc',
@@ -167,7 +183,7 @@ const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, dev
 });
 
 if (success) {
-  console.info('signed tx:', payload.serializedTx); // 可直接广播
+  // Verify the signed transaction, then submit it through your Bitcoin client.
 }
 ```
 
@@ -178,7 +194,7 @@ if (success) {
   - `49'` → P2SH-P2WPKH
   - `84'` → P2WPKH
   - `86'` → P2TR
-- 必须提供完整 `refTxs`：缺失任何输入的前序交易会被拒签。
+- `refTxs` 必须包含固件请求的完整前序交易；缺失被请求的数据会被拒签。
 - 找零：确保 `address_n` 属于同一账户路径，防止用户混淆。
 - 设备确认：输入、输出、找零、手续费需与前端显示一致。
 - 验签：用 `bitcoinjs-lib` / `@scure/btc-signer` 重建交易，校验 txid 与 `serializedTx`。

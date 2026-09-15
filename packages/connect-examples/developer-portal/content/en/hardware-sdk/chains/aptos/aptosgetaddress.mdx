@@ -24,7 +24,7 @@ const response = await HardwareSDK.aptosGetAddress(connectId, deviceId, params)
 
 **Exporting single address**
 
-* `path` - _required_ `string | Array<number>`  minimum length is 5. [more information](/en/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _required_ `string | Array<number>`  SDK minimum length is `3`. [more information](/en/hardware-sdk/concepts/common-params#hd-path)
 * `showOnOneKey` - _optional_ `boolean` determines if address will be displayed on device. Default is set to `true`
 
 **Exporting bundle of addresses**
@@ -62,7 +62,7 @@ Result with only one address
     success: true,
     payload: {
         address: string,     // displayed address
-        path: Array<number> // hardended path
+        path: string // serialized BIP32 path
     }
 }
 ```
@@ -73,9 +73,9 @@ Result with bundle of addresses sorted by FIFO
 {
     success: true,
     payload: [
-        { address: string, path: Array<number> }, // account 1
-        { address: string, path: Array<number> }, // account 2
-        { address: string, path: Array<number> }  // account 3
+        { address: string, path: string }, // account 1
+        { address: string, path: string }, // account 2
+        { address: string, path: string }  // account 3
     ]
 }
 ```
@@ -87,7 +87,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

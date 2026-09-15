@@ -12,15 +12,15 @@ title: 标识符（Identifiers）
 > 找的是**传入 SDK 的参数**（`passphraseState`、`initSession`、
 > `useEmptyPassphrase` 等）？请看 [通用参数](/zh/hardware-sdk/concepts/common-params)。
 
-## 四层标识符
+## 五层标识符
 
-每个标识符属于四类生命周期之一。知道它属于哪一类，就知道什么时候该刷新、什么
+每个标识符属于五类生命周期之一。知道它属于哪一类，就知道什么时候该刷新、什么
 时候能长期缓存。
 
 | 层级 | 生命周期 | 变化触发 | 字段 |
 | --- | --- | --- | --- |
-| **物理硬件** | 永久（跟硬件本体绑定） | 永不变化 | `uuid`、`onekey_serial`、`serial_no` |
-| **传输连接** | 本次连接 | 重新 `searchDevices()`；换传输方式 | `connectId`、`path`、`name`、`deviceType` |
+| **物理硬件** | 永久（跟硬件本体绑定） | 永不变化 | `onekey_serial`、`serial_no` |
+| **传输连接** | 本次连接 | 重新 `searchDevices()`；换传输方式 | `connectId`、`uuid`、`path`、`name`、`deviceType` |
 | **种子 / 钱包状态** | 恢复出厂 / 擦除 / 恢复助记词之前 | 恢复出厂、重新导入助记词、擦除 | `device_id` / `deviceId`、`label` |
 | **隐藏钱包指纹** | 该 passphrase 不变就一直有效 | 更换 passphrase | `passphraseState` |
 | **固件 session（内部）** | 设备锁屏之前 | 锁屏、USB 断开 | 固件 `session_id` —— 只在 Core 内，不要持久化 |
@@ -31,7 +31,7 @@ title: 标识符（Identifiers）
 
 | ID | 需要传入？ | 传在哪里 | 什么时候必传？ |
 | --- | --- | --- | --- |
-| `connectId` | ✅ | 每个方法的第一个位置参数 | **总是必传** |
+| `connectId` | ✅ | 设备/钱包方法的第一个位置参数 | 以各方法为准；初始化、搜索、事件不需要 |
 | `deviceId` | ✅ | 签名 / 地址 / 加密类方法的第二个位置参数 | 钱包级操作必传；设备管理操作可省 |
 | `passphraseState` | ✅ | 在 `params` 对象里 | 只在访问隐藏钱包（带 passphrase）时传 |
 | `uuid`、`onekey_serial`、`device_id`、`session_id`、`path`、`name`、`deviceType`、`label` | ❌ 仅响应字段 | — | — |
@@ -51,9 +51,8 @@ HardwareSDK.evmGetAddress(connectId, deviceId, {
 });
 
 // 钱包级（隐藏钱包）—— connectId + deviceId + passphraseState
-HardwareSDK.evmSignTransaction(connectId, deviceId, {
+HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
-  transaction: { /* ... */ },
   passphraseState, // 由 openWalletSession 一次性获取
 });
 ```
@@ -62,7 +61,8 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 
 | 类别 | 适用场景 | 代表方法 |
 | --- | --- | --- |
-| 🟡 仅 `connectId` | 设备级操作（不触碰钱包状态）| `searchDevices` · `getDeviceState` · `openWalletSession` · `deviceLock` · `deviceUnlock` · `deviceWipe` · `deviceSettings` · `deviceVerify` · `cancel` · `checkFirmwareRelease` · `checkBootloaderRelease` |
+| 🟢 无需标识 | SDK 生命周期与事件 | `init` · `searchDevices` · `on/off` · `uiResponse` · `dispose` |
+| 🟡 仅 `connectId` | 设备管理与钱包选择；部分方法允许省略 connectId| `getDeviceState` · `openWalletSession` · `deviceLock` · `deviceUnlock` · `deviceWipe` · `deviceSettings` · `deviceVerify` · `cancel` · `checkFirmwareRelease` · `checkBootloaderRelease` |
 | 🔵 `connectId` + `deviceId` | 钱包级：地址派生 / 签名 / 加密 | `evmGetAddress` · `evmSignTransaction` · `evmSignMessage` · `btcGetAddress` · `btcSignTransaction` · `btcSignPsbt` · `solGetAddress` · `solSignMessage` · `nostrEncryptMessage` · `allNetworkGetAddress` · 所有其他链方法 |
 | 🟣 `connectId` + `deviceId` + `passphraseState` | 和 🔵 相同，但访问的是带 passphrase 的隐藏钱包 | 🔵 里所有方法，params 里带非空 `passphraseState` |
 
@@ -72,11 +72,11 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 | --- | --- |
 | `connectId` 缺失或未知 | `DeviceNotFound` —— SDK 不知道要路由到哪台设备 |
 | `deviceId` 不对（中途换了种子）| `DeviceCheckDeviceIdError` —— SDK 拒绝在另一个种子上签名 |
-| 访问隐藏钱包漏传 `passphraseState` | ⚠️ **返回标准钱包的结果，无任何报错** —— 地址 / 签名都是另一个钱包的 |
+| 访问隐藏钱包漏传 `passphraseState` | 调用没有绑定目标隐藏钱包，可能返回其他钱包的结果且不报错 |
 | `passphraseState` 不匹配当前 session | 错误码 112（passphrase state mismatch）—— session 过期或隐藏钱包变了 |
-| `passphraseState` 和 `useEmptyPassphrase: true` 同时传 | `passphraseState` 优先（走隐藏钱包）——`useEmptyPassphrase` 被忽略 |
+| `passphraseState` 和 `useEmptyPassphrase: true` 同时传 | 不要混传。隐藏钱包仅传 `passphraseState`；标准钱包仅传 `useEmptyPassphrase: true`。 |
 
-> ⚠️ 第三行是最坑的：隐藏钱包调用时漏传 `passphraseState`，拿到的是标准钱包的地址/签名，**完全没有报错**。所以隐藏钱包场景里，用 `openWalletSession` 拿一次 `passphraseState` 之后必须挂到后续所有钱包级调用上；如果明确就是要走标准钱包，就显式传 `useEmptyPassphrase: true`，别把它留空。
+> 从成功打开的隐藏钱包结果获取 `passphraseState`，并传给后续隐藏钱包调用；标准钱包显式传 `useEmptyPassphrase: true`。
 
 ## 物理硬件标识符
 
@@ -84,7 +84,6 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 
 | 字段 | 来源 | 格式 | 说明 |
 | --- | --- | --- | --- |
-| `uuid` | `searchDevices()[].uuid` | 依传输方式（见下） | USB 传输时和 `connectId` 相同。BLE 上可能和 OS 层的 `connectId` 不同。 |
 | `onekey_serial` / `onekey_serial_no` | `getFeatures().payload` | `CLB21J0013` 这种格式 | 出厂分配；**印在设备 / 包装盒上**。 |
 
 ## 传输连接标识符
@@ -95,7 +94,7 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 ### `connectId` —— 路由用的 key
 <div id="connectid" />
 
-每次调用 SDK 方法都要把 `connectId` 作为第一个参数，SDK 据此判断请求发给哪台
+设备/钱包方法按各自签名接收第一个参数 `connectId`，SDK 据此判断请求发给哪台
 设备 / 哪个连接。同传输下的多次 `searchDevices()` 返回相同值。
 
 | 传输方式 | `connectId` 格式 | 例子 |
@@ -116,6 +115,7 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 
 | 字段 | 作用 | 典型值 | 说明 |
 | --- | --- | --- | --- |
+| `uuid` | `searchDevices()[].uuid` | 依传输方式（见下） | USB 传输时和 `connectId` 相同。BLE 上可能和 OS 层的 `connectId` 不同。 |
 | `path` | 底层总线路径 | USB: 设备路径或 `device_id`；BLE: `undefined` | **实现细节** —— 调用路由请**始终用 `connectId`**，不要用 `path`。 |
 | `name` | 展示用的人类可读标签 | USB: 设备 `label`；BLE: 广播名 | 仅用于 UI 展示，不参与路由。 |
 | `deviceType` | 设备型号 | `classic` / `classic1s` / `classicpure` / `mini` / `touch` / `pro` | 用于按型号分支能力（如按键机型才走 PIN matrix 流程）。取值来自 `EDeviceType`。 |
@@ -135,15 +135,18 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 ### 用法
 
 ```ts
-const { payload: features } = await HardwareSDK.getFeatures(connectId);
-const deviceId = features.device_id;
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device has no wallet identity');
 
-// 每次签名调用都带上 deviceId —— SDK 用它检测过程中种子是否变了，
-// 变了就抛 `DeviceCheckDeviceIdError` 阻止签在错的种子上
-await HardwareSDK.evmSignTransaction(connectId, deviceId, { ... });
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
 ```
 
-遇到 `DeviceCheckDeviceIdError` 就重新 `getFeatures(connectId)` 并更新缓存
+遇到 `DeviceCheckDeviceIdError` 就重新 `getDeviceState(connectId)` 并更新缓存
 的 `deviceId`。
 
 ## 会话标识符
@@ -184,7 +187,7 @@ passphrase 永远产生同一个 `passphraseState`。**
 ```jsonc
 {
   "connectId":  "CLB21J0013",                      // 传输层（USB 下 = 设备序列号）
-  "uuid":       "CLB21J0013",                      // 物理层（USB 下 = connectId）
+  "uuid":       "CLB21J0013",                      // 依传输而定（USB 下 = connectId）
   "deviceType": "classic1s",                       // 传输层
   "deviceId":   "399A2470958EDB3D9F3826C2",        // 种子状态；重置后会变
   "path":       "399A2470958EDB3D9F3826C2",        // 传输内部；各传输不一样
@@ -198,7 +201,6 @@ passphrase 永远产生同一个 `passphraseState`。**
 {
   "device_id":       "399A2470958EDB3D9F3826C2",   // 和上面 deviceId 相同
   "onekey_serial":   "CLB21J0013",                 // 物理；USB 下和 connectId 相同
-  "session_id":      "80cb8aef933870e4…",          // 短期；锁屏后重置
   "passphrase_protection": true,
   "unlocked":        true,
   "label":           "OneKey Classic 1S"
@@ -220,13 +222,12 @@ passphrase 永远产生同一个 `passphraseState`。**
 
 USB 下两者**是同一个字符串**（都是设备序列号）。BLE 下可能不一样：
 `connectId` 是 OS 层的连接句柄（MAC / CoreBluetooth UUID / …），`uuid` 则是
-SDK 层暴露给应用用的稳定 ID。**路由始终用 `connectId`**；如果需要一个跨传输
-稳定的 ID 做展示用途，再考虑 `uuid`。
+SDK 暴露的、依传输而定的标识。**路由始终用 `connectId`**；不要把 `uuid` 当作跨传输稳定的物理身份。
 
 ### `deviceId` vs `uuid` / `onekey_serial`
 
 - `deviceId` —— 重置 / 换种子后会变。用来回答*"这还是同一个钱包吗？"*
-- `uuid` / `onekey_serial` —— 永不变化。用来回答*"这还是同一台物理设备
+- `onekey_serial` —— 独立于传输的物理设备标识。用来回答*"这还是同一台物理设备
   吗？"*
 
 ### `session_id` vs `passphraseState`

@@ -26,14 +26,14 @@ const result = await HardwareSDK.nexaGetAddress(connectId, deviceId, params);
 
 * `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
 * `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
-* `prefix` - _可选_ `string` 地址前缀。默认设置为 `nexatest`
+* `prefix` - _可选_ `string` 地址前缀，如主网使用 `nexa`；请显式指定目标网络
 * `scheme` - _可选_ `string` 加密算法模式。默认设置为 `schnorr`
 
 
 
 #### 导出批量公钥
 
-* `bundle` - 包含 `path`、`coin` 字段的对象 `Array`
+* `bundle` - 包含 `path`、`prefix`、`scheme`、`showOnOneKey` 字段的对象 `Array`
 
 ### 示例
 
@@ -43,7 +43,7 @@ const result = await HardwareSDK.nexaGetAddress(connectId, deviceId, params);
 HardwareSDK.nexaGetAddress(connectId, deviceId, {
     path: "m/44'/29223'/0'/0/0",
     showOnOneKey: true,
-    isTestnet: false
+    prefix: "nexa"
 });
 ```
 
@@ -67,7 +67,7 @@ HardwareSDK.nexaGetAddress(connectId, deviceId, {
 {
     success: true,
     payload: {
-        path: Array<number>, // 强化路径
+        path: string, // 序列化 BIP32 路径
         address: string,   // 地址
     }
 }
@@ -93,7 +93,7 @@ HardwareSDK.nexaGetAddress(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

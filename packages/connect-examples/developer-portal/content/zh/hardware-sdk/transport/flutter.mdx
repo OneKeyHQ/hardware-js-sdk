@@ -4,7 +4,7 @@ title: Flutter：通过蓝牙连接（原生）
 
 # Flutter：通过蓝牙连接（原生）
 
-> 本页基于《[底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin)》与消息协议，建议先阅读接口与 64 字节帧格式。
+> 本页基于《[底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin)》，建议先阅读 BLE 收发接口与 Protocol V1/V2 的处理边界。
 
 适用于通过 WebView 或 JS 引擎加载 JS 包并使用底层适配器桥接到 `@onekeyfe/hd-common-connect-sdk` 的 Flutter 应用。
 
@@ -23,7 +23,7 @@ title: Flutter：通过蓝牙连接（原生）
 
 ## 步骤 4. 实现消息桥接
 
-从原生向 JS 暴露 `enumerate/connect/disconnect/send/receive`，保持相同的签名。转发 64 字节 BLE 通知块并在 JS 上为 `receive()` 重组十六进制负载。
+从原生向 JS 暴露 `enumerate/connect/disconnect/send/receive`，保持相同的签名。将未经修改的 BLE 通知块编码为 hex，放入按连接隔离的队列供 `receive(uuid)` 读取。V1/V2 帧处理与重组由 SDK 完成。
 
 ## 步骤 5. 处理 UI 事件
 
@@ -37,7 +37,7 @@ title: Flutter：通过蓝牙连接（原生）
 
 ## 参考
 
-- 协议帧：[见底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin#消息协议包含在底层传输中)
+- 协议帧：[见底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin#ble-协议原生移动端)
 - UI 事件：[事件配置](/zh/hardware-sdk/core-api-guide#events-ui)，[PIN](/zh/hardware-sdk/concepts/pin)，[Passphrase](/zh/hardware-sdk/concepts/passphrase)
 - 平台详情：[iOS 蓝牙](/zh/hardware-sdk/transport/ios)，[Android 蓝牙](/zh/hardware-sdk/transport/android)
 

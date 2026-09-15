@@ -4,7 +4,7 @@ title: Solana Signer
 
 # Solana Signer
 
-Solana hardware signing guide. Covers address confirmation and message/transaction signing with fixed hardened path and serialized `rawTx`. Aligned with hardware-js-sdk (Promise responses + UI events).
+Solana hardware signing guide. Covers address confirmation and message/transaction signing with supported hardened path and serialized `rawTx`. Aligned with hardware-js-sdk (Promise responses + UI events).
 
 ## Index
 
@@ -20,9 +20,9 @@ Solana hardware signing guide. Covers address confirmation and message/transacti
 
 ## How it works
 
-OneKey Solana signer uses `HardwareSDK` to talk to the device app. You pass a serialized `rawTx` (base64/hex); the device displays source/destination, amount, and fee summary, then returns a signature. Host attaches the signature with `@solana/web3.js` and verifies against the public key from `solGetAddress`.
+OneKey Solana signer uses `HardwareSDK` to talk to the device. You pass a hex-encoded Solana message bytes in `rawTx`; the device displays source/destination, amount, and fee summary, then returns a signature. Host attaches the signature with `@solana/web3.js` and verifies against the public key decoded from the base58 `address` returned by `solGetAddress`.
 
-- Path is fixed, fully hardened, length 4: `m/44'/501'/account'/0'`.
+- Use a firmware-supported hardened path, for example: `m/44'/501'/account'/0'`.
 - Ensure the message/tx includes a fresh recent blockhash.
 
 ## Installation
@@ -35,10 +35,17 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
-await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
 const { connectId } = devices.payload[0];
-const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
 ```
 
 ## Common scenarios
@@ -50,18 +57,21 @@ const res = await HardwareSDK.solGetAddress(connectId, deviceId, {
   path: "m/44'/501'/0'/0'",
   showOnOneKey: true,
 });
-// res.payload.address, publicKey?, path
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.address and res.payload.path are strings.
 ```
 
 **Parameters**
 
-- `path`: required; must follow `44'/501'/account'/0'`.
+- `path`: required; a recommended path is `44'/501'/account'/0'`.
 - `showOnOneKey?`: optional; display and confirm on device.
 
 **Returns**
 
 ```ts
-Promise<{ success, payload: { address, path, publicKey? } }>
+type AddressResult =
+  | { success: true; payload: { address: string; path: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
 ```
 
 ---
@@ -74,24 +84,27 @@ const res = await HardwareSDK.solSignTransaction(connectId, deviceId, {
   rawTx,
   useEmptyPassphrase: true,
 });
-// res.payload.signature
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.signature is hex; res.payload.path is the serialized path.
 ```
 
 **Parameters**
 
-- `path`: required; hardened, length 4.
-- `rawTx`: required; serialized Solana message/tx (base64 or hex).
+- `path`: required; SDK minimum length is 3, subject to firmware path policy.
+- `rawTx`: required; hex-encoded serialized message bytes, excluding the transaction signature envelope. The runtime requires this field.
 - `useEmptyPassphrase?`: optional; force the standard wallet. Hidden wallet: pass `passphraseState`.
 
 **Returns**
 
 ```ts
-Promise<{ success, payload: { signature } }>
+type SignResult =
+  | { success: true; payload: { signature: string; path: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
 ```
 
 ## Interaction & Status
 
-- APIs resolve on completion; user prompts surface via `UI_REQUEST` (unlock device, open Solana app, confirm transaction).
+- APIs resolve on completion; user prompts surface via `UI_REQUEST` (unlock device, confirm transaction).
 - Run calls serially per device. Reuse `passphraseState` or `useEmptyPassphrase: true`. `keepSession` still holds the transport; it is not a wallet binding.
 
 ## Example
@@ -99,17 +112,26 @@ Promise<{ success, payload: { signature } }>
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 
-await HardwareSDK.init({ env: 'webusb', debug: false });
+const initialized = await HardwareSDK.init({ env: 'webusb', debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
 
 const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
 const { connectId } = devices.payload[0];
-const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
 
 const path = "m/44'/501'/0'/0'";
 await HardwareSDK.solGetAddress(connectId, deviceId, { path, showOnOneKey: true });
 
-const rawTx =
-  '4301355cc18d85809872bcbd63cb6ea5ac3c2814a1bacf2e50d8ec62367211917b79ecd1f1a98fa0d793d7cb92ebd9a479dc6aba0ae8570253aa87c0da32db5ed2bd401f3bbee52c2bc55761fd8486fae2e28f46499282f4267b8b90fc8c1cc97bb659b6cc927f2ec1701ef2928ddb84759ba5c557f549db';
+// Obtain these bytes from Transaction.serializeMessage() or
+// VersionedTransaction.message.serialize(), with a fresh recent blockhash.
+declare const messageBytes: Uint8Array;
+const rawTx = Array.from(messageBytes, byte => byte.toString(16).padStart(2, '0')).join('');
 
 const { success, payload } = await HardwareSDK.solSignTransaction(connectId, deviceId, {
   path,
@@ -118,13 +140,13 @@ const { success, payload } = await HardwareSDK.solSignTransaction(connectId, dev
 });
 
 if (success) {
-  console.info('signature:', payload.signature);
+  // Attach the signature and verify it against the address before broadcasting.
 }
 ```
 
 ## Validation & Troubleshooting
 
-- Path: must follow `44'/501'/account'/0'`; other paths are rejected.
+- Path: the SDK checks a minimum of 3 components; firmware enforces the supported derivation paths. The examples use `m/44'/501'/account'/0'`.
 - Message/tx: include fresh `recentBlockhash`, correct accounts, and instruction order.
 - Device review: path/account, destination, amount, fee summary must match your UI.
 - Host verify: attach signature with `@solana/web3.js`, confirm the signer equals `solGetAddress` result.

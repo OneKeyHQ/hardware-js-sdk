@@ -6,7 +6,7 @@ title: deviceVerify
 
 ## 验证设备
 
-从设备获取硬件签名信息的 cert 和 signature 字段，并提交到 OneKey 服务器验证设备的可靠性。读取签名数据需要在设备上确认。
+从设备获取验证挑战对应的 `cert` 和 `signature`。由宿主将结果提交给验证服务；此 API 不执行服务器验证。读取签名数据需要在设备上确认。
 
 ```typescript
 const result = await HardwareSDK.deviceVerify(connectId, params);
@@ -17,13 +17,16 @@ const result = await HardwareSDK.deviceVerify(connectId, params);
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
 
-* `dataHex` - _可选_ `string` 十六进制字符串形式的随机字符串，例如以十六进制字符串传入的时间戳。
+* `dataHex` - _必需_ `string` 验证流程提供的非空 hex 编码挑战数据。
 
 ## 示例
 
 ```typescript
+// Obtain a fresh challenge from your verification flow.
+declare const challengeHex: string;
+
 HardwareSDK.deviceVerify(connectId, {
-    dataHex: '183533a058f'
+    dataHex: challengeHex
 });
 ```
 
@@ -46,7 +49,7 @@ HardwareSDK.deviceVerify(connectId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

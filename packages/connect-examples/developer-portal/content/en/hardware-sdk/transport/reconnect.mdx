@@ -16,37 +16,35 @@ This page is the integrator contract. It does not describe Protocol V2 sequence 
 
 ## What you must do
 
-1. Subscribe to `DEVICE_EVENT` once at app start.
+1. Subscribe to `DEVICE.CONNECT` / `DEVICE.DISCONNECT` once at app start.
 2. On `DISCONNECT`, mark that `connectId` busy/invalid and fail the current UI flow. Do not retry the same side-effecting method.
 3. Search again (`searchDevices`) when the user is ready. USB replug and BLE re-pair can mint a **new** `connectId`. Cache USB and BLE IDs separately. See [Identifiers](/en/hardware-sdk/concepts/identifiers).
 4. After a new connection, refresh device state with [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state). Reuse persisted `deviceId + passphraseState`; do not persist firmware `session_id`.
 5. On the next address / sign call, pass the persisted `passphraseState` or `useEmptyPassphrase: true`. Core resumes the firmware session inside that method. Do not reopen a wallet session just to reconnect.
 
 ```ts
-import { DEVICE_EVENT, DEVICE } from '@onekeyfe/hd-core';
+import { DEVICE } from '@onekeyfe/hd-core';
 
-HardwareSDK.on(DEVICE_EVENT, (msg) => {
-  if (msg.type === DEVICE.DISCONNECT) {
-    markDisconnected(msg.payload);
-    // fail the open PIN / sign modal; do not call firmwareUpdate* again
-  }
-  if (msg.type === DEVICE.CONNECT) {
-    refreshDeviceList();
-  }
+HardwareSDK.on(DEVICE.DISCONNECT, (payload) => {
+  markDisconnected(payload);
+  // Fail the open UI flow; do not replay signing or firmware updates.
+});
+HardwareSDK.on(DEVICE.CONNECT, () => {
+  refreshDeviceList();
 });
 ```
 
 ## BLE-specific
 
 - Permissions (`BLUETOOTH_SCAN` / `CONNECT`, iOS Bluetooth usage strings, often location on Android) must still be granted after process death. See [React Native BLE](/en/hardware-sdk/transport/react-native-ble).
-- `retryCount` / `timeout` on **address and signing** calls help a flaky link. They are not a reconnect strategy.
+- `retryCount` / `timeout` control connection setup before a device call. They do not retry signing or replace application-level recovery.
 - If the OS bond is stale, stop looping connect. Ask the user to forget the device in system Bluetooth settings and pair again.
 - Mini has no BLE. Neo has BLE but no camera. See [Devices](/en/hardware-sdk/concepts/devices).
 
 ## USB-specific
 
 - WebUSB needs a user gesture to show the chooser again unless you pass `skipWebDevicePrompt` on a still-authorized device. See [Common Params](/en/hardware-sdk/concepts/common-params).
-- Another tab or Bridge holding the device surfaces as `USED_ELSEWHERE`. Close the other owner; do not `dispose()` as a first reaction.
+- Another tab or Bridge holding the device can cause an acquire/open error. Close the other owner; do not `dispose()` as a first reaction.
 
 ## `dispose()`
 
