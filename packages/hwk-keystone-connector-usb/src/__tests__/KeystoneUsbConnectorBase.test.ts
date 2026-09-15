@@ -76,7 +76,6 @@ describe('KeystoneUsbConnectorBase', () => {
       expect(parseHardwareRuntimeId(devices[0].connectId)).toMatchObject({
         kind: 'search-target',
         vendor: 'keystone',
-        connectionType: 'usb',
       });
       expect(devices[0].connectionType).toBe('usb');
     });
@@ -478,9 +477,8 @@ describe('KeystoneUsbConnectorBase', () => {
       const session = await connector.connect();
 
       expect(parseHardwareRuntimeId(session.sessionId)).toMatchObject({
-        kind: 'connector-session',
+        kind: 'link',
         vendor: 'keystone',
-        connectionType: 'usb',
       });
       expect(session.deviceInfo.deviceId).toBe('');
       expect(session.deviceInfo.raw).toEqual({ masterFingerprint: FAKE_MFP });
@@ -563,7 +561,7 @@ describe('KeystoneUsbConnectorBase', () => {
     });
   });
 
-  describe('on-device interaction events', () => {
+  describe('on-device operation events', () => {
     it('brackets signing resolveUr calls with ConfirmOnDevice / InteractionComplete', async () => {
       // The USB channel used to be completely silent while the device sat on
       // an approval screen. Hosts render these with the same handler they

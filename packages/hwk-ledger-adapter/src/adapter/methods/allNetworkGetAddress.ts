@@ -53,7 +53,7 @@ export type LedgerGetChainFingerprint = (
   context: LedgerInstallAppContext
 ) => Promise<Response<string>>;
 
-export type LedgerRetainInteraction = (interactionId: string) => () => void;
+export type LedgerRetainOperation = (operationId: string) => () => void;
 
 export type LedgerErrorToFailure = <T>(error: unknown) => Response<T>;
 
@@ -69,12 +69,12 @@ const LEDGER_UNSUPPORTED_ALLNETWORK_NETWORKS = new Set(['doge', 'dogecoin']);
 export function createAllNetworkGetAddress({
   callChain,
   getChainFingerprint,
-  retainInteraction,
+  retainOperation,
   errorToFailure,
 }: {
   callChain: LedgerCallChain;
   getChainFingerprint: LedgerGetChainFingerprint;
-  retainInteraction: LedgerRetainInteraction;
+  retainOperation: LedgerRetainOperation;
   errorToFailure: LedgerErrorToFailure;
 }) {
   return async function allNetworkGetAddress(
@@ -91,14 +91,14 @@ export function createAllNetworkGetAddress({
       itemCount: params.bundle.length,
     });
 
-    const target = resolveHardwareOperationTarget(connectId, params.interactionId, 'ledger');
+    const target = resolveHardwareOperationTarget(connectId, params.operationId, 'ledger');
     if (!target.success) return target;
 
     const effectiveTargetId = target.payload.targetId ?? '';
-    let releaseInteractionRetention: (() => void) | undefined;
+    let releaseOperationRetention: (() => void) | undefined;
     try {
-      releaseInteractionRetention = target.payload.interactionId
-        ? retainInteraction(target.payload.interactionId)
+      releaseOperationRetention = target.payload.operationId
+        ? retainOperation(target.payload.operationId)
         : undefined;
     } catch (error) {
       return errorToFailure(error);
@@ -107,7 +107,7 @@ export function createAllNetworkGetAddress({
     const installContext: LedgerInstallAppContext = {};
     const commonParams: ICommonCallParams = {
       autoInstallApp: params.autoInstallApp,
-      interactionId: target.payload.interactionId,
+      operationId: target.payload.operationId,
       knownConnections: params.knownConnections,
       extra: params.extra,
       allowDeviceSelection: params.allowDeviceSelection,
@@ -163,7 +163,7 @@ export function createAllNetworkGetAddress({
       });
       return result;
     } finally {
-      releaseInteractionRetention?.();
+      releaseOperationRetention?.();
     }
   };
 }
@@ -179,8 +179,8 @@ function isTopLevelAllNetworkFailure(response: AllNetworkAddressResponse): boole
     code === HardwareErrorCode.DeviceDisconnected ||
     code === HardwareErrorCode.OperationTimeout ||
     code === HardwareErrorCode.TransportError ||
-    code === HardwareErrorCode.InteractionEnded ||
-    code === HardwareErrorCode.InteractionNotFound ||
+    code === HardwareErrorCode.OperationEnded ||
+    code === HardwareErrorCode.OperationNotFound ||
     code === HardwareErrorCode.UserAborted ||
     code === HardwareErrorCode.UserRejected
   );

@@ -43,8 +43,8 @@ describe('hardware method catalog', () => {
   });
 
   it('builds the shared ambiguous-operation marker', () => {
-    expect(operationMayHaveCompletedParams('evmSignMessage', { interactionId: 'test' })).toEqual({
-      interactionId: 'test',
+    expect(operationMayHaveCompletedParams('evmSignMessage', { operationId: 'test' })).toEqual({
+      operationId: 'test',
       operationMayHaveCompleted: true,
       method: 'evmSignMessage',
     });
