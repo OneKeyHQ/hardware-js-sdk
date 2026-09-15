@@ -52,9 +52,9 @@ export interface ThirdPartyBleApi {
   subscribe(id: string): Promise<void>;
   unsubscribe(id: string): Promise<void>;
   /**
-   * Write a payload (already-framed if Trezor v1, or a single 244-byte chunk
-   * for THP). The main process is responsible for splitting it into BLE-MTU
-   * chunks before handing it to noble.
+   * Write an already-framed payload. The main process applies the framing rule
+   * recorded at connect time — splitting and zero-padding for `padded`, or
+   * writing the buffer as given for `raw`.
    */
   write(id: string, hexData: string): Promise<void>;
   checkAvailability(): Promise<ThirdPartyBleAvailability>;
