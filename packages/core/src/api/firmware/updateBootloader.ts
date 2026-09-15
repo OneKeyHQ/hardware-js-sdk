@@ -1,29 +1,82 @@
 import ByteBuffer from 'bytebuffer';
 import semver from 'semver';
+import { EDeviceType, type EFirmwareType } from '@onekeyfe/hd-shared';
 
 import { DeviceModelToTypes } from '../../types';
 import { getDeviceBootloaderVersion, getDeviceFirmwareVersion, getDeviceType } from '../../utils';
+import { resolveDeviceBootloaderMode } from '../../utils/deviceFeaturesCompat';
 import { DataManager } from '../../data-manager';
 import { shouldUpdateBootloaderForClassicAndMini } from './bootloaderHelper';
 
 import type { Features } from '../../types';
-import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { FirmwareByteSource } from './FirmwareArtifactSource';
 
+/** Touch 3.2.0 added ResourceUpdate (homescreen / UI resources). */
+const RESOURCE_UPDATE_MIN_FIRMWARE_VERSION = '3.2.0';
+
+/**
+ * Touch/Pro 4.1.0 added ResourceUpdate("bootloader.bin") from firmware mode.
+ * deviceUpdateBootloader uses that path when the device is not in bootloader.
+ */
+const FIRMWARE_MODE_BOOTLOADER_UPDATE_MIN_VERSION = '4.1.0';
+
+/**
+ * Pro MCU 4.14.0+ is larger than the pre-2.8.0 bootloader size limit and fails
+ * load_image_header with "Update file header invalid".
+ */
+export const PRO_MCU_MIN_BOOTLOADER_VERSION = '2.8.0';
+
+const canInstallBootloaderFromFirmware = (features: Features) => {
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+  return (
+    !!semver.valid(currentVersion) &&
+    semver.gte(currentVersion, RESOURCE_UPDATE_MIN_FIRMWARE_VERSION) &&
+    semver.gte(currentVersion, FIRMWARE_MODE_BOOTLOADER_UPDATE_MIN_VERSION)
+  );
+};
+
+const canInstallBootloaderNow = (features: Features) =>
+  resolveDeviceBootloaderMode(features) || canInstallBootloaderFromFirmware(features);
+
+const proMcuRequiresNewerBootloader = (features: Features) => {
+  const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
+  return (
+    getDeviceType(features) === EDeviceType.Pro &&
+    !!semver.valid(bootloaderVersion) &&
+    semver.lt(bootloaderVersion, PRO_MCU_MIN_BOOTLOADER_VERSION)
+  );
+};
+
+/**
+ * Whether App/web should run deviceUpdateBootloader before a Touch/Pro MCU update.
+ *
+ * This is two separate questions:
+ * 1. Capability — can deviceUpdateBootloader succeed right now?
+ *    Firmware mode needs firmware >= 4.1.0 (ResourceUpdate bootloader.bin).
+ *    Bootloader mode writes 0:boot/bootloader.bin and reboots into boardloader.
+ * 2. Need — should we update boot at all?
+ *    Config target (optional bump, e.g. 2.8.0 → 2.8.4), or Pro MCU compatibility
+ *    (boot < 2.8.0 cannot parse current firmware-v8 packages).
+ *
+ * Firmware < 4.1.0 still in firmware mode cannot install boot here. Returning
+ * true would make App call ResourceUpdate and fail. Those devices must enter
+ * bootloader first (or use firmware-updater-web).
+ */
 export function checkNeedUpdateBootForTouch(features: Features, firmwareType: EFirmwareType) {
   const deviceType = getDeviceType(features);
   if (!DeviceModelToTypes.model_touch.includes(deviceType)) return false;
-  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+
   const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
+  if (proMcuRequiresNewerBootloader(features) && canInstallBootloaderNow(features)) {
+    return true;
+  }
+
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
   const targetBootloaderVersion = DataManager.getBootloaderTargetVersion(features, firmwareType);
   if (!targetBootloaderVersion) return false;
 
   return (
-    // support ResourceUpdate version 3.2.0
-    semver.gte(currentVersion, '3.2.0') &&
-    // support update bootloader version 4.1.0
-    semver.gte(currentVersion, '4.1.0') &&
-    // target bootloader version
+    canInstallBootloaderFromFirmware(features) &&
     semver.lte(bootloaderVersion, targetBootloaderVersion.join('.'))
   );
 }
