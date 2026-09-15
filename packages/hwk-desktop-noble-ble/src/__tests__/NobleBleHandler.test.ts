@@ -5,8 +5,6 @@ import type { NoblePeripheralLike } from '../NobleBleHandler';
 import { initThirdPartyBleSupport } from '../main';
 import { THIRD_PARTY_BLE_CHANNELS } from '../constants';
 
-import type { ThirdPartyBleApi } from '../types/desktop-api';
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // A stand-in vendor. The handler holds no vendor knowledge, so these tests
