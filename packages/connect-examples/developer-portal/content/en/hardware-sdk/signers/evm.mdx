@@ -4,28 +4,105 @@ title: EVM Signer
 
 # EVM Signer
 
+> Type: Integration guide · Audience: SDK integrators · Status: Current implementation
+>
+> Scope: EVM signing APIs and Pro2/Neo firmware · Last code verification: 2026-09-15
+>
+> Prerequisite: [Request Basics](/en/hardware-sdk/core-api-guide#request-basics)
+
 End-to-end EVM signing guide. Covers address confirmation, EIP‑1559/Legacy transactions, personal_sign, and EIP‑712 typed data. Content is aligned with hardware-js-sdk behavior (Promise responses + UI events) and mirrors the Chinese page.
 
 ## Index
 
 1. [How it works](#how-it-works)
-2. [Installation](#installation)
-3. [Initialization](#initialization)
-4. [Common scenarios](#common-scenarios)
+2. [Clear Signing](#clear-signing)
+3. [Installation](#installation)
+4. [Initialization](#initialization)
+5. [Common scenarios](#common-scenarios)
    - [Get Address](#scenario-1-get-address)
    - [Sign Transaction (1559 / Legacy)](#scenario-2-sign-transaction)
-   - [Sign Message (personal_sign)](#scenario-3-sign-message)
-   - [Sign Typed Data (EIP-712)](#scenario-4-sign-typed-data)
-5. [Interaction & Status](#interaction--status)
-6. [Examples](#examples)
-7. [Validation & Troubleshooting](#validation--troubleshooting)
+   - [Sign Message (personal_sign)](#scenario-3-sign-message-personal_sign)
+   - [Sign Typed Data (EIP-712)](#scenario-4-sign-typed-data-eip-712)
+6. [Interaction & Status](#interaction--status)
+7. [Examples](#examples)
+8. [Validation & Troubleshooting](#validation--troubleshooting)
 
 ## How it works
 
-- `HardwareSDK` talks to the OneKey device app; APIs return `Promise<{ success, payload }>`.
-- User interaction is driven by `UI_REQUEST` events (PIN, passphrase, confirm address/tx/message/typed data/app open).
-- The device shows path/account, recipient, amount, chainId, fee summary; long `data` is often summarized as a hash.
-- Host serializes and verifies with `ethers`/`viem`, then broadcasts via RPC.
+- `HardwareSDK` communicates with the OneKey firmware; APIs return `Promise<{ success, payload }>`.
+- Subscribe to `UI_EVENT` and handle the relevant `UI_REQUEST` prompts for the device and transport. See [Request Basics](/en/hardware-sdk/core-api-guide#request-basics).
+- The device parses supported signing data and presents confirmation screens. The available detail depends on the request and firmware; see [Clear Signing](#clear-signing).
+- The application verifies the signature and serializes/broadcasts transactions via RPC.
+
+## Clear Signing
+
+Clear Signing lets users review the meaning of a signing request on the hardware wallet: who receives an asset, which contract receives an allowance, or which structured message is being signed. The SDK sends the transaction or typed data; the device firmware parses supported formats and asks the user to confirm.
+
+Use the existing `evmSignTransaction` and `evmSignTypedData` methods. There is no separate Clear Signing package or `clearSigning` switch. The public transaction API does not accept host-supplied token metadata, contract labels, or a `domain` label.
+
+### Supported requests and review details
+
+The following describes the current SDK integration and the Pro2/Neo firmware implementation. Screen layout, token metadata, and recognized formats depend on the device and firmware; this is not a guarantee that every model or contract has the same display.
+
+| Request | What to pass | What users should review on a supporting device |
+| --- | --- | --- |
+| Native Transfer | `evmSignTransaction`: recipient in `transaction.to`, amount in `value`, empty `data` | Recipient, amount, network, and fee |
+| ERC-20 Transfer | Token contract in `to`, zero native `value`, ABI-encoded `transfer(address,uint256)` in `data` | Token contract, actual recipient, token amount, and fee |
+| Approve / Revoke | Token contract in `to`, zero native `value`, ABI-encoded `approve(address,uint256)` in `data`; amount `0` revokes an allowance | Spender, token contract, allowance or revocation, and fee; maximum `uint256` is an unlimited allowance |
+| Token / Contract | The actual contract address, chain ID, value, and full calldata | Known token metadata and supported decoded fields; unknown assets or calls may show addresses, raw amounts, and calldata |
+| EIP-712 | `evmSignTypedData` with the complete `types`, `primaryType`, `domain`, and `message` | Domain and structured fields in the parsed signing flow; see the [hash-signing limitations](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata#hash-signing-fallback) |
+| Safe Tx | `evmSignTypedData` with the standard `SafeTx` schema | Safe address, network, destination, value, operation, nonce, gas/refund fields, and transaction data |
+
+### Transfer and allowance integration
+
+For an ERC-20 transfer, `transaction.to` is the **token contract**; the recipient is encoded in calldata. For approval, the encoded address is the **spender**, not the recipient of a transfer. Amounts are integers in the token's smallest unit. Native `value` remains zero for these ERC-20 calls.
+
+The following fragment assumes the SDK and wallet are initialized. It uses `ethers` v6; replace the example addresses and fetch nonce, gas limit, and fees for the selected account and network before signing.
+
+```ts
+import { Interface } from 'ethers';
+
+const tokenContract = '0x1111111111111111111111111111111111111111';
+const spender = '0x2222222222222222222222222222222222222222';
+const erc20 = new Interface(['function approve(address spender, uint256 amount)']);
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  transaction: {
+    to: tokenContract,
+    value: '0x0',
+    data: erc20.encodeFunctionData('approve', [spender, 0n]), // Revoke
+    chainId: 1,
+    nonce: '0x0',
+    gasLimit: '0x186a0',
+    maxFeePerGas: '0x77359400',
+    maxPriorityFeePerGas: '0x3b9aca00',
+  },
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+Changing the amount to a positive integer grants that allowance. Do not substitute an unlimited amount for a requested finite allowance. This example returns a signature; the application still verifies, serializes, and broadcasts the transaction.
+
+### Token and contract recognition
+
+Recognition uses the chain ID, contract address, and calldata. A familiar token symbol or provider name is supplementary information: users must still check the actual addresses. On Pro2/Neo, an unknown ERC-20 token uses a generic token label and raw integer amount because its decimals are unavailable. The host application's token list does not supply device display metadata through these signing APIs.
+
+A successful signature does not mean every contract call was decoded. Unsupported calls may expose raw calldata instead of a human-readable action. Clear Signing also does not determine whether a contract is trustworthy or predict its execution result.
+
+### EIP-712 and Safe Tx
+
+Always pass the complete typed data and the matching `metamaskV4Compat` value (`true` for v4). Parsed signing lets the device request and display structured fields. Devices or payloads that require hash signing cannot provide the same structured review; supplying hashes does not force Clear Signing. See [evmSignTypedData](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata) for the exact fallback conditions.
+
+For Safe, use the standard `SafeTx` primary type with `domain.chainId` and `domain.verifyingContract` set to the Safe's network and address. Include all ten Safe transaction fields. The Pro2/Neo implementation uses the Safe v1.3.0 domain and transaction schema; arbitrary custom schemas named `SafeTx` are not interchangeable. See the [Safe Tx example](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata#safe-tx).
+
+The returned signature authorizes a Safe transaction. Collecting owners' signatures and submitting `execTransaction` are separate application steps. Signing an on-chain Safe `approveHash` or `execTransaction` call uses `evmSignTransaction`; supporting firmware can recognize those calls, but an `approveHash` request alone cannot show the transaction represented by that hash.
+
+### Integration checks
+
+- Confirm the account on the device, use the same wallet context for signing, and keep the chain ID consistent with the target network and EIP-712 domain.
+- Check a native transfer, token transfer, finite approval, revocation, EIP-712 message, and Safe Tx on each supported device/firmware combination. Include an unknown token or contract and a payload that requires hash signing.
+- Review the actual device screens. UI events and `success: true` do not attest that every field was decoded; the response has no Clear Signing status field.
+- Check `success` before using the signature, recover/verify the signer against the exact request, and preserve all signed fields when serializing. Surface rejection or unsupported data to the user instead of changing the request automatically.
 
 ## Installation
 
@@ -40,10 +117,17 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
-await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error('No device connected');
 const { connectId } = devices.payload[0];
-const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
+if (!connectId) throw new Error('Device connection unavailable');
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device identity unavailable');
 ```
 
 ## Common scenarios
@@ -56,7 +140,7 @@ const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   showOnOneKey: true,
   chainId: 1,
 });
-// res.payload.address, publicKey?, chainCode?
+// res.payload: { address, path }
 ```
 
 **Parameters**
@@ -68,22 +152,20 @@ const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {
 **Returns**
 
 ```ts
-Promise<{ success, payload: { address, path, publicKey?, chainCode? } }>
+Promise<{ success, payload: { address, path } }>
 ```
 
 ---
 
 ### Scenario 2: Sign Transaction
 
-Supports EIP‑1559 (`type: 2`) and Legacy.
+Supports EIP‑1559 and Legacy transactions.
 
 ```ts
 const { success, payload } = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
   transaction: tx,
-  chainId: 1,
   useEmptyPassphrase: true,
-  domain: 'ens.example', // optional
 });
 // payload: { v, r, s }
 ```
@@ -92,11 +174,12 @@ const { success, payload } = await HardwareSDK.evmSignTransaction(connectId, dev
 
 - `path`: required.
 - `transaction`: required.
-  - 1559: `to` `value` `data` `nonce` `gasLimit` `maxFeePerGas` `maxPriorityFeePerGas` `chainId` `type: 2`
+  - 1559: `to` `value` `data` `nonce` `gasLimit` `maxFeePerGas` `maxPriorityFeePerGas` `chainId`
   - Legacy: `to` `value` `data` `nonce` `gasLimit` `gasPrice` `chainId`
-- `chainId`: required.
+- `transaction.chainId`: required; a number inside the transaction.
 - `useEmptyPassphrase?`: optional; force the standard wallet. Hidden wallet: pass `passphraseState` from `openWalletSession`.
-- `domain?`: optional; domain label (e.g., ENS) for device display.
+
+The SDK selects EIP-1559 from its fee fields; `type: 2` is only needed by the host serializer. See [Clear Signing](#clear-signing) for token transfers and approvals.
 
 **Returns**
 
@@ -126,8 +209,10 @@ const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
 **Returns**
 
 ```ts
-Promise<{ success, payload: { signature } }>
+Promise<{ success, payload: { address, signature } }>
 ```
+
+`signature` is a hex string without the `0x` prefix. Add the prefix before ethers verification, as shown below.
 
 ---
 
@@ -137,6 +222,7 @@ Promise<{ success, payload: { signature } }>
 const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
   data: typedData,
+  metamaskV4Compat: true,
   chainId: 1,
 });
 // res.payload.signature
@@ -146,57 +232,41 @@ const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
 
 - `path`: required.
 - `data`: required; EIP‑712 JSON v4 with `domain/types/primaryType/message`.
-- `chainId`: required.
+- `metamaskV4Compat`: required; use `true` for v4.
+- `chainId`: optional; keep it consistent with `data.domain.chainId` when present.
 
-TypedData shape:
-
-```ts
-interface TypedData {
-  domain: {
-    name?: string;
-    version?: string;
-    chainId?: number;
-    verifyingContract?: string;
-    salt?: string;
-  };
-  types: Record<string, Array<{ name: string; type: string }>>;
-  primaryType: string;
-  message: Record<string, unknown>;
-}
-```
+For the typed-data schema, Safe Tx example, and hash-signing conditions, see [evmSignTypedData](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata).
 
 **Returns**
 
 ```ts
-Promise<{ success, payload: { signature } }>
+Promise<{ success, payload: { address, signature } }>
 ```
+
+`signature` is a hex string without the `0x` prefix. Add the prefix before ethers verification, as shown below.
 
 ## Interaction & Status
 
-- APIs resolve when the operation finishes; user prompts are surfaced via `UI_REQUEST` events.
-- Common prompts: unlock device, open EVM app, verify address, sign transaction, sign personal message, sign typed data.
+- APIs resolve when the operation finishes; subscribe to `UI_EVENT` for prompts identified by `UI_REQUEST` types.
+- Common prompts include unlocking the device and confirming an address, transaction, or message. Handle events as described in [Request Basics](/en/hardware-sdk/core-api-guide#request-basics).
 - For repeated calls, serialize per device and reuse `passphraseState` (or `useEmptyPassphrase: true`). `keepSession` still holds the transport; it is not a wallet binding.
 
 ## Examples
 
 ### EIP-1559 transaction
 
+Use the initialized SDK and UI handlers from above. This serialization example uses `@ethersproject/*` v5. Fetch current nonce, gas, and fees before signing.
+
 ```ts
-import HardwareSDK, { UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { serialize, TransactionTypes } from '@ethersproject/transactions';
 
-await HardwareSDK.init({ env: 'webusb', debug: false });
-
-const devices = await HardwareSDK.searchDevices();
-const { connectId } = devices.payload[0];
-const deviceId = (await HardwareSDK.getDeviceState(connectId)).payload?.identity.deviceId;
-
-HardwareSDK.on(UI_REQUEST.REQUEST_PIN, () => {
-  // Prompt PIN (prefer on-device); then call uiResponse if needed
-});
-
 const accountPath = "m/44'/60'/0'/0/0";
-await HardwareSDK.evmGetAddress(connectId, deviceId, { path: accountPath, showOnOneKey: true });
+const addressResult = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: accountPath,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!addressResult.success) throw new Error(addressResult.payload.error);
 
 const tx = {
   to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
@@ -204,19 +274,20 @@ const tx = {
   data: '0x',
   nonce: '0x0',
   gasLimit: '0x5208',
-  maxFeePerGas: '0x3b9aca00',
-  maxPriorityFeePerGas: '0x59682f00',
+  maxFeePerGas: '0x77359400',
+  maxPriorityFeePerGas: '0x3b9aca00',
   chainId: 1,
 };
 
 const { success, payload: sig } = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
   path: accountPath,
   transaction: tx,
-  chainId: 1,
   useEmptyPassphrase: true,
 });
 
-const rawTx = serialize({ ...tx, type: TransactionTypes.eip1559 }, {
+if (!success) throw new Error(sig.error);
+
+const rawTx = serialize({ ...tx, nonce: Number(tx.nonce), type: TransactionTypes.eip1559 }, {
   r: sig.r,
   s: sig.s,
   v: Number(sig.v),
@@ -229,7 +300,7 @@ const rawTx = serialize({ ...tx, type: TransactionTypes.eip1559 }, {
 
 ```ts
 const legacyTx = {
-  to: '0xRecipient',
+  to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
   value: '0x2386f26fc10000', // 0.01 ETH
   data: '0x',
   nonce: '0x1',
@@ -241,27 +312,35 @@ const legacyTx = {
 const sig = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
   path: accountPath,
   transaction: legacyTx,
-  chainId: 1,
 });
 ```
 
 ### Message (personal_sign / EIP-191)
 
 ```ts
+import { hexlify, toUtf8Bytes, verifyMessage } from 'ethers';
+
 const message = 'Hello OneKey';
-const messageHex = Buffer.from(message).toString('hex');
+const messageHex = hexlify(toUtf8Bytes(message));
 
 const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
   path: accountPath,
   messageHex,
   chainId: 1,
 });
-// res.payload.signature -> verify with ethers.verifyMessage(message, signature)
+if (!res.success) throw new Error(res.payload.error);
+const signature = `0x${res.payload.signature}`;
+const signer = verifyMessage(toUtf8Bytes(message), signature);
+if (signer.toLowerCase() !== res.payload.address.toLowerCase()) {
+  throw new Error('Signature does not match the returned address');
+}
 ```
 
 ### Typed data (EIP-712)
 
 ```ts
+import { verifyTypedData } from 'ethers';
+
 const typedData = {
   types: {
     EIP712Domain: [
@@ -297,9 +376,16 @@ const typedData = {
 const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
   path: accountPath,
   data: typedData,
+  metamaskV4Compat: true,
   chainId: 1,
 });
-// res.payload.signature -> recover with ethers.verifyTypedData(domain, types, message, signature)
+if (!res.success) throw new Error(res.payload.error);
+const { EIP712Domain, ...messageTypes } = typedData.types;
+const signature = `0x${res.payload.signature}`;
+const signer = verifyTypedData(typedData.domain, messageTypes, typedData.message, signature);
+if (signer.toLowerCase() !== res.payload.address.toLowerCase()) {
+  throw new Error('Signature does not match the returned address');
+}
 ```
 
 ## Validation & Troubleshooting
