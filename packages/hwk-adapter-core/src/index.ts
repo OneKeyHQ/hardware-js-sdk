@@ -182,19 +182,18 @@ export type {
 
 export { DeviceJobQueue } from './utils/DeviceJobQueue';
 export type { JobOptions, ActiveJobInfo } from './utils/DeviceJobQueue';
-export { InteractionRegistry, INTERACTION_DEFAULT_TTL_MS } from './utils/InteractionRegistry';
-export type { HardwareInteraction, InteractionEndReason } from './utils/InteractionRegistry';
+export { OperationRegistry, OPERATION_DEFAULT_TTL_MS } from './utils/OperationRegistry';
+export type { HardwareOperation, OperationEndReason } from './utils/OperationRegistry';
 export {
   HARDWARE_RUNTIME_ID_PREFIX,
-  createHardwareConnectorSessionId,
-  createHardwareInteractionId,
+  createHardwareLinkId,
+  createHardwareOperationId,
   createHardwareSearchTargetId,
   hasHardwareRuntimeIdPrefix,
-  isHardwareInteractionId,
-  isHardwareSearchTargetId,
+  isHardwareOperationId,
   parseHardwareRuntimeId,
 } from './utils/hardwareRuntimeId';
-export type { HardwareRuntimeId } from './utils/hardwareRuntimeId';
+export type { HardwareRuntimeId, HardwareRuntimeIdKind } from './utils/hardwareRuntimeId';
 export { resolveHardwareOperationTarget } from './utils/hardwareOperationTarget';
 export type { HardwareOperationTarget } from './utils/hardwareOperationTarget';
 
@@ -225,6 +224,7 @@ export { TypedEventEmitter } from './utils/TypedEventEmitter';
 export type {
   ElectronBleApi,
   ElectronBleDeviceInfo,
+  ElectronBleMatch,
   ElectronBleScanOptions,
   ElectronBleConnectOptions,
 } from './types/electronBle';

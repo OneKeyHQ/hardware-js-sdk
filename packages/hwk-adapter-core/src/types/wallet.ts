@@ -18,7 +18,7 @@ import type { ChainForFingerprint } from './fingerprint';
 import type { UI_REQUEST, UiResponseEvent } from '../events/ui-request';
 import type { SDK } from '../events/sdk';
 import type { HardwareErrorCode } from './errors';
-import type { InteractionEndReason } from '../utils/InteractionRegistry';
+import type { OperationEndReason } from '../utils/OperationRegistry';
 import type { AllNetworkMethodName } from '../utils/methodCatalog';
 
 /**
@@ -177,7 +177,7 @@ export interface ICommonCallParams extends IHardwareConnectionContext {
    */
   autoInstallApp?: boolean;
   /** Runtime-only id returned by connectDevice(). When present, discovery and fallback are disabled. */
-  interactionId?: string;
+  operationId?: string;
 }
 
 export type NullableCallArg<T> = T | null | undefined;
@@ -197,7 +197,7 @@ export type IHardwareCallParams<T> = T & IHardwareCommonCallParams;
  * reconnect. It must never be forwarded to vendor firmware.
  */
 export interface IDeviceManagerOperationContext extends IHardwareConnectionContext {
-  interactionId?: string;
+  operationId?: string;
   expectedDeviceIdentity?: WalletIdentity;
 }
 
@@ -315,10 +315,10 @@ export type SdkEvent =
   | { type: typeof SDK.DEVICE_UNRESPONSIVE; payload: { connectId: string } }
   | { type: typeof SDK.DEVICE_RECOVERED; payload: { connectId: string } }
   | {
-      type: typeof SDK.INTERACTION_ENDED;
+      type: typeof SDK.OPERATION_ENDED;
       payload: {
-        interactionId: string;
-        reason: InteractionEndReason;
+        operationId: string;
+        reason: OperationEndReason;
       };
     };
 
@@ -445,11 +445,11 @@ export interface HardwareEventMap {
     payload: { connectId: string };
   };
   [SDK.DEVICE_RECOVERED]: { type: typeof SDK.DEVICE_RECOVERED; payload: { connectId: string } };
-  [SDK.INTERACTION_ENDED]: {
-    type: typeof SDK.INTERACTION_ENDED;
+  [SDK.OPERATION_ENDED]: {
+    type: typeof SDK.OPERATION_ENDED;
     payload: {
-      interactionId: string;
-      reason: InteractionEndReason;
+      operationId: string;
+      reason: OperationEndReason;
     };
   };
 }
@@ -543,19 +543,18 @@ export interface IHardwareWallet<TConfig = unknown>
   searchDeviceTargets(options?: SearchDevicesOptions): Promise<DeviceSearchTarget[]>;
   /** @deprecated Use searchDeviceTargets(). */
   listConnectionTargets(options?: SearchDevicesOptions): Promise<ConnectionTarget[]>;
-  /** Connect or logically bind a selected search result and return a runtime-only interaction id. */
+  /** Connect or logically bind a selected search result and return a runtime-only operation id. */
   connectDevice(searchTargetId: string): Promise<Response<string>>;
   /** Explicit Device Manager binding: verify the existing identity before replacing its BLE locator. */
   bindBleDevice?(params: BindBleDeviceParams): Promise<Response<string>>;
   /** Resolve operation-first routing/selection and pin it. The caller must verify wallet identity before business calls. */
-  acquireInteraction?(
+  acquireOperation?(
     connectId: string,
     context: IHardwareConnectionContext
   ): Promise<Response<string>>;
-  /** Release an interaction owned by the caller. Disconnect events end matching interactions automatically. */
-  releaseInteraction(interactionId: string): Promise<void>;
+  /** Release an operation owned by the caller. Disconnect events end matching operations automatically. */
+  releaseOperation(operationId: string): Promise<void>;
   getDeviceInfo(connectId: string, deviceId: string): Promise<Response<DeviceInfo>>;
-  getSupportedChains(): ChainCapability[];
   /** Abort the in-flight call. Omit connectId to cancel whatever is active. */
   cancel(connectId?: string): void;
 

@@ -36,7 +36,7 @@ export interface KeystoneDeviceRecord {
   importedAt: number;
   /**
    * Set to the connector's process-local `sessionId` once a live USB session exists for
-   * this wallet. Cleared by `releaseInteraction`. Presence of this field is
+   * this wallet. Cleared by `releaseOperation`. Presence of this field is
    * what `KeystoneAdapter._resolveUr` uses to route a call over USB instead
    * of QR.
    */

@@ -14,7 +14,7 @@ import {
   HardwareErrorCode,
   UI_REQUEST,
   UI_RESPONSE,
-  createHardwareInteractionId,
+  createHardwareOperationId,
   createHardwareSearchTargetId,
   deriveWalletId,
   parseHardwareRuntimeId,
@@ -269,10 +269,7 @@ function fakeUsbConnector(
       }
       const discoveredRoots = searchRoots?.length ? searchRoots : [root];
       const devices = discoveredRoots.map(discoveredRoot => {
-        const searchTargetId = createHardwareSearchTargetId({
-          vendor: 'keystone',
-          connectionType: 'usb',
-        });
+        const searchTargetId = createHardwareSearchTargetId('keystone');
         searchTargetIds.push(searchTargetId);
         rootsBySearchTarget.set(searchTargetId, discoveredRoot);
         return {
@@ -305,9 +302,7 @@ function fakeUsbConnector(
       // fingerprints remain post-connect identity assertions.
       const runtimeId = parseHardwareRuntimeId(deviceId);
       const isUsbSearchTarget =
-        runtimeId?.kind === 'search-target' &&
-        runtimeId.vendor === 'keystone' &&
-        runtimeId.connectionType === 'usb';
+        runtimeId?.kind === 'search-target' && runtimeId.vendor === 'keystone';
       if (deviceId && !isUsbSearchTarget && deviceId.toLowerCase() !== walletMfp.toLowerCase()) {
         return Promise.reject(
           Object.assign(
@@ -681,7 +676,7 @@ describe('KeystoneAdapter', () => {
       ]);
     });
 
-    it('signs the dApp\'s original EIP-712 bytes when dataJson is supplied', async () => {
+    it("signs the dApp's original EIP-712 bytes when dataJson is supplied", async () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
       // A uint256 wider than 2^53: JSON.parse/stringify would round it, so the
@@ -1100,7 +1095,7 @@ describe('KeystoneAdapter', () => {
   });
 
   describe('cancel', () => {
-    it('ignores an old interaction cancellation while a newer USB operation is pending', async () => {
+    it('ignores an old operation cancellation while a newer USB operation is pending', async () => {
       const usb = fakeUsbConnector();
       const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });
       const first = await connectUsbDevice(adapter);
@@ -1119,7 +1114,7 @@ describe('KeystoneAdapter', () => {
         .evmSignTransaction(second.payload, FIXTURE_WALLET_ID, {
           path: "m/44'/60'/0'/0/0",
           serializedTx: `02${'ab'.repeat(30)}`,
-          interactionId: second.payload,
+          operationId: second.payload,
         })
         .then(result => {
           settled = true;
@@ -1213,7 +1208,7 @@ describe('KeystoneAdapter', () => {
       const params = {
         path: "m/44'/60'/0'/0/0",
         serializedTx: `02${'ab'.repeat(30)}`,
-        interactionId: connected.payload,
+        operationId: connected.payload,
       };
       const pending = adapter.evmSignTransaction(connected.payload, FIXTURE_WALLET_ID, params);
       await new Promise<void>(resolve => {
@@ -1225,7 +1220,7 @@ describe('KeystoneAdapter', () => {
         success: false,
         payload: { code: HardwareErrorCode.UserAborted },
       });
-      const release = adapter.releaseInteraction(connected.payload);
+      const release = adapter.releaseOperation(connected.payload);
       await new Promise<void>(resolve => {
         setImmediate(resolve);
       });
@@ -1268,7 +1263,7 @@ describe('KeystoneAdapter', () => {
       const pending = adapter.evmSignTransaction(connected.payload, FIXTURE_WALLET_ID, {
         path: "m/44'/60'/0'/0/0",
         serializedTx: `02${'ab'.repeat(30)}`,
-        interactionId: connected.payload,
+        operationId: connected.payload,
       });
       await new Promise<void>(resolve => {
         setImmediate(resolve);
@@ -1296,7 +1291,7 @@ describe('KeystoneAdapter', () => {
     });
   });
 
-  describe('QR interaction timeout', () => {
+  describe('QR operation timeout', () => {
     it('fails with OperationTimeout when the app never answers within qrTimeoutMs', async () => {
       const adapter = new KeystoneAdapter({ qrTimeoutMs: 20 });
       // No fake device — nothing ever answers the display request.
@@ -1366,7 +1361,7 @@ describe('KeystoneAdapter', () => {
       expect(fake.requests).toHaveLength(1); // no additional round trip
     });
 
-    it('honors an interaction id instead of falling back to a persisted wallet id', async () => {
+    it('honors an operation id instead of falling back to a persisted wallet id', async () => {
       const adapter = newTestAdapter();
       attachFakeDevice(adapter);
       const targets = await adapter.searchDeviceTargets({ transportType: 'qr' });
@@ -1374,29 +1369,29 @@ describe('KeystoneAdapter', () => {
       expect(connected.success).toBe(true);
       if (!connected.success) return;
 
-      await adapter.releaseInteraction(connected.payload);
+      await adapter.releaseOperation(connected.payload);
       const result = await adapter.btcGetMasterFingerprint(
         `keystone-wallet:${FIXTURE_WALLET_ID}`,
         FIXTURE_WALLET_ID,
-        { interactionId: connected.payload }
+        { operationId: connected.payload }
       );
 
       expect(result.success).toBe(false);
       if (result.success) return;
-      expect(result.payload.code).toBe(HardwareErrorCode.InteractionEnded);
+      expect(result.payload.code).toBe(HardwareErrorCode.OperationEnded);
     });
   });
 
   describe('wallet-creation burst', () => {
-    it('rejects conflicting positional and common interaction ids before any device call', async () => {
+    it('rejects conflicting positional and common operation ids before any device call', async () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
-      const positionalInteractionId = createHardwareInteractionId('keystone');
-      const commonInteractionId = createHardwareInteractionId('keystone');
+      const positionalOperationId = createHardwareOperationId('keystone');
+      const commonOperationId = createHardwareOperationId('keystone');
 
-      const result = await adapter.evmGetAddress(positionalInteractionId, null, {
+      const result = await adapter.evmGetAddress(positionalOperationId, null, {
         path: "m/44'/60'/0'/0/0",
-        interactionId: commonInteractionId,
+        operationId: commonOperationId,
       });
 
       expect(result).toMatchObject({
@@ -1406,7 +1401,7 @@ describe('KeystoneAdapter', () => {
       expect(fake.requests).toHaveLength(0);
     });
 
-    it('keeps all-network calls pinned by commonParams.interactionId', async () => {
+    it('keeps all-network calls pinned by commonParams.operationId', async () => {
       const usb = fakeUsbConnector();
       const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });
       const qrFake = attachFakeDevice(adapter);
@@ -1419,7 +1414,7 @@ describe('KeystoneAdapter', () => {
         `keystone-wallet:${FIXTURE_WALLET_ID}`,
         FIXTURE_WALLET_ID,
         {
-          interactionId: connected.payload,
+          operationId: connected.payload,
           bundle: [
             {
               methodName: 'btcGetPublicKey',
@@ -2009,7 +2004,7 @@ describe('KeystoneAdapter', () => {
       const connected = await connectUsbDevice(adapter);
       expect(connected.success).toBe(true);
       if (!connected.success) return;
-      await adapter.releaseInteraction(connected.payload);
+      await adapter.releaseOperation(connected.payload);
       usb.searchCalls.length = 0;
       usb.connectArgs.length = 0;
       usb.setAvailable(false);
@@ -2031,7 +2026,7 @@ describe('KeystoneAdapter', () => {
       expect(qrFake.requests).toHaveLength(qrRequestsAfterImport);
     });
 
-    it('does not fall back to QR when an interaction-pinned USB call fails', async () => {
+    it('does not fall back to QR when an operation-pinned USB call fails', async () => {
       const usb = fakeUsbConnector();
       const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });
       const qrFake = attachFakeDevice(adapter);
@@ -2048,7 +2043,7 @@ describe('KeystoneAdapter', () => {
 
       expect(signed.success).toBe(false);
       if (!signed.success) {
-        expect(signed.payload.code).toBe(HardwareErrorCode.InteractionEnded);
+        expect(signed.payload.code).toBe(HardwareErrorCode.OperationEnded);
       }
       expect(qrFake.requests).toHaveLength(qrRequestsBeforeSign);
     });
@@ -2133,7 +2128,7 @@ describe('KeystoneAdapter', () => {
       expect(qrFake.requests).toHaveLength(0);
     });
 
-    it('returns a QR connection target without interaction, then connectDevice completes one sync', async () => {
+    it('returns a QR connection target without operation, then connectDevice completes one sync', async () => {
       // The host uses the same search -> connect sequence as USB, while the
       // wallet protocol round trip remains owned by the connect phase.
       const adapter = newTestAdapter();
@@ -2151,7 +2146,7 @@ describe('KeystoneAdapter', () => {
       expect(connected.success).toBe(true);
       if (!connected.success) return;
       expect(parseHardwareRuntimeId(connected.payload)).toMatchObject({
-        kind: 'interaction',
+        kind: 'operation',
         vendor: 'keystone',
       });
       expect(fake.requests).toHaveLength(1);
@@ -2162,7 +2157,7 @@ describe('KeystoneAdapter', () => {
       expect(info.payload.deviceId).toBe(FIXTURE_WALLET_ID);
     });
 
-    it('lists a QR target without interaction and connectDevice binds its wallet', async () => {
+    it('lists a QR target without operation and connectDevice binds its wallet', async () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
 
@@ -2188,7 +2183,7 @@ describe('KeystoneAdapter', () => {
       expect(fake.requests).toHaveLength(1);
     });
 
-    it('does not disconnect the replacement USB interaction when the retired owner ends late', async () => {
+    it('does not disconnect the replacement USB operation when the retired owner ends late', async () => {
       const usb = fakeUsbConnector(undefined, undefined, undefined, FIXTURE_ROOT, false, true);
       const disconnect = jest.spyOn(usb.connector, 'disconnect');
       const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });
@@ -2201,7 +2196,7 @@ describe('KeystoneAdapter', () => {
       expect(disconnect).toHaveBeenCalledWith('keystone-usb-session:1');
       disconnect.mockClear();
 
-      await adapter.releaseInteraction(first.payload);
+      await adapter.releaseOperation(first.payload);
 
       expect(disconnect).not.toHaveBeenCalled();
       await expect(adapter.getDeviceInfo(second.payload, '')).resolves.toEqual({
@@ -2211,11 +2206,11 @@ describe('KeystoneAdapter', () => {
         }),
       });
 
-      await adapter.releaseInteraction(second.payload);
+      await adapter.releaseOperation(second.payload);
       expect(disconnect).toHaveBeenCalledWith('keystone-usb-session:2');
     });
 
-    it('cancels the active QR job without terminating its interaction', async () => {
+    it('cancels the active QR job without terminating its operation', async () => {
       const adapter = newTestAdapter();
       attachFakeDevice(adapter);
       const targets = await adapter.searchDeviceTargets({ transportType: 'qr' });
@@ -2227,10 +2222,10 @@ describe('KeystoneAdapter', () => {
 
       const info = await adapter.getDeviceInfo(connected.payload, '');
       expect(info.success).toBe(true);
-      await adapter.releaseInteraction(connected.payload);
+      await adapter.releaseOperation(connected.payload);
     });
 
-    it('defers public derivation until a business call uses the interaction', async () => {
+    it('defers public derivation until a business call uses the operation', async () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
       const targets = await adapter.searchDeviceTargets({ transportType: 'qr' });
@@ -2243,7 +2238,7 @@ describe('KeystoneAdapter', () => {
 
       const address = await adapter.solGetAddress(connected.payload, FIXTURE_WALLET_ID, {
         path: solPath,
-        interactionId: connected.payload,
+        operationId: connected.payload,
       });
       expect(address.success).toBe(true);
       expect(fake.requests).toHaveLength(2);
@@ -2336,11 +2331,10 @@ describe('KeystoneAdapter', () => {
       expect(parseHardwareRuntimeId(targets[0].searchTargetId)).toMatchObject({
         kind: 'search-target',
         vendor: 'keystone',
-        connectionType: 'usb',
       });
     });
 
-    it('keeps an explicit QR interaction on QR when the wallet also has a live USB session', async () => {
+    it('keeps an explicit QR operation on QR when the wallet also has a live USB session', async () => {
       const usb = fakeUsbConnector();
       const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });
       const qrFake = attachFakeDevice(adapter);
@@ -2354,14 +2348,14 @@ describe('KeystoneAdapter', () => {
 
       const result = await adapter.btcGetPublicKey(qrConnected.payload, FIXTURE_WALLET_ID, {
         path: "m/84'/0'/0'",
-        interactionId: qrConnected.payload,
+        operationId: qrConnected.payload,
       });
 
       expect(result.success).toBe(true);
       expect(usb.calls).toHaveLength(usbCallsBeforeQrConnect);
       expect(qrFake.requests).toHaveLength(qrRequestsAfterConnect + 1);
 
-      await adapter.releaseInteraction(qrConnected.payload);
+      await adapter.releaseOperation(qrConnected.payload);
       expect(usb.connectArgs).toHaveLength(1);
     });
 
@@ -2381,7 +2375,6 @@ describe('KeystoneAdapter', () => {
       expect(parseHardwareRuntimeId(usb.connectArgs[0])).toMatchObject({
         kind: 'search-target',
         vendor: 'keystone',
-        connectionType: 'usb',
       });
       expect(qrFake.requests).toHaveLength(0);
       expect(usb.calls).toHaveLength(2);
@@ -2437,7 +2430,6 @@ describe('KeystoneAdapter', () => {
       expect(parseHardwareRuntimeId(usb.connectArgs[0])).toMatchObject({
         kind: 'search-target',
         vendor: 'keystone',
-        connectionType: 'usb',
       });
       expect(usb.calls.map(c => (c.params as { urType: string }).urType)).toEqual([
         'qr-hardware-call',
@@ -2513,7 +2505,7 @@ describe('KeystoneAdapter', () => {
 
       const publicKey = await adapter.btcGetPublicKey(connected.payload, FIXTURE_WALLET_ID, {
         path: "m/84'/0'/0'",
-        interactionId: connected.payload,
+        operationId: connected.payload,
       });
       expect(publicKey.success).toBe(true);
       expect(usb.calls).toHaveLength(2);
@@ -2727,7 +2719,7 @@ describe('KeystoneAdapter', () => {
       expect(qrFake.requests.at(-1)?.data.urType).toBe('eth-sign-request');
     });
 
-    it('releaseInteraction() demotes a QR+USB merged wallet back to QR-only, keeping the entry', async () => {
+    it('releaseOperation() demotes a QR+USB merged wallet back to QR-only, keeping the entry', async () => {
       const usb = fakeUsbConnector();
       const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });
       attachFakeDevice(adapter);
@@ -2736,7 +2728,7 @@ describe('KeystoneAdapter', () => {
       expect(connected.success).toBe(true);
       if (!connected.success) return;
 
-      await adapter.releaseInteraction(connected.payload);
+      await adapter.releaseOperation(connected.payload);
 
       const devices = await adapter.searchDevices();
       const own = devices.find(d => d.deviceId === FIXTURE_WALLET_ID);
@@ -2744,7 +2736,7 @@ describe('KeystoneAdapter', () => {
       expect(own?.connectionType).toBe('qr');
     });
 
-    it('releaseInteraction() drops a USB-only wallet outright (never QR-synced)', async () => {
+    it('releaseOperation() drops a USB-only wallet outright (never QR-synced)', async () => {
       const usb = fakeUsbConnector();
       const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });
       const events: HardwareEvent[] = [];
@@ -2753,7 +2745,7 @@ describe('KeystoneAdapter', () => {
       expect(connected.success).toBe(true);
       if (!connected.success) return;
 
-      await adapter.releaseInteraction(connected.payload);
+      await adapter.releaseOperation(connected.payload);
 
       expect(events).toHaveLength(1);
       const devices = await adapter.searchDevices();

@@ -68,7 +68,7 @@ describe('serializeConnectorError / rehydrateConnectorError', () => {
   it('preserves recovery metadata across connector serialization', () => {
     const error = Object.assign(new Error('disconnected'), {
       code: 10101,
-      recovery: { scope: 'interaction' },
+      recovery: { scope: 'operation' },
     });
 
     const serialized = serializeConnectorError(error);
@@ -77,7 +77,7 @@ describe('serializeConnectorError / rehydrateConnectorError', () => {
       recovery?: { scope?: string };
     };
 
-    expect(rehydrated.recovery).toEqual({ scope: 'interaction' });
+    expect(rehydrated.recovery).toEqual({ scope: 'operation' });
   });
 
   it('survives the bridge error whitelist that drops top-level custom fields', () => {

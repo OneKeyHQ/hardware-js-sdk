@@ -55,10 +55,18 @@ export enum HardwareErrorCode {
   DevicePathForbidden = 10110,
   /** Busy with our own in-flight request (queue guard / firmware Failure_Busy), not another app — wait and retry, don't close other apps. */
   DeviceBusyInternal = 10111,
-  /** The supplied runtime-only interaction id is unknown to this adapter instance. */
-  InteractionNotFound = 10112,
-  /** The supplied interaction ended and can never be resumed. */
-  InteractionEnded = 10113,
+  /** The supplied runtime-only operation id is unknown to this adapter instance. */
+  OperationNotFound = 10112,
+  /** The supplied operation ended and can never be resumed. */
+  OperationEnded = 10113,
+  /**
+   * Discovery found devices but none of them is the wallet being looked for.
+   * Milder than DeviceMismatch: nothing about the known wallet has changed, the
+   * user simply has the wrong unit connected. DeviceMismatch stays reserved for
+   * reaching the expected device and finding a different identity on it, which
+   * can mean it was wiped, reseeded, or swapped.
+   */
+  DeviceSearchMismatch = 10114,
 
   // --- 10200s Firmware ---
   FirmwareTooOld = 10200,
@@ -216,9 +224,10 @@ export const ORPHAN_ELIGIBLE_ERROR_CODES: number[] = [
   HardwareErrorCode.UserRejected,
   HardwareErrorCode.DeviceNotFound,
   HardwareErrorCode.DeviceDisconnected,
-  HardwareErrorCode.InteractionNotFound,
-  HardwareErrorCode.InteractionEnded,
+  HardwareErrorCode.OperationNotFound,
+  HardwareErrorCode.OperationEnded,
   HardwareErrorCode.DeviceMismatch,
+  HardwareErrorCode.DeviceSearchMismatch,
   HardwareErrorCode.DeviceAppStuck,
   HardwareErrorCode.DeviceOneDeviceOnly,
   HardwareErrorCode.TransportError,
@@ -262,10 +271,10 @@ export type HwkErrorOrigin = 'device' | 'transport' | 'host';
  * operation. This is connection-lifecycle metadata, not UI navigation and not
  * permission to replay a signing command automatically.
  *
- * - `operation`: the interaction and selected target are still eligible for an
- *   explicit retry, usually after the user fixes device state.
- * - `interaction`: the interaction is no longer usable; the selected target may
- *   be used to establish a new one when its identity is persistent.
+ * - `call`: nothing needs replacing; re-issuing the same call is eligible,
+ *   usually after the user fixes device state.
+ * - `operation`: the operation binding is no longer usable; the selected target
+ *   may be used to establish a new one when its identity is persistent.
  * - `search-target`: the selected discovery result is stale or untrusted;
  *   rediscover on the same transport and let the user select again.
  * - `transport`: the selected transport is unavailable or unsuitable; repair
@@ -274,8 +283,8 @@ export type HwkErrorOrigin = 'device' | 'transport' | 'host';
  * - `unknown`: the SDK cannot make a safe recovery claim.
  */
 export type HwkRecoveryScope =
+  | 'call'
   | 'operation'
-  | 'interaction'
   | 'search-target'
   | 'transport'
   | 'not-recoverable'
@@ -286,8 +295,8 @@ export interface HwkRecoveryHint {
 }
 
 const RECOVERY_SCOPES = new Set<HwkRecoveryScope>([
+  'call',
   'operation',
-  'interaction',
   'search-target',
   'transport',
   'not-recoverable',
@@ -300,8 +309,8 @@ export function isHwkRecoveryHint(value: unknown): value is HwkRecoveryHint {
   return typeof scope === 'string' && RECOVERY_SCOPES.has(scope as HwkRecoveryScope);
 }
 
+const RECOVERY_CALL: HwkRecoveryHint = Object.freeze({ scope: 'call' });
 const RECOVERY_OPERATION: HwkRecoveryHint = Object.freeze({ scope: 'operation' });
-const RECOVERY_INTERACTION: HwkRecoveryHint = Object.freeze({ scope: 'interaction' });
 const RECOVERY_SEARCH_TARGET: HwkRecoveryHint = Object.freeze({ scope: 'search-target' });
 const RECOVERY_TRANSPORT: HwkRecoveryHint = Object.freeze({ scope: 'transport' });
 const RECOVERY_NOT_RECOVERABLE: HwkRecoveryHint = Object.freeze({
@@ -346,19 +355,20 @@ export function defaultRecoveryForCode(code: HardwareErrorCode): HwkRecoveryHint
     case HardwareErrorCode.TronSignByHashRequired:
     case HardwareErrorCode.BtcWalletPolicyHmacMismatch:
     case HardwareErrorCode.BtcUnexpectedState:
-      return RECOVERY_OPERATION;
+      return RECOVERY_CALL;
     case HardwareErrorCode.DeviceNotFound:
     case HardwareErrorCode.DeviceDisconnected:
-    case HardwareErrorCode.InteractionNotFound:
-    case HardwareErrorCode.InteractionEnded:
+    case HardwareErrorCode.OperationNotFound:
+    case HardwareErrorCode.OperationEnded:
     case HardwareErrorCode.TransportError:
     case HardwareErrorCode.BlePairingTimeout:
     case HardwareErrorCode.ThpPairingFailed:
     case HardwareErrorCode.ThpPairingRequired:
     case HardwareErrorCode.BleConnectFailed:
     case HardwareErrorCode.BlePairingCancelled:
-      return RECOVERY_INTERACTION;
+      return RECOVERY_OPERATION;
     case HardwareErrorCode.DeviceMismatch:
+    case HardwareErrorCode.DeviceSearchMismatch:
     case HardwareErrorCode.DeviceOneDeviceOnly:
     case HardwareErrorCode.BleBondInvalid:
       return RECOVERY_SEARCH_TARGET;
@@ -399,6 +409,7 @@ export function defaultOriginForCode(code: HardwareErrorCode): HwkErrorOrigin | 
     case HardwareErrorCode.DeviceNotInitialized:
     case HardwareErrorCode.DeviceInBootloader:
     case HardwareErrorCode.DeviceMismatch:
+    case HardwareErrorCode.DeviceSearchMismatch:
     case HardwareErrorCode.DeviceAppStuck:
     case HardwareErrorCode.DevicePathForbidden:
     case HardwareErrorCode.DeviceBusyInternal:

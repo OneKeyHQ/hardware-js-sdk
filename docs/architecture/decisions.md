@@ -46,7 +46,33 @@ The following rules apply:
   interaction. A transient disconnect during an active Ledger job goes through the recovery chain above
   first, and terminates only once recovery is exhausted or the identity does not match. `cancel()`
   aborts the current job only; it does not implicitly end the interaction, and the lifecycle owner must
-  still call `releaseInteraction()`.
+  still call `releaseInteraction()`. The reverse holds too: `releaseInteraction()` ends the
+  association and does not abort a job that is already running. A call that has entered the
+  connector runs to its own conclusion and its result stays valid. `cancel` governs the job,
+  `release` governs the association, and neither implies the other.
+- Cancelling by name and cancelling everything are different instructions. `cancel(id)` for an
+  interaction that has already ended has nothing left to cancel and must do nothing at all: it must
+  not fall through to the untargeted form and tear down whatever unrelated operation happens to be
+  running. `cancel()` with no argument keeps its existing meaning.
+- A command must not reach the connector once its signal is aborted. Wrapping the call in an abort
+  race is not enough - the command is already on the wire by then, and the caller is told the
+  operation was aborted while the device acts on it. Check before dispatch, so "aborted" keeps
+  meaning "this did not happen".
+- Any public entry point that moves the adapter from "no chosen device" to "one chosen device" runs
+  through the device job queue. `connectDevice` and `acquireInteraction` both evict the existing
+  session before connecting, so two of them in flight leave two live sessions behind the
+  single-session invariant.
+- Which chains a vendor supports is declared by the host, per chain, next to that chain's own
+  settings - not by the adapter. The adapter has no equivalent declaration, and one must not be
+  re-added: a chain-capability list is too coarse to answer the question a host actually asks. A
+  host asks "can this wallet use this network", and a single `btc` capability covers BTC, BCH, LTC,
+  DOGE and testnet alike; it also cannot express that a chain is wired for addresses but not for
+  message signing. Two lists at different granularities drift, and the coarser one wins arguments it
+  should lose.
+- Releasing a device is not the same as ending the UI the user is looking at. Every exit that does
+  not save a binding closes the binding request it opened, under the original selection id. Prefer
+  one place that covers all exits over one emit per failure path, because the next failure added
+  will be the one that forgets.
 - `releaseInteraction()` is the explicit release; an unrecoverable disconnect underneath is the passive
   source of the same state transition. Before the recovery chain resends a business method it must redo
   whatever device or wallet identity verification the vendor can provide; a USB ephemeral candidate must
@@ -80,6 +106,65 @@ Primary implementation:
 - `packages/hwk-ledger-adapter/src/adapter/LedgerAdapter.ts`
 - `packages/hwk-trezor-adapter/src/adapter/TrezorAdapter.ts`
 - `packages/hwk-keystone-adapter/src/adapter/KeystoneAdapter.ts`
+
+## UI Request Attribution Is Deliberately Opt-In
+
+`UiRequestRegistry` keeps at most one pending waiter per request type: a second `wait()` on the same
+type preempts the first with `UiRequestPreempted`. Attribution by `requestId` is layered on top of
+that model and is **not** applied to every request type. `resolve()` enforces ownership only when the
+waiter registered an id (`entry.requestId !== undefined`); a waiter that registers none accepts any
+response of its type, which is the pre-existing behaviour.
+
+This asymmetry is intentional, not an unfinished migration of the registry itself. The rules are:
+
+- A request type carries a `requestId` when it is **long-lived or re-emitting**, so that "which round
+  does this answer belong to" is a real question. `REQUEST_SELECT_DEVICE` republishes scan snapshots
+  under one id while the user is choosing, and a rejected candidate starts a new round with a new id;
+  `REQUEST_SAVE_DEVICE_BINDING` blocks on a host acknowledgement that must be matched to the
+  selection that produced it.
+- Those two flows also need **scoped cancellation**. `requestBleDeviceSelection` and
+  `requestSaveDeviceBinding` call `registry.cancel(type, requestId)` from a `finally` that runs on the
+  success path too; without the id that cleanup would reject whatever is pending on the type at that
+  moment. Every other cancel site is deliberately unscoped (`cancel()` / `cancel(type)`), because it
+  is tearing the whole adapter or transport down.
+- The host builds its own ownership on the same id. The binding UI tracks an active selection by
+  `bindingSessionId` + `requestId`, decides whether an incoming snapshot belongs to the dialog on
+  screen, and echoes the id back in `RECEIVE_SELECT_DEVICE` / `RECEIVE_SAVE_DEVICE_BINDING`. Removing
+  the id would require rewriting that ownership model, not just deleting a field.
+- A **one-shot prompt does not carry an id**. PIN, passphrase, QR display/scan, device connect,
+  device permission and app install each ask once and settle once; one-pending-per-type plus
+  preemption already retires the previous waiter. What remains uncovered is the narrow race between
+  the user submitting and the pending entry being replaced. That residual exposure is accepted here
+  and is not a licence to leave it uncovered where the consequence is material — see the migration
+  rule below.
+- When adding a request type, decide explicitly which side of this line it falls on and say why in
+  the call site. Do not copy whichever neighbouring call was pasted last.
+
+Migrating an existing one-shot prompt to attribution is allowed, but only per request type and
+together with its host UI path in the same change:
+
+- **Never make the ownership check mandatory in the registry.** Until a host echoes the id, a global
+  requirement silently drops every PIN, passphrase and QR response: the user submits, nothing
+  happens, and the call fails only at the ten-minute timeout. The `entry.requestId !== undefined`
+  guard is what makes incremental migration safe; it must stay.
+- `REQUEST_PASSPHRASE_ON_DEVICE` has no host-side answer and is not part of any such migration.
+- `RECEIVE_QR_RESPONSE` resolves dynamically to `REQUEST_QR_DISPLAY` or `REQUEST_QR_SCAN`, so
+  attribution there must identify the step, not just the round.
+- Strict attribution changes behaviour the host must handle: an answer typed into a superseded prompt
+  stops being silently accepted and starts being rejected, so the host needs a "re-enter" path rather
+  than a dead dialog.
+
+Priority follows consequence, not symmetry. A misrouted passphrase selects a different hidden wallet
+and is worth covering; a misrouted PIN unlocks the same physical device the user was already
+unlocking, and no misrouted answer can approve a transaction, because these vendors confirm the
+transaction on the device itself.
+
+Primary implementation:
+
+- `packages/hwk-adapter-core/src/utils/UiRequestRegistry.ts`
+- `packages/hwk-adapter-core/src/utils/requestBleDeviceSelection.ts`
+- `packages/hwk-adapter-core/src/utils/requestSaveDeviceBinding.ts`
+- `packages/hwk-adapter-core/src/events/ui-request.ts`
 
 ## Keystone Key Material Is Never Retained
 

@@ -4,5 +4,5 @@ export const SDK = {
   DEVICE_UNRESPONSIVE: 'device-unresponsive',
   DEVICE_RECOVERED: 'device-recovered',
   DEVICE_INTERACTION: 'device-interaction',
-  INTERACTION_ENDED: 'interaction-ended',
+  OPERATION_ENDED: 'operation-ended',
 } as const;
