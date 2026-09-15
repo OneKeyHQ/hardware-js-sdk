@@ -5,7 +5,7 @@ import {
   DEVICE,
   DeviceJobQueue,
   HardwareErrorCode,
-  InteractionRegistry,
+  OperationRegistry,
   SDK,
   TypedEventEmitter,
   UI_REQUEST,
@@ -22,7 +22,7 @@ import {
   getAllNetworkMethodChain,
   hasHardwareRuntimeIdPrefix,
   isAllNetworkMethodName,
-  isHardwareInteractionId,
+  isHardwareOperationId,
   isHwkRecoveryHint,
   operationMayHaveCompletedParams,
   parseBip32MasterFingerprint,
@@ -124,13 +124,9 @@ const KEYSTONE_USB_REATTACH_PROBE_INTERVAL_MS = 500;
 
 function resolveHardwareOperationTarget(
   positionalTargetId: string | null | undefined,
-  interactionId: string | null | undefined
+  operationId: string | null | undefined
 ) {
-  const result = resolveGenericHardwareOperationTarget(
-    positionalTargetId,
-    interactionId,
-    'keystone'
-  );
+  const result = resolveGenericHardwareOperationTarget(positionalTargetId, operationId, 'keystone');
   return result;
 }
 
@@ -141,7 +137,7 @@ function waitForKeystoneUsbReattachProbe(): Promise<void> {
 }
 
 function getKeystoneJobId(connectId?: string, deviceId?: string): string {
-  return isHardwareInteractionId(connectId)
+  return isHardwareOperationId(connectId)
     ? connectId
     : deviceId || connectId || COLD_START_JOB_LABEL;
 }
@@ -185,24 +181,24 @@ export class KeystoneAdapter implements IHardwareWallet {
 
   private readonly emitter = new TypedEventEmitter<HardwareEventMap>();
 
-  private readonly _interactionRoutes = new Map<
+  private readonly _operationRoutes = new Map<
     string,
-    { interactionId: string; connectionType: 'usb' | 'qr' }
+    { operationId: string; connectionType: 'usb' | 'qr' }
   >();
 
-  private readonly _interactions = new InteractionRegistry({
+  private readonly _operations = new OperationRegistry({
     vendor: 'keystone',
-    onEnded: (interaction, reason) => {
-      const route = this._interactionRoutes.get(interaction.connectId);
-      if (route?.interactionId === interaction.interactionId) {
-        this._interactionRoutes.delete(interaction.connectId);
+    onEnded: (operation, reason) => {
+      const route = this._operationRoutes.get(operation.connectId);
+      if (route?.operationId === operation.operationId) {
+        this._operationRoutes.delete(operation.connectId);
       }
-      this.emitter.emit(SDK.INTERACTION_ENDED, {
-        type: SDK.INTERACTION_ENDED,
-        payload: { interactionId: interaction.interactionId, reason },
+      this.emitter.emit(SDK.OPERATION_ENDED, {
+        type: SDK.OPERATION_ENDED,
+        payload: { operationId: operation.operationId, reason },
       });
       if (reason === 'timeout') {
-        this._releaseInteractionConnection(interaction).catch(() => undefined);
+        this._releaseOperationConnection(operation).catch(() => undefined);
       }
     },
   });
@@ -243,8 +239,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     const record = Array.from(this._devices.values()).find(item => item.usbSessionId === connectId);
     if (!record) return;
 
-    this._interactions.endByConnectionKey(connectId, 'disconnect');
-    this._interactions.endByConnectionKey(record.connectId, 'disconnect');
+    this._operations.endByConnectionKey(connectId, 'disconnect');
+    this._operations.endByConnectionKey(record.connectId, 'disconnect');
 
     record.usbSessionId = undefined;
     const info = toDeviceInfo(record);
@@ -267,7 +263,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     this._jobQueue = new DeviceJobQueue();
     this._usbConnector = options?.usbConnector;
     this._usbConnector?.on('device-disconnect', this._handleUsbDisconnect);
-    // Relay connector interaction events (ConfirmOnDevice / InteractionComplete
+    // Relay connector operation events (ConfirmOnDevice / InteractionComplete
     // around every USB UR round trip) to the host verbatim — same pass-through
     // the Ledger adapter does, so hosts reuse one handler for both vendors.
     this._usbConnector?.on('ui-event', this._handleUsbUiEvent);
@@ -298,7 +294,7 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   async dispose(): Promise<void> {
-    this._interactions.endAll('runtime-reset');
+    this._operations.endAll('runtime-reset');
     this._uiRegistry.cancel();
     this._jobQueue.clear();
     this._searchDeviceTargets.clear();
@@ -339,10 +335,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     // the host can keep the common search -> connect flow without starting a
     // wallet protocol round trip during discovery.
     if (options?.transportType === 'qr') {
-      const searchTargetId = createHardwareSearchTargetId({
-        vendor: 'keystone',
-        connectionType: 'qr',
-      });
+      const searchTargetId = createHardwareSearchTargetId('keystone');
       this._searchDeviceTargets.set(searchTargetId, 'qr');
       return [
         {
@@ -395,7 +388,7 @@ export class KeystoneAdapter implements IHardwareWallet {
   private async _resetUsbSessions(): Promise<void> {
     await this._runUsbTeardown(async () => {
       await this._usbConnectTail;
-      this._interactions.endAll('runtime-reset');
+      this._operations.endAll('runtime-reset');
       if (!this._usbConnector) return;
 
       const sessionIds = new Set(
@@ -483,19 +476,19 @@ export class KeystoneAdapter implements IHardwareWallet {
       if (!connected.success) return connected;
 
       const record = this._devices.get(connected.payload.deviceId);
-      this._interactions.endByConnectionKey(connected.payload.connectId, 'explicit');
-      const interaction = this._interactions.create({
+      this._operations.endByConnectionKey(connected.payload.connectId, 'explicit');
+      const operation = this._operations.create({
         searchTargetId,
         connectId: connected.payload.connectId,
         device: connected.payload,
         connectionKeys:
           selectedConnectionType === 'usb' && record?.usbSessionId ? [record.usbSessionId] : [],
       });
-      this._interactionRoutes.set(connected.payload.connectId, {
-        interactionId: interaction.interactionId,
+      this._operationRoutes.set(connected.payload.connectId, {
+        operationId: operation.operationId,
         connectionType: selectedConnectionType,
       });
-      return success(interaction.interactionId);
+      return success(operation.operationId);
     } catch (err) {
       return this._errorToFailure<string>(err);
     }
@@ -508,28 +501,28 @@ export class KeystoneAdapter implements IHardwareWallet {
    * QR-only (if it was ever QR-synced) or removes it entirely (pure-USB
    * wallet that was never seen over QR) — see §4.2 of the design doc.
    */
-  async releaseInteraction(interactionId: string): Promise<void> {
-    const interaction = this._interactions.find(interactionId);
-    if (!interaction) {
-      this._interactions.resolve(interactionId);
+  async releaseOperation(operationId: string): Promise<void> {
+    const operation = this._operations.find(operationId);
+    if (!operation) {
+      this._operations.resolve(operationId);
       return;
     }
-    const endedInteraction = this._interactions.end(interactionId, 'explicit');
-    if (!endedInteraction) return;
-    await this._releaseInteractionConnection(endedInteraction);
+    const endedOperation = this._operations.end(operationId, 'explicit');
+    if (!endedOperation) return;
+    await this._releaseOperationConnection(endedOperation);
   }
 
-  private async _releaseInteractionConnection(
-    interaction: NonNullable<ReturnType<InteractionRegistry['find']>>
+  private async _releaseOperationConnection(
+    operation: NonNullable<ReturnType<OperationRegistry['find']>>
   ): Promise<void> {
-    const { connectId } = interaction;
+    const { connectId } = operation;
     let record: KeystoneDeviceRecord | undefined;
     try {
       record = this._resolveTarget(connectId).record;
     } catch {
       return;
     }
-    if (!record?.usbSessionId || !interaction.connectionKeys.includes(record.usbSessionId)) {
+    if (!record?.usbSessionId || !operation.connectionKeys.includes(record.usbSessionId)) {
       return;
     }
 
@@ -546,11 +539,11 @@ export class KeystoneAdapter implements IHardwareWallet {
     });
   }
 
-  getDeviceInfo(connectIdOrInteractionId: string, deviceId: string): Promise<Response<DeviceInfo>> {
+  getDeviceInfo(connectIdOrOperationId: string, deviceId: string): Promise<Response<DeviceInfo>> {
     try {
-      const connectId = isHardwareInteractionId(connectIdOrInteractionId)
-        ? this._interactions.resolve(connectIdOrInteractionId).connectId
-        : connectIdOrInteractionId;
+      const connectId = isHardwareOperationId(connectIdOrOperationId)
+        ? this._operations.resolve(connectIdOrOperationId).connectId
+        : connectIdOrOperationId;
       const { record } = this._resolveTarget(connectId, deviceId);
       if (!record) {
         return Promise.resolve(
@@ -564,10 +557,6 @@ export class KeystoneAdapter implements IHardwareWallet {
     } catch (err) {
       return Promise.resolve(this._errorToFailure<DeviceInfo>(err));
     }
-  }
-
-  getSupportedChains(): ChainCapability[] {
-    return ['evm', 'btc', 'sol', 'tron'];
   }
 
   cancel(connectId?: string): void {
@@ -689,10 +678,10 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceId: string,
     params: AllNetworkGetAddressParams
   ): Promise<Response<AllNetworkAddressResponse[]>> => {
-    const operationTarget = resolveHardwareOperationTarget(connectId, params.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectId, params.operationId);
     if (!operationTarget.success) return operationTarget;
     const effectiveConnectId = operationTarget.payload.targetId ?? '';
-    const { interactionId } = operationTarget.payload;
+    const { operationId } = operationTarget.payload;
     try {
       const prefetched = await this._prefetchAllNetworkAccounts(
         effectiveConnectId,
@@ -712,7 +701,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           const commonArgs = {
             path: item.path,
             showOnDevice: item.showOnDevice,
-            interactionId,
+            operationId,
           };
           switch (method) {
             case 'evmGetAddress':
@@ -766,7 +755,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     paramsArg?: NullableCallArg<IHardwareCallParams<EvmGetAddressParams>>,
     book?: AccountBook
   ): Promise<Response<EvmAddress>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -820,7 +809,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     paramsArg?: NullableCallArg<IHardwareCallParams<EvmSignTxParams>>
   ): Promise<Response<EvmSignedTx>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -896,7 +885,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     paramsArg?: NullableCallArg<IHardwareCallParams<EvmSignMsgParams>>
   ): Promise<Response<EvmSignature>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -956,7 +945,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     paramsArg?: NullableCallArg<IHardwareCallParams<EvmSignTypedDataParams>>
   ): Promise<Response<EvmSignature>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1034,7 +1023,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     paramsArg?: NullableCallArg<IHardwareCallParams<BtcGetAddressParams>>,
     book?: AccountBook
   ): Promise<Response<BtcAddress>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1116,7 +1105,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     paramsArg?: NullableCallArg<IHardwareCallParams<BtcGetPublicKeyParams>>,
     book?: AccountBook
   ): Promise<Response<BtcPublicKey>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1184,7 +1173,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     paramsArg?: NullableCallArg<IHardwareCallParams<BtcSignPsbtParams>>
   ): Promise<Response<BtcSignedPsbt>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1230,7 +1219,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     paramsArg?: NullableCallArg<IHardwareCallParams<BtcSignMsgParams>>
   ): Promise<Response<BtcSignature>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1285,7 +1274,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     paramsArg?: NullableCallArg<IHardwareCommonCallParams>
   ): Promise<Response<{ masterFingerprint: string }>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1309,7 +1298,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     paramsArg?: NullableCallArg<IHardwareCallParams<SolGetAddressParams>>,
     book?: AccountBook
   ): Promise<Response<SolAddress>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1341,7 +1330,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     paramsArg?: NullableCallArg<IHardwareCallParams<SolSignTxParams>>
   ): Promise<Response<SolSignedTx>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1394,7 +1383,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     paramsArg?: NullableCallArg<IHardwareCallParams<SolSignMsgParams>>
   ): Promise<Response<SolSignature>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1455,7 +1444,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     paramsArg?: NullableCallArg<IHardwareCallParams<TronGetAddressParams>>,
     book?: AccountBook
   ): Promise<Response<TronAddress>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1505,7 +1494,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     paramsArg?: NullableCallArg<IHardwareCallParams<TronSignTxParams>>
   ): Promise<Response<TronSignedTx>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1564,7 +1553,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     paramsArg?: NullableCallArg<IHardwareCallParams<TronSignMsgParams>>
   ): Promise<Response<TronSignature>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.interactionId);
+    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1803,8 +1792,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     expectedMasterFingerprint?: string;
   } {
     let resolvedConnectId = connectId;
-    if (isHardwareInteractionId(connectId)) {
-      resolvedConnectId = this._interactions.resolve(connectId).connectId;
+    if (isHardwareOperationId(connectId)) {
+      resolvedConnectId = this._operations.resolve(connectId).connectId;
     }
     const identifiers = [deviceId, resolvedConnectId].filter((identifier): identifier is string =>
       Boolean(identifier)
@@ -1875,7 +1864,7 @@ export class KeystoneAdapter implements IHardwareWallet {
    * already has a live session, so this must NOT unconditionally mark
    * `qrSynced`, or a USB-only wallet would wrongly survive a later USB
    * disconnect as a "QR-synced, demote to QR-only" entry instead of being
-   * dropped outright (see `releaseInteraction`).
+   * dropped outright (see `releaseOperation`).
    */
   private _upsertDeviceRecord(
     parsed: KeystoneParsedMultiAccounts,
@@ -2040,7 +2029,7 @@ export class KeystoneAdapter implements IHardwareWallet {
    * then attach and verify the requested wallet when one is present. This is
    * used both after an adapter restart and after a QR-only period, so plugging
    * USB back in affects the next business call without changing an in-flight
-   * QR interaction.
+   * QR operation.
    */
   private async _tryUsbAttach(
     expectedWalletId?: string,
@@ -2116,24 +2105,24 @@ export class KeystoneAdapter implements IHardwareWallet {
     record: KeystoneDeviceRecord | undefined,
     requestUr: KeystoneUr,
     animated: boolean,
-    interactionId: string | undefined,
+    operationId: string | undefined,
     signal: AbortSignal,
     operationName?: string
   ): Promise<KeystoneUr> {
-    const releaseInteractionRetention = isHardwareInteractionId(interactionId)
-      ? this._interactions.retain(interactionId)
+    const releaseOperationRetention = isHardwareOperationId(operationId)
+      ? this._operations.retain(operationId)
       : undefined;
     try {
       return await this._resolveUrWithRoute(
         record,
         requestUr,
         animated,
-        interactionId,
+        operationId,
         signal,
         operationName
       );
     } finally {
-      releaseInteractionRetention?.();
+      releaseOperationRetention?.();
     }
   }
 
@@ -2141,20 +2130,20 @@ export class KeystoneAdapter implements IHardwareWallet {
     record: KeystoneDeviceRecord | undefined,
     requestUr: KeystoneUr,
     animated: boolean,
-    interactionId: string | undefined,
+    operationId: string | undefined,
     signal: AbortSignal,
     operationName?: string
   ): Promise<KeystoneUr> {
-    let interactionRoute: { interactionId: string; connectionType: 'usb' | 'qr' } | undefined;
-    if (isHardwareInteractionId(interactionId)) {
-      const interaction = this._interactions.resolve(interactionId);
-      const route = this._interactionRoutes.get(interaction.connectId);
-      if (!route || route.interactionId !== interactionId) {
-        this._interactions.end(interactionId, 'disconnect');
+    let interactionRoute: { operationId: string; connectionType: 'usb' | 'qr' } | undefined;
+    if (isHardwareOperationId(operationId)) {
+      const operation = this._operations.resolve(operationId);
+      const route = this._operationRoutes.get(operation.connectId);
+      if (!route || route.operationId !== operationId) {
+        this._operations.end(operationId, 'disconnect');
         throw createHwkError({
-          code: HardwareErrorCode.InteractionEnded,
-          message: 'Keystone hardware interaction is no longer connected',
-          params: { interactionId, reason: 'disconnect' },
+          code: HardwareErrorCode.OperationEnded,
+          message: 'Keystone hardware operation is no longer connected',
+          params: { operationId, reason: 'disconnect' },
         });
       }
       interactionRoute = route;
@@ -2190,12 +2179,12 @@ export class KeystoneAdapter implements IHardwareWallet {
     if (wantUsb) {
       if (!record?.usbSessionId || !this._usbConnector) {
         if (interactionRoute) {
-          this._interactions.end(interactionRoute.interactionId, 'disconnect');
+          this._operations.end(interactionRoute.operationId, 'disconnect');
           throw createHwkError({
-            code: HardwareErrorCode.InteractionEnded,
-            message: 'Keystone interaction USB connection was lost',
+            code: HardwareErrorCode.OperationEnded,
+            message: 'Keystone operation USB connection was lost',
             params: {
-              interactionId: interactionRoute.interactionId,
+              operationId: interactionRoute.operationId,
               reason: 'disconnect',
             },
           });
@@ -2229,7 +2218,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         });
       }
       // Deliberately does NOT retry over QR. By this point the request has
-      // been put on the wire and the device may well be mid-interaction —
+      // been put on the wire and the device may well be mid-operation —
       // showing a passphrase keyboard or a confirm screen. Swapping channels
       // here throws away work the user is in the middle of and asks them to
       // redo it a different way, which is worse than either succeeding or
@@ -2266,20 +2255,20 @@ export class KeystoneAdapter implements IHardwareWallet {
         }
         record.usbSessionId = undefined;
         if (interactionRoute) {
-          this._interactions.end(interactionRoute.interactionId, 'disconnect');
+          this._operations.end(interactionRoute.operationId, 'disconnect');
           throw createHwkError({
-            code: HardwareErrorCode.InteractionEnded,
+            code: HardwareErrorCode.OperationEnded,
             message: operationName
               ? `Keystone ${operationName} may have completed before the USB connection was lost`
-              : 'Keystone interaction USB connection was lost',
+              : 'Keystone operation USB connection was lost',
             recovery: operationName ? { scope: 'unknown' } : undefined,
             params: operationName
               ? operationMayHaveCompletedParams(operationName, {
-                  interactionId: interactionRoute.interactionId,
+                  operationId: interactionRoute.operationId,
                   reason: 'disconnect',
                 })
               : {
-                  interactionId: interactionRoute.interactionId,
+                  operationId: interactionRoute.operationId,
                   reason: 'disconnect',
                 },
           });
@@ -2651,13 +2640,13 @@ export class KeystoneAdapter implements IHardwareWallet {
       if (e._tag === UI_REQUEST_CANCELLED_TAG || e._tag === UI_REQUEST_PREEMPTED_TAG) {
         return failure(
           HardwareErrorCode.UserAborted,
-          e.message ?? 'Keystone QR interaction was cancelled'
+          e.message ?? 'Keystone QR operation was cancelled'
         );
       }
       if (e._tag === UI_REQUEST_TIMEOUT_TAG) {
         return failure(
           HardwareErrorCode.OperationTimeout,
-          e.message ?? 'Keystone QR interaction timed out'
+          e.message ?? 'Keystone QR operation timed out'
         );
       }
     }

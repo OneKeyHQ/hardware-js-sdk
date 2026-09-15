@@ -4,7 +4,7 @@ import {
   ORPHAN_ELIGIBLE_ERROR_CODES,
   UI_REQUEST,
   UI_RESPONSE,
-  createHardwareInteractionId,
+  createHardwareOperationId,
   parseHardwareRuntimeId,
 } from '@onekeyfe/hwk-adapter-core';
 
@@ -100,7 +100,7 @@ describe('TrezorAdapter', () => {
     });
     if (connected.success) {
       expect(parseHardwareRuntimeId(connected.payload)).toMatchObject({
-        kind: 'interaction',
+        kind: 'operation',
         vendor: 'trezor',
       });
     }
@@ -400,41 +400,46 @@ describe('TrezorAdapter', () => {
     expect(connector.connect).toHaveBeenCalledWith('safe-7', { transportType: 'ble' });
   });
 
-  it.each([true, false])('requires persistence before the wallet call (saved=%s)', async saved => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
-    (connector.call as CallMock).mockImplementation(async (_session, method) => {
-      if (method === 'createAppSession') return { protocol: 'v1' };
-      return { address: 'verified-address' };
-    });
-    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-      adapter.uiResponse({
-        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-        payload: { requestId: event.payload.requestId, sdkConnectId: 'safe-7' },
+  it.each([true, false])(
+    'runs the wallet call after the binding answer (saved=%s)',
+    async saved => {
+      const connector = createConnector();
+      const adapter = new TrezorAdapter(connector);
+      (connector.call as CallMock).mockImplementation(async (_session, method) => {
+        if (method === 'createAppSession') return { protocol: 'v1' };
+        return { address: 'verified-address' };
       });
-    });
-    const save = jest.fn();
-    adapter.on(UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING, event => {
-      save(event.payload);
+      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+          payload: { requestId: event.payload.requestId, sdkConnectId: 'safe-7' },
+        });
+      });
+      const save = jest.fn();
+      adapter.on(UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING, event => {
+        save(event.payload);
+        expect(
+          (connector.call as CallMock).mock.calls.some(([, method]) => method === 'evmGetAddress')
+        ).toBe(false);
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING,
+          payload: { requestId: event.payload.requestId, saved },
+        });
+      });
+      const result = await adapter.evmGetAddress('', 'safe-7', {
+        path: "m/44'/60'/0'/0/0",
+        useEmptyPassphrase: true,
+        extra: { dbDeviceId: 'binding-record' },
+      });
+      expect(save).toHaveBeenCalledTimes(1);
+      // The device identity was checked before the binding was offered, so a host
+      // that could not file the binding away does not invalidate the address.
+      expect(result.success).toBe(true);
       expect(
         (connector.call as CallMock).mock.calls.some(([, method]) => method === 'evmGetAddress')
-      ).toBe(false);
-      adapter.uiResponse({
-        type: UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING,
-        payload: { requestId: event.payload.requestId, saved },
-      });
-    });
-    const result = await adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
-      extra: { dbDeviceId: 'binding-record' },
-    });
-    expect(save).toHaveBeenCalledTimes(1);
-    expect(result.success).toBe(saved);
-    expect(
-      (connector.call as CallMock).mock.calls.some(([, method]) => method === 'evmGetAddress')
-    ).toBe(saved);
-  });
+      ).toBe(true);
+    }
+  );
 
   it('carries opaque context through explicit binding before the wallet call runs', async () => {
     const connector = createConnector();
@@ -777,6 +782,37 @@ describe('TrezorAdapter', () => {
     expect(connector.call).not.toHaveBeenCalled();
   });
 
+  it('terminates binding UI when passphrase resolution fails after a good selection', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    const status = jest.fn();
+    adapter.on(UI_REQUEST.DEVICE_BINDING_STATUS, status);
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+        payload: { requestId: event.payload.requestId, sdkConnectId: 'safe-7' },
+      });
+    });
+    // Selection and identity both succeed; the wallet session is what fails.
+    // Releasing the device is not the same as closing the dialog the user is
+    // watching - without a terminal status it sits on "verifying" forever.
+    (connector.call as CallMock).mockImplementation(async (_session, method) => {
+      if (method === 'createAppSession') throw new Error('wallet session failed');
+      return { address: 'verified-address' };
+    });
+
+    const result = await adapter.getPassphraseState('', undefined, {
+      expectedDeviceIdentity: { vendor: 'trezor', type: 'deviceId', value: 'safe-7' },
+      knownConnections: [],
+    });
+
+    expect(result.success).toBe(false);
+    expect(status).toHaveBeenLastCalledWith({
+      type: UI_REQUEST.DEVICE_BINDING_STATUS,
+      payload: { selectionRequestId: expect.any(String), status: 'failed' },
+    });
+  });
+
   it('terminates binding UI when a selected BLE endpoint fails to connect', async () => {
     const connector = createConnector();
     (connector.connect as ConnectMock).mockRejectedValueOnce(
@@ -1022,7 +1058,7 @@ describe('TrezorAdapter', () => {
     });
   });
 
-  it('connects without deriving public data and exposes info through the interaction', async () => {
+  it('connects without deriving public data and exposes info through the operation', async () => {
     const connector = createConnector();
     (connector.connect as ConnectMock).mockResolvedValueOnce({
       sessionId: 'safe-7-session',
@@ -1048,7 +1084,7 @@ describe('TrezorAdapter', () => {
     });
     if (!result.success) return;
     expect(parseHardwareRuntimeId(result.payload)).toMatchObject({
-      kind: 'interaction',
+      kind: 'operation',
       vendor: 'trezor',
     });
     await expect(adapter.getDeviceInfo(result.payload, '')).resolves.toEqual({
@@ -1061,23 +1097,23 @@ describe('TrezorAdapter', () => {
     });
   });
 
-  it('fails an ended interaction without reconnecting', async () => {
+  it('fails an ended operation without reconnecting', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
     const connected = await adapter.connectDevice('safe-7');
     expect(connected.success).toBe(true);
     if (!connected.success) return;
-    await adapter.releaseInteraction(connected.payload);
+    await adapter.releaseOperation(connected.payload);
     jest.clearAllMocks();
 
     const result = await adapter.evmGetAddress(connected.payload, '', {
       path: "m/44'/60'/0'/0/0",
-      interactionId: connected.payload,
+      operationId: connected.payload,
     });
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.payload.code).toBe(HardwareErrorCode.InteractionEnded);
+      expect(result.payload.code).toBe(HardwareErrorCode.OperationEnded);
     }
     expect(connector.searchDevices).not.toHaveBeenCalled();
     expect(connector.connect).not.toHaveBeenCalled();
@@ -1104,7 +1140,7 @@ describe('TrezorAdapter', () => {
     expect(connector.connect).not.toHaveBeenCalled();
   });
 
-  it('retires an older interaction when the same target is selected again', async () => {
+  it('retires an older operation when the same target is selected again', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
     const first = await adapter.connectDevice('safe-7');
@@ -1116,7 +1152,7 @@ describe('TrezorAdapter', () => {
     const oldInfo = await adapter.getDeviceInfo(first.payload, '');
     expect(oldInfo.success).toBe(false);
     if (!oldInfo.success) {
-      expect(oldInfo.payload.code).toBe(HardwareErrorCode.InteractionEnded);
+      expect(oldInfo.payload.code).toBe(HardwareErrorCode.OperationEnded);
     }
     await expect(adapter.getDeviceInfo(second.payload, '')).resolves.toEqual({
       success: true,
@@ -1124,7 +1160,7 @@ describe('TrezorAdapter', () => {
     });
   });
 
-  it('does not disconnect the replacement interaction when the retired owner ends late', async () => {
+  it('does not disconnect the replacement operation when the retired owner ends late', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
     const first = await adapter.connectDevice('safe-7');
@@ -1134,7 +1170,7 @@ describe('TrezorAdapter', () => {
     if (!first.success || !second.success) return;
     jest.clearAllMocks();
 
-    await adapter.releaseInteraction(first.payload);
+    await adapter.releaseOperation(first.payload);
 
     expect(connector.disconnect).not.toHaveBeenCalled();
     await expect(adapter.getDeviceInfo(second.payload, '')).resolves.toEqual({
@@ -1142,11 +1178,11 @@ describe('TrezorAdapter', () => {
       payload: expect.objectContaining({ connectId: 'safe-7' }),
     });
 
-    await adapter.releaseInteraction(second.payload);
+    await adapter.releaseOperation(second.payload);
     expect(connector.disconnect).toHaveBeenCalledWith('safe-7-session');
   });
 
-  it('rejects conflicting positional and common interaction ids', async () => {
+  it('rejects conflicting positional and common operation ids', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
     const first = await adapter.connectDevice('safe-7');
@@ -1160,7 +1196,7 @@ describe('TrezorAdapter', () => {
       path: "m/44'/60'/0'/0/0",
       showOnDevice: false,
       useEmptyPassphrase: true,
-      interactionId: second.payload,
+      operationId: second.payload,
     });
 
     expect(result.success).toBe(false);
@@ -1219,6 +1255,52 @@ describe('TrezorAdapter', () => {
       'evmGetAddress',
       expect.any(Object)
     );
+  });
+
+  it('reports a search mismatch, not a device mismatch, when no connected unit is the wallet', async () => {
+    const connector = createSeriallessUsbConnector();
+    const adapter = new TrezorAdapter(connector);
+
+    const result = await adapter.evmGetAddress('', 'a-wallet-that-is-not-plugged-in', {
+      path: "m/44'/60'/0'/0/0",
+      showOnDevice: false,
+      useEmptyPassphrase: true,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      // Nothing about the known wallet changed, so this must not surface as
+      // DeviceMismatch, whose remedy is re-selecting rather than a cable swap.
+      expect(result.payload.code).toBe(HardwareErrorCode.DeviceSearchMismatch);
+      expect(result.payload.params).toEqual({
+        connectedDeviceIds: ['wrong-device-id', 'expected-device-id'],
+      });
+    }
+    expect(connector.call).not.toHaveBeenCalled();
+  });
+
+  it('does not claim the wrong device when no candidate could be opened at all', async () => {
+    const connector = createSeriallessUsbConnector();
+    (connector.connect as ConnectMock).mockImplementation(() =>
+      Promise.reject(
+        Object.assign(new Error('gone'), { code: HardwareErrorCode.DeviceDisconnected })
+      )
+    );
+    const adapter = new TrezorAdapter(connector);
+
+    const result = await adapter.evmGetAddress('', 'expected-device-id', {
+      path: "m/44'/60'/0'/0/0",
+      showOnDevice: false,
+      useEmptyPassphrase: true,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      // No identity was ever read, so asserting the wrong unit is plugged in
+      // would point the user at the wrong remedy.
+      expect(result.payload.code).toBe(HardwareErrorCode.DeviceNotFound);
+      expect(result.payload.params).toBeUndefined();
+    }
   });
 
   it('keeps an all-network operation on the serialless USB device selected by identity', async () => {
@@ -1300,7 +1382,7 @@ describe('TrezorAdapter', () => {
     });
   });
 
-  it('ends a pinned interaction when its transport disconnects without reconnecting', async () => {
+  it('ends a pinned operation when its transport disconnects without reconnecting', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
     const connected = await adapter.connectDevice('safe-7');
@@ -1315,19 +1397,19 @@ describe('TrezorAdapter', () => {
 
     const result = await adapter.evmGetAddress(connected.payload, '', {
       path: "m/44'/60'/0'/0/0",
-      interactionId: connected.payload,
+      operationId: connected.payload,
       useEmptyPassphrase: true,
     });
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.payload.code).toBe(HardwareErrorCode.InteractionEnded);
+      expect(result.payload.code).toBe(HardwareErrorCode.OperationEnded);
     }
     expect(connector.searchDevices).not.toHaveBeenCalled();
     expect(connector.connect).not.toHaveBeenCalled();
   });
 
-  it('cancels the active job without terminating its interaction', async () => {
+  it('cancels the active job without terminating its operation', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
     const connected = await adapter.connectDevice('safe-7');
@@ -1339,7 +1421,7 @@ describe('TrezorAdapter', () => {
     expect(connector.cancel).toHaveBeenCalledWith('safe-7-session');
     const info = await adapter.getDeviceInfo(connected.payload, '');
     expect(info.success).toBe(true);
-    await adapter.releaseInteraction(connected.payload);
+    await adapter.releaseOperation(connected.payload);
   });
 
   it('maps WebUSB transfer errors during connect to TransportError', async () => {
@@ -1375,7 +1457,7 @@ describe('TrezorAdapter', () => {
     });
     if (result.success) {
       expect(parseHardwareRuntimeId(result.payload)).toMatchObject({
-        kind: 'interaction',
+        kind: 'operation',
         vendor: 'trezor',
       });
     }
@@ -2160,7 +2242,7 @@ describe('TrezorAdapter', () => {
     jest.clearAllMocks();
 
     const pending = adapter.getFeatures(connected.payload, {
-      interactionId: connected.payload,
+      operationId: connected.payload,
       expectedDeviceIdentity: {
         vendor: 'trezor',
         type: 'deviceId',
@@ -2760,7 +2842,7 @@ describe('TrezorAdapter', () => {
     expect(connector.call).toHaveBeenCalledTimes(2);
   });
 
-  it('pins all-network feature and address calls to the common interaction target', async () => {
+  it('pins all-network feature and address calls to the common operation target', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
     const connected = await adapter.connectDevice('safe-7');
@@ -2774,7 +2856,7 @@ describe('TrezorAdapter', () => {
       .mockResolvedValueOnce({ device_id: 'trezor-device-uuid-abc' });
 
     const result = await adapter.allNetworkGetAddress('stale-or-unrelated-connect-id', '', {
-      interactionId: connected.payload,
+      operationId: connected.payload,
       bundle: [
         {
           network: 'eth',
@@ -2791,7 +2873,7 @@ describe('TrezorAdapter', () => {
     expect(connector.connect).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects conflicting all-network interaction ids before device I/O', async () => {
+  it('rejects conflicting all-network operation ids before device I/O', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
     const connected = await adapter.connectDevice('safe-7');
@@ -2800,7 +2882,7 @@ describe('TrezorAdapter', () => {
     jest.clearAllMocks();
 
     const result = await adapter.allNetworkGetAddress(connected.payload, '', {
-      interactionId: createHardwareInteractionId('trezor'),
+      operationId: createHardwareOperationId('trezor'),
       bundle: [
         {
           network: 'eth',
@@ -2927,7 +3009,7 @@ describe('TrezorAdapter', () => {
     expect(connector.call).toHaveBeenCalledTimes(2);
   });
 
-  it('ends a pinned signing interaction with an ambiguous-operation marker', async () => {
+  it('ends a pinned signing operation with an ambiguous-operation marker', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
     const connected = await adapter.connectDevice('safe-7');
@@ -2944,17 +3026,17 @@ describe('TrezorAdapter', () => {
     const result = await adapter.evmSignMessage(connected.payload, 'safe-7', {
       path: "m/44'/60'/0'/0/0",
       message: 'hello',
-      interactionId: connected.payload,
+      operationId: connected.payload,
       useEmptyPassphrase: true,
     });
 
     expect(result).toMatchObject({
       success: false,
       payload: {
-        code: HardwareErrorCode.InteractionEnded,
+        code: HardwareErrorCode.OperationEnded,
         recovery: { scope: 'unknown' },
         params: {
-          interactionId: connected.payload,
+          operationId: connected.payload,
           operationMayHaveCompleted: true,
           method: 'evmSignMessage',
         },
@@ -3101,7 +3183,7 @@ describe('TrezorAdapter', () => {
     void first;
   });
 
-  it('cancel aborts an in-flight call via forceCancelActive', async () => {
+  it('cancel aborts an in-flight call via cancelActive', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
     const connected = await adapter.connectDevice('safe-7');
@@ -3114,7 +3196,7 @@ describe('TrezorAdapter', () => {
       path: "m/44'/60'/0'/0/0",
       showOnDevice: false,
       useEmptyPassphrase: true,
-      interactionId: connected.payload,
+      operationId: connected.payload,
     });
 
     // Give the queue time to start the job.
@@ -3145,7 +3227,7 @@ describe('TrezorAdapter', () => {
         })
     );
     const inFlight = adapter.getFeatures(connected.payload, {
-      interactionId: connected.payload,
+      operationId: connected.payload,
     });
     await new Promise(resolve => setImmediate(resolve));
 
@@ -3157,7 +3239,7 @@ describe('TrezorAdapter', () => {
     });
 
     const earlyRetry = await adapter.getFeatures(connected.payload, {
-      interactionId: connected.payload,
+      operationId: connected.payload,
     });
     expect(earlyRetry).toMatchObject({
       success: false,
@@ -3168,13 +3250,13 @@ describe('TrezorAdapter', () => {
     resolveRawCall({ device_id: 'safe-7' });
     await new Promise(resolve => setImmediate(resolve));
     const settledRetry = await adapter.getFeatures(connected.payload, {
-      interactionId: connected.payload,
+      operationId: connected.payload,
     });
     expect(settledRetry.success).toBe(true);
     expect(connector.call).toHaveBeenCalledTimes(2);
   });
 
-  it('waits for a cancelled raw call before releasing its interaction session', async () => {
+  it('waits for a cancelled raw call before releasing its operation session', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
     const connected = await adapter.connectDevice('safe-7');
@@ -3189,7 +3271,7 @@ describe('TrezorAdapter', () => {
         })
     );
     const inFlight = adapter.getFeatures(connected.payload, {
-      interactionId: connected.payload,
+      operationId: connected.payload,
     });
     await new Promise(resolve => setImmediate(resolve));
     adapter.cancel(connected.payload);
@@ -3198,7 +3280,7 @@ describe('TrezorAdapter', () => {
       payload: { code: HardwareErrorCode.UserAborted },
     });
 
-    const release = adapter.releaseInteraction(connected.payload);
+    const release = adapter.releaseOperation(connected.payload);
     await new Promise(resolve => setImmediate(resolve));
     expect(connector.disconnect).not.toHaveBeenCalled();
     await expect(adapter.connectDevice('safe-7')).resolves.toMatchObject({
@@ -3256,24 +3338,24 @@ describe('TrezorAdapter', () => {
     expect(connector.call).toHaveBeenCalledTimes(4);
   });
 
-  it('retains a pinned interaction for the complete passphrase discovery job', async () => {
+  it('retains a pinned operation for the complete passphrase discovery job', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
     const connected = await adapter.connectDevice('safe-7');
     expect(connected.success).toBe(true);
     if (!connected.success) return;
 
-    const interactions = (
+    const operations = (
       adapter as unknown as {
-        _interactions: {
-          retain(interactionId: string): () => void;
+        _operations: {
+          retain(operationId: string): () => void;
         };
       }
-    )._interactions;
-    const originalRetain = interactions.retain.bind(interactions);
+    )._operations;
+    const originalRetain = operations.retain.bind(operations);
     const release = jest.fn();
-    const retain = jest.spyOn(interactions, 'retain').mockImplementation(interactionId => {
-      const originalRelease = originalRetain(interactionId);
+    const retain = jest.spyOn(operations, 'retain').mockImplementation(operationId => {
+      const originalRelease = originalRetain(operationId);
       return () => {
         release();
         originalRelease();

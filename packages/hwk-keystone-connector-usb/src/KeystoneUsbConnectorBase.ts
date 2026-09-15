@@ -4,7 +4,7 @@ import {
   EConnectorInteraction,
   HardwareErrorCode,
   TypedEventEmitter,
-  createHardwareConnectorSessionId,
+  createHardwareLinkId,
   createHardwareSearchTargetId,
   createHwkError,
   hasHardwareRuntimeIdPrefix,
@@ -212,10 +212,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
       return [];
     }
     return devices.map(device => {
-      const connectId = createHardwareSearchTargetId({
-        vendor: 'keystone',
-        connectionType: 'usb',
-      });
+      const connectId = createHardwareSearchTargetId('keystone');
       (isAvailabilitySearch ? this.availabilityDevices : this.discoveredDevices).set(
         connectId,
         device
@@ -295,7 +292,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
     if (searchTargetId && !selectedDevice) {
       throw createHwkError({
         code: HardwareErrorCode.DeviceNotFound,
-        message: `Keystone USB search target is no longer available: ${searchTargetId}`,
+        message: `Keystone USB search target is not in the current scan: ${searchTargetId}`,
         recovery: { scope: 'search-target' },
       });
     }
@@ -402,10 +399,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
           message: `Connected Keystone wallet (mfp ${config.mfp}) does not match the requested wallet fingerprint (${expectedMasterFingerprint})`,
         });
       }
-      const sessionId = createHardwareConnectorSessionId({
-        vendor: 'keystone',
-        connectionType: 'usb',
-      });
+      const sessionId = createHardwareLinkId('keystone');
       activeOpenedTransport.bindSessionId(sessionId);
       this.sessions.set(sessionId, {
         transport,
@@ -465,23 +459,15 @@ export class KeystoneUsbConnectorBase implements IConnector {
 
     const runtimeId = parseHardwareRuntimeId(value);
     if (runtimeId) {
-      if (
-        runtimeId.kind === 'search-target' &&
-        runtimeId.vendor === 'keystone' &&
-        runtimeId.connectionType === 'usb'
-      ) {
+      // Whether this particular target is ours is settled by the snapshot
+      // lookup in `_connectResolved`, not by anything encoded in the id.
+      if (runtimeId.kind === 'search-target' && runtimeId.vendor === 'keystone') {
         return { searchTargetId: value };
       }
       throw createHwkError({
         code: HardwareErrorCode.InvalidParams,
         message: 'Keystone USB connector received an incompatible hardware runtime id',
-        params: {
-          kind: runtimeId.kind,
-          vendor: runtimeId.vendor,
-          ...(runtimeId.kind === 'search-target'
-            ? { connectionType: runtimeId.connectionType }
-            : {}),
-        },
+        params: { kind: runtimeId.kind, vendor: runtimeId.vendor },
       });
     }
 

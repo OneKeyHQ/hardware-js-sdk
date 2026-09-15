@@ -1,10 +1,10 @@
 import {
   HardwareErrorCode,
-  InteractionRegistry,
+  OperationRegistry,
   ORPHAN_ELIGIBLE_ERROR_CODES,
-  createHardwareConnectorSessionId,
+  createHardwareLinkId,
   createHardwareSearchTargetId,
-  isHardwareInteractionId,
+  isHardwareOperationId,
   parseHardwareRuntimeId,
   resolveHardwareOperationTarget,
 } from '../index';
@@ -18,32 +18,31 @@ const device = {
   connectionType: 'usb' as const,
 };
 
-describe('InteractionRegistry', () => {
-  it('treats interaction loss as an onboarding-wide failure', () => {
+describe('OperationRegistry', () => {
+  it('treats operation loss as an onboarding-wide failure', () => {
     expect(ORPHAN_ELIGIBLE_ERROR_CODES).toEqual(
       expect.arrayContaining([
-        HardwareErrorCode.InteractionNotFound,
-        HardwareErrorCode.InteractionEnded,
+        HardwareErrorCode.OperationNotFound,
+        HardwareErrorCode.OperationEnded,
       ])
     );
   });
 
   it('creates an opaque runtime id and resolves the same bound search target', () => {
-    const registry = new InteractionRegistry({ vendor: 'ledger' });
-    const interaction = registry.create({
+    const registry = new OperationRegistry({ vendor: 'ledger' });
+    const operation = registry.create({
       searchTargetId: 'usb-target',
       connectId: 'usb-target',
       device,
       connectionKeys: ['session-1'],
     });
 
-    expect(isHardwareInteractionId(interaction.interactionId)).toBe(true);
-    expect(parseHardwareRuntimeId(interaction.interactionId)).toMatchObject({
-      kind: 'interaction',
+    expect(isHardwareOperationId(operation.operationId)).toBe(true);
+    expect(parseHardwareRuntimeId(operation.operationId)).toMatchObject({
+      kind: 'operation',
       vendor: 'ledger',
     });
-    expect(registry.resolve(interaction.interactionId)).toMatchObject({
-      searchTargetId: 'usb-target',
+    expect(registry.resolve(operation.operationId)).toMatchObject({
       connectId: 'usb-target',
       connectionKeys: ['usb-target', 'session-1'],
     });
@@ -52,7 +51,7 @@ describe('InteractionRegistry', () => {
   });
 
   it('uses random runtime ids instead of a process-local sequence', () => {
-    const registry = new InteractionRegistry({ vendor: 'ledger' });
+    const registry = new OperationRegistry({ vendor: 'ledger' });
     const first = registry.create({
       searchTargetId: 'usb-target',
       connectId: 'usb-target',
@@ -64,28 +63,24 @@ describe('InteractionRegistry', () => {
       device,
     });
 
-    expect(first.interactionId).not.toBe(second.interactionId);
-    expect(first.interactionId).toMatch(/^hwk:runtime:v1:interaction:ledger:[0-9a-f]{32}$/);
-    expect(second.interactionId).toMatch(/^hwk:runtime:v1:interaction:ledger:[0-9a-f]{32}$/);
+    expect(first.operationId).not.toBe(second.operationId);
+    expect(first.operationId).toMatch(/^hwk:runtime:operation:ledger:[0-9a-f]{32}$/);
+    expect(second.operationId).toMatch(/^hwk:runtime:operation:ledger:[0-9a-f]{32}$/);
     registry.endAll('runtime-reset');
   });
 
   it('creates typed search targets without exposing physical descriptor data', () => {
-    const searchTargetId = createHardwareSearchTargetId({
-      vendor: 'keystone',
-      connectionType: 'usb',
-    });
+    const searchTargetId = createHardwareSearchTargetId('keystone');
 
-    expect(parseHardwareRuntimeId(searchTargetId)).toMatchObject({
+    expect(parseHardwareRuntimeId(searchTargetId)).toEqual({
       kind: 'search-target',
       vendor: 'keystone',
-      connectionType: 'usb',
     });
     expect(searchTargetId).not.toContain('serial');
   });
 
-  it('normalizes positional compatibility and rejects conflicting interaction ids', () => {
-    const registry = new InteractionRegistry({ vendor: 'trezor' });
+  it('normalizes positional compatibility and rejects conflicting operation ids', () => {
+    const registry = new OperationRegistry({ vendor: 'trezor' });
     const first = registry.create({
       searchTargetId: 'usb-target',
       connectId: 'usb-target',
@@ -97,41 +92,33 @@ describe('InteractionRegistry', () => {
       device: { ...device, vendor: 'trezor' },
     });
 
-    expect(resolveHardwareOperationTarget(first.interactionId, undefined)).toEqual({
+    expect(resolveHardwareOperationTarget(first.operationId, undefined)).toEqual({
       success: true,
       payload: {
-        targetId: first.interactionId,
-        interactionId: first.interactionId,
+        targetId: first.operationId,
+        operationId: first.operationId,
       },
     });
-    expect(resolveHardwareOperationTarget('usb-target', first.interactionId)).toEqual({
+    expect(resolveHardwareOperationTarget('usb-target', first.operationId)).toEqual({
       success: true,
       payload: {
-        targetId: first.interactionId,
-        interactionId: first.interactionId,
+        targetId: first.operationId,
+        operationId: first.operationId,
       },
     });
-    expect(resolveHardwareOperationTarget(first.interactionId, second.interactionId)).toMatchObject(
-      {
-        success: false,
-        payload: { code: HardwareErrorCode.InvalidParams },
-      }
-    );
+    expect(resolveHardwareOperationTarget(first.operationId, second.operationId)).toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.InvalidParams },
+    });
     registry.endAll('runtime-reset');
   });
 
-  it('rejects malformed, cross-vendor, and connector-session runtime targets', () => {
-    const keystoneTarget = createHardwareSearchTargetId({
-      vendor: 'keystone',
-      connectionType: 'usb',
-    });
-    const ledgerSession = createHardwareConnectorSessionId({
-      vendor: 'ledger',
-      connectionType: 'usb',
-    });
+  it('rejects malformed, cross-vendor, and link runtime targets', () => {
+    const keystoneTarget = createHardwareSearchTargetId('keystone');
+    const ledgerSession = createHardwareLinkId('ledger');
 
     expect(
-      resolveHardwareOperationTarget('hwk:runtime:v1:interaction:ledger:not-random', undefined)
+      resolveHardwareOperationTarget('hwk:runtime:operation:ledger:not-random', undefined)
     ).toMatchObject({
       success: false,
       payload: { code: HardwareErrorCode.InvalidParams },
@@ -153,59 +140,60 @@ describe('InteractionRegistry', () => {
   });
 
   it('keeps an ended id as a tombstone so it cannot silently fall back', () => {
-    const registry = new InteractionRegistry({ vendor: 'trezor' });
-    const interaction = registry.create({
+    const registry = new OperationRegistry({ vendor: 'trezor' });
+    const operation = registry.create({
       searchTargetId: 'safe-7',
       connectId: 'safe-7',
       device: { ...device, vendor: 'trezor', connectId: 'safe-7' },
     });
 
-    registry.end(interaction.interactionId, 'disconnect');
+    registry.end(operation.operationId, 'disconnect');
 
-    expect(() => registry.resolve(interaction.interactionId)).toThrow(
+    expect(() => registry.resolve(operation.operationId)).toThrow(
       expect.objectContaining({
-        code: HardwareErrorCode.InteractionEnded,
+        code: HardwareErrorCode.OperationEnded,
         params: expect.objectContaining({ reason: 'disconnect' }),
       })
     );
   });
 
-  it('rebinds an active interaction to a recovered session without reviving ended ids', () => {
-    const registry = new InteractionRegistry({ vendor: 'ledger' });
-    const interaction = registry.create({
+  it('rebinds an active operation to a recovered session without reviving ended ids', () => {
+    const registry = new OperationRegistry({ vendor: 'ledger' });
+    const operation = registry.create({
       searchTargetId: 'usb-target',
       connectId: 'usb-target',
       device,
       connectionKeys: ['session-1'],
     });
 
-    registry.endByConnectionKey('session-1', 'disconnect', interaction.interactionId);
-    registry.endAll('explicit', interaction.interactionId);
+    registry.endByConnectionKey('session-1', 'disconnect', operation.operationId);
+    registry.endAll('explicit', operation.operationId);
 
-    registry.rebind(interaction.interactionId, {
+    registry.rebind(operation.operationId, {
       connectId: 'usb-target-recovered',
       device: { ...device, connectId: 'usb-target-recovered' },
       connectionKeys: ['session-2'],
     });
 
-    expect(registry.resolve(interaction.interactionId)).toMatchObject({
-      searchTargetId: 'usb-target',
+    // A rebind replaces the transport binding wholesale: the recovered
+    // connectId is the only key, and the pre-rebind target is not carried over.
+    expect(registry.resolve(operation.operationId)).toMatchObject({
       connectId: 'usb-target-recovered',
       connectionKeys: ['usb-target-recovered', 'session-2'],
     });
-    registry.end(interaction.interactionId, 'disconnect');
+    registry.end(operation.operationId, 'disconnect');
     expect(() =>
-      registry.rebind(interaction.interactionId, {
+      registry.rebind(operation.operationId, {
         connectId: 'usb-target-3',
         device,
       })
-    ).toThrow(expect.objectContaining({ code: HardwareErrorCode.InteractionEnded }));
+    ).toThrow(expect.objectContaining({ code: HardwareErrorCode.OperationEnded }));
   });
 
   it('ends a binding when its physical session disconnects', () => {
     const onEnded = jest.fn();
-    const registry = new InteractionRegistry({ vendor: 'ledger', onEnded });
-    const interaction = registry.create({
+    const registry = new OperationRegistry({ vendor: 'ledger', onEnded });
+    const operation = registry.create({
       searchTargetId: '',
       connectId: '',
       device: { ...device, connectId: '' },
@@ -215,22 +203,22 @@ describe('InteractionRegistry', () => {
     registry.endByConnectionKey('session-1', 'disconnect');
 
     expect(onEnded).toHaveBeenCalledWith(
-      expect.objectContaining({ interactionId: interaction.interactionId }),
+      expect.objectContaining({ operationId: operation.operationId }),
       'disconnect'
     );
-    expect(() => registry.resolve(interaction.interactionId)).toThrow(
-      expect.objectContaining({ code: HardwareErrorCode.InteractionEnded })
+    expect(() => registry.resolve(operation.operationId)).toThrow(
+      expect.objectContaining({ code: HardwareErrorCode.OperationEnded })
     );
   });
 
   it('expires an idle binding', async () => {
     const onEnded = jest.fn();
-    const registry = new InteractionRegistry({
+    const registry = new OperationRegistry({
       vendor: 'keystone',
       ttlMs: 5,
       onEnded,
     });
-    const interaction = registry.create({
+    const operation = registry.create({
       searchTargetId: 'keystone-qr:connect',
       connectId: 'keystone-wallet:abc',
       device: { ...device, vendor: 'keystone' },
@@ -239,34 +227,34 @@ describe('InteractionRegistry', () => {
     await new Promise(resolve => setTimeout(resolve, 20));
 
     expect(onEnded).toHaveBeenCalledWith(
-      expect.objectContaining({ interactionId: interaction.interactionId }),
+      expect.objectContaining({ operationId: operation.operationId }),
       'timeout'
     );
   });
 
   it('does not expire while retained by an active device job', async () => {
     const onEnded = jest.fn();
-    const registry = new InteractionRegistry({ vendor: 'ledger', ttlMs: 5, onEnded });
-    const interaction = registry.create({
+    const registry = new OperationRegistry({ vendor: 'ledger', ttlMs: 5, onEnded });
+    const operation = registry.create({
       searchTargetId: 'usb-target',
       connectId: 'usb-target',
       device,
     });
-    const release = registry.retain(interaction.interactionId);
+    const release = registry.retain(operation.operationId);
 
     await new Promise(resolve => setTimeout(resolve, 20));
-    expect(registry.resolve(interaction.interactionId)).toMatchObject({
-      interactionId: interaction.interactionId,
+    expect(registry.resolve(operation.operationId)).toMatchObject({
+      operationId: operation.operationId,
     });
     expect(onEnded).not.toHaveBeenCalled();
 
     release();
-    registry.end(interaction.interactionId, 'explicit');
+    registry.end(operation.operationId, 'explicit');
   });
 
   it('keeps binding data after timeout so adapters can release the session', async () => {
-    const registry = new InteractionRegistry({ vendor: 'trezor', ttlMs: 5 });
-    const interaction = registry.create({
+    const registry = new OperationRegistry({ vendor: 'trezor', ttlMs: 5 });
+    const operation = registry.create({
       searchTargetId: 'safe-7',
       connectId: 'safe-7',
       device: { ...device, vendor: 'trezor', connectId: 'safe-7' },
@@ -275,7 +263,7 @@ describe('InteractionRegistry', () => {
 
     await new Promise(resolve => setTimeout(resolve, 20));
 
-    expect(registry.find(interaction.interactionId)).toMatchObject({
+    expect(registry.find(operation.operationId)).toMatchObject({
       connectId: 'safe-7',
       connectionKeys: expect.arrayContaining(['session-7']),
     });
