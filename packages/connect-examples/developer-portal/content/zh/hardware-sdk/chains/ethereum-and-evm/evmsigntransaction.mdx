@@ -7,7 +7,7 @@ title: evmSignTransaction
 ### 以太坊：签名交易
 
 * 使用 `evmSignTransaction` 来签名交易
-* 支持 EIP-1559 和 Legacy 交易。（但请确保你使用的 RPC 节点支持你所使用的类型）
+* 本页介绍 Legacy 和 EIP-1559（Type 2）交易。请确保 RPC 节点支持所使用的交易类型。
 
 使用指定 BIP32 路径派生的私钥对交易进行签名。设备请求用户确认交易；可解析展示的详情取决于固件与 calldata。
 
@@ -20,7 +20,7 @@ const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params)
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
 * `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `transaction` - _必需_ `Object` 类型为 `EVMTransaction | EVMTransactionEIP1559 | EVMTransactionEIP7702`。交易数值使用十六进制字符串，`transaction.chainId` 使用数字
+* `transaction` - _必需_ `Object`。本页介绍的类型为 `EVMTransaction`（Legacy）和 `EVMTransactionEIP1559`。交易数值使用十六进制字符串，`transaction.chainId` 使用数字
 * `transaction.chainId` - _必需_ `number`。必须与构造及广播交易的网络一致，不是顶层参数。
 * `transaction.data` - _可选_ `string`。完整的十六进制 calldata；空数据使用 `0x`。
 
@@ -103,7 +103,7 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 
 ### 交易签名和广播示例
 
-此示例使用 `@ethersproject/*` v5 和已初始化的 SDK。广播前应恢复签名者并与选定账户核对。
+此示例使用 `@ethersproject/*` v5 和已初始化的 SDK，签名并序列化 EIP-1559（Type 2）交易。广播前应恢复签名者并与选定账户核对。
 
 ```typescript
 import type { EVMTransactionEIP1559 } from '@onekeyfe/hd-core';

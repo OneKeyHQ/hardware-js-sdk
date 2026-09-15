@@ -7,7 +7,7 @@ title: evmSignTransaction
 ### Ethereum: Sign transaction
 
 * Use `evmSignTransaction` for signing transactions
-* Supports both EIP-1559 and Legacy transactions. (But make sure that the RPC node you are using supports the type you are using)
+* This page covers Legacy and EIP-1559 (Type 2) transactions. Make sure your RPC node supports the transaction type you use.
 
 Asks device to sign given transaction using the private key derived by given BIP32 path. The device asks the user to confirm the transaction; decoded detail depends on the firmware and calldata.
 
@@ -20,7 +20,7 @@ const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params)
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
 * `path` - _required_ `string | Array<number>` minimum length is `3`. [read more](/en/hardware-sdk/concepts/common-params#hd-path)
-* `transaction` - _required_ `Object` type of `EVMTransaction | EVMTransactionEIP1559 | EVMTransactionEIP7702`. Numeric transaction quantities are hex strings; `transaction.chainId` is a number
+* `transaction` - _required_ `Object`. The types covered on this page are `EVMTransaction` (Legacy) and `EVMTransactionEIP1559`. Numeric transaction quantities are hex strings; `transaction.chainId` is a number
 * `transaction.chainId` - _required_ `number`. Must match the network used to construct and broadcast the transaction. It is not a top-level parameter.
 * `transaction.data` - _optional_ `string`. Full hex-encoded calldata; use `0x` for an empty payload.
 
@@ -103,7 +103,7 @@ Error
 
 ### Transaction Signing and Broadcasting example
 
-This example uses `@ethersproject/*` v5 and the initialized SDK. Verify the recovered signer against the selected account before broadcasting.
+This example signs and serializes an EIP-1559 (Type 2) transaction using `@ethersproject/*` v5 and the initialized SDK. Verify the recovered signer against the selected account before broadcasting.
 
 ```typescript
 import type { EVMTransactionEIP1559 } from '@onekeyfe/hd-core';
