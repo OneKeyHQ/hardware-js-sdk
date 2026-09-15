@@ -46,7 +46,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git",
-    "directory": "packages/hwk-trezor-connector-electron-ble"
+    "directory": "packages/hwk-desktop-noble-ble"
   },
   "keywords": [
     "trezor",
