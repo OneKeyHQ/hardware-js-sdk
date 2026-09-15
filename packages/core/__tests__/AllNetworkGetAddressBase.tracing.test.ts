@@ -21,7 +21,7 @@ class TestAllNetworkMethod extends AllNetworkGetAddressBase {
   }
 }
 
-describe('Pro2 all-network loading lifecycle', () => {
+describe.each([EDeviceType.Pro2, EDeviceType.Neo])('%s loading lifecycle', deviceType => {
   function setup(callback = false) {
     const Method = callback ? AllNetworkGetAddressByLoop : AllNetworkGetAddress;
     const method = new Method({
@@ -45,7 +45,7 @@ describe('Pro2 all-network loading lifecycle', () => {
     method.device = {
       commands: { typedCall, disposed: false },
       isProtocolV2: jest.fn(() => true),
-      getCurrentDeviceType: jest.fn(() => EDeviceType.Pro2),
+      getCurrentDeviceType: jest.fn(() => deviceType),
       ensureProtocolV2RuntimeContext: jest.fn(() =>
         Promise.resolve({ supported_messages: [60461] })
       ),
@@ -74,11 +74,11 @@ describe('Pro2 all-network loading lifecycle', () => {
     ]);
   });
 
-  test.each(['V1', 'unsupported', 'Neo'])('does not change %s device behavior', async variant => {
+  test.each(['V1', 'unsupported', 'Pro'])('does not change %s device behavior', async variant => {
     const { method, calls } = setup();
     if (variant === 'V1') jest.spyOn(method.device, 'isProtocolV2').mockReturnValue(false);
-    if (variant === 'Neo')
-      jest.spyOn(method.device, 'getCurrentDeviceType').mockReturnValue(EDeviceType.Neo);
+    if (variant === 'Pro')
+      jest.spyOn(method.device, 'getCurrentDeviceType').mockReturnValue(EDeviceType.Pro);
     if (variant === 'unsupported') {
       jest
         .spyOn(method.device, 'ensureProtocolV2RuntimeContext')
