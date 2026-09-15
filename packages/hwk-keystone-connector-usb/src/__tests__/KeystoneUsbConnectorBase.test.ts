@@ -65,6 +65,51 @@ function fakeTransportClass(transport: TransportHID): KeystoneUsbTransportStatic
 
 describe('KeystoneUsbConnectorBase', () => {
   describe('searchDevices', () => {
+    const withDevices = (devices: unknown[]) =>
+      new KeystoneUsbConnectorBase(
+        {
+          ...fakeTransportClass(fakeTransport({})),
+          getKeystoneDevices: () => Promise.resolve(devices as never),
+        },
+        { timeoutMs: 1000 }
+      );
+
+    it('shows the model the device reports', async () => {
+      const connector = withDevices([
+        { serialNumber: 'M-76AB5599', productName: 'Keystone 3 Pro' },
+      ]);
+
+      const devices = await connector.searchDevices();
+
+      expect(devices.map(d => d.name)).toEqual(['Keystone 3 Pro']);
+    });
+
+    it('never appends the serial, even when two units report the same model', async () => {
+      const connector = withDevices([
+        { serialNumber: 'M-76AB5599', productName: 'Keystone 3 Pro' },
+        { serialNumber: 'M-1234ABCD', productName: 'Keystone 3 Pro' },
+        { serialNumber: 'M-99999999', productName: 'Keystone Essential' },
+      ]);
+
+      const devices = await connector.searchDevices();
+
+      // The serial is not readable on the unit, so it would not tell the two
+      // apart for the person choosing — it would only cost the model name.
+      expect(devices.map(d => d.name)).toEqual([
+        'Keystone 3 Pro',
+        'Keystone 3 Pro',
+        'Keystone Essential',
+      ]);
+    });
+
+    it('falls back to the brand when the device publishes no product name', async () => {
+      const connector = withDevices([{ serialNumber: 'M-76AB5599' }]);
+
+      const devices = await connector.searchDevices();
+
+      expect(devices.map(d => d.name)).toEqual(['Keystone']);
+    });
+
     it('lists devices without opening/claiming (no mfp yet)', async () => {
       const connector = new KeystoneUsbConnectorBase(fakeTransportClass(fakeTransport({})), {
         timeoutMs: 1000,
