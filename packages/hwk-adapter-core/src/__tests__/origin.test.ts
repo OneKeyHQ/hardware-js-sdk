@@ -42,10 +42,10 @@ describe('defaultOriginForCode', () => {
 
 describe('hardware recovery metadata', () => {
   it.each([
-    [HardwareErrorCode.DeviceLocked, 'operation'],
-    [HardwareErrorCode.WrongApp, 'operation'],
-    [HardwareErrorCode.DeviceDisconnected, 'interaction'],
-    [HardwareErrorCode.InteractionEnded, 'interaction'],
+    [HardwareErrorCode.DeviceLocked, 'call'],
+    [HardwareErrorCode.WrongApp, 'call'],
+    [HardwareErrorCode.DeviceDisconnected, 'operation'],
+    [HardwareErrorCode.OperationEnded, 'operation'],
     [HardwareErrorCode.DeviceMismatch, 'search-target'],
     [HardwareErrorCode.BleBondInvalid, 'search-target'],
     [HardwareErrorCode.TransportNotAvailable, 'transport'],
@@ -57,7 +57,7 @@ describe('hardware recovery metadata', () => {
   });
 
   it('accepts only known serialized recovery scopes', () => {
-    expect(isHwkRecoveryHint({ scope: 'interaction' })).toBe(true);
+    expect(isHwkRecoveryHint({ scope: 'operation' })).toBe(true);
     expect(isHwkRecoveryHint({ scope: 'future-scope' })).toBe(false);
     expect(isHwkRecoveryHint(null)).toBe(false);
   });
