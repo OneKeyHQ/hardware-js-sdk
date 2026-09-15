@@ -1,8 +1,10 @@
-import { EDeviceType } from '@onekeyfe/hd-shared';
+import { EDeviceType, HardwareErrorCode, HardwareErrorCodeMessage } from '@onekeyfe/hd-shared';
 
 import AllNetworkGetAddressBase from '../src/api/allnetwork/AllNetworkGetAddressBase';
 import AllNetworkGetAddress from '../src/api/allnetwork/AllNetworkGetAddress';
 import AllNetworkGetAddressByLoop from '../src/api/allnetwork/AllNetworkGetAddressByLoop';
+import EvmGetAddress from '../src/api/evm/EVMGetAddress';
+import { UI_REQUEST } from '../src/constants/ui-request';
 import { findMethod } from '../src/api/utils';
 import { getActiveRequestsByDeviceInstance } from '../src/utils/tracing';
 
@@ -486,6 +488,116 @@ describe('AllNetworkGetAddressBase tracing', () => {
     };
   }
 
+  function createGroupedAddressHarness(showOnOneKey?: boolean) {
+    const { method: nestedHarness, checkPassphraseStateSafety } = createV2NestedHarness({});
+    const bundle = [0, 1, 2].map(index => ({
+      network: 'evm',
+      path: `m/44'/60'/${index}'/0/0`,
+      showOnOneKey,
+    }));
+    const method = new AllNetworkGetAddress({
+      id: 11,
+      payload: {
+        method: 'allNetworkGetAddress',
+        connectId: 'connect-id',
+        deviceId: 'device-id',
+        useEmptyPassphrase: true,
+        bundle,
+      },
+    });
+    method.protocolV2UnlockContext = nestedHarness.protocolV2UnlockContext;
+    method.abortController = new AbortController();
+    method.device = nestedHarness.device;
+    method.device.getCurrentDeviceType = jest.fn().mockReturnValue(EDeviceType.Pro2);
+    method.device.toMessageObject = jest.fn().mockReturnValue({});
+    method.postMessage = jest.fn();
+    const typedCall = jest
+      .fn()
+      .mockImplementation((_type: string, _response: string, params: { address_n: number[] }) => {
+        const index = params.address_n[2] - 0x80000000;
+        if (index === 1) return Promise.reject(new Error('Forbidden key path'));
+        return Promise.resolve({ message: { address: `address-${index}` } });
+      });
+    method.device.commands.typedCall = typedCall;
+    (findMethod as jest.Mock).mockImplementation(message => new EvmGetAddress(message));
+    method.init();
+    return { method, typedCall, checkPassphraseStateSafety, bundle };
+  }
+
+  test.each([false, true, undefined])(
+    'isolates a V2 address failure without repeating device confirmations (showOnOneKey=%s)',
+    async showOnOneKey => {
+      const { method, typedCall, checkPassphraseStateSafety, bundle } =
+        createGroupedAddressHarness(showOnOneKey);
+
+      const result = await method.getAllNetworkAddress(7);
+
+      expect(result.map(item => item.success)).toEqual([true, false, true]);
+      expect(result.map(item => item.path)).toEqual(bundle.map(item => item.path));
+      expect(result[0].payload).toMatchObject({ address: 'address-0', rootFingerprint: 7 });
+      expect(result[1].payload).toMatchObject({
+        code: HardwareErrorCode.CallMethodInvalidParameter,
+      });
+      expect(result[2].payload).toMatchObject({ address: 'address-2', rootFingerprint: 7 });
+      expect(typedCall.mock.calls.map(([, , params]) => params.address_n[2] - 0x80000000)).toEqual(
+        showOnOneKey === false ? [0, 1, 0, 1, 2] : [0, 1, 2]
+      );
+      expect(checkPassphraseStateSafety).toHaveBeenCalledTimes(1);
+      expect(method.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: UI_REQUEST.DEVICE_PROGRESS, payload: { progress: 100 } })
+      );
+      expect(getActiveRequestsByDeviceInstance('device-instance')).toEqual([]);
+    }
+  );
+
+  test('does not retry a failed V2 link as individual address requests', async () => {
+    const { method, typedCall } = createGroupedAddressHarness(false);
+    const error = new Error('link disconnected');
+    typedCall.mockRejectedValueOnce(error);
+
+    await expect(method.getAllNetworkAddress(7)).rejects.toBe(error);
+
+    expect(typedCall).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not retry a V2 wallet mismatch as individual address requests', async () => {
+    const { method, typedCall, checkPassphraseStateSafety } = createGroupedAddressHarness(false);
+    checkPassphraseStateSafety.mockResolvedValueOnce(false);
+
+    await expect(method.getAllNetworkAddress(7)).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceCheckPassphraseStateError,
+    });
+
+    expect(checkPassphraseStateSafety).toHaveBeenCalledTimes(1);
+    expect(typedCall).not.toHaveBeenCalled();
+  });
+
+  test('does not start individual retries after cancellation', async () => {
+    const { method, typedCall } = createGroupedAddressHarness(false);
+    typedCall.mockImplementationOnce(() => {
+      method.abortController?.abort();
+      return Promise.reject(new Error('Forbidden key path'));
+    });
+
+    await expect(method.getAllNetworkAddress(7)).rejects.toThrow(
+      HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]
+    );
+
+    expect(typedCall).toHaveBeenCalledTimes(1);
+  });
+
+  test('preserves Protocol V1 grouped error handling', async () => {
+    const { method, typedCall, checkPassphraseStateSafety } = createGroupedAddressHarness(false);
+    jest.spyOn(method.device, 'isProtocolV2').mockReturnValue(false);
+    jest.spyOn(method.device, 'getProtocol').mockReturnValue('V1');
+
+    const result = await method.getAllNetworkAddress(7);
+
+    expect(result.map(item => item.success)).toEqual([false, false, false]);
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(checkPassphraseStateSafety).not.toHaveBeenCalled();
+  });
+
   test('reuses a Protocol V2 hidden-wallet session across later nested chain methods', async () => {
     const { calls, checkPassphraseStateSafety, method } = createV2NestedHarness({
       passphraseState: 'hidden-state',
@@ -573,8 +685,8 @@ describe('AllNetworkGetAddressBase tracing', () => {
         deviceId: 'device-id',
         useEmptyPassphrase: true,
         bundle: [
-          { network: 'evm', path: "m/44'/60'/0'/0/0" },
-          { network: 'evm', path: "m/44'/60'/0'/0/1" },
+          { network: 'evm', path: "m/44'/60'/0'/0/0", showOnOneKey: false },
+          { network: 'evm', path: "m/44'/60'/0'/0/1", showOnOneKey: false },
         ],
       },
     });
@@ -607,9 +719,9 @@ describe('AllNetworkGetAddressBase tracing', () => {
         deviceId: 'device-id',
         passphraseState: 'hidden-state',
         bundle: [
-          { network: 'evm', path: "m/44'/60'/0'/0/0" },
-          { network: 'evm', path: "m/44'/60'/0'/0/1" },
-          { network: 'sol', path: "m/44'/501'/0'" },
+          { network: 'evm', path: "m/44'/60'/0'/0/0", showOnOneKey: false },
+          { network: 'evm', path: "m/44'/60'/0'/0/1", showOnOneKey: false },
+          { network: 'sol', path: "m/44'/501'/0'", showOnOneKey: false },
         ],
       },
     });

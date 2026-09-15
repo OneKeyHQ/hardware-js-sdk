@@ -53,7 +53,38 @@ export default class AllNetworkGetAddress extends AllNetworkGetAddressBase {
       if (this.abortController?.signal.aborted) {
         throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
       }
-      const response = await this.callMethod(methodName, methodCallParams, rootFingerprint);
+      const isProtocolV2 = this.device.isProtocolV2();
+      // Displayed addresses must not be replayed if a later item fails.
+      const runIndividually =
+        isProtocolV2 &&
+        params.length > 1 &&
+        params.some(param => param._originRequestParams.showOnOneKey !== false);
+      let response: AllNetworkAddress[] = [];
+      if (!runIndividually) {
+        response = await this.callMethod(methodName, methodCallParams, rootFingerprint);
+      }
+
+      // callMethod returns failures only for skippable errors; link, cancellation,
+      // and wallet errors throw. Retry silent reads separately to isolate a bad
+      // path or unsupported coin while reusing the already selected wallet.
+      if (
+        isProtocolV2 &&
+        params.length > 1 &&
+        (runIndividually || response.every(item => !item.success))
+      ) {
+        response = [];
+        for (const param of params) {
+          if (this.abortController?.signal.aborted) {
+            throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
+          }
+          const itemResponse = await this.callMethod(
+            methodName,
+            { bundle: [{ ...param.params }] },
+            rootFingerprint
+          );
+          response.push(...itemResponse);
+        }
+      }
 
       if (this.abortController?.signal.aborted) {
         throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
