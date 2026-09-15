@@ -49,6 +49,8 @@ The current SDK selects fallback in these cases:
 
 The size check above measures `message.data`, not the total JSON document. The Classic/Mini family also has format limits: 16 fields per struct, 63 characters per type/member name, 24 array-typed fields, access-path depth of 6, 8 custom dependency structs excluding the primary type and domain, and 1,536 bytes per string/bytes value. Arrays of primitive values are limited to 24 elements; struct arrays have that limit in v4 mode. Cyclic type dependencies also trigger fallback.
 
+On Touch/Pro, hash signing requires firmware 4.2.0 or later. Earlier firmware returns `CallMethodNeedUpgradeFirmware` when this route is selected.
+
 Supplying hashes does not force the hash route when parsed signing is available. If fallback is required and hashes are absent, the call fails. Handle this explicitly in the application's signing policy; do not silently replace the original request or claim a successful signature proves that all fields were displayed.
 
 ### Example
@@ -166,7 +168,7 @@ This returns an owner signature, not a broadcast transaction. Keep the typed dat
     success: true,
     payload: {
         address: string,
-        signature: string, // hexadecimal string with "0x" prefix
+        signature: string, // hexadecimal string without the "0x" prefix
     }
 }
 ```
@@ -178,7 +180,7 @@ Error
     success: false,
     payload: {
         error: string, // error message
-        code: number // error code
+        code?: string | number // error code
     }
 }
 ```

@@ -51,6 +51,8 @@ SDK 选择哈希签名时，设备收到的是预先计算的哈希，而不是�
 
 提供哈希不会在解析签名可用时强制切换到哈希路径。需要退回但缺少哈希时，调用会失败。应用应明确处理此情况，不应自动替换原始请求，也不能用签名成功证明所有字段都已展示。
 
+Touch/Pro 的哈希签名要求固件 4.2.0 或更高版本。低于该版本时，进入此分支会返回 `CallMethodNeedUpgradeFirmware`。
+
 ### 示例
 
 以下片段使用 `ethers` v6 准备 v4 编码的备用哈希，复用已初始化的 SDK 和选定的钱包。提供哈希不会跳过设备确认。
@@ -166,7 +168,7 @@ if (!result.success) throw new Error(result.payload.error);
     success: true,
     payload: {
         address: string,
-        signature: string, // 带有 "0x" 前缀的十六进制字符串
+        signature: string, // 不带 "0x" 前缀的十六进制字符串
     }
 }
 ```
@@ -178,7 +180,7 @@ if (!result.success) throw new Error(result.payload.error);
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误码
+        code?: string | number // 错误码
     }
 }
 ```

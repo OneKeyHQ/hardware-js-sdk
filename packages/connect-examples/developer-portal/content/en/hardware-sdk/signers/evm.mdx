@@ -123,6 +123,7 @@ const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error('No device connected');
 const { connectId } = devices.payload[0];
+if (!connectId) throw new Error('Device connection unavailable');
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
@@ -139,7 +140,7 @@ const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   showOnOneKey: true,
   chainId: 1,
 });
-// res.payload.address, publicKey?, chainCode?
+// res.payload: { address, path }
 ```
 
 **Parameters**
@@ -151,7 +152,7 @@ const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {
 **Returns**
 
 ```ts
-Promise<{ success, payload: { address, path, publicKey?, chainCode? } }>
+Promise<{ success, payload: { address, path } }>
 ```
 
 ---
@@ -208,8 +209,10 @@ const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
 **Returns**
 
 ```ts
-Promise<{ success, payload: { signature } }>
+Promise<{ success, payload: { address, signature } }>
 ```
+
+`signature` is a hex string without the `0x` prefix. Add the prefix before ethers verification, as shown below.
 
 ---
 
@@ -237,8 +240,10 @@ For the typed-data schema, Safe Tx example, and hash-signing conditions, see [ev
 **Returns**
 
 ```ts
-Promise<{ success, payload: { signature } }>
+Promise<{ success, payload: { address, signature } }>
 ```
+
+`signature` is a hex string without the `0x` prefix. Add the prefix before ethers verification, as shown below.
 
 ## Interaction & Status
 
@@ -313,20 +318,29 @@ const sig = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
 ### Message (personal_sign / EIP-191)
 
 ```ts
+import { hexlify, toUtf8Bytes, verifyMessage } from 'ethers';
+
 const message = 'Hello OneKey';
-const messageHex = Buffer.from(message).toString('hex');
+const messageHex = hexlify(toUtf8Bytes(message));
 
 const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
   path: accountPath,
   messageHex,
   chainId: 1,
 });
-// res.payload.signature -> verify with ethers.verifyMessage(message, signature)
+if (!res.success) throw new Error(res.payload.error);
+const signature = `0x${res.payload.signature}`;
+const signer = verifyMessage(toUtf8Bytes(message), signature);
+if (signer.toLowerCase() !== res.payload.address.toLowerCase()) {
+  throw new Error('Signature does not match the returned address');
+}
 ```
 
 ### Typed data (EIP-712)
 
 ```ts
+import { verifyTypedData } from 'ethers';
+
 const typedData = {
   types: {
     EIP712Domain: [
@@ -365,7 +379,13 @@ const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
   metamaskV4Compat: true,
   chainId: 1,
 });
-// res.payload.signature -> recover with ethers.verifyTypedData(domain, types, message, signature)
+if (!res.success) throw new Error(res.payload.error);
+const { EIP712Domain, ...messageTypes } = typedData.types;
+const signature = `0x${res.payload.signature}`;
+const signer = verifyTypedData(typedData.domain, messageTypes, typedData.message, signature);
+if (signer.toLowerCase() !== res.payload.address.toLowerCase()) {
+  throw new Error('Signature does not match the returned address');
+}
 ```
 
 ## Validation & Troubleshooting

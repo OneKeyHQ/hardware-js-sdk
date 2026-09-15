@@ -123,6 +123,7 @@ const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error('No device connected');
 const { connectId } = devices.payload[0];
+if (!connectId) throw new Error('Device connection unavailable');
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
@@ -147,27 +148,25 @@ const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   showOnOneKey: true,
   chainId: 1,
 });
-// res.payload.address, publicKey?, chainCode?
+// res.payload: { address, path }
 ```
 
 **参数**
 
-- `path` (string | number[]): 必填，BIP44 路径，例如 `"44'/60'/0'/0/0"`。
+- `path` (string | number[]): 必填，BIP44 路径，例如 `"m/44'/60'/0'/0/0"`。
 - `showOnOneKey?` (boolean): 可选，是否在设备上展示并让用户确认地址。
 - `chainId?` (number): 可选，显示在设备上的链 ID，建议填真实网络。
 
 **返回**
 
 ```ts
-Promise<{ success, payload: { address, path, publicKey?, chainCode? } }>
+Promise<{ success, payload: { address, path } }>
 ```
 
 ```ts
 type GetAddressResult = {
   address: `0x${string}`;
   path: string;
-  publicKey?: string;
-  chainCode?: string;
 };
 ```
 
@@ -228,7 +227,11 @@ const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
 
 **返回**
 
-签名十六进制或 `{ r, s, v }`，可用 `ethers.verifyMessage` 校验。
+```ts
+Promise<{ success, payload: { address, signature } }>
+```
+
+`signature` 是不带 `0x` 前缀的十六进制字符串；传给 ethers 验签前需补齐前缀，见下方示例。
 
 ---
 
@@ -259,10 +262,10 @@ Typed Data 结构、Safe Tx 示例和哈希签名条件参见 [evmSignTypedData]
 **返回**
 
 ```ts
-Promise<{ success, payload: { signature } }>
+Promise<{ success, payload: { address, signature } }>
 ```
 
-可用 `ethers.verifyTypedData` 校验。
+`signature` 是不带 `0x` 前缀的十六进制字符串；传给 ethers 验签前需补齐前缀，见下方示例。
 
 ## 交互与状态
 
@@ -337,20 +340,29 @@ const sig = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
 ### 示例：personal_sign 消息签名
 
 ```ts
+import { hexlify, toUtf8Bytes, verifyMessage } from 'ethers';
+
 const message = 'Hello OneKey';
-const messageHex = Buffer.from(message).toString('hex');
+const messageHex = hexlify(toUtf8Bytes(message));
 
 const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
   path: accountPath,
   messageHex,
   chainId: 1,
 });
-// res.payload.signature -> 用 ethers.verifyMessage 校验
+if (!res.success) throw new Error(res.payload.error);
+const signature = `0x${res.payload.signature}`;
+const signer = verifyMessage(toUtf8Bytes(message), signature);
+if (signer.toLowerCase() !== res.payload.address.toLowerCase()) {
+  throw new Error('Signature does not match the returned address');
+}
 ```
 
 ### 示例：Typed Data（EIP-712）
 
 ```ts
+import { verifyTypedData } from 'ethers';
+
 const typedData = {
   types: {
     EIP712Domain: [
@@ -389,15 +401,21 @@ const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
   metamaskV4Compat: true,
   chainId: 1,
 });
-// res.payload.signature -> 用 ethers.verifyTypedData(...) 恢复签名者
+if (!res.success) throw new Error(res.payload.error);
+const { EIP712Domain, ...messageTypes } = typedData.types;
+const signature = `0x${res.payload.signature}`;
+const signer = verifyTypedData(typedData.domain, messageTypes, typedData.message, signature);
+if (signer.toLowerCase() !== res.payload.address.toLowerCase()) {
+  throw new Error('Signature does not match the returned address');
+}
 ```
 
 ## 验签与排障
 
 - 验签：
   - 交易：用 `ethers/viem` 重新序列化，校验签名哈希与设备显示一致。
-  - personal_sign：`ethers.verifyMessage(message, sig.signature)`。
-  - EIP‑712：`ethers.verifyTypedData(domain, types, message, sig.signature)`。
+  - personal_sign：按上方示例为签名补齐 `0x`，使用原始消息字节调用 `verifyMessage`。
+  - EIP‑712：为签名补齐 `0x`，从 `types` 中排除 `EIP712Domain` 后调用 `verifyTypedData`；SDK 请求仍需保留完整 `types`。
 - 常见限制：超大 `data` 或异常字段可能被拒；`chainId` 必须与广播网络一致。
 - 常见错误：
   - 路径不一致：默认 `m/44'/60'/0'/0/0`，按账户/地址递增；务必与地址确认一致。
