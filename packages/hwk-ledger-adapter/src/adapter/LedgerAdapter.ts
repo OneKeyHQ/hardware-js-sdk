@@ -5,20 +5,28 @@ import {
   DeviceJobQueue,
   EConnectorInteraction,
   HardwareErrorCode,
+  OperationRegistry,
+  SDK,
   TypedEventEmitter,
   UI_REQUEST,
   UI_REQUEST_PREEMPTED_TAG,
   UiRequestRegistry,
+  canReplayHardwareMethodAfterTransportFailure,
   createHwkError,
   deriveDeviceFingerprint,
   failure,
+  isHardwareOperationId,
+  isHwkRecoveryHint,
+  operationMayHaveCompletedParams,
   rehydrateConnectorError,
+  requestBleDeviceSelection,
+  requestSaveDeviceBinding,
+  resolveSearchTargetReusePolicy,
   success,
 } from '@onekeyfe/hwk-adapter-core';
 
 import {
   ERROR_TAG,
-  createMultipleUsbLedgerDevicesError,
   isAppNotInstalledError,
   isConnectionLevelError,
   isDeviceDisconnectedError,
@@ -36,6 +44,7 @@ import { debugError, debugLog } from '../utils/debugLog';
 import type { LedgerInstallAppContext } from './methods/allNetworkGetAddress';
 import type { AppMetadata, FirmwareVersion, LedgerDeviceInfo } from '../device-apps/DeviceApps';
 import type {
+  BindBleDeviceParams,
   BtcAddress,
   BtcGetAddressParams,
   BtcGetPublicKeyParams,
@@ -46,8 +55,8 @@ import type {
   BtcSignature,
   BtcSignedPsbt,
   BtcSignedTx,
-  ChainCapability,
   ChainForFingerprint,
+  ConnectionTarget,
   ConnectorCallResult,
   ConnectorDevice,
   ConnectorUiEvent,
@@ -56,6 +65,7 @@ import type {
   DeviceEventListener,
   DeviceInfo,
   DevicePermissionResponse,
+  DeviceSearchTarget,
   EvmAddress,
   EvmGetAddressParams,
   EvmSignMsgParams,
@@ -69,6 +79,7 @@ import type {
   IConnector,
   IHardwareCallParams,
   IHardwareCommonCallParams,
+  IHardwareConnectionContext,
   IHardwareWallet,
   NullableCallArg,
   Response,
@@ -87,7 +98,19 @@ import type {
   TronSignature,
   TronSignedTx,
   UiResponseEvent,
+  ZcashFullViewingKey,
+  ZcashGetFullViewingKeyParams,
+  ZcashGetShieldedAddressParams,
+  ZcashShieldedAddress,
 } from '@onekeyfe/hwk-adapter-core';
+
+type LedgerConnectionAttempt = ICommonCallParams & {
+  bindingReason?: 'manual-rebind';
+  bindingSessionId?: string;
+  rejectedConnectIds?: Set<string>;
+  rejectedConnectId?: string;
+  selectedConnection?: { connectId: string; requestId: string };
+};
 
 /**
  * Result of `_verifyDeviceFingerprint`.
@@ -138,9 +161,34 @@ export class LedgerAdapter implements IHardwareWallet {
 
   private readonly emitter = new TypedEventEmitter<HardwareEventMap>();
 
+  private readonly _operations = new OperationRegistry({
+    vendor: 'ledger',
+    onEnded: (operation, reason) => {
+      const binding = this._pendingOperationBindings.get(operation.operationId);
+      if (binding?.selectedConnection?.requestId === this._bindingSelectionRequestId) {
+        this._finishBleBinding('cancelled');
+      }
+      this._pendingOperationBindings.delete(operation.operationId);
+      this.emitter.emit(SDK.OPERATION_ENDED, {
+        type: SDK.OPERATION_ENDED,
+        payload: { operationId: operation.operationId, reason },
+      });
+      if (reason === 'timeout') {
+        void this._releaseOperationConnection(operation);
+      }
+    },
+  });
+
   private _discoveredDevices = new Map<string, DeviceInfo>();
 
   private _sessions = new Map<string, string>();
+
+  private readonly _pendingOperationBindings = new Map<string, LedgerConnectionAttempt>();
+
+  private readonly _verifiedBleReconnectTargets = new Map<
+    string,
+    { connectId: string; chain: ChainForFingerprint; fingerprint: string }
+  >();
 
   private readonly _uiRegistry = new UiRequestRegistry();
 
@@ -154,7 +202,7 @@ export class LedgerAdapter implements IHardwareWallet {
   // Pure FIFO queue. New jobs chain onto the tail and run in order. The
   // queue is intentionally passive: it does not arbitrate, does not ask
   // the user. Callers wanting "interrupt current?" semantics must do so
-  // explicitly via `getActiveJob()` + `forceCancelActive()` from the UI
+  // explicitly via `getActiveJob()` + `cancelActive()` from the UI
   // layer. USB transports can't read multiple devices in parallel, and
   // BLE-only parallelism isn't worth the coordination cost.
   private readonly _jobQueue: DeviceJobQueue;
@@ -171,6 +219,36 @@ export class LedgerAdapter implements IHardwareWallet {
   // so the host can opt the whole adapter in once instead of per call.
   private readonly _defaultAutoInstallApp: boolean;
 
+  private readonly _unsettledConnectorOperations = new Map<string, number>();
+
+  private readonly _connectorIdleWaiters = new Set<() => void>();
+
+  private _resetPromise: Promise<void> | null = null;
+
+  private _stateGeneration = 0;
+
+  private _connectorTeardownTail: Promise<void> = Promise.resolve();
+
+  private _pendingConnectorTeardowns = 0;
+
+  private _activeConnectionType: 'usb' | 'ble' | undefined;
+
+  private _bindingSelectionRequestId: string | undefined;
+
+  private _finishBleBinding(status: 'failed' | 'cancelled'): void {
+    const selectionRequestId = this._bindingSelectionRequestId;
+    this._bindingSelectionRequestId = undefined;
+    if (selectionRequestId)
+      this.emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
+        type: UI_REQUEST.DEVICE_BINDING_STATUS,
+        payload: { selectionRequestId, status },
+      });
+  }
+
+  private _isBleConnection(): boolean {
+    return isLedgerBleConnectionType(this._activeConnectionType ?? this.connector.connectionType);
+  }
+
   constructor(connector: IConnector, options?: { autoInstallApp?: boolean }) {
     this.connector = connector;
     this._defaultAutoInstallApp = options?.autoInstallApp ?? false;
@@ -180,10 +258,15 @@ export class LedgerAdapter implements IHardwareWallet {
 
   // Transport
   get activeTransport(): TransportType | null {
-    return isLedgerBleConnectionType(this.connector.connectionType) ? 'ble' : 'hid';
+    return this._isBleConnection() ? 'ble' : 'hid';
   }
 
   getAvailableTransports(): TransportType[] {
+    if (this.connector.availableTransports) {
+      return this.connector.availableTransports.map(transport =>
+        transport === 'ble' ? 'ble' : 'hid'
+      );
+    }
     return this.activeTransport ? [this.activeTransport] : [];
   }
 
@@ -203,22 +286,43 @@ export class LedgerAdapter implements IHardwareWallet {
    * The next operation will re-discover and re-connect automatically.
    */
   resetState(): void {
+    void this._resetStateAndDisconnectSessions();
+  }
+
+  private _resetStateAndDisconnectSessions(): Promise<void> {
+    if (this._resetPromise) return this._resetPromise;
+
+    const sessionIds = new Set(this._sessions.values());
+    this._stateGeneration += 1;
+    this._finishBleBinding('cancelled');
+    this._operations.endAll('runtime-reset');
+    this._doConnectAbortController?.abort();
     this._discoveredDevices.clear();
     this._sessions.clear();
+    this._verifiedBleReconnectTargets.clear();
     this._connectingPromise = null;
+    this._doConnectAbortController = null;
     this._uiRegistry.reset();
     this._jobQueue.clear();
     this._btcHighIndexConfirmedThisSession = false;
+
+    const resetPromise = this._runConnectorTeardown(async () => {
+      for (const sessionId of sessionIds) {
+        await this.connector.disconnect(sessionId).catch(() => undefined);
+      }
+    });
+    this._resetPromise = resetPromise;
+    return resetPromise.finally(() => {
+      if (this._resetPromise === resetPromise) {
+        this._resetPromise = null;
+      }
+    });
   }
 
   async dispose(): Promise<void> {
-    this._uiRegistry.reset();
-    this._jobQueue.clear();
+    await this._resetStateAndDisconnectSessions();
     this.unregisterEventListeners();
     this.connector.reset();
-    this._discoveredDevices.clear();
-    this._sessions.clear();
-    this._btcHighIndexConfirmedThisSession = false;
     this.emitter.removeAllListeners();
   }
 
@@ -231,19 +335,40 @@ export class LedgerAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
 
   async searchDevices(options?: SearchDevicesOptions): Promise<DeviceInfo[]> {
+    return this._searchDevices(options);
+  }
+
+  private async _searchDevices(
+    options?: SearchDevicesOptions,
+    signal?: AbortSignal
+  ): Promise<DeviceInfo[]> {
     debugLog('[LedgerAdapter][REQ]', { method: 'searchDevices', params: options });
     try {
       if (options?.resetSession) {
-        this._doConnectAbortController?.abort();
-        this._sessions.clear();
-        this._connectingPromise = null;
-        this._doConnectAbortController = null;
-        this._btcHighIndexConfirmedThisSession = false;
+        await this._resetStateAndDisconnectSessions();
+      } else {
+        await this._connectorTeardownTail;
       }
 
-      await this._ensureDevicePermission();
+      await this._ensureDevicePermission(undefined, undefined, signal);
+      if (signal) LedgerAdapter._throwIfAborted(signal);
+      const stateGeneration = this._stateGeneration;
 
-      const devices = await this.connector.searchDevices();
+      const devices = await this.connector.searchDevices(
+        options?.transportType
+          ? {
+              transportType: options.transportType,
+              waitForAll: options.waitForAllTransports,
+            }
+          : undefined
+      );
+      if (signal) LedgerAdapter._throwIfAborted(signal);
+      if (stateGeneration !== this._stateGeneration) {
+        throw createHwkError({
+          code: HardwareErrorCode.UserAborted,
+          message: 'Ledger discovery was reset',
+        });
+      }
 
       // Replace cache with this round's raw result. DMK paths used as connectId
       // on USB are ephemeral — incremental writes leave stale entries.
@@ -255,7 +380,7 @@ export class LedgerAdapter implements IHardwareWallet {
       }
 
       if (this._discoveredDevices.size === 0) {
-        await this._ensureDevicePermission();
+        await this._ensureDevicePermission(undefined, undefined, signal);
       }
 
       const result = Array.from(this._discoveredDevices.values());
@@ -276,18 +401,44 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
+  async searchDeviceTargets(options?: SearchDevicesOptions): Promise<DeviceSearchTarget[]> {
+    const devices = await this.searchDevices(options);
+    return devices.map(device => ({
+      searchTargetId: device.connectId,
+      searchTargetReusePolicy: resolveSearchTargetReusePolicy(device),
+      vendor: 'ledger',
+      connectionType: device.connectionType,
+      kind: 'physical',
+      label: device.label,
+      model: device.model,
+      modelName: device.modelName,
+      serialNumber: device.serialNumber,
+    }));
+  }
+
+  async listConnectionTargets(options?: SearchDevicesOptions): Promise<ConnectionTarget[]> {
+    const targets = await this.searchDeviceTargets(options);
+    return targets.map(({ searchTargetId, ...target }) => ({
+      ...target,
+      targetId: searchTargetId,
+    }));
+  }
+
   // USB single-session invariant: evict all sessions, best-effort (see connectDevice).
-  private async _evictAllSessions(): Promise<void> {
+  private async _evictAllSessions(preserveOperationId?: string): Promise<void> {
+    this._operations.endAll('explicit', preserveOperationId);
     if (this._sessions.size === 0) return;
     const stale = [...this._sessions.values()];
     this._sessions.clear();
-    for (const sid of stale) {
-      try {
-        await this.connector.disconnect(sid);
-      } catch {
-        // best-effort
+    await this._runConnectorTeardown(async () => {
+      for (const sid of stale) {
+        try {
+          await this.connector.disconnect(sid);
+        } catch {
+          // best-effort
+        }
       }
-    }
+    });
   }
 
   // Layer 2 retry budget after connection-class error. Each round delegates
@@ -308,6 +459,10 @@ export class LedgerAdapter implements IHardwareWallet {
   // populated by the runtime (Hermes/RN). Set in cancel(), cleared shortly.
   private _lastCancelReason: Error | undefined;
 
+  private readonly _activeOperationJobs = new Set<string>();
+
+  private readonly _pendingOperationDisconnects = new Set<string>();
+
   // Throttle AppInstallProgress by progress delta — DMK streams much faster
   // than UIs need. Final frame (progress >= 1) always passes.
   private static readonly APP_INSTALL_PROGRESS_MIN_DELTA = 0.05;
@@ -322,31 +477,271 @@ export class LedgerAdapter implements IHardwareWallet {
     });
   }
 
-  async connectDevice(connectId: string): Promise<Response<string>> {
+  async connectDevice(searchTargetId: string): Promise<Response<string>> {
+    // Same queue as acquireOperation. Both take the adapter from "no chosen
+    // device" to "one chosen device", and both start by evicting whatever
+    // session exists; run two of them at once and each evicts before the other
+    // connects, leaving two live sessions behind the single-session invariant.
+    try {
+      return await this._jobQueue.enqueue(
+        searchTargetId || '__ledger_connect__',
+        async () => {
+          const connected = await this._connectTarget(searchTargetId);
+          if (!connected.success) return connected;
+          return this._createOperation(searchTargetId, connected.payload);
+        },
+        {
+          label: 'connectDevice',
+          rejectIfBusy: true,
+          busyError: LedgerAdapter._createDeviceBusyError('connectDevice'),
+        }
+      );
+    } catch (error) {
+      return this.errorToFailure(error);
+    }
+  }
+
+  async bindBleDevice(params: BindBleDeviceParams): Promise<Response<string>> {
+    if (params.identity.vendor !== 'ledger' || !params.identity.value) {
+      return failure(HardwareErrorCode.InvalidParams, 'Ledger wallet identity is required');
+    }
+    const { chain, value: expectedFingerprint } = params.identity;
+    try {
+      return await this._jobQueue.enqueue(
+        expectedFingerprint,
+        async signal => {
+          if (!this.getAvailableTransports().includes('ble')) {
+            throw createHwkError({
+              code: HardwareErrorCode.TransportNotAvailable,
+              message: 'Ledger Bluetooth transport is not available',
+            });
+          }
+          this._activeConnectionType = 'ble';
+          await this._ensureDevicePermission(undefined, undefined, signal);
+          const attempt: LedgerConnectionAttempt = {
+            extra: params.extra,
+            bindingReason: 'manual-rebind',
+          };
+          try {
+            for (;;) {
+              const connectId = await this._connectFirstOrSelect(
+                [],
+                undefined,
+                true,
+                undefined,
+                attempt,
+                signal
+              );
+              const sessionId = this._sessions.get(connectId);
+              if (!sessionId) {
+                throw createHwkError({
+                  code: HardwareErrorCode.DeviceDisconnected,
+                  message: 'Selected Ledger connection ended',
+                });
+              }
+              let saved = false;
+              try {
+                const installContext: LedgerInstallAppContext = {
+                  connection: { connectId, sessionId },
+                };
+                const fingerprint = await this._computeChainFingerprint(
+                  chain,
+                  (method, callParams) =>
+                    this._runConnectorCall(
+                      connectId,
+                      method,
+                      callParams,
+                      signal,
+                      undefined,
+                      undefined,
+                      { autoInstallApp: true },
+                      installContext
+                    )
+                );
+                if (fingerprint !== expectedFingerprint) {
+                  attempt.rejectedConnectIds ??= new Set();
+                  attempt.rejectedConnectIds.add(connectId);
+                  attempt.rejectedConnectId = connectId;
+                } else {
+                  const persisted = await this._publishVerifiedBleBinding(
+                    connectId,
+                    chain,
+                    fingerprint,
+                    attempt,
+                    undefined,
+                    signal
+                  );
+                  if (!persisted) {
+                    // A business call can shrug off an unsaved binding, but
+                    // here saving the binding IS the operation.
+                    throw createHwkError({
+                      code: HardwareErrorCode.UnknownError,
+                      message: 'Bluetooth binding could not be saved',
+                      origin: 'host',
+                    });
+                  }
+                  saved = true;
+                  return success(connectId);
+                }
+              } finally {
+                if (!saved && this._sessions.get(connectId) === sessionId) {
+                  this._sessions.delete(connectId);
+                  const teardown = this._runConnectorTeardown(() =>
+                    this.connector.disconnect(sessionId)
+                  ).catch(() => undefined);
+                  if (!signal.aborted) await teardown;
+                }
+              }
+            }
+          } catch (error) {
+            this._finishBleBinding(signal.aborted ? 'cancelled' : 'failed');
+            throw error;
+          }
+        },
+        {
+          label: 'bindBleDevice',
+          rejectIfBusy: true,
+          busyError: LedgerAdapter._createDeviceBusyError('bindBleDevice'),
+        }
+      );
+    } catch (error) {
+      return this.errorToFailure(error);
+    }
+  }
+
+  async acquireOperation(
+    connectId: string,
+    context: IHardwareConnectionContext
+  ): Promise<Response<string>> {
+    try {
+      return await this._jobQueue.enqueue(
+        connectId || '__ledger_acquire__',
+        async signal => {
+          const transport = this._isBleConnection() ? 'ble' : 'usb';
+          const hint = context.knownConnections?.find(
+            connection => connection.transport === transport
+          );
+          const target = hint && hint.transport !== 'qr' ? hint.connectId : connectId;
+          await this._ensureDevicePermission(target, undefined, signal);
+          const attempt: LedgerConnectionAttempt = {
+            ...context,
+            extra: context.extra ? { ...context.extra } : undefined,
+          };
+          try {
+            const resolvedConnectId = await this.ensureConnected(
+              target,
+              signal,
+              true,
+              undefined,
+              attempt
+            );
+            LedgerAdapter._throwIfAborted(signal);
+            const result = this._createOperation(connectId, resolvedConnectId);
+            if (result.success && attempt.selectedConnection) {
+              this._pendingOperationBindings.set(result.payload, attempt);
+            }
+            return result;
+          } catch (error) {
+            this._finishBleBinding(signal.aborted ? 'cancelled' : 'failed');
+            throw error;
+          }
+        },
+        {
+          label: 'acquireOperation',
+          rejectIfBusy: true,
+          busyError: LedgerAdapter._createDeviceBusyError('acquireOperation'),
+        }
+      );
+    } catch (error) {
+      return this.errorToFailure(error);
+    }
+  }
+
+  private _createOperation(searchTargetId: string, resolvedConnectId: string): Response<string> {
+    this._operations.endByConnectionKey(resolvedConnectId, 'explicit');
+    const sessionId = this._sessions.get(resolvedConnectId);
+    if (sessionId) this._operations.endByConnectionKey(sessionId, 'explicit');
+    const device = this._discoveredDevices.get(resolvedConnectId) ?? {
+      vendor: 'ledger' as const,
+      model: 'unknown',
+      firmwareVersion: '',
+      deviceId: '',
+      connectId: resolvedConnectId,
+      connectionType: this.connector.connectionType,
+    };
+    const operation = this._operations.create({
+      searchTargetId,
+      connectId: resolvedConnectId,
+      device,
+      connectionKeys: [this._sessions.get(resolvedConnectId) ?? ''],
+    });
+    return success(operation.operationId);
+  }
+
+  private async _connectTarget(
+    connectId: string,
+    preserveOperationId?: string,
+    signal?: AbortSignal
+  ): Promise<Response<string>> {
     debugLog('[LedgerAdapter][REQ]', { method: 'connectDevice', connectId, params: { connectId } });
     try {
-      if (isLedgerBleConnectionType(this.connector.connectionType) && !connectId) {
+      this._assertConnectorReady('connectDevice');
+      const discoveredType = this._discoveredDevices.get(connectId)?.connectionType;
+      if (discoveredType === 'usb' || discoveredType === 'ble') {
+        this._activeConnectionType = discoveredType;
+      }
+      if (this._isBleConnection() && !connectId) {
         throw Object.assign(new Error('Ledger BLE connectId is required.'), {
           code: HardwareErrorCode.DeviceNotFound,
         });
       }
 
-      // USB single-session invariant: evict any stale session before opening
-      // a new one — guards ensureConnected's ambient fallback against ghosts.
-      if (!isLedgerBleConnectionType(this.connector.connectionType)) {
-        await this._evictAllSessions();
+      await this._ensureDevicePermission(connectId, undefined, signal);
+      if (signal) LedgerAdapter._throwIfAborted(signal);
+
+      // A new explicit selection owns a fresh operation. Retire any session
+      // that could otherwise let an older operation id reach the new one.
+      if (this.connector.availableTransports && this.connector.availableTransports.length > 1) {
+        await this._evictAllSessions(preserveOperationId);
+      } else if (this._isBleConnection()) {
+        const previousSessionId = this._sessions.get(connectId);
+        this._operations.endByConnectionKey(connectId, 'explicit', preserveOperationId);
+        if (previousSessionId) {
+          this._operations.endByConnectionKey(previousSessionId, 'explicit', preserveOperationId);
+          this._sessions.delete(connectId);
+          await this.connector.disconnect(previousSessionId).catch(() => undefined);
+        }
+      } else {
+        await this._evictAllSessions(preserveOperationId);
       }
+      if (signal) LedgerAdapter._throwIfAborted(signal);
 
-      await this._ensureDevicePermission(connectId);
-
-      const session = await this.connector.connect(connectId);
-      this._sessions.set(connectId, session.sessionId);
+      const stateGeneration = this._stateGeneration;
+      const releaseOperation = this._retainConnectorOperation(`connect:${connectId}`);
+      let session: Awaited<ReturnType<IConnector['connect']>>;
+      try {
+        session = this.connector.availableTransports?.length
+          ? await this.connector.connect(connectId, {
+              transportType: this._activeConnectionType ?? 'usb',
+            })
+          : await this.connector.connect(connectId);
+        if (signal?.aborted || stateGeneration !== this._stateGeneration) {
+          await this.connector.disconnect(session.sessionId).catch(() => undefined);
+          throw Object.assign(new Error('Ledger connection aborted'), {
+            code: HardwareErrorCode.UserAborted,
+          });
+        }
+      } finally {
+        releaseOperation();
+      }
+      const resolvedConnectId = session.deviceInfo?.connectId || connectId;
+      this._sessions.set(resolvedConnectId, session.sessionId);
 
       if (session.deviceInfo) {
-        this._discoveredDevices.set(connectId, session.deviceInfo);
+        this._discoveredDevices.set(resolvedConnectId, session.deviceInfo);
       }
 
-      const result = success(connectId);
+      const result = success(resolvedConnectId);
       debugLog('[LedgerAdapter][RES]', { method: 'connectDevice', success: true, payload: result });
       return result;
     } catch (err) {
@@ -360,23 +755,27 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
-  async disconnectDevice(connectId: string): Promise<void> {
+  async releaseOperation(operationId: string): Promise<void> {
+    const operation = this._operations.find(operationId);
+    if (!operation) {
+      this._operations.resolve(operationId);
+      return;
+    }
+    const endedOperation = this._operations.end(operationId, 'explicit');
+    if (!endedOperation) return;
+    const { connectId } = operation;
     debugLog('[LedgerAdapter][REQ]', {
-      method: 'disconnectDevice',
+      method: 'releaseOperation',
       connectId,
       params: { connectId },
     });
     try {
-      const sessionId = this._sessions.get(connectId);
-      if (sessionId) {
-        await this.connector.disconnect(sessionId);
-        this._sessions.delete(connectId);
-      }
-      debugLog('[LedgerAdapter][RES]', { method: 'disconnectDevice', success: true });
+      await this._releaseOperationConnection(endedOperation);
+      debugLog('[LedgerAdapter][RES]', { method: 'releaseOperation', success: true });
     } catch (err) {
       const e = err as Record<string, unknown> | null | undefined;
       debugLog('[LedgerAdapter][RES]', {
-        method: 'disconnectDevice',
+        method: 'releaseOperation',
         success: false,
         error: { message: e?.message, _tag: e?._tag, code: e?.code ?? e?.errorCode },
       });
@@ -384,7 +783,46 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
-  async getDeviceInfo(connectId: string, deviceId: string): Promise<Response<DeviceInfo>> {
+  private async _releaseOperationConnection(
+    operation: NonNullable<ReturnType<OperationRegistry['find']>>
+  ): Promise<void> {
+    const sessionIds = new Set<string>();
+    for (const [connectId, sessionId] of this._sessions) {
+      if (
+        connectId === operation.connectId ||
+        operation.connectionKeys.includes(connectId) ||
+        operation.connectionKeys.includes(sessionId)
+      ) {
+        this._sessions.delete(connectId);
+        sessionIds.add(sessionId);
+      }
+    }
+    for (const sessionId of sessionIds) {
+      await this._runConnectorTeardown(() =>
+        this.connector.disconnect(sessionId).catch(() => undefined)
+      );
+    }
+  }
+
+  private async _releaseLostOperationConnection(operationId: string): Promise<void> {
+    const endedOperation = this._operations.end(operationId, 'disconnect');
+    if (!endedOperation) return;
+    this._discoveredDevices.delete(endedOperation.connectId);
+    await this._releaseOperationConnection(endedOperation);
+  }
+
+  async getDeviceInfo(
+    connectIdOrOperationId: string,
+    deviceId: string
+  ): Promise<Response<DeviceInfo>> {
+    let connectId: string;
+    try {
+      connectId = isHardwareOperationId(connectIdOrOperationId)
+        ? this._operations.resolve(connectIdOrOperationId).connectId
+        : connectIdOrOperationId;
+    } catch (error) {
+      return this.errorToFailure<DeviceInfo>(error);
+    }
     debugLog('[LedgerAdapter][REQ]', {
       method: 'getDeviceInfo',
       connectId,
@@ -430,13 +868,20 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
-  getSupportedChains(): ChainCapability[] {
-    return ['evm', 'btc', 'sol', 'tron'];
-  }
-
   allNetworkGetAddress = createAllNetworkGetAddress({
     callChain: this.callChain.bind(this),
-    getChainFingerprint: (connectId, chain) => this.getChainFingerprint(connectId, '', chain),
+    getChainFingerprint: async (connectId, chain, context) => {
+      try {
+        const fingerprint = await this._computeChainFingerprint(chain, (method, params) =>
+          this.connectorCall(connectId, method, params, undefined, undefined, undefined, context)
+        );
+        return success(fingerprint);
+      } catch (error) {
+        return this.errorToFailure<string>(error);
+      }
+    },
+    retainOperation: operationId => this._operations.retain(operationId),
+    errorToFailure: <T>(error: unknown) => this.errorToFailure<T>(error),
   });
 
   // ---------------------------------------------------------------------------
@@ -496,13 +941,22 @@ export class LedgerAdapter implements IHardwareWallet {
     if (params && typeof params === 'object') {
       const {
         autoInstallApp,
+        operationId,
         passphraseState: _passphraseState,
         useEmptyPassphrase: _useEmptyPassphrase,
+        knownConnections,
+        extra,
+        allowDeviceSelection,
         ...rest
       } = params as Record<string, unknown>;
       return {
         commonParams: {
           autoInstallApp: typeof autoInstallApp === 'boolean' ? autoInstallApp : undefined,
+          operationId: typeof operationId === 'string' ? operationId : undefined,
+          knownConnections: knownConnections as ICommonCallParams['knownConnections'],
+          extra: extra as ICommonCallParams['extra'],
+          allowDeviceSelection:
+            typeof allowDeviceSelection === 'boolean' ? allowDeviceSelection : undefined,
         },
         rest,
       };
@@ -770,6 +1224,38 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   // ---------------------------------------------------------------------------
+  // Zcash chain methods (viewing key + shielded address reads; Zcash app >= 3.8.0)
+  // ---------------------------------------------------------------------------
+
+  zcashGetFullViewingKey(
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<ZcashGetFullViewingKeyParams>
+  ) {
+    return this.callChainWithMergedParams<ZcashFullViewingKey>(
+      connectId,
+      deviceId,
+      'zcash',
+      'zcashGetFullViewingKey',
+      params
+    );
+  }
+
+  zcashGetShieldedAddress(
+    connectId?: string | null,
+    deviceId?: string | null,
+    params?: LedgerCallParams<ZcashGetShieldedAddressParams>
+  ) {
+    return this.callChainWithMergedParams<ZcashShieldedAddress>(
+      connectId,
+      deviceId,
+      'zcash',
+      'zcashGetShieldedAddress',
+      params
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // App management — OS-level Ledger app install / list. Bypasses fingerprint
   // and chain-handler dispatch; installApp progress is forwarded to the adapter
   // emitter via 'ui-event' AppInstallProgress events.
@@ -876,7 +1362,7 @@ export class LedgerAdapter implements IHardwareWallet {
           );
         }
         await this.connector.configure({ ledgerGenuineCheckWebSocketUrl: relayUrl });
-        this.resetState();
+        await this._resetStateAndDisconnectSessions();
       }
       const result = (await this.connectorCall(connectId, 'getDeviceGenuineCheck', {})) as {
         isGenuine: boolean;
@@ -908,12 +1394,12 @@ export class LedgerAdapter implements IHardwareWallet {
       if (relayUrl) {
         try {
           await this.connector.configure?.({ ledgerGenuineCheckWebSocketUrl: undefined });
-          this.resetState();
+          await this._resetStateAndDisconnectSessions();
         } catch {
           // Fail safe: reset() also clears the one-shot relay URL in connectors
           // that implement runtime relay configuration.
           this.connector.reset();
-          this.resetState();
+          await this._resetStateAndDisconnectSessions();
         }
       }
     }
@@ -946,6 +1432,29 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   cancel(connectId?: string): void {
+    // "Cancel this one" and "cancel whatever is running" are different
+    // instructions. An id that no longer resolves means the thing it named has
+    // already finished, so there is nothing to cancel - and it must not decay
+    // into the untargeted form and take down an unrelated operation that
+    // happens to be running now. Decided before anything else, so this call
+    // leaves no trace at all.
+    const namedOperationIsLive = (id: string): boolean => {
+      try {
+        this._operations.resolve(id);
+        return true;
+      } catch {
+        // Ended (tombstoned) and never-existed both land here, and neither
+        // leaves anything to cancel.
+        return false;
+      }
+    };
+    if (isHardwareOperationId(connectId) && !namedOperationIsLive(connectId)) {
+      debugLog('[LedgerAdapter] cancel target already ended; nothing to cancel', {
+        connectId,
+      });
+      return;
+    }
+
     const userAbortReason = Object.assign(new Error('User aborted operation'), {
       code: HardwareErrorCode.UserAborted,
       _tag: ERROR_TAG.UserAborted,
@@ -962,18 +1471,51 @@ export class LedgerAdapter implements IHardwareWallet {
       }
     }, 2000);
 
-    this._uiRegistry.cancel();
+    const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
+    let operationId: string | undefined;
+    if (isHardwareOperationId(connectId)) {
+      operationId = connectId;
+    } else if (!connectId && isHardwareOperationId(activeJobId)) {
+      operationId = activeJobId;
+    }
+    let resolvedConnectId = connectId;
+    if (operationId) {
+      try {
+        resolvedConnectId = this._operations.resolve(operationId).connectId;
+      } catch {
+        // Still live per the guard above, but its binding is gone: cancel what
+        // this adapter is doing rather than guessing at a session.
+        resolvedConnectId = undefined;
+      }
+    }
 
-    // No-connectId path collateral-cancels concurrent silent jobs (known
-    // limitation; needs per-job foreground flag to fix).
-    if (connectId) {
-      this._jobQueue.cancelActiveAndPending(connectId, userAbortReason);
+    this._uiRegistry.cancel();
+    this._finishBleBinding('cancelled');
+
+    const interactionForPhysicalId =
+      !operationId && connectId ? this._operations.findActiveByConnectionKey(connectId) : undefined;
+    const queueKey =
+      operationId ??
+      (activeJobId === connectId ? connectId : interactionForPhysicalId?.operationId) ??
+      connectId;
+
+    const pendingOperationId = operationId ?? interactionForPhysicalId?.operationId;
+    if (!connectId) this._pendingOperationBindings.clear();
+    else if (pendingOperationId) {
+      this._pendingOperationBindings.delete(pendingOperationId);
+    }
+
+    // The no-connectId path cancels everything queued. Every job enqueued today
+    // is user-triggered, so there is nothing to collateral-damage; introducing
+    // background work would need a per-job foreground flag first.
+    if (queueKey) {
+      this._jobQueue.cancelActiveAndPending(queueKey, userAbortReason);
     } else {
       this._jobQueue.cancelActiveAndPending(undefined, userAbortReason);
     }
 
-    if (connectId) {
-      const sessionId = this._sessions.get(connectId) ?? connectId;
+    if (resolvedConnectId) {
+      const sessionId = this._sessions.get(resolvedConnectId) ?? resolvedConnectId;
       void this.connector.cancel(sessionId);
     } else {
       for (const sid of this._sessions.values()) void this.connector.cancel(sid);
@@ -990,6 +1532,7 @@ export class LedgerAdapter implements IHardwareWallet {
   // Chain fingerprint
   // ---------------------------------------------------------------------------
 
+  /** A non-empty deviceId is an expected chain fingerprint, not a transport identifier. */
   async getChainFingerprint(
     connectId: string,
     deviceId: string,
@@ -999,6 +1542,24 @@ export class LedgerAdapter implements IHardwareWallet {
       const fingerprint = await this._computeChainFingerprint(chain, (method, params) =>
         this.connectorCall(connectId, method, params, undefined, deviceId)
       );
+      if (deviceId) {
+        if (fingerprint !== deviceId) {
+          return failure(
+            HardwareErrorCode.DeviceMismatch,
+            formatDeviceMismatchError(deviceId, fingerprint)
+          );
+        }
+        if (isHardwareOperationId(connectId)) {
+          const operation = this._operations.resolve(connectId);
+          await this._publishVerifiedBleBinding(
+            operation.connectId,
+            chain,
+            fingerprint,
+            undefined,
+            connectId
+          );
+        }
+      }
       return success(fingerprint);
     } catch (err) {
       debugError('[LedgerAdapter] getChainFingerprint error:', chain, err);
@@ -1006,10 +1567,67 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
-  /**
-   * Verify fingerprint using an existing sessionId directly.
-   * Safe to call inside connectorCall without causing queue deadlock.
-   */
+  /** Discovery may select a BLE target before a later call verifies its wallet. */
+  private async _publishVerifiedBleBinding(
+    connectId: string,
+    chain: ChainForFingerprint,
+    fingerprint: string,
+    attempt?: LedgerConnectionAttempt,
+    operationId?: string,
+    signal?: AbortSignal
+  ): Promise<boolean> {
+    const binding = operationId ? this._pendingOperationBindings.get(operationId) : attempt;
+    if (!this._isBleConnection() || binding?.selectedConnection?.connectId !== connectId) {
+      return false;
+    }
+    try {
+      const outcome = await requestSaveDeviceBinding(
+        this.emitter,
+        this._uiRegistry,
+        {
+          selectionRequestId: binding.selectedConnection.requestId,
+          connection: { transport: 'ble', connectId },
+          identity: { vendor: 'ledger', type: 'chainFingerprint', chain, value: fingerprint },
+          extra: binding.extra,
+        },
+        signal
+      );
+      if (operationId) this._operations.resolve(operationId);
+      if (!outcome.saved) {
+        // The wallet was verified on this connection; only the host's record
+        // of it is missing. Keep the session and let the caller decide whether
+        // losing the binding matters for what it was doing.
+        debugLog('[LedgerAdapter] BLE binding not persisted by host', {
+          connectId,
+          reason: outcome.reason,
+        });
+      }
+      return outcome.saved;
+    } catch (error) {
+      if (operationId) {
+        this._pendingOperationBindings.delete(operationId);
+        this._operations.end(operationId, 'explicit');
+      }
+      const sessionId = this._sessions.get(connectId);
+      this._sessions.delete(connectId);
+      if (sessionId) {
+        const teardown = this._runConnectorTeardown(() =>
+          this.connector.disconnect(sessionId)
+        ).catch(() => undefined);
+        if (!signal?.aborted) await teardown;
+      }
+      throw error;
+    } finally {
+      if (this._bindingSelectionRequestId === binding.selectedConnection.requestId) {
+        this._bindingSelectionRequestId = undefined;
+      }
+      if (operationId) {
+        this._pendingOperationBindings.delete(operationId);
+      }
+    }
+  }
+
+  /** Verify on the acquired session without re-entering the job queue. */
   private async _verifyDeviceFingerprintWithSession(
     sessionId: string,
     deviceId: string,
@@ -1017,24 +1635,13 @@ export class LedgerAdapter implements IHardwareWallet {
   ): Promise<IFingerprintVerifyResult> {
     if (!deviceId) return { success: true };
 
-    try {
-      const fingerprint = await this._computeChainFingerprint(chain, (method, params) =>
-        this._callConnector(sessionId, method, params)
-      );
-      if (fingerprint === deviceId) {
-        return { success: true };
-      }
-      return { success: false, expected: deviceId, actual: fingerprint };
-    } catch (err) {
-      const mapped = mapLedgerError(err);
-      if (
-        mapped.code === HardwareErrorCode.WrongApp ||
-        mapped.code === HardwareErrorCode.DeviceLocked
-      ) {
-        return { success: true };
-      }
-      throw err;
+    const fingerprint = await this._computeChainFingerprint(chain, (method, params) =>
+      this._callConnector(sessionId, method, params)
+    );
+    if (fingerprint === deviceId) {
+      return { success: true };
     }
+    return { success: false, expected: deviceId, actual: fingerprint };
   }
 
   /**
@@ -1085,6 +1692,12 @@ export class LedgerAdapter implements IHardwareWallet {
           address: string;
         }
       ).address;
+    } else if (chain === 'zcash') {
+      address = (
+        (await callMethod('zcashGetShieldedAddress', { path, showOnDevice: false })) as {
+          address: string;
+        }
+      ).address;
     } else {
       throw new Error(`Unsupported chain for fingerprint: ${chain as string}`);
     }
@@ -1101,7 +1714,7 @@ export class LedgerAdapter implements IHardwareWallet {
    *
    * - If a session already exists for the given connectId, reuse it.
    * - If ANY session exists (Ledger IDs are ephemeral), reuse it.
-   * - Otherwise: search → exactly 1 USB device auto-connects; multiple or none throws.
+   * - Otherwise: search → one USB device auto-connects; multiple asks the host to choose.
    */
   // Mutex for ensureConnected — prevents concurrent calls from establishing duplicate connections
   private _connectingPromise: Promise<string> | null = null;
@@ -1262,11 +1875,14 @@ export class LedgerAdapter implements IHardwareWallet {
   private async ensureConnected(
     connectId: string | undefined,
     signal: AbortSignal,
-    allowUsbEphemeralFallback = false
+    allowUsbEphemeralFallback = false,
+    preserveOperationId?: string,
+    context?: LedgerConnectionAttempt
   ): Promise<string> {
     if (signal.aborted) LedgerAdapter._throwIfAborted(signal);
+    this._assertConnectorReady('connectDevice');
 
-    if (isLedgerBleConnectionType(this.connector.connectionType) && !connectId) {
+    if (this._isBleConnection() && !connectId && !allowUsbEphemeralFallback) {
       throw Object.assign(new Error('Ledger BLE connectId is required.'), {
         code: HardwareErrorCode.DeviceNotFound,
       });
@@ -1279,7 +1895,7 @@ export class LedgerAdapter implements IHardwareWallet {
     if (!connectId && this._sessions.size > 0) {
       // Fail loud rather than route to a wrong device; connectDevice evicts
       // first, so size>1 here should be impossible.
-      if (!isLedgerBleConnectionType(this.connector.connectionType) && this._sessions.size > 1) {
+      if (!this._isBleConnection() && this._sessions.size > 1) {
         throw Object.assign(
           new Error(
             'Ledger USB session invariant violated: more than one session is active. Please reconnect the device.'
@@ -1290,15 +1906,24 @@ export class LedgerAdapter implements IHardwareWallet {
       return this._sessions.keys().next().value as string;
     }
 
-    if (!this._connectingPromise) {
-      this._doConnectAbortController = new AbortController();
-      const innerSignal = this._doConnectAbortController.signal;
+    if (!this._connectingPromise || this._doConnectAbortController?.signal.aborted) {
+      const controller = new AbortController();
+      this._doConnectAbortController = controller;
+      const innerSignal = controller.signal;
       this._connectingPromise = (async () => {
         try {
-          return await this._doConnect(innerSignal, connectId, allowUsbEphemeralFallback);
+          return await this._doConnect(
+            innerSignal,
+            connectId,
+            allowUsbEphemeralFallback,
+            preserveOperationId,
+            context
+          );
         } finally {
-          this._connectingPromise = null;
-          this._doConnectAbortController = null;
+          if (this._doConnectAbortController === controller) {
+            this._connectingPromise = null;
+            this._doConnectAbortController = null;
+          }
         }
       })();
     }
@@ -1312,28 +1937,61 @@ export class LedgerAdapter implements IHardwareWallet {
   private async _doConnect(
     internalSignal: AbortSignal,
     targetConnectId?: string,
-    allowUsbEphemeralFallback = false
+    allowUsbEphemeralFallback = false,
+    preserveOperationId?: string,
+    context?: LedgerConnectionAttempt
   ): Promise<string> {
-    if (isLedgerBleConnectionType(this.connector.connectionType) && targetConnectId) {
-      try {
-        return await this._connectDeviceOrThrow(targetConnectId);
-      } catch (err) {
-        if (
-          !isDeviceLockedError(err) &&
-          !isDeviceNotAdvertisingError(err) &&
-          !isDeviceDisconnectedError(err)
-        ) {
-          throw err;
-        }
-        this._discoveredDevices.delete(targetConnectId);
-        if (isDeviceDisconnectedError(err)) {
-          try {
-            this.connector.reset?.();
-          } catch {
-            // best-effort
-          }
-        }
+    LedgerAdapter._throwIfAborted(internalSignal);
+    if (
+      this.connector.availableTransports?.includes('usb') &&
+      this.connector.availableTransports.includes('ble')
+    ) {
+      this._activeConnectionType = 'usb';
+      const usbDevices = await this._searchDevices({ transportType: 'usb' }, internalSignal);
+      LedgerAdapter._throwIfAborted(internalSignal);
+      if (usbDevices.length > 0) {
+        const knownUsb = context?.knownConnections?.find(
+          connection => connection.transport === 'usb'
+        );
+        const usbTarget =
+          knownUsb?.transport === 'usb'
+            ? knownUsb.connectId
+            : usbDevices.find(device => device.connectId === targetConnectId)?.connectId;
+        return this._connectFirstOrSelect(
+          usbDevices,
+          usbTarget,
+          allowUsbEphemeralFallback,
+          preserveOperationId,
+          context,
+          internalSignal
+        );
       }
+      this._activeConnectionType = 'ble';
+      const knownBle = context?.knownConnections?.find(
+        connection => connection.transport === 'ble'
+      );
+      if (knownBle?.transport === 'ble') {
+        // A saved endpoint follows normal connect/error behavior, never a new binding picker.
+        return this._connectDeviceOrThrow(knownBle.connectId, preserveOperationId, internalSignal);
+      }
+      if (targetConnectId && context?.knownConnections === undefined) {
+        throw createHwkError({
+          code: HardwareErrorCode.DeviceNotFound,
+          message: 'Ledger connection metadata is required before starting Bluetooth binding',
+        });
+      }
+      const bleDevices = await this._searchDevices({ transportType: 'ble' }, internalSignal);
+      return this._connectFirstOrSelect(
+        bleDevices,
+        undefined,
+        allowUsbEphemeralFallback,
+        preserveOperationId,
+        context,
+        internalSignal
+      );
+    }
+    if (this._isBleConnection() && targetConnectId) {
+      return this._connectDeviceOrThrow(targetConnectId, preserveOperationId, internalSignal);
     }
 
     let confirms = 0;
@@ -1346,7 +2004,8 @@ export class LedgerAdapter implements IHardwareWallet {
         type: EConnectorInteraction.Searching,
         payload: { sessionId: '' },
       });
-      let devices = await this.searchDevices();
+      let devices = await this._searchDevices(undefined, internalSignal);
+      LedgerAdapter._throwIfAborted(internalSignal);
 
       // First scan empty? Retry — BLE state can be flaky right after a
       // PairingRefused / Disconnect / fresh app restart, and ble-plx scans
@@ -1357,17 +2016,22 @@ export class LedgerAdapter implements IHardwareWallet {
           await new Promise<void>(resolve => {
             setTimeout(resolve, DEVICE_CONNECT_RETRY_DELAY_MS);
           });
-          devices = await this.searchDevices();
+          LedgerAdapter._throwIfAborted(internalSignal);
+          devices = await this._searchDevices(undefined, internalSignal);
+          LedgerAdapter._throwIfAborted(internalSignal);
           if (devices.length > 0) break;
         }
       }
 
-      if (devices.length > 0) {
+      if (devices.length > 0 || (this._isBleConnection() && allowUsbEphemeralFallback)) {
         try {
           return await this._connectFirstOrSelect(
             devices,
             targetConnectId,
-            allowUsbEphemeralFallback
+            allowUsbEphemeralFallback,
+            preserveOperationId,
+            context,
+            internalSignal
           );
         } catch (err) {
           // PairingFailure / DeviceMismatch / unclassified → throw out, no
@@ -1412,15 +2076,19 @@ export class LedgerAdapter implements IHardwareWallet {
 
   private async _connectFirstOrSelect(
     devices: DeviceInfo[],
-    targetConnectId?: string,
-    allowUsbEphemeralFallback = false
+    targetConnectId: string | undefined,
+    allowUsbEphemeralFallback: boolean,
+    preserveOperationId: string | undefined,
+    context: LedgerConnectionAttempt | undefined,
+    signal: AbortSignal
   ): Promise<string> {
+    LedgerAdapter._throwIfAborted(signal);
     if (targetConnectId) {
       const target = devices.find(
         d => d.connectId === targetConnectId || d.deviceId === targetConnectId
       );
       if (target) {
-        return this._connectDeviceOrThrow(target.connectId);
+        return this._connectDeviceOrThrow(target.connectId, preserveOperationId, signal);
       }
 
       // Decision: a stale USB target + fresh search returning exactly one
@@ -1434,37 +2102,137 @@ export class LedgerAdapter implements IHardwareWallet {
       // run `_verifyDeviceFingerprintWithSession` before sending the real APDU.
       // Calls without that identity check fail closed with DeviceNotFound so
       // the host can ask the user to reconnect/select again.
-      if (
-        !isLedgerBleConnectionType(this.connector.connectionType) &&
-        devices.length === 1 &&
-        allowUsbEphemeralFallback
-      ) {
+      if (!this._isBleConnection() && devices.length === 1 && allowUsbEphemeralFallback) {
         debugLog(
           `[LedgerAdapter] target ${targetConnectId} not in fresh enumeration; ` +
             `accepting sole USB device ${devices[0].connectId} for fingerprint-verified recovery`
         );
-        return this._connectDeviceOrThrow(devices[0].connectId);
+        return this._connectDeviceOrThrow(devices[0].connectId, preserveOperationId, signal);
       }
 
-      const err = Object.assign(new Error(`Target Ledger unavailable: ${targetConnectId}`), {
-        code: HardwareErrorCode.DeviceNotFound,
-      }) as Error & { _tag?: string };
-      if (isLedgerBleConnectionType(this.connector.connectionType)) {
-        err._tag = ERROR_TAG.DeviceNotAdvertising;
+      if (!this._isBleConnection() || !allowUsbEphemeralFallback) {
+        const err = Object.assign(new Error(`Target Ledger unavailable: ${targetConnectId}`), {
+          code: HardwareErrorCode.DeviceNotFound,
+        }) as Error & { _tag?: string };
+        if (this._isBleConnection()) {
+          err._tag = ERROR_TAG.DeviceNotAdvertising;
+        }
+        throw err;
       }
-      throw err;
     }
 
-    if (isLedgerBleConnectionType(this.connector.connectionType)) {
+    const requiresBleSelection = this._isBleConnection();
+    if (requiresBleSelection && !allowUsbEphemeralFallback) {
       throw Object.assign(new Error('Ledger BLE connectId is required.'), {
         code: HardwareErrorCode.DeviceNotFound,
       });
     }
 
-    // No target + multiple USB devices: refuse to auto-pick by ephemeral
-    // connectId (the multi-device drift bug). Caller must specify which device.
-    if (devices.length > 1) {
-      throw createMultipleUsbLedgerDevicesError();
+    if (requiresBleSelection && context?.allowDeviceSelection !== false) {
+      const bindingSessionId = context?.bindingSessionId ?? this._uiRegistry.createRequestId();
+      if (context) context.bindingSessionId = bindingSessionId;
+      const allowUsbFallback =
+        context?.bindingReason !== 'manual-rebind' &&
+        Boolean(this.connector.availableTransports?.includes('usb'));
+      const knownUsb = context?.knownConnections?.find(
+        connection => connection.transport === 'usb'
+      );
+      const usbConnectId = knownUsb?.transport === 'usb' ? knownUsb.connectId : targetConnectId;
+      const { device, requestId } = await requestBleDeviceSelection({
+        emitter: this.emitter,
+        registry: this._uiRegistry,
+        signal,
+        allowUsbFallback,
+        scan: async () => {
+          if (allowUsbFallback) {
+            const usbDevices = await this._searchDevices({ transportType: 'usb' }, signal);
+            const candidate =
+              usbDevices.find(
+                device => device.connectionType === 'usb' && device.connectId === usbConnectId
+              ) ??
+              (usbDevices.length === 1 && usbDevices[0].connectionType === 'usb'
+                ? usbDevices[0]
+                : undefined);
+            if (candidate) return [candidate];
+          }
+          return (
+            await this._searchDevices({ transportType: 'ble', waitForAllTransports: true }, signal)
+          ).filter(device => !context?.rejectedConnectIds?.has(device.connectId));
+        },
+        request: {
+          devices: devices.filter(device => !context?.rejectedConnectIds?.has(device.connectId)),
+          bindingSessionId,
+          rejectedConnectId: context?.rejectedConnectId,
+          context: {
+            kind: 'bind-connection',
+            transport: 'ble',
+            reason:
+              context?.bindingReason ??
+              (targetConnectId ? 'known-connection-unavailable' : 'missing-binding'),
+          },
+          extra: context?.extra,
+        },
+      });
+      if (device.connectionType === 'usb') {
+        // This is still discovery; the caller verifies the wallet before the business APDU.
+        this._activeConnectionType = 'usb';
+        if (context) context.selectedConnection = undefined;
+        if (preserveOperationId) this._pendingOperationBindings.delete(preserveOperationId);
+        this._bindingSelectionRequestId = undefined;
+        this.emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
+          type: UI_REQUEST.DEVICE_BINDING_STATUS,
+          payload: { selectionRequestId: requestId, status: 'cancelled' },
+        });
+        return this._connectDeviceOrThrow(device.connectId, preserveOperationId, signal);
+      }
+      if (context) context.selectedConnection = { connectId: device.connectId, requestId };
+      this._bindingSelectionRequestId = requestId;
+      return this._connectDeviceOrThrow(device.connectId, preserveOperationId, signal);
+    }
+
+    // An operation-first call has no preselected target. Let the host choose
+    // from this scan generation, then connect only the returned candidate.
+    if (devices.length > 0 && (devices.length > 1 || requiresBleSelection)) {
+      if (
+        context?.allowDeviceSelection === false ||
+        !this.emitter.listenerCount(UI_REQUEST.REQUEST_SELECT_DEVICE)
+      ) {
+        throw createHwkError({
+          code: HardwareErrorCode.DeviceNotFound,
+          message: 'Select a Ledger device before continuing',
+        });
+      }
+      const requestId = this._uiRegistry.createRequestId();
+      const waitPromise = this._uiRegistry.wait<{ sdkConnectId: string }>(
+        UI_REQUEST.REQUEST_SELECT_DEVICE,
+        { requestId }
+      );
+      this.emitter.emit(UI_REQUEST.REQUEST_SELECT_DEVICE, {
+        type: UI_REQUEST.REQUEST_SELECT_DEVICE,
+        payload: {
+          devices,
+          requestId,
+          context: requiresBleSelection
+            ? {
+                kind: 'bind-connection',
+                transport: 'ble',
+                reason: targetConnectId ? 'known-connection-unavailable' : 'missing-binding',
+              }
+            : { kind: 'select-device', transport: 'usb', reason: 'multiple-candidates' },
+          extra: context?.extra,
+        },
+      });
+      const { sdkConnectId } = await (signal ? this._abortable(signal, waitPromise) : waitPromise);
+      if (signal) LedgerAdapter._throwIfAborted(signal);
+      const selected = devices.find(device => device.connectId === sdkConnectId);
+      if (!selected) {
+        throw Object.assign(new Error('Selected Ledger is no longer available'), {
+          code: HardwareErrorCode.DeviceNotFound,
+        });
+      }
+      if (context && requiresBleSelection)
+        context.selectedConnection = { connectId: selected.connectId, requestId };
+      return this._connectDeviceOrThrow(selected.connectId, preserveOperationId, signal);
     }
 
     if (devices.length !== 1) {
@@ -1473,11 +2241,15 @@ export class LedgerAdapter implements IHardwareWallet {
       });
     }
 
-    return this._connectDeviceOrThrow(devices[0].connectId);
+    return this._connectDeviceOrThrow(devices[0].connectId, preserveOperationId, signal);
   }
 
-  private async _connectDeviceOrThrow(chosenConnectId: string): Promise<string> {
-    const result = await this.connectDevice(chosenConnectId);
+  private async _connectDeviceOrThrow(
+    chosenConnectId: string,
+    preserveOperationId?: string,
+    signal?: AbortSignal
+  ): Promise<string> {
+    const result = await this._connectTarget(chosenConnectId, preserveOperationId, signal);
     if (!result.success) {
       // _tag must survive — _doConnect's catch is _tag-based.
       const payload = result.payload as { error: string; code: number; _tag?: string };
@@ -1489,7 +2261,7 @@ export class LedgerAdapter implements IHardwareWallet {
       }
       throw rethrow;
     }
-    return chosenConnectId;
+    return result.payload;
   }
 
   /**
@@ -1526,9 +2298,83 @@ export class LedgerAdapter implements IHardwareWallet {
     params: unknown,
     signal?: AbortSignal
   ): Promise<unknown> {
-    const promise = this.connector.call(sessionId, method, params);
+    this._assertConnectorReady(method);
+    // Check before handing the command to the connector, not only around the
+    // promise. A listener that cancels synchronously - install progress firing
+    // at 0 is the real case - would otherwise put the command on the wire and
+    // still be told the operation was aborted. Refusing here is the stronger
+    // guarantee: nothing was sent, so nothing may have happened.
+    if (signal?.aborted) throw this._abortReason(signal);
+    const releaseOperation = this._retainConnectorOperation(`call:${sessionId}`);
+    let promise: ReturnType<IConnector['call']>;
+    try {
+      promise = this.connector.call(sessionId, method, params).finally(releaseOperation);
+    } catch (error) {
+      releaseOperation();
+      throw error;
+    }
     const result = signal ? await this._abortable(signal, promise) : await promise;
     return this._unwrapConnectorResult(result);
+  }
+
+  private _assertConnectorReady(method: string): void {
+    if (
+      this._resetPromise ||
+      this._pendingConnectorTeardowns > 0 ||
+      this._unsettledConnectorOperations.size > 0
+    ) {
+      throw LedgerAdapter._createDeviceBusyError(method);
+    }
+  }
+
+  private _runConnectorTeardown(task: () => Promise<void>): Promise<void> {
+    const previous = this._connectorTeardownTail;
+    let releaseTail: () => void = () => undefined;
+    this._connectorTeardownTail = new Promise<void>(resolve => {
+      releaseTail = resolve;
+    });
+    this._pendingConnectorTeardowns += 1;
+    return (async () => {
+      try {
+        await previous;
+        await this._waitForConnectorOperationsToDrain();
+        await task();
+      } finally {
+        this._pendingConnectorTeardowns -= 1;
+        releaseTail();
+      }
+    })();
+  }
+
+  private _waitForConnectorOperationsToDrain(): Promise<void> {
+    if (this._unsettledConnectorOperations.size === 0) {
+      return Promise.resolve();
+    }
+    return new Promise(resolve => {
+      this._connectorIdleWaiters.add(resolve);
+    });
+  }
+
+  private _retainConnectorOperation(key: string): () => void {
+    this._unsettledConnectorOperations.set(
+      key,
+      (this._unsettledConnectorOperations.get(key) ?? 0) + 1
+    );
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const remaining = (this._unsettledConnectorOperations.get(key) ?? 1) - 1;
+      if (remaining > 0) {
+        this._unsettledConnectorOperations.set(key, remaining);
+      } else {
+        this._unsettledConnectorOperations.delete(key);
+      }
+      if (this._unsettledConnectorOperations.size === 0) {
+        for (const resolve of this._connectorIdleWaiters) resolve();
+        this._connectorIdleWaiters.clear();
+      }
+    };
   }
 
   private async connectorCall(
@@ -1540,29 +2386,69 @@ export class LedgerAdapter implements IHardwareWallet {
     commonParams?: ICommonCallParams,
     installContext?: LedgerInstallAppContext
   ): Promise<unknown> {
+    const positionalOperationId = isHardwareOperationId(connectId) ? connectId : undefined;
+    if (
+      positionalOperationId &&
+      commonParams?.operationId &&
+      positionalOperationId !== commonParams.operationId
+    ) {
+      throw createHwkError({
+        code: HardwareErrorCode.InvalidParams,
+        message: 'Conflicting Ledger operation ids',
+        params: {
+          positionalOperationId,
+          commonOperationId: commonParams.operationId,
+        },
+      });
+    }
+    const operationId = commonParams?.operationId ?? positionalOperationId;
+    const operation = operationId ? this._operations.resolve(operationId) : undefined;
+    const releaseOperationRetention = operationId
+      ? this._operations.retain(operationId)
+      : undefined;
+    const effectiveConnectId = operation?.connectId ?? connectId;
     // [REQ] / [RES] are the canonical request/response trace for any operation
     // that hits the device — chain methods, installApp, list*, firmware, etc.
     // Diagnostic / recovery debugLog lines below are NOT a duplicate: they log
     // what the SDK decides to do about an error, not the response itself.
-    debugLog('[LedgerAdapter][REQ]', { method, connectId: connectId || '(empty)', params });
+    debugLog('[LedgerAdapter][REQ]', {
+      method,
+      connectId: effectiveConnectId || '(empty)',
+      params,
+    });
 
     // Queue is global serial; deviceId is just a label for inspection / cancellation.
-    const queueKey = connectId || '__ledger_default__';
+    const queueKey = (operationId ?? effectiveConnectId) || '__ledger_default__';
 
     try {
       const result = await this._jobQueue.enqueue(
         queueKey,
-        async signal =>
-          this._runConnectorCall(
-            connectId,
-            method,
-            params,
-            signal,
-            fingerprint,
-            permissionDeviceId,
-            commonParams,
-            installContext
-          ),
+        async signal => {
+          if (operationId) this._activeOperationJobs.add(operationId);
+          try {
+            return await this._runConnectorCall(
+              effectiveConnectId,
+              method,
+              params,
+              signal,
+              fingerprint,
+              permissionDeviceId,
+              commonParams,
+              installContext ?? {},
+              operationId
+            );
+          } catch (error) {
+            this._finishBleBinding(signal.aborted ? 'cancelled' : 'failed');
+            throw error;
+          } finally {
+            if (operationId) {
+              this._activeOperationJobs.delete(operationId);
+              if (this._pendingOperationDisconnects.delete(operationId)) {
+                await this._releaseLostOperationConnection(operationId);
+              }
+            }
+          }
+        },
         {
           label: method,
           rejectIfBusy: true,
@@ -1583,6 +2469,8 @@ export class LedgerAdapter implements IHardwareWallet {
         },
       });
       throw err;
+    } finally {
+      releaseOperationRetention?.();
     }
   }
 
@@ -1590,13 +2478,20 @@ export class LedgerAdapter implements IHardwareWallet {
    * Race a promise against an abort signal. On abort, rejects with
    * signal.reason → instance _lastCancelReason → generic Error('Aborted').
    */
-  private _abortable<T>(signal: AbortSignal, promise: Promise<T>): Promise<T> {
-    const getAbortReason = () =>
+  /** Hermes/RN polyfills don't always populate signal.reason; fall back. */
+  private _abortReason(signal: AbortSignal): unknown {
+    return (
       (signal as AbortSignal & { reason?: unknown }).reason ??
       this._lastCancelReason ??
-      new Error('Aborted');
+      new Error('Aborted')
+    );
+  }
+
+  private _abortable<T>(signal: AbortSignal, promise: Promise<T>): Promise<T> {
+    const getAbortReason = () => this._abortReason(signal);
 
     if (signal.aborted) {
+      void promise.catch(() => undefined);
       return Promise.reject(getAbortReason());
     }
     return new Promise<T>((resolve, reject) => {
@@ -1633,14 +2528,18 @@ export class LedgerAdapter implements IHardwareWallet {
     fingerprint?: ConnectorCallFingerprint,
     permissionDeviceId?: string,
     commonParams?: ICommonCallParams,
-    installContext?: LedgerInstallAppContext
+    installContext?: LedgerInstallAppContext,
+    operationId?: string,
+    lockedRetryBudget = LedgerAdapter.MAX_BUSINESS_RETRY_BUDGET
   ): Promise<unknown> {
     LedgerAdapter._throwIfAborted(signal);
-    await this._ensureDevicePermission(
-      connectId,
-      permissionDeviceId ?? fingerprint?.deviceId,
-      signal
-    );
+    if (!operationId) {
+      await this._ensureDevicePermission(
+        connectId,
+        permissionDeviceId ?? fingerprint?.deviceId,
+        signal
+      );
+    }
     LedgerAdapter._throwIfAborted(signal);
     let effectiveParams = params;
     if (method === 'btcGetPublicKey') {
@@ -1655,18 +2554,62 @@ export class LedgerAdapter implements IHardwareWallet {
     }
 
     const allowUsbEphemeralFallback = !!fingerprint?.deviceId && !fingerprint.skipFingerprint;
+    let businessCallStarted = false;
 
     // Wrap ensureConnected in _abortable so an abort during device discovery /
     // user-connect UI wait rejects this caller immediately. The underlying
     // _doConnect / _connectingPromise is shared across callers and continues
     // running — other concurrent callers aren't affected.
-    const resolvedConnectId = await this.ensureConnected(
-      connectId,
-      signal,
-      allowUsbEphemeralFallback
+    const verifiedBleTarget = connectId
+      ? this._verifiedBleReconnectTargets.get(connectId)
+      : undefined;
+    const knownTransport = this._isBleConnection() ? 'ble' : 'usb';
+    const hintedConnectId = commonParams?.knownConnections?.find(
+      connection => connection.transport === knownTransport
     );
-    const sessionId = this._sessions.get(resolvedConnectId);
+    const inputConnectId =
+      hintedConnectId && hintedConnectId.transport !== 'qr' ? hintedConnectId.connectId : connectId;
+    const preferredConnectId =
+      fingerprint &&
+      !fingerprint.skipFingerprint &&
+      verifiedBleTarget?.chain === fingerprint.chain &&
+      verifiedBleTarget.fingerprint === fingerprint.deviceId
+        ? verifiedBleTarget.connectId
+        : inputConnectId;
+    const connectionAttempt: LedgerConnectionAttempt = { ...commonParams };
+    const bundleConnection = installContext?.connection;
+    if (
+      bundleConnection &&
+      this._sessions.get(bundleConnection.connectId) !== bundleConnection.sessionId
+    ) {
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceDisconnected,
+        message: 'Ledger all-network connection ended',
+      });
+    }
+    let resolvedConnectId = operationId
+      ? this._operations.resolve(operationId).connectId
+      : bundleConnection?.connectId ??
+        (await this.ensureConnected(
+          preferredConnectId,
+          signal,
+          allowUsbEphemeralFallback,
+          undefined,
+          connectionAttempt
+        ));
+    let sessionId = this._sessions.get(resolvedConnectId);
+    if (sessionId && installContext && !installContext.connection) {
+      installContext.connection = { connectId: resolvedConnectId, sessionId };
+    }
     if (!sessionId) {
+      if (operationId) {
+        this._operations.end(operationId, 'disconnect');
+        throw createHwkError({
+          code: HardwareErrorCode.OperationEnded,
+          message: 'Ledger operation connection is no longer active',
+          params: { operationId, reason: 'disconnect' },
+        });
+      }
       throw Object.assign(new Error('Auto-connect succeeded but no session found'), {
         _tag: ERROR_TAG.DeviceSessionNotFound,
       });
@@ -1682,24 +2625,112 @@ export class LedgerAdapter implements IHardwareWallet {
       // session to subsequent retries (they keep using the same broken
       // sessionId until the user replugs).
       if (fingerprint && !fingerprint.skipFingerprint && fingerprint.deviceId) {
-        const fp = await this._abortable(
-          signal,
-          this._verifyDeviceFingerprintWithSession(
-            sessionId,
-            fingerprint.deviceId,
-            fingerprint.chain
-          )
+        for (;;) {
+          const fp = await this._abortable(
+            signal,
+            this._verifyDeviceFingerprintWithSession(
+              sessionId,
+              fingerprint.deviceId,
+              fingerprint.chain
+            )
+          );
+          if (fp.success) break;
+          const binding = operationId
+            ? this._pendingOperationBindings.get(operationId)
+            : connectionAttempt;
+          if (
+            !this._isBleConnection() ||
+            binding?.selectedConnection?.connectId !== resolvedConnectId
+          ) {
+            throw Object.assign(new Error(formatDeviceMismatchError(fp.expected, fp.actual)), {
+              code: HardwareErrorCode.DeviceMismatch,
+            });
+          }
+          // Only an unverified binding may replace its provisional endpoint.
+          // A known/pinned verified connection still fails closed on mismatch.
+          binding.rejectedConnectIds ??= new Set();
+          binding.rejectedConnectIds.add(resolvedConnectId);
+          binding.rejectedConnectId = resolvedConnectId;
+          this._sessions.delete(resolvedConnectId);
+          await this.connector.disconnect(sessionId);
+          if (operationId) this._pendingOperationDisconnects.delete(operationId);
+          LedgerAdapter._throwIfAborted(signal);
+          resolvedConnectId = await this._connectFirstOrSelect(
+            [],
+            undefined,
+            true,
+            operationId,
+            binding,
+            signal
+          );
+          const selectedSession = this._sessions.get(resolvedConnectId);
+          const selectedDevice = this._discoveredDevices.get(resolvedConnectId);
+          if (!selectedSession || !selectedDevice)
+            throw createHwkError({
+              code: HardwareErrorCode.DeviceDisconnected,
+              message: 'Selected Ledger connection ended',
+            });
+          sessionId = selectedSession;
+          if (operationId)
+            this._operations.rebind(operationId, {
+              connectId: resolvedConnectId,
+              device: selectedDevice,
+              connectionKeys: [sessionId],
+            });
+          if (installContext)
+            installContext.connection = { connectId: resolvedConnectId, sessionId };
+        }
+        await this._publishVerifiedBleBinding(
+          resolvedConnectId,
+          fingerprint.chain,
+          fingerprint.deviceId,
+          connectionAttempt,
+          operationId,
+          signal
         );
-        if (!fp.success) {
-          throw Object.assign(new Error(formatDeviceMismatchError(fp.expected, fp.actual)), {
-            code: HardwareErrorCode.DeviceMismatch,
+        if (
+          !operationId &&
+          connectionAttempt.selectedConnection?.connectId === resolvedConnectId &&
+          this._isBleConnection()
+        ) {
+          this._verifiedBleReconnectTargets.set(connectId, {
+            connectId: resolvedConnectId,
+            chain: fingerprint.chain,
+            fingerprint: fingerprint.deviceId,
           });
         }
       }
+      businessCallStarted = true;
       return await this._callConnector(sessionId, method, effectiveParams, signal);
     } catch (err) {
       // If the abort fired, surface it directly — skip recovery paths.
       if (signal.aborted) throw err;
+      // Once a session is acquired, a lost connection ends even a one-shot call.
+      // Never rediscover/rebind and replay it on a fresh USB/BLE session.
+      if (
+        isDeviceDisconnectedError(err) ||
+        isDeviceNotAdvertisingError(err) ||
+        isTimeoutError(err) ||
+        isConnectionLevelError(err)
+      ) {
+        this._discoveredDevices.delete(resolvedConnectId);
+        if (operationId) await this._releaseLostOperationConnection(operationId);
+        else {
+          this._sessions.delete(resolvedConnectId);
+          await this.connector.disconnect(sessionId).catch(() => undefined);
+        }
+        const ambiguous =
+          businessCallStarted && !canReplayHardwareMethodAfterTransportFailure(method);
+        const interactionParams = operationId ? { operationId, reason: 'disconnect' } : undefined;
+        throw createHwkError({
+          code: operationId ? HardwareErrorCode.OperationEnded : mapLedgerError(err).code,
+          message: 'Ledger operation connection was lost; start a new operation',
+          params: ambiguous
+            ? operationMayHaveCompletedParams(method, { operationId })
+            : interactionParams,
+          recovery: ambiguous ? { scope: 'unknown' } : undefined,
+        });
+      }
       const errObj = err as Record<string, unknown> | null | undefined;
       debugLog('[LedgerAdapter] connectorCall error:', method, {
         message: errObj?.message,
@@ -1711,6 +2742,90 @@ export class LedgerAdapter implements IHardwareWallet {
         isNotAdvertising: isDeviceNotAdvertisingError(err),
         isStuckApp: isStuckAppStateError(err),
       });
+
+      // A precise DeviceLocked response means the business APDU was rejected
+      // before execution. Keep the pinned session, ask the user to unlock, and
+      // retry within a bounded budget without searching or reconnecting.
+      if (
+        (isDeviceLockedError(err) || errObj?.code === HardwareErrorCode.DeviceLocked) &&
+        lockedRetryBudget > 0
+      ) {
+        await this._waitForDeviceConnect(signal);
+        if (this._sessions.get(resolvedConnectId) !== sessionId) {
+          throw createHwkError({
+            code: operationId
+              ? HardwareErrorCode.OperationEnded
+              : HardwareErrorCode.DeviceDisconnected,
+            message: 'Ledger connection ended while waiting for unlock',
+          });
+        }
+        return this._runConnectorCall(
+          resolvedConnectId,
+          method,
+          effectiveParams,
+          signal,
+          fingerprint,
+          permissionDeviceId,
+          commonParams,
+          installContext,
+          operationId,
+          lockedRetryBudget - 1
+        );
+      }
+
+      if (businessCallStarted && isStuckAppStateError(err)) {
+        await this._sleepAbortable(LedgerAdapter.STUCK_APP_RETRY_DELAY_MS, signal);
+        if (this._sessions.get(resolvedConnectId) !== sessionId) {
+          throw createHwkError({
+            code: operationId
+              ? HardwareErrorCode.OperationEnded
+              : HardwareErrorCode.DeviceDisconnected,
+            message: 'Ledger connection ended during the app transition',
+          });
+        }
+        try {
+          return await this._callConnector(sessionId, method, effectiveParams, signal);
+        } catch (retryErr) {
+          if (isStuckAppStateError(retryErr)) throw err;
+          if (
+            isDeviceDisconnectedError(retryErr) ||
+            isDeviceNotAdvertisingError(retryErr) ||
+            isTimeoutError(retryErr) ||
+            isConnectionLevelError(retryErr)
+          ) {
+            if (operationId) await this._releaseLostOperationConnection(operationId);
+            else {
+              this._sessions.delete(resolvedConnectId);
+              this._discoveredDevices.delete(resolvedConnectId);
+              await this.connector.disconnect(sessionId).catch(() => undefined);
+            }
+            throw createHwkError({
+              code: operationId ? HardwareErrorCode.OperationEnded : mapLedgerError(retryErr).code,
+              message: `Ledger ${method} may have completed before the connection was lost`,
+              params: !canReplayHardwareMethodAfterTransportFailure(method)
+                ? operationMayHaveCompletedParams(method, {
+                    operationId,
+                    reason: 'disconnect',
+                  })
+                : { operationId, reason: 'disconnect' },
+              recovery: !canReplayHardwareMethodAfterTransportFailure(method)
+                ? { scope: 'unknown' }
+                : undefined,
+            });
+          }
+          throw retryErr;
+        }
+      }
+
+      if (
+        !operationId &&
+        (err as { code?: number } | null | undefined)?.code === HardwareErrorCode.DeviceMismatch
+      ) {
+        this._sessions.delete(resolvedConnectId);
+        this._discoveredDevices.delete(resolvedConnectId);
+        await this.connector.disconnect(sessionId).catch(() => undefined);
+        throw err;
+      }
 
       // Auto-install: required app missing + caller opted in via commonParams.
       // Ask the user, install (DMK returns to dashboard then installs, streaming
@@ -1786,217 +2901,15 @@ export class LedgerAdapter implements IHardwareWallet {
             fingerprint,
             permissionDeviceId,
             commonParams,
-            installContext
+            installContext,
+            operationId
           );
         }
-      }
-
-      // Stuck DMK slot — reset transport, wait briefly, retry ONCE.
-      // Trigger: Stax CloseApp→OpenApp race returns APDU 6901 before the
-      // user can react. A short pause lets the device finish its transition;
-      // on persistent 6901 the user really does need to act, so surface it.
-      if (isStuckAppStateError(err)) {
-        try {
-          this._sessions.delete(resolvedConnectId);
-          this._discoveredDevices.delete(resolvedConnectId);
-          this.connector.reset?.();
-        } catch {
-          // best-effort reset — fall through to retry
-        }
-        debugLog(
-          '[LedgerAdapter] stuck-app retry: method=',
-          method,
-          'delayMs=',
-          LedgerAdapter.STUCK_APP_RETRY_DELAY_MS,
-          '_tag=',
-          (err as Record<string, unknown> | null | undefined)?._tag
-        );
-        try {
-          const retryResult = await this._retryAfterStuckApp(
-            resolvedConnectId,
-            method,
-            effectiveParams,
-            signal,
-            err,
-            fingerprint
-          );
-          debugLog('[LedgerAdapter] stuck-app retry succeeded: method=', method);
-          return retryResult;
-        } catch (retryErr) {
-          if (signal.aborted) throw retryErr;
-          // Second stuck-app hit → genuinely needs user action; surface
-          // the original error so callers see a consistent _tag.
-          if (isStuckAppStateError(retryErr)) {
-            debugLog('[LedgerAdapter] stuck-app retry exhausted (2nd 6901): method=', method);
-            throw err;
-          }
-          debugLog(
-            '[LedgerAdapter] stuck-app retry threw non-stuck error: method=',
-            method,
-            'retryErrTag=',
-            (retryErr as Record<string, unknown> | null | undefined)?._tag
-          );
-          throw retryErr;
-        }
-      }
-
-      // Connection-class error → Layer 2 retry (bounded budget).
-      // PairingFailure intentionally NOT retried — user declined the OS
-      // pair prompt / didn't confirm on device, retrying makes no sense.
-      if (
-        isDeviceLockedError(err) ||
-        isDeviceNotAdvertisingError(err) ||
-        isDeviceDisconnectedError(err)
-      ) {
-        let lastErr: unknown = err;
-        for (let attempt = 0; attempt < LedgerAdapter.MAX_BUSINESS_RETRY_BUDGET; attempt += 1) {
-          if (signal.aborted) throw lastErr;
-
-          try {
-            this._sessions.delete(resolvedConnectId);
-            this._discoveredDevices.delete(resolvedConnectId);
-
-            // Disconnected: DMK transport may retain stale session. Drop
-            // DMK so ensureConnected rebuilds from scratch. Locked /
-            // NotAdvertising don't need this — DMK side is clean.
-            if (isDeviceDisconnectedError(lastErr)) {
-              try {
-                this.connector.reset?.();
-              } catch {
-                // best-effort
-              }
-            }
-            // ensureConnected → _doConnect handles "device not found" UI
-            // request (search returns 0). DMK's unlock-device propagates
-            // as a ui-event toast and self-recovers, so DeviceLocked from
-            // DMK never reaches Layer 2. The only DeviceLocked here is
-            // from APDU 0x5515 (rare hardware-direct), and _doConnect's
-            // dialog still covers it via the same UI request.
-
-            // Preserve connectId across retry to prevent multi-device drift.
-            // USB replug fallback is allowed only when this call will verify
-            // the device fingerprint before sending the business APDU.
-            const reConnectId = await this.ensureConnected(
-              resolvedConnectId,
-              signal,
-              allowUsbEphemeralFallback
-            );
-            const reSessionId = this._sessions.get(reConnectId);
-            if (!reSessionId) throw lastErr;
-
-            // Re-verify fingerprint — Layer 1 may have picked a different
-            // physical device (multi-Ledger rig).
-            if (fingerprint && !fingerprint.skipFingerprint && fingerprint.deviceId) {
-              const fp = await this._abortable(
-                signal,
-                this._verifyDeviceFingerprintWithSession(
-                  reSessionId,
-                  fingerprint.deviceId,
-                  fingerprint.chain
-                )
-              );
-              if (!fp.success) {
-                throw Object.assign(new Error(formatDeviceMismatchError(fp.expected, fp.actual)), {
-                  code: HardwareErrorCode.DeviceMismatch,
-                });
-              }
-            }
-
-            return await this._callConnector(reSessionId, method, effectiveParams, signal);
-          } catch (retryErr) {
-            if (signal.aborted) throw retryErr;
-            lastErr = retryErr;
-            const canRetry =
-              attempt < LedgerAdapter.MAX_BUSINESS_RETRY_BUDGET - 1 &&
-              (isDeviceLockedError(retryErr) ||
-                isDeviceNotAdvertisingError(retryErr) ||
-                isDeviceDisconnectedError(retryErr));
-            if (!canRetry) {
-              throw retryErr;
-            }
-          }
-        }
-        // Budget exhausted — surface last seen error to caller.
-        throw lastErr;
-      }
-
-      if (isTimeoutError(err)) {
-        debugLog('[LedgerAdapter] timeout, retrying with fresh connection...');
-        this._discoveredDevices.delete(resolvedConnectId);
-        return this._retryWithFreshConnection(
-          resolvedConnectId,
-          method,
-          effectiveParams,
-          signal,
-          err,
-          fingerprint
-        );
-      }
-
-      // Fail-closed for connection-level errors so batch can't continue on
-      // a wedged transport. Reset connector so next caller gets fresh DMK.
-      if (isConnectionLevelError(err)) {
-        debugLog('[LedgerAdapter] connection-level fail-closed reset');
-        this._sessions.delete(resolvedConnectId);
-        this._discoveredDevices.delete(resolvedConnectId);
-        this.connector.reset();
-        const codeNum = (err as { code?: number })?.code;
-        throw Object.assign(err as Error, {
-          code: codeNum ?? HardwareErrorCode.DeviceDisconnected,
-        });
       }
 
       // Business errors (BlindSigning, AppStuck, etc.) propagate untouched.
       throw err;
     }
-  }
-
-  /**
-   * Stuck-app recovery: pause for the device's UI transition, then retry once.
-   *
-   * Caller has already cleared the session + reset connector. We wait so Stax
-   * finishes its post-CloseApp animation, then go through ensureConnected +
-   * fingerprint check + call exactly once. Caller decides what to do on a
-   * second stuck-app hit.
-   */
-  private async _retryAfterStuckApp(
-    resolvedConnectId: string,
-    method: string,
-    params: unknown,
-    signal: AbortSignal,
-    originalErr: unknown,
-    fingerprint?: ConnectorCallFingerprint
-  ): Promise<unknown> {
-    await this._sleepAbortable(LedgerAdapter.STUCK_APP_RETRY_DELAY_MS, signal);
-
-    // Preserve connectId across retry (APDU 6901 didn't disconnect, so it's
-    // still valid). If a USB replug changed the connectId, recover only when
-    // the call has a fingerprint check queued immediately after reconnect.
-    const retryConnectId = await this.ensureConnected(
-      resolvedConnectId,
-      signal,
-      !!fingerprint?.deviceId && !fingerprint.skipFingerprint
-    );
-    const retrySessionId = this._sessions.get(retryConnectId);
-    if (!retrySessionId) throw originalErr;
-
-    if (fingerprint && !fingerprint.skipFingerprint && fingerprint.deviceId) {
-      const fp = await this._abortable(
-        signal,
-        this._verifyDeviceFingerprintWithSession(
-          retrySessionId,
-          fingerprint.deviceId,
-          fingerprint.chain
-        )
-      );
-      if (!fp.success) {
-        throw Object.assign(new Error(formatDeviceMismatchError(fp.expected, fp.actual)), {
-          code: HardwareErrorCode.DeviceMismatch,
-        });
-      }
-    }
-
-    return this._callConnector(retrySessionId, method, params, signal);
   }
 
   private _sleepAbortable(ms: number, signal: AbortSignal): Promise<void> {
@@ -2015,107 +2928,6 @@ export class LedgerAdapter implements IHardwareWallet {
       };
       signal.addEventListener('abort', onAbort, { once: true });
     });
-  }
-
-  /**
-   * Clear stale session, reconnect, and retry the call.
-   *
-   * Timeout recovery starts with a full connector reset. After an APDU
-   * timeout, DMK/transport state may still emit malformed responses; retrying
-   * on the same DMK can poison the next chain switch.
-   */
-  private async _retryWithFreshConnection(
-    targetConnectId: string,
-    method: string,
-    params: unknown,
-    signal: AbortSignal,
-    originalErr: unknown,
-    fingerprint?: ConnectorCallFingerprint
-  ): Promise<unknown> {
-    this.connector.reset();
-    this._sessions.clear();
-    this._discoveredDevices.clear();
-    this._connectingPromise = null;
-
-    const allowUsbEphemeralFallback = !!fingerprint?.deviceId && !fingerprint.skipFingerprint;
-    const retryConnectId = await this.ensureConnected(
-      targetConnectId,
-      signal,
-      allowUsbEphemeralFallback
-    );
-    const retrySessionId = this._sessions.get(retryConnectId);
-    if (!retrySessionId) {
-      throw originalErr;
-    }
-    try {
-      if (fingerprint && !fingerprint.skipFingerprint && fingerprint.deviceId) {
-        const fp = await this._abortable(
-          signal,
-          this._verifyDeviceFingerprintWithSession(
-            retrySessionId,
-            fingerprint.deviceId,
-            fingerprint.chain
-          )
-        );
-        if (!fp.success) {
-          throw Object.assign(new Error(formatDeviceMismatchError(fp.expected, fp.actual)), {
-            code: HardwareErrorCode.DeviceMismatch,
-          });
-        }
-      }
-
-      return await this._callConnector(retrySessionId, method, params, signal);
-    } catch (retryErr) {
-      if (signal.aborted) throw retryErr;
-      this.connector.reset();
-      this._sessions.clear();
-      this._discoveredDevices.clear();
-      this._connectingPromise = null;
-      if (!isDeviceDisconnectedError(retryErr) && !isTimeoutError(retryErr)) {
-        throw retryErr;
-      }
-      debugLog(
-        '[LedgerAdapter] fresh-session retry still failed; resetting connector and rebuilding DMK'
-      );
-      // Full reset: drops _dmk, _deviceManager, _signerManager, ID maps
-      // and in-flight cancellers. Next ensureConnected() will rebuild from
-      // the ground up via _doConnect → connector.connect → fresh DMK.
-      this.connector.reset();
-      this._sessions.clear();
-      this._discoveredDevices.clear();
-      this._connectingPromise = null;
-      const finalConnectId = await this.ensureConnected(
-        targetConnectId,
-        signal,
-        allowUsbEphemeralFallback
-      );
-      const finalSessionId = this._sessions.get(finalConnectId);
-      if (!finalSessionId) {
-        throw originalErr;
-      }
-
-      // Re-verify fingerprint after the full reset — `ensureConnected` may have
-      // selected a different physical device (e.g. multi-Ledger BLE rig where
-      // the original peripheral went out of range). Without this replay,
-      // `connector.call` could sign on the wrong device.
-      if (fingerprint && !fingerprint.skipFingerprint && fingerprint.deviceId) {
-        const fp = await this._abortable(
-          signal,
-          this._verifyDeviceFingerprintWithSession(
-            finalSessionId,
-            fingerprint.deviceId,
-            fingerprint.chain
-          )
-        );
-        if (!fp.success) {
-          throw Object.assign(new Error(formatDeviceMismatchError(fp.expected, fp.actual)), {
-            code: HardwareErrorCode.DeviceMismatch,
-          });
-        }
-      }
-
-      return this._callConnector(finalSessionId, method, params, signal);
-    }
   }
 
   /**
@@ -2217,12 +3029,21 @@ export class LedgerAdapter implements IHardwareWallet {
         appName?: string;
         reason?: string;
         params?: Record<string, unknown>;
+        recovery?: unknown;
       };
       const params =
         e.code === HardwareErrorCode.DevicePermissionDenied && e.reason
           ? { permissionDeniedReason: e.reason }
           : e.params;
-      return ledgerFailure(e.code, e.message ?? 'Unknown error', e.appName, tag, params);
+      return ledgerFailure(
+        e.code,
+        e.message ?? 'Unknown error',
+        e.appName,
+        tag,
+        params,
+        undefined,
+        isHwkRecoveryHint(e.recovery) ? e.recovery : undefined
+      );
     }
 
     const mapped = mapLedgerError(err);
@@ -2250,6 +3071,12 @@ export class LedgerAdapter implements IHardwareWallet {
   };
 
   private deviceDisconnectHandler = (data: { connectId: string }): void => {
+    const activeOperation = this._operations.findActiveByConnectionKey(data.connectId);
+    if (activeOperation && this._activeOperationJobs.has(activeOperation.operationId)) {
+      this._pendingOperationDisconnects.add(activeOperation.operationId);
+    } else {
+      this._operations.endByConnectionKey(data.connectId, 'disconnect');
+    }
     this._discoveredDevices.delete(data.connectId);
     this._sessions.delete(data.connectId);
     this.emitter.emit(DEVICE.DISCONNECT, {
@@ -2331,7 +3158,7 @@ export class LedgerAdapter implements IHardwareWallet {
       deviceId: device.deviceId,
       connectId: device.connectId,
       label: device.name,
-      connectionType: this.connector.connectionType,
+      connectionType: device.connectionType ?? this.connector.connectionType,
       rssi: device.rssi,
       isConnectable: device.isConnectable,
       serialNumber: device.serialNumber,

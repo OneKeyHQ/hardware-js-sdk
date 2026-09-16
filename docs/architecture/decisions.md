@@ -2,6 +2,199 @@
 
 This document records architecture decisions that still constrain the current implementation. It is not an archive of the design process; obsolete discussions are preserved in Git history and PRs.
 
+## HWK Interaction Lifecycle
+
+HWK exposes a single device-selection lifecycle: `searchDeviceTargets()` discovers candidates,
+`connectDevice(searchTargetId)` connects or establishes a logical association and returns an opaque
+`operationId`, business methods may carry that ID in their common params, and
+`releaseOperation(operationId)` releases it. `openWallet()` / `WalletContext` are no longer part of
+the HWK public contract.
+
+The following rules apply:
+
+- A `DeviceSearchTarget` only represents a selectable communication entry point within the current
+  discovery round. Its `searchTargetId` is an opaque search handle and proves neither a physical device
+  nor a wallet identity. A Ledger USB search target may be an ephemeral handle; a Keystone QR search
+  target may be an entry point that only a scan can resolve.
+- An `operationId` exists only inside the current adapter runtime and binds the selected search
+  target, the actual connect/session key, and the connection channel. It is not a `connectId`, a wallet
+  identity, or a firmware session; it must not be written to the host database and must not survive an
+  adapter reset or a process restart. A controlled reconnect inside one active operation may update its
+  underlying session binding, but must not change the selected device or wallet identity.
+- Calling `connectDevice()` again for the same search target starts a new business lifecycle. When the
+  connection implementation has to replace an existing session, the operation that owned the old
+  session is terminated first; the old ID must not borrow the new session.
+- A business call carrying an `operationId` is a strict routing path: it reuses only that
+  operation's connected session or logical QR association and its established channel. It must not
+  use an ambient session, reselect an unverified device, or switch channels. It returns
+  `InteractionEnded` once the association cannot be restored, and `InteractionNotFound` for an ID that
+  never belonged to this adapter instance.
+- Ledger keeps its existing bounded session recovery: `DeviceLocked` waits for unlock on the original
+  session, `0x6901` retries once on the original session after a delay, and disconnect,
+  not-advertising, and timeout may re-search the original target. BLE must match the original
+  `connectId`. When a USB ephemeral search target changes, only a business call carrying the wallet
+  fingerprint may connect to a single candidate, and that fingerprint must be verified before the
+  business APDU is resent. On success the operation's connect/session binding is updated; on failure
+  the operation is terminated.
+- A call without an `operationId` is an operation-first path. The adapter may discover candidates
+  before it runs the business call; a single verifiable candidate proceeds, while multiple candidates
+  wait for the host to return this round's `sdkConnectId` through `REQUEST_SELECT_DEVICE`. Selection is
+  only a routing decision; the business call must still verify the physical device or wallet identity
+  according to vendor capability.
+- Idle timeout, a runtime reset, and a failed connection recovery all terminate the matching
+  operation and emit `operation-ended`. The idle timer pauses while an active device job holds the
+  operation. A transient disconnect during an active Ledger job goes through the recovery chain above
+  first, and terminates only once recovery is exhausted or the identity does not match. `cancel()`
+  aborts the current job only; it does not implicitly end the operation, and the lifecycle owner must
+  still call `releaseOperation()`. The reverse holds too: `releaseOperation()` ends the
+  association and does not abort a job that is already running. A call that has entered the
+  connector runs to its own conclusion and its result stays valid. `cancel` governs the job,
+  `release` governs the association, and neither implies the other.
+- Cancelling by name and cancelling everything are different instructions. `cancel(id)` for an
+  operation that has already ended has nothing left to cancel and must do nothing at all: it must
+  not fall through to the untargeted form and tear down whatever unrelated operation happens to be
+  running. `cancel()` with no argument keeps its existing meaning.
+- A command must not reach the connector once its signal is aborted. Wrapping the call in an abort
+  race is not enough - the command is already on the wire by then, and the caller is told the
+  operation was aborted while the device acts on it. Check before dispatch, so "aborted" keeps
+  meaning "this did not happen".
+- Any public entry point that moves the adapter from "no chosen device" to "one chosen device" runs
+  through the device job queue. `connectDevice` and `acquireOperation` both evict the existing
+  session before connecting, so two of them in flight leave two live sessions behind the
+  single-session invariant.
+- Which chains a vendor supports is declared by the host, per chain, next to that chain's own
+  settings - not by the adapter. The adapter has no equivalent declaration, and one must not be
+  re-added: a chain-capability list is too coarse to answer the question a host actually asks. A
+  host asks "can this wallet use this network", and a single `btc` capability covers BTC, BCH, LTC,
+  DOGE and testnet alike; it also cannot express that a chain is wired for addresses but not for
+  message signing. Two lists at different granularities drift, and the coarser one wins arguments it
+  should lose.
+- Releasing a device is not the same as ending the UI the user is looking at. Every exit that does
+  not save a binding closes the binding request it opened, under the original selection id. Prefer
+  one place that covers all exits over one emit per failure path, because the next failure added
+  will be the one that forgets.
+- `releaseOperation()` is the explicit release; an unrecoverable disconnect underneath is the passive
+  source of the same state transition. Before the recovery chain resends a business method it must redo
+  whatever device or wallet identity verification the vendor can provide; a USB ephemeral candidate must
+  never be treated as the original device without identity evidence.
+- The core method catalog separates replayable read-only methods from non-replayable signing, device
+  mutation, and unknown methods. Once a non-replayable method has entered the connector it must not be
+  resent automatically when the response is lost; the error carries `operationMayHaveCompleted` and the
+  method name so the host can ask the user to check state. Errors that provably happen before the send,
+  such as `PayloadTooLarge`, are not unknown outcomes.
+- Adapter reset/dispose is a teardown barrier: terminate runtime operations, cancel UI and job waits,
+  wait for calls that already entered the connector to exit, then disconnect captured sessions and reset
+  the connector. A new adapter must not run in parallel with calls left over from the old instance.
+- Keystone USB keeps the UI selection snapshot and the operation-first availability snapshot in separate
+  generations. A selection token may only exact-open its own descriptor. A cold start that holds nothing
+  but a persistent wallet identity may exact-open candidates one by one and read the fixed identity
+  xpub, and may run business calls only after the full wallet id matches. An expired token returns
+  `search-target` recovery and must not fall back to the first device.
+- The `onPairingCredentialsChanged` payload from Trezor Core is the complete authoritative list. The
+  connector replaces its in-memory list wholesale rather than merging incrementally; otherwise a stale
+  credential the device rejected is preferred again within the current adapter lifetime.
+
+Vendor differences stay inside the adapters: OneKey and Trezor let the host choose USB or BLE
+explicitly; Ledger and Keystone let their own SDK manage protocol and channel selection; a Keystone QR
+connect is a logical wallet association rather than a persistent physical connection. The strict reuse
+and termination semantics of an operation are the same in every implementation.
+
+Primary implementation:
+
+- `packages/hwk-adapter-core/src/utils/OperationRegistry.ts`
+- `packages/hwk-adapter-core/src/types/wallet.ts`
+- `packages/hwk-ledger-adapter/src/adapter/LedgerAdapter.ts`
+- `packages/hwk-trezor-adapter/src/adapter/TrezorAdapter.ts`
+- `packages/hwk-keystone-adapter/src/adapter/KeystoneAdapter.ts`
+
+## UI Request Attribution Is Deliberately Opt-In
+
+`UiRequestRegistry` keeps at most one pending waiter per request type: a second `wait()` on the same
+type preempts the first with `UiRequestPreempted`. Attribution by `requestId` is layered on top of
+that model and is **not** applied to every request type. `resolve()` enforces ownership only when the
+waiter registered an id (`entry.requestId !== undefined`); a waiter that registers none accepts any
+response of its type, which is the pre-existing behaviour.
+
+This asymmetry is intentional, not an unfinished migration of the registry itself. The rules are:
+
+- A request type carries a `requestId` when it is **long-lived or re-emitting**, so that "which round
+  does this answer belong to" is a real question. `REQUEST_SELECT_DEVICE` republishes scan snapshots
+  under one id while the user is choosing, and a rejected candidate starts a new round with a new id;
+  `REQUEST_SAVE_DEVICE_BINDING` blocks on a host acknowledgement that must be matched to the
+  selection that produced it.
+- Those two flows also need **scoped cancellation**. `requestBleDeviceSelection` and
+  `requestSaveDeviceBinding` call `registry.cancel(type, requestId)` from a `finally` that runs on the
+  success path too; without the id that cleanup would reject whatever is pending on the type at that
+  moment. Every other cancel site is deliberately unscoped (`cancel()` / `cancel(type)`), because it
+  is tearing the whole adapter or transport down.
+- The host builds its own ownership on the same id. The binding UI tracks an active selection by
+  `bindingSessionId` + `requestId`, decides whether an incoming snapshot belongs to the dialog on
+  screen, and echoes the id back in `RECEIVE_SELECT_DEVICE` / `RECEIVE_SAVE_DEVICE_BINDING`. Removing
+  the id would require rewriting that ownership model, not just deleting a field.
+- A **one-shot prompt does not carry an id**. PIN, passphrase, QR display/scan, device connect,
+  device permission and app install each ask once and settle once; one-pending-per-type plus
+  preemption already retires the previous waiter. What remains uncovered is the narrow race between
+  the user submitting and the pending entry being replaced. That residual exposure is accepted here
+  and is not a licence to leave it uncovered where the consequence is material — see the migration
+  rule below.
+- When adding a request type, decide explicitly which side of this line it falls on and say why in
+  the call site. Do not copy whichever neighbouring call was pasted last.
+
+Migrating an existing one-shot prompt to attribution is allowed, but only per request type and
+together with its host UI path in the same change:
+
+- **Never make the ownership check mandatory in the registry.** Until a host echoes the id, a global
+  requirement silently drops every PIN, passphrase and QR response: the user submits, nothing
+  happens, and the call fails only at the ten-minute timeout. The `entry.requestId !== undefined`
+  guard is what makes incremental migration safe; it must stay.
+- `REQUEST_PASSPHRASE_ON_DEVICE` has no host-side answer and is not part of any such migration.
+- `RECEIVE_QR_RESPONSE` resolves dynamically to `REQUEST_QR_DISPLAY` or `REQUEST_QR_SCAN`, so
+  attribution there must identify the step, not just the round.
+- Strict attribution changes behaviour the host must handle: an answer typed into a superseded prompt
+  stops being silently accepted and starts being rejected, so the host needs a "re-enter" path rather
+  than a dead dialog.
+
+Priority follows consequence, not symmetry. A misrouted passphrase selects a different hidden wallet
+and is worth covering; a misrouted PIN unlocks the same physical device the user was already
+unlocking, and no misrouted answer can approve a transaction, because these vendors confirm the
+transaction on the device itself.
+
+Primary implementation:
+
+- `packages/hwk-adapter-core/src/utils/UiRequestRegistry.ts`
+- `packages/hwk-adapter-core/src/utils/requestBleDeviceSelection.ts`
+- `packages/hwk-adapter-core/src/utils/requestSaveDeviceBinding.ts`
+- `packages/hwk-adapter-core/src/events/ui-request.ts`
+
+## Keystone Key Material Is Never Retained
+
+A `KeystoneDeviceRecord` holds wallet identity and transport state only: the wallet id derived from the
+fixed identity xpub, the BIP32 master fingerprint, model and firmware strings, and USB session flags.
+Extended public keys and public keys are fetched from the device for one operation and discarded when
+that operation returns. `allNetworkGetAddress` threads them through a call-scoped account book, so one
+QR scan or one USB export burst still answers a whole bundle.
+
+The following rules apply:
+
+- No adapter path may write key material onto a device record or any module-level structure. A caller
+  that wants an address or an xpub has to reach the device again.
+- `connectDevice()` and `importFromQr()` request only the fixed identity path `m/44'/60'/0'`. Requesting
+  account paths there would buy nothing, because nothing survives the call.
+- Keystone firmware verifies BTC PSBT inputs against a fixed table of account-0 xpubs (`gui_btc.c`
+  `PreparePublicKeys`: purpose 44'/49'/84'/86', coin 0' or 1', account 0'). Any other BTC account index
+  is refused in the adapter before a request reaches the device, because such an account could receive
+  funds it can never spend.
+- TRON uses Keystone's own `tron-sign-request` / `tron-signature` registry types (5201/5202) with the key
+  layout from keystone-sdk-rust. The OneKey air-gap encoding under the same tag is a different layout and
+  the firmware rejects it. Message signing is limited to the TIP-191 `signMessageV2` scheme, the only one
+  the firmware implements.
+
+Primary implementation:
+
+- `packages/hwk-keystone-adapter/src/adapter/KeystoneAdapter.ts`
+- `packages/hwk-keystone-adapter/src/adapter/pathUtils.ts`
+- `packages/hwk-keystone-adapter/src/urEngine/TronSignRequest.ts`
+
 ## Protocol V2 Link and Sequence Number Lifecycle
 
 Protocol V2 responses rely on serial calls, message types, and frame sequence numbers to maintain request boundaries. The current rules are:
