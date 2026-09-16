@@ -15,6 +15,7 @@ import {
   DEVICE_SETTINGS_V2_ONLY_FIELDS,
   LANGUAGE_LABELS,
   getDeviceSettingsCapabilities,
+  shouldUseProtocolV2SettingsDelayPages,
 } from '../../utils/deviceSettings';
 
 import type { ApplySettings } from '@onekeyfe/hd-transport';
@@ -63,16 +64,33 @@ const assertProtocolV2SettingValues = (
   });
 };
 
-const settingsPageForPayload = (
-  payload: DeviceSettingsParams
-): DeviceSettingsPage.DevicePassphrase | DeviceSettingsPage.DeviceAirgap | undefined => {
-  if (payload.usePassphrase !== undefined) {
-    return DeviceSettingsPage.DevicePassphrase;
+const PROTOCOL_V2_BOOLEAN_PAGES = [
+  ['usePassphrase', DeviceSettingsPage.DevicePassphrase],
+  ['airgapMode', DeviceSettingsPage.DeviceAirgap],
+] as const;
+
+const PROTOCOL_V2_DELAY_PAGES = [
+  ['autoLockDelayMs', DeviceSettingsPage.DeviceAutolock],
+  ['autoShutdownDelayMs', DeviceSettingsPage.DeviceAutoshutdown],
+] as const;
+
+const requestedSettingsPages = (payload: DeviceSettingsParams, includeDelayPages: boolean) =>
+  [...PROTOCOL_V2_BOOLEAN_PAGES, ...(includeDelayPages ? PROTOCOL_V2_DELAY_PAGES : [])].filter(
+    ([field]) => payload[field] !== undefined
+  );
+
+const settingsPageForPayload = (payload: DeviceSettingsParams, includeDelayPages: boolean) => {
+  const pages = requestedSettingsPages(payload, includeDelayPages);
+  return pages.length === 1 ? pages[0][1] : undefined;
+};
+
+const protocolV2DirectSettings = (payload: DeviceSettingsParams, includeDelayPages: boolean) => {
+  const settings = mapCommonSettingsToProtocolV2(payload);
+  if (includeDelayPages) {
+    delete settings.autolock_delay_ms;
+    delete settings.autoshutdown_delay_ms;
   }
-  if (payload.airgapMode !== undefined) {
-    return DeviceSettingsPage.DeviceAirgap;
-  }
-  return undefined;
+  return settings;
 };
 
 export default class DeviceSettings extends BaseMethod<ApplySettings> {
@@ -128,10 +146,26 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
         : undefined),
       haptic_feedback: this.payload.hapticFeedback,
     };
-    const page = settingsPageForPayload(this.payload);
-    const directSettings = mapCommonSettingsToProtocolV2(this.payload);
-    const hasConflictingPages =
-      this.payload.usePassphrase !== undefined && this.payload.airgapMode !== undefined;
+    this.applyProtocolV2SettingsBehavior();
+  }
+
+  setDevice(device: DeviceSettings['device']) {
+    super.setDevice(device);
+    this.applyProtocolV2SettingsBehavior();
+  }
+
+  private usesProtocolV2DelayPages() {
+    return Boolean(
+      this.device?.isProtocolV2?.() &&
+        shouldUseProtocolV2SettingsDelayPages(this.device.getCurrentFirmwareVersionString())
+    );
+  }
+
+  private applyProtocolV2SettingsBehavior() {
+    const includeDelayPages = this.usesProtocolV2DelayPages();
+    const page = settingsPageForPayload(this.payload, includeDelayPages);
+    const directSettings = protocolV2DirectSettings(this.payload, includeDelayPages);
+    const hasConflictingPages = requestedSettingsPages(this.payload, includeDelayPages).length > 1;
     const combinesPageWithDirectSettings =
       page !== undefined && Object.keys(directSettings).length > 0;
     if (hasConflictingPages || combinesPageWithDirectSettings) {
@@ -175,18 +209,22 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
           'V2'
         );
         assertProtocolV2SettingValues(this.payload, capabilities);
-        const settings = mapCommonSettingsToProtocolV2(this.payload);
+        const includeDelayPages = this.usesProtocolV2DelayPages();
+        const settings = protocolV2DirectSettings(this.payload, includeDelayPages);
+        const requestedPages = requestedSettingsPages(this.payload, includeDelayPages);
         const requestedPassphrase = this.payload.usePassphrase;
         const requestedAirgap = this.payload.airgapMode;
-        const hasPassphrasePage = requestedPassphrase !== undefined;
-        const hasAirgapPage = requestedAirgap !== undefined;
+        const requestedAutoLock = includeDelayPages ? this.payload.autoLockDelayMs : undefined;
+        const requestedAutoShutdown = includeDelayPages
+          ? this.payload.autoShutdownDelayMs
+          : undefined;
 
-        if (hasPassphrasePage && hasAirgapPage) {
+        if (requestedPages.length > 1) {
           throw invalidParameter(
-            'Protocol V2 passphrase and air-gap settings must be changed in separate calls.'
+            'Protocol V2 on-device settings must be changed in separate calls.'
           );
         }
-        if ((hasPassphrasePage || hasAirgapPage) && Object.keys(settings).length > 0) {
+        if (requestedPages.length === 1 && Object.keys(settings).length > 0) {
           throw invalidParameter(
             'Protocol V2 on-device settings must not be combined with direct settings.'
           );
@@ -232,6 +270,30 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
               'Protocol V2 air-gap setting did not reach the requested value.'
             );
           }
+          return res.message;
+        }
+        if (requestedAutoLock !== undefined) {
+          const current = await this.device.getDeviceState({ refreshSections: ['settings'] });
+          if (current.settings.autoLockDelayMs === requestedAutoLock) {
+            return { message: 'Settings already match requested value.' };
+          }
+
+          const res = await this.device.commands.typedCall('DeviceSettingsPageShow', 'Success', {
+            page: DeviceSettingsPage.DeviceAutolock,
+          });
+          await refreshStatusAndSettings();
+          return res.message;
+        }
+        if (requestedAutoShutdown !== undefined) {
+          const current = await this.device.getDeviceState({ refreshSections: ['settings'] });
+          if (current.settings.autoShutdownDelayMs === requestedAutoShutdown) {
+            return { message: 'Settings already match requested value.' };
+          }
+
+          const res = await this.device.commands.typedCall('DeviceSettingsPageShow', 'Success', {
+            page: DeviceSettingsPage.DeviceAutoshutdown,
+          });
+          await refreshStatusAndSettings();
           return res.message;
         }
         if (Object.keys(settings).length === 0) {

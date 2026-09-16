@@ -14,11 +14,11 @@ These raw commands are not public `CoreApi`. Callers use `deviceSettings`; Core 
 
 Public `DeviceSettings` fields include device name, Bluetooth, language, wallpaper path, brightness, auto-lock, auto-shutdown, animation, tap-to-wake, haptic, USB lock, randomized keyboard, and security-mode state. They can be read while locked. `passphrase_enable` and `fido_enabled` are private and returned only when unlocked. Fields follow the current protobuf and generated types.
 
-`deviceSettingsSet` supports partial updates, but the SDK strips `passphrase_enable` and `airgap_mode`. Updates that only include `label`, `language`, `brightness`, or `haptic_feedback` write without unlocking. Any other field unlocks first when the device is locked. Success toasts and page jumps for `autolock_delay_ms` / `autoshutdown_delay_ms` are implemented by firmware.
+`deviceSettingsSet` supports partial updates, but the SDK strips `passphrase_enable` and `airgap_mode`. Firmware 1.0.2 and later also strip `autolock_delay_ms` and `autoshutdown_delay_ms` and open `DeviceAutolock` / `DeviceAutoshutdown` instead. Released 1.0.1 still writes those delays with `DeviceSettingsSet`. Updates that only include `label`, `language`, `brightness`, or `haptic_feedback` write without unlocking. Any other direct field unlocks first when the device is locked.
 
 After any successful Protocol V2 settings write, the SDK force-refreshes `DeviceStatus` and `DeviceSettings`, and updates the unified `DeviceState` only from device readback. Write request parameters are not a state source. If readback fails after a successful write, the public call fails; callers must not replay a settings command that may already have taken effect.
 
-`passphrase_enable` and `airgap_mode` must open a device page through `deviceSettingsPageShow` and be confirmed on-device.
+`passphrase_enable` and `airgap_mode` must open a device page through `deviceSettingsPageShow` and be confirmed on-device. From firmware 1.0.2, `autolock_delay_ms` and `autoshutdown_delay_ms` use the same page path.
 
 Supported settings pages:
 
@@ -26,6 +26,8 @@ Supported settings pages:
 - `DevicePinChange`
 - `DevicePassphrase`
 - `DeviceAirgap`
+- `DeviceAutolock`
+- `DeviceAutoshutdown`
 
 Status reads disable wallet Session handling and use `unlockPolicy='none'`, so they do not auto-unlock. Unified `deviceSettings` computes `none` or `unlock-before-run` from the fields; device pages also use `unlock-before-run`. A known locked device is unlocked first, but a later locked response does not replay the settings write or page operation.
 

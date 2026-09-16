@@ -9,6 +9,7 @@ export type DeviceSettingsParams = {
   homescreen?: string;
   /** Protocol V1 only. */
   passphraseSource?: number;
+  /** Protocol V2 firmware 1.0.2+ opens the on-device auto-lock page; 1.0.1 writes the delay. */
   autoLockDelayMs?: number;
   /** Protocol V1 only. */
   displayRotation?: number;
@@ -18,6 +19,7 @@ export type DeviceSettingsParams = {
   safetyChecks?: Enum_SafetyCheckLevel;
   /** Protocol V1 only; the current Protocol V2 schema has no matching field. */
   experimentalFeatures?: boolean;
+  /** Protocol V2 firmware 1.0.2+ opens the on-device auto-shutdown page; 1.0.1 writes the delay. */
   autoShutdownDelayMs?: number;
   /** Protocol V1 only; opens the legacy device-side brightness flow. */
   changeBrightness?: boolean;

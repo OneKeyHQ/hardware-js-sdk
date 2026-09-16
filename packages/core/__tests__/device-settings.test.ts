@@ -20,7 +20,13 @@ const features = {
   language: 'en-US',
 } as Features;
 
-function createDevice({ protocol }: { protocol: 'V1' | 'V2' }) {
+function createDevice({
+  protocol,
+  firmwareVersion,
+}: {
+  protocol: 'V1' | 'V2';
+  firmwareVersion?: string;
+}) {
   const typedCall = jest.fn().mockResolvedValue({ message: { message: 'Success' } });
   const updateState = jest.fn();
   const getDeviceState = jest.fn();
@@ -32,6 +38,8 @@ function createDevice({ protocol }: { protocol: 'V1' | 'V2' }) {
       features,
       isProtocolV2: () => protocol === 'V2',
       getCurrentDeviceType: () => (protocol === 'V2' ? EDeviceType.Pro2 : EDeviceType.Pro),
+      getCurrentFirmwareVersionString: () =>
+        firmwareVersion ?? (protocol === 'V2' ? '1.0.1' : '3.12.0'),
       commands: { typedCall },
       updateState,
       getDeviceState,
@@ -69,7 +77,6 @@ describe('DeviceSettings protocol routing', () => {
     ['label', { label: 'Shared Label' }],
     ['auto lock', { autoLockDelayMs: 60_000 }],
     ['auto shutdown', { autoShutdownDelayMs: 120_000 }],
-    ['mixed settings', { brightness: 80, autoLockDelayMs: 60_000 }],
   ])('unlocks Protocol V2 before changing %s', (_name, settings) => {
     const method = new DeviceSettings({
       id: 1,
@@ -164,7 +171,6 @@ describe('DeviceSettings protocol routing', () => {
         method: 'deviceSettings',
         label: 'Shared Label',
         language: 'ja',
-        autoLockDelayMs: 60_000,
         hapticFeedback: true,
         bluetoothEnabled: true,
       },
@@ -178,7 +184,6 @@ describe('DeviceSettings protocol routing', () => {
         label: 'Shared Label',
         language: 'ja-Jpan-JP',
         bt_enable: true,
-        autolock_delay_ms: 60_000,
         haptic_feedback: true,
       },
     });
@@ -604,27 +609,108 @@ describe('DeviceSettings protocol routing', () => {
     expect(typedCall).not.toHaveBeenCalled();
   });
 
-  it('accepts the Protocol V2 never timeout wire value', async () => {
-    const { device, typedCall } = createDevice({ protocol: 'V2' });
+  it('writes auto-lock delays on Protocol V2 firmware before 1.0.2', async () => {
+    const { device, typedCall } = createDevice({ protocol: 'V2', firmwareVersion: '1.0.1' });
+    const method = new DeviceSettings({
+      id: 10,
+      payload: {
+        method: 'deviceSettings',
+        autoLockDelayMs: 60_000,
+      },
+    });
+    method.init();
+    method.setDevice(device as never);
+
+    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSettingsSet', 'Success', {
+      settings: { autolock_delay_ms: 60_000 },
+    });
+    expect(typedCall).not.toHaveBeenCalledWith(
+      'DeviceSettingsPageShow',
+      'Success',
+      expect.anything()
+    );
+  });
+
+  it('opens the Protocol V2 auto-lock page instead of writing the delay', async () => {
+    const { device, typedCall, getDeviceState } = createDevice({
+      protocol: 'V2',
+      firmwareVersion: '1.0.2',
+    });
+    getDeviceState
+      .mockResolvedValueOnce({
+        settings: { autoLockDelayMs: 30_000 },
+      })
+      .mockResolvedValueOnce({
+        settings: { autoLockDelayMs: 60_000 },
+      });
     const method = new DeviceSettings({
       id: 11,
       payload: {
         method: 'deviceSettings',
-        autoLockDelayMs: 0x10000000,
+        autoLockDelayMs: 60_000,
+      },
+    });
+    method.init();
+    method.setDevice(device as never);
+
+    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSettingsPageShow', 'Success', {
+      page: DeviceSettingsPage.DeviceAutolock,
+    });
+    expect(typedCall).not.toHaveBeenCalledWith('DeviceSettingsSet', 'Success', expect.anything());
+  });
+
+  it('opens the Protocol V2 auto-shutdown page instead of writing the delay', async () => {
+    const { device, typedCall, getDeviceState } = createDevice({
+      protocol: 'V2',
+      firmwareVersion: '1.0.2',
+    });
+    getDeviceState
+      .mockResolvedValueOnce({
+        settings: { autoShutdownDelayMs: 60_000 },
+      })
+      .mockResolvedValueOnce({
+        settings: { autoShutdownDelayMs: 0x10000000 },
+      });
+    const method = new DeviceSettings({
+      id: 12,
+      payload: {
+        method: 'deviceSettings',
         autoShutdownDelayMs: 0x10000000,
       },
     });
     method.init();
-    (method as any).device = device;
+    method.setDevice(device as never);
 
-    await method.run();
+    await expect(method.run()).resolves.toEqual({ message: 'Success' });
+    expect(typedCall).toHaveBeenCalledWith('DeviceSettingsPageShow', 'Success', {
+      page: DeviceSettingsPage.DeviceAutoshutdown,
+    });
+  });
 
-    expect(typedCall).toHaveBeenCalledWith('DeviceSettingsSet', 'Success', {
-      settings: {
-        autolock_delay_ms: 0x10000000,
-        autoshutdown_delay_ms: 0x10000000,
+  it('rejects combining Protocol V2 auto-lock with a direct setting', async () => {
+    const { device, typedCall } = createDevice({
+      protocol: 'V2',
+      firmwareVersion: '1.0.2',
+    });
+    const method = new DeviceSettings({
+      id: 13,
+      payload: {
+        method: 'deviceSettings',
+        brightness: 80,
+        autoLockDelayMs: 60_000,
       },
     });
+    method.init();
+    method.setDevice(device as never);
+
+    expect(method.unlockPolicy).toBe('none');
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.CallMethodInvalidParameter,
+      message: 'Protocol V2 on-device settings must not be combined with direct settings.',
+    });
+    expect(typedCall).not.toHaveBeenCalled();
   });
 
   it('rejects unsupported Protocol V2 timeout values before sending a command', async () => {

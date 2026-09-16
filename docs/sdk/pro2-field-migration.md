@@ -262,8 +262,8 @@ Public callers only use unified `deviceSettings`. Inside Core, `DeviceSettingsSe
 performs partial updates for fields that can be changed directly.
 
 `passphrase_enable` and `airgap_mode` cannot be changed directly through `DeviceSettingsSet`.
-Core reads the current state from the target boolean in `deviceSettings`, opens the corresponding device page through
-`DeviceSettingsPageShow` when needed, and reads the state again after user confirmation to verify the result.
+Firmware 1.0.2 and later also move `autolock_delay_ms` and `autoshutdown_delay_ms` to on-device pages.
+Released 1.0.1 still writes those delays with `DeviceSettingsSet`. Core chooses the path from the connected firmware version.
 
 Pages that can be opened include:
 
@@ -273,6 +273,8 @@ Pages that can be opened include:
 | `DevicePinChange` | Change PIN |
 | `DevicePassphrase` | Passphrase settings |
 | `DeviceAirgap` | Air Gap settings |
+| `DeviceAutolock` | Auto lock-screen delay |
+| `DeviceAutoshutdown` | Auto shutdown delay |
 
 A successful low-level response only means the page has been opened. Public `deviceSettings` succeeds only after the target state has been read and confirmed.
 

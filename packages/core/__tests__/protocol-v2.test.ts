@@ -10896,7 +10896,6 @@ describe('Protocol V2 current low-level methods', () => {
     ['auto lock', { autoLockDelayMs: 60_000 }],
     ['auto shutdown', { autoShutdownDelayMs: 120_000 }],
     ['label mixed with lock-free settings', { label: 'My Pro 2', brightness: 80 }],
-    ['mixed protected settings', { brightness: 80, autoLockDelayMs: 60_000 }],
     ['other protected settings', { usbLockEnabled: true }],
   ])('unlocks before changing unified Protocol V2 %s', (_name, settings) => {
     const method = new DeviceSettings({

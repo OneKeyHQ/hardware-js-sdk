@@ -11718,7 +11718,14 @@
         "DeviceReset": 0,
         "DevicePinChange": 1,
         "DevicePassphrase": 2,
-        "DeviceAirgap": 3
+        "DeviceAirgap": 3,
+        "DeviceNameDisplay": 4,
+        "DeviceUsbLock": 5,
+        "DeviceRandomKeypad": 6,
+        "DeviceFido": 7,
+        "DeviceAutolock": 8,
+        "DeviceAutoshutdown": 9,
+        "DeviceBluetooth": 10
       }
     },
     "DeviceSettingsPageShow": {

@@ -1,3 +1,4 @@
+import semver from 'semver';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 import { Enum_SafetyCheckLevel } from '@onekeyfe/hd-transport';
 
@@ -40,6 +41,13 @@ export const DEVICE_SETTINGS_V2_ONLY_FIELDS = [
 ] as const satisfies readonly DeviceSettingsField[];
 
 export const DEVICE_SETTINGS_NEVER_TIMEOUT_MS = 0x10000000;
+// Firmware 1.0.2 (#208) moved these delays to DeviceSettingsPageShow.
+export const PROTOCOL_V2_SETTINGS_DELAY_PAGES_MIN_VERSION = '1.0.2';
+
+export const shouldUseProtocolV2SettingsDelayPages = (firmwareVersion?: string) => {
+  const version = firmwareVersion ? semver.valid(semver.coerce(firmwareVersion)) : null;
+  return Boolean(version && version !== '0.0.0' && semver.gte(version, PROTOCOL_V2_SETTINGS_DELAY_PAGES_MIN_VERSION));
+};
 // Keep the protocol-specific name for compatibility with existing SDK consumers.
 export const PROTOCOL_V2_NEVER_TIMEOUT_MS = DEVICE_SETTINGS_NEVER_TIMEOUT_MS;
 
