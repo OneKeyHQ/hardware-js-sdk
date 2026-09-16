@@ -348,7 +348,8 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
     params: any & {
       bundle: (any & { _originRequestParams: CommonResponseParams })[];
     },
-    rootFingerprint: number
+    rootFingerprint: number,
+    postMessage = this.postMessage
   ) {
     const method: BaseMethod = findMethod({
       event: IFRAME.CALL,
@@ -362,7 +363,7 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
     });
 
     method.connector = this.connector;
-    method.postMessage = this.postMessage;
+    method.postMessage = postMessage;
     if (this.context) {
       method.setContext?.(this.context);
     }

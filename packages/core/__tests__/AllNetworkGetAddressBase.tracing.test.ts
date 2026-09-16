@@ -543,12 +543,60 @@ describe('AllNetworkGetAddressBase tracing', () => {
         showOnOneKey === false ? [0, 1, 0, 1, 2] : [0, 1, 2]
       );
       expect(checkPassphraseStateSafety).toHaveBeenCalledTimes(1);
+      expect(
+        jest
+          .mocked(method.postMessage)
+          .mock.calls.flatMap(([message]) =>
+            message.type === UI_REQUEST.PREVIOUS_ADDRESS_RESULT ? [message.payload.data.path] : []
+          )
+      ).toEqual([bundle[0].path, bundle[2].path]);
       expect(method.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({ type: UI_REQUEST.DEVICE_PROGRESS, payload: { progress: 100 } })
       );
       expect(getActiveRequestsByDeviceInstance('device-instance')).toEqual([]);
     }
   );
+
+  test('preserves repeated input addresses when suppressing V2 retry notifications', async () => {
+    const { method, bundle } = createGroupedAddressHarness(false);
+    method.payload.bundle = [bundle[0], bundle[0], bundle[1], bundle[0], bundle[2]];
+
+    const result = await method.getAllNetworkAddress(7);
+
+    expect(result.map(item => item.success)).toEqual([true, true, false, true, true]);
+    expect(
+      jest
+        .mocked(method.postMessage)
+        .mock.calls.flatMap(([message]) =>
+          message.type === UI_REQUEST.PREVIOUS_ADDRESS_RESULT ? [message.payload.data.path] : []
+        )
+    ).toEqual([bundle[0].path, bundle[0].path, bundle[0].path, bundle[2].path]);
+  });
+
+  test('forwards successful V2 address notifications before the batch finishes', async () => {
+    const { method, typedCall, bundle } = createGroupedAddressHarness(false);
+    typedCall.mockImplementation((_type, _response, params) => {
+      const index = params.address_n[2] - 0x80000000;
+      expect(
+        jest
+          .mocked(method.postMessage)
+          .mock.calls.filter(([message]) => message.type === UI_REQUEST.PREVIOUS_ADDRESS_RESULT)
+      ).toHaveLength(index);
+      return Promise.resolve({ message: { address: `address-${index}` } });
+    });
+
+    const result = await method.getAllNetworkAddress(7);
+
+    expect(result.map(item => item.success)).toEqual([true, true, true]);
+    expect(typedCall).toHaveBeenCalledTimes(3);
+    expect(
+      jest
+        .mocked(method.postMessage)
+        .mock.calls.flatMap(([message]) =>
+          message.type === UI_REQUEST.PREVIOUS_ADDRESS_RESULT ? [message.payload.data.path] : []
+        )
+    ).toEqual(bundle.map(item => item.path));
+  });
 
   test('does not retry a failed V2 link as individual address requests', async () => {
     const { method, typedCall } = createGroupedAddressHarness(false);
@@ -706,7 +754,8 @@ describe('AllNetworkGetAddressBase tracing', () => {
     expect(callMethod).toHaveBeenCalledWith(
       'evmGetAddress',
       expect.objectContaining({ bundle: [expect.any(Object), expect.any(Object)] }),
-      7
+      7,
+      expect.any(Function)
     );
   });
 
@@ -745,7 +794,8 @@ describe('AllNetworkGetAddressBase tracing', () => {
       1,
       'evmGetAddress',
       expect.objectContaining({ bundle: [expect.any(Object), expect.any(Object)] }),
-      7
+      7,
+      expect.any(Function)
     );
     expect(callMethod).toHaveBeenNthCalledWith(
       2,

@@ -7,21 +7,74 @@ import AllNetworkGetAddressBase from './AllNetworkGetAddressBase';
 import type { CoreApi } from '../../types';
 import type {
   AllNetworkAddress,
-  AllNetworkAddressParams,
   AllNetworkGetAddressParams,
 } from '../../types/api/allNetworkGetAddress';
 
-type MethodParams = {
-  methodName: keyof CoreApi;
-  params: Parameters<CoreApi[keyof CoreApi]>[0];
-  _originRequestParams: AllNetworkAddressParams;
-  _originalIndex: number;
-};
+type MethodParams = ReturnType<AllNetworkGetAddressBase['generateMethodName']>;
 
 export default class AllNetworkGetAddress extends AllNetworkGetAddressBase {
+  private checkAborted() {
+    if (this.abortController?.signal.aborted) {
+      throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
+    }
+  }
+
+  private async callAddressGroup(
+    methodName: keyof CoreApi,
+    params: MethodParams[],
+    rootFingerprint: number
+  ): Promise<AllNetworkAddress[]> {
+    const methodCallParams = { bundle: params.map(param => ({ ...param.params })) };
+    if (!this.device.isProtocolV2() || params.length === 1) {
+      return this.callMethod(methodName, methodCallParams, rootFingerprint);
+    }
+
+    const postedAddressCounts = new Map<string, number>();
+    let runningIndividually = false;
+    const postMessage: typeof this.postMessage = message => {
+      if (message.type === UI_REQUEST.PREVIOUS_ADDRESS_RESULT) {
+        const { path, address } = message.payload.data;
+        const key = JSON.stringify([path, address]);
+        const count = postedAddressCounts.get(key) ?? 0;
+        if (runningIndividually && count > 0) {
+          postedAddressCounts.set(key, count - 1);
+          return;
+        }
+        if (!runningIndividually) postedAddressCounts.set(key, count + 1);
+      }
+      this.postMessage(message);
+    };
+
+    // Only silent reads may be replayed. Forward their notifications immediately,
+    // then suppress matching retry copies by count so repeated inputs still emit.
+    if (params.every(param => param._originRequestParams.showOnOneKey === false)) {
+      const response = await this.callMethod(
+        methodName,
+        methodCallParams,
+        rootFingerprint,
+        postMessage
+      );
+      // Skippable errors become failed items; link, cancellation and wallet errors throw.
+      if (response.some(item => item.success)) return response;
+    }
+
+    runningIndividually = true;
+    const responses: AllNetworkAddress[] = [];
+    for (const param of params) {
+      this.checkAborted();
+      const response = await this.callMethod(
+        methodName,
+        { bundle: [{ ...param.params }] },
+        rootFingerprint,
+        postMessage
+      );
+      responses.push(...response);
+    }
+    return responses;
+  }
+
   async getAllNetworkAddress(rootFingerprint: number) {
     const responses: AllNetworkAddress[] = [];
-    const resultMap: Record<string, AllNetworkAddress> = {};
     const { bundle } = this.payload as AllNetworkGetAddressParams;
 
     const methodParams = bundle.map((param, index) =>
@@ -44,55 +97,13 @@ export default class AllNetworkGetAddress extends AllNetworkGetAddressBase {
 
     let processed = 0;
     for (const [methodName, params] of methodGroups.entries()) {
-      const methodCallParams = {
-        bundle: params.map(param => ({
-          ...param.params,
-        })),
-      };
-
-      if (this.abortController?.signal.aborted) {
-        throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
-      }
-      const isProtocolV2 = this.device.isProtocolV2();
-      // Displayed addresses must not be replayed if a later item fails.
-      const runIndividually =
-        isProtocolV2 &&
-        params.length > 1 &&
-        params.some(param => param._originRequestParams.showOnOneKey !== false);
-      let response: AllNetworkAddress[] = [];
-      if (!runIndividually) {
-        response = await this.callMethod(methodName, methodCallParams, rootFingerprint);
-      }
-
-      // callMethod returns failures only for skippable errors; link, cancellation,
-      // and wallet errors throw. Retry silent reads separately to isolate a bad
-      // path or unsupported coin while reusing the already selected wallet.
-      if (
-        isProtocolV2 &&
-        params.length > 1 &&
-        (runIndividually || response.every(item => !item.success))
-      ) {
-        response = [];
-        for (const param of params) {
-          if (this.abortController?.signal.aborted) {
-            throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
-          }
-          const itemResponse = await this.callMethod(
-            methodName,
-            { bundle: [{ ...param.params }] },
-            rootFingerprint
-          );
-          response.push(...itemResponse);
-        }
-      }
-
-      if (this.abortController?.signal.aborted) {
-        throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
-      }
+      this.checkAborted();
+      const response = await this.callAddressGroup(methodName, params, rootFingerprint);
+      this.checkAborted();
 
       for (let index = 0; index < params.length; index++) {
         const { _originRequestParams, _originalIndex } = params[index];
-        resultMap[`${_originalIndex}`] = {
+        responses[_originalIndex] = {
           ..._originRequestParams,
           ...response[index],
         };
@@ -105,11 +116,7 @@ export default class AllNetworkGetAddress extends AllNetworkGetAddressBase {
       }
     }
 
-    for (let i = 0; i < bundle.length; i++) {
-      responses.push(resultMap[i]);
-    }
-
     this.abortController = null;
-    return Promise.resolve(responses);
+    return responses;
   }
 }
