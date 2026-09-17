@@ -564,20 +564,25 @@ export class KeystoneAdapter implements IHardwareWallet {
       code: HardwareErrorCode.UserAborted,
       message: 'User aborted operation',
     });
-    const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
     if (connectId) {
-      if (
-        !activeJobId ||
-        (activeJobId !== connectId && activeJobId !== this._walletIdFromIdentifier(connectId))
-      ) {
-        this._jobQueue.cancelActiveAndPending(connectId, reason);
-        const walletId = this._walletIdFromIdentifier(connectId);
-        if (walletId && walletId !== connectId) {
-          this._jobQueue.cancelActiveAndPending(walletId, reason);
-        }
-        return;
+      // An operation-scoped call queues under its operation id, so cancelling by
+      // the raw connectId alone never reaches it. Cancel every queue key this
+      // identifier can stand for, and always clear the pending UI requests.
+      const queueKeys = new Set<string>();
+      const addIdentifier = (identifier: string | undefined): void => {
+        if (!identifier) return;
+        queueKeys.add(identifier);
+        const walletId = this._walletIdFromIdentifier(identifier);
+        if (walletId) queueKeys.add(walletId);
+      };
+      addIdentifier(connectId);
+      addIdentifier(this._operationRoutes.get(connectId)?.operationId);
+      if (isHardwareOperationId(connectId)) {
+        addIdentifier(this._operations.find(connectId)?.connectId);
       }
-      this._jobQueue.cancelActiveAndPending(activeJobId, reason);
+      for (const key of queueKeys) {
+        this._jobQueue.cancelActiveAndPending(key, reason);
+      }
     } else {
       this._jobQueue.cancelActiveAndPending(undefined, reason);
     }
@@ -2530,6 +2535,17 @@ export class KeystoneAdapter implements IHardwareWallet {
         code: HardwareErrorCode.DeviceBusyInternal,
         message: `Keystone USB is busy while calling ${method}`,
       });
+    }
+    // Check before handing the command to the connector, not only around the
+    // promise: racing an already-aborted signal still puts the command on the
+    // wire. Refusing here guarantees nothing was sent.
+    if (signal?.aborted) {
+      throw signal.reason instanceof Error
+        ? signal.reason
+        : createHwkError({
+            code: HardwareErrorCode.UserAborted,
+            message: 'User aborted operation',
+          });
     }
     const releaseOperation = this._retainUsbOperation(`call:${sessionId}`);
     let rawCall: Promise<ConnectorCallResult>;
