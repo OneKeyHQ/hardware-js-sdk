@@ -2317,6 +2317,90 @@ describe('TrezorAdapter', () => {
     expect(connector.cancel).toHaveBeenCalledWith('safe-7-session');
   });
 
+  it('refuses to put a cancelled command on the wire', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    // No REQUEST_SAVE_DEVICE_BINDING listener, so the binding declines and
+    // emits its terminal status synchronously. A host that cancels from that
+    // handler is the window where an aborted signal reaches the business call:
+    // nothing between the decline and the dispatch re-checks the signal.
+    adapter.on(UI_REQUEST.DEVICE_BINDING_STATUS, event => {
+      if (event.payload.status === 'failed') adapter.cancel();
+    });
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+        payload: { requestId: event.payload.requestId, sdkConnectId: 'safe-7' },
+      });
+    });
+    (connector.call as CallMock).mockResolvedValue({ protocol: 'v1' });
+
+    const result = await adapter.evmGetAddress('', 'safe-7', {
+      path: "m/44'/60'/0'/0/0",
+      useEmptyPassphrase: true,
+      knownConnections: [],
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.UserAborted },
+    });
+    expect((connector.call as CallMock).mock.calls.map(([, method]) => method)).not.toContain(
+      'evmGetAddress'
+    );
+    await adapter.dispose();
+  });
+
+  it('reports a terminal binding status when the device record disappears first', async () => {
+    const connector = createConnector();
+    const handlers = new Map<string, Set<(data: unknown) => void>>();
+    (connector.on as jest.Mock).mockImplementation(
+      (event: string, handler: (data: unknown) => void) => {
+        if (!handlers.has(event)) handlers.set(event, new Set());
+        handlers.get(event)!.add(handler);
+      }
+    );
+    (connector.off as jest.Mock).mockImplementation(
+      (event: string, handler: (data: unknown) => void) => {
+        handlers.get(event)?.delete(handler);
+      }
+    );
+    const adapter = new TrezorAdapter(connector);
+    const save = acknowledgeBindings(adapter);
+    const status = jest.fn();
+    adapter.on(UI_REQUEST.DEVICE_BINDING_STATUS, status);
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+        payload: { requestId: event.payload.requestId, sdkConnectId: 'safe-7' },
+      });
+    });
+    // The link drops while the wallet session is created, so the device row is
+    // gone by the time the binding would be verified. The call itself still
+    // completes on the session it already holds.
+    (connector.call as CallMock).mockImplementation(async (_session, method) => {
+      if (method === '__thpCreateSession') {
+        handlers.get('device-disconnect')?.forEach(handler => handler({ connectId: 'safe-7' }));
+        return { protocol: 'v1' };
+      }
+      return { address: 'verified-address' };
+    });
+
+    const result = await adapter.evmGetAddress('', 'safe-7', {
+      path: "m/44'/60'/0'/0/0",
+      useEmptyPassphrase: true,
+      knownConnections: [],
+    });
+
+    expect(result.success).toBe(true);
+    expect(save).not.toHaveBeenCalled();
+    expect(status).toHaveBeenLastCalledWith({
+      type: UI_REQUEST.DEVICE_BINDING_STATUS,
+      payload: { selectionRequestId: expect.any(String), status: 'failed' },
+    });
+    await adapter.dispose();
+  });
+
   it('getChainFingerprint returns features.device_id (chain-agnostic)', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);

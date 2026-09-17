@@ -1212,6 +1212,76 @@ describe('KeystoneAdapter', () => {
       }
     );
 
+    it('cancels an operation-scoped job addressed by its wallet connectId', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+      const connected = await connectQrDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      // Leave the signing request unanswered: it stays pending in the UI
+      // registry until something cancels it.
+      fake.detach();
+
+      const pending = adapter.evmSignTransaction(connected.payload, FIXTURE_WALLET_ID, {
+        path: "m/44'/60'/0'/0/0",
+        serializedTx: `02${'ab'.repeat(30)}`,
+        operationId: connected.payload,
+      });
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 10);
+      });
+      // The host cancels with the connectId it holds, not the operation id the
+      // job was queued under.
+      adapter.cancel(`keystone-wallet:${FIXTURE_WALLET_ID}`);
+
+      await expect(pending).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.UserAborted },
+      });
+      await adapter.dispose();
+    });
+
+    it('refuses to put a cancelled command on the USB wire', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });
+      attachFakeDevice(adapter);
+      const imported = await adapter.importFromQr();
+      expect(imported.success).toBe(true);
+      if (!imported.success) return;
+
+      // Hold the best-effort USB re-attach open. It takes no signal, so a
+      // cancel landing here is only seen once the call reaches the connector.
+      const rawConnect = usb.connector.connect.bind(usb.connector);
+      let finishConnect: (() => void) | undefined;
+      jest.spyOn(usb.connector, 'connect').mockImplementationOnce(
+        (...args) =>
+          new Promise(resolve => {
+            finishConnect = () => resolve(rawConnect(...args));
+          })
+      );
+
+      const pending = adapter.evmSignTransaction(
+        imported.payload.connectId,
+        imported.payload.deviceId,
+        { path: "m/44'/60'/0'/0/0", serializedTx: `02${'ab'.repeat(30)}` }
+      );
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 10);
+      });
+      expect(finishConnect).toBeDefined();
+      adapter.cancel(imported.payload.deviceId);
+      finishConnect?.();
+
+      await expect(pending).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.UserAborted },
+      });
+      expect(usb.calls.map(call => (call.params as { urType?: string })?.urType)).not.toContain(
+        'eth-sign-request'
+      );
+      await adapter.dispose();
+    });
+
     it('rejects a pending QR display request with UserAborted', async () => {
       const adapter = newTestAdapter();
       // No fake device attached — the request is left pending until cancelled.
