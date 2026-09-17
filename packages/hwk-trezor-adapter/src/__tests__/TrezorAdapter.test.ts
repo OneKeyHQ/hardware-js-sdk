@@ -2396,7 +2396,7 @@ describe('TrezorAdapter', () => {
     expect(save).not.toHaveBeenCalled();
     expect(status).toHaveBeenLastCalledWith({
       type: UI_REQUEST.DEVICE_BINDING_STATUS,
-      payload: { selectionRequestId: expect.any(String), status: 'failed' },
+      payload: { selectionRequestId: expect.any(String), status: 'cancelled' },
     });
     await adapter.dispose();
   });

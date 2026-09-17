@@ -354,3 +354,93 @@ describe('LedgerConnectorBase BLE direct-connect gate', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// installApp failure teardown
+// ---------------------------------------------------------------------------
+
+describe('LedgerConnectorBase installApp failure teardown', () => {
+  const SESSION_ID = 'session-install-1';
+
+  /** Wire a connector with a stubbed DeviceApps whose install() rejects. */
+  function connectorWithFailingInstall(error: unknown) {
+    const connector = new LedgerConnectorBase(async () => ({}));
+    const cancel = jest.fn();
+    const invalidateDeviceApps = jest.fn();
+    const invalidateSigners = jest.fn();
+
+    (connector as any)._deviceAppsManager = {
+      getOrCreate: async () => ({
+        install: async () => {
+          // Mirror a real handler: register the canceller for the in-flight
+          // device action, then fail.
+          throw error;
+        },
+        set onRegisterCanceller(fn: (c: () => void) => void) {
+          fn(cancel);
+        },
+        set onInteraction(_fn: unknown) {
+          /* not exercised here */
+        },
+      }),
+      invalidate: invalidateDeviceApps,
+      clearAll: jest.fn(),
+    };
+    (connector as any)._signerManager = {
+      invalidate: invalidateSigners,
+      clearAll: jest.fn(),
+    };
+
+    return { connector, cancel, invalidateDeviceApps, invalidateSigners };
+  }
+
+  it('cancels the secure-channel action and clears both managers on SecureChannelError', async () => {
+    const secureChannelError = {
+      _tag: ERROR_TAG.SecureChannel,
+      error: { url: 'wss://scriptrunner', errorMessage: 'Connection closed unexpectedly' },
+      originalError: { url: 'wss://scriptrunner', errorMessage: 'Connection closed unexpectedly' },
+    };
+    const { connector, cancel, invalidateDeviceApps, invalidateSigners } =
+      connectorWithFailingInstall(secureChannelError);
+
+    const result = await connector.call(SESSION_ID, 'installApp', { appName: 'Bitcoin' });
+
+    expect(result.success).toBe(false);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(invalidateDeviceApps).toHaveBeenCalledWith(SESSION_ID);
+    expect(invalidateSigners).toHaveBeenCalledWith(SESSION_ID);
+    expect((connector as any)._cancellers.has(SESSION_ID)).toBe(false);
+  });
+
+  it('carries _tag and the secure-channel code across the connector boundary', async () => {
+    const { connector } = connectorWithFailingInstall({
+      _tag: ERROR_TAG.SecureChannel,
+      error: { url: 'wss://scriptrunner', errorMessage: 'Connection closed unexpectedly' },
+      originalError: { url: 'wss://scriptrunner', errorMessage: 'Connection closed unexpectedly' },
+    });
+
+    const result = await connector.call(SESSION_ID, 'installApp', { appName: 'Bitcoin' });
+
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('expected failure');
+    expect(result.error.code).toBe(HardwareErrorCode.LedgerSecureChannelError);
+    expect(result.error.params?._tag).toBe(ERROR_TAG.SecureChannel);
+  });
+
+  it('maps a metadata failure to LedgerFirmwareMetadataError without a transport teardown', async () => {
+    const { connector } = connectorWithFailingInstall({
+      _tag: ERROR_TAG.InvalidFirmwareMetadataResponse,
+      originalError: new Error('Invalid Firmware Metadata response error.'),
+    });
+
+    const result = await connector.call(SESSION_ID, 'installApp', { appName: 'Bitcoin' });
+
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('expected failure');
+    expect(result.error.code).toBe(HardwareErrorCode.LedgerFirmwareMetadataError);
+    expect(result.error.params?._tag).toBe(ERROR_TAG.InvalidFirmwareMetadataResponse);
+    // Not DeviceDisconnected / TransportError: the device link was never the problem.
+    expect(result.error.code).not.toBe(HardwareErrorCode.DeviceDisconnected);
+    expect(result.error.code).not.toBe(HardwareErrorCode.TransportError);
+  });
+});

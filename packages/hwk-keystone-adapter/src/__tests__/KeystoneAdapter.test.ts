@@ -1212,6 +1212,46 @@ describe('KeystoneAdapter', () => {
       }
     );
 
+    it('leaves no trace when the named operation has already ended', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+      const connected = await connectQrDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      await adapter.releaseOperation(connected.payload);
+      // Leave the next request unanswered so it stays cancellable.
+      fake.detach();
+
+      let settled = false;
+      const pending = adapter
+        .evmSignTransaction(`keystone-wallet:${FIXTURE_WALLET_ID}`, FIXTURE_WALLET_ID, {
+          path: "m/44'/60'/0'/0/0",
+          serializedTx: `02${'ab'.repeat(30)}`,
+        })
+        .then(result => {
+          settled = true;
+          return result;
+        });
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 10);
+      });
+
+      // Naming a finished operation cancels nothing: not this unrelated job on
+      // the same wallet, and not the QR request it is waiting on.
+      adapter.cancel(connected.payload);
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 10);
+      });
+      expect(settled).toBe(false);
+
+      adapter.cancel(FIXTURE_WALLET_ID);
+      await expect(pending).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.UserAborted },
+      });
+      await adapter.dispose();
+    });
+
     it('cancels an operation-scoped job addressed by its wallet connectId', async () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);

@@ -137,6 +137,21 @@ export enum HardwareErrorCode {
    * and from BlePairingTimeout (the SMP window elapsed on its own).
    */
   BlePairingCancelled = 10310,
+  /**
+   * The vendor's remote secure channel broke while it was relaying APDUs to the
+   * device (Ledger: the manager-api script-runner WebSocket behind app install,
+   * uninstall and genuine check). The device link itself is still usable, so
+   * this is not a disconnect: retry the same call. Distinct from NetworkError,
+   * which is a plain HTTP/WS request that never carried device traffic.
+   */
+  LedgerSecureChannelError = 10311,
+  /**
+   * The vendor's metadata service answered with a payload the SDK cannot use
+   * (Ledger: firmware metadata or the application catalog). Not a connectivity
+   * failure — the request succeeded and the response was unusable — so callers
+   * must not treat it as a dropped link.
+   */
+  LedgerFirmwareMetadataError = 10312,
 
   // --- 10400s PIN / Passphrase ---
   PinInvalid = 10400,
@@ -166,6 +181,8 @@ export enum HardwareErrorCode {
   AppTooOld = 10502,
   /** Not enough free storage for install/update; user must uninstall apps first. */
   DeviceOutOfMemory = 10503,
+  /** Install refused because the app is already on the device. Benign for callers that only need it present. */
+  AppAlreadyInstalled = 10504,
 
   // --- 10600s Payload / framing limits ---
   /**
@@ -334,6 +351,8 @@ export function defaultRecoveryForCode(code: HardwareErrorCode): HwkRecoveryHint
     case HardwareErrorCode.DeviceAppStuck:
     case HardwareErrorCode.DeviceBusyInternal:
     case HardwareErrorCode.NetworkError:
+    case HardwareErrorCode.LedgerSecureChannelError:
+    case HardwareErrorCode.LedgerFirmwareMetadataError:
     case HardwareErrorCode.PinInvalid:
     case HardwareErrorCode.PinCancelled:
     case HardwareErrorCode.PassphraseRejected:
@@ -345,6 +364,7 @@ export function defaultRecoveryForCode(code: HardwareErrorCode): HwkRecoveryHint
     case HardwareErrorCode.WrongApp:
     case HardwareErrorCode.AppTooOld:
     case HardwareErrorCode.DeviceOutOfMemory:
+    case HardwareErrorCode.AppAlreadyInstalled:
     case HardwareErrorCode.EvmBlindSigningRequired:
     case HardwareErrorCode.EvmClearSignPluginMissing:
     case HardwareErrorCode.EvmDataTooLarge:
@@ -426,6 +446,7 @@ export function defaultOriginForCode(code: HardwareErrorCode): HwkErrorOrigin | 
     case HardwareErrorCode.AppNotInstalled:
     case HardwareErrorCode.AppTooOld:
     case HardwareErrorCode.DeviceOutOfMemory:
+    case HardwareErrorCode.AppAlreadyInstalled:
       return 'device';
     case HardwareErrorCode.DeviceNotFound:
     case HardwareErrorCode.DeviceDisconnected:
@@ -434,6 +455,8 @@ export function defaultOriginForCode(code: HardwareErrorCode): HwkErrorOrigin | 
     case HardwareErrorCode.TransportNotAvailable:
     case HardwareErrorCode.BlePairingTimeout:
     case HardwareErrorCode.NetworkError:
+    case HardwareErrorCode.LedgerSecureChannelError:
+    case HardwareErrorCode.LedgerFirmwareMetadataError:
     case HardwareErrorCode.BleBondInvalid:
     case HardwareErrorCode.BleConnectFailed:
       return 'transport';

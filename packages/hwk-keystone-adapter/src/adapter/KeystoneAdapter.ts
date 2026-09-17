@@ -560,6 +560,20 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   cancel(connectId?: string): void {
+    // "Cancel this one" and "cancel whatever is running" are different
+    // instructions. An operation id that has already ended names nothing, so
+    // this call must leave no trace at all rather than decay into the
+    // untargeted form and take down an unrelated job or someone else's
+    // pending UI request. Decided before anything else.
+    let namedOperationConnectId: string | undefined;
+    if (isHardwareOperationId(connectId)) {
+      try {
+        namedOperationConnectId = this._operations.resolve(connectId).connectId;
+      } catch {
+        // Ended (tombstoned) and never-existed both land here.
+        return;
+      }
+    }
     const reason = createHwkError({
       code: HardwareErrorCode.UserAborted,
       message: 'User aborted operation',
@@ -577,9 +591,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       };
       addIdentifier(connectId);
       addIdentifier(this._operationRoutes.get(connectId)?.operationId);
-      if (isHardwareOperationId(connectId)) {
-        addIdentifier(this._operations.find(connectId)?.connectId);
-      }
+      addIdentifier(namedOperationConnectId);
       for (const key of queueKeys) {
         this._jobQueue.cancelActiveAndPending(key, reason);
       }
