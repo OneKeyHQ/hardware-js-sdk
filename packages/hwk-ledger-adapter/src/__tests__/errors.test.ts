@@ -599,6 +599,14 @@ function dmkDaError(tag: string, message: string): Record<string, unknown> {
   return { _tag: tag, originalError: new Error(message) };
 }
 
+/**
+ * The four classes `SecureChannelError.mapInstallDAErrors()` builds with no
+ * argument, so DMK's own default text applies: the literal "Unknown error.".
+ */
+function dmkDaErrorNoArg(tag: string): Record<string, unknown> {
+  return dmkDaError(tag, 'Unknown error.');
+}
+
 /** Shape of DMK's SecureChannelError: payload on `error`, no `message`. */
 function dmkSecureChannelError(errorMessage: string): Record<string, unknown> {
   const payload = { url: 'wss://scriptrunner.api.live.ledger.com/update/install', errorMessage };
@@ -607,12 +615,30 @@ function dmkSecureChannelError(errorMessage: string): Record<string, unknown> {
 
 describe('installApp DMK error classification', () => {
   it('maps RefusedByUserDAError to UserRejected', () => {
-    const err = dmkDaError(ERROR_TAG.RefusedByUserDA, 'User refused on the device');
+    const err = dmkDaErrorNoArg(ERROR_TAG.RefusedByUserDA);
     expect(isUserRejectedError(err)).toBe(true);
     const result = mapLedgerError(err);
     expect(result.code).toBe(HardwareErrorCode.UserRejected);
     expect(result.origin).toBe('device');
-    expect(result.message).toContain('User refused on the device');
+  });
+
+  it('falls back to the tag rather than surfacing DMK\'s "Unknown error." placeholder', () => {
+    const placeholderClasses = [
+      ERROR_TAG.RefusedByUserDA,
+      ERROR_TAG.AppAlreadyInstalledDA,
+      ERROR_TAG.OutOfMemoryDA,
+      'UnknownDAError',
+    ];
+    for (const tag of placeholderClasses) {
+      const { message } = mapLedgerError(dmkDaErrorNoArg(tag));
+      expect(message).not.toContain('Unknown error.');
+      expect(message).toContain(tag);
+    }
+  });
+
+  it('still prefers real DMK text when the class was given one', () => {
+    const err = dmkDaError(ERROR_TAG.OutOfMemoryDA, 'Not enough memory for those applications');
+    expect(mapLedgerError(err).message).toContain('Not enough memory for those applications');
   });
 
   it('maps SecureChannelError to LedgerSecureChannelError with a transport origin', () => {
@@ -623,7 +649,7 @@ describe('installApp DMK error classification', () => {
   });
 
   it('maps AppAlreadyInstalledDAError to AppAlreadyInstalled', () => {
-    const err = dmkDaError(ERROR_TAG.AppAlreadyInstalledDA, 'App already installed');
+    const err = dmkDaErrorNoArg(ERROR_TAG.AppAlreadyInstalledDA);
     expect(mapLedgerError(err).code).toBe(HardwareErrorCode.AppAlreadyInstalled);
   });
 
@@ -652,9 +678,9 @@ describe('installApp DMK error classification', () => {
 
   it('no longer collapses the install failure surface into UnknownError', () => {
     const errors = [
-      dmkDaError(ERROR_TAG.RefusedByUserDA, 'User refused on the device'),
+      dmkDaErrorNoArg(ERROR_TAG.RefusedByUserDA),
       dmkSecureChannelError('Connection closed unexpectedly'),
-      dmkDaError(ERROR_TAG.AppAlreadyInstalledDA, 'App already installed'),
+      dmkDaErrorNoArg(ERROR_TAG.AppAlreadyInstalledDA),
       dmkDaError(ERROR_TAG.DeviceNotOnboarded, 'Device not onboarded.'),
       dmkDaError(ERROR_TAG.ApplicationsMetadataTask, 'Failed to get applications metadata.'),
       dmkDaError(
@@ -683,7 +709,7 @@ describe('installApp DMK error classification', () => {
   });
 
   it('still reports UnknownError for a genuinely unmapped tag, but carries _tag', () => {
-    const err = dmkDaError('UnknownDAError', 'Unknown error.');
+    const err = dmkDaErrorNoArg('UnknownDAError');
     const mapped = mapLedgerError(err);
     expect(mapped.code).toBe(HardwareErrorCode.UnknownError);
 
