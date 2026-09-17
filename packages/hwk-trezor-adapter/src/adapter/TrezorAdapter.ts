@@ -2412,9 +2412,11 @@ export class TrezorAdapter implements IHardwareWallet {
     if (!device || device.deviceId !== deviceId || device.connectionType !== 'ble') {
       // Every other exit reports a terminal status, this one has to as well:
       // callers clear the request id and would leave the host dialog waiting.
+      // Cancelled, not failed - the call itself carries on, same as the USB
+      // fallback that drops a binding without stopping the operation.
       this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
         type: UI_REQUEST.DEVICE_BINDING_STATUS,
-        payload: { selectionRequestId, status: signal?.aborted ? 'cancelled' : 'failed' },
+        payload: { selectionRequestId, status: 'cancelled' },
       });
       return false;
     }

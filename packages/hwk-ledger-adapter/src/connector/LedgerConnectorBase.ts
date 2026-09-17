@@ -339,6 +339,7 @@ export class LedgerConnectorBase implements IConnector {
       emit: <K extends ConnectorEventType>(event: K, data: ConnectorEventMap[K]) =>
         this._emit(event, data),
       invalidateSession: sid => this._invalidateSession(sid),
+      teardownSecureChannelSession: sid => this._teardownSecureChannelSession(sid),
       wrapError: (err, opts) => this._wrapError(err, opts),
       getOrCreateDmk: () => this._getOrCreateDmk(),
       getDeviceManager: () => this._getDeviceManager(),
@@ -855,7 +856,7 @@ export class LedgerConnectorBase implements IConnector {
             });
           });
         } catch (err) {
-          ctx.invalidateSession(sessionId);
+          ctx.teardownSecureChannelSession(sessionId);
           throw ctx.wrapError(err);
         } finally {
           ctx.clearCanceller(sessionId);
@@ -960,7 +961,7 @@ export class LedgerConnectorBase implements IConnector {
 
           return { isGenuine: output.isGenuine, deviceId };
         } catch (err) {
-          ctx.invalidateSession(sessionId);
+          ctx.teardownSecureChannelSession(sessionId);
           throw ctx.wrapError(err);
         } finally {
           ctx.clearCanceller(sessionId);
@@ -1117,6 +1118,31 @@ export class LedgerConnectorBase implements IConnector {
 
   private _invalidateSession(sessionId: string): void {
     this._signerManager?.invalidate(sessionId);
+    this._deviceAppsManager?.invalidate(sessionId);
+  }
+
+  /**
+   * Teardown for the OS-level actions that open a manager-api secure channel
+   * (install, uninstall, genuine check). Cancelling the device action is what
+   * stops DMK's xstate actor, which unsubscribes the secure-channel observable
+   * and closes its WebSocket; dropping the canceller without firing it leaves
+   * that teardown to run only if the action settled on its own.
+   *
+   * The DMK device session is deliberately kept: the secure channel is a
+   * separate WebSocket per call, and disconnecting here would break the bounded
+   * unlock/retry recovery the adapter runs on the original session.
+   */
+  private _teardownSecureChannelSession(sessionId: string): void {
+    const cancel = this._cancellers.get(sessionId);
+    this._cancellers.delete(sessionId);
+    if (cancel) {
+      try {
+        cancel();
+      } catch {
+        // Action may already have settled — nothing left to cancel.
+      }
+    }
+    this._invalidateSession(sessionId);
   }
 
   /**
