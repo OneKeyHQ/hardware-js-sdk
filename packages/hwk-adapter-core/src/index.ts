@@ -181,7 +181,7 @@ export type {
 } from './types/transport';
 
 export { DeviceJobQueue } from './utils/DeviceJobQueue';
-export type { JobOptions, ActiveJobInfo } from './utils/DeviceJobQueue';
+export type { JobOptions, ActiveJobInfo, CancelScopeHandle } from './utils/DeviceJobQueue';
 export { OperationRegistry, OPERATION_DEFAULT_TTL_MS } from './utils/OperationRegistry';
 export type { HardwareOperation, OperationEndReason } from './utils/OperationRegistry';
 export {

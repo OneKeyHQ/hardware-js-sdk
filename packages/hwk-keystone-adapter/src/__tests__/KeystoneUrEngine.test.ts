@@ -159,9 +159,7 @@ describe('KeystoneUrEngine', () => {
         Buffer.from('2b5893f252e24ba89d5e6c2b6f5f1c11', 'hex')
       );
 
-      expect(() => engine.parseEthSignature(urFromSdk(short.toUR()))).toThrow(
-        /expected 65 bytes/
-      );
+      expect(() => engine.parseEthSignature(urFromSdk(short.toUR()))).toThrow(/expected 65 bytes/);
     });
 
     it('round-trips a requestId the engine itself minted, byte for byte', () => {
