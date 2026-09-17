@@ -23,7 +23,8 @@ export const isNativeBleDisconnectError = (error: unknown): boolean => {
   const nativeError = error as NativeBleErrorFields;
   return (
     nativeError.errorCode === BLE_PLX_DEVICE_DISCONNECTED ||
-    nativeError.iosErrorCode === IOS_PERIPHERAL_DISCONNECTED
+    nativeError.iosErrorCode === IOS_PERIPHERAL_DISCONNECTED ||
+    nativeErrorText(nativeError).toLowerCase().includes('was disconnected')
   );
 };
 
