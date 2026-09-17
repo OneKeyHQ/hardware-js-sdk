@@ -355,6 +355,8 @@ const DEVICE_NOT_FOUND_TAGS: Set<string> = new Set([
   ERROR_TAG.DeviceNotInDiscoveryCache,
 ]);
 
+// HID-shaped reading of the opening tag: the device is held by another page.
+// BLE callers wrap it as a pairing failure before it reaches here.
 const DEVICE_BUSY_TAGS: Set<string> = new Set([
   ERROR_TAG.OpeningConnection,
   ERROR_TAG.OpeningConnectionLegacy,
@@ -386,6 +388,22 @@ export function isConnectionLevelError(err: unknown): boolean {
  *  unchanged or wrap as BleGattBondingFailed. */
 export function isKnownConnectionTag(tag: unknown): boolean {
   return typeof tag === 'string' && CONNECTION_LEVEL_TAGS.has(tag);
+}
+
+/**
+ * "Could not open the connection" — every DMK transport's catch-all for a
+ * failed connect, so it says nothing about the cause. On HID that is almost
+ * always another page holding the device (DeviceBusy); on BLE it is the
+ * generic GATT/pairing failure that RNBleTransport raises for anything it
+ * cannot attribute to a removed pairing, and the BLE caller must keep
+ * classifying it itself rather than trust the tag.
+ */
+const CONNECTION_OPENING_TAGS: ReadonlySet<string> = new Set<string>([
+  ERROR_TAG.OpeningConnection,
+  ERROR_TAG.OpeningConnectionLegacy,
+]);
+export function isConnectionOpeningTag(tag: unknown): boolean {
+  return typeof tag === 'string' && CONNECTION_OPENING_TAGS.has(tag);
 }
 
 /** Check if a status/error code exists in the given set, crawling the error chain. */
@@ -637,6 +655,23 @@ export function isStuckAppStateError(err: unknown): boolean {
 }
 
 /**
+ * DMK's placeholder text. `mapInstallDAErrors()` builds RefusedByUser /
+ * AppAlreadyInstalled / OutOfMemory / UnknownDA with no argument, so their
+ * `originalError.message` is this literal — less informative than the tag.
+ */
+const DMK_PLACEHOLDER_MESSAGE = 'Unknown error.';
+
+/** Readable text from a wrapped error, or undefined when it says nothing. */
+function nestedErrorMessage(nested: unknown): string | undefined {
+  if (!nested || typeof nested !== 'object') return undefined;
+  const { message } = nested as Record<string, unknown>;
+  if (typeof message !== 'string') return undefined;
+  const trimmed = message.trim();
+  if (!trimmed || trimmed === DMK_PLACEHOLDER_MESSAGE) return undefined;
+  return message;
+}
+
+/**
  * Map a Ledger DMK error to a HardwareErrorCode and human-readable message.
  * `opts.defaultAppName` fills `appName` when the raw error doesn't carry it
  * (DMK signer errors don't).
@@ -660,17 +695,8 @@ export function mapLedgerError(
     originalMessage = err.message;
   } else if (err && typeof err === 'object') {
     const e = err as Record<string, unknown>;
-    const nested = e.originalError;
-    const nestedMessage =
-      nested && typeof nested === 'object'
-        ? (nested as Record<string, unknown>).message
-        : undefined;
     originalMessage = String(
-      e.message ??
-        (typeof nestedMessage === 'string' ? nestedMessage : undefined) ??
-        e._tag ??
-        e.type ??
-        JSON.stringify(err)
+      e.message ?? nestedErrorMessage(e.originalError) ?? e._tag ?? e.type ?? JSON.stringify(err)
     );
   }
 
@@ -681,10 +707,14 @@ export function mapLedgerError(
     code = HardwareErrorCode.DeviceLocked;
   } else if (isDeviceNotAdvertisingError(err) || isDeviceNotFoundError(err)) {
     code = HardwareErrorCode.DeviceNotFound;
+  } else if (isBlePairingFailureError(err)) {
+    // Must precede isDeviceBusyError: the BLE wrapper keeps the raw transport
+    // error on `originalError`, and the busy check crawls that chain. A GATT
+    // failure the BLE layer already classified is a pairing failure, not a
+    // device held by another app.
+    code = HardwareErrorCode.BlePairingTimeout;
   } else if (isDeviceBusyError(err)) {
     code = HardwareErrorCode.DeviceBusy;
-  } else if (isBlePairingFailureError(err)) {
-    code = HardwareErrorCode.BlePairingTimeout;
   } else if (isUserAbortedError(err)) {
     // SDK-level abort (e.g. user declined the install prompt). Distinct from
     // on-device UserRejected — surface UserAborted so callers can tell apart

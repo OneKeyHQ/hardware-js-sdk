@@ -1,7 +1,7 @@
-import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
+import { HardwareErrorCode, ORPHAN_ELIGIBLE_ERROR_CODES } from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerConnectorBase } from '../connector/LedgerConnectorBase';
-import { ERROR_TAG } from '../errors';
+import { ERROR_TAG, mapLedgerError } from '../errors';
 
 import type { ConnectionType, DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
 
@@ -394,20 +394,21 @@ describe('LedgerConnectorBase installApp failure teardown', () => {
     return { connector, cancel, invalidateDeviceApps, invalidateSigners };
   }
 
-  it('cancels the secure-channel action and clears both managers on SecureChannelError', async () => {
+  it('cancels the secure-channel action and drops the session signers on SecureChannelError', async () => {
     const secureChannelError = {
       _tag: ERROR_TAG.SecureChannel,
       error: { url: 'wss://scriptrunner', errorMessage: 'Connection closed unexpectedly' },
       originalError: { url: 'wss://scriptrunner', errorMessage: 'Connection closed unexpectedly' },
     };
-    const { connector, cancel, invalidateDeviceApps, invalidateSigners } =
+    const { connector, cancel, invalidateSigners } =
       connectorWithFailingInstall(secureChannelError);
 
     const result = await connector.call(SESSION_ID, 'installApp', { appName: 'Bitcoin' });
 
     expect(result.success).toBe(false);
+    // Cancelling is the teardown that reaches the secure channel: it stops
+    // DMK's device action, which closes the WebSocket.
     expect(cancel).toHaveBeenCalledTimes(1);
-    expect(invalidateDeviceApps).toHaveBeenCalledWith(SESSION_ID);
     expect(invalidateSigners).toHaveBeenCalledWith(SESSION_ID);
     expect((connector as any)._cancellers.has(SESSION_ID)).toBe(false);
   });
@@ -442,5 +443,73 @@ describe('LedgerConnectorBase installApp failure teardown', () => {
     // Not DeviceDisconnected / TransportError: the device link was never the problem.
     expect(result.error.code).not.toBe(HardwareErrorCode.DeviceDisconnected);
     expect(result.error.code).not.toBe(HardwareErrorCode.TransportError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DMK transports raise OpeningConnectionError (`_tag: "ConnectionOpeningError"`)
+// from the catch-all of connect(). On BLE that is RNBleTransport's generic GATT
+// failure and must stay a pairing failure; on HID it means another page holds
+// the device, which is DeviceBusy.
+// ---------------------------------------------------------------------------
+
+describe('LedgerConnectorBase connect() opening-tag classification', () => {
+  const DEVICE_PATH = 'device-path-1';
+
+  function connectorWithFailingDmConnect(connectionType: ConnectionType) {
+    const connector = new LedgerConnectorBase(async () => ({}), {
+      connectionType,
+      dmk: {} as any,
+    });
+    const connect = jest.fn(async () => {
+      throw Object.assign(new Error('Failed to open connection'), {
+        _tag: ERROR_TAG.OpeningConnection,
+      });
+    });
+    (connector as any)._deviceManager = {
+      connect,
+      // Must be present: the BLE direct-connect path probes it before
+      // connecting, and a missing method would throw a TypeError that the
+      // catch below would wrap as a pairing failure for the wrong reason.
+      hasDiscoveredDevice: () => true,
+      getLiveDevices: async () => [{ id: DEVICE_PATH }],
+      getDeviceName: () => 'Ledger',
+      getDeviceId: () => DEVICE_PATH,
+      getDiscoveredDeviceInfo: () => undefined,
+      disposeKeepingDmk: () => undefined,
+      dispose: () => undefined,
+    };
+    return { connector, connect };
+  }
+
+  it('keeps a BLE opening failure in the bluetooth family and orphan-eligible', async () => {
+    const { connector, connect } = connectorWithFailingDmConnect('ble');
+
+    const err = await connector.connect(DEVICE_PATH).then(
+      () => null,
+      (e: unknown) => e
+    );
+
+    // Guard the guard: the failure must come from dm.connect, not from a
+    // half-built stub.
+    expect(connect).toHaveBeenCalledTimes(1);
+    expect(err).not.toBeNull();
+    const mapped = mapLedgerError(err);
+    expect(mapped.code).toBe(HardwareErrorCode.BlePairingTimeout);
+    expect(mapped.code).not.toBe(HardwareErrorCode.DeviceBusy);
+    expect(ORPHAN_ELIGIBLE_ERROR_CODES).toContain(mapped.code);
+  });
+
+  it('still reads a HID opening failure as DeviceBusy', async () => {
+    const { connector, connect } = connectorWithFailingDmConnect('usb');
+
+    const err = await connector.connect(DEVICE_PATH).then(
+      () => null,
+      (e: unknown) => e
+    );
+
+    expect(connect).toHaveBeenCalledTimes(1);
+    expect(err).not.toBeNull();
+    expect(mapLedgerError(err).code).toBe(HardwareErrorCode.DeviceBusy);
   });
 });

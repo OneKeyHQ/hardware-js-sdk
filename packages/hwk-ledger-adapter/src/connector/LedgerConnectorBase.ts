@@ -10,6 +10,7 @@ import { SignerManager } from '../signer/SignerManager';
 import {
   ERROR_TAG,
   isAppStuckByApdu,
+  isConnectionOpeningTag,
   isKnownConnectionTag,
   isTransportStuck,
   mapLedgerError,
@@ -602,7 +603,13 @@ export class LedgerConnectorBase implements IConnector {
         // If DMK already gave a recognized tag (locked / disconnected / pairing
         // / transport-class), pass through untouched so SDK classifiers can
         // route on the real cause. We only wrap completely untagged errors.
-        if (isKnownConnectionTag(tag)) {
+        //
+        // The opening tag is excluded: RNBleTransport raises it for every
+        // connect failure it cannot attribute to a removed pairing, so it
+        // names the step, not the cause. Passing it through would classify a
+        // GATT failure as DeviceBusy and drop it out of the orphan-eligible
+        // set, where the BLE flow needs it.
+        if (isKnownConnectionTag(tag) && !isConnectionOpeningTag(tag)) {
           throw err;
         }
 
@@ -1116,9 +1123,11 @@ export class LedgerConnectorBase implements IConnector {
     return this._deviceAppsManager!;
   }
 
+  // DeviceAppsManager is intentionally absent here: it is a per-call factory
+  // with no cached session state, so there is nothing to invalidate. Cancelling
+  // the device action is what closes the secure channel.
   private _invalidateSession(sessionId: string): void {
     this._signerManager?.invalidate(sessionId);
-    this._deviceAppsManager?.invalidate(sessionId);
   }
 
   /**
