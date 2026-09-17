@@ -1702,7 +1702,10 @@ export class KeystoneAdapter implements IHardwareWallet {
         KeystoneAdapter._throwIfAborted(signal);
       }
 
-      if (this._forcedTransport !== 'qr' && record?.usbSessionId) {
+      // importFromQr remembers the record without clearing usbSessionId, so a
+      // wallet with an earlier USB session still carries one when the user
+      // comes back in through QR. Route, not the leftover session, decides.
+      if (this._forcedTransport !== 'qr' && !routedToQr && record?.usbSessionId) {
         const bundleSessionId = record.usbSessionId;
         const assertBundleSession = () => {
           if (record?.usbSessionId !== bundleSessionId) {
