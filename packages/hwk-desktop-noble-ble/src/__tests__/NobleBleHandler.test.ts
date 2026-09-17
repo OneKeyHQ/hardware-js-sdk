@@ -430,6 +430,43 @@ describe('NobleBleHandler', () => {
     peripheral.emit('disconnect');
     expect(onDisc).toHaveBeenCalledWith('id-1');
   });
+
+  test('a disconnect that returns after a reconnect leaves the new link alone', async () => {
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    const noble = new FakeNoble([peripheral]);
+    const handler = new NobleBleHandler({ nobleFactory: () => noble as any });
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+    await handler.connect('id-1', PADDED_PROFILE);
+
+    // Hold the explicit disconnect open so a reconnect can commit a new entry
+    // for the same id while the old flow is still awaiting.
+    let releaseDisconnect: () => void = () => undefined;
+    peripheral.disconnectAsync.mockImplementationOnce(
+      () =>
+        new Promise<undefined>(resolve => {
+          releaseDisconnect = () => {
+            peripheral.state = 'disconnected';
+            resolve(undefined);
+          };
+        })
+    );
+    const staleDisconnect = handler.disconnect('id-1');
+
+    await handler.connect('id-1', PADDED_PROFILE);
+    const received: Array<[string, string]> = [];
+    handler.setNotificationListener((id, hex) => received.push([id, hex]));
+    await handler.subscribe('id-1');
+    const onDisc = jest.fn();
+    handler.setDisconnectedListener(onDisc);
+
+    releaseDisconnect();
+    await staleDisconnect;
+
+    peripheral.notifyChar.emit('data', Buffer.from([0x01, 0x02]), true);
+    expect(received).toEqual([['id-1', '0102']]);
+    peripheral.emit('disconnect');
+    expect(onDisc).toHaveBeenCalledWith('id-1');
+  });
 });
 
 describe('initThirdPartyBleSupport', () => {

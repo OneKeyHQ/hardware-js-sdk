@@ -1181,10 +1181,12 @@ export class KeystoneAdapter implements IHardwareWallet {
     if (!params) return failure(HardwareErrorCode.InvalidParams, 'btcSignPsbt requires params');
     if (!params.psbt)
       return failure(HardwareErrorCode.InvalidParams, 'btcSignPsbt requires params.psbt');
-    if (
-      params.path &&
-      !isKeystoneSignableBtcAccountPath(splitAccountPath(params.path).accountPath)
-    ) {
+    // `path` is optional in the shared param type, but the account-0 gate is
+    // only enforceable with it — so require it here rather than let a pathless
+    // request reach the device ungated.
+    if (!params.path)
+      return failure(HardwareErrorCode.InvalidParams, 'btcSignPsbt requires params.path');
+    if (!isKeystoneSignableBtcAccountPath(splitAccountPath(params.path).accountPath)) {
       return failure(HardwareErrorCode.DevicePathForbidden, KEYSTONE_BTC_ACCOUNT_FORBIDDEN_MESSAGE);
     }
 
@@ -1432,10 +1434,11 @@ export class KeystoneAdapter implements IHardwareWallet {
 
   // ---------------------------------------------------------------------------
   // TRON — routed through `TronSignRequest`/`TronSignature` (see
-  // urEngine/TronSignRequest.ts), a port of OneKey's own already-proven
-  // production TRON QR-wallet implementation — NOT keystone-sdk's own
-  // bundled `sdk.tron` module (different, protobuf-based protocol with
-  // unverified response semantics).
+  // urEngine/TronSignRequest.ts), whose key layout follows keystone-sdk-rust
+  // (tags 5201/5202, firmware >= 2.5.0). The OneKey Pro air-gap encoding under
+  // the same tag is a different layout the firmware rejects. Not keystone-sdk's
+  // bundled `sdk.tron` module either (protobuf-based, unverified response
+  // semantics).
   // ---------------------------------------------------------------------------
 
   async tronGetAddress(
@@ -1674,8 +1677,19 @@ export class KeystoneAdapter implements IHardwareWallet {
         return { book };
       }
 
+      // An operation routed to QR at connectDevice must stay on QR: attaching
+      // USB here would export per path while `_resolveUr` still prompts a QR.
+      const operation = isHardwareOperationId(params.operationId)
+        ? this._operations.find(params.operationId)
+        : undefined;
+      const operationRoute = operation ? this._operationRoutes.get(operation.connectId) : undefined;
+      const routedToQr =
+        operationRoute?.operationId === operation?.operationId &&
+        operationRoute?.connectionType === 'qr';
+
       if (
         this._forcedTransport !== 'qr' &&
+        !routedToQr &&
         !record?.usbSessionId &&
         this._usbConnector &&
         target.expectedWalletId
@@ -2627,7 +2641,11 @@ export class KeystoneAdapter implements IHardwareWallet {
         _tag?: string;
         recovery?: unknown;
       };
-      if (typeof e.code === 'number') {
+      // Only five-digit HWK codes are already-mapped errors. A low-numbered
+      // `.code` (a DOMException's legacy code, an errno) would otherwise
+      // escape as a bogus HWK code and break the range contract; those fall
+      // through to UnknownError below and keep their message.
+      if (typeof e.code === 'number' && e.code >= 10000 && e.code <= 99999) {
         const { origin } = e as { origin?: unknown };
         return failure(
           e.code as HardwareErrorCode,

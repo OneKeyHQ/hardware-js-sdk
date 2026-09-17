@@ -20,10 +20,11 @@ export interface TronSignTransactionCallParams {
   /** Protobuf-encoded raw transaction hex (no 0x prefix) */
   rawTxHex: string;
   /**
-   * Legacy TRC token metadata from the `hw-app-trx` era. The DMK signer
-   * resolves token and contract context itself, so this is accepted and
-   * ignored rather than removed — dropping it would break callers that still
-   * pass it, and forwarding it has nowhere to go.
+   * Legacy TRC token metadata from the `hw-app-trx` era.
+   * `@ledgerhq/device-signer-kit-tron` 0.2.0 has no context module and no
+   * token-metadata channel, so TRC-20 transfers are blind-signed on device.
+   * Accepted and ignored rather than removed: no caller passes it today, and
+   * there is nowhere to forward it to.
    */
   tokenSignatures?: string[];
 }

@@ -485,10 +485,10 @@ export class NobleBleHandler {
   /**
    * Stops the process-wide scan no matter which vendor asked. Scan *results*
    * are filtered per vendor, but the radio is not: one vendor's stopScan ends
-   * the other's discovery too. That is safe only because the adapter job queue
-   * serializes discovery across vendors, so two are never scanning at once.
-   * Anything that breaks that — a background presence probe, say — needs
-   * per-vendor refcounting here first.
+   * the other's discovery too. That is safe only because the host mounts one
+   * vendor's flow at a time; queues are per adapter, not shared. Anything
+   * that breaks that — a background presence probe, say — needs per-vendor
+   * refcounting here first.
    */
   async stopScan(): Promise<void> {
     await this._stopContinuousScan();
@@ -883,7 +883,7 @@ export class NobleBleHandler {
     } catch (error) {
       this._log('warn', 'disconnect.error', { id, error: String(error) });
     }
-    this._cleanupDevice(id, /* unexpected */ false);
+    this._cleanupDevice(id, /* unexpected */ false, entry);
   }
 
   async subscribe(id: string): Promise<void> {
@@ -932,7 +932,7 @@ export class NobleBleHandler {
       return;
     }
 
-    const chunkSize = framing.chunkSize;
+    const { chunkSize } = framing;
     if (!chunkSize) throw new Error(`Padded BLE writes need a chunkSize for ${id}`);
     for (let offset = 0; offset < buffer.length; offset += chunkSize) {
       this._assertActive();
@@ -1048,9 +1048,12 @@ export class NobleBleHandler {
     if (this._disposed) throw new Error('Desktop BLE is shutting down');
   }
 
-  private _cleanupDevice(id: string, unexpected: boolean): void {
+  private _cleanupDevice(id: string, unexpected: boolean, expected?: DeviceEntry): void {
     const entry = this._connected.get(id);
     if (!entry) return;
+    // A reconnect may have replaced the entry while the caller awaited.
+    // A stale caller must not tear down the link it no longer owns.
+    if (expected && entry !== expected) return;
     if (entry.notifyChar && entry.notifyHandler) {
       entry.notifyChar.removeListener('data', entry.notifyHandler);
     }

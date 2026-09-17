@@ -4260,7 +4260,7 @@
     reflect-metadata "0.2.2"
     xstate "5.19.2"
 
-"@ledgerhq/device-transport-kit-react-native-ble@^1.0.0":
+"@ledgerhq/device-transport-kit-react-native-ble@1.3.2":
   version "1.3.2"
   resolved "https://registry.yarnpkg.com/@ledgerhq/device-transport-kit-react-native-ble/-/device-transport-kit-react-native-ble-1.3.2.tgz#da9997c74d0c9c752582659cab46dcd4e8c945f5"
   integrity sha512-NX/Ml23AR/8iQ5pUPQqum3qjQpValxNhZSbp+Zm/lSl8W0HETLMFK03w/4lj2nfPjiwBy3U+uPhzYNDzdROYQg==
@@ -4270,7 +4270,7 @@
     purify-ts "2.1.0"
     uuid "11.0.3"
 
-"@ledgerhq/device-transport-kit-web-hid@^1.0.0":
+"@ledgerhq/device-transport-kit-web-hid@1.2.3":
   version "1.2.3"
   resolved "https://registry.yarnpkg.com/@ledgerhq/device-transport-kit-web-hid/-/device-transport-kit-web-hid-1.2.3.tgz#800a36536547b4bc2cc9113e2bac7afc1e6b07d8"
   integrity sha512-p0v0K4otRT/jVC1ysLiXWJ6Nrzw1/5IxGxHaNUrbdiX+ndpjTFQsELkqDyDMKCHaP22sGSXqrQFVFW5Z2DNRVw==
@@ -4309,13 +4309,6 @@
   resolved "https://registry.yarnpkg.com/@ledgerhq/errors/-/errors-6.33.0.tgz#137aca1bc962be71d7445fd242f3fb27228a8ada"
   integrity sha512-9iMdjB0Hfxfd8HGMVM0TDPfxBXhJ4MtGKyFlm8aveSHSXjcTjGtCkcnk4OUZ6ZHopBb69BFR+HC2N/ob9xuNgA==
 
-"@ledgerhq/hw-app-trx@^6.34.1":
-  version "6.35.0"
-  resolved "https://registry.yarnpkg.com/@ledgerhq/hw-app-trx/-/hw-app-trx-6.35.0.tgz#eb041455ad0c49a64b9baea51ff2193e3807b869"
-  integrity sha512-ALPDRCQbWKtkWA/eXwL6zvstIFCXI+bgEMSPy3Z1Nt2FsoPJ5yyA57e0qrIetxde6tNJcgq8L6HhJm4GoCkhyg==
-  dependencies:
-    "@ledgerhq/hw-transport" "6.35.0"
-
 "@ledgerhq/hw-transport-web-ble@5.48.0":
   version "5.48.0"
   resolved "https://registry.yarnpkg.com/@ledgerhq/hw-transport-web-ble/-/hw-transport-web-ble-5.48.0.tgz#41b29293c263d8ed4200037eb6da4db3bd4268a6"
@@ -4347,7 +4340,7 @@
     "@ledgerhq/hw-transport" "^5.48.0"
     "@ledgerhq/logs" "^5.48.0"
 
-"@ledgerhq/hw-transport@6.35.0", "@ledgerhq/hw-transport@^6.34.1":
+"@ledgerhq/hw-transport@6.35.0":
   version "6.35.0"
   resolved "https://registry.yarnpkg.com/@ledgerhq/hw-transport/-/hw-transport-6.35.0.tgz#cf1f283c38ef1f34cb3a17362389838c8a05805b"
   integrity sha512-BFk4Zr5gfzT40RT6nj0NQTNB25bxWD3QWhdrOA6Mi/CChFTdGomjOuAhWHla2kH50ft8M5UsiiUeHoR+56J69g==

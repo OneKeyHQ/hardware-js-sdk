@@ -205,6 +205,34 @@ describe('TrezorAdapter', () => {
     await adapter.dispose();
   });
 
+  it('closes the binding request when the call exits before any device work', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    const status = jest.fn();
+    adapter.on(UI_REQUEST.DEVICE_BINDING_STATUS, status);
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+        payload: { requestId: event.payload.requestId, sdkConnectId: 'safe-7' },
+      });
+    });
+    // No passphraseState and no useEmptyPassphrase: the call returns InvalidParams
+    // before it reaches the device, well after the user picked a BLE endpoint.
+    const result = await adapter.evmGetAddress('', 'safe-7', {
+      path: "m/44'/60'/0'/0/0",
+      knownConnections: [],
+    });
+    expect(result).toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.InvalidParams },
+    });
+    expect(status.mock.calls.map(([event]) => event.payload.status)).toEqual([
+      'verifying',
+      'failed',
+    ]);
+    await adapter.dispose();
+  });
+
   it('keeps saved binding terminal when the following business call fails', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);

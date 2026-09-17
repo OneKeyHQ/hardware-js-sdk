@@ -110,6 +110,26 @@ describe('KeystoneUsbConnectorBase', () => {
       expect(devices.map(d => d.name)).toEqual(['Keystone']);
     });
 
+    it('maps an enumeration DOMException to a five-digit HWK code, not its legacy code', async () => {
+      const connector = new KeystoneUsbConnectorBase(
+        {
+          connect: jest.fn().mockRejectedValue(new Error('ambient connect must not run')),
+          getKeystoneDevices: jest
+            .fn()
+            .mockRejectedValue(new DOMException('device is gone', 'NotFoundError')),
+          isSupported: () => Promise.resolve(true),
+        },
+        { timeoutMs: 1000 }
+      );
+
+      const scan = connector.searchDevices();
+      await expect(scan).rejects.toThrow('device is gone');
+      await expect(scan).rejects.toMatchObject({
+        code: HardwareErrorCode.DeviceNotFound,
+        origin: 'transport',
+      });
+    });
+
     it('lists devices without opening/claiming (no mfp yet)', async () => {
       const connector = new KeystoneUsbConnectorBase(fakeTransportClass(fakeTransport({})), {
         timeoutMs: 1000,
@@ -831,6 +851,135 @@ describe('KeystoneUsbConnectorBase', () => {
       const r2 = await slow.call(s2.sessionId, 'resolveUr', { urType: 'x', urData: 'de' });
       expect(r2.success).toBe(false);
       if (!r2.success) expect(r2.error.params?.origin).toBeUndefined();
+    });
+
+    it('keeps every firmware status word on the device side, mapped to its own code', async () => {
+      const mkConnector = (status: number) => {
+        const transport = fakeTransport({
+          [Actions.CMD_GET_DEVICE_VERSION]: () => ({
+            firmwareVersion: '1.7.0',
+            walletMFP: FAKE_MFP,
+          }),
+          [Actions.CMD_RESOLVE_UR]: () => {
+            throw new TransportError('unknown error', status);
+          },
+        });
+        return new KeystoneUsbConnectorBase(fakeTransportClass(transport), { timeoutMs: 1000 });
+      };
+
+      // Status 0..15 are firmware response status words, so every one of them
+      // means the device answered — tearing the USB session down there is what
+      // used to make "decline on screen, then retry" impossible.
+      const expected: Array<[number, HardwareErrorCode]> = [
+        [Status.RSP_FAILURE_CODE, HardwareErrorCode.UnknownError],
+        [Status.PRS_INVALID_TOTAL_PACKETS, HardwareErrorCode.InvalidParams],
+        [Status.PRS_INVALID_INDEX, HardwareErrorCode.InvalidParams],
+        [Status.PRS_PARSING_REJECTED, HardwareErrorCode.UserRejected],
+        [Status.PRS_PARSING_ERROR, HardwareErrorCode.InvalidParams],
+        [Status.PRS_PARSING_DISALLOWED, HardwareErrorCode.DeviceLocked],
+        [Status.PRS_PARSING_UNMATCHED, HardwareErrorCode.InvalidParams],
+        [Status.PRS_PARSING_MISMATCHED_WALLET, HardwareErrorCode.DeviceMismatch],
+        [Status.PRS_PARSING_VERIFY_PASSWORD_ERROR, HardwareErrorCode.PinInvalid],
+        [Status.PRS_EXPORT_ADDRESS_UNSUPPORTED_CHAIN, HardwareErrorCode.ChainNotSupported],
+        [Status.PRS_EXPORT_ADDRESS_INVALID_PARAMS, HardwareErrorCode.InvalidParams],
+        [Status.PRS_EXPORT_ADDRESS_ERROR, HardwareErrorCode.UnknownError],
+        [Status.PRS_EXPORT_ADDRESS_DISALLOWED, HardwareErrorCode.DeviceLocked],
+        [Status.PRS_EXPORT_ADDRESS_REJECTED, HardwareErrorCode.UserRejected],
+        [Status.PRS_EXPORT_ADDRESS_BUSY, HardwareErrorCode.DeviceBusyInternal],
+      ];
+
+      for (const [status, code] of expected) {
+        const connector = mkConnector(status);
+        // eslint-disable-next-line no-await-in-loop
+        const session = await connector.connect();
+        // eslint-disable-next-line no-await-in-loop
+        const result = await connector.call(session.sessionId, 'resolveUr', {
+          urType: 'eth-sign-request',
+          urData: 'de',
+        });
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect({ status, code: result.error.code, origin: result.error.params?.origin }).toEqual({
+          status,
+          code,
+          origin: 'device',
+        });
+      }
+    });
+
+    it('names a firmware status the device sent no text for', async () => {
+      const transport = fakeTransport({
+        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
+        [Actions.CMD_RESOLVE_UR]: () => {
+          // What hw-transport-webusb throws when the response frame carries no
+          // payload text: `TransportError('unknown error', status)`.
+          throw new TransportError('unknown error', Status.PRS_PARSING_VERIFY_PASSWORD_ERROR);
+        },
+      });
+      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
+        timeoutMs: 1000,
+      });
+      const session = await connector.connect();
+
+      const result = await connector.call(session.sessionId, 'resolveUr', {
+        urType: 'eth-sign-request',
+        urData: 'de',
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.message).toContain('password verification failed');
+    });
+
+    it('keeps a device-supplied message instead of the table wording', async () => {
+      const transport = fakeTransport({
+        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
+        [Actions.CMD_RESOLVE_UR]: () => {
+          throw new TransportError(
+            'wallet is exporting another address',
+            Status.PRS_EXPORT_ADDRESS_BUSY
+          );
+        },
+      });
+      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
+        timeoutMs: 1000,
+      });
+      const session = await connector.connect();
+
+      const result = await connector.call(session.sessionId, 'resolveUr', {
+        urType: 'eth-sign-request',
+        urData: 'de',
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.message).toContain('wallet is exporting another address');
+    });
+
+    it('treats an unlisted firmware status as the device answering, not a dead pipe', async () => {
+      // Forward-compat: a status word the enum does not name yet still came
+      // back inside a response frame, so the session must survive it.
+      const unlistedFirmwareStatus = Status.PRS_EXPORT_ADDRESS_BUSY + 1;
+      const transport = fakeTransport({
+        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
+        [Actions.CMD_RESOLVE_UR]: () => {
+          throw new TransportError('something new', unlistedFirmwareStatus);
+        },
+      });
+      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
+        timeoutMs: 1000,
+      });
+      const session = await connector.connect();
+
+      const result = await connector.call(session.sessionId, 'resolveUr', {
+        urType: 'eth-sign-request',
+        urData: 'de',
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.code).toBe(HardwareErrorCode.UnknownError);
+      expect(result.error.params?.origin).toBe('device');
     });
 
     it('maps ERR_DATA_TOO_LARGE to PayloadTooLarge', async () => {
