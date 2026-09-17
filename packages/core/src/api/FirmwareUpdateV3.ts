@@ -13,6 +13,7 @@ import {
   getLogger,
 } from '../utils';
 import { getBinary, getSysResourceBinary } from './firmware/getBinary';
+import { PRO_MCU_MIN_BOOTLOADER_VERSION } from './firmware/updateBootloader';
 import { normalizeFirmwarePreparationError } from './firmware/FirmwarePreparationError';
 import { DataManager } from '../data-manager';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
@@ -39,7 +40,7 @@ import type { FirmwareByteSource } from './firmware/FirmwareArtifactSource';
 
 const Log = getLogger(LoggerNames.Method);
 
-export const MIN_UPDATE_V3_BOOTLOADER_VERSION = '2.8.0';
+export const MIN_UPDATE_V3_BOOTLOADER_VERSION = PRO_MCU_MIN_BOOTLOADER_VERSION;
 
 /**
  * FirmwareUpdateV3 flow

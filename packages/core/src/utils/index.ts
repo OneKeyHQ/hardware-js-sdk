@@ -26,6 +26,7 @@ export {
   getFirmwareUpdateFieldArray,
 } from './deviceFeaturesUtils';
 export {
+  PRO_MCU_MIN_BOOTLOADER_VERSION,
   checkNeedUpdateBootForTouch,
   checkNeedUpdateBootForClassicAndMini,
 } from '../api/firmware/updateBootloader';
