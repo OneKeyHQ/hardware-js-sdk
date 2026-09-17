@@ -1,9 +1,8 @@
-import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
-import Trx from '@ledgerhq/hw-app-trx';
+import { HardwareErrorCode, bytesToHex, hexToBytes } from '@onekeyfe/hwk-adapter-core';
 
-import { normalizePath } from './utils';
-import { withLegacyChainCall } from './legacyChainCall';
-import { DmkTransport } from '../../transport/DmkTransport';
+import { collapseSignerInteraction, normalizePath } from './utils';
+import { SignerTron } from '../../signer/SignerTron';
+import { debugLog } from '../../utils/debugLog';
 
 import type { ConnectorContext } from './types';
 
@@ -21,8 +20,10 @@ export interface TronSignTransactionCallParams {
   /** Protobuf-encoded raw transaction hex (no 0x prefix) */
   rawTxHex: string;
   /**
-   * TRC token metadata for Ledger clear-signing. Omit → TRC-20 transfers
-   * fall back to blind-signing (user sees only raw bytes on-device).
+   * TRC-20 transfers are clear-signed from a firmware token table
+   * (address -> ticker/decimals); tokens outside it show as a custom
+   * contract. This field is the legacy `hw-app-trx` TRC-10 name/decimals
+   * channel (P1 0xA0); `device-signer-kit-tron` 0.2.0 doesn't implement it.
    */
   tokenSignatures?: string[];
 }
@@ -42,24 +43,20 @@ export async function tronGetAddress(
   sessionId: string,
   params: TronGetAddressCallParams
 ): Promise<{ address: string; publicKey: string; path: string }> {
+  const tronSigner = await _createTronSigner(ctx, sessionId);
   const path = normalizePath(params.path);
-  const showOnDevice = params.showOnDevice ?? false;
 
-  return withLegacyChainCall(
-    ctx,
-    sessionId,
-    {
-      appName: 'Tron',
-      // Only show "confirm on device" UI when the device is actually going
-      // to display the address for the user to verify.
-      needsConfirmation: showOnDevice,
-    },
-    async sid => {
-      const trx = await _createTrx(ctx, sid);
-      const result = await trx.getAddress(path, showOnDevice);
-      return { address: result.address, publicKey: result.publicKey, path: params.path };
-    }
-  );
+  try {
+    const result = await tronSigner.getAddress(path, {
+      checkOnDevice: params.showOnDevice ?? false,
+    });
+    return { address: result.address, publicKey: result.publicKey, path: params.path };
+  } catch (err) {
+    ctx.invalidateSession(sessionId);
+    throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
+  }
 }
 
 export async function tronSignTransaction(
@@ -74,22 +71,18 @@ export async function tronSignTransaction(
     );
   }
 
+  const tronSigner = await _createTronSigner(ctx, sessionId);
   const path = normalizePath(params.path);
 
-  return withLegacyChainCall(
-    ctx,
-    sessionId,
-    { appName: 'Tron', needsConfirmation: true },
-    async sid => {
-      const trx = await _createTrx(ctx, sid);
-      const signature = await trx.signTransaction(
-        path,
-        params.rawTxHex,
-        params.tokenSignatures ?? []
-      );
-      return { signature };
-    }
-  );
+  try {
+    const signature = await tronSigner.signTransaction(path, hexToBytes(params.rawTxHex));
+    return { signature: bytesToHex(signature) };
+  } catch (err) {
+    ctx.invalidateSession(sessionId);
+    throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
+  }
 }
 
 export async function tronSignMessage(
@@ -97,25 +90,39 @@ export async function tronSignMessage(
   sessionId: string,
   params: TronSignMessageCallParams
 ): Promise<{ signature: string }> {
+  const tronSigner = await _createTronSigner(ctx, sessionId);
   const path = normalizePath(params.path);
 
-  return withLegacyChainCall(
-    ctx,
-    sessionId,
-    { appName: 'Tron', needsConfirmation: true },
-    async sid => {
-      const trx = await _createTrx(ctx, sid);
-      const signature = await trx.signPersonalMessage(path, params.messageHex);
-      return { signature };
-    }
-  );
+  try {
+    const signature = await tronSigner.signPersonalMessage(path, hexToBytes(params.messageHex));
+    return { signature: bytesToHex(signature) };
+  } catch (err) {
+    ctx.invalidateSession(sessionId);
+    throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Internal
+// Internal -- TRON signer creation
 // ---------------------------------------------------------------------------
 
-async function _createTrx(ctx: ConnectorContext, sessionId: string): Promise<Trx> {
+async function _createTronSigner(ctx: ConnectorContext, sessionId: string): Promise<SignerTron> {
   const dmk = await ctx.getOrCreateDmk();
-  return new Trx(new DmkTransport(dmk, sessionId));
+  const { SignerTrxBuilder } = await ctx.importLedgerKit('@ledgerhq/device-signer-kit-tron');
+  const sdkSigner = new SignerTrxBuilder({ dmk, sessionId }).build();
+  const signer = new SignerTron(sdkSigner);
+
+  signer.onInteraction = (interaction: string) => {
+    debugLog('[LedgerConnector] tron.onInteraction:', interaction);
+    ctx.emit('ui-event', {
+      type: collapseSignerInteraction(interaction),
+      payload: { sessionId },
+    });
+  };
+  signer.onRegisterCanceller = cancel => {
+    ctx.registerCanceller(sessionId, cancel);
+  };
+  return signer;
 }

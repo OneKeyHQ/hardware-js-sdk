@@ -1,5 +1,20 @@
-export { HardwareErrorCode, ORPHAN_ELIGIBLE_ERROR_CODES, createHwkError } from './types/errors';
-export type { HwkError, IHwkErrorPayload } from './types/errors';
+export {
+  HardwareErrorCode,
+  ORPHAN_ELIGIBLE_ERROR_CODES,
+  createHwkError,
+  defaultOriginForCode,
+  defaultRecoveryForCode,
+  isHwkRecoveryHint,
+  operationMayHaveCompletedParams,
+} from './types/errors';
+export type {
+  HwkError,
+  HwkErrorOrigin,
+  HwkRecoveryHint,
+  HwkRecoveryScope,
+  IHwkErrorPayload,
+  IOperationMayHaveCompletedParams,
+} from './types/errors';
 
 export type { Success, Failure, Response } from './types/response';
 export { success, failure } from './types/response';
@@ -11,7 +26,12 @@ export type {
   DeviceInfo,
   DeviceTarget,
   DeviceCapabilities,
+  ConnectionTarget,
+  DeviceSearchTarget,
+  SearchTargetReusePolicy,
+  WalletIdentity,
 } from './types/device';
+export { resolveSearchTargetReusePolicy } from './types/device';
 
 export type {
   EvmGetAddressParams,
@@ -57,6 +77,7 @@ export type {
   SolSignTxParams,
   SolSignedTx,
   SolSignMsgParams,
+  SolOffchainMessageV1Params,
   SolSignature,
   ISolMethods,
 } from './types/chain-sol';
@@ -80,12 +101,25 @@ export type {
   ITronMethods,
 } from './types/chain-tron';
 
+export type {
+  ZcashFullViewingKeyMode,
+  ZcashGetFullViewingKeyParams,
+  ZcashFullViewingKey,
+  ZcashGetShieldedAddressParams,
+  ZcashShieldedAddress,
+} from './types/chain-zcash';
+
 export type { PassphraseStateAware } from './types/passphrase';
 
 export type { QrDisplayData, QrResponseData } from './types/qr';
 
 export type { ChainForFingerprint } from './types/fingerprint';
-export { CHAIN_FINGERPRINT_PATHS, deriveDeviceFingerprint } from './types/fingerprint';
+export {
+  CHAIN_FINGERPRINT_PATHS,
+  deriveDeviceFingerprint,
+  deriveWalletId,
+  parseBip32MasterFingerprint,
+} from './types/fingerprint';
 
 export type {
   IHardwareWallet,
@@ -100,6 +134,15 @@ export type {
   TrezorDisplayRotation,
   TrezorSafetyCheckLevel,
   ICommonCallParams,
+  IHardwareConnectionContext,
+  KnownDeviceConnection,
+  HardwareCallExtra,
+  DeviceSelectionContext,
+  DeviceSelectionRequest,
+  SaveDeviceBindingRequest,
+  BindBleDeviceParams,
+  DeviceBindingStatus,
+  IDeviceManagerOperationContext,
   IPassphraseCallParams,
   IHardwareCommonCallParams,
   IHardwareCallParams,
@@ -108,6 +151,7 @@ export type {
   AllNetworkGetAddressParams,
   AllNetworkAddressResponsePayload,
   AllNetworkAddressResponse,
+  AllNetworkDeviceIdentity,
   DeviceEvent,
   UiRequestEvent,
   SdkEvent,
@@ -124,6 +168,7 @@ export { UI_EVENT, UI_REQUEST, UI_RESPONSE } from './events/ui-request';
 export type {
   DevicePermissionDeniedReason,
   DevicePermissionResponse,
+  SaveDeviceBindingDeclineReason,
   UiResponseEvent,
 } from './events/ui-request';
 export { SDK } from './events/sdk';
@@ -136,11 +181,26 @@ export type {
 } from './types/transport';
 
 export { DeviceJobQueue } from './utils/DeviceJobQueue';
-export type { JobOptions, ActiveJobInfo } from './utils/DeviceJobQueue';
+export type { JobOptions, ActiveJobInfo, CancelScopeHandle } from './utils/DeviceJobQueue';
+export { OperationRegistry, OPERATION_DEFAULT_TTL_MS } from './utils/OperationRegistry';
+export type { HardwareOperation, OperationEndReason } from './utils/OperationRegistry';
+export {
+  HARDWARE_RUNTIME_ID_PREFIX,
+  createHardwareLinkId,
+  createHardwareOperationId,
+  createHardwareSearchTargetId,
+  hasHardwareRuntimeIdPrefix,
+  isHardwareOperationId,
+  parseHardwareRuntimeId,
+} from './utils/hardwareRuntimeId';
+export type { HardwareRuntimeId, HardwareRuntimeIdKind } from './utils/hardwareRuntimeId';
+export { resolveHardwareOperationTarget } from './utils/hardwareOperationTarget';
+export type { HardwareOperationTarget } from './utils/hardwareOperationTarget';
 
 export type {
   ConnectorDevice,
   ConnectorSession,
+  ConnectorConnectTarget,
   ConnectorEventType,
   ConnectorEventMap,
   ConnectorUiEvent,
@@ -148,6 +208,7 @@ export type {
   ConnectorSerializedError,
   ConnectorErrorParams,
   ConnectorConfig,
+  ConnectorSearchDevicesOptions,
   IConnector,
   IHardwareBridge,
 } from './types/connector';
@@ -160,6 +221,15 @@ export {
 } from './types/connector';
 
 export { TypedEventEmitter } from './utils/TypedEventEmitter';
+export type {
+  ElectronBleApi,
+  ElectronBleDeviceInfo,
+  ElectronBleMatch,
+  ElectronBleScanOptions,
+  ElectronBleConnectOptions,
+} from './types/electronBle';
+export { requestSaveDeviceBinding } from './utils/requestSaveDeviceBinding';
+export { requestBleDeviceSelection } from './utils/requestBleDeviceSelection';
 export {
   UiRequestRegistry,
   UI_REQUEST_DEFAULT_TIMEOUT_MS,
@@ -169,6 +239,11 @@ export {
 } from './utils/UiRequestRegistry';
 export { compareSemver } from './utils/semver';
 export { ensure0x, stripHex, padHex64, hexToBytes, bytesToHex } from './utils/hex';
+export { prepareSolanaOffchainMessageV1 } from './utils/solanaOffchainMessage';
+export type {
+  PreparedSolanaOffchainMessageV1,
+  PrepareSolanaOffchainMessageV1Params,
+} from './utils/solanaOffchainMessage';
 export { enrichErrorMessage } from './utils/errorMessages';
 export {
   detectHardwareVendorFromDescriptor,
@@ -181,6 +256,7 @@ export {
   HARDWARE_METHOD_CATALOG,
   getAllNetworkMethodChain,
   getHardwareMethodMetadata,
+  canReplayHardwareMethodAfterTransportFailure,
   isAllNetworkMethodName,
 } from './utils/methodCatalog';
 export type {

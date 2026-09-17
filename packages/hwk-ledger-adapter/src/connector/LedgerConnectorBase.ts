@@ -33,6 +33,8 @@ import {
   tronGetAddress,
   tronSignMessage,
   tronSignTransaction,
+  zcashGetFullViewingKey,
+  zcashGetShieldedAddress,
 } from './chains';
 import { DeviceAppsManager } from '../device-apps/DeviceAppsManager';
 import { collapseSignerInteraction } from './chains/utils';
@@ -76,6 +78,8 @@ import type {
   TronGetAddressCallParams,
   TronSignMessageCallParams,
   TronSignTransactionCallParams,
+  ZcashGetFullViewingKeyCallParams,
+  ZcashGetShieldedAddressCallParams,
 } from './chains';
 
 // ---------------------------------------------------------------------------
@@ -111,6 +115,7 @@ const METHOD_PREFIX_TO_APP_NAME: Record<string, string> = {
   btc: 'Bitcoin',
   sol: 'Solana',
   tron: 'Tron',
+  zcash: 'Zcash',
 };
 
 const HARDWARE_ERROR_CODE_VALUES = new Set<number>(
@@ -182,7 +187,7 @@ function assertAllowedLedgerRelayUrl(rawUrl: string): void {
  * Metro (React Native) can't resolve these; pass a custom importer that
  * uses CJS paths (e.g. `@ledgerhq/device-signer-kit-ethereum/lib/cjs/index.js`).
  */
-async function defaultLedgerKitImporter(pkg: string): Promise<any> {
+export async function defaultLedgerKitImporter(pkg: string): Promise<any> {
   switch (pkg) {
     case '@ledgerhq/device-management-kit':
       return import('@ledgerhq/device-management-kit');
@@ -192,6 +197,10 @@ async function defaultLedgerKitImporter(pkg: string): Promise<any> {
       return import('@ledgerhq/device-signer-kit-bitcoin');
     case '@ledgerhq/device-signer-kit-solana':
       return import('@ledgerhq/device-signer-kit-solana');
+    case '@ledgerhq/device-signer-kit-tron':
+      return import('@ledgerhq/device-signer-kit-tron');
+    case '@ledgerhq/device-signer-kit-zcash':
+      return import('@ledgerhq/device-signer-kit-zcash');
     case '@ledgerhq/context-module':
       return import('@ledgerhq/context-module');
     default:
@@ -801,6 +810,11 @@ export class LedgerConnectorBase implements IConnector {
         return solSignTransaction(ctx, sessionId, params as SolSignTransactionCallParams);
       case 'solSignMessage':
         return solSignMessage(ctx, sessionId, params as SolSignMessageCallParams);
+      // ZCASH
+      case 'zcashGetFullViewingKey':
+        return zcashGetFullViewingKey(ctx, sessionId, params as ZcashGetFullViewingKeyCallParams);
+      case 'zcashGetShieldedAddress':
+        return zcashGetShieldedAddress(ctx, sessionId, params as ZcashGetShieldedAddressCallParams);
       // TRON
       case 'tronGetAddress':
         return tronGetAddress(ctx, sessionId, params as TronGetAddressCallParams);
@@ -1207,7 +1221,7 @@ export class LedgerConnectorBase implements IConnector {
    * at every catch site. Falls through unchanged for unknown methods.
    */
   private _ctxForMethod(method: string): ConnectorContext {
-    const prefix = /^(evm|btc|sol|tron)/.exec(method)?.[1];
+    const prefix = /^(evm|btc|sol|tron|zcash)/.exec(method)?.[1];
     const defaultAppName = prefix ? METHOD_PREFIX_TO_APP_NAME[prefix] : undefined;
     if (!defaultAppName) return this._ctx;
     return {

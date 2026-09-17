@@ -219,6 +219,23 @@ describe('DeviceJobQueue', () => {
     expect(started).toEqual(['A']);
   });
 
+  it('targeted cancellation preserves queued jobs for other operations', async () => {
+    const queue = new DeviceJobQueue();
+    const reason = new Error('Operation cancelled');
+    const cancelledJob = jest.fn(async () => 'cancelled');
+    const otherJob = jest.fn(async () => 'other');
+    const first = queue.enqueue('old-operation', cancelledJob);
+    const second = queue.enqueue('new-operation', otherJob);
+
+    expect(queue.cancelActiveAndPending('old-operation', reason)).toBe(true);
+    expect(await Promise.allSettled([first, second])).toEqual([
+      { status: 'rejected', reason },
+      { status: 'fulfilled', value: 'other' },
+    ]);
+    expect(cancelledJob).not.toHaveBeenCalled();
+    expect(otherJob).toHaveBeenCalledTimes(1);
+  });
+
   it('clear() during running job does not clobber successor _active (identity guard)', async () => {
     const queue = new DeviceJobQueue();
 
@@ -251,9 +268,45 @@ describe('DeviceJobQueue', () => {
     await expect(j2).resolves.toBe('j2');
   });
 
-  it('isBusy reflects the active slot', async () => {
+  it('cancelActiveAndPending aborts a cancel scope when no job is in the queue', async () => {
     const queue = new DeviceJobQueue();
-    expect(queue.isBusy()).toBe(false);
+    const scope = queue.createCancelScope('d');
+
+    await queue.enqueue('d', async () => 'item-1');
+    expect(queue.getActiveJob()).toBeNull();
+
+    const reason = new Error('User aborted operation');
+    expect(queue.cancelActiveAndPending('d', reason)).toBe(true);
+    expect(scope.signal.aborted).toBe(true);
+    expect(scope.signal.reason).toBe(reason);
+  });
+
+  it('cancel scopes are keyed like jobs and released by the owner', async () => {
+    const queue = new DeviceJobQueue();
+    const scope = queue.createCancelScope('d');
+
+    expect(queue.cancelActiveAndPending('other', new Error('nope'))).toBe(false);
+    expect(scope.signal.aborted).toBe(false);
+
+    scope.release();
+    expect(queue.cancelActiveAndPending('d', new Error('too late'))).toBe(false);
+    expect(scope.signal.aborted).toBe(false);
+  });
+
+  it('clear aborts every open cancel scope', () => {
+    const queue = new DeviceJobQueue();
+    const scopeA = queue.createCancelScope('a');
+    const scopeB = queue.createCancelScope('b');
+
+    queue.clear(new Error('torn down'));
+
+    expect(scopeA.signal.aborted).toBe(true);
+    expect(scopeB.signal.aborted).toBe(true);
+  });
+
+  it('getActiveJob reflects the active slot', async () => {
+    const queue = new DeviceJobQueue();
+    expect(queue.getActiveJob()).toBeNull();
 
     let release: () => void = () => {};
     const j = queue.enqueue(
@@ -265,10 +318,10 @@ describe('DeviceJobQueue', () => {
     );
 
     await new Promise(r => setTimeout(r, 5));
-    expect(queue.isBusy()).toBe(true);
+    expect(queue.getActiveJob()).toMatchObject({ deviceId: 'd' });
 
     release();
     await j;
-    expect(queue.isBusy()).toBe(false);
+    expect(queue.getActiveJob()).toBeNull();
   });
 });

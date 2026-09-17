@@ -1,24 +1,17 @@
+import { type BleDebugLogLevel, type BleDebugLogger, redactBleDebugLogData } from './debugLog';
 import {
-  TREZOR_BLE_PACKET_SIZE,
-  TREZOR_BLE_UUIDS,
-  isTrezorBleServiceUuid,
-  isTrezorSafe7BleName,
-} from '@onekeyfe/hwk-trezor-adapter';
-import {
-  type TrezorDebugLogLevel,
-  type TrezorDebugLogger,
-  filterTrezorDebugLogEntry,
-} from '@onekeyfe/hwk-trezor-connector';
-
-import {
-  TREZOR_BLE_DEVICE_TTL_MS,
-  TREZOR_BLE_POWER_ON_TIMEOUT_MS,
-  TREZOR_BLE_SCAN_DURATION_MS,
-  TREZOR_BLE_SCAN_IDLE_STOP_MS,
-  TREZOR_BLE_WRITE_CHUNK_DELAY_MS,
+  THIRD_PARTY_BLE_DEVICE_TTL_MS,
+  THIRD_PARTY_BLE_POWER_ON_TIMEOUT_MS,
+  THIRD_PARTY_BLE_SCAN_DURATION_MS,
+  THIRD_PARTY_BLE_SCAN_IDLE_STOP_MS,
 } from './constants';
 
-import type { TrezorBleAvailability, TrezorBleDeviceInfo } from './types/desktop-api';
+import type { ThirdPartyBleAvailability, ThirdPartyBleDeviceInfo } from './types/desktop-api';
+import type {
+  ElectronBleConnectOptions,
+  ElectronBleMatch,
+  ElectronBleScanOptions,
+} from '@onekeyfe/hwk-adapter-core';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -102,6 +95,9 @@ const DEFAULT_NOBLE_FACTORY: NobleFactory = () => {
 };
 
 interface DeviceEntry {
+  /** Opaque partition key from the caller; this handler never interprets it. */
+  vendor?: string;
+  write?: ElectronBleConnectOptions['write'];
   peripheral: NoblePeripheralLike;
   writeChar?: NobleCharacteristicLike;
   notifyChar?: NobleCharacteristicLike;
@@ -112,14 +108,27 @@ interface DeviceEntry {
 const normalizeUuid = (uuid: string): string => uuid.replace(/-/g, '').toLowerCase();
 
 /**
- * Is this advertisement a Trezor? Stands in for the service-UUID scan filter,
- * which we cannot use (see `scan`). Matches the name carried in the ADV packet,
- * or the service UUID once a scan response has merged into the peripheral.
+ * Does this advertisement belong to the vendor that asked? Stands in for the
+ * service-UUID scan filter, which we cannot use (see `scan`). The criteria are
+ * supplied by the caller, so no vendor knowledge lives here: a peripheral
+ * matches on an advertised service UUID, or on a local name that satisfies
+ * every name pattern.
  */
-const isTrezorPeripheral = (p: NoblePeripheralLike): boolean => {
+const matchesPeripheral = (p: NoblePeripheralLike, match?: ElectronBleMatch): boolean => {
+  if (!match) return false;
   const adv = p.advertisement ?? {};
-  if (isTrezorSafe7BleName(adv.localName)) return true;
-  return (adv.serviceUuids ?? []).some(uuid => isTrezorBleServiceUuid(uuid));
+  const advertised = adv.serviceUuids ?? [];
+  if (
+    match.serviceUuids?.length &&
+    advertised.some(uuid =>
+      match.serviceUuids?.some(wanted => normalizeUuid(wanted) === normalizeUuid(uuid))
+    )
+  ) {
+    return true;
+  }
+  const name = adv.localName;
+  if (!match.namePatterns?.length || !name) return false;
+  return match.namePatterns.every(pattern => new RegExp(pattern, 'i').test(name));
 };
 
 /**
@@ -128,7 +137,7 @@ const isTrezorPeripheral = (p: NoblePeripheralLike): boolean => {
  * advertisement field is forwarded — the renderer/connector decides which
  * one is a usable cross-transport identity.
  */
-const peripheralToInfo = (p: NoblePeripheralLike): TrezorBleDeviceInfo => {
+const peripheralToInfo = (p: NoblePeripheralLike): ThirdPartyBleDeviceInfo => {
   const adv = p.advertisement ?? {};
   return {
     id: p.id,
@@ -173,13 +182,9 @@ const NOBLE_RECOVER_COOLDOWN_MS = 10_000;
 export interface NobleBleHandlerOptions {
   /** Override for tests; defaults to `require('@stoprocent/noble')`. */
   nobleFactory?: NobleFactory;
-  /** Override BLE service+char UUIDs (defaults to Trezor Safe 7). */
-  uuids?: typeof TREZOR_BLE_UUIDS;
-  /** Override the 244-byte chunk size. */
-  chunkSize?: number;
   /** Override the overall connect timeout (tests only; defaults to 31s). */
   connectTimeoutMs?: number;
-  logger?: TrezorDebugLogger;
+  logger?: BleDebugLogger;
 }
 
 /**
@@ -192,10 +197,6 @@ export class NobleBleHandler {
   private _noble: NobleLike | undefined;
 
   private readonly _factory: NobleFactory;
-
-  private readonly _uuids: typeof TREZOR_BLE_UUIDS;
-
-  private readonly _chunkSize: number;
 
   private readonly _connectTimeoutMs: number;
 
@@ -248,8 +249,6 @@ export class NobleBleHandler {
 
   constructor(options: NobleBleHandlerOptions = {}) {
     this._factory = options.nobleFactory ?? DEFAULT_NOBLE_FACTORY;
-    this._uuids = options.uuids ?? TREZOR_BLE_UUIDS;
-    this._chunkSize = options.chunkSize ?? TREZOR_BLE_PACKET_SIZE;
     this._connectTimeoutMs = options.connectTimeoutMs ?? BLE_CONNECT_TIMEOUT_MS;
     this._logger = options.logger;
   }
@@ -275,7 +274,7 @@ export class NobleBleHandler {
       };
       this._noble.removeListener('discover', this._discoverHandler);
       this._noble.on('discover', this._discoverHandler);
-      await this._waitForPoweredOn(TREZOR_BLE_POWER_ON_TIMEOUT_MS);
+      await this._waitForPoweredOn(THIRD_PARTY_BLE_POWER_ON_TIMEOUT_MS);
       this._assertActive();
       this._initialized = true;
     })();
@@ -286,7 +285,7 @@ export class NobleBleHandler {
     }
   }
 
-  async checkAvailability(): Promise<TrezorBleAvailability> {
+  async checkAvailability(): Promise<ThirdPartyBleAvailability> {
     this._assertActive();
     if (!this._noble) {
       try {
@@ -307,7 +306,7 @@ export class NobleBleHandler {
   /**
    * Lazy-start a continuous scan and return the current snapshot immediately.
    *
-   * Scans UNFILTERED and filters for Trezor in `_snapshot()` instead. A
+   * Scans UNFILTERED and applies the caller's match criteria in `_snapshot()` instead. A
    * service-UUID filter cannot be used here: noble's Windows backend applies it
    * per RECEIVED PACKET (`BLEManager::OnScanResult`, lib/win/src/ble_manager.cc),
    * and a Safe 7's ADV packet carries only its name — the service UUID lives in
@@ -317,11 +316,7 @@ export class NobleBleHandler {
    * own devices do advertise their service UUID, which is why the same filter is
    * safe in `hd-transport-electron` and was copied here by mistake.)
    */
-  async scan(options?: {
-    /** Accepted for IPC compatibility with older renderers, but ALWAYS ignored — see the doc comment above. */
-    serviceUuids?: string[];
-    durationMs?: number;
-  }): Promise<TrezorBleDeviceInfo[]> {
+  async scan(options?: ElectronBleScanOptions): Promise<ThirdPartyBleDeviceInfo[]> {
     await this.init();
     if (!this._scanning) {
       this._scanning = true;
@@ -342,11 +337,11 @@ export class NobleBleHandler {
     }
     this._assertActive();
     this._armIdleStop();
-    const devices = this._snapshot();
+    const devices = this._snapshot(options);
     // raw vs kept. An empty result now has two very different causes and the log
     // must say which: raw=0 means nothing is on air at all (radio, or the device
     // simply is not advertising); raw>0 with kept=0 means WE are dropping it —
-    // the Trezor name/uuid filter is wrong. Without this the two look identical.
+    // the caller's match criteria are wrong. Without this the two look identical.
     if (devices.length === 0) {
       // Counts only: the scan is unfiltered, so naming what it saw would put
       // bystanders' devices in a log the user hands to support.
@@ -360,8 +355,8 @@ export class NobleBleHandler {
   }
 
   /**
-   * Current in-range Trezor devices, dropping any that aged past the liveness
-   * TTL. The Trezor test replaces the service-UUID scan filter we cannot use
+   * Current in-range devices for the asking vendor, dropping any that aged past
+   * the liveness TTL. The match test replaces the service-UUID scan filter we cannot use
    * (see `scan`): it matches the name from the ADV packet, or the service UUID
    * once a scan response has merged into the same peripheral.
    *
@@ -369,16 +364,17 @@ export class NobleBleHandler {
    * the source of truth for reachability — a device missing from here can still
    * be connected to by id (`_directConnect`).
    */
-  private _snapshot(): TrezorBleDeviceInfo[] {
+  private _snapshot(options?: ElectronBleScanOptions): ThirdPartyBleDeviceInfo[] {
     const now = Date.now();
-    const result: TrezorBleDeviceInfo[] = [];
+    const result: ThirdPartyBleDeviceInfo[] = [];
     for (const [id, peripheral] of this._discovered) {
-      if (now - (this._lastSeen.get(id) ?? 0) > TREZOR_BLE_DEVICE_TTL_MS) {
+      if (now - (this._lastSeen.get(id) ?? 0) > THIRD_PARTY_BLE_DEVICE_TTL_MS) {
         this._discovered.delete(id);
         this._lastSeen.delete(id);
         continue;
       }
-      if (!isTrezorPeripheral(peripheral)) continue;
+      const match = options?.match ?? { serviceUuids: options?.serviceUuids };
+      if (!matchesPeripheral(peripheral, match)) continue;
       result.push(peripheralToInfo(peripheral));
     }
     // A device WE hold a link to stops advertising (standard BLE), so it ages
@@ -388,6 +384,7 @@ export class NobleBleHandler {
     // pairing/THP handshake alone does NOT silence a Safe 7; holding the
     // connection does.
     for (const [id, entry] of this._connected) {
+      if (entry.vendor !== options?.vendor) continue;
       if (result.some(info => info.id === id)) continue;
       result.push(peripheralToInfo(entry.peripheral));
     }
@@ -447,7 +444,7 @@ export class NobleBleHandler {
       this._scanning = false;
       this._discovered.clear();
       this._lastSeen.clear();
-      await this._waitForPoweredOn(TREZOR_BLE_POWER_ON_TIMEOUT_MS);
+      await this._waitForPoweredOn(THIRD_PARTY_BLE_POWER_ON_TIMEOUT_MS);
       this._log('warn', 'noble.recover.done', { state: this._noble?.state });
     } catch (error) {
       // Recovery is best-effort; the caller already reported the scan failure.
@@ -460,7 +457,7 @@ export class NobleBleHandler {
     this._clearIdleStop();
     this._idleStopTimer = setTimeout(() => {
       void this._stopContinuousScan();
-    }, TREZOR_BLE_SCAN_IDLE_STOP_MS);
+    }, THIRD_PARTY_BLE_SCAN_IDLE_STOP_MS);
   }
 
   private _clearIdleStop(): void {
@@ -485,6 +482,14 @@ export class NobleBleHandler {
     this._lastSeen.clear();
   }
 
+  /**
+   * Stops the process-wide scan no matter which vendor asked. Scan *results*
+   * are filtered per vendor, but the radio is not: one vendor's stopScan ends
+   * the other's discovery too. That is safe only because the host mounts one
+   * vendor's flow at a time; queues are per adapter, not shared. Anything
+   * that breaks that — a background presence probe, say — needs per-vendor
+   * refcounting here first.
+   */
   async stopScan(): Promise<void> {
     await this._stopContinuousScan();
   }
@@ -493,7 +498,7 @@ export class NobleBleHandler {
    * Look up a previously-scanned device by id (no extra BLE traffic).
    * Returns null if the device hasn't been seen by a recent scan.
    */
-  getDevice(id: string): TrezorBleDeviceInfo | null {
+  getDevice(id: string): ThirdPartyBleDeviceInfo | null {
     const p = this._discovered.get(id);
     if (!p) return null;
     return peripheralToInfo(p);
@@ -585,7 +590,7 @@ export class NobleBleHandler {
    * Connect by id with no scan and no advertisement.
    *
    * This is the ONLY path that reaches a device which is connected but silent.
-   * A Trezor Safe 7 stops advertising while it HOLDS A LINK (standard BLE; its
+   * A linked peripheral stops advertising while it HOLDS A LINK (standard BLE; a Safe 7's
    * screen says "wait connection") — field-verified: bonding/THP handshake
    * alone does NOT silence it, holding the connection does. So while a link is
    * up, no amount of scanning will rediscover it — `_scanUntilFound` alone
@@ -667,7 +672,19 @@ export class NobleBleHandler {
   // covers the whole flow. Two distinct failures reach the connector: a `timed
   // out` reject (device unreachable) vs a connectAsync `connection failed`
   // reject (link refused / stale bond) — mapped to different error codes there.
-  async connect(id: string): Promise<{ id: string; name?: string }> {
+  async connect(
+    id: string,
+    options: ElectronBleConnectOptions
+  ): Promise<{ id: string; name?: string }> {
+    if (
+      !options ||
+      !options.vendor ||
+      ![options.serviceUuid, options.writeUuid, options.notifyUuid].every(
+        uuid => typeof uuid === 'string' && /^[0-9a-f]{32}$/i.test(normalizeUuid(uuid))
+      )
+    ) {
+      throw new Error('Invalid BLE GATT profile');
+    }
     this._assertActive();
     // Promise.race only times out the CALLER — it cannot cancel the in-flight
     // _connectInner. Native cancellation is handled separately during disposal.
@@ -699,7 +716,7 @@ export class NobleBleHandler {
     };
     this._activeConnect = attempt;
     this._connectAttempts.add(attempt);
-    const nativeOperation = this._connectInner(id, claim);
+    const nativeOperation = this._connectInner(id, claim, options);
     const caller = (async () => {
       try {
         return await Promise.race([nativeOperation, abandoned]);
@@ -721,7 +738,8 @@ export class NobleBleHandler {
 
   private async _connectInner(
     id: string,
-    claim: { abandoned: boolean; cancelNative?: () => void }
+    claim: { abandoned: boolean; cancelNative?: () => void },
+    options: ElectronBleConnectOptions
   ): Promise<{ id: string; name?: string }> {
     await this.init();
     // Stop scanning (keep the cache) and let the radio settle before connecting.
@@ -736,7 +754,7 @@ export class NobleBleHandler {
     let peripheral = this._discovered.get(id);
     if (!peripheral) {
       route = 'scan';
-      peripheral = await this._scanUntilFound(id, TREZOR_BLE_SCAN_DURATION_MS);
+      peripheral = await this._scanUntilFound(id, THIRD_PARTY_BLE_SCAN_DURATION_MS);
     }
     if (!peripheral) {
       route = 'direct';
@@ -765,9 +783,8 @@ export class NobleBleHandler {
         id,
         route: 'none',
         discoveredCount: this._discovered.size,
-        trezorCount: [...this._discovered.values()].filter(isTrezorPeripheral).length,
       });
-      throw new Error(`Trezor BLE device not found: ${id}`);
+      throw new Error(`BLE device not found: ${id}`);
     }
 
     // Checked after every await that can outlive the caller's timeout. The
@@ -808,26 +825,42 @@ export class NobleBleHandler {
     }
 
     try {
+      const uuids = {
+        service: options.serviceUuid,
+        write: options.writeUuid,
+        notify: options.notifyUuid,
+      };
       const { characteristics } = await peripheral.discoverSomeServicesAndCharacteristicsAsync(
-        [this._uuids.service],
-        [this._uuids.write, this._uuids.notify]
+        [uuids.service],
+        [uuids.write, uuids.notify]
       );
-      const writeUuid = normalizeUuid(this._uuids.write);
-      const notifyUuid = normalizeUuid(this._uuids.notify);
+      const writeUuid = normalizeUuid(uuids.write);
+      const notifyUuid = normalizeUuid(uuids.notify);
       const writeChar = characteristics.find(c => normalizeUuid(c.uuid) === writeUuid);
       const notifyChar = characteristics.find(c => normalizeUuid(c.uuid) === notifyUuid);
       if (!writeChar || !notifyChar) {
-        throw new Error(`Trezor BLE characteristics not found on device ${id}`);
+        throw new Error(`BLE characteristics not found on device ${id}`);
       }
       // Last gate before commit: service discovery can also outlast the timeout.
       await abortIfAbandoned('discovery');
 
       const disconnectHandler = () => {
+        // One peripheral object outlives many connections. Only the handler
+        // the current entry owns may act: a handler left over from an earlier
+        // link must not report the current one as unexpectedly dropped.
+        if (this._connected.get(id)?.disconnectHandler !== disconnectHandler) return;
         this._cleanupDevice(id, /* unexpected */ true);
       };
       peripheral.on('disconnect', disconnectHandler);
 
-      this._connected.set(id, { peripheral, writeChar, notifyChar, disconnectHandler });
+      this._connected.set(id, {
+        peripheral,
+        writeChar,
+        notifyChar,
+        disconnectHandler,
+        vendor: options.vendor,
+        write: options.write,
+      });
       this._log('info', 'connect.done', { id, name: peripheral.advertisement.localName });
       return { id, name: peripheral.advertisement.localName };
     } catch (error) {
@@ -850,12 +883,12 @@ export class NobleBleHandler {
     } catch (error) {
       this._log('warn', 'disconnect.error', { id, error: String(error) });
     }
-    this._cleanupDevice(id, /* unexpected */ false);
+    this._cleanupDevice(id, /* unexpected */ false, entry);
   }
 
   async subscribe(id: string): Promise<void> {
     const entry = this._requireEntry(id);
-    if (!entry.notifyChar) throw new Error(`Trezor BLE notify char missing for ${id}`);
+    if (!entry.notifyChar) throw new Error(`BLE notify characteristic missing for ${id}`);
     if (entry.notifyHandler) return;
     const handler = (data: Buffer) => {
       this._onNotification?.(id, data.toString('hex'));
@@ -881,21 +914,38 @@ export class NobleBleHandler {
 
   async write(id: string, hexData: string): Promise<void> {
     const entry = this._requireEntry(id);
-    if (!entry.writeChar) throw new Error(`Trezor BLE write char missing for ${id}`);
+    if (!entry.writeChar) throw new Error(`BLE write characteristic missing for ${id}`);
     const buffer = Buffer.from(hexData, 'hex');
-    for (let offset = 0; offset < buffer.length; offset += this._chunkSize) {
+    const framing = entry.write;
+    if (!framing) throw new Error(`No BLE write framing recorded for ${id}`);
+
+    if (framing.mode === 'raw') {
+      // Framing that carries its own length and sequence; padding corrupts it.
+      // `maxLength` bounds the write without truncating a negotiated frame —
+      // for Ledger the size is negotiated per connection (0x08 handshake) and
+      // reported in a single byte, so 255 is the most that protocol can ask for.
+      const maxLength = framing.maxLength ?? buffer.length;
+      if (!/^(?:[0-9a-f]{2})+$/i.test(hexData) || buffer.length > maxLength) {
+        throw new Error(`Invalid BLE frame for ${entry.vendor ?? 'device'}`);
+      }
+      await entry.writeChar.writeAsync(buffer, false);
+      return;
+    }
+
+    const { chunkSize } = framing;
+    if (!chunkSize) throw new Error(`Padded BLE writes need a chunkSize for ${id}`);
+    for (let offset = 0; offset < buffer.length; offset += chunkSize) {
       this._assertActive();
-      const slice = buffer.subarray(offset, offset + this._chunkSize);
-      // Trezor BLE firmware expects FIXED-size packets: every packet must be
-      // padded to the full MTU (244) with zeros. A short final packet is
-      // silently dropped by the device → no response → RetriesExceeded.
-      // Matches trezor-suite transport-bluetooth (`Buffer.alloc(chunkSize)`).
-      const chunk = Buffer.alloc(this._chunkSize);
+      const slice = buffer.subarray(offset, offset + chunkSize);
+      // Padded framing means every packet is the full chunk size, zero-filled.
+      // Firmware that wants padding silently drops a short final packet → no response →
+      // RetriesExceeded. Matches trezor-suite transport-bluetooth.
+      const chunk = Buffer.alloc(chunkSize);
       slice.copy(chunk);
       // OneKey uses writeWithResponse for stability; mirror that.
       await entry.writeChar.writeAsync(chunk, false);
-      if (offset + this._chunkSize < buffer.length) {
-        await delay(TREZOR_BLE_WRITE_CHUNK_DELAY_MS);
+      if (offset + chunkSize < buffer.length && framing.chunkDelayMs) {
+        await delay(framing.chunkDelayMs);
       }
     }
   }
@@ -910,7 +960,7 @@ export class NobleBleHandler {
     this._onDeviceDisconnected = undefined;
     const connections = Array.from(this._connectAttempts);
     for (const attempt of connections) {
-      attempt.abandon(new Error('Trezor BLE is shutting down'));
+      attempt.abandon(new Error('Desktop BLE is shutting down'));
       try {
         attempt.cancelNative();
       } catch (error) {
@@ -995,14 +1045,23 @@ export class NobleBleHandler {
   }
 
   private _assertActive(): void {
-    if (this._disposed) throw new Error('Trezor BLE is shutting down');
+    if (this._disposed) throw new Error('Desktop BLE is shutting down');
   }
 
-  private _cleanupDevice(id: string, unexpected: boolean): void {
+  private _cleanupDevice(id: string, unexpected: boolean, expected?: DeviceEntry): void {
     const entry = this._connected.get(id);
     if (!entry) return;
+    // A reconnect may have replaced the entry while the caller awaited.
+    // A stale caller must not tear down the link it no longer owns.
+    if (expected && entry !== expected) return;
     if (entry.notifyChar && entry.notifyHandler) {
       entry.notifyChar.removeListener('data', entry.notifyHandler);
+    }
+    // Release this connection's own disconnect listener. Without it the
+    // handler stays attached to a peripheral we no longer hold, and a later
+    // explicit disconnect of the same device is reported as an unexpected one.
+    if (entry.disconnectHandler) {
+      entry.peripheral.removeListener('disconnect', entry.disconnectHandler);
     }
     this._connected.delete(id);
     if (unexpected) {
@@ -1014,13 +1073,13 @@ export class NobleBleHandler {
   private _requireEntry(id: string): DeviceEntry {
     this._assertActive();
     const entry = this._connected.get(id);
-    if (!entry) throw new Error(`Trezor BLE device is not connected: ${id}`);
+    if (!entry) throw new Error(`BLE device is not connected: ${id}`);
     return entry;
   }
 
   private _requireNoble(): NobleLike {
     this._assertActive();
-    if (!this._noble) throw new Error('Trezor BLE: noble was not initialized');
+    if (!this._noble) throw new Error('Desktop BLE: noble was not initialized');
     return this._noble;
   }
 
@@ -1035,13 +1094,13 @@ export class NobleBleHandler {
       };
       const cancel = () => {
         cleanup();
-        reject(new Error('Trezor BLE is shutting down'));
+        reject(new Error('Desktop BLE is shutting down'));
       };
       const timer = setTimeout(() => {
         cleanup();
         reject(
           new Error(
-            `Trezor BLE: noble did not reach poweredOn within ${timeoutMs}ms (last state: ${noble.state})`
+            `Desktop BLE: noble did not reach poweredOn within ${timeoutMs}ms (last state: ${noble.state})`
           )
         );
       }, timeoutMs);
@@ -1051,7 +1110,7 @@ export class NobleBleHandler {
           resolve();
         } else if (state === 'unsupported' || state === 'unauthorized') {
           cleanup();
-          reject(new Error(`Trezor BLE: noble state ${state}`));
+          reject(new Error(`Desktop BLE: noble state ${state}`));
         }
       };
       this._pendingCancellations.add(cancel);
@@ -1059,10 +1118,12 @@ export class NobleBleHandler {
     });
   }
 
-  private _log(level: TrezorDebugLogLevel, event: string, data?: Record<string, unknown>): void {
-    const entry = filterTrezorDebugLogEntry({ level, scope: 'trezor-electron-ble', event, data });
-    if (!entry) return;
-
-    this._logger?.(entry);
+  private _log(level: BleDebugLogLevel, event: string, data?: Record<string, unknown>): void {
+    this._logger?.({
+      level,
+      scope: 'desktop-noble-ble',
+      event,
+      data: redactBleDebugLogData(data),
+    });
   }
 }

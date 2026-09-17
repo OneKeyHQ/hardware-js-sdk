@@ -1,12 +1,16 @@
 /**
- * Pure FIFO job queue. Every enqueue chains onto the tail; jobs run one at
- * a time across all devices. The queue is intentionally passive — it does
- * NOT decide whether to interrupt or ask the user. Those are application-
- * layer concerns owned by the caller (e.g. a UI button handler that wants
- * to ask "device is busy, interrupt current?" before submitting). The
- * queue exposes inspection (`getActiveJob`) and explicit cancellation
- * (`cancelActive` / `cancelAll`) so callers can implement those policies
- * synchronously, without racing against in-flight enqueues.
+ * Serializes every device call and gives callers one handle to cancel them.
+ *
+ * Ordering is the lesser half of the job: calls already await each other, and
+ * nothing in the app issues two device operations at once. What this buys is
+ * the rest — an AbortController per job so a cancel has something to pull, a
+ * busy check so a double-submit is refused rather than queued, and generation
+ * tracking so a job that was queued before a teardown does not start after it.
+ * Those races exist in a perfectly sequential caller, because cleanup is async.
+ *
+ * The queue never decides whether to interrupt or ask the user; the caller owns
+ * that. `getActiveJob()` reads synchronously so a UI handler can look, decide,
+ * and submit in one turn without racing an in-flight enqueue.
  */
 
 export interface JobOptions {
@@ -28,12 +32,24 @@ interface ActiveJob {
   startedAt: number;
 }
 
+interface CancelScope {
+  deviceId: string;
+  abortController: AbortController;
+}
+
+export interface CancelScopeHandle {
+  signal: AbortSignal;
+  release: () => void;
+}
+
 export class DeviceJobQueue {
   private _tail: Promise<unknown> = Promise.resolve();
 
   private _active: ActiveJob | null = null;
 
-  private readonly _jobs = new Map<object, { deviceId: string }>();
+  private readonly _jobs = new Map<object, ActiveJob>();
+
+  private readonly _cancelScopes = new Map<object, CancelScope>();
 
   /** Incremented on clear() so queued-but-not-yet-running jobs detect invalidation. */
   private _generation = 0;
@@ -63,7 +79,7 @@ export class DeviceJobQueue {
       abortController: ac,
       startedAt: Date.now(),
     };
-    this._jobs.set(jobToken, { deviceId });
+    this._jobs.set(jobToken, activeJob);
 
     const next = prev
       .catch(() => {})
@@ -73,6 +89,7 @@ export class DeviceJobQueue {
             this._generationCancelReasons.get(gen) ?? new Error('Job cancelled: queue was cleared')
           );
         }
+        if (ac.signal.aborted) throw ac.signal.reason;
         this._active = activeJob;
         try {
           return await job(ac.signal);
@@ -92,34 +109,55 @@ export class DeviceJobQueue {
     return next;
   }
 
-  /** Cancel the active job. If `deviceId` is given, only cancels when it matches. */
-  cancelActive(deviceId?: string): boolean {
-    if (!this._active) return false;
-    if (deviceId && this._active.deviceId !== deviceId) return false;
-    this._active.abortController.abort(new Error('Manually cancelled'));
-    return true;
+  /**
+   * Open a cancellation scope that outlives the individual jobs under it.
+   *
+   * A bundle (all-network) does not enqueue itself — it enqueues one job per
+   * item. Between two items the queue is empty, so a cancel landing in that
+   * gap finds nothing to abort and the next item goes to the device anyway.
+   * The scope holds the cancel across those gaps; the bundle checks its
+   * signal before each item. Callers must `release()` when the bundle ends.
+   */
+  createCancelScope(deviceId: string): CancelScopeHandle {
+    const scopeToken = {};
+    const abortController = new AbortController();
+    this._cancelScopes.set(scopeToken, { deviceId, abortController });
+    return {
+      signal: abortController.signal,
+      release: () => {
+        this._cancelScopes.delete(scopeToken);
+      },
+    };
   }
 
-  /** Force cancel the active job. `reason` becomes signal.reason. */
-  forceCancelActive(deviceId?: string, reason?: Error): boolean {
+  /** Cancel the running job. `reason` becomes signal.reason. */
+  cancelActive(deviceId?: string, reason?: Error): boolean {
     if (!this._active) return false;
     if (deviceId && this._active.deviceId !== deviceId) return false;
-    this._active.abortController.abort(reason ?? new Error('Force cancelled for recovery'));
+    this._active.abortController.abort(reason ?? new Error('Cancelled'));
     return true;
-  }
-
-  /** Cancel the active job (alias for callers that previously needed multi-device cancel). */
-  cancelAllActive(reason?: Error): void {
-    if (!this._active) return;
-    this._active.abortController.abort(reason ?? new Error('Cancelled by cancelAllActive'));
   }
 
   /** Cancel the active job and invalidate queued jobs that have not started. */
   cancelActiveAndPending(deviceId?: string, reason?: Error): boolean {
-    if (deviceId && this._active && this._active.deviceId !== deviceId) {
-      return false;
+    const cancelReason = reason ?? new Error('Cancelled by cancelActiveAndPending');
+    if (deviceId) {
+      let cancelled = false;
+      for (const job of this._jobs.values()) {
+        if (job.deviceId === deviceId) {
+          job.abortController.abort(cancelReason);
+          cancelled = true;
+        }
+      }
+      for (const scope of this._cancelScopes.values()) {
+        if (scope.deviceId === deviceId) {
+          scope.abortController.abort(cancelReason);
+          cancelled = true;
+        }
+      }
+      return cancelled;
     }
-    this.clear(reason ?? new Error('Cancelled by cancelActiveAndPending'));
+    this.clear(cancelReason);
     return true;
   }
 
@@ -134,11 +172,6 @@ export class DeviceJobQueue {
     };
   }
 
-  /** True if any job is currently running. */
-  isBusy(): boolean {
-    return this._jobs.size > 0;
-  }
-
   clear(reason?: Error): void {
     const cancelledGeneration = this._generation;
     this._generation++;
@@ -151,6 +184,9 @@ export class DeviceJobQueue {
     }
     if (this._active) {
       this._active.abortController.abort(cancelReason);
+    }
+    for (const scope of this._cancelScopes.values()) {
+      scope.abortController.abort(cancelReason);
     }
   }
 }
