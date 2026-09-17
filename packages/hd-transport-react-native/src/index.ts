@@ -910,12 +910,10 @@ export default class ReactNativeBleTransport {
         (error, device) => {
           if (error) {
             Log?.debug('ble scan error: ', error);
-            if (
-              [BleErrorCode.BluetoothPoweredOff, BleErrorCode.BluetoothInUnknownState].includes(
-                error.errorCode
-              )
-            ) {
-              finishScan(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
+            if (error.errorCode === BleErrorCode.BluetoothPoweredOff) {
+              finishScan(ERRORS.TypedError(HardwareErrorCode.BlePoweredOff));
+            } else if (error.errorCode === BleErrorCode.BluetoothUnsupported) {
+              finishScan(ERRORS.TypedError(HardwareErrorCode.BleUnsupported));
             } else if (error.errorCode === BleErrorCode.BluetoothUnauthorized) {
               finishScan(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
             } else if (error.errorCode === BleErrorCode.LocationServicesDisabled) {
