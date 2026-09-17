@@ -175,8 +175,8 @@ const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
   const code = (error as { errorCode?: unknown })?.errorCode;
   // Bonding and GATT failures are not evidence of a protocol mismatch. Preserve
   // them instead of probing another protocol on an unusable connection.
-  // Native PLX disconnects (errorCode 201 / iOS 7) must match before they are
-  // mapped: Protocol V2 writes rethrow them unchanged unless normalized first.
+  // Native PLX disconnects (errorCode 201 / iOS 7, or the unstructured
+  // "was disconnected" fallback) must match before Protocol V2 probing.
   return (
     isBleStaleBondHardwareError(error) ||
     isNativeBleDisconnectError(error) ||
@@ -460,11 +460,11 @@ function remapError(error: IOBleErrorRemap) {
     }
   }
 
-  if (
-    error instanceof Error &&
-    error.message &&
-    (error.message.includes('was disconnected') || error.message.includes('not found'))
-  ) {
+  if (isNativeBleDisconnectError(error)) {
+    throw toBleDisconnectHardwareError(error);
+  }
+
+  if (error instanceof Error && error.message?.includes('not found')) {
     throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
   }
 
@@ -2342,6 +2342,12 @@ export default class ReactNativeBleTransport {
         if (resetManager) {
           throw this.createWedgedBleSetupError();
         }
+      }
+      if (isNativeBleStaleBondError(error) || isBleStaleBondHardwareError(error)) {
+        throw toBleStaleBondHardwareError(error);
+      }
+      if (isNativeBleDisconnectError(error)) {
+        throw toBleDisconnectHardwareError(error);
       }
       if (Platform.OS === 'android' && isMissingGattShapeError(error)) {
         this.androidGattCacheRefreshes.add(uuid);
