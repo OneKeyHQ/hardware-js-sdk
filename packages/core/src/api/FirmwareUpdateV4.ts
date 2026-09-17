@@ -91,6 +91,8 @@ const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 90 * 1000;
 const PROTOCOL_V2_FINAL_RECONNECT_TIMEOUT = 3 * 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
 const PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT = 15 * 1000;
+// React Native invalidates a timed-out BLE link, and V4 can safely replay the staging file.
+const PROTOCOL_V2_FILE_WRITE_RESPONSE_TIMEOUT = 30 * 1000;
 const PROTOCOL_V2_INSTALL_TIMEOUT = 5 * 60 * 1000;
 const PROTOCOL_V2_INSTALL_STATUS_INITIAL_DELAY = 1000;
 const PROTOCOL_V2_INSTALL_FINISHED_AFTER_DISCONNECT_POLLS = 4;
@@ -3132,6 +3134,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     progress: number | null
   ): Promise<TypedResponseMessage<'FilesystemFile'>> {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const env = DataManager.getSettings('env');
     const writeRes = await typedCall(
       'FilesystemFileWrite',
       'FilesystemFile',
@@ -3147,6 +3150,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         ui_percentage: progress ?? undefined,
       },
       {
+        timeoutMs: env === 'react-native' ? PROTOCOL_V2_FILE_WRITE_RESPONSE_TIMEOUT : undefined,
         writeWithResponse: false,
         onWriteCompleted: () => undefined,
       }
