@@ -32,12 +32,24 @@ interface ActiveJob {
   startedAt: number;
 }
 
+interface CancelScope {
+  deviceId: string;
+  abortController: AbortController;
+}
+
+export interface CancelScopeHandle {
+  signal: AbortSignal;
+  release: () => void;
+}
+
 export class DeviceJobQueue {
   private _tail: Promise<unknown> = Promise.resolve();
 
   private _active: ActiveJob | null = null;
 
   private readonly _jobs = new Map<object, ActiveJob>();
+
+  private readonly _cancelScopes = new Map<object, CancelScope>();
 
   /** Incremented on clear() so queued-but-not-yet-running jobs detect invalidation. */
   private _generation = 0;
@@ -97,6 +109,27 @@ export class DeviceJobQueue {
     return next;
   }
 
+  /**
+   * Open a cancellation scope that outlives the individual jobs under it.
+   *
+   * A bundle (all-network) does not enqueue itself — it enqueues one job per
+   * item. Between two items the queue is empty, so a cancel landing in that
+   * gap finds nothing to abort and the next item goes to the device anyway.
+   * The scope holds the cancel across those gaps; the bundle checks its
+   * signal before each item. Callers must `release()` when the bundle ends.
+   */
+  createCancelScope(deviceId: string): CancelScopeHandle {
+    const scopeToken = {};
+    const abortController = new AbortController();
+    this._cancelScopes.set(scopeToken, { deviceId, abortController });
+    return {
+      signal: abortController.signal,
+      release: () => {
+        this._cancelScopes.delete(scopeToken);
+      },
+    };
+  }
+
   /** Cancel the running job. `reason` becomes signal.reason. */
   cancelActive(deviceId?: string, reason?: Error): boolean {
     if (!this._active) return false;
@@ -113,6 +146,12 @@ export class DeviceJobQueue {
       for (const job of this._jobs.values()) {
         if (job.deviceId === deviceId) {
           job.abortController.abort(cancelReason);
+          cancelled = true;
+        }
+      }
+      for (const scope of this._cancelScopes.values()) {
+        if (scope.deviceId === deviceId) {
+          scope.abortController.abort(cancelReason);
           cancelled = true;
         }
       }
@@ -145,6 +184,9 @@ export class DeviceJobQueue {
     }
     if (this._active) {
       this._active.abortController.abort(cancelReason);
+    }
+    for (const scope of this._cancelScopes.values()) {
+      scope.abortController.abort(cancelReason);
     }
   }
 }

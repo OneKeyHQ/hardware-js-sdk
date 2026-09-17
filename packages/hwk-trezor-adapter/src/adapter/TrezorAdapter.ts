@@ -1995,26 +1995,26 @@ export class TrezorAdapter implements IHardwareWallet {
     } catch (error) {
       // If we were aborted, surface as-is — don't take the retry/recovery path.
       if (signal.aborted) {
-        if (pendingBindingRequestId)
+        if (pendingBindingRequestId) {
           this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
             type: UI_REQUEST.DEVICE_BINDING_STATUS,
             payload: { selectionRequestId: pendingBindingRequestId, status: 'cancelled' },
           });
+          pendingBindingRequestId = undefined;
+        }
         return this._errorToFailure(error);
       }
       const code = TrezorAdapter._errorCode(error);
-      if (
-        pendingBindingRequestId &&
-        !(
-          allowRetry &&
-          (passphraseState || useEmptyPassphrase === true) &&
-          TrezorAdapter._isStaleSessionError(code)
-        )
-      ) {
+      const willRetryStaleSession =
+        allowRetry &&
+        (passphraseState || useEmptyPassphrase === true) &&
+        TrezorAdapter._isStaleSessionError(code);
+      if (pendingBindingRequestId && !willRetryStaleSession) {
         this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
           type: UI_REQUEST.DEVICE_BINDING_STATUS,
           payload: { selectionRequestId: pendingBindingRequestId, status: 'failed' },
         });
+        pendingBindingRequestId = undefined;
       }
       const ambiguousTransportFailure =
         code === HardwareErrorCode.DeviceDisconnected ||
@@ -2058,14 +2058,13 @@ export class TrezorAdapter implements IHardwareWallet {
       }
       // The device evicted the passphrase session created for this call. Retry
       // once and recreate the requested wallet context.
-      if (
-        allowRetry &&
-        (passphraseState || useEmptyPassphrase === true) &&
-        TrezorAdapter._isStaleSessionError(code)
-      ) {
+      if (willRetryStaleSession) {
         if (passphraseState) {
           this._forgetVerifiedPassphraseSession(connectId, passphraseState);
         }
+        // The retry owns the binding request from here on.
+        const retryBindingRequestId = pendingBindingRequestId;
+        pendingBindingRequestId = undefined;
         return await this._callWithRetry<T>(
           connectId,
           methodName,
@@ -2075,7 +2074,7 @@ export class TrezorAdapter implements IHardwareWallet {
           false,
           signal,
           operationId,
-          pendingBindingRequestId,
+          retryBindingRequestId,
           bundleContext
         );
       }
@@ -2087,6 +2086,18 @@ export class TrezorAdapter implements IHardwareWallet {
       return this._errorToFailure(error);
     } finally {
       restorePassphraseRequestContext();
+      // Early returns above leave the host dialog waiting; close the request here
+      // so every exit that did not verify the binding reports a terminal status.
+      if (pendingBindingRequestId) {
+        this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
+          type: UI_REQUEST.DEVICE_BINDING_STATUS,
+          payload: {
+            selectionRequestId: pendingBindingRequestId,
+            status: signal.aborted ? 'cancelled' : 'failed',
+          },
+        });
+        pendingBindingRequestId = undefined;
+      }
     }
   }
 

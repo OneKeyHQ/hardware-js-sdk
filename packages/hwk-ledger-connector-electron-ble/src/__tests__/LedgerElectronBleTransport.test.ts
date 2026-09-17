@@ -161,6 +161,25 @@ describe('Ledger Electron BLE lifecycle', () => {
     await transport.disconnect({ connectedDevice: next.unsafeCoerce() });
   });
 
+  it('catches a link that drops while connect is still resolving', async () => {
+    const { transport, bridge, disconnects, notifications } = fixture();
+    const onDisconnect = jest.fn();
+    // The device drops the link as pairing completes, before connect returns.
+    bridge.connect.mockImplementationOnce(async () => {
+      disconnects.forEach(handler => handler('ledger-test'));
+      return { id: 'ledger-test' };
+    });
+    const result = await transport.connect({ deviceId: 'ledger-test', onDisconnect });
+    expect(result.isLeft()).toBe(true);
+    expect(onDisconnect).toHaveBeenCalledWith('ledger-test');
+    expect(disconnects.size).toBe(0);
+    expect(notifications.size).toBe(0);
+    // The dead link never becomes an owned connection, so a retry is allowed.
+    const next = await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() });
+    expect(next.isRight()).toBe(true);
+    await transport.disconnect({ connectedDevice: next.unsafeCoerce() });
+  });
+
   it('uses DMK framing for a multi-frame exchange without replay', async () => {
     const { transport, bridge, notify } = fixture();
     const connected = (

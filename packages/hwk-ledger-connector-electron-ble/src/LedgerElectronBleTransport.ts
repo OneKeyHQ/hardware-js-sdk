@@ -169,6 +169,16 @@ export class LedgerElectronBleTransport implements Transport {
         release();
         return Left(new UnknownDeviceError());
       }
+      // Registered before connect: a Ledger often drops the link the moment
+      // pairing completes, and an event missed here costs a full APDU timeout.
+      // The handler filters by id, and every failure path below closes it.
+      removeDisconnect = this.bridge.onDeviceDisconnected(id => {
+        if (id !== deviceId) return;
+        if (close()) {
+          release();
+          onDisconnect(deviceId);
+        }
+      });
       await this.bridge.connect(
         deviceId,
         ledgerBleConnectProfile({
@@ -177,13 +187,7 @@ export class LedgerElectronBleTransport implements Transport {
           notifyUuid: known.profile.notifyUuid,
         })
       );
-      removeDisconnect = this.bridge.onDeviceDisconnected(id => {
-        if (id !== deviceId) return;
-        if (close()) {
-          release();
-          onDisconnect(deviceId);
-        }
-      });
+      if (closed) throw new Error('Bluetooth connection ended');
       removeNotification = this.bridge.onNotification((id, hex) => {
         if (id !== deviceId || closed) return;
         if (!/^(?:[0-9a-f]{2})+$/i.test(hex)) {

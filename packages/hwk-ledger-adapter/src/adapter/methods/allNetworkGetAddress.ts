@@ -14,6 +14,7 @@ import type {
   AllNetworkMethodName,
   BtcAddress,
   BtcPublicKey,
+  CancelScopeHandle,
   ChainForFingerprint,
   EvmAddress,
   ICommonCallParams,
@@ -57,6 +58,13 @@ export type LedgerRetainOperation = (operationId: string) => () => void;
 
 export type LedgerErrorToFailure = <T>(error: unknown) => Response<T>;
 
+/**
+ * Opens a cancellation scope that spans the whole bundle. Each item enqueues
+ * its own job, so a cancel between two items has no job to abort; the scope
+ * is what survives that gap.
+ */
+export type LedgerCreateCancelScope = (queueKey: string) => CancelScopeHandle;
+
 const LEDGER_BTC_NETWORK_COIN_MAP: Partial<Record<string, string>> = {
   tbtc: 'Testnet',
   bch: 'Bcash',
@@ -71,11 +79,13 @@ export function createAllNetworkGetAddress({
   getChainFingerprint,
   retainOperation,
   errorToFailure,
+  createCancelScope,
 }: {
   callChain: LedgerCallChain;
   getChainFingerprint: LedgerGetChainFingerprint;
   retainOperation: LedgerRetainOperation;
   errorToFailure: LedgerErrorToFailure;
+  createCancelScope: LedgerCreateCancelScope;
 }) {
   return async function allNetworkGetAddress(
     connectId: string,
@@ -104,6 +114,12 @@ export function createAllNetworkGetAddress({
       return errorToFailure(error);
     }
 
+    // Same key connectorCall enqueues under, so LedgerAdapter.cancel() reaches
+    // this scope with the queue key it already computes.
+    const cancelScope = createCancelScope(
+      (target.payload.operationId ?? effectiveTargetId) || '__ledger_default__'
+    );
+
     const installContext: LedgerInstallAppContext = {};
     const commonParams: ICommonCallParams = {
       autoInstallApp: params.autoInstallApp,
@@ -125,6 +141,7 @@ export function createAllNetworkGetAddress({
             ? buildUnsupportedNetworkResponse(item)
             : undefined,
         callItem: async ({ method, chain, item }) => {
+          if (cancelScope.signal.aborted) return buildCancelledFailure(cancelScope.signal);
           const itemDeviceId = getItemDeviceId(item) ?? chainFingerprints.get(chain) ?? '';
           return callAllNetworkMethod(
             callChain,
@@ -144,7 +161,8 @@ export function createAllNetworkGetAddress({
             chain,
             payload,
             chainFingerprints,
-            installContext
+            installContext,
+            cancelScope.signal
           ),
         shouldAbortBundle: isTopLevelAllNetworkFailure,
         buildTopLevelFailure: response => {
@@ -163,9 +181,21 @@ export function createAllNetworkGetAddress({
       });
       return result;
     } finally {
+      cancelScope.release();
       releaseOperationRetention?.();
     }
   };
+}
+
+/** UserAborted is a top-level abort code, so this ends the bundle. */
+function buildCancelledFailure<T>(signal: AbortSignal): Response<T> {
+  const reason = signal.reason as { code?: unknown; message?: unknown } | undefined;
+  const code =
+    typeof reason?.code === 'number'
+      ? (reason.code as HardwareErrorCode)
+      : HardwareErrorCode.UserAborted;
+  const message = typeof reason?.message === 'string' ? reason.message : '';
+  return failure(code, message || 'All-network get-address cancelled');
 }
 
 function isTopLevelAllNetworkFailure(response: AllNetworkAddressResponse): boolean {
@@ -232,11 +262,17 @@ async function attachLedgerIdentity(
   chain: ChainForFingerprint,
   payload: Record<string, unknown>,
   chainFingerprints: Map<ChainForFingerprint, string>,
-  context: LedgerInstallAppContext
+  context: LedgerInstallAppContext,
+  cancelSignal: AbortSignal
 ): Promise<AllNetworkAddressResponse> {
+  const knownFingerprint = getItemDeviceId(item) || chainFingerprints.get(chain) || '';
+  // Bootstrapping is another device round trip, so it needs the same gap check.
+  if (!knownFingerprint && cancelSignal.aborted) {
+    const cancelled = buildCancelledFailure<never>(cancelSignal);
+    return { ...item, success: false, payload: cancelled.payload };
+  }
   const fingerprint =
-    getItemDeviceId(item) ||
-    chainFingerprints.get(chain) ||
+    knownFingerprint ||
     (await bootstrapChainFingerprint(
       getChainFingerprint,
       context.connection?.connectId ?? connectId,

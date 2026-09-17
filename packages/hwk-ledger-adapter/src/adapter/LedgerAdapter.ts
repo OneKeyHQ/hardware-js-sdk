@@ -882,6 +882,7 @@ export class LedgerAdapter implements IHardwareWallet {
     },
     retainOperation: operationId => this._operations.retain(operationId),
     errorToFailure: <T>(error: unknown) => this.errorToFailure<T>(error),
+    createCancelScope: queueKey => this._jobQueue.createCancelScope(queueKey),
   });
 
   // ---------------------------------------------------------------------------
