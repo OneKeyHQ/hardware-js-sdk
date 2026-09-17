@@ -1472,6 +1472,43 @@ describe('KeystoneAdapter', () => {
       expect(qrFake.requests).toHaveLength(0);
     });
 
+    it('keeps a QR-routed bundle on QR when the record still carries a USB session', async () => {
+      // importFromQr remembers the record without clearing usbSessionId, so a
+      // wallet that was on USB earlier still has one. The operation route, not
+      // that leftover session, decides which transport the bundle uses.
+      const usb = fakeUsbConnector();
+      const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });
+      const qrFake = attachFakeDevice(adapter);
+
+      const usbConnected = await connectUsbDevice(adapter);
+      expect(usbConnected.success).toBe(true);
+
+      const qrConnected = await connectQrDevice(adapter);
+      expect(qrConnected.success).toBe(true);
+      if (!qrConnected.success) return;
+
+      const usbCallsBeforeBundle = usb.calls.length;
+      const qrRequestsBeforeBundle = qrFake.requests.length;
+
+      const result = await adapter.allNetworkGetAddress(
+        `keystone-wallet:${FIXTURE_WALLET_ID}`,
+        FIXTURE_WALLET_ID,
+        {
+          operationId: qrConnected.payload,
+          bundle: [
+            { methodName: 'evmGetAddress', network: 'evm', path: "m/44'/60'/0'/0/0" },
+            { methodName: 'solGetAddress', network: 'sol', path: "m/44'/501'/0'/0'" },
+          ],
+        }
+      );
+
+      expect(result.success).toBe(true);
+      expect(usb.calls.length).toBe(usbCallsBeforeBundle);
+      // One batched QR request covers both paths. The USB branch walks the
+      // missing schemas one at a time, so taking it costs a scan per path.
+      expect(qrFake.requests.length).toBe(qrRequestsBeforeBundle + 1);
+    });
+
     it('uses single-path USB exports throughout the default-network creation burst', async () => {
       // What app-monorepo actually does right after connectDevice: build the
       // wallet xfp (mfp + first taproot xpub), then derive an address per

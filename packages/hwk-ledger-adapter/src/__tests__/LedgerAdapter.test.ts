@@ -12,6 +12,7 @@ import {
 
 import { LedgerAdapter } from '../adapter/LedgerAdapter';
 import { ERROR_TAG } from '../errors';
+import { ledgerQueueKey } from '../utils/queueKey';
 
 import type {
   ConnectorDevice,
@@ -3543,6 +3544,69 @@ describe('LedgerAdapter', () => {
           path: "m/44'/60'/0'/0/0",
           deviceId: expectedFingerprint,
         })
+      );
+    });
+
+    it('enqueues and opens the bundle cancel scope under the same queue key', async () => {
+      // connectorCall, the bundle's cancel scope and cancel() all derive their
+      // key from ledgerQueueKey. Let them drift and a cancel misses its target.
+      const queue = (
+        adapter as unknown as {
+          _jobQueue: {
+            enqueue: (deviceId: string, ...rest: unknown[]) => Promise<unknown>;
+            createCancelScope: (key: string) => { signal: AbortSignal };
+          };
+        }
+      )._jobQueue;
+      const enqueue = jest.spyOn(queue, 'enqueue');
+      const createCancelScope = jest.spyOn(queue, 'createCancelScope');
+
+      connector.callImpl.mockResolvedValue({ address: '0xBUNDLE', path: "m/44'/60'/0'/0/0" });
+      await adapter.connectDevice('dev-1');
+      enqueue.mockClear();
+
+      const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        bundle: [
+          { network: 'evm', methodName: 'evmGetAddress', path: "m/44'/60'/0'/0/0", chainId: 1 },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      const expectedKey = ledgerQueueKey({ connectId: 'dev-1' });
+      expect(createCancelScope).toHaveBeenCalledWith(expectedKey);
+      expect(enqueue).toHaveBeenCalled();
+      for (const call of enqueue.mock.calls) {
+        expect(call[0]).toBe(expectedKey);
+      }
+    });
+
+    it('derives the same queue key for an operation, a connectId and neither', () => {
+      expect(ledgerQueueKey({ operationId: 'op-1', connectId: 'dev-1' })).toBe('op-1');
+      expect(ledgerQueueKey({ connectId: 'dev-1' })).toBe('dev-1');
+      expect(ledgerQueueKey({})).toBe('__ledger_default__');
+    });
+
+    it('cancel(connectId) reaches a bundle scope opened without an operationId', async () => {
+      // A bundle called with a raw connectId enqueues its items — and opens its
+      // cancel scope — under that connectId. Between two items nothing is in
+      // the queue, so the scope is all the cancel has left to land on, while
+      // cancel() resolves the connectId to the operation that owns it. The gap
+      // itself holds no macrotask a test can hook, so this drives the scope
+      // directly and asserts the key routing that makes the gap check work.
+      await adapter.connectDevice('dev-1');
+
+      const queue = (
+        adapter as unknown as {
+          _jobQueue: { createCancelScope: (key: string) => { signal: AbortSignal } };
+        }
+      )._jobQueue;
+      const scope = queue.createCancelScope(ledgerQueueKey({ connectId: 'dev-1' }));
+
+      adapter.cancel('dev-1');
+
+      expect(scope.signal.aborted).toBe(true);
+      expect((scope.signal.reason as { code?: number } | undefined)?.code).toBe(
+        HardwareErrorCode.UserAborted
       );
     });
 
