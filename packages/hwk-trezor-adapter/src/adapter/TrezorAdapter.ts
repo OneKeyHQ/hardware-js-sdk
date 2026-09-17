@@ -1989,7 +1989,7 @@ export class TrezorAdapter implements IHardwareWallet {
       businessCallStarted = true;
       const result = await TrezorAdapter._abortable(
         signal,
-        this._callConnector(sessionId, methodName, rest)
+        this._callConnector(sessionId, methodName, rest, signal)
       );
       return success(result as T);
     } catch (error) {
@@ -2409,7 +2409,15 @@ export class TrezorAdapter implements IHardwareWallet {
   ): Promise<boolean> {
     if (!selectionRequestId) return false;
     const device = this._devices.get(connectId);
-    if (!device || device.deviceId !== deviceId || device.connectionType !== 'ble') return false;
+    if (!device || device.deviceId !== deviceId || device.connectionType !== 'ble') {
+      // Every other exit reports a terminal status, this one has to as well:
+      // callers clear the request id and would leave the host dialog waiting.
+      this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
+        type: UI_REQUEST.DEVICE_BINDING_STATUS,
+        payload: { selectionRequestId, status: signal?.aborted ? 'cancelled' : 'failed' },
+      });
+      return false;
+    }
     const outcome = await requestSaveDeviceBinding(
       this._emitter,
       this._uiRegistry,
@@ -2450,9 +2458,14 @@ export class TrezorAdapter implements IHardwareWallet {
 
     const created = (await TrezorAdapter._abortable(
       signal,
-      this._callConnector(sessionId, '__thpCreateSession', {
-        passphraseMode: 'prompt',
-      })
+      this._callConnector(
+        sessionId,
+        '__thpCreateSession',
+        {
+          passphraseMode: 'prompt',
+        },
+        signal
+      )
     )) as { protocol?: string; thpSessionId?: string | null };
     // v1 has no host-managed app-session id, but the connector has just
     // re-initialized a fresh device session; continue with reactive
@@ -2532,9 +2545,14 @@ export class TrezorAdapter implements IHardwareWallet {
         if (!cached.thpSessionId) return false;
         await TrezorAdapter._abortable(
           signal,
-          this._callConnector(sessionId, '__thpSelectSession', {
-            thpSessionId: cached.thpSessionId,
-          })
+          this._callConnector(
+            sessionId,
+            '__thpSelectSession',
+            {
+              thpSessionId: cached.thpSessionId,
+            },
+            signal
+          )
         );
       }
       const state = await this._deriveState(sessionId, signal);
@@ -2555,9 +2573,14 @@ export class TrezorAdapter implements IHardwareWallet {
     // enforced inside connector/core, not delegated to host UI handlers.
     await TrezorAdapter._abortable(
       signal,
-      this._callConnector(sessionId, '__thpCreateSession', {
-        passphraseMode: 'empty',
-      })
+      this._callConnector(
+        sessionId,
+        '__thpCreateSession',
+        {
+          passphraseMode: 'empty',
+        },
+        signal
+      )
     );
   }
 
@@ -2573,10 +2596,15 @@ export class TrezorAdapter implements IHardwareWallet {
   private async _deriveState(sessionId: string, signal: AbortSignal): Promise<string> {
     const derived = (await TrezorAdapter._abortable(
       signal,
-      this._callConnector(sessionId, 'btcGetPublicKey', {
-        path: "m/44'/0'/0'",
-        showOnDevice: false,
-      })
+      this._callConnector(
+        sessionId,
+        'btcGetPublicKey',
+        {
+          path: "m/44'/0'/0'",
+          showOnDevice: false,
+        },
+        signal
+      )
     )) as { publicKey?: string };
     const state = derived?.publicKey;
     if (!state) {
@@ -2622,14 +2650,19 @@ export class TrezorAdapter implements IHardwareWallet {
       //      standard wallet → return null (OneKey-aligned).
       const created = (await TrezorAdapter._abortable(
         signal,
-        this._callConnector(sessionId, '__thpCreateSession', {
-          passphraseMode: 'prompt',
-        })
+        this._callConnector(
+          sessionId,
+          '__thpCreateSession',
+          {
+            passphraseMode: 'prompt',
+          },
+          signal
+        )
       )) as { protocol?: string; thpSessionId?: string | null };
       const state = await this._deriveState(sessionId, signal);
       const features = (await TrezorAdapter._abortable(
         signal,
-        this._callConnector(sessionId, 'getFeatures', { refresh: true })
+        this._callConnector(sessionId, 'getFeatures', { refresh: true }, signal)
       )) as Record<string, unknown> | undefined;
       if (features?.passphrase_protection !== true) {
         // Standard wallet — discard the derived state, return null (OneKey convention).
