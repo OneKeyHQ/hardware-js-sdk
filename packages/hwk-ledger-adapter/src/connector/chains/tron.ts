@@ -20,11 +20,10 @@ export interface TronSignTransactionCallParams {
   /** Protobuf-encoded raw transaction hex (no 0x prefix) */
   rawTxHex: string;
   /**
-   * Legacy TRC token metadata from the `hw-app-trx` era.
-   * `@ledgerhq/device-signer-kit-tron` 0.2.0 has no context module and no
-   * token-metadata channel, so TRC-20 transfers are blind-signed on device.
-   * Accepted and ignored rather than removed: no caller passes it today, and
-   * there is nowhere to forward it to.
+   * TRC-20 transfers are clear-signed from a firmware token table
+   * (address -> ticker/decimals); tokens outside it show as a custom
+   * contract. This field is the legacy `hw-app-trx` TRC-10 name/decimals
+   * channel (P1 0xA0); `device-signer-kit-tron` 0.2.0 doesn't implement it.
    */
   tokenSignatures?: string[];
 }
