@@ -37,6 +37,7 @@ import {
   ledgerFailure,
   mapLedgerError,
 } from '../errors';
+import { ledgerQueueKey } from '../utils/queueKey';
 import { createAllNetworkGetAddress } from './methods/allNetworkGetAddress';
 import { isLedgerBleConnectionType } from '../utils/ledgerDmkTransport';
 import { debugError, debugLog } from '../utils/debugLog';
@@ -1495,10 +1496,6 @@ export class LedgerAdapter implements IHardwareWallet {
 
     const interactionForPhysicalId =
       !operationId && connectId ? this._operations.findActiveByConnectionKey(connectId) : undefined;
-    const queueKey =
-      operationId ??
-      (activeJobId === connectId ? connectId : interactionForPhysicalId?.operationId) ??
-      connectId;
 
     const pendingOperationId = operationId ?? interactionForPhysicalId?.operationId;
     if (!connectId) this._pendingOperationBindings.clear();
@@ -1506,11 +1503,25 @@ export class LedgerAdapter implements IHardwareWallet {
       this._pendingOperationBindings.delete(pendingOperationId);
     }
 
-    // The no-connectId path cancels everything queued. Every job enqueued today
-    // is user-triggered, so there is nothing to collateral-damage; introducing
-    // background work would need a per-job foreground flag first.
-    if (queueKey) {
-      this._jobQueue.cancelActiveAndPending(queueKey, userAbortReason);
+    // A bundle called without an operationId queues its items — and opens its
+    // cancel scope — under the raw connectId, while the operation that owns
+    // that connection is a second live key. Both get cancelled. With neither,
+    // everything queued goes: every job enqueued today is user-triggered, so
+    // there is nothing to collateral-damage; background work would need a
+    // per-job foreground flag first.
+    const queueKeys = new Set<string>();
+    if (connectId) queueKeys.add(ledgerQueueKey({ connectId }));
+    if (pendingOperationId) queueKeys.add(ledgerQueueKey({ operationId: pendingOperationId }));
+    if (queueKeys.size) {
+      let cancelledAnyJob = false;
+      for (const key of queueKeys) {
+        cancelledAnyJob =
+          this._jobQueue.cancelActiveAndPending(key, userAbortReason) || cancelledAnyJob;
+      }
+      debugLog('[LedgerAdapter] cancel routed to queue keys', {
+        queueKeys: [...queueKeys],
+        cancelledAnyJob,
+      });
     } else {
       this._jobQueue.cancelActiveAndPending(undefined, userAbortReason);
     }
@@ -2419,7 +2430,7 @@ export class LedgerAdapter implements IHardwareWallet {
     });
 
     // Queue is global serial; deviceId is just a label for inspection / cancellation.
-    const queueKey = (operationId ?? effectiveConnectId) || '__ledger_default__';
+    const queueKey = ledgerQueueKey({ operationId, connectId: effectiveConnectId });
 
     try {
       const result = await this._jobQueue.enqueue(

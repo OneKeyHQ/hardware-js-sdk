@@ -6,6 +6,7 @@ import {
 } from '@onekeyfe/hwk-adapter-core';
 
 import { debugLog } from '../../utils/debugLog';
+import { ledgerQueueKey } from '../../utils/queueKey';
 
 import type {
   AllNetworkAddressParams,
@@ -117,7 +118,7 @@ export function createAllNetworkGetAddress({
     // Same key connectorCall enqueues under, so LedgerAdapter.cancel() reaches
     // this scope with the queue key it already computes.
     const cancelScope = createCancelScope(
-      (target.payload.operationId ?? effectiveTargetId) || '__ledger_default__'
+      ledgerQueueKey({ operationId: target.payload.operationId, connectId: effectiveTargetId })
     );
 
     const installContext: LedgerInstallAppContext = {};
