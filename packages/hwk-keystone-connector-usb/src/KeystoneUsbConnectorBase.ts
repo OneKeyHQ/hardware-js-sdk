@@ -196,7 +196,15 @@ export class KeystoneUsbConnectorBase implements IConnector {
       this._invalidateDiscoverySnapshot();
       this.activeDiscoveryGeneration = discoveryGeneration;
     }
-    const devices = await this.transportClass.getKeystoneDevices();
+    // Enumeration throws DOMExceptions whose legacy `.code` collides with the
+    // five-digit HWK range, so it needs the same mapping as every other
+    // transport call here.
+    let devices: ReadonlyArray<KeystoneUsbDeviceDescriptor>;
+    try {
+      devices = await this.transportClass.getKeystoneDevices();
+    } catch (err) {
+      throw mapKeystoneUsbError(err);
+    }
     // No mfp is available without opening+claiming the device. The target id
     // therefore identifies only this discovery snapshot; wallet identity is
     // learned and verified after connect. WebUSB can reopen the exact cached
