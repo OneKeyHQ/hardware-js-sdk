@@ -669,8 +669,8 @@ export class LedgerAdapter implements IHardwareWallet {
     const sessionId = this._sessions.get(resolvedConnectId);
     if (sessionId) this._operations.endByConnectionKey(sessionId, 'explicit');
     // The channel this operation runs on, taken from the transport the adapter
-    // selected. A combined connector stamps a nominal `connectionType` on the
-    // device snapshot, so that snapshot is not the source.
+    // selected. The discovery snapshot would do, but a session connect
+    // overwrites it with whatever the connector reports for the session.
     const connectionType: ConnectionType = this._isBleConnection() ? 'ble' : 'usb';
     const device = this._discoveredDevices.get(resolvedConnectId) ?? {
       vendor: 'ledger' as const,
@@ -1509,8 +1509,14 @@ export class LedgerAdapter implements IHardwareWallet {
 
     // A named cancel clears only the prompts its own operation opened; another
     // operation's device-selection or permission wait is not this call's
-    // business. With no name at all this is teardown, and everything goes.
-    this._uiRegistry.cancel(undefined, undefined, connectId ? pendingOperationId : undefined);
+    // business. Named but unresolvable clears nothing, because falling through
+    // to the untargeted form is exactly what a named cancel must not do. With
+    // no name at all this is teardown, and everything goes.
+    if (!connectId) {
+      this._uiRegistry.cancel();
+    } else if (pendingOperationId) {
+      this._uiRegistry.cancel(undefined, undefined, pendingOperationId);
+    }
     this._finishBleBinding('cancelled');
     if (!connectId) this._pendingOperationBindings.clear();
     else if (pendingOperationId) {
@@ -1748,13 +1754,17 @@ export class LedgerAdapter implements IHardwareWallet {
 
   // Ledger WebUSB won't expose a locked device, so we can't auto-detect unlock.
   /**
-   * The operation the running device job belongs to. A call pinned to an
-   * operation queues under its id (`ledgerQueueKey`), so this is how a UI
-   * request raised mid-call learns which operation it belongs to.
+   * The operation the running device job belongs to, so a UI request raised
+   * mid-call can name it. A call pinned to an operation queues under its id
+   * (`ledgerQueueKey`); a call without one queues under the connectId, and the
+   * live operation on that connection is still the owner. Only work with no
+   * operation at all (cold start) comes back undefined.
    */
   private _activeOperationId(): string | undefined {
     const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
-    return isHardwareOperationId(activeJobId) ? activeJobId : undefined;
+    if (!activeJobId) return undefined;
+    if (isHardwareOperationId(activeJobId)) return activeJobId;
+    return this._operations.findActiveByConnectionKey(activeJobId)?.operationId;
   }
 
   // The user must press Confirm after unlocking, which triggers a search retry.
@@ -2724,7 +2734,7 @@ export class LedgerAdapter implements IHardwareWallet {
               connectId: resolvedConnectId,
               device: selectedDevice,
               // Same source as `_createOperation`: the selected transport, not
-              // the device snapshot, which a session connect overwrites.
+              // the device snapshot a session connect overwrote.
               connectionType: this._isBleConnection() ? 'ble' : 'usb',
               connectionKeys: [sessionId],
             });
