@@ -1265,10 +1265,6 @@ export class TrezorAdapter implements IHardwareWallet {
     const userAbortReason = Object.assign(new Error('User aborted operation'), {
       code: HardwareErrorCode.UserAborted,
     });
-    // Release adapter-level UI waits (preemption) and connector-level ones
-    // (THP pairing / PIN matrix) — a single CANCEL clears whichever is open.
-    this._uiRegistry.cancel();
-    this._connector.uiResponse({ type: UI_RESPONSE.CANCEL });
     const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
     const targetId = connectId ?? activeJobId;
     if (targetId) {
@@ -1292,6 +1288,12 @@ export class TrezorAdapter implements IHardwareWallet {
       // and scopes go with the active one: between two bundle items nothing is
       // active, and only the scope carries the cancel across that gap.
       const pendingOperationId = operationId ?? interactionForPhysicalId?.operationId;
+      // Release adapter-level UI waits (preemption, device selection) and
+      // connector-level ones (THP pairing / PIN matrix). A named cancel keeps
+      // the adapter-side clear inside its own operation, so cancelling one
+      // signing call no longer closes another operation's PIN prompt.
+      this._uiRegistry.cancel(undefined, undefined, connectId ? pendingOperationId : undefined);
+      this._connector.uiResponse({ type: UI_RESPONSE.CANCEL });
       const queueKeys = new Set<string>([trezorQueueKey({ connectId: targetId })]);
       if (pendingOperationId) queueKeys.add(trezorQueueKey({ operationId: pendingOperationId }));
       for (const key of queueKeys) {
@@ -1302,10 +1304,23 @@ export class TrezorAdapter implements IHardwareWallet {
       }
       return;
     }
+    // Nothing to name: teardown clears every waiter on both sides.
+    this._uiRegistry.cancel();
+    this._connector.uiResponse({ type: UI_RESPONSE.CANCEL });
     this._jobQueue.cancelActiveAndPending(undefined, userAbortReason);
     for (const sessionId of this._sessions.values()) {
       void this._connector.cancel(sessionId);
     }
+  }
+
+  /**
+   * The operation the running device job belongs to. A call pinned to an
+   * operation queues under its id (`trezorQueueKey`), so this is how a UI
+   * request raised mid-call learns which operation it belongs to.
+   */
+  private _activeOperationId(): string | undefined {
+    const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
+    return isHardwareOperationId(activeJobId) ? activeJobId : undefined;
   }
 
   /**
@@ -2389,6 +2404,7 @@ export class TrezorAdapter implements IHardwareWallet {
             reason,
           },
           extra: context?.extra,
+          operationId: this._activeOperationId(),
         },
       });
       try {
@@ -2475,6 +2491,7 @@ export class TrezorAdapter implements IHardwareWallet {
         connection: { transport: 'ble', connectId },
         identity: { vendor: 'trezor', type: 'deviceId', value: deviceId },
         extra: context?.extra,
+        operationId: this._activeOperationId(),
       },
       signal
     );
@@ -2755,13 +2772,19 @@ export class TrezorAdapter implements IHardwareWallet {
     });
   };
 
+  // The one outlet for every connector-raised UI request (PIN, passphrase,
+  // button, THP pairing), so the operation is stamped here instead of at each
+  // connector call site.
   private _onUiRequest = (data: { type: string; payload?: unknown }): void => {
+    const operationId = this._activeOperationId();
+    const basePayload =
+      data.payload && typeof data.payload === 'object'
+        ? (data.payload as Record<string, unknown>)
+        : {};
+    const attribution = operationId === undefined ? {} : { operationId };
     if (data.type === UI_REQUEST.REQUEST_PASSPHRASE) {
-      const payload =
-        data.payload && typeof data.payload === 'object'
-          ? (data.payload as Record<string, unknown>)
-          : {};
-      const connectId = typeof payload.connectId === 'string' ? payload.connectId : undefined;
+      const connectId =
+        typeof basePayload.connectId === 'string' ? basePayload.connectId : undefined;
       const context = connectId
         ? this._passphraseRequestContextByConnectId.get(connectId)
         : undefined;
@@ -2770,19 +2793,23 @@ export class TrezorAdapter implements IHardwareWallet {
         {
           ...data,
           payload: {
-            ...payload,
+            ...basePayload,
             ...(context?.passphraseState !== undefined
               ? { passphraseState: context.passphraseState }
               : {}),
             ...(context?.useEmptyPassphrase !== undefined
               ? { useEmptyPassphrase: context.useEmptyPassphrase }
               : {}),
+            ...attribution,
           },
         } as never
       );
       return;
     }
-    this._emitter.emit(data.type as keyof HardwareEventMap, data as never);
+    // Leave the payload exactly as the connector sent it when there is no
+    // operation to name.
+    const payload = operationId === undefined ? data.payload : { ...basePayload, ...attribution };
+    this._emitter.emit(data.type as keyof HardwareEventMap, { ...data, payload } as never);
   };
 
   private _onUiEvent = (data: ConnectorUiEvent): void => {
@@ -2914,14 +2941,15 @@ export class TrezorAdapter implements IHardwareWallet {
     }
     const transportType: TransportType = requestedTransport ?? this.activeTransport ?? 'usb';
 
+    const operationId = this._activeOperationId();
     const waitPromise = this._uiRegistry.wait<{ granted: boolean; reason?: string }>(
       UI_REQUEST.REQUEST_DEVICE_PERMISSION,
-      { timeoutMs: 60_000 }
+      { timeoutMs: 60_000, operationId }
     );
 
     this._emitter.emit(UI_REQUEST.REQUEST_DEVICE_PERMISSION, {
       type: UI_REQUEST.REQUEST_DEVICE_PERMISSION,
-      payload: { transportType, connectId, deviceId },
+      payload: { transportType, connectId, deviceId, operationId },
     });
 
     const { granted } = await waitPromise;

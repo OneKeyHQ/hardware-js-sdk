@@ -668,6 +668,8 @@ describe('LedgerAdapter', () => {
             value: fingerprint,
           },
           extra: { dbDeviceId: 'binding-record' },
+          // The binding request names the operation it belongs to.
+          operationId,
         });
         await adapter.releaseOperation(operationId);
       }

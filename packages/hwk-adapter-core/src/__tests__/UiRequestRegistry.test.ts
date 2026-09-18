@@ -50,3 +50,34 @@ describe('UiRequestRegistry selection correlation', () => {
     await expect(pending).resolves.toEqual({ sdkConnectId: 'legacy' });
   });
 });
+
+describe('UiRequestRegistry operation scoping', () => {
+  it('clears only the waiters opened under the named operation', async () => {
+    const registry = new UiRequestRegistry();
+    const mine = registry.wait(UI_REQUEST.REQUEST_PIN, { operationId: 'op-a' });
+    const theirs = registry.wait(UI_REQUEST.REQUEST_QR_SCAN, { operationId: 'op-b' });
+    const unattributed = registry.wait(UI_REQUEST.REQUEST_PASSPHRASE);
+
+    registry.cancel(undefined, undefined, 'op-a');
+
+    await expect(mine).rejects.toMatchObject({ _tag: 'UiRequestCancelled' });
+    expect(registry.hasPending(UI_REQUEST.REQUEST_QR_SCAN)).toBe(true);
+    expect(registry.hasPending(UI_REQUEST.REQUEST_PASSPHRASE)).toBe(true);
+
+    registry.cancel();
+    await expect(theirs).rejects.toMatchObject({ _tag: 'UiRequestCancelled' });
+    await expect(unattributed).rejects.toMatchObject({ _tag: 'UiRequestCancelled' });
+    expect(registry.hasPending()).toBe(false);
+  });
+
+  it('leaves a typed waiter alone when it belongs to another operation', async () => {
+    const registry = new UiRequestRegistry();
+    const pending = registry.wait(UI_REQUEST.REQUEST_PIN, { operationId: 'op-a' });
+
+    registry.cancel(UI_REQUEST.REQUEST_PIN, undefined, 'op-b');
+    expect(registry.hasPending(UI_REQUEST.REQUEST_PIN)).toBe(true);
+
+    registry.cancel(UI_REQUEST.REQUEST_PIN, undefined, 'op-a');
+    await expect(pending).rejects.toMatchObject({ _tag: 'UiRequestCancelled' });
+  });
+});
