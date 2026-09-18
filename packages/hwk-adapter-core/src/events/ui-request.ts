@@ -45,6 +45,16 @@ export const UI_RESPONSE = {
   CANCEL: 'cancel',
 } as const;
 
+/**
+ * Which operation a UI request was opened under. Optional: a request emitted
+ * outside any operation (cold start, teardown) has none, and a host that does
+ * not track operations can ignore it. It is what lets a cancel aimed at one
+ * operation leave another operation's prompts alone.
+ */
+export type UiRequestOperationAttribution = {
+  operationId?: string;
+};
+
 export type DevicePermissionDeniedReason =
   | 'bluetoothTurnedOff'
   | 'permissionDenied'

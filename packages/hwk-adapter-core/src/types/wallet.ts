@@ -15,7 +15,11 @@ import type { ISolMethods } from './chain-sol';
 import type { ITronMethods } from './chain-tron';
 import type { QrDisplayData } from './qr';
 import type { ChainForFingerprint } from './fingerprint';
-import type { UI_REQUEST, UiResponseEvent } from '../events/ui-request';
+import type {
+  UI_REQUEST,
+  UiRequestOperationAttribution,
+  UiResponseEvent,
+} from '../events/ui-request';
 import type { SDK } from '../events/sdk';
 import type { HardwareErrorCode } from './errors';
 import type { OperationEndReason } from '../utils/OperationRegistry';
@@ -141,7 +145,7 @@ export type DeviceSelectionContext =
       reason: 'missing-binding' | 'known-connection-unavailable' | 'manual-rebind';
     };
 
-export interface DeviceSelectionRequest {
+export interface DeviceSelectionRequest extends UiRequestOperationAttribution {
   devices: DeviceInfo[];
   requestId: string;
   context: DeviceSelectionContext;
@@ -154,7 +158,7 @@ export interface DeviceSelectionRequest {
 }
 
 /** The SDK has verified this endpoint; the host must persist it before acknowledging. */
-export interface SaveDeviceBindingRequest {
+export interface SaveDeviceBindingRequest extends UiRequestOperationAttribution {
   requestId: string;
   selectionRequestId: string;
   connection: { transport: 'ble'; connectId: string };
@@ -256,19 +260,39 @@ export type DeviceEvent =
 export type UiRequestEvent =
   | {
       type: typeof UI_REQUEST.REQUEST_PIN;
-      payload: { device?: DeviceInfo; connectId?: string; type?: string };
+      payload: {
+        device?: DeviceInfo;
+        connectId?: string;
+        type?: string;
+      } & UiRequestOperationAttribution;
     }
-  | { type: typeof UI_REQUEST.REQUEST_PASSPHRASE; payload: { device: DeviceInfo } }
-  | { type: typeof UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE; payload: { device: DeviceInfo } }
-  | { type: typeof UI_REQUEST.REQUEST_BUTTON; payload: { device: DeviceInfo; code?: string } }
+  | {
+      type: typeof UI_REQUEST.REQUEST_PASSPHRASE;
+      payload: { device: DeviceInfo } & UiRequestOperationAttribution;
+    }
+  | {
+      type: typeof UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE;
+      payload: { device: DeviceInfo } & UiRequestOperationAttribution;
+    }
+  | {
+      type: typeof UI_REQUEST.REQUEST_BUTTON;
+      payload: { device: DeviceInfo; code?: string } & UiRequestOperationAttribution;
+    }
   | {
       type: typeof UI_REQUEST.REQUEST_QR_DISPLAY;
-      payload: { device: DeviceInfo; data: QrDisplayData };
+      payload: { device: DeviceInfo; data: QrDisplayData } & UiRequestOperationAttribution;
     }
-  | { type: typeof UI_REQUEST.REQUEST_QR_SCAN; payload: { device: DeviceInfo } }
+  | {
+      type: typeof UI_REQUEST.REQUEST_QR_SCAN;
+      payload: { device: DeviceInfo } & UiRequestOperationAttribution;
+    }
   | {
       type: typeof UI_REQUEST.REQUEST_DEVICE_PERMISSION;
-      payload: { transportType: TransportType; connectId?: string; deviceId?: string };
+      payload: {
+        transportType: TransportType;
+        connectId?: string;
+        deviceId?: string;
+      } & UiRequestOperationAttribution;
     }
   | { type: typeof UI_REQUEST.REQUEST_SELECT_DEVICE; payload: DeviceSelectionRequest }
   | { type: typeof UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING; payload: SaveDeviceBindingRequest }
@@ -292,11 +316,11 @@ export type UiRequestEvent =
          * isn't recognized.
          */
         message: string;
-      };
+      } & UiRequestOperationAttribution;
     }
   | {
       type: typeof UI_REQUEST.REQUEST_INSTALL_APP;
-      payload: { vendor: string; appName: string };
+      payload: { vendor: string; appName: string } & UiRequestOperationAttribution;
     }
   | {
       type: typeof UI_REQUEST.REQUEST_TREZOR_THP_PAIRING;
@@ -305,9 +329,9 @@ export type UiRequestEvent =
         availableMethods: number[];
         selectedMethod: number;
         nfcData?: string;
-      };
+      } & UiRequestOperationAttribution;
     }
-  | { type: typeof UI_REQUEST.CLOSE_UI_WINDOW; payload: Record<string, never> };
+  | { type: typeof UI_REQUEST.CLOSE_UI_WINDOW; payload: UiRequestOperationAttribution };
 
 export type SdkEvent =
   | { type: typeof SDK.DEVICE_INTERACTION; payload: { connectId: string; action: string } }
@@ -365,7 +389,11 @@ export interface HardwareEventMap {
   // UI request events
   [UI_REQUEST.REQUEST_PIN]: {
     type: typeof UI_REQUEST.REQUEST_PIN;
-    payload: { device?: DeviceInfo; connectId?: string; type?: string };
+    payload: {
+      device?: DeviceInfo;
+      connectId?: string;
+      type?: string;
+    } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_PASSPHRASE]: {
     type: typeof UI_REQUEST.REQUEST_PASSPHRASE;
@@ -374,27 +402,31 @@ export interface HardwareEventMap {
       connectId?: string;
       passphraseState?: string;
       useEmptyPassphrase?: boolean;
-    };
+    } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE]: {
     type: typeof UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE;
-    payload: { device: DeviceInfo };
+    payload: { device: DeviceInfo } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_BUTTON]: {
     type: typeof UI_REQUEST.REQUEST_BUTTON;
-    payload: { device: DeviceInfo; code?: string };
+    payload: { device: DeviceInfo; code?: string } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_QR_DISPLAY]: {
     type: typeof UI_REQUEST.REQUEST_QR_DISPLAY;
-    payload: { device: DeviceInfo; data: QrDisplayData };
+    payload: { device: DeviceInfo; data: QrDisplayData } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_QR_SCAN]: {
     type: typeof UI_REQUEST.REQUEST_QR_SCAN;
-    payload: { device: DeviceInfo };
+    payload: { device: DeviceInfo } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_DEVICE_PERMISSION]: {
     type: typeof UI_REQUEST.REQUEST_DEVICE_PERMISSION;
-    payload: { transportType: TransportType; connectId?: string; deviceId?: string };
+    payload: {
+      transportType: TransportType;
+      connectId?: string;
+      deviceId?: string;
+    } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_SELECT_DEVICE]: {
     type: typeof UI_REQUEST.REQUEST_SELECT_DEVICE;
@@ -406,7 +438,7 @@ export interface HardwareEventMap {
       vendor: string;
       reason: string;
       message: string;
-    };
+    } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM]: {
     type: typeof UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM;
@@ -414,11 +446,11 @@ export interface HardwareEventMap {
       vendor: string;
       path: string;
       accountIndex: number;
-    };
+    } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_INSTALL_APP]: {
     type: typeof UI_REQUEST.REQUEST_INSTALL_APP;
-    payload: { vendor: string; appName: string };
+    payload: { vendor: string; appName: string } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_TREZOR_THP_PAIRING]: {
     type: typeof UI_REQUEST.REQUEST_TREZOR_THP_PAIRING;
@@ -427,11 +459,11 @@ export interface HardwareEventMap {
       availableMethods: number[];
       selectedMethod: number;
       nfcData?: string;
-    };
+    } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.CLOSE_UI_WINDOW]: {
     type: typeof UI_REQUEST.CLOSE_UI_WINDOW;
-    payload: Record<string, never>;
+    payload: UiRequestOperationAttribution;
   };
 
   // SDK events

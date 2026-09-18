@@ -1987,6 +1987,42 @@ describe('KeystoneAdapter', () => {
       expect(qrFake.requests).toHaveLength(0);
     });
 
+    it('a named cancel leaves a UI request that belongs to another flow alone', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });
+      const qrRequests: QrDisplayData[] = [];
+      // Deliberately never answers: the prompt has to stay pending.
+      adapter.on(UI_REQUEST.REQUEST_QR_DISPLAY, event => {
+        qrRequests.push(event.payload.data);
+      });
+
+      const connected = await connectUsbDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+
+      // A cold start belongs to no operation, so the USB operation's cancel
+      // has no claim on its QR prompt.
+      let coldStartSettled = false;
+      const coldStart = adapter.importFromQr().then(result => {
+        coldStartSettled = true;
+        return result;
+      });
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 10);
+      });
+      expect(qrRequests).toHaveLength(1);
+
+      adapter.cancel(connected.payload);
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 10);
+      });
+      expect(coldStartSettled).toBe(false);
+
+      // Teardown still clears everything.
+      adapter.cancel();
+      expect((await coldStart).success).toBe(false);
+    });
+
     it('origin beats the legacy code list when deciding whether the device answered', async () => {
       // A device-origin failure whose code is NOT in the legacy fallback list
       // (PassphraseRejected) must still keep the session — proving recovery

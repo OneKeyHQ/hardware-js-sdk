@@ -1491,13 +1491,16 @@ export class LedgerAdapter implements IHardwareWallet {
       }
     }
 
-    this._uiRegistry.cancel();
-    this._finishBleBinding('cancelled');
-
     const interactionForPhysicalId =
       !operationId && connectId ? this._operations.findActiveByConnectionKey(connectId) : undefined;
 
     const pendingOperationId = operationId ?? interactionForPhysicalId?.operationId;
+
+    // A named cancel clears only the prompts its own operation opened; another
+    // operation's device-selection or permission wait is not this call's
+    // business. With no name at all this is teardown, and everything goes.
+    this._uiRegistry.cancel(undefined, undefined, connectId ? pendingOperationId : undefined);
+    this._finishBleBinding('cancelled');
     if (!connectId) this._pendingOperationBindings.clear();
     else if (pendingOperationId) {
       this._pendingOperationBindings.delete(pendingOperationId);
@@ -1601,6 +1604,7 @@ export class LedgerAdapter implements IHardwareWallet {
           connection: { transport: 'ble', connectId },
           identity: { vendor: 'ledger', type: 'chainFingerprint', chain, value: fingerprint },
           extra: binding.extra,
+          operationId,
         },
         signal
       );
@@ -1732,6 +1736,16 @@ export class LedgerAdapter implements IHardwareWallet {
   private _connectingPromise: Promise<string> | null = null;
 
   // Ledger WebUSB won't expose a locked device, so we can't auto-detect unlock.
+  /**
+   * The operation the running device job belongs to. A call pinned to an
+   * operation queues under its id (`ledgerQueueKey`), so this is how a UI
+   * request raised mid-call learns which operation it belongs to.
+   */
+  private _activeOperationId(): string | undefined {
+    const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
+    return isHardwareOperationId(activeJobId) ? activeJobId : undefined;
+  }
+
   // The user must press Confirm after unlocking, which triggers a search retry.
   // If `signal` is provided, an abort cancels the pending UI request so the
   // registry slot is released and a stale RECEIVE_DEVICE_CONNECT won't land in
@@ -1745,8 +1759,10 @@ export class LedgerAdapter implements IHardwareWallet {
     // inside the emit handler would otherwise resolve before the registry
     // slot exists, and the response would be silently dropped (see
     // UiRequestRegistry.resolve early-return on missing entry).
+    const operationId = this._activeOperationId();
     const waitPromise = this._uiRegistry.wait<{ confirmed: boolean }>(
-      UI_REQUEST.REQUEST_DEVICE_CONNECT
+      UI_REQUEST.REQUEST_DEVICE_CONNECT,
+      { operationId }
     );
 
     this.emitter.emit(UI_REQUEST.REQUEST_DEVICE_CONNECT, {
@@ -1755,6 +1771,7 @@ export class LedgerAdapter implements IHardwareWallet {
         vendor: 'ledger',
         reason: 'device-not-found',
         message: 'Please connect and unlock your Ledger device',
+        operationId,
       },
     });
 
@@ -1832,8 +1849,10 @@ export class LedgerAdapter implements IHardwareWallet {
     // inside the emit handler would otherwise resolve before the registry
     // slot exists, and the response would be silently dropped (see
     // UiRequestRegistry.resolve early-return on missing entry).
+    const operationId = this._activeOperationId();
     const waitPromise = this._uiRegistry.wait<{ confirmed: boolean }>(
-      UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM
+      UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM,
+      { operationId }
     );
 
     this.emitter.emit(UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM, {
@@ -1842,6 +1861,7 @@ export class LedgerAdapter implements IHardwareWallet {
         vendor: 'ledger',
         path,
         accountIndex,
+        operationId,
       },
     });
 
@@ -1860,13 +1880,15 @@ export class LedgerAdapter implements IHardwareWallet {
   // Ask the user whether to install a missing app (autoInstallApp flow).
   // Same register-then-emit ordering as the BTC high-index gate.
   private async _waitForInstallAppConfirm(appName: string): Promise<boolean> {
+    const operationId = this._activeOperationId();
     const waitPromise = this._uiRegistry.wait<{ confirmed: boolean }>(
-      UI_REQUEST.REQUEST_INSTALL_APP
+      UI_REQUEST.REQUEST_INSTALL_APP,
+      { operationId }
     );
 
     this.emitter.emit(UI_REQUEST.REQUEST_INSTALL_APP, {
       type: UI_REQUEST.REQUEST_INSTALL_APP,
-      payload: { vendor: 'ledger', appName },
+      payload: { vendor: 'ledger', appName, operationId },
     });
 
     try {
@@ -2183,6 +2205,7 @@ export class LedgerAdapter implements IHardwareWallet {
               (targetConnectId ? 'known-connection-unavailable' : 'missing-binding'),
           },
           extra: context?.extra,
+          operationId: preserveOperationId,
         },
       });
       if (device.connectionType === 'usb') {
@@ -2215,15 +2238,17 @@ export class LedgerAdapter implements IHardwareWallet {
         });
       }
       const requestId = this._uiRegistry.createRequestId();
+      const operationId = this._activeOperationId();
       const waitPromise = this._uiRegistry.wait<{ sdkConnectId: string }>(
         UI_REQUEST.REQUEST_SELECT_DEVICE,
-        { requestId }
+        { requestId, operationId }
       );
       this.emitter.emit(UI_REQUEST.REQUEST_SELECT_DEVICE, {
         type: UI_REQUEST.REQUEST_SELECT_DEVICE,
         payload: {
           devices,
           requestId,
+          operationId,
           context: requiresBleSelection
             ? {
                 kind: 'bind-connection',
@@ -2967,14 +2992,15 @@ export class LedgerAdapter implements IHardwareWallet {
     // Register the wait before emitting — a synchronous listener that replies
     // immediately (e.g. in tests or a same-process consumer) would otherwise
     // resolve before any pending entry exists and the response would drop.
+    const operationId = this._activeOperationId();
     const waitPromise = this._uiRegistry.wait<DevicePermissionResponse>(
       UI_REQUEST.REQUEST_DEVICE_PERMISSION,
-      { timeoutMs: 60_000 }
+      { timeoutMs: 60_000, operationId }
     );
 
     this.emitter.emit(UI_REQUEST.REQUEST_DEVICE_PERMISSION, {
       type: UI_REQUEST.REQUEST_DEVICE_PERMISSION,
-      payload: { transportType, connectId, deviceId },
+      payload: { transportType, connectId, deviceId, operationId },
     });
 
     let response: DevicePermissionResponse;

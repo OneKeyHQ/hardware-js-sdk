@@ -601,10 +601,17 @@ export class KeystoneAdapter implements IHardwareWallet {
       for (const key of queueKeys) {
         this._jobQueue.cancelActiveAndPending(key, reason);
       }
+      // A named cancel clears only the prompts its own operation opened, so
+      // cancelling one QR flow no longer rejects another operation's scan.
+      const scopedOperationId = isHardwareOperationId(connectId)
+        ? connectId
+        : this._operationRoutes.get(connectId)?.operationId;
+      this._uiRegistry.cancel(undefined, undefined, scopedOperationId);
     } else {
+      // Nothing to name: teardown clears every waiter.
       this._jobQueue.cancelActiveAndPending(undefined, reason);
+      this._uiRegistry.cancel();
     }
-    this._uiRegistry.cancel();
   }
 
   getChainFingerprint(
@@ -2527,30 +2534,42 @@ export class KeystoneAdapter implements IHardwareWallet {
     return { record };
   }
 
+  /**
+   * The operation the running device job belongs to. A call pinned to an
+   * operation queues under its id (`keystoneQueueKey`), so this is how a UI
+   * request raised mid-call learns which operation it belongs to.
+   */
+  private _activeOperationId(): string | undefined {
+    const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
+    return isHardwareOperationId(activeJobId) ? activeJobId : undefined;
+  }
+
   private async _requestQrDisplayAndAwaitResponse(
     device: DeviceInfo,
     data: QrDisplayData
   ): Promise<KeystoneUr> {
+    const operationId = this._activeOperationId();
     const waitPromise = this._uiRegistry.wait<{ urType: string; urData: string }>(
       UI_REQUEST.REQUEST_QR_DISPLAY,
-      { timeoutMs: this._qrTimeoutMs }
+      { timeoutMs: this._qrTimeoutMs, operationId }
     );
     this.emitter.emit(UI_REQUEST.REQUEST_QR_DISPLAY, {
       type: UI_REQUEST.REQUEST_QR_DISPLAY,
-      payload: { device, data },
+      payload: { device, data, operationId },
     });
     const response = await waitPromise;
     return { urType: response.urType, urData: response.urData };
   }
 
   private async _requestQrScanAndAwaitResponse(device: DeviceInfo): Promise<KeystoneUr> {
+    const operationId = this._activeOperationId();
     const waitPromise = this._uiRegistry.wait<{ urType: string; urData: string }>(
       UI_REQUEST.REQUEST_QR_SCAN,
-      { timeoutMs: this._qrTimeoutMs }
+      { timeoutMs: this._qrTimeoutMs, operationId }
     );
     this.emitter.emit(UI_REQUEST.REQUEST_QR_SCAN, {
       type: UI_REQUEST.REQUEST_QR_SCAN,
-      payload: { device },
+      payload: { device, operationId },
     });
     const response = await waitPromise;
     return { urType: response.urType, urData: response.urData };
