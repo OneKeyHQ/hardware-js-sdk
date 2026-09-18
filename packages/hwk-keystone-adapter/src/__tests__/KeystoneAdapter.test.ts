@@ -33,6 +33,7 @@ import type {
   ConnectorCallResult,
   ConnectorEventMap,
   DeviceInfo,
+  DeviceJobQueue,
   HardwareEvent,
   IConnector,
   QrDisplayData,
@@ -3068,6 +3069,53 @@ describe('KeystoneAdapter', () => {
         expect(
           (item.payload as { deviceIdentity?: { type: string; value: string } }).deviceIdentity
         ).toEqual({ vendor: 'keystone', type: 'walletId', value: FIXTURE_WALLET_ID });
+      }
+    });
+
+    it('stops the bundle when cancel lands between two chains', async () => {
+      // One scan answers the whole bundle inside the prefetch job, which that
+      // job's own signal already covers. The per-chain calls after it are one
+      // job each, so between two of them the queue is empty and a cancel has no
+      // job to abort — only the bundle scope is left to carry it.
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+
+      const queue = (adapter as unknown as { _jobQueue: DeviceJobQueue })._jobQueue;
+      type EnqueueFn = (
+        deviceId: string,
+        job: (signal: AbortSignal) => Promise<unknown>,
+        options?: unknown
+      ) => Promise<unknown>;
+      const realEnqueue = queue.enqueue.bind(queue) as EnqueueFn;
+      let settledJobs = 0;
+      let cancelled = false;
+      (queue as unknown as { enqueue: EnqueueFn }).enqueue = async (deviceId, job, options) => {
+        const result = await realEnqueue(deviceId, job, options);
+        settledJobs += 1;
+        // Job 1 is the bundle prefetch, job 2 is the first chain.
+        if (settledJobs === 2) {
+          cancelled = true;
+          expect(queue.getActiveJob()).toBeNull();
+          adapter.cancel(FIXTURE_WALLET_ID);
+        }
+        return result;
+      };
+
+      const result = await adapter.allNetworkGetAddress(null as unknown as string, '', {
+        bundle: [
+          { methodName: 'evmGetAddress', network: 'evm', path: "m/44'/60'/0'/0/0" },
+          { methodName: 'solGetAddress', network: 'sol', path: "m/44'/501'/0'/0'" },
+          { methodName: 'tronGetAddress', network: 'tron', path: "m/44'/195'/0'/0/0" },
+        ],
+      });
+
+      expect(cancelled).toBe(true);
+      // The cancelled chains neither reached the device nor came back from the
+      // prefetched book: the bundle ends, it does not quietly finish.
+      expect(fake.requests).toHaveLength(1);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.payload.code).toBe(HardwareErrorCode.UserAborted);
       }
     });
   });
