@@ -1954,6 +1954,39 @@ describe('KeystoneAdapter', () => {
       expect(qrFake.requests).toHaveLength(0);
     });
 
+    it('stops a USB bundle when the user rejects one chain on the device', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });
+      const qrFake = attachFakeDevice(adapter);
+
+      const connected = await connectUsbDevice(adapter);
+      expect(connected.success).toBe(true);
+      // Call 1 is the identity export. Let the first bundle items through and
+      // have the user refuse a later one on the device.
+      usb.failCallAt(4, HardwareErrorCode.UserRejected);
+
+      const result = await adapter.allNetworkGetAddress(
+        `keystone-wallet:${FIXTURE_WALLET_ID}`,
+        FIXTURE_WALLET_ID,
+        {
+          bundle: [
+            { methodName: 'btcGetPublicKey', network: 'btc', path: "m/44'/0'/0'" },
+            { methodName: 'btcGetPublicKey', network: 'btc', path: "m/49'/0'/0'" },
+            { methodName: 'evmGetAddress', network: 'evm', path: "m/44'/60'/1'/0/0" },
+            { methodName: 'solGetAddress', network: 'sol', path: "m/44'/501'/1'/0'" },
+          ],
+        }
+      );
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.UserRejected },
+      });
+      // The fourth chain is never asked for: the refusal ended the batch.
+      expect(usb.calls).toHaveLength(4);
+      expect(qrFake.requests).toHaveLength(0);
+    });
+
     it('origin beats the legacy code list when deciding whether the device answered', async () => {
       // A device-origin failure whose code is NOT in the legacy fallback list
       // (PassphraseRejected) must still keep the session — proving recovery

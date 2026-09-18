@@ -138,10 +138,18 @@ export class DeviceJobQueue {
     return true;
   }
 
-  /** Cancel the active job and invalidate queued jobs that have not started. */
+  /**
+   * Cancel the active job and invalidate queued jobs that have not started.
+   *
+   * Only `undefined` means "everything". An empty string is a queue key that
+   * derived to nothing, so it matches nothing and reports `false` rather than
+   * silently tearing the whole queue down.
+   *
+   * Returns what the cancel actually reached, not whether it was accepted.
+   */
   cancelActiveAndPending(deviceId?: string, reason?: Error): boolean {
     const cancelReason = reason ?? new Error('Cancelled by cancelActiveAndPending');
-    if (deviceId) {
+    if (deviceId !== undefined) {
       let cancelled = false;
       for (const job of this._jobs.values()) {
         if (job.deviceId === deviceId) {
@@ -157,8 +165,9 @@ export class DeviceJobQueue {
       }
       return cancelled;
     }
+    const reached = this._active !== null || this._jobs.size > 0 || this._cancelScopes.size > 0;
     this.clear(cancelReason);
-    return true;
+    return reached;
   }
 
   /** Get info about the currently active job, or null if idle. */

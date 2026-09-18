@@ -264,7 +264,12 @@ export type {
   HardwareMethodMetadata,
   HardwareMethodName,
 } from './utils/methodCatalog';
-export { buildUnsupportedMethodResponse, runAllNetworkGetAddress } from './utils/allNetwork';
+export {
+  buildUnsupportedMethodResponse,
+  isConnectionLost,
+  isUserRefusal,
+  runAllNetworkGetAddress,
+} from './utils/allNetwork';
 export type {
   AllNetworkAttachIdentityContext,
   AllNetworkCallItemContext,

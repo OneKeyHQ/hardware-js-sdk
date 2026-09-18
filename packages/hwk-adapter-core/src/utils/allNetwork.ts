@@ -115,6 +115,30 @@ export async function runAllNetworkGetAddress({
   return success(responses);
 }
 
+/**
+ * User said "no": an SDK-dialog cancel and an on-device reject both end the
+ * bundle. Asking the device for the next chain after a refusal is a prompt the
+ * user already answered.
+ */
+export function isUserRefusal(code: HardwareErrorCode | number | undefined): boolean {
+  return code === HardwareErrorCode.UserAborted || code === HardwareErrorCode.UserRejected;
+}
+
+/**
+ * The session the bundle runs on is gone, so the remaining items have nothing
+ * to run against.
+ */
+export function isConnectionLost(code: HardwareErrorCode | number | undefined): boolean {
+  const codes: (HardwareErrorCode | number)[] = [
+    HardwareErrorCode.DeviceDisconnected,
+    HardwareErrorCode.OperationTimeout,
+    HardwareErrorCode.TransportError,
+    HardwareErrorCode.OperationEnded,
+    HardwareErrorCode.OperationNotFound,
+  ];
+  return code !== undefined && codes.includes(code);
+}
+
 export function buildUnsupportedMethodResponse(
   item: AllNetworkAddressParams
 ): AllNetworkAddressResponse {
