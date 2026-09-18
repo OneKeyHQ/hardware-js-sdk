@@ -1213,6 +1213,74 @@ describe('KeystoneAdapter', () => {
       }
     );
 
+    it('cancels an unpinned QR wait through the connection live operation', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+      const connected = await connectQrDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      // Leave the signing request unanswered so it stays pending.
+      fake.detach();
+      const prompts: { payload: { operationId?: string } }[] = [];
+      adapter.on(UI_REQUEST.REQUEST_QR_DISPLAY, event => {
+        prompts.push(event);
+      });
+
+      // No operationId on the call, so the job queues under the wallet id.
+      const pending = adapter.evmSignTransaction(
+        `keystone-wallet:${FIXTURE_WALLET_ID}`,
+        FIXTURE_WALLET_ID,
+        { path: "m/44'/60'/0'/0/0", serializedTx: `02${'ab'.repeat(30)}` }
+      );
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 10);
+      });
+      expect(prompts).toHaveLength(1);
+      expect(prompts[0].payload.operationId).toBe(connected.payload);
+
+      adapter.cancel(`keystone-wallet:${FIXTURE_WALLET_ID}`);
+      await expect(pending).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.UserAborted },
+      });
+      await adapter.dispose();
+    });
+
+    it('reaches nothing when the named connectId resolves to no operation', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+      const connected = await connectQrDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      fake.detach();
+
+      let settled = false;
+      const pending = adapter
+        .evmSignTransaction(`keystone-wallet:${FIXTURE_WALLET_ID}`, FIXTURE_WALLET_ID, {
+          path: "m/44'/60'/0'/0/0",
+          serializedTx: `02${'ab'.repeat(30)}`,
+        })
+        .then(result => {
+          settled = true;
+          return result;
+        });
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 10);
+      });
+
+      // Named but unresolvable: no job under that key and no UI request it
+      // owns. It must not decay into the untargeted form.
+      adapter.cancel(`keystone-wallet:${'f'.repeat(64)}`);
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 10);
+      });
+      expect(settled).toBe(false);
+
+      adapter.cancel(connected.payload);
+      expect((await pending).success).toBe(false);
+      await adapter.dispose();
+    });
+
     it('leaves no trace when the named operation has already ended', async () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
@@ -1954,6 +2022,11 @@ describe('KeystoneAdapter', () => {
       expect(qrFake.requests).toHaveLength(0);
     });
 
+    // Guards the shared top-level abort table, not a new Keystone behaviour: on
+    // USB the refusal is raised inside the account prefetch and reaches the
+    // bundle's outer catch, so `shouldAbortBundle` is not consulted on this
+    // path. The table itself is covered in hwk-adapter-core's allNetwork tests;
+    // this locks the outcome a user sees.
     it('stops a USB bundle when the user rejects one chain on the device', async () => {
       const usb = fakeUsbConnector();
       const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });

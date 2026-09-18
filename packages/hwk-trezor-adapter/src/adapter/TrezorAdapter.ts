@@ -1296,8 +1296,14 @@ export class TrezorAdapter implements IHardwareWallet {
       // Release adapter-level UI waits (preemption, device selection) and
       // connector-level ones (THP pairing / PIN matrix). A named cancel keeps
       // the adapter-side clear inside its own operation, so cancelling one
-      // signing call no longer closes another operation's PIN prompt.
-      this._uiRegistry.cancel(undefined, undefined, connectId ? pendingOperationId : undefined);
+      // signing call no longer closes another operation's PIN prompt. Named but
+      // unresolvable clears nothing: falling through to the untargeted form is
+      // what a named cancel must not do.
+      if (!connectId) {
+        this._uiRegistry.cancel();
+      } else if (pendingOperationId) {
+        this._uiRegistry.cancel(undefined, undefined, pendingOperationId);
+      }
       this._connector.uiResponse({ type: UI_RESPONSE.CANCEL });
       const queueKeys = new Set<string>([trezorQueueKey({ connectId: targetId })]);
       if (pendingOperationId) queueKeys.add(trezorQueueKey({ operationId: pendingOperationId }));
@@ -1319,13 +1325,17 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   /**
-   * The operation the running device job belongs to. A call pinned to an
-   * operation queues under its id (`trezorQueueKey`), so this is how a UI
-   * request raised mid-call learns which operation it belongs to.
+   * The operation the running device job belongs to, so a UI request raised
+   * mid-call can name it. A call pinned to an operation queues under its id
+   * (`trezorQueueKey`); a call without one queues under the connectId, and the
+   * live operation on that connection is still the owner. Only work with no
+   * operation at all comes back undefined.
    */
   private _activeOperationId(): string | undefined {
     const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
-    return isHardwareOperationId(activeJobId) ? activeJobId : undefined;
+    if (!activeJobId) return undefined;
+    if (isHardwareOperationId(activeJobId)) return activeJobId;
+    return this._operations.findActiveByConnectionKey(activeJobId)?.operationId;
   }
 
   /**

@@ -536,7 +536,9 @@ describe('TrezorAdapter passphrase sessions', () => {
       passphraseEvents.push(event);
     });
 
-    await adapter.connectDevice('safe-7');
+    const connected = await adapter.connectDevice('safe-7');
+    expect(connected.success).toBe(true);
+    if (!connected.success) return;
     uiRequestHandler = connector.on.mock.calls.find(c => c[0] === 'ui-request')?.[1];
     expect(uiRequestHandler).toBeDefined();
 
@@ -545,15 +547,54 @@ describe('TrezorAdapter passphrase sessions', () => {
       useEmptyPassphrase: true,
     });
 
+    // The call carries no operationId, so it queues under the connectId; the
+    // live operation on that connection still owns the prompt.
     expect(passphraseEvents).toEqual([
       {
         type: 'ui-request-passphrase',
         payload: {
           connectId: 'safe-7',
           useEmptyPassphrase: true,
+          operationId: connected.payload,
         },
       },
     ]);
+  });
+
+  it('names the connection live operation on a prompt from an unpinned call', async () => {
+    // eslint-disable-next-line prefer-const
+    let uiRequestHandler: ((event: unknown) => void) | undefined;
+    const connector = createConnector({
+      chain: method => {
+        if (method === 'btcGetAddress') {
+          uiRequestHandler?.({ type: 'ui-request-pin', payload: { connectId: 'safe-7' } });
+          return new Promise(() => {
+            // Never settles: the prompt has to stay open.
+          });
+        }
+        return { address: 'bc1qok' };
+      },
+    });
+    const adapter = new TrezorAdapter(connector);
+    const pinEvents: { payload: { operationId?: string } }[] = [];
+    adapter.on('ui-request-pin', event => {
+      pinEvents.push(event as { payload: { operationId?: string } });
+    });
+
+    const connected = await adapter.connectDevice('safe-7');
+    expect(connected.success).toBe(true);
+    if (!connected.success) return;
+    uiRequestHandler = connector.on.mock.calls.find(c => c[0] === 'ui-request')?.[1];
+
+    // No operationId on the call, so it queues under the connectId; the live
+    // operation on that connection still owns the prompt.
+    void adapter.btcGetAddress('safe-7', 'safe-7', { path: 'p0', useEmptyPassphrase: true });
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 10);
+    });
+
+    expect(pinEvents).toHaveLength(1);
+    expect(pinEvents[0].payload.operationId).toBe(connected.payload);
   });
 
   it('accepts merged params for btcGetMasterFingerprint', async () => {

@@ -18,10 +18,13 @@ The following rules apply:
   target may be an entry point that only a scan can resolve.
 - An `operationId` exists only inside the current adapter runtime and binds the selected search
   target, the actual connect/session key, and the connection channel. The channel is a required
-  argument of `create()` and `rebind()`, supplied by the adapter that chose it - it is never read back
-  off the device snapshot, whose `connectionType` a combined connector fills with a nominal value. It
-  is not a `connectId`, a wallet identity, or a firmware session; it must not be written to the host
-  database and must not survive an adapter reset or a process restart. A controlled reconnect inside
+  argument of `create()` and `rebind()`, supplied by the adapter that chose it. Where the adapter
+  reads it from is a vendor decision: a combined connector's own top-level `connectionType` is only a
+  nominal value, while the per-device `connectionType` it tags each discovered device with is
+  authoritative, so Trezor takes the device's. Ledger takes its selected transport instead, because a
+  session connect overwrites the discovery snapshot it would otherwise read. It is not a `connectId`,
+  a wallet identity, or a firmware session; it must not be written to the host database and must not
+  survive an adapter reset or a process restart. A controlled reconnect inside
   one active operation may update its underlying session binding, but must not change the selected
   device or wallet identity.
 - Calling `connectDevice()` again for the same search target starts a new business lifecycle. When the

@@ -1855,6 +1855,73 @@ describe('LedgerAdapter', () => {
       );
     });
 
+    it('names the connection live operation on a prompt from an unpinned call', async () => {
+      const connected = await adapter.connectDevice('dev-1');
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      connector.callImpl.mockImplementation(
+        () =>
+          new Promise(() => {
+            // Never settles: the prompt has to stay open.
+          })
+      );
+
+      const prompts: { payload: { operationId?: string } }[] = [];
+      adapter.on(UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM, event => {
+        prompts.push(event);
+      });
+
+      const pending = adapter.btcGetPublicKey('dev-1', '', {
+        path: "m/84'/0'/100'",
+        coin: 'btc',
+      });
+      await waitForCondition(() => prompts.length === 1);
+
+      // The call carries no operationId, so it queues under the connectId; the
+      // live operation on that connection still owns the prompt.
+      expect(prompts[0].payload.operationId).toBe(connected.payload);
+
+      // Which is what lets a cancel naming that operation reach the prompt.
+      adapter.cancel(connected.payload);
+      expect((await pending).success).toBe(false);
+    });
+
+    it('reaches nothing when the named connectId resolves to no operation', async () => {
+      const connected = await adapter.connectDevice('dev-1');
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      connector.callImpl.mockImplementation(
+        () =>
+          new Promise(() => {
+            // Never settles: the prompt has to stay open.
+          })
+      );
+
+      const prompts: unknown[] = [];
+      adapter.on(UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM, event => {
+        prompts.push(event);
+      });
+      let settled = false;
+      const pending = adapter
+        .btcGetPublicKey('dev-1', '', { path: "m/84'/0'/100'", coin: 'btc' })
+        .then(result => {
+          settled = true;
+          return result;
+        });
+      await waitForCondition(() => prompts.length === 1);
+
+      // Named but unresolvable: no job of that key, and no UI request it owns.
+      // It must not decay into the untargeted form.
+      adapter.cancel('dev-does-not-exist');
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 10);
+      });
+      expect(settled).toBe(false);
+
+      adapter.cancel(connected.payload);
+      expect((await pending).success).toBe(false);
+    });
+
     it('rejects concurrent BTC high-index calls instead of queueing them', async () => {
       let resolveFirstCall: ((value: unknown) => void) | undefined;
       connector.callImpl.mockImplementationOnce(
