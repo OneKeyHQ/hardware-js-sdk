@@ -26,6 +26,8 @@ let requestSequence = 0;
 
 type PendingEntry = {
   requestId?: string;
+  /** The operation this waiter belongs to, when it was opened under one. */
+  operationId?: string;
   resolve: (payload: unknown) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
@@ -51,7 +53,7 @@ export class UiRequestRegistry {
 
   wait<T = unknown>(
     requestType: string,
-    options?: { timeoutMs?: number; requestId?: string }
+    options?: { timeoutMs?: number; requestId?: string; operationId?: string }
   ): Promise<T> {
     const existing = this.pending.get(requestType);
     if (existing) {
@@ -80,6 +82,7 @@ export class UiRequestRegistry {
 
       this.pending.set(requestType, {
         requestId: options?.requestId,
+        operationId: options?.operationId,
         resolve: resolve as (payload: unknown) => void,
         reject,
         timer,
@@ -125,30 +128,37 @@ export class UiRequestRegistry {
     entry.resolve(payload);
   }
 
-  cancel(requestType?: string, requestId?: string): void {
-    if (requestType) {
-      const entry = this.pending.get(requestType);
-      if (!entry) return;
-      if (requestId !== undefined && entry.requestId !== requestId) return;
+  /**
+   * Cancel pending waiters. Each argument narrows what is reached: no argument
+   * at all rejects every waiter and belongs to teardown, while an `operationId`
+   * alone rejects only the prompts that operation opened and leaves another
+   * operation's PIN or QR wait untouched.
+   */
+  cancel(requestType?: string, requestId?: string, operationId?: string): void {
+    const reject = (type: string, entry: PendingEntry) => {
       clearTimeout(entry.timer);
-      this.pending.delete(requestType);
-      entry.reject(
-        Object.assign(new Error(`UI request '${requestType}' was cancelled`), {
-          _tag: UI_REQUEST_CANCELLED_TAG,
-        })
-      );
-      return;
-    }
-
-    for (const [type, entry] of this.pending) {
-      clearTimeout(entry.timer);
+      this.pending.delete(type);
       entry.reject(
         Object.assign(new Error(`UI request '${type}' was cancelled`), {
           _tag: UI_REQUEST_CANCELLED_TAG,
         })
       );
+    };
+
+    if (requestType) {
+      const entry = this.pending.get(requestType);
+      if (!entry) return;
+      if (requestId !== undefined && entry.requestId !== requestId) return;
+      if (operationId !== undefined && entry.operationId !== operationId) return;
+      reject(requestType, entry);
+      return;
     }
-    this.pending.clear();
+
+    for (const [type, entry] of [...this.pending]) {
+      if (operationId === undefined || entry.operationId === operationId) {
+        reject(type, entry);
+      }
+    }
   }
 
   reset(): void {

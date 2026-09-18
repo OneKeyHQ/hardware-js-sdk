@@ -39,7 +39,7 @@ export async function requestSaveDeviceBinding(
   const pending = registry.wait<{
     saved: boolean;
     reason?: SaveDeviceBindingDeclineReason;
-  }>(type, { requestId });
+  }>(type, { requestId, operationId: binding.operationId });
   // A synchronous host listener can throw before execution reaches the await.
   void pending.catch(() => undefined);
   const cancel = () => registry.cancel(type, requestId);

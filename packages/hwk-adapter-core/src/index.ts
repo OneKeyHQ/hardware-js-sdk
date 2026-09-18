@@ -169,6 +169,7 @@ export type {
   DevicePermissionDeniedReason,
   DevicePermissionResponse,
   SaveDeviceBindingDeclineReason,
+  UiRequestOperationAttribution,
   UiResponseEvent,
 } from './events/ui-request';
 export { SDK } from './events/sdk';
