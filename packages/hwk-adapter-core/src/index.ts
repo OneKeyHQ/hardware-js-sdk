@@ -123,6 +123,7 @@ export {
 
 export type {
   IHardwareWallet,
+  CancelCapability,
   IDeviceManagerMethods,
   IWalletStateMethods,
   SearchDevicesOptions,

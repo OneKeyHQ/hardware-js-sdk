@@ -181,6 +181,10 @@ export interface TrezorAdapterOptions {
 export class TrezorAdapter implements IHardwareWallet {
   readonly vendor = 'trezor' as const;
 
+  // The connector has no protocol-level cancel: the adapter stops waiting and
+  // drops the late response, the device carries on.
+  readonly cancelCapability = 'stops-waiting' as const;
+
   private readonly _connector: IConnector;
 
   private readonly _emitter = new TypedEventEmitter<HardwareEventMap>();
@@ -882,6 +886,7 @@ export class TrezorAdapter implements IHardwareWallet {
         searchTargetId,
         connectId: searchTargetId,
         device,
+        connectionType: device.connectionType,
         connectionKeys: [this._sessions.get(searchTargetId) ?? ''],
       });
       return success(operation.operationId);

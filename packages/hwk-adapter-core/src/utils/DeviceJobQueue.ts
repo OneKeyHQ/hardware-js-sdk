@@ -130,7 +130,13 @@ export class DeviceJobQueue {
     };
   }
 
-  /** Cancel the running job. `reason` becomes signal.reason. */
+  /**
+   * Cancel the running job. `reason` becomes signal.reason.
+   *
+   * No caller today: every adapter cancel wants the queued work invalidated
+   * too and uses `cancelActiveAndPending`. Kept for a connector layer that
+   * needs to stop only what is on the wire and leave the queue behind it.
+   */
   cancelActive(deviceId?: string, reason?: Error): boolean {
     if (!this._active) return false;
     if (deviceId && this._active.deviceId !== deviceId) return false;

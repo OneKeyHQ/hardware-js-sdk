@@ -17,17 +17,20 @@ The following rules apply:
   nor a wallet identity. A Ledger USB search target may be an ephemeral handle; a Keystone QR search
   target may be an entry point that only a scan can resolve.
 - An `operationId` exists only inside the current adapter runtime and binds the selected search
-  target, the actual connect/session key, and the connection channel. It is not a `connectId`, a wallet
-  identity, or a firmware session; it must not be written to the host database and must not survive an
-  adapter reset or a process restart. A controlled reconnect inside one active operation may update its
-  underlying session binding, but must not change the selected device or wallet identity.
+  target, the actual connect/session key, and the connection channel. The channel is a required
+  argument of `create()` and `rebind()`, supplied by the adapter that chose it - it is never read back
+  off the device snapshot, whose `connectionType` a combined connector fills with a nominal value. It
+  is not a `connectId`, a wallet identity, or a firmware session; it must not be written to the host
+  database and must not survive an adapter reset or a process restart. A controlled reconnect inside
+  one active operation may update its underlying session binding, but must not change the selected
+  device or wallet identity.
 - Calling `connectDevice()` again for the same search target starts a new business lifecycle. When the
   connection implementation has to replace an existing session, the operation that owned the old
   session is terminated first; the old ID must not borrow the new session.
 - A business call carrying an `operationId` is a strict routing path: it reuses only that
   operation's connected session or logical QR association and its established channel. It must not
   use an ambient session, reselect an unverified device, or switch channels. It returns
-  `InteractionEnded` once the association cannot be restored, and `InteractionNotFound` for an ID that
+  `OperationEnded` once the association cannot be restored, and `OperationNotFound` for an ID that
   never belonged to this adapter instance.
 - Ledger keeps its existing bounded session recovery: `DeviceLocked` waits for unlock on the original
   session, `0x6901` retries once on the original session after a delay, and disconnect,
@@ -53,7 +56,10 @@ The following rules apply:
 - Cancelling by name and cancelling everything are different instructions. `cancel(id)` for an
   operation that has already ended has nothing left to cancel and must do nothing at all: it must
   not fall through to the untargeted form and tear down whatever unrelated operation happens to be
-  running. `cancel()` with no argument keeps its existing meaning.
+  running. `cancel()` with no argument is the teardown form - it belongs to `reset()` / `dispose()`,
+  not to a host-facing cancel path. Most host entry points still pass `{vendor}` alone and land on
+  the untargeted form, and `KeystoneAdapter.uiResponse(CANCEL)` still decays into it as well; that is
+  known transitional debt being paid down, not a second reading of the contract.
 - A command must not reach the connector once its signal is aborted. Wrapping the call in an abort
   race is not enough - the command is already on the wire by then, and the caller is told the
   operation was aborted while the device acts on it. Check before dispatch, so "aborted" keeps
@@ -93,6 +99,33 @@ The following rules apply:
 - The `onPairingCredentialsChanged` payload from Trezor Core is the complete authoritative list. The
   connector replaces its in-memory list wholesale rather than merging incrementally; otherwise a stale
   credential the device rejected is preferred again within the current adapter lifetime.
+
+The cancellation rules below hold in every adapter:
+
+- **Cancellation is named.** Every host-initiated cancel carries the `operationId` it means to stop.
+  The untargeted form `cancel()` is reserved for teardown (`reset()` / `dispose()`) and is not part
+  of the host-facing cancel path. A host that cannot name an operation has nothing it is entitled to
+  cancel.
+- **One derivation for a queue key.** A vendor derives its device-queue key in exactly one function.
+  The job `enqueue`, the bundle cancel scope and `cancel()` all call it. A key that derives to the
+  empty string is never passed to `cancelActiveAndPending`, because that argument silently means
+  "everything".
+- **Cancelling a named operation does not touch another operation's UI requests.**
+  `_uiRegistry.cancel()` with no argument belongs to teardown. A named cancel clears only the UI
+  requests opened under that operation.
+- **A bundle ends on user refusal, in every adapter.** `UserAborted` and `UserRejected` are
+  top-level aborts wherever a bundle runs. An adapter must not keep prompting the device for the
+  next chain after the user said no.
+- **A cancel says what it reached.** The adapter reports whether the cancel stopped a running job,
+  only invalidated queued work, or reached nothing. `cancelActiveAndPending(undefined)` returning a
+  constant `true` is not a report.
+- **The connector declares whether it can interrupt.** Interruption capability is a connector-level
+  declaration, not an assumption. "Aborted" means the command did not reach the device only where
+  the connector can say so; elsewhere the host is told the wait ended, not that the device stopped.
+- **`operation` owns the channel or the field goes.** Either `HardwareOperation` carries a
+  first-class `connectionType` that `create` and `rebind` must both set, or `decisions.md` stops
+  claiming an `operationId` binds the connection channel. A snapshot that nothing reads must not be
+  described as a binding.
 
 Vendor differences stay inside the adapters: OneKey and Trezor let the host choose USB or BLE
 explicitly; Ledger and Keystone let their own SDK manage protocol and channel selection; a Keystone QR

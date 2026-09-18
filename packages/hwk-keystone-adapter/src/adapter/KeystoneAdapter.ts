@@ -188,6 +188,10 @@ export interface ImportFromQrOptions {
 export class KeystoneAdapter implements IHardwareWallet {
   readonly vendor = 'keystone' as const;
 
+  // No protocol-level cancel exists over Keystone USB, and QR has no transport
+  // to interrupt at all. Cancelling ends the wait, not the device's prompt.
+  readonly cancelCapability = 'stops-waiting' as const;
+
   private readonly urEngine: KeystoneUrEngine;
 
   private readonly emitter = new TypedEventEmitter<HardwareEventMap>();
@@ -492,6 +496,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         searchTargetId,
         connectId: connected.payload.connectId,
         device: connected.payload,
+        connectionType: selectedConnectionType,
         connectionKeys:
           selectedConnectionType === 'usb' && record?.usbSessionId ? [record.usbSessionId] : [],
       });

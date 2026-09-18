@@ -34,6 +34,7 @@ describe('OperationRegistry', () => {
       searchTargetId: 'usb-target',
       connectId: 'usb-target',
       device,
+      connectionType: 'usb' as const,
       connectionKeys: ['session-1'],
     });
 
@@ -50,17 +51,54 @@ describe('OperationRegistry', () => {
     registry.endAll('runtime-reset');
   });
 
+  it('records the channel the adapter states, not the one on the device snapshot', () => {
+    const registry = new OperationRegistry({ vendor: 'ledger' });
+    const operation = registry.create({
+      searchTargetId: 'ble-target',
+      connectId: 'ble-target',
+      // A combined connector fills this in with a nominal channel.
+      device: { ...device, connectId: 'ble-target' },
+      connectionType: 'ble',
+    });
+
+    expect(operation.connectionType).toBe('ble');
+    expect(registry.resolve(operation.operationId).connectionType).toBe('ble');
+
+    const rebound = registry.rebind(operation.operationId, {
+      connectId: 'usb-target',
+      device,
+      connectionType: 'usb',
+    });
+    expect(rebound.connectionType).toBe('usb');
+
+    registry.endAll('runtime-reset');
+  });
+
+  it('will not create an operation without a stated channel', () => {
+    const registry = new OperationRegistry({ vendor: 'ledger' });
+    registry.create({
+      searchTargetId: 'usb-target',
+      connectId: 'usb-target',
+      device,
+      // @ts-expect-error the channel is required and must not be inferred from `device`.
+      connectionType: undefined,
+    });
+    registry.endAll('runtime-reset');
+  });
+
   it('uses random runtime ids instead of a process-local sequence', () => {
     const registry = new OperationRegistry({ vendor: 'ledger' });
     const first = registry.create({
       searchTargetId: 'usb-target',
       connectId: 'usb-target',
       device,
+      connectionType: 'usb' as const,
     });
     const second = registry.create({
       searchTargetId: 'usb-target',
       connectId: 'usb-target',
       device,
+      connectionType: 'usb' as const,
     });
 
     expect(first.operationId).not.toBe(second.operationId);
@@ -85,11 +123,13 @@ describe('OperationRegistry', () => {
       searchTargetId: 'usb-target',
       connectId: 'usb-target',
       device: { ...device, vendor: 'trezor' },
+      connectionType: 'usb' as const,
     });
     const second = registry.create({
       searchTargetId: 'usb-target-2',
       connectId: 'usb-target-2',
       device: { ...device, vendor: 'trezor' },
+      connectionType: 'usb' as const,
     });
 
     expect(resolveHardwareOperationTarget(first.operationId, undefined)).toEqual({
@@ -145,6 +185,7 @@ describe('OperationRegistry', () => {
       searchTargetId: 'safe-7',
       connectId: 'safe-7',
       device: { ...device, vendor: 'trezor', connectId: 'safe-7' },
+      connectionType: 'usb' as const,
     });
 
     registry.end(operation.operationId, 'disconnect');
@@ -163,6 +204,7 @@ describe('OperationRegistry', () => {
       searchTargetId: 'usb-target',
       connectId: 'usb-target',
       device,
+      connectionType: 'usb' as const,
       connectionKeys: ['session-1'],
     });
 
@@ -172,6 +214,7 @@ describe('OperationRegistry', () => {
     registry.rebind(operation.operationId, {
       connectId: 'usb-target-recovered',
       device: { ...device, connectId: 'usb-target-recovered' },
+      connectionType: 'usb' as const,
       connectionKeys: ['session-2'],
     });
 
@@ -186,6 +229,7 @@ describe('OperationRegistry', () => {
       registry.rebind(operation.operationId, {
         connectId: 'usb-target-3',
         device,
+        connectionType: 'usb' as const,
       })
     ).toThrow(expect.objectContaining({ code: HardwareErrorCode.OperationEnded }));
   });
@@ -197,6 +241,7 @@ describe('OperationRegistry', () => {
       searchTargetId: '',
       connectId: '',
       device: { ...device, connectId: '' },
+      connectionType: 'usb' as const,
       connectionKeys: ['session-1'],
     });
 
@@ -222,6 +267,7 @@ describe('OperationRegistry', () => {
       searchTargetId: 'keystone-qr:connect',
       connectId: 'keystone-wallet:abc',
       device: { ...device, vendor: 'keystone' },
+      connectionType: 'usb' as const,
     });
 
     await new Promise(resolve => setTimeout(resolve, 20));
@@ -239,6 +285,7 @@ describe('OperationRegistry', () => {
       searchTargetId: 'usb-target',
       connectId: 'usb-target',
       device,
+      connectionType: 'usb' as const,
     });
     const release = registry.retain(operation.operationId);
 
@@ -258,6 +305,7 @@ describe('OperationRegistry', () => {
       searchTargetId: 'safe-7',
       connectId: 'safe-7',
       device: { ...device, vendor: 'trezor', connectId: 'safe-7' },
+      connectionType: 'usb' as const,
       connectionKeys: ['session-7'],
     });
 
