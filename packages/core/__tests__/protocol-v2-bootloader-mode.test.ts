@@ -23,10 +23,16 @@ const createBootloaderDevice = (protocolType: 'V1' | 'V2') => {
 };
 
 describe('Pro2 bootloader mode', () => {
-  test('does not block Protocol V2 methods in bootloader mode', () => {
+  test('blocks Protocol V2 methods that are not allowed in bootloader mode', () => {
     const device = createBootloaderDevice('V2');
 
-    expect(device.hasUnexpectedMode([], [])).toBeNull();
+    expect(device.hasUnexpectedMode([], [])).toBe(UI_REQUEST.BOOTLOADER);
+  });
+
+  test('allows Protocol V2 methods that explicitly support bootloader mode', () => {
+    const device = createBootloaderDevice('V2');
+
+    expect(device.hasUnexpectedMode([UI_REQUEST.BOOTLOADER], [])).toBeNull();
   });
 
   test('keeps the Protocol V1 bootloader restriction', () => {

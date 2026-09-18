@@ -414,6 +414,27 @@ describe('DeviceCommands failure mapping', () => {
     ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceBusy });
   });
 
+  it('maps commands rejected during a Protocol V2 firmware update to DeviceBusy', async () => {
+    const commands = createCommands();
+    const message = 'Requested command not allowed while a firmware update is in progress';
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: { code: 'Failure_ProcessError', message },
+        } as any,
+        'ProtocolInfoRequest'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceBusy,
+      params: {
+        failureCode: 'Failure_ProcessError',
+        firmwareMessage: message,
+      },
+    });
+  });
+
   it('maps the current AskPin passphrase-disabled response without relying on a subcode', async () => {
     const commands = createCommands();
 
