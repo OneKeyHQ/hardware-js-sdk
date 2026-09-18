@@ -304,6 +304,41 @@ describe('DeviceJobQueue', () => {
     expect(scopeB.signal.aborted).toBe(true);
   });
 
+  it('an empty queue key matches nothing instead of clearing the queue', async () => {
+    const queue = new DeviceJobQueue();
+    const scope = queue.createCancelScope('d');
+    const job = jest.fn(async () => 'kept');
+    const pending = queue.enqueue('d', job);
+
+    expect(queue.cancelActiveAndPending('', new Error('untargeted by accident'))).toBe(false);
+
+    await expect(pending).resolves.toBe('kept');
+    expect(job).toHaveBeenCalledTimes(1);
+    expect(scope.signal.aborted).toBe(false);
+  });
+
+  it('an untargeted cancel reports what it reached', async () => {
+    const idle = new DeviceJobQueue();
+    expect(idle.cancelActiveAndPending(undefined, new Error('nothing here'))).toBe(false);
+
+    const withScope = new DeviceJobQueue();
+    withScope.createCancelScope('d');
+    expect(withScope.cancelActiveAndPending(undefined, new Error('scope only'))).toBe(true);
+
+    const withJob = new DeviceJobQueue();
+    const reason = new Error('job running');
+    const running = withJob.enqueue(
+      'd',
+      signal =>
+        new Promise<void>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason));
+        })
+    );
+    await new Promise(r => setTimeout(r, 5));
+    expect(withJob.cancelActiveAndPending(undefined, reason)).toBe(true);
+    await expect(running).rejects.toBe(reason);
+  });
+
   it('getActiveJob reflects the active slot', async () => {
     const queue = new DeviceJobQueue();
     expect(queue.getActiveJob()).toBeNull();
