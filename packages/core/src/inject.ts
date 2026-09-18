@@ -235,6 +235,24 @@ export const createCoreApi = (
   deviceReboot: (connectId, params) => call({ ...params, connectId, method: 'deviceReboot' }),
   deviceGetOnboardingStatus: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceGetOnboardingStatus' }),
+  deviceFactoryPermanentLock: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceFactoryPermanentLock' }),
+  deviceFactoryRebuildFilesystem: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceFactoryRebuildFilesystem' }),
+  deviceProvisionFactoryInfo: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceProvisionFactoryInfo' }),
+  deviceReadFactoryInfo: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceReadFactoryInfo' }),
+  deviceWriteFactoryCertificate: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceWriteFactoryCertificate' }),
+  deviceReadFactoryCertificate: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceReadFactoryCertificate' }),
+  deviceSignFactoryChallenge: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSignFactoryChallenge' }),
+  deviceGetFindMyTokenState: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetFindMyTokenState' }),
+  deviceUpdateFindMyToken: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceUpdateFindMyToken' }),
   deviceUploadWallpaper: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceUploadWallpaper' }),
   deviceUploadNft: (connectId, params) => call({ ...params, connectId, method: 'deviceUploadNft' }),
@@ -502,4 +520,17 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'neoGetAddress' }),
   neoSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'neoSignTransaction' }),
+
+  // Pro Protocol V1 factory API
+  deviceInfoSettings: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceInfoSettings' }),
+  deviceGetInfo: (connectId, params) => call({ ...params, connectId, method: 'deviceGetInfo' }),
+  deviceReadSEPublicCert: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceReadSEPublicCert' }),
+  deviceWriteSEPrivateKey: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceWriteSEPrivateKey' }),
+  deviceWriteSEPublicCert: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceWriteSEPublicCert' }),
+  deviceSESignMessage: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSESignMessage' }),
 });

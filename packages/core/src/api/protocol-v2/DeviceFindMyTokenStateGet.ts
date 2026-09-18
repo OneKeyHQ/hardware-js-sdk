@@ -1,13 +1,14 @@
 import { BaseMethod } from '../BaseMethod';
 import { UI_REQUEST } from '../../constants/ui-request';
 
-export default class DeviceFactoryInfoGet extends BaseMethod {
+const FIND_MY_TOKEN_STATE_TIMEOUT_MS = 5 * 1000;
+
+export default class DeviceFindMyTokenStateGet extends BaseMethod {
   getSupportedProtocols() {
     return ['V2'] as const;
   }
 
   init() {
-    // Protocol V2 (Neo/Pro2) only; Core rejects non-V2 devices.
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.unlockPolicy = 'none';
@@ -17,10 +18,11 @@ export default class DeviceFactoryInfoGet extends BaseMethod {
 
   async run() {
     const res = await this.device.commands.typedCall(
-      'DeviceFactoryInfoGet',
-      'DeviceFactoryInfo',
-      {}
+      'DeviceFindMyTokenStateGet',
+      'DeviceFindMyTokenState',
+      {},
+      { timeoutMs: FIND_MY_TOKEN_STATE_TIMEOUT_MS }
     );
-    return Promise.resolve(res.message);
+    return res.message;
   }
 }

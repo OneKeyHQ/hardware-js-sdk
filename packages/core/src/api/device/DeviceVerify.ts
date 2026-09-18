@@ -7,6 +7,7 @@ import { formatAnyHex } from '../helpers/hexUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { DeviceModelToTypes } from '../../types';
+import { UI_REQUEST } from '../../events';
 
 import type { BixinVerifyDeviceRequest } from '@onekeyfe/hd-transport';
 import type { DeviceVerifySignature } from '../../types';
@@ -30,6 +31,7 @@ export default class DeviceVerify extends BaseMethod<BixinVerifyDeviceRequest> {
       deviceOnly: true,
       operation: 'deviceVerify',
     };
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
 
     // check payload
     validateParams(this.payload, [{ name: 'dataHex', type: 'hexString' }]);

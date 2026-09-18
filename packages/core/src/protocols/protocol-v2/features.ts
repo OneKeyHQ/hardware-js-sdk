@@ -104,7 +104,8 @@ export const getProtocolV2RuntimeMode = (
   if (binary === 'application') return 'normal';
   if (binary) return binary;
 
-  if (isLegacyProtocolV2ProtocolInfo(protocolInfo) && !deviceInfo?.main_mcu?.application) {
+  // Early loaders omit build_fingerprint; infer loader mode only when no application is present.
+  if (!protocolInfo.build_fingerprint && !deviceInfo?.main_mcu?.application) {
     if (deviceInfo?.main_mcu?.romloader) return 'romloader';
     if (deviceInfo?.main_mcu?.bootloader) return 'bootloader';
   }

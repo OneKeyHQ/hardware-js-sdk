@@ -13,6 +13,7 @@ export const LogBlockEvent: Set<string> = new Set([
 const LogPayloadBlockMethod: Set<string> = new Set([
   'deviceUploadNft',
   'deviceUploadWallpaper',
+  'deviceUpdateFindMyToken',
   'uploadPortfolio',
   'fileWrite',
   'fileRead',

@@ -1288,7 +1288,8 @@ export class Device extends EventEmitter {
     }
     const deviceStatusSupported =
       legacyProtocolInfo ||
-      supportsProtocolV2Message(protocolInfo, PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE);
+      supportsProtocolV2Message(protocolInfo, PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE) ||
+      (!protocolInfo.build_fingerprint && runtimeMode === undefined);
 
     if (runtimeMode === 'bootloader' || runtimeMode === 'romloader') {
       return this.updateProtocolV2Features(deviceInfo, null, runtimeMode, protocolInfo);

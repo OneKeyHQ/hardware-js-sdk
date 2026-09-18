@@ -36,6 +36,12 @@ export { default as deviceUpdateBootloader } from './device/DeviceUpdateBootload
 export { default as deviceLock } from './device/DeviceLock';
 export { default as deviceUnlock } from './device/DeviceUnlock';
 export { default as deviceCancel } from './device/DeviceCancel';
+export { default as deviceGetInfo } from './device/GetDeviceInfoSettings';
+export { default as deviceInfoSettings } from './device/DeviceInfoSettings';
+export { default as deviceReadSEPublicCert } from './device/DeviceReadSEPublicCert';
+export { default as deviceWriteSEPrivateKey } from './device/DeviceWriteSEPrivateKey';
+export { default as deviceWriteSEPublicCert } from './device/DeviceWriteSEPublicCert';
+export { default as deviceSESignMessage } from './device/DeviceSESignMessage';
 
 export { default as setU2FCounter } from './u2f/SetU2FCounter';
 export { default as getNextU2FCounter } from './u2f/GetNextU2FCounter';
@@ -49,6 +55,15 @@ export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 // Pro2 business API
 export { default as deviceReboot } from './protocol-v2/DeviceReboot';
 export { default as deviceGetOnboardingStatus } from './protocol-v2/DeviceGetOnboardingStatus';
+export { default as deviceProvisionFactoryInfo } from './protocol-v2/DeviceFactoryInfoSet';
+export { default as deviceFactoryPermanentLock } from './protocol-v2/DeviceFactoryPermanentLock';
+export { default as deviceFactoryRebuildFilesystem } from './protocol-v2/FilesystemFormat';
+export { default as deviceReadFactoryInfo } from './protocol-v2/DeviceFactoryInfoGet';
+export { default as deviceWriteFactoryCertificate } from './protocol-v2/DeviceFactoryCertificateWrite';
+export { default as deviceReadFactoryCertificate } from './protocol-v2/DeviceFactoryCertificateRead';
+export { default as deviceSignFactoryChallenge } from './protocol-v2/DeviceFactoryChallengeSign';
+export { default as deviceGetFindMyTokenState } from './protocol-v2/DeviceFindMyTokenStateGet';
+export { default as deviceUpdateFindMyToken } from './protocol-v2/DeviceFindMyTokenUpdate';
 export { default as deviceUploadWallpaper } from './protocol-v2/DeviceUploadWallpaper';
 export { default as deviceUploadNft } from './protocol-v2/DeviceUploadNft';
 export { default as uploadPortfolio } from './UploadPortfolio';

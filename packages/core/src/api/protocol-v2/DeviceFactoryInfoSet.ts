@@ -1,4 +1,6 @@
 import { BaseMethod } from '../BaseMethod';
+import { UI_REQUEST } from '../../constants/ui-request';
+import { validateDeviceFactoryInfoSetParams } from './helpers';
 
 import type { DeviceFactoryInfoSetParams } from './helpers';
 
@@ -8,16 +10,12 @@ export default class DeviceFactoryInfoSet extends BaseMethod<DeviceFactoryInfoSe
   }
 
   init() {
-    // Protocol V2 (Pro2) only; Core rejects non-V2 devices.
+    // Protocol V2 (Neo/Pro2) only; Core rejects non-V2 devices.
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
-    this.params = {
-      version: this.payload.version,
-      serial_number: this.payload.serial_number,
-      burn_in_completed: this.payload.burn_in_completed,
-      factory_test_completed: this.payload.factory_test_completed,
-      manufacture_time: this.payload.manufacture_time,
-    };
+    this.unlockPolicy = 'none';
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.params = validateDeviceFactoryInfoSetParams(this.payload);
   }
 
   async run() {
@@ -25,7 +23,7 @@ export default class DeviceFactoryInfoSet extends BaseMethod<DeviceFactoryInfoSe
       info: {
         version: this.params.version,
         serial_number: this.params.serial_number,
-        factory_burn_in_completed: this.params.burn_in_completed,
+        factory_burn_in_completed: this.params.factory_burn_in_completed,
         factory_test_completed: this.params.factory_test_completed,
         manufacture_time: this.params.manufacture_time,
       },

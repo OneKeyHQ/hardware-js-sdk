@@ -40,17 +40,21 @@ describe('getLogBlockLabel', () => {
     }
   );
 
-  it.each(['deviceUploadNft', 'deviceUploadWallpaper', 'uploadPortfolio', 'fileWrite', 'fileRead'])(
-    'skips large resource or binary payload logging for %s',
-    method => {
-      const request = { method, path: 'resource.bin', data: 'A'.repeat(1024) };
-      expect(getLogBlockLabel(request)).toBe(method);
-      expect(getSafeLogPayload(request, method)).toEqual({
-        method,
-        payload: '[REDACTED]',
-      });
-    }
-  );
+  it.each([
+    'deviceUploadNft',
+    'deviceUploadWallpaper',
+    'uploadPortfolio',
+    'fileWrite',
+    'fileRead',
+    'deviceUpdateFindMyToken',
+  ])('skips large resource or binary payload logging for %s', method => {
+    const request = { method, path: 'resource.bin', data: 'A'.repeat(1024) };
+    expect(getLogBlockLabel(request)).toBe(method);
+    expect(getSafeLogPayload(request, method)).toEqual({
+      method,
+      payload: '[REDACTED]',
+    });
+  });
 
   it('logs signing requests and responses as-is', () => {
     const request = {

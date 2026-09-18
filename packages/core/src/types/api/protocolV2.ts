@@ -1,6 +1,20 @@
 import type { CommonParams, Response } from '../params';
-import type { OnboardingStatus, Success } from '@onekeyfe/hd-transport';
-import type { DeviceRebootParams } from '../../api/protocol-v2/helpers';
+import type { FactoryFilesystemRebuildParams } from '../../api/protocol-v2/FilesystemFormat';
+import type {
+  DeviceCertificate,
+  DeviceCertificateSignature,
+  DeviceFactoryInfo,
+  DeviceFindMyTokenState,
+  OnboardingStatus,
+  Success,
+} from '@onekeyfe/hd-transport';
+import type {
+  DeviceFactoryCertificateWriteParams,
+  DeviceFactoryChallengeSignParams,
+  DeviceFactoryInfoSetParams,
+  DeviceFindMyTokenUpdateParams,
+  DeviceRebootParams,
+} from '../../api/protocol-v2/helpers';
 import type { UploadPortfolioParams } from '../../api/UploadPortfolio';
 import type {
   DeviceUploadWallpaperParams,
@@ -14,6 +28,12 @@ import type {
 // Re-export implementation parameter types as the single source of truth.
 export type { DeviceRebootParams, RebootTypeInput } from '../../api/protocol-v2/helpers';
 export type { UploadPortfolioParams } from '../../api/UploadPortfolio';
+export type {
+  DeviceFactoryCertificateWriteParams,
+  DeviceFactoryChallengeSignParams,
+  DeviceFactoryInfoSetParams,
+  DeviceFindMyTokenUpdateParams,
+} from '../../api/protocol-v2/helpers';
 export type {
   DeviceUploadWallpaperParams,
   DeviceUploadWallpaperResponse,
@@ -56,6 +76,55 @@ export declare function deviceGetOnboardingStatus(
   connectId: string,
   params?: CommonParams
 ): Response<OnboardingStatus>;
+
+export declare function deviceProvisionFactoryInfo(
+  connectId: string,
+  params: CommonParams & DeviceFactoryInfoSetParams
+): Response<Success>;
+
+export declare function deviceFactoryPermanentLock(
+  connectId: string,
+  params?: CommonParams
+): Response<Success>;
+
+/**
+ * Destructively rebuild both volumes on a Pro2/Neo loader and verify read/write access.
+ * formatConfirmed requires the format reply.
+ */
+export declare function deviceFactoryRebuildFilesystem(
+  connectId: string,
+  params: CommonParams & FactoryFilesystemRebuildParams
+): Response<Success & { formatConfirmed: boolean }>;
+
+export declare function deviceReadFactoryInfo(
+  connectId: string,
+  params?: CommonParams
+): Response<DeviceFactoryInfo>;
+
+export declare function deviceWriteFactoryCertificate(
+  connectId: string,
+  params: CommonParams & DeviceFactoryCertificateWriteParams
+): Response<Success>;
+
+export declare function deviceReadFactoryCertificate(
+  connectId: string,
+  params?: CommonParams
+): Response<DeviceCertificate>;
+
+export declare function deviceSignFactoryChallenge(
+  connectId: string,
+  params: CommonParams & DeviceFactoryChallengeSignParams
+): Response<DeviceCertificateSignature>;
+
+export declare function deviceGetFindMyTokenState(
+  connectId: string,
+  params?: CommonParams
+): Response<DeviceFindMyTokenState>;
+
+export declare function deviceUpdateFindMyToken(
+  connectId: string,
+  params: CommonParams & DeviceFindMyTokenUpdateParams
+): Response<Success>;
 
 export declare function deviceUploadWallpaper(
   connectId: string,

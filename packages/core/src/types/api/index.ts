@@ -1,8 +1,17 @@
 import type {
+  deviceFactoryPermanentLock,
+  deviceFactoryRebuildFilesystem,
+  deviceGetFindMyTokenState,
   deviceGetOnboardingStatus,
+  deviceProvisionFactoryInfo,
+  deviceReadFactoryCertificate,
+  deviceReadFactoryInfo,
   deviceReboot,
+  deviceSignFactoryChallenge,
+  deviceUpdateFindMyToken,
   deviceUploadNft,
   deviceUploadWallpaper,
+  deviceWriteFactoryCertificate,
   testProtocolV2Ping,
   uploadPortfolio,
 } from './protocolV2';
@@ -153,6 +162,12 @@ import type { benfenSignTransaction } from './benfenSignTransaction';
 import type { benfenSignMessage } from './benfenSignMessage';
 import type { neoGetAddress } from './neoGetAddress';
 import type { neoSignTransaction } from './neoSignTransaction';
+import type { deviceInfoSettings } from './deviceInfoSettings';
+import type { deviceGetInfo } from './deviceGetInfo';
+import type { deviceWriteSEPrivateKey } from './deviceWriteSEPrivateKey';
+import type { deviceReadSEPublicCert } from './deviceReadSEPublicCert';
+import type { deviceWriteSEPublicCert } from './deviceWriteSEPublicCert';
+import type { deviceSESignMessage } from './deviceSESignMessage';
 import type { ConnectSettings } from '../settings';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
@@ -166,7 +181,12 @@ export type {
   OpenWalletSessionPayload,
 } from './openWalletSession';
 export type { ClearSessionCacheParams, ClearSessionCachePayload } from './sessionCache';
-export type { TestProtocolV2PingParams } from './protocolV2';
+export type {
+  DeviceFactoryCertificateWriteParams,
+  DeviceFactoryChallengeSignParams,
+  DeviceFactoryInfoSetParams,
+  TestProtocolV2PingParams,
+} from './protocolV2';
 
 export type CoreApi = {
   /**
@@ -260,6 +280,15 @@ export type CoreApi = {
    */
   deviceReboot: typeof deviceReboot;
   deviceGetOnboardingStatus: typeof deviceGetOnboardingStatus;
+  deviceFactoryPermanentLock: typeof deviceFactoryPermanentLock;
+  deviceFactoryRebuildFilesystem: typeof deviceFactoryRebuildFilesystem;
+  deviceProvisionFactoryInfo: typeof deviceProvisionFactoryInfo;
+  deviceReadFactoryInfo: typeof deviceReadFactoryInfo;
+  deviceWriteFactoryCertificate: typeof deviceWriteFactoryCertificate;
+  deviceReadFactoryCertificate: typeof deviceReadFactoryCertificate;
+  deviceSignFactoryChallenge: typeof deviceSignFactoryChallenge;
+  deviceGetFindMyTokenState: typeof deviceGetFindMyTokenState;
+  deviceUpdateFindMyToken: typeof deviceUpdateFindMyToken;
   deviceUploadNft: typeof deviceUploadNft;
   deviceUploadWallpaper: typeof deviceUploadWallpaper;
   uploadPortfolio: typeof uploadPortfolio;
@@ -470,4 +499,12 @@ export type CoreApi = {
    */
   neoGetAddress: typeof neoGetAddress;
   neoSignTransaction: typeof neoSignTransaction;
+
+  /** Pro Protocol V1 factory API. */
+  deviceInfoSettings: typeof deviceInfoSettings;
+  deviceGetInfo: typeof deviceGetInfo;
+  deviceWriteSEPrivateKey: typeof deviceWriteSEPrivateKey;
+  deviceReadSEPublicCert: typeof deviceReadSEPublicCert;
+  deviceWriteSEPublicCert: typeof deviceWriteSEPublicCert;
+  deviceSESignMessage: typeof deviceSESignMessage;
 };

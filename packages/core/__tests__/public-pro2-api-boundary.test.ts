@@ -1,6 +1,7 @@
 import * as publicMethods from '../src/api';
 import { findMethod } from '../src/api/utils';
 import { createCoreApi } from '../src/inject';
+import { UI_REQUEST } from '../src/constants/ui-request';
 
 import type { CoreApi } from '../src/types/api';
 
@@ -43,11 +44,26 @@ const unpublishedFilesystemAliases = [
   'filesystemPathInfoQuery',
 ] as const;
 
-describe('public Pro2 API boundary', () => {
+describe('public factory and Protocol V2 API boundary', () => {
   test('exposes business APIs without raw device or filesystem commands', () => {
     const api = createCoreApi(jest.fn() as CoreApi['call']) as Record<string, unknown>;
 
     expect(api.deviceGetOnboardingStatus).toBeInstanceOf(Function);
+    expect(api.deviceFactoryPermanentLock).toBeInstanceOf(Function);
+    expect(api.deviceFactoryRebuildFilesystem).toBeInstanceOf(Function);
+    expect(api.deviceProvisionFactoryInfo).toBeInstanceOf(Function);
+    expect(api.deviceReadFactoryInfo).toBeInstanceOf(Function);
+    expect(api.deviceWriteFactoryCertificate).toBeInstanceOf(Function);
+    expect(api.deviceReadFactoryCertificate).toBeInstanceOf(Function);
+    expect(api.deviceSignFactoryChallenge).toBeInstanceOf(Function);
+    expect(api.deviceGetFindMyTokenState).toBeInstanceOf(Function);
+    expect(api.deviceUpdateFindMyToken).toBeInstanceOf(Function);
+    expect(api.deviceInfoSettings).toBeInstanceOf(Function);
+    expect(api.deviceGetInfo).toBeInstanceOf(Function);
+    expect(api.deviceWriteSEPrivateKey).toBeInstanceOf(Function);
+    expect(api.deviceReadSEPublicCert).toBeInstanceOf(Function);
+    expect(api.deviceWriteSEPublicCert).toBeInstanceOf(Function);
+    expect(api.deviceSESignMessage).toBeInstanceOf(Function);
     expect(api.deviceUploadNft).toBeInstanceOf(Function);
     expect(api.uploadPortfolio).toBeInstanceOf(Function);
     expect(api.testProtocolV2Ping).toBeInstanceOf(Function);
@@ -62,6 +78,215 @@ describe('public Pro2 API boundary', () => {
     unpublishedFilesystemAliases.forEach(name => {
       expect(api).not.toHaveProperty(name);
       expect(publicMethods).not.toHaveProperty(name);
+    });
+  });
+
+  test('routes semantic Protocol V2 factory APIs', async () => {
+    const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
+    const api = createCoreApi(call as CoreApi['call']) as CoreApi;
+    const manufactureTime = {
+      year: 2026,
+      month: 8,
+      day: 1,
+      hour: 10,
+      minute: 20,
+      second: 30,
+    };
+
+    await api.deviceProvisionFactoryInfo('neo', {
+      version: 1,
+      serial_number: 'NEO00000001',
+      factory_burn_in_completed: true,
+      factory_test_completed: true,
+      manufacture_time: manufactureTime,
+      connectProtocol: 'V2',
+    });
+    await api.deviceFactoryPermanentLock('neo', { connectProtocol: 'V2' });
+    await api.deviceReadFactoryInfo('neo', { connectProtocol: 'V2' });
+    await api.deviceWriteFactoryCertificate('neo', {
+      certificate: 'aabb',
+      connectProtocol: 'V2',
+    });
+    await api.deviceReadFactoryCertificate('neo', { connectProtocol: 'V2' });
+    await api.deviceSignFactoryChallenge('neo', {
+      digest: '22'.repeat(32),
+      connectProtocol: 'V2',
+    });
+    await api.deviceGetFindMyTokenState('pro2', { connectProtocol: 'V2' });
+    await api.deviceUpdateFindMyToken('pro2', {
+      token: 'aabb',
+      connectProtocol: 'V2',
+    });
+
+    expect(call).toHaveBeenNthCalledWith(1, {
+      method: 'deviceProvisionFactoryInfo',
+      connectId: 'neo',
+      version: 1,
+      serial_number: 'NEO00000001',
+      factory_burn_in_completed: true,
+      factory_test_completed: true,
+      manufacture_time: manufactureTime,
+      connectProtocol: 'V2',
+    });
+    expect(call).toHaveBeenNthCalledWith(2, {
+      method: 'deviceFactoryPermanentLock',
+      connectId: 'neo',
+      connectProtocol: 'V2',
+    });
+    expect(call).toHaveBeenNthCalledWith(3, {
+      method: 'deviceReadFactoryInfo',
+      connectId: 'neo',
+      connectProtocol: 'V2',
+    });
+    expect(call).toHaveBeenNthCalledWith(4, {
+      method: 'deviceWriteFactoryCertificate',
+      connectId: 'neo',
+      certificate: 'aabb',
+      connectProtocol: 'V2',
+    });
+    expect(call).toHaveBeenNthCalledWith(5, {
+      method: 'deviceReadFactoryCertificate',
+      connectId: 'neo',
+      connectProtocol: 'V2',
+    });
+    expect(call).toHaveBeenNthCalledWith(6, {
+      method: 'deviceSignFactoryChallenge',
+      connectId: 'neo',
+      digest: '22'.repeat(32),
+      connectProtocol: 'V2',
+    });
+    expect(call).toHaveBeenNthCalledWith(7, {
+      method: 'deviceGetFindMyTokenState',
+      connectId: 'pro2',
+      connectProtocol: 'V2',
+    });
+    expect(call).toHaveBeenNthCalledWith(8, {
+      method: 'deviceUpdateFindMyToken',
+      connectId: 'pro2',
+      token: 'aabb',
+      connectProtocol: 'V2',
+    });
+  });
+
+  test('routes the confirmed factory filesystem recovery through the dispatcher', async () => {
+    const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
+    const api = createCoreApi(call as CoreApi['call']) as CoreApi;
+    await api.deviceFactoryRebuildFilesystem('neo', { confirm: true, connectProtocol: 'V2' });
+    const payload = {
+      method: 'deviceFactoryRebuildFilesystem',
+      connectId: 'neo',
+      confirm: true,
+      connectProtocol: 'V2',
+    };
+    expect(call).toHaveBeenCalledWith(payload);
+    const method = findMethod({ id: 1, payload } as any);
+    method.init();
+    expect(method.getSupportedProtocols()).toEqual(['V2']);
+    expect(method.allowDeviceMode).toContain(UI_REQUEST.BOOTLOADER);
+    expect(method.unlockPolicy).toBe('none');
+  });
+
+  test('uses the dedicated Find My commands and validates the token boundary', async () => {
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ message: { burned: false } })
+      .mockResolvedValueOnce({ message: { message: 'ok' } });
+    const device = { commands: { typedCall } };
+    const stateMethod = findMethod({
+      id: 1,
+      payload: {
+        method: 'deviceGetFindMyTokenState',
+        connectId: 'pro2',
+        connectProtocol: 'V2',
+      },
+    } as any);
+    stateMethod.init();
+    (stateMethod as any).device = device;
+
+    await expect(stateMethod.run()).resolves.toEqual({ burned: false });
+    expect(stateMethod.getSupportedProtocols()).toEqual(['V2']);
+    expect(stateMethod.allowDeviceMode).toContain(UI_REQUEST.BOOTLOADER);
+    expect(stateMethod.unlockPolicy).toBe('none');
+    expect(typedCall).toHaveBeenNthCalledWith(
+      1,
+      'DeviceFindMyTokenStateGet',
+      'DeviceFindMyTokenState',
+      {},
+      { timeoutMs: 5_000 }
+    );
+
+    const updateMethod = findMethod({
+      id: 2,
+      payload: {
+        method: 'deviceUpdateFindMyToken',
+        connectId: 'pro2',
+        connectProtocol: 'V2',
+        token: '01abff',
+      },
+    } as any);
+    updateMethod.init();
+    (updateMethod as any).device = device;
+
+    await expect(updateMethod.run()).resolves.toEqual({ message: 'ok' });
+    expect(updateMethod.getSupportedProtocols()).toEqual(['V2']);
+    expect(updateMethod.allowDeviceMode).toContain(UI_REQUEST.BOOTLOADER);
+    expect(updateMethod.unlockPolicy).toBe('none');
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
+      'DeviceFindMyTokenUpdate',
+      'Success',
+      { token: '01abff' },
+      { timeoutMs: 8_000 }
+    );
+
+    expect(() =>
+      findMethod({
+        id: 3,
+        payload: {
+          method: 'deviceUpdateFindMyToken',
+          connectId: 'pro2',
+          connectProtocol: 'V2',
+          token: 'aa'.repeat(257),
+        },
+      } as any).init()
+    ).toThrow('Parameter [token] must not exceed 256 bytes.');
+  });
+
+  test('routes Pro Protocol V1 factory APIs', async () => {
+    const call = jest.fn().mockResolvedValue({ success: true, payload: {} });
+    const api = createCoreApi(call as CoreApi['call']) as CoreApi;
+
+    await api.deviceInfoSettings('pro', {
+      serial_no: 'PRO00000001',
+      cpu_info: 'cpu',
+      pre_firmware: 'factory',
+      connectProtocol: 'V1',
+    });
+    await api.deviceGetInfo('pro', { connectProtocol: 'V1' });
+    await api.deviceReadSEPublicCert('pro', { connectProtocol: 'V1' });
+    await api.deviceWriteSEPrivateKey('pro', {
+      private_key: '',
+      connectProtocol: 'V1',
+    });
+    await api.deviceWriteSEPublicCert('pro', {
+      public_cert: 'test-certificate',
+      connectProtocol: 'V1',
+    });
+    await api.deviceSESignMessage('pro', {
+      message: 'test-challenge',
+      connectProtocol: 'V1',
+    });
+
+    expect(call.mock.calls.map(([payload]) => payload.method)).toEqual([
+      'deviceInfoSettings',
+      'deviceGetInfo',
+      'deviceReadSEPublicCert',
+      'deviceWriteSEPrivateKey',
+      'deviceWriteSEPublicCert',
+      'deviceSESignMessage',
+    ]);
+    call.mock.calls.forEach(([payload]) => {
+      expect(payload).toMatchObject({ connectId: 'pro', connectProtocol: 'V1' });
     });
   });
 

@@ -5,5 +5,6 @@ export const LogBlockCommand = new Set([
   'FileWrite',
   'EmmcFileWrite',
   'FirmwareUpload',
+  'DeviceFindMyTokenUpdate',
   'ResourceAck',
 ]);
