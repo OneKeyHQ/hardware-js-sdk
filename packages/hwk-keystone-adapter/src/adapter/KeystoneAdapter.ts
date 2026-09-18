@@ -920,6 +920,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           path,
           xfp: record.masterFingerprint,
           chainId: params.chainId,
+          origin: this._origin,
         });
         const responseUr = await this._resolveUr(
           record,
@@ -984,6 +985,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           path,
           xfp: record.masterFingerprint,
           chainId: params.chainId,
+          origin: this._origin,
         });
         const responseUr = await this._resolveUr(
           record,
@@ -1054,6 +1056,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           path,
           xfp: record.masterFingerprint,
           chainId: params.chainId,
+          origin: this._origin,
         });
         const responseUr = await this._resolveUr(
           record,
@@ -1315,6 +1318,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           requestId,
           messageHex,
           accounts: [{ path, xfp: record.masterFingerprint }],
+          origin: this._origin,
         });
         const responseUr = await this._resolveUr(
           record,
@@ -1424,6 +1428,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           dataType: 'transaction',
           path,
           xfp: record.masterFingerprint,
+          origin: this._origin,
         });
         const responseUr = await this._resolveUr(
           record,
@@ -1476,6 +1481,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           dataType: 'message',
           path,
           xfp: record.masterFingerprint,
+          origin: this._origin,
         });
         const responseUr = await this._resolveUr(
           record,
@@ -1591,6 +1597,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           rawTxHex,
           path,
           xfp: record.masterFingerprint,
+          origin: this._origin,
         });
         const responseUr = await this._resolveUr(
           record,
@@ -1654,6 +1661,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           path,
           xfp: record.masterFingerprint,
           signType: TronSignType.PersonalMessage,
+          origin: this._origin,
         });
         const responseUr = await this._resolveUr(
           record,
