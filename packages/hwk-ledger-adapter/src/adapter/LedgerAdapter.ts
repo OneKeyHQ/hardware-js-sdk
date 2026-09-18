@@ -58,6 +58,7 @@ import type {
   BtcSignedTx,
   ChainForFingerprint,
   ConnectionTarget,
+  ConnectionType,
   ConnectorCallResult,
   ConnectorDevice,
   ConnectorUiEvent,
@@ -157,6 +158,11 @@ function btcAccountIndexFromPath(path: string): number | null {
 
 export class LedgerAdapter implements IHardwareWallet {
   readonly vendor = 'ledger' as const;
+
+  // A cancel releases the DMK device action and its intent-queue slot, so the
+  // next call is not blocked behind it. It still cannot retract a confirmation
+  // screen the device is already showing.
+  readonly cancelCapability = 'stops-waiting' as const;
 
   private readonly connector: IConnector;
 
@@ -662,18 +668,23 @@ export class LedgerAdapter implements IHardwareWallet {
     this._operations.endByConnectionKey(resolvedConnectId, 'explicit');
     const sessionId = this._sessions.get(resolvedConnectId);
     if (sessionId) this._operations.endByConnectionKey(sessionId, 'explicit');
+    // The channel this operation runs on, taken from the transport the adapter
+    // selected. A combined connector stamps a nominal `connectionType` on the
+    // device snapshot, so that snapshot is not the source.
+    const connectionType: ConnectionType = this._isBleConnection() ? 'ble' : 'usb';
     const device = this._discoveredDevices.get(resolvedConnectId) ?? {
       vendor: 'ledger' as const,
       model: 'unknown',
       firmwareVersion: '',
       deviceId: '',
       connectId: resolvedConnectId,
-      connectionType: this.connector.connectionType,
+      connectionType,
     };
     const operation = this._operations.create({
       searchTargetId,
       connectId: resolvedConnectId,
       device,
+      connectionType,
       connectionKeys: [this._sessions.get(resolvedConnectId) ?? ''],
     });
     return success(operation.operationId);
@@ -2712,6 +2723,9 @@ export class LedgerAdapter implements IHardwareWallet {
             this._operations.rebind(operationId, {
               connectId: resolvedConnectId,
               device: selectedDevice,
+              // Same source as `_createOperation`: the selected transport, not
+              // the device snapshot, which a session connect overwrites.
+              connectionType: this._isBleConnection() ? 'ble' : 'usb',
               connectionKeys: [sessionId],
             });
           if (installContext)

@@ -1,7 +1,7 @@
 import { HardwareErrorCode, createHwkError } from '../types/errors';
 import { createHardwareOperationId } from './hardwareRuntimeId';
 
-import type { DeviceInfo, VendorType } from '../types/device';
+import type { ConnectionType, DeviceInfo, VendorType } from '../types/device';
 
 export const OPERATION_DEFAULT_TTL_MS = 600_000;
 
@@ -11,6 +11,13 @@ export type HardwareOperation = {
   operationId: string;
   connectId: string;
   device: DeviceInfo;
+  /**
+   * The channel this operation actually runs on. Required on `create` and
+   * `rebind` so it comes from whichever adapter picked the channel, rather
+   * than being read back off `device`, whose snapshot a combined connector
+   * fills with a nominal value.
+   */
+  connectionType: ConnectionType;
   connectionKeys: string[];
   createdAt: number;
   lastActiveAt: number;
@@ -55,6 +62,7 @@ export class OperationRegistry {
     searchTargetId: string;
     connectId: string;
     device: DeviceInfo;
+    connectionType: ConnectionType;
     connectionKeys?: string[];
   }): HardwareOperation {
     const now = Date.now();
@@ -63,6 +71,7 @@ export class OperationRegistry {
       operationId,
       connectId: params.connectId,
       device: params.device,
+      connectionType: params.connectionType,
       connectionKeys: Array.from(
         new Set(
           [params.searchTargetId, params.connectId, ...(params.connectionKeys ?? [])].filter(
@@ -143,6 +152,7 @@ export class OperationRegistry {
     params: {
       connectId: string;
       device: DeviceInfo;
+      connectionType: ConnectionType;
       connectionKeys?: string[];
     }
   ): HardwareOperation {
@@ -154,6 +164,7 @@ export class OperationRegistry {
     if (active.timer) clearTimeout(active.timer);
     active.connectId = params.connectId;
     active.device = params.device;
+    active.connectionType = params.connectionType;
     active.connectionKeys = Array.from(
       new Set([params.connectId, ...(params.connectionKeys ?? [])].filter(Boolean))
     );

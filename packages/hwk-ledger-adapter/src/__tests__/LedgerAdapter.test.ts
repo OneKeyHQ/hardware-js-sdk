@@ -21,6 +21,7 @@ import type {
   ConnectorSearchDevicesOptions,
   ConnectorSession,
   IConnector,
+  OperationRegistry,
 } from '@onekeyfe/hwk-adapter-core';
 
 function createMockConnector(): IConnector & {
@@ -638,6 +639,54 @@ describe('LedgerAdapter', () => {
       return acquired.payload;
     }
 
+    it('keeps a rebound operation on the channel the adapter is using', async () => {
+      Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+      connector.searchDevices.mockResolvedValue([
+        { connectId: 'dev-1', deviceId: 'dev-1', name: 'Nano X', model: 'nanoX' },
+        { connectId: 'dev-2', deviceId: 'dev-2', name: 'Nano X', model: 'nanoX' },
+      ]);
+      acknowledgeBindings();
+      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+        if (!event.payload.devices.length) return;
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+          payload: {
+            requestId: event.payload.requestId,
+            sdkConnectId: event.payload.rejectedConnectId ? 'dev-2' : 'dev-1',
+          },
+        });
+      });
+      const acquired = await adapter.acquireOperation('', {
+        knownConnections: [],
+        extra: { dbDeviceId: 'binding-record' },
+      });
+      expect(acquired.success).toBe(true);
+      if (!acquired.success) return;
+
+      const operations = (adapter as unknown as { _operations: OperationRegistry })._operations;
+      const rebind = jest.spyOn(operations, 'rebind');
+      connector.callImpl
+        .mockResolvedValueOnce({ address: 'different-wallet' })
+        .mockResolvedValueOnce({ address: 'expected-wallet' })
+        .mockResolvedValueOnce({ address: 'business-address' });
+
+      const result = await adapter.evmGetAddress(
+        acquired.payload,
+        deriveDeviceFingerprint('expected-wallet'),
+        { path: "m/44'/60'/0'/0/1", operationId: acquired.payload, showOnDevice: false }
+      );
+
+      expect(result.success).toBe(true);
+      // The reselected device's snapshot says 'usb'; the rebind has to use the
+      // same source `_createOperation` does, so the channel cannot flip.
+      expect(rebind).toHaveBeenCalledWith(
+        acquired.payload,
+        expect.objectContaining({ connectionType: 'ble' })
+      );
+      expect(operations.resolve(acquired.payload).connectionType).toBe('ble');
+      await adapter.releaseOperation(acquired.payload);
+    });
+
     it.each(['business', 'fingerprint'] as const)(
       'saves the original selection once after %s verification',
       async method => {
@@ -964,6 +1013,36 @@ describe('LedgerAdapter', () => {
       expect(connector.searchDevices).not.toHaveBeenCalled();
       expect(connector.connect).not.toHaveBeenCalled();
       expect(connector.call).not.toHaveBeenCalled();
+    });
+
+    it('records the channel the operation actually runs on', async () => {
+      const bleConnector = createMockConnector();
+      (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
+      bleConnector.searchDevices.mockResolvedValue([
+        { connectId: 'dev-1', deviceId: '', name: 'Ledger', connectionType: 'ble' },
+      ]);
+      const bleAdapter = new LedgerAdapter(bleConnector);
+      bleAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        bleAdapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+      });
+      const connected = await bleAdapter.connectDevice('dev-1');
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+
+      // The mock connector's session snapshot says 'usb'; the operation has to
+      // record the channel the adapter selected instead. The registry is not
+      // public, and this is the value a later routing decision would read.
+      const operations = (bleAdapter as unknown as { _operations: OperationRegistry })._operations;
+      expect(operations.resolve(connected.payload).connectionType).toBe('ble');
+
+      const usbConnected = await adapter.connectDevice('dev-1');
+      expect(usbConnected.success).toBe(true);
+      if (!usbConnected.success) return;
+      const usbOperations = (adapter as unknown as { _operations: OperationRegistry })._operations;
+      expect(usbOperations.resolve(usbConnected.payload).connectionType).toBe('usb');
     });
 
     it('retires an older operation before replacing its USB session', async () => {
