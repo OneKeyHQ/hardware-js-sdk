@@ -27,6 +27,7 @@ import { randomBytes } from '@noble/hashes/utils';
 
 import { authenticateDeviceFromProof } from '../deviceAuthenticity';
 import { debugLog } from '../utils/debugLog';
+import { trezorQueueKey } from '../utils/queueKey';
 
 import type { AuthenticityProof } from '../deviceAuthenticity';
 import type {
@@ -953,6 +954,13 @@ export class TrezorAdapter implements IHardwareWallet {
       return this._errorToFailure(error);
     }
 
+    // Each item enqueues its own job, so a cancel landing between two items has
+    // no job to abort. The scope survives that gap; same key `_callMethod`
+    // enqueues under, so `cancel()` reaches it with the key it already computes.
+    const cancelScope = this._jobQueue.createCancelScope(
+      trezorQueueKey({ operationId: target.payload.operationId, connectId: effectiveTargetId })
+    );
+
     let liveDeviceId = '';
     const bundleContext: TrezorBundleContext = {};
     const topLevelFailureIndexes = new Set<number>();
@@ -983,6 +991,10 @@ export class TrezorAdapter implements IHardwareWallet {
         params,
         normalizeItem: TrezorAdapter._normalizeAllNetworkItem,
         callItem: async ({ method, item, index }) => {
+          if (cancelScope.signal.aborted) {
+            topLevelFailureIndexes.add(index);
+            return TrezorAdapter._buildCancelledFailure(cancelScope.signal);
+          }
           const expectedDeviceId = TrezorAdapter._getItemDeviceId(item) ?? deviceId;
           if (expectedDeviceId) {
             const fingerprint = await getLiveDeviceId(expectedDeviceId);
@@ -1002,8 +1014,15 @@ export class TrezorAdapter implements IHardwareWallet {
           const callItem = TrezorAdapter._withAllNetworkRequestCommonParams(item, params);
           return this._callAllNetworkMethod(effectiveTargetId, method, callItem, bundleContext);
         },
-        attachIdentity: async ({ item, chain, payload }) => {
+        attachIdentity: async ({ item, chain, payload, index }) => {
           if (!liveDeviceId) {
+            // Bootstrapping is another device round trip, so it needs the same
+            // gap check.
+            if (cancelScope.signal.aborted) {
+              topLevelFailureIndexes.add(index);
+              const cancelled = TrezorAdapter._buildCancelledFailure<never>(cancelScope.signal);
+              return { ...item, success: false, payload: cancelled.payload };
+            }
             const fingerprint = await getLiveDeviceId(deviceId);
             if (!fingerprint.success) {
               return { ...item, success: false, payload: fingerprint.payload };
@@ -1033,6 +1052,11 @@ export class TrezorAdapter implements IHardwareWallet {
             response.payload?.code === HardwareErrorCode.DevicePathForbidden;
           const isPassphrasePolicyFailure =
             response.payload?.code === HardwareErrorCode.PassphraseAlwaysOnDevice;
+          // User said "no" — SDK-dialog cancel and on-device reject both end
+          // the batch instead of prompting for the next chain.
+          const isUserRefusal =
+            response.payload?.code === HardwareErrorCode.UserAborted ||
+            response.payload?.code === HardwareErrorCode.UserRejected;
           const isConnectionLost =
             response.payload?.code === HardwareErrorCode.DeviceDisconnected ||
             response.payload?.code === HardwareErrorCode.OperationTimeout ||
@@ -1043,11 +1067,13 @@ export class TrezorAdapter implements IHardwareWallet {
             isSessionLevelFailure ||
             isWholeChainForbidden ||
             isPassphrasePolicyFailure ||
+            isUserRefusal ||
             isConnectionLost
           );
         },
       });
     } finally {
+      cancelScope.release();
       releaseOperationRetention?.();
     }
   }
@@ -1231,6 +1257,19 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   cancel(connectId?: string): void {
+    // "Cancel this one" and "cancel whatever is running" are different
+    // instructions. An operation id that has already ended names nothing, so
+    // this call must leave no trace at all rather than decay into the
+    // untargeted form and take down an unrelated job or someone else's pending
+    // UI request. Decided before anything else.
+    if (isHardwareOperationId(connectId)) {
+      try {
+        this._operations.resolve(connectId);
+      } catch {
+        // Ended (tombstoned) and never-existed both land here.
+        return;
+      }
+    }
     const userAbortReason = Object.assign(new Error('User aborted operation'), {
       code: HardwareErrorCode.UserAborted,
     });
@@ -1255,18 +1294,23 @@ export class TrezorAdapter implements IHardwareWallet {
         !operationId && connectId
           ? this._operations.findActiveByConnectionKey(connectId)
           : undefined;
-      this._jobQueue.cancelActive(
-        operationId ??
-          (activeJobId === targetId ? targetId : interactionForPhysicalId?.operationId) ??
-          targetId,
-        userAbortReason
-      );
+      // A bundle called without an operationId queues its items — and opens its
+      // cancel scope — under the raw connectId, while the operation that owns
+      // that connection is a second live key. Both get cancelled. Pending jobs
+      // and scopes go with the active one: between two bundle items nothing is
+      // active, and only the scope carries the cancel across that gap.
+      const pendingOperationId = operationId ?? interactionForPhysicalId?.operationId;
+      const queueKeys = new Set<string>([trezorQueueKey({ connectId: targetId })]);
+      if (pendingOperationId) queueKeys.add(trezorQueueKey({ operationId: pendingOperationId }));
+      for (const key of queueKeys) {
+        this._jobQueue.cancelActiveAndPending(key, userAbortReason);
+      }
       if (resolvedConnectId) {
         void this._connector.cancel(this._sessions.get(resolvedConnectId) ?? resolvedConnectId);
       }
       return;
     }
-    this._jobQueue.cancelActive(undefined, userAbortReason);
+    this._jobQueue.cancelActiveAndPending(undefined, userAbortReason);
     for (const sessionId of this._sessions.values()) {
       void this._connector.cancel(sessionId);
     }
@@ -1342,7 +1386,7 @@ export class TrezorAdapter implements IHardwareWallet {
     }
     return this._jobQueue
       .enqueue(
-        operationId || resolvedConnectId,
+        trezorQueueKey({ operationId, connectId: resolvedConnectId }),
         async signal => {
           let selectionRequestId: string | undefined;
           let verified = false;
@@ -1703,6 +1747,17 @@ export class TrezorAdapter implements IHardwareWallet {
     return typeof deviceId === 'string' && deviceId.length > 0 ? deviceId : undefined;
   }
 
+  /** UserAborted is a top-level abort code, so this ends the bundle. */
+  private static _buildCancelledFailure<T>(signal: AbortSignal): Response<T> {
+    const reason = signal.reason as { code?: unknown; message?: unknown } | undefined;
+    const code =
+      typeof reason?.code === 'number'
+        ? (reason.code as HardwareErrorCode)
+        : HardwareErrorCode.UserAborted;
+    const message = typeof reason?.message === 'string' ? reason.message : '';
+    return failure(code, message || 'All-network get-address cancelled');
+  }
+
   private _callAllNetworkMethod(
     connectId: string,
     method: AllNetworkMethodName,
@@ -1831,7 +1886,7 @@ export class TrezorAdapter implements IHardwareWallet {
     });
     try {
       const response = await this._jobQueue.enqueue(
-        operationId ?? call.connectId,
+        trezorQueueKey({ operationId, connectId: call.connectId }),
         async signal => {
           let effectiveConnectId = call.connectId;
           let selectionRequestId: string | undefined;

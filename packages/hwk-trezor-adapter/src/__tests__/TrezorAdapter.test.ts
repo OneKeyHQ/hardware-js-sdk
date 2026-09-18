@@ -9,8 +9,9 @@ import {
 } from '@onekeyfe/hwk-adapter-core';
 
 import { TrezorAdapter, onSdkEvent } from '../index';
+import { trezorQueueKey } from '../utils/queueKey';
 
-import type { IConnector } from '@onekeyfe/hwk-adapter-core';
+import type { DeviceJobQueue, IConnector } from '@onekeyfe/hwk-adapter-core';
 
 type ConnectMock = jest.Mock<ReturnType<IConnector['connect']>, Parameters<IConnector['connect']>>;
 type CallMock = jest.Mock<Promise<unknown>, Parameters<IConnector['call']>>;
@@ -2534,6 +2535,325 @@ describe('TrezorAdapter', () => {
       ],
     });
     expect(connector.call).toHaveBeenCalledWith('safe-7-session', 'getFeatures', {});
+  });
+
+  it('allNetworkGetAddress stops the bundle when cancel lands between two items', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    await adapter.connectDevice('safe-7');
+
+    const methodsSent: string[] = [];
+    const addressMethodsSent = () =>
+      methodsSent.filter(method => method.toLowerCase().includes('getaddress'));
+    (connector.call as CallMock).mockImplementation((_sessionId, method) => {
+      methodsSent.push(method);
+      if (method === 'getFeatures') {
+        return Promise.resolve({ device_id: 'trezor-device-uuid-abc' });
+      }
+      if (method === '__thpCreateSession') {
+        return Promise.resolve({ protocol: 'thp', thpSessionId: 'session-empty' });
+      }
+      return Promise.resolve({ address: `0x${methodsSent.length}`, path: "m/44'/60'/0'/0/0" });
+    });
+
+    // Each item is its own queue job, so it runs to completion and leaves the
+    // queue empty. The cancel below lands in that gap: no job to abort.
+    const queue = (adapter as unknown as { _jobQueue: DeviceJobQueue })._jobQueue;
+    type EnqueueFn = (
+      deviceId: string,
+      job: (signal: AbortSignal) => Promise<unknown>,
+      options?: unknown
+    ) => Promise<unknown>;
+    const realEnqueue = queue.enqueue.bind(queue) as EnqueueFn;
+    let cancelled = false;
+    (queue as unknown as { enqueue: EnqueueFn }).enqueue = async (deviceId, job, options) => {
+      const result = await realEnqueue(deviceId, job, options);
+      if (!cancelled && addressMethodsSent().length === 1) {
+        cancelled = true;
+        expect(queue.getActiveJob()).toBeNull();
+        adapter.cancel('safe-7');
+      }
+      return result;
+    };
+
+    const result = await adapter.allNetworkGetAddress('safe-7', 'trezor-device-uuid-abc', {
+      useEmptyPassphrase: true,
+      bundle: [
+        {
+          network: 'eth',
+          methodName: 'evmGetAddress',
+          path: "m/44'/60'/0'/0/0",
+          showOnDevice: false,
+        },
+        {
+          network: 'sol',
+          methodName: 'solGetAddress',
+          path: "m/44'/501'/0'/0'",
+          showOnDevice: false,
+        },
+        {
+          network: 'tron',
+          methodName: 'tronGetAddress',
+          path: "m/44'/195'/0'/0/0",
+          showOnDevice: false,
+        },
+      ],
+    });
+
+    expect(cancelled).toBe(true);
+    expect(addressMethodsSent()).toEqual(['evmGetAddress']);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.payload.code).toBe(HardwareErrorCode.UserAborted);
+    }
+  });
+
+  it('allNetworkGetAddress stops the bundle when cancel lands while a chain is running', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    await adapter.connectDevice('safe-7');
+
+    const methodsSent: string[] = [];
+    (connector.call as CallMock).mockImplementation((_sessionId, method) => {
+      methodsSent.push(method);
+      if (method === 'getFeatures') {
+        return Promise.resolve({ device_id: 'trezor-device-uuid-abc' });
+      }
+      if (method === '__thpCreateSession') {
+        return Promise.resolve({ protocol: 'thp', thpSessionId: 'session-empty' });
+      }
+      if (method === 'tronGetAddress') {
+        // The user hits cancel with the last chain already on the device: the
+        // job is active, so this is not the queue-gap case — the item comes
+        // back aborted and the bundle must report that, not a partial success.
+        adapter.cancel('safe-7');
+      }
+      return Promise.resolve({ address: `0x${methodsSent.length}`, path: "m/44'/60'/0'/0/0" });
+    });
+
+    const result = await adapter.allNetworkGetAddress('safe-7', 'trezor-device-uuid-abc', {
+      useEmptyPassphrase: true,
+      bundle: [
+        {
+          network: 'eth',
+          methodName: 'evmGetAddress',
+          path: "m/44'/60'/0'/0/0",
+          showOnDevice: false,
+        },
+        {
+          network: 'sol',
+          methodName: 'solGetAddress',
+          path: "m/44'/501'/0'/0'",
+          showOnDevice: false,
+        },
+        {
+          network: 'tron',
+          methodName: 'tronGetAddress',
+          path: "m/44'/195'/0'/0/0",
+          showOnDevice: false,
+        },
+      ],
+    });
+
+    expect(methodsSent).toContain('tronGetAddress');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.payload.code).toBe(HardwareErrorCode.UserAborted);
+    }
+  });
+
+  it('allNetworkGetAddress reports a cancel that lands before the last item attaches identity', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    await adapter.connectDevice('safe-7');
+
+    const methodsSent: string[] = [];
+    (connector.call as CallMock).mockImplementation((_sessionId, method) => {
+      methodsSent.push(method);
+      if (method === 'getFeatures') {
+        return Promise.resolve({ device_id: 'trezor-device-uuid-abc' });
+      }
+      if (method === '__thpCreateSession') {
+        return Promise.resolve({ protocol: 'thp', thpSessionId: 'session-empty' });
+      }
+      return Promise.resolve({ address: '0xabc', path: "m/44'/60'/0'/0/0" });
+    });
+
+    // No deviceId anywhere, so the device_id the identity is attached from is
+    // fetched after the address call — another round trip, in another job, with
+    // a queue gap in front of it. The cancel below lands in that gap.
+    const queue = (adapter as unknown as { _jobQueue: DeviceJobQueue })._jobQueue;
+    type EnqueueFn = (
+      deviceId: string,
+      job: (signal: AbortSignal) => Promise<unknown>,
+      options?: unknown
+    ) => Promise<unknown>;
+    const realEnqueue = queue.enqueue.bind(queue) as EnqueueFn;
+    let cancelled = false;
+    (queue as unknown as { enqueue: EnqueueFn }).enqueue = async (deviceId, job, options) => {
+      const result = await realEnqueue(deviceId, job, options);
+      if (!cancelled) {
+        cancelled = true;
+        adapter.cancel('safe-7');
+      }
+      return result;
+    };
+
+    const result = await adapter.allNetworkGetAddress('safe-7', '', {
+      useEmptyPassphrase: true,
+      bundle: [
+        {
+          network: 'eth',
+          methodName: 'evmGetAddress',
+          path: "m/44'/60'/0'/0/0",
+          showOnDevice: false,
+        },
+      ],
+    });
+
+    expect(cancelled).toBe(true);
+    // The identity bootstrap never reached the device, and the bundle says so
+    // instead of returning a payload with one silently failed item.
+    expect(methodsSent).not.toContain('getFeatures');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.payload.code).toBe(HardwareErrorCode.UserAborted);
+    }
+  });
+
+  it('cancel() with nothing running still ends the queued job and an open scope', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    const queue = (adapter as unknown as { _jobQueue: DeviceJobQueue })._jobQueue;
+    const scope = queue.createCancelScope('safe-7');
+
+    let queuedRan = false;
+    const queuedOutcome = queue
+      .enqueue('safe-7', async () => {
+        queuedRan = true;
+      })
+      .catch((error: unknown) => error);
+
+    // The queue starts a job a microtask later, so nothing is active yet and
+    // cancel() has no job id to route by — it takes its untargeted path.
+    expect(queue.getActiveJob()).toBeNull();
+    adapter.cancel();
+
+    expect(scope.signal.aborted).toBe(true);
+    await expect(queuedOutcome).resolves.toMatchObject({
+      code: HardwareErrorCode.UserAborted,
+    });
+    expect(queuedRan).toBe(false);
+    scope.release();
+  });
+
+  it('cancel() ends the active job, the job queued behind it and an open scope', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    const queue = (adapter as unknown as { _jobQueue: DeviceJobQueue })._jobQueue;
+    const scope = queue.createCancelScope('safe-7');
+
+    let activeSignal: AbortSignal | undefined;
+    let releaseActive = (): void => undefined;
+    const activeStarted = new Promise<void>(resolveStarted => {
+      void queue
+        .enqueue('safe-7', async signal => {
+          activeSignal = signal;
+          resolveStarted();
+          await new Promise<void>(resolveJob => {
+            releaseActive = resolveJob;
+          });
+        })
+        .catch(() => undefined);
+    });
+    await activeStarted;
+
+    let queuedRan = false;
+    const queuedOutcome = queue
+      .enqueue('safe-7', async () => {
+        queuedRan = true;
+      })
+      .catch((error: unknown) => error);
+
+    adapter.cancel();
+
+    expect(activeSignal?.aborted).toBe(true);
+    expect(scope.signal.aborted).toBe(true);
+    releaseActive();
+    await expect(queuedOutcome).resolves.toMatchObject({
+      code: HardwareErrorCode.UserAborted,
+    });
+    expect(queuedRan).toBe(false);
+    scope.release();
+  });
+
+  it('cancel() leaves no trace when the named operation has already ended', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    const connected = await adapter.connectDevice('safe-7');
+    expect(connected.success).toBe(true);
+    if (!connected.success) return;
+    await adapter.releaseOperation(connected.payload);
+
+    const queue = (adapter as unknown as { _jobQueue: DeviceJobQueue })._jobQueue;
+    const scope = queue.createCancelScope('safe-7');
+    const uiRegistry = (adapter as unknown as { _uiRegistry: { cancel: () => void } })._uiRegistry;
+    const uiRegistryCancel = jest.spyOn(uiRegistry, 'cancel');
+    (connector.uiResponse as jest.Mock).mockClear();
+
+    // Naming a finished operation cancels nothing: not an unrelated job on the
+    // same device, and not whatever UI request someone else is waiting on.
+    adapter.cancel(connected.payload);
+
+    expect(scope.signal.aborted).toBe(false);
+    expect(uiRegistryCancel).not.toHaveBeenCalled();
+    expect(connector.uiResponse).not.toHaveBeenCalled();
+    scope.release();
+  });
+
+  it('allNetworkGetAddress opens its cancel scope under the key its items queue under', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    await adapter.connectDevice('safe-7');
+    (connector.call as CallMock).mockImplementation((_sessionId, method) => {
+      if (method === 'getFeatures') {
+        return Promise.resolve({ device_id: 'trezor-device-uuid-abc' });
+      }
+      if (method === '__thpCreateSession') {
+        return Promise.resolve({ protocol: 'thp', thpSessionId: 'session-empty' });
+      }
+      return Promise.resolve({ address: '0xabc', path: "m/44'/60'/0'/0/0" });
+    });
+
+    const queue = (adapter as unknown as { _jobQueue: DeviceJobQueue })._jobQueue;
+    const enqueue = jest.spyOn(queue, 'enqueue');
+    const createCancelScope = jest.spyOn(queue, 'createCancelScope');
+
+    const result = await adapter.allNetworkGetAddress('safe-7', 'trezor-device-uuid-abc', {
+      useEmptyPassphrase: true,
+      bundle: [
+        {
+          network: 'eth',
+          methodName: 'evmGetAddress',
+          path: "m/44'/60'/0'/0/0",
+          showOnDevice: false,
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    const expectedKey = trezorQueueKey({ connectId: 'safe-7' });
+    expect(createCancelScope).toHaveBeenCalledWith(expectedKey);
+    expect(enqueue).toHaveBeenCalled();
+    for (const call of enqueue.mock.calls) {
+      expect(call[0]).toBe(expectedKey);
+    }
+  });
+
+  it('derives the same queue key for an operation, a connectId and neither', () => {
+    expect(trezorQueueKey({ operationId: 'op-1', connectId: 'safe-7' })).toBe('op-1');
+    expect(trezorQueueKey({ connectId: 'safe-7' })).toBe('safe-7');
+    expect(trezorQueueKey({})).toBe('');
   });
 
   it('allNetworkGetAddress aborts the single-chain bundle on DevicePathForbidden without extra round-trips', async () => {
