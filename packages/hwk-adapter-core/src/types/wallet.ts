@@ -552,6 +552,21 @@ export interface IWalletStateMethods {
   ): Promise<Response<string | null>>;
 }
 
+/**
+ * What a `cancel()` actually reaches on this vendor.
+ *
+ * - `stops-waiting`: the caller stops waiting and the adapter drops the
+ *   response, but a confirmation screen already on the device stays up until
+ *   the user answers it or the device times out.
+ * - `interrupts-device`: the command on the wire is genuinely withdrawn.
+ *
+ * No vendor here reports `interrupts-device`: none of the three can retract a
+ * prompt the device is already showing. The distinction exists so a host can
+ * say "we stopped waiting, answer or reject on the device" instead of claiming
+ * the operation was cancelled.
+ */
+export type CancelCapability = 'interrupts-device' | 'stops-waiting';
+
 export interface IHardwareWallet<TConfig = unknown>
   extends IEvmMethods,
     IBtcMethods,
@@ -561,6 +576,8 @@ export interface IHardwareWallet<TConfig = unknown>
     IWalletStateMethods {
   readonly vendor: string;
   readonly activeTransport: TransportType | null;
+  /** What `cancel()` reaches on this vendor. Declared, never inferred. */
+  readonly cancelCapability: CancelCapability;
 
   init(config: TConfig): Promise<void>;
   dispose(): Promise<void>;
