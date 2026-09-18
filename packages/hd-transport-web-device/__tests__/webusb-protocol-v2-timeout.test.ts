@@ -238,9 +238,15 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     webusb.resetConnectionAfterProbe = jest.fn();
     await webusb.rotateProtocolV2UsbGeneration(path, 'test connection');
 
-    await expect(webusb.callProtocolV2(path, 'Ping', { message: 'read-error' })).rejects.toThrow(
-      'NetworkError'
-    );
+    await expect(
+      webusb.callProtocolV2(path, 'Ping', { message: 'read-error' })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BridgeDeviceDisconnected,
+      params: {
+        operation: 'transferIn',
+        nativeErrorMessage: 'NetworkError: transferIn device disconnected',
+      },
+    });
 
     expect(webusb.readProtocolV2UsbPacket).toHaveBeenCalledTimes(1);
     expect(webusb.resetProtocolV2UsbNativeLink).toHaveBeenCalledWith(
