@@ -68,6 +68,7 @@ import type {
   BtcSignature,
   BtcSignedPsbt,
   BtcSignedTx,
+  CancelScopeHandle,
   ChainCapability,
   ChainForFingerprint,
   ConnectionTarget,
@@ -140,6 +141,17 @@ function getKeystoneJobId(connectId?: string, deviceId?: string): string {
   return isHardwareOperationId(connectId)
     ? connectId
     : deviceId || connectId || COLD_START_JOB_LABEL;
+}
+
+/** UserAborted is a top-level abort code, so this ends the bundle. */
+function buildCancelledFailure<T>(signal: AbortSignal): Response<T> {
+  const reason = signal.reason as { code?: unknown; message?: unknown } | undefined;
+  const code =
+    typeof reason?.code === 'number'
+      ? (reason.code as HardwareErrorCode)
+      : HardwareErrorCode.UserAborted;
+  const message = typeof reason?.message === 'string' ? reason.message : '';
+  return failure(code, message || 'All-network get-address cancelled');
 }
 
 const BIP44_COIN_TYPE_TO_CHAIN: Record<number, ChainCapability> = {
@@ -699,6 +711,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     if (!operationTarget.success) return operationTarget;
     const effectiveConnectId = operationTarget.payload.targetId ?? '';
     const { operationId } = operationTarget.payload;
+    let cancelScope: CancelScopeHandle | undefined;
     try {
       const prefetched = await this._prefetchAllNetworkAccounts(
         effectiveConnectId,
@@ -710,11 +723,24 @@ export class KeystoneAdapter implements IHardwareWallet {
       // just established the wallet identity, so route the per-item calls to
       // it instead of resolving an empty target and re-syncing per item.
       const itemDeviceId = deviceId || prefetched.walletId || '';
+      // The QR branch answers the whole bundle inside the prefetch job, which
+      // its own signal already covers. Per-item calls enqueue one job each, so
+      // a cancel between two of them finds nothing to abort; the scope carries
+      // it across that gap, under the same key those jobs queue under.
+      const scope = this._jobQueue.createCancelScope(
+        getKeystoneJobId(effectiveConnectId, itemDeviceId)
+      );
+      cancelScope = scope;
+      const cancelledIndexes = new Set<number>();
       return await runAllNetworkGetAddress({
         connectId: effectiveConnectId,
         deviceId: itemDeviceId,
         params,
-        callItem: async ({ method, item }) => {
+        callItem: async ({ method, item, index }) => {
+          if (scope.signal.aborted) {
+            cancelledIndexes.add(index);
+            return buildCancelledFailure(scope.signal);
+          }
           const commonArgs = {
             path: item.path,
             showOnDevice: item.showOnDevice,
@@ -756,9 +782,14 @@ export class KeystoneAdapter implements IHardwareWallet {
             },
           });
         },
+        // Only our own gap check ends the bundle; every other per-item failure
+        // keeps its existing "carry on with the next chain" behaviour.
+        shouldAbortBundle: (_response, { index }) => cancelledIndexes.has(index),
       });
     } catch (err) {
       return this._errorToFailure<AllNetworkAddressResponse[]>(err);
+    } finally {
+      cancelScope?.release();
     }
   };
 
