@@ -675,6 +675,10 @@ describe('KeystoneAdapter', () => {
         'qr-hardware-call',
         'eth-sign-request',
       ]);
+      const signRequest = fake.requests.find(r => r.data.urType === 'eth-sign-request');
+      expect(
+        EthSignRequest.fromCBOR(Buffer.from(signRequest?.data.urData ?? '', 'hex')).getOrigin()
+      ).toBe('OneKey');
     });
 
     it("signs the dApp's original EIP-712 bytes when dataJson is supplied", async () => {
@@ -843,6 +847,12 @@ describe('KeystoneAdapter', () => {
         'qr-hardware-call',
         'sol-sign-request',
       ]);
+      // sol.generateSignRequest has no config-level origin fallback, so this
+      // regresses to a missing origin if the adapter stops forwarding it.
+      const signRequest = fake.requests.find(r => r.data.urType === 'sol-sign-request');
+      expect(
+        SolSignRequest.fromCBOR(Buffer.from(signRequest?.data.urData ?? '', 'hex')).getOrigin()
+      ).toBe('OneKey');
     });
   });
 
@@ -1047,6 +1057,9 @@ describe('KeystoneAdapter', () => {
       const decoded = TronSignRequest.fromCBOR(Buffer.from(signRequest.data.urData, 'hex'));
       expect(decoded.getSignType()).toBe(TronSignType.PersonalMessage);
       expect(decoded.getSignData().toString('utf8')).toBe('hello tron');
+      // TronSignRequest only writes origin when truthy, so this regresses to a
+      // missing origin if the adapter stops forwarding it.
+      expect(decoded.getOrigin()).toBe('OneKey');
     });
 
     it.each([undefined, 'V1'] as const)(
@@ -1084,6 +1097,10 @@ describe('KeystoneAdapter', () => {
         'qr-hardware-call',
         'tron-sign-request',
       ]);
+      const signRequest = fake.requests.find(r => r.data.urType === 'tron-sign-request');
+      expect(
+        TronSignRequest.fromCBOR(Buffer.from(signRequest?.data.urData ?? '', 'hex')).getOrigin()
+      ).toBe('OneKey');
     });
 
     it('rejects a call with no rawTxHex — Keystone has no structured-field equivalent', async () => {
