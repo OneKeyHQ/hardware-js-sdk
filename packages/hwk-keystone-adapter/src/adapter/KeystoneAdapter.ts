@@ -22,8 +22,10 @@ import {
   getAllNetworkMethodChain,
   hasHardwareRuntimeIdPrefix,
   isAllNetworkMethodName,
+  isConnectionLost,
   isHardwareOperationId,
   isHwkRecoveryHint,
+  isUserRefusal,
   operationMayHaveCompletedParams,
   parseBip32MasterFingerprint,
   rehydrateConnectorError,
@@ -36,7 +38,6 @@ import {
 import { KeystoneUrEngine } from '../urEngine/KeystoneUrEngine';
 import { TronSignType } from '../urEngine/TronSignRequest';
 import {
-  KEYSTONE_WALLET_CONNECT_ID_PREFIX,
   KEYSTONE_WALLET_ID_PATH,
   accountKey,
   createDeviceRecord,
@@ -51,6 +52,12 @@ import {
   normalizePath,
   splitAccountPath,
 } from './pathUtils';
+import {
+  KEYSTONE_COLD_START_JOB_LABEL,
+  keystoneCancelQueueKeys,
+  keystoneQueueKey,
+  keystoneWalletIdFromIdentifier,
+} from '../utils/queueKey';
 
 import type { KeystoneParsedMultiAccounts, KeystoneUr } from '../urEngine/types';
 import type { KeystoneAccountEntry, KeystoneDeviceRecord } from './deviceTable';
@@ -115,8 +122,6 @@ import type {
 /** Key material for one operation, keyed by `accountKey()`; never retained. */
 type AccountBook = Map<string, KeystoneAccountEntry>;
 
-const COLD_START_JOB_LABEL = 'keystone-cold-start';
-
 // Keystone briefly leaves the USB bus while entering external-wallet mode.
 // A persisted-wallet call can therefore race the macOS/Chromium re-enumeration
 // and must not fall back to QR after a single empty snapshot.
@@ -135,12 +140,6 @@ function waitForKeystoneUsbReattachProbe(): Promise<void> {
   return new Promise(resolve => {
     setTimeout(resolve, KEYSTONE_USB_REATTACH_PROBE_INTERVAL_MS);
   });
-}
-
-function getKeystoneJobId(connectId?: string, deviceId?: string): string {
-  return isHardwareOperationId(connectId)
-    ? connectId
-    : deviceId || connectId || COLD_START_JOB_LABEL;
 }
 
 /** UserAborted is a top-level abort code, so this ends the bundle. */
@@ -594,16 +593,11 @@ export class KeystoneAdapter implements IHardwareWallet {
       // An operation-scoped call queues under its operation id, so cancelling by
       // the raw connectId alone never reaches it. Cancel every queue key this
       // identifier can stand for, and always clear the pending UI requests.
-      const queueKeys = new Set<string>();
-      const addIdentifier = (identifier: string | undefined): void => {
-        if (!identifier) return;
-        queueKeys.add(identifier);
-        const walletId = this._walletIdFromIdentifier(identifier);
-        if (walletId) queueKeys.add(walletId);
-      };
-      addIdentifier(connectId);
-      addIdentifier(this._operationRoutes.get(connectId)?.operationId);
-      addIdentifier(namedOperationConnectId);
+      const queueKeys = keystoneCancelQueueKeys([
+        connectId,
+        this._operationRoutes.get(connectId)?.operationId,
+        namedOperationConnectId,
+      ]);
       for (const key of queueKeys) {
         this._jobQueue.cancelActiveAndPending(key, reason);
       }
@@ -669,7 +663,7 @@ export class KeystoneAdapter implements IHardwareWallet {
 
   async importFromQr(options: ImportFromQrOptions = {}): Promise<Response<DeviceInfo>> {
     try {
-      return await this._jobQueue.enqueue(COLD_START_JOB_LABEL, async signal => {
+      return await this._jobQueue.enqueue(KEYSTONE_COLD_START_JOB_LABEL, async signal => {
         const displayDevice = placeholderDeviceInfo();
         let responseUr: KeystoneUr;
 
@@ -728,7 +722,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       // a cancel between two of them finds nothing to abort; the scope carries
       // it across that gap, under the same key those jobs queue under.
       const scope = this._jobQueue.createCancelScope(
-        getKeystoneJobId(effectiveConnectId, itemDeviceId)
+        keystoneQueueKey(effectiveConnectId, itemDeviceId)
       );
       cancelScope = scope;
       const cancelledIndexes = new Set<number>();
@@ -782,9 +776,13 @@ export class KeystoneAdapter implements IHardwareWallet {
             },
           });
         },
-        // Only our own gap check ends the bundle; every other per-item failure
-        // keeps its existing "carry on with the next chain" behaviour.
-        shouldAbortBundle: (_response, { index }) => cancelledIndexes.has(index),
+        // The gap check plus the shared top-level table: a refusal or a lost
+        // session ends the batch, every other per-item failure keeps its
+        // existing "carry on with the next chain" behaviour.
+        shouldAbortBundle: (response, { index }) => {
+          const { code } = response.payload ?? {};
+          return cancelledIndexes.has(index) || isUserRefusal(code) || isConnectionLost(code);
+        },
       });
     } catch (err) {
       return this._errorToFailure<AllNetworkAddressResponse[]>(err);
@@ -821,7 +819,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         const { account } = await this._fetchAccount(
           connectId,
           deviceId,
@@ -881,7 +879,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     const path = normalizePath(params.path);
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         // Signing only needs the wallet's mfp (the device re-derives the
         // signing key itself from path+xfp) — not a cached xpub for this
         // exact path, so this must NOT key off the leaf path the way
@@ -951,7 +949,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     const path = normalizePath(params.path);
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         // Signing only needs the wallet's mfp (the device re-derives the
         // signing key itself from path+xfp) — not a cached xpub for this
         // exact path, so this must NOT key off the leaf path the way
@@ -1021,7 +1019,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     const path = normalizePath(params.path);
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         // Signing only needs the wallet's mfp (the device re-derives the
         // signing key itself from path+xfp) — not a cached xpub for this
         // exact path, so this must NOT key off the leaf path the way
@@ -1107,7 +1105,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         const { account } = await this._fetchAccount(
           connectId,
           deviceId,
@@ -1174,7 +1172,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         const { account } = await this._fetchAccount(
           connectId,
           deviceId,
@@ -1239,7 +1237,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         // A PSBT can span multiple inputs/paths — there's no single leaf path
         // to scope a sync to, so this only needs the wallet's mfp to be known.
         const { record } = await this._ensureWalletKnown(connectId, deviceId, 'btc', signal);
@@ -1290,7 +1288,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         const { record } = await this._ensureWalletKnown(connectId, deviceId, 'btc', signal);
         KeystoneAdapter._throwIfAborted(signal);
 
@@ -1329,7 +1327,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         const { record } = await this._ensureWalletKnown(connectId, deviceId, 'btc', signal);
         return success({ masterFingerprint: record.masterFingerprint });
       });
@@ -1359,7 +1357,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     const path = normalizePath(params.path);
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         const { account } = await this._fetchAccount(connectId, deviceId, 'sol', path, signal, {
           book,
         });
@@ -1396,7 +1394,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     const path = normalizePath(params.path);
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         // Same reasoning as evmSignTransaction — signing needs only the mfp.
         const { record } = await this._ensureWalletKnown(connectId, deviceId, 'sol', signal);
         KeystoneAdapter._throwIfAborted(signal);
@@ -1448,7 +1446,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     const path = normalizePath(params.path);
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         // Same reasoning as evmSignTransaction — signing needs only the mfp.
         const { record } = await this._ensureWalletKnown(connectId, deviceId, 'sol', signal);
         KeystoneAdapter._throwIfAborted(signal);
@@ -1513,7 +1511,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         const { account } = await this._fetchAccount(
           connectId,
           deviceId,
@@ -1565,7 +1563,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     const path = normalizePath(params.path);
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         const { record } = await this._ensureWalletKnown(connectId, deviceId, 'tron', signal);
         KeystoneAdapter._throwIfAborted(signal);
 
@@ -1627,7 +1625,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     const path = normalizePath(params.path);
 
     try {
-      return await this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+      return await this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
         const { record } = await this._ensureWalletKnown(connectId, deviceId, 'tron', signal);
         KeystoneAdapter._throwIfAborted(signal);
 
@@ -1663,10 +1661,7 @@ export class KeystoneAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
 
   private _walletIdFromIdentifier(identifier: string): string | undefined {
-    const value = identifier.startsWith(KEYSTONE_WALLET_CONNECT_ID_PREFIX)
-      ? identifier.slice(KEYSTONE_WALLET_CONNECT_ID_PREFIX.length)
-      : identifier;
-    return /^[0-9a-f]{64}$/i.test(value) ? value.toLowerCase() : undefined;
+    return keystoneWalletIdFromIdentifier(identifier);
   }
 
   private _allNetworkSyncSchema(
@@ -1709,7 +1704,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceId: string,
     params: AllNetworkGetAddressParams
   ): Promise<{ book: AccountBook; walletId?: string }> {
-    return this._jobQueue.enqueue(getKeystoneJobId(connectId, deviceId), async signal => {
+    return this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
       const target = this._resolveTarget(connectId, deviceId);
       const { record: targetRecord } = target;
       let record = targetRecord;

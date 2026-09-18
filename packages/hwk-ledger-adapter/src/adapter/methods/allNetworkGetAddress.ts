@@ -1,6 +1,8 @@
 import {
   HardwareErrorCode,
   failure,
+  isConnectionLost,
+  isUserRefusal,
   resolveHardwareOperationTarget,
   runAllNetworkGetAddress,
 } from '@onekeyfe/hwk-adapter-core';
@@ -204,17 +206,9 @@ function isTopLevelAllNetworkFailure(response: AllNetworkAddressResponse): boole
     return false;
   }
   const code = response.payload?.code;
-  // User said "no" — SDK-dialog cancel and on-device reject both end the batch.
-  return (
-    code === HardwareErrorCode.DeviceMismatch ||
-    code === HardwareErrorCode.DeviceDisconnected ||
-    code === HardwareErrorCode.OperationTimeout ||
-    code === HardwareErrorCode.TransportError ||
-    code === HardwareErrorCode.OperationEnded ||
-    code === HardwareErrorCode.OperationNotFound ||
-    code === HardwareErrorCode.UserAborted ||
-    code === HardwareErrorCode.UserRejected
-  );
+  // DeviceMismatch is Ledger-only: the rest of the bundle would derive against
+  // a device the caller did not ask for.
+  return code === HardwareErrorCode.DeviceMismatch || isUserRefusal(code) || isConnectionLost(code);
 }
 
 function getItemDeviceId(item: AllNetworkAddressParams): string | undefined {

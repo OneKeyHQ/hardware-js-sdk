@@ -12,8 +12,10 @@ import {
   createHwkError,
   defaultOriginForCode,
   failure,
+  isConnectionLost,
   isHardwareOperationId,
   isHwkRecoveryHint,
+  isUserRefusal,
   operationMayHaveCompletedParams,
   rehydrateConnectorError,
   requestBleDeviceSelection,
@@ -1052,23 +1054,13 @@ export class TrezorAdapter implements IHardwareWallet {
             response.payload?.code === HardwareErrorCode.DevicePathForbidden;
           const isPassphrasePolicyFailure =
             response.payload?.code === HardwareErrorCode.PassphraseAlwaysOnDevice;
-          // User said "no" — SDK-dialog cancel and on-device reject both end
-          // the batch instead of prompting for the next chain.
-          const isUserRefusal =
-            response.payload?.code === HardwareErrorCode.UserAborted ||
-            response.payload?.code === HardwareErrorCode.UserRejected;
-          const isConnectionLost =
-            response.payload?.code === HardwareErrorCode.DeviceDisconnected ||
-            response.payload?.code === HardwareErrorCode.OperationTimeout ||
-            response.payload?.code === HardwareErrorCode.TransportError ||
-            response.payload?.code === HardwareErrorCode.OperationEnded ||
-            response.payload?.code === HardwareErrorCode.OperationNotFound;
+          const { code } = response.payload ?? {};
           return (
             isSessionLevelFailure ||
             isWholeChainForbidden ||
             isPassphrasePolicyFailure ||
-            isUserRefusal ||
-            isConnectionLost
+            isUserRefusal(code) ||
+            isConnectionLost(code)
           );
         },
       });
