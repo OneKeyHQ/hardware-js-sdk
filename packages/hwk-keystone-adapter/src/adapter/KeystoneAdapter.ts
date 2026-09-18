@@ -44,6 +44,7 @@ import {
   deriveKeystoneWalletId,
   placeholderDeviceInfo,
   toDeviceInfo,
+  walletConnectId,
 } from './deviceTable';
 import {
   KEYSTONE_BTC_ACCOUNT_FORBIDDEN_MESSAGE,
@@ -608,10 +609,14 @@ export class KeystoneAdapter implements IHardwareWallet {
       }
       // A named cancel clears only the prompts its own operation opened, so
       // cancelling one QR flow no longer rejects another operation's scan.
+      // Named but unresolvable clears nothing: falling through to the
+      // untargeted form is what a named cancel must not do.
       const scopedOperationId = isHardwareOperationId(connectId)
         ? connectId
-        : this._operationRoutes.get(connectId)?.operationId;
-      this._uiRegistry.cancel(undefined, undefined, scopedOperationId);
+        : this._operationRouteForIdentifier(connectId)?.operationId;
+      if (scopedOperationId) {
+        this._uiRegistry.cancel(undefined, undefined, scopedOperationId);
+      }
     } else {
       // Nothing to name: teardown clears every waiter.
       this._jobQueue.cancelActiveAndPending(undefined, reason);
@@ -680,17 +685,18 @@ export class KeystoneAdapter implements IHardwareWallet {
         let responseUr: KeystoneUr;
 
         if (options.mode === 'scan') {
-          responseUr = await this._requestQrScanAndAwaitResponse(displayDevice);
+          responseUr = await this._requestQrScanAndAwaitResponse(displayDevice, signal);
         } else {
           // Identity only; key material is never retained.
           const requestUr = this.urEngine.buildKeyDerivationRequest({
             schemas: [{ path: KEYSTONE_WALLET_ID_PATH, curve: 'secp256k1' }],
             origin: this._origin,
           });
-          responseUr = await this._requestQrDisplayAndAwaitResponse(displayDevice, {
-            ...requestUr,
-            animated: false,
-          });
+          responseUr = await this._requestQrDisplayAndAwaitResponse(
+            displayDevice,
+            { ...requestUr, animated: false },
+            signal
+          );
         }
         KeystoneAdapter._throwIfAborted(signal);
 
@@ -1818,7 +1824,8 @@ export class KeystoneAdapter implements IHardwareWallet {
       });
       const responseUr = await this._requestQrDisplayAndAwaitResponse(
         record ? toDeviceInfo(record) : placeholderDeviceInfo(),
-        { ...requestUr, animated: false }
+        { ...requestUr, animated: false },
+        signal
       );
       KeystoneAdapter._throwIfAborted(signal);
 
@@ -2284,10 +2291,11 @@ export class KeystoneAdapter implements IHardwareWallet {
         usbErrorOrigin !== 'device'
       ) {
         const displayDevice = toDeviceInfo(record);
-        return this._requestQrDisplayAndAwaitResponse(displayDevice, {
-          ...requestUr,
-          animated,
-        });
+        return this._requestQrDisplayAndAwaitResponse(
+          displayDevice,
+          { ...requestUr, animated },
+          signal
+        );
       }
       // Deliberately does NOT retry over QR. By this point the request has
       // been put on the wire and the device may well be mid-operation —
@@ -2360,10 +2368,11 @@ export class KeystoneAdapter implements IHardwareWallet {
 
     const displayDevice = record ? toDeviceInfo(record) : placeholderDeviceInfo();
     try {
-      return await this._requestQrDisplayAndAwaitResponse(displayDevice, {
-        ...requestUr,
-        animated,
-      });
+      return await this._requestQrDisplayAndAwaitResponse(
+        displayDevice,
+        { ...requestUr, animated },
+        signal
+      );
     } catch (error) {
       const { code, _tag: tag } = error as { code?: unknown; _tag?: unknown };
       if (
@@ -2540,18 +2549,60 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   /**
-   * The operation the running device job belongs to. A call pinned to an
-   * operation queues under its id (`keystoneQueueKey`), so this is how a UI
-   * request raised mid-call learns which operation it belongs to.
+   * The operation the running device job belongs to, so a UI request raised
+   * mid-call can name it. A call pinned to an operation queues under its id
+   * (`keystoneQueueKey`); a call without one queues under the wallet id or the
+   * wallet connectId, and the live operation routed to that connection is still
+   * the owner. Only a cold start comes back undefined.
    */
   private _activeOperationId(): string | undefined {
     const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
-    return isHardwareOperationId(activeJobId) ? activeJobId : undefined;
+    if (!activeJobId) return undefined;
+    if (isHardwareOperationId(activeJobId)) return activeJobId;
+    return this._operationRouteForIdentifier(activeJobId)?.operationId;
+  }
+
+  /** Routes are keyed by connectId; a job key may be the bare wallet id. */
+  private _operationRouteForIdentifier(
+    identifier: string
+  ): { operationId: string; connectionType: 'usb' | 'qr' } | undefined {
+    for (const key of keystoneCancelQueueKeys([identifier])) {
+      const route = this._operationRoutes.get(key);
+      if (route) return route;
+    }
+    const walletId = keystoneWalletIdFromIdentifier(identifier);
+    return walletId ? this._operationRoutes.get(walletConnectId(walletId)) : undefined;
+  }
+
+  /**
+   * A QR prompt has no transport to interrupt, so an aborted job would sit here
+   * until the QR timeout. Releasing the registry slot on abort is what lets a
+   * cancel reach the wait at all.
+   */
+  private async _awaitQrResponse<T>(
+    requestType: string,
+    pending: Promise<T>,
+    signal?: AbortSignal
+  ): Promise<T> {
+    if (!signal) return pending;
+    let settled = false;
+    const onAbort = () => {
+      if (!settled) this._uiRegistry.cancel(requestType);
+    };
+    if (signal.aborted) onAbort();
+    else signal.addEventListener('abort', onAbort, { once: true });
+    try {
+      return await pending;
+    } finally {
+      settled = true;
+      signal.removeEventListener('abort', onAbort);
+    }
   }
 
   private async _requestQrDisplayAndAwaitResponse(
     device: DeviceInfo,
-    data: QrDisplayData
+    data: QrDisplayData,
+    signal?: AbortSignal
   ): Promise<KeystoneUr> {
     const operationId = this._activeOperationId();
     const waitPromise = this._uiRegistry.wait<{ urType: string; urData: string }>(
@@ -2562,11 +2613,18 @@ export class KeystoneAdapter implements IHardwareWallet {
       type: UI_REQUEST.REQUEST_QR_DISPLAY,
       payload: { device, data, operationId },
     });
-    const response = await waitPromise;
+    const response = await this._awaitQrResponse(
+      UI_REQUEST.REQUEST_QR_DISPLAY,
+      waitPromise,
+      signal
+    );
     return { urType: response.urType, urData: response.urData };
   }
 
-  private async _requestQrScanAndAwaitResponse(device: DeviceInfo): Promise<KeystoneUr> {
+  private async _requestQrScanAndAwaitResponse(
+    device: DeviceInfo,
+    signal?: AbortSignal
+  ): Promise<KeystoneUr> {
     const operationId = this._activeOperationId();
     const waitPromise = this._uiRegistry.wait<{ urType: string; urData: string }>(
       UI_REQUEST.REQUEST_QR_SCAN,
@@ -2576,7 +2634,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       type: UI_REQUEST.REQUEST_QR_SCAN,
       payload: { device, operationId },
     });
-    const response = await waitPromise;
+    const response = await this._awaitQrResponse(UI_REQUEST.REQUEST_QR_SCAN, waitPromise, signal);
     return { urType: response.urType, urData: response.urData };
   }
 
