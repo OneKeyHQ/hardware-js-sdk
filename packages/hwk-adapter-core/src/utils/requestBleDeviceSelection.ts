@@ -34,6 +34,7 @@ export async function requestBleDeviceSelection({
     });
   }
   const requestId = registry.createRequestId();
+  const { operationId } = request;
   let devices = allowUsbFallback
     ? request.devices.filter(device => device.connectionType === 'ble')
     : request.devices;
@@ -53,7 +54,9 @@ export async function requestBleDeviceSelection({
       if (stopped) resolve();
     });
   const cancel = () => registry.cancel(type, requestId);
-  const reply = registry.wait<{ sdkConnectId: string }>(type, { requestId }).finally(stop);
+  const reply = registry
+    .wait<{ sdkConnectId: string }>(type, { requestId, operationId })
+    .finally(stop);
   void reply.catch(() => undefined);
   const publish = () => {
     // UI replies can refer to a displayed snapshot while the next scan completes.
