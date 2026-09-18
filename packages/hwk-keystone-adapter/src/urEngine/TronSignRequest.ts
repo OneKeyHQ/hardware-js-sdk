@@ -76,6 +76,8 @@ export class TronSignRequest extends RegistryItem {
 
   getDerivationPath = (): string => this.derivationPath.getPath();
 
+  getOrigin = (): string | undefined => this.origin;
+
   toDataItem = (): DataItem => {
     const map: DataItemMap = {};
     if (this.requestId) {

@@ -8,13 +8,14 @@ import {
   PathComponent,
   QRHardwareCall,
   QRHardwareCallVersion,
+  extend,
 } from '@keystonehq/bc-ur-registry';
 import {
   ETHSignature,
   DataType as EthDataType,
   EthSignRequest,
 } from '@keystonehq/bc-ur-registry-eth';
-import { SolSignature } from '@keystonehq/bc-ur-registry-sol';
+import { SolSignRequest, SolSignature } from '@keystonehq/bc-ur-registry-sol';
 import HDKey from 'hdkey';
 
 import { KeystoneUrEngine } from '../urEngine/KeystoneUrEngine';
@@ -128,6 +129,7 @@ describe('KeystoneUrEngine', () => {
       const decoded = EthSignRequest.fromCBOR(Buffer.from(ur.urData, 'hex'));
       expect(decoded.getDataType()).toBe(EthDataType.typedTransaction);
       expect(decoded.getDerivationPath()).toBe("44'/60'/0'/0/0");
+      expect(decoded.getOrigin()).toBe('OneKey');
       expect(decoded.getSourceFingerprint().toString('hex')).toBe(FAKE_MFP_HEX);
       expect(decoded.getChainId()).toBe(1);
       expect(decoded.getSignData().toString('hex')).toBe('deadbeef');
@@ -233,6 +235,26 @@ describe('KeystoneUrEngine', () => {
     });
   });
 
+  describe('BTC message sign request', () => {
+    it('carries the origin through to the btc-sign-request UR', () => {
+      const ur = engine.buildBtcMessageSignRequest({
+        requestId: '2b5893f2-52e2-4ba8-9d5e-6c2b6f5f1c11',
+        messageHex: Buffer.from('hello').toString('hex'),
+        accounts: [{ path: "m/84'/0'/0'/0/0", xfp: FAKE_MFP_HEX }],
+        origin: 'OneKey',
+      });
+
+      expect(ur.urType).toBe('btc-sign-request');
+      // BtcSignRequest key 6 is `origin` (bc-ur-registry-btc); decoded via the
+      // shared CBOR helper to avoid taking a direct dependency on that package.
+      const decodedMap = extend.decodeToDataItem(Buffer.from(ur.urData, 'hex')).getData() as Record<
+        number,
+        unknown
+      >;
+      expect(decodedMap[6]).toBe('OneKey');
+    });
+  });
+
   describe('SOL sign request / signature round trip', () => {
     it('builds a sol-sign-request UR and parses its signature back', () => {
       const ur = engine.buildSolSignRequest({
@@ -241,8 +263,12 @@ describe('KeystoneUrEngine', () => {
         dataType: 'transaction',
         path: "m/44'/501'/0'/0'",
         xfp: FAKE_MFP_HEX,
+        origin: 'OneKey',
       });
       expect(ur.urType).toBe('sol-sign-request');
+      // `sol.generateSignRequest` has no config-level origin fallback (unlike
+      // eth/btc), so an unset input here would silently ship no origin at all.
+      expect(SolSignRequest.fromCBOR(Buffer.from(ur.urData, 'hex')).getOrigin()).toBe('OneKey');
 
       const requestId = Buffer.from('2b5893f252e24ba89d5e6c2b6f5f1c11', 'hex');
       const signature = new SolSignature(Buffer.alloc(64, 0x07), requestId);
@@ -260,12 +286,16 @@ describe('KeystoneUrEngine', () => {
         rawTxHex: 'deadbeef',
         path: "m/44'/195'/0'/0/0",
         xfp: FAKE_MFP_HEX,
+        origin: 'OneKey',
       });
 
       expect(ur.urType).toBe('tron-sign-request');
       const decoded = TronSignRequest.fromCBOR(Buffer.from(ur.urData, 'hex'));
       expect(decoded.getSignData().toString('hex')).toBe('deadbeef');
       expect(decoded.getDerivationPath()).toBe("44'/195'/0'/0/0");
+      // TronSignRequest.toDataItem() only writes the origin key when it's
+      // truthy, so an unset input would silently ship no origin at all.
+      expect(decoded.getOrigin()).toBe('OneKey');
 
       const requestId = Buffer.from('2b5893f252e24ba89d5e6c2b6f5f1c11', 'hex');
       const signature = new TronUrSignature(Buffer.alloc(65, 0x09), requestId);
