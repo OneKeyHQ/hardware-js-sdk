@@ -75,8 +75,7 @@ type NobleBleNativeError = Error & {
 export function createNobleBleConnectionError(error: NobleBleNativeError, messagePrefix = '') {
   const errorMessage = error.message;
   const isInvalidMacOsBond =
-    (error.nativeErrorCode === 14 && error.nativeErrorDomain === 'CBErrorDomain') ||
-    (error.nativeErrorCode === 15 && error.nativeErrorDomain === 'CBATTErrorDomain');
+    error.nativeErrorCode === 14 && error.nativeErrorDomain === 'CBErrorDomain';
   if (isInvalidMacOsBond) {
     const nativeErrorMessage = `${messagePrefix}${errorMessage}`;
     return ERRORS.TypedError(
@@ -2120,10 +2119,18 @@ async function subscribeNotifications(
       ms: Date.now() - subscribeStartedAt,
     });
   } catch (error) {
-    throw createNobleBleConnectionError(
-      error as NobleBleNativeError,
-      'Notification subscription failed: '
-    );
+    const nativeError = error as NobleBleNativeError;
+    if (
+      nativeError.nativeErrorCode === 15 &&
+      nativeError.nativeErrorDomain === 'CBATTErrorDomain'
+    ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.BleDeviceNotBonded,
+        HardwareErrorCodeMessage[HardwareErrorCode.BleDeviceNotBonded],
+        { nativeErrorMessage: `Notification subscription failed: ${nativeError.message}` }
+      );
+    }
+    throw createNobleBleConnectionError(nativeError, 'Notification subscription failed: ');
   } finally {
     // 🔒 CRITICAL: Always clear operation state (even on error)
     if (!disposing) subscriptionOperations.set(deviceId, 'idle');

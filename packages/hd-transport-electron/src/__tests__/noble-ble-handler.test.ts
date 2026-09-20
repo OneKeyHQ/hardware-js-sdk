@@ -68,7 +68,7 @@ describe('Electron Noble BLE device discovery', () => {
         })
       )
     ).toMatchObject({
-      errorCode: HardwareErrorCode.BleBondInvalid,
+      errorCode: HardwareErrorCode.BleConnectedError,
     });
     expect(createNobleBleConnectionError(new Error('connection failed'))).toMatchObject({
       errorCode: HardwareErrorCode.BleConnectedError,
@@ -705,7 +705,7 @@ describe('Electron Noble BLE device discovery', () => {
         type: 'NobleBleIpcError',
         success: false,
         error: {
-          errorCode: HardwareErrorCode.BleBondInvalid,
+          errorCode: HardwareErrorCode.BleDeviceNotBonded,
           params: {
             nativeErrorMessage: 'Notification subscription failed: Encryption is insufficient',
           },
