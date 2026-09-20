@@ -45,6 +45,14 @@ jest.mock('../BleManager', () => ({
   pairDevice: jest.fn(() => Promise.resolve({ bonded: true, bonding: false })),
 }));
 
+// The native facade is replaced wholesale above; key missing is covered by its own suite.
+jest.mock('../bleKeyMissing', () => ({
+  isBleKeyMissingSupported: jest.fn(() => false),
+  startBleKeyMissingTracking: jest.fn(() => false),
+  stopBleKeyMissingTracking: jest.fn(),
+  waitForBleKeyMissing: jest.fn(() => Promise.resolve(false)),
+}));
+
 jest.mock('../subscribeBleOn', () => ({
   subscribeBleOn: jest.fn(() => Promise.resolve()),
 }));

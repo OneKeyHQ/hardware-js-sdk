@@ -142,6 +142,23 @@ than repeating the message predicate.
 Map once inside the selected system. Do not translate between `hd-core` and `hwk` inside the SDK,
 and do not reclassify an already canonical error from its fallback message.
 
+### Android Key Missing
+
+Android 16+ keeps its side of a bond the device no longer has keys for (device wiped, bond
+removed) and reports it only through the `ACTION_KEY_MISSING` broadcast. GATT shows an ordinary
+peer disconnect, and the same status is reported when a device reboots, so the disconnect status
+must never be used as the classifier.
+
+`hd-transport-react-native` re-reads a link loss as `BleBondInvalid` only when the broadcast
+belongs to the same link attempt (`bleKeyMissing.ts`): matching device, received after that link
+started, and the failure within `ANDROID_KEY_MISSING_LINK_WINDOW_MS` of it. Without the signal,
+or on an OS or native build that cannot report it, the original error is kept unchanged.
+
+Android 17 first re-pairs by itself and broadcasts key missing only if that fails. A failed
+re-pair restores the old bond (`BONDING -> BONDED`) and a successful one replaces it
+(`BONDING -> NONE -> BONDING -> BONDED`), so a bond-state wait that joins a system-initiated
+bonding relies on key missing, not on the final state, to detect failure.
+
 ## Cross-Runtime Transport
 
 The legacy Core response path uses `serializeError()` through `createResponseMessage()`. HWK

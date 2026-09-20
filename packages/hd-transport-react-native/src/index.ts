@@ -47,6 +47,12 @@ import {
   getInfosForServiceUuid,
   isSameBleUuid,
 } from './constants';
+import {
+  isBleKeyMissingSupported,
+  startBleKeyMissingTracking,
+  stopBleKeyMissingTracking,
+  waitForBleKeyMissing,
+} from './bleKeyMissing';
 import { isNativeBleDisconnectError, toBleDisconnectHardwareError } from './bleNativeDisconnect';
 import {
   isBleStaleBondHardwareError,
@@ -186,6 +192,28 @@ const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
     code === HardwareErrorCode.BleCharacteristicNotifyError ||
     code === HardwareErrorCode.BleCharacteristicNotifyChangeFailure ||
     code === HardwareErrorCode.BleWriteCharacteristicError
+  );
+};
+/**
+ * Android reports a lost bond (ACTION_KEY_MISSING) while it encrypts a new link, so only
+ * a failure this soon after the link started can be explained by it. Later disconnects,
+ * such as a firmware-update reboot, must keep their own meaning.
+ */
+export const ANDROID_KEY_MISSING_LINK_WINDOW_MS = 10_000;
+/** The broadcast and the GATT disconnect it explains travel separately; either can land first. */
+export const ANDROID_KEY_MISSING_GRACE_MS = 500;
+/**
+ * How a link dropped by a device that refuses a stale bond reaches JS. A wedged write is
+ * excluded: the system is still re-pairing then and has not reported key missing yet.
+ */
+const isAndroidLinkLossError = (error: unknown): boolean => {
+  const code = (error as { errorCode?: unknown })?.errorCode;
+  return (
+    isNativeBleDisconnectError(error) ||
+    code === HardwareErrorCode.BleDeviceNotBonded ||
+    code === HardwareErrorCode.BleDeviceDisconnected ||
+    code === HardwareErrorCode.BleCharacteristicNotifyError ||
+    code === HardwareErrorCode.BleConnectedError
   );
 };
 /** Consecutive wedged writes on one device before the BLE manager itself is recreated. */
@@ -539,6 +567,9 @@ export default class ReactNativeBleTransport {
    * fails with ATT 5/15. Remember it so detectProtocol fails immediately.
    */
   private staleBondErrors: Map<string, Error> = new Map();
+
+  /** When the current Android link attempt began; bounds which key-missing signals apply. */
+  private androidLinkStartedAt: Map<string, number> = new Map();
 
   /** Strict or previously confirmed V2 target while acquire installs notifications. */
   private acquiringProtocolV2 = new Set<string>();
@@ -1055,7 +1086,13 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
     }
 
-    return this.runLifecycleOperation(uuid, () => this.acquireUnlocked(input));
+    return this.runLifecycleOperation(uuid, async () => {
+      try {
+        return await this.acquireUnlocked(input);
+      } catch (error) {
+        throw await this.resolveAndroidBondInvalid(uuid, error);
+      }
+    });
   }
 
   private async acquireUnlocked(input: FirmwareInstallBleAcquireInput) {
@@ -1166,11 +1203,17 @@ export default class ReactNativeBleTransport {
 
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     if (Platform.OS === 'android') {
+      // Subscribe before the link exists: key missing is broadcast while Android encrypts it.
+      startBleKeyMissingTracking();
+      // Failures before the new link starts must not be read against the previous link.
+      this.androidLinkStartedAt.delete(uuid);
       // Initiate bonding locally before GATT can trigger peripheral-initiated pairing.
       try {
         const bondState = await pairDevice(uuid);
         if (bondState.bonding) {
-          await onDeviceBondState(uuid, this.bondAbortController.signal);
+          await onDeviceBondState(uuid, this.bondAbortController.signal, {
+            systemInitiated: bondState.initiated === false,
+          });
         } else if (!bondState.bonded) {
           throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
         }
@@ -1182,6 +1225,7 @@ export default class ReactNativeBleTransport {
         });
         throw error;
       }
+      this.androidLinkStartedAt.set(uuid, Date.now());
     }
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
 
@@ -1689,16 +1733,44 @@ export default class ReactNativeBleTransport {
         `Device protocol has not been detected for ${uuid}`
       );
     }
-    if (protocol === 'V2') {
-      return this.callProtocolV2(uuid, name, data, options);
-    }
-
     const forceRun = name === 'Initialize' || name === 'Cancel';
-    if (this.runPromise && !forceRun) {
+    if (protocol !== 'V2' && this.runPromise && !forceRun) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
     }
 
-    return this.callProtocolV1(uuid, name, data, options);
+    try {
+      return protocol === 'V2'
+        ? await this.callProtocolV2(uuid, name, data, options)
+        : await this.callProtocolV1(uuid, name, data, options);
+    } catch (error) {
+      // An expected-V1 acquire skips the probe, so the first call is what meets the dropped link.
+      throw await this.resolveAndroidBondInvalid(uuid, error);
+    }
+  }
+
+  /**
+   * Android 16+ keeps a bond the device no longer holds keys for. The device drops the link
+   * and the only structured evidence is ACTION_KEY_MISSING, so a link loss right after
+   * connect is re-read as an invalid bond when that signal belongs to the same attempt.
+   */
+  private async resolveAndroidBondInvalid(uuid: string, error: unknown): Promise<unknown> {
+    if (Platform.OS !== 'android' || !isBleKeyMissingSupported()) return error;
+    if (isBleStaleBondHardwareError(error) || !isAndroidLinkLossError(error)) return error;
+    const linkStartedAt = this.androidLinkStartedAt.get(uuid);
+    if (
+      linkStartedAt === undefined ||
+      Date.now() - linkStartedAt > ANDROID_KEY_MISSING_LINK_WINDOW_MS
+    ) {
+      return error;
+    }
+    if (!(await waitForBleKeyMissing(uuid, linkStartedAt, ANDROID_KEY_MISSING_GRACE_MS))) {
+      return error;
+    }
+    Log?.debug('[ReactNativeBleTransport] Android key missing, bond is invalid:', uuid);
+    return ERRORS.TypedError(HardwareErrorCode.BleBondInvalid, undefined, {
+      phase: 'connect',
+      reason: 'key_missing',
+    });
   }
 
   private async callProtocolV1(
@@ -1966,6 +2038,8 @@ export default class ReactNativeBleTransport {
     this.androidPriorityResetTimers.forEach(timeout => clearTimeout(timeout));
     this.androidPriorityResetTimers.clear();
     this.androidHighPriorityDevices.clear();
+    this.androidLinkStartedAt.clear();
+    stopBleKeyMissingTracking();
     const error = ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     this.runPromise?.reject(error);
     this.runPromise = null;
