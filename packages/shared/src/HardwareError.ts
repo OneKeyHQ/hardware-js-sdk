@@ -522,6 +522,12 @@ export const HardwareErrorCode = {
    * Web USB or Web Bluetooth device prompt access error
    */
   WebDevicePromptAccessError: 902,
+
+  /**
+   * WebUSB device is present, but its interface or endpoint is unavailable
+   * @params: { operation: 'claimInterface' | 'transferIn' | 'transferOut'; nativeErrorName?: string; nativeErrorMessage?: string }
+   */
+  WebUsbDeviceAccessError: 903,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -677,6 +683,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
     'Web-USB or Web-Bluetooth device not found or needs permission',
   [HardwareErrorCode.WebDevicePromptAccessError]:
     'Web-USB or Web-Bluetooth device prompt access error',
+  [HardwareErrorCode.WebUsbDeviceAccessError]: 'WebUSB device access failed',
 } as const;
 
 export const TypedError = (

@@ -549,6 +549,11 @@ export class DeviceCommands {
           this.device.isProtocolV2() &&
           DEVICE_CONTROL_CALLS.has(callType) &&
           subcode === DeviceErrorCode.DeviceError_Busy;
+        const isProtocolV2FirmwareUpdateBusyFailure =
+          this.device.isProtocolV2() &&
+          /^requested command not allowed while a firmware update is in progress$/i.test(
+            normalizedMessage
+          );
         const isLegacyProtocolV2LockedFailure =
           this.device.isProtocolV2() && /^device (?:is )?locked$/i.test(normalizedMessage);
         if (
@@ -606,7 +611,7 @@ export class DeviceCommands {
             subcode,
             firmwareMessage: message,
           });
-        } else if (isProtocolV2DeviceBusyFailure) {
+        } else if (isProtocolV2DeviceBusyFailure || isProtocolV2FirmwareUpdateBusyFailure) {
           error = ERRORS.TypedError(HardwareErrorCode.DeviceBusy, message, {
             failureCode: code,
             subcode,

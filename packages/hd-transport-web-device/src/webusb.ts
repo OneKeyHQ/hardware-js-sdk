@@ -13,6 +13,7 @@ import transport, {
 } from '@onekeyfe/hd-transport';
 import {
   ERRORS,
+  HardwareError,
   HardwareErrorCode,
   ONEKEY_WEBUSB_FILTER,
   inferProtocolHintFromUsbId,
@@ -69,6 +70,8 @@ interface DeviceEndpoints {
 interface TransferCancelToken {
   cancelled: boolean;
 }
+
+type WebUsbOperation = 'claimInterface' | 'transferIn' | 'transferOut';
 
 /**
  * The navigator.usb disconnect listener is module-scoped and attached at most
@@ -592,7 +595,11 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     // Discover endpoints from USB descriptors; descriptors are not used for protocol selection.
     const endpoints = this.discoverEndpoints(device);
     this.deviceEndpoints.set(path, endpoints);
-    await device.claimInterface(endpoints.interfaceNumber);
+    try {
+      await device.claimInterface(endpoints.interfaceNumber);
+    } catch (error) {
+      return this.throwWebUsbIoError(path, 'claimInterface', error);
+    }
     await this.clearEndpointHalt(device, 'in', endpoints.endpointIn);
     await this.clearEndpointHalt(device, 'out', endpoints.endpointOut);
   }
@@ -660,6 +667,65 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       return typeof message === 'string' ? message : String(message ?? '');
     }
     return String(error);
+  }
+
+  private getErrorName(error: unknown) {
+    if (typeof error === 'object' && error && 'name' in error) {
+      const { name } = error as { name?: unknown };
+      return typeof name === 'string' ? name : String(name ?? '');
+    }
+    return '';
+  }
+
+  private isWebUsbIoHardwareError(error: unknown): error is HardwareError {
+    return (
+      error instanceof HardwareError &&
+      (error.errorCode === HardwareErrorCode.BridgeDeviceDisconnected ||
+        error.errorCode === HardwareErrorCode.WebUsbDeviceAccessError)
+    );
+  }
+
+  private async isDeviceStillEnumerated(path: string): Promise<boolean | undefined> {
+    if (!this.usb) return undefined;
+    try {
+      const devices = await this.usb.getDevices();
+      return devices.some(device => resolveOneKeyUsbDevicePath(device) === path);
+    } catch (error) {
+      this.Log?.debug('[WebUsbTransport] failed to verify WebUSB device presence:', error);
+      return undefined;
+    }
+  }
+
+  private async throwWebUsbIoError(
+    path: string,
+    operation: WebUsbOperation,
+    error: unknown
+  ): Promise<never> {
+    if (this.isWebUsbIoHardwareError(error)) throw error;
+    if (error instanceof ProtocolV2LinkError && error.code !== 'io') throw error;
+
+    const nativeError = error instanceof ProtocolV2LinkError ? error.cause ?? error : error;
+    if (this.isWebUsbIoHardwareError(nativeError)) throw nativeError;
+
+    const nativeErrorName = this.getErrorName(nativeError);
+    const nativeErrorMessage = this.getErrorMessage(nativeError);
+    const disconnectedByMessage =
+      /(?:device )?disconnected|device not found|action was interrupted/i.test(
+        `${nativeErrorName}: ${nativeErrorMessage}`
+      );
+    const stillEnumerated = disconnectedByMessage
+      ? false
+      : await this.isDeviceStillEnumerated(path);
+    const errorCode =
+      disconnectedByMessage || stillEnumerated === false
+        ? HardwareErrorCode.BridgeDeviceDisconnected
+        : HardwareErrorCode.WebUsbDeviceAccessError;
+
+    throw ERRORS.TypedError(errorCode, nativeErrorMessage || undefined, {
+      operation,
+      nativeErrorName: nativeErrorName || undefined,
+      nativeErrorMessage: nativeErrorMessage || undefined,
+    });
   }
 
   private isRetryablePacketIoError(error: unknown) {
@@ -742,7 +808,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         lastError = error;
         const shouldRetry = attempt < PACKET_IO_MAX_RETRIES && this.isRetryablePacketIoError(error);
         if (!shouldRetry) {
-          throw error;
+          return this.throwWebUsbIoError(path, 'transferOut', error);
         }
         try {
           await this.reconnectForPacketIoRetry(path, 'out', attempt, error);
@@ -756,7 +822,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         }
       }
     }
-    throw lastError;
+    return this.throwWebUsbIoError(path, 'transferOut', lastError);
   }
 
   private async transferOutOnce(path: string, packet: Uint8Array) {
@@ -798,7 +864,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         }
         const shouldRetry = attempt < PACKET_IO_MAX_RETRIES && this.isRetryablePacketIoError(error);
         if (!shouldRetry) {
-          throw error;
+          return this.throwWebUsbIoError(path, 'transferIn', error);
         }
         try {
           await this.reconnectForPacketIoRetry(path, 'in', attempt, error);
@@ -812,7 +878,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         }
       }
     }
-    throw lastError;
+    return this.throwWebUsbIoError(path, 'transferIn', lastError);
   }
 
   private async transferInOnce(path: string, length: number): Promise<DataView> {
@@ -894,7 +960,8 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         }
       );
       return true;
-    } catch (_error) {
+    } catch (error) {
+      if (this.isWebUsbIoHardwareError(error)) throw error;
       return false;
     }
   }
@@ -909,6 +976,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT,
       logger: this.Log,
       logPrefix: 'ProtocolV2 WebUSB',
+      shouldRethrow: error => this.isWebUsbIoHardwareError(error),
     });
   }
 
@@ -986,7 +1054,13 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     data: Record<string, unknown>,
     options?: TransportCallOptions
   ) {
-    return this.callProtocolV2Usb(path, name, data, options);
+    try {
+      return await this.callProtocolV2Usb(path, name, data, options);
+    } catch (error) {
+      if (!(error instanceof ProtocolV2LinkError) || error.code !== 'io') throw error;
+      const operation = error.message.includes(' USB write failed:') ? 'transferOut' : 'transferIn';
+      return this.throwWebUsbIoError(path, operation, error);
+    }
   }
 
   /**

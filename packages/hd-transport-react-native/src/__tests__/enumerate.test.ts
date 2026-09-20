@@ -1,5 +1,8 @@
 import { EventEmitter } from 'events';
 
+import { BleErrorCode } from 'react-native-ble-plx';
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { getConnectedDeviceIds } from '../BleManager';
 import ReactNativeBleTransport from '../index';
 
@@ -14,7 +17,14 @@ jest.mock(
 
 jest.mock('react-native-ble-plx', () => ({
   BleError: class BleError extends Error {},
-  BleErrorCode: {},
+  BleErrorCode: {
+    BluetoothUnsupported: 100,
+    BluetoothUnauthorized: 101,
+    BluetoothPoweredOff: 102,
+    BluetoothInUnknownState: 103,
+    ScanStartFailed: 600,
+    LocationServicesDisabled: 601,
+  },
   BleManager: jest.fn(),
   ScanMode: { LowLatency: 2 },
 }));
@@ -30,6 +40,31 @@ jest.mock('../subscribeBleOn', () => ({
 }));
 
 const ONEKEY_SERVICE_UUID = '00000001-0000-1000-8000-00805f9b34fb';
+
+describe('ReactNativeBleTransport scan error mapping', () => {
+  test.each([
+    [BleErrorCode.BluetoothPoweredOff, HardwareErrorCode.BlePoweredOff],
+    [BleErrorCode.BluetoothUnsupported, HardwareErrorCode.BleUnsupported],
+    [BleErrorCode.BluetoothInUnknownState, HardwareErrorCode.BleScanError],
+    [BleErrorCode.BluetoothUnauthorized, HardwareErrorCode.BleLocationError],
+  ])('maps native BLE error %s to hardware error %s', async (nativeCode, errorCode) => {
+    jest.mocked(getConnectedDeviceIds).mockResolvedValueOnce([]);
+    const blePlxManager = {
+      startDeviceScan: jest.fn((_serviceUUIDs, _options, listener) => {
+        queueMicrotask(() => {
+          listener({ errorCode: nativeCode, reason: 'native scan failure' }, null);
+        });
+      }),
+      stopDeviceScan: jest.fn(() => Promise.resolve()),
+    };
+    const transport = new ReactNativeBleTransport({ scanTimeout: 10_000 });
+    transport.blePlxManager = blePlxManager as never;
+    transport.init({ debug: jest.fn(), error: jest.fn() }, new EventEmitter());
+
+    await expect(transport.enumerate()).rejects.toMatchObject({ errorCode });
+    expect(blePlxManager.stopDeviceScan).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('ReactNativeBleTransport iOS discovery', () => {
   test('keeps a bonded Pro2 communication peripheral after Find My changes its name', async () => {
