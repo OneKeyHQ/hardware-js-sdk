@@ -172,6 +172,25 @@ reconnects and bonds created by the same acquire skip the wait. Core's `ensureCo
 each attempt by its call timeout, which a user-confirmed re-pair can exceed; the re-pair still
 completes and the next attempt reuses the link.
 
+### iOS Link Ended By The Device
+
+iOS names a bond the device no longer holds with `CBErrorPeerRemovedPairingInformation` (14),
+mapped to `BlePeerRemovedPairingInformation`. The iPhone 17 family does not: the device ends the
+link about a second after connecting (Pro 2 firmware drops a link on its second key failure), and
+the only trace is `CBErrorPeripheralDisconnected` (7) on whatever operation was in flight. The
+disconnect event has no reason on iOS, and a third-party scanner app gets the same code from the
+same device, so nothing the transport sends causes or avoids it.
+
+A device that reboots or powers off right after connecting ends one link the same way, so one
+drop keeps its original error and Core retries. `hd-transport-react-native` reports
+`BleBondInvalid` (`reason: 'peer_disconnected'`) only for the second acquire attempt in a row
+that the device ended with code 7, each on a link that attempt opened, within
+`IOS_PEER_TERMINATION_LINK_WINDOW_MS` of connecting and before any response
+(`bleIosStaleBond.ts`). An attempt that succeeds or fails any other way starts the count over, the
+first drop expires after `IOS_PEER_TERMINATION_REPEAT_WINDOW_MS`, and firmware-install reconnects
+are never counted. iOS does not re-pair on its own, so the user has to forget the device in
+system settings; there is no in-place recovery as on Android.
+
 ## Cross-Runtime Transport
 
 The legacy Core response path uses `serializeError()` through `createResponseMessage()`. HWK
