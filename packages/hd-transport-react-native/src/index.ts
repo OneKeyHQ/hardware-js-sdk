@@ -53,6 +53,12 @@ import {
   stopBleKeyMissingTracking,
   waitForBleKeyMissing,
 } from './bleKeyMissing';
+import {
+  markBleLinkEncrypted,
+  startBleEncryptionTracking,
+  stopBleEncryptionTracking,
+  waitForAndroidLinkEncryption,
+} from './bleEncryption';
 import { isNativeBleDisconnectError, toBleDisconnectHardwareError } from './bleNativeDisconnect';
 import {
   isBleStaleBondHardwareError,
@@ -68,6 +74,7 @@ import type { Deferred } from '@onekeyfe/hd-shared';
 import type { Characteristic, Device, Subscription } from 'react-native-ble-plx';
 import type EventEmitter from 'events';
 import type { BleAcquireInput, TransportOptions } from './types';
+import type { AndroidLinkEncryption } from './bleEncryption';
 
 type FirmwareInstallBleAcquireInput = BleAcquireInput & {
   /**
@@ -202,6 +209,16 @@ const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
 export const ANDROID_KEY_MISSING_LINK_WINDOW_MS = 10_000;
 /** The broadcast and the GATT disconnect it explains travel separately; either can land first. */
 export const ANDROID_KEY_MISSING_GRACE_MS = 500;
+/**
+ * Android reports a bonded link's first encryption result within about half a second of
+ * connecting. Past this, the result is treated as unknown and the link is used as before.
+ */
+export const ANDROID_ENCRYPTION_RESULT_TIMEOUT_MS = 1500;
+/**
+ * A system re-pairing needs the user to accept a pairing request and confirm the code on the
+ * device. The Bluetooth stack gives up after 30s and then reports key missing.
+ */
+export const ANDROID_SYSTEM_REPAIR_TIMEOUT_MS = 35_000;
 /**
  * How a link dropped by a device that refuses a stale bond reaches JS. A wedged write is
  * excluded: the system is still re-pairing then and has not reported key missing yet.
@@ -635,6 +652,11 @@ export default class ReactNativeBleTransport {
   init(logger: any, emitter: EventEmitter) {
     setBleLogger(logger);
     this.emitter = emitter;
+    if (Platform.OS === 'android') {
+      // Link security events are only meaningful if they were observed since the link came up.
+      startBleKeyMissingTracking();
+      startBleEncryptionTracking();
+    }
   }
 
   configure(signedData: any) {
@@ -1172,6 +1194,8 @@ export default class ReactNativeBleTransport {
 
     let device: Device | null = null;
     const isAndroid = Platform.OS === 'android';
+    // Only a bond that existed before this acquire can have been lost by the device.
+    let androidBondedBeforeConnect = false;
     // A firmware-install reconnect always refreshes: the new firmware may expose a different table.
     const refreshAndroidGattCache =
       isAndroid && (!!skipProtocolProbe || this.androidGattCacheRefreshes.has(uuid));
@@ -1205,11 +1229,13 @@ export default class ReactNativeBleTransport {
     if (Platform.OS === 'android') {
       // Subscribe before the link exists: key missing is broadcast while Android encrypts it.
       startBleKeyMissingTracking();
+      startBleEncryptionTracking();
       // Failures before the new link starts must not be read against the previous link.
       this.androidLinkStartedAt.delete(uuid);
       // Initiate bonding locally before GATT can trigger peripheral-initiated pairing.
       try {
         const bondState = await pairDevice(uuid);
+        androidBondedBeforeConnect = !bondState.bonding && bondState.bonded;
         if (bondState.bonding) {
           await onDeviceBondState(uuid, this.bondAbortController.signal, {
             systemInitiated: bondState.initiated === false,
@@ -1413,7 +1439,13 @@ export default class ReactNativeBleTransport {
       this.acquiringProtocolV2.add(uuid);
     }
 
+    let linkEncryption: AndroidLinkEncryption | undefined;
     try {
+      // A firmware-install reconnect keeps its existing sequence.
+      if (androidBondedBeforeConnect && !skipProtocolProbe) {
+        linkEncryption = await this.waitForAndroidLinkSecurity(uuid);
+        if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+      }
       await this.installTransportForAcquire(uuid, acquiredDevice, {
         writeCharacteristic,
         notifyCharacteristic,
@@ -1465,6 +1497,11 @@ export default class ReactNativeBleTransport {
         throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
       }
       this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
+      if (linkEncryption === 'unresolved') {
+        // Notifications and the probe only work on an encrypted link, so the next reuse of this
+        // link needs no result that was reported before tracking started.
+        markBleLinkEncrypted(uuid);
+      }
       return { uuid, protocolType };
     } catch (error) {
       // A failed acquire must retire the physical link before Core retries. Logical
@@ -1773,6 +1810,39 @@ export default class ReactNativeBleTransport {
     });
   }
 
+  /**
+   * Android 16+ encrypts a bonded link on its own right after connecting. Subscribing to
+   * notifications before that finishes gets the CCCD write rejected, and the framework's retry
+   * encrypts again with the same stale key; firmware that allows one failure per link then drops
+   * it before the system can re-pair. Holding GATT until the result lets a lost bond be re-paired
+   * in place. Without the platform signal this resolves immediately.
+   */
+  private async waitForAndroidLinkSecurity(uuid: string): Promise<AndroidLinkEncryption> {
+    const linkStartedAt = this.androidLinkStartedAt.get(uuid);
+    if (linkStartedAt === undefined) return 'unresolved';
+    const waitStartedAt = Date.now();
+    const result = await waitForAndroidLinkEncryption({
+      deviceId: uuid,
+      linkStartedAt,
+      resultTimeoutMs: ANDROID_ENCRYPTION_RESULT_TIMEOUT_MS,
+      repairTimeoutMs: ANDROID_SYSTEM_REPAIR_TIMEOUT_MS,
+      keyMissingGraceMs: ANDROID_KEY_MISSING_GRACE_MS,
+      signal: this.bondAbortController.signal,
+      onRepairStarted: () => {
+        Log?.debug(
+          '[ReactNativeBleTransport] Android bond lost, waiting for system re-pairing:',
+          uuid
+        );
+      },
+    });
+    Log?.debug('[ReactNativeBleTransport] Android link encryption', {
+      connectIdSuffix: uuid.slice(-8),
+      result,
+      waitedMs: Date.now() - waitStartedAt,
+    });
+    return result;
+  }
+
   private async callProtocolV1(
     uuid: string,
     name: string,
@@ -2040,6 +2110,7 @@ export default class ReactNativeBleTransport {
     this.androidHighPriorityDevices.clear();
     this.androidLinkStartedAt.clear();
     stopBleKeyMissingTracking();
+    stopBleEncryptionTracking();
     const error = ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     this.runPromise?.reject(error);
     this.runPromise = null;

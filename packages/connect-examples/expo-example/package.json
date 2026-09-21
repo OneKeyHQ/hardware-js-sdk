@@ -24,7 +24,7 @@
     "@onekeyfe/hd-core": "1.2.3-alpha.9",
     "@onekeyfe/hd-shared": "1.2.3-alpha.9",
     "@onekeyfe/hd-transport": "1.2.3-alpha.9",
-    "@onekeyfe/react-native-ble-utils": "0.1.8",
+    "@onekeyfe/react-native-ble-utils": "0.1.9",
     "@polkadot/util-crypto": "13.1.1",
     "@react-native-async-storage/async-storage": "1.21.0",
     "@react-native-picker/picker": "2.6.1",
