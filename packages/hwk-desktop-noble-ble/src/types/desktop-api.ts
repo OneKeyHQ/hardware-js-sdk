@@ -45,7 +45,7 @@ export type ThirdPartyBleScanOptions = ElectronBleScanOptions;
 
 export interface ThirdPartyBleApi {
   scan(options?: ThirdPartyBleScanOptions): Promise<ThirdPartyBleDeviceInfo[]>;
-  stopScan(): Promise<void>;
+  stopScan(vendor?: string): Promise<void>;
   connect(id: string, options: ElectronBleConnectOptions): Promise<{ id: string; name?: string }>;
   disconnect(id: string): Promise<void>;
   /** Subscribe to the BLE notify characteristic for `id`. */
@@ -62,8 +62,8 @@ export interface ThirdPartyBleApi {
   getDevice(id: string): Promise<ThirdPartyBleDeviceInfo | null>;
   /** Read current RSSI (dBm) of a *connected* peripheral. */
   readRssi(id: string): Promise<number>;
-  /** Stop scan + disconnect every in-flight connection. */
-  cancelPairing(): Promise<void>;
+  /** Cancel only the named vendor/device; no argument retains legacy global teardown. */
+  cancelPairing(options?: { vendor: string; id?: string }): Promise<void>;
 
   /** Register a listener for incoming BLE notifications. Returns an unsubscribe fn. */
   onNotification(handler: (id: string, hexData: string) => void): () => void;

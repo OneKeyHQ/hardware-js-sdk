@@ -124,7 +124,7 @@ export class LedgerElectronBleTransport implements Transport {
 
   async stopDiscovering(): Promise<void> {
     await this.scanPromise?.catch(() => undefined);
-    await this.bridge.stopScan();
+    await this.bridge.stopScan(LEDGER_BLE_VENDOR);
   }
 
   async connect({
