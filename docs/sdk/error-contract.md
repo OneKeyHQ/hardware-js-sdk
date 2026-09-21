@@ -191,6 +191,20 @@ first drop expires after `IOS_PEER_TERMINATION_REPEAT_WINDOW_MS`, and firmware-i
 are never counted. iOS does not re-pair on its own, so the user has to forget the device in
 system settings; there is no in-place recovery as on Android.
 
+### iOS Lost Bond Reported After The Connect Budget
+
+Code 14 arrives as a failed connect, and how fast depends on the phone and the device. On an
+iPhone XR (iOS 18) with a wiped Neo it took longer than the 3 s native connect budget in 12 of 15
+calls: ble-plx cancelled the attempt first, the second timeout reset the BLE manager, and the
+call ended as `PollingTimeout` ("BLE setup wedged repeatedly"), which reads as a connect timeout.
+The calls that stayed under 3 s ended as `BlePeerRemovedPairingInformation`.
+
+An absent device never answers, so the budget cannot simply grow. A device that a scan saw within
+`IOS_PRESENT_DEVICE_WINDOW_MS` is present, so its next connect gets
+`IOS_PRESENT_DEVICE_CONNECT_TIMEOUT_MS`. The sighting is used once: a retry after a timeout has no
+new scan behind it and keeps the short budget, so a wedged setup still resets after two timeouts.
+Flows that connect by id without scanning, and firmware-install reconnects, keep the short budget.
+
 ## Cross-Runtime Transport
 
 The legacy Core response path uses `serializeError()` through `createResponseMessage()`. HWK
