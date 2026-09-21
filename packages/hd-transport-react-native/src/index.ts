@@ -1530,7 +1530,7 @@ export default class ReactNativeBleTransport {
     const subscription = characteristic.monitor((error, c) => {
       const isCurrentMonitor = this.monitorTokens.get(uuid) === monitorToken;
       if (error) {
-        if (isCurrentMonitor) this.iosPeerTermination.note(uuid, error);
+        if (isCurrentMonitor) this.noteIosLinkError(uuid, 'notify', error);
         Log?.debug(
           `error monitor ${characteristic.uuid}, deviceId: ${characteristic.deviceID}: ${
             error as unknown as string
@@ -1814,6 +1814,31 @@ export default class ReactNativeBleTransport {
     return ERRORS.TypedError(HardwareErrorCode.BleBondInvalid, undefined, {
       phase: 'connect',
       reason: 'key_missing',
+    });
+  }
+
+  /**
+   * iOS says why a link ended only on the operation it interrupted, so the native codes are read
+   * and logged here. Codes only: the reason text is localized and cannot be matched or searched.
+   */
+  private noteIosLinkError(uuid: string, stage: 'gatt-setup' | 'notify' | 'write', error: unknown) {
+    if (Platform.OS !== 'ios') return;
+    this.iosPeerTermination.note(uuid, error);
+    // Writes and notifications also fail for reasons that say nothing about the link.
+    if (stage !== 'gatt-setup' && !isNativeBleDisconnectError(error)) return;
+    const native = (error ?? {}) as {
+      errorCode?: unknown;
+      iosErrorCode?: unknown;
+      attErrorCode?: unknown;
+    };
+    const code = (value: unknown) =>
+      typeof value === 'number' || typeof value === 'string' ? value : undefined;
+    Log?.debug('[ReactNativeBleTransport] iOS operation failed', {
+      connectIdSuffix: uuid.slice(-8),
+      stage,
+      errorCode: code(native.errorCode),
+      iosErrorCode: code(native.iosErrorCode),
+      attErrorCode: code(native.attErrorCode),
     });
   }
 
@@ -2513,7 +2538,7 @@ export default class ReactNativeBleTransport {
       succeeded = true;
       return result;
     } catch (error) {
-      this.iosPeerTermination.note(uuid, error);
+      this.noteIosLinkError(uuid, 'gatt-setup', error);
       if (Platform.OS === 'ios' && isNativeBleStaleBondError(error)) {
         // iOS can report the lost bond on the first request instead of on the connect.
         throw toBleStaleBondHardwareError(error);
@@ -2635,7 +2660,7 @@ export default class ReactNativeBleTransport {
       ]);
       this.writeTimeoutCounts.delete(uuid);
     } catch (error) {
-      this.iosPeerTermination.note(uuid, error);
+      this.noteIosLinkError(uuid, 'write', error);
       if (timedOut) {
         // A superseded call's late write must not tear down the link the current
         // call is using; only the owner of the transport may declare it dead.

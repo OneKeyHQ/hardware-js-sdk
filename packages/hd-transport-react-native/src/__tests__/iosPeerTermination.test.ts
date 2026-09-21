@@ -102,12 +102,10 @@ function createHarness() {
     }),
     state: jest.fn(() => Promise.resolve('PoweredOn')),
   };
-  transport.init(
-    { debug: jest.fn(), error: jest.fn(), warn: jest.fn() } as any,
-    new EventEmitter()
-  );
+  const logger = { debug: jest.fn(), error: jest.fn(), warn: jest.fn() };
+  transport.init(logger as any, new EventEmitter());
   transport.configure(protocolV1Schema);
-  return { transport, device, writeCharacteristic, notifyCharacteristic };
+  return { transport, device, writeCharacteristic, notifyCharacteristic, logger };
 }
 
 type Outcome = { code?: unknown; params?: unknown; native?: unknown };
@@ -246,6 +244,23 @@ describe('iOS link ended by the device right after connecting', () => {
     await expect(acquire(transport, reconnect)).resolves.toEqual({ native: 7 });
     // The device was rebooting, so those drops are not evidence for a later attempt either.
     await expect(acquire(transport)).resolves.toEqual({ native: 7 });
+  });
+
+  test('logs the native codes of the failed operation, which iOS reports nowhere else', async () => {
+    const { transport, device, logger } = createHarness();
+    device.discoverAllServicesAndCharacteristics.mockImplementation(() =>
+      Promise.reject(peerEndedLink())
+    );
+
+    await acquire(transport);
+
+    expect(logger.debug).toHaveBeenCalledWith('[ReactNativeBleTransport] iOS operation failed', {
+      connectIdSuffix: UUID.slice(-8),
+      stage: 'gatt-setup',
+      errorCode: 201,
+      iosErrorCode: 7,
+      attErrorCode: undefined,
+    });
   });
 
   test('reports a lost bond that iOS names during GATT setup', async () => {
