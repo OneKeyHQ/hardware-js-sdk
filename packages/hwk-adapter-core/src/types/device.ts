@@ -16,12 +16,14 @@ export type TransportType = 'usb' | 'ble' | 'hid' | 'bridge' | 'qr';
  */
 export interface DeviceCapabilities {
   /**
-   * Whether connectId/deviceId persist across sessions.
+   * Whether the connection/discovery handle can be reused across sessions.
+   * `true` allows reconnecting through the stored handle; `false` requires
+   * discovery instead of treating a previous handle as a durable locator.
    *
-   * - `true`: IDs are stable (e.g., OneKey USB, Trezor USB).
-   *   Business logic can match devices by stored connectId/deviceId.
-   * - `false`: IDs are ephemeral, regenerated each session (e.g., Ledger WebHID).
-   *   Business logic should NOT rely on stored connectId/deviceId for matching.
+   * This does not describe the stability of the post-handshake deviceId and
+   * does not prove physical-device or wallet identity. For example, Trezor BLE
+   * reports false here while its verified firmware device_id remains stable.
+   * Callers must verify the expected device/wallet identity independently.
    */
   persistentDeviceIdentity: boolean;
 }
