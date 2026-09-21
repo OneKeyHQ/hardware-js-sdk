@@ -244,6 +244,8 @@ export class KeystoneAdapter implements IHardwareWallet {
 
   private readonly _usbIdleWaiters = new Set<() => void>();
 
+  private _abandonedUsbConnects = 0;
+
   private _usbTeardownTail: Promise<void> = Promise.resolve();
 
   private _pendingUsbTeardowns = 0;
@@ -314,6 +316,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     this._uiRegistry.cancel();
     this._jobQueue.clear();
     this._searchDeviceTargets.clear();
+    await this._usbConnectTail;
     await this._resetUsbSessions();
     this._usbConnector?.off('device-disconnect', this._handleUsbDisconnect);
     this._usbConnector?.off('ui-event', this._handleUsbUiEvent);
@@ -450,6 +453,7 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   async connectDevice(searchTargetId: string): Promise<Response<string>> {
+    const scope = this._jobQueue.createCancelScope(searchTargetId);
     try {
       let connected: Response<DeviceInfo>;
       let selectedConnectionType: 'usb' | 'qr';
@@ -465,7 +469,7 @@ export class KeystoneAdapter implements IHardwareWallet {
             'No USB connector configured for this Keystone adapter'
           );
         }
-        connected = await this._connectUsb({}, searchTargetId);
+        connected = await this._connectUsb({}, searchTargetId, scope.signal);
       } else if (hasHardwareRuntimeIdPrefix(searchTargetId)) {
         return failure(
           HardwareErrorCode.DeviceNotFound,
@@ -486,9 +490,10 @@ export class KeystoneAdapter implements IHardwareWallet {
           );
         } else {
           selectedConnectionType = 'usb';
-          connected = await this._connectUsb(target);
+          connected = await this._connectUsb(target, undefined, scope.signal);
         }
       }
+      KeystoneAdapter._throwIfAborted(scope.signal);
       if (!connected.success) return connected;
 
       const record = this._devices.get(connected.payload.deviceId);
@@ -508,6 +513,8 @@ export class KeystoneAdapter implements IHardwareWallet {
       return success(operation.operationId);
     } catch (err) {
       return this._errorToFailure<string>(err);
+    } finally {
+      scope.release();
     }
   }
 
@@ -1995,25 +2002,37 @@ export class KeystoneAdapter implements IHardwareWallet {
       expectedWalletId?: string;
       expectedMasterFingerprint?: string;
     },
-    searchTargetId?: string
+    searchTargetId?: string,
+    signal?: AbortSignal
   ): Promise<Response<DeviceInfo>> {
-    if (this._pendingUsbTeardowns > 0) {
+    if (this._pendingUsbTeardowns > 0 || this._abandonedUsbConnects > 0) {
       return failure(
         HardwareErrorCode.DeviceBusyInternal,
         'Keystone USB session is being released'
       );
     }
-    const previous = this._usbConnectTail;
-    let release: (() => void) | undefined;
-    this._usbConnectTail = new Promise<void>(resolve => {
-      release = resolve;
+    if (signal) KeystoneAdapter._throwIfAborted(signal);
+    let abandoned = false;
+    const onAbort = () => {
+      abandoned = true;
+      this._abandonedUsbConnects += 1;
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    // Cancellation releases the caller, not the physical USB transfer. Keep
+    // the tail until the late result has been rejected and disconnected.
+    const pending = this._usbConnectTail.then(async () => {
+      if (signal) KeystoneAdapter._throwIfAborted(signal);
+      return this._connectUsbExclusive(expected, searchTargetId, signal);
     });
-    await previous;
-    try {
-      return await this._connectUsbExclusive(expected, searchTargetId);
-    } finally {
-      release?.();
-    }
+    const settled = pending.finally(() => {
+      signal?.removeEventListener('abort', onAbort);
+      if (abandoned) this._abandonedUsbConnects -= 1;
+    });
+    this._usbConnectTail = settled.then(
+      () => undefined,
+      () => undefined
+    );
+    return signal ? KeystoneAdapter._abortable(signal, settled) : settled;
   }
 
   private async _connectUsbExclusive(
@@ -2021,7 +2040,8 @@ export class KeystoneAdapter implements IHardwareWallet {
       expectedWalletId?: string;
       expectedMasterFingerprint?: string;
     },
-    searchTargetId?: string
+    searchTargetId?: string,
+    signal?: AbortSignal
   ): Promise<Response<DeviceInfo>> {
     if (!this._usbConnector) {
       return failure(
@@ -2045,6 +2065,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         ? connector.connectTarget(connectTarget)
         : connector.connect(searchTargetId ?? expected.expectedMasterFingerprint));
       sessionId = session.sessionId;
+      if (signal) KeystoneAdapter._throwIfAborted(signal);
       const raw = session.deviceInfo.raw as { masterFingerprint?: unknown } | undefined;
       const mfpValue = parseBip32MasterFingerprint(raw?.masterFingerprint);
       if (!mfpValue) {
@@ -2073,6 +2094,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         'resolveUr',
         identityRequest
       );
+      if (signal) KeystoneAdapter._throwIfAborted(signal);
       if (!identityResult.success) {
         throw rehydrateConnectorError(identityResult.error);
       }
@@ -2083,10 +2105,6 @@ export class KeystoneAdapter implements IHardwareWallet {
       });
       const walletId = deriveKeystoneWalletId(parsed.accounts);
       const previousUsbSessionId = this._devices.get(walletId)?.usbSessionId;
-      const record = this._upsertDeviceRecord(parsed, {
-        viaUsb: true,
-        usbSessionId: session.sessionId,
-      });
       if (previousUsbSessionId && previousUsbSessionId !== session.sessionId) {
         try {
           await this._usbConnector.disconnect(previousUsbSessionId);
@@ -2094,6 +2112,12 @@ export class KeystoneAdapter implements IHardwareWallet {
           // The replacement session is authoritative even if stale teardown fails.
         }
       }
+      if (signal) KeystoneAdapter._throwIfAborted(signal);
+      const record = this._upsertDeviceRecord(parsed, {
+        viaUsb: true,
+        usbSessionId: session.sessionId,
+      });
+      if (signal) KeystoneAdapter._throwIfAborted(signal);
       record.hadUsbSession = true;
       record.model = session.deviceInfo.modelName ?? session.deviceInfo.model ?? record.model;
       record.deviceVersion = session.deviceInfo.firmwareVersion ?? record.deviceVersion;

@@ -85,7 +85,7 @@ export function initThirdPartyBleSupport(
   handle(THIRD_PARTY_BLE_CHANNELS.scan, (options?: ElectronBleScanOptions) =>
     handler.scan(options)
   );
-  handle(THIRD_PARTY_BLE_CHANNELS.stopScan, () => handler.stopScan());
+  handle(THIRD_PARTY_BLE_CHANNELS.stopScan, (vendor?: string) => handler.stopScan(vendor));
   handle(THIRD_PARTY_BLE_CHANNELS.connect, (id: string, options: ElectronBleConnectOptions) =>
     handler.connect(id, options)
   );
@@ -98,7 +98,9 @@ export function initThirdPartyBleSupport(
   handle(THIRD_PARTY_BLE_CHANNELS.availability, () => handler.checkAvailability());
   handle(THIRD_PARTY_BLE_CHANNELS.getDevice, (id: string) => handler.getDevice(id));
   handle(THIRD_PARTY_BLE_CHANNELS.readRssi, (id: string) => handler.readRssi(id));
-  handle(THIRD_PARTY_BLE_CHANNELS.cancelPairing, () => handler.cancelPairing());
+  handle(THIRD_PARTY_BLE_CHANNELS.cancelPairing, (options?: { vendor: string; id?: string }) =>
+    handler.cancelPairing(options)
+  );
 
   const removeHandlers = () => {
     if (disposed) return;

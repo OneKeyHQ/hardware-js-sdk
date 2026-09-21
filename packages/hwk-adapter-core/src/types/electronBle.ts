@@ -50,7 +50,7 @@ export interface ElectronBleConnectOptions {
 /** Native code handles GATT only; framing, identity checks and wallet operations stay in the SDK. */
 export interface ElectronBleApi {
   scan(options?: ElectronBleScanOptions): Promise<ElectronBleDeviceInfo[]>;
-  stopScan(): Promise<void>;
+  stopScan(vendor?: string): Promise<void>;
   connect(id: string, options?: ElectronBleConnectOptions): Promise<{ id: string; name?: string }>;
   disconnect(id: string): Promise<void>;
   subscribe(id: string): Promise<void>;

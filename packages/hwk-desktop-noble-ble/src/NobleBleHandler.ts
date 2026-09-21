@@ -213,6 +213,8 @@ export class NobleBleHandler {
 
   private _scanning = false;
 
+  private readonly _scanOwners = new Set<string | undefined>();
+
   private _idleStopTimer?: ReturnType<typeof setTimeout>;
 
   private _onNotification?: (id: string, hexData: string) => void;
@@ -235,6 +237,7 @@ export class NobleBleHandler {
 
   private readonly _connectAttempts = new Set<{
     id: string;
+    vendor: string;
     abandon: (error: Error) => void;
     cancelNative: () => void;
     settled: Promise<unknown>;
@@ -318,6 +321,7 @@ export class NobleBleHandler {
    */
   async scan(options?: ElectronBleScanOptions): Promise<ThirdPartyBleDeviceInfo[]> {
     await this.init();
+    this._scanOwners.add(options?.vendor);
     if (!this._scanning) {
       this._scanning = true;
       // allowDuplicates=true keeps advertisements flowing so we can age out gone devices.
@@ -477,20 +481,18 @@ export class NobleBleHandler {
 
   /** Stop scanning and forget discovered devices (idle timeout / teardown). */
   private async _stopContinuousScan(): Promise<void> {
+    this._scanOwners.clear();
     await this._pauseScan();
     this._discovered.clear();
     this._lastSeen.clear();
   }
 
-  /**
-   * Stops the process-wide scan no matter which vendor asked. Scan *results*
-   * are filtered per vendor, but the radio is not: one vendor's stopScan ends
-   * the other's discovery too. That is safe only because the host mounts one
-   * vendor's flow at a time; queues are per adapter, not shared. Anything
-   * that breaks that — a background presence probe, say — needs per-vendor
-   * refcounting here first.
-   */
-  async stopScan(): Promise<void> {
+  /** A vendor releasing discovery must not stop another vendor's scan. */
+  async stopScan(vendor?: string): Promise<void> {
+    if (vendor !== undefined) {
+      this._scanOwners.delete(vendor);
+      if (this._scanOwners.size > 0) return;
+    }
     await this._stopContinuousScan();
   }
 
@@ -518,27 +520,19 @@ export class NobleBleHandler {
     return entry.peripheral.rssi;
   }
 
-  /**
-   * Abort the in-flight pairing flow: abandon a connect that is still running,
-   * stop scanning, disconnect every peripheral the host currently has open.
-   * Caller is responsible for surfacing the cancellation to the upper UI layer.
-   *
-   * Abandoning the connect is what actually ends the flow. Pairing happens
-   * inside connectAsync and the entry only reaches _connected after service
-   * discovery, so the loop below never sees the device being paired — without
-   * the abandon the caller waits out the full connect timeout, which is sized
-   * to the OS pairing window and so feels like a hang.
-   */
-  async cancelPairing(): Promise<void> {
-    const attempt = this._activeConnect;
-    if (attempt) {
-      this._activeConnect = undefined;
-      // connect()'s catch tears down the half-open peripheral from _discovered.
+  /** Abandon matching pairing attempts without touching another owner's links. */
+  async cancelPairing(options?: { vendor: string; id?: string }): Promise<void> {
+    const matches = (id: string, vendor?: string) =>
+      options === undefined ||
+      (vendor === options.vendor && (options.id === undefined || id === options.id));
+    for (const attempt of this._connectAttempts) {
+      if (!matches(attempt.id, attempt.vendor)) continue;
+      if (this._activeConnect === attempt) this._activeConnect = undefined;
       attempt.abandon(new Error(`connect cancelled: ${attempt.id}`));
     }
-    await this.stopScan();
-    for (const id of Array.from(this._connected.keys())) {
-      await this.disconnect(id).catch(() => undefined);
+    if (options?.id === undefined) await this.stopScan(options?.vendor);
+    for (const [id, entry] of this._connected) {
+      if (matches(id, entry.vendor)) await this.disconnect(id).catch(() => undefined);
     }
   }
 
@@ -710,6 +704,7 @@ export class NobleBleHandler {
     );
     const attempt = {
       id,
+      vendor: options.vendor,
       abandon,
       cancelNative: () => claim.cancelNative?.(),
       settled: Promise.resolve<unknown>(undefined),
