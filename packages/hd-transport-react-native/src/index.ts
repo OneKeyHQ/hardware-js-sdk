@@ -233,6 +233,52 @@ const isAndroidLinkLossError = (error: unknown): boolean => {
     code === HardwareErrorCode.BleConnectedError
   );
 };
+
+const logIosBleBondDiagnostic = (
+  phase: string,
+  error: unknown,
+  outcome: 'fallback' | 'rethrow'
+) => {
+  if (Platform.OS !== 'ios') return;
+
+  const nativeError = (error ?? {}) as {
+    name?: unknown;
+    errorCode?: unknown;
+    attErrorCode?: unknown;
+    iosErrorCode?: unknown;
+    androidErrorCode?: unknown;
+  };
+  const scalar = (value: unknown) =>
+    typeof value === 'string' || typeof value === 'number' ? value : undefined;
+
+  Log?.debug('[ReactNativeBleTransport][BleBondDiagnostic] probe error', {
+    phase,
+    outcome,
+    errorName: scalar(nativeError.name),
+    errorCode: scalar(nativeError.errorCode),
+    attErrorCode: scalar(nativeError.attErrorCode),
+    iosErrorCode: scalar(nativeError.iosErrorCode),
+    androidErrorCode: scalar(nativeError.androidErrorCode),
+    nativeStaleBond: isNativeBleStaleBondError(error),
+    hardwareStaleBond: isBleStaleBondHardwareError(error),
+    nativeDisconnect: isNativeBleDisconnectError(error),
+  });
+};
+
+type IosProbeDisconnectEvidence = {
+  phase: 'protocol-v1-get-features' | 'protocol-v2-ping';
+  errorCode?: string | number;
+};
+
+const isIosProbeDisconnectError = (error: unknown): boolean => {
+  if (Platform.OS !== 'ios') return false;
+  const code = (error as { errorCode?: unknown })?.errorCode;
+  return (
+    isNativeBleDisconnectError(error) ||
+    code === HardwareErrorCode.BleDeviceNotBonded ||
+    code === HardwareErrorCode.BleDeviceDisconnected
+  );
+};
 /** Consecutive wedged writes on one device before the BLE manager itself is recreated. */
 export const BLE_WRITE_TIMEOUT_MANAGER_RESET_THRESHOLD = 2;
 const DEVICE_SCAN_TIMEOUT_MS = 3000;
@@ -574,6 +620,14 @@ export default class ReactNativeBleTransport {
 
   /** Endpoints whose last detection got no answer; 'woken' once their Initialize wake is spent. */
   private silentDetections = new Map<string, 'silent' | 'woken'>();
+
+  /**
+   * iOS can report a reset Pro2 as a generic peripheral disconnect instead of
+   * CBErrorPeerRemovedPairingInformation. Keep that first probe failure across
+   * the automatic cold reconnect and require a second failed probe before
+   * classifying the OS bond as invalid.
+   */
+  private iosProbeDisconnectEvidence = new Map<string, IosProbeDisconnectEvidence>();
 
   /** Android endpoints whose cached GATT table is suspect; the next connect refreshes it. */
   private androidGattCacheRefreshes = new Set<string>();
@@ -1506,7 +1560,9 @@ export default class ReactNativeBleTransport {
     } catch (error) {
       // A failed acquire must retire the physical link before Core retries. Logical
       // release leaves GATT connected even when neither protocol receives a response.
-      await this.disconnectUnlocked(uuid);
+      await this.disconnectUnlocked(uuid, {
+        preserveIosProbeDisconnect: this.iosProbeDisconnectEvidence.has(uuid),
+      });
       throw error;
     } finally {
       this.acquiringProtocolV2.delete(uuid);
@@ -2111,6 +2167,7 @@ export default class ReactNativeBleTransport {
     this.androidLinkStartedAt.clear();
     stopBleKeyMissingTracking();
     stopBleEncryptionTracking();
+    this.iosProbeDisconnectEvidence.clear();
     const error = ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     this.runPromise?.reject(error);
     this.runPromise = null;
@@ -2146,7 +2203,10 @@ export default class ReactNativeBleTransport {
     return this.runLifecycleOperation(session, () => this.disconnectUnlocked(session));
   }
 
-  private async disconnectUnlocked(session: string) {
+  private async disconnectUnlocked(
+    session: string,
+    options?: { preserveIosProbeDisconnect?: boolean }
+  ) {
     await this.protocolV2Links.invalidateLink(session, 'React Native BLE transport disconnected');
     const transport = transportCache[session];
     const manager = this.blePlxManager;
@@ -2188,6 +2248,9 @@ export default class ReactNativeBleTransport {
     this.deviceProtocolHints.delete(session);
     this.sessionProtocols.delete(session);
     this.protocolReprobeFailures.delete(session);
+    if (!options?.preserveIosProbeDisconnect) {
+      this.iosProbeDisconnectEvidence.delete(session);
+    }
     this.protocolV2Assemblers.delete(session);
     this.resetProtocolV2Frames(session);
 
@@ -2536,6 +2599,7 @@ export default class ReactNativeBleTransport {
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
     this.staleBondErrors.delete(uuid);
+    this.iosProbeDisconnectEvidence.delete(uuid);
     this.acquiringProtocolV2.delete(uuid);
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);
@@ -2634,6 +2698,7 @@ export default class ReactNativeBleTransport {
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
     this.staleBondErrors.delete(uuid);
+    this.iosProbeDisconnectEvidence.delete(uuid);
     this.acquiringProtocolV2.delete(uuid);
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);
@@ -2687,6 +2752,7 @@ export default class ReactNativeBleTransport {
     this.deviceProtocol.clear();
     this.probingProtocols.clear();
     this.staleBondErrors.clear();
+    this.iosProbeDisconnectEvidence.clear();
     this.acquiringProtocolV2.clear();
     this.sessionProtocols.clear();
     // Keep transport-lifetime V2 proof so the same endpoint can finish a no-probe
@@ -2730,6 +2796,47 @@ export default class ReactNativeBleTransport {
     );
   }
 
+  private rememberIosProbeDisconnect(
+    uuid: string,
+    phase: IosProbeDisconnectEvidence['phase'],
+    error: unknown
+  ): Error | undefined {
+    if (!isIosProbeDisconnectError(error)) return undefined;
+
+    const previous = this.iosProbeDisconnectEvidence.get(uuid);
+    const errorCode = (error as { errorCode?: unknown })?.errorCode;
+    const evidence: IosProbeDisconnectEvidence = {
+      phase,
+      ...(typeof errorCode === 'string' || typeof errorCode === 'number' ? { errorCode } : {}),
+    };
+    this.iosProbeDisconnectEvidence.set(uuid, evidence);
+    Log?.debug('[ReactNativeBleTransport][BleBondDiagnostic] probe disconnect recorded', {
+      phase,
+      errorCode: evidence.errorCode,
+      repeated: Boolean(previous),
+    });
+
+    if (!previous) return undefined;
+    return this.consumeIosProbeDisconnect(uuid, 'repeated-probe-disconnect');
+  }
+
+  private consumeIosProbeDisconnect(
+    uuid: string,
+    confirmation: 'repeated-probe-disconnect' | 'follow-up-no-response'
+  ): Error | undefined {
+    const evidence = this.iosProbeDisconnectEvidence.get(uuid);
+    if (!evidence) return undefined;
+
+    this.iosProbeDisconnectEvidence.delete(uuid);
+    Log?.debug('[ReactNativeBleTransport][BleBondDiagnostic] stale bond confirmed', {
+      confirmation,
+      triggerPhase: evidence.phase,
+      triggerErrorCode: evidence.errorCode,
+      finalErrorCode: HardwareErrorCode.BleBondInvalid,
+    });
+    return ERRORS.TypedError(HardwareErrorCode.BleBondInvalid);
+  }
+
   private clearProbeProtocol(uuid: string, protocol: ProtocolType) {
     if (this.probingProtocols.get(uuid) === protocol) {
       this.probingProtocols.delete(uuid);
@@ -2761,6 +2868,7 @@ export default class ReactNativeBleTransport {
     // received no response. skipProtocolProbe does not need it either — its only
     // caller is the V2 firmware-install reconnect.
     if (expectedProtocol === 'V1') {
+      this.iosProbeDisconnectEvidence.delete(uuid);
       this.deviceProtocol.set(uuid, 'V1');
       Log?.debug('[ReactNativeBleTransport] protocol selected', {
         deviceId: uuid,
@@ -2776,6 +2884,7 @@ export default class ReactNativeBleTransport {
 
     if (expectedProtocol === 'V2') {
       if (await this.probeProtocolV2(uuid)) {
+        this.iosProbeDisconnectEvidence.delete(uuid);
         this.deviceProtocol.set(uuid, 'V2');
         this.sessionProtocols.set(uuid, 'V2');
         this.confirmedProtocolV2.add(uuid);
@@ -2786,6 +2895,18 @@ export default class ReactNativeBleTransport {
         });
         return 'V2';
       }
+      const staleBondError = this.consumeIosProbeDisconnect(uuid, 'follow-up-no-response');
+      if (Platform.OS === 'ios') {
+        Log?.debug('[ReactNativeBleTransport][BleBondDiagnostic] protocol detection ended', {
+          outcome: 'expected-v2-no-response',
+          expectedProtocol,
+          protocolHint: protocolHint ?? 'none',
+          finalErrorCode: staleBondError
+            ? HardwareErrorCode.BleBondInvalid
+            : HardwareErrorCode.RuntimeError,
+        });
+      }
+      if (staleBondError) throw staleBondError;
       throw this.createProtocolMismatchError(expectedProtocol);
     }
 
@@ -2821,6 +2942,7 @@ export default class ReactNativeBleTransport {
       const detected =
         protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
       if (detected) {
+        this.iosProbeDisconnectEvidence.delete(uuid);
         this.deviceProtocol.set(uuid, protocol);
         this.sessionProtocols.set(uuid, protocol);
         if (protocol === 'V2') {
@@ -2850,6 +2972,25 @@ export default class ReactNativeBleTransport {
 
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
+    const staleBondError = this.consumeIosProbeDisconnect(uuid, 'follow-up-no-response');
+    if (Platform.OS === 'ios') {
+      Log?.debug('[ReactNativeBleTransport][BleBondDiagnostic] protocol detection ended', {
+        outcome: 'all-probes-no-response',
+        expectedProtocol: expectedProtocol ?? 'none',
+        protocolHint: protocolHint ?? 'none',
+        sessionProtocol: sessionProtocol ?? 'none',
+        probeOrder: probeOrder.join(','),
+        trustSessionProtocol,
+        reprobeFailures,
+        transportCached: Boolean(transportCache[uuid]),
+        notifyActive: Boolean(transportCache[uuid]?.notifySubscription),
+        staleBondRecorded: this.staleBondErrors.has(uuid),
+        finalErrorCode: staleBondError
+          ? HardwareErrorCode.BleBondInvalid
+          : HardwareErrorCode.BleTimeoutError,
+      });
+    }
+    if (staleBondError) throw staleBondError;
     throw this.createProtocolDetectionError();
   }
 
@@ -2948,7 +3089,19 @@ export default class ReactNativeBleTransport {
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
       Log?.debug('[ReactNativeBleTransport] Protocol V1 GetFeatures probe failed:', error);
-      if (shouldRethrowProtocolProbeError(error)) {
+      const shouldRethrow = shouldRethrowProtocolProbeError(error);
+      const staleBondError = this.rememberIosProbeDisconnect(
+        uuid,
+        'protocol-v1-get-features',
+        error
+      );
+      logIosBleBondDiagnostic(
+        'protocol-v1-get-features',
+        error,
+        shouldRethrow ? 'rethrow' : 'fallback'
+      );
+      if (staleBondError) throw staleBondError;
+      if (shouldRethrow) {
         throw error;
       }
       return false;
@@ -2963,18 +3116,26 @@ export default class ReactNativeBleTransport {
     this.probingProtocols.set(uuid, 'V2');
     this.protocolV2Assemblers.get(uuid)?.reset();
     this.throwIfStaleBondError(uuid);
-    const detected = await probeProtocolV2Helper({
-      call: (name: string, data: Record<string, unknown>, options?: TransportCallOptions) =>
-        this.callProtocolV2(uuid, name, data, options),
-      timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
-      logger: Log,
-      logPrefix: 'ProtocolV2 RN-BLE',
-      onProbeFailed: () => {
-        this.protocolV2Assemblers.get(uuid)?.reset();
-        this.resetProtocolV2Frames(uuid);
-      },
-      shouldRethrow: shouldRethrowProtocolProbeError,
-    });
+    let detected: boolean;
+    try {
+      detected = await probeProtocolV2Helper({
+        call: (name: string, data: Record<string, unknown>, options?: TransportCallOptions) =>
+          this.callProtocolV2(uuid, name, data, options),
+        timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
+        logger: Log,
+        logPrefix: 'ProtocolV2 RN-BLE',
+        onProbeFailed: () => {
+          this.protocolV2Assemblers.get(uuid)?.reset();
+          this.resetProtocolV2Frames(uuid);
+        },
+        shouldRethrow: shouldRethrowProtocolProbeError,
+      });
+    } catch (error) {
+      const staleBondError = this.rememberIosProbeDisconnect(uuid, 'protocol-v2-ping', error);
+      logIosBleBondDiagnostic('protocol-v2-ping', error, 'rethrow');
+      if (staleBondError) throw staleBondError;
+      throw error;
+    }
     if (!detected) {
       this.clearProbeProtocol(uuid, 'V2');
     } else {
