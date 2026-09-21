@@ -1,5 +1,7 @@
+import { ZcashAddressScope, ZcashAddressType } from '@onekeyfe/hd-transport';
+
 import { BaseMethod } from '../BaseMethod';
-import { serializedPath, validatePath } from '../helpers/pathUtils';
+import { serializedPath, toHardened, validatePath } from '../helpers/pathUtils';
 import { invalidParameter, validateParams, validateResult } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
 
@@ -30,20 +32,27 @@ export default class ZcashGetAddress extends BaseMethod<HardwareZcashGetAddress[
       const addressN = validatePath(batch.path, 3);
       if (
         addressN.length !== 3 ||
-        addressN[0] !== 0x80000020 ||
-        addressN[1] !== 0x80000085 ||
-        addressN[2] < 0x80000000 ||
+        addressN[0] !== toHardened(32) ||
+        addressN[1] !== toHardened(133) ||
+        addressN[2] < toHardened(0) ||
         addressN[2] > 0xffffffff
       ) {
         throw invalidParameter("Zcash requires a ZIP-32 account path m/32'/133'/account'");
       }
-      const addressType = batch.addressType ?? 0;
-      const scope = batch.scope ?? 0;
+      const addressType = batch.addressType ?? ZcashAddressType.UNIFIED_ORCHARD_P2PKH;
+      const scope = batch.scope ?? ZcashAddressScope.EXTERNAL;
       const diversifierIndex = batch.diversifierIndex ?? 0;
-      if (![0, 1, 2].includes(addressType) || ![0, 1].includes(scope)) {
+      if (
+        ![
+          ZcashAddressType.UNIFIED_ORCHARD_P2PKH,
+          ZcashAddressType.TRANSPARENT_P2PKH,
+          ZcashAddressType.UNIFIED_ORCHARD,
+        ].includes(addressType) ||
+        ![ZcashAddressScope.EXTERNAL, ZcashAddressScope.INTERNAL].includes(scope)
+      ) {
         throw invalidParameter('Invalid Zcash address type or scope');
       }
-      const maxIndex = addressType === 2 ? 0xffffffff : 0x7fffffff;
+      const maxIndex = addressType === ZcashAddressType.UNIFIED_ORCHARD ? 0xffffffff : 0x7fffffff;
       if (
         !Number.isSafeInteger(diversifierIndex) ||
         diversifierIndex < 0 ||
