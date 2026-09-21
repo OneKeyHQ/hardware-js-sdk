@@ -142,6 +142,36 @@ than repeating the message predicate.
 Map once inside the selected system. Do not translate between `hd-core` and `hwk` inside the SDK,
 and do not reclassify an already canonical error from its fallback message.
 
+### Android Key Missing
+
+Android 16+ keeps its side of a bond the device no longer has keys for (device wiped, bond
+removed) and reports it only through the `ACTION_KEY_MISSING` broadcast. GATT shows an ordinary
+peer disconnect, and the same status is reported when a device reboots, so the disconnect status
+must never be used as the classifier.
+
+`hd-transport-react-native` re-reads a link loss as `BleBondInvalid` only when the broadcast
+belongs to the same link attempt (`bleKeyMissing.ts`): matching device, received after that link
+started, and the failure within `ANDROID_KEY_MISSING_LINK_WINDOW_MS` of it. Without the signal,
+or on an OS or native build that cannot report it, the original error is kept unchanged.
+
+Android 17 first re-pairs by itself and broadcasts key missing only if that fails. A failed
+re-pair restores the old bond (`BONDING -> BONDED`) and a successful one replaces it
+(`BONDING -> NONE -> BONDING -> BONDED`), so a bond-state wait that joins a system-initiated
+bonding relies on key missing, not on the final state, to detect failure.
+
+Android also encrypts a bonded link on its own right after connecting. A request that needs
+encryption sent before that attempt finishes (the notification CCCD write) is rejected, and the
+framework retries it by encrypting again with the same stale key; Pro 2 firmware allows one key
+failure per link and drops it on the second, before the system re-pair can finish. So when the
+device was bonded before the acquire, the transport waits for `ACTION_ENCRYPTION_CHANGE` before
+subscribing to notifications (`bleEncryption.ts`): success proceeds, key missing (HCI `0x06`)
+keeps GATT idle until the system re-pairs on the same link (or reports key missing, mapped to
+`BleBondInvalid`), and no result within `ANDROID_ENCRYPTION_RESULT_TIMEOUT_MS` proceeds as
+before. A link that is still up and was encrypted earlier does not wait. Firmware-install
+reconnects and bonds created by the same acquire skip the wait. Core's `ensureConnected` bounds
+each attempt by its call timeout, which a user-confirmed re-pair can exceed; the re-pair still
+completes and the next attempt reuses the link.
+
 ## Cross-Runtime Transport
 
 The legacy Core response path uses `serializeError()` through `createResponseMessage()`. HWK

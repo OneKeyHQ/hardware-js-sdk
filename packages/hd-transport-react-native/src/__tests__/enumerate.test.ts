@@ -25,6 +25,21 @@ jest.mock('../BleManager', () => ({
   pairDevice: jest.fn(),
 }));
 
+// The native facade is replaced wholesale above; key missing and link encryption are covered
+// by their own suites.
+jest.mock('../bleKeyMissing', () => ({
+  isBleKeyMissingSupported: jest.fn(() => false),
+  startBleKeyMissingTracking: jest.fn(() => false),
+  stopBleKeyMissingTracking: jest.fn(),
+  waitForBleKeyMissing: jest.fn(() => Promise.resolve(false)),
+}));
+jest.mock('../bleEncryption', () => ({
+  markBleLinkEncrypted: jest.fn(),
+  startBleEncryptionTracking: jest.fn(() => false),
+  stopBleEncryptionTracking: jest.fn(),
+  waitForAndroidLinkEncryption: jest.fn(() => Promise.resolve('unresolved')),
+}));
+
 jest.mock('../subscribeBleOn', () => ({
   subscribeBleOn: jest.fn(() => Promise.resolve()),
 }));
