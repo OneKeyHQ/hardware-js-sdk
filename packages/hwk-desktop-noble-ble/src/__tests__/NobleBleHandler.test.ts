@@ -286,6 +286,37 @@ describe('NobleBleHandler', () => {
     // _connectInner: scanning first is what keeps macOS from hanging).
   }, 15_000);
 
+  test('scoped scan release leaves another vendor discovery running', async () => {
+    const noble = new FakeNoble([]);
+    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    await handler.scan({ vendor: 'first' });
+    await handler.scan({ vendor: 'second' });
+    await handler.stopScan('first');
+    expect(noble.stopScanningAsync).not.toHaveBeenCalled();
+    await handler.stopScan('second');
+    expect(noble.stopScanningAsync).toHaveBeenCalledTimes(1);
+  });
+
+  test('targeted pairing cancellation preserves other vendors and same-vendor devices', async () => {
+    const first = new FakePeripheral('first', { localName: 'Trezor Safe 7' });
+    const second = new FakePeripheral('second', { localName: 'Trezor Safe 7' });
+    const ledger = new FakePeripheral('ledger', { localName: 'Ledger' });
+    const noble = new FakeNoble([first, second, ledger]);
+    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    await handler.scan({ ...PADDED_VENDOR });
+    await handler.connect('first', PADDED_PROFILE);
+    await handler.connect('second', PADDED_PROFILE);
+    await handler.connect('ledger', { ...PADDED_PROFILE, vendor: 'ledger' });
+    await handler.cancelPairing({ vendor: PADDED_VENDOR.vendor, id: 'first' });
+    expect(first.disconnectAsync).toHaveBeenCalled();
+    expect(second.disconnectAsync).not.toHaveBeenCalled();
+    expect(ledger.disconnectAsync).not.toHaveBeenCalled();
+    await handler.cancelPairing({ vendor: PADDED_VENDOR.vendor });
+    expect(second.disconnectAsync).toHaveBeenCalled();
+    expect(ledger.disconnectAsync).not.toHaveBeenCalled();
+    await handler.disconnect('ledger');
+  });
+
   test('cancelPairing ends a connect still waiting on the OS pairing window', async () => {
     // Pairing happens inside connectAsync, so the device is not in _connected
     // yet. Before cancelPairing could abandon the attempt, cancelling left the
@@ -315,8 +346,9 @@ describe('NobleBleHandler', () => {
       setTimeout(resolve, 350);
     });
 
-    await handler.cancelPairing();
-
+    await handler.cancelPairing({ vendor: 'another-vendor' });
+    expect(peripheral.disconnectAsync).not.toHaveBeenCalled();
+    await handler.cancelPairing({ vendor: PADDED_VENDOR.vendor, id: 'id-1' });
     await expect(settled).resolves.toMatch(/connect cancelled/);
   });
 
@@ -497,6 +529,12 @@ describe('initThirdPartyBleSupport', () => {
     ]) {
       expect(ipcMain.handlers.has(ch)).toBe(true);
     }
+
+    // The IPC seam must forward the scope rather than silently cancelling globally.
+    const cancel = jest.spyOn(NobleBleHandler.prototype, 'cancelPairing').mockResolvedValueOnce();
+    await ipcMain.invoke(THIRD_PARTY_BLE_CHANNELS.cancelPairing, { vendor: 'trezor', id: 'id-1' });
+    expect(cancel).toHaveBeenCalledWith({ vendor: 'trezor', id: 'id-1' });
+    cancel.mockRestore();
 
     // Drive the handlers through IPC.
     await ipcMain.invoke(THIRD_PARTY_BLE_CHANNELS.scan, { durationMs: 0 });

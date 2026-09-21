@@ -2683,6 +2683,59 @@ describe('KeystoneAdapter', () => {
   });
 
   describe('USB channel', () => {
+    it.each(['connect', 'identity'] as const)(
+      'cancels USB first contact during %s and drains late completion before reuse',
+      async phase => {
+        const usb = fakeUsbConnector();
+        const adapter = new KeystoneAdapter({ usbConnector: usb.connector });
+        const [target] = await adapter.searchDeviceTargets({ transportType: 'usb' });
+        let resume!: () => void;
+        const wait = new Promise<void>(resolve => {
+          resume = resolve;
+        });
+        const originalConnect = usb.connector.connect.bind(usb.connector);
+        const originalCall = usb.connector.call.bind(usb.connector);
+        const connect = jest.spyOn(usb.connector, 'connect').mockImplementation(async (...args) => {
+          if (phase === 'connect') await wait;
+          return originalConnect(...args);
+        });
+        const call = jest.spyOn(usb.connector, 'call').mockImplementation(async (...args) => {
+          if (phase === 'identity') await wait;
+          return originalCall(...args);
+        });
+        const disconnect = jest.spyOn(usb.connector, 'disconnect');
+        const events: HardwareEvent[] = [];
+        adapter.on('device-connect', event => events.push(event));
+        const pending = adapter.connectDevice(target.searchTargetId);
+        await new Promise<void>(resolve => {
+          setImmediate(resolve);
+        });
+        expect(connect).toHaveBeenCalledTimes(1);
+        adapter.cancel(target.searchTargetId);
+        await expect(pending).resolves.toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.UserAborted },
+        });
+        await expect(adapter.connectDevice(target.searchTargetId)).resolves.toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.DeviceBusyInternal },
+        });
+        expect(connect).toHaveBeenCalledTimes(1);
+        resume();
+        await new Promise<void>(resolve => {
+          setImmediate(resolve);
+        });
+        expect(disconnect).toHaveBeenCalledWith('keystone-usb-session:1');
+        expect(events).toHaveLength(0);
+        if (phase === 'connect') expect(call).not.toHaveBeenCalled();
+        await expect(adapter.connectDevice(target.searchTargetId)).resolves.toMatchObject({
+          success: true,
+        });
+        expect(events).toHaveLength(1);
+        await adapter.dispose();
+      }
+    );
+
     it('search reset disconnects and retires a pure-USB wallet session', async () => {
       const usb = fakeUsbConnector();
       const disconnect = jest.spyOn(usb.connector, 'disconnect');

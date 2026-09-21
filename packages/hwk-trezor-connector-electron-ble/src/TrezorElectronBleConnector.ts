@@ -155,7 +155,7 @@ export class TrezorElectronBleConnector extends TrezorConnectorBase {
     // Base cancel only settles UI waiters; a connect stuck in the main process
     // must be abandoned there.
     try {
-      await this._transport?.cancelPairing();
+      await this._transport?.cancelPairing(sessionId);
     } catch {
       // Cancel must never throw.
     }
