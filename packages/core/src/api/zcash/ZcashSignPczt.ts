@@ -2,7 +2,7 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { invalidParameter, validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 import { UI_REQUEST } from '../../constants/ui-request';
 
@@ -31,13 +31,10 @@ export default class ZcashSignPczt extends BaseMethod<HardwareZcashSignPczt> {
 
     this.pczt = Buffer.from(formatAnyHex(this.payload.pczt), 'hex');
     if (this.pczt.length === 0) {
-      throw ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter, 'pczt is empty');
+      throw invalidParameter('pczt is empty');
     }
     if (this.pczt.length > ZCASH_PCZT_MAX_BYTES) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.CallMethodInvalidParameter,
-        `pczt exceeds ${ZCASH_PCZT_MAX_BYTES} bytes (${this.pczt.length})`
-      );
+      throw invalidParameter(`pczt exceeds ${ZCASH_PCZT_MAX_BYTES} bytes (${this.pczt.length})`);
     }
 
     this.params = {
