@@ -75,8 +75,7 @@ type NobleBleNativeError = Error & {
 export function createNobleBleConnectionError(error: NobleBleNativeError, messagePrefix = '') {
   const errorMessage = error.message;
   const isInvalidMacOsBond =
-    (error.nativeErrorCode === 14 && error.nativeErrorDomain === 'CBErrorDomain') ||
-    (error.nativeErrorCode === 15 && error.nativeErrorDomain === 'CBATTErrorDomain');
+    error.nativeErrorCode === 14 && error.nativeErrorDomain === 'CBErrorDomain';
   if (isInvalidMacOsBond) {
     const nativeErrorMessage = `${messagePrefix}${errorMessage}`;
     return ERRORS.TypedError(
@@ -1742,11 +1741,15 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
     logger?.info('[NobleBLE] Direct connect-by-id succeeded', { deviceId });
     return peripheral;
   } catch (error) {
-    directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
     logger?.info('[NobleBLE] Direct connect-by-id failed, falling back to scan', {
       deviceId,
       error: String(error),
     });
+    const nativeError = error as NobleBleNativeError;
+    if (nativeError.nativeErrorCode === 14 && nativeError.nativeErrorDomain === 'CBErrorDomain') {
+      throw createNobleBleConnectionError(nativeError);
+    }
+    directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
     return undefined;
   } finally {
     clearTimeout(timer);
@@ -1809,12 +1812,21 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       }
     };
 
+    let staleBondError: Error | undefined;
     const connectById = async () => {
-      const found = await tryDirectConnectById(deviceId);
-      if (found) {
-        discoveredDevices.set(deviceId, found);
+      try {
+        const found = await tryDirectConnectById(deviceId);
+        if (found) {
+          discoveredDevices.set(deviceId, found);
+        }
+        return found;
+      } catch (error) {
+        if ((error as { errorCode?: number }).errorCode !== HardwareErrorCode.BleBondInvalid) {
+          throw error;
+        }
+        staleBondError = error as Error;
+        return undefined;
       }
-      return found;
     };
 
     peripheral = byIdFirst ? await connectById() : await scanForPeripheral();
@@ -1823,6 +1835,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       // silent), or not reachable by id. Try the other one before giving up.
       peripheral = byIdFirst ? await scanForPeripheral() : await connectById();
     }
+    if (!peripheral && staleBondError) throw staleBondError;
   }
 
   assertBleActive();
@@ -2120,10 +2133,18 @@ async function subscribeNotifications(
       ms: Date.now() - subscribeStartedAt,
     });
   } catch (error) {
-    throw createNobleBleConnectionError(
-      error as NobleBleNativeError,
-      'Notification subscription failed: '
-    );
+    const nativeError = error as NobleBleNativeError;
+    if (
+      nativeError.nativeErrorCode === 15 &&
+      nativeError.nativeErrorDomain === 'CBATTErrorDomain'
+    ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.BleDeviceNotBonded,
+        HardwareErrorCodeMessage[HardwareErrorCode.BleDeviceNotBonded],
+        { nativeErrorMessage: `Notification subscription failed: ${nativeError.message}` }
+      );
+    }
+    throw createNobleBleConnectionError(nativeError, 'Notification subscription failed: ');
   } finally {
     // 🔒 CRITICAL: Always clear operation state (even on error)
     if (!disposing) subscriptionOperations.set(deviceId, 'idle');
