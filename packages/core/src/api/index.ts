@@ -174,3 +174,5 @@ export { default as benfenSignTransaction } from './benfen/BenfenSignTransaction
 
 export { default as neoGetAddress } from './neo/NeoGetAddress';
 export { default as neoSignTransaction } from './neo/NeoSignTransaction';
+export { default as zcashGetAddress } from './zcash/ZcashGetAddress';
+export { default as zcashSignPczt } from './zcash/ZcashSignPczt';

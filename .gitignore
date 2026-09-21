@@ -95,3 +95,6 @@ packages/connect-examples/expo-example/web-build
 
 # bitcoin.test.ts writes its refTx next to itself; never commit the artifact
 packages/connect-examples/expo-example/src/data/output.json
+
+# Local development notes
+/note/

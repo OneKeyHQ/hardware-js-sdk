@@ -153,6 +153,8 @@ import type { benfenSignTransaction } from './benfenSignTransaction';
 import type { benfenSignMessage } from './benfenSignMessage';
 import type { neoGetAddress } from './neoGetAddress';
 import type { neoSignTransaction } from './neoSignTransaction';
+import type { zcashGetAddress } from './zcashGetAddress';
+import type { zcashSignPczt } from './zcashSignPczt';
 import type { ConnectSettings } from '../settings';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
@@ -470,4 +472,10 @@ export type CoreApi = {
    */
   neoGetAddress: typeof neoGetAddress;
   neoSignTransaction: typeof neoSignTransaction;
+
+  /**
+   * Zcash
+   */
+  zcashGetAddress: typeof zcashGetAddress;
+  zcashSignPczt: typeof zcashSignPczt;
 };
