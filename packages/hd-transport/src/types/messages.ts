@@ -4680,6 +4680,33 @@ export type UiAnimationRequest = {
   type?: UiAnimationType;
 };
 
+// ZcashSignPczt
+export type ZcashSignPczt = {
+  pczt_length: number;
+  pczt_initial_chunk: string;
+};
+
+// ZcashPcztChunkRequest
+export type ZcashPcztChunkRequest = {
+  chunk_length: number;
+};
+
+// ZcashPcztChunkAck
+export type ZcashPcztChunkAck = {
+  data_chunk: string;
+};
+
+// ZcashSignedPczt
+export type ZcashSignedPczt = {
+  pczt_length: number;
+  pczt_initial_chunk: string;
+};
+
+// ZcashSignedPcztChunkRequest
+export type ZcashSignedPcztChunkRequest = {
+  chunk_length: number;
+};
+
 // experimental_message
 export type experimental_message = {};
 
@@ -5374,6 +5401,35 @@ export type ViewVerifyPage = {
   content?: ViewContentPreview;
 };
 
+export enum ZcashAddressType {
+  UNIFIED_ORCHARD_P2PKH = 0,
+  TRANSPARENT_P2PKH = 1,
+  UNIFIED_ORCHARD = 2,
+}
+
+export enum ZcashAddressScope {
+  EXTERNAL = 0,
+  INTERNAL = 1,
+}
+
+// ZcashGetAddress
+export type ZcashGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+  include_seed_fingerprint?: boolean;
+  include_ufvk?: boolean;
+  diversifier_index?: number;
+  address_type?: ZcashAddressType;
+  scope?: ZcashAddressScope;
+};
+
+// ZcashAddress
+export type ZcashAddress = {
+  address: string;
+  ufvk?: string;
+  seed_fingerprint?: string;
+};
+
 export enum ProtocolV2FailureType {
   Failure_InvalidMessage = 1,
   Failure_UndefinedError = 2,
@@ -5988,6 +6044,11 @@ export type MessageType = {
   UnlockPath: UnlockPath;
   UnlockedPathRequest: UnlockedPathRequest;
   UiAnimationRequest: UiAnimationRequest;
+  ZcashSignPczt: ZcashSignPczt;
+  ZcashPcztChunkRequest: ZcashPcztChunkRequest;
+  ZcashPcztChunkAck: ZcashPcztChunkAck;
+  ZcashSignedPczt: ZcashSignedPczt;
+  ZcashSignedPcztChunkRequest: ZcashSignedPcztChunkRequest;
   experimental_message: experimental_message;
   experimental_field: experimental_field;
   ProtocolInfoRequest: ProtocolInfoRequest;
@@ -6064,6 +6125,8 @@ export type MessageType = {
   ViewSignPage: ViewSignPage;
   ViewWarningPage: ViewWarningPage;
   ViewVerifyPage: ViewVerifyPage;
+  ZcashGetAddress: ZcashGetAddress;
+  ZcashAddress: ZcashAddress;
 };
 
 export type MessageKey = keyof MessageType;
