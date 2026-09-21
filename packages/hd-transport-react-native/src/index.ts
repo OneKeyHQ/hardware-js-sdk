@@ -368,6 +368,18 @@ const isStaleGattTableNotifyReason = (reason: string | null | undefined): boolea
  */
 export const BLE_CONNECT_TIMEOUT_MS = BLE_NATIVE_CONNECT_TIMEOUT_MS * 2 + 2000;
 /**
+ * iOS names a bond the device no longer holds only by failing the connect, and on some phones
+ * that takes a little longer than the native budget: the attempt is cancelled first, the answer
+ * is lost, and two such timeouts reset the BLE manager and end as a connect timeout. A device
+ * that was just seen advertising is present, so its connect gets the time iOS needs. Without
+ * that sighting the budget stays short, because an absent device never answers.
+ */
+export const IOS_PRESENT_DEVICE_CONNECT_TIMEOUT_MS = 8000;
+/** How recent a sighting must be to show that the device is present. */
+export const IOS_PRESENT_DEVICE_WINDOW_MS = 15_000;
+export const IOS_PRESENT_DEVICE_CONNECT_BACKSTOP_MS =
+  IOS_PRESENT_DEVICE_CONNECT_TIMEOUT_MS + (BLE_CONNECT_TIMEOUT_MS - BLE_NATIVE_CONNECT_TIMEOUT_MS);
+/**
  * Service discovery and characteristic resolution run after connect() succeeds, but
  * CoreBluetooth schedules them on the same serial queue. If that queue is wedged by a
  * device reboot, these calls can remain pending forever unless they have their own
@@ -591,6 +603,9 @@ export default class ReactNativeBleTransport {
 
   /** iOS acquire attempts whose new link the peer ended; two in a row mean a stale bond. */
   private iosPeerTermination = new IosPeerTerminationTracker();
+
+  /** When a scan last saw each device on iOS; a fresh sighting earns one longer connect. */
+  private iosLastAdvertisedAt = new Map<string, number>();
 
   /** Strict or previously confirmed V2 target while acquire installs notifications. */
   private acquiringProtocolV2 = new Set<string>();
@@ -1039,6 +1054,7 @@ export default class ReactNativeBleTransport {
       );
 
       const addDevice = (device: Device) => {
+        if (Platform.OS === 'ios') this.iosLastAdvertisedAt.set(device.id, Date.now());
         if (!finished && deviceList.every(d => d.id !== device.id)) {
           firstDeviceMs ??= Date.now() - scanStartedAt;
           const displayName = getDeviceDisplayName(device) ?? 'Unknown BLE Device';
@@ -1205,10 +1221,17 @@ export default class ReactNativeBleTransport {
     const refreshAndroidGattCache =
       isAndroid && (!!skipProtocolProbe || this.androidGattCacheRefreshes.has(uuid));
     let nativeConnectOptions = connectOptions;
+    let bareConnectOptions = fallbackConnectOptions;
+    let connectBackstopMs = BLE_CONNECT_TIMEOUT_MS;
     if (isAndroid) {
       nativeConnectOptions = refreshAndroidGattCache
         ? androidRefreshGattConnectOptions
         : fallbackConnectOptions;
+    } else if (this.takeIosPresentDeviceSighting(uuid, skipProtocolProbe)) {
+      const timeout = IOS_PRESENT_DEVICE_CONNECT_TIMEOUT_MS;
+      nativeConnectOptions = { ...connectOptions, timeout };
+      bareConnectOptions = { ...fallbackConnectOptions, timeout };
+      connectBackstopMs = IOS_PRESENT_DEVICE_CONNECT_BACKSTOP_MS;
     }
     // Only a connect that carried refreshGatt clears the marker; the fallback connects drop it.
     let androidRefreshConnectRan = false;
@@ -1275,8 +1298,10 @@ export default class ReactNativeBleTransport {
     if (!device) {
       Log?.debug('try to connect to device: ', uuid);
       try {
-        device = await this.connectWithTimeout(uuid, () =>
-          blePlxManager.connectToDevice(uuid, nativeConnectOptions)
+        device = await this.connectWithTimeout(
+          uuid,
+          () => blePlxManager.connectToDevice(uuid, nativeConnectOptions),
+          connectBackstopMs
         );
         androidRefreshConnectRan = refreshAndroidGattCache;
       } catch (e) {
@@ -1287,8 +1312,10 @@ export default class ReactNativeBleTransport {
         if (isMtuOrCancelledConnectError(e)) {
           skipPostConnectMtu = true;
           Log?.debug('first try to reconnect without params');
-          device = await this.connectWithTimeout(uuid, () =>
-            blePlxManager.connectToDevice(uuid, fallbackConnectOptions)
+          device = await this.connectWithTimeout(
+            uuid,
+            () => blePlxManager.connectToDevice(uuid, bareConnectOptions),
+            connectBackstopMs
           );
         } else if (e.errorCode === BleErrorCode.DeviceAlreadyConnected) {
           Log?.debug('device already connected');
@@ -1319,8 +1346,10 @@ export default class ReactNativeBleTransport {
       const disconnectedDevice = device;
 
       try {
-        device = await this.connectWithTimeout(uuid, () =>
-          disconnectedDevice.connect(nativeConnectOptions)
+        device = await this.connectWithTimeout(
+          uuid,
+          () => disconnectedDevice.connect(nativeConnectOptions),
+          connectBackstopMs
         );
         androidRefreshConnectRan = refreshAndroidGattCache;
       } catch (e) {
@@ -1332,8 +1361,10 @@ export default class ReactNativeBleTransport {
           skipPostConnectMtu = true;
           Log?.debug('second try to reconnect without params');
           try {
-            device = await this.connectWithTimeout(uuid, () =>
-              disconnectedDevice.connect(fallbackConnectOptions)
+            device = await this.connectWithTimeout(
+              uuid,
+              () => disconnectedDevice.connect(bareConnectOptions),
+              connectBackstopMs
             );
           } catch (fallbackError) {
             Log?.debug('last try to reconnect error: ', fallbackError);
@@ -1342,8 +1373,10 @@ export default class ReactNativeBleTransport {
             if (fallbackError.errorCode === BleErrorCode.OperationCancelled) {
               Log?.debug('last try to reconnect');
               await disconnectedDevice.cancelConnection();
-              device = await this.connectWithTimeout(uuid, () =>
-                disconnectedDevice.connect(fallbackConnectOptions)
+              device = await this.connectWithTimeout(
+                uuid,
+                () => disconnectedDevice.connect(bareConnectOptions),
+                connectBackstopMs
               );
             } else {
               remapError(fallbackError);
@@ -1408,8 +1441,10 @@ export default class ReactNativeBleTransport {
           throw ERRORS.TypedError(HardwareErrorCode.BleTimeoutError, 'BLE MTU cleanup timed out');
         }
         try {
-          device = await this.connectWithTimeout(uuid, () =>
-            timedOutDevice.connect(fallbackConnectOptions)
+          device = await this.connectWithTimeout(
+            uuid,
+            () => timedOutDevice.connect(bareConnectOptions),
+            connectBackstopMs
           );
         } catch (error) {
           if (shouldRethrowBleSetupError(error)) throw error;
@@ -1818,6 +1853,19 @@ export default class ReactNativeBleTransport {
   }
 
   /**
+   * Whether this acquire may spend the longer iOS connect budget. The sighting is used up: the
+   * retry that follows a timeout gets no new scan, and the device may have left by then. A
+   * firmware-install reconnect keeps its short polling cadence.
+   */
+  private takeIosPresentDeviceSighting(uuid: string, skipProtocolProbe?: boolean): boolean {
+    if (Platform.OS !== 'ios') return false;
+    const seenAt = this.iosLastAdvertisedAt.get(uuid);
+    this.iosLastAdvertisedAt.delete(uuid);
+    if (skipProtocolProbe || seenAt === undefined) return false;
+    return Date.now() - seenAt <= IOS_PRESENT_DEVICE_WINDOW_MS;
+  }
+
+  /**
    * iOS says why a link ended only on the operation it interrupted, so the native codes are read
    * and logged here. Codes only: the reason text is localized and cannot be matched or searched.
    */
@@ -2167,6 +2215,7 @@ export default class ReactNativeBleTransport {
     this.androidHighPriorityDevices.clear();
     this.androidLinkStartedAt.clear();
     this.iosPeerTermination.reset();
+    this.iosLastAdvertisedAt.clear();
     stopBleKeyMissingTracking();
     stopBleEncryptionTracking();
     const error = ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
@@ -2458,7 +2507,11 @@ export default class ReactNativeBleTransport {
   }
 
   /** Run a native connect under the JS backstop budget. */
-  private async connectWithTimeout<T>(uuid: string, connect: () => Promise<T>): Promise<T> {
+  private async connectWithTimeout<T>(
+    uuid: string,
+    connect: () => Promise<T>,
+    backstopMs = BLE_CONNECT_TIMEOUT_MS
+  ): Promise<T> {
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     const startedAt = Date.now();
     let succeeded = false;
@@ -2477,10 +2530,10 @@ export default class ReactNativeBleTransport {
             reject(
               ERRORS.TypedError(
                 HardwareErrorCode.BleConnectedError,
-                `BLE connect timeout after ${BLE_CONNECT_TIMEOUT_MS}ms for ${uuid}`
+                `BLE connect timeout after ${backstopMs}ms for ${uuid}`
               )
             );
-          }, BLE_CONNECT_TIMEOUT_MS);
+          }, backstopMs);
         }),
       ]);
       succeeded = true;
@@ -2504,6 +2557,7 @@ export default class ReactNativeBleTransport {
         elapsedMs: Date.now() - startedAt,
         succeeded,
         backstopExpired: timedOut,
+        backstopMs,
       });
     }
   }
