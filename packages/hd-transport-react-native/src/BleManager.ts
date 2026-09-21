@@ -31,13 +31,7 @@ export const getConnectedDeviceIds = (serviceUuids: string[]) =>
 
 export const getBondedDevices = () => BleUtils.getBondedPeripherals();
 
-type PairDeviceResult = Awaited<ReturnType<typeof BleUtils.pairDevice>> & {
-  /** Reported by newer native builds: whether this call started the bonding. */
-  initiated?: boolean;
-};
-
-export const pairDevice = (macAddress: string): Promise<PairDeviceResult> =>
-  BleUtils.pairDevice(macAddress);
+export const pairDevice = (macAddress: string) => BleUtils.pairDevice(macAddress);
 
 /**
  * Android replaces a bond as BONDING -> NONE, then NONE -> BONDING within milliseconds.

@@ -5359,10 +5359,10 @@
   resolved "https://registry.npmjs.org/@onekeyfe/hwk-trezor-core/-/hwk-trezor-core-1.1.34-alpha.1.tgz#7c546189c76211109e4a6b0e3d4290608938abe7"
   integrity sha512-lTkcGwymMGGyQCn6UN+hoqH2q4LjYx97W6KC0IoUEdwNP1Pipa4YjDi0dvRfJaCaYYErgMfhR3Z2/BapqG+dYQ==
 
-"@onekeyfe/react-native-ble-utils@0.1.6":
-  version "0.1.6"
-  resolved "https://registry.npmjs.org/@onekeyfe/react-native-ble-utils/-/react-native-ble-utils-0.1.6.tgz#1f0c4055504f433b41e0e2a000ac499ca099877b"
-  integrity sha512-S7aGN8Qmw0XZDe3BtwDtgdrABzFK8BW035QXXvgKtBgwQocfpel2B17LECJYL1Lm5gbqOcdZYcHAJBR5lxcPdw==
+"@onekeyfe/react-native-ble-utils@0.1.8":
+  version "0.1.8"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/react-native-ble-utils/-/react-native-ble-utils-0.1.8.tgz#eb9b391b62eb1febe3489f5d2f7a48e9b5685e3e"
+  integrity sha512-ADr3+K7yWl7op+bleFcaYtDbejkEZhuPl8vwMhR3DpzRzZqVXdOARgz4Uo33keiKNptBvseyEEstiZYqc8wBBw==
 
 "@peculiar/asn1-schema@^2.3.8":
   version "2.3.13"

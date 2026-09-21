@@ -11,14 +11,11 @@ import BleUtils from '@onekeyfe/react-native-ble-utils';
  * an ordinary disconnect (a firmware-update reboot, for example) into a terminal bond error.
  */
 
-type KeyMissingEvent = { id?: unknown };
-
-// The capability ships in a later react-native-ble-utils than the one this package is
-// typed against, and the JS bundle can also run on a native build that predates it.
-type KeyMissingCapableBleUtils = {
-  supportsDeviceKeyMissing?: () => boolean;
-  onDeviceKeyMissing?: (callback: (event: KeyMissingEvent) => void) => () => void;
-};
+// An app can still resolve a react-native-ble-utils older than 0.1.8, and the JS bundle can
+// run on a native build that predates the event, so neither method is assumed to exist.
+type KeyMissingCapableBleUtils = Partial<
+  Pick<typeof BleUtils, 'supportsDeviceKeyMissing' | 'onDeviceKeyMissing'>
+>;
 
 type KeyMissingListener = (deviceId: string) => void;
 
@@ -30,7 +27,7 @@ const normalizeDeviceId = (deviceId: string) => deviceId.toLowerCase();
 
 const getCapableBleUtils = (): KeyMissingCapableBleUtils | undefined => {
   if (Platform.OS !== 'android') return undefined;
-  const bleUtils = BleUtils as unknown as KeyMissingCapableBleUtils;
+  const bleUtils: KeyMissingCapableBleUtils = BleUtils;
   if (
     typeof bleUtils.supportsDeviceKeyMissing !== 'function' ||
     typeof bleUtils.onDeviceKeyMissing !== 'function'
