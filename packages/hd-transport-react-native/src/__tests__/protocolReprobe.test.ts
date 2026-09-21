@@ -183,6 +183,10 @@ describe('iOS reset-device stale bond confirmation', () => {
     await expect(detect(transport)).rejects.toMatchObject({
       errorCode: HardwareErrorCode.BleBondInvalid,
     });
+    await expect(detect(transport)).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleBondInvalid,
+    });
+    expect((transport as any).iosProbeDisconnectEvidence.has(UUID)).toBe(true);
   });
 
   test('promotes a repeated iOS probe disconnect without waiting for probe timeouts', () => {
@@ -199,6 +203,7 @@ describe('iOS reset-device stale bond confirmation', () => {
     expect(
       (transport as any).rememberIosProbeDisconnect(UUID, 'protocol-v2-ping', secondError)
     ).toMatchObject({ errorCode: HardwareErrorCode.BleBondInvalid });
+    expect((transport as any).iosProbeDisconnectEvidence.has(UUID)).toBe(true);
   });
 
   test('clears the disconnect evidence after a valid protocol response', async () => {
@@ -213,7 +218,7 @@ describe('iOS reset-device stale bond confirmation', () => {
     expect((transport as any).iosProbeDisconnectEvidence.has(UUID)).toBe(false);
   });
 
-  test('preserves evidence for acquire retry cleanup and clears it on an explicit disconnect', async () => {
+  test('preserves evidence across disconnect and stalled setup cleanup', async () => {
     const { transport } = createHarness({ v1: false, v2: false });
     (transport as any).rememberIosProbeDisconnect(
       UUID,
@@ -221,12 +226,30 @@ describe('iOS reset-device stale bond confirmation', () => {
       ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded)
     );
 
-    await (transport as any).disconnectUnlocked(UUID, {
-      preserveIosProbeDisconnect: true,
-    });
+    await (transport as any).disconnectUnlocked(UUID);
     expect((transport as any).iosProbeDisconnectEvidence.has(UUID)).toBe(true);
 
-    await (transport as any).disconnectUnlocked(UUID);
+    (transport as any).abandonStalledConnection(UUID, 'connect-native');
+    expect((transport as any).iosProbeDisconnectEvidence.has(UUID)).toBe(true);
+
+    await expect(detect(transport)).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleBondInvalid,
+    });
+  });
+
+  test('expires old disconnect evidence before classifying a later timeout', async () => {
+    const { transport } = createHarness({ v1: false, v2: false });
+    (transport as any).rememberIosProbeDisconnect(
+      UUID,
+      'protocol-v1-get-features',
+      ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded)
+    );
+    const evidence = (transport as any).iosProbeDisconnectEvidence.get(UUID);
+    evidence.recordedAt = Date.now() - 5 * 60_000 - 1;
+
+    await expect(detect(transport)).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleTimeoutError,
+    });
     expect((transport as any).iosProbeDisconnectEvidence.has(UUID)).toBe(false);
   });
 
