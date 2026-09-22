@@ -3413,3 +3413,108 @@ describe('Keystone operation transport ownership', () => {
     }
   );
 });
+
+describe('Keystone automatic USB attach cancellation', () => {
+  const flush = () =>
+    new Promise<void>(resolve => {
+      setImmediate(resolve);
+    });
+
+  it.each(['enumerate', 'connect', 'identity'] as const)(
+    'stops after cancellation during %s and cleans up late results',
+    async phase => {
+      const usb = fakeUsbConnector(undefined, undefined, undefined, FIXTURE_ROOT, false, true, [
+        OTHER_ROOT,
+        FIXTURE_ROOT,
+      ]);
+      const adapter = new KeystoneAdapter({ usbConnector: usb.connector });
+      let resume!: () => void;
+      const wait = new Promise<void>(resolve => {
+        resume = resolve;
+      });
+      const originalSearch = usb.connector.searchDevices.bind(usb.connector);
+      const originalConnect = usb.connector.connect.bind(usb.connector);
+      const originalCall = usb.connector.call.bind(usb.connector);
+      jest.spyOn(usb.connector, 'searchDevices').mockImplementation(async (...args) => {
+        if (phase === 'enumerate') await wait;
+        return originalSearch(...args);
+      });
+      const connect = jest.spyOn(usb.connector, 'connect').mockImplementation(async (...args) => {
+        if (phase === 'connect') await wait;
+        return originalConnect(...args);
+      });
+      const call = jest.spyOn(usb.connector, 'call').mockImplementation(async (...args) => {
+        if (phase === 'identity') await wait;
+        return originalCall(...args);
+      });
+      const disconnect = jest.spyOn(usb.connector, 'disconnect');
+      const connected = jest.fn();
+      const qrDisplay = jest.fn();
+      adapter.on('device-connect', connected);
+      adapter.on(UI_REQUEST.REQUEST_QR_DISPLAY, qrDisplay);
+      let settled = false;
+      const pending = adapter
+        .evmGetAddress('', FIXTURE_WALLET_ID, {
+          path: "m/44'/60'/0'/0/0",
+        })
+        .then(result => {
+          settled = true;
+          return result;
+        });
+      try {
+        await flush();
+        adapter.cancel(FIXTURE_WALLET_ID);
+        await flush();
+        expect(settled).toBe(true);
+        await expect(pending).resolves.toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.UserAborted },
+        });
+        resume();
+        await flush();
+        expect(connect).toHaveBeenCalledTimes(phase === 'enumerate' ? 0 : 1);
+        expect(call).toHaveBeenCalledTimes(phase === 'identity' ? 1 : 0);
+        expect(disconnect).toHaveBeenCalledTimes(phase === 'enumerate' ? 0 : 1);
+        expect(connected).not.toHaveBeenCalled();
+        expect(qrDisplay).not.toHaveBeenCalled();
+      } finally {
+        resume();
+        await pending;
+        await adapter.dispose();
+      }
+    }
+  );
+
+  it('does not probe again after cancellation in the re-enumeration delay', async () => {
+    const usb = fakeUsbConnector();
+    const adapter = new KeystoneAdapter({ usbConnector: usb.connector });
+    const fake = attachFakeDevice(adapter);
+    try {
+      await connectUsbDevice(adapter);
+      await adapter.importFromQr();
+      usb.setAvailable(false);
+      usb.emitDisconnect();
+      const searchesBefore = usb.searchCalls.length;
+      const requestsBefore = fake.requests.length;
+      const pending = adapter.evmSignMessage('', FIXTURE_WALLET_ID, {
+        path: "m/44'/60'/0'/0/0",
+        message: 'cancellation fixture',
+      });
+      await flush();
+      expect(usb.searchCalls.length).toBe(searchesBefore + 1);
+      adapter.cancel(FIXTURE_WALLET_ID);
+      await expect(pending).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.UserAborted },
+      });
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 550);
+      });
+      expect(usb.searchCalls.length).toBe(searchesBefore + 1);
+      expect(fake.requests).toHaveLength(requestsBefore);
+    } finally {
+      fake.detach();
+      await adapter.dispose();
+    }
+  });
+});
