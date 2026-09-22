@@ -78,12 +78,17 @@ class FakeNoble extends EventEmitter {
 
   private readonly peripherals: FakePeripheral[];
 
+  scanning = false;
+
   startScanningAsync = jest.fn(async () => {
+    this.scanning = true;
     // Simulate discovery synchronously.
     for (const p of this.peripherals) this.emit('discover', p);
   });
 
-  stopScanningAsync = jest.fn(async () => undefined);
+  stopScanningAsync = jest.fn(async () => {
+    this.scanning = false;
+  });
 
   constructor(peripherals: FakePeripheral[] = []) {
     super();
@@ -742,5 +747,132 @@ describe('Trezor BLE process shutdown', () => {
     expect(releaseNoble).toHaveBeenCalledWith(native);
     expect(native.stop).not.toHaveBeenCalled();
     expect(jest.getTimerCount()).toBe(0);
+  });
+});
+
+describe('reconnect scan ownership', () => {
+  const flush = () => new Promise<void>(resolve => setImmediate(resolve));
+
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test('a reconnect finishing leaves another vendor discovery running', async () => {
+    const peripheral = new FakePeripheral('reconnecting', { localName: 'Trezor Safe 7' });
+    const noble = new FakeNoble();
+    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    try {
+      const connection = handler.connect(peripheral.id, PADDED_PROFILE);
+      await flush();
+      jest.advanceTimersByTime(300);
+      await flush();
+      await handler.scan({ vendor: 'ledger' });
+      noble.emit('discover', peripheral);
+      await connection;
+      expect(noble.scanning).toBe(true);
+      expect(noble.startScanningAsync).toHaveBeenCalledTimes(1);
+      await handler.scan({ vendor: 'ledger' });
+      expect(noble.scanning).toBe(true);
+    } finally {
+      await handler.dispose();
+    }
+  });
+
+  test('cancel then reopen discovery cannot be stopped by the old scan timeout', async () => {
+    const noble = Object.assign(new FakeNoble(), { connectAsync: jest.fn() });
+    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    try {
+      const connection = handler.connect('offline', PADDED_PROFILE);
+      const rejected = expect(connection).rejects.toThrow('connect cancelled');
+      await flush();
+      jest.advanceTimersByTime(300);
+      await flush();
+      await handler.cancelPairing({ vendor: PADDED_VENDOR.vendor, id: 'offline' });
+      await rejected;
+      await handler.scan(PADDED_VENDOR);
+      jest.advanceTimersByTime(5200);
+      await flush();
+      await handler.scan(PADDED_VENDOR);
+      expect(noble.scanning).toBe(true);
+      expect(noble.connectAsync).not.toHaveBeenCalled();
+      expect(noble.listenerCount('discover')).toBe(1);
+    } finally {
+      await handler.dispose();
+    }
+  });
+
+  test('a cancelled reconnect cannot start discovery after its settle delay', async () => {
+    const noble = Object.assign(new FakeNoble(), { connectAsync: jest.fn() });
+    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    try {
+      const connection = handler.connect('offline', PADDED_PROFILE);
+      const rejected = expect(connection).rejects.toThrow('connect cancelled');
+      await flush();
+      await handler.cancelPairing({ vendor: PADDED_VENDOR.vendor, id: 'offline' });
+      await rejected;
+      jest.advanceTimersByTime(300);
+      await flush();
+      expect(noble.startScanningAsync).not.toHaveBeenCalled();
+      expect(noble.connectAsync).not.toHaveBeenCalled();
+    } finally {
+      await handler.dispose();
+    }
+  });
+
+  test('targeted cancellation leaves another reconnect scan active', async () => {
+    const second = new FakePeripheral('second', { localName: 'Trezor Safe 7' });
+    const noble = new FakeNoble();
+    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    try {
+      const firstConnection = handler.connect('first', PADDED_PROFILE);
+      const rejected = expect(firstConnection).rejects.toThrow('connect cancelled');
+      const secondConnection = handler.connect(second.id, PADDED_PROFILE);
+      await flush();
+      jest.advanceTimersByTime(300);
+      await flush();
+      await handler.cancelPairing({ vendor: PADDED_VENDOR.vendor, id: 'first' });
+      await rejected;
+      expect(noble.scanning).toBe(true);
+      noble.emit('discover', second);
+      await secondConnection;
+      expect(noble.scanning).toBe(false);
+      expect(noble.listenerCount('discover')).toBe(1);
+    } finally {
+      await handler.dispose();
+    }
+  });
+
+  test('new discovery waits for an outstanding native stop to complete', async () => {
+    const noble = new FakeNoble();
+    let finishStop!: () => void;
+    noble.stopScanningAsync.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          finishStop = () => {
+            noble.scanning = false;
+            resolve();
+          };
+        })
+    );
+    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    try {
+      await handler.scan(PADDED_VENDOR);
+      const stopped = handler.stopScan(PADDED_VENDOR.vendor);
+      await flush();
+      const restarted = handler.scan({ vendor: 'ledger' });
+      await flush();
+      expect(noble.startScanningAsync).toHaveBeenCalledTimes(1);
+      finishStop();
+      await stopped;
+      await restarted;
+      expect(noble.startScanningAsync).toHaveBeenCalledTimes(2);
+      expect(noble.scanning).toBe(true);
+    } finally {
+      await handler.dispose();
+    }
   });
 });
