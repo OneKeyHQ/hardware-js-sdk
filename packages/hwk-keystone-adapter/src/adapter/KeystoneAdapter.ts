@@ -2334,18 +2334,18 @@ export class KeystoneAdapter implements IHardwareWallet {
       const usbError = rehydrateConnectorError(result.error);
       const usbErrorOrigin = (usbError as Error & { origin?: string }).origin;
       const usbErrorCode = (usbError as Error & { code?: number }).code;
-      if (
-        !interactionRoute &&
-        !this._forcedTransport &&
-        usbErrorCode === HardwareErrorCode.PayloadTooLarge &&
-        usbErrorOrigin !== 'device'
-      ) {
-        const displayDevice = toDeviceInfo(record);
-        return this._requestQrDisplayAndAwaitResponse(
-          displayDevice,
-          { ...requestUr, animated },
-          signal
-        );
+      if (usbErrorCode === HardwareErrorCode.PayloadTooLarge && usbErrorOrigin !== 'device') {
+        if (!interactionRoute && !this._forcedTransport) {
+          const displayDevice = toDeviceInfo(record);
+          return this._requestQrDisplayAndAwaitResponse(
+            displayDevice,
+            { ...requestUr, animated },
+            signal
+          );
+        }
+        // The host rejected the size before sending. Keep the pinned USB
+        // session and report the limit without implying the operation ran.
+        throw usbError;
       }
       // Deliberately does NOT retry over QR. By this point the request has
       // been put on the wire and the device may well be mid-operation —
