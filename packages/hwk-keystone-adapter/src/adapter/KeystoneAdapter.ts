@@ -257,8 +257,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     const record = Array.from(this._devices.values()).find(item => item.usbSessionId === connectId);
     if (!record) return;
 
+    // QR operations for the same wallet do not depend on this USB session.
     this._operations.endByConnectionKey(connectId, 'disconnect');
-    this._operations.endByConnectionKey(record.connectId, 'disconnect');
 
     record.usbSessionId = undefined;
     const info = toDeviceInfo(record);
@@ -2439,6 +2439,9 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
   ): Promise<{ record: KeystoneDeviceRecord; account: KeystoneAccountEntry }> {
     const target = this._resolveTarget(connectId, deviceId);
+    const operationConnectionType = isHardwareOperationId(connectId)
+      ? this._operations.resolve(connectId).connectionType
+      : undefined;
     const key = accountKey(hwkChain, syncPath);
 
     let existingRecord = target.record;
@@ -2452,7 +2455,12 @@ export class KeystoneAdapter implements IHardwareWallet {
     if (existingRecord && booked) {
       return { record: existingRecord, account: booked };
     }
-    if (existingRecord && !existingRecord.usbSessionId && this._forcedTransport === 'usb') {
+    if (
+      !operationConnectionType &&
+      existingRecord &&
+      !existingRecord.usbSessionId &&
+      this._forcedTransport === 'usb'
+    ) {
       // Pinned to USB without a session: attach here so enumeration errors
       // surface (resolveUr skips its probe for pinned transports).
       await this._tryUsbAttach(existingRecord.walletId, existingRecord.masterFingerprint, {
@@ -2465,8 +2473,10 @@ export class KeystoneAdapter implements IHardwareWallet {
     // Match the proven browser-demo flow: USB exports one missing account path
     // per request, while QR keeps its batched import flow. The all-network API
     // still returns one result bundle after these per-chain calls complete.
-    const useSinglePathUsbExport =
-      this._forcedTransport !== 'qr' && Boolean(existingRecord?.usbSessionId);
+    // A retained USB session must not change a QR operation's request or identity checks.
+    const useSinglePathUsbExport = operationConnectionType
+      ? operationConnectionType === 'usb'
+      : this._forcedTransport !== 'qr' && Boolean(existingRecord?.usbSessionId);
     const requestedSchemaPaths: Array<{ hwkChain: ChainCapability; path: string }> = [
       { hwkChain, path: syncPath },
     ];
@@ -2499,7 +2509,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     } else {
       this._assertParsedIdentity(parsed, target);
       record = this._upsertDeviceRecord(parsed, {
-        viaUsb: Boolean(existingRecord?.usbSessionId),
+        viaUsb: operationConnectionType !== 'qr' && Boolean(existingRecord?.usbSessionId),
       });
     }
     const account = parsed.accounts.find(a => normalizePath(a.path) === syncPath);
