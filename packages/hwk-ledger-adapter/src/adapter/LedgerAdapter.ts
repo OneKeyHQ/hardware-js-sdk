@@ -492,8 +492,8 @@ export class LedgerAdapter implements IHardwareWallet {
     try {
       return await this._jobQueue.enqueue(
         searchTargetId || '__ledger_connect__',
-        async () => {
-          const connected = await this._connectTarget(searchTargetId);
+        async signal => {
+          const connected = await this._connectTarget(searchTargetId, undefined, signal);
           if (!connected.success) return connected;
           return this._createOperation(searchTargetId, connected.payload);
         },

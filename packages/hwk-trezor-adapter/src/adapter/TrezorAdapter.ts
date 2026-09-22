@@ -665,7 +665,11 @@ export class TrezorAdapter implements IHardwareWallet {
     // releaseOperation()/resetState() ran mid-connect: tear down the now-
     // unwanted session instead of caching it (else it leaks a limited THP slot
     // or lets stale state reappear after reset).
-    if (stateGeneration !== this._stateGeneration || this._disconnectRequested.delete(connectId)) {
+    if (
+      signal?.aborted ||
+      stateGeneration !== this._stateGeneration ||
+      this._disconnectRequested.delete(connectId)
+    ) {
       const releaseCleanup = this._retainConnectorOperation(`disconnect:${session.sessionId}`);
       try {
         await this._connector.disconnect(session.sessionId).catch(() => undefined);
@@ -870,13 +874,18 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   async connectDevice(searchTargetId: string): Promise<Response<string>> {
+    const scope = this._jobQueue.createCancelScope(searchTargetId);
     try {
-      await this._ensureDevicePermission(
-        searchTargetId,
-        undefined,
-        this._devices.get(searchTargetId)?.connectionType
+      await TrezorAdapter._abortable(
+        scope.signal,
+        this._ensureDevicePermission(
+          searchTargetId,
+          undefined,
+          this._devices.get(searchTargetId)?.connectionType
+        )
       );
-      await this._ensureSession(searchTargetId);
+      await this._ensureSession(searchTargetId, scope.signal);
+      if (scope.signal.aborted) throw scope.signal.reason;
       const device = this._devices.get(searchTargetId);
       if (!device) {
         return failure(HardwareErrorCode.DeviceNotFound, 'Trezor device not found after connect');
@@ -891,7 +900,15 @@ export class TrezorAdapter implements IHardwareWallet {
       });
       return success(operation.operationId);
     } catch (error) {
+      if (scope.signal.aborted) {
+        // Hosts may tear down the BLE link on failure. Keep explicit connect
+        // pending until the raw handshake and its late-session cleanup finish.
+        await this._waitForConnectorOperationsToDrain();
+        return failure(HardwareErrorCode.UserAborted, 'Trezor connection aborted');
+      }
       return this._errorToFailure(error);
+    } finally {
+      scope.release();
     }
   }
 

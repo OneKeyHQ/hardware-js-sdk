@@ -107,6 +107,100 @@ describe('TrezorAdapter', () => {
     }
   });
 
+  it.each([
+    ['usb', undefined],
+    ['usb', 'safe-7'],
+    ['ble', undefined],
+    ['ble', 'safe-7'],
+  ] as const)(
+    'rejects a late explicit connection after cancellation (%s, %s)',
+    async (transport, target) => {
+      const connector = { ...createConnector(), connectionType: transport };
+      const adapter = new TrezorAdapter(connector);
+      let finishConnect!: (session: Awaited<ReturnType<IConnector['connect']>>) => void;
+      let connectStarted!: () => void;
+      const started = new Promise<void>(resolve => {
+        connectStarted = resolve;
+      });
+      (connector.connect as ConnectMock).mockImplementationOnce(() => {
+        connectStarted();
+        return new Promise(resolve => {
+          finishConnect = resolve;
+        });
+      });
+      let settled = false;
+      const pending = adapter.connectDevice('safe-7').finally(() => {
+        settled = true;
+      });
+      await started;
+      adapter.cancel(target);
+      await new Promise(resolve => setImmediate(resolve));
+      await expect(adapter.connectDevice('safe-7')).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceBusyInternal },
+      });
+      expect(connector.connect).toHaveBeenCalledTimes(1);
+      expect(settled).toBe(false);
+      expect(connector.disconnect).not.toHaveBeenCalled();
+      finishConnect({
+        sessionId: 'late-session',
+        deviceInfo: {
+          vendor: 'trezor',
+          model: 'T3W1',
+          firmwareVersion: '',
+          deviceId: 'safe-7',
+          connectId: 'safe-7',
+          connectionType: transport,
+        },
+      });
+      const result = await pending;
+      await new Promise(resolve => setImmediate(resolve));
+      try {
+        expect(result).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.UserAborted },
+        });
+        expect(connector.disconnect).toHaveBeenCalledWith('late-session');
+        expect(connector.call).not.toHaveBeenCalled();
+        const retry = await adapter.connectDevice('safe-7');
+        expect(retry.success).toBe(true);
+        if (retry.success) await adapter.releaseOperation(retry.payload);
+      } finally {
+        await adapter.dispose();
+      }
+    }
+  );
+
+  it.each([undefined, 'safe-7'])(
+    'does not connect after cancelled permission is granted late (%s)',
+    async target => {
+      const connector = createConnector();
+      const adapter = new TrezorAdapter(connector);
+      let permissionRequested!: () => void;
+      const requested = new Promise<void>(resolve => {
+        permissionRequested = resolve;
+      });
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, permissionRequested);
+      const pending = adapter.connectDevice('safe-7');
+      await requested;
+      adapter.cancel(target);
+      try {
+        await expect(pending).resolves.toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.UserAborted },
+        });
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+        await new Promise(resolve => setImmediate(resolve));
+        expect(connector.connect).not.toHaveBeenCalled();
+      } finally {
+        await adapter.dispose();
+      }
+    }
+  );
+
   /** Hosts must acknowledge every binding; return the payloads the SDK asked to save. */
   function acknowledgeBindings(adapter: TrezorAdapter): jest.Mock {
     const save = jest.fn();
@@ -3903,6 +3997,7 @@ describe('TrezorAdapter', () => {
       payload: { code: HardwareErrorCode.DeviceNotFound },
     });
 
+    expect(connector.disconnect).toHaveBeenCalledWith('late-safe-7-session');
     await expect(adapter.connectDevice('safe-7')).resolves.toMatchObject({ success: true });
     expect(connector.connect).toHaveBeenCalledTimes(2);
   });

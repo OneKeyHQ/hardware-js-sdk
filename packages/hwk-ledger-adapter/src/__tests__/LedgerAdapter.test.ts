@@ -133,6 +133,87 @@ describe('LedgerAdapter', () => {
     });
   });
 
+  it.each([
+    ['usb', undefined],
+    ['usb', 'dev-1'],
+    ['ble', undefined],
+    ['ble', 'dev-1'],
+  ] as const)(
+    'rejects a late explicit connection after cancellation (%s, %s)',
+    async (transport, target) => {
+      Object.defineProperty(connector, 'connectionType', { value: transport });
+      let finishConnect!: (session: ConnectorSession) => void;
+      let connectStarted!: () => void;
+      const started = new Promise<void>(resolve => {
+        connectStarted = resolve;
+      });
+      (connector.connect as jest.Mock).mockImplementationOnce(() => {
+        connectStarted();
+        return new Promise<ConnectorSession>(resolve => {
+          finishConnect = resolve;
+        });
+      });
+      const pending = adapter.connectDevice('dev-1');
+      await started;
+      adapter.cancel(target);
+      finishConnect({
+        sessionId: 'late-session',
+        deviceInfo: {
+          vendor: 'ledger',
+          model: 'nanoX',
+          firmwareVersion: '',
+          deviceId: 'dev-1',
+          connectId: 'dev-1',
+          connectionType: transport,
+        },
+      });
+      const result = await pending;
+      try {
+        expect(result).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.UserAborted },
+        });
+        expect(connector.disconnect).toHaveBeenCalledWith('late-session');
+        expect(connector.callImpl).not.toHaveBeenCalled();
+        const retry = await adapter.connectDevice('dev-1');
+        expect(retry.success).toBe(true);
+        if (retry.success) await adapter.releaseOperation(retry.payload);
+      } finally {
+        await adapter.dispose();
+      }
+    }
+  );
+
+  it.each([undefined, 'dev-1'])(
+    'does not connect after cancelled permission is granted late (%s)',
+    async target => {
+      await adapter.dispose();
+      adapter = new LedgerAdapter(connector);
+      let permissionRequested!: () => void;
+      const requested = new Promise<void>(resolve => {
+        permissionRequested = resolve;
+      });
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, permissionRequested);
+      const pending = adapter.connectDevice('dev-1');
+      await requested;
+      adapter.cancel(target);
+      try {
+        await expect(pending).resolves.toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.UserAborted },
+        });
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+        await new Promise(resolve => setImmediate(resolve));
+        expect(connector.connect).not.toHaveBeenCalled();
+      } finally {
+        await adapter.dispose();
+      }
+    }
+  );
+
   /** Hosts must acknowledge every binding; return the payloads the SDK asked to save. */
   function acknowledgeBindings(): jest.Mock {
     const save = jest.fn();
