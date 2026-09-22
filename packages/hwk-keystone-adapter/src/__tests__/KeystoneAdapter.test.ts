@@ -3477,6 +3477,12 @@ describe('Keystone automatic USB attach cancellation', () => {
         expect(disconnect).toHaveBeenCalledTimes(phase === 'enumerate' ? 0 : 1);
         expect(connected).not.toHaveBeenCalled();
         expect(qrDisplay).not.toHaveBeenCalled();
+        const retried = await adapter.evmGetAddress('', FIXTURE_WALLET_ID, {
+          path: "m/44'/60'/0'/0/0",
+        });
+        expect(retried.success).toBe(true);
+        expect(connected).toHaveBeenCalledTimes(1);
+        expect(qrDisplay).not.toHaveBeenCalled();
       } finally {
         resume();
         await pending;
@@ -3517,4 +3523,49 @@ describe('Keystone automatic USB attach cancellation', () => {
       await adapter.dispose();
     }
   });
+});
+
+it('reports busy on immediate USB reattach retry until the cancelled connect drains', async () => {
+  const usb = fakeUsbConnector();
+  const adapter = new KeystoneAdapter({ usbConnector: usb.connector });
+  const fake = attachFakeDevice(adapter);
+  let resume!: () => void;
+  const wait = new Promise<void>(resolve => {
+    resume = resolve;
+  });
+  const originalConnect = usb.connector.connect.bind(usb.connector);
+  jest.spyOn(usb.connector, 'connect').mockImplementationOnce(async (...args) => {
+    await wait;
+    return originalConnect(...args);
+  });
+  const first = adapter.evmGetAddress('', FIXTURE_WALLET_ID, { path: "m/44'/60'/0'/0/0" });
+  try {
+    await new Promise<void>(resolve => {
+      setImmediate(resolve);
+    });
+    adapter.cancel(FIXTURE_WALLET_ID);
+    await first;
+    const retried = await adapter.evmGetAddress('', FIXTURE_WALLET_ID, {
+      path: "m/44'/60'/0'/0/0",
+    });
+    expect(retried).toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.DeviceBusyInternal },
+    });
+    expect(fake.requests).toHaveLength(0);
+    resume();
+    await new Promise<void>(resolve => {
+      setImmediate(resolve);
+    });
+    const afterCleanup = await adapter.evmGetAddress('', FIXTURE_WALLET_ID, {
+      path: "m/44'/60'/0'/0/0",
+    });
+    expect(afterCleanup.success).toBe(true);
+    expect(fake.requests).toHaveLength(0);
+  } finally {
+    resume();
+    await first;
+    fake.detach();
+    await adapter.dispose();
+  }
 });
