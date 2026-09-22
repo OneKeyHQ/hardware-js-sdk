@@ -2204,6 +2204,14 @@ export class KeystoneAdapter implements IHardwareWallet {
         signal
       );
       KeystoneAdapter._throwIfAborted(signal);
+      // A cancelled transfer still draining is not an unavailable USB device.
+      // Preserve the busy result instead of prompting QR during its teardown.
+      if (!attached.success && attached.payload.code === HardwareErrorCode.DeviceBusyInternal) {
+        throw createHwkError({
+          ...attached.payload,
+          message: attached.payload.error,
+        });
+      }
       if (attached.success) {
         record = this._devices.get(expectedWalletId);
         if (record) break;
