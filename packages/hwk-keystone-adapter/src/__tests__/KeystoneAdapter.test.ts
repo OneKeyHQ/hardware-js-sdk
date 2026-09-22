@@ -2437,27 +2437,71 @@ describe('KeystoneAdapter', () => {
       expect(qrFake.requests).toHaveLength(qrRequestsAfterImport);
     });
 
-    it('does not fall back to QR when an operation-pinned USB call fails', async () => {
-      const usb = fakeUsbConnector();
-      const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });
-      const qrFake = attachFakeDevice(adapter);
-      const connected = await connectUsbDevice(adapter);
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
-      const qrRequestsBeforeSign = qrFake.requests.length;
+    it.each([
+      ['operation', 'transport'],
+      ['forced', 'transport'],
+      ['auto', 'transport'],
+      ['operation', 'device'],
+      ['forced', 'device'],
+      ['auto', 'device'],
+    ] as const)(
+      'preserves USB ownership for a %s route with a %s size failure',
+      async (route, origin) => {
+        const usb = fakeUsbConnector();
+        const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, usbConnector: usb.connector });
+        const qrFake = attachFakeDevice(adapter);
+        const connected = await connectUsbDevice(adapter);
+        expect(connected.success).toBe(true);
+        if (!connected.success) return;
+        if (route !== 'operation') await adapter.releaseOperation(connected.payload);
+        if (route === 'forced') await adapter.switchTransport('usb');
+        const target =
+          route === 'operation' ? connected.payload : `keystone-wallet:${FIXTURE_WALLET_ID}`;
+        const callUsb = usb.connector.call.bind(usb.connector);
+        const callSpy = jest
+          .spyOn(usb.connector, 'call')
+          .mockImplementation((sessionId, method, params) => {
+            if ((params as { urType?: string })?.urType === 'eth-sign-request') {
+              return Promise.resolve({
+                success: false,
+                error: {
+                  code: HardwareErrorCode.PayloadTooLarge,
+                  message: 'USB size limit',
+                  params: { origin, recovery: { scope: 'transport' } },
+                },
+              });
+            }
+            return callUsb(sessionId, method, params);
+          });
+        try {
+          const params = {
+            path: "m/44'/60'/0'/0/0",
+            serializedTx: `02${'ab'.repeat(30)}`,
+          };
+          const signed = await adapter.evmSignTransaction(target, FIXTURE_WALLET_ID, params);
+          const shouldUseQr = route === 'auto' && origin === 'transport';
+          expect(signed.success).toBe(shouldUseQr);
+          if (!signed.success) {
+            expect(signed.payload.code).toBe(HardwareErrorCode.PayloadTooLarge);
+            expect(signed.payload.recovery).toEqual({ scope: 'transport' });
+            expect(signed.payload.params?.operationMayHaveCompleted).toBeUndefined();
+          }
+          expect(qrFake.requests).toHaveLength(shouldUseQr ? 1 : 0);
+          expect(adapter.activeTransport).toBe('usb');
 
-      usb.failNextCall(HardwareErrorCode.PayloadTooLarge);
-      const signed = await adapter.evmSignTransaction(connected.payload, FIXTURE_WALLET_ID, {
-        path: "m/44'/60'/0'/0/0",
-        serializedTx: `02${'ab'.repeat(30)}`,
-      });
-
-      expect(signed.success).toBe(false);
-      if (!signed.success) {
-        expect(signed.payload.code).toBe(HardwareErrorCode.OperationEnded);
+          const connectsAfterFailure = usb.connectArgs.length;
+          callSpy.mockRestore();
+          // A later user request can still use the same operation and USB session.
+          const retry = await adapter.evmSignTransaction(target, FIXTURE_WALLET_ID, params);
+          expect(retry.success).toBe(true);
+          expect(usb.connectArgs).toHaveLength(connectsAfterFailure);
+          expect(qrFake.requests).toHaveLength(shouldUseQr ? 1 : 0);
+        } finally {
+          callSpy.mockRestore();
+          await adapter.dispose();
+        }
       }
-      expect(qrFake.requests).toHaveLength(qrRequestsBeforeSign);
-    });
+    );
 
     it('probes USB before each fetch and attaches when USB returns', async () => {
       const usb = fakeUsbConnector();
