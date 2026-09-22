@@ -1304,9 +1304,19 @@ export class TrezorAdapter implements IHardwareWallet {
       } else if (pendingOperationId) {
         this._uiRegistry.cancel(undefined, undefined, pendingOperationId);
       }
-      this._connector.uiResponse({ type: UI_RESPONSE.CANCEL });
       const queueKeys = new Set<string>([trezorQueueKey({ connectId: targetId })]);
       if (pendingOperationId) queueKeys.add(trezorQueueKey({ operationId: pendingOperationId }));
+      // Connector UI cancellation is global. A live but idle operation must not
+      // dismiss another job's PIN/passphrase prompt. Initial connectDevice calls
+      // run outside the job queue, so preserve cancellation of a sole handshake.
+      const ownsConnectorInteraction =
+        activeJobId !== undefined
+          ? queueKeys.has(activeJobId) ||
+            (pendingOperationId !== undefined && this._activeOperationId() === pendingOperationId)
+          : this._connectingPromises.size === 1 && this._connectingPromises.has(resolvedConnectId);
+      if (connectId === undefined || ownsConnectorInteraction) {
+        this._connector.uiResponse({ type: UI_RESPONSE.CANCEL });
+      }
       for (const key of queueKeys) {
         this._jobQueue.cancelActiveAndPending(key, userAbortReason);
       }

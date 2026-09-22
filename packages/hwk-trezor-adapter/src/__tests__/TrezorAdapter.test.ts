@@ -2296,14 +2296,14 @@ describe('TrezorAdapter', () => {
     expect(connector.reset).toHaveBeenCalledTimes(1);
   });
 
-  it('cancel forwards UI_RESPONSE.CANCEL to the connector', async () => {
+  it('cancelling an idle connection does not broadcast a connector UI cancellation', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);
     await adapter.connectDevice('safe-7');
 
     adapter.cancel('safe-7');
 
-    expect(connector.uiResponse).toHaveBeenCalledWith({ type: UI_RESPONSE.CANCEL });
+    expect(connector.uiResponse).not.toHaveBeenCalled();
     expect(connector.cancel).toHaveBeenCalledWith('safe-7-session');
   });
 
