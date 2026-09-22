@@ -3332,3 +3332,84 @@ describe('KeystoneAdapter', () => {
     });
   });
 });
+
+describe('Keystone operation transport ownership', () => {
+  it.each(['usb', 'qr'] as const)(
+    'USB disconnect ends only operations bound to USB (selected=%s)',
+    async selected => {
+      const usb = fakeUsbConnector();
+      const adapter = new KeystoneAdapter({ usbConnector: usb.connector });
+      const fake = attachFakeDevice(adapter);
+      try {
+        const usbOperation = await connectUsbDevice(adapter);
+        const connected = selected === 'qr' ? await connectQrDevice(adapter) : usbOperation;
+        if (!connected.success) throw new Error('Expected a connected operation');
+        usb.emitDisconnect();
+        const result = await adapter.evmGetAddress(connected.payload, FIXTURE_WALLET_ID, {
+          path: "m/44'/60'/0'/0/0",
+          operationId: connected.payload,
+        });
+        if (selected === 'usb') {
+          expect(result).toMatchObject({
+            success: false,
+            payload: { code: HardwareErrorCode.OperationEnded },
+          });
+        } else {
+          expect(result.success).toBe(true);
+        }
+      } finally {
+        fake.detach();
+        await adapter.dispose();
+      }
+    }
+  );
+
+  it.each([
+    { method: 'btcGetPublicKey', path: "m/84'/0'/0'" },
+    { method: 'evmGetAddress', path: "m/44'/60'/1'/0/0" },
+    { method: 'solGetAddress', path: "m/44'/501'/0'/0'" },
+    { method: 'tronGetAddress', path: "m/44'/195'/0'/0/0" },
+  ] as const)(
+    '$method verifies QR wallet identity even while an earlier USB session remains',
+    async ({ method, path }) => {
+      const usb = fakeUsbConnector();
+      const adapter = new KeystoneAdapter({ usbConnector: usb.connector });
+      const initial = attachFakeDevice(adapter);
+      try {
+        await connectUsbDevice(adapter);
+        const connected = await connectQrDevice(adapter);
+        if (!connected.success) throw new Error('Expected a QR operation');
+        initial.detach();
+        // The response claims the expected short fingerprint but contains
+        // different public keys. Only the full wallet identity can reject it.
+        const wrongWallet = attachFakeDevice(adapter, { root: OTHER_ROOT });
+        try {
+          const result = await adapter[method](connected.payload, FIXTURE_WALLET_ID, {
+            path,
+            operationId: connected.payload,
+          });
+          expect(result).toMatchObject({
+            success: false,
+            payload: { code: HardwareErrorCode.DeviceMismatch },
+          });
+          expect(requestedPathsOf(wrongWallet.requests[0])).toContain(KEYSTONE_WALLET_ID_PATH);
+        } finally {
+          wrongWallet.detach();
+        }
+        const correctWallet = attachFakeDevice(adapter);
+        try {
+          // The positional operation id must carry the same route on retry.
+          const retried = await adapter[method](connected.payload, FIXTURE_WALLET_ID, { path });
+          expect(retried.success).toBe(true);
+          expect(requestedPathsOf(correctWallet.requests[0])).toContain(KEYSTONE_WALLET_ID_PATH);
+          expect(usb.calls).toHaveLength(1);
+        } finally {
+          correctWallet.detach();
+        }
+      } finally {
+        initial.detach();
+        await adapter.dispose();
+      }
+    }
+  );
+});
