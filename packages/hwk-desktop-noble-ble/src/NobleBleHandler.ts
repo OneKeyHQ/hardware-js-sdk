@@ -94,6 +94,12 @@ const DEFAULT_NOBLE_FACTORY: NobleFactory = () => {
   return noble;
 };
 
+interface ConnectClaim {
+  abandoned: boolean;
+  cancelScan?: () => void;
+  cancelNative?: () => void;
+}
+
 interface DeviceEntry {
   /** Opaque partition key from the caller; this handler never interprets it. */
   vendor?: string;
@@ -213,7 +219,9 @@ export class NobleBleHandler {
 
   private _scanning = false;
 
-  private readonly _scanOwners = new Set<string | undefined>();
+  private readonly _scanOwners = new Set<string | symbol | undefined>();
+
+  private _scanTransition: Promise<void> = Promise.resolve();
 
   private _idleStopTimer?: ReturnType<typeof setTimeout>;
 
@@ -322,22 +330,11 @@ export class NobleBleHandler {
   async scan(options?: ElectronBleScanOptions): Promise<ThirdPartyBleDeviceInfo[]> {
     await this.init();
     this._scanOwners.add(options?.vendor);
-    if (!this._scanning) {
-      this._scanning = true;
-      // allowDuplicates=true keeps advertisements flowing so we can age out gone devices.
-      try {
-        await this._requireNoble().startScanningAsync([], true);
-        // warn: unfiltered scan on the noble instance shared with the OneKey
-        // handler — must always be visible for cross-correlation.
-        this._log('warn', 'scan.start', {
-          ignoredServiceUuids: options?.serviceUuids,
-          allowDuplicates: true,
-        });
-      } catch (error) {
-        this._scanning = false;
-        this._log('warn', 'scan.start.error', { error: String(error) });
-        await this._recoverNobleIfStuck(String(error));
-      }
+    try {
+      await this._setScanning(true);
+    } catch (error) {
+      this._log('warn', 'scan.start.error', { error: String(error) });
+      await this._recoverNobleIfStuck(String(error));
     }
     this._assertActive();
     this._armIdleStop();
@@ -471,20 +468,44 @@ export class NobleBleHandler {
     }
   }
 
+  // Keep native start/stop callbacks ordered: a late stop must finish before
+  // a newer scan starts, even when callers belong to different vendors.
+  private _setScanning(scanning: boolean): Promise<void> {
+    const transition = this._scanTransition.then(async () => {
+      if (scanning) {
+        this._assertActive();
+        if (this._scanOwners.size === 0) return;
+      }
+      if (this._scanning === scanning) return;
+      this._scanning = scanning;
+      try {
+        if (scanning) {
+          await this._requireNoble().startScanningAsync([], true);
+          this._log('warn', 'scan.start', { allowDuplicates: true });
+        } else {
+          await this._noble?.stopScanningAsync();
+        }
+      } catch (error) {
+        this._scanning = false;
+        if (scanning) throw error;
+      }
+    });
+    this._scanTransition = transition.catch(() => undefined);
+    return transition;
+  }
+
   /** Stop scanning but keep the discovered cache (used before connect). */
   private async _pauseScan(): Promise<void> {
     this._clearIdleStop();
-    if (!this._scanning) return;
-    this._scanning = false;
-    await this._noble?.stopScanningAsync().catch(() => undefined);
+    await this._setScanning(false);
   }
 
   /** Stop scanning and forget discovered devices (idle timeout / teardown). */
   private async _stopContinuousScan(): Promise<void> {
     this._scanOwners.clear();
-    await this._pauseScan();
     this._discovered.clear();
     this._lastSeen.clear();
+    await this._pauseScan();
   }
 
   /** A vendor releasing discovery must not stop another vendor's scan. */
@@ -538,7 +559,7 @@ export class NobleBleHandler {
 
   /**
    * Scan for a specific peripheral id and resolve THE MOMENT it's discovered,
-   * stopping the scan immediately (don't wait out the full window). The fast
+   * releasing only its own scan ownership (don't wait out the full window). The fast
    * reconnect path for a stored connectId when the device IS advertising.
    *
    * This used to be the only reconnect path, on two assumptions that are both
@@ -549,12 +570,16 @@ export class NobleBleHandler {
    */
   private async _scanUntilFound(
     id: string,
-    timeoutMs: number
+    timeoutMs: number,
+    claim: ConnectClaim
   ): Promise<NoblePeripheralLike | undefined> {
     await this.init();
+    if (claim.abandoned) return undefined;
     const existing = this._discovered.get(id);
     if (existing) return existing;
     const noble = this._requireNoble();
+    const owner = Symbol('connect-scan');
+    this._scanOwners.add(owner);
     return new Promise<NoblePeripheralLike | undefined>(resolve => {
       let done = false;
       const finish = (p?: NoblePeripheralLike) => {
@@ -563,8 +588,13 @@ export class NobleBleHandler {
         this._pendingCancellations.delete(cancel);
         clearTimeout(timer);
         noble.removeListener('discover', onDiscover);
-        void noble.stopScanningAsync().catch(() => undefined);
-        resolve(p);
+        if (claim.cancelScan === cancel) claim.cancelScan = undefined;
+        this._scanOwners.delete(owner);
+        if (this._scanOwners.size === 0) {
+          void this._pauseScan().then(() => resolve(p));
+        } else {
+          resolve(p);
+        }
       };
       const onDiscover = (peripheral: NoblePeripheralLike) => {
         this._discovered.set(peripheral.id, peripheral);
@@ -573,10 +603,9 @@ export class NobleBleHandler {
       const timer = setTimeout(() => finish(this._discovered.get(id)), timeoutMs);
       const cancel = () => finish();
       this._pendingCancellations.add(cancel);
+      claim.cancelScan = cancel;
       noble.on('discover', onDiscover);
-      // Unfiltered, for the same reason as `scan()` — a service-UUID filter
-      // drops the Safe 7's ADV packets outright on Windows.
-      void noble.startScanningAsync([], false).catch(() => finish());
+      void this._setScanning(true).catch(() => finish());
     });
   }
 
@@ -688,7 +717,7 @@ export class NobleBleHandler {
     // stops advertising, every retry then dead-ends until app restart. The
     // token flags the attempt as abandoned so a late success tears the link
     // down instead of committing it.
-    const claim: { abandoned: boolean; cancelNative?: () => void } = { abandoned: false };
+    const claim: ConnectClaim = { abandoned: false };
     // The timeout is one way to abandon the attempt; cancelPairing is the other,
     // so the rejection is hoisted out of the timer and both share it.
     let abandon!: (error: Error) => void;
@@ -696,6 +725,7 @@ export class NobleBleHandler {
       abandon = (error: Error) => {
         claim.abandoned = true;
         reject(error);
+        claim.cancelScan?.();
       };
     });
     const timer = setTimeout(
@@ -733,23 +763,40 @@ export class NobleBleHandler {
 
   private async _connectInner(
     id: string,
-    claim: { abandoned: boolean; cancelNative?: () => void },
+    claim: ConnectClaim,
     options: ElectronBleConnectOptions
   ): Promise<{ id: string; name?: string }> {
+    let route: 'cache' | 'scan' | 'direct' | 'none' = 'cache';
+    let peripheral: NoblePeripheralLike | undefined;
+    // Checked after every await that can outlive the caller's timeout. The
+    // rejection thrown here is unobservable (Promise.race already settled) —
+    // its only job is to stop the flow before it commits an unowned link.
+    const abortIfAbandoned = async (stage: string) => {
+      if (!claim.abandoned && !this._disposed) return;
+      // Tear down only a link nobody owns: if a previous connect still holds
+      // this id in _connected, its keep-alive timers manage the link.
+      if (peripheral && peripheral.state === 'connected' && !this._connected.has(id)) {
+        await this._safeDisconnect(peripheral);
+      }
+      this._log('warn', 'connect.abandoned', { id, route, stage });
+      throw new Error(`connect abandoned after timeout: ${id}`);
+    };
     await this.init();
+    await abortIfAbandoned('init');
     // Stop scanning (keep the cache) and let the radio settle before connecting.
     await this._pauseScan();
     await delay(BLE_CONNECT_SETTLE_MS);
+    await abortIfAbandoned('settle');
     this._assertActive();
     // Which of the three routes got us a peripheral is THE diagnostic for this
     // whole area: a cache hit means the happy path; a scan hit means the device
     // was still advertising; `direct` means it had gone silent and only
     // connect-by-id could reach it; `none` means we are back to the old dead end.
-    let route: 'cache' | 'scan' | 'direct' | 'none' = 'cache';
-    let peripheral = this._discovered.get(id);
+    peripheral = this._discovered.get(id);
     if (!peripheral) {
       route = 'scan';
-      peripheral = await this._scanUntilFound(id, THIRD_PARTY_BLE_SCAN_DURATION_MS);
+      peripheral = await this._scanUntilFound(id, THIRD_PARTY_BLE_SCAN_DURATION_MS, claim);
+      await abortIfAbandoned('scan');
     }
     if (!peripheral) {
       route = 'direct';
@@ -782,19 +829,6 @@ export class NobleBleHandler {
       throw new Error(`BLE device not found: ${id}`);
     }
 
-    // Checked after every await that can outlive the caller's timeout. The
-    // rejection thrown here is unobservable (Promise.race already settled) —
-    // its only job is to stop the flow before it commits an unowned link.
-    const abortIfAbandoned = async (stage: string) => {
-      if (!claim.abandoned && !this._disposed) return;
-      // Tear down only a link nobody owns: if a previous connect still holds
-      // this id in _connected, its keep-alive timers manage the link.
-      if (peripheral && peripheral.state === 'connected' && !this._connected.has(id)) {
-        await this._safeDisconnect(peripheral);
-      }
-      this._log('warn', 'connect.abandoned', { id, route, stage });
-      throw new Error(`connect abandoned after timeout: ${id}`);
-    };
     await abortIfAbandoned('resolve');
 
     const wasConnected = peripheral.state === 'connected';
