@@ -491,6 +491,7 @@ export class ProtocolV2Session {
 export async function probeProtocolV2({
   call,
   timeoutMs,
+  probeMessage = 'protocol-v2-probe',
   logger,
   logPrefix = 'ProtocolV2',
   onBeforeProbe,
@@ -503,6 +504,7 @@ export async function probeProtocolV2({
     options?: ProtocolV2CallOptions
   ) => Promise<MessageFromOneKey>;
   timeoutMs: number;
+  probeMessage?: string;
   logger?: ProtocolLogger;
   logPrefix?: string;
   onBeforeProbe?: () => Promise<void> | void;
@@ -514,7 +516,7 @@ export async function probeProtocolV2({
     await onBeforeProbe?.();
     const response = await call(
       'Ping',
-      { message: 'protocol-v2-probe' },
+      { message: probeMessage },
       {
         timeoutMs,
         expectedTypes: ['Success'],

@@ -49,6 +49,8 @@ const PACKET_IO_RETRY_DELAY = 300;
 const PROTOCOL_V1_PROBE_TIMEOUT = 5000;
 const PROTOCOL_V2_PROBE_TIMEOUT = 1000;
 const EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS = 2;
+// Firmware reserves one byte for nanopb's terminating NUL, leaving 63 ASCII bytes.
+const PROTOCOL_V2_WEBUSB_PROBE_MESSAGE = 'protocol-v2-probe'.padEnd(63, '-');
 
 /**
  * Device information with path and WebUSB device instance
@@ -907,6 +909,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     return probeProtocolV2Helper({
       call: (name, data, options) => this.callProtocolV2(path, name, data, options),
       timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT,
+      probeMessage: PROTOCOL_V2_WEBUSB_PROBE_MESSAGE,
       logger: this.Log,
       logPrefix: 'ProtocolV2 WebUSB',
     });

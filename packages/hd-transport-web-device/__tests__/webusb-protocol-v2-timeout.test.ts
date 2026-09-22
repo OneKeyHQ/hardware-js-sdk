@@ -139,6 +139,30 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     );
   });
 
+  test('uses the maximum firmware-safe payload for a Protocol V2 WebUSB probe', async () => {
+    const webusb = new WebUsbTransport() as any;
+    const path = 'pro2-webusb';
+    webusb.messages = transport.parseConfigure(schema);
+    webusb.messagesV2 = transport.parseConfigure(schema);
+    webusb.callProtocolV2 = jest.fn().mockResolvedValue({
+      type: 'Success',
+      message: { message: 'ok' },
+    });
+
+    await expect(webusb.probeProtocolV2(path)).resolves.toBe(true);
+
+    const probeData = webusb.callProtocolV2.mock.calls[0][2] as { message: string };
+    expect(new TextEncoder().encode(probeData.message)).toHaveLength(63);
+    expect(
+      ProtocolV2.encodeFrame(
+        { protocolV1: webusb.messages, protocolV2: webusb.messagesV2 },
+        'Ping',
+        probeData,
+        { router: PROTOCOL_V2_CHANNEL_USB }
+      )
+    ).toHaveLength(75);
+  });
+
   test('retries an expected Protocol V2 probe once after resetting the connection', async () => {
     const webusb = new WebUsbTransport() as any;
     const path = 'pro2-webusb';
