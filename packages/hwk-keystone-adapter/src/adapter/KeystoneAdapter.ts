@@ -1772,6 +1772,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       ) {
         record =
           (await this._tryUsbAttach(
+            signal,
             target.expectedWalletId,
             record?.masterFingerprint ?? target.expectedMasterFingerprint
           )) ?? record;
@@ -2143,10 +2144,12 @@ export class KeystoneAdapter implements IHardwareWallet {
    * QR operation.
    */
   private async _tryUsbAttach(
+    signal: AbortSignal,
     expectedWalletId?: string,
     expectedMasterFingerprint?: string,
     options?: { waitForReenumeration?: boolean }
   ): Promise<KeystoneDeviceRecord | undefined> {
+    KeystoneAdapter._throwIfAborted(signal);
     if (!expectedWalletId || this._forcedTransport === 'qr' || !this._usbConnector) {
       return undefined;
     }
@@ -2155,19 +2158,24 @@ export class KeystoneAdapter implements IHardwareWallet {
     let availableDevices: ConnectorDevice[] = [];
     let lastSearchError: unknown;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      KeystoneAdapter._throwIfAborted(signal);
       try {
         // eslint-disable-next-line no-await-in-loop
-        availableDevices = await this._usbConnector.searchDevices({ purpose: 'availability' });
+        availableDevices = await KeystoneAdapter._abortable(
+          signal,
+          this._usbConnector.searchDevices({ purpose: 'availability' })
+        );
         lastSearchError = undefined;
       } catch (error) {
         lastSearchError = error;
       }
+      KeystoneAdapter._throwIfAborted(signal);
       if (availableDevices.length) {
         break;
       }
       if (attempt < maxAttempts) {
         // eslint-disable-next-line no-await-in-loop
-        await waitForKeystoneUsbReattachProbe();
+        await KeystoneAdapter._abortable(signal, waitForKeystoneUsbReattachProbe());
       }
     }
     if (!availableDevices.length) {
@@ -2192,8 +2200,10 @@ export class KeystoneAdapter implements IHardwareWallet {
       // eslint-disable-next-line no-await-in-loop
       attached = await this._connectUsb(
         { expectedWalletId, expectedMasterFingerprint },
-        device?.connectId
+        device?.connectId,
+        signal
       );
+      KeystoneAdapter._throwIfAborted(signal);
       if (attached.success) {
         record = this._devices.get(expectedWalletId);
         if (record) break;
@@ -2278,7 +2288,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       !record.usbSessionId &&
       this._usbConnector
     ) {
-      await this._tryUsbAttach(record.walletId, record.masterFingerprint, {
+      await this._tryUsbAttach(signal, record.walletId, record.masterFingerprint, {
         waitForReenumeration: record.hadUsbSession,
       });
     }
@@ -2446,7 +2456,7 @@ export class KeystoneAdapter implements IHardwareWallet {
 
     let existingRecord = target.record;
     if (!existingRecord) {
-      const attached = await this._tryUsbAttach(target.expectedWalletId);
+      const attached = await this._tryUsbAttach(signal, target.expectedWalletId);
       KeystoneAdapter._throwIfAborted(signal);
       existingRecord = attached;
     }
@@ -2463,7 +2473,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     ) {
       // Pinned to USB without a session: attach here so enumeration errors
       // surface (resolveUr skips its probe for pinned transports).
-      await this._tryUsbAttach(existingRecord.walletId, existingRecord.masterFingerprint, {
+      await this._tryUsbAttach(signal, existingRecord.walletId, existingRecord.masterFingerprint, {
         waitForReenumeration: existingRecord.hadUsbSession,
       });
       KeystoneAdapter._throwIfAborted(signal);
@@ -2561,7 +2571,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     const target = this._resolveTarget(connectId, deviceId);
     if (target.record) return { record: target.record };
 
-    const attached = await this._tryUsbAttach(target.expectedWalletId);
+    const attached = await this._tryUsbAttach(signal, target.expectedWalletId);
     KeystoneAdapter._throwIfAborted(signal);
     if (attached) return { record: attached };
 
