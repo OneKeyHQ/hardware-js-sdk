@@ -1,10 +1,6 @@
 /**
- * The one place a Keystone device-queue key is derived.
- *
- * Three call sites have to agree on it or a cancel misses its target: the job
- * `enqueue` in every business method, the bundle-wide cancel scope in
- * `allNetworkGetAddress`, and `cancel()`. An operation id wins when there is
- * one, because a call pinned to an operation is queued under it.
+ * Single source of the device-queue key: enqueue, the all-network cancel scope and `cancel()`
+ * must agree or a cancel misses its target. A pinned operation id wins.
  */
 import { isHardwareOperationId } from '@onekeyfe/hwk-adapter-core';
 
@@ -28,9 +24,8 @@ export function keystoneWalletIdFromIdentifier(identifier: string): string | und
 }
 
 /**
- * Every queue key one identifier can stand for. A call queues under its
- * operation id, its connectId or the wallet id behind either, so a cancel that
- * knows only one of them has to fan out over all of them.
+ * Every queue key one identifier can stand for, so a cancel that knows only one of operation id,
+ * connectId or wallet id fans out over all of them.
  */
 export function keystoneCancelQueueKeys(identifiers: (string | undefined)[]): Set<string> {
   const keys = new Set<string>();

@@ -7,16 +7,8 @@ export function normalizePath(path: string): string {
 }
 
 /**
- * Split a full BIP-44 leaf path (`purpose'/coin'/account'/change/index`, 5
- * segments) into its 3-segment account path and the relative `change/index`
- * path from that account to the leaf. Matches the OneKey Keystone air-gap
- * demo's `removePathLastSegment({removeCount: 2})` convention, which is
- * verified against real Keystone hardware.
- *
- * A path with 3 or fewer segments IS already an account path (or shorter) —
- * BIP-44's account level is exactly 3 hardened components — so there is
- * nothing to split off: `relativeDerivePath` is empty and `accountPath` is
- * the (normalized) input unchanged.
+ * Splits a 5-segment BIP-44 leaf path into the 3-segment account path and the relative
+ * `change/index`; a path of 3 or fewer segments is already an account path.
  */
 export function splitAccountPath(path: string): {
   accountPath: string;
@@ -35,11 +27,7 @@ export function splitAccountPath(path: string): {
   };
 }
 
-/**
- * Standard BIP-44/49/84/86 purpose → script-type mapping. Returns `undefined`
- * for a path whose purpose isn't one of these four (or isn't parseable),
- * rather than guessing.
- */
+/** BIP-44/49/84/86 purpose to script type; undefined for any other purpose. */
 export function btcScriptTypeFromPath(path: string): BtcScriptType | undefined {
   const match = normalizePath(path).match(/^m\/(\d+)'/);
   if (!match) return undefined;
@@ -58,10 +46,8 @@ export function btcScriptTypeFromPath(path: string): BtcScriptType | undefined {
 }
 
 /**
- * Keystone firmware signs BTC only against account-0 xpubs (gui_btc.c
- * PreparePublicKeys). Testnet (coin 1') is excluded on top of that: this
- * package derives every BTC address with mainnet parameters, so admitting a
- * testnet path would hand back a mainnet address for a testnet account.
+ * Firmware signs BTC only against account-0 xpubs (gui_btc.c PreparePublicKeys). Testnet is
+ * excluded because addresses are derived with mainnet parameters.
  */
 export function isKeystoneSignableBtcAccountPath(accountPath: string): boolean {
   const segments = normalizePath(accountPath).slice(2).split('/');
