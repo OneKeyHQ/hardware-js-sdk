@@ -52,17 +52,20 @@ function fromSdkUr(ur: UR): KeystoneUr {
   return { urType: ur.type, urData: ur.cbor.toString('hex') };
 }
 
-/** r(32) | s(32) | v(1). A short answer must fail here, not reach a caller as `v: ''`. */
-function splitSignature65(hex: string): { r: string; s: string; v: string } {
-  if (hex.length !== 130) {
+/**
+ * r(32) | s(32) | v. A legacy EIP-155 tx's v is 35 + 2 * chainId + recId, so it
+ * outgrows one byte from chainId 110 on; a short answer must still fail here.
+ */
+function splitEvmSignature(hex: string): { r: string; s: string; v: string } {
+  if (hex.length < 130 || hex.length % 2 !== 0) {
     throw new Error(
-      `Keystone returned a ${hex.length / 2}-byte signature; expected 65 bytes (r|s|v)`
+      `Keystone returned a ${hex.length / 2}-byte signature; expected at least 65 bytes (r|s|v)`
     );
   }
   return { r: hex.slice(0, 64), s: hex.slice(64, 128), v: hex.slice(128) };
 }
 
-/** Same contract as `splitSignature65` for chains whose signature is one fixed-length blob. */
+/** Same short-answer guard as `splitEvmSignature` for chains whose signature is one fixed-length blob. */
 function requireSignatureBytes(hex: string, expectedBytes: number, chain: string): string {
   if (hex.length !== expectedBytes * 2) {
     throw new Error(
@@ -178,7 +181,7 @@ export class KeystoneUrEngine {
 
   parseEthSignature(ur: KeystoneUr): KeystoneEthSignatureResult {
     const signature = this.sdk.eth.parseSignature(toSdkUr(ur));
-    return { requestId: signature.requestId, ...splitSignature65(signature.signature) };
+    return { requestId: signature.requestId, ...splitEvmSignature(signature.signature) };
   }
 
   /** Derives an EVM address offline; `relativeDerivePath` is relative to the xpub, e.g. `'0/0'`. */

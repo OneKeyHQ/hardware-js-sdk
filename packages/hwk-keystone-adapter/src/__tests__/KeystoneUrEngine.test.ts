@@ -161,7 +161,25 @@ describe('KeystoneUrEngine', () => {
         Buffer.from('2b5893f252e24ba89d5e6c2b6f5f1c11', 'hex')
       );
 
-      expect(() => engine.parseEthSignature(urFromSdk(short.toUR()))).toThrow(/expected 65 bytes/);
+      expect(() => engine.parseEthSignature(urFromSdk(short.toUR()))).toThrow(
+        /expected at least 65 bytes/
+      );
+    });
+
+    it('keeps a multi-byte v from a legacy tx on a high chainId', () => {
+      // EIP-155 on chainId 137: v = 35 + 2 * 137 + 1 = 310 = 0x0136.
+      const r = 'aa'.repeat(32);
+      const s = 'bb'.repeat(32);
+      const signature = new ETHSignature(
+        Buffer.from(`${r}${s}0136`, 'hex'),
+        Buffer.from('2b5893f252e24ba89d5e6c2b6f5f1c11', 'hex')
+      );
+
+      expect(engine.parseEthSignature(urFromSdk(signature.toUR()))).toMatchObject({
+        r,
+        s,
+        v: '0136',
+      });
     });
 
     it('round-trips a requestId the engine itself minted, byte for byte', () => {

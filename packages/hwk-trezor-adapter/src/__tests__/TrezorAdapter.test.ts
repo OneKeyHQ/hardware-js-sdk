@@ -622,6 +622,30 @@ describe('TrezorAdapter', () => {
     }
   );
 
+  it('reports why the host denied device permission', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+        payload: { granted: false, reason: 'bluetoothTurnedOff' },
+      });
+    });
+    const result = await adapter.evmGetAddress('', 'safe-7', {
+      path: "m/44'/60'/0'/0/0",
+      useEmptyPassphrase: true,
+      knownConnections: [],
+    });
+    expect(result).toMatchObject({
+      success: false,
+      payload: {
+        code: HardwareErrorCode.DevicePermissionDenied,
+        params: { permissionDeniedReason: 'bluetoothTurnedOff' },
+      },
+    });
+    await adapter.dispose();
+  });
+
   it('does not open BLE binding for a wallet the host marks USB-only', async () => {
     const connector = createConnector();
     (connector.searchDevices as SearchDevicesMock).mockResolvedValue([]);
