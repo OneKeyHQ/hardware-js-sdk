@@ -1,10 +1,6 @@
 /**
- * IPC channel names exchanged between renderer and main process, shared by
- * every third-party vendor that talks BLE on desktop — Ledger reaches the same
- * handler through `desktopApi.thirdPartyBle`, it does not register its own.
- * Namespaced under `$onekey-3p-ble-…` to avoid clashing with the
- * existing OneKey BLE handler (`$onekey-noble-ble-…`) when both run in
- * the same Electron app.
+ * Renderer/main IPC channels shared by every third-party BLE vendor; prefixed to
+ * avoid clashing with the OneKey handler (`$onekey-noble-ble-*`) in one app.
  */
 export const THIRD_PARTY_BLE_CHANNELS = {
   scan: '$onekey-3p-ble-scan',
