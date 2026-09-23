@@ -394,7 +394,7 @@ describe('LedgerConnectorBase installApp failure teardown', () => {
     return { connector, cancel, invalidateDeviceApps, invalidateSigners };
   }
 
-  it('cancels the secure-channel action and drops the session signers on SecureChannelError', async () => {
+  it('maps SecureChannelError, cancels the action and drops the session signers', async () => {
     const secureChannelError = {
       _tag: ERROR_TAG.SecureChannel,
       error: { url: 'wss://scriptrunner', errorMessage: 'Connection closed unexpectedly' },
@@ -406,26 +406,14 @@ describe('LedgerConnectorBase installApp failure teardown', () => {
     const result = await connector.call(SESSION_ID, 'installApp', { appName: 'Bitcoin' });
 
     expect(result.success).toBe(false);
+    if (result.success) throw new Error('expected failure');
+    expect(result.error.code).toBe(HardwareErrorCode.LedgerSecureChannelError);
+    expect(result.error.params?._tag).toBe(ERROR_TAG.SecureChannel);
     // Cancelling is the teardown that reaches the secure channel: it stops
     // DMK's device action, which closes the WebSocket.
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(invalidateSigners).toHaveBeenCalledWith(SESSION_ID);
     expect((connector as any)._cancellers.has(SESSION_ID)).toBe(false);
-  });
-
-  it('carries _tag and the secure-channel code across the connector boundary', async () => {
-    const { connector } = connectorWithFailingInstall({
-      _tag: ERROR_TAG.SecureChannel,
-      error: { url: 'wss://scriptrunner', errorMessage: 'Connection closed unexpectedly' },
-      originalError: { url: 'wss://scriptrunner', errorMessage: 'Connection closed unexpectedly' },
-    });
-
-    const result = await connector.call(SESSION_ID, 'installApp', { appName: 'Bitcoin' });
-
-    expect(result.success).toBe(false);
-    if (result.success) throw new Error('expected failure');
-    expect(result.error.code).toBe(HardwareErrorCode.LedgerSecureChannelError);
-    expect(result.error.params?._tag).toBe(ERROR_TAG.SecureChannel);
   });
 
   it('maps a metadata failure to LedgerFirmwareMetadataError without a transport teardown', async () => {
@@ -440,17 +428,11 @@ describe('LedgerConnectorBase installApp failure teardown', () => {
     if (result.success) throw new Error('expected failure');
     expect(result.error.code).toBe(HardwareErrorCode.LedgerFirmwareMetadataError);
     expect(result.error.params?._tag).toBe(ERROR_TAG.InvalidFirmwareMetadataResponse);
-    // Not DeviceDisconnected / TransportError: the device link was never the problem.
-    expect(result.error.code).not.toBe(HardwareErrorCode.DeviceDisconnected);
-    expect(result.error.code).not.toBe(HardwareErrorCode.TransportError);
   });
 });
 
 // ---------------------------------------------------------------------------
-// DMK transports raise OpeningConnectionError (`_tag: "ConnectionOpeningError"`)
-// from the catch-all of connect(). On BLE that is RNBleTransport's generic GATT
-// failure and must stay a pairing failure; on HID it means another page holds
-// the device, which is DeviceBusy.
+// DMK transports raise OpeningConnectionError from connect()'s catch-all: BLE keeps it a pairing failure, HID means DeviceBusy.
 // ---------------------------------------------------------------------------
 
 describe('LedgerConnectorBase connect() opening-tag classification', () => {
@@ -496,7 +478,6 @@ describe('LedgerConnectorBase connect() opening-tag classification', () => {
     expect(err).not.toBeNull();
     const mapped = mapLedgerError(err);
     expect(mapped.code).toBe(HardwareErrorCode.BlePairingTimeout);
-    expect(mapped.code).not.toBe(HardwareErrorCode.DeviceBusy);
     expect(ORPHAN_ELIGIBLE_ERROR_CODES).toContain(mapped.code);
   });
 

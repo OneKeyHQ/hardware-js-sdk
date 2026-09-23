@@ -603,12 +603,8 @@ export class LedgerConnectorBase implements IConnector {
         // If DMK already gave a recognized tag (locked / disconnected / pairing
         // / transport-class), pass through untouched so SDK classifiers can
         // route on the real cause. We only wrap completely untagged errors.
-        //
-        // The opening tag is excluded: RNBleTransport raises it for every
-        // connect failure it cannot attribute to a removed pairing, so it
-        // names the step, not the cause. Passing it through would classify a
-        // GATT failure as DeviceBusy and drop it out of the orphan-eligible
-        // set, where the BLE flow needs it.
+        // The opening tag names the step, not the cause; passing it through
+        // would misclassify a GATT failure as DeviceBusy.
         if (isKnownConnectionTag(tag) && !isConnectionOpeningTag(tag)) {
           throw err;
         }
@@ -1123,23 +1119,15 @@ export class LedgerConnectorBase implements IConnector {
     return this._deviceAppsManager!;
   }
 
-  // DeviceAppsManager is intentionally absent here: it is a per-call factory
-  // with no cached session state, so there is nothing to invalidate. Cancelling
-  // the device action is what closes the secure channel.
+  // DeviceAppsManager is a per-call factory with no cached session state, so
+  // there is nothing to invalidate for it here.
   private _invalidateSession(sessionId: string): void {
     this._signerManager?.invalidate(sessionId);
   }
 
   /**
-   * Teardown for the OS-level actions that open a manager-api secure channel
-   * (install, uninstall, genuine check). Cancelling the device action is what
-   * stops DMK's xstate actor, which unsubscribes the secure-channel observable
-   * and closes its WebSocket; dropping the canceller without firing it leaves
-   * that teardown to run only if the action settled on its own.
-   *
-   * The DMK device session is deliberately kept: the secure channel is a
-   * separate WebSocket per call, and disconnecting here would break the bounded
-   * unlock/retry recovery the adapter runs on the original session.
+   * Fire the canceller so DMK closes the secure-channel WebSocket. The DMK device
+   * session is kept: unlock/retry recovery reuses it.
    */
   private _teardownSecureChannelSession(sessionId: string): void {
     const cancel = this._cancellers.get(sessionId);
@@ -1148,7 +1136,7 @@ export class LedgerConnectorBase implements IConnector {
       try {
         cancel();
       } catch {
-        // Action may already have settled — nothing left to cancel.
+        // Action may already have settled: nothing left to cancel.
       }
     }
     this._invalidateSession(sessionId);

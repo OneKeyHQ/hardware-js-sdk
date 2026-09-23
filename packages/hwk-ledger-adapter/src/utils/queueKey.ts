@@ -1,10 +1,6 @@
 /**
- * The one place a Ledger device-queue key is derived.
- *
- * Three call sites have to agree on it or a cancel misses its target: the job
- * `enqueue` in `connectorCall`, the bundle-wide cancel scope in
- * `allNetworkGetAddress`, and `cancel()`. An operation id wins when there is
- * one, because a call pinned to an operation is queued under it.
+ * Single source of the Ledger device-queue key: connectorCall, allNetworkGetAddress
+ * and cancel() must agree or a cancel misses its target. Operation id wins.
  */
 export const LEDGER_DEFAULT_QUEUE_KEY = '__ledger_default__';
 
