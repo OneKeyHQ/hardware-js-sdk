@@ -775,6 +775,12 @@ export abstract class TrezorConnectorBase implements IConnector {
           return this.thp.onPairingRequest(payload);
         }
 
+        // Register the waiter before emitting, like onPinMatrixRequest and
+        // onPassphraseRequest: a synchronous host reply would otherwise find
+        // no waiter and hang the pairing for the full timeout.
+        const pairingPromise = this.uiRequests.wait<
+          Awaited<ReturnType<NonNullable<TrezorThpSessionOptions['onPairingRequest']>>>
+        >(UI_REQUEST.REQUEST_TREZOR_THP_PAIRING);
         this.emit('ui-request', {
           type: UI_REQUEST.REQUEST_TREZOR_THP_PAIRING,
           payload: {
@@ -784,7 +790,7 @@ export abstract class TrezorConnectorBase implements IConnector {
             nfcData: payload.nfcData,
           },
         });
-        return this.uiRequests.wait(UI_REQUEST.REQUEST_TREZOR_THP_PAIRING);
+        return pairingPromise;
       },
       onButtonRequest: async payload => {
         await this.thp?.onButtonRequest?.(payload);
