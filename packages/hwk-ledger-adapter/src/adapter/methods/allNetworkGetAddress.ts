@@ -62,9 +62,8 @@ export type LedgerRetainOperation = (operationId: string) => () => void;
 export type LedgerErrorToFailure = <T>(error: unknown) => Response<T>;
 
 /**
- * Opens a cancellation scope that spans the whole bundle. Each item enqueues
- * its own job, so a cancel between two items has no job to abort; the scope
- * is what survives that gap.
+ * Bundle-wide cancel scope: each item enqueues its own job, so a cancel landing
+ * between two items has no job to abort and only the scope sees it.
  */
 export type LedgerCreateCancelScope = (queueKey: string) => CancelScopeHandle;
 
@@ -130,6 +129,7 @@ export function createAllNetworkGetAddress({
       knownConnections: params.knownConnections,
       extra: params.extra,
       allowDeviceSelection: params.allowDeviceSelection,
+      supportedTransports: params.supportedTransports,
     };
     const chainFingerprints = new Map<ChainForFingerprint, string>();
 

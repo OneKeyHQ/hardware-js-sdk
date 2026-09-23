@@ -275,4 +275,32 @@ describe('Ledger Electron BLE lifecycle', () => {
     expect(bridge.write).toHaveBeenCalledTimes(1);
     expect(bridge.disconnect).toHaveBeenCalledTimes(1);
   });
+
+  it('forwards cancelPairing to the bridge only for connects still in flight', async () => {
+    const { transport, bridge } = fixture();
+    const cancelPairing = jest.fn(async (): Promise<void> => undefined);
+    Object.assign(bridge, { cancelPairing });
+    let rejectConnect!: (error: Error) => void;
+    bridge.connect.mockImplementationOnce(
+      () =>
+        new Promise<{ id: string }>((_resolve, reject) => {
+          rejectConnect = reject;
+        })
+    );
+    const pending = transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() });
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+    expect(bridge.connect).toHaveBeenCalledTimes(1);
+    await transport.cancelPairing('ledger-test');
+    expect(cancelPairing).toHaveBeenCalledWith({ vendor: LEDGER_BLE_VENDOR, id: 'ledger-test' });
+    rejectConnect(new Error('connect cancelled: ledger-test'));
+    expect((await pending).isLeft()).toBe(true);
+
+    cancelPairing.mockClear();
+    const connected = await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() });
+    expect(connected.isRight()).toBe(true);
+    await transport.cancelPairing();
+    expect(cancelPairing).not.toHaveBeenCalled();
+  });
 });

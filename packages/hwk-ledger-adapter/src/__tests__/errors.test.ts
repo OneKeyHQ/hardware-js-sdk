@@ -587,11 +587,8 @@ describe('serializeConnectorError', () => {
 });
 
 // ---------------------------------------------------------------------------
-// DMK OS / secure-channel device-action errors (the installApp failure surface)
-//
-// These classes carry no `message` of their own — only `_tag` plus an
-// `originalError` holding the text — so message-substring matching never sees
-// them. Before they were matched by tag they all collapsed to UnknownError.
+// DMK OS / secure-channel device-action errors: no `message` of their own,
+// only `_tag` plus `originalError` holding the text, so they must be matched by tag.
 // ---------------------------------------------------------------------------
 
 /** Shape of @ledgerhq/device-management-kit's device-action error classes. */
@@ -648,49 +645,22 @@ describe('installApp DMK error classification', () => {
     expect(result.origin).toBe('transport');
   });
 
-  it('maps AppAlreadyInstalledDAError to AppAlreadyInstalled', () => {
-    const err = dmkDaErrorNoArg(ERROR_TAG.AppAlreadyInstalledDA);
-    expect(mapLedgerError(err).code).toBe(HardwareErrorCode.AppAlreadyInstalled);
-  });
-
-  it('maps OutOfMemoryDAError to DeviceOutOfMemory', () => {
-    const err = dmkDaError(ERROR_TAG.OutOfMemoryDA, 'Not enough memory for those applications');
-    expect(mapLedgerError(err).code).toBe(HardwareErrorCode.DeviceOutOfMemory);
-  });
-
-  it('maps DeviceNotOnboardedError to DeviceNotInitialized', () => {
-    const err = dmkDaError(ERROR_TAG.DeviceNotOnboarded, 'Device not onboarded.');
-    expect(mapLedgerError(err).code).toBe(HardwareErrorCode.DeviceNotInitialized);
-  });
-
-  it('maps GetApplicationsMetadataTaskError to LedgerFirmwareMetadataError', () => {
-    const err = dmkDaError(
+  it.each([
+    [ERROR_TAG.AppAlreadyInstalledDA, 'Unknown error.', HardwareErrorCode.AppAlreadyInstalled],
+    [
+      ERROR_TAG.OutOfMemoryDA,
+      'Not enough memory for those applications',
+      HardwareErrorCode.DeviceOutOfMemory,
+    ],
+    [ERROR_TAG.DeviceNotOnboarded, 'Device not onboarded.', HardwareErrorCode.DeviceNotInitialized],
+    [
       ERROR_TAG.ApplicationsMetadataTask,
-      'Failed to get applications metadata.'
-    );
-    expect(mapLedgerError(err).code).toBe(HardwareErrorCode.LedgerFirmwareMetadataError);
-  });
-
-  it('maps NetworkDAError to NetworkError', () => {
-    const err = dmkDaError(ERROR_TAG.NetworkDA, 'Network error.');
-    expect(mapLedgerError(err).code).toBe(HardwareErrorCode.NetworkError);
-  });
-
-  it('no longer collapses the install failure surface into UnknownError', () => {
-    const errors = [
-      dmkDaErrorNoArg(ERROR_TAG.RefusedByUserDA),
-      dmkSecureChannelError('Connection closed unexpectedly'),
-      dmkDaErrorNoArg(ERROR_TAG.AppAlreadyInstalledDA),
-      dmkDaError(ERROR_TAG.DeviceNotOnboarded, 'Device not onboarded.'),
-      dmkDaError(ERROR_TAG.ApplicationsMetadataTask, 'Failed to get applications metadata.'),
-      dmkDaError(
-        ERROR_TAG.InvalidFirmwareMetadataResponse,
-        'Invalid Firmware Metadata response error.'
-      ),
-    ];
-    for (const err of errors) {
-      expect(mapLedgerError(err).code).not.toBe(HardwareErrorCode.UnknownError);
-    }
+      'Failed to get applications metadata.',
+      HardwareErrorCode.LedgerFirmwareMetadataError,
+    ],
+    [ERROR_TAG.NetworkDA, 'Network error.', HardwareErrorCode.NetworkError],
+  ])('maps %s to its dedicated code', (tag, message, code) => {
+    expect(mapLedgerError(dmkDaError(tag, message)).code).toBe(code);
   });
 
   it('keeps secure-channel and metadata failures out of the connection-level set', () => {
@@ -730,9 +700,8 @@ describe('installApp DMK error classification', () => {
 });
 
 // ---------------------------------------------------------------------------
-// DMK's OpeningConnectionError class carries `_tag = "ConnectionOpeningError"`,
-// and its typings widen `_tag` to `string`, so the class name never matched the
-// runtime tag. Both spellings are accepted.
+// DMK's OpeningConnectionError class carries the runtime `_tag`
+// "ConnectionOpeningError", so both spellings are accepted.
 // ---------------------------------------------------------------------------
 
 describe('connection-opening tag spelling', () => {
@@ -741,7 +710,6 @@ describe('connection-opening tag spelling', () => {
   it.each(spellings)('maps %s to DeviceBusy rather than UnknownError', tag => {
     const result = mapLedgerError({ _tag: tag, message: 'Failed to open connection' });
     expect(result.code).toBe(HardwareErrorCode.DeviceBusy);
-    expect(result.code).not.toBe(HardwareErrorCode.UnknownError);
   });
 
   it.each(spellings)('treats %s as a connection-level failure', tag => {

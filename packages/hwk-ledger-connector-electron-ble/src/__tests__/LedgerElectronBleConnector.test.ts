@@ -1,5 +1,6 @@
 import { LedgerConnectorBase } from '@onekeyfe/hwk-ledger-adapter';
-import { createLedgerElectronBleConnector, LedgerElectronBleTransport } from '../index';
+
+import { LedgerElectronBleTransport, createLedgerElectronBleConnector } from '../index';
 
 jest.mock('@onekeyfe/hwk-ledger-adapter', () => ({
   LedgerConnectorBase: jest.fn(),
