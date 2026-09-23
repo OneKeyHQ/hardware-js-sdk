@@ -141,6 +141,16 @@ function formatDeviceMismatchError(expected: string, actual: string): string {
   return `Wrong device: expected ${expected}, got ${actual}`;
 }
 
+// Viewing keys reveal a Zcash account's whole shielded history; logs get exported to support.
+const LOG_REDACTED_RESULT_KEYS = ['ufvk', 'orchardFvk'];
+
+function redactResultForLog(result: unknown): unknown {
+  if (!result || typeof result !== 'object') return result;
+  const keys = LOG_REDACTED_RESULT_KEYS.filter(key => key in result);
+  if (!keys.length) return result;
+  return { ...result, ...Object.fromEntries(keys.map(key => [key, '[redacted]'])) };
+}
+
 /** The session is gone: disconnect, not advertising, timeout, or a connection-level tag. */
 function isLostConnectionError(err: unknown): boolean {
   return (
@@ -2509,7 +2519,11 @@ export class LedgerAdapter implements IHardwareWallet {
           busyError: LedgerAdapter._createDeviceBusyError(method),
         }
       );
-      debugLog('[LedgerAdapter][RES]', { method, success: true, payload: result });
+      debugLog('[LedgerAdapter][RES]', {
+        method,
+        success: true,
+        payload: redactResultForLog(result),
+      });
       return result;
     } catch (err) {
       const e = err as Record<string, unknown> | null | undefined;
