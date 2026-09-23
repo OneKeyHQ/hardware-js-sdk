@@ -98,7 +98,9 @@ function fixture() {
       defaultApduReceiverServiceStubBuilder({ channel: Nothing }, () => logger),
   };
   const transport = new LedgerElectronBleTransport(bridge, args);
-  return { bridge, transport, senderFactory, notifications, disconnects, notify };
+  const connect = (onDisconnect: (id: string) => void = jest.fn()) =>
+    transport.connect({ deviceId: 'ledger-test', onDisconnect });
+  return { bridge, transport, connect, senderFactory, notifications, disconnects, notify };
 }
 
 describe('Ledger Electron BLE lifecycle', () => {
@@ -117,8 +119,8 @@ describe('Ledger Electron BLE lifecycle', () => {
   });
 
   it('uses the cached advertisement profile and negotiates a safe frame size', async () => {
-    const { transport, bridge, senderFactory, notifications } = fixture();
-    const result = await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() });
+    const { transport, connect, bridge, senderFactory, notifications } = fixture();
+    const result = await connect();
     expect(result.isRight()).toBe(true);
     expect(bridge.scan).not.toHaveBeenCalled();
     // The shared handler has no per-vendor write rule of its own: `raw` and the
@@ -136,9 +138,9 @@ describe('Ledger Electron BLE lifecycle', () => {
   });
 
   it('rejects a second acquire while the first connection is still opening', async () => {
-    const { transport, bridge } = fixture();
-    const first = transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() });
-    const second = transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() });
+    const { transport, connect, bridge } = fixture();
+    const first = connect();
+    const second = connect();
     const results = await Promise.all([first, second]);
     expect(results.map(result => result.isRight())).toEqual([true, false]);
     expect(bridge.connect).toHaveBeenCalledTimes(1);
@@ -146,45 +148,41 @@ describe('Ledger Electron BLE lifecycle', () => {
   });
 
   it('closes an invalid MTU negotiation and allows a fresh acquire', async () => {
-    const { transport, bridge, notify, notifications, disconnects } = fixture();
+    const { transport, connect, bridge, notify, notifications, disconnects } = fixture();
     bridge.write.mockImplementationOnce(async () => {
       notify('080000000005');
     });
-    expect(
-      (await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() })).isLeft()
-    ).toBe(true);
+    expect((await connect()).isLeft()).toBe(true);
     expect(bridge.disconnect).toHaveBeenCalledTimes(1);
     expect(notifications.size).toBe(0);
     expect(disconnects.size).toBe(0);
-    const next = await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() });
+    const next = await connect();
     expect(next.isRight()).toBe(true);
     await transport.disconnect({ connectedDevice: next.unsafeCoerce() });
   });
 
   it('catches a link that drops while connect is still resolving', async () => {
-    const { transport, bridge, disconnects, notifications } = fixture();
+    const { transport, connect, bridge, disconnects, notifications } = fixture();
     const onDisconnect = jest.fn();
     // The device drops the link as pairing completes, before connect returns.
     bridge.connect.mockImplementationOnce(async () => {
       disconnects.forEach(handler => handler('ledger-test'));
       return { id: 'ledger-test' };
     });
-    const result = await transport.connect({ deviceId: 'ledger-test', onDisconnect });
+    const result = await connect(onDisconnect);
     expect(result.isLeft()).toBe(true);
     expect(onDisconnect).toHaveBeenCalledWith('ledger-test');
     expect(disconnects.size).toBe(0);
     expect(notifications.size).toBe(0);
     // The dead link never becomes an owned connection, so a retry is allowed.
-    const next = await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() });
+    const next = await connect();
     expect(next.isRight()).toBe(true);
     await transport.disconnect({ connectedDevice: next.unsafeCoerce() });
   });
 
   it('uses DMK framing for a multi-frame exchange without replay', async () => {
-    const { transport, bridge, notify } = fixture();
-    const connected = (
-      await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() })
-    ).unsafeCoerce();
+    const { transport, connect, bridge, notify } = fixture();
+    const connected = (await connect()).unsafeCoerce();
     bridge.write.mockClear();
     bridge.write.mockImplementation(async () => {
       if (bridge.write.mock.calls.length === 3) notify('05000000029000');
@@ -198,10 +196,8 @@ describe('Ledger Electron BLE lifecycle', () => {
   });
 
   it('rejects a concurrent exchange while preserving the first response', async () => {
-    const { transport, notify } = fixture();
-    const connected = (
-      await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() })
-    ).unsafeCoerce();
+    const { transport, connect, notify } = fixture();
+    const connected = (await connect()).unsafeCoerce();
     const pending = connected.sendApdu(Uint8Array.of(0), false);
     expect((await connected.sendApdu(Uint8Array.of(1), false)).isLeft()).toBe(true);
     notify('05000000029000');
@@ -210,11 +206,9 @@ describe('Ledger Electron BLE lifecycle', () => {
   });
 
   it('reports one disconnect and rejects the pending exchange', async () => {
-    const { transport, disconnects, notifications } = fixture();
+    const { connect, disconnects, notifications } = fixture();
     const onDisconnect = jest.fn();
-    const connected = (
-      await transport.connect({ deviceId: 'ledger-test', onDisconnect })
-    ).unsafeCoerce();
+    const connected = (await connect(onDisconnect)).unsafeCoerce();
     const pending = connected.sendApdu(Uint8Array.of(0), false);
     disconnects.forEach(handler => handler('ledger-test'));
     expect((await pending).isLeft()).toBe(true);
@@ -223,14 +217,10 @@ describe('Ledger Electron BLE lifecycle', () => {
   });
 
   it('does not let a late release close a replacement connection', async () => {
-    const { transport, bridge, disconnects } = fixture();
-    const first = (
-      await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() })
-    ).unsafeCoerce();
+    const { transport, connect, bridge, disconnects } = fixture();
+    const first = (await connect()).unsafeCoerce();
     disconnects.forEach(handler => handler('ledger-test'));
-    const replacement = (
-      await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() })
-    ).unsafeCoerce();
+    const replacement = (await connect()).unsafeCoerce();
     await transport.disconnect({ connectedDevice: first });
     expect(bridge.disconnect).not.toHaveBeenCalled();
     await transport.disconnect({ connectedDevice: replacement });
@@ -238,10 +228,8 @@ describe('Ledger Electron BLE lifecycle', () => {
   });
 
   it('retains connection ownership until native teardown completes', async () => {
-    const { transport, bridge } = fixture();
-    const connected = (
-      await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() })
-    ).unsafeCoerce();
+    const { transport, connect, bridge } = fixture();
+    const connected = (await connect()).unsafeCoerce();
     let finishTeardown: (() => void) | undefined;
     bridge.disconnect.mockImplementationOnce(
       () =>
@@ -250,25 +238,18 @@ describe('Ledger Electron BLE lifecycle', () => {
         })
     );
     const teardown = transport.disconnect({ connectedDevice: connected });
-    expect(
-      (await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() })).isLeft()
-    ).toBe(true);
+    expect((await connect()).isLeft()).toBe(true);
     if (!finishTeardown) throw new Error('Expected native teardown to start');
     finishTeardown();
     await teardown;
-    const replacement = await transport.connect({
-      deviceId: 'ledger-test',
-      onDisconnect: jest.fn(),
-    });
+    const replacement = await connect();
     expect(replacement.isRight()).toBe(true);
     await transport.disconnect({ connectedDevice: replacement.unsafeCoerce() });
   });
 
   it('makes a timed-out exchange link-fatal without replaying it', async () => {
-    const { transport, bridge } = fixture();
-    const connected = (
-      await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() })
-    ).unsafeCoerce();
+    const { connect, bridge } = fixture();
+    const connected = (await connect()).unsafeCoerce();
     bridge.write.mockClear();
     expect((await connected.sendApdu(Uint8Array.of(0), false, 10)).isLeft()).toBe(true);
     expect((await connected.sendApdu(Uint8Array.of(1), false)).isLeft()).toBe(true);
@@ -277,7 +258,7 @@ describe('Ledger Electron BLE lifecycle', () => {
   });
 
   it('forwards cancelPairing to the bridge only for connects still in flight', async () => {
-    const { transport, bridge } = fixture();
+    const { transport, connect, bridge } = fixture();
     const cancelPairing = jest.fn(async (): Promise<void> => undefined);
     Object.assign(bridge, { cancelPairing });
     let rejectConnect!: (error: Error) => void;
@@ -287,7 +268,7 @@ describe('Ledger Electron BLE lifecycle', () => {
           rejectConnect = reject;
         })
     );
-    const pending = transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() });
+    const pending = connect();
     await new Promise(resolve => {
       setTimeout(resolve, 0);
     });
@@ -298,7 +279,7 @@ describe('Ledger Electron BLE lifecycle', () => {
     expect((await pending).isLeft()).toBe(true);
 
     cancelPairing.mockClear();
-    const connected = await transport.connect({ deviceId: 'ledger-test', onDisconnect: jest.fn() });
+    const connected = await connect();
     expect(connected.isRight()).toBe(true);
     await transport.cancelPairing();
     expect(cancelPairing).not.toHaveBeenCalled();

@@ -82,7 +82,6 @@ export async function requestBleDeviceSelection({
         if (usbFallback) return usbFallback;
         devices = snapshot;
         publish();
-        if (stopped) return;
         await waitForNextScan();
       }
     })();

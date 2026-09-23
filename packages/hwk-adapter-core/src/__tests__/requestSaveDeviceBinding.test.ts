@@ -69,11 +69,24 @@ describe('acknowledged device binding', () => {
 
   it('cancels the pending wait when the operation is aborted', async () => {
     const { emitter, registry } = setup();
+    const status = jest.fn();
+    emitter.on(UI_REQUEST.DEVICE_BINDING_STATUS, status);
     const controller = new AbortController();
     const pending = requestSaveDeviceBinding(emitter, registry, binding, controller.signal);
     controller.abort();
     await expect(pending).rejects.toMatchObject({ _tag: 'UiRequestCancelled' });
+    expect(status.mock.calls.map(([event]) => event.payload.status)).toEqual(['cancelled']);
     expect(registry.hasPending()).toBe(false);
+  });
+
+  it('throws for an already-aborted signal without opening a request', async () => {
+    const { emitter, registry, requests } = setup();
+    const controller = new AbortController();
+    controller.abort(new Error('aborted first'));
+    await expect(
+      requestSaveDeviceBinding(emitter, registry, binding, controller.signal)
+    ).rejects.toThrow('aborted first');
+    expect(requests).toHaveLength(0);
   });
 
   it('does not let superseded cleanup cancel a newer binding request', async () => {
