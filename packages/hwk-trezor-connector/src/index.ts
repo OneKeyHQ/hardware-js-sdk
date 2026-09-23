@@ -862,9 +862,17 @@ export abstract class TrezorConnectorBase implements IConnector {
         return res?.passphraseOnDevice ? { on_device: true } : { passphrase: res?.value ?? '' };
       },
       onPairingCredentialsChanged: async payload => {
-        // Core reports the complete authoritative list. Replacing it removes
-        // credentials rejected by the device instead of retrying them forever.
-        this.setKnownCredentials(payload.credentials);
+        // The shared list serves every device while core reports one device:
+        // drop what the device rejected, then merge this device's credentials.
+        const blob = (cred: TrezorThpCredentials) => (cred as { credential?: string }).credential;
+        const rejected = new Set((payload.removed ?? []).map(blob));
+        const merged = this.knownCredentials.filter(cred => !rejected.has(blob(cred)));
+        for (const cred of payload.credentials) {
+          if (blob(cred) && !merged.some(existing => blob(existing) === blob(cred))) {
+            merged.push(cred);
+          }
+        }
+        this.setKnownCredentials(merged);
         await this.thp?.onPairingCredentialsChanged?.(payload);
         this.emit('device-trezor-thp-credentials-changed', {
           connectId: device.connectId,

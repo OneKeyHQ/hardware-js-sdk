@@ -220,7 +220,7 @@ export class LedgerElectronBleTransport implements Transport {
           resolve: (value: T) => void,
           reject: (error: unknown) => void
         ) => void,
-        timeoutMs: number
+        timeoutMs: number | undefined
       ): Promise<T> => {
         if (closed) throw new Error('Bluetooth connection ended');
         if (pending) throw new Error('Bluetooth exchange is busy');
@@ -228,10 +228,12 @@ export class LedgerElectronBleTransport implements Transport {
         try {
           return await new Promise<T>((resolve, reject) => {
             pending = { reject, receive: bytes => accept(bytes, resolve, reject) };
-            timer = setTimeout(
-              () => reject(new SendApduTimeoutError('Bluetooth response timed out')),
-              timeoutMs
-            );
+            if (timeoutMs !== undefined) {
+              timer = setTimeout(
+                () => reject(new SendApduTimeoutError('Bluetooth response timed out')),
+                timeoutMs
+              );
+            }
             void (async () => {
               for (const frame of frames) {
                 if (closed) throw new Error('Bluetooth connection ended');
@@ -276,7 +278,9 @@ export class LedgerElectronBleTransport implements Transport {
                     response.map(value => resolve(Right(value)));
                   },
                 }),
-              abortTimeout ?? 120_000
+              // No default: a signing APDU waits on the user, and close() or a
+              // disconnect already fails a pending exchange.
+              abortTimeout
             );
             if (result.isLeft()) {
               await disconnect(true);
