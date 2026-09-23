@@ -811,6 +811,9 @@ export abstract class TrezorConnectorBase implements IConnector {
       },
       onButtonRequestComplete: async payload => {
         await this.thp?.onButtonRequestComplete?.(payload);
+        // A multi-step confirmation answers one button with the next one;
+        // report completion only once the device leaves confirmation.
+        if (payload.responseType === 'ButtonRequest') return;
         this.emit('ui-event', {
           type: EConnectorInteraction.InteractionComplete,
           payload: {

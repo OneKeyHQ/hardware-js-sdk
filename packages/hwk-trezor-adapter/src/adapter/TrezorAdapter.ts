@@ -2932,10 +2932,12 @@ export class TrezorAdapter implements IHardwareWallet {
       payload: { transportType, connectId, deviceId, operationId },
     });
 
-    const { granted } = await waitPromise;
+    const { granted, reason } = await waitPromise;
     if (!granted) {
+      // Same field Ledger reports: the host picks its Bluetooth dialog by it.
       throw Object.assign(new Error('Device permission denied'), {
         code: HardwareErrorCode.DevicePermissionDenied,
+        ...(reason ? { params: { permissionDeniedReason: reason } } : {}),
       });
     }
   }

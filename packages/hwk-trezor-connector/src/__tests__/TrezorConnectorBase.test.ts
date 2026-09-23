@@ -173,6 +173,10 @@ describe('TrezorConnectorBase device resolution', () => {
     });
 
     await connector.connect('safe-7');
+    // A second confirmation step keeps the device in confirmation.
+    await capturedThpOptions?.onButtonRequestComplete?.({
+      responseType: 'ButtonRequest',
+    });
     await capturedThpOptions?.onButtonRequestComplete?.({
       responseType: 'Address',
     });
