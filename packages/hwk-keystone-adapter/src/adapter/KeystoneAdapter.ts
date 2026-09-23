@@ -123,6 +123,10 @@ import type {
 /** Key material for one operation, keyed by `accountKey()`; never retained. */
 type AccountBook = Map<string, KeystoneAccountEntry>;
 
+type OperationRoute = { operationId: string; connectionType: 'usb' | 'qr' };
+
+type ExpectedWallet = { expectedWalletId?: string; expectedMasterFingerprint?: string };
+
 // Keystone briefly leaves the USB bus when entering external-wallet mode, so a persisted-wallet
 // call must wait out re-enumeration instead of falling back to QR on one empty snapshot.
 const KEYSTONE_USB_REATTACH_PROBE_ATTEMPTS = 4;
@@ -195,10 +199,7 @@ export class KeystoneAdapter implements IHardwareWallet {
 
   private readonly emitter = new TypedEventEmitter<HardwareEventMap>();
 
-  private readonly _operationRoutes = new Map<
-    string,
-    { operationId: string; connectionType: 'usb' | 'qr' }
-  >();
+  private readonly _operationRoutes = new Map<string, OperationRoute>();
 
   private readonly _operations = new OperationRegistry({
     vendor: 'keystone',
@@ -401,14 +402,21 @@ export class KeystoneAdapter implements IHardwareWallet {
           .filter((sessionId): sessionId is string => Boolean(sessionId))
       );
       for (const sessionId of sessionIds) {
-        try {
-          await this._usbConnector.disconnect(sessionId);
-        } catch {
-          // Still retired below so a stale session cannot be selected after reset.
-        }
-        this._handleUsbDisconnect({ connectId: sessionId });
+        await this._retireUsbSession(sessionId);
       }
     });
+  }
+
+  /** Best-effort disconnect; the session is retired either way so it cannot be selected again. */
+  private async _retireUsbSession(sessionId: string): Promise<void> {
+    if (this._usbConnector) {
+      try {
+        await this._usbConnector.disconnect(sessionId);
+      } catch {
+        // Local routing state is cleared below regardless.
+      }
+    }
+    this._handleUsbDisconnect({ connectId: sessionId });
   }
 
   async searchDeviceTargets(options?: SearchDevicesOptions): Promise<DeviceSearchTarget[]> {
@@ -543,16 +551,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
 
     const { usbSessionId } = record;
-    await this._runUsbTeardown(async () => {
-      if (this._usbConnector) {
-        try {
-          await this._usbConnector.disconnect(usbSessionId);
-        } catch {
-          // Best-effort teardown; local routing state is cleared below either way.
-        }
-      }
-      this._handleUsbDisconnect({ connectId: usbSessionId });
-    });
+    await this._runUsbTeardown(() => this._retireUsbSession(usbSessionId));
   }
 
   getDeviceInfo(connectIdOrOperationId: string, deviceId: string): Promise<Response<DeviceInfo>> {
@@ -1213,9 +1212,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     const path = normalizePath(params.path);
 
     return this._runJob(connectId, deviceId, async signal => {
-      const { account } = await this._fetchAccount(connectId, deviceId, 'sol', path, signal, {
-        book,
-      });
+      const { account } = await this._fetchAccount(connectId, deviceId, 'sol', path, signal, book);
       KeystoneAdapter._throwIfAborted(signal);
       // The Ed25519 public key is the Solana address (base58).
       const address = bs58.encode(Buffer.from(account.publicKey, 'hex'));
@@ -1456,7 +1453,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       hwkChain,
       accountPath,
       signal,
-      { book }
+      book
     );
     KeystoneAdapter._throwIfAborted(signal);
     if (!account.extendedPublicKey) {
@@ -1615,7 +1612,7 @@ export class KeystoneAdapter implements IHardwareWallet {
               schema.hwkChain,
               schema.path,
               signal,
-              { book }
+              book
             );
             record = synced.record;
             assertBundleSession();
@@ -1674,11 +1671,7 @@ export class KeystoneAdapter implements IHardwareWallet {
   private _resolveTarget(
     connectId?: string,
     deviceId?: string
-  ): {
-    record?: KeystoneDeviceRecord;
-    expectedWalletId?: string;
-    expectedMasterFingerprint?: string;
-  } {
+  ): ExpectedWallet & { record?: KeystoneDeviceRecord } {
     const resolvedConnectId = isHardwareOperationId(connectId)
       ? this._operations.resolve(connectId).connectId
       : connectId;
@@ -1723,7 +1716,7 @@ export class KeystoneAdapter implements IHardwareWallet {
 
   private _assertParsedIdentity(
     parsed: KeystoneParsedMultiAccounts,
-    expected: { expectedWalletId?: string; expectedMasterFingerprint?: string }
+    expected: ExpectedWallet
   ): string {
     const walletId = deriveKeystoneWalletId(parsed.accounts);
     if (
@@ -1781,10 +1774,7 @@ export class KeystoneAdapter implements IHardwareWallet {
    * xpub. A known wallet gains USB in place (`device-changed`); an unseen one becomes USB-only.
    */
   private async _connectUsb(
-    expected: {
-      expectedWalletId?: string;
-      expectedMasterFingerprint?: string;
-    },
+    expected: ExpectedWallet,
     searchTargetId?: string,
     signal?: AbortSignal
   ): Promise<Response<DeviceInfo>> {
@@ -1819,10 +1809,7 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   private async _connectUsbExclusive(
-    expected: {
-      expectedWalletId?: string;
-      expectedMasterFingerprint?: string;
-    },
+    expected: ExpectedWallet,
     searchTargetId?: string,
     signal?: AbortSignal
   ): Promise<Response<DeviceInfo>> {
@@ -2032,7 +2019,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     signal: AbortSignal,
     operationName?: string
   ): Promise<KeystoneUr> {
-    let interactionRoute: { operationId: string; connectionType: 'usb' | 'qr' } | undefined;
+    let interactionRoute: OperationRoute | undefined;
     if (isHardwareOperationId(operationId)) {
       const operation = this._operations.resolve(operationId);
       const route = this._operationRoutes.get(operation.connectId);
@@ -2083,8 +2070,10 @@ export class KeystoneAdapter implements IHardwareWallet {
       if (result.success) return result.payload as KeystoneUr;
 
       const usbError = rehydrateConnectorError(result.error);
-      const usbErrorOrigin = (usbError as Error & { origin?: string }).origin;
-      const usbErrorCode = (usbError as Error & { code?: number }).code;
+      const { origin: usbErrorOrigin, code: usbErrorCode } = usbError as Error & {
+        origin?: string;
+        code?: number;
+      };
       if (usbErrorCode === HardwareErrorCode.PayloadTooLarge && usbErrorOrigin !== 'device') {
         if (!interactionRoute && !this._forcedTransport) {
           const displayDevice = toDeviceInfo(record);
@@ -2186,9 +2175,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     hwkChain: ChainCapability,
     syncPath: string,
     signal: AbortSignal,
-    options?: {
-      book?: AccountBook;
-    }
+    book?: AccountBook
   ): Promise<{ record: KeystoneDeviceRecord; account: KeystoneAccountEntry }> {
     const target = this._resolveTarget(connectId, deviceId);
     const operationConnectionType = isHardwareOperationId(connectId)
@@ -2201,7 +2188,6 @@ export class KeystoneAdapter implements IHardwareWallet {
       existingRecord = await this._tryUsbAttach(signal, target.expectedWalletId);
       KeystoneAdapter._throwIfAborted(signal);
     }
-    const book = options?.book;
     const booked = book?.get(key);
     if (existingRecord && booked) {
       return { record: existingRecord, account: booked };
@@ -2318,9 +2304,7 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   /** Routes are keyed by connectId; a job key may be the bare wallet id. */
-  private _operationRouteForIdentifier(
-    identifier: string
-  ): { operationId: string; connectionType: 'usb' | 'qr' } | undefined {
+  private _operationRouteForIdentifier(identifier: string): OperationRoute | undefined {
     for (const key of keystoneCancelQueueKeys([identifier])) {
       const route = this._operationRoutes.get(key);
       if (route) return route;
@@ -2477,13 +2461,11 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   private static _abortable<T>(signal: AbortSignal, promise: Promise<T>): Promise<T> {
-    if (signal.aborted) {
-      return Promise.reject(signal.reason instanceof Error ? signal.reason : new Error('Aborted'));
-    }
+    const abortReason = () =>
+      signal.reason instanceof Error ? signal.reason : new Error('Aborted');
+    if (signal.aborted) return Promise.reject(abortReason());
     return new Promise<T>((resolve, reject) => {
-      const onAbort = () => {
-        reject(signal.reason instanceof Error ? signal.reason : new Error('Aborted'));
-      };
+      const onAbort = () => reject(abortReason());
       signal.addEventListener('abort', onAbort, { once: true });
       promise.then(
         value => {

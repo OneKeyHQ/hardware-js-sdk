@@ -1,10 +1,8 @@
 import { defaultLedgerKitImporter } from '../connector/LedgerConnectorBase';
 
 /**
- * Every chain the adapter can dispatch needs its signer kit registered in the
- * default importer. A missing case only surfaces at the moment a user signs,
- * because the adapter tests mock the connector and never reach the importer,
- * which is exactly how the Tron kit shipped unregistered.
+ * Every dispatchable chain needs its signer kit in the default importer. Adapter
+ * tests mock the connector, so a missing case would only surface when a user signs.
  */
 const REQUIRED_KITS = [
   '@ledgerhq/device-management-kit',

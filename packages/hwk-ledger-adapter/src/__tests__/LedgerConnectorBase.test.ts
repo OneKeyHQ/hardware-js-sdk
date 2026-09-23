@@ -372,8 +372,6 @@ describe('LedgerConnectorBase installApp failure teardown', () => {
     (connector as any)._deviceAppsManager = {
       getOrCreate: async () => ({
         install: async () => {
-          // Mirror a real handler: register the canceller for the in-flight
-          // device action, then fail.
           throw error;
         },
         set onRegisterCanceller(fn: (c: () => void) => void) {
@@ -432,7 +430,8 @@ describe('LedgerConnectorBase installApp failure teardown', () => {
 });
 
 // ---------------------------------------------------------------------------
-// DMK transports raise OpeningConnectionError from connect()'s catch-all: BLE keeps it a pairing failure, HID means DeviceBusy.
+// DMK transports raise OpeningConnectionError from connect()'s catch-all:
+// BLE keeps it a pairing failure, HID means DeviceBusy.
 // ---------------------------------------------------------------------------
 
 describe('LedgerConnectorBase connect() opening-tag classification', () => {

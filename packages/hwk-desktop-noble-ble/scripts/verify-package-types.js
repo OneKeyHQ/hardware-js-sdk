@@ -5,10 +5,8 @@ const packageRoot = path.resolve(__dirname, '..');
 const packageJson = require(path.join(packageRoot, 'package.json'));
 
 // Walk every export rather than naming subpaths: a hardcoded list silently
-// checks nothing once a subpath is renamed or added, which is how this file
-// ended up verifying a `./main` entry that no longer exists.
+// checks nothing once a subpath is renamed or added.
 function collectDeclarations(node, out) {
-  if (typeof node === 'string') return;
   if (!node || typeof node !== 'object') return;
   for (const [key, value] of Object.entries(node)) {
     if (key === 'types' && typeof value === 'string') out.push(value);

@@ -62,7 +62,10 @@ function sleep(ms: number): Promise<void> {
 // from it via `hdkey` so xpubs are well-formed.
 const FIXTURE_ROOT = HDKey.fromMasterSeed(Buffer.alloc(32, 0x09));
 const OTHER_ROOT = HDKey.fromMasterSeed(Buffer.alloc(32, 0x0a));
-const FIXTURE_MFP = FIXTURE_ROOT.fingerprint.toString(16).padStart(8, '0');
+function mfpOf(root: HDKey): string {
+  return root.fingerprint.toString(16).padStart(8, '0');
+}
+const FIXTURE_MFP = mfpOf(FIXTURE_ROOT);
 const FIXTURE_WALLET_ID = deriveWalletId(
   `keystone:secp256k1:${KEYSTONE_WALLET_ID_PATH}:${FIXTURE_ROOT.derive(
     KEYSTONE_WALLET_ID_PATH
@@ -135,6 +138,9 @@ function attachFakeDevice(adapter: KeystoneAdapter, options: FakeDeviceOptions =
   const requests: Array<{ device: DeviceInfo; data: QrDisplayData }> = [];
   const mfpHex = FIXTURE_MFP;
 
+  const respond = (ur: { type: string; cbor: Buffer }) =>
+    adapter.uiResponse({ type: UI_RESPONSE.RECEIVE_QR_RESPONSE, payload: urJson(ur) });
+
   const handler = (event: { payload: { device: DeviceInfo; data: QrDisplayData } }) => {
     const { device, data } = event.payload;
     requests.push({ device, data });
@@ -164,48 +170,33 @@ function attachFakeDevice(adapter: KeystoneAdapter, options: FakeDeviceOptions =
           keys,
           'Keystone 3 Pro (fixture)'
         );
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_QR_RESPONSE,
-          payload: urJson(response.toUR()),
-        });
+        respond(response.toUR());
         return;
       }
       case 'eth-sign-request': {
         const request = EthSignRequest.fromCBOR(cbor);
         const requestId = options.wrongRequestId ? wrongUuidBuffer() : request.getRequestId();
         const signature = new ETHSignature(Buffer.alloc(65, 0x07), requestId);
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_QR_RESPONSE,
-          payload: urJson(signature.toUR()),
-        });
+        respond(signature.toUR());
         return;
       }
       case 'sol-sign-request': {
         const request = SolSignRequest.fromCBOR(cbor);
         const requestId = options.wrongRequestId ? wrongUuidBuffer() : request.getRequestId();
         const signature = new SolSignature(Buffer.alloc(64, 0x08), requestId);
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_QR_RESPONSE,
-          payload: urJson(signature.toUR()),
-        });
+        respond(signature.toUR());
         return;
       }
       case 'crypto-psbt': {
         const signed = new CryptoPSBT(Buffer.from('signed-psbt-fixture-bytes'));
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_QR_RESPONSE,
-          payload: urJson(signed.toUR()),
-        });
+        respond(signed.toUR());
         return;
       }
       case 'tron-sign-request': {
         const request = TronSignRequest.fromCBOR(cbor);
         const requestId = options.wrongRequestId ? wrongUuidBuffer() : request.getRequestId();
         const signature = new TronUrSignature(Buffer.alloc(65, 0x06), requestId);
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_QR_RESPONSE,
-          payload: urJson(signature.toUR()),
-        });
+        respond(signature.toUR());
         return;
       }
       default:
@@ -247,7 +238,7 @@ function fakeUsbConnector({
   incrementSessionIds = false,
   searchRoots = [],
 }: FakeUsbOptions = {}) {
-  const walletMfp = mfpHex ?? root.fingerprint.toString(16).padStart(8, '0');
+  const walletMfp = mfpHex ?? mfpOf(root);
   const calls: Array<{ sessionId: string; method: string; params: unknown }> = [];
   const searchCalls: number[] = [];
   const searchTargetIds: string[] = [];
@@ -318,7 +309,7 @@ function fakeUsbConnector({
         );
       }
       const selectedRoot = rootsBySearchTarget.get(deviceId ?? '') ?? root;
-      const selectedMfp = selectedRoot.fingerprint.toString(16).padStart(8, '0');
+      const selectedMfp = mfpOf(selectedRoot);
       const sessionId = `keystone-usb-session:${incrementSessionIds ? connectArgs.length : 1}`;
       rootsBySession.set(sessionId, selectedRoot);
       return Promise.resolve({
@@ -373,7 +364,7 @@ function fakeUsbConnector({
       const { urType: requestUrType, urData } = params as { urType: string; urData: string };
       const cbor = Buffer.from(urData, 'hex');
       const sessionRoot = rootsBySession.get(sessionId) ?? root;
-      const sessionMfp = sessionRoot.fingerprint.toString(16).padStart(8, '0');
+      const sessionMfp = mfpOf(sessionRoot);
       switch (requestUrType) {
         case 'qr-hardware-call': {
           const call = QRHardwareCall.fromCBOR(cbor);

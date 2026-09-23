@@ -1751,7 +1751,6 @@ export class LedgerAdapter implements IHardwareWallet {
   // Mutex for ensureConnected — prevents concurrent calls from establishing duplicate connections
   private _connectingPromise: Promise<string> | null = null;
 
-  // Ledger WebUSB won't expose a locked device, so we can't auto-detect unlock.
   /**
    * Operation owning the running job, so a mid-call UI request can name it.
    * Undefined at cold start when no operation owns the job.
@@ -1763,6 +1762,7 @@ export class LedgerAdapter implements IHardwareWallet {
     return this._operations.findActiveByConnectionKey(activeJobId)?.operationId;
   }
 
+  // Ledger WebUSB won't expose a locked device, so we can't auto-detect unlock.
   // The user must press Confirm after unlocking, which triggers a search retry.
   // If `signal` is provided, an abort cancels the pending UI request so the
   // registry slot is released and a stale RECEIVE_DEVICE_CONNECT won't land in
@@ -2610,10 +2610,6 @@ export class LedgerAdapter implements IHardwareWallet {
     const allowUsbEphemeralFallback = !!fingerprint?.deviceId && !fingerprint.skipFingerprint;
     let businessCallStarted = false;
 
-    // Wrap ensureConnected in _abortable so an abort during device discovery /
-    // user-connect UI wait rejects this caller immediately. The underlying
-    // _doConnect / _connectingPromise is shared across callers and continues
-    // running — other concurrent callers aren't affected.
     const verifiedBleTarget = connectId
       ? this._verifiedBleReconnectTargets.get(connectId)
       : undefined;
@@ -2641,6 +2637,10 @@ export class LedgerAdapter implements IHardwareWallet {
         message: 'Ledger all-network connection ended',
       });
     }
+    // Wrap ensureConnected in _abortable so an abort during device discovery /
+    // user-connect UI wait rejects this caller immediately. The underlying
+    // _doConnect / _connectingPromise is shared across callers and continues
+    // running — other concurrent callers aren't affected.
     let resolvedConnectId = operationId
       ? this._operations.resolve(operationId).connectId
       : bundleConnection?.connectId ??

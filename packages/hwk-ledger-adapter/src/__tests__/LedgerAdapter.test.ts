@@ -234,6 +234,17 @@ describe('LedgerAdapter', () => {
     return save;
   }
 
+  /** Pick dev-1 once the BLE picker has candidates; an empty first offer waits for the scan. */
+  function selectDevOneWhenOffered(): void {
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+      if (!event.payload.devices.length) return;
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+        payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
+      });
+    });
+  }
+
   it.each([true, false])(
     'explicit BLE binding verifies identity and waits for saving (saved=%s)',
     async saved => {
@@ -277,13 +288,7 @@ describe('LedgerAdapter', () => {
 
   it('drains the raw fingerprint call before disconnecting a cancelled manual binding', async () => {
     Object.defineProperty(connector, 'connectionType', { value: 'ble' });
-    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-      if (!event.payload.devices.length) return;
-      adapter.uiResponse({
-        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-        payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
-      });
-    });
+    selectDevOneWhenOffered();
     let finishCall!: (value: unknown) => void;
     connector.callImpl.mockImplementation(
       () =>
@@ -405,13 +410,7 @@ describe('LedgerAdapter', () => {
           payload: { requestId: event.payload.requestId, saved: false },
         });
       });
-      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-        if (!event.payload.devices.length) return;
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-          payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
-        });
-      });
+      selectDevOneWhenOffered();
       let target = targetKind === 'legacy' ? 'previous-usb-id' : '';
       if (targetKind === 'operation') {
         const acquired = await adapter.acquireOperation('', { knownConnections: [] });
@@ -539,13 +538,7 @@ describe('LedgerAdapter', () => {
     ]);
     connector.callImpl.mockResolvedValue({ address: 'original-wallet' });
     const save = acknowledgeBindings();
-    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-      if (!event.payload.devices.length) return;
-      adapter.uiResponse({
-        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-        payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
-      });
-    });
+    selectDevOneWhenOffered();
     const result = await adapter.bindBleDevice({
       identity: {
         vendor: 'ledger',

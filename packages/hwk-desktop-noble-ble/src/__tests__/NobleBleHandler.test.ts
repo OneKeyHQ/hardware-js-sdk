@@ -118,6 +118,11 @@ class FakeIpcMain {
   }
 }
 
+const flush = () =>
+  new Promise<void>(resolve => {
+    setImmediate(resolve);
+  });
+
 async function connectedHandler() {
   const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
   const handler = new NobleBleHandler({ nobleFactory: () => new FakeNoble([peripheral]) });
@@ -408,7 +413,7 @@ describe('NobleBleHandler', () => {
   });
 
   test('explicit disconnect does NOT fire unexpected-disconnect event', async () => {
-    const { peripheral, handler } = await connectedHandler();
+    const { handler } = await connectedHandler();
 
     const onDisc = jest.fn();
     handler.setDisconnectedListener(onDisc);
@@ -514,10 +519,6 @@ describe('initThirdPartyBleSupport', () => {
 
 describe('Trezor BLE process shutdown', () => {
   afterEach(() => jest.useRealTimers());
-  const flushCallbacks = () =>
-    new Promise<void>(resolve => {
-      setImmediate(resolve);
-    });
 
   test('awaits native cancellation and caller disconnect before stopping Noble', async () => {
     jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
@@ -544,12 +545,12 @@ describe('Trezor BLE process shutdown', () => {
     await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
     const connecting = handler.connect(peripheral.id, PADDED_PROFILE);
     const rejected = expect(connecting).rejects.toThrow('shutting down');
-    await flushCallbacks();
+    await flush();
     jest.advanceTimersByTime(300);
-    await flushCallbacks();
+    await flush();
     expect(peripheral.connectAsync).toHaveBeenCalledTimes(1);
     const disposing = handler.disposeForAppQuit();
-    await flushCallbacks();
+    await flush();
     expect(peripheral.cancelConnect).toHaveBeenCalledTimes(1);
     expect(peripheral.disconnectAsync).toHaveBeenCalledTimes(1);
     expect(native.stop).not.toHaveBeenCalled();
@@ -590,16 +591,16 @@ describe('Trezor BLE process shutdown', () => {
       await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
       const connecting = handler.connect(peripheral.id, PADDED_PROFILE);
       const rejected = expect(connecting).rejects.toThrow('shutting down');
-      await flushCallbacks();
+      await flush();
       jest.advanceTimersByTime(300);
-      await flushCallbacks();
+      await flush();
       if (route === 'direct') {
         jest.advanceTimersByTime(5000);
-        await flushCallbacks();
+        await flush();
       }
       expect(route === 'direct' ? connectAsync : peripheral.connectAsync).toHaveBeenCalledTimes(1);
       const disposing = handler.disposeForAppQuit();
-      await flushCallbacks();
+      await flush();
       expect(
         route === 'direct' ? native.cancelConnect : peripheral.cancelConnect
       ).toHaveBeenCalledTimes(1);
@@ -609,7 +610,7 @@ describe('Trezor BLE process shutdown', () => {
       const disconnects = peripheral.disconnectAsync.mock.calls.length;
       peripheral.state = 'connected';
       finishConnect();
-      await flushCallbacks();
+      await flush();
       await rejected;
       expect(peripheral.disconnectAsync).toHaveBeenCalledTimes(disconnects);
       expect(peripheral.discoverSomeServicesAndCharacteristicsAsync).not.toHaveBeenCalled();
@@ -706,8 +707,6 @@ describe('Trezor BLE process shutdown', () => {
 });
 
 describe('reconnect scan ownership', () => {
-  const flush = () => new Promise<void>(resolve => setImmediate(resolve));
-
   beforeEach(() => {
     jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
   });

@@ -1,4 +1,5 @@
 import { UI_REQUEST, UI_RESPONSE } from '../events/ui-request';
+import { HardwareErrorCode } from '../types/errors';
 import { TypedEventEmitter } from '../utils/TypedEventEmitter';
 import { UiRequestRegistry } from '../utils/UiRequestRegistry';
 import { requestBleDeviceSelection } from '../utils/requestBleDeviceSelection';
@@ -164,6 +165,28 @@ describe('SDK-owned BLE binding discovery', () => {
     await rejected;
     expect(registry.hasPending()).toBe(false);
     expect(scan).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails before scanning when aborted or when no host can show the picker', async () => {
+    const aborted = setup();
+    aborted.controller.abort(new Error('aborted first'));
+    await expect(aborted.run()).rejects.toThrow('aborted first');
+
+    const scan = jest.fn<Promise<DeviceInfo[]>, []>();
+    await expect(
+      requestBleDeviceSelection({
+        emitter: new TypedEventEmitter<HardwareEventMap>(),
+        registry: new UiRequestRegistry(),
+        scan,
+        signal: new AbortController().signal,
+        request: {
+          devices: [],
+          context: { kind: 'bind-connection', transport: 'ble', reason: 'missing-binding' },
+        },
+      })
+    ).rejects.toMatchObject({ code: HardwareErrorCode.DeviceNotFound });
+    expect(aborted.scan).not.toHaveBeenCalled();
+    expect(scan).not.toHaveBeenCalled();
   });
 
   it('surfaces a discovery error and removes its unanswered UI request', async () => {
