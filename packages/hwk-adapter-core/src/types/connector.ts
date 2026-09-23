@@ -206,9 +206,8 @@ export interface IConnector {
     options?: { transportType: ConnectionType }
   ): Promise<ConnectorSession>;
   /**
-   * Structured form for connectors where a discovery handle and a stable
-   * device identity are different concepts. The string form remains for
-   * bridge and legacy compatibility.
+   * Structured form for connectors where a discovery handle and a stable device identity are
+   * different concepts. The string form remains for bridge and legacy compatibility.
    */
   connectTarget?(target: ConnectorConnectTarget): Promise<ConnectorSession>;
   disconnect(sessionId: string): Promise<void>;
@@ -555,14 +554,15 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
     });
   }
 
+  const onTransport = (child: IConnector, transportType?: ConnectionType) =>
+    !transportType || child.connectionType === transportType;
+
   const searchDevices = async (
     options: ConnectorSearchDevicesOptions = {}
   ): Promise<ConnectorDevice[]> => {
     const selectedConnectors = connectors
       .map((child, index) => ({ child, index }))
-      .filter(
-        ({ child }) => !options.transportType || child.connectionType === options.transportType
-      );
+      .filter(({ child }) => onTransport(child, options.transportType));
     if (!selectedConnectors.length) return [];
     const perConnector: Array<{
       index: number;
@@ -619,11 +619,8 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
 
     perConnector.sort((a, b) => a.index - b.index);
 
-    if (!options.transportType) deviceOwner.clear();
-    else {
-      for (const [id, owner] of deviceOwner) {
-        if (owner.connectionType === options.transportType) deviceOwner.delete(id);
-      }
+    for (const [id, owner] of deviceOwner) {
+      if (onTransport(owner, options.transportType)) deviceOwner.delete(id);
     }
     const merged: ConnectorDevice[] = [];
     perConnector.forEach(({ index, devices }) => {
@@ -639,13 +636,9 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
     deviceId?: string,
     transportType?: ConnectionType
   ): Promise<{ owner: IConnector; deviceId?: string }> => {
-    if (
-      deviceId &&
-      deviceOwner.has(deviceId) &&
-      (!transportType || deviceOwner.get(deviceId)?.connectionType === transportType)
-    ) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      return { owner: deviceOwner.get(deviceId)!, deviceId };
+    const cachedOwner = deviceId ? deviceOwner.get(deviceId) : undefined;
+    if (cachedOwner && onTransport(cachedOwner, transportType)) {
+      return { owner: cachedOwner, deviceId };
     }
     const devices = await searchDevices({ waitForAll: Boolean(deviceId), transportType });
     if (deviceId) {
@@ -665,13 +658,13 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
     transportType?: ConnectionType
   ): Promise<{ session: ConnectorSession; owner: IConnector }> => {
     const cachedOwner = deviceOwner.get(deviceId);
-    if (cachedOwner && (!transportType || cachedOwner.connectionType === transportType)) {
+    if (cachedOwner && onTransport(cachedOwner, transportType)) {
       return { session: await cachedOwner.connect(deviceId), owner: cachedOwner };
     }
 
     let lastError: unknown;
     for (const child of connectors) {
-      if (transportType && child.connectionType !== transportType) continue;
+      if (!onTransport(child, transportType)) continue;
       try {
         const session = await child.connect(deviceId);
         deviceOwner.set(deviceId, child);
@@ -735,8 +728,13 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
 
     cancel: async sessionId => {
       const owner = sessionOwner.get(sessionId);
-      if (!owner) return;
-      await owner.cancel(sessionId);
+      if (owner) {
+        await owner.cancel(sessionId);
+        return;
+      }
+      // No session yet: the id may name a connect still in flight on one of
+      // the children. Each child ignores ids it does not hold.
+      await Promise.all(connectors.map(child => child.cancel(sessionId)));
     },
 
     uiResponse: response => {

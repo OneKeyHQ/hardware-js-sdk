@@ -12,10 +12,8 @@ export type HardwareOperation = {
   connectId: string;
   device: DeviceInfo;
   /**
-   * The channel this operation actually runs on. Required on `create` and
-   * `rebind` so it comes from whichever adapter picked the channel, rather
-   * than being read back off `device`, whose snapshot a combined connector
-   * fills with a nominal value.
+   * The channel this operation runs on, set by the adapter that picked it. Never read it off
+   * `device`: a combined connector fills that snapshot with a nominal value.
    */
   connectionType: ConnectionType;
   connectionKeys: string[];
@@ -27,6 +25,13 @@ type EndedOperation = {
   reason: OperationEndReason;
   operation: HardwareOperation;
 };
+
+type ActiveOperation = HardwareOperation & {
+  timer: ReturnType<typeof setTimeout> | undefined;
+  retainCount: number;
+};
+
+const uniqueKeys = (keys: string[]): string[] => Array.from(new Set(keys.filter(Boolean)));
 
 type OperationRegistryOptions = {
   vendor: VendorType;
@@ -42,13 +47,7 @@ export class OperationRegistry {
 
   private readonly _onEnded?: OperationRegistryOptions['onEnded'];
 
-  private readonly _active = new Map<
-    string,
-    HardwareOperation & {
-      timer: ReturnType<typeof setTimeout> | undefined;
-      retainCount: number;
-    }
-  >();
+  private readonly _active = new Map<string, ActiveOperation>();
 
   private readonly _ended = new Map<string, EndedOperation>();
 
@@ -72,13 +71,11 @@ export class OperationRegistry {
       connectId: params.connectId,
       device: params.device,
       connectionType: params.connectionType,
-      connectionKeys: Array.from(
-        new Set(
-          [params.searchTargetId, params.connectId, ...(params.connectionKeys ?? [])].filter(
-            Boolean
-          )
-        )
-      ),
+      connectionKeys: uniqueKeys([
+        params.searchTargetId,
+        params.connectId,
+        ...(params.connectionKeys ?? []),
+      ]),
       createdAt: now,
       lastActiveAt: now,
     };
@@ -105,18 +102,13 @@ export class OperationRegistry {
       });
     }
 
-    if (active.timer) clearTimeout(active.timer);
-    active.lastActiveAt = Date.now();
-    active.timer = active.retainCount === 0 ? this._createTimer(operationId) : undefined;
+    this._touch(active);
     return active;
   }
 
   /** Keep an operation alive while one device job is actively using it. */
   retain(operationId: string): () => void {
-    const active = this.resolve(operationId) as HardwareOperation & {
-      timer: ReturnType<typeof setTimeout> | undefined;
-      retainCount: number;
-    };
+    const active = this.resolve(operationId) as ActiveOperation;
     if (active.timer) clearTimeout(active.timer);
     active.timer = undefined;
     active.retainCount += 1;
@@ -161,15 +153,11 @@ export class OperationRegistry {
       this.resolve(operationId);
       throw new Error('Unreachable operation rebind');
     }
-    if (active.timer) clearTimeout(active.timer);
     active.connectId = params.connectId;
     active.device = params.device;
     active.connectionType = params.connectionType;
-    active.connectionKeys = Array.from(
-      new Set([params.connectId, ...(params.connectionKeys ?? [])].filter(Boolean))
-    );
-    active.lastActiveAt = Date.now();
-    active.timer = active.retainCount === 0 ? this._createTimer(operationId) : undefined;
+    active.connectionKeys = uniqueKeys([params.connectId, ...(params.connectionKeys ?? [])]);
+    this._touch(active);
     return active;
   }
 
@@ -202,6 +190,12 @@ export class OperationRegistry {
       if (operationId === exceptOperationId) continue;
       this.end(operationId, reason);
     }
+  }
+
+  private _touch(active: ActiveOperation): void {
+    if (active.timer) clearTimeout(active.timer);
+    active.lastActiveAt = Date.now();
+    active.timer = active.retainCount === 0 ? this._createTimer(active.operationId) : undefined;
   }
 
   private _createTimer(operationId: string): ReturnType<typeof setTimeout> {

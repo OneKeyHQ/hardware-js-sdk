@@ -16,14 +16,8 @@ export type TransportType = 'usb' | 'ble' | 'hid' | 'bridge' | 'qr';
  */
 export interface DeviceCapabilities {
   /**
-   * Whether the connection/discovery handle can be reused across sessions.
-   * `true` allows reconnecting through the stored handle; `false` requires
-   * discovery instead of treating a previous handle as a durable locator.
-   *
-   * This does not describe the stability of the post-handshake deviceId and
-   * does not prove physical-device or wallet identity. For example, Trezor BLE
-   * reports false here while its verified firmware device_id remains stable.
-   * Callers must verify the expected device/wallet identity independently.
+   * Whether the discovery handle can be reused to reconnect; `false` requires rediscovery. Says
+   * nothing about identity (Trezor BLE is false yet its device_id is stable); verify it separately.
    */
   persistentDeviceIdentity: boolean;
 }
@@ -74,8 +68,7 @@ export type SearchTargetReusePolicy = 'current-discovery' | 'reconnectable' | 'r
 export function resolveSearchTargetReusePolicy(
   device: Pick<DeviceInfo, 'connectionType' | 'capabilities'>
 ): SearchTargetReusePolicy {
-  if (device.capabilities?.persistentDeviceIdentity) return 'reconnectable';
-  return 'current-discovery';
+  return device.capabilities?.persistentDeviceIdentity ? 'reconnectable' : 'current-discovery';
 }
 
 /**
@@ -86,11 +79,7 @@ export function resolveSearchTargetReusePolicy(
 export interface DeviceSearchTarget {
   /** Opaque handle scoped to the adapter's current discovery state. */
   searchTargetId: string;
-  /**
-   * Whether the handle itself may be retried. This says nothing about the
-   * identity learned after connect and must not be inferred from a stored
-   * connectId.
-   */
+  /** Whether the handle itself may be retried; never inferred from a stored connectId. */
   searchTargetReusePolicy?: SearchTargetReusePolicy;
   vendor: VendorType;
   connectionType: ConnectionType;

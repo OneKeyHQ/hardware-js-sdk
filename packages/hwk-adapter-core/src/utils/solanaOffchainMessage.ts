@@ -31,11 +31,9 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 function decodeUtf8Strict(bytes: Uint8Array): string {
-  let encoded = '';
-  for (const value of bytes) {
-    encoded += `%${value.toString(16).padStart(2, '0')}`;
-  }
-  return decodeURIComponent(encoded);
+  return decodeURIComponent(
+    Array.from(bytes, value => `%${value.toString(16).padStart(2, '0')}`).join('')
+  );
 }
 
 export function prepareSolanaOffchainMessageV1({
@@ -69,30 +67,20 @@ export function prepareSolanaOffchainMessageV1({
     return bytes;
   });
   signerBytes.sort(compareBytes);
-  for (let index = 1; index < signerBytes.length; index += 1) {
-    if (bytesEqual(signerBytes[index - 1], signerBytes[index])) {
-      throw new Error('Solana off-chain signers must be unique');
-    }
+  if (signerBytes.some((bytes, index) => index > 0 && bytesEqual(signerBytes[index - 1], bytes))) {
+    throw new Error('Solana off-chain signers must be unique');
   }
 
-  const serializedMessage = new Uint8Array(
-    SOLANA_OFFCHAIN_SIGNING_DOMAIN.length +
-      2 +
-      signerBytes.length * SOLANA_PUBLIC_KEY_LENGTH +
-      message.length
+  // Layout: signing domain, version (1), signer count, signers, raw message (no length prefix).
+  const signersOffset = SOLANA_OFFCHAIN_SIGNING_DOMAIN.length + 2;
+  const messageOffset = signersOffset + signerBytes.length * SOLANA_PUBLIC_KEY_LENGTH;
+  const serializedMessage = new Uint8Array(messageOffset + message.length);
+  serializedMessage.set(SOLANA_OFFCHAIN_SIGNING_DOMAIN);
+  serializedMessage.set([1, signerBytes.length], SOLANA_OFFCHAIN_SIGNING_DOMAIN.length);
+  signerBytes.forEach((signer, index) =>
+    serializedMessage.set(signer, signersOffset + index * SOLANA_PUBLIC_KEY_LENGTH)
   );
-  let offset = 0;
-  serializedMessage.set(SOLANA_OFFCHAIN_SIGNING_DOMAIN, offset);
-  offset += SOLANA_OFFCHAIN_SIGNING_DOMAIN.length;
-  serializedMessage[offset] = 1;
-  offset += 1;
-  serializedMessage[offset] = signerBytes.length;
-  offset += 1;
-  for (const signer of signerBytes) {
-    serializedMessage.set(signer, offset);
-    offset += SOLANA_PUBLIC_KEY_LENGTH;
-  }
-  serializedMessage.set(message, offset);
+  serializedMessage.set(message, messageOffset);
 
   return {
     messageText,
