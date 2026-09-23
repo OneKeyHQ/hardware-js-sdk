@@ -157,6 +157,28 @@ const peripheralToInfo = (p: NoblePeripheralLike): ThirdPartyBleDeviceInfo => {
 
 const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
+/** Waits for `work` or `ms`, whichever comes first; never rejects on timeout. */
+const raceTimeout = async (
+  work: Promise<unknown> | undefined,
+  ms: number,
+  onTimeout?: () => void
+): Promise<void> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      work,
+      new Promise<void>(resolve => {
+        timer = setTimeout(() => {
+          onTimeout?.();
+          resolve();
+        }, ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 // Radio-settle wait between stopping the scan and opening a GATT connection.
 const BLE_CONNECT_SETTLE_MS = 300;
 // noble has no connect timeout. SMP pairing timeout (30s, the OS dialog's
@@ -601,17 +623,10 @@ export class NobleBleHandler {
   // sends the disconnect event), so bound it.
   private async _safeDisconnect(peripheral: NoblePeripheralLike): Promise<void> {
     if (this._nativeReleased) return;
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    try {
-      await Promise.race([
-        peripheral.disconnectAsync().catch(() => undefined),
-        new Promise<void>(resolve => {
-          timeout = setTimeout(resolve, BLE_DISCONNECT_TIMEOUT_MS);
-        }),
-      ]);
-    } finally {
-      clearTimeout(timeout);
-    }
+    await raceTimeout(
+      peripheral.disconnectAsync().catch(() => undefined),
+      BLE_DISCONNECT_TIMEOUT_MS
+    );
   }
 
   // One timeout covers connect and service discovery; the connector maps
@@ -891,43 +906,28 @@ export class NobleBleHandler {
       this._noble.removeListener('discover', this._discoverHandler);
     }
     const entries = Array.from(this._connected.entries());
-    for (const [id, entry] of entries) {
-      if (entry.disconnectHandler) {
-        entry.peripheral.removeListener('disconnect', entry.disconnectHandler);
-      }
-      this._cleanupDevice(id, false);
-    }
-    let timeout: ReturnType<typeof setTimeout> | undefined;
+    for (const [id] of entries) this._cleanupDevice(id, false);
     this._disposePromise = (async () => {
       try {
-        await Promise.race([
+        await raceTimeout(
           Promise.allSettled([
             ...connections.map(attempt => attempt.settled),
             ...Array.from(this._nobleInstances, async instance => instance.stopScanningAsync()),
             ...entries.map(async ([, entry]) => {
-              let unsubscribeTimeout: ReturnType<typeof setTimeout> | undefined;
               try {
-                await Promise.race([
+                await raceTimeout(
                   entry.notifyChar?.unsubscribeAsync().catch(() => undefined),
-                  new Promise<void>(resolve => {
-                    unsubscribeTimeout = setTimeout(resolve, 250);
-                  }),
-                ]);
+                  250
+                );
               } finally {
-                clearTimeout(unsubscribeTimeout);
                 await this._safeDisconnect(entry.peripheral);
               }
             }),
           ]),
-          new Promise<void>(resolve => {
-            timeout = setTimeout(() => {
-              this._log('warn', 'dispose.timeout');
-              resolve();
-            }, 3500);
-          }),
-        ]);
+          3500,
+          () => this._log('warn', 'dispose.timeout')
+        );
       } finally {
-        clearTimeout(timeout);
         this._discovered.clear();
         this._lastSeen.clear();
         this._initialized = false;

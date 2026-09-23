@@ -109,9 +109,8 @@ export class OperationRegistry {
   /** Keep an operation alive while one device job is actively using it. */
   retain(operationId: string): () => void {
     const active = this.resolve(operationId) as ActiveOperation;
-    if (active.timer) clearTimeout(active.timer);
-    active.timer = undefined;
     active.retainCount += 1;
+    this._touch(active);
     let released = false;
     return () => {
       if (released) return;
@@ -119,10 +118,7 @@ export class OperationRegistry {
       const current = this._active.get(operationId);
       if (!current) return;
       current.retainCount = Math.max(0, current.retainCount - 1);
-      current.lastActiveAt = Date.now();
-      if (current.retainCount === 0) {
-        current.timer = this._createTimer(operationId);
-      }
+      this._touch(current);
     };
   }
 
@@ -148,11 +144,7 @@ export class OperationRegistry {
       connectionKeys?: string[];
     }
   ): HardwareOperation {
-    const active = this._active.get(operationId);
-    if (!active) {
-      this.resolve(operationId);
-      throw new Error('Unreachable operation rebind');
-    }
+    const active = this.resolve(operationId) as ActiveOperation;
     active.connectId = params.connectId;
     active.device = params.device;
     active.connectionType = params.connectionType;

@@ -61,6 +61,16 @@ const CLIENT_STATUS_MAP: Partial<Record<number, HardwareErrorCode>> = {
   [Status.ERR_NOT_SUPPORTED]: HardwareErrorCode.TransportNotAvailable,
 };
 
+/** WebUSB DOMExceptions; an unplug or bus reset mid-call is the common case. */
+const DOM_EXCEPTION_MAP = new Map<string, { code: HardwareErrorCode; origin: HwkErrorOrigin }>([
+  ['NotFoundError', { code: HardwareErrorCode.DeviceNotFound, origin: 'transport' }],
+  ['NetworkError', { code: HardwareErrorCode.DeviceNotFound, origin: 'transport' }],
+  ['SecurityError', { code: HardwareErrorCode.DevicePermissionDenied, origin: 'host' }],
+  ['NotAllowedError', { code: HardwareErrorCode.DevicePermissionDenied, origin: 'host' }],
+  ['InvalidStateError', { code: HardwareErrorCode.DeviceBusy, origin: 'transport' }],
+  ['AbortError', { code: HardwareErrorCode.DeviceBusy, origin: 'transport' }],
+]);
+
 /**
  * Maps a Keystone USB SDK failure to `HardwareErrorCode`. Fields are read duck-typed because
  * duplicate `@keystonehq/*` module instances break `instanceof`.
@@ -108,30 +118,9 @@ export function mapKeystoneUsbError(err: unknown): HwkError {
     });
   }
 
-  // WebUSB DOMExceptions; an unplug or bus reset mid-call is the common case.
-  if (domName === 'NotFoundError' || domName === 'NetworkError') {
-    return createHwkError({
-      code: HardwareErrorCode.DeviceNotFound,
-      message,
-      origin: 'transport',
-      params: { domExceptionName: domName },
-    });
-  }
-  if (domName === 'SecurityError' || domName === 'NotAllowedError') {
-    return createHwkError({
-      code: HardwareErrorCode.DevicePermissionDenied,
-      message,
-      origin: 'host',
-      params: { domExceptionName: domName },
-    });
-  }
-  if (domName === 'InvalidStateError' || domName === 'AbortError') {
-    return createHwkError({
-      code: HardwareErrorCode.DeviceBusy,
-      message,
-      origin: 'transport',
-      params: { domExceptionName: domName },
-    });
+  const domMapping = domName ? DOM_EXCEPTION_MAP.get(domName) : undefined;
+  if (domMapping) {
+    return createHwkError({ ...domMapping, message, params: { domExceptionName: domName } });
   }
 
   // This mapper only wraps transport calls, so 'transport' names the throw site.

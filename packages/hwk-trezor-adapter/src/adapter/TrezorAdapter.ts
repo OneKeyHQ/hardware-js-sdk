@@ -1414,9 +1414,7 @@ export class TrezorAdapter implements IHardwareWallet {
         async signal => {
           let selectionRequestId: string | undefined;
           let verified = false;
-          // One finally closes the binding UI: releasing the device is not the
-          // same as dismissing the dialog, and scattering this per exit risks
-          // a future failure forgetting it.
+          // One finally closes the binding UI, so no early exit leaves the dialog open.
           try {
             if (
               !operationId &&
@@ -1470,13 +1468,7 @@ export class TrezorAdapter implements IHardwareWallet {
             }
           } finally {
             if (selectionRequestId && !verified) {
-              this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-                type: UI_REQUEST.DEVICE_BINDING_STATUS,
-                payload: {
-                  selectionRequestId,
-                  status: signal.aborted ? 'cancelled' : 'failed',
-                },
-              });
+              this._emitBindingStatus(selectionRequestId, signal.aborted ? 'cancelled' : 'failed');
               await this._releaseProvisionalConnection(resolvedConnectId, signal);
             }
           }
@@ -2086,10 +2078,7 @@ export class TrezorAdapter implements IHardwareWallet {
       // If we were aborted, surface as-is — don't take the retry/recovery path.
       if (signal.aborted) {
         if (pendingBindingRequestId) {
-          this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-            type: UI_REQUEST.DEVICE_BINDING_STATUS,
-            payload: { selectionRequestId: pendingBindingRequestId, status: 'cancelled' },
-          });
+          this._emitBindingStatus(pendingBindingRequestId, 'cancelled');
           pendingBindingRequestId = undefined;
         }
         return this._errorToFailure(error);
@@ -2100,46 +2089,42 @@ export class TrezorAdapter implements IHardwareWallet {
         (passphraseState || useEmptyPassphrase === true) &&
         TrezorAdapter._isStaleSessionError(code);
       if (pendingBindingRequestId && !willRetryStaleSession) {
-        this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-          type: UI_REQUEST.DEVICE_BINDING_STATUS,
-          payload: { selectionRequestId: pendingBindingRequestId, status: 'failed' },
-        });
+        this._emitBindingStatus(pendingBindingRequestId, 'failed');
         pendingBindingRequestId = undefined;
       }
       const ambiguousTransportFailure =
         code === HardwareErrorCode.DeviceDisconnected ||
         code === HardwareErrorCode.OperationTimeout ||
         code === HardwareErrorCode.TransportError;
-      if (operationId && ambiguousTransportFailure) {
+      if (ambiguousTransportFailure) {
         this._sessions.delete(connectId);
         this._verifiedPassphraseSessionsByConnectId.delete(connectId);
-        this._operations.end(operationId, 'disconnect');
-        return failure(
-          HardwareErrorCode.OperationEnded,
-          businessCallStarted && !canReplayHardwareMethodAfterTransportFailure(methodName)
-            ? `Trezor ${methodName} may have completed before the connection was lost`
-            : 'Trezor operation connection was lost',
-          businessCallStarted && !canReplayHardwareMethodAfterTransportFailure(methodName)
-            ? operationMayHaveCompletedParams(methodName, {
-                operationId,
-                reason: 'disconnect',
-              })
-            : { operationId, reason: 'disconnect' },
-          undefined,
-          businessCallStarted && !canReplayHardwareMethodAfterTransportFailure(methodName)
-            ? { scope: 'unknown' }
-            : undefined
-        );
-      }
-      // A one-shot operation also owns its connection once initialization starts.
-      // Never reconnect or replay it after the transport is lost.
-      if (!operationId && ambiguousTransportFailure) {
-        this._sessions.delete(connectId);
-        this._verifiedPassphraseSessionsByConnectId.delete(connectId);
-        if (businessCallStarted && !canReplayHardwareMethodAfterTransportFailure(methodName)) {
+        const mayHaveCompleted =
+          businessCallStarted && !canReplayHardwareMethodAfterTransportFailure(methodName);
+        const mayHaveCompletedMessage = `Trezor ${methodName} may have completed before the connection was lost`;
+        if (operationId) {
+          this._operations.end(operationId, 'disconnect');
+          const endedParams = { operationId, reason: 'disconnect' };
+          return mayHaveCompleted
+            ? failure(
+                HardwareErrorCode.OperationEnded,
+                mayHaveCompletedMessage,
+                operationMayHaveCompletedParams(methodName, endedParams),
+                undefined,
+                { scope: 'unknown' }
+              )
+            : failure(
+                HardwareErrorCode.OperationEnded,
+                'Trezor operation connection was lost',
+                endedParams
+              );
+        }
+        // A one-shot operation also owns its connection once initialization
+        // starts. Never reconnect or replay it after the transport is lost.
+        if (mayHaveCompleted) {
           return failure(
             code as HardwareErrorCode,
-            `Trezor ${methodName} may have completed before the connection was lost`,
+            mayHaveCompletedMessage,
             operationMayHaveCompletedParams(methodName),
             undefined,
             { scope: 'unknown' }
@@ -2179,13 +2164,7 @@ export class TrezorAdapter implements IHardwareWallet {
       // Early returns above leave the host dialog waiting; close the request here
       // so every exit that did not verify the binding reports a terminal status.
       if (pendingBindingRequestId) {
-        this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-          type: UI_REQUEST.DEVICE_BINDING_STATUS,
-          payload: {
-            selectionRequestId: pendingBindingRequestId,
-            status: signal.aborted ? 'cancelled' : 'failed',
-          },
-        });
+        this._emitBindingStatus(pendingBindingRequestId, signal.aborted ? 'cancelled' : 'failed');
         pendingBindingRequestId = undefined;
       }
     }
@@ -2303,9 +2282,8 @@ export class TrezorAdapter implements IHardwareWallet {
     }
 
     if (mismatchedDeviceIds.length) {
-      // Every candidate answered and none is this wallet. Say so plainly: the
-      // user can unplug it and connect the right one. This is not
-      // DeviceMismatch, nothing about the known wallet changed.
+      // Every candidate answered and none is this wallet. Not DeviceMismatch:
+      // nothing about the known wallet changed.
       throw createHwkError({
         code: HardwareErrorCode.DeviceSearchMismatch,
         message:
@@ -2431,13 +2409,7 @@ export class TrezorAdapter implements IHardwareWallet {
         }
         await this._ensureSession(selected.connectId, signal, selected.connectionType);
       } catch (error) {
-        this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-          type: UI_REQUEST.DEVICE_BINDING_STATUS,
-          payload: {
-            selectionRequestId: requestId,
-            status: signal.aborted ? 'cancelled' : 'failed',
-          },
-        });
+        this._emitBindingStatus(requestId, signal.aborted ? 'cancelled' : 'failed');
         throw error;
       }
       if (this._devices.get(selected.connectId)?.deviceId !== expectedDeviceId) {
@@ -2448,10 +2420,7 @@ export class TrezorAdapter implements IHardwareWallet {
       }
       if (selected.connectionType === 'usb') {
         // End only the binding UI. The original operation continues on verified USB.
-        this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-          type: UI_REQUEST.DEVICE_BINDING_STATUS,
-          payload: { selectionRequestId: requestId, status: 'cancelled' },
-        });
+        this._emitBindingStatus(requestId, 'cancelled');
         return { connectId: selected.connectId };
       }
       return { connectId: selected.connectId, selectionRequestId: requestId };
@@ -2460,6 +2429,13 @@ export class TrezorAdapter implements IHardwareWallet {
     throw createHwkError({
       code: HardwareErrorCode.DeviceNotFound,
       message: 'No readable Trezor device is available',
+    });
+  }
+
+  private _emitBindingStatus(selectionRequestId: string, status: 'cancelled' | 'failed'): void {
+    this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
+      type: UI_REQUEST.DEVICE_BINDING_STATUS,
+      payload: { selectionRequestId, status },
     });
   }
 
@@ -2488,10 +2464,7 @@ export class TrezorAdapter implements IHardwareWallet {
       // Every other exit reports a terminal status, so this one must too, or
       // callers leave the host dialog waiting. Cancelled, not failed: the call
       // carries on, like the USB fallback that drops a binding without stopping.
-      this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-        type: UI_REQUEST.DEVICE_BINDING_STATUS,
-        payload: { selectionRequestId, status: 'cancelled' },
-      });
+      this._emitBindingStatus(selectionRequestId, 'cancelled');
       return false;
     }
     const outcome = await requestSaveDeviceBinding(
@@ -2899,17 +2872,15 @@ export class TrezorAdapter implements IHardwareWallet {
       trustedNumericCode ??
       TrezorAdapter._mapTrezorFailureCode(error) ??
       HardwareErrorCode.UnknownError;
-    // Origin: trust one already stamped on the error (a thrown HwkError
-    // carries the mapper's context), otherwise fall back to the shared
-    // code-to-origin table, which returns undefined for ambiguous codes.
+    // Prefer the thrower's stamped origin; the shared table leaves ambiguous
+    // codes undefined.
     const stampedOrigin = (error as { origin?: unknown })?.origin;
     const origin =
       stampedOrigin === 'device' || stampedOrigin === 'transport' || stampedOrigin === 'host'
         ? stampedOrigin
         : defaultOriginForCode(code);
-    // Carry the thrower's params across the failure boundary: they distinguish
-    // two situations sharing one code ("wrong Trezor" vs "the bound one is
-    // gone"), which otherwise both read as DeviceMismatch.
+    // Keep the thrower's params: they tell "wrong Trezor" from "the bound one is
+    // gone", which share DeviceMismatch.
     const params =
       typed.params && typeof typed.params === 'object'
         ? (typed.params as Record<string, unknown>)

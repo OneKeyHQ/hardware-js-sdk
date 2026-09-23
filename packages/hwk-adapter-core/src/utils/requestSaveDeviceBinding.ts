@@ -58,10 +58,12 @@ export async function requestSaveDeviceBinding(
     emitStatus('saved');
     return { saved: true };
   } catch (error) {
-    emitStatus(signal?.aborted ? 'cancelled' : 'failed');
-    // Only a user abort throws; any other failure is the host not answering.
-    if (signal?.aborted) throw error;
-    return { saved: false, reason: 'skipped' };
+    if (signal?.aborted) {
+      emitStatus('cancelled');
+      throw error;
+    }
+    // Any other failure is the host not answering.
+    return declined('skipped');
   } finally {
     signal?.removeEventListener('abort', cancel);
     registry.cancel(type, requestId);

@@ -12,6 +12,18 @@ const BUNDLE = [
   { network: 'tron', methodName: 'tronGetAddress' as const, path: "m/44'/195'/0'/0/0" },
 ];
 
+function createWithQueue(queue: DeviceJobQueue, callChain: LedgerCallChain) {
+  return createAllNetworkGetAddress({
+    callChain,
+    getChainFingerprint: async () => success('fingerprint-1'),
+    retainOperation: () => () => undefined,
+    errorToFailure: (error: unknown) => {
+      throw error;
+    },
+    createCancelScope: queueKey => queue.createCancelScope(queueKey),
+  });
+}
+
 describe('Ledger allNetworkGetAddress cancellation', () => {
   it('stops the bundle when cancel lands between two items', async () => {
     const queue = new DeviceJobQueue();
@@ -38,15 +50,7 @@ describe('Ledger allNetworkGetAddress cancellation', () => {
       return result;
     }) as unknown as LedgerCallChain;
 
-    const allNetworkGetAddress = createAllNetworkGetAddress({
-      callChain,
-      getChainFingerprint: async () => success('fingerprint-1'),
-      retainOperation: () => () => undefined,
-      errorToFailure: <T>(error: unknown) => {
-        throw error;
-      },
-      createCancelScope: queueKey => queue.createCancelScope(queueKey),
-    });
+    const allNetworkGetAddress = createWithQueue(queue, callChain);
 
     const result = await allNetworkGetAddress(CONNECT_ID, '', { bundle: BUNDLE });
 
@@ -66,15 +70,7 @@ describe('Ledger allNetworkGetAddress cancellation', () => {
       chain: string
     ) => success({ address: `0x${chain}` })) as unknown as LedgerCallChain;
 
-    const allNetworkGetAddress = createAllNetworkGetAddress({
-      callChain,
-      getChainFingerprint: async () => success('fingerprint-1'),
-      retainOperation: () => () => undefined,
-      errorToFailure: <T>(error: unknown) => {
-        throw error;
-      },
-      createCancelScope: queueKey => queue.createCancelScope(queueKey),
-    });
+    const allNetworkGetAddress = createWithQueue(queue, callChain);
 
     const result = await allNetworkGetAddress(CONNECT_ID, '', { bundle: BUNDLE });
     expect(result.success).toBe(true);

@@ -775,9 +775,8 @@ export abstract class TrezorConnectorBase implements IConnector {
           return this.thp.onPairingRequest(payload);
         }
 
-        // Register the waiter before emitting, like onPinMatrixRequest and
-        // onPassphraseRequest: a synchronous host reply would otherwise find
-        // no waiter and hang the pairing for the full timeout.
+        // Register the waiter before emitting: a synchronous host reply would
+        // otherwise find no waiter and hang pairing until the timeout.
         const pairingPromise = this.uiRequests.wait<
           Awaited<ReturnType<NonNullable<TrezorThpSessionOptions['onPairingRequest']>>>
         >(UI_REQUEST.REQUEST_TREZOR_THP_PAIRING);
