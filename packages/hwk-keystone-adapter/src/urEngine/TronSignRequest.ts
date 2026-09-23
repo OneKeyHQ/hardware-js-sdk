@@ -13,9 +13,8 @@ import type { DataItemMap } from '@keystonehq/bc-ur-registry';
 const { decodeToDataItem } = extend;
 
 /**
- * Keystone's native `tron-sign-request` (tag 5201). Key layout follows
- * keystone-sdk-rust libs/ur-registry/src/tron (firmware >= 2.5.0); the
- * OneKey Pro air-gap layout differs and is not accepted by Keystone.
+ * Native `tron-sign-request` (tag 5201), keyed as keystone-sdk-rust ur-registry/tron (firmware
+ * >= 2.5.0); OneKey Pro's air-gap layout is rejected by Keystone.
  */
 const TRON_SIGN_REQUEST_TYPE = new RegistryType('tron-sign-request', 5201);
 

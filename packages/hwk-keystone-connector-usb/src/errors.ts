@@ -4,20 +4,14 @@ import { Status } from '@keystonehq/hw-transport-error';
 import type { HwkError, HwkErrorOrigin } from '@onekeyfe/hwk-adapter-core';
 
 /**
- * Firmware status words occupy the low end of `Status` (0..15 today); client
- * codes start at `ERR_DEVICE_NOT_OPENED` (0xA0000001). Anything below that
- * boundary arrived inside a device response frame — see
- * `@keystonehq/hw-transport-webusb`, which throws
- * `TransportError(payload, result.status)` for every non-zero response status.
+ * Firmware status words are the low end of `Status` (0..15); client codes start at
+ * `ERR_DEVICE_NOT_OPENED` (0xA0000001), so anything below came from a device response frame.
  */
 function isDeviceStatus(statusCode: number): boolean {
   return statusCode >= 0 && statusCode < Status.ERR_DEVICE_NOT_OPENED;
 }
 
-/**
- * Device-side outcomes (`Status` values reported inside a JSON response
- * payload's status word) — see EAPDU_Readme.md in the Keystone USB SDK repo.
- */
+/** Firmware status words from a device response (EAPDU_Readme.md in the Keystone USB SDK). */
 const DEVICE_STATUS_MAP: Partial<Record<number, HardwareErrorCode>> = {
   [Status.RSP_FAILURE_CODE]: HardwareErrorCode.UnknownError,
   [Status.PRS_INVALID_TOTAL_PACKETS]: HardwareErrorCode.InvalidParams,
@@ -36,11 +30,7 @@ const DEVICE_STATUS_MAP: Partial<Record<number, HardwareErrorCode>> = {
   [Status.PRS_EXPORT_ADDRESS_BUSY]: HardwareErrorCode.DeviceBusyInternal,
 };
 
-/**
- * The Keystone transport only names client-side codes (its `ErrorInfo`); for a
- * firmware status it forwards the device's response payload and falls back to a
- * bare 'unknown error'. These fill that gap when the device sent no text.
- */
+/** Used when the transport forwarded only its 'unknown error' placeholder for a firmware status. */
 const DEVICE_STATUS_MESSAGE: Partial<Record<number, string>> = {
   [Status.RSP_FAILURE_CODE]: 'Keystone reported a failure',
   [Status.PRS_INVALID_TOTAL_PACKETS]: 'Keystone rejected the request framing (total packets)',
@@ -62,7 +52,7 @@ const DEVICE_STATUS_MESSAGE: Partial<Record<number, string>> = {
 /** The placeholder both Keystone transports use when they have nothing better. */
 const PLACEHOLDER_MESSAGE = /^unknown error\b/i;
 
-/** Client-side (transport/framing) failures — never reached the device. */
+/** Client-side (transport/framing) failures, never reached the device. */
 const CLIENT_STATUS_MAP: Partial<Record<number, HardwareErrorCode>> = {
   [Status.ERR_DEVICE_NOT_OPENED]: HardwareErrorCode.DeviceNotFound,
   [Status.ERR_DEVICE_NOT_FOUND]: HardwareErrorCode.DeviceNotFound,
@@ -72,47 +62,29 @@ const CLIENT_STATUS_MAP: Partial<Record<number, HardwareErrorCode>> = {
 };
 
 /**
- * Maps a Keystone USB SDK failure to `HardwareErrorCode`. Errors that already
- * carry a numeric `.code` pass through unchanged. `transportErrorCode` is read
- * duck-typed because duplicate `@keystonehq/*` module instances break
- * `instanceof`.
+ * Maps a Keystone USB SDK failure to `HardwareErrorCode`. Fields are read duck-typed because
+ * duplicate `@keystonehq/*` module instances break `instanceof`.
  */
 export function mapKeystoneUsbError(err: unknown): HwkError {
-  const domName =
-    err && typeof err === 'object' && typeof (err as { name?: unknown }).name === 'string'
-      ? (err as { name: string }).name
-      : undefined;
+  const fields: { name?: unknown; code?: unknown; transportErrorCode?: unknown } =
+    err && typeof err === 'object' ? err : {};
+  const domName = typeof fields.name === 'string' ? fields.name : undefined;
 
-  // Legacy DOMException codes overlap the low-numbered browser error table
-  // (for example NotFoundError is 8). Only five-digit HWK codes are already
-  // mapped errors; letting any numeric `.code` pass through turns a WebUSB
-  // disconnect into an unknown hardware error at the app boundary.
-  if (
-    err &&
-    typeof err === 'object' &&
-    typeof (err as { code?: unknown }).code === 'number' &&
-    (err as { code: number }).code >= 10000 &&
-    (err as { code: number }).code <= 99999
-  ) {
+  // Only five-digit codes are HWK codes; legacy DOMException codes (NotFoundError
+  // is 8) must not pass through as hardware errors.
+  if (typeof fields.code === 'number' && fields.code >= 10000 && fields.code <= 99999) {
     return err as HwkError;
   }
 
   const statusCode =
-    err &&
-    typeof err === 'object' &&
-    typeof (err as { transportErrorCode?: unknown }).transportErrorCode === 'number'
-      ? (err as { transportErrorCode: number }).transportErrorCode
-      : undefined;
+    typeof fields.transportErrorCode === 'number' ? fields.transportErrorCode : undefined;
 
   const message = err instanceof Error ? err.message : String(err);
 
   if (statusCode !== undefined) {
     const fromDevice = isDeviceStatus(statusCode);
-    // An unlisted firmware status is still the firmware answering, so it keeps
-    // 'device' and only the code degrades. Guessing 'transport' there is what
-    // makes KeystoneAdapter tear down a live USB session over an on-device
-    // decline, and a real pipe death already arrives via the transport's
-    // disconnect listener rather than a status word.
+    // An unlisted firmware status keeps origin 'device'; 'transport' would make the
+    // adapter tear down a live session over an on-device decline.
     const code = fromDevice
       ? DEVICE_STATUS_MAP[statusCode] ?? HardwareErrorCode.UnknownError
       : CLIENT_STATUS_MAP[statusCode] ?? HardwareErrorCode.TransportError;
@@ -125,26 +97,18 @@ export function mapKeystoneUsbError(err: unknown): HwkError {
     const description = DEVICE_STATUS_MESSAGE[statusCode];
     return createHwkError({
       code,
-      // The device's own payload text wins; the table only covers the case
-      // where the transport had nothing to forward.
+      // The device's own payload text wins over the table.
       message:
         description && PLACEHOLDER_MESSAGE.test(message)
           ? `${description} (error_code: ${statusCode})`
           : message,
-      // A firmware status word is a result, never a link problem. Client-side
-      // status codes came from the framing/pipe layer — EXCEPT the timeout,
-      // which is genuinely two-faced (the device may be sitting on a confirm
-      // screen waiting for a human, or the pipe may be dead) and stays
-      // unlabeled rather than mislabeled.
+      // A timeout may be either side, so it stays unlabeled.
       origin,
       params: { statusCode, details: (err as { details?: string }).details },
     });
   }
 
-  // WebUSB failures are DOMExceptions. The device dropping off the bus
-  // mid-call is the common one — every command here is its own
-  // open/claim/transfer/release/close cycle, so an unplug or a bus reset lands
-  // exactly here — and it deserves a message the user can act on.
+  // WebUSB DOMExceptions; an unplug or bus reset mid-call is the common case.
   if (domName === 'NotFoundError' || domName === 'NetworkError') {
     return createHwkError({
       code: HardwareErrorCode.DeviceNotFound,
@@ -170,8 +134,6 @@ export function mapKeystoneUsbError(err: unknown): HwkError {
     });
   }
 
-  // Anything else that reached this mapper was thrown by the transport layer
-  // (this function only wraps USB transport calls), so 'transport' is a fact
-  // about the throw site, not a guess about the cause.
+  // This mapper only wraps transport calls, so 'transport' names the throw site.
   return createHwkError({ code: HardwareErrorCode.TransportError, message, origin: 'transport' });
 }

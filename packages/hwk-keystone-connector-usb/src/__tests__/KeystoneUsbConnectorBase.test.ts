@@ -18,6 +18,8 @@ import type { TransportHID } from '@keystonehq/hw-transport-usb';
 
 const FAKE_MFP = 'e89702d2';
 
+type TransportHandlers = Partial<Record<number, (data: unknown) => unknown>>;
+
 function decodeUrString(encoded: string): { urType: string; urData: string } {
   const decoder = new URDecoder();
   decoder.receivePart(encoded);
@@ -32,16 +34,10 @@ function encodeUrString(urType: string, urData: string): string {
 }
 
 /**
- * A fake `TransportHID` that behaves like the real per-call
- * open→transfer→close cycle closely enough to exercise
- * `KeystoneUsbConnectorBase` end to end: it decodes whatever UR string the
- * connector sends and can be told what to answer per `Actions` value,
- * matching the real wire contract (`send()` resolves the already-parsed JSON
- * response body, per `TransportWebUSB`/`TransportNodeUSB` source).
+ * Fake `TransportHID` following the real `send()` contract: decodes the UR the connector sends and
+ * answers per `Actions` value.
  */
-function fakeTransport(
-  handlers: Partial<Record<number, (data: unknown) => unknown>>
-): TransportHID {
+function fakeTransport(handlers: TransportHandlers): TransportHID {
   return {
     open: async () => {},
     close: async () => {},
@@ -54,6 +50,20 @@ function fakeTransport(
   };
 }
 
+/** A transport whose device reports `walletMFP`, plus any extra action handlers. */
+function versionTransport(
+  walletMFP: string | (() => string) = FAKE_MFP,
+  handlers: TransportHandlers = {}
+): TransportHID {
+  return fakeTransport({
+    [Actions.CMD_GET_DEVICE_VERSION]: () => ({
+      firmwareVersion: '1.7.0',
+      walletMFP: typeof walletMFP === 'function' ? walletMFP() : walletMFP,
+    }),
+    ...handlers,
+  });
+}
+
 function fakeTransportClass(transport: TransportHID): KeystoneUsbTransportStatic {
   return {
     connect: () => Promise.resolve(transport),
@@ -63,26 +73,46 @@ function fakeTransportClass(transport: TransportHID): KeystoneUsbTransportStatic
   };
 }
 
+/** A platform that must open descriptors exactly; an ambient `connect()` fails the test. */
+function exactTransportClass(
+  devices: KeystoneUsbDeviceDescriptor[],
+  overrides: Partial<KeystoneUsbTransportStatic> = {}
+): KeystoneUsbTransportStatic {
+  return {
+    connect: jest.fn().mockRejectedValue(new Error('ambient connect must not run')),
+    getKeystoneDevices: () => Promise.resolve(devices),
+    isSupported: () => Promise.resolve(true),
+    ...overrides,
+  };
+}
+
+function newConnector(transportClass: KeystoneUsbTransportStatic): KeystoneUsbConnectorBase {
+  return new KeystoneUsbConnectorBase(transportClass, { timeoutMs: 1000 });
+}
+
+function versionConnector(handlers: TransportHandlers = {}): KeystoneUsbConnectorBase {
+  return newConnector(fakeTransportClass(versionTransport(FAKE_MFP, handlers)));
+}
+
+async function resolveUrError(thrown: unknown, urType = 'eth-sign-request') {
+  const connector = versionConnector({
+    [Actions.CMD_RESOLVE_UR]: () => {
+      throw thrown;
+    },
+  });
+  const session = await connector.connect();
+  const result = await connector.call(session.sessionId, 'resolveUr', { urType, urData: 'de' });
+  if (result.success) throw new Error('expected resolveUr to fail');
+  return result.error;
+}
+
 describe('KeystoneUsbConnectorBase', () => {
   describe('searchDevices', () => {
-    const withDevices = (devices: unknown[]) =>
-      new KeystoneUsbConnectorBase(
-        {
-          ...fakeTransportClass(fakeTransport({})),
-          getKeystoneDevices: () => Promise.resolve(devices as never),
-        },
-        { timeoutMs: 1000 }
-      );
-
-    it('shows the model the device reports', async () => {
-      const connector = withDevices([
-        { serialNumber: 'M-76AB5599', productName: 'Keystone 3 Pro' },
-      ]);
-
-      const devices = await connector.searchDevices();
-
-      expect(devices.map(d => d.name)).toEqual(['Keystone 3 Pro']);
-    });
+    const withDevices = (devices: KeystoneUsbDeviceDescriptor[]) =>
+      newConnector({
+        ...fakeTransportClass(fakeTransport({})),
+        getKeystoneDevices: () => Promise.resolve(devices),
+      });
 
     it('never appends the serial, even when two units report the same model', async () => {
       const connector = withDevices([
@@ -94,7 +124,7 @@ describe('KeystoneUsbConnectorBase', () => {
       const devices = await connector.searchDevices();
 
       // The serial is not readable on the unit, so it would not tell the two
-      // apart for the person choosing — it would only cost the model name.
+      // apart for the person choosing; it would only cost the model name.
       expect(devices.map(d => d.name)).toEqual([
         'Keystone 3 Pro',
         'Keystone 3 Pro',
@@ -111,15 +141,12 @@ describe('KeystoneUsbConnectorBase', () => {
     });
 
     it('maps an enumeration DOMException to a five-digit HWK code, not its legacy code', async () => {
-      const connector = new KeystoneUsbConnectorBase(
-        {
-          connect: jest.fn().mockRejectedValue(new Error('ambient connect must not run')),
+      const connector = newConnector(
+        exactTransportClass([], {
           getKeystoneDevices: jest
             .fn()
             .mockRejectedValue(new DOMException('device is gone', 'NotFoundError')),
-          isSupported: () => Promise.resolve(true),
-        },
-        { timeoutMs: 1000 }
+        })
       );
 
       const scan = connector.searchDevices();
@@ -131,9 +158,7 @@ describe('KeystoneUsbConnectorBase', () => {
     });
 
     it('lists devices without opening/claiming (no mfp yet)', async () => {
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(fakeTransport({})), {
-        timeoutMs: 1000,
-      });
+      const connector = newConnector(fakeTransportClass(fakeTransport({})));
       const devices = await connector.searchDevices();
       expect(devices).toHaveLength(1);
       expect(devices[0].deviceId).toBe('');
@@ -146,21 +171,12 @@ describe('KeystoneUsbConnectorBase', () => {
     });
 
     it('rotates opaque targets on every scan and rejects an expired target', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-          firmwareVersion: '1.7.0',
-          walletMFP: FAKE_MFP,
-        }),
-      });
-      const connectDevice = jest.fn().mockResolvedValue(transport);
-      const transportClass: KeystoneUsbTransportStatic = {
-        connect: jest.fn().mockRejectedValue(new Error('ambient connect must not run')),
-        connectDevice,
-        getKeystoneDevices: () =>
-          Promise.resolve([{ serialNumber: 'SAME-SERIAL', productName: 'Keystone 3 Pro' }]),
-        isSupported: () => Promise.resolve(true),
-      };
-      const connector = new KeystoneUsbConnectorBase(transportClass, { timeoutMs: 1000 });
+      const connectDevice = jest.fn().mockResolvedValue(versionTransport());
+      const connector = newConnector(
+        exactTransportClass([{ serialNumber: 'SAME-SERIAL', productName: 'Keystone 3 Pro' }], {
+          connectDevice,
+        })
+      );
 
       const firstTarget = (await connector.searchDevices())[0].connectId;
       const secondTarget = (await connector.searchDevices())[0].connectId;
@@ -173,21 +189,9 @@ describe('KeystoneUsbConnectorBase', () => {
     });
 
     it('invalidates selected targets when the connector resets', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-          firmwareVersion: '1.7.0',
-          walletMFP: FAKE_MFP,
-        }),
-      });
-      const connectDevice = jest.fn().mockResolvedValue(transport);
-      const connector = new KeystoneUsbConnectorBase(
-        {
-          connect: jest.fn().mockRejectedValue(new Error('ambient connect must not run')),
-          connectDevice,
-          getKeystoneDevices: () => Promise.resolve([{ serialNumber: 'RESET-ME' }]),
-          isSupported: () => Promise.resolve(true),
-        },
-        { timeoutMs: 1000 }
+      const connectDevice = jest.fn().mockResolvedValue(versionTransport());
+      const connector = newConnector(
+        exactTransportClass([{ serialNumber: 'RESET-ME' }], { connectDevice })
       );
       const target = (await connector.searchDevices())[0].connectId;
 
@@ -200,25 +204,13 @@ describe('KeystoneUsbConnectorBase', () => {
     });
 
     it('invalidates the previous snapshot before a failed replacement scan', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-          firmwareVersion: '1.7.0',
-          walletMFP: FAKE_MFP,
-        }),
-      });
-      const connectDevice = jest.fn().mockResolvedValue(transport);
+      const connectDevice = jest.fn().mockResolvedValue(versionTransport());
       const getKeystoneDevices = jest
         .fn()
         .mockResolvedValueOnce([{ serialNumber: 'OLD' }])
         .mockRejectedValueOnce(new Error('enumeration failed'));
-      const connector = new KeystoneUsbConnectorBase(
-        {
-          connect: jest.fn().mockRejectedValue(new Error('ambient connect must not run')),
-          connectDevice,
-          getKeystoneDevices,
-          isSupported: () => Promise.resolve(true),
-        },
-        { timeoutMs: 1000 }
+      const connector = newConnector(
+        exactTransportClass([], { connectDevice, getKeystoneDevices })
       );
       const oldTarget = (await connector.searchDevices())[0].connectId;
 
@@ -247,14 +239,7 @@ describe('KeystoneUsbConnectorBase', () => {
               resolveSecond = resolve;
             })
         );
-      const connector = new KeystoneUsbConnectorBase(
-        {
-          connect: jest.fn().mockRejectedValue(new Error('ambient connect must not run')),
-          getKeystoneDevices,
-          isSupported: () => Promise.resolve(true),
-        },
-        { timeoutMs: 1000 }
-      );
+      const connector = newConnector(exactTransportClass([], { getKeystoneDevices }));
 
       const firstScan = connector.searchDevices();
       const secondScan = connector.searchDevices();
@@ -269,22 +254,8 @@ describe('KeystoneUsbConnectorBase', () => {
     it('keeps availability targets exact-connectable without expiring the UI snapshot', async () => {
       const first = { serialNumber: 'FIRST', productName: 'Keystone 3 Pro' };
       const second = { serialNumber: 'SECOND', productName: 'Keystone 3 Pro' };
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-          firmwareVersion: '1.7.0',
-          walletMFP: FAKE_MFP,
-        }),
-      });
-      const connectDevice = jest.fn().mockResolvedValue(transport);
-      const connector = new KeystoneUsbConnectorBase(
-        {
-          connect: jest.fn().mockRejectedValue(new Error('ambient connect must not run')),
-          connectDevice,
-          getKeystoneDevices: () => Promise.resolve([first, second]),
-          isSupported: () => Promise.resolve(true),
-        },
-        { timeoutMs: 1000 }
-      );
+      const connectDevice = jest.fn().mockResolvedValue(versionTransport());
+      const connector = newConnector(exactTransportClass([first, second], { connectDevice }));
 
       const uiTarget = (await connector.searchDevices())[0].connectId;
       const firstAvailabilityTargets = await connector.searchDevices({ purpose: 'availability' });
@@ -310,22 +281,10 @@ describe('KeystoneUsbConnectorBase', () => {
   describe('connect', () => {
     it('uses exact-device opening for a default connect when the platform supports it', async () => {
       const onlyDevice = { serialNumber: 'ONLY', productName: 'Keystone 3 Pro' };
-      const selectedTransport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-          firmwareVersion: '1.7.0',
-          walletMFP: FAKE_MFP,
-        }),
-      });
+      const connectDevice = jest.fn().mockResolvedValue(versionTransport());
       const ambientConnect = jest.fn().mockRejectedValue(new Error('ambient connect must not run'));
-      const connectDevice = jest.fn().mockResolvedValue(selectedTransport);
-      const connector = new KeystoneUsbConnectorBase(
-        {
-          connect: ambientConnect,
-          connectDevice,
-          getKeystoneDevices: () => Promise.resolve([onlyDevice]),
-          isSupported: () => Promise.resolve(true),
-        },
-        { timeoutMs: 1000 }
+      const connector = newConnector(
+        exactTransportClass([onlyDevice], { connect: ambientConnect, connectDevice })
       );
 
       const session = await connector.connect();
@@ -336,17 +295,13 @@ describe('KeystoneUsbConnectorBase', () => {
     });
 
     it('requires an explicit choice for a default connect with multiple devices', async () => {
-      const ambientConnect = jest.fn().mockRejectedValue(new Error('ambient connect must not run'));
       const connectDevice = jest.fn();
-      const connector = new KeystoneUsbConnectorBase(
-        {
+      const ambientConnect = jest.fn().mockRejectedValue(new Error('ambient connect must not run'));
+      const connector = newConnector(
+        exactTransportClass([{ serialNumber: 'FIRST' }, { serialNumber: 'SECOND' }], {
           connect: ambientConnect,
           connectDevice,
-          getKeystoneDevices: () =>
-            Promise.resolve([{ serialNumber: 'FIRST' }, { serialNumber: 'SECOND' }]),
-          isSupported: () => Promise.resolve(true),
-        },
-        { timeoutMs: 1000 }
+        })
       );
 
       await expect(connector.connect()).rejects.toMatchObject({
@@ -359,20 +314,8 @@ describe('KeystoneUsbConnectorBase', () => {
     it('opens the exact descriptor selected from a multi-device search', async () => {
       const first = { serialNumber: 'FIRST', productName: 'Keystone 3 Pro' };
       const second = { serialNumber: 'SECOND', productName: 'Keystone 3 Pro' };
-      const selectedTransport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-          firmwareVersion: '1.7.0',
-          walletMFP: FAKE_MFP,
-        }),
-      });
-      const connectDevice = jest.fn().mockResolvedValue(selectedTransport);
-      const transportClass: KeystoneUsbTransportStatic = {
-        connect: jest.fn().mockRejectedValue(new Error('ambient connect must not run')),
-        connectDevice,
-        getKeystoneDevices: () => Promise.resolve([first, second]),
-        isSupported: () => Promise.resolve(true),
-      };
-      const connector = new KeystoneUsbConnectorBase(transportClass, { timeoutMs: 1000 });
+      const connectDevice = jest.fn().mockResolvedValue(versionTransport());
+      const connector = newConnector(exactTransportClass([first, second], { connectDevice }));
       const targets = await connector.searchDevices();
 
       const session = await connector.connectTarget({
@@ -385,20 +328,9 @@ describe('KeystoneUsbConnectorBase', () => {
     });
 
     it('disposes platform transport resources exactly once when a session ends', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-          firmwareVersion: '1.7.0',
-          walletMFP: FAKE_MFP,
-        }),
-      });
+      const transport = versionTransport();
       const disposeTransport = jest.fn();
-      const connector = new KeystoneUsbConnectorBase(
-        {
-          ...fakeTransportClass(transport),
-          disposeTransport,
-        },
-        { timeoutMs: 1000 }
-      );
+      const connector = newConnector({ ...fakeTransportClass(transport), disposeTransport });
 
       const session = await connector.connect();
       await connector.disconnect(session.sessionId);
@@ -412,20 +344,8 @@ describe('KeystoneUsbConnectorBase', () => {
     it('selects by descriptor identity when serial numbers are duplicated', async () => {
       const first = { serialNumber: 'DUPLICATE', productName: 'Keystone 3 Pro' };
       const second = { serialNumber: 'DUPLICATE', productName: 'Keystone 3 Pro' };
-      const selectedTransport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-          firmwareVersion: '1.7.0',
-          walletMFP: FAKE_MFP,
-        }),
-      });
-      const connectDevice = jest.fn().mockResolvedValue(selectedTransport);
-      const transportClass: KeystoneUsbTransportStatic = {
-        connect: jest.fn().mockRejectedValue(new Error('ambient connect must not run')),
-        connectDevice,
-        getKeystoneDevices: () => Promise.resolve([first, second]),
-        isSupported: () => Promise.resolve(true),
-      };
-      const connector = new KeystoneUsbConnectorBase(transportClass, { timeoutMs: 1000 });
+      const connectDevice = jest.fn().mockResolvedValue(versionTransport());
+      const connector = newConnector(exactTransportClass([first, second], { connectDevice }));
       const targets = await connector.searchDevices();
 
       await connector.connect(targets[1].connectId);
@@ -434,20 +354,12 @@ describe('KeystoneUsbConnectorBase', () => {
     });
 
     it('fails closed when a platform cannot target one of multiple descriptors', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-          firmwareVersion: '1.7.0',
-          walletMFP: FAKE_MFP,
-        }),
-      });
-      const ambientConnect = jest.fn().mockResolvedValue(transport);
-      const transportClass: KeystoneUsbTransportStatic = {
-        connect: ambientConnect,
-        getKeystoneDevices: () =>
-          Promise.resolve([{ serialNumber: 'FIRST' }, { serialNumber: 'SECOND' }]),
-        isSupported: () => Promise.resolve(true),
-      };
-      const connector = new KeystoneUsbConnectorBase(transportClass, { timeoutMs: 1000 });
+      const ambientConnect = jest.fn().mockResolvedValue(versionTransport());
+      const connector = newConnector(
+        exactTransportClass([{ serialNumber: 'FIRST' }, { serialNumber: 'SECOND' }], {
+          connect: ambientConnect,
+        })
+      );
       const targets = await connector.searchDevices();
 
       await expect(connector.connect(targets[1].connectId)).rejects.toMatchObject({
@@ -459,31 +371,20 @@ describe('KeystoneUsbConnectorBase', () => {
     it('finds the expected wallet across multiple USB descriptors without an ambient pick', async () => {
       const first = { serialNumber: 'FIRST', productName: 'Keystone 3 Pro' };
       const second = { serialNumber: 'SECOND', productName: 'Keystone 3 Pro' };
-      const firstTransport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-          firmwareVersion: '1.7.0',
-          walletMFP: 'deadbeef',
-        }),
-      });
-      const secondTransport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-          firmwareVersion: '1.7.0',
-          walletMFP: FAKE_MFP,
-        }),
-      });
+      const firstTransport = versionTransport('deadbeef');
+      const secondTransport = versionTransport();
       const connectDevice = jest.fn((device: KeystoneUsbDeviceDescriptor) =>
         Promise.resolve(device === first ? firstTransport : secondTransport)
       );
-      const ambientConnect = jest.fn().mockRejectedValue(new Error('ambient connect must not run'));
       const disposeTransport = jest.fn();
-      const transportClass: KeystoneUsbTransportStatic = {
-        connect: ambientConnect,
-        connectDevice,
-        getKeystoneDevices: () => Promise.resolve([first, second]),
-        isSupported: () => Promise.resolve(true),
-        disposeTransport,
-      };
-      const connector = new KeystoneUsbConnectorBase(transportClass, { timeoutMs: 1000 });
+      const ambientConnect = jest.fn().mockRejectedValue(new Error('ambient connect must not run'));
+      const connector = newConnector(
+        exactTransportClass([first, second], {
+          connect: ambientConnect,
+          connectDevice,
+          disposeTransport,
+        })
+      );
 
       const session = await connector.connectTarget({
         type: 'expected-device-identity',
@@ -503,23 +404,11 @@ describe('KeystoneUsbConnectorBase', () => {
     });
 
     it('fails closed after every connected Keystone has the wrong wallet fingerprint', async () => {
-      const devices = [{ serialNumber: 'FIRST' }, { serialNumber: 'SECOND' }];
-      const connectDevice = jest.fn().mockResolvedValue(
-        fakeTransport({
-          [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-            firmwareVersion: '1.7.0',
-            walletMFP: 'deadbeef',
-          }),
-        })
-      );
-      const connector = new KeystoneUsbConnectorBase(
-        {
-          connect: jest.fn().mockRejectedValue(new Error('ambient connect must not run')),
+      const connectDevice = jest.fn().mockResolvedValue(versionTransport('deadbeef'));
+      const connector = newConnector(
+        exactTransportClass([{ serialNumber: 'FIRST' }, { serialNumber: 'SECOND' }], {
           connectDevice,
-          getKeystoneDevices: () => Promise.resolve(devices),
-          isSupported: () => Promise.resolve(true),
-        },
-        { timeoutMs: 1000 }
+        })
       );
 
       await expect(
@@ -532,14 +421,7 @@ describe('KeystoneUsbConnectorBase', () => {
     });
 
     it('keeps the transport session separate from the device-reported mfp', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
-      });
-
-      const session = await connector.connect();
+      const session = await versionConnector().connect();
 
       expect(parseHardwareRuntimeId(session.sessionId)).toMatchObject({
         kind: 'link',
@@ -554,28 +436,13 @@ describe('KeystoneUsbConnectorBase', () => {
     });
 
     it('fails closed when the connected wallet does not match the expected MFP', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
-      });
-
-      await expect(connector.connect('deadbeef')).rejects.toMatchObject({
+      await expect(versionConnector().connect('deadbeef')).rejects.toMatchObject({
         code: HardwareErrorCode.DeviceMismatch,
       });
     });
 
     it('rejects a walletMFP that is not exactly 4 bytes encoded as 8 hex characters', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-          firmwareVersion: '1.7.0',
-          walletMFP: 'aabbccddee',
-        }),
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
-      });
+      const connector = newConnector(fakeTransportClass(versionTransport('aabbccddee')));
 
       await expect(connector.connect()).rejects.toMatchObject({
         code: HardwareErrorCode.DeviceMismatch,
@@ -596,8 +463,7 @@ describe('KeystoneUsbConnectorBase', () => {
       const requestUr = { urType: requestSdkUr.type, urData: requestSdkUr.cbor.toString('hex') };
 
       let sentEncodedUr = '';
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
+      const connector = versionConnector({
         [Actions.CMD_RESOLVE_UR]: data => {
           sentEncodedUr = data as string;
           const decodedRequest = decodeUrString(sentEncodedUr);
@@ -612,9 +478,6 @@ describe('KeystoneUsbConnectorBase', () => {
           };
         },
       });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
-      });
       const session = await connector.connect();
 
       const result = await connector.call(session.sessionId, 'resolveUr', requestUr);
@@ -627,17 +490,14 @@ describe('KeystoneUsbConnectorBase', () => {
   });
 
   describe('on-device operation events', () => {
+    const answerBytes = {
+      [Actions.CMD_RESOLVE_UR]: () => ({ payload: encodeUrString('bytes', 'deadbeef') }),
+    };
+
     it('brackets signing resolveUr calls with ConfirmOnDevice / InteractionComplete', async () => {
-      // The USB channel used to be completely silent while the device sat on
-      // an approval screen. Hosts render these with the same handler they
-      // already have for Ledger.
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
-        [Actions.CMD_RESOLVE_UR]: () => ({ payload: encodeUrString('bytes', 'deadbeef') }),
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
-      });
+      // The USB channel is otherwise silent while the device sits on an approval screen; hosts
+      // render these events with the same handler they already have for Ledger.
+      const connector = versionConnector(answerBytes);
       const events: string[] = [];
       connector.on('ui-event', e => events.push((e as { type: string }).type));
 
@@ -653,13 +513,9 @@ describe('KeystoneUsbConnectorBase', () => {
 
     it('asks a different wallet for its own public-data approval', async () => {
       let walletMFP = FAKE_MFP;
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP }),
-        [Actions.CMD_RESOLVE_UR]: () => ({ payload: encodeUrString('bytes', 'deadbeef') }),
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
-      });
+      const connector = newConnector(
+        fakeTransportClass(versionTransport(() => walletMFP, answerBytes))
+      );
       const confirmations: string[] = [];
       connector.on('ui-event', e => {
         const { type } = e as { type: string };
@@ -685,13 +541,7 @@ describe('KeystoneUsbConnectorBase', () => {
     });
 
     it('shows public-data confirmation only once across internal USB session recovery', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
-        [Actions.CMD_RESOLVE_UR]: () => ({ payload: encodeUrString('bytes', 'deadbeef') }),
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
-      });
+      const connector = versionConnector(answerBytes);
       const events: string[] = [];
       connector.on('ui-event', e => events.push((e as { type: string }).type));
 
@@ -724,14 +574,10 @@ describe('KeystoneUsbConnectorBase', () => {
     it('always closes the bracket, even when the device rejects', async () => {
       // A rejection without InteractionComplete would leave the host's
       // "confirm on device" toast up forever.
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
+      const connector = versionConnector({
         [Actions.CMD_RESOLVE_UR]: () => {
           throw new TransportError('rejected', Status.PRS_PARSING_REJECTED);
         },
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
       });
       const events: string[] = [];
       connector.on('ui-event', e => events.push((e as { type: string }).type));
@@ -756,15 +602,8 @@ describe('KeystoneUsbConnectorBase', () => {
       const firstPart = encoder.nextPart().toUpperCase();
       expect(firstPart).toMatch(/^UR:BYTES\/1-/);
 
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-          firmwareVersion: '1.7.0',
-          walletMFP: FAKE_MFP,
-        }),
+      const connector = versionConnector({
         [Actions.CMD_RESOLVE_UR]: () => ({ payload: firstPart }),
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 2000,
       });
       const session = await connector.connect();
 
@@ -779,14 +618,11 @@ describe('KeystoneUsbConnectorBase', () => {
       expect(result.error.message).toContain('incomplete BC-UR response');
     });
   });
+
   describe('call("checkLockStatus", ...)', () => {
     it('passes through the device-reported lock status', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
+      const connector = versionConnector({
         [Actions.CMD_CHECK_LOCK_STATUS]: () => ({ payload: true }),
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
       });
       const session = await connector.connect();
 
@@ -798,245 +634,82 @@ describe('KeystoneUsbConnectorBase', () => {
   });
 
   describe('error mapping', () => {
-    it('maps a device-rejected TransportError to UserRejected as call data, not a throw', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
-        [Actions.CMD_RESOLVE_UR]: () => {
-          throw new TransportError('rejected', Status.PRS_PARSING_REJECTED);
-        },
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
-      });
-      const session = await connector.connect();
-
-      const result = await connector.call(session.sessionId, 'resolveUr', {
-        urType: 'eth-sign-request',
-        urData: 'de',
-      });
-
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error.code).toBe(HardwareErrorCode.UserRejected);
-      // The rejection is the DEVICE speaking — recovery logic keys on this to
-      // keep the session and never channel-switch. Travels via params in the
-      // serialized shape.
-      expect(result.error.params?.origin).toBe('device');
+    // A timeout is two-faced (device waiting for a human vs dead pipe), so an honest unset beats
+    // a plausible mislabel.
+    it.each([
+      [Status.ERR_DEVICE_NOT_FOUND, 'transport'],
+      [Status.ERR_TIMEOUT, undefined],
+    ])('labels pipe-level status %s with origin %s', async (status, origin) => {
+      const error = await resolveUrError(new TransportError('boom', status));
+      expect(error.params?.origin).toBe(origin);
     });
 
-    it('stamps transport origin on pipe-level failures and leaves timeouts unlabeled', async () => {
-      const mkConnector = (status: number) => {
-        const transport = fakeTransport({
-          [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-            firmwareVersion: '1.7.0',
-            walletMFP: FAKE_MFP,
-          }),
-          [Actions.CMD_RESOLVE_UR]: () => {
-            throw new TransportError('boom', status);
-          },
-        });
-        return new KeystoneUsbConnectorBase(fakeTransportClass(transport), { timeoutMs: 1000 });
-      };
-
-      const gone = mkConnector(Status.ERR_DEVICE_NOT_FOUND);
-      const s1 = await gone.connect();
-      const r1 = await gone.call(s1.sessionId, 'resolveUr', { urType: 'x', urData: 'de' });
-      expect(r1.success).toBe(false);
-      if (!r1.success) expect(r1.error.params?.origin).toBe('transport');
-
-      // A timeout is two-faced (device waiting for a human vs dead pipe) —
-      // an honest unset beats a plausible mislabel.
-      const slow = mkConnector(Status.ERR_TIMEOUT);
-      const s2 = await slow.connect();
-      const r2 = await slow.call(s2.sessionId, 'resolveUr', { urType: 'x', urData: 'de' });
-      expect(r2.success).toBe(false);
-      if (!r2.success) expect(r2.error.params?.origin).toBeUndefined();
-    });
-
-    it('keeps every firmware status word on the device side, mapped to its own code', async () => {
-      const mkConnector = (status: number) => {
-        const transport = fakeTransport({
-          [Actions.CMD_GET_DEVICE_VERSION]: () => ({
-            firmwareVersion: '1.7.0',
-            walletMFP: FAKE_MFP,
-          }),
-          [Actions.CMD_RESOLVE_UR]: () => {
-            throw new TransportError('unknown error', status);
-          },
-        });
-        return new KeystoneUsbConnectorBase(fakeTransportClass(transport), { timeoutMs: 1000 });
-      };
-
-      // Status 0..15 are firmware response status words, so every one of them
-      // means the device answered — tearing the USB session down there is what
-      // used to make "decline on screen, then retry" impossible.
-      const expected: Array<[number, HardwareErrorCode]> = [
-        [Status.RSP_FAILURE_CODE, HardwareErrorCode.UnknownError],
-        [Status.PRS_INVALID_TOTAL_PACKETS, HardwareErrorCode.InvalidParams],
-        [Status.PRS_INVALID_INDEX, HardwareErrorCode.InvalidParams],
-        [Status.PRS_PARSING_REJECTED, HardwareErrorCode.UserRejected],
-        [Status.PRS_PARSING_ERROR, HardwareErrorCode.InvalidParams],
-        [Status.PRS_PARSING_DISALLOWED, HardwareErrorCode.DeviceLocked],
-        [Status.PRS_PARSING_UNMATCHED, HardwareErrorCode.InvalidParams],
-        [Status.PRS_PARSING_MISMATCHED_WALLET, HardwareErrorCode.DeviceMismatch],
-        [Status.PRS_PARSING_VERIFY_PASSWORD_ERROR, HardwareErrorCode.PinInvalid],
-        [Status.PRS_EXPORT_ADDRESS_UNSUPPORTED_CHAIN, HardwareErrorCode.ChainNotSupported],
-        [Status.PRS_EXPORT_ADDRESS_INVALID_PARAMS, HardwareErrorCode.InvalidParams],
-        [Status.PRS_EXPORT_ADDRESS_ERROR, HardwareErrorCode.UnknownError],
-        [Status.PRS_EXPORT_ADDRESS_DISALLOWED, HardwareErrorCode.DeviceLocked],
-        [Status.PRS_EXPORT_ADDRESS_REJECTED, HardwareErrorCode.UserRejected],
-        [Status.PRS_EXPORT_ADDRESS_BUSY, HardwareErrorCode.DeviceBusyInternal],
-      ];
-
-      for (const [status, code] of expected) {
-        const connector = mkConnector(status);
-        // eslint-disable-next-line no-await-in-loop
-        const session = await connector.connect();
-        // eslint-disable-next-line no-await-in-loop
-        const result = await connector.call(session.sessionId, 'resolveUr', {
-          urType: 'eth-sign-request',
-          urData: 'de',
-        });
-        expect(result.success).toBe(false);
-        if (result.success) return;
-        expect({ status, code: result.error.code, origin: result.error.params?.origin }).toEqual({
-          status,
-          code,
-          origin: 'device',
-        });
-      }
+    // Status 0..15 are firmware response status words, so every one of them means the device
+    // answered; tearing the USB session down there would break "decline on screen, then retry".
+    it.each<[number, HardwareErrorCode]>([
+      [Status.RSP_FAILURE_CODE, HardwareErrorCode.UnknownError],
+      [Status.PRS_INVALID_TOTAL_PACKETS, HardwareErrorCode.InvalidParams],
+      [Status.PRS_INVALID_INDEX, HardwareErrorCode.InvalidParams],
+      [Status.PRS_PARSING_REJECTED, HardwareErrorCode.UserRejected],
+      [Status.PRS_PARSING_ERROR, HardwareErrorCode.InvalidParams],
+      [Status.PRS_PARSING_DISALLOWED, HardwareErrorCode.DeviceLocked],
+      [Status.PRS_PARSING_UNMATCHED, HardwareErrorCode.InvalidParams],
+      [Status.PRS_PARSING_MISMATCHED_WALLET, HardwareErrorCode.DeviceMismatch],
+      [Status.PRS_PARSING_VERIFY_PASSWORD_ERROR, HardwareErrorCode.PinInvalid],
+      [Status.PRS_EXPORT_ADDRESS_UNSUPPORTED_CHAIN, HardwareErrorCode.ChainNotSupported],
+      [Status.PRS_EXPORT_ADDRESS_INVALID_PARAMS, HardwareErrorCode.InvalidParams],
+      [Status.PRS_EXPORT_ADDRESS_ERROR, HardwareErrorCode.UnknownError],
+      [Status.PRS_EXPORT_ADDRESS_DISALLOWED, HardwareErrorCode.DeviceLocked],
+      [Status.PRS_EXPORT_ADDRESS_REJECTED, HardwareErrorCode.UserRejected],
+      [Status.PRS_EXPORT_ADDRESS_BUSY, HardwareErrorCode.DeviceBusyInternal],
+      // Forward-compat: a status word the enum does not name yet still came back inside a
+      // response frame, so the session must survive it.
+      [Status.PRS_EXPORT_ADDRESS_BUSY + 1, HardwareErrorCode.UnknownError],
+    ])('keeps firmware status %s on the device side as code %s', async (status, code) => {
+      const error = await resolveUrError(new TransportError('unknown error', status));
+      expect({ code: error.code, origin: error.params?.origin }).toEqual({
+        code,
+        origin: 'device',
+      });
     });
 
     it('names a firmware status the device sent no text for', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
-        [Actions.CMD_RESOLVE_UR]: () => {
-          // What hw-transport-webusb throws when the response frame carries no
-          // payload text: `TransportError('unknown error', status)`.
-          throw new TransportError('unknown error', Status.PRS_PARSING_VERIFY_PASSWORD_ERROR);
-        },
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
-      });
-      const session = await connector.connect();
-
-      const result = await connector.call(session.sessionId, 'resolveUr', {
-        urType: 'eth-sign-request',
-        urData: 'de',
-      });
-
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error.message).toContain('password verification failed');
+      // What hw-transport-webusb throws when the response frame carries no
+      // payload text: `TransportError('unknown error', status)`.
+      const error = await resolveUrError(
+        new TransportError('unknown error', Status.PRS_PARSING_VERIFY_PASSWORD_ERROR)
+      );
+      expect(error.message).toContain('password verification failed');
     });
 
     it('keeps a device-supplied message instead of the table wording', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
-        [Actions.CMD_RESOLVE_UR]: () => {
-          throw new TransportError(
-            'wallet is exporting another address',
-            Status.PRS_EXPORT_ADDRESS_BUSY
-          );
-        },
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
-      });
-      const session = await connector.connect();
-
-      const result = await connector.call(session.sessionId, 'resolveUr', {
-        urType: 'eth-sign-request',
-        urData: 'de',
-      });
-
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error.message).toContain('wallet is exporting another address');
-    });
-
-    it('treats an unlisted firmware status as the device answering, not a dead pipe', async () => {
-      // Forward-compat: a status word the enum does not name yet still came
-      // back inside a response frame, so the session must survive it.
-      const unlistedFirmwareStatus = Status.PRS_EXPORT_ADDRESS_BUSY + 1;
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
-        [Actions.CMD_RESOLVE_UR]: () => {
-          throw new TransportError('something new', unlistedFirmwareStatus);
-        },
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
-      });
-      const session = await connector.connect();
-
-      const result = await connector.call(session.sessionId, 'resolveUr', {
-        urType: 'eth-sign-request',
-        urData: 'de',
-      });
-
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error.code).toBe(HardwareErrorCode.UnknownError);
-      expect(result.error.params?.origin).toBe('device');
+      const error = await resolveUrError(
+        new TransportError('wallet is exporting another address', Status.PRS_EXPORT_ADDRESS_BUSY)
+      );
+      expect(error.message).toContain('wallet is exporting another address');
     });
 
     it('maps ERR_DATA_TOO_LARGE to PayloadTooLarge', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
-        [Actions.CMD_RESOLVE_UR]: () => {
-          throw new TransportError('too large', Status.ERR_DATA_TOO_LARGE);
-        },
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
-      });
-      const session = await connector.connect();
-
-      const result = await connector.call(session.sessionId, 'resolveUr', {
-        urType: 'eth-sign-request',
-        urData: 'de',
-      });
-
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error.code).toBe(HardwareErrorCode.PayloadTooLarge);
+      const error = await resolveUrError(
+        new TransportError('too large', Status.ERR_DATA_TOO_LARGE)
+      );
+      expect(error.code).toBe(HardwareErrorCode.PayloadTooLarge);
     });
 
     it('maps a legacy WebUSB NotFoundError code to DeviceNotFound', async () => {
-      const transport = fakeTransport({
-        [Actions.CMD_GET_DEVICE_VERSION]: () => ({ firmwareVersion: '1.7.0', walletMFP: FAKE_MFP }),
-        [Actions.CMD_RESOLVE_UR]: () => {
-          throw Object.assign(new Error('The device was disconnected'), {
-            name: 'NotFoundError',
-            code: 8,
-          });
-        },
-      });
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(transport), {
-        timeoutMs: 1000,
-      });
-      const session = await connector.connect();
-
-      const result = await connector.call(session.sessionId, 'resolveUr', {
-        urType: 'qr-hardware-call',
-        urData: 'de',
-      });
-
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error.code).toBe(HardwareErrorCode.DeviceNotFound);
-      expect(result.error.params).toMatchObject({
+      const error = await resolveUrError(
+        Object.assign(new Error('The device was disconnected'), { name: 'NotFoundError', code: 8 }),
+        'qr-hardware-call'
+      );
+      expect(error.code).toBe(HardwareErrorCode.DeviceNotFound);
+      expect(error.params).toMatchObject({
         domExceptionName: 'NotFoundError',
         origin: 'transport',
       });
     });
 
     it('returns DeviceNotFound as data for an unknown sessionId, never throwing', async () => {
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(fakeTransport({})), {
-        timeoutMs: 1000,
-      });
+      const connector = newConnector(fakeTransportClass(fakeTransport({})));
       const result = await connector.call('nonexistent-session', 'resolveUr', {});
       expect(result.success).toBe(false);
       if (result.success) return;
@@ -1046,9 +719,7 @@ describe('KeystoneUsbConnectorBase', () => {
 
   describe('cancel / uiResponse', () => {
     it('are safe no-ops (no protocol-level cancel or UI relay over USB)', async () => {
-      const connector = new KeystoneUsbConnectorBase(fakeTransportClass(fakeTransport({})), {
-        timeoutMs: 1000,
-      });
+      const connector = newConnector(fakeTransportClass(fakeTransport({})));
       await expect(connector.cancel('any')).resolves.toBeUndefined();
       expect(() => connector.uiResponse({ type: 'cancel' as any })).not.toThrow();
     });

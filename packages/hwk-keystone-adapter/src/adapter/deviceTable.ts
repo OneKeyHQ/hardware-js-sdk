@@ -34,25 +34,14 @@ export interface KeystoneDeviceRecord {
   model?: string;
   deviceVersion?: string;
   importedAt: number;
-  /**
-   * Set to the connector's process-local `sessionId` once a live USB session exists for
-   * this wallet. Cleared by `releaseOperation`. Presence of this field is
-   * what `KeystoneAdapter._resolveUr` uses to route a call over USB instead
-   * of QR.
-   */
+  /** Connector session id while a live USB session exists; its presence routes calls over USB. */
   usbSessionId?: string;
   /**
-   * Remains true after a live USB session is lost. It allows the adapter to
-   * wait through the device's short USB re-enumeration window without making
-   * wallets that have only ever used QR pay the same retry delay.
+   * Stays true after the USB session is lost, so only these wallets wait through the device's
+   * USB re-enumeration window.
    */
   hadUsbSession?: boolean;
-  /**
-   * True once this wallet has completed at least one QR round trip.
-   * Distinguishes "USB session dropped but this wallet was also QR-synced —
-   * fall back to a QR-only entry" from "this was a USB-only wallet that
-   * never synced over QR — drop the entry entirely" on USB disconnect.
-   */
+  /** True after one QR round trip; on USB disconnect it decides demote-to-QR versus drop. */
   qrSynced?: boolean;
 }
 
@@ -85,11 +74,8 @@ export function createDeviceRecord(
 const CAPABILITIES: DeviceCapabilities = { persistentDeviceIdentity: true };
 
 export function toDeviceInfo(record: KeystoneDeviceRecord): DeviceInfo {
-  // `connectionType` reflects the channel a call would currently be routed
-  // over (USB preferred when live — see `KeystoneAdapter._resolveUr`), not
-  // just "however this record was first created". `raw.availableChannels`
-  // carries the full picture for a merged (QR + USB) wallet — see §4.2 of
-  // docs/design/keystone-integration/README.md.
+  // `connectionType` is the channel a call would use now; `raw.availableChannels`
+  // lists both for a merged QR + USB wallet.
   let availableChannels: Array<'qr' | 'usb'> = ['qr'];
   if (record.usbSessionId) {
     availableChannels = record.qrSynced ? ['qr', 'usb'] : ['usb'];
@@ -111,7 +97,7 @@ export function toDeviceInfo(record: KeystoneDeviceRecord): DeviceInfo {
   };
 }
 
-/** A device row for a wallet the adapter hasn't synced yet — used while a cold-start round trip is in flight. */
+/** Device row for a not-yet-synced wallet during a cold-start round trip. */
 export function placeholderDeviceInfo(): DeviceInfo {
   return {
     vendor: 'keystone',

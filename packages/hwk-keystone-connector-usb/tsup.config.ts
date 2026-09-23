@@ -1,14 +1,14 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  // Map form controls emitted file names — see hwk-adapter-core's tsup.config.ts
+  // Map form controls emitted file names (see hwk-adapter-core's tsup.config.ts)
   // for why: without it tsup preserves the `_subpath/` source directory in
   // `dist/`, leaking an internal layout detail into the package.json export map.
   entry: {
     index: 'src/index.ts',
     // Split so a browser bundle never pulls in the native `usb` binding
     // (nodeusb's dependency) and a Node/Electron bundle never pulls in a
-    // `navigator.usb` reference (webusb's dependency) — each subpath only
+    // `navigator.usb` reference (webusb's dependency). Each subpath only
     // imports its own transport package.
     webusb: 'src/_subpath/webusb.ts',
     nodeusb: 'src/_subpath/nodeusb.ts',

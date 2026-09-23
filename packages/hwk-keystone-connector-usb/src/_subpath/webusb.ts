@@ -51,11 +51,7 @@ export function createKeystoneWebUsbConnector(options?: { timeoutMs?: number }):
   );
 }
 
-/**
- * Triggers the browser's WebUSB device picker. Must be called from a
- * user-gesture handler (e.g. directly inside a button's `onclick`) — same
- * requirement as any other WebUSB permission request.
- */
+/** Opens the WebUSB device picker; must be called from a user-gesture handler. */
 export async function requestKeystoneUsbPermission(): Promise<void> {
   await TransportWebUSB.requestPermission();
 }
