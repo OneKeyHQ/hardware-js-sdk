@@ -141,6 +141,16 @@ function formatDeviceMismatchError(expected: string, actual: string): string {
   return `Wrong device: expected ${expected}, got ${actual}`;
 }
 
+/** The session is gone: disconnect, not advertising, timeout, or a connection-level tag. */
+function isLostConnectionError(err: unknown): boolean {
+  return (
+    isDeviceDisconnectedError(err) ||
+    isDeviceNotAdvertisingError(err) ||
+    isTimeoutError(err) ||
+    isConnectionLevelError(err)
+  );
+}
+
 /**
  * Ledger Bitcoin App constant `MAX_BIP44_ACCOUNT_RECOMMENDED`. Account index >=
  * this triggers `SW_NOT_SUPPORTED (0x6a82)` unless the call sets
@@ -159,9 +169,8 @@ function btcAccountIndexFromPath(path: string): number | null {
 export class LedgerAdapter implements IHardwareWallet {
   readonly vendor = 'ledger' as const;
 
-  // A cancel releases the DMK device action and its intent-queue slot, so the
-  // next call is not blocked behind it. It still cannot retract a confirmation
-  // screen the device is already showing.
+  // Cancel frees the DMK action and its intent-queue slot, but cannot retract a
+  // confirmation screen the device is already showing.
   readonly cancelCapability = 'stops-waiting' as const;
 
   private readonly connector: IConnector;
@@ -221,6 +230,10 @@ export class LedgerAdapter implements IHardwareWallet {
 
   // Shared across concurrent callers — only `cancel()` aborts.
   private _doConnectAbortController: AbortController | null = null;
+
+  // Connect id handed to the connector and not yet answered; cancel() forwards
+  // it so a BLE connect stuck in the main process can be abandoned there.
+  private _connectingConnectId: string | undefined;
 
   // Default for commonParams.autoInstallApp when a call doesn't specify it,
   // so the host can opt the whole adapter in once instead of per call.
@@ -485,10 +498,8 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   async connectDevice(searchTargetId: string): Promise<Response<string>> {
-    // Same queue as acquireOperation. Both take the adapter from "no chosen
-    // device" to "one chosen device", and both start by evicting whatever
-    // session exists; run two of them at once and each evicts before the other
-    // connects, leaving two live sessions behind the single-session invariant.
+    // Rejects while busy: both this and acquireOperation evict before connecting,
+    // so two at once would break the single-session invariant.
     try {
       return await this._jobQueue.enqueue(
         searchTargetId || '__ledger_connect__',
@@ -580,7 +591,7 @@ export class LedgerAdapter implements IHardwareWallet {
                   );
                   if (!persisted) {
                     // A business call can shrug off an unsaved binding, but
-                    // here saving the binding IS the operation.
+                    // here saving the binding is the operation.
                     throw createHwkError({
                       code: HardwareErrorCode.UnknownError,
                       message: 'Bluetooth binding could not be saved',
@@ -668,9 +679,8 @@ export class LedgerAdapter implements IHardwareWallet {
     this._operations.endByConnectionKey(resolvedConnectId, 'explicit');
     const sessionId = this._sessions.get(resolvedConnectId);
     if (sessionId) this._operations.endByConnectionKey(sessionId, 'explicit');
-    // The channel this operation runs on, taken from the transport the adapter
-    // selected. The discovery snapshot would do, but a session connect
-    // overwrites it with whatever the connector reports for the session.
+    // Use the transport the adapter selected: a session connect overwrites the
+    // discovery snapshot with whatever the connector reports.
     const connectionType: ConnectionType = this._isBleConnection() ? 'ble' : 'usb';
     const device = this._discoveredDevices.get(resolvedConnectId) ?? {
       vendor: 'ledger' as const,
@@ -713,9 +723,8 @@ export class LedgerAdapter implements IHardwareWallet {
 
       // A new explicit selection owns a fresh operation. Retire any session
       // that could otherwise let an older operation id reach the new one.
-      if (this.connector.availableTransports && this.connector.availableTransports.length > 1) {
-        await this._evictAllSessions(preserveOperationId);
-      } else if (this._isBleConnection()) {
+      const isMultiTransport = (this.connector.availableTransports?.length ?? 0) > 1;
+      if (!isMultiTransport && this._isBleConnection()) {
         const previousSessionId = this._sessions.get(connectId);
         this._operations.endByConnectionKey(connectId, 'explicit', preserveOperationId);
         if (previousSessionId) {
@@ -731,6 +740,7 @@ export class LedgerAdapter implements IHardwareWallet {
       const stateGeneration = this._stateGeneration;
       const releaseOperation = this._retainConnectorOperation(`connect:${connectId}`);
       let session: Awaited<ReturnType<IConnector['connect']>>;
+      this._connectingConnectId = connectId;
       try {
         session = this.connector.availableTransports?.length
           ? await this.connector.connect(connectId, {
@@ -744,6 +754,7 @@ export class LedgerAdapter implements IHardwareWallet {
           });
         }
       } finally {
+        if (this._connectingConnectId === connectId) this._connectingConnectId = undefined;
         releaseOperation();
       }
       const resolvedConnectId = session.deviceInfo?.connectId || connectId;
@@ -876,7 +887,7 @@ export class LedgerAdapter implements IHardwareWallet {
         success: false,
         error: { message: e?.message, _tag: e?._tag, code: e?.code ?? e?.errorCode },
       });
-      throw err;
+      return this.errorToFailure<DeviceInfo>(err);
     }
   }
 
@@ -960,6 +971,7 @@ export class LedgerAdapter implements IHardwareWallet {
         knownConnections,
         extra,
         allowDeviceSelection,
+        supportedTransports,
         ...rest
       } = params as Record<string, unknown>;
       return {
@@ -970,6 +982,7 @@ export class LedgerAdapter implements IHardwareWallet {
           extra: extra as ICommonCallParams['extra'],
           allowDeviceSelection:
             typeof allowDeviceSelection === 'boolean' ? allowDeviceSelection : undefined,
+          supportedTransports: supportedTransports as ICommonCallParams['supportedTransports'],
         },
         rest,
       };
@@ -1269,9 +1282,7 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   // ---------------------------------------------------------------------------
-  // App management — OS-level Ledger app install / list. Bypasses fingerprint
-  // and chain-handler dispatch; installApp progress is forwarded to the adapter
-  // emitter via 'ui-event' AppInstallProgress events.
+  // App management: OS-level app install/list, no fingerprint or chain dispatch.
   // ---------------------------------------------------------------------------
 
   async installApp(connectId: string, appName: string): Promise<Response<void>> {
@@ -1445,12 +1456,8 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   cancel(connectId?: string): void {
-    // "Cancel this one" and "cancel whatever is running" are different
-    // instructions. An id that no longer resolves means the thing it named has
-    // already finished, so there is nothing to cancel - and it must not decay
-    // into the untargeted form and take down an unrelated operation that
-    // happens to be running now. Decided before anything else, so this call
-    // leaves no trace at all.
+    // A named id that no longer resolves has nothing to cancel; it must not fall
+    // through to the untargeted form and take down an unrelated operation.
     const namedOperationIsLive = (id: string): boolean => {
       try {
         this._operations.resolve(id);
@@ -1473,10 +1480,8 @@ export class LedgerAdapter implements IHardwareWallet {
       _tag: ERROR_TAG.UserAborted,
     });
 
-    // Hermes/RN polyfills don't always populate signal.reason from
-    // abortController.abort(reason). Cache the reason here so _abortable
-    // can fall back to it. Cleared after a short window so a stale reason
-    // can't taint an unrelated abort later.
+    // Hermes/RN may not populate signal.reason; _abortable falls back to this
+    // cached reason, cleared shortly so it cannot taint a later abort.
     this._lastCancelReason = userAbortReason;
     setTimeout(() => {
       if (this._lastCancelReason === userAbortReason) {
@@ -1507,11 +1512,8 @@ export class LedgerAdapter implements IHardwareWallet {
 
     const pendingOperationId = operationId ?? interactionForPhysicalId?.operationId;
 
-    // A named cancel clears only the prompts its own operation opened; another
-    // operation's device-selection or permission wait is not this call's
-    // business. Named but unresolvable clears nothing, because falling through
-    // to the untargeted form is exactly what a named cancel must not do. With
-    // no name at all this is teardown, and everything goes.
+    // A named cancel clears only its own operation's prompts; an unresolvable
+    // name clears nothing. No name at all is full teardown.
     if (!connectId) {
       this._uiRegistry.cancel();
     } else if (pendingOperationId) {
@@ -1523,12 +1525,8 @@ export class LedgerAdapter implements IHardwareWallet {
       this._pendingOperationBindings.delete(pendingOperationId);
     }
 
-    // A bundle called without an operationId queues its items — and opens its
-    // cancel scope — under the raw connectId, while the operation that owns
-    // that connection is a second live key. Both get cancelled. With neither,
-    // everything queued goes: every job enqueued today is user-triggered, so
-    // there is nothing to collateral-damage; background work would need a
-    // per-job foreground flag first.
+    // A bundle without operationId queues under the raw connectId while its owning
+    // operation is a second key, so cancel both. With neither, every job goes.
     const queueKeys = new Set<string>();
     if (connectId) queueKeys.add(ledgerQueueKey({ connectId }));
     if (pendingOperationId) queueKeys.add(ledgerQueueKey({ operationId: pendingOperationId }));
@@ -1558,6 +1556,8 @@ export class LedgerAdapter implements IHardwareWallet {
     if (this._connectingPromise) {
       this._doConnectAbortController?.abort(userAbortReason);
     }
+    const connectingConnectId = this._connectingConnectId;
+    if (connectingConnectId) void this.connector.cancel(connectingConnectId);
   }
 
   // ---------------------------------------------------------------------------
@@ -1627,9 +1627,8 @@ export class LedgerAdapter implements IHardwareWallet {
       );
       if (operationId) this._operations.resolve(operationId);
       if (!outcome.saved) {
-        // The wallet was verified on this connection; only the host's record
-        // of it is missing. Keep the session and let the caller decide whether
-        // losing the binding matters for what it was doing.
+        // The wallet is verified; only the host's record is missing. Keep the
+        // session and let the caller decide whether that matters.
         debugLog('[LedgerAdapter] BLE binding not persisted by host', {
           connectId,
           reason: outcome.reason,
@@ -1754,11 +1753,8 @@ export class LedgerAdapter implements IHardwareWallet {
 
   // Ledger WebUSB won't expose a locked device, so we can't auto-detect unlock.
   /**
-   * The operation the running device job belongs to, so a UI request raised
-   * mid-call can name it. A call pinned to an operation queues under its id
-   * (`ledgerQueueKey`); a call without one queues under the connectId, and the
-   * live operation on that connection is still the owner. Only work with no
-   * operation at all (cold start) comes back undefined.
+   * Operation owning the running job, so a mid-call UI request can name it.
+   * Undefined at cold start when no operation owns the job.
    */
   private _activeOperationId(): string | undefined {
     const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
@@ -2021,6 +2017,12 @@ export class LedgerAdapter implements IHardwareWallet {
           internalSignal
         );
       }
+      if (context?.supportedTransports && !context.supportedTransports.includes('ble')) {
+        throw createHwkError({
+          code: HardwareErrorCode.DeviceNotFound,
+          message: 'This Ledger model has no Bluetooth transport; connect it over USB',
+        });
+      }
       this._activeConnectionType = 'ble';
       const knownBle = context?.knownConnections?.find(
         connection => connection.transport === 'ble'
@@ -2234,11 +2236,8 @@ export class LedgerAdapter implements IHardwareWallet {
         this._activeConnectionType = 'usb';
         if (context) context.selectedConnection = undefined;
         if (preserveOperationId) this._pendingOperationBindings.delete(preserveOperationId);
-        this._bindingSelectionRequestId = undefined;
-        this.emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-          type: UI_REQUEST.DEVICE_BINDING_STATUS,
-          payload: { selectionRequestId: requestId, status: 'cancelled' },
-        });
+        this._bindingSelectionRequestId = requestId;
+        this._finishBleBinding('cancelled');
         return this._connectDeviceOrThrow(device.connectId, preserveOperationId, signal);
       }
       if (context) context.selectedConnection = { connectId: device.connectId, requestId };
@@ -2280,8 +2279,8 @@ export class LedgerAdapter implements IHardwareWallet {
           extra: context?.extra,
         },
       });
-      const { sdkConnectId } = await (signal ? this._abortable(signal, waitPromise) : waitPromise);
-      if (signal) LedgerAdapter._throwIfAborted(signal);
+      const { sdkConnectId } = await this._abortable(signal, waitPromise);
+      LedgerAdapter._throwIfAborted(signal);
       const selected = devices.find(device => device.connectId === sdkConnectId);
       if (!selected) {
         throw Object.assign(new Error('Selected Ledger is no longer available'), {
@@ -2357,11 +2356,8 @@ export class LedgerAdapter implements IHardwareWallet {
     signal?: AbortSignal
   ): Promise<unknown> {
     this._assertConnectorReady(method);
-    // Check before handing the command to the connector, not only around the
-    // promise. A listener that cancels synchronously - install progress firing
-    // at 0 is the real case - would otherwise put the command on the wire and
-    // still be told the operation was aborted. Refusing here is the stronger
-    // guarantee: nothing was sent, so nothing may have happened.
+    // Check before sending too: a listener may cancel synchronously (install
+    // progress at 0), which must not still put the command on the wire.
     if (signal?.aborted) throw this._abortReason(signal);
     const releaseOperation = this._retainConnectorOperation(`call:${sessionId}`);
     let promise: ReturnType<IConnector['call']>;
@@ -2532,10 +2528,6 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
-  /**
-   * Race a promise against an abort signal. On abort, rejects with
-   * signal.reason → instance _lastCancelReason → generic Error('Aborted').
-   */
   /** Hermes/RN polyfills don't always populate signal.reason; fall back. */
   private _abortReason(signal: AbortSignal): unknown {
     return (
@@ -2545,6 +2537,10 @@ export class LedgerAdapter implements IHardwareWallet {
     );
   }
 
+  /**
+   * Race a promise against an abort signal. On abort, rejects with
+   * signal.reason → instance _lastCancelReason → generic Error('Aborted').
+   */
   private _abortable<T>(signal: AbortSignal, promise: Promise<T>): Promise<T> {
     const getAbortReason = () => this._abortReason(signal);
 
@@ -2768,12 +2764,7 @@ export class LedgerAdapter implements IHardwareWallet {
       if (signal.aborted) throw err;
       // Once a session is acquired, a lost connection ends even a one-shot call.
       // Never rediscover/rebind and replay it on a fresh USB/BLE session.
-      if (
-        isDeviceDisconnectedError(err) ||
-        isDeviceNotAdvertisingError(err) ||
-        isTimeoutError(err) ||
-        isConnectionLevelError(err)
-      ) {
+      if (isLostConnectionError(err)) {
         this._discoveredDevices.delete(resolvedConnectId);
         if (operationId) await this._releaseLostOperationConnection(operationId);
         else {
@@ -2804,22 +2795,24 @@ export class LedgerAdapter implements IHardwareWallet {
         isStuckApp: isStuckAppStateError(err),
       });
 
-      // A precise DeviceLocked response means the business APDU was rejected
-      // before execution. Keep the pinned session, ask the user to unlock, and
-      // retry within a bounded budget without searching or reconnecting.
+      const assertSessionCurrent = (message: string): void => {
+        if (this._sessions.get(resolvedConnectId) === sessionId) return;
+        throw createHwkError({
+          code: operationId
+            ? HardwareErrorCode.OperationEnded
+            : HardwareErrorCode.DeviceDisconnected,
+          message,
+        });
+      };
+
+      // DeviceLocked means the APDU was rejected before execution: keep the
+      // session, ask to unlock, and retry within budget without reconnecting.
       if (
         (isDeviceLockedError(err) || errObj?.code === HardwareErrorCode.DeviceLocked) &&
         lockedRetryBudget > 0
       ) {
         await this._waitForDeviceConnect(signal);
-        if (this._sessions.get(resolvedConnectId) !== sessionId) {
-          throw createHwkError({
-            code: operationId
-              ? HardwareErrorCode.OperationEnded
-              : HardwareErrorCode.DeviceDisconnected,
-            message: 'Ledger connection ended while waiting for unlock',
-          });
-        }
+        assertSessionCurrent('Ledger connection ended while waiting for unlock');
         return this._runConnectorCall(
           resolvedConnectId,
           method,
@@ -2836,52 +2829,33 @@ export class LedgerAdapter implements IHardwareWallet {
 
       if (businessCallStarted && isStuckAppStateError(err)) {
         await this._sleepAbortable(LedgerAdapter.STUCK_APP_RETRY_DELAY_MS, signal);
-        if (this._sessions.get(resolvedConnectId) !== sessionId) {
-          throw createHwkError({
-            code: operationId
-              ? HardwareErrorCode.OperationEnded
-              : HardwareErrorCode.DeviceDisconnected,
-            message: 'Ledger connection ended during the app transition',
-          });
-        }
+        assertSessionCurrent('Ledger connection ended during the app transition');
         try {
           return await this._callConnector(sessionId, method, effectiveParams, signal);
         } catch (retryErr) {
           if (isStuckAppStateError(retryErr)) throw err;
-          if (
-            isDeviceDisconnectedError(retryErr) ||
-            isDeviceNotAdvertisingError(retryErr) ||
-            isTimeoutError(retryErr) ||
-            isConnectionLevelError(retryErr)
-          ) {
+          if (isLostConnectionError(retryErr)) {
             if (operationId) await this._releaseLostOperationConnection(operationId);
             else {
               this._sessions.delete(resolvedConnectId);
               this._discoveredDevices.delete(resolvedConnectId);
               await this.connector.disconnect(sessionId).catch(() => undefined);
             }
+            const ambiguous = !canReplayHardwareMethodAfterTransportFailure(method);
             throw createHwkError({
               code: operationId ? HardwareErrorCode.OperationEnded : mapLedgerError(retryErr).code,
               message: `Ledger ${method} may have completed before the connection was lost`,
-              params: !canReplayHardwareMethodAfterTransportFailure(method)
-                ? operationMayHaveCompletedParams(method, {
-                    operationId,
-                    reason: 'disconnect',
-                  })
+              params: ambiguous
+                ? operationMayHaveCompletedParams(method, { operationId, reason: 'disconnect' })
                 : { operationId, reason: 'disconnect' },
-              recovery: !canReplayHardwareMethodAfterTransportFailure(method)
-                ? { scope: 'unknown' }
-                : undefined,
+              recovery: ambiguous ? { scope: 'unknown' } : undefined,
             });
           }
           throw retryErr;
         }
       }
 
-      if (
-        !operationId &&
-        (err as { code?: number } | null | undefined)?.code === HardwareErrorCode.DeviceMismatch
-      ) {
+      if (!operationId && errObj?.code === HardwareErrorCode.DeviceMismatch) {
         this._sessions.delete(resolvedConnectId);
         this._discoveredDevices.delete(resolvedConnectId);
         await this.connector.disconnect(sessionId).catch(() => undefined);
@@ -2992,16 +2966,8 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   /**
-   * Ensure OS-level device permission (Bluetooth / USB) before proceeding.
-   *
-   * Emits `REQUEST_DEVICE_PERMISSION` and awaits the consumer's
-   * `RECEIVE_DEVICE_PERMISSION` reply (60s budget covers "probe → system
-   * prompt → user tap" plus a generous margin). If the consumer never wires
-   * a handler or never replies, the wait times out and the operation fails
-   * fast so scanners/callers don't hang silently.
-   *
-   * - No connectId (searchDevices): environment-level permission
-   * - With connectId (business methods): device-level permission
+   * Ensure OS-level Bluetooth/USB permission; times out after 60s if the host never
+   * replies. Without connectId the request is environment-level, else device-level.
    */
   private async _ensureDevicePermission(
     connectId?: string,
@@ -3013,7 +2979,7 @@ export class LedgerAdapter implements IHardwareWallet {
     }
     const transportType: TransportType = this.activeTransport ?? 'hid';
 
-    // Register the wait before emitting — a synchronous listener that replies
+    // Register the wait before emitting: a synchronous listener that replies
     // immediately (e.g. in tests or a same-process consumer) would otherwise
     // resolve before any pending entry exists and the response would drop.
     const operationId = this._activeOperationId();
@@ -3111,7 +3077,7 @@ export class LedgerAdapter implements IHardwareWallet {
     const mapped = mapLedgerError(err);
 
     // DeviceLocked is handled by connectorCall retry logic (_waitForDeviceConnect).
-    // Do NOT emit UI events here — it would show UI and return error simultaneously.
+    // Do not emit UI events here: it would show UI and return an error simultaneously.
 
     return ledgerFailure(mapped.code, mapped.message, mapped.appName, tag);
   }
@@ -3148,10 +3114,8 @@ export class LedgerAdapter implements IHardwareWallet {
   };
 
   // Forward connector `ui-event` to the public hw.emitter so consumers only
-  // need to subscribe in one place. For the AppInstallProgress variant we
-  // re-key sessionId → connectId via the live _sessions map; if no mapping
-  // exists (race during teardown) we drop. All other variants pass through
-  // unchanged.
+  // need to subscribe in one place. The AppInstallProgress variant re-keys
+  // sessionId to connectId via `_sessions`, and drops if no mapping exists.
   private uiEventForwarder = (event: ConnectorUiEvent): void => {
     if (event.type === EConnectorInteraction.AppInstallProgress) {
       let connectId: string | undefined;
@@ -3170,8 +3134,8 @@ export class LedgerAdapter implements IHardwareWallet {
       }
       const { appName, progress } = event.payload;
       const key = `${connectId}:${appName}`;
-      // Reset baseline on app/device switch — and after the prior stream
-      // finished — so the next install of the same app emits intermediate
+      // Reset baseline on app/device switch, and after the prior stream
+      // finished, so the next install of the same app emits intermediate
       // frames instead of staying stuck at the final 1.0 baseline.
       if (this._installProgressLastKey !== key || this._installProgressLastEmittedValue >= 1) {
         this._installProgressLastEmittedValue = -Infinity;

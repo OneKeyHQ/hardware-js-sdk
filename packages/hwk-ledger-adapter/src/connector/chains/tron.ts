@@ -1,8 +1,7 @@
 import { HardwareErrorCode, bytesToHex, hexToBytes } from '@onekeyfe/hwk-adapter-core';
 
-import { collapseSignerInteraction, normalizePath } from './utils';
+import { normalizePath, runSignerCall, wireSignerToSession } from './utils';
 import { SignerTron } from '../../signer/SignerTron';
-import { debugLog } from '../../utils/debugLog';
 
 import type { ConnectorContext } from './types';
 
@@ -20,10 +19,8 @@ export interface TronSignTransactionCallParams {
   /** Protobuf-encoded raw transaction hex (no 0x prefix) */
   rawTxHex: string;
   /**
-   * TRC-20 transfers are clear-signed from a firmware token table
-   * (address -> ticker/decimals); tokens outside it show as a custom
-   * contract. This field is the legacy `hw-app-trx` TRC-10 name/decimals
-   * channel (P1 0xA0); `device-signer-kit-tron` 0.2.0 doesn't implement it.
+   * Legacy `hw-app-trx` TRC-10 descriptor channel (P1 0xA0), unimplemented in signer-kit-tron
+   * 0.2.0. TRC-20 is clear-signed from the firmware token table instead.
    */
   tokenSignatures?: string[];
 }
@@ -46,17 +43,12 @@ export async function tronGetAddress(
   const tronSigner = await _createTronSigner(ctx, sessionId);
   const path = normalizePath(params.path);
 
-  try {
+  return runSignerCall(ctx, sessionId, async () => {
     const result = await tronSigner.getAddress(path, {
       checkOnDevice: params.showOnDevice ?? false,
     });
     return { address: result.address, publicKey: result.publicKey, path: params.path };
-  } catch (err) {
-    ctx.invalidateSession(sessionId);
-    throw ctx.wrapError(err);
-  } finally {
-    ctx.clearCanceller(sessionId);
-  }
+  });
 }
 
 export async function tronSignTransaction(
@@ -74,15 +66,10 @@ export async function tronSignTransaction(
   const tronSigner = await _createTronSigner(ctx, sessionId);
   const path = normalizePath(params.path);
 
-  try {
+  return runSignerCall(ctx, sessionId, async () => {
     const signature = await tronSigner.signTransaction(path, hexToBytes(params.rawTxHex));
     return { signature: bytesToHex(signature) };
-  } catch (err) {
-    ctx.invalidateSession(sessionId);
-    throw ctx.wrapError(err);
-  } finally {
-    ctx.clearCanceller(sessionId);
-  }
+  });
 }
 
 export async function tronSignMessage(
@@ -93,15 +80,10 @@ export async function tronSignMessage(
   const tronSigner = await _createTronSigner(ctx, sessionId);
   const path = normalizePath(params.path);
 
-  try {
+  return runSignerCall(ctx, sessionId, async () => {
     const signature = await tronSigner.signPersonalMessage(path, hexToBytes(params.messageHex));
     return { signature: bytesToHex(signature) };
-  } catch (err) {
-    ctx.invalidateSession(sessionId);
-    throw ctx.wrapError(err);
-  } finally {
-    ctx.clearCanceller(sessionId);
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -112,17 +94,5 @@ async function _createTronSigner(ctx: ConnectorContext, sessionId: string): Prom
   const dmk = await ctx.getOrCreateDmk();
   const { SignerTrxBuilder } = await ctx.importLedgerKit('@ledgerhq/device-signer-kit-tron');
   const sdkSigner = new SignerTrxBuilder({ dmk, sessionId }).build();
-  const signer = new SignerTron(sdkSigner);
-
-  signer.onInteraction = (interaction: string) => {
-    debugLog('[LedgerConnector] tron.onInteraction:', interaction);
-    ctx.emit('ui-event', {
-      type: collapseSignerInteraction(interaction),
-      payload: { sessionId },
-    });
-  };
-  signer.onRegisterCanceller = cancel => {
-    ctx.registerCanceller(sessionId, cancel);
-  };
-  return signer;
+  return wireSignerToSession(ctx, sessionId, 'tron', new SignerTron(sdkSigner));
 }

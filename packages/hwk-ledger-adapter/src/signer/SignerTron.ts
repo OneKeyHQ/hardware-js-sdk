@@ -9,12 +9,8 @@ type TronTxOptions = Parameters<ISdkSignerTrx['signTransaction']>[2];
 type TronMsgOptions = Parameters<ISdkSignerTrx['signPersonalMessage']>[2];
 
 /**
- * Wraps Ledger's Tron DMK signer (Observable-based DeviceActions) into a
- * simple async interface returning plain serializable data.
- *
- * Signatures come back as raw bytes here, unlike the legacy `hw-app-trx` path
- * which returned hex. Callers hex-encode at the connector boundary so the wire
- * format the adapter exposes is unchanged.
+ * Async wrapper over Ledger's Tron DMK signer. Signatures are raw bytes; the
+ * connector hex-encodes them to keep the legacy `hw-app-trx` wire format.
  */
 export class SignerTron {
   onInteraction?: (interaction: string) => void;

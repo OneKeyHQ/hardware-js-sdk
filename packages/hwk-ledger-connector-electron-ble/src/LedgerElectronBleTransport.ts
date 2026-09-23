@@ -27,9 +27,6 @@ import type {
 import type { ElectronBleApi, ElectronBleDeviceInfo } from '@onekeyfe/hwk-adapter-core';
 
 const TRANSPORT_ID = 'ELECTRON_BLE';
-// Ledger's own transports open at the ATT default and then raise it from the
-// device's answer to the 0x08 handshake below. Keep the same floor so a device
-// that reports nothing useful still works.
 const normalizeUuid = (uuid: string) => uuid.replace(/-/g, '').toLowerCase();
 const toHex = (bytes: Uint8Array) =>
   Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
@@ -127,6 +124,23 @@ export class LedgerElectronBleTransport implements Transport {
     await this.bridge.stopScan(LEDGER_BLE_VENDOR);
   }
 
+  /**
+   * Abandon connects still in flight in the main process. The pending
+   * `bridge.connect` then rejects and connect()'s own error path cleans up.
+   */
+  async cancelPairing(deviceId?: string): Promise<void> {
+    const ids = [...this.connections.entries()]
+      .filter(
+        ([id, entry]) => !entry.connectedDevice && (deviceId === undefined || id === deviceId)
+      )
+      .map(([id]) => id);
+    await Promise.all(
+      ids.map(id =>
+        this.bridge.cancelPairing?.({ vendor: LEDGER_BLE_VENDOR, id }).catch(() => undefined)
+      )
+    );
+  }
+
   async connect({
     deviceId,
     onDisconnect,
@@ -136,14 +150,16 @@ export class LedgerElectronBleTransport implements Transport {
     let removeNotification: (() => void) | undefined;
     let removeDisconnect: (() => void) | undefined;
     let closed = false;
-    let rejectPending: ((error: unknown) => void) | undefined;
-    let receive: ((bytes: Uint8Array) => void) | undefined;
+    // The single in-flight exchange; notifications feed it, close() rejects it.
+    let pending:
+      | { receive: (bytes: Uint8Array) => void; reject: (error: unknown) => void }
+      | undefined;
     const close = () => {
       if (closed) return false;
       closed = true;
       removeNotification?.();
       removeDisconnect?.();
-      rejectPending?.(new Error('Bluetooth connection ended'));
+      pending?.reject(new Error('Bluetooth connection ended'));
       return true;
     };
     const release = () => {
@@ -169,9 +185,8 @@ export class LedgerElectronBleTransport implements Transport {
         release();
         return Left(new UnknownDeviceError());
       }
-      // Registered before connect: a Ledger often drops the link the moment
-      // pairing completes, and an event missed here costs a full APDU timeout.
-      // The handler filters by id, and every failure path below closes it.
+      // Registered before connect: a Ledger often drops the link right after
+      // pairing, and a missed event costs a full APDU timeout.
       removeDisconnect = this.bridge.onDeviceDisconnected(id => {
         if (id !== deviceId) return;
         if (close()) {
@@ -191,10 +206,10 @@ export class LedgerElectronBleTransport implements Transport {
       removeNotification = this.bridge.onNotification((id, hex) => {
         if (id !== deviceId || closed) return;
         if (!/^(?:[0-9a-f]{2})+$/i.test(hex)) {
-          rejectPending?.(new Error('Malformed Bluetooth notification'));
+          pending?.reject(new Error('Malformed Bluetooth notification'));
           return;
         }
-        receive?.(hexToBytes(hex));
+        pending?.receive(hexToBytes(hex));
       });
       await this.bridge.subscribe(deviceId);
 
@@ -208,12 +223,11 @@ export class LedgerElectronBleTransport implements Transport {
         timeoutMs: number
       ): Promise<T> => {
         if (closed) throw new Error('Bluetooth connection ended');
-        if (receive) throw new Error('Bluetooth exchange is busy');
+        if (pending) throw new Error('Bluetooth exchange is busy');
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {
           return await new Promise<T>((resolve, reject) => {
-            rejectPending = reject;
-            receive = bytes => accept(bytes, resolve, reject);
+            pending = { reject, receive: bytes => accept(bytes, resolve, reject) };
             timer = setTimeout(
               () => reject(new SendApduTimeoutError('Bluetooth response timed out')),
               timeoutMs
@@ -227,8 +241,7 @@ export class LedgerElectronBleTransport implements Transport {
           });
         } finally {
           if (timer !== undefined) clearTimeout(timer);
-          receive = undefined;
-          rejectPending = undefined;
+          pending = undefined;
         }
       };
 
@@ -238,10 +251,7 @@ export class LedgerElectronBleTransport implements Transport {
           if (bytes.length < 6 || bytes[0] !== 0x08 || bytes[5] < 6) {
             reject(new Error('Invalid Ledger BLE MTU response'));
           } else {
-            // Matches @ledgerhq/hw-transport-web-ble inferMTU: the device
-            // reports the frame size it can take, and it is only ever used to
-            // raise the floor. Capping it here would negotiate and then throw
-            // the answer away, leaving every transfer at ~7x the frame count.
+            // Matches hw-transport-web-ble inferMTU: the answer only raises the floor.
             resolve(Math.max(LEDGER_BLE_MIN_FRAME_SIZE, bytes[5]));
           }
         },
@@ -254,7 +264,7 @@ export class LedgerElectronBleTransport implements Transport {
         type: 'BLE',
         sendApdu: async (apdu, _triggersDisconnection, abortTimeout): Promise<SendApduResult> => {
           if (closed) return Left(new DisconnectError());
-          if (receive) return Left(new SendApduConcurrencyError());
+          if (pending) return Left(new SendApduConcurrencyError());
           const receiver = this.args.apduReceiverServiceFactory();
           try {
             const result = await exchange<SendApduResult>(
