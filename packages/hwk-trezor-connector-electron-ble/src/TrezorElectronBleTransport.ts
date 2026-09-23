@@ -75,11 +75,9 @@ export class TrezorElectronBleTransport {
   }
 
   async scan(durationMs?: number): Promise<ThirdPartyBleDeviceInfo[]> {
-    // `match` is applied in JS, after an unfiltered radio scan — it is not a
-    // native scan filter. That distinction matters: a native service-UUID
-    // filter drops a Safe 7's ADV packets on Windows, because its UUID travels
-    // in the scan response rather than the ADV packet. Hence the name patterns,
-    // which match what the ADV packet does carry.
+    // `match` is applied in JS after an unfiltered radio scan, not as a native
+    // scan filter: a native service-UUID filter drops a Safe 7's ADV packets on
+    // Windows, since its UUID lives in the scan response, not the ADV packet.
     try {
       return await this._bridge.scan({
         vendor: TREZOR_BLE_VENDOR,

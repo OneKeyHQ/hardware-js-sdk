@@ -8,10 +8,8 @@ export const TREZOR_BLE_WRITE_CHUNK_DELAY_MS = 5;
 export const TREZOR_BLE_VENDOR = 'trezor';
 
 /**
- * How the shared desktop handler recognizes a Trezor. The main process holds
- * no vendor knowledge, so the name test that used to live there travels as
- * data: a local name must satisfy every pattern, which reproduces
- * `isTrezorSafe7BleName` — "Trezor" plus either "Safe 7" or "T3W1".
+ * Trezor matcher sent to the vendor-agnostic main process. A name must match every
+ * pattern, like `isTrezorSafe7BleName`: "Trezor" plus "Safe 7" or "T3W1".
  */
 export const TREZOR_BLE_MATCH: ElectronBleMatch = {
   serviceUuids: [TREZOR_BLE_UUIDS.service],

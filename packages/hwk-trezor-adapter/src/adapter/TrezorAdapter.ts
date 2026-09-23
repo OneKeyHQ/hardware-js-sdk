@@ -151,6 +151,17 @@ type TrezorBundleContext = {
   connection?: { connectId: string; sessionId: string };
 };
 
+const ALL_NETWORK_COMMON_PARAM_KEYS = [
+  'autoInstallApp',
+  'passphraseState',
+  'useEmptyPassphrase',
+  'operationId',
+  'knownConnections',
+  'extra',
+  'allowDeviceSelection',
+  'supportedTransports',
+] as const;
+
 const TREZOR_BTC_NETWORK_COIN_MAP: Partial<Record<string, string>> = {
   btc: 'Bitcoin',
   bitcoin: 'Bitcoin',
@@ -299,6 +310,7 @@ export class TrezorAdapter implements IHardwareWallet {
         knownConnections,
         extra,
         allowDeviceSelection,
+        supportedTransports,
         ...rest
       } = params as Record<string, unknown>;
       return {
@@ -311,6 +323,8 @@ export class TrezorAdapter implements IHardwareWallet {
           extra: extra as IHardwareConnectionContext['extra'],
           allowDeviceSelection:
             typeof allowDeviceSelection === 'boolean' ? allowDeviceSelection : undefined,
+          supportedTransports:
+            supportedTransports as IHardwareConnectionContext['supportedTransports'],
         },
         rest,
       };
@@ -322,33 +336,11 @@ export class TrezorAdapter implements IHardwareWallet {
     item: AllNetworkAddressParams,
     commonParams: TrezorCommonParams
   ): AllNetworkAddressParams {
-    const autoInstallApp = commonParams?.autoInstallApp;
-    const passphraseState = commonParams?.passphraseState;
-    const useEmptyPassphrase = commonParams?.useEmptyPassphrase;
-    const operationId = commonParams?.operationId;
-    const knownConnections = commonParams?.knownConnections;
-    const extra = commonParams?.extra;
-    const allowDeviceSelection = commonParams?.allowDeviceSelection;
-    if (
-      autoInstallApp === undefined &&
-      passphraseState === undefined &&
-      useEmptyPassphrase === undefined &&
-      operationId === undefined &&
-      knownConnections === undefined &&
-      extra === undefined &&
-      allowDeviceSelection === undefined
-    ) {
-      return item;
-    }
+    const defined = ALL_NETWORK_COMMON_PARAM_KEYS.filter(key => commonParams?.[key] !== undefined);
+    if (!defined.length) return item;
     return {
       ...item,
-      ...(autoInstallApp !== undefined ? { autoInstallApp } : {}),
-      ...(passphraseState !== undefined ? { passphraseState } : {}),
-      ...(useEmptyPassphrase !== undefined ? { useEmptyPassphrase } : {}),
-      ...(operationId !== undefined ? { operationId } : {}),
-      ...(knownConnections !== undefined ? { knownConnections } : {}),
-      ...(extra !== undefined ? { extra } : {}),
-      ...(allowDeviceSelection !== undefined ? { allowDeviceSelection } : {}),
+      ...Object.fromEntries(defined.map(key => [key, commonParams?.[key]])),
     };
   }
 
@@ -748,12 +740,7 @@ export class TrezorAdapter implements IHardwareWallet {
     options?: SearchDevicesOptions,
     signal?: AbortSignal
   ): Promise<DeviceInfo[]> {
-    if (
-      options?.transportType &&
-      !(this._connector.availableTransports ?? [this._connector.connectionType]).includes(
-        options.transportType
-      )
-    )
+    if (options?.transportType && !this._availableTransports().includes(options.transportType))
       return [];
     if (options?.resetSession) {
       await this._resetStateAndDisconnectSessions();
@@ -848,7 +835,7 @@ export class TrezorAdapter implements IHardwareWallet {
             );
             if (!persisted) {
               // A business call can shrug off an unsaved binding, but here
-              // saving the binding IS the operation.
+              // saving the binding is the operation.
               throw createHwkError({
                 code: HardwareErrorCode.UnknownError,
                 message: 'Bluetooth binding could not be saved',
@@ -936,9 +923,7 @@ export class TrezorAdapter implements IHardwareWallet {
       if (connecting) this._disconnectRequested.add(connectId);
       return;
     }
-    this._sessions.delete(connectId);
-    this._verifiedPassphraseSessionsByConnectId.delete(connectId);
-    await this._runConnectorTeardown(() => this._connector.disconnect(sessionId));
+    await this._disconnectSession(connectId, sessionId);
   }
 
   async getDeviceInfo(
@@ -1070,7 +1055,7 @@ export class TrezorAdapter implements IHardwareWallet {
         // One named boolean per abort reason.
         shouldAbortBundle: (response, { index }) => {
           const isSessionLevelFailure = topLevelFailureIndexes.has(index);
-          // Mixed bundles must not abort — other chains can still derive.
+          // Mixed bundles must not abort, other chains can still derive.
           const isWholeChainForbidden =
             isSingleNetworkBundle &&
             response.payload?.code === HardwareErrorCode.DevicePathForbidden;
@@ -1243,6 +1228,7 @@ export class TrezorAdapter implements IHardwareWallet {
                   knownConnections: commonParams.knownConnections,
                   extra: commonParams.extra,
                   allowDeviceSelection: commonParams.allowDeviceSelection,
+                  supportedTransports: commonParams.supportedTransports,
                   passphraseState: commonParams.passphraseState,
                   useEmptyPassphrase: commonParams.useEmptyPassphrase,
                 }
@@ -1271,11 +1257,9 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   cancel(connectId?: string): void {
-    // "Cancel this one" and "cancel whatever is running" are different
-    // instructions. An operation id that has already ended names nothing, so
-    // this call must leave no trace at all rather than decay into the
-    // untargeted form and take down an unrelated job or someone else's pending
-    // UI request. Decided before anything else.
+    // "Cancel this one" and "cancel everything" are different instructions:
+    // an already-ended operation id must cancel nothing, not fall through to
+    // the untargeted form and take down an unrelated job or UI request.
     if (isHardwareOperationId(connectId)) {
       try {
         this._operations.resolve(connectId);
@@ -1304,18 +1288,12 @@ export class TrezorAdapter implements IHardwareWallet {
         !operationId && connectId
           ? this._operations.findActiveByConnectionKey(connectId)
           : undefined;
-      // A bundle called without an operationId queues its items — and opens its
-      // cancel scope — under the raw connectId, while the operation that owns
-      // that connection is a second live key. Both get cancelled. Pending jobs
-      // and scopes go with the active one: between two bundle items nothing is
-      // active, and only the scope carries the cancel across that gap.
+      // A bundle without an operationId queues under the raw connectId, but the
+      // connection's owning operation is a second live key, so both get
+      // cancelled: only the scope survives the gap between two bundle items.
       const pendingOperationId = operationId ?? interactionForPhysicalId?.operationId;
-      // Release adapter-level UI waits (preemption, device selection) and
-      // connector-level ones (THP pairing / PIN matrix). A named cancel keeps
-      // the adapter-side clear inside its own operation, so cancelling one
-      // signing call no longer closes another operation's PIN prompt. Named but
-      // unresolvable clears nothing: falling through to the untargeted form is
-      // what a named cancel must not do.
+      // Adapter and connector UI waits of this operation only; an unresolvable
+      // named cancel clears nothing instead of falling through to cancel-all.
       if (!connectId) {
         this._uiRegistry.cancel();
       } else if (pendingOperationId) {
@@ -1352,11 +1330,8 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   /**
-   * The operation the running device job belongs to, so a UI request raised
-   * mid-call can name it. A call pinned to an operation queues under its id
-   * (`trezorQueueKey`); a call without one queues under the connectId, and the
-   * live operation on that connection is still the owner. Only work with no
-   * operation at all comes back undefined.
+   * Operation owning the running job: its queue key when pinned, else the live
+   * operation of its connectId, so a mid-call UI request can name it.
    */
   private _activeOperationId(): string | undefined {
     const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
@@ -1439,12 +1414,9 @@ export class TrezorAdapter implements IHardwareWallet {
         async signal => {
           let selectionRequestId: string | undefined;
           let verified = false;
-          // One exit for the binding UI. Everything between picking an endpoint
-          // and saving its binding can fail - identity mismatch, session
-          // creation, unlock, passphrase derivation - and releasing the device
-          // is not the same as closing the dialog the user is looking at. Left
-          // to individual exits, the next failure added below would forget
-          // again; here every one of them lands in the same finally.
+          // One finally closes the binding UI: releasing the device is not the
+          // same as dismissing the dialog, and scattering this per exit risks
+          // a future failure forgetting it.
           try {
             if (
               !operationId &&
@@ -1724,6 +1696,19 @@ export class TrezorAdapter implements IHardwareWallet {
     })();
   }
 
+  private async _disconnectSession(
+    connectId: string,
+    sessionId = this._sessions.get(connectId)
+  ): Promise<void> {
+    this._sessions.delete(connectId);
+    this._verifiedPassphraseSessionsByConnectId.delete(connectId);
+    if (sessionId) await this._runConnectorTeardown(() => this._connector.disconnect(sessionId));
+  }
+
+  private _availableTransports(): readonly ConnectionType[] {
+    return this._connector.availableTransports ?? [this._connector.connectionType];
+  }
+
   private async _releaseProvisionalConnection(
     connectId: string,
     signal: AbortSignal
@@ -1888,6 +1873,7 @@ export class TrezorAdapter implements IHardwareWallet {
         knownConnections: operationContext?.knownConnections,
         extra: operationContext?.extra,
         allowDeviceSelection: operationContext?.allowDeviceSelection,
+        supportedTransports: operationContext?.supportedTransports,
         ...(operationContext?.operationId ? { operationId: operationContext.operationId } : {}),
       },
       false
@@ -2257,9 +2243,7 @@ export class TrezorAdapter implements IHardwareWallet {
     );
     if (connectedMatch) return { connectId: connectedMatch.connectId };
 
-    const availableTransports = this._connector.availableTransports ?? [
-      this._connector.connectionType,
-    ];
+    const availableTransports = this._availableTransports();
     if (availableTransports.includes('usb')) {
       await TrezorAdapter._abortable(
         signal,
@@ -2285,13 +2269,8 @@ export class TrezorAdapter implements IHardwareWallet {
     const knownBleIds = suppliedBleIds?.length
       ? suppliedBleIds
       : [knownConnection?.bleConnectId].filter((id): id is string => Boolean(id));
-    // A Trezor publishes its serial at enumeration, so a saved USB locator
-    // answers "is my wallet on this bus?" without opening anything. When the
-    // saved locator is absent from this round, the wallet is not plugged in:
-    // go to BLE rather than initializing every other Trezor on the bus - which
-    // on a Safe 7 means a THP handshake on a device that is not ours - only to
-    // fail afterwards. A wallet that has never been reached over USB has no
-    // locator to check, and there we do have to connect before we can tell.
+    // A saved USB locator (serial at enumeration) confirms presence unopened, so
+    // other Trezors are not THP-probed; without one, every USB candidate is probed.
     const usbCandidates = candidates.filter(
       device =>
         device.connectionType === 'usb' &&
@@ -2318,18 +2297,15 @@ export class TrezorAdapter implements IHardwareWallet {
       }
 
       if (sessionId) {
-        const mismatchedSessionId = sessionId;
-        this._sessions.delete(candidate.connectId);
-        this._verifiedPassphraseSessionsByConnectId.delete(candidate.connectId);
         // eslint-disable-next-line no-await-in-loop
-        await this._runConnectorTeardown(() => this._connector.disconnect(mismatchedSessionId));
+        await this._disconnectSession(candidate.connectId, sessionId);
       }
     }
 
     if (mismatchedDeviceIds.length) {
       // Every candidate answered and none is this wallet. Say so plainly: the
       // user can unplug it and connect the right one. This is not
-      // DeviceMismatch — nothing about the known wallet changed.
+      // DeviceMismatch, nothing about the known wallet changed.
       throw createHwkError({
         code: HardwareErrorCode.DeviceSearchMismatch,
         message:
@@ -2357,18 +2333,19 @@ export class TrezorAdapter implements IHardwareWallet {
       await this._ensureSession(knownBleConnectId, signal, 'ble');
       const actualDeviceId = this._devices.get(knownBleConnectId)?.deviceId;
       if (actualDeviceId === expectedDeviceId) return { connectId: knownBleConnectId };
-      const sessionId = this._sessions.get(knownBleConnectId);
-      this._sessions.delete(knownBleConnectId);
-      this._verifiedPassphraseSessionsByConnectId.delete(knownBleConnectId);
-      if (sessionId) {
-        await this._runConnectorTeardown(() => this._connector.disconnect(sessionId));
-      }
+      await this._disconnectSession(knownBleConnectId);
       throw createHwkError({
         code: HardwareErrorCode.DeviceMismatch,
         message: 'The bound Trezor Bluetooth device has a different identity',
       });
     }
 
+    if (context?.supportedTransports && !context.supportedTransports.includes('ble')) {
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceNotFound,
+        message: 'This Trezor model has no Bluetooth transport; connect it over USB',
+      });
+    }
     if (context?.allowDeviceSelection === false) {
       throw createHwkError({
         code: HardwareErrorCode.DeviceNotFound,
@@ -2384,9 +2361,7 @@ export class TrezorAdapter implements IHardwareWallet {
     context: IHardwareConnectionContext | undefined,
     reason: 'missing-binding' | 'manual-rebind'
   ): Promise<{ connectId: string; selectionRequestId?: string }> {
-    const availableTransports = this._connector.availableTransports ?? [
-      this._connector.connectionType,
-    ];
+    const availableTransports = this._availableTransports();
     const allowUsbFallback = reason !== 'manual-rebind' && availableTransports.includes('usb');
     const knownUsbIds = context?.knownConnections
       ? context.knownConnections.flatMap(connection =>
@@ -2466,12 +2441,7 @@ export class TrezorAdapter implements IHardwareWallet {
         throw error;
       }
       if (this._devices.get(selected.connectId)?.deviceId !== expectedDeviceId) {
-        const sessionId = this._sessions.get(selected.connectId);
-        this._sessions.delete(selected.connectId);
-        this._verifiedPassphraseSessionsByConnectId.delete(selected.connectId);
-        if (sessionId) {
-          await this._runConnectorTeardown(() => this._connector.disconnect(sessionId));
-        }
+        await this._disconnectSession(selected.connectId);
         rejectedConnectId = selected.connectId;
         rejectedConnectIds.add(selected.connectId);
         continue;
@@ -2515,10 +2485,9 @@ export class TrezorAdapter implements IHardwareWallet {
     if (!selectionRequestId) return false;
     const device = this._devices.get(connectId);
     if (!device || device.deviceId !== deviceId || device.connectionType !== 'ble') {
-      // Every other exit reports a terminal status, this one has to as well:
-      // callers clear the request id and would leave the host dialog waiting.
-      // Cancelled, not failed - the call itself carries on, same as the USB
-      // fallback that drops a binding without stopping the operation.
+      // Every other exit reports a terminal status, so this one must too, or
+      // callers leave the host dialog waiting. Cancelled, not failed: the call
+      // carries on, like the USB fallback that drops a binding without stopping.
       this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
         type: UI_REQUEST.DEVICE_BINDING_STATUS,
         payload: { selectionRequestId, status: 'cancelled' },
@@ -2931,18 +2900,16 @@ export class TrezorAdapter implements IHardwareWallet {
       TrezorAdapter._mapTrezorFailureCode(error) ??
       HardwareErrorCode.UnknownError;
     // Origin: trust one already stamped on the error (a thrown HwkError
-    // carries the mapper's context knowledge), otherwise fall back to the
-    // shared code→origin table — which returns undefined for the genuinely
-    // ambiguous codes instead of guessing.
+    // carries the mapper's context), otherwise fall back to the shared
+    // code-to-origin table, which returns undefined for ambiguous codes.
     const stampedOrigin = (error as { origin?: unknown })?.origin;
     const origin =
       stampedOrigin === 'device' || stampedOrigin === 'transport' || stampedOrigin === 'host'
         ? stampedOrigin
         : defaultOriginForCode(code);
-    // Carry the thrower's params across the failure boundary. They are how a
-    // caller tells apart two situations that share one code - "you plugged in
-    // a different Trezor" vs "the bound one is gone" both read as
-    // DeviceMismatch otherwise.
+    // Carry the thrower's params across the failure boundary: they distinguish
+    // two situations sharing one code ("wrong Trezor" vs "the bound one is
+    // gone"), which otherwise both read as DeviceMismatch.
     const params =
       typed.params && typeof typed.params === 'object'
         ? (typed.params as Record<string, unknown>)
