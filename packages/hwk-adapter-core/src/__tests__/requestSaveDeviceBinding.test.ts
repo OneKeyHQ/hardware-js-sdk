@@ -37,9 +37,6 @@ describe('acknowledged device binding', () => {
     expect(registry.hasPending()).toBe(false);
   });
 
-  // The wallet on the wire was verified before we asked the host to store it,
-  // so a refusal is the host's bookkeeping, not a reason to fail the user's
-  // work. Every shape of "not saved" is reported, never thrown.
   it.each([false, undefined, 'true'])('reports an unsuccessful save: %s', async saved => {
     const { emitter, registry, requests } = setup();
     const pending = requestSaveDeviceBinding(emitter, registry, binding);
@@ -75,8 +72,6 @@ describe('acknowledged device binding', () => {
     const controller = new AbortController();
     const pending = requestSaveDeviceBinding(emitter, registry, binding, controller.signal);
     controller.abort();
-    // A user abort is the one refusal that really is the user's, so it stays an
-    // exception rather than becoming an unsaved-binding report.
     await expect(pending).rejects.toMatchObject({ _tag: 'UiRequestCancelled' });
     expect(registry.hasPending()).toBe(false);
   });
@@ -116,8 +111,6 @@ describe('acknowledged device binding', () => {
     emitter.on(UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING, () => {
       throw new Error('host failure');
     });
-    // A host that blows up mid-emit still has not stored anything, and that is
-    // the same outcome as declining: report it and let the caller continue.
     await expect(requestSaveDeviceBinding(emitter, registry, binding)).resolves.toEqual({
       saved: false,
       reason: 'skipped',

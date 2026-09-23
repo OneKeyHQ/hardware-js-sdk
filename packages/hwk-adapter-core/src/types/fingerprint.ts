@@ -51,13 +51,8 @@ export function deriveDeviceFingerprint(value: string): string {
 }
 
 /**
- * Stable 256-bit wallet identity derived from canonical public wallet
- * material. The domain separator prevents the same input from being confused
- * with hashes used by other SDK features.
- *
- * Callers must provide one fixed, vendor-defined identity source. Do not hash
- * a variable subset of exported accounts: the same wallet would then receive
- * different ids depending on which accounts happened to be returned.
+ * Domain-separated 256-bit wallet id. Input must be one fixed, vendor-defined public source, never
+ * a variable subset of exported accounts, or one wallet would get several ids.
  */
 export function deriveWalletId(canonicalPublicMaterial: string): string {
   return bytesToHex(sha256(utf8ToBytes(`onekey-hwk-wallet-id:v1:${canonicalPublicMaterial}`)));

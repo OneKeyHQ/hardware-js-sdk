@@ -8,15 +8,8 @@ const RANDOM_ID_BYTES = 16;
 const RANDOM_ID_PATTERN = /^[0-9a-f]{32}$/;
 
 /**
- * Scopes a runtime id can name. Each is a different lifetime, and none of them
- * nests cleanly inside another:
- *
- * - `search-target` — one device in one discovery snapshot. Dies on the next
- *   search of the same kind, so a stale pick is refused rather than silently
- *   resolved against a different unit.
- * - `link` — one open transport. Outlives the snapshot that produced it.
- * - `operation` — one business operation. Outlives the link: `rebind()` swaps
- *   the transport underneath while the id stays the same.
+ * `search-target`: one device in one discovery snapshot, dead on the next search of that kind.
+ * `link`: one open transport. `operation`: one business operation, outliving links via `rebind()`.
  */
 export type HardwareRuntimeIdKind = 'operation' | 'search-target' | 'link';
 

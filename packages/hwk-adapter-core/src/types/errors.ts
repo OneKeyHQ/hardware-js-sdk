@@ -12,7 +12,7 @@
  *   10400-10499  PIN / Passphrase
  *   10500-10599  App lifecycle (wrong app, not open, too old)
  *   10600-10699  Payload / framing limits (adapter-level)
- *   10700-10999  RESERVED — future adapter-level categories
+ *   10700-10999  RESERVED, future adapter-level categories
  *
  *   11000-11099  EVM APDU (reactive mapping)
  *   11100-11199  Solana APDU
@@ -60,11 +60,8 @@ export enum HardwareErrorCode {
   /** The supplied operation ended and can never be resumed. */
   OperationEnded = 10113,
   /**
-   * Discovery found devices but none of them is the wallet being looked for.
-   * Milder than DeviceMismatch: nothing about the known wallet has changed, the
-   * user simply has the wrong unit connected. DeviceMismatch stays reserved for
-   * reaching the expected device and finding a different identity on it, which
-   * can mean it was wiped, reseeded, or swapped.
+   * Discovery found devices but none is the expected wallet (wrong unit connected). DeviceMismatch
+   * is for reaching the expected device and finding a different identity on it.
    */
   DeviceSearchMismatch = 10114,
 
@@ -138,18 +135,13 @@ export enum HardwareErrorCode {
    */
   BlePairingCancelled = 10310,
   /**
-   * The vendor's remote secure channel broke while it was relaying APDUs to the
-   * device (Ledger: the manager-api script-runner WebSocket behind app install,
-   * uninstall and genuine check). The device link itself is still usable, so
-   * this is not a disconnect: retry the same call. Distinct from NetworkError,
-   * which is a plain HTTP/WS request that never carried device traffic.
+   * Ledger manager-api WebSocket (app install/uninstall, genuine check) broke while relaying APDUs.
+   * The device link is fine, so retry; NetworkError never carried device traffic.
    */
   LedgerSecureChannelError = 10311,
   /**
-   * The vendor's metadata service answered with a payload the SDK cannot use
-   * (Ledger: firmware metadata or the application catalog). Not a connectivity
-   * failure — the request succeeded and the response was unusable — so callers
-   * must not treat it as a dropped link.
+   * Vendor metadata service returned an unusable payload (Ledger firmware metadata, app catalog).
+   * The request succeeded, so callers must not treat it as a dropped link.
    */
   LedgerFirmwareMetadataError = 10312,
 
@@ -181,17 +173,13 @@ export enum HardwareErrorCode {
   AppTooOld = 10502,
   /** Not enough free storage for install/update; user must uninstall apps first. */
   DeviceOutOfMemory = 10503,
-  /** Install refused because the app is already on the device. Benign for callers that only need it present. */
+  /** Install refused, the app is already on the device; benign when the caller only needs it. */
   AppAlreadyInstalled = 10504,
 
   // --- 10600s Payload / framing limits ---
   /**
-   * The call payload exceeds a transport's fixed framing capacity (e.g.
-   * Keystone USB's ~12.5KB per-request cap — 200 frames of 64 bytes). Distinct
-   * from a generic TransportError: the request never reached the device, and
-   * retrying with the same payload over the same transport will fail the same
-   * way. Callers should route the call over a different channel (e.g. Keystone
-   * QR) or reduce the payload (e.g. a smaller PSBT) instead of retrying as-is.
+   * Payload exceeds a transport's framing cap (Keystone USB: ~12.5KB, 200 frames of 64 bytes).
+   * Retrying on the same transport fails the same way; switch channel or shrink the payload.
    */
   PayloadTooLarge = 10600,
 
@@ -263,41 +251,21 @@ export const ORPHAN_ELIGIBLE_ERROR_CODES: number[] = [
 // ---------------------------------------------------------------------------
 
 /**
- * Where a failure came from. The distinction the numeric code ranges cannot
- * make reliably (UserRejected=10001 sits in the general range but is the
- * device speaking; DevicePermissionDenied=10303 sits in the transport range
- * but is the browser speaking), and the one recovery logic actually needs:
- *
- * - `device`    the firmware ANSWERED: rejection, locked screen, wrong
- *               wallet, bad PIN. It is a result, not a malfunction — surface
- *               it to the user verbatim; never auto-reconnect, never switch
- *               channels, never drop a healthy session over it.
- * - `transport` the pipe failed: cable pulled, bus reset, bridge gone.
- *               Reconnecting or falling back to another channel is fair game.
- * - `host`      the host environment refused: browser permission, picker
- *               dismissed, bad parameters. Fix the environment, not the link.
- *
- * Optional on purpose: a mapper that cannot tell MUST leave it unset rather
- * than guess — consumers fall back to their existing code-based tables, so an
- * unset origin degrades to today's behavior instead of mislabeling.
+ * Where a failure came from; code ranges can't tell (UserRejected=10001 is the device,
+ * DevicePermissionDenied=10303 is the host).
+ * `device`: the firmware answered (rejection, locked, wrong PIN); surface verbatim, never
+ * auto-reconnect, switch channels, or drop a healthy session.
+ * `transport`: the pipe failed (cable pulled, bus reset); reconnecting is fair game.
+ * `host`: the environment refused (permission, picker, bad params); fix it, not the link.
+ * A mapper that can't tell leaves it unset so consumers fall back to code-based tables.
  */
 export type HwkErrorOrigin = 'device' | 'transport' | 'host';
 
 /**
- * Smallest runtime resource a consumer must replace before retrying a failed
- * operation. This is connection-lifecycle metadata, not UI navigation and not
- * permission to replay a signing command automatically.
- *
- * - `call`: nothing needs replacing; re-issuing the same call is eligible,
- *   usually after the user fixes device state.
- * - `operation`: the operation binding is no longer usable; the selected target
- *   may be used to establish a new one when its identity is persistent.
- * - `search-target`: the selected discovery result is stale or untrusted;
- *   rediscover on the same transport and let the user select again.
- * - `transport`: the selected transport is unavailable or unsuitable; repair
- *   it or choose another transport.
- * - `not-recoverable`: retrying the same operation/context cannot succeed.
- * - `unknown`: the SDK cannot make a safe recovery claim.
+ * Smallest resource to replace before retrying; never permission to auto-replay a signing command.
+ * `call`: nothing. `operation`: rebind from the target if its identity is persistent.
+ * `search-target`: rediscover and reselect. `transport`: repair or switch transport.
+ * `not-recoverable`: retrying cannot succeed. `unknown`: no safe claim.
  */
 export type HwkRecoveryScope =
   | 'call'
@@ -335,11 +303,7 @@ const RECOVERY_NOT_RECOVERABLE: HwkRecoveryHint = Object.freeze({
 });
 const RECOVERY_UNKNOWN: HwkRecoveryHint = Object.freeze({ scope: 'unknown' });
 
-/**
- * Vendor-neutral fallback used when an adapter has no more precise runtime
- * knowledge. Adapters may stamp a narrower hint when transport/session state
- * makes the correct scope unambiguous.
- */
+/** Vendor-neutral fallback; adapters may stamp a narrower hint when session state is clear. */
 export function defaultRecoveryForCode(code: HardwareErrorCode): HwkRecoveryHint {
   switch (code) {
     case HardwareErrorCode.UserRejected:
@@ -410,18 +374,11 @@ export function defaultRecoveryForCode(code: HardwareErrorCode): HwkRecoveryHint
 }
 
 /**
- * The authoritative code→origin table. Most codes imply their origin by
- * definition (UserRejected IS the device speaking; BridgeNotFound IS the
- * pipe). Vendors use this as the default and override only where their
- * mapping context knows better. Codes whose origin genuinely depends on
- * context (UnknownError, OperationTimeout — the device may be waiting for a
- * human, or the pipe may be dead — and DeviceBusy) return undefined: an
- * honest "can't tell" beats a plausible mislabel, because consumers fall
- * back to their existing behavior instead of taking the wrong recovery.
+ * Default code-to-origin table; vendors override only where their mapping knows better.
+ * Context-dependent codes (UnknownError, OperationTimeout, DeviceBusy) return undefined.
  */
 export function defaultOriginForCode(code: HardwareErrorCode): HwkErrorOrigin | undefined {
-  // Chain APDU blocks (11000+) are, without exception, the chain app on the
-  // device answering a request it understood and refused/qualified.
+  // Chain APDU codes (11000+) are always the device's chain app refusing or qualifying a request.
   if (code >= 11_000) return 'device';
   switch (code) {
     case HardwareErrorCode.UserRejected:
@@ -490,9 +447,8 @@ export interface IOperationMayHaveCompletedParams extends Record<string, unknown
 }
 
 /**
- * Marks an unsafe hardware request whose response was lost after dispatch.
- * Callers must not interpret the resulting transport error as proof that the
- * device rejected or did not execute the operation.
+ * Marks an unsafe request whose response was lost after dispatch; the transport error is not proof
+ * that the device rejected or skipped it.
  */
 export function operationMayHaveCompletedParams(
   method: string,
@@ -507,9 +463,7 @@ export function operationMayHaveCompletedParams(
 
 export type HwkError = Error & {
   code: HardwareErrorCode;
-  /** See {@link HwkErrorOrigin}. Survives serializeConnectorError/rehydrate
-   *  automatically (own fields outside the top-level whitelist travel via
-   *  `params` and are lifted back). */
+  /** See {@link HwkErrorOrigin}. Survives serializeConnectorError/rehydrate via `params`. */
   origin?: HwkErrorOrigin;
   recovery?: HwkRecoveryHint;
   appName?: string;

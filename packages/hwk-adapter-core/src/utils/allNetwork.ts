@@ -115,19 +115,16 @@ export async function runAllNetworkGetAddress({
   return success(responses);
 }
 
-/**
- * User said "no": an SDK-dialog cancel and an on-device reject both end the
- * bundle. Asking the device for the next chain after a refusal is a prompt the
- * user already answered.
- */
+/** An SDK-dialog cancel or on-device reject ends the bundle; the user already answered "no". */
 export function isUserRefusal(code: HardwareErrorCode | number | undefined): boolean {
-  return code === HardwareErrorCode.UserAborted || code === HardwareErrorCode.UserRejected;
+  return (
+    code === HardwareErrorCode.UserAborted ||
+    code === HardwareErrorCode.UserRejected ||
+    code === HardwareErrorCode.PinCancelled
+  );
 }
 
-/**
- * The session the bundle runs on is gone, so the remaining items have nothing
- * to run against.
- */
+/** The bundle's session is gone, so the remaining items have nothing to run against. */
 export function isConnectionLost(code: HardwareErrorCode | number | undefined): boolean {
   const codes: (HardwareErrorCode | number)[] = [
     HardwareErrorCode.DeviceDisconnected,
