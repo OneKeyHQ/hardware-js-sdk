@@ -1,16 +1,17 @@
 import { UI_REQUEST } from '../events/ui-request';
 
 import type { SaveDeviceBindingDeclineReason } from '../events/ui-request';
-import type { HardwareEventMap, SaveDeviceBindingRequest } from '../types/wallet';
+import type {
+  DeviceBindingStatus,
+  HardwareEventMap,
+  SaveDeviceBindingRequest,
+} from '../types/wallet';
 import type { TypedEventEmitter } from './TypedEventEmitter';
 import type { UiRequestRegistry } from './UiRequestRegistry';
 
 /**
- * The outcome of asking the host to persist a verified binding. A refusal is
- * reported, never thrown: by this point the SDK has already verified that the
- * connected wallet is the one the operation expects, so anything the host says
- * back is about the host's own records. Losing the binding is worth a warning
- * and a retry next time; it is not a reason to fail work the user asked for.
+ * A host refusal is reported, never thrown: wallet identity is already verified, so a lost binding
+ * is worth a warning and a retry, not failing the user's work.
  */
 export type SaveDeviceBindingOutcome =
   | { saved: true }
@@ -24,11 +25,13 @@ export async function requestSaveDeviceBinding(
   signal?: AbortSignal
 ): Promise<SaveDeviceBindingOutcome> {
   const type = UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING;
-  const declined = (reason: SaveDeviceBindingDeclineReason): SaveDeviceBindingOutcome => {
+  const emitStatus = (status: DeviceBindingStatus['status']) =>
     emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
       type: UI_REQUEST.DEVICE_BINDING_STATUS,
-      payload: { selectionRequestId: binding.selectionRequestId, status: 'failed' },
+      payload: { selectionRequestId: binding.selectionRequestId, status },
     });
+  const declined = (reason: SaveDeviceBindingDeclineReason): SaveDeviceBindingOutcome => {
+    emitStatus('failed');
     return { saved: false, reason };
   };
   if (!emitter.listenerCount(type)) {
@@ -49,27 +52,14 @@ export async function requestSaveDeviceBinding(
     const response = await pending;
     if (signal?.aborted) throw signal.reason;
     if (response?.saved !== true) {
-      // 'mismatch' and 'skipped' both mean the host could not tie this
-      // verified connection to the record it is holding. Neither says the
-      // user is holding the wrong device — that was settled before we got
-      // here — so neither stops the operation.
+      // Both 'mismatch' and 'skipped' concern the host's record, not the verified device.
       return declined(response?.reason ?? 'skipped');
     }
-    emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-      type: UI_REQUEST.DEVICE_BINDING_STATUS,
-      payload: { selectionRequestId: binding.selectionRequestId, status: 'saved' },
-    });
+    emitStatus('saved');
     return { saved: true };
   } catch (error) {
-    emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-      type: UI_REQUEST.DEVICE_BINDING_STATUS,
-      payload: {
-        selectionRequestId: binding.selectionRequestId,
-        status: signal?.aborted ? 'cancelled' : 'failed',
-      },
-    });
-    // A user abort is the one refusal that is genuinely the user's; everything
-    // else here is the host failing to answer, which is not the user's problem.
+    emitStatus(signal?.aborted ? 'cancelled' : 'failed');
+    // Only a user abort throws; any other failure is the host not answering.
     if (signal?.aborted) throw error;
     return { saved: false, reason: 'skipped' };
   } finally {

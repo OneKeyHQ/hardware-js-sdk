@@ -116,12 +116,6 @@ export type DeviceAuthenticityResult = {
   };
 };
 
-/**
- * Cross-chain / cross-vendor options passed alongside any chain method's
- * own params (the optional last argument). Holds operation-level switches
- * that aren't specific to one chain. Vendor-specific options can be added
- * as typed sub-fields here when a vendor actually needs them.
- */
 /** Persisted connection hints, never proof of device or wallet identity. */
 export type KnownDeviceConnection =
   | { transport: 'usb' | 'ble'; connectId: string }
@@ -135,6 +129,8 @@ export interface IHardwareConnectionContext {
   extra?: HardwareCallExtra;
   /** False makes discovery fail instead of asking the user to select a new endpoint. */
   allowDeviceSelection?: boolean;
+  /** Transports the host's model table allows; discovery never opens others. Omitted = any. */
+  supportedTransports?: readonly ('usb' | 'ble')[];
 }
 
 export type DeviceSelectionContext =
@@ -173,6 +169,12 @@ export interface DeviceBindingStatus {
   status: 'verifying' | 'saved' | 'failed' | 'cancelled';
 }
 
+/**
+ * Cross-chain / cross-vendor options passed alongside any chain method's
+ * own params (the optional last argument). Holds operation-level switches
+ * that aren't specific to one chain. Vendor-specific options can be added
+ * as typed sub-fields here when a vendor actually needs them.
+ */
 export interface ICommonCallParams extends IHardwareConnectionContext {
   /**
    * When the required device app is missing, prompt the user (UI request)
@@ -180,7 +182,7 @@ export interface ICommonCallParams extends IHardwareConnectionContext {
    * Off by default — preserves the plain "app not installed" failure.
    */
   autoInstallApp?: boolean;
-  /** Runtime-only id returned by connectDevice(). When present, discovery and fallback are disabled. */
+  /** Runtime-only id from connectDevice(); when present, discovery and fallback are disabled. */
   operationId?: string;
 }
 
@@ -196,9 +198,8 @@ export type IHardwareCommonCallParams = ICommonCallParams & IPassphraseCallParam
 export type IHardwareCallParams<T> = T & IHardwareCommonCallParams;
 
 /**
- * Runtime-only context for device-manager operations. The expected identity
- * lets an adapter fail closed before a read or mutation is replayed after a
- * reconnect. It must never be forwarded to vendor firmware.
+ * Runtime-only device-manager context, never forwarded to firmware. The expected identity lets an
+ * adapter fail closed before replaying a read or mutation after a reconnect.
  */
 export interface IDeviceManagerOperationContext extends IHardwareConnectionContext {
   operationId?: string;
@@ -553,17 +554,9 @@ export interface IWalletStateMethods {
 }
 
 /**
- * What a `cancel()` actually reaches on this vendor.
- *
- * - `stops-waiting`: the caller stops waiting and the adapter drops the
- *   response, but a confirmation screen already on the device stays up until
- *   the user answers it or the device times out.
- * - `interrupts-device`: the command on the wire is genuinely withdrawn.
- *
- * No vendor here reports `interrupts-device`: none of the three can retract a
- * prompt the device is already showing. The distinction exists so a host can
- * say "we stopped waiting, answer or reject on the device" instead of claiming
- * the operation was cancelled.
+ * `stops-waiting`: an on-device confirmation stays up until answered or timed out.
+ * `interrupts-device`: the command on the wire is withdrawn. No vendor reports it, so hosts
+ * should say "stopped waiting, answer on the device", not "cancelled".
  */
 export type CancelCapability = 'interrupts-device' | 'stops-waiting';
 
@@ -594,14 +587,14 @@ export interface IHardwareWallet<TConfig = unknown>
   listConnectionTargets(options?: SearchDevicesOptions): Promise<ConnectionTarget[]>;
   /** Connect or logically bind a selected search result and return a runtime-only operation id. */
   connectDevice(searchTargetId: string): Promise<Response<string>>;
-  /** Explicit Device Manager binding: verify the existing identity before replacing its BLE locator. */
+  /** Device Manager rebind: verify the existing identity before replacing its BLE locator. */
   bindBleDevice?(params: BindBleDeviceParams): Promise<Response<string>>;
-  /** Resolve operation-first routing/selection and pin it. The caller must verify wallet identity before business calls. */
+  /** Resolve and pin operation routing; the caller verifies wallet identity before business calls. */
   acquireOperation?(
     connectId: string,
     context: IHardwareConnectionContext
   ): Promise<Response<string>>;
-  /** Release an operation owned by the caller. Disconnect events end matching operations automatically. */
+  /** Release a caller-owned operation. Disconnect events end matching operations automatically. */
   releaseOperation(operationId: string): Promise<void>;
   getDeviceInfo(connectId: string, deviceId: string): Promise<Response<DeviceInfo>>;
   /** Abort the in-flight call. Omit connectId to cancel whatever is active. */
@@ -666,11 +659,8 @@ export interface SearchDevicesOptions {
    */
   waitForAllTransports?: boolean;
   /**
-   * Restrict discovery to one transport. A non-enumerable channel may return
-   * a virtual connection target (for example Keystone QR), but discovery must
-   * not start a wallet protocol or account-export interaction. The target is
-   * resolved by the following `connectDevice()` call. Omit to scan everything
-   * available.
+   * Restrict discovery to one transport. A virtual target (Keystone QR) must not start any wallet
+   * interaction during discovery; `connectDevice()` resolves it.
    */
   transportType?: ConnectionType;
 }

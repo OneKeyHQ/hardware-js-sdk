@@ -175,6 +175,7 @@ describe('shared bundle abort table', () => {
   it('names user refusal and lost sessions, and nothing else', () => {
     expect(isUserRefusal(HardwareErrorCode.UserAborted)).toBe(true);
     expect(isUserRefusal(HardwareErrorCode.UserRejected)).toBe(true);
+    expect(isUserRefusal(HardwareErrorCode.PinCancelled)).toBe(true);
     expect(isUserRefusal(HardwareErrorCode.DeviceDisconnected)).toBe(false);
     expect(isUserRefusal(undefined)).toBe(false);
 

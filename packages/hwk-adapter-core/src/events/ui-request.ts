@@ -46,10 +46,8 @@ export const UI_RESPONSE = {
 } as const;
 
 /**
- * Which operation a UI request was opened under. Optional: a request emitted
- * outside any operation (cold start, teardown) has none, and a host that does
- * not track operations can ignore it. It is what lets a cancel aimed at one
- * operation leave another operation's prompts alone.
+ * The operation a UI request was opened under, so a cancel for one operation spares another's
+ * prompts. Absent outside any operation (cold start, teardown).
  */
 export type UiRequestOperationAttribution = {
   operationId?: string;
@@ -67,11 +65,8 @@ export type DevicePermissionResponse = {
 };
 
 /**
- * Why a host refused to persist a binding.
- * - `mismatch`: the selected device is not the one this operation belongs to —
- *   a user-facing outcome, surfaced as `DeviceMismatch`.
- * - `skipped`: the host had nothing to bind (no record for this call). A host
- *   contract problem, not something the user did.
+ * `mismatch`: the selected device is not this operation's device, surfaced as `DeviceMismatch`.
+ * `skipped`: the host had nothing to bind, a host contract problem rather than a user action.
  */
 export type SaveDeviceBindingDeclineReason = 'mismatch' | 'skipped';
 

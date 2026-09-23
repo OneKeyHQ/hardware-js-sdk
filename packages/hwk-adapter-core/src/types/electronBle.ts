@@ -7,12 +7,8 @@ export interface ElectronBleDeviceInfo {
 }
 
 /**
- * How the main process recognizes one vendor's peripherals. Everything here
- * crosses IPC, so it is data rather than predicates: the handler owns no
- * vendor knowledge of its own. A peripheral matches when it advertises one of
- * `serviceUuids`, or when its local name matches every entry in
- * `namePatterns` (each is a case-insensitive regular expression source, so a
- * single entry can carry alternations).
+ * IPC-safe peripheral match: advertises one of `serviceUuids`, or its local name matches every
+ * `namePatterns` entry (case-insensitive regex sources).
  */
 export interface ElectronBleMatch {
   serviceUuids?: string[];
@@ -35,9 +31,8 @@ export interface ElectronBleConnectOptions {
   writeUuid: string;
   notifyUuid: string;
   /**
-   * `padded` splits into fixed `chunkSize` packets, zero-filling the last one
-   * — Trezor firmware silently drops a short packet. `raw` writes the buffer
-   * as given, for framing that carries its own length (Ledger).
+   * `padded`: fixed `chunkSize` packets, last zero-filled (Trezor firmware drops short packets).
+   * `raw`: the buffer as given, for self-length-framed protocols (Ledger).
    */
   write?: {
     mode: 'padded' | 'raw';
@@ -47,7 +42,7 @@ export interface ElectronBleConnectOptions {
   };
 }
 
-/** Native code handles GATT only; framing, identity checks and wallet operations stay in the SDK. */
+/** Native code handles GATT only; framing, identity checks and wallet calls stay in the SDK. */
 export interface ElectronBleApi {
   scan(options?: ElectronBleScanOptions): Promise<ElectronBleDeviceInfo[]>;
   stopScan(vendor?: string): Promise<void>;
@@ -60,4 +55,6 @@ export interface ElectronBleApi {
   getDevice(id: string): Promise<ElectronBleDeviceInfo | null>;
   onNotification(handler: (id: string, hexData: string) => void): () => void;
   onDeviceDisconnected(handler: (id: string) => void): () => void;
+  /** Abandon an in-flight connect in the main process. Optional for hosts that cannot cancel. */
+  cancelPairing?(options?: { vendor: string; id?: string }): Promise<void>;
 }

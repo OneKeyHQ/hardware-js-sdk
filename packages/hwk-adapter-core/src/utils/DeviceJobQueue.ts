@@ -1,16 +1,11 @@
 /**
- * Serializes every device call and gives callers one handle to cancel them.
+ * Serializes every device call and gives callers one handle to cancel them. Ordering is already
+ * guaranteed by awaiting callers, so what this adds is an AbortController per job, a busy check
+ * that rejects double-submits, and generation tracking so a job queued before a teardown doesn't
+ * start after it; these races exist even for a sequential caller because cleanup is async.
  *
- * Ordering is the lesser half of the job: calls already await each other, and
- * nothing in the app issues two device operations at once. What this buys is
- * the rest — an AbortController per job so a cancel has something to pull, a
- * busy check so a double-submit is refused rather than queued, and generation
- * tracking so a job that was queued before a teardown does not start after it.
- * Those races exist in a perfectly sequential caller, because cleanup is async.
- *
- * The queue never decides whether to interrupt or ask the user; the caller owns
- * that. `getActiveJob()` reads synchronously so a UI handler can look, decide,
- * and submit in one turn without racing an in-flight enqueue.
+ * Interrupt-or-ask policy belongs to the caller; `getActiveJob()` is synchronous so a UI handler
+ * can look, decide, and submit in one turn without racing an in-flight enqueue.
  */
 
 export interface JobOptions {
@@ -110,13 +105,8 @@ export class DeviceJobQueue {
   }
 
   /**
-   * Open a cancellation scope that outlives the individual jobs under it.
-   *
-   * A bundle (all-network) does not enqueue itself — it enqueues one job per
-   * item. Between two items the queue is empty, so a cancel landing in that
-   * gap finds nothing to abort and the next item goes to the device anyway.
-   * The scope holds the cancel across those gaps; the bundle checks its
-   * signal before each item. Callers must `release()` when the bundle ends.
+   * Holds a cancel across the gaps between a bundle's per-item jobs, when the queue is empty.
+   * Callers must `release()` when the bundle ends.
    */
   createCancelScope(deviceId: string): CancelScopeHandle {
     const scopeToken = {};
@@ -131,11 +121,8 @@ export class DeviceJobQueue {
   }
 
   /**
-   * Cancel the running job. `reason` becomes signal.reason.
-   *
-   * No caller today: every adapter cancel wants the queued work invalidated
-   * too and uses `cancelActiveAndPending`. Kept for a connector layer that
-   * needs to stop only what is on the wire and leave the queue behind it.
+   * Cancels the running job only; `reason` becomes signal.reason. Adapters use
+   * `cancelActiveAndPending`; this stays for a connector layer that stops only what is on the wire.
    */
   cancelActive(deviceId?: string, reason?: Error): boolean {
     if (!this._active) return false;
@@ -145,27 +132,18 @@ export class DeviceJobQueue {
   }
 
   /**
-   * Cancel the active job and invalidate queued jobs that have not started.
-   *
-   * Only `undefined` means "everything". An empty string is a queue key that
-   * derived to nothing, so it matches nothing and reports `false` rather than
-   * silently tearing the whole queue down.
-   *
-   * Returns what the cancel actually reached, not whether it was accepted.
+   * Cancels the active job and unstarted queued jobs; returns whether anything was reached. Only
+   * `undefined` means everything: an empty key matches nothing instead of tearing the queue down.
    */
   cancelActiveAndPending(deviceId?: string, reason?: Error): boolean {
     const cancelReason = reason ?? new Error('Cancelled by cancelActiveAndPending');
     if (deviceId !== undefined) {
       let cancelled = false;
-      for (const job of this._jobs.values()) {
-        if (job.deviceId === deviceId) {
-          job.abortController.abort(cancelReason);
-          cancelled = true;
-        }
-      }
-      for (const scope of this._cancelScopes.values()) {
-        if (scope.deviceId === deviceId) {
-          scope.abortController.abort(cancelReason);
+      const targets: Map<object, CancelScope>[] = [this._jobs, this._cancelScopes];
+      for (const map of targets) {
+        for (const target of map.values()) {
+          if (target.deviceId !== deviceId) continue;
+          target.abortController.abort(cancelReason);
           cancelled = true;
         }
       }

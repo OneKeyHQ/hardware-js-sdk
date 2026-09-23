@@ -12,7 +12,7 @@ export interface Failure {
   payload: {
     error: string;
     code: HardwareErrorCode;
-    /** See HwkErrorOrigin — who the failure came from. Optional so an
+    /** See HwkErrorOrigin, who the failure came from. Optional so an
      *  unclassified failure degrades to code-based handling, never a guess. */
     origin?: HwkErrorOrigin;
     /** Connection-lifecycle recovery semantics. Optional for wire compatibility

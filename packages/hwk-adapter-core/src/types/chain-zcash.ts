@@ -4,7 +4,7 @@ import type { PassphraseStateAware } from './passphrase';
 export type ZcashFullViewingKeyMode = 'ufvk' | 'orchardFvk';
 
 export interface ZcashGetFullViewingKeyParams extends PassphraseStateAware {
-  /** BIP44 account path `m/44'/133'/a'` (any deeper transparent path is accepted; only the account level is used). */
+  /** BIP44 account path `m/44'/133'/a'`; a deeper transparent path is accepted, only `a'` is used. */
   path: string;
   /** Default `ufvk`. */
   mode?: ZcashFullViewingKeyMode;

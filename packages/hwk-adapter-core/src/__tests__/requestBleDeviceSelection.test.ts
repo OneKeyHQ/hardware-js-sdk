@@ -39,7 +39,19 @@ function setup(devices: DeviceInfo[] = []) {
       requestId,
       sdkConnectId: candidate.connectId,
     });
-  return { emitter, registry, controller, requests, scan, run, select };
+  return { registry, controller, requests, scan, run, select };
+}
+
+const flush = () => new Promise<void>(resolve => setImmediate(resolve));
+
+function deferScan(scan: jest.Mock<Promise<DeviceInfo[]>, []>) {
+  let finishScan!: (devices: DeviceInfo[]) => void;
+  scan.mockReturnValue(
+    new Promise(resolve => {
+      finishScan = resolve;
+    })
+  );
+  return (devices: DeviceInfo[]) => finishScan(devices);
 }
 
 describe('SDK-owned BLE binding discovery', () => {
@@ -60,19 +72,14 @@ describe('SDK-owned BLE binding discovery', () => {
 
   it('drains USB discovery but does not override a BLE selection that already won', async () => {
     const { run, scan, select, requests, registry } = setup([candidate]);
-    let finishScan!: (devices: DeviceInfo[]) => void;
-    scan.mockReturnValue(
-      new Promise(resolve => {
-        finishScan = resolve;
-      })
-    );
+    const finishScan = deferScan(scan);
     let settled = false;
     const pending = run(true).finally(() => {
       settled = true;
     });
-    await new Promise<void>(resolve => setImmediate(resolve));
+    await flush();
     select(requests[0].requestId);
-    await new Promise<void>(resolve => setImmediate(resolve));
+    await flush();
     expect(settled).toBe(false);
     finishScan([usbCandidate]);
     await expect(pending).resolves.toMatchObject({ device: candidate });
@@ -81,20 +88,15 @@ describe('SDK-owned BLE binding discovery', () => {
 
   it('ignores USB discovered after cancellation and drains its scan', async () => {
     const { run, scan, controller, registry } = setup();
-    let finishScan!: (devices: DeviceInfo[]) => void;
-    scan.mockReturnValue(
-      new Promise(resolve => {
-        finishScan = resolve;
-      })
-    );
+    const finishScan = deferScan(scan);
     let settled = false;
     const pending = run(true).finally(() => {
       settled = true;
     });
     const rejected = expect(pending).rejects.toMatchObject({ _tag: 'UiRequestCancelled' });
-    await new Promise<void>(resolve => setImmediate(resolve));
+    await flush();
     controller.abort();
-    await new Promise<void>(resolve => setImmediate(resolve));
+    await flush();
     expect(settled).toBe(false);
     finishScan([usbCandidate]);
     await rejected;
@@ -116,7 +118,7 @@ describe('SDK-owned BLE binding discovery', () => {
   it('streams from an empty initial snapshot and still requires explicit selection', async () => {
     const { run, requests, select, registry } = setup();
     const pending = run();
-    await new Promise<void>(resolve => setImmediate(resolve));
+    await flush();
     expect(requests[0].devices).toEqual([]);
     expect(requests[1].devices).toEqual([candidate]);
     expect(requests[0].requestId).toBe(requests[1].requestId);
@@ -128,20 +130,15 @@ describe('SDK-owned BLE binding discovery', () => {
 
   it('does not race a connection against an in-flight discovery', async () => {
     const { run, requests, scan, select } = setup([candidate]);
-    let finishScan!: (devices: DeviceInfo[]) => void;
-    scan.mockReturnValue(
-      new Promise(resolve => {
-        finishScan = resolve;
-      })
-    );
+    const finishScan = deferScan(scan);
     let selected = false;
     const pending = run().then(result => {
       selected = true;
       return result;
     });
-    await new Promise<void>(resolve => setImmediate(resolve));
+    await flush();
     select(requests[0].requestId);
-    await new Promise<void>(resolve => setImmediate(resolve));
+    await flush();
     expect(selected).toBe(false);
     finishScan([candidate]);
     await expect(pending).resolves.toMatchObject({ device: candidate });
@@ -152,7 +149,7 @@ describe('SDK-owned BLE binding discovery', () => {
     const { run, requests, scan, select } = setup([candidate]);
     scan.mockResolvedValue([]);
     const pending = run();
-    await new Promise<void>(resolve => setImmediate(resolve));
+    await flush();
     expect(requests[1].devices).toEqual([]);
     select(requests[0].requestId);
     await expect(pending).resolves.toMatchObject({ device: candidate });
@@ -162,7 +159,7 @@ describe('SDK-owned BLE binding discovery', () => {
     const { run, controller, registry, scan } = setup();
     const pending = run();
     const rejected = expect(pending).rejects.toMatchObject({ _tag: 'UiRequestCancelled' });
-    await new Promise<void>(resolve => setImmediate(resolve));
+    await flush();
     controller.abort();
     await rejected;
     expect(registry.hasPending()).toBe(false);

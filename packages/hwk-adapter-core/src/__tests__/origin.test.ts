@@ -7,36 +7,24 @@ import {
 } from '../types/errors';
 
 describe('defaultOriginForCode', () => {
-  it('labels device verdicts as device, wherever their code range sits', () => {
-    // UserRejected lives in the generic 10000s range — the range alone would
-    // misfile it. The table exists precisely because ranges cannot be trusted.
-    expect(defaultOriginForCode(HardwareErrorCode.UserRejected)).toBe('device');
-    expect(defaultOriginForCode(HardwareErrorCode.DeviceLocked)).toBe('device');
-    expect(defaultOriginForCode(HardwareErrorCode.DeviceMismatch)).toBe('device');
-    expect(defaultOriginForCode(HardwareErrorCode.WrongApp)).toBe('device');
-    // Every chain-APDU code is the on-device app answering.
-    expect(defaultOriginForCode(HardwareErrorCode.EvmBlindSigningRequired)).toBe('device');
-  });
-
-  it('labels pipe failures as transport', () => {
-    expect(defaultOriginForCode(HardwareErrorCode.DeviceNotFound)).toBe('transport');
-    expect(defaultOriginForCode(HardwareErrorCode.DeviceDisconnected)).toBe('transport');
-    expect(defaultOriginForCode(HardwareErrorCode.BleConnectFailed)).toBe('transport');
-  });
-
-  it('labels host-environment refusals as host — including the one parked in the transport range', () => {
-    expect(defaultOriginForCode(HardwareErrorCode.DevicePermissionDenied)).toBe('host');
-    expect(defaultOriginForCode(HardwareErrorCode.UserAborted)).toBe('host');
-    expect(defaultOriginForCode(HardwareErrorCode.InvalidParams)).toBe('host');
-  });
-
-  it('refuses to guess for genuinely ambiguous codes', () => {
-    // A timeout can be a human not pressing confirm OR a dead pipe; Unknown is
-    // unknown. Returning undefined forces consumers onto their explicit
-    // fallbacks instead of a confident mislabel.
-    expect(defaultOriginForCode(HardwareErrorCode.OperationTimeout)).toBeUndefined();
-    expect(defaultOriginForCode(HardwareErrorCode.UnknownError)).toBeUndefined();
-    expect(defaultOriginForCode(HardwareErrorCode.DeviceBusy)).toBeUndefined();
+  // UserRejected and DevicePermissionDenied sit in ranges that would misfile them.
+  it.each([
+    [HardwareErrorCode.UserRejected, 'device'],
+    [HardwareErrorCode.DeviceLocked, 'device'],
+    [HardwareErrorCode.DeviceMismatch, 'device'],
+    [HardwareErrorCode.WrongApp, 'device'],
+    [HardwareErrorCode.EvmBlindSigningRequired, 'device'],
+    [HardwareErrorCode.DeviceNotFound, 'transport'],
+    [HardwareErrorCode.DeviceDisconnected, 'transport'],
+    [HardwareErrorCode.BleConnectFailed, 'transport'],
+    [HardwareErrorCode.DevicePermissionDenied, 'host'],
+    [HardwareErrorCode.UserAborted, 'host'],
+    [HardwareErrorCode.InvalidParams, 'host'],
+    [HardwareErrorCode.OperationTimeout, undefined],
+    [HardwareErrorCode.UnknownError, undefined],
+    [HardwareErrorCode.DeviceBusy, undefined],
+  ] as const)('labels error %s as %s', (code, origin) => {
+    expect(defaultOriginForCode(code)).toBe(origin);
   });
 });
 
@@ -63,12 +51,16 @@ describe('hardware recovery metadata', () => {
   });
 
   it('lets runtime-specific adapter knowledge override the default', () => {
+    // Must differ from TransportError's default scope, or a fallthrough would also pass.
+    expect(defaultRecoveryForCode(HardwareErrorCode.TransportError)).toEqual({
+      scope: 'operation',
+    });
     const error = createHwkError({
       code: HardwareErrorCode.TransportError,
-      message: 'session survived a transient connector error',
-      recovery: { scope: 'operation' },
+      message: 'retry only this call',
+      recovery: { scope: 'call' },
     });
 
-    expect(error.recovery).toEqual({ scope: 'operation' });
+    expect(error.recovery).toEqual({ scope: 'call' });
   });
 });

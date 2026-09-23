@@ -1,10 +1,6 @@
 import { HardwareErrorCode } from '../types/errors';
 import { failure, success } from '../types/response';
-import {
-  hasHardwareRuntimeIdPrefix,
-  isHardwareOperationId,
-  parseHardwareRuntimeId,
-} from './hardwareRuntimeId';
+import { hasHardwareRuntimeIdPrefix, parseHardwareRuntimeId } from './hardwareRuntimeId';
 
 import type { VendorType } from '../types/device';
 import type { Response } from '../types/response';
@@ -25,37 +21,30 @@ export function resolveHardwareOperationTarget(
   commonOperationId: string | null | undefined,
   expectedVendor?: VendorType
 ): Response<HardwareOperationTarget> {
-  const normalizedPositionalTargetId = positionalTargetId ?? undefined;
-  const normalizedCommonOperationId = commonOperationId || undefined;
-  const positionalOperationId = isHardwareOperationId(normalizedPositionalTargetId)
-    ? normalizedPositionalTargetId
-    : undefined;
-  const parsedPositionalTarget = parseHardwareRuntimeId(normalizedPositionalTargetId);
-  const parsedCommonOperation = parseHardwareRuntimeId(normalizedCommonOperationId);
+  const targetId = positionalTargetId ?? undefined;
+  const commonId = commonOperationId || undefined;
+  const parsedTarget = parseHardwareRuntimeId(targetId);
+  const parsedCommon = parseHardwareRuntimeId(commonId);
+  const positionalOperationId = parsedTarget?.kind === 'operation' ? targetId : undefined;
 
-  if (
-    normalizedPositionalTargetId &&
-    hasHardwareRuntimeIdPrefix(normalizedPositionalTargetId) &&
-    !parsedPositionalTarget
-  ) {
+  if (hasHardwareRuntimeIdPrefix(targetId) && !parsedTarget) {
     return failure(HardwareErrorCode.InvalidParams, 'Invalid hardware operation target id');
   }
 
-  if (parsedPositionalTarget?.kind === 'link') {
+  if (parsedTarget?.kind === 'link') {
     return failure(
       HardwareErrorCode.InvalidParams,
       'Hardware transport link id cannot be used as an operation target'
     );
   }
 
-  if (normalizedCommonOperationId && parsedCommonOperation?.kind !== 'operation') {
+  if (commonId && parsedCommon?.kind !== 'operation') {
     return failure(HardwareErrorCode.InvalidParams, 'Invalid hardware operation id');
   }
 
   if (
     expectedVendor &&
-    ((parsedPositionalTarget && parsedPositionalTarget.vendor !== expectedVendor) ||
-      (parsedCommonOperation && parsedCommonOperation.vendor !== expectedVendor))
+    [parsedTarget, parsedCommon].some(parsed => parsed && parsed.vendor !== expectedVendor)
   ) {
     return failure(
       HardwareErrorCode.InvalidParams,
@@ -63,20 +52,13 @@ export function resolveHardwareOperationTarget(
     );
   }
 
-  if (
-    positionalOperationId &&
-    normalizedCommonOperationId &&
-    positionalOperationId !== normalizedCommonOperationId
-  ) {
+  if (positionalOperationId && commonId && positionalOperationId !== commonId) {
     return failure(HardwareErrorCode.InvalidParams, 'Conflicting hardware operation ids', {
       positionalOperationId,
-      commonOperationId: normalizedCommonOperationId,
+      commonOperationId: commonId,
     });
   }
 
-  const operationId = normalizedCommonOperationId ?? positionalOperationId;
-  return success({
-    operationId,
-    targetId: operationId ?? normalizedPositionalTargetId,
-  });
+  const operationId = commonId ?? positionalOperationId;
+  return success({ operationId, targetId: operationId ?? targetId });
 }

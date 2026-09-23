@@ -110,9 +110,9 @@ export class UiRequestRegistry {
         : undefined;
     // A late response must not resolve (or cancel) a newer request of the same type.
     if (entry.requestId !== undefined && response?.requestId !== entry.requestId) return;
+    clearTimeout(entry.timer);
+    this.pending.delete(requestType);
     if (requestType === UI_REQUEST.REQUEST_SELECT_DEVICE && response?.cancelled === true) {
-      clearTimeout(entry.timer);
-      this.pending.delete(requestType);
       entry.reject(
         createHwkError({
           code: HardwareErrorCode.UserAborted,
@@ -122,17 +122,12 @@ export class UiRequestRegistry {
       );
       return;
     }
-
-    clearTimeout(entry.timer);
-    this.pending.delete(requestType);
     entry.resolve(payload);
   }
 
   /**
-   * Cancel pending waiters. Each argument narrows what is reached: no argument
-   * at all rejects every waiter and belongs to teardown, while an `operationId`
-   * alone rejects only the prompts that operation opened and leaves another
-   * operation's PIN or QR wait untouched.
+   * Each argument narrows the cancel: none rejects every waiter (teardown); an `operationId` alone
+   * rejects only that operation's prompts and leaves another operation's PIN or QR wait untouched.
    */
   cancel(requestType?: string, requestId?: string, operationId?: string): void {
     const reject = (type: string, entry: PendingEntry) => {
