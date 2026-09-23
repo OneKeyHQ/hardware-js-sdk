@@ -12,6 +12,7 @@ import {
 import { LedgerAdapter } from '../adapter/LedgerAdapter';
 import { ERROR_TAG } from '../errors';
 import { ledgerQueueKey } from '../utils/queueKey';
+import { onSdkEvent } from '../utils/sdkEventBus';
 
 import type {
   ConnectorDevice,
@@ -2193,6 +2194,31 @@ describe('LedgerAdapter', () => {
       );
       expect(connector.disconnect).toHaveBeenCalledWith('session-abc');
     });
+  });
+
+  it('keeps Zcash viewing keys out of the response log', async () => {
+    const logs: string[] = [];
+    const stop = onSdkEvent(event => logs.push(event.message));
+    try {
+      await adapter.connectDevice('dev-1');
+      connector.callImpl.mockResolvedValue({
+        path: "m/32'/133'/0'",
+        mode: 'ufvk',
+        ufvk: 'uview1-secret-viewing-key',
+      });
+      const result = await adapter.zcashGetFullViewingKey('dev-1', '', {
+        path: "m/32'/133'/0'",
+        mode: 'ufvk',
+      });
+      expect(result).toMatchObject({
+        success: true,
+        payload: { ufvk: 'uview1-secret-viewing-key' },
+      });
+      expect(logs.some(message => message.includes('zcashGetFullViewingKey'))).toBe(true);
+      expect(logs.some(message => message.includes('uview1-secret-viewing-key'))).toBe(false);
+    } finally {
+      stop();
+    }
   });
 
   describe('cancel', () => {

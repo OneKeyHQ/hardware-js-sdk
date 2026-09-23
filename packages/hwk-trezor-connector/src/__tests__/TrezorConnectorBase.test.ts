@@ -3849,9 +3849,10 @@ describe('TrezorConnectorBase', () => {
     await expect(pairingPromise).resolves.toEqual({ tag: '123456' });
   });
 
-  test('replaces a rejected THP credential with the authoritative list', async () => {
+  test('drops a rejected THP credential and keeps other devices credentials', async () => {
     const staleCredential = { credential: 'stale' };
     const freshCredential = { credential: 'fresh' };
+    const otherDeviceCredential = { credential: 'other-device' };
     let capturedThp: TrezorThpSessionOptions | undefined;
     const onPairingCredentialsChanged = jest.fn();
 
@@ -3860,7 +3861,7 @@ describe('TrezorConnectorBase', () => {
         super({
           connectionType: 'ble',
           thp: {
-            knownCredentials: [staleCredential],
+            knownCredentials: [staleCredential, otherDeviceCredential],
             onPairingCredentialsChanged,
           },
           deviceSessionFactory: ({ thp }) => {
@@ -3887,11 +3888,18 @@ describe('TrezorConnectorBase', () => {
     const connector = new CredentialConnector();
     await connector.connect('device-1');
 
-    expect(capturedThp?.knownCredentials).toEqual([staleCredential]);
+    expect(capturedThp?.knownCredentials).toEqual([staleCredential, otherDeviceCredential]);
+    // Handshake: the device rejected its stored credential.
+    await capturedThp?.onPairingCredentialsChanged?.({
+      credentials: [],
+      removed: [staleCredential],
+    });
+    expect(capturedThp?.knownCredentials).toEqual([otherDeviceCredential]);
+    // Pairing: core reports only the new credential for this device.
     await capturedThp?.onPairingCredentialsChanged?.({ credentials: [freshCredential] });
 
-    expect(capturedThp?.knownCredentials).toEqual([freshCredential]);
-    expect(onPairingCredentialsChanged).toHaveBeenCalledWith({
+    expect(capturedThp?.knownCredentials).toEqual([otherDeviceCredential, freshCredential]);
+    expect(onPairingCredentialsChanged).toHaveBeenLastCalledWith({
       credentials: [freshCredential],
     });
   });

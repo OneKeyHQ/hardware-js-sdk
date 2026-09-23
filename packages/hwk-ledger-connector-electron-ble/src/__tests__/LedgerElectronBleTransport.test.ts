@@ -257,6 +257,20 @@ describe('Ledger Electron BLE lifecycle', () => {
     expect(bridge.disconnect).toHaveBeenCalledTimes(1);
   });
 
+  it('lets an exchange without a caller timeout wait for the user, until the link drops', async () => {
+    const { connect, disconnects } = fixture();
+    const connected = (await connect()).unsafeCoerce();
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+    try {
+      const pending = connected.sendApdu(Uint8Array.of(0), false);
+      expect(setTimeoutSpy).not.toHaveBeenCalled();
+      disconnects.forEach(handler => handler('ledger-test'));
+      expect((await pending).isLeft()).toBe(true);
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+  });
+
   it('forwards cancelPairing to the bridge only for connects still in flight', async () => {
     const { transport, connect, bridge } = fixture();
     const cancelPairing = jest.fn(async (): Promise<void> => undefined);

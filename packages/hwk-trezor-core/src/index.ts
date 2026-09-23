@@ -504,7 +504,10 @@ export type TrezorThpSessionOptions = {
    * it back via `knownCredentials` on the next connect to skip pairing UX.
    */
   onPairingCredentialsChanged?: (payload: {
+    /** This device's credentials only, never other devices'. */
     credentials: TrezorThpCredentials[];
+    /** Credentials the device rejected; a host keeping one list for all devices drops these. */
+    removed?: TrezorThpCredentials[];
   }) => Promise<void> | void;
   logger?: TrezorDebugLogger;
 };
@@ -1118,6 +1121,7 @@ class TrezorThpSession {
       this.thpState.removePairingCredential(handshakeCredentials.credentials);
       await this.options.onPairingCredentialsChanged?.({
         credentials: this.thpState.pairingCredentials as TrezorThpCredentials[],
+        removed: [handshakeCredentials.credentials as TrezorThpCredentials],
       });
     }
 
