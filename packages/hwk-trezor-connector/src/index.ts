@@ -814,11 +814,11 @@ export abstract class TrezorConnectorBase implements IConnector {
         // A multi-step confirmation answers one button with the next one;
         // report completion only once the device leaves confirmation.
         if (payload.responseType === 'ButtonRequest') return;
+        // Empty sessionId, the untargeted form: calls are serialized, so this
+        // ends the one prompt on screen, and button prompts have no owner.
         this.emit('ui-event', {
           type: EConnectorInteraction.InteractionComplete,
-          payload: {
-            sessionId: device.connectId,
-          },
+          payload: { sessionId: '' },
         });
       },
       onPinMatrixRequest: async payload => {
