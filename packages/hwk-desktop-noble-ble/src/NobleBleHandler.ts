@@ -27,11 +27,8 @@ export interface NobleLike {
   stopScanningAsync(): Promise<void>;
   stop?(): void;
   /**
-   * Connect by id/address with NO scan. Both native backends support this and
-   * emit a `discover` for the peripheral as a side effect: Windows synthesizes
-   * one for an unknown address (`BLEManager::Connect`, lib/win/src/ble_manager.cc)
-   * and macOS resolves it via `retrievePeripheralsWithIdentifiers`
-   * (lib/mac/src/ble_manager.mm). Optional so a stub noble can omit it.
+   * Connect by id with no scan; both backends emit `discover` as a side effect
+   * (win `BLEManager::Connect`, mac `retrievePeripheralsWithIdentifiers`).
    */
   connectAsync?(idOrAddress: string): Promise<NoblePeripheralLike | undefined>;
   cancelConnect?(idOrAddress: string): void;
@@ -40,9 +37,8 @@ export interface NobleLike {
 
 export interface NoblePeripheralLike {
   id: string;
-  // The full noble advertisement. We capture every field noble surfaces so
-  // the host can hunt for a cross-transport identity (e.g. a device serial
-  // baked into manufacturerData) without another scan.
+  // Every advertisement field, so the host can look for a cross-transport
+  // identity (e.g. a serial in manufacturerData) without another scan.
   advertisement: {
     localName?: string;
     serviceUuids?: string[];
@@ -114,11 +110,8 @@ interface DeviceEntry {
 const normalizeUuid = (uuid: string): string => uuid.replace(/-/g, '').toLowerCase();
 
 /**
- * Does this advertisement belong to the vendor that asked? Stands in for the
- * service-UUID scan filter, which we cannot use (see `scan`). The criteria are
- * supplied by the caller, so no vendor knowledge lives here: a peripheral
- * matches on an advertised service UUID, or on a local name that satisfies
- * every name pattern.
+ * Matches a peripheral against caller-supplied criteria (service UUID or every
+ * name pattern), standing in for the scan filter we cannot use (see `scan`).
  */
 const matchesPeripheral = (p: NoblePeripheralLike, match?: ElectronBleMatch): boolean => {
   if (!match) return false;
@@ -137,12 +130,7 @@ const matchesPeripheral = (p: NoblePeripheralLike, match?: ElectronBleMatch): bo
   return match.namePatterns.every(pattern => new RegExp(pattern, 'i').test(name));
 };
 
-/**
- * Map a noble peripheral to the serializable info we ship over IPC. Buffers
- * are hex-encoded so they survive the structured-clone boundary, and every
- * advertisement field is forwarded — the renderer/connector decides which
- * one is a usable cross-transport identity.
- */
+/** Hex-encodes buffers so the info survives the IPC structured clone. */
 const peripheralToInfo = (p: NoblePeripheralLike): ThirdPartyBleDeviceInfo => {
   const adv = p.advertisement ?? {};
   return {
@@ -167,19 +155,14 @@ const peripheralToInfo = (p: NoblePeripheralLike): ThirdPartyBleDeviceInfo => {
   };
 };
 
-/**
- * Sleep helper without taking a dep on timers/promises. Microtask-friendly.
- */
 const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
 // Radio-settle wait between stopping the scan and opening a GATT connection.
 const BLE_CONNECT_SETTLE_MS = 300;
-// Hard cap on the connect — noble has none, so a stale bond hangs forever
-// without this. Set to the Bluetooth SMP (Security Manager) pairing timeout
-// (30s, the OS pairing dialog's own limit) + 1s, so a real first-time pairing
-// is never cut off before the system itself gives up.
+// noble has no connect timeout. SMP pairing timeout (30s, the OS dialog's
+// limit) + 1s, so a first-time pairing is never cut off before the OS gives up.
 const BLE_CONNECT_TIMEOUT_MS = 31_000;
-// Cap on a cleanup disconnectAsync — it hangs on a just-failed connect.
+// Cap on a cleanup disconnectAsync, which hangs on a just-failed connect.
 const BLE_DISCONNECT_TIMEOUT_MS = 2_000;
 
 /** Floor between noble rebuilds, so a persistent failure can't thrash. */
@@ -193,12 +176,7 @@ export interface NobleBleHandlerOptions {
   logger?: BleDebugLogger;
 }
 
-/**
- * Core BLE logic, decoupled from Electron's IPC layer so it can be unit
- * tested with a fake noble. Mirrors the OneKey `noble-ble-handler.ts`
- * pattern (a single class that owns the peripheral cache + disconnect
- * callbacks), but trimmed to the minimum surface we expose.
- */
+/** Noble BLE logic decoupled from Electron IPC, so tests can use a fake noble. */
 export class NobleBleHandler {
   private _noble: NobleLike | undefined;
 
@@ -254,9 +232,6 @@ export class NobleBleHandler {
   private _nativeReleased = false;
 
   private _lastNobleRecoverAt?: number;
-
-  /** The connect currently in flight, so cancelPairing can abandon it. */
-  private _activeConnect?: { id: string; abandon: (error: Error) => void };
 
   constructor(options: NobleBleHandlerOptions = {}) {
     this._factory = options.nobleFactory ?? DEFAULT_NOBLE_FACTORY;
@@ -315,21 +290,20 @@ export class NobleBleHandler {
   }
 
   /**
-   * Lazy-start a continuous scan and return the current snapshot immediately.
-   *
-   * Scans UNFILTERED and applies the caller's match criteria in `_snapshot()` instead. A
-   * service-UUID filter cannot be used here: noble's Windows backend applies it
-   * per RECEIVED PACKET (`BLEManager::OnScanResult`, lib/win/src/ble_manager.cc),
-   * and a Safe 7's ADV packet carries only its name — the service UUID lives in
-   * the scan response, which arrives as a separate, irregularly-timed event. So
-   * a filtered scan drops every ADV packet and the device appears to be
-   * undiscoverable for minutes at a time while it is plainly on air. (OneKey's
-   * own devices do advertise their service UUID, which is why the same filter is
-   * safe in `hd-transport-electron` and was copied here by mistake.)
+   * Lazy-start an unfiltered scan and return the current snapshot. noble-win filters per
+   * packet, and a Safe 7 ADV carries only its name (UUID is in the scan response).
    */
   async scan(options?: ElectronBleScanOptions): Promise<ThirdPartyBleDeviceInfo[]> {
-    await this.init();
+    // Claim before init: a stopScan/cancelPairing during the power-on wait must
+    // find this owner, or the scan revives once the adapter powers on.
     this._scanOwners.add(options?.vendor);
+    try {
+      await this.init();
+    } catch (error) {
+      this._scanOwners.delete(options?.vendor);
+      throw error;
+    }
+    if (!this._scanOwners.has(options?.vendor)) return [];
     try {
       await this._setScanning(true);
     } catch (error) {
@@ -339,13 +313,9 @@ export class NobleBleHandler {
     this._assertActive();
     this._armIdleStop();
     const devices = this._snapshot(options);
-    // raw vs kept. An empty result now has two very different causes and the log
-    // must say which: raw=0 means nothing is on air at all (radio, or the device
-    // simply is not advertising); raw>0 with kept=0 means WE are dropping it —
-    // the caller's match criteria are wrong. Without this the two look identical.
+    // raw=0: nothing on air; raw>0: the match criteria dropped it. Counts only,
+    // so bystanders' devices from the unfiltered scan stay out of support logs.
     if (devices.length === 0) {
-      // Counts only: the scan is unfiltered, so naming what it saw would put
-      // bystanders' devices in a log the user hands to support.
       this._log('warn', 'scan.empty', {
         raw: this._discovered.size,
         kept: 0,
@@ -356,17 +326,12 @@ export class NobleBleHandler {
   }
 
   /**
-   * Current in-range devices for the asking vendor, dropping any that aged past
-   * the liveness TTL. The match test replaces the service-UUID scan filter we cannot use
-   * (see `scan`): it matches the name from the ADV packet, or the service UUID
-   * once a scan response has merged into the same peripheral.
-   *
-   * Note the TTL only prunes what the CALLER sees. `_discovered` is a cache, not
-   * the source of truth for reachability — a device missing from here can still
-   * be connected to by id (`_directConnect`).
+   * In-range devices matching the caller, minus TTL-expired ones. `_discovered`
+   * is only a cache; a missing device can still be reached by `_directConnect`.
    */
   private _snapshot(options?: ElectronBleScanOptions): ThirdPartyBleDeviceInfo[] {
     const now = Date.now();
+    const match = options?.match ?? { serviceUuids: options?.serviceUuids };
     const result: ThirdPartyBleDeviceInfo[] = [];
     for (const [id, peripheral] of this._discovered) {
       if (now - (this._lastSeen.get(id) ?? 0) > THIRD_PARTY_BLE_DEVICE_TTL_MS) {
@@ -374,16 +339,11 @@ export class NobleBleHandler {
         this._lastSeen.delete(id);
         continue;
       }
-      const match = options?.match ?? { serviceUuids: options?.serviceUuids };
       if (!matchesPeripheral(peripheral, match)) continue;
       result.push(peripheralToInfo(peripheral));
     }
-    // A device WE hold a link to stops advertising (standard BLE), so it ages
-    // out of the scan cache above within the TTL — exactly while keep-alive
-    // holds the link for up to minutes. Without this merge, the one device the
-    // user is actively using vanishes from the device list. Field-verified:
-    // pairing/THP handshake alone does NOT silence a Safe 7; holding the
-    // connection does.
+    // A linked device stops advertising and ages out above, so merge held links
+    // back in (field-verified on Safe 7: holding the link silences it).
     for (const [id, entry] of this._connected) {
       if (entry.vendor !== options?.vendor) continue;
       if (result.some(info => info.id === id)) continue;
@@ -401,12 +361,8 @@ export class NobleBleHandler {
   }
 
   /**
-   * Rebuild noble when its adapter state is stuck. Re-enumerating the Windows
-   * BLE stack (pairing, or removing the device from OS settings) can catch
-   * noble's RadioWatcher mid-churn: it latches `unsupported` and never
-   * re-evaluates, so every later scan fails until the process restarts. Fresh
-   * bindings restart that watcher, which is the in-process equivalent of the
-   * app restart that is otherwise the only cure.
+   * Rebuild noble when Windows BLE re-enumeration latched its RadioWatcher at
+   * `unsupported`; fresh bindings restart the watcher without an app restart.
    */
   private async _recoverNobleIfStuck(reason: string): Promise<void> {
     if (this._disposed) return;
@@ -432,10 +388,8 @@ export class NobleBleHandler {
       if (previous && this._discoverHandler) {
         previous.removeListener('discover', this._discoverHandler);
       }
-      // The default factory returns noble's module singleton — the very object
-      // that is stuck — so rebuilding needs `withBindings()`, which mints a new
-      // instance (and with it a new RadioWatcher). Injected factories are
-      // assumed to already hand back a fresh instance.
+      // The default factory returns the stuck module singleton; `withBindings()`
+      // mints a new instance. Injected factories are assumed to return fresh ones.
       const fresh = this._createFreshNoble();
       this._noble = fresh;
       this._nobleInstances.add(fresh);
@@ -527,12 +481,7 @@ export class NobleBleHandler {
     return peripheralToInfo(p);
   }
 
-  /**
-   * Read the current RSSI (in dBm) for a connected peripheral. Requires
-   * the device to be connected — noble can't read RSSI off a scan-only
-   * peripheral. Falls back to the cached scan-time rssi when the noble
-   * peripheral doesn't expose updateRssiAsync.
-   */
+  /** Live RSSI (dBm) of a connected peripheral, else the cached scan-time value. */
   async readRssi(id: string): Promise<number> {
     const entry = this._requireEntry(id);
     if (entry.peripheral.updateRssiAsync) {
@@ -548,8 +497,15 @@ export class NobleBleHandler {
       (vendor === options.vendor && (options.id === undefined || id === options.id));
     for (const attempt of this._connectAttempts) {
       if (!matches(attempt.id, attempt.vendor)) continue;
-      if (this._activeConnect === attempt) this._activeConnect = undefined;
       attempt.abandon(new Error(`connect cancelled: ${attempt.id}`));
+      try {
+        attempt.cancelNative();
+      } catch (error) {
+        this._log('warn', 'cancelPairing.cancelConnect.error', {
+          id: attempt.id,
+          error: String(error),
+        });
+      }
     }
     if (options?.id === undefined) await this.stopScan(options?.vendor);
     for (const [id, entry] of this._connected) {
@@ -558,15 +514,8 @@ export class NobleBleHandler {
   }
 
   /**
-   * Scan for a specific peripheral id and resolve THE MOMENT it's discovered,
-   * releasing only its own scan ownership (don't wait out the full window). The fast
-   * reconnect path for a stored connectId when the device IS advertising.
-   *
-   * This used to be the only reconnect path, on two assumptions that are both
-   * false: that noble cannot connect by id without a scan (it can — see
-   * `_directConnect`), and that "the device advertises continuously" (a bonded
-   * Safe 7 does not — it holds the link and goes silent). Callers must fall
-   * back to `_directConnect` when this returns undefined.
+   * Scan until `id` is discovered, releasing only its own scan ownership. A
+   * bonded Safe 7 goes silent, so callers fall back to `_directConnect`.
    */
   private async _scanUntilFound(
     id: string,
@@ -610,54 +559,30 @@ export class NobleBleHandler {
   }
 
   /**
-   * Connect by id with no scan and no advertisement.
-   *
-   * This is the ONLY path that reaches a device which is connected but silent.
-   * A linked peripheral stops advertising while it HOLDS A LINK (standard BLE; a Safe 7's
-   * screen says "wait connection") — field-verified: bonding/THP handshake
-   * alone does NOT silence it, holding the connection does. So while a link is
-   * up, no amount of scanning will rediscover it — `_scanUntilFound` alone
-   * dead-ends with "device not found" on a device that is sitting right there,
-   * connected and reachable.
-   *
-   * noble supports this: `noble.connectAsync(id)` needs no prior `discover`,
-   * because both native backends materialize the peripheral themselves (Windows
-   * synthesizes one for an unknown address, macOS retrieves it by identifier)
-   * and then emit a `discover`, which our own handler turns back into a
-   * `_discovered` entry. OneKey's own noble handler calls this "direct
-   * connection mode"; Trezor Suite's equivalent is asking the adapter for its
-   * peripheral list instead of keeping a cache.
-   *
-   * Returns undefined (not throw) so the caller reports the normal
-   * "device not found" rather than a confusing noble-internal error.
+   * Connect by id without advertisement: the only route to a linked, silent device.
+   * Returns undefined instead of throwing so the caller reports "device not found".
    */
   private async _directConnect(id: string): Promise<NoblePeripheralLike | undefined> {
     const noble = this._requireNoble();
     if (typeof noble.connectAsync !== 'function') {
-      // An old/stub noble. Say so explicitly — otherwise this is indistinguishable
-      // in the log from "the device wasn't there", which is a different problem.
+      // Distinguishes a stub noble from "the device wasn't there" in the log.
       this._log('warn', 'connect.direct.unavailable', { id });
       return undefined;
     }
-    // warn, not info: this call is the load-bearing assumption of the whole fix —
-    // that noble can still reach a bonded device which has STOPPED ADVERTISING.
-    // It has never been proven against real hardware, so it must always be in the
-    // log, not only when debug logging happens to be on.
+    // warn, not info: reaching a silent bonded device this way is unproven on
+    // real hardware, so it must always be logged.
     this._log('warn', 'connect.direct.start', { id });
     const startedAt = Date.now();
     try {
-      // Bounded by the overall connect timeout in `connect()` — noble itself has
-      // none, and the macOS backend silently never resolves when it cannot
-      // retrieve the peripheral.
+      // Bounded by the connect() timeout; noble-mac never resolves when it
+      // cannot retrieve the peripheral.
       const peripheral = await noble.connectAsync(id);
       const resolved = peripheral ?? this._discovered.get(id);
       this._log('warn', 'connect.direct.done', {
         id,
         elapsedMs: Date.now() - startedAt,
         found: Boolean(resolved),
-        // The one field that says whether the fix actually worked: an open link,
-        // or merely an object. Anything other than 'connected' is a failure that
-        // would otherwise surface later as a confusing service-discovery error.
+        // Anything but 'connected' later surfaces as a service-discovery error.
         state: resolved?.state,
         fromNoble: Boolean(peripheral),
       });
@@ -672,9 +597,8 @@ export class NobleBleHandler {
     }
   }
 
-  // noble's disconnectAsync hangs on a peripheral whose connect just failed (it
-  // waits for a CoreBluetooth disconnect event that never comes); bound it so a
-  // cleanup disconnect can't hang the connect flow.
+  // noble's disconnectAsync hangs after a failed connect (CoreBluetooth never
+  // sends the disconnect event), so bound it.
   private async _safeDisconnect(peripheral: NoblePeripheralLike): Promise<void> {
     if (this._nativeReleased) return;
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -690,11 +614,8 @@ export class NobleBleHandler {
     }
   }
 
-  // noble has no connect timeout, so a stale bond hangs anywhere — connectAsync
-  // OR the post-connect (encrypted) service discovery. One overall timeout
-  // covers the whole flow. Two distinct failures reach the connector: a `timed
-  // out` reject (device unreachable) vs a connectAsync `connection failed`
-  // reject (link refused / stale bond) — mapped to different error codes there.
+  // One timeout covers connect and service discovery; the connector maps
+  // `timed out` (unreachable) and `connection failed` (stale bond) differently.
   async connect(
     id: string,
     options: ElectronBleConnectOptions
@@ -709,17 +630,10 @@ export class NobleBleHandler {
       throw new Error('Invalid BLE GATT profile');
     }
     this._assertActive();
-    // Promise.race only times out the CALLER — it cannot cancel the in-flight
-    // _connectInner. Native cancellation is handled separately during disposal.
-    // Without the claim token a late
-    // connectAsync success would still discover services and commit to
-    // _connected: an open GATT link nobody owns, and since a linked Safe 7
-    // stops advertising, every retry then dead-ends until app restart. The
-    // token flags the attempt as abandoned so a late success tears the link
-    // down instead of committing it.
+    // Promise.race cannot stop _connectInner; the claim makes a late success tear
+    // its link down instead of committing an unowned one that silences the device.
     const claim: ConnectClaim = { abandoned: false };
-    // The timeout is one way to abandon the attempt; cancelPairing is the other,
-    // so the rejection is hoisted out of the timer and both share it.
+    // Shared by the timeout and cancelPairing.
     let abandon!: (error: Error) => void;
     const abandoned = new Promise<never>((_, reject) => {
       abandon = (error: Error) => {
@@ -739,7 +653,6 @@ export class NobleBleHandler {
       cancelNative: () => claim.cancelNative?.(),
       settled: Promise.resolve<unknown>(undefined),
     };
-    this._activeConnect = attempt;
     this._connectAttempts.add(attempt);
     const nativeOperation = this._connectInner(id, claim, options);
     const caller = (async () => {
@@ -747,16 +660,23 @@ export class NobleBleHandler {
         return await Promise.race([nativeOperation, abandoned]);
       } catch (error) {
         const peripheral = this._discovered.get(id);
-        if (peripheral) await this._safeDisconnect(peripheral);
+        // Tear down only a link nobody owns, same guard as _connectInner.abortIfAbandoned.
+        if (peripheral && !this._connected.has(id)) await this._safeDisconnect(peripheral);
         throw error;
       } finally {
         clearTimeout(timer);
-        if (this._activeConnect === attempt) this._activeConnect = undefined;
       }
     })();
     // A rejected caller can still have a native connect or disconnect in flight.
     attempt.settled = Promise.allSettled([nativeOperation, caller]).finally(() => {
       this._connectAttempts.delete(attempt);
+      // Resume the radio only for a connect-scan (symbol) owner; a vendor's
+      // idle scan owner must not restart it during pairing.
+      const connectScanWaiting = [...this._scanOwners].some(owner => typeof owner === 'symbol');
+      if (connectScanWaiting) {
+        this._armIdleStop();
+        void this._setScanning(true).catch(() => undefined);
+      }
     });
     return caller;
   }
@@ -768,13 +688,11 @@ export class NobleBleHandler {
   ): Promise<{ id: string; name?: string }> {
     let route: 'cache' | 'scan' | 'direct' | 'none' = 'cache';
     let peripheral: NoblePeripheralLike | undefined;
-    // Checked after every await that can outlive the caller's timeout. The
-    // rejection thrown here is unobservable (Promise.race already settled) —
-    // its only job is to stop the flow before it commits an unowned link.
+    // Stops the flow before it commits an unowned link; the rejection itself is
+    // unobservable because Promise.race already settled.
     const abortIfAbandoned = async (stage: string) => {
       if (!claim.abandoned && !this._disposed) return;
-      // Tear down only a link nobody owns: if a previous connect still holds
-      // this id in _connected, its keep-alive timers manage the link.
+      // A link still held in _connected belongs to a previous connect.
       if (peripheral && peripheral.state === 'connected' && !this._connected.has(id)) {
         await this._safeDisconnect(peripheral);
       }
@@ -788,10 +706,6 @@ export class NobleBleHandler {
     await delay(BLE_CONNECT_SETTLE_MS);
     await abortIfAbandoned('settle');
     this._assertActive();
-    // Which of the three routes got us a peripheral is THE diagnostic for this
-    // whole area: a cache hit means the happy path; a scan hit means the device
-    // was still advertising; `direct` means it had gone silent and only
-    // connect-by-id could reach it; `none` means we are back to the old dead end.
     peripheral = this._discovered.get(id);
     if (!peripheral) {
       route = 'scan';
@@ -800,27 +714,14 @@ export class NobleBleHandler {
     }
     if (!peripheral) {
       route = 'direct';
-    }
-    if (!peripheral) {
-      // Last resort, and the only path that works for a bonded-but-silent
-      // device. See _directConnect.
-      //
-      // Deliberately AFTER the scan, even though that costs the full scan window
-      // on this path: macOS's noble backend never resolves connect-by-id for a
-      // peripheral CoreBluetooth cannot retrieve (it drops the failure on the
-      // floor — `NobleMac::Connect`, lib/mac/src/noble_mac.mm), so trying it
-      // first would risk hanging where a scan would simply have found the device.
+      // Deliberately after the scan: noble-mac never resolves connect-by-id for a
+      // peripheral CoreBluetooth cannot retrieve (`NobleMac::Connect`).
       const native = this._requireNoble();
       claim.cancelNative = () => native.cancelConnect?.(id);
       peripheral = await this._directConnect(id);
     }
     if (!peripheral) {
-      // Every route exhausted. Log what we could see, so "device not found" is
-      // never again a dead end with nothing behind it: `discoveredCount` says
-      // whether the scan saw ANY BLE traffic (0 = radio/scan problem) and
-      // `trezorCount` whether the name/uuid filter is rejecting our own device.
-      // Counts only — see scan.empty. The target id is ours to log; the rest of
-      // the unfiltered scan is not.
+      // discoveredCount=0 points at the radio/scan; counts only, see scan.empty.
       this._log('warn', 'connect.notFound', {
         id,
         route: 'none',
@@ -841,7 +742,6 @@ export class NobleBleHandler {
         native.cancelConnect?.(id);
       }
     };
-    // The single line that explains any BLE connect after the fact.
     this._log('warn', 'connect.route', {
       id,
       route,
@@ -854,17 +754,12 @@ export class NobleBleHandler {
     }
 
     try {
-      const uuids = {
-        service: options.serviceUuid,
-        write: options.writeUuid,
-        notify: options.notifyUuid,
-      };
       const { characteristics } = await peripheral.discoverSomeServicesAndCharacteristicsAsync(
-        [uuids.service],
-        [uuids.write, uuids.notify]
+        [options.serviceUuid],
+        [options.writeUuid, options.notifyUuid]
       );
-      const writeUuid = normalizeUuid(uuids.write);
-      const notifyUuid = normalizeUuid(uuids.notify);
+      const writeUuid = normalizeUuid(options.writeUuid);
+      const notifyUuid = normalizeUuid(options.notifyUuid);
       const writeChar = characteristics.find(c => normalizeUuid(c.uuid) === writeUuid);
       const notifyChar = characteristics.find(c => normalizeUuid(c.uuid) === notifyUuid);
       if (!writeChar || !notifyChar) {
@@ -874,9 +769,8 @@ export class NobleBleHandler {
       await abortIfAbandoned('discovery');
 
       const disconnectHandler = () => {
-        // One peripheral object outlives many connections. Only the handler
-        // the current entry owns may act: a handler left over from an earlier
-        // link must not report the current one as unexpectedly dropped.
+        // One peripheral outlives many links; a stale handler must not report
+        // the current link as unexpectedly dropped.
         if (this._connected.get(id)?.disconnectHandler !== disconnectHandler) return;
         this._cleanupDevice(id, /* unexpected */ true);
       };
@@ -893,8 +787,7 @@ export class NobleBleHandler {
       this._log('info', 'connect.done', { id, name: peripheral.advertisement.localName });
       return { id, name: peripheral.advertisement.localName };
     } catch (error) {
-      // Discovery failed after we opened the GATT connection — disconnect it
-      // (bounded) so we don't leak it. Only if this call connected it.
+      // Don't leak a GATT link this call opened.
       if (!wasConnected) await this._safeDisconnect(peripheral);
       throw error;
     }
@@ -949,10 +842,8 @@ export class NobleBleHandler {
     if (!framing) throw new Error(`No BLE write framing recorded for ${id}`);
 
     if (framing.mode === 'raw') {
-      // Framing that carries its own length and sequence; padding corrupts it.
-      // `maxLength` bounds the write without truncating a negotiated frame —
-      // for Ledger the size is negotiated per connection (0x08 handshake) and
-      // reported in a single byte, so 255 is the most that protocol can ask for.
+      // Self-framed, so padding corrupts it. Ledger negotiates the size per link
+      // (0x08 handshake) in one byte, so it never exceeds 255.
       const maxLength = framing.maxLength ?? buffer.length;
       if (!/^(?:[0-9a-f]{2})+$/i.test(hexData) || buffer.length > maxLength) {
         throw new Error(`Invalid BLE frame for ${entry.vendor ?? 'device'}`);
@@ -966,9 +857,8 @@ export class NobleBleHandler {
     for (let offset = 0; offset < buffer.length; offset += chunkSize) {
       this._assertActive();
       const slice = buffer.subarray(offset, offset + chunkSize);
-      // Padded framing means every packet is the full chunk size, zero-filled.
-      // Firmware that wants padding silently drops a short final packet → no response →
-      // RetriesExceeded. Matches trezor-suite transport-bluetooth.
+      // Firmware drops a short final packet (then RetriesExceeded), so every chunk
+      // is zero-filled to full size, as in trezor-suite transport-bluetooth.
       const chunk = Buffer.alloc(chunkSize);
       slice.copy(chunk);
       // OneKey uses writeWithResponse for stability; mirror that.
@@ -1047,9 +937,8 @@ export class NobleBleHandler {
   }
 
   /**
-   * Terminal native release, including instances replaced by adapter recovery.
-   * A host sharing Noble must defer stop() until all transports have disposed,
-   * and deduplicate instances passed to releaseNoble across those transports.
+   * Terminal native release, including recovered instances. A host sharing noble
+   * must defer stop() until every transport disposed, and dedupe the instances.
    */
   disposeForAppQuit(
     releaseNoble: (instance: { stop?(): void }) => void = instance => instance.stop?.()
@@ -1086,9 +975,7 @@ export class NobleBleHandler {
     if (entry.notifyChar && entry.notifyHandler) {
       entry.notifyChar.removeListener('data', entry.notifyHandler);
     }
-    // Release this connection's own disconnect listener. Without it the
-    // handler stays attached to a peripheral we no longer hold, and a later
-    // explicit disconnect of the same device is reported as an unexpected one.
+    // Otherwise a later explicit disconnect is reported as unexpected.
     if (entry.disconnectHandler) {
       entry.peripheral.removeListener('disconnect', entry.disconnectHandler);
     }

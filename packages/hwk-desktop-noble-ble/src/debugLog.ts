@@ -10,18 +10,10 @@ export type BleDebugLogEntry = {
 export type BleDebugLogger = (entry: BleDebugLogEntry) => void;
 
 /**
- * Keys whose values never belong in a log. This handler only ever sees
- * transport-level data — device ids, names, counts — but a caller can pass an
- * arbitrary `data` bag, and a raw frame or a pairing secret reaching an
- * on-disk log is not something to leave to caller discipline.
- *
- * The list is deliberately narrow: only real secrets and key material. A BLE
- * transport bug is diagnosed from frames, sizes, states and stacks, so
- * redacting those would trade a leak we do not have for a repro we cannot do.
- * Raw frames (`packetHex`, `hexData`, `payload`) stay: on this handler they
- * are Trezor THP ciphertext or Ledger APDUs, and neither carries a PIN,
- * passphrase or seed — those never leave the device. Add a cleartext protocol
- * here and they move into the redact list.
+ * Keys whose values never belong in a log, kept narrow to real secrets and
+ * key material. Raw frames (`packetHex`, `hexData`, `payload`) stay only because
+ * they are Trezor THP ciphertext or Ledger APDUs; a vendor with a cleartext
+ * protocol must move them into this list.
  */
 const REDACTED_KEYS: ReadonlySet<string> = new Set([
   // Secrets the user types or the device derives.

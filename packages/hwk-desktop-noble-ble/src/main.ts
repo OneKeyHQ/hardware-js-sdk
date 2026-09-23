@@ -54,11 +54,8 @@ const DEFAULT_IPC_MAIN: () => IpcMainLike = () => {
 };
 
 /**
- * Wire a `NobleBleHandler` to Electron's IPC so the renderer can drive BLE
- * via `window.desktopApi.trezorBle`. Call once from the main process after
- * `BrowserWindow` is ready.
- *
- * Call dispose() when retiring a renderer and disposeForAppQuit() before Node teardown.
+ * Wire a `NobleBleHandler` to Electron IPC once `BrowserWindow` is ready. Call dispose()
+ * when retiring a renderer and disposeForAppQuit() before Node teardown.
  */
 export function initThirdPartyBleSupport(
   webContents: WebContentsLike,
