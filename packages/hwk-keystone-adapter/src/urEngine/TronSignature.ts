@@ -10,7 +10,7 @@ import type { DataItemMap } from '@keystonehq/bc-ur-registry';
 
 const { decodeToDataItem } = extend;
 
-/** See `TronSignRequest.ts`'s doc comment — same proven, CBOR-native pair (registry type 5202). */
+/** Response half of the `tron-sign-request` (5201) pair, registry type 5202. */
 const TRON_SIGNATURE_TYPE = new RegistryType('tron-signature', 5202);
 
 enum SignatureKeys {
@@ -47,6 +47,9 @@ export class TronSignature extends RegistryItem {
   static fromDataItem(dataItem: DataItem): TronSignature {
     const map = dataItem.getData() as Record<number, unknown>;
     const signature = map[SignatureKeys.signature] as Buffer;
+    if (!Buffer.isBuffer(signature)) {
+      throw new Error('Keystone tron-signature UR is missing its signature bytes');
+    }
     const requestIdItem = map[SignatureKeys.requestId] as DataItem | undefined;
     const requestId = requestIdItem?.getData() as Buffer | undefined;
     return new TronSignature(signature, requestId);

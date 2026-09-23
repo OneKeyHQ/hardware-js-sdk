@@ -29,16 +29,7 @@ import type {
 } from '@onekeyfe/hwk-adapter-core';
 import type { TransportConfig, TransportHID } from '@keystonehq/hw-transport-usb';
 
-/**
- * Static surface shared by `TransportWebUSB` and `TransportNodeUSB`; the
- * platform-specific transport is injected by `_subpath/*`.
- */
-/**
- * What enumeration can see before the device is opened. WebUSB hands back a
- * `USBDevice`; node-usb's wrapper exposes the same descriptor strings. Every
- * field is optional because a device may simply not publish that string
- * descriptor — read defensively, never assume presence.
- */
+/** Descriptor fields readable before opening; any may be absent if not published. */
 export interface KeystoneUsbDeviceDescriptor {
   serialNumber?: string;
   productName?: string;
@@ -57,16 +48,12 @@ export interface KeystoneUsbDeviceDescriptor {
   deviceProtocol?: number;
 }
 
-/**
- * Enumeration-time display name. The serial is the only other field readable
- * before a device is opened, but it is not printed on the unit or shown in its
- * UI, so appending it cannot help anyone tell two Keystones apart — it only
- * makes the model harder to read.
- */
+/** The serial is not shown on the unit, so it would not help tell two devices apart. */
 function usbDisplayName(device: KeystoneUsbDeviceDescriptor): string {
   return device.productName?.trim() || 'Keystone';
 }
 
+/** Static surface of `TransportWebUSB`/`TransportNodeUSB`, injected by `_subpath/*`. */
 export interface KeystoneUsbTransportStatic {
   connect(config?: TransportConfig): Promise<TransportHID>;
   connectDevice?(
@@ -91,6 +78,11 @@ interface UsbSession {
   dispose(): void;
 }
 
+interface AppConfig {
+  version?: string;
+  mfp?: string;
+}
+
 interface OpenedUsbTransport {
   transport: TransportHID;
   bindSessionId(sessionId: string): void;
@@ -102,7 +94,8 @@ type KeystoneUsbConnectInput =
   | { searchTargetId?: never; expectedMasterFingerprint: string }
   | { searchTargetId?: never; expectedMasterFingerprint?: never };
 
-const DEFAULT_TIMEOUT_MS = 100_000; // SDK's own raw default is 15s ("may need users' action on the device") — too short for real confirmation.
+// The SDK default of 15s is too short for on-device confirmation.
+const DEFAULT_TIMEOUT_MS = 100_000;
 
 const KEYSTONE_PUBLIC_DATA_UR_TYPE = 'qr-hardware-call';
 
@@ -113,9 +106,7 @@ function toUrEncoded(ur: KeystoneUr): string {
 }
 
 function fromUrEncoded(encoded: unknown): KeystoneUr {
-  // Accept either one complete UR or multiple whitespace-separated parts.
-  // The transport owns EAPDU framing; this function only validates and joins
-  // the BC-UR text present in that response.
+  // One complete UR or whitespace-separated parts; EAPDU framing is the transport's job.
   const text = typeof encoded === 'string' ? encoded.trim() : '';
   const parts = text.split(/\s+/).filter(Boolean);
   const decoder = new URDecoder();
@@ -139,9 +130,8 @@ function fromUrEncoded(encoded: unknown): KeystoneUr {
 }
 
 /**
- * `IConnector` for Keystone over USB. Each transport call is its own
- * open/claim/transfer/close cycle, so `connect()` only caches the transport
- * object. `resolveUr` carries the same UR payloads as the QR channel.
+ * Keystone USB `IConnector`. Each transport call is its own open/claim/transfer/close cycle, so
+ * `connect()` only caches the transport object.
  */
 export class KeystoneUsbConnectorBase implements IConnector {
   readonly connectionType = 'usb' as const;
@@ -162,11 +152,10 @@ export class KeystoneUsbConnectorBase implements IConnector {
 
   private activeAvailabilityGeneration: symbol | undefined;
 
-  // Keystone may re-enumerate on the USB bus between public-data exports,
-  // which replaces the physical transport session without starting a new
-  // user operation. Keep this UI-only state at connector lifetime scope so
-  // an internal recovery does not look like another first connection.
-  /** Wallets that already approved a public-data export, keyed by master fingerprint. */
+  /**
+   * Wallets (by mfp) that approved a public-data export. Connector-scoped because the device can
+   * re-enumerate between exports, and that must not re-prompt.
+   */
   private readonly publicDataConfirmedWallets = new Set<string>();
 
   constructor(transportClass: KeystoneUsbTransportStatic, options?: { timeoutMs?: number }) {
@@ -196,20 +185,15 @@ export class KeystoneUsbConnectorBase implements IConnector {
       this._invalidateDiscoverySnapshot();
       this.activeDiscoveryGeneration = discoveryGeneration;
     }
-    // Enumeration throws DOMExceptions whose legacy `.code` collides with the
-    // five-digit HWK range, so it needs the same mapping as every other
-    // transport call here.
+    // Enumeration DOMException codes collide with the HWK range, so map them too.
     let devices: ReadonlyArray<KeystoneUsbDeviceDescriptor>;
     try {
       devices = await this.transportClass.getKeystoneDevices();
     } catch (err) {
       throw mapKeystoneUsbError(err);
     }
-    // No mfp is available without opening+claiming the device. The target id
-    // therefore identifies only this discovery snapshot; wallet identity is
-    // learned and verified after connect. WebUSB can reopen the exact cached
-    // descriptor. Platforms without that ability fail closed for multi-device
-    // selection instead of silently opening a different unit.
+    // Without an mfp before opening, the target id names only this snapshot; platforms that
+    // cannot reopen a cached descriptor fail closed on multi-device selection.
     if (
       (isAvailabilitySearch
         ? this.activeAvailabilityGeneration
@@ -230,10 +214,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
         connectionType: 'usb',
         serialNumber: device.serialNumber,
         capabilities: { persistentDeviceIdentity: false },
-        // Everything enumeration can see, verbatim. Nothing here is normalized
-        // or defaulted: a missing key means the device published no such string
-        // descriptor. Promote a field onto the typed surface above once
-        // something actually consumes it.
+        // Verbatim descriptor fields; a missing key means the device did not publish it.
         raw: {
           serialNumber: device.serialNumber,
           productName: device.productName,
@@ -304,7 +285,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
     }
     let openedTransport: OpenedUsbTransport | undefined;
     try {
-      let config: Awaited<ReturnType<KeystoneUsbConnectorBase['_readAppConfig']>>;
+      let config: AppConfig;
 
       if (expectedMasterFingerprint && !searchTargetId) {
         const availableDevices = await this.transportClass.getKeystoneDevices();
@@ -322,7 +303,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
             | {
                 device: KeystoneUsbDeviceDescriptor;
                 opened: OpenedUsbTransport;
-                config: Awaited<ReturnType<KeystoneUsbConnectorBase['_readAppConfig']>>;
+                config: AppConfig;
               }
             | undefined;
           for (const device of availableDevices) {
@@ -387,12 +368,6 @@ export class KeystoneUsbConnectorBase implements IConnector {
         config = await this._readAppConfig(openedTransport.transport);
       }
 
-      if (!openedTransport) {
-        throw createHwkError({
-          code: HardwareErrorCode.DeviceNotFound,
-          message: 'Keystone USB transport was not opened',
-        });
-      }
       const activeOpenedTransport = openedTransport;
       const { transport } = activeOpenedTransport;
       if (
@@ -435,8 +410,8 @@ export class KeystoneUsbConnectorBase implements IConnector {
   }
 
   private async _openTransport(device?: KeystoneUsbDeviceDescriptor): Promise<OpenedUsbTransport> {
-    // A rejected candidate can keep its USB disconnect listener. Give every
-    // descriptor a separate holder so it cannot retire a later matched session.
+    // A rejected candidate may keep its disconnect listener; a per-descriptor
+    // holder stops it from retiring a later matched session.
     let connectedSessionId: string | undefined;
     const transportConfig: TransportConfig = {
       timeout: this.timeoutMs,
@@ -465,8 +440,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
 
     const runtimeId = parseHardwareRuntimeId(value);
     if (runtimeId) {
-      // Whether this particular target is ours is settled by the snapshot
-      // lookup in `_connectResolved`, not by anything encoded in the id.
+      // Ownership is settled by the snapshot lookup in `_connectResolved`.
       if (runtimeId.kind === 'search-target' && runtimeId.vendor === 'keystone') {
         return { searchTargetId: value };
       }
@@ -499,9 +473,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
     this.sessions.delete(sessionId);
     if (session) {
       session.dispose();
-      // No persistent claim to release (see class doc) — nothing to await
-      // here beyond letting the underlying transport's own per-call close
-      // run its course, which already happened on the last send().
+      // No persistent claim to release; each send() already closed the device.
       this.emitter.emit('device-disconnect', { connectId: sessionId });
     }
     return Promise.resolve();
@@ -533,9 +505,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
           const { urType, urData } = params as KeystoneUr;
           const encoded = toUrEncoded({ urType, urData });
           const isPublicDataRequest = urType === KEYSTONE_PUBLIC_DATA_UR_TYPE;
-          // Public-data export asks for approval once per wallet: internal USB
-          // re-enumeration must not reopen the toast, but a different device
-          // has not approved anything yet. Signing always confirms.
+          // Public-data export prompts once per wallet; signing always prompts.
           const publicDataKey = session.mfp?.toLowerCase() ?? sessionId;
           const shouldShowConfirmation =
             !isPublicDataRequest || !this.publicDataConfirmedWallets.has(publicDataKey);
@@ -565,15 +535,11 @@ export class KeystoneUsbConnectorBase implements IConnector {
             Actions.CMD_CHECK_LOCK_STATUS,
             ''
           );
-          // Naming-only assumption (no positive-case fixture to confirm
-          // against) — `checkDeviceLockStatus`'s own name is the only
-          // evidence `true` means locked; verify against real hardware.
+          // `true` = locked is inferred from the SDK method name only; unverified on hardware.
           return success({ locked: response.payload });
         }
-        case 'getAppConfig': {
-          const config = await this._readAppConfig(session.transport);
-          return success(config);
-        }
+        case 'getAppConfig':
+          return success(await this._readAppConfig(session.transport));
         default:
           return {
             success: false,
@@ -590,16 +556,13 @@ export class KeystoneUsbConnectorBase implements IConnector {
     }
   }
 
-  // No protocol-level cancel exists over USB (verified: nothing in the SDK's
-  // public surface can interrupt an in-flight transferIn/transferOut) — the
-  // best this connector can do is stop waiting on its side; the underlying
-  // `send()` promise still settles (or times out) on its own.
+  // The SDK cannot interrupt an in-flight transfer; the pending send() settles or
+  // times out on its own.
   cancel(_sessionId: string): Promise<void> {
     return Promise.resolve();
   }
 
-  // Keystone USB never relays PIN/passphrase through the host — entry always
-  // happens on the device's own touchscreen — so there is nothing to answer.
+  // PIN/passphrase entry happens on the device touchscreen, never via the host.
   uiResponse(_response: UiResponseEvent): void {}
 
   on<K extends ConnectorEventType>(event: K, handler: (data: ConnectorEventMap[K]) => void): void {
@@ -620,9 +583,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
     this.publicDataConfirmedWallets.clear();
   }
 
-  private async _readAppConfig(
-    transport: TransportHID
-  ): Promise<{ version?: string; mfp?: string }> {
+  private async _readAppConfig(transport: TransportHID): Promise<AppConfig> {
     const response = await transport.send<Record<string, unknown>>(
       Actions.CMD_GET_DEVICE_VERSION,
       ''
@@ -649,11 +610,8 @@ export class KeystoneUsbConnectorBase implements IConnector {
   ) {
     return {
       vendor: 'keystone' as const,
-      // The device publishes its model as a USB string descriptor
-      // (`productName`, e.g. "Keystone 3 Pro"); `device.model` carries it here.
-      // Empty rather than a literal 'unknown' when it says nothing, so the
-      // host's own default-name fallback can win instead of a fake model
-      // reaching the UI and the persisted device settings.
+      // Model is the USB `productName`; empty, not 'unknown', so the host's
+      // default-name fallback wins.
       model: device.model ?? '',
       modelName: device.modelName,
       firmwareVersion: firmwareVersion ?? '0.0.0',

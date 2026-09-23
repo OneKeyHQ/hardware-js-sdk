@@ -1,5 +1,4 @@
-// UR engine (used by the QR event loop and the USB connector alike — both
-// channels carry the same UR payloads).
+// UR engine, shared by QR and USB since both carry the same UR payloads.
 export { KeystoneUrEngine } from './urEngine/KeystoneUrEngine';
 export type {
   BtcScriptType,

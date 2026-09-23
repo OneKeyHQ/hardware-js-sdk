@@ -26,7 +26,7 @@ import type { KeyDerivation } from '@keystonehq/bc-ur-registry';
 import type { KeystoneUr } from '../urEngine/types';
 
 // Every buffer below is a fixed, clearly-synthetic byte pattern chosen only to
-// exercise CBOR/UR framing — none of it is derived from or resembles real key
+// exercise CBOR/UR framing, none of it is derived from or resembles real key
 // material. The 4-byte MFP is protocol metadata, not a wallet identity key.
 const FAKE_MFP_HEX = '52a5d0d1';
 
@@ -54,7 +54,7 @@ function buildMultiAccountsUr(): KeystoneUr {
     Buffer.from(FAKE_MFP_HEX, 'hex'),
     [hdKey],
     'Keystone 3 Pro',
-    undefined, // deviceId — omitted, matching the firmware's generic KeyDerivation response
+    undefined, // deviceId omitted, matching the firmware's generic KeyDerivation response
     '1.7.0'
   );
   return urFromSdk(multiAccounts.toUR());
@@ -180,7 +180,7 @@ describe('KeystoneUrEngine', () => {
 
   describe('deriveEvmAddressFromXpub', () => {
     // Generated from a fixed, clearly-synthetic 32-byte seed (all 0x07) via the
-    // same `hdkey` library bc-ur-registry-eth uses internally — not a real xpub,
+    // same `hdkey` library bc-ur-registry-eth uses internally, not a real xpub,
     // not derived from any real seed phrase.
     const SYNTHETIC_XPUB = HDKey.fromMasterSeed(Buffer.alloc(32, 0x07)).publicExtendedKey;
 
@@ -208,11 +208,8 @@ describe('KeystoneUrEngine', () => {
 
       expect(ur.urType).toBe('qr-hardware-call');
       const decoded = QRHardwareCall.fromCBOR(Buffer.from(ur.urData, 'hex'));
-      // Real Keystone firmware validates an unversioned/V0 request as
-      // Cardano-only and rejects every other chain's path outright
-      // (confirmed against `keystone3-firmware`'s
-      // `CheckHardwareCallRequestIsLegal`) — V1 is what enables the general
-      // per-chain path whitelist. Locking this in so it can't silently regress.
+      // Firmware validates V0 as Cardano-only (`CheckHardwareCallRequestIsLegal`); V1
+      // enables the per-chain path whitelist.
       expect(decoded.getVersion()).toBe(QRHardwareCallVersion.V1);
       const schemas = (decoded.getParams() as KeyDerivation).getSchemas();
       expect(schemas).toHaveLength(2);
@@ -346,7 +343,7 @@ describe('KeystoneUrEngine', () => {
       const tronAddress = engine.deriveTronAddressFromXpub(SYNTHETIC_XPUB, '0/0');
       const evmAddress = engine.deriveEvmAddressFromXpub(SYNTHETIC_XPUB, '0/0');
       expect(tronAddress).toMatch(/^T[1-9A-HJ-NP-Za-km-z]{33}$/);
-      // Same underlying secp256k1/keccak derivation as EVM — only the final
+      // Same underlying secp256k1/keccak derivation as EVM, only the final
       // text encoding differs (base58check + 0x41 prefix vs checksummed hex).
       expect(tronAddress).not.toBe(evmAddress);
     });
@@ -359,9 +356,8 @@ describe('KeystoneUrEngine', () => {
   });
 
   it('never touches the network — KeystoneSDK is constructed bare, not via create()', () => {
-    // Regression guard for the keyst.one config-fetch footgun documented in the
-    // integration design: `KeystoneSDK.create()` phones home for fragment-size
-    // config. `new KeystoneUrEngine()` must only ever use the bare constructor.
+    // `KeystoneSDK.create()` fetches remote fragment-size config, so only the bare
+    // constructor may be used.
     const source = KeystoneUrEngine.toString();
     expect(source).not.toMatch(/\.create\(/);
   });
