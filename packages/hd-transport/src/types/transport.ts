@@ -59,6 +59,8 @@ export type AcquireInput = {
    * transport must probe the protocol on the wire, bypassing any cached result.
    */
   forceProtocolDetection?: boolean;
+  /** Timeout for one strict Protocol V2 recovery probe. */
+  protocolProbeTimeoutMs?: number;
   /** Reuse expectedProtocol only when this transport previously confirmed it for the same endpoint. */
   skipProtocolProbe?: boolean;
 };

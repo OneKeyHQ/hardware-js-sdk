@@ -92,6 +92,13 @@ export default class SearchDevices extends BaseMethod {
   async run(): Promise<SearchDevice[]> {
     const env = DataManager.getSettings('env');
     const isWebUsb = env === 'webusb' || env === 'desktop-webusb';
+    const protocolProbeOnly = isWebUsb && this.payload.protocolProbeOnly === true;
+    const protocolProbeTimeoutMs =
+      protocolProbeOnly &&
+      Number.isInteger(this.payload.protocolProbeTimeoutMs) &&
+      this.payload.protocolProbeTimeoutMs > 0
+        ? this.payload.protocolProbeTimeoutMs
+        : undefined;
     const requestQueue = this.context?.requestQueue;
     const hasActiveWebUsbRequest = isWebUsb && (requestQueue?.getRequestTasksId().length ?? 0) > 0;
     // Bring up WebUSB even when schema configuration is deferred while a
@@ -139,6 +146,53 @@ export default class SearchDevices extends BaseMethod {
     }
 
     const deviceList: SearchDevice[] = [];
+    if (protocolProbeOnly) {
+      for (const descriptor of devicesDescriptor) {
+        const ownedByActiveRequest =
+          hasActiveWebUsbRequest && isOwnedByActiveWebUsbRequest(descriptor, requestQueue);
+        if (descriptor.path && !ownedByActiveRequest) {
+          let session: string | undefined;
+          try {
+            const acquired = await this.connector?.acquire(
+              descriptor.path,
+              descriptor.session,
+              undefined,
+              'V2',
+              undefined,
+              true,
+              undefined,
+              protocolProbeTimeoutMs
+            );
+            if (typeof acquired === 'string') {
+              session = acquired;
+              deviceList.push({
+                ...toSearchDeviceFromDescriptor(descriptor),
+                connectProtocol: 'V2',
+              });
+            }
+          } catch (error) {
+            const errorCode =
+              error && typeof error === 'object' && 'errorCode' in error
+                ? (error as { errorCode?: unknown }).errorCode
+                : undefined;
+            Log.debug('Skip unavailable Protocol V2 device during probe-only search', {
+              path: descriptor.path,
+              ...(errorCode !== undefined ? { errorCode } : {}),
+            });
+          } finally {
+            if (session) {
+              try {
+                await this.connector?.release(session, false);
+              } catch (error) {
+                Log.debug('Unable to release Protocol V2 probe-only search session', error);
+              }
+            }
+          }
+        }
+      }
+      return deviceList;
+    }
+
     for (const descriptor of devicesDescriptor) {
       if (hasActiveWebUsbRequest && isOwnedByActiveWebUsbRequest(descriptor, requestQueue)) {
         const cached = DevicePool.getDeviceByPath(descriptor.path);

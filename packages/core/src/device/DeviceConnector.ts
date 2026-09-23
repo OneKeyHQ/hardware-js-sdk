@@ -97,7 +97,8 @@ export default class DeviceConnector {
     expectedProtocol?: HardwareConnectProtocol,
     protocolHint?: HardwareConnectProtocol,
     forceProtocolDetection?: boolean,
-    skipProtocolProbe?: boolean
+    skipProtocolProbe?: boolean,
+    protocolProbeTimeoutMs?: number
   ) {
     Log.debug('acquire', path, session, expectedProtocol, protocolHint);
     const env = DataManager.getSettings('env');
@@ -112,6 +113,7 @@ export default class DeviceConnector {
           protocolHint,
           forceProtocolDetection,
           skipProtocolProbe,
+          protocolProbeTimeoutMs,
         };
         res = await transport.acquire(acquireInput);
       } else {
@@ -122,6 +124,7 @@ export default class DeviceConnector {
           protocolHint,
           forceProtocolDetection,
           skipProtocolProbe,
+          protocolProbeTimeoutMs,
         });
       }
       if (expectedProtocol) {

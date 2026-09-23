@@ -150,6 +150,27 @@ describe('WebUsbTransport protocol probe cache', () => {
     expect(webusb.detectProtocol).toHaveBeenCalledTimes(1);
   });
 
+  test('strict forced Protocol V2 recovery sends one probe without an internal retry', async () => {
+    const webusb = buildAcquirableTransport();
+    const path = 'pro-webusb';
+    webusb.probeProtocolV2 = jest.fn().mockResolvedValue(false);
+    webusb.resetConnectionAfterProbe = jest.fn().mockResolvedValue(undefined);
+    webusb.closeConnectionAfterProbe = jest.fn().mockResolvedValue(undefined);
+
+    await expect(
+      webusb.acquire({
+        path,
+        expectedProtocol: 'V2',
+        forceProtocolDetection: true,
+        protocolProbeTimeoutMs: 200,
+      })
+    ).rejects.toThrow('Protocol V2 probe timeout after 1 attempts');
+
+    expect(webusb.probeProtocolV2).toHaveBeenCalledWith(path, 200);
+    expect(webusb.resetConnectionAfterProbe).not.toHaveBeenCalled();
+    expect(webusb.closeConnectionAfterProbe).toHaveBeenCalledTimes(1);
+  });
+
   test('acquire re-probes when the USBDevice object identity changed since the probe', async () => {
     const webusb = buildAcquirableTransport();
     const path = 'pro-webusb';

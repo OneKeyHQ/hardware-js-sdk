@@ -377,11 +377,16 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         if (protocolHint) {
           this.deviceProtocolHints.set(input.path, protocolHint);
         }
-        const detectedProtocol = await this.detectProtocol(
-          input.path,
-          input.expectedProtocol,
-          protocolHint
-        );
+        const detectedProtocol =
+          input.forceProtocolDetection && input.expectedProtocol === 'V2'
+            ? await this.detectProtocol(
+                input.path,
+                input.expectedProtocol,
+                protocolHint,
+                1,
+                input.protocolProbeTimeoutMs
+              )
+            : await this.detectProtocol(input.path, input.expectedProtocol, protocolHint);
         this.confirmedDeviceProtocols.set(input.path, detectedProtocol);
         const probedDevice = this.deviceList.find(d => d.path === input.path)?.device;
         if (probedDevice) {
@@ -424,7 +429,9 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   private async detectProtocol(
     path: string,
     expectedProtocol?: ProtocolType,
-    protocolHint?: ProtocolType
+    protocolHint?: ProtocolType,
+    expectedProtocolProbeAttempts = EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS,
+    protocolV2ProbeTimeoutMs = PROTOCOL_V2_PROBE_TIMEOUT
   ): Promise<ProtocolType> {
     if (expectedProtocol === 'V1') {
       if (await this.probeProtocolV1(path)) {
@@ -436,27 +443,24 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     }
 
     if (expectedProtocol === 'V2') {
-      for (let attempt = 1; attempt <= EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS; attempt += 1) {
-        if (await this.probeProtocolV2(path)) {
+      for (let attempt = 1; attempt <= expectedProtocolProbeAttempts; attempt += 1) {
+        if (await this.probeProtocolV2(path, protocolV2ProbeTimeoutMs)) {
           this.deviceProtocol.set(path, 'V2');
           return 'V2';
         }
-        if (attempt < EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS) {
+        if (attempt < expectedProtocolProbeAttempts) {
           await this.resetConnectionAfterProbe(path);
           this.Log?.debug(
             `[WebUsbTransport] Protocol V2 probe timed out, retrying ${
               attempt + 1
-            }/${EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS}`
+            }/${expectedProtocolProbeAttempts}`
           );
         } else {
           await this.closeConnectionAfterProbe(path);
         }
       }
       this.deviceProtocol.delete(path);
-      throw this.createProtocolProbeTimeoutError(
-        expectedProtocol,
-        EXPECTED_PROTOCOL_V2_PROBE_ATTEMPTS
-      );
+      throw this.createProtocolProbeTimeoutError(expectedProtocol, expectedProtocolProbeAttempts);
     }
 
     // Protocol must be actively probed after connection. Name, PID, and descriptors only
@@ -901,14 +905,14 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     }
   }
 
-  private async probeProtocolV2(path: string) {
+  private async probeProtocolV2(path: string, timeoutMs = PROTOCOL_V2_PROBE_TIMEOUT) {
     if (!this.messages || !this.messagesV2) {
       return false;
     }
 
     return probeProtocolV2Helper({
       call: (name, data, options) => this.callProtocolV2(path, name, data, options),
-      timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT,
+      timeoutMs,
       probeMessage: PROTOCOL_V2_WEBUSB_PROBE_MESSAGE,
       logger: this.Log,
       logPrefix: 'ProtocolV2 WebUSB',

@@ -296,6 +296,57 @@ describe('SearchDevices', () => {
     );
   });
 
+  test('Protocol V2 probe-only search performs one strict wire probe without initialization', async () => {
+    const descriptor = {
+      path: 'pro2-webusb',
+      session: null,
+      name: 'OneKey Pro 2',
+      commType: 'webusb',
+    };
+    const acquire = jest.fn().mockResolvedValue(descriptor.path);
+    const release = jest.fn().mockResolvedValue(undefined);
+    const method = new SearchDevices({
+      id: 1,
+      payload: {
+        method: 'searchDevices',
+        connectProtocol: 'V2',
+        protocolProbeOnly: true,
+        protocolProbeTimeoutMs: 200,
+      },
+    } as any);
+    method.init();
+    method.connector = {
+      enumerate: jest.fn().mockResolvedValue({ descriptors: [descriptor] }),
+      acquire,
+      release,
+    } as any;
+
+    await expect(method.run()).resolves.toEqual([
+      {
+        connectId: descriptor.path,
+        uuid: '',
+        serialNo: null,
+        deviceId: null,
+        deviceType: 'unknown',
+        name: descriptor.name,
+        commType: descriptor.commType,
+        connectProtocol: 'V2',
+      },
+    ]);
+    expect(acquire).toHaveBeenCalledWith(
+      descriptor.path,
+      descriptor.session,
+      undefined,
+      'V2',
+      undefined,
+      true,
+      undefined,
+      200
+    );
+    expect(release).toHaveBeenCalledWith(descriptor.path, false);
+    expect(mockGetDevices).not.toHaveBeenCalled();
+  });
+
   test.each([
     ['OneKey Pro', 'pro'],
     ['OneKey Pro 2', 'pro2'],
