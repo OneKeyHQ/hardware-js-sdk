@@ -84,8 +84,7 @@ describe('TrezorElectronBleTransport', () => {
     const transport = new TrezorElectronBleTransport({ bridge });
 
     await transport.connect('BLE-1');
-    // The shared handler has no Trezor defaults left, so the GATT uuids and the
-    // padded-write framing must travel with every connect.
+    // The shared handler holds no vendor defaults, so the profile travels with every connect.
     expect(bridge.connect).toHaveBeenCalledWith('BLE-1', TREZOR_BLE_CONNECT_PROFILE);
     expect(bridge.subscribe).toHaveBeenCalledWith('BLE-1');
 
@@ -376,25 +375,25 @@ describe('targeted pairing cancellation', () => {
     expect(bridge.disconnect).toHaveBeenCalledWith('BLE-1');
     transport.reset();
   });
-});
 
-it('targeted cancel retires only that local link and allows reconnecting it', async () => {
-  const bridge = new FakeBridge();
-  const transport = new TrezorElectronBleTransport({ bridge });
-  await transport.connect('BLE-1');
-  await transport.connect('BLE-2');
-  const disconnected = jest.fn();
-  transport.onDisconnect('BLE-1', disconnected);
-  await transport.cancelPairing('BLE-1');
-  expect(bridge.cancelPairing).toHaveBeenCalledTimes(1);
-  expect(bridge.cancelPairing).toHaveBeenCalledWith({
-    vendor: TREZOR_BLE_CONNECT_PROFILE.vendor,
-    id: 'BLE-1',
+  it('targeted cancel retires only that local link and allows reconnecting it', async () => {
+    const bridge = new FakeBridge();
+    const transport = new TrezorElectronBleTransport({ bridge });
+    await transport.connect('BLE-1');
+    await transport.connect('BLE-2');
+    const disconnected = jest.fn();
+    transport.onDisconnect('BLE-1', disconnected);
+    await transport.cancelPairing('BLE-1');
+    expect(bridge.cancelPairing).toHaveBeenCalledTimes(1);
+    expect(bridge.cancelPairing).toHaveBeenCalledWith({
+      vendor: TREZOR_BLE_CONNECT_PROFILE.vendor,
+      id: 'BLE-1',
+    });
+    expect(disconnected).toHaveBeenCalledTimes(1);
+    await expect(transport.write('BLE-1', new Uint8Array())).rejects.toThrow('not connected');
+    await expect(transport.write('BLE-2', new Uint8Array())).resolves.toBeUndefined();
+    await transport.connect('BLE-1');
+    expect(bridge.connect).toHaveBeenCalledTimes(3);
+    transport.reset();
   });
-  expect(disconnected).toHaveBeenCalledTimes(1);
-  await expect(transport.write('BLE-1', new Uint8Array())).rejects.toThrow('not connected');
-  await expect(transport.write('BLE-2', new Uint8Array())).resolves.toBeUndefined();
-  await transport.connect('BLE-1');
-  expect(bridge.connect).toHaveBeenCalledTimes(3);
-  transport.reset();
 });

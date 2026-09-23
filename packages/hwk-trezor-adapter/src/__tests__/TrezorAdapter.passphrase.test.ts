@@ -586,8 +586,6 @@ describe('TrezorAdapter passphrase sessions', () => {
     if (!connected.success) return;
     uiRequestHandler = connector.on.mock.calls.find(c => c[0] === 'ui-request')?.[1];
 
-    // No operationId on the call, so it queues under the connectId; the live
-    // operation on that connection still owns the prompt.
     void adapter.btcGetAddress('safe-7', 'safe-7', { path: 'p0', useEmptyPassphrase: true });
     await new Promise<void>(resolve => {
       setTimeout(resolve, 10);
