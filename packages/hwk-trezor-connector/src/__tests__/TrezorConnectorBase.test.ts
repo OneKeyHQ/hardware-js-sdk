@@ -184,9 +184,7 @@ describe('TrezorConnectorBase device resolution', () => {
     expect(events).toEqual([
       {
         type: EConnectorInteraction.InteractionComplete,
-        payload: {
-          sessionId: 'safe-7',
-        },
+        payload: { sessionId: '' },
       },
     ]);
   });
