@@ -22,11 +22,10 @@ export type {
 export { KeystoneAdapter } from './adapter/KeystoneAdapter';
 export type { ImportFromQrOptions } from './adapter/KeystoneAdapter';
 export {
+  KEYSTONE_COLD_START_PATH,
   KEYSTONE_WALLET_CONNECT_ID_PREFIX,
-  KEYSTONE_WALLET_ID_PATH,
   accountKey,
   createDeviceRecord,
-  deriveKeystoneWalletId,
   placeholderDeviceInfo,
   toDeviceInfo,
   walletConnectId,

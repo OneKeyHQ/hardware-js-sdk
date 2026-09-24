@@ -3,35 +3,34 @@ import { createHardwareOperationId } from '@onekeyfe/hwk-adapter-core';
 import {
   KEYSTONE_COLD_START_JOB_LABEL,
   keystoneCancelQueueKeys,
+  keystoneMfpFromIdentifier,
   keystoneQueueKey,
-  keystoneWalletIdFromIdentifier,
 } from '../utils/queueKey';
 
-const WALLET_ID = 'a'.repeat(64);
+const MFP = 'a1b2c3d4';
 
 describe('keystoneQueueKey', () => {
   it('prefers the operation id, then the device id, then the connect id', () => {
     const operationId = createHardwareOperationId('keystone');
 
-    expect(keystoneQueueKey(operationId, WALLET_ID)).toBe(operationId);
-    expect(keystoneQueueKey(`keystone-wallet:${WALLET_ID}`, WALLET_ID)).toBe(WALLET_ID);
-    expect(keystoneQueueKey(`keystone-wallet:${WALLET_ID}`)).toBe(`keystone-wallet:${WALLET_ID}`);
+    expect(keystoneQueueKey(operationId, MFP)).toBe(operationId);
+    expect(keystoneQueueKey(`keystone-wallet:${MFP}`, MFP)).toBe(MFP);
+    expect(keystoneQueueKey(`keystone-wallet:${MFP}`)).toBe(`keystone-wallet:${MFP}`);
     expect(keystoneQueueKey()).toBe(KEYSTONE_COLD_START_JOB_LABEL);
   });
 
-  it('reads the wallet id out of either identifier spelling', () => {
-    expect(keystoneWalletIdFromIdentifier(`keystone-wallet:${WALLET_ID.toUpperCase()}`)).toBe(
-      WALLET_ID
-    );
-    expect(keystoneWalletIdFromIdentifier(WALLET_ID)).toBe(WALLET_ID);
-    expect(keystoneWalletIdFromIdentifier('keystone-cold-start')).toBeUndefined();
+  it('reads the master fingerprint out of either identifier spelling', () => {
+    expect(keystoneMfpFromIdentifier(`keystone-wallet:${MFP.toUpperCase()}`)).toBe(MFP);
+    expect(keystoneMfpFromIdentifier(MFP)).toBe(MFP);
+    expect(keystoneMfpFromIdentifier('keystone-cold-start')).toBeUndefined();
+    expect(keystoneMfpFromIdentifier('a'.repeat(64))).toBeUndefined();
   });
 
   it('fans a cancel out over every key one identifier can stand for', () => {
     const operationId = createHardwareOperationId('keystone');
 
-    expect(
-      keystoneCancelQueueKeys([`keystone-wallet:${WALLET_ID}`, undefined, operationId, ''])
-    ).toEqual(new Set([`keystone-wallet:${WALLET_ID}`, WALLET_ID, operationId]));
+    expect(keystoneCancelQueueKeys([`keystone-wallet:${MFP}`, undefined, operationId, ''])).toEqual(
+      new Set([`keystone-wallet:${MFP}`, MFP, operationId])
+    );
   });
 });
