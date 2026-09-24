@@ -16,13 +16,12 @@ import {
   UI_RESPONSE,
   createHardwareOperationId,
   createHardwareSearchTargetId,
-  deriveWalletId,
   parseHardwareRuntimeId,
 } from '@onekeyfe/hwk-adapter-core';
 import HDKey from 'hdkey';
 
 import { KeystoneAdapter } from '../adapter/KeystoneAdapter';
-import { KEYSTONE_WALLET_ID_PATH } from '../adapter/deviceTable';
+import { KEYSTONE_COLD_START_PATH } from '../adapter/deviceTable';
 import { normalizePath } from '../adapter/pathUtils';
 import { KeystoneUrEngine } from '../urEngine/KeystoneUrEngine';
 import { TronSignRequest, TronSignType } from '../urEngine/TronSignRequest';
@@ -66,11 +65,6 @@ function mfpOf(root: HDKey): string {
   return root.fingerprint.toString(16).padStart(8, '0');
 }
 const FIXTURE_MFP = mfpOf(FIXTURE_ROOT);
-const FIXTURE_WALLET_ID = deriveWalletId(
-  `keystone:secp256k1:${KEYSTONE_WALLET_ID_PATH}:${FIXTURE_ROOT.derive(
-    KEYSTONE_WALLET_ID_PATH
-  ).publicExtendedKey.trim()}`
-);
 
 function pathComponents(path: string): PathComponent[] {
   return normalizePath(path)
@@ -128,6 +122,8 @@ interface FakeDeviceOptions {
    */
   bundleExtraBtcVariants?: boolean;
   root?: HDKey;
+  /** Master fingerprint the device reports; defaults to the fixture wallet's. */
+  mfpHex?: string;
 }
 
 /**
@@ -136,7 +132,7 @@ interface FakeDeviceOptions {
  */
 function attachFakeDevice(adapter: KeystoneAdapter, options: FakeDeviceOptions = {}) {
   const requests: Array<{ device: DeviceInfo; data: QrDisplayData }> = [];
-  const mfpHex = FIXTURE_MFP;
+  const mfpHex = options.mfpHex ?? FIXTURE_MFP;
 
   const respond = (ur: { type: string; cbor: Buffer }) =>
     adapter.uiResponse({ type: UI_RESPONSE.RECEIVE_QR_RESPONSE, payload: urJson(ur) });
@@ -494,7 +490,7 @@ describe('KeystoneAdapter', () => {
   });
 
   describe('importFromQr', () => {
-    it('syncs the default account set and registers a collision-resistant wallet id', async () => {
+    it('syncs the default account set and registers the wallet by its master fingerprint', async () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
 
@@ -502,8 +498,8 @@ describe('KeystoneAdapter', () => {
 
       expect(result.success).toBe(true);
       if (!result.success) return;
-      expect(result.payload.deviceId).toBe(FIXTURE_WALLET_ID);
-      expect(result.payload.connectId).toBe(`keystone-wallet:${FIXTURE_WALLET_ID}`);
+      expect(result.payload.deviceId).toBe(FIXTURE_MFP);
+      expect(result.payload.connectId).toBe(`keystone-wallet:${FIXTURE_MFP}`);
       expect(result.payload.vendor).toBe('keystone');
       expect(result.payload.connectionType).toBe('qr');
       expect(fake.requests).toHaveLength(1);
@@ -511,46 +507,22 @@ describe('KeystoneAdapter', () => {
 
       const devices = await adapter.searchDevices();
       expect(devices).toHaveLength(1);
-      expect(devices[0].deviceId).toBe(FIXTURE_WALLET_ID);
-    });
-
-    it('keeps two wallets with the same 8-hex MFP separate and rejects 8-hex lookup', async () => {
-      const adapter = newTestAdapter();
-      const firstDevice = attachFakeDevice(adapter);
-      const first = await adapter.importFromQr();
-      expect(first.success).toBe(true);
-      firstDevice.detach();
-
-      attachFakeDevice(adapter, { root: OTHER_ROOT });
-      const second = await adapter.importFromQr();
-      expect(second.success).toBe(true);
-      if (!first.success || !second.success) return;
-
-      expect(second.payload.deviceId).not.toBe(first.payload.deviceId);
-      expect(await adapter.searchDevices()).toHaveLength(2);
-
-      for (const identifier of [FIXTURE_MFP, `keystone-qr:${FIXTURE_MFP}`]) {
-        const lookup = await adapter.getDeviceInfo(identifier, identifier);
-        expect(lookup.success).toBe(false);
-        if (!lookup.success) {
-          expect(lookup.payload.code).toBe(HardwareErrorCode.DeviceNotFound);
-        }
-      }
+      expect(devices[0].deviceId).toBe(FIXTURE_MFP);
     });
 
     it('learns only the wallet identity; a later address request asks the device for its own path', async () => {
       // Key material is never retained on the wallet record, so importFromQr
-      // requests just the identity xpub and every later address request pays
-      // its own round trip (identity + the path it needs).
+      // requests just the cold-start xpub and every later address request pays
+      // its own round trip for only the path it needs.
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
 
       const imported = await adapter.importFromQr();
       expect(imported.success).toBe(true);
       expect(fake.requests).toHaveLength(1);
-      expect(requestedPathsOf(fake.requests[0])).toEqual([KEYSTONE_WALLET_ID_PATH]);
+      expect(requestedPathsOf(fake.requests[0])).toEqual([KEYSTONE_COLD_START_PATH]);
 
-      const result = await adapter.btcGetAddress(null, FIXTURE_WALLET_ID, {
+      const result = await adapter.btcGetAddress(null, FIXTURE_MFP, {
         path: "m/84'/0'/0'/0/0",
         showOnDevice: false,
       });
@@ -558,7 +530,7 @@ describe('KeystoneAdapter', () => {
       if (!result.success) return;
       expect(result.payload.address).toMatch(/^bc1q[0-9a-z]{38}$/);
       expect(fake.requests).toHaveLength(2);
-      expect(requestedPathsOf(fake.requests[1])).toEqual([KEYSTONE_WALLET_ID_PATH, "m/84'/0'/0'"]);
+      expect(requestedPathsOf(fake.requests[1])).toEqual(["m/84'/0'/0'"]);
     });
 
     it('does not retain a BTC script-type variant the device volunteers beyond the current operation', async () => {
@@ -575,7 +547,7 @@ describe('KeystoneAdapter', () => {
       expect(first.success).toBe(true);
       expect(fake.requests).toHaveLength(1);
 
-      const second = await adapter.btcGetAddress(null, FIXTURE_WALLET_ID, {
+      const second = await adapter.btcGetAddress(null, FIXTURE_MFP, {
         path: "m/84'/0'/0'/0/0",
         showOnDevice: false,
       });
@@ -595,7 +567,7 @@ describe('KeystoneAdapter', () => {
       expect(imported.success).toBe(true);
       expect(fake.requests).toHaveLength(1);
 
-      const result = await adapter.btcGetPublicKey(null, FIXTURE_WALLET_ID, {
+      const result = await adapter.btcGetPublicKey(null, FIXTURE_MFP, {
         path: "m/84'/0'/0'",
       });
       expect(result.success).toBe(true);
@@ -616,7 +588,7 @@ describe('KeystoneAdapter', () => {
       attachFakeDevice(adapter);
       await adapter.importFromQr();
 
-      const result = await adapter.btcGetPublicKey(null, FIXTURE_WALLET_ID, {
+      const result = await adapter.btcGetPublicKey(null, FIXTURE_MFP, {
         path: "m/84'/0'/0'/0/0",
       });
       expect(result.success).toBe(false);
@@ -758,24 +730,6 @@ describe('KeystoneAdapter', () => {
       if (result.success) return;
       expect(result.payload.code).toBe(HardwareErrorCode.DeviceMismatch);
     });
-
-    it('fails closed when the scanned 64-hex wallet identity does not match deviceId', async () => {
-      const adapter = newTestAdapter();
-      attachFakeDevice(adapter, { root: OTHER_ROOT });
-
-      const result = await adapter.evmSignTransaction(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
-        {
-          path: "m/44'/60'/0'/0/0",
-          serializedTx: `02${'ab'.repeat(30)}`,
-        }
-      );
-
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.payload.code).toBe(HardwareErrorCode.DeviceMismatch);
-    });
   });
 
   describe('evmGetAddress', () => {
@@ -819,6 +773,114 @@ describe('KeystoneAdapter', () => {
         Buffer.from('signed-psbt-fixture-bytes').toString('hex')
       );
       expect(fake.requests.map(r => r.data.urType)).toEqual(['qr-hardware-call', 'crypto-psbt']);
+    });
+  });
+
+  describe('signing with a caller-supplied mfp and no known record', () => {
+    function signSourceFingerprint(request: { data: QrDisplayData }): string {
+      return EthSignRequest.fromCBOR(Buffer.from(request.data.urData, 'hex'))
+        .getSourceFingerprint()
+        .toString('hex');
+    }
+
+    it.each([
+      ['deviceId', null, FIXTURE_MFP],
+      ['connectId', `keystone-wallet:${FIXTURE_MFP}`, null],
+    ] as const)(
+      'evmSignMessage by %s sends only the sign request, carrying that xfp',
+      async (_name, connectId, deviceId) => {
+        const adapter = newTestAdapter();
+        const fake = attachFakeDevice(adapter);
+
+        const result = await adapter.evmSignMessage(connectId, deviceId, {
+          path: "m/44'/60'/0'/0/0",
+          message: 'hi',
+        });
+
+        expect(result.success).toBe(true);
+        expect(fake.requests.map(r => r.data.urType)).toEqual(['eth-sign-request']);
+        expect(signSourceFingerprint(fake.requests[0])).toBe(FIXTURE_MFP);
+      }
+    );
+
+    it('evmSignTransaction on a fresh adapter sends only the sign request, carrying that xfp', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+
+      const result = await adapter.evmSignTransaction(null, FIXTURE_MFP, {
+        path: "m/44'/60'/0'/0/0",
+        serializedTx: `02${'ab'.repeat(30)}`,
+      });
+
+      expect(result.success).toBe(true);
+      expect(fake.requests.map(r => r.data.urType)).toEqual(['eth-sign-request']);
+      expect(signSourceFingerprint(fake.requests[0])).toBe(FIXTURE_MFP);
+    });
+
+    it('btcSignPsbt on a fresh adapter sends only the PSBT request', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+
+      const result = await adapter.btcSignPsbt(`keystone-wallet:${FIXTURE_MFP}`, FIXTURE_MFP, {
+        psbt: 'cafe'.repeat(4),
+        coin: 'BTC',
+        path: "m/84'/0'/0'",
+      });
+
+      expect(result.success).toBe(true);
+      expect(fake.requests.map(r => r.data.urType)).toEqual(['crypto-psbt']);
+    });
+
+    it('btcGetMasterFingerprint on a fresh adapter answers from the supplied mfp', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+
+      const result = await adapter.btcGetMasterFingerprint(null, FIXTURE_MFP);
+
+      expect(result).toMatchObject({
+        success: true,
+        payload: { masterFingerprint: FIXTURE_MFP },
+      });
+      expect(fake.requests).toHaveLength(0);
+    });
+
+    it.each([
+      [
+        'btcSignPsbt',
+        "m/44'/0'/0'",
+        (a: KeystoneAdapter) =>
+          a.btcSignPsbt(null, null, { psbt: 'cafe'.repeat(4), coin: 'BTC', path: "m/84'/0'/0'" }),
+      ],
+      [
+        'solSignTransaction',
+        "m/44'/501'/0'",
+        (a: KeystoneAdapter) =>
+          a.solSignTransaction(null, null, { path: "m/44'/501'/0'", serializedTx: 'cafe' }),
+      ],
+    ] as const)(
+      'a true cold start of %s asks once, for only the chain account path %s',
+      async (_name, accountPath, call) => {
+        const adapter = newTestAdapter();
+        const fake = attachFakeDevice(adapter);
+
+        const result = await call(adapter);
+
+        expect(result.success).toBe(true);
+        expect(fake.requests).toHaveLength(2);
+        expect(fake.requests[0].data.urType).toBe('qr-hardware-call');
+        expect(requestedPathsOf(fake.requests[0])).toEqual([accountPath]);
+      }
+    );
+
+    it('rejects a response whose master fingerprint is 00000000', async () => {
+      const adapter = newTestAdapter();
+      attachFakeDevice(adapter, { mfpHex: '00000000' });
+
+      const result = await adapter.importFromQr();
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.payload.error).toMatch(/master fingerprint/i);
     });
   });
 
@@ -944,7 +1006,7 @@ describe('KeystoneAdapter', () => {
       // Keystone answers account-level KeyDerivation requests; nothing is
       // displayed on the device for this call, so a leaf-path request would
       // only cost an extra round trip.
-      expect(requestedPathsOf(fake.requests[0])).toEqual([KEYSTONE_WALLET_ID_PATH, "m/84'/0'/0'"]);
+      expect(requestedPathsOf(fake.requests[0])).toEqual(["m/84'/0'/0'"]);
       expect(result.payload.path).toBe(path);
       expect(result.payload.address).toMatch(/^bc1q[0-9a-z]{38}$/);
     });
@@ -1103,7 +1165,7 @@ describe('KeystoneAdapter', () => {
         .spyOn(usb.connector, 'call')
         .mockRejectedValueOnce(new DOMException('device is gone', 'NotFoundError'));
 
-      const result = await adapter.evmSignTransaction(connected.payload, FIXTURE_WALLET_ID, {
+      const result = await adapter.evmSignTransaction(connected.payload, FIXTURE_MFP, {
         path: "m/44'/60'/0'/0/0",
         serializedTx: `02${'ab'.repeat(30)}`,
         operationId: connected.payload,
@@ -1133,7 +1195,7 @@ describe('KeystoneAdapter', () => {
       );
       let settled = false;
       const pending = adapter
-        .evmSignTransaction(second.payload, FIXTURE_WALLET_ID, {
+        .evmSignTransaction(second.payload, FIXTURE_MFP, {
           path: "m/44'/60'/0'/0/0",
           serializedTx: `02${'ab'.repeat(30)}`,
           operationId: second.payload,
@@ -1168,10 +1230,10 @@ describe('KeystoneAdapter', () => {
             })
         );
         const params = { path: "m/44'/60'/0'/0/0", serializedTx: `02${'ab'.repeat(30)}` };
-        const active = adapter.evmSignTransaction(connected.payload, FIXTURE_WALLET_ID, params);
+        const active = adapter.evmSignTransaction(connected.payload, FIXTURE_MFP, params);
         await nextImmediate();
-        const target = matchesActive ? connected.payload : FIXTURE_WALLET_ID;
-        const queued = adapter.evmSignTransaction(target, FIXTURE_WALLET_ID, params);
+        const target = matchesActive ? connected.payload : FIXTURE_MFP;
+        const queued = adapter.evmSignTransaction(target, FIXTURE_MFP, params);
         adapter.cancel(target);
         expect(finishCall).toBeDefined();
         finishCall?.();
@@ -1200,16 +1262,15 @@ describe('KeystoneAdapter', () => {
       });
 
       // No operationId on the call, so the job queues under the wallet id.
-      const pending = adapter.evmSignTransaction(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
-        { path: "m/44'/60'/0'/0/0", serializedTx: `02${'ab'.repeat(30)}` }
-      );
+      const pending = adapter.evmSignTransaction(`keystone-wallet:${FIXTURE_MFP}`, FIXTURE_MFP, {
+        path: "m/44'/60'/0'/0/0",
+        serializedTx: `02${'ab'.repeat(30)}`,
+      });
       await sleep(10);
       expect(prompts).toHaveLength(1);
       expect(prompts[0].payload.operationId).toBe(connected.payload);
 
-      adapter.cancel(`keystone-wallet:${FIXTURE_WALLET_ID}`);
+      adapter.cancel(`keystone-wallet:${FIXTURE_MFP}`);
       await expect(pending).resolves.toMatchObject({
         success: false,
         payload: { code: HardwareErrorCode.UserAborted },
@@ -1227,7 +1288,7 @@ describe('KeystoneAdapter', () => {
 
       let settled = false;
       const pending = adapter
-        .evmSignTransaction(`keystone-wallet:${FIXTURE_WALLET_ID}`, FIXTURE_WALLET_ID, {
+        .evmSignTransaction(`keystone-wallet:${FIXTURE_MFP}`, FIXTURE_MFP, {
           path: "m/44'/60'/0'/0/0",
           serializedTx: `02${'ab'.repeat(30)}`,
         })
@@ -1260,7 +1321,7 @@ describe('KeystoneAdapter', () => {
 
       let settled = false;
       const pending = adapter
-        .evmSignTransaction(`keystone-wallet:${FIXTURE_WALLET_ID}`, FIXTURE_WALLET_ID, {
+        .evmSignTransaction(`keystone-wallet:${FIXTURE_MFP}`, FIXTURE_MFP, {
           path: "m/44'/60'/0'/0/0",
           serializedTx: `02${'ab'.repeat(30)}`,
         })
@@ -1276,7 +1337,7 @@ describe('KeystoneAdapter', () => {
       await sleep(10);
       expect(settled).toBe(false);
 
-      adapter.cancel(FIXTURE_WALLET_ID);
+      adapter.cancel(FIXTURE_MFP);
       await expect(pending).resolves.toMatchObject({
         success: false,
         payload: { code: HardwareErrorCode.UserAborted },
@@ -1294,7 +1355,7 @@ describe('KeystoneAdapter', () => {
       // registry until something cancels it.
       fake.detach();
 
-      const pending = adapter.evmSignTransaction(connected.payload, FIXTURE_WALLET_ID, {
+      const pending = adapter.evmSignTransaction(connected.payload, FIXTURE_MFP, {
         path: "m/44'/60'/0'/0/0",
         serializedTx: `02${'ab'.repeat(30)}`,
         operationId: connected.payload,
@@ -1302,7 +1363,7 @@ describe('KeystoneAdapter', () => {
       await sleep(10);
       // The host cancels with the connectId it holds, not the operation id the
       // job was queued under.
-      adapter.cancel(`keystone-wallet:${FIXTURE_WALLET_ID}`);
+      adapter.cancel(`keystone-wallet:${FIXTURE_MFP}`);
 
       await expect(pending).resolves.toMatchObject({
         success: false,
@@ -1388,7 +1449,7 @@ describe('KeystoneAdapter', () => {
         serializedTx: `02${'ab'.repeat(30)}`,
         operationId: connected.payload,
       };
-      const pending = adapter.evmSignTransaction(connected.payload, FIXTURE_WALLET_ID, params);
+      const pending = adapter.evmSignTransaction(connected.payload, FIXTURE_MFP, params);
       await nextImmediate();
       adapter.cancel(connected.payload);
 
@@ -1401,7 +1462,7 @@ describe('KeystoneAdapter', () => {
       expect(disconnect).not.toHaveBeenCalled();
 
       await expect(
-        adapter.evmSignTransaction(null, FIXTURE_WALLET_ID, {
+        adapter.evmSignTransaction(null, FIXTURE_MFP, {
           path: params.path,
           serializedTx: params.serializedTx,
         })
@@ -1434,7 +1495,7 @@ describe('KeystoneAdapter', () => {
             resolveRawCall = resolve;
           })
       );
-      const pending = adapter.evmSignTransaction(connected.payload, FIXTURE_WALLET_ID, {
+      const pending = adapter.evmSignTransaction(connected.payload, FIXTURE_MFP, {
         path: "m/44'/60'/0'/0/0",
         serializedTx: `02${'ab'.repeat(30)}`,
         operationId: connected.payload,
@@ -1481,7 +1542,7 @@ describe('KeystoneAdapter', () => {
       expect(imported.success).toBe(true);
       fake.detach();
 
-      const result = await adapter.evmSignTransaction(null, FIXTURE_WALLET_ID, {
+      const result = await adapter.evmSignTransaction(null, FIXTURE_MFP, {
         path: "m/44'/60'/0'/0/0",
         serializedTx: `02${'ab'.repeat(30)}`,
       });
@@ -1505,8 +1566,8 @@ describe('KeystoneAdapter', () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
       const result = await adapter.getChainFingerprint(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
+        `keystone-wallet:${FIXTURE_MFP}`,
+        FIXTURE_MFP,
         'evm'
       );
       expect(result.success).toBe(true);
@@ -1524,8 +1585,8 @@ describe('KeystoneAdapter', () => {
       expect(fake.requests).toHaveLength(1);
 
       const second = await adapter.btcGetMasterFingerprint(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID
+        `keystone-wallet:${FIXTURE_MFP}`,
+        FIXTURE_MFP
       );
       expect(second.success).toBe(true);
       expect(fake.requests).toHaveLength(1); // no additional round trip
@@ -1540,8 +1601,8 @@ describe('KeystoneAdapter', () => {
 
       await adapter.releaseOperation(connected.payload);
       const result = await adapter.btcGetMasterFingerprint(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
+        `keystone-wallet:${FIXTURE_MFP}`,
+        FIXTURE_MFP,
         { operationId: connected.payload }
       );
 
@@ -1580,8 +1641,8 @@ describe('KeystoneAdapter', () => {
       const callsAfterConnect = usb.calls.length;
 
       const result = await adapter.allNetworkGetAddress(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
+        `keystone-wallet:${FIXTURE_MFP}`,
+        FIXTURE_MFP,
         {
           operationId: connected.payload,
           bundle: [
@@ -1618,8 +1679,8 @@ describe('KeystoneAdapter', () => {
       const qrRequestsBeforeBundle = qrFake.requests.length;
 
       const result = await adapter.allNetworkGetAddress(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
+        `keystone-wallet:${FIXTURE_MFP}`,
+        FIXTURE_MFP,
         {
           operationId: qrConnected.payload,
           bundle: [
@@ -1650,55 +1711,58 @@ describe('KeystoneAdapter', () => {
       const roundTripsAfterConnect = usb.calls.length;
 
       // buildHwWalletXfp
-      expect((await adapter.btcGetMasterFingerprint(connectId, FIXTURE_WALLET_ID)).success).toBe(
-        true
-      );
+      expect((await adapter.btcGetMasterFingerprint(connectId, FIXTURE_MFP)).success).toBe(true);
       expect(
-        (await adapter.btcGetPublicKey(connectId, FIXTURE_WALLET_ID, { path: "m/86'/0'/0'" }))
-          .success
+        (await adapter.btcGetPublicKey(connectId, FIXTURE_MFP, { path: "m/86'/0'/0'" })).success
       ).toBe(true);
       // one address per default network
       expect(
         (
-          await adapter.evmGetAddress(connectId, FIXTURE_WALLET_ID, {
+          await adapter.evmGetAddress(connectId, FIXTURE_MFP, {
             path: "m/44'/60'/0'/0/0",
           })
         ).success
       ).toBe(true);
       expect(
-        (await adapter.solGetAddress(connectId, FIXTURE_WALLET_ID, { path: "m/44'/501'/0'" }))
-          .success
+        (await adapter.solGetAddress(connectId, FIXTURE_MFP, { path: "m/44'/501'/0'" })).success
       ).toBe(true);
       expect(
         (
-          await adapter.tronGetAddress(connectId, FIXTURE_WALLET_ID, {
+          await adapter.tronGetAddress(connectId, FIXTURE_MFP, {
             path: "m/44'/195'/0'/0/0",
           })
         ).success
       ).toBe(true);
 
-      // Nothing from the identity export is retained: BTC, EVM, SOL and
-      // Tron each pay one single-path export.
-      expect(roundTripsAfterConnect).toBe(1);
-      expect(usb.calls).toHaveLength(5);
+      // Connect exports nothing and the xfp comes from the USB session: BTC, EVM,
+      // SOL and Tron each pay one single-path export.
+      expect(roundTripsAfterConnect).toBe(0);
+      expect(usb.calls).toHaveLength(4);
       const schemaCounts = usb.calls.map(
         call => requestedPathsOfUr((call.params as { urData: string }).urData).length
       );
-      expect(schemaCounts).toEqual([1, 1, 1, 1, 1]);
+      expect(schemaCounts).toEqual([1, 1, 1, 1]);
     });
   });
 
   describe('key export consent', () => {
-    it('fails connect when the fixed identity key export is rejected', async () => {
+    it('connects without a key export and surfaces a rejected export on the first key request', async () => {
       const usb = fakeUsbConnector({ failCallWith: HardwareErrorCode.UserRejected });
       const adapter = newTestAdapter(usb.connector);
 
       const found = await adapter.searchDevices({ transportType: 'usb' });
       const connected = await adapter.connectDevice(found[0].connectId);
 
-      expect(connected.success).toBe(false);
-      if (connected.success) return;
-      expect(connected.payload.code).toBe(HardwareErrorCode.UserRejected);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      expect(usb.calls).toHaveLength(0);
+
+      const address = await adapter.evmGetAddress(connected.payload, FIXTURE_MFP, {
+        path: "m/44'/60'/0'/0/0",
+      });
+      expect(address.success).toBe(false);
+      if (address.success) return;
+      expect(address.payload.code).toBe(HardwareErrorCode.UserRejected);
       expect(usb.calls).toHaveLength(1);
     });
 
@@ -1711,18 +1775,17 @@ describe('KeystoneAdapter', () => {
       if (!connected.success) return;
       const connectId = connected.payload;
 
-      await adapter.evmGetAddress(connectId, FIXTURE_WALLET_ID, {
+      await adapter.evmGetAddress(connectId, FIXTURE_MFP, {
         path: "m/44'/60'/0'/0/0",
       });
-      // Call 1 was the identity export at connect; nothing from it is
-      // retained, so EVM pays its own export too.
-      expect(usb.calls).toHaveLength(2);
+      // Connect exported nothing, so EVM pays its own export.
+      expect(usb.calls).toHaveLength(1);
 
-      await adapter.tronGetAddress(connectId, FIXTURE_WALLET_ID, {
+      await adapter.tronGetAddress(connectId, FIXTURE_MFP, {
         path: "m/44'/195'/0'/0/0",
       });
-      await adapter.btcGetPublicKey(connectId, FIXTURE_WALLET_ID, { path: "m/84'/0'/0'" });
-      expect(usb.calls).toHaveLength(4);
+      await adapter.btcGetPublicKey(connectId, FIXTURE_MFP, { path: "m/84'/0'/0'" });
+      expect(usb.calls).toHaveLength(3);
     });
   });
 
@@ -1764,10 +1827,8 @@ describe('KeystoneAdapter', () => {
     });
 
     it('falls back from one rejected USB attach to one QR scan for the complete account bundle', async () => {
-      const usb = fakeUsbConnector({
-        failCallWith: HardwareErrorCode.DeviceLocked,
-        failOnUrType: 'qr-hardware-call',
-      });
+      // The USB device holds another wallet, so the targeted connect is refused.
+      const usb = fakeUsbConnector({ mfpHex: mfpOf(OTHER_ROOT) });
       const adapter = newTestAdapter(usb.connector);
       const qrFake = attachFakeDevice(adapter);
       const imported = await adapter.importFromQr();
@@ -1833,13 +1894,13 @@ describe('KeystoneAdapter', () => {
           item => item.payload?.rootFingerprint === Number.parseInt(FIXTURE_MFP, 16)
         )
       ).toBe(true);
-      expect(usb.calls).toHaveLength(1);
+      expect(usb.connectArgs).toEqual([FIXTURE_MFP]);
+      expect(usb.calls).toHaveLength(0);
       expect(qrFake.requests).toHaveLength(2);
 
       // Nothing is retained from importFromQr, so the one fallback scan
       // carries every bundled path (BTC is account 0 only).
       expect(requestedPathsOf(qrFake.requests[1])).toEqual([
-        KEYSTONE_WALLET_ID_PATH,
         "m/44'/0'/0'",
         "m/49'/0'/0'",
         "m/84'/0'/0'",
@@ -1863,8 +1924,8 @@ describe('KeystoneAdapter', () => {
       });
 
       const result = await adapter.allNetworkGetAddress(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
+        `keystone-wallet:${FIXTURE_MFP}`,
+        FIXTURE_MFP,
         {
           bundle: [
             { methodName: 'btcGetPublicKey', network: 'btc', path: "m/44'/0'/0'" },
@@ -1877,18 +1938,18 @@ describe('KeystoneAdapter', () => {
         success: false,
         payload: { code: HardwareErrorCode.TransportNotAvailable },
       });
-      expect(usb.calls).toHaveLength(2);
+      expect(usb.calls).toHaveLength(1);
       expect(usb.connectArgs).toHaveLength(1);
       expect(qrFake.requests).toHaveLength(0);
     });
 
-    // Call 1 is the identity export; the failing call is a bundle item. On USB the refusal is
-    // raised inside the prefetch and reaches the bundle's outer catch; `shouldAbortBundle`
-    // itself is covered in hwk-adapter-core's allNetwork tests.
+    // Connect sends no export, so every call is a bundle item. On USB the refusal is raised inside
+    // the prefetch and reaches the bundle's outer catch; `shouldAbortBundle` itself is covered in
+    // hwk-adapter-core's allNetwork tests.
     it.each([
-      ['a rejection of the first item', 2, HardwareErrorCode.UserRejected],
-      ['a mid-operation disconnect', 3, HardwareErrorCode.DeviceNotFound],
-      ['a rejection of a later chain', 4, HardwareErrorCode.UserRejected],
+      ['a rejection of the first item', 1, HardwareErrorCode.UserRejected],
+      ['a mid-operation disconnect', 2, HardwareErrorCode.DeviceNotFound],
+      ['a rejection of a later chain', 3, HardwareErrorCode.UserRejected],
     ])(
       'stops a USB bundle after %s without retrying or switching to QR',
       async (_name, failAt, code) => {
@@ -1901,8 +1962,8 @@ describe('KeystoneAdapter', () => {
         usb.failCallAt(failAt, code);
 
         const result = await adapter.allNetworkGetAddress(
-          `keystone-wallet:${FIXTURE_WALLET_ID}`,
-          FIXTURE_WALLET_ID,
+          `keystone-wallet:${FIXTURE_MFP}`,
+          FIXTURE_MFP,
           {
             bundle: [
               { methodName: 'btcGetPublicKey', network: 'btc', path: "m/44'/0'/0'" },
@@ -1982,10 +2043,10 @@ describe('KeystoneAdapter', () => {
 
       // Signing always reaches the device, unlike an address that could be served locally.
       const params = { path: "m/44'/60'/0'/0/0", serializedTx: `02${'ab'.repeat(30)}` };
-      const first = await adapter.evmSignTransaction(connected.payload, FIXTURE_WALLET_ID, params);
+      const first = await adapter.evmSignTransaction(connected.payload, FIXTURE_MFP, params);
       expect(first.success).toBe(false);
 
-      const retry = await adapter.evmSignTransaction(connected.payload, FIXTURE_WALLET_ID, params);
+      const retry = await adapter.evmSignTransaction(connected.payload, FIXTURE_MFP, params);
       expect(retry.success).toBe(true);
       expect(usb.connectArgs).toHaveLength(attachesAfterConnect);
       expect(qrFake.requests).toHaveLength(0);
@@ -2005,8 +2066,8 @@ describe('KeystoneAdapter', () => {
       const qrBefore = qrFake.requests.length;
 
       const signed = await adapter.evmSignTransaction(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
+        `keystone-wallet:${FIXTURE_MFP}`,
+        FIXTURE_MFP,
         { path: "m/44'/60'/0'/0/0", serializedTx: `02${'ab'.repeat(30)}` }
       );
 
@@ -2148,8 +2209,7 @@ describe('KeystoneAdapter', () => {
         if (!connected.success) return;
         if (route !== 'operation') await adapter.releaseOperation(connected.payload);
         if (route === 'forced') await adapter.switchTransport('usb');
-        const target =
-          route === 'operation' ? connected.payload : `keystone-wallet:${FIXTURE_WALLET_ID}`;
+        const target = route === 'operation' ? connected.payload : `keystone-wallet:${FIXTURE_MFP}`;
         const callUsb = usb.connector.call.bind(usb.connector);
         const callSpy = jest
           .spyOn(usb.connector, 'call')
@@ -2171,7 +2231,7 @@ describe('KeystoneAdapter', () => {
             path: "m/44'/60'/0'/0/0",
             serializedTx: `02${'ab'.repeat(30)}`,
           };
-          const signed = await adapter.evmSignTransaction(target, FIXTURE_WALLET_ID, params);
+          const signed = await adapter.evmSignTransaction(target, FIXTURE_MFP, params);
           const shouldUseQr = route === 'auto' && origin === 'transport';
           expect(signed.success).toBe(shouldUseQr);
           if (!signed.success) {
@@ -2185,7 +2245,7 @@ describe('KeystoneAdapter', () => {
           const connectsAfterFailure = usb.connectArgs.length;
           callSpy.mockRestore();
           // A later user request can still use the same operation and USB session.
-          const retry = await adapter.evmSignTransaction(target, FIXTURE_WALLET_ID, params);
+          const retry = await adapter.evmSignTransaction(target, FIXTURE_MFP, params);
           expect(retry.success).toBe(true);
           expect(usb.connectArgs).toHaveLength(connectsAfterFailure);
           expect(qrFake.requests).toHaveLength(shouldUseQr ? 1 : 0);
@@ -2232,33 +2292,60 @@ describe('KeystoneAdapter', () => {
   });
 
   describe('generic searchDevices → connectDevice flow', () => {
-    it('rejects a different Keystone when connectId commits to a 64-hex wallet identity', async () => {
+    it('rejects a different Keystone when connectId commits to a wallet mfp', async () => {
       const usb = fakeUsbConnector({ root: OTHER_ROOT });
       const adapter = newTestAdapter(usb.connector);
 
-      const connected = await adapter.connectDevice(`keystone-wallet:${FIXTURE_WALLET_ID}`);
+      const connected = await adapter.connectDevice(`keystone-wallet:${FIXTURE_MFP}`);
 
       expect(connected.success).toBe(false);
-      expect(usb.connectArgs).toEqual([undefined]);
-      expect(usb.calls).toHaveLength(1);
+      expect(usb.connectArgs).toEqual([FIXTURE_MFP]);
+      expect(usb.calls).toHaveLength(0);
     });
 
-    it('rejects 8-hex identifiers without opening USB or starting QR', async () => {
+    it('rejects non-mfp identifiers without opening USB or starting QR', async () => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);
       const qrFake = attachFakeDevice(adapter);
 
-      for (const identifier of [FIXTURE_MFP, `keystone-qr:${FIXTURE_MFP}`]) {
+      const legacyWalletId = 'ab'.repeat(32);
+      for (const identifier of [
+        legacyWalletId,
+        `keystone-wallet:${legacyWalletId}`,
+        `keystone-qr:${FIXTURE_MFP}`,
+      ]) {
         const connected = await adapter.connectDevice(identifier);
         expect(connected.success).toBe(false);
         if (!connected.success) {
           expect(connected.payload.code).toBe(HardwareErrorCode.DeviceNotFound);
         }
       }
-      const address = await adapter.evmGetAddress(null, FIXTURE_MFP, {
+      const address = await adapter.evmGetAddress(null, legacyWalletId, {
         path: "m/44'/60'/0'/0/0",
       });
-      expect(address.success).toBe(false);
+      expect(address).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceNotFound },
+      });
+      expect(usb.connectArgs).toHaveLength(0);
+      expect(qrFake.requests).toHaveLength(0);
+    });
+
+    it('rejects a connectId and deviceId that name different wallets', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+
+      const address = await adapter.evmGetAddress(
+        `keystone-wallet:${FIXTURE_MFP}`,
+        mfpOf(OTHER_ROOT),
+        { path: "m/44'/60'/0'/0/0" }
+      );
+
+      expect(address).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceMismatch },
+      });
       expect(usb.connectArgs).toHaveLength(0);
       expect(qrFake.requests).toHaveLength(0);
     });
@@ -2289,7 +2376,7 @@ describe('KeystoneAdapter', () => {
       const info = await adapter.getDeviceInfo(connected.payload, '');
       expect(info.success).toBe(true);
       if (!info.success) return;
-      expect(info.payload.deviceId).toBe(FIXTURE_WALLET_ID);
+      expect(info.payload.deviceId).toBe(FIXTURE_MFP);
     });
 
     it('lists a QR target without operation and connectDevice binds its wallet', async () => {
@@ -2314,7 +2401,7 @@ describe('KeystoneAdapter', () => {
       const info = await adapter.getDeviceInfo(connected.payload, '');
       expect(info.success).toBe(true);
       if (!info.success) return;
-      expect(info.payload.deviceId).toBe(FIXTURE_WALLET_ID);
+      expect(info.payload.deviceId).toBe(FIXTURE_MFP);
       expect(fake.requests).toHaveLength(1);
     });
 
@@ -2337,7 +2424,7 @@ describe('KeystoneAdapter', () => {
       await expect(adapter.getDeviceInfo(second.payload, '')).resolves.toEqual({
         success: true,
         payload: expect.objectContaining({
-          connectId: `keystone-wallet:${FIXTURE_WALLET_ID}`,
+          connectId: `keystone-wallet:${FIXTURE_MFP}`,
         }),
       });
 
@@ -2371,7 +2458,7 @@ describe('KeystoneAdapter', () => {
       if (!connected.success) return;
       expect(fake.requests).toHaveLength(1);
 
-      const address = await adapter.solGetAddress(connected.payload, FIXTURE_WALLET_ID, {
+      const address = await adapter.solGetAddress(connected.payload, FIXTURE_MFP, {
         path: solPath,
         operationId: connected.payload,
       });
@@ -2400,61 +2487,54 @@ describe('KeystoneAdapter', () => {
       jest.spyOn(usb.connector, 'searchDevices').mockRejectedValue(enumerationError);
 
       await expect(adapter.searchDevices()).resolves.toEqual([
-        expect.objectContaining({ deviceId: FIXTURE_WALLET_ID, connectionType: 'qr' }),
+        expect.objectContaining({ deviceId: FIXTURE_MFP, connectionType: 'qr' }),
       ]);
       await expect(adapter.searchDevices({ transportType: 'usb' })).rejects.toBe(enumerationError);
     });
   });
 
   describe('USB channel', () => {
-    it.each(['connect', 'identity'] as const)(
-      'cancels USB first contact during %s and drains late completion before reuse',
-      async phase => {
-        const usb = fakeUsbConnector();
-        const adapter = new KeystoneAdapter({ usbConnector: usb.connector });
-        const [target] = await adapter.searchDeviceTargets({ transportType: 'usb' });
-        let resume!: () => void;
-        const wait = new Promise<void>(resolve => {
-          resume = resolve;
-        });
-        const originalConnect = usb.connector.connect.bind(usb.connector);
-        const originalCall = usb.connector.call.bind(usb.connector);
-        const connect = jest.spyOn(usb.connector, 'connect').mockImplementation(async (...args) => {
-          if (phase === 'connect') await wait;
-          return originalConnect(...args);
-        });
-        const call = jest.spyOn(usb.connector, 'call').mockImplementation(async (...args) => {
-          if (phase === 'identity') await wait;
-          return originalCall(...args);
-        });
-        const disconnect = jest.spyOn(usb.connector, 'disconnect');
-        const events: HardwareEvent[] = [];
-        adapter.on('device-connect', event => events.push(event));
-        const pending = adapter.connectDevice(target.searchTargetId);
-        await nextImmediate();
-        expect(connect).toHaveBeenCalledTimes(1);
-        adapter.cancel(target.searchTargetId);
-        await expect(pending).resolves.toMatchObject({
-          success: false,
-          payload: { code: HardwareErrorCode.UserAborted },
-        });
-        await expect(adapter.connectDevice(target.searchTargetId)).resolves.toMatchObject({
-          success: false,
-          payload: { code: HardwareErrorCode.DeviceBusyInternal },
-        });
-        expect(connect).toHaveBeenCalledTimes(1);
-        resume();
-        await nextImmediate();
-        expect(disconnect).toHaveBeenCalledWith('keystone-usb-session:1');
-        expect(events).toHaveLength(0);
-        if (phase === 'connect') expect(call).not.toHaveBeenCalled();
-        await expect(adapter.connectDevice(target.searchTargetId)).resolves.toMatchObject({
-          success: true,
-        });
-        expect(events).toHaveLength(1);
-        await adapter.dispose();
-      }
-    );
+    it('cancels USB first contact during connect and drains late completion before reuse', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = new KeystoneAdapter({ usbConnector: usb.connector });
+      const [target] = await adapter.searchDeviceTargets({ transportType: 'usb' });
+      let resume!: () => void;
+      const wait = new Promise<void>(resolve => {
+        resume = resolve;
+      });
+      const originalConnect = usb.connector.connect.bind(usb.connector);
+      const connect = jest.spyOn(usb.connector, 'connect').mockImplementation(async (...args) => {
+        await wait;
+        return originalConnect(...args);
+      });
+      const call = jest.spyOn(usb.connector, 'call');
+      const disconnect = jest.spyOn(usb.connector, 'disconnect');
+      const events: HardwareEvent[] = [];
+      adapter.on('device-connect', event => events.push(event));
+      const pending = adapter.connectDevice(target.searchTargetId);
+      await nextImmediate();
+      expect(connect).toHaveBeenCalledTimes(1);
+      adapter.cancel(target.searchTargetId);
+      await expect(pending).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.UserAborted },
+      });
+      await expect(adapter.connectDevice(target.searchTargetId)).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceBusyInternal },
+      });
+      expect(connect).toHaveBeenCalledTimes(1);
+      resume();
+      await nextImmediate();
+      expect(disconnect).toHaveBeenCalledWith('keystone-usb-session:1');
+      expect(events).toHaveLength(0);
+      expect(call).not.toHaveBeenCalled();
+      await expect(adapter.connectDevice(target.searchTargetId)).resolves.toMatchObject({
+        success: true,
+      });
+      expect(events).toHaveLength(1);
+      await adapter.dispose();
+    });
 
     it('search reset disconnects and retires a pure-USB wallet session', async () => {
       const usb = fakeUsbConnector();
@@ -2467,7 +2547,7 @@ describe('KeystoneAdapter', () => {
 
       expect(disconnect).toHaveBeenCalledWith('keystone-usb-session:1');
       await expect(
-        adapter.getDeviceInfo(`keystone-wallet:${FIXTURE_WALLET_ID}`, FIXTURE_WALLET_ID)
+        adapter.getDeviceInfo(`keystone-wallet:${FIXTURE_MFP}`, FIXTURE_MFP)
       ).resolves.toMatchObject({
         success: false,
         payload: { code: HardwareErrorCode.DeviceNotFound },
@@ -2484,14 +2564,11 @@ describe('KeystoneAdapter', () => {
 
       await adapter.searchDevices({ transportType: 'usb', resetSession: true });
 
-      const info = await adapter.getDeviceInfo(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID
-      );
+      const info = await adapter.getDeviceInfo(`keystone-wallet:${FIXTURE_MFP}`, FIXTURE_MFP);
       expect(info).toEqual({
         success: true,
         payload: expect.objectContaining({
-          deviceId: FIXTURE_WALLET_ID,
+          deviceId: FIXTURE_MFP,
           connectionType: 'qr',
         }),
       });
@@ -2530,7 +2607,7 @@ describe('KeystoneAdapter', () => {
       if (!qrConnected.success) return;
       const qrRequestsAfterConnect = qrFake.requests.length;
 
-      const result = await adapter.btcGetPublicKey(qrConnected.payload, FIXTURE_WALLET_ID, {
+      const result = await adapter.btcGetPublicKey(qrConnected.payload, FIXTURE_MFP, {
         path: "m/84'/0'/0'",
         operationId: qrConnected.payload,
       });
@@ -2555,8 +2632,8 @@ describe('KeystoneAdapter', () => {
       const usbConnectsAfterConnect = usb.connectArgs.length;
 
       const result = await adapter.allNetworkGetAddress(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
+        `keystone-wallet:${FIXTURE_MFP}`,
+        FIXTURE_MFP,
         {
           operationId: qrConnected.payload,
           bundle: [
@@ -2586,20 +2663,15 @@ describe('KeystoneAdapter', () => {
       const qrFake = attachFakeDevice(adapter);
       const path = "m/84'/0'/0'";
 
-      const result = await adapter.btcGetPublicKey(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
-        { path }
-      );
+      const result = await adapter.btcGetPublicKey(`keystone-wallet:${FIXTURE_MFP}`, FIXTURE_MFP, {
+        path,
+      });
 
       expect(result.success).toBe(true);
-      expect(parseHardwareRuntimeId(usb.connectArgs[0])).toMatchObject({
-        kind: 'search-target',
-        vendor: 'keystone',
-      });
+      expect(usb.connectArgs).toEqual([FIXTURE_MFP]);
       expect(qrFake.requests).toHaveLength(0);
-      expect(usb.calls).toHaveLength(2);
-      expect(requestedPathsOfUr((usb.calls[1].params as { urData: string }).urData)).toEqual([
+      expect(usb.calls).toHaveLength(1);
+      expect(requestedPathsOfUr((usb.calls[0].params as { urData: string }).urData)).toEqual([
         path,
       ]);
     });
@@ -2609,18 +2681,14 @@ describe('KeystoneAdapter', () => {
       const adapter = newTestAdapter(usb.connector);
       const qrFake = attachFakeDevice(adapter);
 
-      const first = await adapter.btcGetPublicKey(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
-        { path: "m/84'/0'/0'" }
-      );
+      const first = await adapter.btcGetPublicKey(`keystone-wallet:${FIXTURE_MFP}`, FIXTURE_MFP, {
+        path: "m/84'/0'/0'",
+      });
       // Second operation on a path the first sync did not cover (BTC is
       // account-0 only, so use an EVM account-1 path to force a new sync).
-      const second = await adapter.evmGetAddress(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
-        { path: "m/44'/60'/1'/0/0" }
-      );
+      const second = await adapter.evmGetAddress(`keystone-wallet:${FIXTURE_MFP}`, FIXTURE_MFP, {
+        path: "m/44'/60'/1'/0/0",
+      });
 
       expect(first.success).toBe(true);
       expect(second.success).toBe(true);
@@ -2634,8 +2702,8 @@ describe('KeystoneAdapter', () => {
       const qrFake = attachFakeDevice(adapter);
 
       const result = await adapter.evmSignTransaction(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
+        `keystone-wallet:${FIXTURE_MFP}`,
+        FIXTURE_MFP,
         {
           path: "m/44'/60'/0'/0/0",
           serializedTx: `02${'ab'.repeat(30)}`,
@@ -2643,18 +2711,14 @@ describe('KeystoneAdapter', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(parseHardwareRuntimeId(usb.connectArgs[0])).toMatchObject({
-        kind: 'search-target',
-        vendor: 'keystone',
-      });
+      expect(usb.connectArgs).toEqual([FIXTURE_MFP]);
       expect(usb.calls.map(c => (c.params as { urType: string }).urType)).toEqual([
-        'qr-hardware-call',
         'eth-sign-request',
       ]);
       expect(qrFake.requests).toHaveLength(0);
     });
 
-    it('probes exact USB targets until a cold persisted wallet identity matches', async () => {
+    it('connects USB straight to a persisted mfp instead of probing each target', async () => {
       const usb = fakeUsbConnector({
         incrementSessionIds: true,
         searchRoots: [OTHER_ROOT, FIXTURE_ROOT],
@@ -2663,8 +2727,8 @@ describe('KeystoneAdapter', () => {
       const qrFake = attachFakeDevice(adapter);
 
       const result = await adapter.evmSignTransaction(
-        `keystone-wallet:${FIXTURE_WALLET_ID}`,
-        FIXTURE_WALLET_ID,
+        `keystone-wallet:${FIXTURE_MFP}`,
+        FIXTURE_MFP,
         {
           path: "m/44'/60'/0'/0/0",
           serializedTx: `02${'ab'.repeat(30)}`,
@@ -2672,15 +2736,9 @@ describe('KeystoneAdapter', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(usb.connectArgs).toEqual(usb.searchTargetIds.slice(0, 2));
-      expect(usb.calls.map(call => call.sessionId)).toEqual([
-        'keystone-usb-session:1',
-        'keystone-usb-session:2',
-        'keystone-usb-session:2',
-      ]);
+      expect(usb.connectArgs).toEqual([FIXTURE_MFP]);
+      expect(usb.calls.map(call => call.sessionId)).toEqual(['keystone-usb-session:1']);
       expect(usb.calls.map(call => (call.params as { urType: string }).urType)).toEqual([
-        'qr-hardware-call',
-        'qr-hardware-call',
         'eth-sign-request',
       ]);
       expect(qrFake.requests).toHaveLength(0);
@@ -2697,12 +2755,12 @@ describe('KeystoneAdapter', () => {
       expect(usb.connectArgs).toEqual([usb.searchTargetIds.at(-1)]);
 
       const devices = await adapter.searchDevices();
-      const own = devices.find(d => d.deviceId === FIXTURE_WALLET_ID);
+      const own = devices.find(d => d.deviceId === FIXTURE_MFP);
       expect(own).toBeDefined();
       expect(own?.connectionType).toBe('usb');
     });
 
-    it('connectDevice() resolves only identity and defers USB derivation', async () => {
+    it('connectDevice() takes the USB-reported mfp and defers USB derivation', async () => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);
 
@@ -2710,17 +2768,17 @@ describe('KeystoneAdapter', () => {
       const connected = await adapter.connectDevice(targets[0].searchTargetId);
       expect(connected.success).toBe(true);
       if (!connected.success) return;
-      expect(requestedPathsOfUr((usb.calls[0].params as { urData: string }).urData)).toEqual([
-        KEYSTONE_WALLET_ID_PATH,
-      ]);
-      expect(usb.calls).toHaveLength(1);
+      expect(usb.calls).toHaveLength(0);
 
-      const publicKey = await adapter.btcGetPublicKey(connected.payload, FIXTURE_WALLET_ID, {
+      const publicKey = await adapter.btcGetPublicKey(connected.payload, FIXTURE_MFP, {
         path: "m/84'/0'/0'",
         operationId: connected.payload,
       });
       expect(publicKey.success).toBe(true);
-      expect(usb.calls).toHaveLength(2);
+      expect(usb.calls).toHaveLength(1);
+      expect(requestedPathsOfUr((usb.calls[0].params as { urData: string }).urData)).toEqual([
+        "m/84'/0'/0'",
+      ]);
     });
 
     it('merges a USB connect into an existing QR-synced wallet — device-changed, not a second device-connect', async () => {
@@ -2740,8 +2798,8 @@ describe('KeystoneAdapter', () => {
       expect(events.map(e => e.type)).toEqual(['device-connect', 'device-changed']);
 
       const devices = await adapter.searchDevices();
-      // Merged, not duplicated, still exactly one row for this wallet id.
-      expect(devices.filter(d => d.deviceId === FIXTURE_WALLET_ID)).toHaveLength(1);
+      // Merged, not duplicated, still exactly one row for this wallet mfp.
+      expect(devices.filter(d => d.deviceId === FIXTURE_MFP)).toHaveLength(1);
       expect(devices[0].connectionType).toBe('usb');
       expect(qrFake.requests).toHaveLength(1); // only the original QR import, no USB-side QR requests
     });
@@ -2753,7 +2811,7 @@ describe('KeystoneAdapter', () => {
 
       await connectUsbDevice(adapter);
 
-      const result = await adapter.evmSignTransaction(null, FIXTURE_WALLET_ID, {
+      const result = await adapter.evmSignTransaction(null, FIXTURE_MFP, {
         path: "m/44'/60'/0'/0/0",
         serializedTx: `02${'ab'.repeat(30)}`,
       });
@@ -2761,10 +2819,9 @@ describe('KeystoneAdapter', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
       expect(result.payload.r).toMatch(/^0x[0-9a-f]{64}$/);
-      // Connect derives the wallet id from one fixed account xpub, then the
-      // sign request uses the cached mfp. QR never fires.
+      // Connect takes the mfp from the USB session, so the sign request is the
+      // only USB call. QR never fires.
       expect(usb.calls.map(c => (c.params as { urType: string }).urType)).toEqual([
-        'qr-hardware-call',
         'eth-sign-request',
       ]);
       expect(qrFake.requests).toHaveLength(0);
@@ -2777,7 +2834,7 @@ describe('KeystoneAdapter', () => {
       await connectUsbDevice(adapter);
       usb.failNextCall(HardwareErrorCode.DeviceDisconnected);
 
-      const result = await adapter.evmSignTransaction(null, FIXTURE_WALLET_ID, {
+      const result = await adapter.evmSignTransaction(null, FIXTURE_MFP, {
         path: "m/44'/60'/0'/0/0",
         serializedTx: `02${'ab'.repeat(30)}`,
       });
@@ -2793,25 +2850,24 @@ describe('KeystoneAdapter', () => {
           },
         },
       });
-      expect(usb.calls).toHaveLength(2);
+      expect(usb.calls).toHaveLength(1);
       expect(qrFake.requests).toHaveLength(0);
     });
 
-    it('routes an implicit default-account sync over USB after identity connect', async () => {
+    it('routes an implicit default-account sync over USB after connect', async () => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);
       const qrFake = attachFakeDevice(adapter);
 
       await connectUsbDevice(adapter);
 
-      const result = await adapter.btcGetPublicKey(null, FIXTURE_WALLET_ID, {
+      const result = await adapter.btcGetPublicKey(null, FIXTURE_MFP, {
         path: "m/84'/0'/0'",
       });
 
       expect(result.success).toBe(true);
       if (!result.success) return;
       expect(usb.calls.map(c => (c.params as { urType: string }).urType)).toEqual([
-        'qr-hardware-call',
         'qr-hardware-call',
       ]);
       expect(qrFake.requests).toHaveLength(0);
@@ -2826,7 +2882,7 @@ describe('KeystoneAdapter', () => {
       expect(connected.success).toBe(true);
       usb.failNextCall(HardwareErrorCode.DeviceNotFound);
 
-      const result = await adapter.btcGetPublicKey(null, FIXTURE_WALLET_ID, {
+      const result = await adapter.btcGetPublicKey(null, FIXTURE_MFP, {
         path: "m/84'/0'/0'",
       });
 
@@ -2835,7 +2891,7 @@ describe('KeystoneAdapter', () => {
         payload: { code: HardwareErrorCode.DeviceNotFound },
       });
       expect(usb.connectArgs).toHaveLength(1);
-      expect(usb.calls).toHaveLength(2);
+      expect(usb.calls).toHaveLength(1);
       expect(qrFake.requests).toHaveLength(0);
     });
 
@@ -2847,15 +2903,15 @@ describe('KeystoneAdapter', () => {
       await connectUsbDevice(adapter);
       await adapter.switchTransport('qr');
 
-      const result = await adapter.evmSignTransaction(null, FIXTURE_WALLET_ID, {
+      const result = await adapter.evmSignTransaction(null, FIXTURE_MFP, {
         path: "m/44'/60'/0'/0/0",
         serializedTx: `02${'ab'.repeat(30)}`,
       });
 
       expect(result.success).toBe(true);
-      // USB carried only the identity request from connect. The explicit pin
-      // sends the actual sign request through QR.
-      expect(usb.calls).toHaveLength(1);
+      // Connect sent nothing over USB. The explicit pin sends the sign request
+      // through QR.
+      expect(usb.calls).toHaveLength(0);
       expect(qrFake.requests.map(r => r.data.urType)).toEqual(['eth-sign-request']);
     });
 
@@ -2871,7 +2927,7 @@ describe('KeystoneAdapter', () => {
       });
       jest.spyOn(usb.connector, 'searchDevices').mockRejectedValue(enumerationError);
 
-      const result = await adapter.btcGetPublicKey(null, FIXTURE_WALLET_ID, {
+      const result = await adapter.btcGetPublicKey(null, FIXTURE_MFP, {
         path: "m/84'/0'/0'",
       });
 
@@ -2898,7 +2954,7 @@ describe('KeystoneAdapter', () => {
 
       usb.emitDisconnect();
 
-      const result = await adapter.evmSignTransaction(null, FIXTURE_WALLET_ID, {
+      const result = await adapter.evmSignTransaction(null, FIXTURE_MFP, {
         path: "m/44'/60'/0'/0/0",
         serializedTx: `02${'ab'.repeat(30)}`,
       });
@@ -2921,7 +2977,7 @@ describe('KeystoneAdapter', () => {
       await adapter.releaseOperation(connected.payload);
 
       const devices = await adapter.searchDevices();
-      const own = devices.find(d => d.deviceId === FIXTURE_WALLET_ID);
+      const own = devices.find(d => d.deviceId === FIXTURE_MFP);
       expect(own).toBeDefined();
       expect(own?.connectionType).toBe('qr');
     });
@@ -2939,7 +2995,7 @@ describe('KeystoneAdapter', () => {
 
       expect(events).toHaveLength(1);
       const devices = await adapter.searchDevices();
-      expect(devices.find(d => d.deviceId === FIXTURE_WALLET_ID)).toBeUndefined();
+      expect(devices.find(d => d.deviceId === FIXTURE_MFP)).toBeUndefined();
     });
   });
 
@@ -2967,7 +3023,7 @@ describe('KeystoneAdapter', () => {
         expect(item.success).toBe(true);
         expect(
           (item.payload as { deviceIdentity?: { type: string; value: string } }).deviceIdentity
-        ).toEqual({ vendor: 'keystone', type: 'walletId', value: FIXTURE_WALLET_ID });
+        ).toEqual({ vendor: 'keystone', type: 'walletId', value: FIXTURE_MFP });
       }
     });
 
@@ -2993,7 +3049,7 @@ describe('KeystoneAdapter', () => {
         if (settledJobs === 2) {
           cancelled = true;
           expect(queue.getActiveJob()).toBeNull();
-          adapter.cancel(FIXTURE_WALLET_ID);
+          adapter.cancel(FIXTURE_MFP);
         }
         return result;
       };
@@ -3030,7 +3086,7 @@ describe('Keystone operation transport ownership', () => {
         const connected = selected === 'qr' ? await connectQrDevice(adapter) : usbOperation;
         if (!connected.success) throw new Error('Expected a connected operation');
         usb.emitDisconnect();
-        const result = await adapter.evmGetAddress(connected.payload, FIXTURE_WALLET_ID, {
+        const result = await adapter.evmGetAddress(connected.payload, FIXTURE_MFP, {
           path: "m/44'/60'/0'/0/0",
           operationId: connected.payload,
         });
@@ -3055,7 +3111,7 @@ describe('Keystone operation transport ownership', () => {
     { method: 'solGetAddress', path: "m/44'/501'/0'/0'" },
     { method: 'tronGetAddress', path: "m/44'/195'/0'/0/0" },
   ] as const)(
-    '$method verifies QR wallet identity even while an earlier USB session remains',
+    '$method verifies the QR wallet mfp even while an earlier USB session remains',
     async ({ method, path }) => {
       const usb = fakeUsbConnector();
       const adapter = new KeystoneAdapter({ usbConnector: usb.connector });
@@ -3065,11 +3121,13 @@ describe('Keystone operation transport ownership', () => {
         const connected = await connectQrDevice(adapter);
         if (!connected.success) throw new Error('Expected a QR operation');
         initial.detach();
-        // The response claims the expected short fingerprint but contains
-        // different public keys. Only the full wallet identity can reject it.
-        const wrongWallet = attachFakeDevice(adapter, { root: OTHER_ROOT });
+        // A different wallet answers the QR request with its own mfp.
+        const wrongWallet = attachFakeDevice(adapter, {
+          root: OTHER_ROOT,
+          mfpHex: mfpOf(OTHER_ROOT),
+        });
         try {
-          const result = await adapter[method](connected.payload, FIXTURE_WALLET_ID, {
+          const result = await adapter[method](connected.payload, FIXTURE_MFP, {
             path,
             operationId: connected.payload,
           });
@@ -3077,17 +3135,17 @@ describe('Keystone operation transport ownership', () => {
             success: false,
             payload: { code: HardwareErrorCode.DeviceMismatch },
           });
-          expect(requestedPathsOf(wrongWallet.requests[0])).toContain(KEYSTONE_WALLET_ID_PATH);
+          expect(requestedPathsOf(wrongWallet.requests[0])).toHaveLength(1);
         } finally {
           wrongWallet.detach();
         }
         const correctWallet = attachFakeDevice(adapter);
         try {
           // The positional operation id must carry the same route on retry.
-          const retried = await adapter[method](connected.payload, FIXTURE_WALLET_ID, { path });
+          const retried = await adapter[method](connected.payload, FIXTURE_MFP, { path });
           expect(retried.success).toBe(true);
-          expect(requestedPathsOf(correctWallet.requests[0])).toContain(KEYSTONE_WALLET_ID_PATH);
-          expect(usb.calls).toHaveLength(1);
+          expect(requestedPathsOf(correctWallet.requests[0])).toHaveLength(1);
+          expect(usb.calls).toHaveLength(0);
         } finally {
           correctWallet.detach();
         }
@@ -3100,7 +3158,7 @@ describe('Keystone operation transport ownership', () => {
 });
 
 describe('Keystone automatic USB attach cancellation', () => {
-  it.each(['enumerate', 'connect', 'identity'] as const)(
+  it.each(['enumerate', 'connect'] as const)(
     'stops after cancellation during %s and cleans up late results',
     async phase => {
       const usb = fakeUsbConnector({
@@ -3114,7 +3172,6 @@ describe('Keystone automatic USB attach cancellation', () => {
       });
       const originalSearch = usb.connector.searchDevices.bind(usb.connector);
       const originalConnect = usb.connector.connect.bind(usb.connector);
-      const originalCall = usb.connector.call.bind(usb.connector);
       jest.spyOn(usb.connector, 'searchDevices').mockImplementation(async (...args) => {
         if (phase === 'enumerate') await wait;
         return originalSearch(...args);
@@ -3123,10 +3180,7 @@ describe('Keystone automatic USB attach cancellation', () => {
         if (phase === 'connect') await wait;
         return originalConnect(...args);
       });
-      const call = jest.spyOn(usb.connector, 'call').mockImplementation(async (...args) => {
-        if (phase === 'identity') await wait;
-        return originalCall(...args);
-      });
+      const call = jest.spyOn(usb.connector, 'call');
       const disconnect = jest.spyOn(usb.connector, 'disconnect');
       const connected = jest.fn();
       const qrDisplay = jest.fn();
@@ -3134,7 +3188,7 @@ describe('Keystone automatic USB attach cancellation', () => {
       adapter.on(UI_REQUEST.REQUEST_QR_DISPLAY, qrDisplay);
       let settled = false;
       const pending = adapter
-        .evmGetAddress('', FIXTURE_WALLET_ID, {
+        .evmGetAddress('', FIXTURE_MFP, {
           path: "m/44'/60'/0'/0/0",
         })
         .then(result => {
@@ -3143,7 +3197,7 @@ describe('Keystone automatic USB attach cancellation', () => {
         });
       try {
         await nextImmediate();
-        adapter.cancel(FIXTURE_WALLET_ID);
+        adapter.cancel(FIXTURE_MFP);
         await nextImmediate();
         expect(settled).toBe(true);
         await expect(pending).resolves.toMatchObject({
@@ -3153,11 +3207,11 @@ describe('Keystone automatic USB attach cancellation', () => {
         resume();
         await nextImmediate();
         expect(connect).toHaveBeenCalledTimes(phase === 'enumerate' ? 0 : 1);
-        expect(call).toHaveBeenCalledTimes(phase === 'identity' ? 1 : 0);
+        expect(call).not.toHaveBeenCalled();
         expect(disconnect).toHaveBeenCalledTimes(phase === 'enumerate' ? 0 : 1);
         expect(connected).not.toHaveBeenCalled();
         expect(qrDisplay).not.toHaveBeenCalled();
-        const retried = await adapter.evmGetAddress('', FIXTURE_WALLET_ID, {
+        const retried = await adapter.evmGetAddress('', FIXTURE_MFP, {
           path: "m/44'/60'/0'/0/0",
         });
         expect(retried.success).toBe(true);
@@ -3182,13 +3236,13 @@ describe('Keystone automatic USB attach cancellation', () => {
       usb.emitDisconnect();
       const searchesBefore = usb.searchCalls.length;
       const requestsBefore = fake.requests.length;
-      const pending = adapter.evmSignMessage('', FIXTURE_WALLET_ID, {
+      const pending = adapter.evmSignMessage('', FIXTURE_MFP, {
         path: "m/44'/60'/0'/0/0",
         message: 'cancellation fixture',
       });
       await nextImmediate();
       expect(usb.searchCalls.length).toBe(searchesBefore + 1);
-      adapter.cancel(FIXTURE_WALLET_ID);
+      adapter.cancel(FIXTURE_MFP);
       await expect(pending).resolves.toMatchObject({
         success: false,
         payload: { code: HardwareErrorCode.UserAborted },
@@ -3215,12 +3269,12 @@ describe('Keystone automatic USB attach cancellation', () => {
       await wait;
       return originalConnect(...args);
     });
-    const first = adapter.evmGetAddress('', FIXTURE_WALLET_ID, { path: "m/44'/60'/0'/0/0" });
+    const first = adapter.evmGetAddress('', FIXTURE_MFP, { path: "m/44'/60'/0'/0/0" });
     try {
       await nextImmediate();
-      adapter.cancel(FIXTURE_WALLET_ID);
+      adapter.cancel(FIXTURE_MFP);
       await first;
-      const retried = await adapter.evmGetAddress('', FIXTURE_WALLET_ID, {
+      const retried = await adapter.evmGetAddress('', FIXTURE_MFP, {
         path: "m/44'/60'/0'/0/0",
       });
       expect(retried).toMatchObject({
@@ -3230,7 +3284,7 @@ describe('Keystone automatic USB attach cancellation', () => {
       expect(fake.requests).toHaveLength(0);
       resume();
       await nextImmediate();
-      const afterCleanup = await adapter.evmGetAddress('', FIXTURE_WALLET_ID, {
+      const afterCleanup = await adapter.evmGetAddress('', FIXTURE_MFP, {
         path: "m/44'/60'/0'/0/0",
       });
       expect(afterCleanup.success).toBe(true);

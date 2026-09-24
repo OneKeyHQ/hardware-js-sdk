@@ -38,10 +38,9 @@ import {
 import { KeystoneUrEngine } from '../urEngine/KeystoneUrEngine';
 import { TronSignType } from '../urEngine/TronSignRequest';
 import {
-  KEYSTONE_WALLET_ID_PATH,
+  KEYSTONE_COLD_START_PATH,
   accountKey,
   createDeviceRecord,
-  deriveKeystoneWalletId,
   placeholderDeviceInfo,
   toDeviceInfo,
   walletConnectId,
@@ -56,8 +55,8 @@ import {
 import {
   KEYSTONE_COLD_START_JOB_LABEL,
   keystoneCancelQueueKeys,
+  keystoneMfpFromIdentifier,
   keystoneQueueKey,
-  keystoneWalletIdFromIdentifier,
 } from '../utils/queueKey';
 
 import type { KeystoneKeySchema, KeystoneParsedMultiAccounts, KeystoneUr } from '../urEngine/types';
@@ -125,7 +124,7 @@ type AccountBook = Map<string, KeystoneAccountEntry>;
 
 type OperationRoute = { operationId: string; connectionType: 'usb' | 'qr' };
 
-type ExpectedWallet = { expectedWalletId?: string; expectedMasterFingerprint?: string };
+type ExpectedWallet = { expectedMasterFingerprint?: string };
 
 // Keystone briefly leaves the USB bus when entering external-wallet mode, so a persisted-wallet
 // call must wait out re-enumeration instead of falling back to QR on one empty snapshot.
@@ -178,14 +177,14 @@ function inferHwkChainFromPath(path: string): ChainCapability | undefined {
 
 export interface ImportFromQrOptions {
   /**
-   * 'request' asks the device for the identity xpub; 'scan' waits for whatever export it already
-   * shows. Only the wallet identity is learned either way.
+   * 'request' asks the device for one account; 'scan' waits for whatever export it already shows.
+   * Only the wallet's master fingerprint is learned either way.
    */
   mode?: 'request' | 'scan';
 }
 
 /**
- * QR and USB behind one `IHardwareWallet`, keyed by a wallet id derived from the identity xpub.
+ * QR and USB behind one `IHardwareWallet`, keyed by the wallet's BIP32 master fingerprint.
  * Key material is fetched per operation and never retained.
  */
 export class KeystoneAdapter implements IHardwareWallet {
@@ -264,7 +263,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     if (record.qrSynced) {
       this.emitter.emit(DEVICE.CHANGED, { type: DEVICE.CHANGED, payload: info });
     } else {
-      this._devices.delete(record.walletId);
+      this._devices.delete(record.masterFingerprint);
       this.emitter.emit(DEVICE.DISCONNECT, { type: DEVICE.DISCONNECT, payload: info });
     }
   };
@@ -423,7 +422,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     const devices = await this.searchDevices(options);
     return devices.map(device => ({
       searchTargetId: device.connectId,
-      // The wallet id is stable only after the USB/QR handshake.
+      // The master fingerprint is known only after the USB/QR handshake.
       searchTargetReusePolicy: 'current-discovery',
       vendor: device.vendor,
       connectionType: device.connectionType,
@@ -623,13 +622,15 @@ export class KeystoneAdapter implements IHardwareWallet {
   ): Promise<Response<string>> {
     try {
       const target = this._resolveTarget(connectId, deviceId);
-      const walletId = target.record?.walletId ?? target.expectedWalletId;
-      if (!walletId) {
+      const masterFingerprint = target.expectedMasterFingerprint;
+      if (!masterFingerprint) {
         return Promise.resolve(
           failure(HardwareErrorCode.DeviceNotFound, 'Unknown Keystone wallet identity')
         );
       }
-      return Promise.resolve(success(deriveDeviceFingerprint(`keystone:${chain}:${walletId}`)));
+      return Promise.resolve(
+        success(deriveDeviceFingerprint(`keystone:${chain}:${masterFingerprint}`))
+      );
     } catch (err) {
       return Promise.resolve(this._errorToFailure<string>(err));
     }
@@ -679,7 +680,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           responseUr = await this._requestQrScanAndAwaitResponse(displayDevice, signal);
         } else {
           const requestUr = this.urEngine.buildKeyDerivationRequest({
-            schemas: [keySchema('evm', KEYSTONE_WALLET_ID_PATH)],
+            schemas: [keySchema('evm', KEYSTONE_COLD_START_PATH)],
             origin: this._origin,
           });
           responseUr = await this._requestQrDisplayAndAwaitResponse(
@@ -721,7 +722,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       const { book } = prefetched;
       // On a cold start the prefetch established the wallet identity; route
       // per-item calls to it instead of re-syncing per item.
-      const itemDeviceId = deviceId || prefetched.walletId || '';
+      const itemDeviceId = deviceId || prefetched.masterFingerprint || '';
       // A cancel between two per-item jobs finds nothing to abort; the scope
       // carries it across that gap under the same queue key.
       const scope = this._jobQueue.createCancelScope(
@@ -773,7 +774,7 @@ export class KeystoneAdapter implements IHardwareWallet {
                 ? {
                     vendor: 'keystone' as const,
                     type: 'walletId' as const,
-                    value: record.walletId,
+                    value: record.masterFingerprint,
                   }
                 : undefined,
             },
@@ -1538,7 +1539,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     connectId: string,
     deviceId: string,
     params: AllNetworkGetAddressParams
-  ): Promise<{ book: AccountBook; walletId?: string }> {
+  ): Promise<{ book: AccountBook; masterFingerprint?: string }> {
     return this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
       const target = this._resolveTarget(connectId, deviceId);
       let { record } = target;
@@ -1580,14 +1581,9 @@ export class KeystoneAdapter implements IHardwareWallet {
         !routedToQr &&
         !record?.usbSessionId &&
         this._usbConnector &&
-        target.expectedWalletId
+        target.expectedMasterFingerprint
       ) {
-        record =
-          (await this._tryUsbAttach(
-            signal,
-            target.expectedWalletId,
-            record?.masterFingerprint ?? target.expectedMasterFingerprint
-          )) ?? record;
+        record = (await this._tryUsbAttach(signal, target.expectedMasterFingerprint)) ?? record;
         KeystoneAdapter._throwIfAborted(signal);
       }
 
@@ -1619,7 +1615,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           }
         }
         assertAllBooked();
-        return { book, walletId: record.walletId };
+        return { book, masterFingerprint: record.masterFingerprint };
       }
       if (this._forcedTransport === 'usb') {
         throw createHwkError({
@@ -1628,12 +1624,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         });
       }
 
-      const schemas = [
-        { hwkChain: 'evm' as const, path: KEYSTONE_WALLET_ID_PATH },
-        ...requestedSchemas.filter(
-          schema => normalizePath(schema.path) !== KEYSTONE_WALLET_ID_PATH
-        ),
-      ];
+      const schemas = requestedSchemas;
       const requestUr = this.urEngine.buildKeyDerivationRequest({
         schemas: schemas.map(schema => keySchema(schema.hwkChain, schema.path)),
         origin: this._origin,
@@ -1660,14 +1651,11 @@ export class KeystoneAdapter implements IHardwareWallet {
         }
       }
       assertAllBooked();
-      return { book, walletId: record.walletId };
+      return { book, masterFingerprint: record.masterFingerprint };
     });
   }
 
-  /**
-   * Resolve only the stable 64-hex wallet identity. The 8-hex BIP32 master
-   * fingerprint is protocol metadata and is never accepted as a lookup key.
-   */
+  /** Resolve the wallet's master fingerprint from the connectId and/or deviceId the caller passed. */
   private _resolveTarget(
     connectId?: string,
     deviceId?: string
@@ -1680,45 +1668,31 @@ export class KeystoneAdapter implements IHardwareWallet {
     );
     if (!identifiers.length) return {};
 
-    const walletIds = identifiers
-      .map(identifier => keystoneWalletIdFromIdentifier(identifier))
-      .filter((walletId): walletId is string => Boolean(walletId));
-    if (!walletIds.length) {
+    const fingerprints = identifiers.map(identifier => keystoneMfpFromIdentifier(identifier));
+    const expectedMasterFingerprint = fingerprints[0];
+    if (!expectedMasterFingerprint || fingerprints.some(value => !value)) {
       throw createHwkError({
         code: HardwareErrorCode.DeviceNotFound,
-        message: 'Keystone device lookup requires a 64-hex wallet identity',
+        message: 'Keystone device lookup requires the wallet master fingerprint',
       });
     }
-
-    const expectedWalletId = walletIds[0];
-    if (walletIds.some(walletId => walletId !== expectedWalletId)) {
+    if (fingerprints.some(value => value !== expectedMasterFingerprint)) {
       throw createHwkError({
         code: HardwareErrorCode.DeviceMismatch,
         message: 'Keystone connectId and deviceId identify different wallets',
       });
     }
-    if (identifiers.some(identifier => !keystoneWalletIdFromIdentifier(identifier))) {
-      throw createHwkError({
-        code: HardwareErrorCode.DeviceMismatch,
-        message: 'Keystone connectId and deviceId are inconsistent',
-      });
-    }
 
-    const record = this._devices.get(expectedWalletId);
-    return record
-      ? {
-          record,
-          expectedWalletId,
-          expectedMasterFingerprint: record.masterFingerprint,
-        }
-      : { expectedWalletId };
+    return {
+      record: this._devices.get(expectedMasterFingerprint),
+      expectedMasterFingerprint,
+    };
   }
 
   private _assertParsedIdentity(
     parsed: KeystoneParsedMultiAccounts,
     expected: ExpectedWallet
-  ): string {
-    const walletId = deriveKeystoneWalletId(parsed.accounts);
+  ): void {
     if (
       expected.expectedMasterFingerprint &&
       parsed.masterFingerprint !== expected.expectedMasterFingerprint
@@ -1728,13 +1702,6 @@ export class KeystoneAdapter implements IHardwareWallet {
         message: `Connected Keystone wallet (mfp ${parsed.masterFingerprint}) does not match the requested wallet fingerprint (${expected.expectedMasterFingerprint})`,
       });
     }
-    if (expected.expectedWalletId && walletId !== expected.expectedWalletId) {
-      throw createHwkError({
-        code: HardwareErrorCode.DeviceMismatch,
-        message: 'Connected Keystone wallet does not match the requested wallet identity',
-      });
-    }
-    return walletId;
   }
 
   /**
@@ -1745,17 +1712,12 @@ export class KeystoneAdapter implements IHardwareWallet {
     parsed: KeystoneParsedMultiAccounts,
     options?: { viaUsb?: boolean; usbSessionId?: string }
   ): KeystoneDeviceRecord {
-    const walletId = deriveKeystoneWalletId(parsed.accounts);
-    let record = this._devices.get(walletId);
+    const { masterFingerprint } = parsed;
+    let record = this._devices.get(masterFingerprint);
     const isNew = !record;
     if (!record) {
-      record = createDeviceRecord(walletId, parsed.masterFingerprint);
-      this._devices.set(walletId, record);
-    } else if (record.masterFingerprint !== parsed.masterFingerprint) {
-      throw createHwkError({
-        code: HardwareErrorCode.DeviceMismatch,
-        message: 'Keystone wallet identity returned an inconsistent master fingerprint',
-      });
+      record = createDeviceRecord(masterFingerprint);
+      this._devices.set(masterFingerprint, record);
     }
     record.model = parsed.device ?? record.model;
     record.deviceVersion = parsed.deviceVersion ?? record.deviceVersion;
@@ -1770,8 +1732,8 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   /**
-   * Opens a permitted USB Keystone, reads its mfp, and derives the wallet id from the identity
-   * xpub. A known wallet gains USB in place (`device-changed`); an unseen one becomes USB-only.
+   * Opens a permitted USB Keystone and takes its mfp as the wallet identity. A known wallet gains
+   * USB in place (`device-changed`); an unseen one becomes USB-only.
    */
   private async _connectUsb(
     expected: ExpectedWallet,
@@ -1855,26 +1817,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         });
       }
 
-      const identityRequest = this.urEngine.buildKeyDerivationRequest({
-        schemas: [keySchema('evm', KEYSTONE_WALLET_ID_PATH)],
-        origin: this._origin,
-      });
-      const identityResult = await this._callUsbConnector(
-        session.sessionId,
-        'resolveUr',
-        identityRequest
-      );
-      KeystoneAdapter._throwIfAborted(signal);
-      if (!identityResult.success) {
-        throw rehydrateConnectorError(identityResult.error);
-      }
-      const parsed = this.urEngine.parseAccountResponse(identityResult.payload as KeystoneUr);
-      this._assertParsedIdentity(parsed, {
-        ...expected,
-        expectedMasterFingerprint: expected.expectedMasterFingerprint ?? masterFingerprint,
-      });
-      const walletId = deriveKeystoneWalletId(parsed.accounts);
-      const previousUsbSessionId = this._devices.get(walletId)?.usbSessionId;
+      const previousUsbSessionId = this._devices.get(masterFingerprint)?.usbSessionId;
       if (previousUsbSessionId && previousUsbSessionId !== session.sessionId) {
         try {
           await this._usbConnector.disconnect(previousUsbSessionId);
@@ -1883,10 +1826,13 @@ export class KeystoneAdapter implements IHardwareWallet {
         }
       }
       KeystoneAdapter._throwIfAborted(signal);
-      const record = this._upsertDeviceRecord(parsed, {
-        viaUsb: true,
-        usbSessionId: session.sessionId,
-      });
+      const record = this._upsertDeviceRecord(
+        { masterFingerprint, accounts: [] },
+        {
+          viaUsb: true,
+          usbSessionId: session.sessionId,
+        }
+      );
       KeystoneAdapter._throwIfAborted(signal);
       record.hadUsbSession = true;
       record.model = session.deviceInfo.modelName ?? session.deviceInfo.model ?? record.model;
@@ -1910,12 +1856,11 @@ export class KeystoneAdapter implements IHardwareWallet {
    */
   private async _tryUsbAttach(
     signal: AbortSignal,
-    expectedWalletId?: string,
     expectedMasterFingerprint?: string,
     options?: { waitForReenumeration?: boolean }
   ): Promise<KeystoneDeviceRecord | undefined> {
     KeystoneAdapter._throwIfAborted(signal);
-    if (!expectedWalletId || this._forcedTransport === 'qr' || !this._usbConnector) {
+    if (!expectedMasterFingerprint || this._forcedTransport === 'qr' || !this._usbConnector) {
       return undefined;
     }
 
@@ -1952,34 +1897,17 @@ export class KeystoneAdapter implements IHardwareWallet {
       return undefined;
     }
 
-    // Enumeration retries are silent; the identity handshake runs once so a flaky
-    // channel cannot flash the device's approval screen on every retry.
-    let attached: Response<DeviceInfo> | undefined;
-    let record: KeystoneDeviceRecord | undefined;
-    const candidates = expectedMasterFingerprint ? [undefined] : availableDevices;
-    for (const device of candidates) {
-      // A cold adapter knows only the wallet id, not the mfp: probe each target and
-      // verify the identity xpub before any signing request is sent.
-      // eslint-disable-next-line no-await-in-loop
-      attached = await this._connectUsb(
-        { expectedWalletId, expectedMasterFingerprint },
-        device?.connectId,
-        signal
-      );
-      KeystoneAdapter._throwIfAborted(signal);
-      // A cancelled transfer still draining is busy, not absent; don't fall back to QR.
-      if (!attached.success && attached.payload.code === HardwareErrorCode.DeviceBusyInternal) {
-        throw createHwkError({
-          ...attached.payload,
-          message: attached.payload.error,
-        });
-      }
-      if (attached.success) {
-        record = this._devices.get(expectedWalletId);
-        if (record) break;
-      }
+    // Enumeration retries are silent; the connect runs once, targeted at the expected mfp.
+    const attached = await this._connectUsb({ expectedMasterFingerprint }, undefined, signal);
+    KeystoneAdapter._throwIfAborted(signal);
+    // A cancelled transfer still draining is busy, not absent; don't fall back to QR.
+    if (!attached.success && attached.payload.code === HardwareErrorCode.DeviceBusyInternal) {
+      throw createHwkError({
+        ...attached.payload,
+        message: attached.payload.error,
+      });
     }
-    return record;
+    return attached.success ? this._devices.get(expectedMasterFingerprint) : undefined;
   }
 
   /**
@@ -2012,13 +1940,14 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   private async _resolveUrWithRoute(
-    record: KeystoneDeviceRecord | undefined,
+    callerRecord: KeystoneDeviceRecord | undefined,
     requestUr: KeystoneUr,
     animated: boolean,
     operationId: string | undefined,
     signal: AbortSignal,
     operationName?: string
   ): Promise<KeystoneUr> {
+    let record = callerRecord;
     let interactionRoute: OperationRoute | undefined;
     if (isHardwareOperationId(operationId)) {
       const operation = this._operations.resolve(operationId);
@@ -2039,9 +1968,10 @@ export class KeystoneAdapter implements IHardwareWallet {
       !record.usbSessionId &&
       this._usbConnector
     ) {
-      await this._tryUsbAttach(signal, record.walletId, record.masterFingerprint, {
-        waitForReenumeration: record.hadUsbSession,
-      });
+      record =
+        (await this._tryUsbAttach(signal, record.masterFingerprint, {
+          waitForReenumeration: record.hadUsbSession,
+        })) ?? record;
     }
 
     const wantUsb = interactionRoute
@@ -2185,7 +2115,7 @@ export class KeystoneAdapter implements IHardwareWallet {
 
     let existingRecord = target.record;
     if (!existingRecord) {
-      existingRecord = await this._tryUsbAttach(signal, target.expectedWalletId);
+      existingRecord = await this._tryUsbAttach(signal, target.expectedMasterFingerprint);
       KeystoneAdapter._throwIfAborted(signal);
     }
     const booked = book?.get(key);
@@ -2200,22 +2130,18 @@ export class KeystoneAdapter implements IHardwareWallet {
     ) {
       // Pinned to USB without a session: attach here so enumeration errors
       // surface (resolveUr skips its probe for pinned transports).
-      await this._tryUsbAttach(signal, existingRecord.walletId, existingRecord.masterFingerprint, {
+      await this._tryUsbAttach(signal, existingRecord.masterFingerprint, {
         waitForReenumeration: existingRecord.hadUsbSession,
       });
       KeystoneAdapter._throwIfAborted(signal);
-      existingRecord = this._devices.get(existingRecord.walletId) ?? existingRecord;
+      existingRecord = this._devices.get(existingRecord.masterFingerprint) ?? existingRecord;
     }
 
-    // USB exports one path per request; QR also asks for the identity path so it can verify the
-    // wallet. A leftover USB session must not change a QR operation's request.
+    // A leftover USB session must not change a QR operation's request.
     const useSinglePathUsbExport = operationConnectionType
       ? operationConnectionType === 'usb'
       : this._forcedTransport !== 'qr' && Boolean(existingRecord?.usbSessionId);
-    const schemas =
-      useSinglePathUsbExport || normalizePath(syncPath) === KEYSTONE_WALLET_ID_PATH
-        ? [keySchema(hwkChain, syncPath)]
-        : [keySchema('evm', KEYSTONE_WALLET_ID_PATH), keySchema(hwkChain, syncPath)];
+    const schemas = [keySchema(hwkChain, syncPath)];
     const requestUr = this.urEngine.buildKeyDerivationRequest({ schemas, origin: this._origin });
     const responseUr = await this._resolveUr(existingRecord, requestUr, false, connectId, signal);
     KeystoneAdapter._throwIfAborted(signal);
@@ -2273,23 +2199,26 @@ export class KeystoneAdapter implements IHardwareWallet {
     const target = this._resolveTarget(connectId, deviceId);
     if (target.record) return { record: target.record };
 
-    const attached = await this._tryUsbAttach(signal, target.expectedWalletId);
+    const attached = await this._tryUsbAttach(signal, target.expectedMasterFingerprint);
     KeystoneAdapter._throwIfAborted(signal);
     if (attached) return { record: attached };
 
-    // No known or restorable USB record remains, so continue with QR.
+    // The caller named the wallet: its mfp is all a signing request needs, and a wrong wallet is
+    // refused by the device itself. No identity round trip first.
+    if (target.expectedMasterFingerprint) {
+      return { record: createDeviceRecord(target.expectedMasterFingerprint) };
+    }
+
+    // A true cold start: ask the device once for any account, which carries the mfp.
     const { accountPath } = splitAccountPath(CHAIN_FINGERPRINT_PATHS[chain]);
-    const schemas =
-      accountPath === KEYSTONE_WALLET_ID_PATH
-        ? [keySchema('evm', KEYSTONE_WALLET_ID_PATH)]
-        : [keySchema('evm', KEYSTONE_WALLET_ID_PATH), keySchema(chain, accountPath)];
-    const requestUr = this.urEngine.buildKeyDerivationRequest({ schemas, origin: this._origin });
+    const requestUr = this.urEngine.buildKeyDerivationRequest({
+      schemas: [keySchema(chain, accountPath)],
+      origin: this._origin,
+    });
     const responseUr = await this._resolveUr(undefined, requestUr, false, connectId, signal);
     KeystoneAdapter._throwIfAborted(signal);
 
-    const parsed = this.urEngine.parseAccountResponse(responseUr);
-    this._assertParsedIdentity(parsed, target);
-    return { record: this._upsertDeviceRecord(parsed) };
+    return { record: this._upsertDeviceRecord(this.urEngine.parseAccountResponse(responseUr)) };
   }
 
   /**
@@ -2303,14 +2232,16 @@ export class KeystoneAdapter implements IHardwareWallet {
     return this._operationRouteForIdentifier(activeJobId)?.operationId;
   }
 
-  /** Routes are keyed by connectId; a job key may be the bare wallet id. */
+  /** Routes are keyed by connectId; a job key may be the bare master fingerprint. */
   private _operationRouteForIdentifier(identifier: string): OperationRoute | undefined {
     for (const key of keystoneCancelQueueKeys([identifier])) {
       const route = this._operationRoutes.get(key);
       if (route) return route;
     }
-    const walletId = keystoneWalletIdFromIdentifier(identifier);
-    return walletId ? this._operationRoutes.get(walletConnectId(walletId)) : undefined;
+    const masterFingerprint = keystoneMfpFromIdentifier(identifier);
+    return masterFingerprint
+      ? this._operationRoutes.get(walletConnectId(masterFingerprint))
+      : undefined;
   }
 
   /**
