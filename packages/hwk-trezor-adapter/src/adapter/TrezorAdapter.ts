@@ -733,6 +733,9 @@ export class TrezorAdapter implements IHardwareWallet {
   async switchTransport(_type: TransportType): Promise<void> {}
 
   async searchDevices(options?: SearchDevicesOptions): Promise<DeviceInfo[]> {
+    // The host raises its BLE permission / power dialog from this request; the
+    // native BLE scan itself only returns an empty list when Bluetooth is off.
+    await this._ensureDevicePermission(undefined, undefined, options?.transportType);
     return this._searchDevices(options);
   }
 
