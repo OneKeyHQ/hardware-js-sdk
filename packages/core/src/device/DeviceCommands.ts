@@ -549,6 +549,11 @@ export class DeviceCommands {
           this.device.isProtocolV2() &&
           DEVICE_CONTROL_CALLS.has(callType) &&
           subcode === DeviceErrorCode.DeviceError_Busy;
+        const isProtocolV2PinCancelledBusyFailure =
+          this.device.isProtocolV2() &&
+          !DEVICE_SESSION_CALLS.has(callType) &&
+          subcode === DeviceSessionErrorCode.DeviceSessionError_UserCancelled &&
+          /^pin cancelled$/i.test(normalizedMessage);
         const isProtocolV2FirmwareUpdateBusyFailure =
           this.device.isProtocolV2() &&
           /^requested command not allowed while a firmware update is in progress$/i.test(
@@ -611,7 +616,11 @@ export class DeviceCommands {
             subcode,
             firmwareMessage: message,
           });
-        } else if (isProtocolV2DeviceBusyFailure || isProtocolV2FirmwareUpdateBusyFailure) {
+        } else if (
+          isProtocolV2DeviceBusyFailure ||
+          isProtocolV2PinCancelledBusyFailure ||
+          isProtocolV2FirmwareUpdateBusyFailure
+        ) {
           error = ERRORS.TypedError(HardwareErrorCode.DeviceBusy, message, {
             failureCode: code,
             subcode,
