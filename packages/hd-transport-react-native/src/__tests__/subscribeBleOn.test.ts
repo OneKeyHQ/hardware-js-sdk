@@ -67,27 +67,29 @@ describe('subscribeBleOn', () => {
     ['Unauthorized', HardwareErrorCode.BlePermissionError],
   ] as const)('maps %s to hardware error %s', async (state, errorCode) => {
     const { bleManager, emitState, remove } = createBleManager();
-    const result = subscribeBleOn(bleManager);
+    const result = subscribeBleOn(bleManager, 2000);
     const rejection = expect(result).rejects.toMatchObject({ errorCode });
 
     emitState(state);
+    jest.advanceTimersByTime(1999);
+    expect(remove).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
 
     await rejection;
     expect(remove).toHaveBeenCalledTimes(1);
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  test('settles only once when terminal states repeat', async () => {
+  test('resolves if Bluetooth powers on during the readiness window', async () => {
     const { bleManager, emitState, remove } = createBleManager();
     const result = subscribeBleOn(bleManager);
-    const rejection = expect(result).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BlePoweredOff,
-    });
 
     emitState('PoweredOff');
+    jest.advanceTimersByTime(1999);
+    expect(remove).not.toHaveBeenCalled();
     emitState('PoweredOn');
 
-    await rejection;
+    await expect(result).resolves.toBeUndefined();
     expect(remove).toHaveBeenCalledTimes(1);
     expect(jest.getTimerCount()).toBe(0);
   });
@@ -101,6 +103,7 @@ describe('subscribeBleOn', () => {
         errorCode: HardwareErrorCode.BleScanError,
       });
 
+      emitState('PoweredOff');
       emitState(state);
       jest.advanceTimersByTime(1000);
 

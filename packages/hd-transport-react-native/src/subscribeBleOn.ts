@@ -4,9 +4,10 @@ import timer from './utils/timer';
 
 import type { BlePlxManager } from './types';
 
-export const subscribeBleOn = (bleManager: BlePlxManager, ms = 1000): Promise<void> =>
+export const subscribeBleOn = (bleManager: BlePlxManager, ms = 2000): Promise<void> =>
   new Promise((resolve, reject) => {
     let done = false;
+    let pendingError: Error | undefined;
     let cancelTimeout: () => void = () => undefined;
     let removeSubscription: () => void = () => undefined;
 
@@ -23,11 +24,13 @@ export const subscribeBleOn = (bleManager: BlePlxManager, ms = 1000): Promise<vo
       if (state === 'PoweredOn') {
         finish();
       } else if (state === 'PoweredOff') {
-        finish(ERRORS.TypedError(HardwareErrorCode.BlePoweredOff));
+        pendingError = ERRORS.TypedError(HardwareErrorCode.BlePoweredOff);
       } else if (state === 'Unsupported') {
-        finish(ERRORS.TypedError(HardwareErrorCode.BleUnsupported));
+        pendingError = ERRORS.TypedError(HardwareErrorCode.BleUnsupported);
       } else if (state === 'Unauthorized') {
-        finish(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
+        pendingError = ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
+      } else {
+        pendingError = undefined;
       }
     }, true);
     removeSubscription = () => subscription.remove();
@@ -36,7 +39,7 @@ export const subscribeBleOn = (bleManager: BlePlxManager, ms = 1000): Promise<vo
       removeSubscription();
     } else {
       cancelTimeout = timer.timeout(() => {
-        finish(ERRORS.TypedError(HardwareErrorCode.BleScanError));
+        finish(pendingError ?? ERRORS.TypedError(HardwareErrorCode.BleScanError));
       }, ms);
     }
   });
