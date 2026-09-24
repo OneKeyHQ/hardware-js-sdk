@@ -1,5 +1,3 @@
-import { deriveWalletId } from '@onekeyfe/hwk-adapter-core';
-
 import { normalizePath } from './pathUtils';
 
 import type { KeystoneParsedAccount } from '../urEngine/types';
@@ -7,11 +5,11 @@ import type { ChainCapability, DeviceCapabilities, DeviceInfo } from '@onekeyfe/
 
 export const KEYSTONE_WALLET_CONNECT_ID_PREFIX = 'keystone-wallet:';
 
-/** Fixed public source used to derive a collision-resistant wallet id. */
-export const KEYSTONE_WALLET_ID_PATH = "m/44'/60'/0'";
+/** Account a QR cold start requests when the caller named no path; any path returns the mfp. */
+export const KEYSTONE_COLD_START_PATH = "m/44'/60'/0'";
 
-export function walletConnectId(walletId: string): string {
-  return `${KEYSTONE_WALLET_CONNECT_ID_PREFIX}${walletId}`;
+export function walletConnectId(masterFingerprint: string): string {
+  return `${KEYSTONE_WALLET_CONNECT_ID_PREFIX}${masterFingerprint}`;
 }
 
 export interface KeystoneAccountEntry extends KeystoneParsedAccount {
@@ -23,9 +21,7 @@ export function accountKey(hwkChain: ChainCapability, path: string): string {
 }
 
 export interface KeystoneDeviceRecord {
-  /** SHA-256 id derived from the fixed account-level identity xpub. */
-  walletId: string;
-  /** Lowercase 8-char BIP32 fingerprint used by BC-UR as xfp, never as identity. */
+  /** Lowercase 8-char BIP32 master fingerprint: the wallet identity and the BC-UR xfp. */
   masterFingerprint: string;
   connectId: string;
   /** Optional physical-device id exposed by some Keystone QR export menus. */
@@ -45,28 +41,10 @@ export interface KeystoneDeviceRecord {
   qrSynced?: boolean;
 }
 
-export function deriveKeystoneWalletId(accounts: KeystoneParsedAccount[]): string {
-  const identityAccount = accounts.find(
-    account => normalizePath(account.path) === KEYSTONE_WALLET_ID_PATH
-  );
-  if (!identityAccount?.extendedPublicKey) {
-    throw new Error(
-      `Keystone identity response is missing the extended public key at ${KEYSTONE_WALLET_ID_PATH}`
-    );
-  }
-  return deriveWalletId(
-    `keystone:secp256k1:${KEYSTONE_WALLET_ID_PATH}:${identityAccount.extendedPublicKey.trim()}`
-  );
-}
-
-export function createDeviceRecord(
-  walletId: string,
-  masterFingerprint: string
-): KeystoneDeviceRecord {
+export function createDeviceRecord(masterFingerprint: string): KeystoneDeviceRecord {
   return {
-    walletId,
     masterFingerprint,
-    connectId: walletConnectId(walletId),
+    connectId: walletConnectId(masterFingerprint),
     importedAt: Date.now(),
   };
 }
@@ -85,7 +63,7 @@ export function toDeviceInfo(record: KeystoneDeviceRecord): DeviceInfo {
     model: record.model ?? 'unknown',
     modelName: record.model,
     firmwareVersion: record.deviceVersion ?? '0.0.0',
-    deviceId: record.walletId,
+    deviceId: record.masterFingerprint,
     connectId: record.connectId,
     connectionType: record.usbSessionId ? 'usb' : 'qr',
     capabilities: CAPABILITIES,

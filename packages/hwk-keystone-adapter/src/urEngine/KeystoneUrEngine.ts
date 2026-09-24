@@ -77,9 +77,12 @@ function requireSignatureBytes(hex: string, expectedBytes: number, chain: string
   return hex;
 }
 
+// The registry decodes a missing mfp as four zero bytes; that is never a usable wallet identity.
+const MISSING_MASTER_FINGERPRINT = '00000000';
+
 function requireBip32MasterFingerprint(value: unknown): string {
   const fingerprint = parseBip32MasterFingerprint(value);
-  if (!fingerprint) {
+  if (!fingerprint || fingerprint === MISSING_MASTER_FINGERPRINT) {
     throw new Error('Keystone master fingerprint must be exactly 4 bytes (8 hex characters)');
   }
   return fingerprint;
