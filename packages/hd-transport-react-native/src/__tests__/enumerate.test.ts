@@ -1,15 +1,22 @@
 import { EventEmitter } from 'events';
-
+import { PermissionsAndroid, Platform } from 'react-native';
 import { BleErrorCode } from 'react-native-ble-plx';
 import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { getConnectedDeviceIds } from '../BleManager';
 import ReactNativeBleTransport from '../index';
+import { subscribeBleOn } from '../subscribeBleOn';
 
 jest.mock(
   'react-native',
   () => ({
-    PermissionsAndroid: {},
+    PermissionsAndroid: {
+      PERMISSIONS: {
+        BLUETOOTH_CONNECT: 'android.permission.BLUETOOTH_CONNECT',
+        BLUETOOTH_SCAN: 'android.permission.BLUETOOTH_SCAN',
+      },
+      requestMultiple: jest.fn(),
+    },
     Platform: { OS: 'ios' },
   }),
   { virtual: true }
@@ -42,11 +49,35 @@ jest.mock('../subscribeBleOn', () => ({
 const ONEKEY_SERVICE_UUID = '00000001-0000-1000-8000-00805f9b34fb';
 
 describe('ReactNativeBleTransport scan error mapping', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    Object.assign(Platform, { OS: 'ios', Version: undefined });
+  });
+
+  test('checks Android Bluetooth permissions before waiting for adapter state', async () => {
+    Object.assign(Platform, { OS: 'android', Version: 31 });
+    jest.mocked(PermissionsAndroid).requestMultiple.mockResolvedValueOnce({
+      [PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT]: 'denied',
+      [PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN]: 'denied',
+    });
+    const transport = new ReactNativeBleTransport({});
+    transport.blePlxManager = {} as never;
+    transport.init({ debug: jest.fn(), error: jest.fn() }, new EventEmitter());
+
+    await expect(transport.enumerate()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BlePermissionError,
+    });
+    expect(subscribeBleOn).not.toHaveBeenCalled();
+  });
+
   test.each([
     [BleErrorCode.BluetoothPoweredOff, HardwareErrorCode.BlePoweredOff],
     [BleErrorCode.BluetoothUnsupported, HardwareErrorCode.BleUnsupported],
     [BleErrorCode.BluetoothInUnknownState, HardwareErrorCode.BleScanError],
-    [BleErrorCode.BluetoothUnauthorized, HardwareErrorCode.BleLocationError],
+    [BleErrorCode.BluetoothUnauthorized, HardwareErrorCode.BlePermissionError],
   ])('maps native BLE error %s to hardware error %s', async (nativeCode, errorCode) => {
     jest.mocked(getConnectedDeviceIds).mockResolvedValueOnce([]);
     const blePlxManager = {

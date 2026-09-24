@@ -851,7 +851,6 @@ export default class ReactNativeBleTransport {
     const scanStartedAt = Date.now();
     let firstDeviceMs: number | undefined;
     const blePlxManager = await this.getPlxManager();
-    await subscribeBleOn(blePlxManager);
     if (Platform.OS === 'android' && Platform.Version >= 31) {
       Log?.debug('requesting permissions, please wait...');
 
@@ -868,6 +867,7 @@ export default class ReactNativeBleTransport {
         throw ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
       }
     }
+    await subscribeBleOn(blePlxManager);
 
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     return new Promise<IOneKeyDevice[]>((resolve, reject) => {
@@ -915,7 +915,7 @@ export default class ReactNativeBleTransport {
             } else if (error.errorCode === BleErrorCode.BluetoothUnsupported) {
               finishScan(ERRORS.TypedError(HardwareErrorCode.BleUnsupported));
             } else if (error.errorCode === BleErrorCode.BluetoothUnauthorized) {
-              finishScan(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
+              finishScan(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
             } else if (error.errorCode === BleErrorCode.LocationServicesDisabled) {
               finishScan(ERRORS.TypedError(HardwareErrorCode.BleLocationServicesDisabled));
             } else if (error.errorCode === BleErrorCode.ScanStartFailed) {
