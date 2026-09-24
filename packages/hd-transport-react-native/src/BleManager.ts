@@ -1,7 +1,6 @@
 import BleUtils from '@onekeyfe/react-native-ble-utils';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
-import { onBleKeyMissing, startBleKeyMissingTracking } from './bleKeyMissing';
 import { bleLogger } from './logger';
 
 import type { Peripheral } from '@onekeyfe/react-native-ble-utils';
@@ -32,21 +31,6 @@ export const getConnectedDeviceIds = (serviceUuids: string[]) =>
 export const getBondedDevices = () => BleUtils.getBondedPeripherals();
 
 export const pairDevice = (macAddress: string) => BleUtils.pairDevice(macAddress);
-
-/**
- * Android replaces a bond as BONDING -> NONE, then NONE -> BONDING within milliseconds.
- * The window covers slow broadcast delivery before the first half counts as a failure.
- */
-export const SYSTEM_BONDING_RESTART_WINDOW_MS = 1500;
-
-export type DeviceBondStateOptions = {
-  /**
-   * The system, not this transport, started the bonding in progress. Android 16+ re-pairs
-   * by itself after it detects a lost bond, and a successful re-pair replaces the old bond
-   * instead of going straight to BONDED.
-   */
-  systemInitiated?: boolean;
-};
 
 const createBondFailureError = (bondState: Peripheral['bondState']) => {
   const nativeReason =
@@ -82,22 +66,18 @@ const createBondFailureError = (bondState: Peripheral['bondState']) => {
 
 export const onDeviceBondState = (
   bleMacAddress: string,
-  signal?: AbortSignal,
-  options?: DeviceBondStateOptions
+  signal?: AbortSignal
 ): Promise<Peripheral | undefined> =>
   new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
       return;
     }
-    let pendingFailure: ReturnType<typeof setTimeout> | undefined;
     const cleanup = () => {
       if (timeout) {
         clearTimeout(timeout);
       }
-      if (pendingFailure) clearTimeout(pendingFailure);
       if (cleanupListener) cleanupListener();
-      cleanupKeyMissing?.();
       signal?.removeEventListener('abort', onAbort);
     };
     const onAbort = () => {
@@ -117,20 +97,6 @@ export const onDeviceBondState = (
       );
     }, 60 * 1000);
 
-    // A failed system re-pair restores the old bond, so it also ends in BONDED. Key
-    // missing is what tells it apart from a bond that now works.
-    const cleanupKeyMissing = startBleKeyMissingTracking()
-      ? onBleKeyMissing(bleMacAddress, () => {
-          cleanup();
-          reject(
-            ERRORS.TypedError(HardwareErrorCode.BleBondInvalid, undefined, {
-              phase: 'bond',
-              reason: 'key_missing',
-            })
-          );
-        })
-      : undefined;
-
     const cleanupListener = BleUtils.onDeviceBondState(peripheral => {
       if (peripheral.id?.toLowerCase() !== bleMacAddress.toLowerCase()) {
         return;
@@ -139,20 +105,10 @@ export const onDeviceBondState = (
 
       const hasBonded = bondState.preState === 'BOND_BONDING' && bondState.state === 'BOND_BONDED';
       const hasFailed = bondState.preState === 'BOND_BONDING' && bondState.state === 'BOND_NONE';
-      const hasRestarted = bondState.preState === 'BOND_NONE' && bondState.state === 'BOND_BONDING';
       Logger.debug('onDeviceBondState bondState:', bondState);
       if (hasBonded) {
         cleanup();
         resolve(peripheral);
-      } else if (hasRestarted && pendingFailure) {
-        clearTimeout(pendingFailure);
-        pendingFailure = undefined;
-      } else if (hasFailed && options?.systemInitiated) {
-        if (pendingFailure) clearTimeout(pendingFailure);
-        pendingFailure = setTimeout(() => {
-          cleanup();
-          reject(createBondFailureError(bondState));
-        }, SYSTEM_BONDING_RESTART_WINDOW_MS);
       } else if (hasFailed) {
         cleanup();
         reject(createBondFailureError(bondState));
