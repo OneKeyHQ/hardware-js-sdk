@@ -646,6 +646,25 @@ describe('TrezorAdapter', () => {
     await adapter.dispose();
   });
 
+  it('asks the host for device permission before scanning and fails a denied scan', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    const permissionRequested = jest.fn(() => {
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+        payload: { granted: false, reason: 'bluetoothTurnedOff' },
+      });
+    });
+    adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, permissionRequested);
+
+    await expect(adapter.searchDeviceTargets()).rejects.toMatchObject({
+      code: HardwareErrorCode.DevicePermissionDenied,
+    });
+    expect(permissionRequested).toHaveBeenCalledTimes(1);
+    expect(connector.searchDevices).not.toHaveBeenCalled();
+    await adapter.dispose();
+  });
+
   it('does not open BLE binding for a wallet the host marks USB-only', async () => {
     const connector = createConnector();
     (connector.searchDevices as SearchDevicesMock).mockResolvedValue([]);
