@@ -18,7 +18,6 @@ import {
   HardwareErrorCode,
   HardwareErrorCodeMessage,
   createDeferred,
-  isBleStaleBondHardwareError,
   isHeaderChunk,
 } from '@onekeyfe/hd-shared';
 
@@ -676,10 +675,7 @@ export default class ElectronBleTransport {
         this.resetProtocolV2Frames(uuid);
       },
       // A declared V2 protocol needs no fallback; preserve the actual link failure.
-      shouldRethrow: error =>
-        expectedProtocol === 'V2' ||
-        isBleStaleBondHardwareError(error) ||
-        isProtocolV2LinkDisabledError(error),
+      shouldRethrow: error => expectedProtocol === 'V2' || isProtocolV2LinkDisabledError(error),
     });
     if (!detected) {
       this.clearProbeProtocol(uuid, 'V2');

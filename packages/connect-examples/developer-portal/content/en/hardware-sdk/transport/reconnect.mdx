@@ -38,7 +38,6 @@ HardwareSDK.on(DEVICE.CONNECT, () => {
 
 - Permissions (`BLUETOOTH_SCAN` / `CONNECT`, iOS Bluetooth usage strings, often location on Android) must still be granted after process death. See [React Native BLE](/en/hardware-sdk/transport/react-native-ble).
 - `retryCount` / `timeout` control connection setup before a device call. They do not retry signing or replace application-level recovery.
-- If the OS bond is stale, stop looping connect. Ask the user to forget the device in system Bluetooth settings and pair again.
 - Mini has no BLE. Neo has BLE but no camera. See [Devices](/en/hardware-sdk/concepts/devices).
 
 ## USB-specific

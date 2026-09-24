@@ -45,21 +45,6 @@ jest.mock('../BleManager', () => ({
   pairDevice: jest.fn(() => Promise.resolve({ bonded: true, bonding: false })),
 }));
 
-// The native facade is replaced wholesale above; key missing and link encryption are covered
-// by their own suites.
-jest.mock('../bleKeyMissing', () => ({
-  isBleKeyMissingSupported: jest.fn(() => false),
-  startBleKeyMissingTracking: jest.fn(() => false),
-  stopBleKeyMissingTracking: jest.fn(),
-  waitForBleKeyMissing: jest.fn(() => Promise.resolve(false)),
-}));
-jest.mock('../bleEncryption', () => ({
-  markBleLinkEncrypted: jest.fn(),
-  startBleEncryptionTracking: jest.fn(() => false),
-  stopBleEncryptionTracking: jest.fn(),
-  waitForAndroidLinkEncryption: jest.fn(() => Promise.resolve('unresolved')),
-}));
-
 jest.mock('../subscribeBleOn', () => ({
   subscribeBleOn: jest.fn(() => Promise.resolve()),
 }));
@@ -478,27 +463,11 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   });
 
   test.each([
-    [
-      'ios',
-      'OneKey Neo',
-      {
-        iosErrorCode: 14,
-        reason: 'Peer removed pairing information',
-      },
-      HardwareErrorCode.BlePeerRemovedPairingInformation,
-    ],
-    [
-      'android',
-      'OneKey Pro 2',
-      {
-        androidErrorCode: 5,
-        reason: 'Connection state changed with status 5',
-      },
-      HardwareErrorCode.BleDeviceBondError,
-    ],
+    ['ios', 'OneKey Neo', { iosErrorCode: 14, reason: 'Native connection failed' }],
+    ['android', 'OneKey Pro 2', { androidErrorCode: 5, reason: 'Native connection failed' }],
   ] as const)(
-    'maps a %s %s stale bond during connect before protocol detection',
-    async (platform, deviceName, nativeError, errorCode) => {
+    'keeps a %s %s native connect failure generic before protocol detection',
+    async (platform, deviceName, nativeError) => {
       setPlatformOS(platform);
       const { transport, uuid, device } = createHarness({ deviceName });
       const BleErrorMock = jest.requireMock('react-native-ble-plx').BleError as new (
@@ -512,7 +481,9 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
         .fn()
         .mockRejectedValue(Object.assign(new BleErrorMock(nativeError.reason), nativeError));
 
-      await expect(transport.acquire({ uuid })).rejects.toMatchObject({ errorCode });
+      await expect(transport.acquire({ uuid })).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleConnectedError,
+      });
       expect(pairDeviceMock).toHaveBeenCalledTimes(platform === 'android' ? 1 : 0);
       expect(transport.getProtocolType(uuid)).toBeUndefined();
     }
@@ -608,7 +579,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
-  test('keeps native stale-bond write mapping out of Protocol V1 calls', async () => {
+  test('maps native Protocol V1 write failures to the generic write error', async () => {
     const { transport, uuid, writeCharacteristic } = createV1Harness();
     const nativeError = Object.assign(new Error('Encryption is insufficient'), {
       attErrorCode: 15,
@@ -831,35 +802,6 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     }
   );
 
-  test.each([
-    [
-      'Encryption is insufficient',
-      { reason: 'Encryption is insufficient', attErrorCode: 15 },
-      HardwareErrorCode.BleDeviceBondError,
-    ],
-    [
-      'Peer removed pairing information',
-      { reason: 'Peer removed pairing information', iosErrorCode: 14 },
-      HardwareErrorCode.BlePeerRemovedPairingInformation,
-    ],
-  ] as const)(
-    'fails Protocol V2 acquire immediately on %s instead of waiting for Ping',
-    async (_label, nativeError, errorCode) => {
-      const { transport, uuid, device } = createHarness({
-        monitorError: Object.assign(new Error(nativeError.reason), nativeError),
-      });
-      const probe = jest.spyOn(transport as any, 'probeProtocolV2');
-
-      await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
-        errorCode,
-      });
-
-      expect(probe).not.toHaveBeenCalled();
-      expect(device.cancelConnection).toHaveBeenCalled();
-      expect(transport.getProtocolType(uuid)).toBeUndefined();
-    }
-  );
-
   test.each(['ios', 'android'] as const)(
     'disconnects after a confirmed Protocol V2 probe miss on %s without reporting a bond error',
     async platform => {
@@ -1029,7 +971,6 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       for (const errorCode of [
         HardwareErrorCode.BleDeviceNotBonded,
         HardwareErrorCode.BleDeviceBondedCanceled,
-        HardwareErrorCode.BlePeerRemovedPairingInformation,
         HardwareErrorCode.BleDeviceDisconnected,
         HardwareErrorCode.BleCharacteristicNotifyError,
         HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
@@ -1210,20 +1151,20 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   }, 10_000);
 
-  test('maps a stale bond from the iOS MTU-timeout reconnect', async () => {
+  test('keeps an iOS MTU-timeout reconnect failure generic', async () => {
     const { BleError: BleErrorMock } = jest.requireMock('react-native-ble-plx');
     const { transport, uuid, device } = createHarness();
     device.mtu = 23;
     device.requestMTU.mockImplementationOnce(() => new Promise(() => {}));
     device.connect.mockRejectedValueOnce(
-      Object.assign(new BleErrorMock('Peer removed pairing information'), {
+      Object.assign(new BleErrorMock('Native connection failed'), {
         errorCode: 200,
         iosErrorCode: 14,
       })
     );
 
     await expect(transport.acquire({ uuid })).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
+      errorCode: HardwareErrorCode.BleConnectedError,
     });
     await transport.release(uuid, true).catch(() => undefined);
   }, 10_000);
