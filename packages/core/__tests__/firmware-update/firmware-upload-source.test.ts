@@ -1,6 +1,10 @@
 import { EDeviceType } from '@onekeyfe/hd-shared';
 
-import { uploadFirmwareFromSource } from '../../src/api/firmware/uploadFirmware';
+import { openFirmwareByteSource } from '../../src/api/firmware/FirmwareArtifactSource';
+import {
+  updateResourceFromSource,
+  uploadFirmwareFromSource,
+} from '../../src/api/firmware/uploadFirmware';
 
 import type { Device } from '../../src/device/Device';
 import type { FirmwareByteSource } from '../../src/api/firmware/FirmwareArtifactSource';
@@ -66,5 +70,42 @@ describe('uploadFirmwareFromSource', () => {
     expect(requestedRanges).toHaveLength(Math.ceil(size / requestedLength));
     expect(requestedRanges.every(({ length }) => length <= 256 * 1024)).toBe(true);
     expect(requestedRanges.some(({ length }) => length === size)).toBe(false);
+  });
+});
+
+describe('updateResourceFromSource', () => {
+  it('serves a fixed-size request at the end of a bootloader artifact', async () => {
+    const bytes = new Uint8Array(259072);
+    bytes.fill(0xab);
+    const source = await openFirmwareByteSource({ binary: bytes.buffer });
+    if (!source) {
+      throw new Error('Expected a firmware byte source');
+    }
+
+    const ackChunks: string[] = [];
+    const typedCall = jest.fn(
+      (type: string, _expected: unknown, params: { data_chunk?: string }) => {
+        if (type === 'ResourceUpdate') {
+          return Promise.resolve({
+            type: 'ResourceRequest',
+            message: { offset: 245760, data_length: 16 * 1024 },
+          });
+        }
+        if (type === 'ResourceAck') {
+          ackChunks.push(params.data_chunk ?? '');
+          return Promise.resolve({
+            type: 'Success',
+            message: { message: 'updated' },
+          });
+        }
+        return Promise.reject(new Error(`Unexpected command: ${type}`));
+      }
+    );
+
+    await expect(
+      updateResourceFromSource(typedCall as never, 'bootloader.bin', source)
+    ).resolves.toEqual({ message: 'updated' });
+    expect(ackChunks).toEqual(['ab'.repeat(13312)]);
+    await source.close();
   });
 });

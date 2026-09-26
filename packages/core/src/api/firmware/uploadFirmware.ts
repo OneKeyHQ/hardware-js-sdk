@@ -565,17 +565,19 @@ export const updateResourceFromSource = async (
       !Number.isSafeInteger(offset) ||
       offset === undefined ||
       offset < 0 ||
+      offset >= source.size ||
       !Number.isSafeInteger(dataLength) ||
       dataLength === undefined ||
-      dataLength <= 0 ||
-      offset + dataLength > source.size
+      dataLength <= 0
     ) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
         'Device requested an invalid firmware resource range'
       );
     }
-    const chunk = new Uint8Array(await source.readAt(offset, dataLength));
+    // Touch requests a full chunk even when fewer bytes remain in the artifact.
+    const length = Math.min(dataLength, source.size - offset);
+    const chunk = new Uint8Array(await source.readAt(offset, length));
     response = await typedCall('ResourceAck', ['ResourceRequest', 'Success'], {
       data_chunk: bytesToHex(chunk),
       hash: bytesToHex(blake2s(chunk)),
