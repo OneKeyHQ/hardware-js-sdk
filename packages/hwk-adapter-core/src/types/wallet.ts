@@ -153,12 +153,13 @@ export interface DeviceSelectionRequest extends UiRequestOperationAttribution {
   rejectedConnectId?: string;
 }
 
-/** The SDK has verified this endpoint; the host must persist it before acknowledging. */
+/** The host must persist this endpoint before acknowledging. */
 export interface SaveDeviceBindingRequest extends UiRequestOperationAttribution {
   requestId: string;
   selectionRequestId: string;
   connection: { transport: 'ble'; connectId: string };
-  identity: Extract<WalletIdentity, { vendor: 'ledger' | 'trezor' }>;
+  /** Omitted when the vendor binds the selected BLE endpoint without checking its wallet (Ledger). */
+  identity?: Extract<WalletIdentity, { vendor: 'ledger' | 'trezor' }>;
   extra?: HardwareCallExtra;
 }
 

@@ -10,14 +10,14 @@ import type { TypedEventEmitter } from './TypedEventEmitter';
 import type { UiRequestRegistry } from './UiRequestRegistry';
 
 /**
- * A host refusal is reported, never thrown: wallet identity is already verified, so a lost binding
+ * A host refusal is reported, never thrown: the device is already connected, so a lost binding
  * is worth a warning and a retry, not failing the user's work.
  */
 export type SaveDeviceBindingOutcome =
   | { saved: true }
   | { saved: false; reason: SaveDeviceBindingDeclineReason };
 
-/** Persist a verified binding through the host. Only a user abort throws. */
+/** Persist a binding through the host. Only a user abort throws. */
 export async function requestSaveDeviceBinding(
   emitter: TypedEventEmitter<HardwareEventMap>,
   registry: UiRequestRegistry,
@@ -52,7 +52,7 @@ export async function requestSaveDeviceBinding(
     const response = await pending;
     if (signal?.aborted) throw signal.reason;
     if (response?.saved !== true) {
-      // Both 'mismatch' and 'skipped' concern the host's record, not the verified device.
+      // Both 'mismatch' and 'skipped' concern the host's record, not the connected device.
       return declined(response?.reason ?? 'skipped');
     }
     emitStatus('saved');
