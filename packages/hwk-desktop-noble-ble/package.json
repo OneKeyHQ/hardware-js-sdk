@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-desktop-noble-ble",
-  "version": "1.2.5-alpha.2",
+  "version": "1.2.5-alpha.3",
   "description": "Main-process BLE service (noble) shared by third-party hardware connectors on desktop.",
   "author": "OneKey",
   "license": "MIT",
@@ -58,7 +58,7 @@
     "connector"
   ],
   "dependencies": {
-    "@onekeyfe/hwk-adapter-core": "1.2.5-alpha.2",
+    "@onekeyfe/hwk-adapter-core": "1.2.5-alpha.3",
     "buffer": "^6.0.3"
   },
   "peerDependencies": {
