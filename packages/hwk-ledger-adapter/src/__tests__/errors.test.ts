@@ -2,6 +2,7 @@ import { HardwareErrorCode, serializeConnectorError } from '@onekeyfe/hwk-adapte
 
 import {
   ERROR_TAG,
+  isConnectionLevelError,
   isDeviceDisconnectedError,
   isDeviceLockedError,
   isNetworkError,
@@ -187,8 +188,13 @@ describe('isNetworkError', () => {
     expect(isNetworkError({ _tag: 'FetchError' })).toBe(true);
   });
 
-  it('should detect _tag InvalidGetFirmwareMetadataResponseError (manager-api metadata)', () => {
-    expect(isNetworkError({ _tag: 'InvalidGetFirmwareMetadataResponseError' })).toBe(true);
+  it('should detect _tag NetworkDAError (device-action network failure)', () => {
+    expect(isNetworkError({ _tag: 'NetworkDAError' })).toBe(true);
+  });
+
+  // Metadata failures are a parseable-response problem, not a dead link.
+  it('should NOT claim InvalidGetFirmwareMetadataResponseError as a network failure', () => {
+    expect(isNetworkError({ _tag: 'InvalidGetFirmwareMetadataResponseError' })).toBe(false);
   });
 
   it('should detect in error chain (originalError)', () => {
@@ -264,12 +270,13 @@ describe('mapLedgerError', () => {
     expect(result.code).toBe(HardwareErrorCode.NetworkError);
   });
 
-  it('should map InvalidGetFirmwareMetadataResponseError to NetworkError', () => {
+  it('should map InvalidGetFirmwareMetadataResponseError to LedgerFirmwareMetadataError', () => {
     const result = mapLedgerError({
       _tag: 'InvalidGetFirmwareMetadataResponseError',
       message: 'Invalid Firmware Metadata response error.',
     });
-    expect(result.code).toBe(HardwareErrorCode.NetworkError);
+    expect(result.code).toBe(HardwareErrorCode.LedgerFirmwareMetadataError);
+    expect(result.origin).toBe('transport');
   });
 
   it('should map BLE not-advertising to DeviceNotFound', () => {
@@ -576,5 +583,140 @@ describe('serializeConnectorError', () => {
   it('falls back to a plain message for non-object inputs', () => {
     expect(serializeConnectorError('just a string')).toEqual({ message: 'just a string' });
     expect(serializeConnectorError(undefined)).toEqual({ message: 'Unknown error' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DMK OS / secure-channel device-action errors: no `message` of their own,
+// only `_tag` plus `originalError` holding the text, so they must be matched by tag.
+// ---------------------------------------------------------------------------
+
+/** Shape of @ledgerhq/device-management-kit's device-action error classes. */
+function dmkDaError(tag: string, message: string): Record<string, unknown> {
+  return { _tag: tag, originalError: new Error(message) };
+}
+
+/**
+ * The four classes `SecureChannelError.mapInstallDAErrors()` builds with no
+ * argument, so DMK's own default text applies: the literal "Unknown error.".
+ */
+function dmkDaErrorNoArg(tag: string): Record<string, unknown> {
+  return dmkDaError(tag, 'Unknown error.');
+}
+
+/** Shape of DMK's SecureChannelError: payload on `error`, no `message`. */
+function dmkSecureChannelError(errorMessage: string): Record<string, unknown> {
+  const payload = { url: 'wss://scriptrunner.api.live.ledger.com/update/install', errorMessage };
+  return { _tag: ERROR_TAG.SecureChannel, error: payload, originalError: payload };
+}
+
+describe('installApp DMK error classification', () => {
+  it('maps RefusedByUserDAError to UserRejected', () => {
+    const err = dmkDaErrorNoArg(ERROR_TAG.RefusedByUserDA);
+    expect(isUserRejectedError(err)).toBe(true);
+    const result = mapLedgerError(err);
+    expect(result.code).toBe(HardwareErrorCode.UserRejected);
+    expect(result.origin).toBe('device');
+  });
+
+  it('falls back to the tag rather than surfacing DMK\'s "Unknown error." placeholder', () => {
+    const placeholderClasses = [
+      ERROR_TAG.RefusedByUserDA,
+      ERROR_TAG.AppAlreadyInstalledDA,
+      ERROR_TAG.OutOfMemoryDA,
+      'UnknownDAError',
+    ];
+    for (const tag of placeholderClasses) {
+      const { message } = mapLedgerError(dmkDaErrorNoArg(tag));
+      expect(message).not.toContain('Unknown error.');
+      expect(message).toContain(tag);
+    }
+  });
+
+  it('still prefers real DMK text when the class was given one', () => {
+    const err = dmkDaError(ERROR_TAG.OutOfMemoryDA, 'Not enough memory for those applications');
+    expect(mapLedgerError(err).message).toContain('Not enough memory for those applications');
+  });
+
+  it('maps SecureChannelError to LedgerSecureChannelError with a transport origin', () => {
+    const err = dmkSecureChannelError('Connection closed unexpectedly');
+    const result = mapLedgerError(err);
+    expect(result.code).toBe(HardwareErrorCode.LedgerSecureChannelError);
+    expect(result.origin).toBe('transport');
+  });
+
+  it.each([
+    [ERROR_TAG.AppAlreadyInstalledDA, 'Unknown error.', HardwareErrorCode.AppAlreadyInstalled],
+    [
+      ERROR_TAG.OutOfMemoryDA,
+      'Not enough memory for those applications',
+      HardwareErrorCode.DeviceOutOfMemory,
+    ],
+    [ERROR_TAG.DeviceNotOnboarded, 'Device not onboarded.', HardwareErrorCode.DeviceNotInitialized],
+    [
+      ERROR_TAG.ApplicationsMetadataTask,
+      'Failed to get applications metadata.',
+      HardwareErrorCode.LedgerFirmwareMetadataError,
+    ],
+    [ERROR_TAG.NetworkDA, 'Network error.', HardwareErrorCode.NetworkError],
+  ])('maps %s to its dedicated code', (tag, message, code) => {
+    expect(mapLedgerError(dmkDaError(tag, message)).code).toBe(code);
+  });
+
+  it('keeps secure-channel and metadata failures out of the connection-level set', () => {
+    // Connection-level membership is what drives BLE/transport teardown. A
+    // broken relay to Ledger's servers must never tear down the device link.
+    expect(isConnectionLevelError(dmkSecureChannelError('closed'))).toBe(false);
+    expect(
+      isConnectionLevelError(
+        dmkDaError(
+          ERROR_TAG.InvalidFirmwareMetadataResponse,
+          'Invalid Firmware Metadata response error.'
+        )
+      )
+    ).toBe(false);
+    expect(isDeviceDisconnectedError(dmkSecureChannelError('closed'))).toBe(false);
+  });
+
+  it('still reports UnknownError for a genuinely unmapped tag, but carries _tag', () => {
+    const err = dmkDaErrorNoArg('UnknownDAError');
+    const mapped = mapLedgerError(err);
+    expect(mapped.code).toBe(HardwareErrorCode.UnknownError);
+
+    const failure = ledgerFailure(mapped.code, mapped.message, undefined, 'UnknownDAError');
+    expect(failure.payload._tag).toBe('UnknownDAError');
+  });
+
+  it('carries _tag and the new code through the Failure payload', () => {
+    const err = dmkSecureChannelError('Connection closed unexpectedly');
+    const mapped = mapLedgerError(err);
+    const failure = ledgerFailure(mapped.code, mapped.message, undefined, ERROR_TAG.SecureChannel);
+    expect(failure.payload).toMatchObject({
+      code: HardwareErrorCode.LedgerSecureChannelError,
+      _tag: ERROR_TAG.SecureChannel,
+      origin: 'transport',
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DMK's OpeningConnectionError class carries the runtime `_tag`
+// "ConnectionOpeningError", so both spellings are accepted.
+// ---------------------------------------------------------------------------
+
+describe('connection-opening tag spelling', () => {
+  const spellings = ['ConnectionOpeningError', 'OpeningConnectionError'];
+
+  it.each(spellings)('maps %s to DeviceBusy rather than UnknownError', tag => {
+    const result = mapLedgerError({ _tag: tag, message: 'Failed to open connection' });
+    expect(result.code).toBe(HardwareErrorCode.DeviceBusy);
+  });
+
+  it.each(spellings)('treats %s as a connection-level failure', tag => {
+    expect(isConnectionLevelError({ _tag: tag })).toBe(true);
+  });
+
+  it('matches the tag DMK actually emits', () => {
+    expect(ERROR_TAG.OpeningConnection).toBe('ConnectionOpeningError');
   });
 });

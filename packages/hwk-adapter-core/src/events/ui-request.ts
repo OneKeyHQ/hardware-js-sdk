@@ -13,6 +13,8 @@ export const UI_REQUEST = {
   REQUEST_QR_SCAN: 'ui-request-qr-scan',
   REQUEST_DEVICE_PERMISSION: 'ui-request-device-permission',
   REQUEST_SELECT_DEVICE: 'ui-request-select-device',
+  REQUEST_SAVE_DEVICE_BINDING: 'ui-request-save-device-binding',
+  DEVICE_BINDING_STATUS: 'ui-device-binding-status',
   REQUEST_DEVICE_CONNECT: 'ui-request-device-connect',
   // Ledger BTC App: account index >= 100 requires display=true. Adapter asks
   // the user once per session before promoting the call.
@@ -33,6 +35,7 @@ export const UI_RESPONSE = {
   RECEIVE_PASSPHRASE: 'receive-passphrase',
   RECEIVE_QR_RESPONSE: 'receive-qr-response',
   RECEIVE_SELECT_DEVICE: 'receive-select-device',
+  RECEIVE_SAVE_DEVICE_BINDING: 'receive-save-device-binding',
   RECEIVE_DEVICE_CONNECT: 'receive-device-connect',
   RECEIVE_DEVICE_PERMISSION: 'receive-device-permission',
   RECEIVE_BTC_HIGH_INDEX_CONFIRM: 'receive-btc-high-index-confirm',
@@ -41,6 +44,14 @@ export const UI_RESPONSE = {
   RECEIVE_TREZOR_THP_PAIRING: 'receive-trezor-thp-pairing',
   CANCEL: 'cancel',
 } as const;
+
+/**
+ * The operation a UI request was opened under, so a cancel for one operation spares another's
+ * prompts. Absent outside any operation (cold start, teardown).
+ */
+export type UiRequestOperationAttribution = {
+  operationId?: string;
+};
 
 export type DevicePermissionDeniedReason =
   | 'bluetoothTurnedOff'
@@ -53,7 +64,21 @@ export type DevicePermissionResponse = {
   message?: string;
 };
 
+/**
+ * `mismatch`: the selected device is not this operation's device, surfaced as `DeviceMismatch`.
+ * `skipped`: the host had nothing to bind, a host contract problem rather than a user action.
+ */
+export type SaveDeviceBindingDeclineReason = 'mismatch' | 'skipped';
+
 export type UiResponseEvent =
+  | {
+      type: typeof UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING;
+      payload: {
+        requestId: string;
+        saved: boolean;
+        reason?: SaveDeviceBindingDeclineReason;
+      };
+    }
   | {
       type: typeof UI_RESPONSE.RECEIVE_PIN;
       payload: string;
@@ -75,7 +100,10 @@ export type UiResponseEvent =
       // the REQUEST_SELECT_DEVICE event's `devices` list. Scope is the current
       // search session; may be ephemeral (e.g. Ledger USB DMK UUID).
       type: typeof UI_RESPONSE.RECEIVE_SELECT_DEVICE;
-      payload: { sdkConnectId: string };
+      payload: { requestId?: string } & (
+        | { sdkConnectId: string; cancelled?: false }
+        | { cancelled: true }
+      );
     }
   | {
       type: typeof UI_RESPONSE.RECEIVE_DEVICE_CONNECT;

@@ -1,16 +1,28 @@
 import type { ConnectorUiEvent, EConnectorInteraction } from './connector';
 import type { DEVICE } from '../events/device';
 import type { Response } from './response';
-import type { DeviceInfo, TransportType } from './device';
+import type {
+  ConnectionTarget,
+  ConnectionType,
+  DeviceInfo,
+  DeviceSearchTarget,
+  TransportType,
+  WalletIdentity,
+} from './device';
 import type { IEvmMethods } from './chain-evm';
 import type { IBtcMethods } from './chain-btc';
 import type { ISolMethods } from './chain-sol';
 import type { ITronMethods } from './chain-tron';
 import type { QrDisplayData } from './qr';
 import type { ChainForFingerprint } from './fingerprint';
-import type { UI_REQUEST, UiResponseEvent } from '../events/ui-request';
+import type {
+  UI_REQUEST,
+  UiRequestOperationAttribution,
+  UiResponseEvent,
+} from '../events/ui-request';
 import type { SDK } from '../events/sdk';
 import type { HardwareErrorCode } from './errors';
+import type { OperationEndReason } from '../utils/OperationRegistry';
 import type { AllNetworkMethodName } from '../utils/methodCatalog';
 
 /**
@@ -25,7 +37,7 @@ export type HardwareUiEvent =
       payload: { connectId: string; appName: string; progress: number };
     };
 
-export type ChainCapability = 'evm' | 'btc' | 'sol' | 'tron';
+export type ChainCapability = 'evm' | 'btc' | 'sol' | 'tron' | 'zcash';
 
 export type TrezorDisplayRotation = 'North' | 'East' | 'South' | 'West';
 
@@ -104,19 +116,75 @@ export type DeviceAuthenticityResult = {
   };
 };
 
+/** Persisted connection hints, never proof of device or wallet identity. */
+export type KnownDeviceConnection =
+  | { transport: 'usb' | 'ble'; connectId: string }
+  | { transport: 'qr' };
+
+/** Opaque host lookup identifiers. Never forward these to firmware or logs. */
+export type HardwareCallExtra = Readonly<Record<string, string>>;
+
+export interface IHardwareConnectionContext {
+  knownConnections?: readonly KnownDeviceConnection[];
+  extra?: HardwareCallExtra;
+  /** False makes discovery fail instead of asking the user to select a new endpoint. */
+  allowDeviceSelection?: boolean;
+  /** Transports the host's model table allows; discovery never opens others. Omitted = any. */
+  supportedTransports?: readonly ('usb' | 'ble')[];
+}
+
+export type DeviceSelectionContext =
+  | { kind: 'select-device'; transport: 'usb'; reason: 'multiple-candidates' }
+  | {
+      kind: 'bind-connection';
+      transport: 'ble';
+      reason: 'missing-binding' | 'known-connection-unavailable' | 'manual-rebind';
+    };
+
+export interface DeviceSelectionRequest extends UiRequestOperationAttribution {
+  devices: DeviceInfo[];
+  requestId: string;
+  context: DeviceSelectionContext;
+  extra?: HardwareCallExtra;
+  /** Repeated snapshots with this requestId update one SDK-owned binding scan. */
+  scanning?: boolean;
+  bindingSessionId?: string;
+  /** A candidate rejected by SDK identity verification in this binding session. */
+  rejectedConnectId?: string;
+}
+
+/** The host must persist this endpoint before acknowledging. */
+export interface SaveDeviceBindingRequest extends UiRequestOperationAttribution {
+  requestId: string;
+  selectionRequestId: string;
+  connection: { transport: 'ble'; connectId: string };
+  /** Omitted when the vendor binds the selected BLE endpoint without checking its wallet (Ledger). */
+  identity?: Extract<WalletIdentity, { vendor: 'ledger' | 'trezor' }>;
+  extra?: HardwareCallExtra;
+}
+
+export type BindBleDeviceParams = Pick<SaveDeviceBindingRequest, 'identity' | 'extra'>;
+
+export interface DeviceBindingStatus {
+  selectionRequestId: string;
+  status: 'verifying' | 'saved' | 'failed' | 'cancelled';
+}
+
 /**
  * Cross-chain / cross-vendor options passed alongside any chain method's
  * own params (the optional last argument). Holds operation-level switches
  * that aren't specific to one chain. Vendor-specific options can be added
  * as typed sub-fields here when a vendor actually needs them.
  */
-export interface ICommonCallParams {
+export interface ICommonCallParams extends IHardwareConnectionContext {
   /**
    * When the required device app is missing, prompt the user (UI request)
    * to install it, stream install progress, then retry the operation once.
    * Off by default — preserves the plain "app not installed" failure.
    */
   autoInstallApp?: boolean;
+  /** Runtime-only id from connectDevice(); when present, discovery and fallback are disabled. */
+  operationId?: string;
 }
 
 export type NullableCallArg<T> = T | null | undefined;
@@ -130,6 +198,15 @@ export type IHardwareCommonCallParams = ICommonCallParams & IPassphraseCallParam
 
 export type IHardwareCallParams<T> = T & IHardwareCommonCallParams;
 
+/**
+ * Runtime-only device-manager context, never forwarded to firmware. The expected identity lets an
+ * adapter fail closed before replaying a read or mutation after a reconnect.
+ */
+export interface IDeviceManagerOperationContext extends IHardwareConnectionContext {
+  operationId?: string;
+  expectedDeviceIdentity?: WalletIdentity;
+}
+
 export interface AllNetworkAddressParams {
   network: string;
   path: string;
@@ -142,18 +219,7 @@ export interface AllNetworkGetAddressParams extends IHardwareCommonCallParams {
   bundle: AllNetworkAddressParams[];
 }
 
-export type AllNetworkDeviceIdentity =
-  | {
-      vendor: 'ledger';
-      type: 'chainFingerprint';
-      chain: ChainForFingerprint;
-      value: string;
-    }
-  | {
-      vendor: 'trezor';
-      type: 'deviceId';
-      value: string;
-    };
+export type AllNetworkDeviceIdentity = WalletIdentity;
 
 export type AllNetworkAddressResponsePayload = Record<string, unknown> & {
   error?: string;
@@ -162,6 +228,7 @@ export type AllNetworkAddressResponsePayload = Record<string, unknown> & {
   connectId?: string;
   deviceId?: string;
   deviceIdentity?: AllNetworkDeviceIdentity;
+  rootFingerprint?: number;
   chainFingerprint?: string;
   chainFingerprintChain?: ChainForFingerprint;
   params?: Record<string, unknown>;
@@ -195,21 +262,43 @@ export type DeviceEvent =
 export type UiRequestEvent =
   | {
       type: typeof UI_REQUEST.REQUEST_PIN;
-      payload: { device?: DeviceInfo; connectId?: string; type?: string };
+      payload: {
+        device?: DeviceInfo;
+        connectId?: string;
+        type?: string;
+      } & UiRequestOperationAttribution;
     }
-  | { type: typeof UI_REQUEST.REQUEST_PASSPHRASE; payload: { device: DeviceInfo } }
-  | { type: typeof UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE; payload: { device: DeviceInfo } }
-  | { type: typeof UI_REQUEST.REQUEST_BUTTON; payload: { device: DeviceInfo; code?: string } }
+  | {
+      type: typeof UI_REQUEST.REQUEST_PASSPHRASE;
+      payload: { device: DeviceInfo } & UiRequestOperationAttribution;
+    }
+  | {
+      type: typeof UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE;
+      payload: { device: DeviceInfo } & UiRequestOperationAttribution;
+    }
+  | {
+      type: typeof UI_REQUEST.REQUEST_BUTTON;
+      payload: { device: DeviceInfo; code?: string } & UiRequestOperationAttribution;
+    }
   | {
       type: typeof UI_REQUEST.REQUEST_QR_DISPLAY;
-      payload: { device: DeviceInfo; data: QrDisplayData };
+      payload: { device: DeviceInfo; data: QrDisplayData } & UiRequestOperationAttribution;
     }
-  | { type: typeof UI_REQUEST.REQUEST_QR_SCAN; payload: { device: DeviceInfo } }
+  | {
+      type: typeof UI_REQUEST.REQUEST_QR_SCAN;
+      payload: { device: DeviceInfo } & UiRequestOperationAttribution;
+    }
   | {
       type: typeof UI_REQUEST.REQUEST_DEVICE_PERMISSION;
-      payload: { transportType: TransportType; connectId?: string; deviceId?: string };
+      payload: {
+        transportType: TransportType;
+        connectId?: string;
+        deviceId?: string;
+      } & UiRequestOperationAttribution;
     }
-  | { type: typeof UI_REQUEST.REQUEST_SELECT_DEVICE; payload: { devices: DeviceInfo[] } }
+  | { type: typeof UI_REQUEST.REQUEST_SELECT_DEVICE; payload: DeviceSelectionRequest }
+  | { type: typeof UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING; payload: SaveDeviceBindingRequest }
+  | { type: typeof UI_REQUEST.DEVICE_BINDING_STATUS; payload: DeviceBindingStatus }
   | {
       type: typeof UI_REQUEST.REQUEST_DEVICE_CONNECT;
       payload: {
@@ -229,11 +318,11 @@ export type UiRequestEvent =
          * isn't recognized.
          */
         message: string;
-      };
+      } & UiRequestOperationAttribution;
     }
   | {
       type: typeof UI_REQUEST.REQUEST_INSTALL_APP;
-      payload: { vendor: string; appName: string };
+      payload: { vendor: string; appName: string } & UiRequestOperationAttribution;
     }
   | {
       type: typeof UI_REQUEST.REQUEST_TREZOR_THP_PAIRING;
@@ -242,15 +331,22 @@ export type UiRequestEvent =
         availableMethods: number[];
         selectedMethod: number;
         nfcData?: string;
-      };
+      } & UiRequestOperationAttribution;
     }
-  | { type: typeof UI_REQUEST.CLOSE_UI_WINDOW; payload: Record<string, never> };
+  | { type: typeof UI_REQUEST.CLOSE_UI_WINDOW; payload: UiRequestOperationAttribution };
 
 export type SdkEvent =
   | { type: typeof SDK.DEVICE_INTERACTION; payload: { connectId: string; action: string } }
   | { type: typeof SDK.DEVICE_STUCK; payload: { connectId: string } }
   | { type: typeof SDK.DEVICE_UNRESPONSIVE; payload: { connectId: string } }
-  | { type: typeof SDK.DEVICE_RECOVERED; payload: { connectId: string } };
+  | { type: typeof SDK.DEVICE_RECOVERED; payload: { connectId: string } }
+  | {
+      type: typeof SDK.OPERATION_ENDED;
+      payload: {
+        operationId: string;
+        reason: OperationEndReason;
+      };
+    };
 
 export type HardwareEvent = DeviceEvent | UiRequestEvent | SdkEvent | HardwareUiEvent;
 export type DeviceEventListener = (event: HardwareEvent) => void;
@@ -262,6 +358,14 @@ export type DeviceEventListener = (event: HardwareEvent) => void;
  * and the value is the narrowed event object the listener will receive.
  */
 export interface HardwareEventMap {
+  [UI_REQUEST.DEVICE_BINDING_STATUS]: {
+    type: typeof UI_REQUEST.DEVICE_BINDING_STATUS;
+    payload: DeviceBindingStatus;
+  };
+  [UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING]: {
+    type: typeof UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING;
+    payload: SaveDeviceBindingRequest;
+  };
   // Low-level connector UI event (forwarded from IConnector 'ui-event').
   // Carries every EConnectorInteraction variant — interaction prompts
   // (ConfirmOnDevice / ConfirmOpenApp / UnlockDevice / InteractionComplete /
@@ -287,7 +391,11 @@ export interface HardwareEventMap {
   // UI request events
   [UI_REQUEST.REQUEST_PIN]: {
     type: typeof UI_REQUEST.REQUEST_PIN;
-    payload: { device?: DeviceInfo; connectId?: string; type?: string };
+    payload: {
+      device?: DeviceInfo;
+      connectId?: string;
+      type?: string;
+    } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_PASSPHRASE]: {
     type: typeof UI_REQUEST.REQUEST_PASSPHRASE;
@@ -296,31 +404,35 @@ export interface HardwareEventMap {
       connectId?: string;
       passphraseState?: string;
       useEmptyPassphrase?: boolean;
-    };
+    } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE]: {
     type: typeof UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE;
-    payload: { device: DeviceInfo };
+    payload: { device: DeviceInfo } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_BUTTON]: {
     type: typeof UI_REQUEST.REQUEST_BUTTON;
-    payload: { device: DeviceInfo; code?: string };
+    payload: { device: DeviceInfo; code?: string } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_QR_DISPLAY]: {
     type: typeof UI_REQUEST.REQUEST_QR_DISPLAY;
-    payload: { device: DeviceInfo; data: QrDisplayData };
+    payload: { device: DeviceInfo; data: QrDisplayData } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_QR_SCAN]: {
     type: typeof UI_REQUEST.REQUEST_QR_SCAN;
-    payload: { device: DeviceInfo };
+    payload: { device: DeviceInfo } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_DEVICE_PERMISSION]: {
     type: typeof UI_REQUEST.REQUEST_DEVICE_PERMISSION;
-    payload: { transportType: TransportType; connectId?: string; deviceId?: string };
+    payload: {
+      transportType: TransportType;
+      connectId?: string;
+      deviceId?: string;
+    } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_SELECT_DEVICE]: {
     type: typeof UI_REQUEST.REQUEST_SELECT_DEVICE;
-    payload: { devices: DeviceInfo[] };
+    payload: DeviceSelectionRequest;
   };
   [UI_REQUEST.REQUEST_DEVICE_CONNECT]: {
     type: typeof UI_REQUEST.REQUEST_DEVICE_CONNECT;
@@ -328,7 +440,7 @@ export interface HardwareEventMap {
       vendor: string;
       reason: string;
       message: string;
-    };
+    } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM]: {
     type: typeof UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM;
@@ -336,11 +448,11 @@ export interface HardwareEventMap {
       vendor: string;
       path: string;
       accountIndex: number;
-    };
+    } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_INSTALL_APP]: {
     type: typeof UI_REQUEST.REQUEST_INSTALL_APP;
-    payload: { vendor: string; appName: string };
+    payload: { vendor: string; appName: string } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_TREZOR_THP_PAIRING]: {
     type: typeof UI_REQUEST.REQUEST_TREZOR_THP_PAIRING;
@@ -349,11 +461,11 @@ export interface HardwareEventMap {
       availableMethods: number[];
       selectedMethod: number;
       nfcData?: string;
-    };
+    } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.CLOSE_UI_WINDOW]: {
     type: typeof UI_REQUEST.CLOSE_UI_WINDOW;
-    payload: Record<string, never>;
+    payload: UiRequestOperationAttribution;
   };
 
   // SDK events
@@ -367,28 +479,45 @@ export interface HardwareEventMap {
     payload: { connectId: string };
   };
   [SDK.DEVICE_RECOVERED]: { type: typeof SDK.DEVICE_RECOVERED; payload: { connectId: string } };
+  [SDK.OPERATION_ENDED]: {
+    type: typeof SDK.OPERATION_ENDED;
+    payload: {
+      operationId: string;
+      reason: OperationEndReason;
+    };
+  };
 }
 
 export interface IDeviceManagerMethods {
-  getFeatures?(connectId: string): Promise<Response<Record<string, unknown>>>;
+  getFeatures?(
+    connectId: string,
+    operationContext?: IDeviceManagerOperationContext
+  ): Promise<Response<Record<string, unknown>>>;
   deviceSettings?(
     connectId: string,
-    params: TrezorDeviceSettingsParams
+    params: TrezorDeviceSettingsParams,
+    operationContext?: IDeviceManagerOperationContext
   ): Promise<Response<Record<string, unknown>>>;
   setBrightness?(
     connectId: string,
-    params?: TrezorBrightnessParams
+    params?: TrezorBrightnessParams,
+    operationContext?: IDeviceManagerOperationContext
   ): Promise<Response<Record<string, unknown>>>;
   changePin?(
     connectId: string,
-    params?: TrezorChangePinParams
+    params?: TrezorChangePinParams,
+    operationContext?: IDeviceManagerOperationContext
   ): Promise<Response<Record<string, unknown>>>;
-  wipeDevice?(connectId: string): Promise<Response<Record<string, unknown>>>;
+  wipeDevice?(
+    connectId: string,
+    operationContext?: IDeviceManagerOperationContext
+  ): Promise<Response<Record<string, unknown>>>;
   // Sends AuthenticateDevice and returns the raw AuthenticityProof message.
   // The challenge must be generated host-side and passed in.
   authenticateDevice?(
     connectId: string,
-    params: { challenge: string }
+    params: { challenge: string },
+    operationContext?: IDeviceManagerOperationContext
   ): Promise<Response<Record<string, unknown>>>;
 }
 
@@ -420,9 +549,17 @@ export interface IWalletStateMethods {
    */
   getPassphraseState?(
     connectId: string,
-    passphraseState?: string
+    passphraseState?: string,
+    operationContext?: IDeviceManagerOperationContext
   ): Promise<Response<string | null>>;
 }
+
+/**
+ * `stops-waiting`: an on-device confirmation stays up until answered or timed out.
+ * `interrupts-device`: the command on the wire is withdrawn. No vendor reports it, so hosts
+ * should say "stopped waiting, answer on the device", not "cancelled".
+ */
+export type CancelCapability = 'interrupts-device' | 'stops-waiting';
 
 export interface IHardwareWallet<TConfig = unknown>
   extends IEvmMethods,
@@ -433,6 +570,8 @@ export interface IHardwareWallet<TConfig = unknown>
     IWalletStateMethods {
   readonly vendor: string;
   readonly activeTransport: TransportType | null;
+  /** What `cancel()` reaches on this vendor. Declared, never inferred. */
+  readonly cancelCapability: CancelCapability;
 
   init(config: TConfig): Promise<void>;
   dispose(): Promise<void>;
@@ -443,10 +582,22 @@ export interface IHardwareWallet<TConfig = unknown>
 
   // Device
   searchDevices(options?: SearchDevicesOptions): Promise<DeviceInfo[]>;
-  connectDevice(connectId: string): Promise<Response<string>>;
-  disconnectDevice(connectId: string): Promise<void>;
+  /** Discover selectable hardware entries without claiming identified devices or wallets. */
+  searchDeviceTargets(options?: SearchDevicesOptions): Promise<DeviceSearchTarget[]>;
+  /** @deprecated Use searchDeviceTargets(). */
+  listConnectionTargets(options?: SearchDevicesOptions): Promise<ConnectionTarget[]>;
+  /** Connect or logically bind a selected search result and return a runtime-only operation id. */
+  connectDevice(searchTargetId: string): Promise<Response<string>>;
+  /** Device Manager rebind: verify the existing identity before replacing its BLE locator. */
+  bindBleDevice?(params: BindBleDeviceParams): Promise<Response<string>>;
+  /** Resolve and pin operation routing; the caller verifies wallet identity before business calls. */
+  acquireOperation?(
+    connectId: string,
+    context: IHardwareConnectionContext
+  ): Promise<Response<string>>;
+  /** Release a caller-owned operation. Disconnect events end matching operations automatically. */
+  releaseOperation(operationId: string): Promise<void>;
   getDeviceInfo(connectId: string, deviceId: string): Promise<Response<DeviceInfo>>;
-  getSupportedChains(): ChainCapability[];
   /** Abort the in-flight call. Omit connectId to cancel whatever is active. */
   cancel(connectId?: string): void;
 
@@ -508,4 +659,9 @@ export interface SearchDevicesOptions {
    * was discovered first.
    */
   waitForAllTransports?: boolean;
+  /**
+   * Restrict discovery to one transport. A virtual target (Keystone QR) must not start any wallet
+   * interaction during discovery; `connectDevice()` resolves it.
+   */
+  transportType?: ConnectionType;
 }

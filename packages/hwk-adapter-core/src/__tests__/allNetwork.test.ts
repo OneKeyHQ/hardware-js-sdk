@@ -1,4 +1,11 @@
-import { HardwareErrorCode, runAllNetworkGetAddress, success } from '../index';
+import {
+  HardwareErrorCode,
+  failure,
+  isConnectionLost,
+  isUserRefusal,
+  runAllNetworkGetAddress,
+  success,
+} from '../index';
 
 import type {
   AllNetworkAddressParams,
@@ -99,7 +106,7 @@ describe('runAllNetworkGetAddress', () => {
         responseItem.payload?.code === HardwareErrorCode.DeviceMismatch,
     });
 
-    expect(response).toEqual({
+    expect(response).toMatchObject({
       success: false,
       payload: {
         code: HardwareErrorCode.DeviceMismatch,
@@ -161,5 +168,54 @@ describe('runAllNetworkGetAddress', () => {
         },
       },
     ]);
+  });
+});
+
+describe('shared bundle abort table', () => {
+  it('names user refusal and lost sessions, and nothing else', () => {
+    expect(isUserRefusal(HardwareErrorCode.UserAborted)).toBe(true);
+    expect(isUserRefusal(HardwareErrorCode.UserRejected)).toBe(true);
+    expect(isUserRefusal(HardwareErrorCode.PinCancelled)).toBe(true);
+    expect(isUserRefusal(HardwareErrorCode.DeviceDisconnected)).toBe(false);
+    expect(isUserRefusal(undefined)).toBe(false);
+
+    expect(isConnectionLost(HardwareErrorCode.DeviceDisconnected)).toBe(true);
+    expect(isConnectionLost(HardwareErrorCode.OperationTimeout)).toBe(true);
+    expect(isConnectionLost(HardwareErrorCode.TransportError)).toBe(true);
+    expect(isConnectionLost(HardwareErrorCode.OperationEnded)).toBe(true);
+    expect(isConnectionLost(HardwareErrorCode.OperationNotFound)).toBe(true);
+    expect(isConnectionLost(HardwareErrorCode.UserRejected)).toBe(false);
+    expect(isConnectionLost(undefined)).toBe(false);
+  });
+
+  it('ends a bundle at the refused item instead of asking for the next chain', async () => {
+    const asked: string[] = [];
+
+    const response = await runAllNetworkGetAddress({
+      connectId: 'conn-1',
+      deviceId: 'device-1',
+      params: {
+        bundle: [
+          { methodName: 'btcGetPublicKey', network: 'btc', path: 'p0' },
+          { methodName: 'evmGetAddress', network: 'evm', path: 'p1' },
+          { methodName: 'solGetAddress', network: 'sol', path: 'p2' },
+        ],
+      },
+      callItem: async ({ item, index }) => {
+        asked.push(item.path ?? '');
+        return index === 1
+          ? failure(HardwareErrorCode.UserRejected, 'rejected on device')
+          : success({});
+      },
+      attachIdentity: async ({ item, payload }) => ({ ...item, success: true, payload }),
+      shouldAbortBundle: response =>
+        isUserRefusal(response.payload?.code) || isConnectionLost(response.payload?.code),
+    });
+
+    expect(response).toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.UserRejected },
+    });
+    expect(asked).toEqual(['p0', 'p1']);
   });
 });

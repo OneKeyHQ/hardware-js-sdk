@@ -1,8 +1,11 @@
-export type VendorType = 'trezor' | 'ledger';
+import type { ChainForFingerprint } from './fingerprint';
 
-export type ConnectionType = 'usb' | 'ble';
+export type VendorType = 'trezor' | 'ledger' | 'keystone';
 
-export type TransportType = 'usb' | 'ble' | 'hid' | 'bridge';
+/** 'qr' is a virtual channel: UR payloads travel via app-rendered/scanned QR codes. */
+export type ConnectionType = 'usb' | 'ble' | 'qr';
+
+export type TransportType = 'usb' | 'ble' | 'hid' | 'bridge' | 'qr';
 
 /**
  * Device capabilities — describes what a specific device/connection
@@ -13,12 +16,8 @@ export type TransportType = 'usb' | 'ble' | 'hid' | 'bridge';
  */
 export interface DeviceCapabilities {
   /**
-   * Whether connectId/deviceId persist across sessions.
-   *
-   * - `true`: IDs are stable (e.g., OneKey USB, Trezor USB).
-   *   Business logic can match devices by stored connectId/deviceId.
-   * - `false`: IDs are ephemeral, regenerated each session (e.g., Ledger WebHID).
-   *   Business logic should NOT rely on stored connectId/deviceId for matching.
+   * Whether the discovery handle can be reused to reconnect; `false` requires rediscovery. Says
+   * nothing about identity (Trezor BLE is false yet its device_id is stable); verify it separately.
    */
   persistentDeviceIdentity: boolean;
 }
@@ -59,3 +58,61 @@ export interface DeviceTarget {
   connectId: string;
   deviceId: string;
 }
+
+/**
+ * How long a discovery handle remains safe to use for a new connection.
+ * This is deliberately separate from post-connect device identity.
+ */
+export type SearchTargetReusePolicy = 'current-discovery' | 'reconnectable' | 'rediscover';
+
+export function resolveSearchTargetReusePolicy(
+  device: Pick<DeviceInfo, 'connectionType' | 'capabilities'>
+): SearchTargetReusePolicy {
+  return device.capabilities?.persistentDeviceIdentity ? 'reconnectable' : 'current-discovery';
+}
+
+/**
+ * A selectable result from hardware discovery. It may represent a physical
+ * transport endpoint or an interactive entry such as Keystone QR; it is not a
+ * physical-device or wallet identity.
+ */
+export interface DeviceSearchTarget {
+  /** Opaque handle scoped to the adapter's current discovery state. */
+  searchTargetId: string;
+  /** Whether the handle itself may be retried; never inferred from a stored connectId. */
+  searchTargetReusePolicy?: SearchTargetReusePolicy;
+  vendor: VendorType;
+  connectionType: ConnectionType;
+  kind: 'physical' | 'interactive';
+  label?: string;
+  model?: string;
+  modelName?: string;
+  serialNumber?: string;
+}
+
+/**
+ * @deprecated Use DeviceSearchTarget. Kept for consumers of the pre-release
+ * connection-target API.
+ */
+export type ConnectionTarget = Omit<DeviceSearchTarget, 'searchTargetId'> & {
+  targetId: string;
+  searchTargetId?: string;
+};
+
+export type WalletIdentity =
+  | {
+      vendor: 'ledger';
+      type: 'chainFingerprint';
+      chain: ChainForFingerprint;
+      value: string;
+    }
+  | {
+      vendor: 'trezor';
+      type: 'deviceId';
+      value: string;
+    }
+  | {
+      vendor: 'keystone';
+      type: 'walletId';
+      value: string;
+    };

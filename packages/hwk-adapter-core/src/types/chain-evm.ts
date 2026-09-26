@@ -129,6 +129,11 @@ export interface EvmSignTypedDataFull extends PassphraseStateAware {
     primaryType: string;
     message: Record<string, unknown>;
   };
+  /**
+   * The dApp's original EIP-712 JSON, byte for byte. Serializing vendors (Keystone) must prefer it:
+   * re-stringifying `data` rewrites integers wider than 2^53 and exponent forms.
+   */
+  dataJson?: string;
   metamaskV4Compat?: boolean;
   showMessageHash?: boolean;
   /**

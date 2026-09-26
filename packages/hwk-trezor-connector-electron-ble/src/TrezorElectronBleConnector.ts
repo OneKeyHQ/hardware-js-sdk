@@ -20,7 +20,7 @@ import {
 } from './TrezorElectronBleTransport';
 
 import type { ConnectorDevice } from '@onekeyfe/hwk-adapter-core';
-import type { TrezorBleDeviceInfo } from './types/desktop-api';
+import type { ThirdPartyBleDeviceInfo } from '@onekeyfe/hwk-desktop-noble-ble';
 
 const isStandardHwkError = (error: unknown): error is { code: number } =>
   typeof (error as { code?: unknown })?.code === 'number';
@@ -155,7 +155,7 @@ export class TrezorElectronBleConnector extends TrezorConnectorBase {
     // Base cancel only settles UI waiters; a connect stuck in the main process
     // must be abandoned there.
     try {
-      await this._transport?.cancelPairing();
+      await this._transport?.cancelPairing(sessionId);
     } catch {
       // Cancel must never throw.
     }
@@ -192,13 +192,13 @@ export function createTrezorElectronBleConnector(
   return new TrezorElectronBleConnector(options);
 }
 
-function readStringArrayField(source: TrezorBleDeviceInfo, key: string): string[] | undefined {
+function readStringArrayField(source: ThirdPartyBleDeviceInfo, key: string): string[] | undefined {
   const value = (source as unknown as Record<string, unknown>)[key];
   if (!Array.isArray(value)) return undefined;
   return value.filter((item): item is string => typeof item === 'string');
 }
 
-function toBleFilterLogSample(device: TrezorBleDeviceInfo): Record<string, unknown> {
+function toBleFilterLogSample(device: ThirdPartyBleDeviceInfo): Record<string, unknown> {
   return {
     id: device.id,
     name: device.name,

@@ -2,12 +2,26 @@ import {
   DEVICE,
   DeviceJobQueue,
   HardwareErrorCode,
+  OperationRegistry,
+  SDK,
   TypedEventEmitter,
   UI_REQUEST,
   UI_RESPONSE,
   UiRequestRegistry,
+  canReplayHardwareMethodAfterTransportFailure,
+  createHwkError,
+  defaultOriginForCode,
   failure,
+  isConnectionLost,
+  isHardwareOperationId,
+  isHwkRecoveryHint,
+  isUserRefusal,
+  operationMayHaveCompletedParams,
   rehydrateConnectorError,
+  requestBleDeviceSelection,
+  requestSaveDeviceBinding,
+  resolveHardwareOperationTarget,
+  resolveSearchTargetReusePolicy,
   runAllNetworkGetAddress,
   success,
 } from '@onekeyfe/hwk-adapter-core';
@@ -15,6 +29,7 @@ import { randomBytes } from '@noble/hashes/utils';
 
 import { authenticateDeviceFromProof } from '../deviceAuthenticity';
 import { debugLog } from '../utils/debugLog';
+import { trezorQueueKey } from '../utils/queueKey';
 
 import type { AuthenticityProof } from '../deviceAuthenticity';
 import type {
@@ -22,6 +37,7 @@ import type {
   AllNetworkAddressResponse,
   AllNetworkGetAddressParams,
   AllNetworkMethodName,
+  BindBleDeviceParams,
   BtcAddress,
   BtcGetAddressParams,
   BtcGetPublicKeyParams,
@@ -32,8 +48,9 @@ import type {
   BtcSignature,
   BtcSignedPsbt,
   BtcSignedTx,
-  ChainCapability,
   ChainForFingerprint,
+  ConnectionTarget,
+  ConnectionType,
   ConnectorCallResult,
   ConnectorDevice,
   ConnectorUiEvent,
@@ -41,6 +58,7 @@ import type {
   DeviceAuthenticityResult,
   DeviceEventListener,
   DeviceInfo,
+  DeviceSearchTarget,
   EvmAddress,
   EvmGetAddressParams,
   EvmSignMsgParams,
@@ -54,11 +72,14 @@ import type {
   ICommonCallParams,
   IConnector,
   IDeviceManagerMethods,
+  IDeviceManagerOperationContext,
   IEvmMethods,
+  IHardwareConnectionContext,
   IHardwareWallet,
   ISolMethods,
   ITronMethods,
   Response,
+  SearchDevicesOptions,
   SolAddress,
   SolGetAddressParams,
   SolSignMsgParams,
@@ -126,6 +147,21 @@ type TrezorDeviceManagerMethodName = AsyncMethodName<IDeviceManagerMethods>;
 
 type TrezorMethodName = TrezorWalletMethodName | TrezorDeviceManagerMethodName;
 
+type TrezorBundleContext = {
+  connection?: { connectId: string; sessionId: string };
+};
+
+const ALL_NETWORK_COMMON_PARAM_KEYS = [
+  'autoInstallApp',
+  'passphraseState',
+  'useEmptyPassphrase',
+  'operationId',
+  'knownConnections',
+  'extra',
+  'allowDeviceSelection',
+  'supportedTransports',
+] as const;
+
 const TREZOR_BTC_NETWORK_COIN_MAP: Partial<Record<string, string>> = {
   btc: 'Bitcoin',
   bitcoin: 'Bitcoin',
@@ -142,12 +178,40 @@ const TREZOR_BTC_NETWORK_COIN_MAP: Partial<Record<string, string>> = {
   dash: 'Dash',
 };
 
+export interface TrezorKnownDeviceConnection {
+  deviceId: string;
+  usbConnectId?: string;
+  bleConnectId?: string;
+}
+
+export interface TrezorAdapterOptions {
+  /** Persisted endpoints are routing hints, never proof of device identity. */
+  knownDeviceConnections?: readonly TrezorKnownDeviceConnection[];
+}
+
 export class TrezorAdapter implements IHardwareWallet {
   readonly vendor = 'trezor' as const;
+
+  // The connector has no protocol-level cancel: the adapter stops waiting and
+  // drops the late response, the device carries on.
+  readonly cancelCapability = 'stops-waiting' as const;
 
   private readonly _connector: IConnector;
 
   private readonly _emitter = new TypedEventEmitter<HardwareEventMap>();
+
+  private readonly _operations = new OperationRegistry({
+    vendor: 'trezor',
+    onEnded: (operation, reason) => {
+      this._emitter.emit(SDK.OPERATION_ENDED, {
+        type: SDK.OPERATION_ENDED,
+        payload: { operationId: operation.operationId, reason },
+      });
+      if (reason === 'timeout') {
+        void this._releaseOperationConnection(operation).catch(() => undefined);
+      }
+    },
+  });
 
   private readonly _devices = new Map<string, DeviceInfo>();
 
@@ -170,14 +234,34 @@ export class TrezorAdapter implements IHardwareWallet {
     Map<string, TrezorVerifiedPassphraseSession>
   >();
 
+  /** Raw connector calls that outlive an aborted caller, keyed by session. */
+  private readonly _unsettledConnectorOperations = new Map<string, number>();
+
+  private readonly _connectorIdleWaiters = new Set<() => void>();
+
+  private _resetPromise: Promise<void> | null = null;
+
+  private _connectorTeardownTail: Promise<void> = Promise.resolve();
+
+  private _pendingConnectorTeardowns = 0;
+
+  private _stateGeneration = 0;
+
   // Per-device queue with preemption + AbortSignal. Same-device chain calls
   // serialize (Trezor's protocol is single-request-response — interleaving
   // desyncs THP nonce). 'safe' read methods auto-cancel each other; 'confirm'
   // sign methods emit REQUEST_PREEMPTION so the consumer can decide.
   private readonly _jobQueue: DeviceJobQueue;
 
-  constructor(connector: IConnector) {
+  private readonly _knownDeviceConnections = new Map<string, TrezorKnownDeviceConnection>();
+
+  constructor(connector: IConnector, options?: TrezorAdapterOptions) {
     this._connector = connector;
+    for (const connection of options?.knownDeviceConnections ?? []) {
+      if (connection.deviceId) {
+        this._knownDeviceConnections.set(connection.deviceId, { ...connection });
+      }
+    }
     // Upstream DeviceJobQueue is now a global FIFO with no built-in
     // preemption — interruptibility lives at the application layer.
     this._jobQueue = new DeviceJobQueue();
@@ -213,19 +297,35 @@ export class TrezorAdapter implements IHardwareWallet {
   private static _splitCommonParams(params: unknown): {
     passphraseState?: string;
     useEmptyPassphrase?: boolean;
+    operationId?: string;
+    connectionContext?: IHardwareConnectionContext;
     rest: unknown;
   } {
     if (params && typeof params === 'object') {
       const {
         passphraseState,
         autoInstallApp: _autoInstallApp,
+        operationId,
         useEmptyPassphrase,
+        knownConnections,
+        extra,
+        allowDeviceSelection,
+        supportedTransports,
         ...rest
       } = params as Record<string, unknown>;
       return {
         passphraseState: typeof passphraseState === 'string' ? passphraseState : undefined,
         useEmptyPassphrase:
           typeof useEmptyPassphrase === 'boolean' ? useEmptyPassphrase : undefined,
+        operationId: typeof operationId === 'string' ? operationId : undefined,
+        connectionContext: {
+          knownConnections: knownConnections as IHardwareConnectionContext['knownConnections'],
+          extra: extra as IHardwareConnectionContext['extra'],
+          allowDeviceSelection:
+            typeof allowDeviceSelection === 'boolean' ? allowDeviceSelection : undefined,
+          supportedTransports:
+            supportedTransports as IHardwareConnectionContext['supportedTransports'],
+        },
         rest,
       };
     }
@@ -236,26 +336,18 @@ export class TrezorAdapter implements IHardwareWallet {
     item: AllNetworkAddressParams,
     commonParams: TrezorCommonParams
   ): AllNetworkAddressParams {
-    const autoInstallApp = commonParams?.autoInstallApp;
-    const passphraseState = commonParams?.passphraseState;
-    const useEmptyPassphrase = commonParams?.useEmptyPassphrase;
-    if (
-      autoInstallApp === undefined &&
-      passphraseState === undefined &&
-      useEmptyPassphrase === undefined
-    ) {
-      return item;
-    }
+    const defined = ALL_NETWORK_COMMON_PARAM_KEYS.filter(key => commonParams?.[key] !== undefined);
+    if (!defined.length) return item;
     return {
       ...item,
-      ...(autoInstallApp !== undefined ? { autoInstallApp } : {}),
-      ...(passphraseState !== undefined ? { passphraseState } : {}),
-      ...(useEmptyPassphrase !== undefined ? { useEmptyPassphrase } : {}),
+      ...Object.fromEntries(defined.map(key => [key, commonParams?.[key]])),
     };
   }
 
   // Keys are matched after normalizeLogKey, so snake_case/camelCase both hit.
   private static readonly _sensitiveLogKeys = new Set([
+    'extra',
+    'knownconnections',
     'credential',
     'credentials',
     'entropy',
@@ -439,16 +531,11 @@ export class TrezorAdapter implements IHardwareWallet {
    * selected is gone (the device evicted it from its limited slot pool). The
    * caller drops the stale cache entry and recreates from scratch.
    *
-   * NOTE: the exact eviction code still needs real-device confirmation — match
-   * conservatively so a genuine error isn't mistaken for an evicted session
-   * (which would silently re-prompt the passphrase).
+   * Match only the protocol's explicit unallocated-channel code. Guessing from
+   * an error message could replay a request after an unrelated business error.
    */
   private static _isStaleSessionError(code: unknown): boolean {
-    if (typeof code !== 'string') return false;
-    return (
-      code === 'ThpUnallocatedChannel' ||
-      /invalid.?session|unallocated.?session|session.?not.?found/i.test(code)
-    );
+    return code === 'ThpUnallocatedChannel';
   }
 
   private static _errorCode(error: unknown): unknown {
@@ -476,13 +563,14 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   /**
-   * Race a promise against an abort signal. Copied from LedgerAdapter:
-   * IConnector.call() can't actually be cancelled at the protocol level, but
-   * the caller gets the abort immediately and the underlying work completes
-   * uselessly in the background.
+   * Race a promise against an abort signal. IConnector.call() can't actually
+   * be cancelled at the protocol level, so the caller gets the abort while the
+   * adapter keeps the transport exclusively reserved until the raw call drains.
    */
   private static _abortable<T>(signal: AbortSignal, promise: Promise<T>): Promise<T> {
     if (signal.aborted) {
+      // The operation may already have started before its signal was checked.
+      void promise.catch(() => undefined);
       return Promise.reject(
         (signal as AbortSignal & { reason?: unknown }).reason ?? new Error('Aborted')
       );
@@ -505,19 +593,49 @@ export class TrezorAdapter implements IHardwareWallet {
     });
   }
 
-  private async _connectSession(connectId: string, signal?: AbortSignal): Promise<string> {
+  private async _connectSession(
+    connectId: string,
+    signal: AbortSignal | undefined,
+    stateGeneration: number,
+    transportType?: ConnectionType
+  ): Promise<string> {
     const connectOnce = async () => {
-      const connectPromise = this._connector.connect(connectId);
-      if (!signal) return connectPromise;
+      if (signal?.aborted) {
+        throw (signal as AbortSignal & { reason?: unknown }).reason ?? new Error('Aborted');
+      }
+      this._assertConnectorIdle('connectDevice');
+      const releaseOperation = this._retainConnectorOperation(`connect:${connectId}`);
+      let connectPromise: ReturnType<IConnector['connect']>;
       try {
-        return await TrezorAdapter._abortable(signal, connectPromise);
+        connectPromise = transportType
+          ? this._connector.connect(connectId, { transportType })
+          : this._connector.connect(connectId);
       } catch (error) {
-        // _abortable rejected (abort/failure) but the underlying connect keeps
-        // running — tear down any session it still resolves so it isn't orphaned.
-        void connectPromise.then(
-          orphan => this._connector.disconnect(orphan.sessionId).catch(() => undefined),
-          () => undefined
-        );
+        releaseOperation();
+        throw error;
+      }
+      if (!signal) {
+        try {
+          return await connectPromise;
+        } finally {
+          releaseOperation();
+        }
+      }
+      try {
+        const session = await TrezorAdapter._abortable(signal, connectPromise);
+        releaseOperation();
+        return session;
+      } catch (error) {
+        if (signal.aborted) {
+          // The underlying connect cannot be cancelled. Keep the connector
+          // reserved until its late session has been disconnected.
+          void connectPromise
+            .then(orphan => this._connector.disconnect(orphan.sessionId).catch(() => undefined))
+            .catch(() => undefined)
+            .finally(releaseOperation);
+        } else {
+          releaseOperation();
+        }
         throw error;
       }
     };
@@ -536,10 +654,20 @@ export class TrezorAdapter implements IHardwareWallet {
       });
       session = await connectOnce();
     }
-    // disconnectDevice() ran mid-connect: tear down the now-unwanted session
-    // instead of caching it (else it leaks a limited THP slot).
-    if (this._disconnectRequested.delete(connectId)) {
-      await this._connector.disconnect(session.sessionId).catch(() => undefined);
+    // releaseOperation()/resetState() ran mid-connect: tear down the now-
+    // unwanted session instead of caching it (else it leaks a limited THP slot
+    // or lets stale state reappear after reset).
+    if (
+      signal?.aborted ||
+      stateGeneration !== this._stateGeneration ||
+      this._disconnectRequested.delete(connectId)
+    ) {
+      const releaseCleanup = this._retainConnectorOperation(`disconnect:${session.sessionId}`);
+      try {
+        await this._connector.disconnect(session.sessionId).catch(() => undefined);
+      } finally {
+        releaseCleanup();
+      }
       throw Object.assign(new Error('Trezor connection aborted'), {
         code: HardwareErrorCode.UserAborted,
       });
@@ -557,14 +685,9 @@ export class TrezorAdapter implements IHardwareWallet {
   async init(_config?: unknown): Promise<void> {}
 
   async dispose(): Promise<void> {
+    await this._resetStateAndDisconnectSessions();
     this._unregisterConnectorEvents();
-    this._uiRegistry.reset();
-    this._jobQueue.clear();
     this._connector.reset();
-    this._devices.clear();
-    this._sessions.clear();
-    this._verifiedPassphraseSessionsByConnectId.clear();
-    this._connectingPromises.clear();
     this._emitter.removeAllListeners();
   }
 
@@ -574,12 +697,33 @@ export class TrezorAdapter implements IHardwareWallet {
    * error flows. Aborts active jobs and releases UI waits.
    */
   resetState(): void {
+    void this._resetStateAndDisconnectSessions();
+  }
+
+  private _resetStateAndDisconnectSessions(): Promise<void> {
+    if (this._resetPromise) return this._resetPromise;
+
+    const sessionIds = new Set(this._sessions.values());
+    this._stateGeneration += 1;
+    this._operations.endAll('runtime-reset');
     this._uiRegistry.reset();
     this._jobQueue.clear();
     this._devices.clear();
     this._sessions.clear();
     this._verifiedPassphraseSessionsByConnectId.clear();
     this._connectingPromises.clear();
+
+    const resetPromise = this._runConnectorTeardown(async () => {
+      for (const sessionId of sessionIds) {
+        await this._connector.disconnect(sessionId).catch(() => undefined);
+      }
+    });
+    this._resetPromise = resetPromise;
+    return resetPromise.finally(() => {
+      if (this._resetPromise === resetPromise) {
+        this._resetPromise = null;
+      }
+    });
   }
 
   getAvailableTransports(): TransportType[] {
@@ -588,37 +732,191 @@ export class TrezorAdapter implements IHardwareWallet {
 
   async switchTransport(_type: TransportType): Promise<void> {}
 
-  async searchDevices(options?: { waitForAllTransports?: boolean }): Promise<DeviceInfo[]> {
-    await this._ensureDevicePermission();
+  async searchDevices(options?: SearchDevicesOptions): Promise<DeviceInfo[]> {
+    // The host raises its BLE permission / power dialog from this request; the
+    // native BLE scan itself only returns an empty list when Bluetooth is off.
+    await this._ensureDevicePermission(undefined, undefined, options?.transportType);
+    return this._searchDevices(options);
+  }
+
+  private async _searchDevices(
+    options?: SearchDevicesOptions,
+    signal?: AbortSignal
+  ): Promise<DeviceInfo[]> {
+    if (options?.transportType && !this._availableTransports().includes(options.transportType))
+      return [];
+    if (options?.resetSession) {
+      await this._resetStateAndDisconnectSessions();
+    } else {
+      await this._connectorTeardownTail;
+    }
+    if (signal?.aborted) throw signal.reason;
+    const stateGeneration = this._stateGeneration;
     const scanned = await this._connector.searchDevices(
-      options?.waitForAllTransports ? { waitForAll: true } : undefined
+      options?.waitForAllTransports || options?.transportType
+        ? {
+            ...(options.waitForAllTransports ? { waitForAll: true } : {}),
+            ...(options.transportType ? { transportType: options.transportType } : {}),
+          }
+        : undefined
     );
+    if (signal?.aborted) throw signal.reason;
+    if (stateGeneration !== this._stateGeneration) {
+      throw createHwkError({
+        code: HardwareErrorCode.UserAborted,
+        message: 'Trezor discovery belongs to an ended operation',
+      });
+    }
     const scannedIds = new Set(scanned.map(d => d.connectId));
     // A rescan that misses a currently-connected device shouldn't evict it —
     // otherwise getDeviceInfo would return DeviceNotFound for an active session.
     for (const connectId of [...this._devices.keys()]) {
-      if (!scannedIds.has(connectId) && !this._sessions.has(connectId)) {
+      if (
+        (!options?.transportType ||
+          this._devices.get(connectId)?.connectionType === options.transportType) &&
+        !scannedIds.has(connectId) &&
+        !this._sessions.has(connectId)
+      ) {
         this._devices.delete(connectId);
       }
     }
     for (const device of scanned) {
       const info = this._connectorDeviceToDeviceInfo(device);
-      this._devices.set(info.connectId, info);
+      // Discovery descriptors do not carry the firmware-verified identity.
+      if (!this._sessions.has(info.connectId)) this._devices.set(info.connectId, info);
     }
-    return Array.from(this._devices.values());
+    return Array.from(this._devices.values()).filter(
+      device => !options?.transportType || device.connectionType === options.transportType
+    );
   }
 
-  async connectDevice(connectId: string): Promise<Response<string>> {
+  async searchDeviceTargets(options?: SearchDevicesOptions): Promise<DeviceSearchTarget[]> {
+    const devices = await this.searchDevices(options);
+    return devices.map(device => ({
+      searchTargetId: device.connectId,
+      searchTargetReusePolicy: resolveSearchTargetReusePolicy(device),
+      vendor: 'trezor',
+      connectionType: device.connectionType,
+      kind: 'physical',
+      label: device.label,
+      model: device.model,
+      modelName: device.modelName,
+      serialNumber: device.serialNumber,
+    }));
+  }
+
+  async listConnectionTargets(options?: SearchDevicesOptions): Promise<ConnectionTarget[]> {
+    const targets = await this.searchDeviceTargets(options);
+    return targets.map(({ searchTargetId, ...target }) => ({
+      ...target,
+      targetId: searchTargetId,
+    }));
+  }
+
+  async bindBleDevice(params: BindBleDeviceParams): Promise<Response<string>> {
+    if (params.identity?.vendor !== 'trezor' || !params.identity.value) {
+      return failure(HardwareErrorCode.InvalidParams, 'Trezor device identity is required');
+    }
+    const { value: deviceId } = params.identity;
     try {
-      await this._ensureDevicePermission(connectId);
-      await this._ensureSession(connectId);
-      return success(connectId);
+      return await this._jobQueue.enqueue(
+        deviceId,
+        async signal => {
+          const selected = await this._selectBleDeviceForBinding(
+            deviceId,
+            signal,
+            { extra: params.extra },
+            'manual-rebind'
+          );
+          try {
+            const persisted = await this._emitVerifiedBinding(
+              deviceId,
+              selected.connectId,
+              selected.selectionRequestId,
+              { extra: params.extra },
+              signal
+            );
+            if (!persisted) {
+              // A business call can shrug off an unsaved binding, but here
+              // saving the binding is the operation.
+              throw createHwkError({
+                code: HardwareErrorCode.UnknownError,
+                message: 'Bluetooth binding could not be saved',
+                origin: 'host',
+              });
+            }
+            this._rememberVerifiedConnection(deviceId, selected.connectId);
+            return success(selected.connectId);
+          } catch (error) {
+            await this._releaseProvisionalConnection(selected.connectId, signal);
+            throw error;
+          }
+        },
+        {
+          label: 'bindBleDevice',
+          rejectIfBusy: true,
+          busyError: TrezorAdapter._createDeviceBusyError('bindBleDevice'),
+        }
+      );
     } catch (error) {
       return this._errorToFailure(error);
     }
   }
 
-  async disconnectDevice(connectId: string): Promise<void> {
+  async connectDevice(searchTargetId: string): Promise<Response<string>> {
+    const scope = this._jobQueue.createCancelScope(searchTargetId);
+    try {
+      await TrezorAdapter._abortable(
+        scope.signal,
+        this._ensureDevicePermission(
+          searchTargetId,
+          undefined,
+          this._devices.get(searchTargetId)?.connectionType
+        )
+      );
+      await this._ensureSession(searchTargetId, scope.signal);
+      if (scope.signal.aborted) throw scope.signal.reason;
+      const device = this._devices.get(searchTargetId);
+      if (!device) {
+        return failure(HardwareErrorCode.DeviceNotFound, 'Trezor device not found after connect');
+      }
+      this._operations.endByConnectionKey(searchTargetId, 'explicit');
+      const operation = this._operations.create({
+        searchTargetId,
+        connectId: searchTargetId,
+        device,
+        connectionType: device.connectionType,
+        connectionKeys: [this._sessions.get(searchTargetId) ?? ''],
+      });
+      return success(operation.operationId);
+    } catch (error) {
+      if (scope.signal.aborted) {
+        // Hosts may tear down the BLE link on failure. Keep explicit connect
+        // pending until the raw handshake and its late-session cleanup finish.
+        await this._waitForConnectorOperationsToDrain();
+        return failure(HardwareErrorCode.UserAborted, 'Trezor connection aborted');
+      }
+      return this._errorToFailure(error);
+    } finally {
+      scope.release();
+    }
+  }
+
+  async releaseOperation(operationId: string): Promise<void> {
+    const operation = this._operations.find(operationId);
+    if (!operation) {
+      this._operations.resolve(operationId);
+      return;
+    }
+    const endedOperation = this._operations.end(operationId, 'explicit');
+    if (!endedOperation) return;
+    await this._releaseOperationConnection(endedOperation);
+  }
+
+  private async _releaseOperationConnection(
+    operation: NonNullable<ReturnType<OperationRegistry['find']>>
+  ): Promise<void> {
+    const { connectId } = operation;
     const connecting = this._connectingPromises.has(connectId);
     this._connectingPromises.delete(connectId);
     const sessionId = this._sessions.get(connectId);
@@ -628,12 +926,21 @@ export class TrezorAdapter implements IHardwareWallet {
       if (connecting) this._disconnectRequested.add(connectId);
       return;
     }
-    this._sessions.delete(connectId);
-    this._verifiedPassphraseSessionsByConnectId.delete(connectId);
-    await this._connector.disconnect(sessionId);
+    await this._disconnectSession(connectId, sessionId);
   }
 
-  async getDeviceInfo(connectId: string, deviceId: string): Promise<Response<DeviceInfo>> {
+  async getDeviceInfo(
+    connectIdOrOperationId: string,
+    deviceId: string
+  ): Promise<Response<DeviceInfo>> {
+    let connectId: string;
+    try {
+      connectId = isHardwareOperationId(connectIdOrOperationId)
+        ? this._operations.resolve(connectIdOrOperationId).connectId
+        : connectIdOrOperationId;
+    } catch (error) {
+      return this._errorToFailure(error);
+    }
     const device =
       this._devices.get(connectId) ??
       Array.from(this._devices.values()).find(item => item.deviceId === deviceId);
@@ -641,96 +948,148 @@ export class TrezorAdapter implements IHardwareWallet {
     return success(device);
   }
 
-  getSupportedChains(): ChainCapability[] {
-    // Keep in sync with TrezorConnectorBase.call()'s switch.
-    // Chain inclusion means "at least one method wired" — per-method gaps:
-    //   sol: signMessage is explicitly NotSupported (firmware doesn't ship it).
-    //   tron: signMessage same. signTransaction uses the multi-step
-    //         TronContractRequest flow.
-    return ['btc', 'evm', 'sol', 'tron'];
-  }
-
   async allNetworkGetAddress(
     connectId: string,
     deviceId: string,
     params: AllNetworkGetAddressParams
   ): Promise<Response<AllNetworkAddressResponse[]>> {
+    const target = resolveHardwareOperationTarget(connectId, params.operationId, 'trezor');
+    if (!target.success) return target;
+
+    let effectiveTargetId = target.payload.targetId ?? '';
+    let releaseOperationRetention: (() => void) | undefined;
+    try {
+      releaseOperationRetention = target.payload.operationId
+        ? this._operations.retain(target.payload.operationId)
+        : undefined;
+    } catch (error) {
+      return this._errorToFailure(error);
+    }
+
+    // Each item enqueues its own job, so a cancel landing between two items has
+    // no job to abort. The scope survives that gap; same key `_callMethod`
+    // enqueues under, so `cancel()` reaches it with the key it already computes.
+    const cancelScope = this._jobQueue.createCancelScope(
+      trezorQueueKey({ operationId: target.payload.operationId, connectId: effectiveTargetId })
+    );
+
     let liveDeviceId = '';
+    const bundleContext: TrezorBundleContext = {};
     const topLevelFailureIndexes = new Set<number>();
     const isSingleNetworkBundle = params.bundle.every(
       item => item.network === params.bundle[0]?.network
     );
-    const getLiveDeviceId = async (): Promise<Response<string>> => {
+    const getLiveDeviceId = async (expectedDeviceId?: string): Promise<Response<string>> => {
       if (liveDeviceId) return success(liveDeviceId);
-      const deviceIdResponse = await this._getTrezorDeviceId(connectId);
+      const deviceIdResponse = await this._getTrezorDeviceId(
+        effectiveTargetId,
+        expectedDeviceId || deviceId,
+        params,
+        bundleContext
+      );
       if (deviceIdResponse.success) {
         liveDeviceId = deviceIdResponse.payload;
+        if (!target.payload.operationId) {
+          effectiveTargetId = bundleContext.connection?.connectId ?? effectiveTargetId;
+        }
       }
       return deviceIdResponse;
     };
 
-    return runAllNetworkGetAddress({
-      connectId,
-      deviceId,
-      params,
-      normalizeItem: TrezorAdapter._normalizeAllNetworkItem,
-      callItem: async ({ method, item, index }) => {
-        const expectedDeviceId = TrezorAdapter._getItemDeviceId(item) ?? deviceId;
-        if (expectedDeviceId) {
-          const fingerprint = await getLiveDeviceId();
-          if (!fingerprint.success) {
+    try {
+      return await runAllNetworkGetAddress({
+        connectId: effectiveTargetId,
+        deviceId,
+        params,
+        normalizeItem: TrezorAdapter._normalizeAllNetworkItem,
+        callItem: async ({ method, item, index }) => {
+          if (cancelScope.signal.aborted) {
             topLevelFailureIndexes.add(index);
-            return fingerprint;
+            return TrezorAdapter._buildCancelledFailure(cancelScope.signal);
           }
-          if (expectedDeviceId !== fingerprint.payload) {
-            topLevelFailureIndexes.add(index);
-            return failure(
-              HardwareErrorCode.DeviceMismatch,
-              `Wrong device: expected ${expectedDeviceId}, got ${fingerprint.payload}`,
-              { expected: expectedDeviceId, actual: fingerprint.payload }
-            );
+          const expectedDeviceId = TrezorAdapter._getItemDeviceId(item) ?? deviceId;
+          if (expectedDeviceId) {
+            const fingerprint = await getLiveDeviceId(expectedDeviceId);
+            if (!fingerprint.success) {
+              topLevelFailureIndexes.add(index);
+              return fingerprint;
+            }
+            if (expectedDeviceId !== fingerprint.payload) {
+              topLevelFailureIndexes.add(index);
+              return failure(
+                HardwareErrorCode.DeviceMismatch,
+                `Wrong device: expected ${expectedDeviceId}, got ${fingerprint.payload}`,
+                { expected: expectedDeviceId, actual: fingerprint.payload }
+              );
+            }
           }
-        }
-        const callItem = TrezorAdapter._withAllNetworkRequestCommonParams(item, params);
-        return this._callAllNetworkMethod(connectId, method, callItem);
-      },
-      attachIdentity: async ({ item, chain, payload }) => {
-        if (!liveDeviceId) {
-          const fingerprint = await getLiveDeviceId();
-          if (!fingerprint.success) {
-            return { ...item, success: false, payload: fingerprint.payload };
+          const callItem = TrezorAdapter._withAllNetworkRequestCommonParams(item, params);
+          return this._callAllNetworkMethod(effectiveTargetId, method, callItem, bundleContext);
+        },
+        attachIdentity: async ({ item, chain, payload, index }) => {
+          if (!liveDeviceId) {
+            // Bootstrapping is another device round trip, so it needs the same
+            // gap check.
+            if (cancelScope.signal.aborted) {
+              topLevelFailureIndexes.add(index);
+              const cancelled = TrezorAdapter._buildCancelledFailure<never>(cancelScope.signal);
+              return { ...item, success: false, payload: cancelled.payload };
+            }
+            const fingerprint = await getLiveDeviceId(deviceId);
+            if (!fingerprint.success) {
+              return { ...item, success: false, payload: fingerprint.payload };
+            }
           }
-        }
-        return {
-          ...item,
-          success: true,
-          payload: {
-            ...payload,
-            deviceIdentity: {
-              vendor: 'trezor',
-              type: 'deviceId',
-              value: liveDeviceId,
+          return {
+            ...item,
+            success: true,
+            payload: {
+              ...payload,
+              deviceIdentity: {
+                vendor: 'trezor',
+                type: 'deviceId',
+                value: liveDeviceId,
+              },
+              chainFingerprint: liveDeviceId,
+              chainFingerprintChain: chain,
             },
-            chainFingerprint: liveDeviceId,
-            chainFingerprintChain: chain,
-          },
-        };
-      },
-      // One named boolean per abort reason.
-      shouldAbortBundle: (response, { index }) => {
-        const isSessionLevelFailure = topLevelFailureIndexes.has(index);
-        // Mixed bundles must not abort — other chains can still derive.
-        const isWholeChainForbidden =
-          isSingleNetworkBundle && response.payload?.code === HardwareErrorCode.DevicePathForbidden;
-        const isPassphrasePolicyFailure =
-          response.payload?.code === HardwareErrorCode.PassphraseAlwaysOnDevice;
-        return isSessionLevelFailure || isWholeChainForbidden || isPassphrasePolicyFailure;
-      },
-    });
+          };
+        },
+        // One named boolean per abort reason.
+        shouldAbortBundle: (response, { index }) => {
+          const isSessionLevelFailure = topLevelFailureIndexes.has(index);
+          // Mixed bundles must not abort, other chains can still derive.
+          const isWholeChainForbidden =
+            isSingleNetworkBundle &&
+            response.payload?.code === HardwareErrorCode.DevicePathForbidden;
+          const isPassphrasePolicyFailure =
+            response.payload?.code === HardwareErrorCode.PassphraseAlwaysOnDevice;
+          const { code } = response.payload ?? {};
+          return (
+            isSessionLevelFailure ||
+            isWholeChainForbidden ||
+            isPassphrasePolicyFailure ||
+            isUserRefusal(code) ||
+            isConnectionLost(code)
+          );
+        },
+      });
+    } finally {
+      cancelScope.release();
+      releaseOperationRetention?.();
+    }
   }
 
-  getFeatures(connectId: string): Promise<Response<Record<string, unknown>>> {
-    return this._callDeviceManagerMethod<Record<string, unknown>>('getFeatures', connectId, {});
+  getFeatures(
+    connectId: string,
+    operationContext?: IDeviceManagerOperationContext
+  ): Promise<Response<Record<string, unknown>>> {
+    return this._callDeviceManagerMethod<Record<string, unknown>>(
+      'getFeatures',
+      connectId,
+      {},
+      operationContext
+    );
   }
 
   /**
@@ -803,39 +1162,95 @@ export class TrezorAdapter implements IHardwareWallet {
 
   deviceSettings(
     connectId: string,
-    params: TrezorDeviceSettingsParams
+    params: TrezorDeviceSettingsParams,
+    operationContext?: IDeviceManagerOperationContext
   ): Promise<Response<Record<string, unknown>>> {
     return this._callDeviceManagerMethod<Record<string, unknown>>(
       'deviceSettings',
       connectId,
-      params
+      params,
+      operationContext
     );
   }
 
   setBrightness(
     connectId: string,
-    params: TrezorBrightnessParams = {}
+    params: TrezorBrightnessParams = {},
+    operationContext?: IDeviceManagerOperationContext
   ): Promise<Response<Record<string, unknown>>> {
     return this._callDeviceManagerMethod<Record<string, unknown>>(
       'setBrightness',
       connectId,
-      params
+      params,
+      operationContext
     );
   }
 
   changePin(
     connectId: string,
-    params: TrezorChangePinParams = {}
+    params: TrezorChangePinParams = {},
+    operationContext?: IDeviceManagerOperationContext
   ): Promise<Response<Record<string, unknown>>> {
-    return this._callDeviceManagerMethod<Record<string, unknown>>('changePin', connectId, params);
+    return this._callDeviceManagerMethod<Record<string, unknown>>(
+      'changePin',
+      connectId,
+      params,
+      operationContext
+    );
   }
 
-  wipeDevice(connectId: string): Promise<Response<Record<string, unknown>>> {
-    return this._callDeviceManagerMethod<Record<string, unknown>>('wipeDevice', connectId, {});
+  wipeDevice(
+    connectId: string,
+    operationContext?: IDeviceManagerOperationContext
+  ): Promise<Response<Record<string, unknown>>> {
+    return this._callDeviceManagerMethod<Record<string, unknown>>(
+      'wipeDevice',
+      connectId,
+      {},
+      operationContext
+    );
   }
 
-  private async _getTrezorDeviceId(connectId: string): Promise<Response<string>> {
-    const features = await this.getFeatures(connectId);
+  private async _getTrezorDeviceId(
+    connectId: string,
+    expectedDeviceId?: string,
+    commonParams?: TrezorCommonParams,
+    bundleContext?: TrezorBundleContext
+  ): Promise<Response<string>> {
+    const hasConnectionContext =
+      commonParams?.knownConnections !== undefined || commonParams?.extra !== undefined;
+    const features =
+      bundleContext || hasConnectionContext
+        ? await this._callMethod<Record<string, unknown>>(
+            'getFeatures',
+            connectId,
+            hasConnectionContext || !connectId ? expectedDeviceId : undefined,
+            hasConnectionContext
+              ? {
+                  operationId: commonParams.operationId,
+                  knownConnections: commonParams.knownConnections,
+                  extra: commonParams.extra,
+                  allowDeviceSelection: commonParams.allowDeviceSelection,
+                  supportedTransports: commonParams.supportedTransports,
+                  passphraseState: commonParams.passphraseState,
+                  useEmptyPassphrase: commonParams.useEmptyPassphrase,
+                }
+              : {},
+            false,
+            bundleContext
+          )
+        : await this.getFeatures(
+            connectId,
+            !connectId && expectedDeviceId
+              ? {
+                  expectedDeviceIdentity: {
+                    vendor: 'trezor',
+                    type: 'deviceId',
+                    value: expectedDeviceId,
+                  },
+                }
+              : undefined
+          );
     if (!features.success) return features;
     const liveDeviceId = features.payload.device_id;
     if (typeof liveDeviceId !== 'string' || liveDeviceId.length === 0) {
@@ -845,24 +1260,87 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   cancel(connectId?: string): void {
+    // "Cancel this one" and "cancel everything" are different instructions:
+    // an already-ended operation id must cancel nothing, not fall through to
+    // the untargeted form and take down an unrelated job or UI request.
+    if (isHardwareOperationId(connectId)) {
+      try {
+        this._operations.resolve(connectId);
+      } catch {
+        // Ended (tombstoned) and never-existed both land here.
+        return;
+      }
+    }
     const userAbortReason = Object.assign(new Error('User aborted operation'), {
       code: HardwareErrorCode.UserAborted,
     });
-    // Release adapter-level UI waits (preemption) and connector-level ones
-    // (THP pairing / PIN matrix) — a single CANCEL clears whichever is open.
-    this._uiRegistry.cancel();
-    this._connector.uiResponse({ type: UI_RESPONSE.CANCEL });
-    if (connectId) {
-      this._jobQueue.forceCancelActive(connectId, userAbortReason);
-      void this._connector.cancel(this._sessions.get(connectId) ?? connectId);
+    const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
+    const targetId = connectId ?? activeJobId;
+    if (targetId) {
+      let resolvedConnectId = targetId;
+      let operationId: string | undefined;
+      if (isHardwareOperationId(targetId)) {
+        try {
+          operationId = targetId;
+          resolvedConnectId = this._operations.resolve(targetId).connectId;
+        } catch {
+          resolvedConnectId = '';
+        }
+      }
+      const interactionForPhysicalId =
+        !operationId && connectId
+          ? this._operations.findActiveByConnectionKey(connectId)
+          : undefined;
+      // A bundle without an operationId queues under the raw connectId, but the
+      // connection's owning operation is a second live key, so both get
+      // cancelled: only the scope survives the gap between two bundle items.
+      const pendingOperationId = operationId ?? interactionForPhysicalId?.operationId;
+      // Adapter and connector UI waits of this operation only; an unresolvable
+      // named cancel clears nothing instead of falling through to cancel-all.
+      if (!connectId) {
+        this._uiRegistry.cancel();
+      } else if (pendingOperationId) {
+        this._uiRegistry.cancel(undefined, undefined, pendingOperationId);
+      }
+      const queueKeys = new Set<string>([trezorQueueKey({ connectId: targetId })]);
+      if (pendingOperationId) queueKeys.add(trezorQueueKey({ operationId: pendingOperationId }));
+      // Connector UI cancellation is global. A live but idle operation must not
+      // dismiss another job's PIN/passphrase prompt. Initial connectDevice calls
+      // run outside the job queue, so preserve cancellation of a sole handshake.
+      const ownsConnectorInteraction =
+        activeJobId !== undefined
+          ? queueKeys.has(activeJobId) ||
+            (pendingOperationId !== undefined && this._activeOperationId() === pendingOperationId)
+          : this._connectingPromises.size === 1 && this._connectingPromises.has(resolvedConnectId);
+      if (connectId === undefined || ownsConnectorInteraction) {
+        this._connector.uiResponse({ type: UI_RESPONSE.CANCEL });
+      }
+      for (const key of queueKeys) {
+        this._jobQueue.cancelActiveAndPending(key, userAbortReason);
+      }
+      if (resolvedConnectId) {
+        void this._connector.cancel(this._sessions.get(resolvedConnectId) ?? resolvedConnectId);
+      }
       return;
     }
-    for (const cid of this._sessions.keys()) {
-      this._jobQueue.forceCancelActive(cid, userAbortReason);
-    }
+    // Nothing to name: teardown clears every waiter on both sides.
+    this._uiRegistry.cancel();
+    this._connector.uiResponse({ type: UI_RESPONSE.CANCEL });
+    this._jobQueue.cancelActiveAndPending(undefined, userAbortReason);
     for (const sessionId of this._sessions.values()) {
       void this._connector.cancel(sessionId);
     }
+  }
+
+  /**
+   * Operation owning the running job: its queue key when pinned, else the live
+   * operation of its connectId, so a mid-call UI request can name it.
+   */
+  private _activeOperationId(): string | undefined {
+    const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
+    if (!activeJobId) return undefined;
+    if (isHardwareOperationId(activeJobId)) return activeJobId;
+    return this._operations.findActiveByConnectionKey(activeJobId)?.operationId;
   }
 
   /**
@@ -873,6 +1351,7 @@ export class TrezorAdapter implements IHardwareWallet {
    */
   uiResponse(response: UiResponseEvent): void {
     this._uiRegistry.resolve(response.type, response.payload);
+    if (response.type === UI_RESPONSE.RECEIVE_SELECT_DEVICE) return;
     this._connector.uiResponse(response);
   }
 
@@ -887,10 +1366,10 @@ export class TrezorAdapter implements IHardwareWallet {
    */
   async getChainFingerprint(
     connectId: string,
-    _deviceId: string,
+    deviceId: string,
     _chain: ChainForFingerprint
   ): Promise<Response<string>> {
-    return this._getTrezorDeviceId(connectId);
+    return this._getTrezorDeviceId(connectId, deviceId);
   }
 
   /**
@@ -903,19 +1382,98 @@ export class TrezorAdapter implements IHardwareWallet {
    */
   getPassphraseState(
     connectId: string,
-    passphraseState?: string
+    passphraseState?: string,
+    operationContext?: IDeviceManagerOperationContext
   ): Promise<Response<string | null>> {
+    const expectedIdentity = operationContext?.expectedDeviceIdentity;
+    if (
+      expectedIdentity &&
+      (expectedIdentity.vendor !== 'trezor' || expectedIdentity.type !== 'deviceId')
+    ) {
+      return Promise.resolve(
+        failure(HardwareErrorCode.InvalidParams, 'Trezor device identity is required')
+      );
+    }
+    const target = resolveHardwareOperationTarget(
+      connectId,
+      operationContext?.operationId,
+      'trezor'
+    );
+    if (!target.success) return Promise.resolve(target);
+    const { operationId } = target.payload;
+    let resolvedConnectId = target.payload.targetId ?? '';
+    let releaseOperationRetention: (() => void) | undefined;
+    if (operationId) {
+      try {
+        resolvedConnectId = this._operations.resolve(operationId).connectId;
+        releaseOperationRetention = this._operations.retain(operationId);
+      } catch (error) {
+        return Promise.resolve(this._errorToFailure(error));
+      }
+    }
     return this._jobQueue
       .enqueue(
-        connectId,
+        trezorQueueKey({ operationId, connectId: resolvedConnectId }),
         async signal => {
-          const restorePassphraseRequestContext = this._setPassphraseRequestContext(connectId, {
-            passphraseState,
-          });
+          let selectionRequestId: string | undefined;
+          let verified = false;
+          // One finally closes the binding UI, so no early exit leaves the dialog open.
           try {
-            return await this._resolvePassphraseState(connectId, passphraseState, signal);
+            if (
+              !operationId &&
+              expectedIdentity?.value &&
+              (!connectId || operationContext?.knownConnections !== undefined)
+            ) {
+              const resolved = await this._resolveExpectedDeviceConnectId(
+                expectedIdentity.value,
+                signal,
+                operationContext
+              );
+              resolvedConnectId = resolved.connectId;
+              selectionRequestId = resolved.selectionRequestId;
+            }
+            if (expectedIdentity?.value) {
+              if (!operationId) await this._ensureSession(resolvedConnectId, signal);
+              if (this._devices.get(resolvedConnectId)?.deviceId !== expectedIdentity.value) {
+                return failure(
+                  HardwareErrorCode.DeviceMismatch,
+                  'Trezor device identity does not match'
+                );
+              }
+            }
+            const restorePassphraseRequestContext = this._setPassphraseRequestContext(
+              resolvedConnectId,
+              {
+                passphraseState,
+              }
+            );
+            try {
+              const result = await this._resolvePassphraseState(
+                resolvedConnectId,
+                passphraseState,
+                signal,
+                operationId
+              );
+              if (result.success && expectedIdentity?.value) {
+                await this._emitVerifiedBinding(
+                  expectedIdentity.value,
+                  resolvedConnectId,
+                  selectionRequestId,
+                  operationContext,
+                  signal
+                );
+                verified = true;
+                this._rememberVerifiedConnection(expectedIdentity.value, resolvedConnectId);
+              }
+              return result;
+            } finally {
+              restorePassphraseRequestContext();
+            }
           } finally {
-            restorePassphraseRequestContext();
+            if (selectionRequestId && !verified) {
+              this._emitBindingStatus(selectionRequestId, signal.aborted ? 'cancelled' : 'failed');
+              await this._releaseProvisionalConnection(resolvedConnectId, signal);
+            }
           }
         },
         {
@@ -924,7 +1482,8 @@ export class TrezorAdapter implements IHardwareWallet {
           busyError: TrezorAdapter._createDeviceBusyError('getPassphraseState'),
         }
       )
-      .catch(error => this._errorToFailure(error));
+      .catch(error => this._errorToFailure(error))
+      .finally(() => releaseOperationRetention?.());
   }
 
   evmGetAddress(
@@ -1075,16 +1634,121 @@ export class TrezorAdapter implements IHardwareWallet {
     return result;
   }
 
-  private static async _callConnector(
-    connector: IConnector,
+  private async _callConnector(
     sessionId: string,
     method: string,
     params: unknown,
     signal?: AbortSignal
   ): Promise<unknown> {
-    const promise = connector.call(sessionId, method, params);
+    if (signal?.aborted) {
+      throw (signal as AbortSignal & { reason?: unknown }).reason ?? new Error('Aborted');
+    }
+    this._assertConnectorIdle(method);
+    const releaseOperation = this._retainConnectorOperation(`call:${sessionId}`);
+    let promise: Promise<unknown>;
+    try {
+      promise = this._connector.call(sessionId, method, params).finally(() => {
+        releaseOperation();
+      });
+    } catch (error) {
+      releaseOperation();
+      throw error;
+    }
     const result = signal ? await TrezorAdapter._abortable(signal, promise) : await promise;
     return TrezorAdapter._unwrapConnectorResult(result);
+  }
+
+  private _assertConnectorIdle(method: string): void {
+    // Trezor's connector owns one physical protocol pipe even when the public
+    // adapter has multiple logical device ids.
+    if (
+      this._resetPromise ||
+      this._pendingConnectorTeardowns > 0 ||
+      this._unsettledConnectorOperations.size > 0
+    ) {
+      throw TrezorAdapter._createDeviceBusyError(method);
+    }
+  }
+
+  private _runConnectorTeardown(task: () => Promise<void>): Promise<void> {
+    const previous = this._connectorTeardownTail;
+    let releaseTail: () => void = () => undefined;
+    this._connectorTeardownTail = new Promise<void>(resolve => {
+      releaseTail = resolve;
+    });
+    this._pendingConnectorTeardowns += 1;
+    return (async () => {
+      try {
+        await previous;
+        // Connector cancel is advisory. Do not close a Trezor transport while
+        // its raw protocol request is still draining.
+        await this._waitForConnectorOperationsToDrain();
+        await task();
+      } finally {
+        this._pendingConnectorTeardowns -= 1;
+        releaseTail();
+      }
+    })();
+  }
+
+  private async _disconnectSession(
+    connectId: string,
+    sessionId = this._sessions.get(connectId)
+  ): Promise<void> {
+    this._sessions.delete(connectId);
+    this._verifiedPassphraseSessionsByConnectId.delete(connectId);
+    if (sessionId) await this._runConnectorTeardown(() => this._connector.disconnect(sessionId));
+  }
+
+  private _availableTransports(): readonly ConnectionType[] {
+    return this._connector.availableTransports ?? [this._connector.connectionType];
+  }
+
+  private async _releaseProvisionalConnection(
+    connectId: string,
+    signal: AbortSignal
+  ): Promise<void> {
+    const sessionId = this._sessions.get(connectId);
+    this._sessions.delete(connectId);
+    this._verifiedPassphraseSessionsByConnectId.delete(connectId);
+    if (!sessionId) return;
+    // Register the teardown barrier before returning cancellation. The raw
+    // protocol call still owns the pipe until it drains, but not its caller.
+    const teardown = this._runConnectorTeardown(() => this._connector.disconnect(sessionId)).catch(
+      () => undefined
+    );
+    if (!signal.aborted) await teardown;
+  }
+
+  private _waitForConnectorOperationsToDrain(): Promise<void> {
+    if (this._unsettledConnectorOperations.size === 0) {
+      return Promise.resolve();
+    }
+    return new Promise(resolve => {
+      this._connectorIdleWaiters.add(resolve);
+    });
+  }
+
+  private _retainConnectorOperation(key: string): () => void {
+    this._unsettledConnectorOperations.set(
+      key,
+      (this._unsettledConnectorOperations.get(key) ?? 0) + 1
+    );
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const remaining = (this._unsettledConnectorOperations.get(key) ?? 1) - 1;
+      if (remaining > 0) {
+        this._unsettledConnectorOperations.set(key, remaining);
+      } else {
+        this._unsettledConnectorOperations.delete(key);
+      }
+      if (this._unsettledConnectorOperations.size === 0) {
+        for (const resolve of this._connectorIdleWaiters) resolve();
+        this._connectorIdleWaiters.clear();
+      }
+    };
   }
 
   private static _normalizeAllNetworkItem(
@@ -1112,22 +1776,30 @@ export class TrezorAdapter implements IHardwareWallet {
     return typeof deviceId === 'string' && deviceId.length > 0 ? deviceId : undefined;
   }
 
+  /** UserAborted is a top-level abort code, so this ends the bundle. */
+  private static _buildCancelledFailure<T>(signal: AbortSignal): Response<T> {
+    const reason = signal.reason as { code?: unknown; message?: unknown } | undefined;
+    const code =
+      typeof reason?.code === 'number'
+        ? (reason.code as HardwareErrorCode)
+        : HardwareErrorCode.UserAborted;
+    const message = typeof reason?.message === 'string' ? reason.message : '';
+    return failure(code, message || 'All-network get-address cancelled');
+  }
+
   private _callAllNetworkMethod(
     connectId: string,
     method: AllNetworkMethodName,
-    item: AllNetworkAddressParams
+    item: AllNetworkAddressParams,
+    bundleContext: TrezorBundleContext
   ): Promise<Response<unknown>> {
     switch (method) {
       case 'evmGetAddress':
-        return this.evmGetAddress(connectId, '', item);
       case 'btcGetAddress':
-        return this.btcGetAddress(connectId, '', item);
       case 'btcGetPublicKey':
-        return this.btcGetPublicKey(connectId, '', item);
       case 'solGetAddress':
-        return this.solGetAddress(connectId, '', item);
       case 'tronGetAddress':
-        return this.tronGetAddress(connectId, '', item);
+        return this._callMethod(method, connectId, '', item, true, bundleContext);
       default:
         return Promise.resolve(
           failure(
@@ -1172,9 +1844,35 @@ export class TrezorAdapter implements IHardwareWallet {
   private _callDeviceManagerMethod<T>(
     methodName: TrezorDeviceManagerMethodName,
     connectId: NullableCallArg<string>,
-    params: NullableCallArg<unknown>
+    params: NullableCallArg<unknown>,
+    operationContext?: IDeviceManagerOperationContext
   ): Promise<Response<T>> {
-    return this._callMethod<T>(methodName, connectId, undefined, params, false);
+    const expectedIdentity = operationContext?.expectedDeviceIdentity;
+    if (
+      expectedIdentity &&
+      (expectedIdentity.vendor !== 'trezor' || expectedIdentity.type !== 'deviceId')
+    ) {
+      return Promise.resolve(
+        failure(
+          HardwareErrorCode.InvalidParams,
+          'Trezor device-manager operations require a Trezor deviceId identity'
+        )
+      );
+    }
+    return this._callMethod<T>(
+      methodName,
+      connectId,
+      expectedIdentity?.value,
+      {
+        ...(params && typeof params === 'object' ? params : {}),
+        knownConnections: operationContext?.knownConnections,
+        extra: operationContext?.extra,
+        allowDeviceSelection: operationContext?.allowDeviceSelection,
+        supportedTransports: operationContext?.supportedTransports,
+        ...(operationContext?.operationId ? { operationId: operationContext.operationId } : {}),
+      },
+      false
+    );
   }
 
   private async _callMethod<T>(
@@ -1182,9 +1880,34 @@ export class TrezorAdapter implements IHardwareWallet {
     connectId: NullableCallArg<string>,
     deviceId: NullableCallArg<string>,
     params: NullableCallArg<unknown>,
-    requiresWalletIntent: boolean
+    requiresWalletIntent: boolean,
+    bundleContext?: TrezorBundleContext
   ): Promise<Response<T>> {
     const call = TrezorAdapter._normalizeCallArgs(connectId, deviceId, params);
+    const commonParams = TrezorAdapter._splitCommonParams(call.params);
+    const positionalOperationId = isHardwareOperationId(call.connectId)
+      ? call.connectId
+      : undefined;
+    if (
+      positionalOperationId &&
+      commonParams.operationId &&
+      positionalOperationId !== commonParams.operationId
+    ) {
+      return failure(HardwareErrorCode.InvalidParams, 'Conflicting Trezor operation ids', {
+        positionalOperationId,
+        commonOperationId: commonParams.operationId,
+      });
+    }
+    const operationId = commonParams.operationId ?? positionalOperationId;
+    let releaseOperationRetention: (() => void) | undefined;
+    try {
+      if (operationId) {
+        call.connectId = this._operations.resolve(operationId).connectId;
+        releaseOperationRetention = this._operations.retain(operationId);
+      }
+    } catch (error) {
+      return this._errorToFailure(error);
+    }
     debugLog('[TrezorAdapter][REQ]', {
       method: methodName,
       connectId: call.connectId || '(empty)',
@@ -1193,16 +1916,47 @@ export class TrezorAdapter implements IHardwareWallet {
     });
     try {
       const response = await this._jobQueue.enqueue(
-        call.connectId,
-        signal =>
-          this._callWithRetry<T>(
-            call.connectId,
+        trezorQueueKey({ operationId, connectId: call.connectId }),
+        async signal => {
+          let effectiveConnectId = call.connectId;
+          let selectionRequestId: string | undefined;
+          try {
+            if (
+              !bundleContext?.connection &&
+              !operationId &&
+              deviceId &&
+              (!connectId || commonParams.connectionContext?.knownConnections !== undefined)
+            ) {
+              const resolved = await this._resolveExpectedDeviceConnectId(
+                deviceId,
+                signal,
+                commonParams.connectionContext
+              );
+              effectiveConnectId = resolved.connectId;
+              selectionRequestId = resolved.selectionRequestId;
+            }
+          } catch (error) {
+            return this._errorToFailure(error);
+          }
+          const response = await this._callWithRetry<T>(
+            bundleContext?.connection?.connectId ?? effectiveConnectId,
             methodName,
             call.params,
+            deviceId || '',
             requiresWalletIntent,
             true,
-            signal
-          ),
+            signal,
+            operationId,
+            selectionRequestId,
+            bundleContext
+          );
+          if (!response.success && selectionRequestId) {
+            // A selected endpoint is provisional until wallet verification succeeds.
+            // Release it so a later attempt gets its own explicit binding request.
+            await this._releaseProvisionalConnection(effectiveConnectId, signal);
+          }
+          return response;
+        },
         {
           label: methodName,
           rejectIfBusy: true,
@@ -1226,6 +1980,8 @@ export class TrezorAdapter implements IHardwareWallet {
         payload: TrezorAdapter._sanitizeForLog(response.payload, methodName),
       });
       return response;
+    } finally {
+      releaseOperationRetention?.();
     }
   }
 
@@ -1233,17 +1989,59 @@ export class TrezorAdapter implements IHardwareWallet {
     connectId: string,
     methodName: TrezorMethodName,
     params: unknown,
+    expectedDeviceId: string,
     requiresWalletIntent: boolean,
     allowRetry: boolean,
-    signal: AbortSignal
+    signal: AbortSignal,
+    operationId?: string,
+    selectionRequestId?: string,
+    bundleContext?: TrezorBundleContext
   ): Promise<Response<T>> {
-    const { passphraseState, useEmptyPassphrase, rest } = TrezorAdapter._splitCommonParams(params);
+    const { passphraseState, useEmptyPassphrase, rest, connectionContext } =
+      TrezorAdapter._splitCommonParams(params);
+    let pendingBindingRequestId = selectionRequestId;
+    let businessCallStarted = false;
     const restorePassphraseRequestContext = this._setPassphraseRequestContext(connectId, {
       passphraseState,
       useEmptyPassphrase,
     });
     try {
-      const sessionId = await this._ensureSession(connectId, signal);
+      if (bundleContext?.connection) {
+        const pinned = bundleContext.connection;
+        if (this._sessions.get(pinned.connectId) !== pinned.sessionId) {
+          return failure(
+            HardwareErrorCode.DeviceDisconnected,
+            'Trezor all-network connection ended'
+          );
+        }
+      }
+      const sessionId = operationId
+        ? this._sessions.get(this._operations.resolve(operationId).connectId)
+        : await this._ensureSession(connectId, signal);
+      if (!sessionId) {
+        if (operationId) {
+          this._operations.end(operationId, 'disconnect');
+          return failure(
+            HardwareErrorCode.OperationEnded,
+            'Trezor operation connection is no longer active',
+            { operationId, reason: 'disconnect' }
+          );
+        }
+        return failure(HardwareErrorCode.DeviceNotFound, 'Trezor session was not found');
+      }
+      if (bundleContext && !bundleContext.connection) {
+        bundleContext.connection = { connectId, sessionId };
+      }
+      if (expectedDeviceId) {
+        const actualDeviceId = this._devices.get(connectId)?.deviceId;
+        if (!actualDeviceId || actualDeviceId !== expectedDeviceId) {
+          return failure(
+            HardwareErrorCode.DeviceMismatch,
+            `Wrong device: expected ${expectedDeviceId}, got ${actualDeviceId || 'unknown'}`,
+            { expected: expectedDeviceId, actual: actualDeviceId || '' }
+          );
+        }
+      }
       if (requiresWalletIntent && !passphraseState && useEmptyPassphrase !== true) {
         return failure(
           HardwareErrorCode.InvalidParams,
@@ -1262,49 +2060,100 @@ export class TrezorAdapter implements IHardwareWallet {
       } else if (useEmptyPassphrase === true) {
         await TrezorAdapter._abortable(signal, this._createFreshAppSession(sessionId, signal));
       }
+      if (expectedDeviceId) {
+        await this._emitVerifiedBinding(
+          expectedDeviceId,
+          connectId,
+          pendingBindingRequestId,
+          connectionContext,
+          signal
+        );
+        pendingBindingRequestId = undefined;
+        this._rememberVerifiedConnection(expectedDeviceId, connectId);
+      }
+      businessCallStarted = true;
       const result = await TrezorAdapter._abortable(
         signal,
-        TrezorAdapter._callConnector(this._connector, sessionId, methodName, rest)
+        this._callConnector(sessionId, methodName, rest, signal)
       );
       return success(result as T);
     } catch (error) {
       // If we were aborted, surface as-is — don't take the retry/recovery path.
       if (signal.aborted) {
+        if (pendingBindingRequestId) {
+          this._emitBindingStatus(pendingBindingRequestId, 'cancelled');
+          pendingBindingRequestId = undefined;
+        }
         return this._errorToFailure(error);
       }
       const code = TrezorAdapter._errorCode(error);
-      // On a transient disconnect (BLE drop, "device not connected" race after
-      // the device-disconnect event hasn't propagated yet), drop the stale
-      // session and reconnect once. Matches Ledger's _retryWithFreshConnection.
-      if (allowRetry && code === HardwareErrorCode.DeviceDisconnected) {
+      const willRetryStaleSession =
+        allowRetry &&
+        (passphraseState || useEmptyPassphrase === true) &&
+        TrezorAdapter._isStaleSessionError(code);
+      if (pendingBindingRequestId && !willRetryStaleSession) {
+        this._emitBindingStatus(pendingBindingRequestId, 'failed');
+        pendingBindingRequestId = undefined;
+      }
+      const ambiguousTransportFailure =
+        code === HardwareErrorCode.DeviceDisconnected ||
+        code === HardwareErrorCode.OperationTimeout ||
+        code === HardwareErrorCode.TransportError;
+      if (ambiguousTransportFailure) {
         this._sessions.delete(connectId);
         this._verifiedPassphraseSessionsByConnectId.delete(connectId);
-        return await this._callWithRetry<T>(
-          connectId,
-          methodName,
-          params,
-          requiresWalletIntent,
-          false,
-          signal
-        );
+        const mayHaveCompleted =
+          businessCallStarted && !canReplayHardwareMethodAfterTransportFailure(methodName);
+        const mayHaveCompletedMessage = `Trezor ${methodName} may have completed before the connection was lost`;
+        if (operationId) {
+          this._operations.end(operationId, 'disconnect');
+          const endedParams = { operationId, reason: 'disconnect' };
+          return mayHaveCompleted
+            ? failure(
+                HardwareErrorCode.OperationEnded,
+                mayHaveCompletedMessage,
+                operationMayHaveCompletedParams(methodName, endedParams),
+                undefined,
+                { scope: 'unknown' }
+              )
+            : failure(
+                HardwareErrorCode.OperationEnded,
+                'Trezor operation connection was lost',
+                endedParams
+              );
+        }
+        // A one-shot operation also owns its connection once initialization
+        // starts. Never reconnect or replay it after the transport is lost.
+        if (mayHaveCompleted) {
+          return failure(
+            code as HardwareErrorCode,
+            mayHaveCompletedMessage,
+            operationMayHaveCompletedParams(methodName),
+            undefined,
+            { scope: 'unknown' }
+          );
+        }
       }
       // The device evicted the passphrase session created for this call. Retry
       // once and recreate the requested wallet context.
-      if (
-        allowRetry &&
-        (passphraseState || useEmptyPassphrase === true) &&
-        TrezorAdapter._isStaleSessionError(code)
-      ) {
+      if (willRetryStaleSession) {
         if (passphraseState) {
           this._forgetVerifiedPassphraseSession(connectId, passphraseState);
         }
+        // The retry owns the binding request from here on.
+        const retryBindingRequestId = pendingBindingRequestId;
+        pendingBindingRequestId = undefined;
         return await this._callWithRetry<T>(
           connectId,
           methodName,
           params,
+          expectedDeviceId,
           requiresWalletIntent,
           false,
-          signal
+          signal,
+          operationId,
+          retryBindingRequestId,
+          bundleContext
         );
       }
       debugLog('[TrezorAdapter][ERROR]', {
@@ -1315,42 +2164,325 @@ export class TrezorAdapter implements IHardwareWallet {
       return this._errorToFailure(error);
     } finally {
       restorePassphraseRequestContext();
+      // Early returns above leave the host dialog waiting; close the request here
+      // so every exit that did not verify the binding reports a terminal status.
+      if (pendingBindingRequestId) {
+        this._emitBindingStatus(pendingBindingRequestId, signal.aborted ? 'cancelled' : 'failed');
+        pendingBindingRequestId = undefined;
+      }
     }
   }
 
-  private async _ensureSession(connectId: string, signal?: AbortSignal): Promise<string> {
+  private async _ensureSession(
+    connectId: string,
+    signal?: AbortSignal,
+    transportType?: ConnectionType
+  ): Promise<string> {
     const existing = this._sessions.get(connectId);
     if (existing) return existing;
 
     const pending = this._connectingPromises.get(connectId);
     if (pending) return pending;
 
+    const stateGeneration = this._stateGeneration;
     const promise = (async () => {
+      if (signal?.aborted) {
+        throw Object.assign(new Error('Trezor connection aborted'), {
+          code: HardwareErrorCode.UserAborted,
+        });
+      }
+      // Fail fast: a single connect attempt. On an "unavailable device" error we
+      // drop the cached session/passphrase state and rethrow (no retry loop).
       try {
-        if (signal?.aborted) {
-          throw Object.assign(new Error('Trezor connection aborted'), {
-            code: HardwareErrorCode.UserAborted,
-          });
+        return await this._connectSession(connectId, signal, stateGeneration, transportType);
+      } catch (error) {
+        if (TrezorAdapter._isConnectionUnavailableError(error)) {
+          this._sessions.delete(connectId);
+          this._verifiedPassphraseSessionsByConnectId.delete(connectId);
         }
-        // Fail fast: a single connect attempt. On an "unavailable device" error we
-        // drop the cached session/passphrase state and rethrow (no retry loop).
-        try {
-          return await this._connectSession(connectId, signal);
-        } catch (error) {
-          if (TrezorAdapter._isConnectionUnavailableError(error)) {
-            this._sessions.delete(connectId);
-            this._verifiedPassphraseSessionsByConnectId.delete(connectId);
-          }
-          throw error;
-        }
-      } finally {
-        this._connectingPromises.delete(connectId);
-        this._disconnectRequested.delete(connectId);
+        throw error;
       }
     })();
 
     this._connectingPromises.set(connectId, promise);
-    return promise;
+    try {
+      return await promise;
+    } finally {
+      if (this._connectingPromises.get(connectId) === promise) {
+        this._connectingPromises.delete(connectId);
+      }
+      this._disconnectRequested.delete(connectId);
+    }
+  }
+
+  private async _resolveExpectedDeviceConnectId(
+    expectedDeviceId: string,
+    signal: AbortSignal,
+    context?: IHardwareConnectionContext
+  ): Promise<{ connectId: string; selectionRequestId?: string }> {
+    const connectedMatch = Array.from(this._devices.values()).find(
+      device => device.deviceId === expectedDeviceId && this._sessions.has(device.connectId)
+    );
+    if (connectedMatch) return { connectId: connectedMatch.connectId };
+
+    const availableTransports = this._availableTransports();
+    if (availableTransports.includes('usb')) {
+      await TrezorAdapter._abortable(
+        signal,
+        this._ensureDevicePermission(undefined, expectedDeviceId, 'usb')
+      );
+    }
+    const candidates = await TrezorAdapter._abortable(
+      signal,
+      this._searchDevices({ transportType: 'usb' }, signal)
+    );
+
+    const mismatchedDeviceIds: string[] = [];
+    const knownConnection = this._knownDeviceConnections.get(expectedDeviceId);
+    const knownUsbIds =
+      context?.knownConnections !== undefined
+        ? context.knownConnections.flatMap(connection =>
+            connection.transport === 'usb' ? [connection.connectId] : []
+          )
+        : [knownConnection?.usbConnectId].filter((id): id is string => Boolean(id));
+    const suppliedBleIds = context?.knownConnections?.flatMap(connection =>
+      connection.transport === 'ble' ? [connection.connectId] : []
+    );
+    const knownBleIds = suppliedBleIds?.length
+      ? suppliedBleIds
+      : [knownConnection?.bleConnectId].filter((id): id is string => Boolean(id));
+    // A saved USB locator (serial at enumeration) confirms presence unopened, so
+    // other Trezors are not THP-probed; without one, every USB candidate is probed.
+    const usbCandidates = candidates.filter(
+      device =>
+        device.connectionType === 'usb' &&
+        (!knownUsbIds.length || knownUsbIds.includes(device.connectId))
+    );
+    // USB discovery may expose only an ephemeral locator. Probe Features to
+    // identify it, but never silently pair arbitrary nearby BLE devices.
+    for (const candidate of usbCandidates) {
+      let sessionId: string | undefined;
+      try {
+        // Connecting only initializes Features. No wallet or business method is
+        // dispatched until the firmware device_id matches the stored identity.
+        // eslint-disable-next-line no-await-in-loop
+        sessionId = await this._ensureSession(candidate.connectId, signal, 'usb');
+        const actualDeviceId = this._devices.get(candidate.connectId)?.deviceId ?? '';
+        if (actualDeviceId === expectedDeviceId) return { connectId: candidate.connectId };
+        mismatchedDeviceIds.push(actualDeviceId || 'unknown');
+      } catch (error) {
+        if (signal.aborted) throw error;
+        // Connector initialization failures intentionally keep the transport
+        // reusable for a same-device retry. Do not open another candidate on
+        // the same protocol pipe until the caller resolves that failure.
+        if (!TrezorAdapter._isConnectionUnavailableError(error)) throw error;
+      }
+
+      if (sessionId) {
+        // eslint-disable-next-line no-await-in-loop
+        await this._disconnectSession(candidate.connectId, sessionId);
+      }
+    }
+
+    if (mismatchedDeviceIds.length) {
+      // Every candidate answered and none is this wallet. Not DeviceMismatch:
+      // nothing about the known wallet changed.
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceSearchMismatch,
+        message:
+          'The connected Trezor is not the wallet this operation needs. Unplug it and connect the right device.',
+        params: { connectedDeviceIds: mismatchedDeviceIds },
+      });
+    }
+
+    if (usbCandidates.length > 0) {
+      // Enumerated but not openable, so no identity was ever read. Claiming the
+      // wrong device is plugged in would send the user after the wrong remedy.
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceNotFound,
+        message: 'Trezor devices are present but none could be opened to check its identity.',
+      });
+    }
+
+    const [knownBleConnectId] = knownBleIds;
+    if (knownBleConnectId && availableTransports.includes('ble')) {
+      // A saved endpoint never opens a new binding session after failure.
+      await TrezorAdapter._abortable(
+        signal,
+        this._ensureDevicePermission(knownBleConnectId, expectedDeviceId, 'ble')
+      );
+      await this._ensureSession(knownBleConnectId, signal, 'ble');
+      const actualDeviceId = this._devices.get(knownBleConnectId)?.deviceId;
+      if (actualDeviceId === expectedDeviceId) return { connectId: knownBleConnectId };
+      await this._disconnectSession(knownBleConnectId);
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceMismatch,
+        message: 'The bound Trezor Bluetooth device has a different identity',
+      });
+    }
+
+    if (context?.supportedTransports && !context.supportedTransports.includes('ble')) {
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceNotFound,
+        message: 'This Trezor model has no Bluetooth transport; connect it over USB',
+      });
+    }
+    if (context?.allowDeviceSelection === false) {
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceNotFound,
+        message: 'No known Trezor connection is available',
+      });
+    }
+    return this._selectBleDeviceForBinding(expectedDeviceId, signal, context, 'missing-binding');
+  }
+
+  private async _selectBleDeviceForBinding(
+    expectedDeviceId: string,
+    signal: AbortSignal,
+    context: IHardwareConnectionContext | undefined,
+    reason: 'missing-binding' | 'manual-rebind'
+  ): Promise<{ connectId: string; selectionRequestId?: string }> {
+    const availableTransports = this._availableTransports();
+    const allowUsbFallback = reason !== 'manual-rebind' && availableTransports.includes('usb');
+    const knownUsbIds = context?.knownConnections
+      ? context.knownConnections.flatMap(connection =>
+          connection.transport === 'usb' ? [connection.connectId] : []
+        )
+      : [this._knownDeviceConnections.get(expectedDeviceId)?.usbConnectId];
+    if (availableTransports.includes('ble')) {
+      await TrezorAdapter._abortable(
+        signal,
+        this._ensureDevicePermission(undefined, expectedDeviceId, 'ble')
+      );
+    }
+    const bleCandidates = (
+      await TrezorAdapter._abortable(
+        signal,
+        this._searchDevices({ transportType: 'ble', waitForAllTransports: true }, signal)
+      )
+    ).filter(device => device.connectionType === 'ble');
+    if (signal.aborted) throw signal.reason;
+    const rejectedConnectIds = new Set<string>();
+    const bindingSessionId = this._uiRegistry.createRequestId();
+    let rejectedConnectId: string | undefined;
+    while (
+      availableTransports.includes('ble') &&
+      this._emitter.listenerCount(UI_REQUEST.REQUEST_SELECT_DEVICE)
+    ) {
+      const { device: selected, requestId } = await requestBleDeviceSelection({
+        emitter: this._emitter,
+        registry: this._uiRegistry,
+        signal,
+        allowUsbFallback,
+        scan: async () => {
+          if (allowUsbFallback) {
+            const usbCandidates = (
+              await this._searchDevices({ transportType: 'usb' }, signal)
+            ).filter(
+              device => device.connectionType === 'usb' && !rejectedConnectIds.has(device.connectId)
+            );
+            const candidate =
+              usbCandidates.find(device => knownUsbIds.includes(device.connectId)) ??
+              usbCandidates[0];
+            if (candidate) return [candidate];
+          }
+          return (
+            await this._searchDevices({ transportType: 'ble', waitForAllTransports: true }, signal)
+          ).filter(
+            device => device.connectionType === 'ble' && !rejectedConnectIds.has(device.connectId)
+          );
+        },
+        request: {
+          devices: bleCandidates.filter(device => !rejectedConnectIds.has(device.connectId)),
+          bindingSessionId,
+          rejectedConnectId,
+          context: {
+            kind: 'bind-connection',
+            transport: 'ble',
+            reason,
+          },
+          extra: context?.extra,
+          operationId: this._activeOperationId(),
+        },
+      });
+      try {
+        if (reason === 'manual-rebind') {
+          this._operations.endByConnectionKey(selected.connectId, 'explicit');
+          await this._releaseProvisionalConnection(selected.connectId, signal);
+        }
+        await this._ensureSession(selected.connectId, signal, selected.connectionType);
+      } catch (error) {
+        this._emitBindingStatus(requestId, signal.aborted ? 'cancelled' : 'failed');
+        throw error;
+      }
+      if (this._devices.get(selected.connectId)?.deviceId !== expectedDeviceId) {
+        await this._disconnectSession(selected.connectId);
+        rejectedConnectId = selected.connectId;
+        rejectedConnectIds.add(selected.connectId);
+        continue;
+      }
+      if (selected.connectionType === 'usb') {
+        // End only the binding UI. The original operation continues on verified USB.
+        this._emitBindingStatus(requestId, 'cancelled');
+        return { connectId: selected.connectId };
+      }
+      return { connectId: selected.connectId, selectionRequestId: requestId };
+    }
+
+    throw createHwkError({
+      code: HardwareErrorCode.DeviceNotFound,
+      message: 'No readable Trezor device is available',
+    });
+  }
+
+  private _emitBindingStatus(selectionRequestId: string, status: 'cancelled' | 'failed'): void {
+    this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
+      type: UI_REQUEST.DEVICE_BINDING_STATUS,
+      payload: { selectionRequestId, status },
+    });
+  }
+
+  private _rememberVerifiedConnection(deviceId: string, connectId: string): void {
+    const device = this._devices.get(connectId);
+    if (!device || device.deviceId !== deviceId) return;
+    const known = this._knownDeviceConnections.get(deviceId) ?? { deviceId };
+    if (device.connectionType === 'ble') {
+      known.bleConnectId = connectId;
+    } else if (device.connectionType === 'usb' && device.capabilities?.persistentDeviceIdentity) {
+      known.usbConnectId = connectId;
+    }
+    this._knownDeviceConnections.set(deviceId, known);
+  }
+
+  private async _emitVerifiedBinding(
+    deviceId: string,
+    connectId: string,
+    selectionRequestId: string | undefined,
+    context?: IHardwareConnectionContext,
+    signal?: AbortSignal
+  ): Promise<boolean> {
+    if (!selectionRequestId) return false;
+    const device = this._devices.get(connectId);
+    if (!device || device.deviceId !== deviceId || device.connectionType !== 'ble') {
+      // Every other exit reports a terminal status, so this one must too, or
+      // callers leave the host dialog waiting. Cancelled, not failed: the call
+      // carries on, like the USB fallback that drops a binding without stopping.
+      this._emitBindingStatus(selectionRequestId, 'cancelled');
+      return false;
+    }
+    const outcome = await requestSaveDeviceBinding(
+      this._emitter,
+      this._uiRegistry,
+      {
+        selectionRequestId,
+        connection: { transport: 'ble', connectId },
+        identity: { vendor: 'trezor', type: 'deviceId', value: deviceId },
+        extra: context?.extra,
+        operationId: this._activeOperationId(),
+      },
+      signal
+    );
+    return outcome.saved;
   }
 
   /**
@@ -1379,15 +2511,27 @@ export class TrezorAdapter implements IHardwareWallet {
 
     const created = (await TrezorAdapter._abortable(
       signal,
-      TrezorAdapter._callConnector(this._connector, sessionId, '__thpCreateSession', {
-        passphraseMode: 'prompt',
-      })
+      this._callConnector(
+        sessionId,
+        '__thpCreateSession',
+        {
+          passphraseMode: 'prompt',
+        },
+        signal
+      )
     )) as { protocol?: string; thpSessionId?: string | null };
     // v1 has no host-managed app-session id, but the connector has just
     // re-initialized a fresh device session; continue with reactive
     // passphrase-state verification.
-    if (created?.protocol === 'thp' && !created.thpSessionId) return;
-    if (created?.protocol !== 'thp' && created?.protocol !== 'v1') return;
+    if (
+      (created?.protocol === 'thp' && !created.thpSessionId) ||
+      (created?.protocol !== 'thp' && created?.protocol !== 'v1')
+    ) {
+      throw createHwkError({
+        code: HardwareErrorCode.TransportError,
+        message: 'Cannot verify the requested Trezor wallet session',
+      });
+    }
     const state = await this._deriveState(sessionId, signal);
     if (state !== passphraseState) {
       throw Object.assign(
@@ -1454,9 +2598,14 @@ export class TrezorAdapter implements IHardwareWallet {
         if (!cached.thpSessionId) return false;
         await TrezorAdapter._abortable(
           signal,
-          TrezorAdapter._callConnector(this._connector, sessionId, '__thpSelectSession', {
-            thpSessionId: cached.thpSessionId,
-          })
+          this._callConnector(
+            sessionId,
+            '__thpSelectSession',
+            {
+              thpSessionId: cached.thpSessionId,
+            },
+            signal
+          )
         );
       }
       const state = await this._deriveState(sessionId, signal);
@@ -1477,9 +2626,14 @@ export class TrezorAdapter implements IHardwareWallet {
     // enforced inside connector/core, not delegated to host UI handlers.
     await TrezorAdapter._abortable(
       signal,
-      TrezorAdapter._callConnector(this._connector, sessionId, '__thpCreateSession', {
-        passphraseMode: 'empty',
-      })
+      this._callConnector(
+        sessionId,
+        '__thpCreateSession',
+        {
+          passphraseMode: 'empty',
+        },
+        signal
+      )
     );
   }
 
@@ -1495,10 +2649,15 @@ export class TrezorAdapter implements IHardwareWallet {
   private async _deriveState(sessionId: string, signal: AbortSignal): Promise<string> {
     const derived = (await TrezorAdapter._abortable(
       signal,
-      TrezorAdapter._callConnector(this._connector, sessionId, 'btcGetPublicKey', {
-        path: "m/44'/0'/0'",
-        showOnDevice: false,
-      })
+      this._callConnector(
+        sessionId,
+        'btcGetPublicKey',
+        {
+          path: "m/44'/0'/0'",
+          showOnDevice: false,
+        },
+        signal
+      )
     )) as { publicKey?: string };
     const state = derived?.publicKey;
     if (!state) {
@@ -1512,10 +2671,19 @@ export class TrezorAdapter implements IHardwareWallet {
   private async _resolvePassphraseState(
     connectId: string,
     passphraseState: string | undefined,
-    signal: AbortSignal
+    signal: AbortSignal,
+    operationId?: string
   ): Promise<Response<string | null>> {
     try {
-      const sessionId = await this._ensureSession(connectId, signal);
+      const sessionId = operationId
+        ? this._sessions.get(this._operations.resolve(operationId).connectId)
+        : await this._ensureSession(connectId, signal);
+      if (!sessionId) {
+        return failure(
+          HardwareErrorCode.OperationEnded,
+          'Trezor operation connection is no longer active'
+        );
+      }
       if (passphraseState) {
         // Verify mode: align (which always re-derives + confirms the state) so the
         // host can gate signing on the correct wallet being active.
@@ -1535,14 +2703,19 @@ export class TrezorAdapter implements IHardwareWallet {
       //      standard wallet → return null (OneKey-aligned).
       const created = (await TrezorAdapter._abortable(
         signal,
-        TrezorAdapter._callConnector(this._connector, sessionId, '__thpCreateSession', {
-          passphraseMode: 'prompt',
-        })
+        this._callConnector(
+          sessionId,
+          '__thpCreateSession',
+          {
+            passphraseMode: 'prompt',
+          },
+          signal
+        )
       )) as { protocol?: string; thpSessionId?: string | null };
       const state = await this._deriveState(sessionId, signal);
       const features = (await TrezorAdapter._abortable(
         signal,
-        TrezorAdapter._callConnector(this._connector, sessionId, 'getFeatures', { refresh: true })
+        this._callConnector(sessionId, 'getFeatures', { refresh: true }, signal)
       )) as Record<string, unknown> | undefined;
       if (features?.passphrase_protection !== true) {
         // Standard wallet — discard the derived state, return null (OneKey convention).
@@ -1562,6 +2735,7 @@ export class TrezorAdapter implements IHardwareWallet {
   };
 
   private _onDeviceDisconnect = (data: { connectId: string }): void => {
+    this._operations.endByConnectionKey(data.connectId, 'disconnect');
     this._sessions.delete(data.connectId);
     this._verifiedPassphraseSessionsByConnectId.delete(data.connectId);
     this._devices.delete(data.connectId);
@@ -1585,13 +2759,19 @@ export class TrezorAdapter implements IHardwareWallet {
     });
   };
 
+  // The one outlet for every connector-raised UI request (PIN, passphrase,
+  // button, THP pairing), so the operation is stamped here instead of at each
+  // connector call site.
   private _onUiRequest = (data: { type: string; payload?: unknown }): void => {
+    const operationId = this._activeOperationId();
+    const basePayload =
+      data.payload && typeof data.payload === 'object'
+        ? (data.payload as Record<string, unknown>)
+        : {};
+    const attribution = operationId === undefined ? {} : { operationId };
     if (data.type === UI_REQUEST.REQUEST_PASSPHRASE) {
-      const payload =
-        data.payload && typeof data.payload === 'object'
-          ? (data.payload as Record<string, unknown>)
-          : {};
-      const connectId = typeof payload.connectId === 'string' ? payload.connectId : undefined;
+      const connectId =
+        typeof basePayload.connectId === 'string' ? basePayload.connectId : undefined;
       const context = connectId
         ? this._passphraseRequestContextByConnectId.get(connectId)
         : undefined;
@@ -1600,19 +2780,23 @@ export class TrezorAdapter implements IHardwareWallet {
         {
           ...data,
           payload: {
-            ...payload,
+            ...basePayload,
             ...(context?.passphraseState !== undefined
               ? { passphraseState: context.passphraseState }
               : {}),
             ...(context?.useEmptyPassphrase !== undefined
               ? { useEmptyPassphrase: context.useEmptyPassphrase }
               : {}),
+            ...attribution,
           },
         } as never
       );
       return;
     }
-    this._emitter.emit(data.type as keyof HardwareEventMap, data as never);
+    // Leave the payload exactly as the connector sent it when there is no
+    // operation to name.
+    const payload = operationId === undefined ? data.payload : { ...basePayload, ...attribution };
+    this._emitter.emit(data.type as keyof HardwareEventMap, { ...data, payload } as never);
   };
 
   private _onUiEvent = (data: ConnectorUiEvent): void => {
@@ -1666,7 +2850,12 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   private _errorToFailure(error: unknown) {
-    const typed = error as { code?: unknown; message?: string };
+    const typed = error as {
+      code?: unknown;
+      message?: string;
+      recovery?: unknown;
+      params?: unknown;
+    };
     // Map hwk-trezor-core's string markers to standard HardwareErrorCodes.
     // The core tags pairing-handshake rejections (e.g. mistyped CodeEntry code)
     // with `code: 'ThpPairingFailed'`; surface it as a proper code, not Unknown.
@@ -1686,7 +2875,26 @@ export class TrezorAdapter implements IHardwareWallet {
       trustedNumericCode ??
       TrezorAdapter._mapTrezorFailureCode(error) ??
       HardwareErrorCode.UnknownError;
-    return failure(code, typed.message ?? String(error));
+    // Prefer the thrower's stamped origin; the shared table leaves ambiguous
+    // codes undefined.
+    const stampedOrigin = (error as { origin?: unknown })?.origin;
+    const origin =
+      stampedOrigin === 'device' || stampedOrigin === 'transport' || stampedOrigin === 'host'
+        ? stampedOrigin
+        : defaultOriginForCode(code);
+    // Keep the thrower's params: they tell "wrong Trezor" from "the bound one is
+    // gone", which share DeviceMismatch.
+    const params =
+      typed.params && typeof typed.params === 'object'
+        ? (typed.params as Record<string, unknown>)
+        : undefined;
+    return failure(
+      code,
+      typed.message ?? String(error),
+      params,
+      origin,
+      isHwkRecoveryHint(typed.recovery) ? typed.recovery : undefined
+    );
   }
 
   /**
@@ -1702,7 +2910,11 @@ export class TrezorAdapter implements IHardwareWallet {
    *   - no `connectId` → environment-level check (scan / picker)
    *   - with `connectId` → device-level check (per-call gating)
    */
-  private async _ensureDevicePermission(connectId?: string, deviceId?: string): Promise<void> {
+  private async _ensureDevicePermission(
+    connectId?: string,
+    deviceId?: string,
+    requestedTransport?: ConnectionType
+  ): Promise<void> {
     // No handler? Skip silently so non-permission-aware hosts (and our own
     // unit tests) keep working — Ledger's adapter has a 60s timeout but
     // hardware-wallet flows on web/desktop don't always have a registered
@@ -1710,22 +2922,25 @@ export class TrezorAdapter implements IHardwareWallet {
     if (!this._emitter.listenerCount(UI_REQUEST.REQUEST_DEVICE_PERMISSION)) {
       return;
     }
-    const transportType: TransportType = this.activeTransport ?? 'usb';
+    const transportType: TransportType = requestedTransport ?? this.activeTransport ?? 'usb';
 
+    const operationId = this._activeOperationId();
     const waitPromise = this._uiRegistry.wait<{ granted: boolean; reason?: string }>(
       UI_REQUEST.REQUEST_DEVICE_PERMISSION,
-      { timeoutMs: 60_000 }
+      { timeoutMs: 60_000, operationId }
     );
 
     this._emitter.emit(UI_REQUEST.REQUEST_DEVICE_PERMISSION, {
       type: UI_REQUEST.REQUEST_DEVICE_PERMISSION,
-      payload: { transportType, connectId, deviceId },
+      payload: { transportType, connectId, deviceId, operationId },
     });
 
-    const { granted } = await waitPromise;
+    const { granted, reason } = await waitPromise;
     if (!granted) {
+      // Same field Ledger reports: the host picks its Bluetooth dialog by it.
       throw Object.assign(new Error('Device permission denied'), {
         code: HardwareErrorCode.DevicePermissionDenied,
+        ...(reason ? { params: { permissionDeniedReason: reason } } : {}),
       });
     }
   }

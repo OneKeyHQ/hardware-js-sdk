@@ -10,6 +10,7 @@ import { SignerManager } from '../signer/SignerManager';
 import {
   ERROR_TAG,
   isAppStuckByApdu,
+  isConnectionOpeningTag,
   isKnownConnectionTag,
   isTransportStuck,
   mapLedgerError,
@@ -33,6 +34,8 @@ import {
   tronGetAddress,
   tronSignMessage,
   tronSignTransaction,
+  zcashGetFullViewingKey,
+  zcashGetShieldedAddress,
 } from './chains';
 import { DeviceAppsManager } from '../device-apps/DeviceAppsManager';
 import { collapseSignerInteraction } from './chains/utils';
@@ -76,6 +79,8 @@ import type {
   TronGetAddressCallParams,
   TronSignMessageCallParams,
   TronSignTransactionCallParams,
+  ZcashGetFullViewingKeyCallParams,
+  ZcashGetShieldedAddressCallParams,
 } from './chains';
 
 // ---------------------------------------------------------------------------
@@ -111,6 +116,7 @@ const METHOD_PREFIX_TO_APP_NAME: Record<string, string> = {
   btc: 'Bitcoin',
   sol: 'Solana',
   tron: 'Tron',
+  zcash: 'Zcash',
 };
 
 const HARDWARE_ERROR_CODE_VALUES = new Set<number>(
@@ -182,7 +188,7 @@ function assertAllowedLedgerRelayUrl(rawUrl: string): void {
  * Metro (React Native) can't resolve these; pass a custom importer that
  * uses CJS paths (e.g. `@ledgerhq/device-signer-kit-ethereum/lib/cjs/index.js`).
  */
-async function defaultLedgerKitImporter(pkg: string): Promise<any> {
+export async function defaultLedgerKitImporter(pkg: string): Promise<any> {
   switch (pkg) {
     case '@ledgerhq/device-management-kit':
       return import('@ledgerhq/device-management-kit');
@@ -192,6 +198,10 @@ async function defaultLedgerKitImporter(pkg: string): Promise<any> {
       return import('@ledgerhq/device-signer-kit-bitcoin');
     case '@ledgerhq/device-signer-kit-solana':
       return import('@ledgerhq/device-signer-kit-solana');
+    case '@ledgerhq/device-signer-kit-tron':
+      return import('@ledgerhq/device-signer-kit-tron');
+    case '@ledgerhq/device-signer-kit-zcash':
+      return import('@ledgerhq/device-signer-kit-zcash');
     case '@ledgerhq/context-module':
       return import('@ledgerhq/context-module');
     default:
@@ -330,6 +340,7 @@ export class LedgerConnectorBase implements IConnector {
       emit: <K extends ConnectorEventType>(event: K, data: ConnectorEventMap[K]) =>
         this._emit(event, data),
       invalidateSession: sid => this._invalidateSession(sid),
+      teardownSecureChannelSession: sid => this._teardownSecureChannelSession(sid),
       wrapError: (err, opts) => this._wrapError(err, opts),
       getOrCreateDmk: () => this._getOrCreateDmk(),
       getDeviceManager: () => this._getDeviceManager(),
@@ -592,7 +603,9 @@ export class LedgerConnectorBase implements IConnector {
         // If DMK already gave a recognized tag (locked / disconnected / pairing
         // / transport-class), pass through untouched so SDK classifiers can
         // route on the real cause. We only wrap completely untagged errors.
-        if (isKnownConnectionTag(tag)) {
+        // The opening tag names the step, not the cause; passing it through
+        // would misclassify a GATT failure as DeviceBusy.
+        if (isKnownConnectionTag(tag) && !isConnectionOpeningTag(tag)) {
           throw err;
         }
 
@@ -801,6 +814,11 @@ export class LedgerConnectorBase implements IConnector {
         return solSignTransaction(ctx, sessionId, params as SolSignTransactionCallParams);
       case 'solSignMessage':
         return solSignMessage(ctx, sessionId, params as SolSignMessageCallParams);
+      // ZCASH
+      case 'zcashGetFullViewingKey':
+        return zcashGetFullViewingKey(ctx, sessionId, params as ZcashGetFullViewingKeyCallParams);
+      case 'zcashGetShieldedAddress':
+        return zcashGetShieldedAddress(ctx, sessionId, params as ZcashGetShieldedAddressCallParams);
       // TRON
       case 'tronGetAddress':
         return tronGetAddress(ctx, sessionId, params as TronGetAddressCallParams);
@@ -841,7 +859,7 @@ export class LedgerConnectorBase implements IConnector {
             });
           });
         } catch (err) {
-          ctx.invalidateSession(sessionId);
+          ctx.teardownSecureChannelSession(sessionId);
           throw ctx.wrapError(err);
         } finally {
           ctx.clearCanceller(sessionId);
@@ -946,7 +964,7 @@ export class LedgerConnectorBase implements IConnector {
 
           return { isGenuine: output.isGenuine, deviceId };
         } catch (err) {
-          ctx.invalidateSession(sessionId);
+          ctx.teardownSecureChannelSession(sessionId);
           throw ctx.wrapError(err);
         } finally {
           ctx.clearCanceller(sessionId);
@@ -1101,8 +1119,27 @@ export class LedgerConnectorBase implements IConnector {
     return this._deviceAppsManager!;
   }
 
+  // DeviceAppsManager is a per-call factory with no cached session state, so
+  // there is nothing to invalidate for it here.
   private _invalidateSession(sessionId: string): void {
     this._signerManager?.invalidate(sessionId);
+  }
+
+  /**
+   * Fire the canceller so DMK closes the secure-channel WebSocket. The DMK device
+   * session is kept: unlock/retry recovery reuses it.
+   */
+  private _teardownSecureChannelSession(sessionId: string): void {
+    const cancel = this._cancellers.get(sessionId);
+    this._cancellers.delete(sessionId);
+    if (cancel) {
+      try {
+        cancel();
+      } catch {
+        // Action may already have settled: nothing left to cancel.
+      }
+    }
+    this._invalidateSession(sessionId);
   }
 
   /**
@@ -1207,7 +1244,7 @@ export class LedgerConnectorBase implements IConnector {
    * at every catch site. Falls through unchanged for unknown methods.
    */
   private _ctxForMethod(method: string): ConnectorContext {
-    const prefix = /^(evm|btc|sol|tron)/.exec(method)?.[1];
+    const prefix = /^(evm|btc|sol|tron|zcash)/.exec(method)?.[1];
     const defaultAppName = prefix ? METHOD_PREFIX_TO_APP_NAME[prefix] : undefined;
     if (!defaultAppName) return this._ctx;
     return {

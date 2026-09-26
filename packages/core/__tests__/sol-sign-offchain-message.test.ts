@@ -54,6 +54,14 @@ describe('SolSignOffchainMessage', () => {
     });
   });
 
+  test('maps omitted required signers to an empty repeated field', () => {
+    const method = createMethod({ requiredSigners: undefined });
+
+    method.init();
+
+    expect(method.params.required_signers).toEqual([]);
+  });
+
   test.each([
     { requiredSigners: ['11'], error: '32-byte hex public key' },
     { requiredSigners: [signerB, signerA], error: 'strictly sorted and unique' },

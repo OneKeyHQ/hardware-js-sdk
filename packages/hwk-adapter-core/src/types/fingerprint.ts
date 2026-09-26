@@ -24,9 +24,22 @@ export const CHAIN_FINGERPRINT_PATHS: Record<ChainForFingerprint, string> = {
   btc: "m/44'/0'/0'",
   sol: "m/44'/501'/0'",
   tron: "m/44'/195'/0'/0/0",
+  // Shielded UA (single Orchard receiver) derived from the transparent path.
+  zcash: "m/44'/133'/0'/0/0",
 };
 
-export type ChainForFingerprint = 'evm' | 'btc' | 'sol' | 'tron';
+export type ChainForFingerprint = 'evm' | 'btc' | 'sol' | 'tron' | 'zcash';
+
+/**
+ * Parses the complete BIP32 master fingerprint wire value: 4 bytes encoded
+ * as exactly 8 hexadecimal characters. This is protocol metadata, not a
+ * collision-resistant wallet identity.
+ */
+export function parseBip32MasterFingerprint(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  return /^[0-9a-f]{8}$/.test(normalized) ? normalized : undefined;
+}
 
 /**
  * 16-char SHA-256 fingerprint for device-identity verification.
@@ -35,4 +48,12 @@ export type ChainForFingerprint = 'evm' | 'btc' | 'sol' | 'tron';
  */
 export function deriveDeviceFingerprint(value: string): string {
   return bytesToHex(sha256(utf8ToBytes(value))).slice(0, 16);
+}
+
+/**
+ * Domain-separated 256-bit wallet id. Input must be one fixed, vendor-defined public source, never
+ * a variable subset of exported accounts, or one wallet would get several ids.
+ */
+export function deriveWalletId(canonicalPublicMaterial: string): string {
+  return bytesToHex(sha256(utf8ToBytes(`onekey-hwk-wallet-id:v1:${canonicalPublicMaterial}`)));
 }
