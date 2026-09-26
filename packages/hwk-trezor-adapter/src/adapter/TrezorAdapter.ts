@@ -814,7 +814,7 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   async bindBleDevice(params: BindBleDeviceParams): Promise<Response<string>> {
-    if (params.identity.vendor !== 'trezor' || !params.identity.value) {
+    if (params.identity?.vendor !== 'trezor' || !params.identity.value) {
       return failure(HardwareErrorCode.InvalidParams, 'Trezor device identity is required');
     }
     const { value: deviceId } = params.identity;
