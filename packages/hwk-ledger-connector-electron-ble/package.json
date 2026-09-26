@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hwk-ledger-connector-electron-ble",
-  "version": "1.2.5-alpha.2",
+  "version": "1.2.5-alpha.3",
   "description": "IConnector implementation for Ledger hardware wallets via Electron BLE",
   "author": "OneKey",
   "license": "MIT",
@@ -49,8 +49,8 @@
   ],
   "dependencies": {
     "@ledgerhq/device-management-kit": "1.9.0",
-    "@onekeyfe/hwk-adapter-core": "1.2.5-alpha.2",
-    "@onekeyfe/hwk-ledger-adapter": "1.2.5-alpha.2",
+    "@onekeyfe/hwk-adapter-core": "1.2.5-alpha.3",
+    "@onekeyfe/hwk-ledger-adapter": "1.2.5-alpha.3",
     "purify-ts": "2.1.0",
     "rxjs": "7.8.2"
   },
