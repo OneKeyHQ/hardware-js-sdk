@@ -3,6 +3,7 @@ import { Actions } from '@keystonehq/hw-transport-usb';
 import {
   EConnectorInteraction,
   HardwareErrorCode,
+  MISSING_BIP32_MASTER_FINGERPRINT,
   TypedEventEmitter,
   createHardwareLinkId,
   createHardwareSearchTargetId,
@@ -590,6 +591,12 @@ export class KeystoneUsbConnectorBase implements IConnector {
     );
     const rawMasterFingerprint = response.walletMFP;
     const masterFingerprint = parseBip32MasterFingerprint(rawMasterFingerprint);
+    if (masterFingerprint === MISSING_BIP32_MASTER_FINGERPRINT) {
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceNotInitialized,
+        message: 'Keystone has no wallet yet; it reported an empty master fingerprint',
+      });
+    }
     if (rawMasterFingerprint !== undefined && !masterFingerprint) {
       throw createHwkError({
         code: HardwareErrorCode.DeviceMismatch,

@@ -41,6 +41,15 @@ export function parseBip32MasterFingerprint(value: unknown): string | undefined 
   return /^[0-9a-f]{8}$/.test(normalized) ? normalized : undefined;
 }
 
+/** Four zero bytes is how a missing master fingerprint is encoded; never a wallet identity. */
+export const MISSING_BIP32_MASTER_FINGERPRINT = '00000000';
+
+/** A master fingerprint usable as a wallet identity: well-formed and not the missing marker. */
+export function parseWalletMasterFingerprint(value: unknown): string | undefined {
+  const fingerprint = parseBip32MasterFingerprint(value);
+  return fingerprint === MISSING_BIP32_MASTER_FINGERPRINT ? undefined : fingerprint;
+}
+
 /**
  * 16-char SHA-256 fingerprint for device-identity verification.
  * Callers must canonicalize input (e.g. EVM address → lowercase) —
