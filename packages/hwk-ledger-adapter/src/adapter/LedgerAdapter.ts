@@ -100,6 +100,7 @@ import type {
   TronSignature,
   TronSignedTx,
   UiResponseEvent,
+  WalletIdentity,
   ZcashFullViewingKey,
   ZcashGetFullViewingKeyParams,
   ZcashGetShieldedAddressParams,
@@ -111,6 +112,9 @@ type LedgerConnectionAttempt = ICommonCallParams & {
   bindingSessionId?: string;
   selectedConnection?: { connectId: string; requestId: string };
   bindingSaved?: boolean;
+  /** The caller checks the wallet first, so a BLE pick waits in `pendingBinding`. */
+  deferBindingSave?: boolean;
+  pendingBinding?: { connectId: string; requestId: string };
 };
 
 /**
@@ -189,6 +193,8 @@ export class LedgerAdapter implements IHardwareWallet {
   private readonly _operations = new OperationRegistry({
     vendor: 'ledger',
     onEnded: (operation, reason) => {
+      this._discardPendingBinding(this._pendingOperationBindings.get(operation.operationId));
+      this._pendingOperationBindings.delete(operation.operationId);
       this.emitter.emit(SDK.OPERATION_ENDED, {
         type: SDK.OPERATION_ENDED,
         payload: { operationId: operation.operationId, reason },
@@ -202,6 +208,9 @@ export class LedgerAdapter implements IHardwareWallet {
   private _discoveredDevices = new Map<string, DeviceInfo>();
 
   private _sessions = new Map<string, string>();
+
+  // An operation's BLE pick is saved by its first call that gets past the wallet check.
+  private readonly _pendingOperationBindings = new Map<string, LedgerConnectionAttempt>();
 
   // Transport each session was opened on, by sessionId. The adapter-wide
   // `_activeConnectionType` moves with every discovery and can go stale.
@@ -260,6 +269,16 @@ export class LedgerAdapter implements IHardwareWallet {
   private _activeConnectionType: 'usb' | 'ble' | undefined;
 
   private _bindingSelectionRequestId: string | undefined;
+
+  private _discardPendingBinding(
+    owner: LedgerConnectionAttempt | undefined,
+    status: 'failed' | 'cancelled' = 'cancelled'
+  ): void {
+    const pending = owner?.pendingBinding;
+    if (!owner || !pending) return;
+    owner.pendingBinding = undefined;
+    if (pending.requestId === this._bindingSelectionRequestId) this._finishBleBinding(status);
+  }
 
   private _finishBleBinding(status: 'failed' | 'cancelled'): void {
     const selectionRequestId = this._bindingSelectionRequestId;
@@ -326,6 +345,7 @@ export class LedgerAdapter implements IHardwareWallet {
     this._discoveredDevices.clear();
     this._sessions.clear();
     this._sessionTransports.clear();
+    this._pendingOperationBindings.clear();
     this._selectedBleReconnectTargets.clear();
     this._connectingPromise = null;
     this._doConnectAbortController = null;
@@ -527,8 +547,9 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
-  /** Ledger binds whichever BLE device the user picks; its wallet is not checked. */
+  /** Binds the picked BLE device; with a recorded wallet identity it must match first. */
   async bindBleDevice(params: BindBleDeviceParams): Promise<Response<string>> {
+    const identity = params.identity?.vendor === 'ledger' ? params.identity : undefined;
     try {
       return await this._jobQueue.enqueue(
         '__ledger_bind_ble__',
@@ -544,6 +565,7 @@ export class LedgerAdapter implements IHardwareWallet {
           const attempt: LedgerConnectionAttempt = {
             extra: params.extra,
             bindingReason: 'manual-rebind',
+            deferBindingSave: Boolean(identity),
           };
           try {
             const connectId = await this._connectFirstOrSelect(
@@ -554,6 +576,46 @@ export class LedgerAdapter implements IHardwareWallet {
               attempt,
               signal
             );
+            const pending = attempt.pendingBinding;
+            if (identity && pending) {
+              attempt.pendingBinding = undefined;
+              const sessionId = this._sessions.get(connectId);
+              if (!sessionId) {
+                throw createHwkError({
+                  code: HardwareErrorCode.DeviceDisconnected,
+                  message: 'Selected Ledger connection ended',
+                });
+              }
+              const fingerprint = await this._computeChainFingerprint(
+                identity.chain,
+                (method, callParams) =>
+                  this._runConnectorCall(
+                    connectId,
+                    method,
+                    callParams,
+                    signal,
+                    undefined,
+                    undefined,
+                    { autoInstallApp: true },
+                    { connection: { connectId, sessionId } }
+                  )
+              );
+              if (fingerprint !== identity.value) {
+                await this._dropSession(connectId, signal);
+                throw createHwkError({
+                  code: HardwareErrorCode.DeviceMismatch,
+                  message: formatDeviceMismatchError(identity.value, fingerprint),
+                });
+              }
+              await this._saveSelectedBleBinding(
+                connectId,
+                pending.requestId,
+                attempt,
+                undefined,
+                signal,
+                identity
+              );
+            }
             if (!attempt.bindingSaved) {
               await this._dropSession(connectId, signal);
               // A business call can shrug off an unsaved binding, but here
@@ -598,6 +660,8 @@ export class LedgerAdapter implements IHardwareWallet {
           const attempt: LedgerConnectionAttempt = {
             ...context,
             extra: context.extra ? { ...context.extra } : undefined,
+            // The operation's calls decide whether the pick is the right wallet.
+            deferBindingSave: true,
           };
           try {
             const resolvedConnectId = await this.ensureConnected(
@@ -608,7 +672,11 @@ export class LedgerAdapter implements IHardwareWallet {
               attempt
             );
             LedgerAdapter._throwIfAborted(signal);
-            return this._createOperation(connectId, resolvedConnectId);
+            const result = this._createOperation(connectId, resolvedConnectId);
+            if (result.success && attempt.pendingBinding) {
+              this._pendingOperationBindings.set(result.payload, attempt);
+            }
+            return result;
           } catch (error) {
             this._finishBleBinding(signal.aborted ? 'cancelled' : 'failed');
             throw error;
@@ -1473,6 +1541,8 @@ export class LedgerAdapter implements IHardwareWallet {
       this._uiRegistry.cancel(undefined, undefined, pendingOperationId);
     }
     this._finishBleBinding('cancelled');
+    if (!connectId) this._pendingOperationBindings.clear();
+    else if (pendingOperationId) this._pendingOperationBindings.delete(pendingOperationId);
 
     // A bundle without operationId queues under the raw connectId while its owning
     // operation is a second key, so cancel both. With neither, every job goes.
@@ -1538,13 +1608,14 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
-  /** Ledger takes the selected BLE endpoint as the device and binds it right away. */
+  /** Saves a picked BLE endpoint; `identity` is set when its wallet was just checked. */
   private async _saveSelectedBleBinding(
     connectId: string,
     selectionRequestId: string,
     context: LedgerConnectionAttempt | undefined,
     operationId: string | undefined,
-    signal: AbortSignal
+    signal: AbortSignal,
+    identity?: Extract<WalletIdentity, { vendor: 'ledger' }>
   ): Promise<void> {
     try {
       const outcome = await requestSaveDeviceBinding(
@@ -1553,6 +1624,7 @@ export class LedgerAdapter implements IHardwareWallet {
         {
           selectionRequestId,
           connection: { transport: 'ble', connectId },
+          ...(identity ? { identity } : {}),
           extra: context?.extra,
           operationId,
         },
@@ -2172,13 +2244,17 @@ export class LedgerAdapter implements IHardwareWallet {
         signal
       );
       if (context) context.selectedConnection = { connectId: connected, requestId };
-      await this._saveSelectedBleBinding(
-        connected,
-        requestId,
-        context,
-        preserveOperationId,
-        signal
-      );
+      if (context?.deferBindingSave) {
+        context.pendingBinding = { connectId: connected, requestId };
+      } else {
+        await this._saveSelectedBleBinding(
+          connected,
+          requestId,
+          context,
+          preserveOperationId,
+          signal
+        );
+      }
       return connected;
     }
 
@@ -2567,7 +2643,14 @@ export class LedgerAdapter implements IHardwareWallet {
       selectedBleTarget.fingerprint === fingerprint.deviceId
         ? selectedBleTarget.connectId
         : inputConnectId;
-    const connectionAttempt: LedgerConnectionAttempt = { ...commonParams };
+    const checksWallet = Boolean(
+      fingerprint && !fingerprint.skipFingerprint && fingerprint.deviceId
+    );
+    // A wallet-checked call saves a fresh BLE pick only once the check passes.
+    const connectionAttempt: LedgerConnectionAttempt = {
+      ...commonParams,
+      deferBindingSave: checksWallet,
+    };
     const bundleConnection = installContext?.connection;
     if (
       bundleConnection &&
@@ -2619,10 +2702,15 @@ export class LedgerAdapter implements IHardwareWallet {
       // a stuck DMK transport during fingerprint check leaks the dead
       // session to subsequent retries (they keep using the same broken
       // sessionId until the user replugs).
-      // Ledger checks the wallet over USB only; a BLE session is taken as the
-      // device the user picked. A session of unknown transport is checked.
       const isBleSession = this._sessionTransports.get(sessionId) === 'ble';
-      if (fingerprint && !fingerprint.skipFingerprint && fingerprint.deviceId && !isBleSession) {
+      const bindingOwner = operationId
+        ? this._pendingOperationBindings.get(operationId)
+        : connectionAttempt;
+      const pendingBinding =
+        bindingOwner?.pendingBinding?.connectId === resolvedConnectId
+          ? bindingOwner.pendingBinding
+          : undefined;
+      if (fingerprint && checksWallet) {
         const fp = await this._abortable(
           signal,
           this._verifyDeviceFingerprintWithSession(
@@ -2632,10 +2720,39 @@ export class LedgerAdapter implements IHardwareWallet {
           )
         );
         if (!fp.success) {
+          if (pendingBinding) {
+            // A fresh pick holding another wallet is neither saved nor reused.
+            // Without an operation the DeviceMismatch handler below drops it.
+            this._discardPendingBinding(bindingOwner, 'failed');
+            if (operationId) {
+              this._pendingOperationBindings.delete(operationId);
+              this._operations.end(operationId, 'explicit');
+              await this._dropSession(resolvedConnectId, signal);
+            }
+          }
           throw Object.assign(new Error(formatDeviceMismatchError(fp.expected, fp.actual)), {
             code: HardwareErrorCode.DeviceMismatch,
           });
         }
+      }
+      if (pendingBinding && bindingOwner) {
+        bindingOwner.pendingBinding = undefined;
+        if (operationId) this._pendingOperationBindings.delete(operationId);
+        await this._saveSelectedBleBinding(
+          pendingBinding.connectId,
+          pendingBinding.requestId,
+          bindingOwner,
+          operationId,
+          signal,
+          fingerprint && checksWallet
+            ? {
+                vendor: 'ledger',
+                type: 'chainFingerprint',
+                chain: fingerprint.chain,
+                value: fingerprint.deviceId,
+              }
+            : undefined
+        );
       }
       if (
         fingerprint &&
@@ -2751,6 +2868,7 @@ export class LedgerAdapter implements IHardwareWallet {
 
       if (!operationId && errObj?.code === HardwareErrorCode.DeviceMismatch) {
         this._sessions.delete(resolvedConnectId);
+        this._sessionTransports.delete(sessionId);
         this._discoveredDevices.delete(resolvedConnectId);
         await this.connector.disconnect(sessionId).catch(() => undefined);
         throw err;
