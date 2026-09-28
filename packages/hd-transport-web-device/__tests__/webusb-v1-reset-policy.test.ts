@@ -10,14 +10,7 @@ function createUsbDevice() {
     selectConfiguration: jest.fn().mockResolvedValue(undefined),
     claimInterface: jest.fn().mockResolvedValue(undefined),
     clearHalt: jest.fn().mockResolvedValue(undefined),
-  } as unknown as USBDevice & {
-    opened: boolean;
-    open: jest.Mock;
-    reset: jest.Mock;
-    selectConfiguration: jest.Mock;
-    claimInterface: jest.Mock;
-    clearHalt: jest.Mock;
-  };
+  } as any;
 
   device.open.mockImplementation(() => {
     device.opened = true;
