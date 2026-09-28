@@ -5,6 +5,7 @@ import {
   DEVICE,
   DeviceJobQueue,
   HardwareErrorCode,
+  MISSING_BIP32_MASTER_FINGERPRINT,
   OperationRegistry,
   SDK,
   TypedEventEmitter,
@@ -28,6 +29,7 @@ import {
   isUserRefusal,
   operationMayHaveCompletedParams,
   parseBip32MasterFingerprint,
+  parseWalletMasterFingerprint,
   rehydrateConnectorError,
   resolveHardwareOperationTarget as resolveGenericHardwareOperationTarget,
   runAllNetworkGetAddress,
@@ -1799,11 +1801,15 @@ export class KeystoneAdapter implements IHardwareWallet {
       sessionId = session.sessionId;
       KeystoneAdapter._throwIfAborted(signal);
       const raw = session.deviceInfo.raw as { masterFingerprint?: unknown } | undefined;
-      const mfpValue = parseBip32MasterFingerprint(raw?.masterFingerprint);
+      const mfpValue = parseWalletMasterFingerprint(raw?.masterFingerprint);
       if (!mfpValue) {
+        const empty =
+          parseBip32MasterFingerprint(raw?.masterFingerprint) === MISSING_BIP32_MASTER_FINGERPRINT;
         throw createHwkError({
-          code: HardwareErrorCode.DeviceMismatch,
-          message: 'Keystone USB did not report a master fingerprint',
+          code: empty ? HardwareErrorCode.DeviceNotInitialized : HardwareErrorCode.DeviceMismatch,
+          message: empty
+            ? 'Keystone has no wallet yet; it reported an empty master fingerprint'
+            : 'Keystone USB did not report a master fingerprint',
         });
       }
       const masterFingerprint = mfpValue.toLowerCase();
@@ -2417,12 +2423,14 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
   }
 
+  /** A response without the request's id is as unrelated as one with another id. */
   private static _assertRequestIdMatches(expected: string, actual?: string): void {
-    if (actual && actual.toLowerCase() !== expected.toLowerCase()) {
+    if (!actual || actual.toLowerCase() !== expected.toLowerCase()) {
       throw createHwkError({
         code: HardwareErrorCode.DeviceMismatch,
-        message:
-          'Keystone response requestId does not match the pending request — discarding a stale or unrelated scan',
+        message: actual
+          ? 'Keystone response requestId does not match the pending request — discarding a stale or unrelated scan'
+          : 'Keystone response carries no requestId — discarding a stale or unrelated scan',
       });
     }
   }

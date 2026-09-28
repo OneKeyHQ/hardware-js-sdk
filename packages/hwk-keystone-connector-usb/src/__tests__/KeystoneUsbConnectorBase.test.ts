@@ -441,6 +441,14 @@ describe('KeystoneUsbConnectorBase', () => {
       });
     });
 
+    it('reports a device with an empty walletMFP as not initialized', async () => {
+      const connector = newConnector(fakeTransportClass(versionTransport('00000000')));
+
+      await expect(connector.connect()).rejects.toMatchObject({
+        code: HardwareErrorCode.DeviceNotInitialized,
+      });
+    });
+
     it('rejects a walletMFP that is not exactly 4 bytes encoded as 8 hex characters', async () => {
       const connector = newConnector(fakeTransportClass(versionTransport('aabbccddee')));
 

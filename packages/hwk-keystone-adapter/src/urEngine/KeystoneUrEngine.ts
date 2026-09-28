@@ -4,7 +4,7 @@ import bs58check from 'bs58check';
 import * as bitcoin from 'bitcoinjs-lib';
 import HDKey from 'hdkey';
 import { parse as uuidParse, stringify as uuidStringify } from 'uuid';
-import { parseBip32MasterFingerprint } from '@onekeyfe/hwk-adapter-core';
+import { parseWalletMasterFingerprint } from '@onekeyfe/hwk-adapter-core';
 
 import { TronSignRequest, TronSignType } from './TronSignRequest';
 import { TronSignature } from './TronSignature';
@@ -78,11 +78,9 @@ function requireSignatureBytes(hex: string, expectedBytes: number, chain: string
 }
 
 // The registry decodes a missing mfp as four zero bytes; that is never a usable wallet identity.
-const MISSING_MASTER_FINGERPRINT = '00000000';
-
 function requireBip32MasterFingerprint(value: unknown): string {
-  const fingerprint = parseBip32MasterFingerprint(value);
-  if (!fingerprint || fingerprint === MISSING_MASTER_FINGERPRINT) {
+  const fingerprint = parseWalletMasterFingerprint(value);
+  if (!fingerprint) {
     throw new Error('Keystone master fingerprint must be exactly 4 bytes (8 hex characters)');
   }
   return fingerprint;

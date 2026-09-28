@@ -24,6 +24,9 @@ describe('keystoneQueueKey', () => {
     expect(keystoneMfpFromIdentifier(MFP)).toBe(MFP);
     expect(keystoneMfpFromIdentifier('keystone-cold-start')).toBeUndefined();
     expect(keystoneMfpFromIdentifier('a'.repeat(64))).toBeUndefined();
+    // Four zero bytes marks a missing fingerprint, never a wallet.
+    expect(keystoneMfpFromIdentifier('00000000')).toBeUndefined();
+    expect(keystoneMfpFromIdentifier('keystone-wallet:00000000')).toBeUndefined();
   });
 
   it('fans a cancel out over every key one identifier can stand for', () => {

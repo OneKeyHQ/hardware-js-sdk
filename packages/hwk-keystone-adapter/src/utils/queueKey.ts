@@ -2,7 +2,7 @@
  * Single source of the device-queue key: enqueue, the all-network cancel scope and `cancel()`
  * must agree or a cancel misses its target. A pinned operation id wins.
  */
-import { isHardwareOperationId, parseBip32MasterFingerprint } from '@onekeyfe/hwk-adapter-core';
+import { isHardwareOperationId, parseWalletMasterFingerprint } from '@onekeyfe/hwk-adapter-core';
 
 import { KEYSTONE_WALLET_CONNECT_ID_PREFIX } from '../adapter/deviceTable';
 
@@ -20,7 +20,7 @@ export function keystoneMfpFromIdentifier(identifier: string): string | undefine
   const value = identifier.startsWith(KEYSTONE_WALLET_CONNECT_ID_PREFIX)
     ? identifier.slice(KEYSTONE_WALLET_CONNECT_ID_PREFIX.length)
     : identifier;
-  return parseBip32MasterFingerprint(value);
+  return parseWalletMasterFingerprint(value);
 }
 
 /**
