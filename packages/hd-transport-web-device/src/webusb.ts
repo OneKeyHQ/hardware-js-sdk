@@ -872,7 +872,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       try {
         const device = await this.findDevice(path);
         if (!device.opened) {
-          await this.connect(path, false);
+          await this.connect(path, false, { reason: 'lazy-transfer' });
         }
         const endpoints = this.deviceEndpoints.get(path);
         const endpointIn = endpoints?.endpointIn ?? this.endpointId;
