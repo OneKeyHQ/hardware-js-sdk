@@ -119,6 +119,8 @@ export {
   deriveDeviceFingerprint,
   deriveWalletId,
   parseBip32MasterFingerprint,
+  parseWalletMasterFingerprint,
+  MISSING_BIP32_MASTER_FINGERPRINT,
 } from './types/fingerprint';
 
 export type {

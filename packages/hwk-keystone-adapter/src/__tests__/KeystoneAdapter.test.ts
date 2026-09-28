@@ -113,9 +113,21 @@ function wrongUuidBuffer(): Buffer {
   return bytes;
 }
 
+/** The requestId the fixture device echoes back, per the options under test. */
+function echoedRequestId(
+  options: FakeDeviceOptions,
+  requestId: Buffer | undefined
+): Buffer | undefined {
+  if (options.omitRequestId) return undefined;
+  if (options.wrongRequestId) return wrongUuidBuffer();
+  return requestId;
+}
+
 interface FakeDeviceOptions {
   /** Have the fixture device echo back a requestId that doesn't match the pending request. */
   wrongRequestId?: boolean;
+  /** Have the fixture device answer without any requestId. */
+  omitRequestId?: boolean;
   /**
    * Answer a BTC account request with all four script-type variants, as real hardware does. Off
    * by default so 1-request/1-key fixtures stay exact.
@@ -171,14 +183,14 @@ function attachFakeDevice(adapter: KeystoneAdapter, options: FakeDeviceOptions =
       }
       case 'eth-sign-request': {
         const request = EthSignRequest.fromCBOR(cbor);
-        const requestId = options.wrongRequestId ? wrongUuidBuffer() : request.getRequestId();
+        const requestId = echoedRequestId(options, request.getRequestId());
         const signature = new ETHSignature(Buffer.alloc(65, 0x07), requestId);
         respond(signature.toUR());
         return;
       }
       case 'sol-sign-request': {
         const request = SolSignRequest.fromCBOR(cbor);
-        const requestId = options.wrongRequestId ? wrongUuidBuffer() : request.getRequestId();
+        const requestId = echoedRequestId(options, request.getRequestId());
         const signature = new SolSignature(Buffer.alloc(64, 0x08), requestId);
         respond(signature.toUR());
         return;
@@ -190,7 +202,7 @@ function attachFakeDevice(adapter: KeystoneAdapter, options: FakeDeviceOptions =
       }
       case 'tron-sign-request': {
         const request = TronSignRequest.fromCBOR(cbor);
-        const requestId = options.wrongRequestId ? wrongUuidBuffer() : request.getRequestId();
+        const requestId = echoedRequestId(options, request.getRequestId());
         const signature = new TronUrSignature(Buffer.alloc(65, 0x06), requestId);
         respond(signature.toUR());
         return;
@@ -715,6 +727,20 @@ describe('KeystoneAdapter', () => {
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.payload.code).toBe(HardwareErrorCode.MethodNotSupported);
+    });
+
+    it('rejects a scanned response that carries no requestId', async () => {
+      const adapter = newTestAdapter();
+      attachFakeDevice(adapter, { omitRequestId: true });
+
+      const result = await adapter.evmSignTransaction(null, null, {
+        path: "m/44'/60'/0'/0/0",
+        serializedTx: `02${'ab'.repeat(30)}`,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.payload.code).toBe(HardwareErrorCode.DeviceMismatch);
     });
 
     it('rejects a scanned response whose requestId does not match the pending request', async () => {
