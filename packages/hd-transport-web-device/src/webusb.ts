@@ -70,6 +70,13 @@ interface TransferCancelToken {
   cancelled: boolean;
 }
 
+type WebUsbConnectReason = 'acquire' | 'packet-retry' | 'probe-recovery' | 'lazy-transfer';
+
+interface WebUsbConnectOptions {
+  expectedProtocol?: ProtocolType;
+  reason?: WebUsbConnectReason;
+}
+
 /**
  * The navigator.usb disconnect listener is module-scoped and attached at most
  * once: listeners on navigator.usb are global and never garbage collected, so a
@@ -309,9 +316,21 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   async acquire(input: AcquireInput) {
     if (!input.path) return;
     try {
+      this.Log?.debug('[WebUsbTransport] acquire begin', {
+        path: input.path,
+        expectedProtocol: input.expectedProtocol,
+        protocolHint: input.protocolHint,
+        cachedProtocol: this.deviceProtocol.get(input.path),
+        skipProtocolProbe: input.skipProtocolProbe === true,
+        forceProtocolDetection: input.forceProtocolDetection === true,
+        staleProtocol: this.staleProtocolPaths.has(input.path),
+      });
       await this.rotateProtocolV2UsbGeneration(input.path, 'WebUSB transport acquired');
       await this.closeOpenDevice(input.path);
-      await this.connect(input.path ?? '', true);
+      await this.connect(input.path ?? '', true, {
+        expectedProtocol: input.expectedProtocol,
+        reason: 'acquire',
+      });
       if (input.skipProtocolProbe) {
         if (!input.expectedProtocol) {
           throw ERRORS.TypedError(
@@ -510,11 +529,19 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   /**
    * Connect to device with retry mechanism
    */
-  async connect(path: string, first: boolean) {
+  async connect(path: string, first: boolean, options: WebUsbConnectOptions = {}) {
     const maxRetries = 5;
     for (let i = 0; i < maxRetries; i++) {
       try {
-        return await this.connectToDevice(path, first);
+        this.Log?.debug('[WebUsbTransport] connect attempt', {
+          path,
+          first,
+          attempt: i + 1,
+          reason: options.reason ?? 'unspecified',
+          expectedProtocol: options.expectedProtocol,
+          cachedProtocol: this.deviceProtocol.get(path),
+        });
+        return await this.connectToDevice(path, first, options);
       } catch (e) {
         if (i === maxRetries - 1) {
           throw e;
@@ -561,22 +588,82 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    * Connect to specific device.
    * Discovers interface/endpoint numbers from USB descriptors on first connection.
    */
-  async connectToDevice(path: string, first: boolean) {
+  async connectToDevice(
+    path: string,
+    first: boolean,
+    options: WebUsbConnectOptions = {}
+  ) {
     let device: USBDevice = await this.findDevice(path);
     if (!device.opened) {
       await device.open();
     }
-    // A V1 packet retry continues an in-flight exchange. Preserve its endpoint
-    // state as in the legacy transport; probing and V2 recovery still reset.
-    if (first || this.deviceProtocol.get(path) !== 'V1') {
+
+    const cachedProtocol = this.deviceProtocol.get(path);
+    const knownV1 =
+      options.expectedProtocol === 'V1' ||
+      (options.expectedProtocol === undefined && cachedProtocol === 'V1');
+    const shouldReset =
+      options.expectedProtocol === 'V2'
+        ? true
+        : !knownV1 && (first || cachedProtocol !== 'V1');
+    const deviceBeforeReset = device;
+
+    this.Log?.debug('[WebUsbTransport] connect before usb reset decision', {
+      path,
+      first,
+      reason: options.reason ?? 'unspecified',
+      expectedProtocol: options.expectedProtocol,
+      cachedProtocol,
+      shouldReset,
+      opened: device.opened,
+      configurationValue: device.configuration?.configurationValue ?? null,
+    });
+
+    // Classic / Classic 1S are Protocol V1 devices. Their firmware treats a USB
+    // link-state change while unlocked as a security/session reset condition.
+    // Do not bounce the USB bus on a normal acquire once V1 is already known.
+    // Unknown/V2 paths keep the existing reset + re-enumeration recovery flow.
+    if (shouldReset) {
+      const resetStartedAt = Date.now();
       try {
         await device.reset();
+        this.Log?.debug('[WebUsbTransport] usb reset completed', {
+          path,
+          reason: options.reason ?? 'unspecified',
+          expectedProtocol: options.expectedProtocol,
+          cachedProtocol,
+          durationMs: Date.now() - resetStartedAt,
+        });
       } catch (error) {
-        this.Log?.debug('[WebUsbTransport] reset before claim failed, continuing:', error);
+        this.Log?.debug('[WebUsbTransport] reset before claim failed, continuing:', {
+          path,
+          reason: options.reason ?? 'unspecified',
+          expectedProtocol: options.expectedProtocol,
+          cachedProtocol,
+          durationMs: Date.now() - resetStartedAt,
+          error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+        });
       }
+    } else {
+      this.Log?.debug('[WebUsbTransport] usb reset skipped', {
+        path,
+        reason: options.reason ?? 'unspecified',
+        expectedProtocol: options.expectedProtocol,
+        cachedProtocol,
+        skipReason: 'protocol-v1-known',
+      });
     }
+
     await this.getConnectedDevices();
     device = await this.findDevice(path);
+    this.Log?.debug('[WebUsbTransport] connect after re-enumeration', {
+      path,
+      reason: options.reason ?? 'unspecified',
+      resetAttempted: shouldReset,
+      deviceObjectChanged: device !== deviceBeforeReset,
+      opened: device.opened,
+      configurationValue: device.configuration?.configurationValue ?? null,
+    });
     if (!device.opened) {
       await device.open();
     }
@@ -710,7 +797,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     }
 
     await this.getConnectedDevices();
-    await this.connect(path, false);
+    await this.connect(path, false, { reason: 'packet-retry' });
   }
 
   private getTransferInData(result: USBInTransferResult): DataView {
@@ -762,7 +849,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   private async transferOutOnce(path: string, packet: Uint8Array) {
     const device = await this.findDevice(path);
     if (!device.opened) {
-      await this.connect(path, false);
+      await this.connect(path, false, { reason: 'lazy-transfer' });
     }
     const endpoints = this.deviceEndpoints.get(path);
     const endpointOut = endpoints?.endpointOut ?? this.endpointId;
@@ -834,7 +921,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   private async resetConnectionAfterProbe(path: string) {
     await this.closeConnectionAfterProbe(path);
     await this.getConnectedDevices();
-    await this.connect(path, false);
+    await this.connect(path, false, { reason: 'probe-recovery' });
   }
 
   private async withProtocolReadTimeout<T>(
