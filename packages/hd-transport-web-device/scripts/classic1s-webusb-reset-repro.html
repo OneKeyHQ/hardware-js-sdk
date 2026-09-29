@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Classic1S WebUSB reset repro</title>
+  <style>
+    body { font: 14px/1.45 system-ui, sans-serif; max-width: 980px; margin: 32px auto; padding: 0 16px; }
+    button, input { font: inherit; margin: 4px; padding: 8px 12px; }
+    button { cursor: pointer; }
+    pre { background: #111; color: #ddd; padding: 16px; min-height: 320px; overflow: auto; white-space: pre-wrap; }
+    code { background: #eee; padding: 2px 4px; }
+    .note { padding: 12px; background: #fff6d8; border: 1px solid #e8ce73; }
+  </style>
+</head>
+<body>
+  <h1>Classic1S WebUSB reset repro</h1>
+  <p class="note">
+    This page only exercises the USB lifecycle. It does not send wallet/protobuf commands,
+    request a PIN, sign, wipe, or update firmware. Keep only one OneKey USB client open while testing.
+  </p>
+
+  <p>
+    Serve this file from <code>http://localhost</code> (WebUSB requires a secure context; localhost is allowed),
+    open it in Chromium, then click <strong>Grant Classic1S</strong>.
+  </p>
+
+  <div>
+    <button id="grant">Grant Classic1S</button>
+    <label>Loops <input id="loops" type="number" min="1" max="20" value="5" /></label>
+  </div>
+
+  <div>
+    <button id="noReset">A: patched V1 (no reset)</button>
+    <button id="legacyReset">B: pre-Pro2 order (config → reset)</button>
+    <button id="currentReset">C: current SDK order (reset → re-enumerate)</button>
+    <button id="clear">Clear log</button>
+  </div>
+
+  <pre id="log"></pre>
+
+<script>
+(() => {
+  const FILTERS = [
+    { vendorId: 0x1209, productId: 0x53c1 }, // Classic / Classic1S / Mini / Pro / Touch firmware
+    { vendorId: 0x1209, productId: 0x53c0 }, // Classic / Classic1S / Mini bootloader
+  ];
+  const CONFIGURATION_ID = 1;
+  let selectedIdentity = null;
+  const logEl = document.getElementById('log');
+
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const hex = value => value == null ? null : '0x' + Number(value).toString(16).padStart(4, '0');
+
+  function log(event, data = {}) {
+    const line = {
+      t: new Date().toISOString(),
+      event,
+      ...data,
+    };
+    logEl.textContent += JSON.stringify(line) + '\n';
+    logEl.scrollTop = logEl.scrollHeight;
+    console.log('[Classic1S-reset-repro]', line);
+  }
+
+  function summarize(device) {
+    return {
+      vendorId: hex(device?.vendorId),
+      productId: hex(device?.productId),
+      productName: device?.productName ?? null,
+      opened: device?.opened ?? null,
+      configurationValue: device?.configuration?.configurationValue ?? null,
+      serialPresent: Boolean(device?.serialNumber),
+    };
+  }
+
+  function rememberIdentity(device) {
+    selectedIdentity = {
+      vendorId: device.vendorId,
+      productId: device.productId,
+      productName: device.productName ?? '',
+      serialNumber: device.serialNumber || undefined,
+    };
+  }
+
+  function matchesSelected(device) {
+    if (!selectedIdentity) return false;
+    if (
+      device.vendorId !== selectedIdentity.vendorId ||
+      device.productId !== selectedIdentity.productId
+    ) return false;
+    if (selectedIdentity.serialNumber) {
+      return device.serialNumber === selectedIdentity.serialNumber;
+    }
+    return (device.productName ?? '') === selectedIdentity.productName;
+  }
+
+  async function getSelectedDevice({ retries = 1, delayMs = 150 } = {}) {
+    for (let attempt = 1; attempt <= retries; attempt += 1) {
+      const devices = await navigator.usb.getDevices();
+      const match = devices.find(matchesSelected);
+      if (match) return match;
+      if (attempt < retries) await sleep(delayMs);
+    }
+    throw new Error('Selected device is not present in navigator.usb.getDevices()');
+  }
+
+  async function ensureOpen(device) {
+    if (!device.opened) {
+      await device.open();
+    }
+  }
+
+  async function ensureConfiguration(device) {
+    if (
+      !device.configuration ||
+      device.configuration.configurationValue !== CONFIGURATION_ID
+    ) {
+      await device.selectConfiguration(CONFIGURATION_ID);
+    }
+  }
+
+  function discoverVendorInterface(device) {
+    const configs = device.configurations ?? [];
+    for (const config of configs) {
+      for (const iface of config.interfaces ?? []) {
+        for (const alt of iface.alternates ?? []) {
+          if (alt.interfaceClass === 0xff) {
+            let endpointIn = 1;
+            let endpointOut = 1;
+            for (const ep of alt.endpoints ?? []) {
+              if (ep.direction === 'in') endpointIn = ep.endpointNumber;
+              if (ep.direction === 'out') endpointOut = ep.endpointNumber;
+            }
+            return {
+              interfaceNumber: iface.interfaceNumber,
+              endpointIn,
+              endpointOut,
+            };
+          }
+        }
+      }
+    }
+    return { interfaceNumber: 0, endpointIn: 1, endpointOut: 1 };
+  }
+
+  function isClaimed(device, interfaceNumber) {
+    return Boolean(
+      device.configuration?.interfaces?.find(
+        iface => iface.interfaceNumber === interfaceNumber
+      )?.claimed
+    );
+  }
+
+  async function claimAndClear(device) {
+    await ensureConfiguration(device);
+    const endpoints = discoverVendorInterface(device);
+    if (!isClaimed(device, endpoints.interfaceNumber)) {
+      await device.claimInterface(endpoints.interfaceNumber);
+    }
+    for (const [direction, endpoint] of [
+      ['in', endpoints.endpointIn],
+      ['out', endpoints.endpointOut],
+    ]) {
+      try {
+        await device.clearHalt(direction, endpoint);
+      } catch (error) {
+        log('clear-halt-error', {
+          direction,
+          endpoint,
+          error: String(error),
+        });
+      }
+    }
+    return endpoints;
+  }
+
+  async function closeDevice(device, endpoints) {
+    if (!device?.opened) return;
+    try {
+      if (isClaimed(device, endpoints.interfaceNumber)) {
+        await device.releaseInterface(endpoints.interfaceNumber);
+      }
+    } catch (error) {
+      log('release-interface-error', { error: String(error) });
+    }
+    try {
+      if (device.opened) await device.close();
+    } catch (error) {
+      log('close-error', { error: String(error) });
+    }
+  }
+
+  async function runNoReset(iteration) {
+    let device = await getSelectedDevice({ retries: 10 });
+    const before = device;
+    await ensureOpen(device);
+    await ensureConfiguration(device);
+    const endpoints = await claimAndClear(device);
+    log('iteration-ready', {
+      mode: 'patched-v1-no-reset',
+      iteration,
+      deviceObjectChanged: device !== before,
+      ...summarize(device),
+    });
+    await sleep(250);
+    await closeDevice(device, endpoints);
+  }
+
+  async function runLegacyReset(iteration) {
+    let device = await getSelectedDevice({ retries: 10 });
+    const before = device;
+    await ensureOpen(device);
+    await ensureConfiguration(device);
+
+    const startedAt = performance.now();
+    try {
+      await device.reset();
+      log('usb-reset-completed', {
+        mode: 'pre-pro2-config-then-reset',
+        iteration,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
+    } catch (error) {
+      log('usb-reset-error', {
+        mode: 'pre-pro2-config-then-reset',
+        iteration,
+        durationMs: Math.round(performance.now() - startedAt),
+        error: String(error),
+      });
+    }
+
+    // Pre-Pro2 SDK did not re-enumerate here. Keep that behavior for the comparison.
+    const endpoints = discoverVendorInterface(device);
+    if (!isClaimed(device, endpoints.interfaceNumber)) {
+      await device.claimInterface(endpoints.interfaceNumber);
+    }
+    log('iteration-ready', {
+      mode: 'pre-pro2-config-then-reset',
+      iteration,
+      deviceObjectChanged: device !== before,
+      ...summarize(device),
+    });
+    await sleep(250);
+    await closeDevice(device, endpoints);
+  }
+
+  async function runCurrentReset(iteration) {
+    let device = await getSelectedDevice({ retries: 10 });
+    const before = device;
+    await ensureOpen(device);
+
+    const startedAt = performance.now();
+    try {
+      await device.reset();
+      log('usb-reset-completed', {
+        mode: 'current-reset-then-reenumerate',
+        iteration,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
+    } catch (error) {
+      log('usb-reset-error', {
+        mode: 'current-reset-then-reenumerate',
+        iteration,
+        durationMs: Math.round(performance.now() - startedAt),
+        error: String(error),
+      });
+    }
+
+    await sleep(150);
+    device = await getSelectedDevice({ retries: 15, delayMs: 150 });
+    const endpoints = await claimAndClear(device);
+    log('iteration-ready', {
+      mode: 'current-reset-then-reenumerate',
+      iteration,
+      deviceObjectChanged: device !== before,
+      ...summarize(device),
+    });
+    await sleep(250);
+    await closeDevice(device, endpoints);
+  }
+
+  async function run(label, fn) {
+    if (!selectedIdentity) {
+      log('error', { error: 'Click Grant Classic1S first.' });
+      return;
+    }
+    const loops = Math.max(1, Math.min(20, Number(document.getElementById('loops').value) || 1));
+    log('run-start', { mode: label, loops });
+    for (let i = 1; i <= loops; i += 1) {
+      try {
+        log('iteration-start', { mode: label, iteration: i });
+        await fn(i);
+        log('iteration-done', { mode: label, iteration: i });
+      } catch (error) {
+        log('iteration-failed', {
+          mode: label,
+          iteration: i,
+          error: error instanceof Error ? error.name + ': ' + error.message : String(error),
+        });
+        break;
+      }
+      await sleep(500);
+    }
+    log('run-end', { mode: label });
+  }
+
+  navigator.usb.addEventListener('disconnect', event => {
+    log('navigator-usb-disconnect', summarize(event.device));
+  });
+  navigator.usb.addEventListener('connect', event => {
+    log('navigator-usb-connect', summarize(event.device));
+  });
+
+  document.getElementById('grant').onclick = async () => {
+    try {
+      const device = await navigator.usb.requestDevice({ filters: FILTERS });
+      rememberIdentity(device);
+      log('device-granted', summarize(device));
+    } catch (error) {
+      log('grant-failed', { error: String(error) });
+    }
+  };
+  document.getElementById('noReset').onclick = () =>
+    run('patched-v1-no-reset', runNoReset);
+  document.getElementById('legacyReset').onclick = () =>
+    run('pre-pro2-config-then-reset', runLegacyReset);
+  document.getElementById('currentReset').onclick = () =>
+    run('current-reset-then-reenumerate', runCurrentReset);
+  document.getElementById('clear').onclick = () => {
+    logEl.textContent = '';
+  };
+
+  log('ready', {
+    hint: 'Grant the Classic1S, then compare A / B / C with the same loop count.',
+  });
+})();
+</script>
+</body>
+</html>
