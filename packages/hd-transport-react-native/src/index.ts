@@ -47,25 +47,7 @@ import {
   getInfosForServiceUuid,
   isSameBleUuid,
 } from './constants';
-import {
-  isBleKeyMissingSupported,
-  startBleKeyMissingTracking,
-  stopBleKeyMissingTracking,
-  waitForBleKeyMissing,
-} from './bleKeyMissing';
-import {
-  markBleLinkEncrypted,
-  startBleEncryptionTracking,
-  stopBleEncryptionTracking,
-  waitForAndroidLinkEncryption,
-} from './bleEncryption';
-import { IosPeerTerminationTracker } from './bleIosStaleBond';
 import { isNativeBleDisconnectError, toBleDisconnectHardwareError } from './bleNativeDisconnect';
-import {
-  isBleStaleBondHardwareError,
-  isNativeBleStaleBondError,
-  toBleStaleBondHardwareError,
-} from './bleStaleBond';
 import { isHeaderChunk } from './utils/validateNotify';
 import BleTransport from './BleTransport';
 import timer from './utils/timer';
@@ -75,7 +57,6 @@ import type { Deferred } from '@onekeyfe/hd-shared';
 import type { Characteristic, Device, Subscription } from 'react-native-ble-plx';
 import type EventEmitter from 'events';
 import type { BleAcquireInput, TransportOptions } from './types';
-import type { AndroidLinkEncryption } from './bleEncryption';
 
 type FirmwareInstallBleAcquireInput = BleAcquireInput & {
   /**
@@ -192,7 +173,6 @@ const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
   // Native PLX disconnects (errorCode 201 / iOS 7) must match before they are
   // mapped: Protocol V2 writes rethrow them unchanged unless normalized first.
   return (
-    isBleStaleBondHardwareError(error) ||
     isNativeBleDisconnectError(error) ||
     code === HardwareErrorCode.BleDeviceNotBonded ||
     code === HardwareErrorCode.BleDeviceBondedCanceled ||
@@ -200,38 +180,6 @@ const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
     code === HardwareErrorCode.BleCharacteristicNotifyError ||
     code === HardwareErrorCode.BleCharacteristicNotifyChangeFailure ||
     code === HardwareErrorCode.BleWriteCharacteristicError
-  );
-};
-/**
- * Android reports a lost bond (ACTION_KEY_MISSING) while it encrypts a new link, so only
- * a failure this soon after the link started can be explained by it. Later disconnects,
- * such as a firmware-update reboot, must keep their own meaning.
- */
-export const ANDROID_KEY_MISSING_LINK_WINDOW_MS = 10_000;
-/** The broadcast and the GATT disconnect it explains travel separately; either can land first. */
-export const ANDROID_KEY_MISSING_GRACE_MS = 500;
-/**
- * Android reports a bonded link's first encryption result within about half a second of
- * connecting. Past this, the result is treated as unknown and the link is used as before.
- */
-export const ANDROID_ENCRYPTION_RESULT_TIMEOUT_MS = 1500;
-/**
- * A system re-pairing needs the user to accept a pairing request and confirm the code on the
- * device. The Bluetooth stack gives up after 30s and then reports key missing.
- */
-export const ANDROID_SYSTEM_REPAIR_TIMEOUT_MS = 35_000;
-/**
- * How a link dropped by a device that refuses a stale bond reaches JS. A wedged write is
- * excluded: the system is still re-pairing then and has not reported key missing yet.
- */
-const isAndroidLinkLossError = (error: unknown): boolean => {
-  const code = (error as { errorCode?: unknown })?.errorCode;
-  return (
-    isNativeBleDisconnectError(error) ||
-    code === HardwareErrorCode.BleDeviceNotBonded ||
-    code === HardwareErrorCode.BleDeviceDisconnected ||
-    code === HardwareErrorCode.BleCharacteristicNotifyError ||
-    code === HardwareErrorCode.BleConnectedError
   );
 };
 /** Consecutive wedged writes on one device before the BLE manager itself is recreated. */
@@ -495,10 +443,6 @@ type IOBleErrorRemap = Error | BleError | null | undefined;
 
 function remapError(error: IOBleErrorRemap) {
   if (error instanceof BleError) {
-    if (isNativeBleStaleBondError(error)) {
-      throw toBleStaleBondHardwareError(error);
-    }
-
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore It's not documented but seems to match a refusal on Android pairing
     if (error?.attErrorCode === 22) {
@@ -579,22 +523,6 @@ export default class ReactNativeBleTransport {
   /** Android endpoints whose cached GATT table is suspect; the next connect refreshes it. */
   private androidGattCacheRefreshes = new Set<string>();
 
-  /**
-   * Native encryption/pairing failures seen before Protocol V2 probe starts.
-   * Pro2/Neo GATT connect can succeed on a stale iOS bond; the CCCD write then
-   * fails with ATT 5/15. Remember it so detectProtocol fails immediately.
-   */
-  private staleBondErrors: Map<string, Error> = new Map();
-
-  /** When the current Android link attempt began; bounds which key-missing signals apply. */
-  private androidLinkStartedAt: Map<string, number> = new Map();
-
-  /** iOS acquire attempts whose new link the peer ended; two in a row mean a stale bond. */
-  private iosPeerTermination = new IosPeerTerminationTracker();
-
-  /** Strict or previously confirmed V2 target while acquire installs notifications. */
-  private acquiringProtocolV2 = new Set<string>();
-
   private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
 
   private protocolV2FrameQueues: Map<string, Uint8Array[]> = new Map();
@@ -656,11 +584,6 @@ export default class ReactNativeBleTransport {
   init(logger: any, emitter: EventEmitter) {
     setBleLogger(logger);
     this.emitter = emitter;
-    if (Platform.OS === 'android') {
-      // Link security events are only meaningful if they were observed since the link came up.
-      startBleKeyMissingTracking();
-      startBleEncryptionTracking();
-    }
   }
 
   configure(signedData: any) {
@@ -1112,23 +1035,12 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
     }
 
-    return this.runLifecycleOperation(uuid, async () => {
-      try {
-        return await this.acquireUnlocked(input);
-      } catch (error) {
-        throw this.resolveIosBondInvalid(input, await this.resolveAndroidBondInvalid(uuid, error));
-      }
-    });
+    return this.runLifecycleOperation(uuid, () => this.acquireUnlocked(input));
   }
 
   private async acquireUnlocked(input: FirmwareInstallBleAcquireInput) {
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     const { uuid, forceCleanRunPromise, expectedProtocol, skipProtocolProbe } = input;
-    this.iosPeerTermination.attemptStarted(uuid);
-    const shouldMapProtocolV2StaleBond = expectedProtocol
-      ? expectedProtocol === 'V2'
-      : this.confirmedProtocolV2.has(uuid);
-
     const cachedTransport = transportCache[uuid];
     if (skipProtocolProbe && !cachedTransport && this.blePlxManager) {
       Log?.debug(
@@ -1200,7 +1112,6 @@ export default class ReactNativeBleTransport {
     let device: Device | null = null;
     const isAndroid = Platform.OS === 'android';
     // Only a bond that existed before this acquire can have been lost by the device.
-    let androidBondedBeforeConnect = false;
     // A firmware-install reconnect always refreshes: the new firmware may expose a different table.
     const refreshAndroidGattCache =
       isAndroid && (!!skipProtocolProbe || this.androidGattCacheRefreshes.has(uuid));
@@ -1232,19 +1143,11 @@ export default class ReactNativeBleTransport {
 
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     if (Platform.OS === 'android') {
-      // Subscribe before the link exists: key missing is broadcast while Android encrypts it.
-      startBleKeyMissingTracking();
-      startBleEncryptionTracking();
-      // Failures before the new link starts must not be read against the previous link.
-      this.androidLinkStartedAt.delete(uuid);
       // Initiate bonding locally before GATT can trigger peripheral-initiated pairing.
       try {
         const bondState = await pairDevice(uuid);
-        androidBondedBeforeConnect = !bondState.bonding && bondState.bonded;
         if (bondState.bonding) {
-          await onDeviceBondState(uuid, this.bondAbortController.signal, {
-            systemInitiated: bondState.initiated === false,
-          });
+          await onDeviceBondState(uuid, this.bondAbortController.signal);
         } else if (!bondState.bonded) {
           throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
         }
@@ -1256,7 +1159,6 @@ export default class ReactNativeBleTransport {
         });
         throw error;
       }
-      this.androidLinkStartedAt.set(uuid, Date.now());
     }
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
 
@@ -1440,17 +1342,7 @@ export default class ReactNativeBleTransport {
       this.deviceProtocolHints.set(uuid, protocolHint);
     }
 
-    if (shouldMapProtocolV2StaleBond) {
-      this.acquiringProtocolV2.add(uuid);
-    }
-
-    let linkEncryption: AndroidLinkEncryption | undefined;
     try {
-      // A firmware-install reconnect keeps its existing sequence.
-      if (androidBondedBeforeConnect && !skipProtocolProbe) {
-        linkEncryption = await this.waitForAndroidLinkSecurity(uuid);
-        if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-      }
       await this.installTransportForAcquire(uuid, acquiredDevice, {
         writeCharacteristic,
         notifyCharacteristic,
@@ -1497,25 +1389,17 @@ export default class ReactNativeBleTransport {
         }
       );
       if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-      this.iosPeerTermination.linkProven(uuid);
       const currentTransport = transportCache[uuid];
       if (!currentTransport) {
         throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
       }
       this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
-      if (linkEncryption === 'unresolved') {
-        // Notifications and the probe only work on an encrypted link, so the next reuse of this
-        // link needs no result that was reported before tracking started.
-        markBleLinkEncrypted(uuid);
-      }
       return { uuid, protocolType };
     } catch (error) {
       // A failed acquire must retire the physical link before Core retries. Logical
       // release leaves GATT connected even when neither protocol receives a response.
       await this.disconnectUnlocked(uuid);
       throw error;
-    } finally {
-      this.acquiringProtocolV2.delete(uuid);
     }
   }
 
@@ -1530,7 +1414,6 @@ export default class ReactNativeBleTransport {
     const subscription = characteristic.monitor((error, c) => {
       const isCurrentMonitor = this.monitorTokens.get(uuid) === monitorToken;
       if (error) {
-        if (isCurrentMonitor) this.noteIosLinkError(uuid, 'notify', error);
         Log?.debug(
           `error monitor ${characteristic.uuid}, deviceId: ${characteristic.deviceID}: ${
             error as unknown as string
@@ -1542,13 +1425,6 @@ export default class ReactNativeBleTransport {
         }
         if (!isCurrentMonitor) {
           Log?.debug('monitor error ignored for stale transport: ', uuid, notifyTransactionId);
-          return;
-        }
-        if (
-          (this.getActiveProtocol(uuid) === 'V2' || this.acquiringProtocolV2.has(uuid)) &&
-          isNativeBleStaleBondError(error)
-        ) {
-          this.rememberStaleBondError(uuid, toBleStaleBondHardwareError(error));
           return;
         }
         if (Platform.OS === 'android' && isStaleGattTableNotifyReason(error.reason)) {
@@ -1710,8 +1586,6 @@ export default class ReactNativeBleTransport {
 
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
-    this.staleBondErrors.delete(uuid);
-    this.acquiringProtocolV2.delete(uuid);
     // Confirmed protocol and caller hints stay in deviceProtocol / protocolHint.
     this.protocolV2Assemblers.get(uuid)?.reset();
     this.protocolV2Assemblers.delete(uuid);
@@ -1782,122 +1656,9 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
     }
 
-    try {
-      return protocol === 'V2'
-        ? await this.callProtocolV2(uuid, name, data, options)
-        : await this.callProtocolV1(uuid, name, data, options);
-    } catch (error) {
-      // An expected-V1 acquire skips the probe, so the first call is what meets the dropped link.
-      throw await this.resolveAndroidBondInvalid(uuid, error);
-    }
-  }
-
-  /**
-   * Android 16+ keeps a bond the device no longer holds keys for. The device drops the link
-   * and the only structured evidence is ACTION_KEY_MISSING, so a link loss right after
-   * connect is re-read as an invalid bond when that signal belongs to the same attempt.
-   */
-  private async resolveAndroidBondInvalid(uuid: string, error: unknown): Promise<unknown> {
-    if (Platform.OS !== 'android' || !isBleKeyMissingSupported()) return error;
-    if (isBleStaleBondHardwareError(error) || !isAndroidLinkLossError(error)) return error;
-    const linkStartedAt = this.androidLinkStartedAt.get(uuid);
-    if (
-      linkStartedAt === undefined ||
-      Date.now() - linkStartedAt > ANDROID_KEY_MISSING_LINK_WINDOW_MS
-    ) {
-      return error;
-    }
-    if (!(await waitForBleKeyMissing(uuid, linkStartedAt, ANDROID_KEY_MISSING_GRACE_MS))) {
-      return error;
-    }
-    Log?.debug('[ReactNativeBleTransport] Android key missing, bond is invalid:', uuid);
-    return ERRORS.TypedError(HardwareErrorCode.BleBondInvalid, undefined, {
-      phase: 'connect',
-      reason: 'key_missing',
-    });
-  }
-
-  /**
-   * iOS says why a link ended only on the operation it interrupted, so the native codes are read
-   * and logged here. Codes only: the reason text is localized and cannot be matched or searched.
-   */
-  private noteIosLinkError(uuid: string, stage: 'gatt-setup' | 'notify' | 'write', error: unknown) {
-    if (Platform.OS !== 'ios') return;
-    this.iosPeerTermination.note(uuid, error);
-    // Writes and notifications also fail for reasons that say nothing about the link.
-    if (stage !== 'gatt-setup' && !isNativeBleDisconnectError(error)) return;
-    const native = (error ?? {}) as {
-      errorCode?: unknown;
-      iosErrorCode?: unknown;
-      attErrorCode?: unknown;
-    };
-    const code = (value: unknown) =>
-      typeof value === 'number' || typeof value === 'string' ? value : undefined;
-    Log?.debug('[ReactNativeBleTransport] iOS operation failed', {
-      connectIdSuffix: uuid.slice(-8),
-      stage,
-      errorCode: code(native.errorCode),
-      iosErrorCode: code(native.iosErrorCode),
-      attErrorCode: code(native.attErrorCode),
-    });
-  }
-
-  /**
-   * iPhones that do not report a lost bond only show the device ending each new link. One such
-   * attempt keeps its error so Core retries; the second in a row is the stale bond.
-   */
-  private resolveIosBondInvalid(input: FirmwareInstallBleAcquireInput, error: unknown): unknown {
-    if (Platform.OS !== 'ios') return error;
-    const { uuid, skipProtocolProbe } = input;
-    // A firmware-install reconnect expects the device to come and go.
-    if (skipProtocolProbe || isBleStaleBondHardwareError(error)) {
-      this.iosPeerTermination.forget(uuid);
-      return error;
-    }
-    if (!this.iosPeerTermination.attemptFailed(uuid)) return error;
-    Log?.debug(
-      '[ReactNativeBleTransport] iOS peer ended two new links in a row, bond is invalid:',
-      {
-        connectIdSuffix: uuid.slice(-8),
-      }
-    );
-    return ERRORS.TypedError(HardwareErrorCode.BleBondInvalid, undefined, {
-      phase: 'connect',
-      reason: 'peer_disconnected',
-    });
-  }
-
-  /**
-   * Android 16+ encrypts a bonded link on its own right after connecting. Subscribing to
-   * notifications before that finishes gets the CCCD write rejected, and the framework's retry
-   * encrypts again with the same stale key; firmware that allows one failure per link then drops
-   * it before the system can re-pair. Holding GATT until the result lets a lost bond be re-paired
-   * in place. Without the platform signal this resolves immediately.
-   */
-  private async waitForAndroidLinkSecurity(uuid: string): Promise<AndroidLinkEncryption> {
-    const linkStartedAt = this.androidLinkStartedAt.get(uuid);
-    if (linkStartedAt === undefined) return 'unresolved';
-    const waitStartedAt = Date.now();
-    const result = await waitForAndroidLinkEncryption({
-      deviceId: uuid,
-      linkStartedAt,
-      resultTimeoutMs: ANDROID_ENCRYPTION_RESULT_TIMEOUT_MS,
-      repairTimeoutMs: ANDROID_SYSTEM_REPAIR_TIMEOUT_MS,
-      keyMissingGraceMs: ANDROID_KEY_MISSING_GRACE_MS,
-      signal: this.bondAbortController.signal,
-      onRepairStarted: () => {
-        Log?.debug(
-          '[ReactNativeBleTransport] Android bond lost, waiting for system re-pairing:',
-          uuid
-        );
-      },
-    });
-    Log?.debug('[ReactNativeBleTransport] Android link encryption', {
-      connectIdSuffix: uuid.slice(-8),
-      result,
-      waitedMs: Date.now() - waitStartedAt,
-    });
-    return result;
+    return protocol === 'V2'
+      ? this.callProtocolV2(uuid, name, data, options)
+      : this.callProtocolV1(uuid, name, data, options);
   }
 
   private async callProtocolV1(
@@ -2165,10 +1926,6 @@ export default class ReactNativeBleTransport {
     this.androidPriorityResetTimers.forEach(timeout => clearTimeout(timeout));
     this.androidPriorityResetTimers.clear();
     this.androidHighPriorityDevices.clear();
-    this.androidLinkStartedAt.clear();
-    this.iosPeerTermination.reset();
-    stopBleKeyMissingTracking();
-    stopBleEncryptionTracking();
     const error = ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     this.runPromise?.reject(error);
     this.runPromise = null;
@@ -2242,7 +1999,6 @@ export default class ReactNativeBleTransport {
     }
     this.deviceProtocol.delete(session);
     this.probingProtocols.delete(session);
-    this.staleBondErrors.delete(session);
     this.deviceProtocolHints.delete(session);
     this.sessionProtocols.delete(session);
     this.protocolReprobeFailures.delete(session);
@@ -2484,7 +2240,6 @@ export default class ReactNativeBleTransport {
         }),
       ]);
       succeeded = true;
-      this.iosPeerTermination.linkStarted(uuid);
       return result;
     } catch (error) {
       if (timedOut || isNativeOperationTimeoutError(error)) {
@@ -2538,11 +2293,6 @@ export default class ReactNativeBleTransport {
       succeeded = true;
       return result;
     } catch (error) {
-      this.noteIosLinkError(uuid, 'gatt-setup', error);
-      if (Platform.OS === 'ios' && isNativeBleStaleBondError(error)) {
-        // iOS can report the lost bond on the first request instead of on the connect.
-        throw toBleStaleBondHardwareError(error);
-      }
       if (timedOut || isNativeOperationTimeoutError(error)) {
         const resetManager = this.abandonStalledConnection(
           uuid,
@@ -2599,8 +2349,6 @@ export default class ReactNativeBleTransport {
     }
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
-    this.staleBondErrors.delete(uuid);
-    this.acquiringProtocolV2.delete(uuid);
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);
 
@@ -2660,7 +2408,6 @@ export default class ReactNativeBleTransport {
       ]);
       this.writeTimeoutCounts.delete(uuid);
     } catch (error) {
-      this.noteIosLinkError(uuid, 'write', error);
       if (timedOut) {
         // A superseded call's late write must not tear down the link the current
         // call is using; only the owner of the transport may declare it dead.
@@ -2698,8 +2445,6 @@ export default class ReactNativeBleTransport {
     }
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
-    this.staleBondErrors.delete(uuid);
-    this.acquiringProtocolV2.delete(uuid);
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);
 
@@ -2751,8 +2496,6 @@ export default class ReactNativeBleTransport {
     });
     this.deviceProtocol.clear();
     this.probingProtocols.clear();
-    this.staleBondErrors.clear();
-    this.acquiringProtocolV2.clear();
     this.sessionProtocols.clear();
     // Keep transport-lifetime V2 proof so the same endpoint can finish a no-probe
     // firmware reconnect after the native BLE manager is recreated.
@@ -2833,10 +2576,6 @@ export default class ReactNativeBleTransport {
         source: 'expected',
       });
       return 'V1';
-    }
-
-    if (expectedProtocol === 'V2' || this.acquiringProtocolV2.has(uuid)) {
-      this.throwIfStaleBondError(uuid);
     }
 
     if (expectedProtocol === 'V2') {
@@ -3027,7 +2766,6 @@ export default class ReactNativeBleTransport {
 
     this.probingProtocols.set(uuid, 'V2');
     this.protocolV2Assemblers.get(uuid)?.reset();
-    this.throwIfStaleBondError(uuid);
     const detected = await probeProtocolV2Helper({
       call: (name: string, data: Record<string, unknown>, options?: TransportCallOptions) =>
         this.callProtocolV2(uuid, name, data, options),
@@ -3107,21 +2845,6 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  private rememberStaleBondError(uuid: string, error: Error) {
-    this.staleBondErrors.set(uuid, error);
-    this.rejectProtocolV2Frames(uuid, error);
-    if (this.runPromise && this.runPromiseDeviceId === uuid) {
-      this.runPromise.reject(error);
-    }
-  }
-
-  private throwIfStaleBondError(uuid: string) {
-    const error = this.staleBondErrors.get(uuid);
-    if (error) {
-      throw error;
-    }
-  }
-
   private async readProtocolV2Frame(uuid: string) {
     const queuedFrame = this.getProtocolV2FrameQueue(uuid).shift();
     if (queuedFrame) {
@@ -3180,11 +2903,6 @@ export default class ReactNativeBleTransport {
         assertCurrentGeneration();
         return;
       } catch (error) {
-        if (isNativeBleStaleBondError(error) || isBleStaleBondHardwareError(error)) {
-          const bondError = toBleStaleBondHardwareError(error);
-          this.rememberStaleBondError(uuid, bondError);
-          throw bondError;
-        }
         if (isNativeBleDisconnectError(error)) {
           throw toBleDisconnectHardwareError(error);
         }

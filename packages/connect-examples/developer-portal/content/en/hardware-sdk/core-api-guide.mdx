@@ -204,7 +204,7 @@ HardwareSDK.on(UI_EVENT, handleUiEvent);
 | IFrame (300–305) | Init missing, load/timeout/blocked | Ensure `init` succeeded; check CSP / iframe |
 | Method/Firmware (400–418) | Bad params, firmware required, forbidden path | Validate HD path; [Firmware Update](/en/hardware-sdk/firmware-update) |
 | Transport (600–603) | Transport not configured, concurrent call | Check `env`, serialize calls |
-| Bluetooth (700–722) | Scan/permission/connect/timeout | Permission, proximity; do not loop on a stale bond |
+| Bluetooth (700–722) | Scan/permission/connect/timeout | Permission and proximity |
 | Runtime/Bridge (800–822) | PIN cancelled, Bridge timeout | Retry or start Bridge |
 | Web device (901–902) | WebUSB not authorized | HTTPS + user gesture |
 

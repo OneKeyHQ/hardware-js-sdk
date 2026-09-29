@@ -14,7 +14,7 @@ describe('native BLE disconnect mapping', () => {
     });
   });
 
-  test('does not treat a stale-bond iOS code as a disconnect', () => {
+  test('does not treat an unrelated iOS code as a disconnect', () => {
     expect(
       isNativeBleDisconnectError({
         iosErrorCode: 14,

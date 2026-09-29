@@ -23,7 +23,6 @@ import {
   createNeedUpgradeFirmwareHardwareError,
   createNewFirmwareForceUpdateHardwareError,
   createNewFirmwareUnReleaseHardwareError,
-  isBleStaleBondHardwareError,
 } from '@onekeyfe/hd-shared';
 
 import { LoggerNames, enableLog, getLogger, setLoggerPostMessage, wait } from '../utils';
@@ -1035,10 +1034,6 @@ export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unkn
   );
 }
 
-export function isTerminalBleStaleBondError(error: unknown) {
-  return isBleStaleBondHardwareError(error);
-}
-
 export function isDeviceIdentityMismatchError(error: unknown) {
   return (
     (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.DeviceCheckDeviceIdError
@@ -1370,7 +1365,6 @@ const ensureConnected = async (
             [HardwareErrorCode.BleDeviceDisconnected, HardwareErrorCode.PollingTimeout].includes(
               error.errorCode
             )) ||
-          isTerminalBleStaleBondError(error) ||
           isDeviceIdentityMismatchError(error)
         ) {
           reject(error);
