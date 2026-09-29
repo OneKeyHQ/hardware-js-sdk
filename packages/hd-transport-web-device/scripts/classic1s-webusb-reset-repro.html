@@ -37,6 +37,14 @@
     <button id="clear">Clear log</button>
   </div>
 
+  <div>
+    <button id="continuousNoReset">Start A continuous</button>
+    <button id="continuousCurrent">Start C continuous</button>
+    <button id="stop">Stop continuous run</button>
+    <label>Interval ms <input id="intervalMs" type="number" min="100" max="10000" value="500" /></label>
+  </div>
+
+  <div id="stats"></div>
   <pre id="log"></pre>
 
 <script>
@@ -47,9 +55,26 @@
   ];
   const CONFIGURATION_ID = 1;
   let selectedIdentity = null;
+  let stopRequested = false;
+  let continuousRunning = false;
+  const stats = {
+    iterations: 0,
+    disconnects: 0,
+    connects: 0,
+    resetCompleted: 0,
+    resetErrors: 0,
+    failures: 0,
+  };
   const logEl = document.getElementById('log');
+  const statsEl = document.getElementById('stats');
 
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  function renderStats() {
+    statsEl.textContent =
+      `iterations=${stats.iterations} disconnects=${stats.disconnects} connects=${stats.connects} ` +
+      `resetCompleted=${stats.resetCompleted} resetErrors=${stats.resetErrors} failures=${stats.failures}`;
+  }
   const hex = value => value == null ? null : '0x' + Number(value).toString(16).padStart(4, '0');
 
   function log(event, data = {}) {
@@ -61,6 +86,7 @@
     logEl.textContent += JSON.stringify(line) + '\n';
     logEl.scrollTop = logEl.scrollHeight;
     console.log('[Classic1S-reset-repro]', line);
+    renderStats();
   }
 
   function summarize(device) {
@@ -216,12 +242,14 @@
     const startedAt = performance.now();
     try {
       await device.reset();
+      stats.resetCompleted += 1;
       log('usb-reset-completed', {
         mode: 'pre-pro2-config-then-reset',
         iteration,
         durationMs: Math.round(performance.now() - startedAt),
       });
     } catch (error) {
+      stats.resetErrors += 1;
       log('usb-reset-error', {
         mode: 'pre-pro2-config-then-reset',
         iteration,
@@ -253,12 +281,14 @@
     const startedAt = performance.now();
     try {
       await device.reset();
+      stats.resetCompleted += 1;
       log('usb-reset-completed', {
         mode: 'current-reset-then-reenumerate',
         iteration,
         durationMs: Math.round(performance.now() - startedAt),
       });
     } catch (error) {
+      stats.resetErrors += 1;
       log('usb-reset-error', {
         mode: 'current-reset-then-reenumerate',
         iteration,
@@ -291,8 +321,10 @@
       try {
         log('iteration-start', { mode: label, iteration: i });
         await fn(i);
+        stats.iterations += 1;
         log('iteration-done', { mode: label, iteration: i });
       } catch (error) {
+        stats.failures += 1;
         log('iteration-failed', {
           mode: label,
           iteration: i,
@@ -305,10 +337,57 @@
     log('run-end', { mode: label });
   }
 
+  async function runContinuous(label, fn) {
+    if (continuousRunning) {
+      log('continuous-run-ignored', { reason: 'already-running' });
+      return;
+    }
+    if (!selectedIdentity) {
+      log('error', { error: 'Click Grant Classic1S first.' });
+      return;
+    }
+    stopRequested = false;
+    continuousRunning = true;
+    let iteration = 0;
+    log('continuous-run-start', { mode: label });
+    try {
+      while (!stopRequested) {
+        iteration += 1;
+        try {
+          log('iteration-start', { mode: label, iteration, continuous: true });
+          await fn(iteration);
+          stats.iterations += 1;
+          log('iteration-done', { mode: label, iteration, continuous: true });
+        } catch (error) {
+          stats.failures += 1;
+          log('iteration-failed', {
+            mode: label,
+            iteration,
+            continuous: true,
+            error: error instanceof Error ? error.name + ': ' + error.message : String(error),
+          });
+          // A real device reboot can temporarily remove it from navigator.usb.
+          // Keep watching so reconnect behavior is captured instead of stopping the repro.
+          await sleep(2000);
+        }
+        const intervalMs = Math.max(
+          100,
+          Math.min(10000, Number(document.getElementById('intervalMs').value) || 500)
+        );
+        await sleep(intervalMs);
+      }
+    } finally {
+      continuousRunning = false;
+      log('continuous-run-end', { mode: label, iterations: iteration });
+    }
+  }
+
   navigator.usb.addEventListener('disconnect', event => {
+    stats.disconnects += 1;
     log('navigator-usb-disconnect', summarize(event.device));
   });
   navigator.usb.addEventListener('connect', event => {
+    stats.connects += 1;
     log('navigator-usb-connect', summarize(event.device));
   });
 
@@ -327,12 +406,29 @@
     run('pre-pro2-config-then-reset', runLegacyReset);
   document.getElementById('currentReset').onclick = () =>
     run('current-reset-then-reenumerate', runCurrentReset);
+  document.getElementById('continuousNoReset').onclick = () =>
+    runContinuous('patched-v1-no-reset', runNoReset);
+  document.getElementById('continuousCurrent').onclick = () =>
+    runContinuous('current-reset-then-reenumerate', runCurrentReset);
+  document.getElementById('stop').onclick = () => {
+    stopRequested = true;
+    log('stop-requested');
+  };
   document.getElementById('clear').onclick = () => {
     logEl.textContent = '';
+    stats.iterations = 0;
+    stats.disconnects = 0;
+    stats.connects = 0;
+    stats.resetCompleted = 0;
+    stats.resetErrors = 0;
+    stats.failures = 0;
+    renderStats();
   };
 
+  renderStats();
   log('ready', {
-    hint: 'Grant the Classic1S, then compare A / B / C with the same loop count.',
+    hint:
+      'Grant the Classic1S. For sustained repro, start C continuous; for patched behavior, start A continuous.',
   });
 })();
 </script>
