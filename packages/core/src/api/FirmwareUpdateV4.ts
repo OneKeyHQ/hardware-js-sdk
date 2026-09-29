@@ -70,7 +70,7 @@ import type {
   FirmwareUpdateV4Target,
 } from '../types/api/firmwareUpdate';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
-import type { ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type { DeviceInfoGet, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
 import type { TypedResponseMessage } from '../device/DeviceCommands';
 import type {
   Features,
@@ -91,7 +91,7 @@ const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 90 * 1000;
 const PROTOCOL_V2_FINAL_RECONNECT_TIMEOUT = 3 * 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
 const PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT = 15 * 1000;
-const PROTOCOL_V2_INSTALL_TIMEOUT = 5 * 60 * 1000;
+const PROTOCOL_V2_INSTALL_TIMEOUT = 10 * 60 * 1000;
 const PROTOCOL_V2_INSTALL_STATUS_INITIAL_DELAY = 1000;
 const PROTOCOL_V2_INSTALL_FINISHED_AFTER_DISCONNECT_POLLS = 4;
 const PROTOCOL_V2_TARGET_STATUS_PENDING = 0;
@@ -1513,8 +1513,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     this.protocolV2ExpectedPath = path;
   }
 
-  private async verifyProtocolV2ReconnectIdentity() {
-    const deviceInfo = await this.requestProtocolV2PhysicalIdentity();
+  private async verifyProtocolV2ReconnectIdentity(request?: DeviceInfoGet) {
+    const deviceInfo = await requestProtocolV2DeviceInfo({
+      commands: this.device.getCommands(),
+      timeoutMs: this.getProtocolV2DeviceInfoTimeout(),
+      request,
+    });
     this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
     return deviceInfo;
   }
@@ -2588,10 +2592,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       finishedStatusSnapshotPolls = 0;
     };
 
-    while (Date.now() - startTime < PROTOCOL_V2_INSTALL_TIMEOUT) {
+    while (true) {
       // A transport release caused by an explicit workflow cancellation must not
       // be mistaken for the expected device reboot during installation.
       this.throwIfAborted();
+      // Read once more at the deadline so a completed reboot is not reported as a timeout.
+      const isFinalStatusCheck = Date.now() - startTime >= PROTOCOL_V2_INSTALL_TIMEOUT;
       try {
         if (shouldReconnect) {
           const isBleInstallReconnect = this.isBleReconnect();
@@ -2750,17 +2756,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
           if (
             statusTargets.length === 0 &&
-            !currentDeviceInfo &&
-            bleInstallLinkReady &&
-            installEvidenceObserved
+            (currentDeviceInfo || bleInstallLinkReady || isFinalStatusCheck)
           ) {
-            // BLE install reconnect skips generic probes because loaders may not answer Ping.
-            // Restore the verified identity only after current-install evidence disappears.
-            currentDeviceInfo = await this.verifyProtocolV2ReconnectIdentity();
+            // Installation can finish while BLE is disconnected, hiding all progress.
+            // Refresh identity and target versions even without observed install status.
+            currentDeviceInfo = await this.verifyProtocolV2ReconnectIdentity(
+              PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST
+            );
             deviceInfo = currentDeviceInfo;
-          }
-
-          if (statusTargets.length === 0 && currentDeviceInfo) {
             const isNormalMode = await this.probeProtocolV2NormalMode(currentDeviceInfo);
             if (
               isNormalMode &&
@@ -2795,29 +2798,25 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             }
           }
         } catch (error) {
-          if (isProtocolV2TerminalInstallStatusError(error)) {
+          if (
+            this.isProtocolV2ReconnectIdentityError(error) ||
+            isProtocolV2TerminalInstallStatusError(error)
+          ) {
             throw error;
           }
-          // App firmware does not register DeviceFirmwareUpdateStatusGet. Treat the
-          // missing endpoint as completion only after the runtime probe confirms App mode.
+          // Some firmware builds do not expose install status. Require a fresh runtime
+          // probe and current-install evidence or changed versions before accepting completion.
           if (isProtocolV2FirmwareStatusEndpointUnavailable(error)) {
-            if (!currentDeviceInfo) {
-              if (!bleInstallLinkReady) {
-                throw ERRORS.TypedError(
-                  HardwareErrorCode.RuntimeError,
-                  'Protocol V2 device identity is unavailable during install polling'
-                );
-              }
-              deviceInfo = await this.verifyProtocolV2ReconnectIdentity();
-            }
-            const reconnectDeviceInfo = currentDeviceInfo ?? deviceInfo;
-            if (!reconnectDeviceInfo) {
+            if (!currentDeviceInfo && !bleInstallLinkReady && !isFinalStatusCheck) {
               throw ERRORS.TypedError(
                 HardwareErrorCode.RuntimeError,
                 'Protocol V2 device identity is unavailable during install polling'
               );
             }
-            const isNormalMode = await this.probeProtocolV2NormalMode(reconnectDeviceInfo);
+            deviceInfo = await this.verifyProtocolV2ReconnectIdentity(
+              PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST
+            );
+            const isNormalMode = await this.probeProtocolV2NormalMode(deviceInfo);
             if (
               isNormalMode &&
               (installEvidenceObserved ||
@@ -2871,6 +2870,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         bleInstallLinkReady = false;
         Log.log('Protocol V2 firmware install device readiness probe failed: ', error);
       }
+      if (isFinalStatusCheck) break;
       await wait(1000);
     }
 
@@ -2909,7 +2909,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async probeProtocolV2NormalMode(deviceInfo: ProtocolV2DeviceInfo) {
     const features = await this.device.probeProtocolV2RuntimeState(
       deviceInfo,
-      PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
+      PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+      { forceRuntimeContextRefresh: true }
     );
     this.protocolV2LastRuntimeProbeFeatures = features;
     return this.isProtocolV2ApplicationMode(features);
