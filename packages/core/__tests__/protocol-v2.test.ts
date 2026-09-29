@@ -6328,7 +6328,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall).toHaveBeenCalledTimes(3);
   });
 
-  test('waits five minutes before rejecting normal mode without install evidence', async () => {
+  test('waits ten minutes before rejecting normal mode without install evidence', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6366,7 +6366,7 @@ describe('Protocol V2 firmware update targets', () => {
     });
 
     expect(method.postProgressMessage).not.toHaveBeenCalledWith(100, 'installingFirmware');
-    expect(typedCall).toHaveBeenCalledTimes(5);
+    expect(typedCall).toHaveBeenCalledTimes(11);
   });
 
   test('preserves multi-app completion evidence when App mode replaces the status endpoint', async () => {
@@ -6410,7 +6410,9 @@ describe('Protocol V2 firmware update targets', () => {
       ])
     ).resolves.toBeUndefined();
 
-    expect(probeProtocolV2RuntimeState).toHaveBeenCalledWith(deviceInfo, 5000);
+    expect(probeProtocolV2RuntimeState).toHaveBeenCalledWith(deviceInfo, 5000, {
+      forceRuntimeContextRefresh: true,
+    });
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
     expect(Array.from((method as any).protocolV2CompletedTargetIds)).toEqual([4, 5]);
 
@@ -6535,7 +6537,9 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).device = stubDevice({ probeProtocolV2RuntimeState });
 
     await expect((method as any).probeProtocolV2NormalMode(deviceInfo)).resolves.toBe(expected);
-    expect(probeProtocolV2RuntimeState).toHaveBeenCalledWith(deviceInfo, 5000);
+    expect(probeProtocolV2RuntimeState).toHaveBeenCalledWith(deviceInfo, 5000, {
+      forceRuntimeContextRefresh: true,
+    });
   });
 
   test('keeps polling when the firmware status handler is missing in loader mode', async () => {
@@ -6888,7 +6892,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
 
-  test('keeps polling missing target records until the five-minute timeout', async () => {
+  test('keeps polling missing target records until the ten-minute timeout', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6926,7 +6930,7 @@ describe('Protocol V2 firmware update targets', () => {
       message: 'Protocol V2 firmware install timed out',
       params: { firmwareUpdateCode: 'FirmwareInstallTimeout' },
     });
-    expect(typedCall).toHaveBeenCalledTimes(5);
+    expect(typedCall).toHaveBeenCalledTimes(11);
   });
 
   test('keeps polling incomplete records after a Pro2 reboot interruption', async () => {
@@ -6982,7 +6986,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall).toHaveBeenCalledTimes(4);
   });
 
-  test('uses a five-minute Pro2 install status window', async () => {
+  test('uses a ten-minute Pro2 install status window with a final status check', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6992,7 +6996,13 @@ describe('Protocol V2 firmware update targets', () => {
     jest
       .spyOn(Date, 'now')
       .mockReturnValueOnce(0)
-      .mockReturnValue(5 * 60 * 1000);
+      .mockReturnValue(10 * 60 * 1000);
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'DeviceFirmwareUpdateStatus',
+      message: { records: [{ target_id: 4, status: 1 }] },
+    });
+    method.device = stubDevice({ getCommands: () => ({ typedCall }) });
+    method.postProgressMessage = jest.fn();
 
     await expect(
       (method as any).waitForProtocolV2FirmwareUpdateComplete([
@@ -7003,6 +7013,7 @@ describe('Protocol V2 firmware update targets', () => {
       message: 'Protocol V2 firmware install timed out',
       params: { firmwareUpdateCode: 'FirmwareInstallTimeout' },
     });
+    expect(typedCall).toHaveBeenCalledTimes(1);
   });
 
   test('uses a 90-second Pro2 bootloader reconnect window', async () => {
