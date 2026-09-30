@@ -1,5 +1,5 @@
 import { SignerEthBuilder } from '@ledgerhq/device-signer-kit-ethereum';
-import { ContextModuleBuilder } from '@ledgerhq/context-module';
+import { ContextModuleBuilder, ContextModuleChainID } from '@ledgerhq/context-module';
 
 import { SignerEth } from './SignerEth';
 import { debugLog } from '../utils/debugLog';
@@ -53,7 +53,10 @@ export class SignerManager {
   }
 
   private static _createContextModule(): ContextModule {
-    const contextModule = new ContextModuleBuilder({}).removeDefaultLoaders().build();
+    const contextModule = new ContextModuleBuilder({})
+      .setChain(ContextModuleChainID.Ethereum)
+      .removeDefaultLoaders()
+      .build();
     return SignerManager.wrapBlindSigningReportNonBlocking(contextModule);
   }
 

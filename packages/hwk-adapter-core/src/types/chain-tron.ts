@@ -131,6 +131,12 @@ export interface TronSignMsgParams extends PassphraseStateAware {
   path: string;
   /** Message hex (no 0x prefix) */
   messageHex: string;
+  /**
+   * TRON message scheme: 'V1' = legacy signMessage (prefix + 32-byte hash),
+   * 'V2' = TIP-191 signMessageV2 (prefix + byte length + message). Adapters
+   * that only implement one scheme reject the other with MethodNotSupported.
+   */
+  messageType?: 'V1' | 'V2';
 }
 
 export interface TronSignature {

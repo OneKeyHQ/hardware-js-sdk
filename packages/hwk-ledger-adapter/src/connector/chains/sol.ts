@@ -1,10 +1,12 @@
-import { bytesToHex, hexToBytes } from '@onekeyfe/hwk-adapter-core';
+import { bytesToHex, hexToBytes, prepareSolanaOffchainMessageV1 } from '@onekeyfe/hwk-adapter-core';
+import bs58 from 'bs58';
 
 import { collapseSignerInteraction, normalizePath } from './utils';
 import { SignerSol } from '../../signer/SignerSol';
 import { debugLog } from '../../utils/debugLog';
 
 import type { ConnectorContext } from './types';
+import type { SolSignMsgParams } from '@onekeyfe/hwk-adapter-core';
 
 // ---------------------------------------------------------------------------
 // Call param types
@@ -21,11 +23,7 @@ export interface SolSignTransactionCallParams {
   serializedTx: string;
 }
 
-export interface SolSignMessageCallParams {
-  path: string;
-  /** Message bytes as hex string (no 0x prefix) */
-  message: string;
-}
+export type SolSignMessageCallParams = SolSignMsgParams;
 
 // ---------------------------------------------------------------------------
 // Handlers
@@ -83,9 +81,22 @@ export async function solSignMessage(
   const messageBytes = hexToBytes(params.message);
 
   try {
-    // DMK signMessage returns { signature: string }, not raw Uint8Array
+    if (params.messageVersion === 1) {
+      const preparedMessage = prepareSolanaOffchainMessageV1({
+        message: messageBytes,
+        requiredSigners: params.requiredSigners,
+      });
+      const { SignMessageVersion } = await ctx.importLedgerKit(
+        '@ledgerhq/device-signer-kit-solana'
+      );
+      const result = await solSigner.signMessage(path, preparedMessage.serializedMessage, {
+        version: SignMessageVersion.Raw,
+      });
+      return { signature: decodeBase58Signature(result.signature) };
+    }
+
     const result = await solSigner.signMessage(path, messageBytes);
-    return { signature: result.signature };
+    return { signature: decodeBase58EnvelopeSignature(result.signature) };
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
@@ -94,15 +105,36 @@ export async function solSignMessage(
   }
 }
 
+function decodeBase58Signature(signature: string): string {
+  const bytes = bs58.decode(signature);
+  if (bytes.length !== 64) {
+    throw new Error(`Ledger Solana signature must be 64 bytes, received ${bytes.length}`);
+  }
+  return bytesToHex(bytes);
+}
+
+function decodeBase58EnvelopeSignature(envelope: string): string {
+  const bytes = bs58.decode(envelope);
+  if (bytes.length < 65 || bytes[0] !== 1) {
+    throw new Error('Ledger Solana signature envelope is invalid');
+  }
+  return bytesToHex(bytes.subarray(1, 65));
+}
+
 // ---------------------------------------------------------------------------
 // Internal -- SOL signer creation
 // ---------------------------------------------------------------------------
 
 async function _createSolSigner(ctx: ConnectorContext, sessionId: string): Promise<SignerSol> {
   const dmk = await ctx.getOrCreateDmk();
-  const { ContextModuleBuilder } = await ctx.importLedgerKit('@ledgerhq/context-module');
+  const { ContextModuleBuilder, ContextModuleChainID } = await ctx.importLedgerKit(
+    '@ledgerhq/context-module'
+  );
   const { SignerSolanaBuilder } = await ctx.importLedgerKit('@ledgerhq/device-signer-kit-solana');
-  const contextModule = new ContextModuleBuilder({}).removeDefaultLoaders().build();
+  const contextModule = new ContextModuleBuilder({})
+    .setChain(ContextModuleChainID.Solana)
+    .removeDefaultLoaders()
+    .build();
   const sdkSigner = new SignerSolanaBuilder({ dmk, sessionId })
     .withContextModule(contextModule)
     .build();

@@ -278,9 +278,9 @@ export abstract class TrezorConnectorBase implements IConnector {
   private readonly thp?: TrezorThpSessionOptions;
 
   // Single owned array — passed by reference into every TrezorThpSession via
-  // `createThpOptions`. setKnownCredentials() and the auto-merge inside
-  // onPairingCredentialsChanged both mutate this array in-place so the next
-  // handshake sees fresh credentials without a connector rebuild.
+  // `createThpOptions`. Both host updates and authoritative device updates
+  // replace its contents in-place so the next handshake sees fresh credentials
+  // without a connector rebuild.
   private readonly knownCredentials: TrezorThpCredentials[] = [];
 
   private readonly deviceSessionFactory: NonNullable<
@@ -330,22 +330,6 @@ export abstract class TrezorConnectorBase implements IConnector {
     this.knownCredentials.length = 0;
     if (credentials?.length) {
       this.knownCredentials.push(...credentials);
-    }
-  }
-
-  /**
-   * Push new credentials minted during pairing into the in-memory array.
-   * Deduplicates by the device-minted `credential` blob — the host has no
-   * other stable identity for a credential.
-   */
-  private mergeKnownCredentials(incoming: ReadonlyArray<TrezorThpCredentials>): void {
-    for (const cred of incoming) {
-      const blob = (cred as { credential?: string }).credential;
-      if (!blob) continue;
-      const exists = this.knownCredentials.some(
-        existing => (existing as { credential?: string }).credential === blob
-      );
-      if (!exists) this.knownCredentials.push(cred);
     }
   }
 
@@ -791,6 +775,11 @@ export abstract class TrezorConnectorBase implements IConnector {
           return this.thp.onPairingRequest(payload);
         }
 
+        // Register the waiter before emitting: a synchronous host reply would
+        // otherwise find no waiter and hang pairing until the timeout.
+        const pairingPromise = this.uiRequests.wait<
+          Awaited<ReturnType<NonNullable<TrezorThpSessionOptions['onPairingRequest']>>>
+        >(UI_REQUEST.REQUEST_TREZOR_THP_PAIRING);
         this.emit('ui-request', {
           type: UI_REQUEST.REQUEST_TREZOR_THP_PAIRING,
           payload: {
@@ -800,7 +789,7 @@ export abstract class TrezorConnectorBase implements IConnector {
             nfcData: payload.nfcData,
           },
         });
-        return this.uiRequests.wait(UI_REQUEST.REQUEST_TREZOR_THP_PAIRING);
+        return pairingPromise;
       },
       onButtonRequest: async payload => {
         await this.thp?.onButtonRequest?.(payload);
@@ -822,11 +811,14 @@ export abstract class TrezorConnectorBase implements IConnector {
       },
       onButtonRequestComplete: async payload => {
         await this.thp?.onButtonRequestComplete?.(payload);
+        // A multi-step confirmation answers one button with the next one;
+        // report completion only once the device leaves confirmation.
+        if (payload.responseType === 'ButtonRequest') return;
+        // Empty sessionId, the untargeted form: calls are serialized, so this
+        // ends the one prompt on screen, and button prompts have no owner.
         this.emit('ui-event', {
           type: EConnectorInteraction.InteractionComplete,
-          payload: {
-            sessionId: device.connectId,
-          },
+          payload: { sessionId: '' },
         });
       },
       onPinMatrixRequest: async payload => {
@@ -870,11 +862,17 @@ export abstract class TrezorConnectorBase implements IConnector {
         return res?.passphraseOnDevice ? { on_device: true } : { passphrase: res?.value ?? '' };
       },
       onPairingCredentialsChanged: async payload => {
-        // Auto-merge into our internal array first so the very next
-        // handshake (e.g. host calls another chain method right after
-        // pairing) sees the credential — the host doesn't have to
-        // round-trip through storage to get autoconnect.
-        this.mergeKnownCredentials(payload.credentials);
+        // The shared list serves every device while core reports one device:
+        // drop what the device rejected, then merge this device's credentials.
+        const blob = (cred: TrezorThpCredentials) => (cred as { credential?: string }).credential;
+        const rejected = new Set((payload.removed ?? []).map(blob));
+        const merged = this.knownCredentials.filter(cred => !rejected.has(blob(cred)));
+        for (const cred of payload.credentials) {
+          if (blob(cred) && !merged.some(existing => blob(existing) === blob(cred))) {
+            merged.push(cred);
+          }
+        }
+        this.setKnownCredentials(merged);
         await this.thp?.onPairingCredentialsChanged?.(payload);
         this.emit('device-trezor-thp-credentials-changed', {
           connectId: device.connectId,
