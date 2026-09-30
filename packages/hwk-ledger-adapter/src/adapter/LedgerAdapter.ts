@@ -212,6 +212,10 @@ export class LedgerAdapter implements IHardwareWallet {
   // An operation's BLE pick is saved by its first call that gets past the wallet check.
   private readonly _pendingOperationBindings = new Map<string, LedgerConnectionAttempt>();
 
+  // A one-shot call's unchecked BLE pick, by connectId. It outlives the call only
+  // through an unlock retry; any other failure drops it with its session.
+  private readonly _pendingPickBindings = new Map<string, LedgerConnectionAttempt>();
+
   // Transport each session was opened on, by sessionId. The adapter-wide
   // `_activeConnectionType` moves with every discovery and can go stale.
   private readonly _sessionTransports = new Map<string, 'usb' | 'ble'>();
@@ -346,6 +350,7 @@ export class LedgerAdapter implements IHardwareWallet {
     this._sessions.clear();
     this._sessionTransports.clear();
     this._pendingOperationBindings.clear();
+    this._pendingPickBindings.clear();
     this._selectedBleReconnectTargets.clear();
     this._connectingPromise = null;
     this._doConnectAbortController = null;
@@ -2505,7 +2510,15 @@ export class LedgerAdapter implements IHardwareWallet {
               operationId
             );
           } catch (error) {
-            this._finishBleBinding(signal.aborted ? 'cancelled' : 'failed');
+            const status = signal.aborted ? 'cancelled' : 'failed';
+            // The call ended before its pick passed the wallet check; the next
+            // call asks for a device again rather than reusing an unchecked one.
+            for (const [pickedConnectId, owner] of this._pendingPickBindings) {
+              this._pendingPickBindings.delete(pickedConnectId);
+              this._discardPendingBinding(owner, status);
+              await this._dropSession(pickedConnectId, signal);
+            }
+            this._finishBleBinding(status);
             throw error;
           } finally {
             if (operationId) {
@@ -2703,9 +2716,12 @@ export class LedgerAdapter implements IHardwareWallet {
       // session to subsequent retries (they keep using the same broken
       // sessionId until the user replugs).
       const isBleSession = this._sessionTransports.get(sessionId) === 'ble';
+      if (!operationId && connectionAttempt.pendingBinding) {
+        this._pendingPickBindings.set(resolvedConnectId, connectionAttempt);
+      }
       const bindingOwner = operationId
         ? this._pendingOperationBindings.get(operationId)
-        : connectionAttempt;
+        : this._pendingPickBindings.get(resolvedConnectId);
       const pendingBinding =
         bindingOwner?.pendingBinding?.connectId === resolvedConnectId
           ? bindingOwner.pendingBinding
@@ -2724,6 +2740,7 @@ export class LedgerAdapter implements IHardwareWallet {
             // A fresh pick holding another wallet is neither saved nor reused.
             // Without an operation the DeviceMismatch handler below drops it.
             this._discardPendingBinding(bindingOwner, 'failed');
+            this._pendingPickBindings.delete(resolvedConnectId);
             if (operationId) {
               this._pendingOperationBindings.delete(operationId);
               this._operations.end(operationId, 'explicit');
@@ -2738,6 +2755,7 @@ export class LedgerAdapter implements IHardwareWallet {
       if (pendingBinding && bindingOwner) {
         bindingOwner.pendingBinding = undefined;
         if (operationId) this._pendingOperationBindings.delete(operationId);
+        else this._pendingPickBindings.delete(resolvedConnectId);
         await this._saveSelectedBleBinding(
           pendingBinding.connectId,
           pendingBinding.requestId,

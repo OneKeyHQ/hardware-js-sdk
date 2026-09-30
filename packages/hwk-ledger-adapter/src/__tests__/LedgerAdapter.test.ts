@@ -2910,10 +2910,12 @@ describe('LedgerAdapter', () => {
       });
     });
 
-    it('reports a wrong-app business failure on a picked BLE device', async () => {
+    it('drops an unchecked BLE pick on a wrong app and saves the next checked pick', async () => {
       Object.defineProperty(connector, 'connectionType', { value: 'ble' });
       const save = acknowledgeBindings();
+      const select = jest.fn();
       adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+        select();
         adapter.uiResponse({
           type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
           payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
@@ -2922,17 +2924,60 @@ describe('LedgerAdapter', () => {
       connector.callImpl.mockRejectedValueOnce(
         Object.assign(new Error('Wrong app opened'), { _tag: ERROR_TAG.WrongAppOpened })
       );
-      const result = await adapter.evmGetAddress('', deriveDeviceFingerprint('expected-wallet'), {
-        path: "m/44'/60'/0'/0/1",
-        extra: { dbDeviceId: 'ledger-db' },
-      });
+      const expectedAddress = '0x1111111111111111111111111111111111111111';
+      const fingerprint = deriveDeviceFingerprint(expectedAddress);
+      const params = { path: "m/44'/60'/0'/0/1", extra: { dbDeviceId: 'ledger-db' } };
+
+      const result = await adapter.evmGetAddress('', fingerprint, params);
+
       expect(result).toMatchObject({
         success: false,
         payload: { code: HardwareErrorCode.WrongApp },
       });
-      expect(connector.callImpl).toHaveBeenCalledTimes(1);
-      // The wallet check never finished, so the pick is not saved.
+      // The wallet check never finished, so the pick is neither saved nor kept.
       expect(save).not.toHaveBeenCalled();
+      expect(connector.disconnect).toHaveBeenCalledTimes(1);
+
+      connector.callImpl
+        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: 'business-address' });
+      expect((await adapter.evmGetAddress('', fingerprint, params)).success).toBe(true);
+      expect(select).toHaveBeenCalledTimes(2);
+      expect(save).toHaveBeenCalledTimes(1);
+    });
+
+    it('saves a BLE pick checked after an unlock retry', async () => {
+      Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+      const save = acknowledgeBindings();
+      const select = jest.fn();
+      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+        select();
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+          payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
+        });
+      });
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, () => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_CONNECT,
+          payload: { confirmed: true },
+        });
+      });
+      const expectedAddress = '0x1111111111111111111111111111111111111111';
+      connector.callImpl
+        .mockRejectedValueOnce(
+          Object.assign(new Error('Ledger is locked'), { code: HardwareErrorCode.DeviceLocked })
+        )
+        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: 'business-address' });
+
+      const result = await adapter.evmGetAddress('', deriveDeviceFingerprint(expectedAddress), {
+        path: "m/44'/60'/0'/0/1",
+      });
+
+      expect(result).toMatchObject({ success: true, payload: { address: 'business-address' } });
+      expect(select).toHaveBeenCalledTimes(1);
+      expect(save).toHaveBeenCalledTimes(1);
     });
 
     it('connects the explicitly targeted device even when multiple USB devices are present', async () => {
