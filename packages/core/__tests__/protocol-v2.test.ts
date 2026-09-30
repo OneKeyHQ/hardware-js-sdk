@@ -6384,7 +6384,10 @@ describe('Protocol V2 firmware update targets', () => {
     const typedCall = jest
       .fn()
       .mockRejectedValue(new Error('Failure: Handler not registered for this message'));
-    const deviceInfo = { hw: { serial_no: 'PRO2-PHYSICAL-1' } };
+    const deviceInfo = {
+      hw: { serial_no: 'PRO2-PHYSICAL-1' },
+      main_mcu: { application_data: { version: '2.0.0' } },
+    };
     const probeProtocolV2RuntimeState = jest.fn().mockResolvedValue({
       mode: 'normal',
       bootloaderMode: false,
@@ -6422,6 +6425,7 @@ describe('Protocol V2 firmware update targets', () => {
     (method as any).protocolV2LatestFinalDeviceInfo = {
       main_mcu: {
         application: { version: '2.0.0' },
+        application_data: { version: '2.0.0' },
       },
     };
     expect(() => (method as any).assertExpectedProtocolV2Versions()).not.toThrow();
@@ -6796,6 +6800,27 @@ describe('Protocol V2 firmware update targets', () => {
 
     expect(() => (method as any).assertExpectedProtocolV2Versions()).toThrow(
       'target app_v2 reached 2.0.1, expected 2.0.0'
+    );
+  });
+
+  test('rejects stale P2 DeviceInfo even when install status reports the expected version', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'desktop',
+        targetsToUpdate: ['app_v2'],
+        expectedTargetVersions: { app_v2: '2.0.0' },
+      },
+    });
+    method.init();
+    (method as any).protocolV2LatestFinalDeviceInfo = {
+      main_mcu: { application_data: { version: '1.0.1' } },
+    };
+    (method as any).protocolV2CompletedTargetVersions = new Map([[5, 0x20000]]);
+
+    expect(() => (method as any).assertExpectedProtocolV2Versions()).toThrow(
+      'target app_v2 reached 1.0.1, expected 2.0.0'
     );
   });
 
@@ -8923,6 +8948,54 @@ describe('Protocol V2 firmware update targets', () => {
         elapsedMs: expect.any(Number),
       }),
     });
+  });
+
+  test.each([
+    ['react-native', 30_000],
+    ['webusb', undefined],
+  ] as const)('uses the native firmware write timeout in %s', async (env, timeoutMs) => {
+    const getSettingsSpy = jest.spyOn(DataManager, 'getSettings').mockReturnValue(env);
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+      },
+    });
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'FilesystemFile',
+      message: { processed_byte: 1 },
+    });
+    (method as any).device = stubDevice({
+      getCommands: () => ({ typedCall }),
+    });
+
+    try {
+      await (method as any).fileWriteChunk(
+        'vol0:/application_p1.bin',
+        1,
+        0,
+        new Uint8Array([1]),
+        true,
+        1
+      );
+    } finally {
+      getSettingsSpy.mockRestore();
+    }
+
+    expect(typedCall).toHaveBeenCalledWith(
+      'FilesystemFileWrite',
+      'FilesystemFile',
+      expect.objectContaining({
+        file: expect.objectContaining({
+          path: 'vol0:/application_p1.bin',
+          offset: 0,
+        }),
+      }),
+      expect.objectContaining({
+        timeoutMs,
+        writeWithResponse: false,
+      })
+    );
   });
 
   test('does not retry or wrap a stale BLE bond during a V4 file transfer', async () => {

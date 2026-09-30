@@ -91,6 +91,8 @@ const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 90 * 1000;
 const PROTOCOL_V2_FINAL_RECONNECT_TIMEOUT = 3 * 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
 const PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT = 15 * 1000;
+// React Native invalidates a timed-out BLE link, and V4 can safely replay the staging file.
+const PROTOCOL_V2_FILE_WRITE_RESPONSE_TIMEOUT = 30 * 1000;
 const PROTOCOL_V2_INSTALL_TIMEOUT = 10 * 60 * 1000;
 const PROTOCOL_V2_INSTALL_STATUS_INITIAL_DELAY = 1000;
 const PROTOCOL_V2_INSTALL_FINISHED_AFTER_DISCONNECT_POLLS = 4;
@@ -577,6 +579,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private protocolV2LatestFinalDeviceInfo?: ProtocolV2DeviceInfo;
 
+  private protocolV2InitialDeviceInfo?: ProtocolV2DeviceInfo;
+
   private protocolV2InstallBaselineVersions = new Map<number, string>();
 
   private protocolV2InstallNeedsReconnect = false;
@@ -814,8 +818,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async runProtocolV2() {
     await this.captureProtocolV2PhysicalIdentity();
     const deviceFeatures = await this.getProtocolV2DeviceFeatures();
-    this.protocolV2InstallBaselineVersions =
-      this.getProtocolV2ObservableTargetVersions(deviceFeatures);
+    this.protocolV2InstallBaselineVersions = this.getProtocolV2ObservableTargetVersions(
+      deviceFeatures,
+      this.protocolV2InitialDeviceInfo
+    );
     this.protocolV2LastRuntimeProbeFeatures = undefined;
     const currentDeviceType = this.device.getCurrentDeviceType();
     const capabilityDeviceType =
@@ -1398,12 +1404,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       )?.[0];
       const statusVersion =
         targetId === undefined ? undefined : this.protocolV2CompletedTargetVersions.get(targetId);
-      const observedVersion =
+      const statusVersionString =
         statusVersion === undefined
-          ? visibleVersions[target]
+          ? undefined
           : `${Math.floor(statusVersion / 0x10000) % 0x100}.${
               Math.floor(statusVersion / 0x100) % 0x100
             }.${statusVersion % 0x100}`;
+      const observedVersion =
+        target === 'app_v2' && visibleVersions.app_v2
+          ? visibleVersions.app_v2
+          : statusVersionString ?? visibleVersions[target];
       if (!observedVersion) {
         const hasCompleteTargetEvidence =
           targetId !== undefined && this.protocolV2CompletedTargetIds.has(targetId);
@@ -1511,6 +1521,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
     this.protocolV2ExpectedSerialNumber = serialNumber;
     this.protocolV2ExpectedPath = path;
+    this.protocolV2InitialDeviceInfo = deviceInfo;
   }
 
   private async verifyProtocolV2ReconnectIdentity(request?: DeviceInfoGet) {
@@ -2509,7 +2520,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return Array.from(expectedTargetIds).filter(targetId => !reportedTargetIds.has(targetId));
   }
 
-  private getProtocolV2ObservableTargetVersions(features: Features) {
+  private getProtocolV2ObservableTargetVersions(
+    features: Features,
+    deviceInfo?: ProtocolV2DeviceInfo
+  ) {
     const versions = new Map<number, string>();
     versions.set(
       ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
@@ -2517,7 +2531,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     );
     const applicationVersion = getDeviceFirmwareVersion(features).join('.');
     versions.set(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1, applicationVersion);
-    versions.set(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2, applicationVersion);
+    const applicationP2Version = deviceInfo?.main_mcu?.application_data?.version;
+    if (applicationP2Version) {
+      versions.set(
+        ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2,
+        applicationP2Version
+      );
+    }
     versions.set(
       ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR,
       getDeviceBLEFirmwareVersion(features).join('.')
@@ -2534,20 +2554,27 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return versions;
   }
 
-  private hasProtocolV2InstallVersionChanged(expectedTargetIds: Set<number>) {
+  private hasProtocolV2InstallVersionChanged(
+    expectedTargetIds: Set<number>,
+    deviceInfo: ProtocolV2DeviceInfo
+  ) {
     if (!this.protocolV2LastRuntimeProbeFeatures) return false;
     const currentVersions = this.getProtocolV2ObservableTargetVersions(
-      this.protocolV2LastRuntimeProbeFeatures
+      this.protocolV2LastRuntimeProbeFeatures,
+      deviceInfo
     );
-    return Array.from(expectedTargetIds).some(targetId => {
-      const previousVersion = this.protocolV2InstallBaselineVersions.get(targetId);
-      const currentVersion = currentVersions.get(targetId);
-      return (
-        previousVersion !== undefined &&
-        currentVersion !== undefined &&
-        previousVersion !== currentVersion
-      );
-    });
+    return (
+      expectedTargetIds.size > 0 &&
+      Array.from(expectedTargetIds).every(targetId => {
+        const previousVersion = this.protocolV2InstallBaselineVersions.get(targetId);
+        const currentVersion = currentVersions.get(targetId);
+        return (
+          previousVersion !== undefined &&
+          currentVersion !== undefined &&
+          previousVersion !== currentVersion
+        );
+      })
+    );
   }
 
   private recordProtocolV2AuthoritativeInstallCompletion(expectedTargetIds: Set<number>) {
@@ -2560,6 +2587,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ) {
     const expectedTargetIds = new Set(targets.map(target => target.target_id));
     const expectedPaths = new Map(targets.map(target => [target.target_id, target.path]));
+    const hasStaleP2Version = (info: ProtocolV2DeviceInfo) => {
+      if (!expectedTargetIds.has(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2)) {
+        return false;
+      }
+      const expectedP2Version = this.params?.expectedTargetVersions?.app_v2;
+      const currentP2Version = info.main_mcu?.application_data?.version;
+      return !!expectedP2Version && !!currentP2Version && currentP2Version !== expectedP2Version;
+    };
     const isBleInstall = this.isBleReconnect();
     const startTime = Date.now();
     let lastError: unknown;
@@ -2767,8 +2802,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             const isNormalMode = await this.probeProtocolV2NormalMode(currentDeviceInfo);
             if (
               isNormalMode &&
+              !hasStaleP2Version(currentDeviceInfo) &&
               (installEvidenceObserved ||
-                this.hasProtocolV2InstallVersionChanged(expectedTargetIds))
+                this.hasProtocolV2InstallVersionChanged(expectedTargetIds, currentDeviceInfo))
             ) {
               Log.log(
                 '[FirmwareUpdateV4] empty firmware status after confirmed App reboot; update complete'
@@ -2819,8 +2855,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             const isNormalMode = await this.probeProtocolV2NormalMode(deviceInfo);
             if (
               isNormalMode &&
+              !hasStaleP2Version(deviceInfo) &&
               (installEvidenceObserved ||
-                this.hasProtocolV2InstallVersionChanged(expectedTargetIds))
+                this.hasProtocolV2InstallVersionChanged(expectedTargetIds, deviceInfo))
             ) {
               Log.log(
                 '[FirmwareUpdateV4] firmware status endpoint unavailable after confirmed App reboot'
@@ -3133,6 +3170,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     progress: number | null
   ): Promise<TypedResponseMessage<'FilesystemFile'>> {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const env = DataManager.getSettings('env');
     const writeRes = await typedCall(
       'FilesystemFileWrite',
       'FilesystemFile',
@@ -3148,6 +3186,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         ui_percentage: progress ?? undefined,
       },
       {
+        timeoutMs: env === 'react-native' ? PROTOCOL_V2_FILE_WRITE_RESPONSE_TIMEOUT : undefined,
         writeWithResponse: false,
         onWriteCompleted: () => undefined,
       }
