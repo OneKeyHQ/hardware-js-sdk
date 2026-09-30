@@ -568,14 +568,15 @@ export const updateResourceFromSource = async (
       !Number.isSafeInteger(dataLength) ||
       dataLength === undefined ||
       dataLength <= 0 ||
-      offset + dataLength > source.size
+      offset >= source.size
     ) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
         'Device requested an invalid firmware resource range'
       );
     }
-    const chunk = new Uint8Array(await source.readAt(offset, dataLength));
+    const chunkLength = Math.min(dataLength, source.size - offset);
+    const chunk = new Uint8Array(await source.readAt(offset, chunkLength));
     response = await typedCall('ResourceAck', ['ResourceRequest', 'Success'], {
       data_chunk: bytesToHex(chunk),
       hash: bytesToHex(blake2s(chunk)),
