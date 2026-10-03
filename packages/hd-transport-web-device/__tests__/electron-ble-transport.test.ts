@@ -1,4 +1,8 @@
-import transport, { PROTOCOL_V2_CHANNEL_BLE_UART, bytesToHex } from '@onekeyfe/hd-transport';
+import transport, {
+  PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
+  PROTOCOL_V2_CHANNEL_BLE_UART,
+  bytesToHex,
+} from '@onekeyfe/hd-transport';
 import { EBleDisconnectReason, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import EventEmitter from 'events';
 
@@ -1133,7 +1137,9 @@ describe('ElectronBleTransport protocol detection', () => {
       expect(nobleBle.write).toHaveBeenCalledTimes(1);
 
       await expect(
-        bleTransport.call(device.id, 'Ping', { message: 'x'.repeat(2048) })
+        bleTransport.call(device.id, 'Ping', {
+          message: 'x'.repeat(PROTOCOL_V2_BLE_FRAME_MAX_BYTES),
+        })
       ).rejects.toThrow(/Protocol V2 frame too large for transport/);
       expect(nobleBle.write).toHaveBeenCalledTimes(1);
     } finally {

@@ -70,6 +70,11 @@ export type TransportWriteMetrics = {
   frameBytes: number;
 };
 
+export type ProtocolV2FileWritePipeline = {
+  next: () => Promise<Record<string, unknown> | undefined>;
+  onResponse: (response: MessageFromOneKey) => void;
+};
+
 export type TransportCallOptions = {
   timeoutMs?: number;
   expectedTypes?: string[];
@@ -83,6 +88,8 @@ export type TransportCallOptions = {
   onResponseAfterWrite?: (response: MessageFromOneKey) => void;
   /** Prefer acknowledged BLE characteristic writes for this call when supported. */
   writeWithResponse?: boolean;
+  /** Keep two ordered FilesystemFileWrite frames in flight within one V2 call. */
+  fileWritePipeline?: ProtocolV2FileWritePipeline;
 };
 
 type ITransportInitFn = (
@@ -147,6 +154,8 @@ export type LowlevelTransportSharedPlugin = {
   disconnect: (uuid: string) => Promise<void>;
   /** Maximum Protocol V2 bytes accepted by one BLE characteristic write. */
   getProtocolV2PacketCapacity?: (uuid: string) => number | undefined | Promise<number | undefined>;
+  startProtocolV2FlowControl?: (uuid: string) => Promise<void>;
+  takeProtocolV2FlowCredit?: (uuid: string) => Promise<void>;
 
   init: () => Promise<void>;
   version: string;

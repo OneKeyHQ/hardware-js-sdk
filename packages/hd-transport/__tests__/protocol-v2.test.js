@@ -543,10 +543,10 @@ describe('Protocol V2 framing and session', () => {
     expect(encodeFileWrite(PROTOCOL_V2_BLE_FILE_CHUNK_SIZE).length).toBeLessThanOrEqual(
       PROTOCOL_V2_BLE_FRAME_MAX_BYTES
     );
-    expect(encodeFileWrite(PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE).length).toBeGreaterThan(
+    expect(encodeFileWrite(PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE).length).toBeLessThanOrEqual(
       PROTOCOL_V2_BLE_FRAME_MAX_BYTES
     );
-    expect(encodeFileWrite(1885)).toHaveLength(PROTOCOL_V2_BLE_FRAME_MAX_BYTES);
+    expect(encodeFileWrite(2637)).toHaveLength(PROTOCOL_V2_BLE_FRAME_MAX_BYTES);
   });
 
   test('keeps bytes after the first complete frame for the next read', () => {

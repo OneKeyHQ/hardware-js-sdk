@@ -70,7 +70,7 @@ import type {
   FirmwareUpdateV4Target,
 } from '../types/api/firmwareUpdate';
 import type { EFirmwareType } from '@onekeyfe/hd-shared';
-import type { ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type { DeviceInfoGet, ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
 import type { TypedResponseMessage } from '../device/DeviceCommands';
 import type {
   Features,
@@ -91,7 +91,9 @@ const PROTOCOL_V2_BOOTLOADER_RECONNECT_TIMEOUT = 90 * 1000;
 const PROTOCOL_V2_FINAL_RECONNECT_TIMEOUT = 3 * 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
 const PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT = 15 * 1000;
-const PROTOCOL_V2_INSTALL_TIMEOUT = 5 * 60 * 1000;
+// React Native invalidates a timed-out BLE link, and V4 can safely replay the staging file.
+const PROTOCOL_V2_FILE_WRITE_RESPONSE_TIMEOUT = 30 * 1000;
+const PROTOCOL_V2_INSTALL_TIMEOUT = 10 * 60 * 1000;
 const PROTOCOL_V2_INSTALL_STATUS_INITIAL_DELAY = 1000;
 const PROTOCOL_V2_INSTALL_FINISHED_AFTER_DISCONNECT_POLLS = 4;
 const PROTOCOL_V2_TARGET_STATUS_PENDING = 0;
@@ -577,6 +579,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private protocolV2LatestFinalDeviceInfo?: ProtocolV2DeviceInfo;
 
+  private protocolV2InitialDeviceInfo?: ProtocolV2DeviceInfo;
+
   private protocolV2InstallBaselineVersions = new Map<number, string>();
 
   private protocolV2InstallNeedsReconnect = false;
@@ -792,9 +796,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         maxChunkSize = PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE;
       } else {
         // Firmware staging writes tolerate a larger BLE chunk than generic filesystem writes.
-        maxChunkSize = PROTOCOL_V2_FIRMWARE_STAGING_PATHS.has(filePath ?? '')
-          ? PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE
-          : PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
+        maxChunkSize =
+          PROTOCOL_V2_FIRMWARE_STAGING_PATHS.has(filePath ?? '') ||
+          isProtocolV2BootResourcePackagePath(filePath ?? '') ||
+          filePath?.toLowerCase().endsWith('.okpkg')
+            ? PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE
+            : PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
       }
     }
     if (!Number.isFinite(payloadChunkSize) || payloadChunkSize <= 0) {
@@ -814,8 +821,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async runProtocolV2() {
     await this.captureProtocolV2PhysicalIdentity();
     const deviceFeatures = await this.getProtocolV2DeviceFeatures();
-    this.protocolV2InstallBaselineVersions =
-      this.getProtocolV2ObservableTargetVersions(deviceFeatures);
+    this.protocolV2InstallBaselineVersions = this.getProtocolV2ObservableTargetVersions(
+      deviceFeatures,
+      this.protocolV2InitialDeviceInfo
+    );
     this.protocolV2LastRuntimeProbeFeatures = undefined;
     const currentDeviceType = this.device.getCurrentDeviceType();
     const capabilityDeviceType =
@@ -1398,12 +1407,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       )?.[0];
       const statusVersion =
         targetId === undefined ? undefined : this.protocolV2CompletedTargetVersions.get(targetId);
-      const observedVersion =
+      const statusVersionString =
         statusVersion === undefined
-          ? visibleVersions[target]
+          ? undefined
           : `${Math.floor(statusVersion / 0x10000) % 0x100}.${
               Math.floor(statusVersion / 0x100) % 0x100
             }.${statusVersion % 0x100}`;
+      const observedVersion =
+        target === 'app_v2' && visibleVersions.app_v2
+          ? visibleVersions.app_v2
+          : statusVersionString ?? visibleVersions[target];
       if (!observedVersion) {
         const hasCompleteTargetEvidence =
           targetId !== undefined && this.protocolV2CompletedTargetIds.has(targetId);
@@ -1511,10 +1524,15 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
     this.protocolV2ExpectedSerialNumber = serialNumber;
     this.protocolV2ExpectedPath = path;
+    this.protocolV2InitialDeviceInfo = deviceInfo;
   }
 
-  private async verifyProtocolV2ReconnectIdentity() {
-    const deviceInfo = await this.requestProtocolV2PhysicalIdentity();
+  private async verifyProtocolV2ReconnectIdentity(request?: DeviceInfoGet) {
+    const deviceInfo = await requestProtocolV2DeviceInfo({
+      commands: this.device.getCommands(),
+      timeoutMs: this.getProtocolV2DeviceInfoTimeout(),
+      request,
+    });
     this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
     return deviceInfo;
   }
@@ -2204,58 +2222,106 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
       this.throwIfAborted();
       try {
-        await writeFirmwareByteSource({
-          source,
-          chunkSize: this.getProtocolV2FirmwareChunkSize('write', filePath),
-          write: async ({ data, sourceOffset, length, first }) => {
+        const chunkSize = this.getProtocolV2FirmwareChunkSize('write', filePath);
+        const reportConfirmedChunk = (chunkEnd: number) => {
+          const transferredBytes = processedSize + chunkEnd;
+          const now = Date.now();
+          const elapsedMs = Math.max(now - transferStartedAt, 0);
+          const progress = Math.min(Math.ceil((transferredBytes / totalSize) * 100), 99);
+          const shouldPostProgress =
+            transferredBytes >= this.protocolV2LastTransferredBytes &&
+            (progress !== this.protocolV2LastTransferProgress ||
+              now - this.protocolV2LastTransferProgressAt >=
+                PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS ||
+              chunkEnd === source.size);
+          if (shouldPostProgress) {
+            this.protocolV2LastTransferProgress = progress;
+            this.protocolV2LastTransferProgressAt = now;
+            this.protocolV2LastTransferredBytes = transferredBytes;
+            this.postProgressMessage(progress, 'transferData', {
+              transferredBytes,
+              totalBytes: totalSize,
+              rateBytesPerSecond:
+                elapsedMs > 0 ? Math.round((transferredBytes / elapsedMs) * 1000) : undefined,
+              elapsedMs,
+            });
+          }
+        };
+        const env = DataManager.getSettings('env');
+        if (env && DataManager.isBleConnect(env) && this.params?.platform !== 'native') {
+          let sendOffset = 0;
+          const nextRequest = async () => {
             this.throwIfAborted();
-            const chunkEnd = sourceOffset + length;
-            const deviceProgress = getProtocolV2DeviceTransferProgress(
-              processedSize + sourceOffset,
-              processedSize + chunkEnd,
-              totalSize
-            );
-            const response = await this.fileWriteChunk(
-              filePath,
-              source.size,
-              sourceOffset,
-              data,
-              first,
-              deviceProgress
-            );
-            const rawProcessedByte = response.message.processed_byte;
-            const nextOffset = rawProcessedByte === undefined ? chunkEnd : Number(rawProcessedByte);
-            if (!Number.isFinite(nextOffset) || nextOffset !== chunkEnd) {
-              throw ERRORS.TypedError(
-                HardwareErrorCode.EmmcFileWriteFirmwareError,
-                `invalid processed_byte ${rawProcessedByte} for offset ${sourceOffset}`
+            if (sendOffset >= source.size) return undefined;
+            const offset = sendOffset;
+            const length = Math.min(chunkSize, source.size - offset);
+            const data = await source.readAt(offset, length);
+            sendOffset += length;
+            return {
+              file: { path: filePath, offset, total_size: source.size, data },
+              overwrite: offset === 0,
+              append: false,
+              ui_percentage: getProtocolV2DeviceTransferProgress(
+                processedSize + offset,
+                processedSize + sendOffset,
+                totalSize
+              ),
+            };
+          };
+          const firstRequest = await nextRequest();
+          if (!firstRequest) {
+            throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError);
+          }
+          const response = await this.device
+            .getCommands()
+            .typedCall('FilesystemFileWrite', 'FilesystemFile', firstRequest, {
+              writeWithResponse: false,
+              timeoutMs: 30_000,
+              fileWritePipeline: {
+                next: nextRequest,
+                onResponse: confirmed => {
+                  this.throwIfAborted();
+                  reportConfirmedChunk(Number(confirmed.message.processed_byte));
+                },
+              },
+            });
+          if (Number(response.message.processed_byte) !== source.size) {
+            throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError);
+          }
+        } else {
+          await writeFirmwareByteSource({
+            source,
+            chunkSize,
+            write: async ({ data, sourceOffset, length, first }) => {
+              this.throwIfAborted();
+              const chunkEnd = sourceOffset + length;
+              const deviceProgress = getProtocolV2DeviceTransferProgress(
+                processedSize + sourceOffset,
+                processedSize + chunkEnd,
+                totalSize
               );
-            }
-            const transferredBytes = processedSize + chunkEnd;
-            const now = Date.now();
-            const elapsedMs = Math.max(now - transferStartedAt, 0);
-            const progress = Math.min(Math.ceil((transferredBytes / totalSize) * 100), 99);
-            const shouldPostProgress =
-              transferredBytes >= this.protocolV2LastTransferredBytes &&
-              (progress !== this.protocolV2LastTransferProgress ||
-                now - this.protocolV2LastTransferProgressAt >=
-                  PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS ||
-                chunkEnd === source.size);
-            if (shouldPostProgress) {
-              this.protocolV2LastTransferProgress = progress;
-              this.protocolV2LastTransferProgressAt = now;
-              this.protocolV2LastTransferredBytes = transferredBytes;
-              this.postProgressMessage(progress, 'transferData', {
-                transferredBytes,
-                totalBytes: totalSize,
-                rateBytesPerSecond:
-                  elapsedMs > 0 ? Math.round((transferredBytes / elapsedMs) * 1000) : undefined,
-                elapsedMs,
-              });
-            }
-            return length;
-          },
-        });
+              const response = await this.fileWriteChunk(
+                filePath,
+                source.size,
+                sourceOffset,
+                data,
+                first,
+                deviceProgress
+              );
+              const rawProcessedByte = response.message.processed_byte;
+              const nextOffset =
+                rawProcessedByte === undefined ? chunkEnd : Number(rawProcessedByte);
+              if (!Number.isFinite(nextOffset) || nextOffset !== chunkEnd) {
+                throw ERRORS.TypedError(
+                  HardwareErrorCode.EmmcFileWriteFirmwareError,
+                  `invalid processed_byte ${rawProcessedByte} for offset ${sourceOffset}`
+                );
+              }
+              reportConfirmedChunk(chunkEnd);
+              return length;
+            },
+          });
+        }
         return processedSize + source.size;
       } catch (error) {
         this.throwIfAborted();
@@ -2505,7 +2571,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return Array.from(expectedTargetIds).filter(targetId => !reportedTargetIds.has(targetId));
   }
 
-  private getProtocolV2ObservableTargetVersions(features: Features) {
+  private getProtocolV2ObservableTargetVersions(
+    features: Features,
+    deviceInfo?: ProtocolV2DeviceInfo
+  ) {
     const versions = new Map<number, string>();
     versions.set(
       ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_BOOTLOADER,
@@ -2513,7 +2582,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     );
     const applicationVersion = getDeviceFirmwareVersion(features).join('.');
     versions.set(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1, applicationVersion);
-    versions.set(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2, applicationVersion);
+    const applicationP2Version = deviceInfo?.main_mcu?.application_data?.version;
+    if (applicationP2Version) {
+      versions.set(
+        ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2,
+        applicationP2Version
+      );
+    }
     versions.set(
       ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_COPROCESSOR,
       getDeviceBLEFirmwareVersion(features).join('.')
@@ -2530,20 +2605,27 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return versions;
   }
 
-  private hasProtocolV2InstallVersionChanged(expectedTargetIds: Set<number>) {
+  private hasProtocolV2InstallVersionChanged(
+    expectedTargetIds: Set<number>,
+    deviceInfo: ProtocolV2DeviceInfo
+  ) {
     if (!this.protocolV2LastRuntimeProbeFeatures) return false;
     const currentVersions = this.getProtocolV2ObservableTargetVersions(
-      this.protocolV2LastRuntimeProbeFeatures
+      this.protocolV2LastRuntimeProbeFeatures,
+      deviceInfo
     );
-    return Array.from(expectedTargetIds).some(targetId => {
-      const previousVersion = this.protocolV2InstallBaselineVersions.get(targetId);
-      const currentVersion = currentVersions.get(targetId);
-      return (
-        previousVersion !== undefined &&
-        currentVersion !== undefined &&
-        previousVersion !== currentVersion
-      );
-    });
+    return (
+      expectedTargetIds.size > 0 &&
+      Array.from(expectedTargetIds).every(targetId => {
+        const previousVersion = this.protocolV2InstallBaselineVersions.get(targetId);
+        const currentVersion = currentVersions.get(targetId);
+        return (
+          previousVersion !== undefined &&
+          currentVersion !== undefined &&
+          previousVersion !== currentVersion
+        );
+      })
+    );
   }
 
   private recordProtocolV2AuthoritativeInstallCompletion(expectedTargetIds: Set<number>) {
@@ -2556,6 +2638,14 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ) {
     const expectedTargetIds = new Set(targets.map(target => target.target_id));
     const expectedPaths = new Map(targets.map(target => [target.target_id, target.path]));
+    const hasStaleP2Version = (info: ProtocolV2DeviceInfo) => {
+      if (!expectedTargetIds.has(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2)) {
+        return false;
+      }
+      const expectedP2Version = this.params?.expectedTargetVersions?.app_v2;
+      const currentP2Version = info.main_mcu?.application_data?.version;
+      return !!expectedP2Version && !!currentP2Version && currentP2Version !== expectedP2Version;
+    };
     const isBleInstall = this.isBleReconnect();
     const startTime = Date.now();
     let lastError: unknown;
@@ -2588,10 +2678,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       finishedStatusSnapshotPolls = 0;
     };
 
-    while (Date.now() - startTime < PROTOCOL_V2_INSTALL_TIMEOUT) {
+    while (true) {
       // A transport release caused by an explicit workflow cancellation must not
       // be mistaken for the expected device reboot during installation.
       this.throwIfAborted();
+      // Read once more at the deadline so a completed reboot is not reported as a timeout.
+      const isFinalStatusCheck = Date.now() - startTime >= PROTOCOL_V2_INSTALL_TIMEOUT;
       try {
         if (shouldReconnect) {
           const isBleInstallReconnect = this.isBleReconnect();
@@ -2750,22 +2842,20 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
           if (
             statusTargets.length === 0 &&
-            !currentDeviceInfo &&
-            bleInstallLinkReady &&
-            installEvidenceObserved
+            (currentDeviceInfo || bleInstallLinkReady || isFinalStatusCheck)
           ) {
-            // BLE install reconnect skips generic probes because loaders may not answer Ping.
-            // Restore the verified identity only after current-install evidence disappears.
-            currentDeviceInfo = await this.verifyProtocolV2ReconnectIdentity();
+            // Installation can finish while BLE is disconnected, hiding all progress.
+            // Refresh identity and target versions even without observed install status.
+            currentDeviceInfo = await this.verifyProtocolV2ReconnectIdentity(
+              PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST
+            );
             deviceInfo = currentDeviceInfo;
-          }
-
-          if (statusTargets.length === 0 && currentDeviceInfo) {
             const isNormalMode = await this.probeProtocolV2NormalMode(currentDeviceInfo);
             if (
               isNormalMode &&
+              !hasStaleP2Version(currentDeviceInfo) &&
               (installEvidenceObserved ||
-                this.hasProtocolV2InstallVersionChanged(expectedTargetIds))
+                this.hasProtocolV2InstallVersionChanged(expectedTargetIds, currentDeviceInfo))
             ) {
               Log.log(
                 '[FirmwareUpdateV4] empty firmware status after confirmed App reboot; update complete'
@@ -2795,33 +2885,30 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             }
           }
         } catch (error) {
-          if (isProtocolV2TerminalInstallStatusError(error)) {
+          if (
+            this.isProtocolV2ReconnectIdentityError(error) ||
+            isProtocolV2TerminalInstallStatusError(error)
+          ) {
             throw error;
           }
-          // App firmware does not register DeviceFirmwareUpdateStatusGet. Treat the
-          // missing endpoint as completion only after the runtime probe confirms App mode.
+          // Some firmware builds do not expose install status. Require a fresh runtime
+          // probe and current-install evidence or changed versions before accepting completion.
           if (isProtocolV2FirmwareStatusEndpointUnavailable(error)) {
-            if (!currentDeviceInfo) {
-              if (!bleInstallLinkReady) {
-                throw ERRORS.TypedError(
-                  HardwareErrorCode.RuntimeError,
-                  'Protocol V2 device identity is unavailable during install polling'
-                );
-              }
-              deviceInfo = await this.verifyProtocolV2ReconnectIdentity();
-            }
-            const reconnectDeviceInfo = currentDeviceInfo ?? deviceInfo;
-            if (!reconnectDeviceInfo) {
+            if (!currentDeviceInfo && !bleInstallLinkReady && !isFinalStatusCheck) {
               throw ERRORS.TypedError(
                 HardwareErrorCode.RuntimeError,
                 'Protocol V2 device identity is unavailable during install polling'
               );
             }
-            const isNormalMode = await this.probeProtocolV2NormalMode(reconnectDeviceInfo);
+            deviceInfo = await this.verifyProtocolV2ReconnectIdentity(
+              PROTOCOL_V2_VERSIONS_DEVICE_INFO_REQUEST
+            );
+            const isNormalMode = await this.probeProtocolV2NormalMode(deviceInfo);
             if (
               isNormalMode &&
+              !hasStaleP2Version(deviceInfo) &&
               (installEvidenceObserved ||
-                this.hasProtocolV2InstallVersionChanged(expectedTargetIds))
+                this.hasProtocolV2InstallVersionChanged(expectedTargetIds, deviceInfo))
             ) {
               Log.log(
                 '[FirmwareUpdateV4] firmware status endpoint unavailable after confirmed App reboot'
@@ -2871,6 +2958,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         bleInstallLinkReady = false;
         Log.log('Protocol V2 firmware install device readiness probe failed: ', error);
       }
+      if (isFinalStatusCheck) break;
       await wait(1000);
     }
 
@@ -2909,7 +2997,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async probeProtocolV2NormalMode(deviceInfo: ProtocolV2DeviceInfo) {
     const features = await this.device.probeProtocolV2RuntimeState(
       deviceInfo,
-      PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
+      PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT,
+      { forceRuntimeContextRefresh: true }
     );
     this.protocolV2LastRuntimeProbeFeatures = features;
     return this.isProtocolV2ApplicationMode(features);
@@ -3132,6 +3221,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     progress: number | null
   ): Promise<TypedResponseMessage<'FilesystemFile'>> {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const env = DataManager.getSettings('env');
     const writeRes = await typedCall(
       'FilesystemFileWrite',
       'FilesystemFile',
@@ -3147,6 +3237,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         ui_percentage: progress ?? undefined,
       },
       {
+        timeoutMs: env === 'react-native' ? PROTOCOL_V2_FILE_WRITE_RESPONSE_TIMEOUT : undefined,
         writeWithResponse: false,
         onWriteCompleted: () => undefined,
       }

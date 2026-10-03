@@ -15,7 +15,11 @@ import * as check from '../../utils/highlevel-checks';
 import { LogBlockCommand } from '../../utils/logBlockCommand';
 
 import type { Root } from 'protobufjs/light';
-import type { MessageFromOneKey, TransportWriteMetrics } from '../../types';
+import type {
+  MessageFromOneKey,
+  ProtocolV2FileWritePipeline,
+  TransportWriteMetrics,
+} from '../../types';
 
 export * from './errors';
 
@@ -28,6 +32,7 @@ export type ProtocolV2CallContext = {
   messageName: string;
   timeoutMs?: number;
   highThroughput: boolean;
+  flowControlled?: boolean;
   writeWithResponse?: boolean;
   generation: number;
   signal: AbortSignal;
@@ -62,6 +67,7 @@ export type ProtocolV2CallOptions = {
   returnAfterWrite?: boolean;
   onResponseAfterWrite?: (response: MessageFromOneKey) => void;
   writeWithResponse?: boolean;
+  fileWritePipeline?: ProtocolV2FileWritePipeline;
 };
 
 export { concatUint8Arrays, ProtocolV2FrameAssembler };
@@ -298,6 +304,9 @@ export class ProtocolV2Session {
     data: Record<string, unknown>,
     callOptions: ProtocolV2CallOptions
   ): Promise<MessageFromOneKey> {
+    if (callOptions.fileWritePipeline) {
+      return this.executeFileWritePipeline(name, data, callOptions);
+    }
     const {
       schemas,
       router,
@@ -485,6 +494,216 @@ export class ProtocolV2Session {
         abortController.abort();
       }
     );
+  }
+
+  private async executeFileWritePipeline(
+    name: string,
+    data: Record<string, unknown>,
+    callOptions: ProtocolV2CallOptions
+  ): Promise<MessageFromOneKey> {
+    if (name !== 'FilesystemFileWrite' || !callOptions.fileWritePipeline) {
+      throw new ProtocolV2LinkError('frame', 'File write pipeline requires FilesystemFileWrite');
+    }
+    const {
+      schemas,
+      router,
+      packetSrc = PROTOCOL_V2_PACKET_SRC_COMMAND,
+      maxFrameBytes,
+      prepareCall,
+      writeFrame,
+      readFrame,
+      logger,
+      logPrefix = 'ProtocolV2',
+      createTimeoutError,
+      generation = 0,
+    } = this.options;
+    const timeoutMs = callOptions.timeoutMs ?? PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS;
+    const abortController = new AbortController();
+    const context: ProtocolV2CallContext = {
+      messageName: name,
+      timeoutMs,
+      highThroughput: true,
+      writeWithResponse: callOptions.writeWithResponse,
+      generation,
+      signal: abortController.signal,
+    };
+    const timeoutError = () =>
+      createTimeoutError
+        ? createTimeoutError(name, timeoutMs)
+        : new ProtocolV2LinkError(
+            'response-timeout',
+            `File write response timeout after ${timeoutMs}ms`
+          );
+    const pending: Array<{ offset: number; end: number; path: string; sentAt: number }> = [];
+    const sentSequences = new Set<number>();
+    let nextRequest: Record<string, unknown> | undefined = data;
+    let nextOffset: number | undefined;
+    let path: string | undefined;
+    let totalSize: number | undefined;
+    let sourceExhausted = false;
+    let lastResponse: MessageFromOneKey | undefined;
+    let lastFrameWriteAt = 0;
+    let completedChunks = 0;
+    let frameWriteMs = 0;
+    let frameWriteMaxMs = 0;
+    let responseMs = 0;
+    let responseMaxMs = 0;
+    let receiveWaitMs = 0;
+    let receiveWaitMaxMs = 0;
+    let receiveImmediateCount = 0;
+    let receiveCount = 0;
+    const logProfile = () =>
+      logger?.debug?.(
+        `${logPrefix} FileWrite profile: chunks ${completedChunks}, frame write call ${(
+          frameWriteMs / Math.max(completedChunks, 1)
+        ).toFixed(1)}/${frameWriteMaxMs} ms avg/max, response dequeued after write call ${(
+          responseMs / Math.max(completedChunks, 1)
+        ).toFixed(1)}/${responseMaxMs} ms avg/max, read wait ${(
+          receiveWaitMs / Math.max(receiveCount, 1)
+        ).toFixed(
+          1
+        )}/${receiveWaitMaxMs} ms avg/max (${receiveImmediateCount}/${receiveCount} immediate)`
+      );
+
+    await prepareCall?.(context);
+    const fillWindow = async () => {
+      while (pending.length < 4 && !sourceExhausted) {
+        const request = nextRequest ?? (await callOptions.fileWritePipeline?.next());
+        nextRequest = undefined;
+        if (!request) {
+          sourceExhausted = true;
+          break;
+        }
+        const file = request.file as
+          | {
+              path?: unknown;
+              offset?: unknown;
+              total_size?: unknown;
+              data?: ArrayBuffer | ArrayBufferView;
+            }
+          | undefined;
+        const offset = Number(file?.offset);
+        const size = Number(file?.total_size);
+        const length = file?.data?.byteLength;
+        if (
+          typeof file?.path !== 'string' ||
+          !Number.isSafeInteger(offset) ||
+          offset < 0 ||
+          !Number.isSafeInteger(size) ||
+          !Number.isSafeInteger(length) ||
+          !length ||
+          offset + length > size ||
+          (nextOffset === undefined && offset !== 0) ||
+          (nextOffset !== undefined && offset !== nextOffset) ||
+          (path !== undefined && file.path !== path) ||
+          (totalSize !== undefined && size !== totalSize)
+        ) {
+          throw new ProtocolV2LinkError('frame', 'File write pipeline has invalid chunk order');
+        }
+        path = file.path;
+        totalSize = size;
+        nextOffset = offset + length;
+        const seq = this.sequenceCursor.next();
+        const frame = ProtocolV2.encodeFrame(schemas, name, request, {
+          packetSrc,
+          router,
+          seq,
+        });
+        if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
+          throw new ProtocolV2LinkError('frame', `File write frame too large: ${frame.length}`);
+        }
+        // Give the BLE-to-UART queue one connection interval to drain between frames.
+        const frameGapMs = 15 - (Date.now() - lastFrameWriteAt);
+        if (!context.flowControlled && lastFrameWriteAt > 0 && frameGapMs > 0) {
+          await new Promise<void>(resolve => {
+            setTimeout(resolve, frameGapMs);
+          });
+        }
+        const writeStartedAt = Date.now();
+        await withProtocolTimeout(
+          this.serializeWrite(() => writeFrame(frame, context)),
+          timeoutMs,
+          timeoutError,
+          () => abortController.abort()
+        );
+        lastFrameWriteAt = Date.now();
+        const writeElapsedMs = lastFrameWriteAt - writeStartedAt;
+        frameWriteMs += writeElapsedMs;
+        frameWriteMaxMs = Math.max(frameWriteMaxMs, writeElapsedMs);
+        sentSequences.add(seq);
+        pending.push({ offset, end: nextOffset, path, sentAt: lastFrameWriteAt });
+      }
+    };
+
+    await fillWindow();
+    while (pending.length > 0) {
+      const receiveStartedAt = Date.now();
+      const frame = await withProtocolTimeout(readFrame(context), timeoutMs, timeoutError, () =>
+        abortController.abort()
+      );
+      const receiveElapsedMs = Date.now() - receiveStartedAt;
+      receiveWaitMs += receiveElapsedMs;
+      receiveWaitMaxMs = Math.max(receiveWaitMaxMs, receiveElapsedMs);
+      receiveCount++;
+      if (receiveElapsedMs <= 1) receiveImmediateCount++;
+      let header: ReturnType<typeof ProtocolV2.inspectFrameHeader>;
+      try {
+        header = ProtocolV2.inspectFrameHeader(frame);
+      } catch (error) {
+        throw new ProtocolV2LinkError('frame', 'Invalid file write response frame', error);
+      }
+      if (header.router !== router || header.packetSrc !== packetSrc) {
+        throw new ProtocolV2LinkError('frame', 'File write response route mismatch');
+      }
+      if (ProtocolV2.isAckFrame(frame)) {
+        if (!sentSequences.has(header.seq)) {
+          throw new ProtocolV2LinkError('ack-sequence', 'Unexpected file write ACK sequence');
+        }
+      } else {
+        const decoded = ProtocolV2.decodeFrame(schemas, frame);
+        if (this.lastResponseSequence === decoded.seq) {
+          throw new ProtocolV2LinkError(
+            'response-sequence',
+            'Duplicate file write response sequence'
+          );
+        }
+        this.lastResponseSequence = decoded.seq;
+        const response = check.call(decoded);
+        const acknowledgedEnd = Number(response.message.processed_byte);
+        const expected = pending[0];
+        if (
+          !expected ||
+          expected.end !== acknowledgedEnd ||
+          response.type !== 'FilesystemFile' ||
+          response.message.path !== expected.path ||
+          Number(response.message.offset) !== expected.offset ||
+          Number(response.message.total_size) !== totalSize
+        ) {
+          throw new ProtocolV2LinkError(
+            'frame',
+            `File write response does not match pending chunk: expected ${expected?.offset}-${
+              expected?.end
+            }, got ${response.type} ${String(response.message.offset)}-${String(
+              response.message.processed_byte
+            )} ${String(response.message.message ?? '')}`
+          );
+        }
+        pending.shift();
+        const responseElapsedMs = Date.now() - expected.sentAt;
+        responseMs += responseElapsedMs;
+        responseMaxMs = Math.max(responseMaxMs, responseElapsedMs);
+        completedChunks++;
+        if (completedChunks % 512 === 0) logProfile();
+        callOptions.fileWritePipeline.onResponse(response);
+        lastResponse = response;
+        await fillWindow();
+      }
+    }
+    if (!sourceExhausted || !lastResponse || nextOffset !== totalSize) {
+      throw new ProtocolV2LinkError('frame', 'File write pipeline ended without confirmation');
+    }
+    logProfile();
+    return lastResponse;
   }
 }
 

@@ -1429,6 +1429,7 @@ export async function runFirmwareUpdateV4WithRetry({
   retries?: number;
 }) {
   const totalBytes = getFirmwareUpdateV4TotalBytes(params);
+  let progressTotalBytes = 0;
   const maxAttempts = Math.max((retries ?? 2) + 1, 1);
   let currentSdk = sdk;
   let retried = false;
@@ -1498,6 +1499,10 @@ export async function runFirmwareUpdateV4WithRetry({
     if (!Number.isFinite(progress)) return;
 
     if (payload.progressType === 'transferData') {
+      const reportedTotalBytes = Number(payload.totalBytes);
+      if (Number.isFinite(reportedTotalBytes) && reportedTotalBytes > 0) {
+        progressTotalBytes = reportedTotalBytes;
+      }
       progressEvents += 1;
       lastProgress = Math.max(lastProgress, progress);
       transferStartedAt ??= Date.now();
@@ -1543,7 +1548,7 @@ export async function runFirmwareUpdateV4WithRetry({
   const metrics = buildFirmwareUpdateV4Metrics({
     attempt,
     maxAttempts,
-    totalBytes,
+    totalBytes: progressTotalBytes || totalBytes,
     totalStartedAt,
     transferStartedAt,
     transferEndedAt,

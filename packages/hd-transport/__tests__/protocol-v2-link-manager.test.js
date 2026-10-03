@@ -34,11 +34,29 @@ const protocolV2Messages = parseConfigure({
         message: { type: 'string', id: 1 },
       },
     },
+    FilesystemFile: {
+      fields: {
+        path: { type: 'string', id: 1 },
+        offset: { type: 'uint32', id: 2 },
+        total_size: { type: 'uint32', id: 3 },
+        data: { type: 'bytes', id: 4 },
+        processed_byte: { type: 'uint32', id: 6 },
+      },
+    },
+    FilesystemFileWrite: {
+      fields: {
+        file: { type: 'FilesystemFile', id: 1 },
+        overwrite: { type: 'bool', id: 2 },
+        append: { type: 'bool', id: 3 },
+      },
+    },
     MessageType: {
       values: {
         MessageType_Ping: 60206,
         MessageType_Success: 60207,
         MessageType_Cancel: 60004,
+        MessageType_FilesystemFile: 60803,
+        MessageType_FilesystemFileWrite: 60805,
       },
     },
   },
@@ -90,6 +108,98 @@ const createAdapterFactory = sentSeqs => {
 };
 
 describe('ProtocolV2LinkManager', () => {
+  test('accepts per-chunk replies in a file write pipeline', async () => {
+    const writes = [];
+    const reads = [];
+    const confirmed = [];
+    const chunks = [0, 2, 4].map(offset => ({
+      file: {
+        path: 'vol0:/test.okpkg',
+        offset,
+        total_size: 6,
+        data: new Uint8Array([offset, offset + 1]),
+      },
+      overwrite: offset === 0,
+      append: false,
+    }));
+    const adapter = {
+      router: 1,
+      generation: 1,
+      prepareCall: jest.fn(),
+      writeFrame: jest.fn(frame => {
+        writes.push(frame);
+        return Promise.resolve();
+      }),
+      readFrame: jest.fn(() => {
+        reads.push(writes.length);
+        const offset = (reads.length - 1) * 2;
+        return Promise.resolve(
+          ProtocolV2.encodeFrame(
+            schemas,
+            'FilesystemFile',
+            { path: 'vol0:/test.okpkg', offset, total_size: 6, processed_byte: offset + 2 },
+            { router: 1, packetSrc: 0, seq: reads.length }
+          )
+        );
+      }),
+      reset: jest.fn(),
+    };
+    const manager = new ProtocolV2LinkManager({
+      getSchemas: () => schemas,
+      classifyError: () => 'link-fatal',
+    });
+    const result = await manager.call('device-a', () => adapter, 'FilesystemFileWrite', chunks[0], {
+      fileWritePipeline: {
+        next: jest.fn().mockResolvedValueOnce(chunks[1]).mockResolvedValueOnce(chunks[2]),
+        onResponse: response => confirmed.push(response.message.processed_byte),
+      },
+    });
+
+    expect(reads).toEqual([3, 3, 3]);
+    expect(confirmed).toEqual([2, 4, 6]);
+    expect(result.message.processed_byte).toBe(6);
+    expect(adapter.reset).not.toHaveBeenCalled();
+  });
+
+  test('invalidates a file write pipeline on a mismatched offset', async () => {
+    const adapter = {
+      router: 1,
+      generation: 1,
+      prepareCall: jest.fn(),
+      writeFrame: jest.fn(() => Promise.resolve()),
+      readFrame: jest.fn(() =>
+        Promise.resolve(
+          ProtocolV2.encodeFrame(
+            schemas,
+            'FilesystemFile',
+            { path: 'vol0:/test.okpkg', offset: 0, total_size: 4, processed_byte: 3 },
+            { router: 1, packetSrc: 0, seq: 1 }
+          )
+        )
+      ),
+      reset: jest.fn(() => Promise.resolve()),
+    };
+    const manager = new ProtocolV2LinkManager({
+      getSchemas: () => schemas,
+      classifyError: () => 'link-fatal',
+    });
+    const chunk = offset => ({
+      file: { path: 'vol0:/test.okpkg', offset, total_size: 4, data: new Uint8Array(2) },
+      overwrite: offset === 0,
+      append: false,
+    });
+
+    await expect(
+      manager.call('device-a', () => adapter, 'FilesystemFileWrite', chunk(0), {
+        fileWritePipeline: {
+          next: jest.fn().mockResolvedValueOnce(chunk(2)).mockResolvedValueOnce(undefined),
+          onResponse: jest.fn(),
+        },
+      })
+    ).rejects.toThrow('does not match pending chunk');
+    expect(adapter.reset).toHaveBeenCalled();
+  });
+
   test('retains the device sequence cursor when an active link is rebuilt', async () => {
     const sentSeqs = [];
     const { adapters, createAdapter } = createAdapterFactory(sentSeqs);
