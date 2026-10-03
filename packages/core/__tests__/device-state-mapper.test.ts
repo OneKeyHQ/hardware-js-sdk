@@ -160,8 +160,8 @@ describe('DeviceStateMapper', () => {
     expect(patch.status?.unlocked).toBeNull();
   });
 
-  test.each([undefined, { version: '1.0.2' }])(
-    'clears a cached loader P2 version when normal firmware reports P1',
+  test.each([undefined, { version: '1.0.2', build_id: 'old-p2', hash: [0x01, 0x02] }])(
+    'clears cached loader P2 version and verification when normal firmware reports P1',
     applicationData => {
       const patch = mapProtocolV2DeviceInfoToState(
         {
@@ -176,6 +176,10 @@ describe('DeviceStateMapper', () => {
       expect(patch.versions).toMatchObject({
         applicationP1: '1.0.3',
         applicationP2: null,
+      });
+      expect(patch.verification).toMatchObject({
+        applicationP2BuildId: null,
+        applicationP2Hash: null,
       });
     }
   );
