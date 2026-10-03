@@ -92,7 +92,7 @@ const PROTOCOL_V2_FINAL_RECONNECT_TIMEOUT = 3 * 60 * 1000;
 const PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT = 5 * 1000;
 const PROTOCOL_V2_FIRMWARE_STATUS_RESPONSE_TIMEOUT = 15 * 1000;
 // React Native invalidates a timed-out BLE link, and V4 can safely replay the staging file.
-const PROTOCOL_V2_FILE_WRITE_RESPONSE_TIMEOUT = 30 * 1000;
+const PROTOCOL_V2_FILE_WRITE_RESPONSE_TIMEOUT = 10 * 1000;
 const PROTOCOL_V2_INSTALL_TIMEOUT = 10 * 60 * 1000;
 const PROTOCOL_V2_INSTALL_STATUS_INITIAL_DELAY = 1000;
 const PROTOCOL_V2_INSTALL_FINISHED_AFTER_DISCONNECT_POLLS = 4;
@@ -1388,7 +1388,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       app_v1: features
         ? getDeviceFirmwareVersion(features).join('.')
         : deviceInfo?.main_mcu?.application?.version,
-      app_v2: deviceInfo?.main_mcu?.application_data?.version,
+      // Production boot verifies P2 against P1 before normal firmware can run.
+      app_v2:
+        features?.mode === 'normal'
+          ? getDeviceFirmwareVersion(features).join('.')
+          : deviceInfo?.main_mcu?.application_data?.version,
       coprocessor: features ? getDeviceBLEFirmwareVersion(features).join('.') : undefined,
       se01: features?.se01Version ?? undefined,
       se02: features?.se02Version ?? undefined,
@@ -2531,7 +2535,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     );
     const applicationVersion = getDeviceFirmwareVersion(features).join('.');
     versions.set(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1, applicationVersion);
-    const applicationP2Version = deviceInfo?.main_mcu?.application_data?.version;
+    const applicationP2Version =
+      features.mode === 'normal'
+        ? applicationVersion
+        : deviceInfo?.main_mcu?.application_data?.version;
     if (applicationP2Version) {
       versions.set(
         ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2,
@@ -2563,9 +2570,23 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       this.protocolV2LastRuntimeProbeFeatures,
       deviceInfo
     );
+    const p1TargetId = ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1;
+    const p2TargetId = ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2;
     return (
       expectedTargetIds.size > 0 &&
       Array.from(expectedTargetIds).every(targetId => {
+        if (targetId === p2TargetId && this.protocolV2LastRuntimeProbeFeatures?.mode === 'normal') {
+          // P1 must change in this install; a pre-existing P1 version cannot prove a P2-only update.
+          if (!expectedTargetIds.has(p1TargetId)) return false;
+          const previousP1Version = this.protocolV2InstallBaselineVersions.get(p1TargetId);
+          const currentP1Version = currentVersions.get(p1TargetId);
+          return (
+            previousP1Version !== undefined &&
+            currentP1Version !== undefined &&
+            previousP1Version !== currentP1Version &&
+            currentP1Version === this.params?.expectedTargetVersions?.app_v2
+          );
+        }
         const previousVersion = this.protocolV2InstallBaselineVersions.get(targetId);
         const currentVersion = currentVersions.get(targetId);
         return (
@@ -2587,14 +2608,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ) {
     const expectedTargetIds = new Set(targets.map(target => target.target_id));
     const expectedPaths = new Map(targets.map(target => [target.target_id, target.path]));
-    const hasStaleP2Version = (info: ProtocolV2DeviceInfo) => {
-      if (!expectedTargetIds.has(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2)) {
-        return false;
-      }
-      const expectedP2Version = this.params?.expectedTargetVersions?.app_v2;
-      const currentP2Version = info.main_mcu?.application_data?.version;
-      return !!expectedP2Version && !!currentP2Version && currentP2Version !== expectedP2Version;
-    };
     const isBleInstall = this.isBleReconnect();
     const startTime = Date.now();
     let lastError: unknown;
@@ -2802,7 +2815,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             const isNormalMode = await this.probeProtocolV2NormalMode(currentDeviceInfo);
             if (
               isNormalMode &&
-              !hasStaleP2Version(currentDeviceInfo) &&
               (installEvidenceObserved ||
                 this.hasProtocolV2InstallVersionChanged(expectedTargetIds, currentDeviceInfo))
             ) {
@@ -2855,7 +2867,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             const isNormalMode = await this.probeProtocolV2NormalMode(deviceInfo);
             if (
               isNormalMode &&
-              !hasStaleP2Version(deviceInfo) &&
               (installEvidenceObserved ||
                 this.hasProtocolV2InstallVersionChanged(expectedTargetIds, deviceInfo))
             ) {
