@@ -37,10 +37,35 @@ type NoblePendingReceiver = {
   reject: (error: Error) => void;
 };
 
+type NoblePendingCredit = {
+  resolve: () => void;
+  reject: (error: Error) => void;
+};
+
 type NobleNotificationState = {
   generation: number;
   queue: string[];
   pendingReceivers: Set<NoblePendingReceiver>;
+  flowCredits: number;
+  flowStarted: boolean;
+  flowError?: Error;
+  flowStartPromise?: Promise<void>;
+  flowStartResolve?: () => void;
+  flowStartReject?: (error: Error) => void;
+  flowStartTimer?: NodeJS.Timeout;
+  flowWaiters: Set<NoblePendingCredit>;
+  flowLastLoggedAt: number;
+  flowCreditWaitMs: number;
+  flowCreditWaitCount: number;
+  flowCreditImmediateCount: number;
+  flowCreditWaitMaxMs: number;
+  flowCreditWaitOver15Ms: number;
+  flowCreditWaitOver30Ms: number;
+  flowGrantCount: number;
+  flowGrantedSlots: number;
+  flowWriteMs: number;
+  flowWriteCount: number;
+  flowWriteBytes: number;
 };
 
 type NobleDisconnectListener = {
@@ -62,6 +87,10 @@ const BLE_PACKET_SIZE_FALLBACK = 192;
 const BLE_PACKET_SIZE_MAX = 244;
 const ATT_WRITE_HEADER_SIZE = 3;
 const BLE_ENCRYPTION_ERROR_PATTERNS = [/encryption is insufficient/i, /insufficient encryption/i];
+const FLOW_HELLO = Buffer.from([0x7e, 0x4f, 0x4b, 0x46, 0x43, 1]);
+const FLOW_CREDIT_PREFIX = Buffer.from([0x7f, 0x4f, 0x4b, 0x46, 0x43, 1]);
+const FLOW_CREDIT_PACKET_LENGTH = 42;
+const FLOW_START_TIMEOUT_MS = 5000;
 
 export function resolveNobleProtocolV2PacketCapacity(
   mtu: number | null | undefined,
@@ -104,6 +133,77 @@ function enqueueNotification(deviceId: string, generation: number, data: Buffer)
   const state = notificationStates.get(deviceId);
   if (!state || state.generation !== generation) return;
 
+  if (
+    data.length === FLOW_CREDIT_PACKET_LENGTH &&
+    data.subarray(0, FLOW_CREDIT_PREFIX.length).equals(FLOW_CREDIT_PREFIX)
+  ) {
+    const grant = data[6];
+    const status = data[7];
+    if (status !== 0) {
+      const error = new Error(
+        `BLE stream flow stopped: status ${status}, scheduler drops ${data.readUInt16LE(
+          14
+        )}, UART failures ${data.readUInt16LE(16)}, replies queued/sent ${data.readUInt16LE(
+          22
+        )}/${data.readUInt16LE(24)}, reply busy/invalid/full ${data.readUInt16LE(
+          26
+        )}/${data.readUInt16LE(28)}/${data.readUInt16LE(30)}, queue peak/depth ${data[32]}/${
+          data[33]
+        }, main credit ${data.readUInt16LE(34)}, granted/in-flight ${data[36]}/${data[37]}`
+      );
+      state.flowError = error;
+      if (state.flowStartTimer) clearTimeout(state.flowStartTimer);
+      state.flowStartReject?.(error);
+      state.flowWaiters.forEach(waiter => waiter.reject(error));
+      state.flowWaiters.clear();
+      state.flowCredits = 0;
+      return;
+    }
+    state.flowCredits += grant;
+    if (grant > 0) {
+      state.flowGrantCount++;
+      state.flowGrantedSlots += grant;
+    }
+    if (grant > 0 && !state.flowStarted) {
+      state.flowStarted = true;
+      if (state.flowStartTimer) clearTimeout(state.flowStartTimer);
+      state.flowStartResolve?.();
+    }
+    while (state.flowCredits > 0 && state.flowWaiters.size > 0) {
+      const [waiter] = state.flowWaiters;
+      state.flowWaiters.delete(waiter);
+      state.flowCredits--;
+      waiter.resolve();
+    }
+    const now = Date.now();
+    if (state.flowLastLoggedAt === 0 || now - state.flowLastLoggedAt >= 10_000) {
+      state.flowLastLoggedAt = now;
+      const intervalMs = (data.readUInt16LE(8) * 1.25).toFixed(2);
+      const dataLength = data.readUInt16LE(12);
+      const schedulerDrops = data.readUInt16LE(14);
+      const uartFailures = data.readUInt16LE(16);
+      const uartAverageMs = data.readUInt16LE(18);
+      const uartMaxMs = data.readUInt16LE(20);
+      const replyQueued = data.readUInt16LE(22);
+      const replySent = data.readUInt16LE(24);
+      const replyResourceWaits = data.readUInt16LE(26);
+      const replyInvalidState = data.readUInt16LE(28);
+      const replyQueueFull = data.readUInt16LE(30);
+      const mainCredit = data.readUInt16LE(34);
+      const uartPackets = data.readUInt32LE(38);
+      const creditWaitMs = state.flowCreditWaitCount
+        ? (state.flowCreditWaitMs / state.flowCreditWaitCount).toFixed(1)
+        : '0';
+      const writeMs = state.flowWriteCount
+        ? (state.flowWriteMs / state.flowWriteCount).toFixed(3)
+        : '0';
+      process.stderr.write(
+        `[onekey-hw] BLE stream: PHY ${data[10]}/${data[11]}, interval ${intervalMs} ms, DLE ${dataLength}, credit wait ${creditWaitMs}/${state.flowCreditWaitMaxMs} ms avg/max (${state.flowCreditWaitCount} waited, ${state.flowCreditImmediateCount} immediate, >15/>30 ms ${state.flowCreditWaitOver15Ms}/${state.flowCreditWaitOver30Ms}), grants ${state.flowGrantedSlots}/${state.flowGrantCount} slots/notifications, Mac write API ${writeMs} ms, UART ${uartAverageMs}/${uartMaxMs} ms avg/max, drops ${schedulerDrops}/${uartFailures}, replies ${replyQueued}/${replySent} queued/sent, busy ${replyResourceWaits}, invalid ${replyInvalidState}, full ${replyQueueFull}, peak ${data[32]}, depth ${data[33]}, packets Mac/UART ${state.flowWriteCount}/${uartPackets}, Mac bytes ${state.flowWriteBytes}, main credit ${mainCredit}, slots ${data[36]}/${data[37]} granted/in-flight\n`
+      );
+    }
+    return;
+  }
+
   const hex = data.toString('hex');
   const [receiver] = state.pendingReceivers;
   if (receiver) {
@@ -127,6 +227,21 @@ function createNotificationState(deviceId: string) {
     generation,
     queue: [],
     pendingReceivers: new Set(),
+    flowCredits: 0,
+    flowStarted: false,
+    flowWaiters: new Set(),
+    flowLastLoggedAt: 0,
+    flowCreditWaitMs: 0,
+    flowCreditWaitCount: 0,
+    flowCreditImmediateCount: 0,
+    flowCreditWaitMaxMs: 0,
+    flowCreditWaitOver15Ms: 0,
+    flowCreditWaitOver30Ms: 0,
+    flowGrantCount: 0,
+    flowGrantedSlots: 0,
+    flowWriteMs: 0,
+    flowWriteCount: 0,
+    flowWriteBytes: 0,
   };
   notificationStates.set(deviceId, state);
   return state;
@@ -139,6 +254,10 @@ function clearNotificationState(deviceId: string, reason: string | Error) {
   notificationStates.delete(deviceId);
   const error = reason instanceof Error ? reason : new Error(reason);
   state.pendingReceivers.forEach(receiver => receiver.reject(error));
+  state.flowStartReject?.(error);
+  if (state.flowStartTimer) clearTimeout(state.flowStartTimer);
+  state.flowWaiters.forEach(waiter => waiter.reject(error));
+  state.flowWaiters.clear();
   state.pendingReceivers.clear();
   state.queue.length = 0;
 }
@@ -501,6 +620,57 @@ export function createNobleBlePlugin(): LowlevelTransportSharedPlugin {
       return resolveNobleProtocolV2PacketCapacity(connectedDevices.get(uuid)?.mtu);
     },
 
+    async startProtocolV2FlowControl(uuid: string) {
+      const state = notificationStates.get(uuid);
+      const characteristics = deviceCharacteristics.get(uuid);
+      if (!state || !characteristics) {
+        throw new Error(`BLE stream device is not connected: ${uuid}`);
+      }
+      if (state.flowStarted) return;
+      if (state.flowStartPromise) return state.flowStartPromise;
+
+      state.flowStartPromise = new Promise<void>((resolve, reject) => {
+        state.flowStartResolve = resolve;
+        state.flowStartReject = reject;
+        state.flowStartTimer = setTimeout(
+          () => reject(new Error('BLE stream credit handshake timed out')),
+          FLOW_START_TIMEOUT_MS
+        );
+      });
+      try {
+        await writeCharacteristic(characteristics.write, FLOW_HELLO, true);
+      } catch (error) {
+        state.flowStartReject?.(error instanceof Error ? error : new Error(String(error)));
+      }
+      return state.flowStartPromise;
+    },
+
+    async takeProtocolV2FlowCredit(uuid: string) {
+      const state = notificationStates.get(uuid);
+      if (!state || !state.flowStarted) return;
+      if (state.flowError) throw state.flowError;
+      if (state.flowCredits > 0) {
+        state.flowCredits--;
+        state.flowCreditImmediateCount++;
+        return;
+      }
+      const startedAt = Date.now();
+      return new Promise<void>((resolve, reject) => {
+        state.flowWaiters.add({
+          resolve: () => {
+            const waitMs = Date.now() - startedAt;
+            state.flowCreditWaitMs += waitMs;
+            state.flowCreditWaitCount++;
+            state.flowCreditWaitMaxMs = Math.max(state.flowCreditWaitMaxMs, waitMs);
+            if (waitMs > 15) state.flowCreditWaitOver15Ms++;
+            if (waitMs > 30) state.flowCreditWaitOver30Ms++;
+            resolve();
+          },
+          reject,
+        });
+      });
+    },
+
     async send(uuid: string, data: string, options?: { withoutResponse?: boolean }) {
       const characteristics = deviceCharacteristics.get(uuid);
       if (!characteristics) {
@@ -513,9 +683,16 @@ export function createNobleBlePlugin(): LowlevelTransportSharedPlugin {
       const buffer = Buffer.from(data, 'hex');
       const withoutResponse = options?.withoutResponse ?? true;
       const packetCapacity = resolveNobleProtocolV2PacketCapacity(connectedDevices.get(uuid)?.mtu);
+      const flowState = notificationStates.get(uuid);
       for (let offset = 0; offset < buffer.length; offset += packetCapacity) {
         const chunk = buffer.subarray(offset, Math.min(offset + packetCapacity, buffer.length));
+        const startedAt = flowState?.flowStarted ? performance.now() : 0;
         await writeCharacteristic(characteristics.write, chunk, withoutResponse);
+        if (startedAt && flowState) {
+          flowState.flowWriteMs += performance.now() - startedAt;
+          flowState.flowWriteCount++;
+          flowState.flowWriteBytes += chunk.length;
+        }
       }
     },
 

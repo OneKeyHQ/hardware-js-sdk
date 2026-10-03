@@ -566,7 +566,10 @@ export default class LowlevelTransport {
       assertActive: assertCurrentGeneration,
       signal: context.signal,
       abortMessage: `Protocol V2 BLE write aborted for ${context.messageName}`,
-      writePacket: packet => this.plugin.send(uuid, bytesToHex(packet)),
+      writePacket: async packet => {
+        await this.plugin.takeProtocolV2FlowCredit?.(uuid);
+        await this.plugin.send(uuid, bytesToHex(packet));
+      },
     });
   }
 
@@ -622,9 +625,13 @@ export default class LowlevelTransport {
       router: PROTOCOL_V2_CHANNEL_BLE_UART,
       maxFrameBytes: PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
       generation,
-      prepareCall: () => {
+      prepareCall: async (context: ProtocolV2CallContext) => {
         assertCurrentGeneration();
         this.protocolV2Assemblers.get(uuid)?.reset();
+        if (context.highThroughput && context.messageName === 'FilesystemFileWrite') {
+          await this.plugin.startProtocolV2FlowControl?.(uuid);
+          context.flowControlled = Boolean(this.plugin.startProtocolV2FlowControl);
+        }
       },
       writeFrame: (frame: Uint8Array, context: ProtocolV2CallContext) =>
         this.writeProtocolV2Frame(uuid, frame, context, assertCurrentGeneration),

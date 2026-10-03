@@ -326,6 +326,53 @@ describe('Noble BLE plugin notification routing', () => {
     ]);
   });
 
+  test('waits for BLE stream credits and replenishes them from notifications', async () => {
+    const device = createPeripheral('device-a');
+    const noble = new EventEmitter() as EventEmitter & {
+      state: string;
+      startScanning: jest.Mock;
+      stopScanning: jest.Mock;
+    };
+    noble.state = 'poweredOn';
+    noble.startScanning = jest.fn((_services, _duplicates, callback) => {
+      callback?.();
+      noble.emit('discover', device.peripheral);
+    });
+    noble.stopScanning = jest.fn(callback => callback?.());
+    jest.doMock('@stoprocent/noble', () => noble);
+
+    const { createNobleBlePlugin } = await import('../transports/nobleBlePlugin');
+    const plugin = createNobleBlePlugin();
+    await plugin.init();
+    await plugin.connect('device-a');
+
+    const started = plugin.startProtocolV2FlowControl?.('device-a');
+    await Promise.resolve();
+    expect(device.write.write.mock.calls[0][0]).toEqual(
+      Buffer.from([0x7e, 0x4f, 0x4b, 0x46, 0x43, 1])
+    );
+    const credit = Buffer.alloc(42);
+    Buffer.from([0x7f, 0x4f, 0x4b, 0x46, 0x43, 1]).copy(credit);
+    credit[6] = 2;
+    device.notify.emit('data', credit);
+    await started;
+    await plugin.takeProtocolV2FlowCredit?.('device-a');
+    await plugin.takeProtocolV2FlowCredit?.('device-a');
+
+    let thirdResolved = false;
+    const takeCredit = plugin.takeProtocolV2FlowCredit;
+    if (!takeCredit) throw new Error('BLE flow credit is unavailable');
+    const third = takeCredit('device-a').then(() => {
+      thirdResolved = true;
+    });
+    await Promise.resolve();
+    expect(thirdResolved).toBe(false);
+    credit[6] = 1;
+    device.notify.emit('data', credit);
+    await third;
+    expect(thirdResolved).toBe(true);
+  });
+
   test('uses acknowledged writes when requested by firmware upload', async () => {
     const device = createPeripheral('device-a');
     const noble = new EventEmitter() as EventEmitter & {

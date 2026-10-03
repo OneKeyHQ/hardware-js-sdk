@@ -1,3 +1,5 @@
+import { UI_REQUEST } from '@onekeyfe/hd-core';
+
 import { createSDK, disposeSDK } from '../sdk';
 import { program, runFirmwareUpdateV4WithRetry } from '../cli';
 
@@ -96,6 +98,45 @@ describe('firmware-update-v4 CLI command', () => {
     expect(result).toMatchObject({
       success: false,
       payload: { error: transientProbeFailure.payload.error, metrics: { attempt: 1 } },
+    });
+  });
+
+  test('reports resource transfer bytes from progress events', async () => {
+    const sdk = createSdkMock();
+    let now = 0;
+    jest.spyOn(Date, 'now').mockImplementation(() => (now += 1000));
+    sdk.firmwareUpdateV4.mockImplementation(() => {
+      const onUiEvent = sdk.on.mock.calls[0][1];
+      onUiEvent({
+        type: UI_REQUEST.FIRMWARE_PROGRESS,
+        payload: {
+          progressType: 'transferData',
+          progress: 1,
+          transferredBytes: 1024,
+          totalBytes: 2048,
+        },
+      });
+      onUiEvent({
+        type: UI_REQUEST.FIRMWARE_PROGRESS,
+        payload: {
+          progressType: 'transferData',
+          progress: 100,
+          transferredBytes: 2048,
+          totalBytes: 2048,
+        },
+      });
+      return Promise.resolve({ success: true, payload: {} });
+    });
+
+    const result = await runFirmwareUpdateV4WithRetry({
+      sdk: sdk as never,
+      globalOpts: { transport: 'ble', connectId: 'pro2-connect-id' },
+      params: { resourceArchiveBinary: new ArrayBuffer(100) } as never,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      payload: { metrics: { totalBytes: 2048, transferKiBPerSecond: 2 } },
     });
   });
 });

@@ -8914,6 +8914,56 @@ describe('Protocol V2 firmware update targets', () => {
     });
   });
 
+  test('sends BLE firmware chunks in one confirmed file write pipeline', async () => {
+    const env = jest.spyOn(DataManager, 'getSettings').mockReturnValue('lowlevel' as any);
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: { method: 'firmwareUpdateV4', platform: 'desktop' },
+    });
+    const requests: Array<{ file: { offset: number; data: ArrayBuffer }; overwrite: boolean }> = [];
+    const typedCall = jest.fn(async (_name, _resType, first, options) => {
+      const pipeline = options.fileWritePipeline;
+      let request = first;
+      while (request) {
+        requests.push(request);
+        pipeline.onResponse({
+          type: 'FilesystemFile',
+          message: {
+            processed_byte: Number(request.file.offset) + Number(request.file.data.byteLength),
+          },
+        });
+        request = await pipeline.next();
+      }
+      return {
+        type: 'FilesystemFile',
+        message: { processed_byte: 4000 },
+      };
+    });
+    (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
+    method.postProgressMessage = jest.fn();
+    const source = await openFirmwareByteSource({ binary: new Uint8Array(4000).buffer });
+
+    try {
+      await (method as any).protocolV2SourceUpdateProcess({
+        source,
+        filePath: 'vol0:/test.okpkg',
+        processedSize: 0,
+        totalSize: 4000,
+      });
+      expect(typedCall).toHaveBeenCalledTimes(1);
+      expect(requests.map(request => request.file.offset)).toEqual([0, 2560]);
+      expect(requests.map(request => request.overwrite)).toEqual([true, false]);
+      expect(
+        (method.postProgressMessage as jest.Mock).mock.calls.map(
+          ([, , metrics]) => metrics.transferredBytes
+        )
+      ).toEqual([2560, 4000]);
+    } finally {
+      env.mockRestore();
+      await source.close();
+    }
+  });
+
   test('does not retry or wrap a stale BLE bond during a V4 file transfer', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -9560,8 +9610,8 @@ describe('Protocol V2 firmware update targets', () => {
     await source?.close();
 
     const writePayloads = typedCall.mock.calls.map(call => call[2]);
-    expect(writePayloads.map(payload => payload.file.offset)).toEqual([0, 1960]);
-    expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([1960, 1]);
+    expect(writePayloads.map(payload => payload.file.offset)).toEqual([0]);
+    expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([1961]);
   });
 
   test('keeps confirmation active after the Request write until terminal Success arrives', async () => {

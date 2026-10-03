@@ -792,9 +792,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         maxChunkSize = PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE;
       } else {
         // Firmware staging writes tolerate a larger BLE chunk than generic filesystem writes.
-        maxChunkSize = PROTOCOL_V2_FIRMWARE_STAGING_PATHS.has(filePath ?? '')
-          ? PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE
-          : PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
+        maxChunkSize =
+          PROTOCOL_V2_FIRMWARE_STAGING_PATHS.has(filePath ?? '') ||
+          isProtocolV2BootResourcePackagePath(filePath ?? '') ||
+          filePath?.toLowerCase().endsWith('.okpkg')
+            ? PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE
+            : PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
       }
     }
     if (!Number.isFinite(payloadChunkSize) || payloadChunkSize <= 0) {
@@ -2204,58 +2207,106 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
       this.throwIfAborted();
       try {
-        await writeFirmwareByteSource({
-          source,
-          chunkSize: this.getProtocolV2FirmwareChunkSize('write', filePath),
-          write: async ({ data, sourceOffset, length, first }) => {
+        const chunkSize = this.getProtocolV2FirmwareChunkSize('write', filePath);
+        const reportConfirmedChunk = (chunkEnd: number) => {
+          const transferredBytes = processedSize + chunkEnd;
+          const now = Date.now();
+          const elapsedMs = Math.max(now - transferStartedAt, 0);
+          const progress = Math.min(Math.ceil((transferredBytes / totalSize) * 100), 99);
+          const shouldPostProgress =
+            transferredBytes >= this.protocolV2LastTransferredBytes &&
+            (progress !== this.protocolV2LastTransferProgress ||
+              now - this.protocolV2LastTransferProgressAt >=
+                PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS ||
+              chunkEnd === source.size);
+          if (shouldPostProgress) {
+            this.protocolV2LastTransferProgress = progress;
+            this.protocolV2LastTransferProgressAt = now;
+            this.protocolV2LastTransferredBytes = transferredBytes;
+            this.postProgressMessage(progress, 'transferData', {
+              transferredBytes,
+              totalBytes: totalSize,
+              rateBytesPerSecond:
+                elapsedMs > 0 ? Math.round((transferredBytes / elapsedMs) * 1000) : undefined,
+              elapsedMs,
+            });
+          }
+        };
+        const env = DataManager.getSettings('env');
+        if (env && DataManager.isBleConnect(env) && this.params?.platform !== 'native') {
+          let sendOffset = 0;
+          const nextRequest = async () => {
             this.throwIfAborted();
-            const chunkEnd = sourceOffset + length;
-            const deviceProgress = getProtocolV2DeviceTransferProgress(
-              processedSize + sourceOffset,
-              processedSize + chunkEnd,
-              totalSize
-            );
-            const response = await this.fileWriteChunk(
-              filePath,
-              source.size,
-              sourceOffset,
-              data,
-              first,
-              deviceProgress
-            );
-            const rawProcessedByte = response.message.processed_byte;
-            const nextOffset = rawProcessedByte === undefined ? chunkEnd : Number(rawProcessedByte);
-            if (!Number.isFinite(nextOffset) || nextOffset !== chunkEnd) {
-              throw ERRORS.TypedError(
-                HardwareErrorCode.EmmcFileWriteFirmwareError,
-                `invalid processed_byte ${rawProcessedByte} for offset ${sourceOffset}`
+            if (sendOffset >= source.size) return undefined;
+            const offset = sendOffset;
+            const length = Math.min(chunkSize, source.size - offset);
+            const data = await source.readAt(offset, length);
+            sendOffset += length;
+            return {
+              file: { path: filePath, offset, total_size: source.size, data },
+              overwrite: offset === 0,
+              append: false,
+              ui_percentage: getProtocolV2DeviceTransferProgress(
+                processedSize + offset,
+                processedSize + sendOffset,
+                totalSize
+              ),
+            };
+          };
+          const firstRequest = await nextRequest();
+          if (!firstRequest) {
+            throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError);
+          }
+          const response = await this.device
+            .getCommands()
+            .typedCall('FilesystemFileWrite', 'FilesystemFile', firstRequest, {
+              writeWithResponse: false,
+              timeoutMs: 30_000,
+              fileWritePipeline: {
+                next: nextRequest,
+                onResponse: confirmed => {
+                  this.throwIfAborted();
+                  reportConfirmedChunk(Number(confirmed.message.processed_byte));
+                },
+              },
+            });
+          if (Number(response.message.processed_byte) !== source.size) {
+            throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError);
+          }
+        } else {
+          await writeFirmwareByteSource({
+            source,
+            chunkSize,
+            write: async ({ data, sourceOffset, length, first }) => {
+              this.throwIfAborted();
+              const chunkEnd = sourceOffset + length;
+              const deviceProgress = getProtocolV2DeviceTransferProgress(
+                processedSize + sourceOffset,
+                processedSize + chunkEnd,
+                totalSize
               );
-            }
-            const transferredBytes = processedSize + chunkEnd;
-            const now = Date.now();
-            const elapsedMs = Math.max(now - transferStartedAt, 0);
-            const progress = Math.min(Math.ceil((transferredBytes / totalSize) * 100), 99);
-            const shouldPostProgress =
-              transferredBytes >= this.protocolV2LastTransferredBytes &&
-              (progress !== this.protocolV2LastTransferProgress ||
-                now - this.protocolV2LastTransferProgressAt >=
-                  PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS ||
-                chunkEnd === source.size);
-            if (shouldPostProgress) {
-              this.protocolV2LastTransferProgress = progress;
-              this.protocolV2LastTransferProgressAt = now;
-              this.protocolV2LastTransferredBytes = transferredBytes;
-              this.postProgressMessage(progress, 'transferData', {
-                transferredBytes,
-                totalBytes: totalSize,
-                rateBytesPerSecond:
-                  elapsedMs > 0 ? Math.round((transferredBytes / elapsedMs) * 1000) : undefined,
-                elapsedMs,
-              });
-            }
-            return length;
-          },
-        });
+              const response = await this.fileWriteChunk(
+                filePath,
+                source.size,
+                sourceOffset,
+                data,
+                first,
+                deviceProgress
+              );
+              const rawProcessedByte = response.message.processed_byte;
+              const nextOffset =
+                rawProcessedByte === undefined ? chunkEnd : Number(rawProcessedByte);
+              if (!Number.isFinite(nextOffset) || nextOffset !== chunkEnd) {
+                throw ERRORS.TypedError(
+                  HardwareErrorCode.EmmcFileWriteFirmwareError,
+                  `invalid processed_byte ${rawProcessedByte} for offset ${sourceOffset}`
+                );
+              }
+              reportConfirmedChunk(chunkEnd);
+              return length;
+            },
+          });
+        }
         return processedSize + source.size;
       } catch (error) {
         this.throwIfAborted();
