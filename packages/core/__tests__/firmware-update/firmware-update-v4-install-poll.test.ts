@@ -862,10 +862,33 @@ describe('FirmwareUpdateV4 install polling', () => {
       updatedAt: Infinity,
       loaderBeforeUpdate: false,
     },
+    {
+      scenario: 'normal firmware P1 updated while P2 is unobservable',
+      updatedAt: Infinity,
+      p1UpdatedAt: 0,
+      loaderBeforeUpdate: false,
+    },
+    {
+      scenario: 'P2-only install cannot be inferred from an already updated P1',
+      updatedAt: Infinity,
+      p1UpdatedAt: 0,
+      loaderBeforeUpdate: false,
+      p2Only: true,
+    },
+    {
+      scenario: 'normal firmware P1 updated after in-progress status disappears',
+      updatedAt: 3000,
+      p1UpdatedAt: 0,
+      statusInProgressAtStart: true,
+      loaderBeforeUpdate: false,
+    },
   ])(
     'checks fresh versions when BLE status is unavailable: $scenario',
     async ({
       updatedAt,
+      p1UpdatedAt,
+      p2Only,
+      statusInProgressAtStart,
       loaderBeforeUpdate,
       skipReconnect,
       statusUnavailable,
@@ -885,18 +908,32 @@ describe('FirmwareUpdateV4 install polling', () => {
         id: 1,
         payload: { method: 'firmwareUpdateV4', connectId: 'pro2-ble' },
       });
-      const targets = [{ target_id: 5, path: 'vol0:/application_p2.bin' }];
+      const targets = [
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
+        { target_id: 5, path: 'vol0:/application_p2.bin' },
+      ].filter(target => !p2Only || target.target_id === 5);
+      let statusPolls = 0;
       const statusGet = jest.fn().mockImplementation(() => {
         if (statusUnavailable) throw new Error('unsupported message');
+        if (statusInProgressAtStart && statusPolls++ === 0) {
+          return {
+            type: 'DeviceFirmwareUpdateStatus',
+            message: { records: [{ ...targets[targets.length - 1], status: 1 }] },
+          };
+        }
         return { type: 'DeviceFirmwareUpdateStatus', message: { records: [] } };
       });
-      const deviceInfoGet = jest.fn().mockImplementation(() => ({
-        type: 'DeviceInfo',
-        message: {
+      let lastDeviceInfo: ProtocolV2DeviceInfo | undefined;
+      const deviceInfoGet = jest.fn().mockImplementation(() => {
+        lastDeviceInfo = {
           hw: { serial_no: differentDevice ? 'pro2-other' : 'pro2-test' },
-          main_mcu: { application: { version: now >= updatedAt ? '1.0.2' : '1.0.1' } },
-        },
-      }));
+          main_mcu: {
+            application: { version: now >= (p1UpdatedAt ?? updatedAt) ? '1.0.2' : '1.0.1' },
+            application_data: { version: now >= updatedAt ? '1.0.2' : '1.0.1' },
+          },
+        };
+        return { type: 'DeviceInfo', message: lastDeviceInfo };
+      });
       const typedCall = jest.fn().mockImplementation((type: string) => {
         if (type === 'DeviceFirmwareUpdateStatusGet') return statusGet();
         if (type === 'DeviceInfoGet') return deviceInfoGet();
@@ -936,6 +973,7 @@ describe('FirmwareUpdateV4 install polling', () => {
         protocolV2ExpectedSerialNumber: string;
         protocolV2InstallBaselineVersions: Map<number, string>;
         protocolV2LatestFinalFeatures?: Features;
+        protocolV2LatestFinalDeviceInfo?: ProtocolV2DeviceInfo;
         params: { expectedTargetVersions: { app_v1: string; app_v2: string } };
         waitForProtocolV2FirmwareUpdateComplete: (
           value: typeof targets,
@@ -947,7 +985,10 @@ describe('FirmwareUpdateV4 install polling', () => {
       firmwareUpdate.isBleReconnect = () => true;
       firmwareUpdate.protocolV2InstallNeedsReconnect = !skipReconnect;
       firmwareUpdate.protocolV2ExpectedSerialNumber = 'pro2-test';
-      firmwareUpdate.protocolV2InstallBaselineVersions = new Map([[5, '1.0.1']]);
+      firmwareUpdate.protocolV2InstallBaselineVersions = new Map([
+        [4, '1.0.1'],
+        [5, '1.0.1'],
+      ]);
       firmwareUpdate.params = { expectedTargetVersions: { app_v1: '1.0.2', app_v2: '1.0.2' } };
       firmwareUpdate.reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
 
@@ -958,10 +999,17 @@ describe('FirmwareUpdateV4 install polling', () => {
         expect(method.postProgressMessage).not.toHaveBeenCalled();
         return;
       }
-      if (Number.isFinite(updatedAt)) {
+      let completionAt = updatedAt;
+      if (p2Only) {
+        completionAt = Infinity;
+      } else if (!loaderBeforeUpdate) {
+        completionAt = Math.min(updatedAt, p1UpdatedAt ?? Infinity);
+      }
+      if (Number.isFinite(completionAt)) {
         await polling;
-        expect(now).toBe(updatedAt);
+        expect(now).toBe(Math.max(completionAt, statusInProgressAtStart ? 1000 : 0));
         firmwareUpdate.protocolV2LatestFinalFeatures = finalFeatures;
+        firmwareUpdate.protocolV2LatestFinalDeviceInfo = lastDeviceInfo;
         expect(() => firmwareUpdate.assertExpectedProtocolV2Versions()).not.toThrow();
         firmwareUpdate.params.expectedTargetVersions.app_v1 = '1.0.3';
         expect(() => firmwareUpdate.assertExpectedProtocolV2Versions()).toThrow('expected 1.0.3');
@@ -973,7 +1021,9 @@ describe('FirmwareUpdateV4 install polling', () => {
         expect(now).toBe(600_000);
         expect(method.postProgressMessage).not.toHaveBeenCalled();
       }
-      expect(deviceInfoGet).toHaveBeenCalledTimes(skipReconnect ? 1 : now / 1000 + 1);
+      expect(deviceInfoGet).toHaveBeenCalledTimes(
+        skipReconnect ? 1 : now / 1000 + 1 - (statusInProgressAtStart ? 1 : 0)
+      );
       expect(probeProtocolV2RuntimeState).toHaveBeenLastCalledWith(
         expect.anything(),
         expect.any(Number),

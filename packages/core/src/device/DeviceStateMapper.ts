@@ -271,7 +271,11 @@ export const mapProtocolV2DeviceInfoToState = (
     versions: definedEntries({
       firmware: imageVersion(info.main_mcu?.application),
       applicationP1: imageVersion(info.main_mcu?.application),
-      applicationP2: imageVersion(info.main_mcu?.application_data),
+      // The running application does not report P2; discard a loader-era version.
+      applicationP2:
+        mode === 'normal' && info.main_mcu?.application
+          ? null
+          : imageVersion(info.main_mcu?.application_data),
       bootloader: imageVersion(info.main_mcu?.bootloader),
       board: imageVersion(info.main_mcu?.romloader),
       ble: imageVersion(info.coprocessor?.application),

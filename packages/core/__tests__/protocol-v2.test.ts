@@ -6381,6 +6381,7 @@ describe('Protocol V2 firmware update targets', () => {
         },
       },
     });
+    method.init();
     const typedCall = jest
       .fn()
       .mockRejectedValue(new Error('Failure: Handler not registered for this message'));
@@ -6739,7 +6740,7 @@ describe('Protocol V2 firmware update targets', () => {
     expect(() => (method as any).assertExpectedProtocolV2Versions()).not.toThrow();
   });
 
-  test('uses the firmware version for P1 and the optional DeviceInfo version for P2', () => {
+  test('uses bootloader DeviceInfo for the P2 version', () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6757,6 +6758,9 @@ describe('Protocol V2 firmware update targets', () => {
       major_version: 1,
       minor_version: 0,
       patch_version: 0,
+      mode: 'bootloader',
+      bootloaderMode: true,
+      firmwareVersion: '1.0.0',
     };
     (method as any).protocolV2LatestFinalDeviceInfo = {
       main_mcu: {
@@ -6768,7 +6772,36 @@ describe('Protocol V2 firmware update targets', () => {
     expect(() => (method as any).assertExpectedProtocolV2Versions()).not.toThrow();
   });
 
-  test('rejects a mismatched final DeviceInfo application slot version', () => {
+  test('uses P1 after normal boot even when DeviceInfo retains an old P2 version', () => {
+    const method = new FirmwareUpdateV4({
+      id: 1,
+      payload: {
+        method: 'firmwareUpdateV4',
+        platform: 'desktop',
+        targetsToUpdate: ['app_v1', 'app_v2'],
+        expectedTargetVersions: { app_v1: '2.0.0', app_v2: '2.0.0' },
+      },
+    });
+    method.init();
+    (method as any).protocolV2LatestFinalFeatures = {
+      major_version: 2,
+      minor_version: 0,
+      patch_version: 0,
+      mode: 'normal',
+      bootloaderMode: false,
+    };
+    (method as any).protocolV2LatestFinalDeviceInfo = {
+      main_mcu: {
+        application: { version: '2.0.0' },
+        application_data: { version: '1.0.1' },
+      },
+    };
+    (method as any).protocolV2CompletedTargetVersions = new Map([[5, 0x20000]]);
+
+    expect(() => (method as any).assertExpectedProtocolV2Versions()).not.toThrow();
+  });
+
+  test('rejects a mismatched bootloader DeviceInfo application slot version', () => {
     const method = new FirmwareUpdateV4({
       id: 1,
       payload: {
@@ -6786,6 +6819,9 @@ describe('Protocol V2 firmware update targets', () => {
       major_version: 1,
       minor_version: 0,
       patch_version: 0,
+      mode: 'bootloader',
+      bootloaderMode: true,
+      firmwareVersion: '1.0.0',
     };
     (method as any).protocolV2LatestFinalDeviceInfo = {
       main_mcu: {
@@ -8926,7 +8962,7 @@ describe('Protocol V2 firmware update targets', () => {
   });
 
   test.each([
-    ['react-native', 30_000],
+    ['react-native', 10_000],
     ['webusb', undefined],
   ] as const)('uses the native firmware write timeout in %s', async (env, timeoutMs) => {
     const getSettingsSpy = jest.spyOn(DataManager, 'getSettings').mockReturnValue(env);
