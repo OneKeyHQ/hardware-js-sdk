@@ -18,6 +18,11 @@ const FILESYSTEM_FILE_WRITE_MESSAGE_TYPE = 60805;
 const PORTFOLIO_UPDATE_MESSAGE_TYPE = 61400;
 
 export default class UploadPortfolio extends FileWrite {
+  getVersionRange() {
+    // Pro2 and Neo rotated the Portfolio verification key in firmware 1.0.3.
+    return { model_pro2: { min: '1.0.3' } };
+  }
+
   init() {
     const { packageBase64, timeoutMs, uiMode = 'silent' } = this.payload as UploadPortfolioParams;
     const packageBytes = decodeCanonicalBase64({
