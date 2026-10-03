@@ -64,6 +64,54 @@ describe('WebUsbTransport protocol probe cache', () => {
     }
   );
 
+  test('reports claimInterface failures as WebUSB device access errors', async () => {
+    const webusb = new WebUsbTransport();
+    const path = 'connected-usb-device';
+    const claimError = Object.assign(new Error('Unable to claim interface'), {
+      name: 'NetworkError',
+    });
+    const device = {
+      opened: true,
+      configuration: { configurationValue: 1 },
+      configurations: [],
+      claimInterface: jest.fn().mockRejectedValue(claimError),
+    };
+    jest.spyOn(webusb, 'findDevice').mockResolvedValue(device as unknown as USBDevice);
+    jest.spyOn(webusb, 'getConnectedDevices').mockResolvedValue([]);
+    const state = webusb as unknown as { deviceProtocol: Map<string, 'V1' | 'V2'> };
+    state.deviceProtocol.set(path, 'V1');
+
+    await expect(webusb.connectToDevice(path, false)).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.WebUsbDeviceAccessError,
+      params: {
+        operation: 'claimInterface',
+        nativeErrorName: 'NetworkError',
+        nativeErrorMessage: 'Unable to claim interface',
+      },
+    });
+  });
+
+  test('reports transferIn failures as WebUSB device access errors', async () => {
+    const webusb = new WebUsbTransport() as any;
+    const path = 'connected-usb-device';
+    const transferError = Object.assign(new Error('Transfer endpoint is unavailable'), {
+      name: 'NetworkError',
+    });
+    webusb.findDevice = jest.fn().mockResolvedValue({
+      opened: true,
+      transferIn: jest.fn().mockRejectedValue(transferError),
+    });
+
+    await expect(webusb.transferInWithRetry(path, 64)).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.WebUsbDeviceAccessError,
+      params: {
+        operation: 'transferIn',
+        nativeErrorName: 'NetworkError',
+        nativeErrorMessage: 'Transfer endpoint is unavailable',
+      },
+    });
+  });
+
   test('acquire skips the wire probe when the protocol is already cached', async () => {
     const webusb = buildAcquirableTransport();
     const path = 'pro-webusb';

@@ -73,24 +73,26 @@ describe('live device state reads', () => {
     }
   );
 
-  test('rejects settings scope in loader mode after minimal mode detection', async () => {
-    const getDeviceState = jest.fn().mockResolvedValue({ status: { mode: 'bootloader' } });
-    const method = new GetDeviceState({
-      id: 1,
-      payload: { method: 'getDeviceState', scope: 'settings' },
-    });
-    method.init();
-    (method as any).device = {
-      isProtocolV2: () => true,
-      getCurrentFirmwareType: () => 'universal',
-      getDeviceState,
-    };
+  test.each(['bootloader', 'romloader'] as const)(
+    'reports %s mode for settings scope after minimal mode detection',
+    async mode => {
+      const getDeviceState = jest.fn().mockResolvedValue({ status: { mode } });
+      const method = new GetDeviceState({
+        id: 1,
+        payload: { method: 'getDeviceState', scope: 'settings' },
+      });
+      method.init();
+      (method as any).device = {
+        isProtocolV2: () => true,
+        getDeviceState,
+      };
 
-    await expect(method.run()).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.DeviceNotSupportMethod,
-    });
-    expect(getDeviceState).toHaveBeenCalledWith({ refreshSections: ['status', 'settings'] });
-  });
+      await expect(method.run()).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.NotAllowInBootloaderMode,
+      });
+      expect(getDeviceState).toHaveBeenCalledWith({ refreshSections: ['status', 'settings'] });
+    }
+  );
 
   test('rejects an unknown scope', () => {
     const method = new GetDeviceState({

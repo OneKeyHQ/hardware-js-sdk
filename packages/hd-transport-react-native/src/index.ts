@@ -59,7 +59,7 @@ import {
   stopBleEncryptionTracking,
   waitForAndroidLinkEncryption,
 } from './bleEncryption';
-import { IosPeerTerminationTracker } from './bleIosStaleBond';
+import { IosPeerTerminationTracker, isIosPeerTerminationError } from './bleIosStaleBond';
 import { isNativeBleDisconnectError, toBleDisconnectHardwareError } from './bleNativeDisconnect';
 import {
   isBleStaleBondHardwareError,
@@ -189,8 +189,8 @@ const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
   const code = (error as { errorCode?: unknown })?.errorCode;
   // Bonding and GATT failures are not evidence of a protocol mismatch. Preserve
   // them instead of probing another protocol on an unusable connection.
-  // Native PLX disconnects (errorCode 201 / iOS 7) must match before they are
-  // mapped: Protocol V2 writes rethrow them unchanged unless normalized first.
+  // Native PLX disconnects (errorCode 201 / iOS 7, or the unstructured
+  // "was disconnected" fallback) must match before Protocol V2 probing.
   return (
     isBleStaleBondHardwareError(error) ||
     isNativeBleDisconnectError(error) ||
@@ -506,11 +506,11 @@ function remapError(error: IOBleErrorRemap) {
     }
   }
 
-  if (
-    error instanceof Error &&
-    error.message &&
-    (error.message.includes('was disconnected') || error.message.includes('not found'))
-  ) {
+  if (isNativeBleDisconnectError(error)) {
+    throw toBleDisconnectHardwareError(error);
+  }
+
+  if (error instanceof Error && error.message?.includes('not found')) {
     throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
   }
 
@@ -908,7 +908,6 @@ export default class ReactNativeBleTransport {
     const scanStartedAt = Date.now();
     let firstDeviceMs: number | undefined;
     const blePlxManager = await this.getPlxManager();
-    await subscribeBleOn(blePlxManager);
     if (Platform.OS === 'android' && Platform.Version >= 31) {
       Log?.debug('requesting permissions, please wait...');
 
@@ -925,6 +924,7 @@ export default class ReactNativeBleTransport {
         throw ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
       }
     }
+    await subscribeBleOn(blePlxManager);
 
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     return new Promise<IOneKeyDevice[]>((resolve, reject) => {
@@ -967,14 +967,12 @@ export default class ReactNativeBleTransport {
         (error, device) => {
           if (error) {
             Log?.debug('ble scan error: ', error);
-            if (
-              [BleErrorCode.BluetoothPoweredOff, BleErrorCode.BluetoothInUnknownState].includes(
-                error.errorCode
-              )
-            ) {
-              finishScan(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
+            if (error.errorCode === BleErrorCode.BluetoothPoweredOff) {
+              finishScan(ERRORS.TypedError(HardwareErrorCode.BlePoweredOff));
+            } else if (error.errorCode === BleErrorCode.BluetoothUnsupported) {
+              finishScan(ERRORS.TypedError(HardwareErrorCode.BleUnsupported));
             } else if (error.errorCode === BleErrorCode.BluetoothUnauthorized) {
-              finishScan(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
+              finishScan(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
             } else if (error.errorCode === BleErrorCode.LocationServicesDisabled) {
               finishScan(ERRORS.TypedError(HardwareErrorCode.BleLocationServicesDisabled));
             } else if (error.errorCode === BleErrorCode.ScanStartFailed) {
@@ -2551,6 +2549,15 @@ export default class ReactNativeBleTransport {
         if (resetManager) {
           throw this.createWedgedBleSetupError();
         }
+      }
+      if (isNativeBleStaleBondError(error) || isBleStaleBondHardwareError(error)) {
+        throw toBleStaleBondHardwareError(error);
+      }
+      if (isNativeBleDisconnectError(error)) {
+        if (Platform.OS === 'ios' && isIosPeerTerminationError(error)) {
+          throw error;
+        }
+        throw toBleDisconnectHardwareError(error);
       }
       if (Platform.OS === 'android' && isMissingGattShapeError(error)) {
         this.androidGattCacheRefreshes.add(uuid);
