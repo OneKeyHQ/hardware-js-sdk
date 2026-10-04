@@ -2636,7 +2636,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       finishedStatusSnapshotPolls = 0;
     };
 
-    while (true) {
+    for (;;) {
       // A transport release caused by an explicit workflow cancellation must not
       // be mistaken for the expected device reboot during installation.
       this.throwIfAborted();
