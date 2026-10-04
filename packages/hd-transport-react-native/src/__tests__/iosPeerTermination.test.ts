@@ -215,7 +215,9 @@ describe('iOS link ended by the device right after connecting', () => {
       .mockImplementation(() => Promise.reject(peerEndedLink()));
 
     await acquire(transport);
-    await expect(acquire(transport)).resolves.toEqual({ native: 6 });
+    await expect(acquire(transport)).resolves.toMatchObject({
+      code: HardwareErrorCode.BleDeviceDisconnected,
+    });
     await expect(acquire(transport)).resolves.toEqual({ native: 7 });
   });
 

@@ -59,7 +59,7 @@ import {
   stopBleEncryptionTracking,
   waitForAndroidLinkEncryption,
 } from './bleEncryption';
-import { IosPeerTerminationTracker } from './bleIosStaleBond';
+import { IosPeerTerminationTracker, isIosPeerTerminationError } from './bleIosStaleBond';
 import { isNativeBleDisconnectError, toBleDisconnectHardwareError } from './bleNativeDisconnect';
 import {
   isBleStaleBondHardwareError,
@@ -2554,6 +2554,9 @@ export default class ReactNativeBleTransport {
         throw toBleStaleBondHardwareError(error);
       }
       if (isNativeBleDisconnectError(error)) {
+        if (Platform.OS === 'ios' && isIosPeerTerminationError(error)) {
+          throw error;
+        }
         throw toBleDisconnectHardwareError(error);
       }
       if (Platform.OS === 'android' && isMissingGattShapeError(error)) {
