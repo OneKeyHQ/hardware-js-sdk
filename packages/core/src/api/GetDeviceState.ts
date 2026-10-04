@@ -1,4 +1,4 @@
-import { ERRORS, HardwareErrorCode, createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
@@ -49,10 +49,7 @@ export default class GetDeviceState extends BaseMethod<
       this.device.isProtocolV2() &&
       isLoaderMode(state.status.mode)
     ) {
-      throw createDeviceNotSupportMethodError(
-        `${this.name}:${this.params.scope}`,
-        this.device.getCurrentFirmwareType()
-      );
+      throw ERRORS.TypedError(HardwareErrorCode.NotAllowInBootloaderMode);
     }
     return state;
   }
