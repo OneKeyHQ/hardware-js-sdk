@@ -76,7 +76,10 @@ describe.each([
     test.each(scenarios)('$scenario', async scenario => {
       let now = 0;
       jest.spyOn(Date, 'now').mockImplementation(() => now);
-      jest.spyOn(global, 'setTimeout').mockImplementation(((callback: () => void, delay: number) => {
+      jest.spyOn(global, 'setTimeout').mockImplementation(((
+        callback: () => void,
+        delay: number
+      ) => {
         now += delay;
         callback();
         return 0;
