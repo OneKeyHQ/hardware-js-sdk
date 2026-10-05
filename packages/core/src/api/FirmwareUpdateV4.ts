@@ -2580,7 +2580,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             previousP1Version !== undefined &&
             currentP1Version !== undefined &&
             previousP1Version !== currentP1Version &&
-            currentP1Version === this.params?.expectedTargetVersions?.app_v2
+            (this.params?.expectedTargetVersions?.app_v2 === undefined ||
+              currentP1Version === this.params?.expectedTargetVersions?.app_v2)
           );
         }
         const previousVersion = this.protocolV2InstallBaselineVersions.get(targetId);
