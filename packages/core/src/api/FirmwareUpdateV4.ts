@@ -1390,7 +1390,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         : deviceInfo?.main_mcu?.application?.version,
       // Production boot verifies P2 against P1 before normal firmware can run.
       app_v2:
-        features?.mode === 'normal'
+        features && this.isProtocolV2ApplicationMode(features)
           ? getDeviceFirmwareVersion(features).join('.')
           : deviceInfo?.main_mcu?.application_data?.version,
       coprocessor: features ? getDeviceBLEFirmwareVersion(features).join('.') : undefined,
@@ -2531,10 +2531,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     );
     const applicationVersion = getDeviceFirmwareVersion(features).join('.');
     versions.set(ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P1, applicationVersion);
-    const applicationP2Version =
-      features.mode === 'normal'
-        ? applicationVersion
-        : deviceInfo?.main_mcu?.application_data?.version;
+    const applicationP2Version = this.isProtocolV2ApplicationMode(features)
+      ? applicationVersion
+      : deviceInfo?.main_mcu?.application_data?.version;
     if (applicationP2Version) {
       versions.set(
         ProtocolV2FirmwareTargetType.FW_MGMT_TARGET_APPLICATION_P2,
@@ -2571,7 +2570,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return (
       expectedTargetIds.size > 0 &&
       Array.from(expectedTargetIds).every(targetId => {
-        if (targetId === p2TargetId && this.protocolV2LastRuntimeProbeFeatures?.mode === 'normal') {
+        if (
+          targetId === p2TargetId &&
+          this.isProtocolV2ApplicationMode(this.protocolV2LastRuntimeProbeFeatures)
+        ) {
           // P1 must change in this install; a pre-existing P1 version cannot prove a P2-only update.
           if (!expectedTargetIds.has(p1TargetId)) return false;
           const previousP1Version = this.protocolV2InstallBaselineVersions.get(p1TargetId);

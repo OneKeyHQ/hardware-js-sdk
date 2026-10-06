@@ -869,6 +869,13 @@ describe('FirmwareUpdateV4 install polling', () => {
       loaderBeforeUpdate: false,
     },
     {
+      scenario: 'uninitialized firmware P1 updated while P2 is unobservable',
+      updatedAt: Infinity,
+      p1UpdatedAt: 0,
+      loaderBeforeUpdate: false,
+      applicationMode: 'notInitialized',
+    },
+    {
       scenario: 'P2-only install cannot be inferred from an already updated P1',
       updatedAt: Infinity,
       p1UpdatedAt: 0,
@@ -893,6 +900,7 @@ describe('FirmwareUpdateV4 install polling', () => {
       skipReconnect,
       statusUnavailable,
       differentDevice,
+      applicationMode,
     }) => {
       let now = 0;
       jest.spyOn(Date, 'now').mockImplementation(() => now);
@@ -951,7 +959,7 @@ describe('FirmwareUpdateV4 install polling', () => {
             const normal =
               options?.forceRuntimeContextRefresh && (!loaderBeforeUpdate || now >= updatedAt);
             finalFeatures = {
-              mode: normal ? 'normal' : 'bootloader',
+              mode: normal ? applicationMode ?? 'normal' : 'bootloader',
               bootloaderMode: !normal,
               firmwareVersion: info.main_mcu?.application?.version,
             } as Features;
