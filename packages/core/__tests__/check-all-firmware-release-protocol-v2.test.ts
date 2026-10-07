@@ -4,8 +4,11 @@ import CheckAllFirmwareRelease, {
   buildProtocolV2FirmwareRelease,
 } from '../src/api/CheckAllFirmwareRelease';
 import { DataManager } from '../src/data-manager';
+import { mapProtocolV2DeviceInfoToState } from '../src/device/DeviceStateMapper';
+import { DeviceStateStore } from '../src/device/DeviceStateStore';
 import { createCoreApi } from '../src/inject';
 
+import type { ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
 import type { CoreApi } from '../src/types/api';
 import type { DeviceStateVersions, IFirmwareReleaseInfo } from '../src/types';
 
@@ -288,6 +291,67 @@ describe('checkAllFirmwareRelease Protocol V2 support', () => {
     });
 
     expect(result.targetsToUpdate).toEqual(['app_v1', 'app_v2']);
+  });
+
+  test('does not repeat a P2 update after normal firmware follows an older loader P2 reading', () => {
+    const store = new DeviceStateStore();
+    store.update(
+      mapProtocolV2DeviceInfoToState(
+        {
+          main_mcu: {
+            application: { version: '1.0.2' },
+            application_data: { version: '1.0.2', build_id: 'old-p2', hash: [0xbb] },
+          },
+        } as ProtocolV2DeviceInfo,
+        'bootloader'
+      ),
+      'device-info'
+    );
+    const { state } = store.update(
+      mapProtocolV2DeviceInfoToState(
+        {
+          main_mcu: {
+            application: { version: '1.0.3', hash: [0xaa] },
+            application_data: { version: '1.0.2', build_id: 'old-p2', hash: [0xbb] },
+          },
+        } as ProtocolV2DeviceInfo,
+        'normal'
+      ),
+      'device-info'
+    );
+    const packageSet: IFirmwareReleaseInfo = {
+      ...release,
+      installOrder: ['applicationP1', 'applicationP2'],
+      components: {
+        applicationP1: {
+          target: 'APPLICATION_P1',
+          version: [1, 0, 3],
+          url: 'https://example.com/p1.okpkg',
+        },
+        applicationP2: {
+          target: 'APPLICATION_P2',
+          version: [1, 0, 3],
+          url: 'https://example.com/p2.okpkg',
+        },
+      },
+    };
+
+    expect(state.versions.applicationP2).toBeNull();
+    expect(state.verification?.applicationP2BuildId).toBeNull();
+    expect(state.verification?.applicationP2Hash).toBeNull();
+    expect(
+      buildProtocolV2FirmwareRelease({
+        currentVersions: state.versions,
+        currentVerification: state.verification,
+        checkFirmwareHash: true,
+        remotePayloadHashes: {
+          applicationP1: 'aa'.repeat(64),
+          applicationP2: 'cc'.repeat(64),
+        },
+        firmwareType: EFirmwareType.Universal,
+        release: packageSet,
+      }).targetsToUpdate
+    ).toEqual([]);
   });
 
   test('does not read vol0 resource inventory while Protocol V2 is in Application mode', async () => {

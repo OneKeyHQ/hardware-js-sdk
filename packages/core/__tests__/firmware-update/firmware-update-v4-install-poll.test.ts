@@ -3,6 +3,8 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import FirmwareUpdateV4 from '../../src/api/FirmwareUpdateV4';
 
 import type { Device } from '../../src/device/Device';
+import type { ProtocolV2DeviceInfo } from '@onekeyfe/hd-transport';
+import type { Features } from '../../src/types';
 
 jest.mock('../../src/data/config', () => ({
   DEFAULT_DOMAIN: 'https://example.com/',
@@ -832,6 +834,312 @@ describe('FirmwareUpdateV4 install polling', () => {
     expect(probeProtocolV2NormalMode).toHaveBeenCalledWith(deviceInfo);
     expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
   });
+
+  test.each([
+    { scenario: 'missed progress after reconnect', updatedAt: 0, loaderBeforeUpdate: false },
+    { scenario: 'a reboot on the reconnected link', updatedAt: 1000, loaderBeforeUpdate: true },
+    { scenario: 'completion at the deadline', updatedAt: 600_000, loaderBeforeUpdate: false },
+    {
+      scenario: 'completion at the deadline without a disconnect',
+      updatedAt: 600_000,
+      loaderBeforeUpdate: false,
+      skipReconnect: true,
+    },
+    {
+      scenario: 'a reboot with an unavailable status endpoint',
+      updatedAt: 1000,
+      loaderBeforeUpdate: true,
+      statusUnavailable: true,
+    },
+    {
+      scenario: 'a different physical device after reconnect',
+      updatedAt: 0,
+      loaderBeforeUpdate: false,
+      differentDevice: true,
+    },
+    {
+      scenario: 'unchanged versions despite cached P2',
+      updatedAt: Infinity,
+      loaderBeforeUpdate: false,
+    },
+    {
+      scenario: 'normal firmware P1 updated while P2 is unobservable',
+      updatedAt: Infinity,
+      p1UpdatedAt: 0,
+      loaderBeforeUpdate: false,
+    },
+    {
+      scenario: 'uninitialized firmware P1 updated while P2 is unobservable',
+      updatedAt: Infinity,
+      p1UpdatedAt: 0,
+      loaderBeforeUpdate: false,
+      applicationMode: 'notInitialized',
+    },
+    {
+      scenario: 'P2-only install cannot be inferred from an already updated P1',
+      updatedAt: Infinity,
+      p1UpdatedAt: 0,
+      loaderBeforeUpdate: false,
+      p2Only: true,
+    },
+    {
+      scenario: 'normal firmware P1 updated after in-progress status disappears',
+      updatedAt: 3000,
+      p1UpdatedAt: 0,
+      statusInProgressAtStart: true,
+      loaderBeforeUpdate: false,
+    },
+  ])(
+    'checks fresh versions when BLE status is unavailable: $scenario',
+    async ({
+      updatedAt,
+      p1UpdatedAt,
+      p2Only,
+      statusInProgressAtStart,
+      loaderBeforeUpdate,
+      skipReconnect,
+      statusUnavailable,
+      differentDevice,
+      applicationMode,
+    }) => {
+      let now = 0;
+      jest.spyOn(Date, 'now').mockImplementation(() => now);
+      jest.spyOn(global, 'setTimeout').mockImplementation(((
+        callback: () => void,
+        delay: number
+      ) => {
+        now += delay;
+        callback();
+        return 0;
+      }) as typeof setTimeout);
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: { method: 'firmwareUpdateV4', connectId: 'pro2-ble' },
+      });
+      const targets = [
+        { target_id: 4, path: 'vol0:/application_p1.bin' },
+        { target_id: 5, path: 'vol0:/application_p2.bin' },
+      ].filter(target => !p2Only || target.target_id === 5);
+      let statusPolls = 0;
+      const statusGet = jest.fn().mockImplementation(() => {
+        if (statusUnavailable) throw new Error('unsupported message');
+        if (statusInProgressAtStart && statusPolls++ === 0) {
+          return {
+            type: 'DeviceFirmwareUpdateStatus',
+            message: { records: [{ ...targets[targets.length - 1], status: 1 }] },
+          };
+        }
+        return { type: 'DeviceFirmwareUpdateStatus', message: { records: [] } };
+      });
+      let lastDeviceInfo: ProtocolV2DeviceInfo | undefined;
+      const deviceInfoGet = jest.fn().mockImplementation(() => {
+        lastDeviceInfo = {
+          hw: { serial_no: differentDevice ? 'pro2-other' : 'pro2-test' },
+          main_mcu: {
+            application: { version: now >= (p1UpdatedAt ?? updatedAt) ? '1.0.2' : '1.0.1' },
+            application_data: { version: now >= updatedAt ? '1.0.2' : '1.0.1' },
+          },
+        };
+        return { type: 'DeviceInfo', message: lastDeviceInfo };
+      });
+      const typedCall = jest.fn().mockImplementation((type: string) => {
+        if (type === 'DeviceFirmwareUpdateStatusGet') return statusGet();
+        if (type === 'DeviceInfoGet') return deviceInfoGet();
+        throw new Error(`Unexpected command: ${type}`);
+      });
+      let finalFeatures: Features | undefined;
+      const probeProtocolV2RuntimeState = jest
+        .fn()
+        .mockImplementation(
+          (
+            info: ProtocolV2DeviceInfo,
+            _timeout: number,
+            options?: { forceRuntimeContextRefresh?: boolean }
+          ) => {
+            const normal =
+              options?.forceRuntimeContextRefresh && (!loaderBeforeUpdate || now >= updatedAt);
+            finalFeatures = {
+              mode: normal ? applicationMode ?? 'normal' : 'bootloader',
+              bootloaderMode: !normal,
+              firmwareVersion: info.main_mcu?.application?.version,
+            } as Features;
+            return finalFeatures;
+          }
+        );
+      method.device = {
+        originalDescriptor: { path: 'pro2-ble' },
+        getCommands: () => ({ typedCall }),
+        // A retained P2 field is deliberately newer than the live pre-install version.
+        state: { versions: { applicationP2: '1.0.2' } },
+        probeProtocolV2RuntimeState,
+        setCancelableAction: jest.fn(),
+      } as unknown as Device;
+      method.postProgressMessage = jest.fn();
+      const firmwareUpdate = method as unknown as {
+        isBleReconnect: () => boolean;
+        protocolV2InstallNeedsReconnect: boolean;
+        protocolV2ExpectedSerialNumber: string;
+        protocolV2InstallBaselineVersions: Map<number, string>;
+        protocolV2LatestFinalFeatures?: Features;
+        protocolV2LatestFinalDeviceInfo?: ProtocolV2DeviceInfo;
+        params: { expectedTargetVersions: { app_v1: string; app_v2: string } };
+        waitForProtocolV2FirmwareUpdateComplete: (
+          value: typeof targets,
+          requireCurrentInstallStatus: boolean
+        ) => Promise<void>;
+        reconnectProtocolV2Device: () => Promise<void>;
+        assertExpectedProtocolV2Versions: () => void;
+      };
+      firmwareUpdate.isBleReconnect = () => true;
+      firmwareUpdate.protocolV2InstallNeedsReconnect = !skipReconnect;
+      firmwareUpdate.protocolV2ExpectedSerialNumber = 'pro2-test';
+      firmwareUpdate.protocolV2InstallBaselineVersions = new Map([
+        [4, '1.0.1'],
+        [5, '1.0.1'],
+      ]);
+      firmwareUpdate.params = { expectedTargetVersions: { app_v1: '1.0.2', app_v2: '1.0.2' } };
+      firmwareUpdate.reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+
+      const polling = firmwareUpdate.waitForProtocolV2FirmwareUpdateComplete(targets, true);
+      if (differentDevice) {
+        await expect(polling).rejects.toThrow('physical identity mismatch');
+        expect(probeProtocolV2RuntimeState).not.toHaveBeenCalled();
+        expect(method.postProgressMessage).not.toHaveBeenCalled();
+        return;
+      }
+      let completionAt = updatedAt;
+      if (p2Only) {
+        completionAt = Infinity;
+      } else if (!loaderBeforeUpdate) {
+        completionAt = Math.min(updatedAt, p1UpdatedAt ?? Infinity);
+      }
+      if (Number.isFinite(completionAt)) {
+        await polling;
+        expect(now).toBe(Math.max(completionAt, statusInProgressAtStart ? 1000 : 0));
+        firmwareUpdate.protocolV2LatestFinalFeatures = finalFeatures;
+        firmwareUpdate.protocolV2LatestFinalDeviceInfo = lastDeviceInfo;
+        expect(() => firmwareUpdate.assertExpectedProtocolV2Versions()).not.toThrow();
+        firmwareUpdate.params.expectedTargetVersions.app_v1 = '1.0.3';
+        expect(() => firmwareUpdate.assertExpectedProtocolV2Versions()).toThrow('expected 1.0.3');
+        expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
+      } else {
+        await expect(polling).rejects.toMatchObject({
+          params: { firmwareUpdateCode: 'FirmwareInstallTimeout' },
+        });
+        expect(now).toBe(600_000);
+        expect(method.postProgressMessage).not.toHaveBeenCalled();
+      }
+      expect(deviceInfoGet).toHaveBeenCalledTimes(
+        skipReconnect ? 1 : now / 1000 + 1 - (statusInProgressAtStart ? 1 : 0)
+      );
+      expect(probeProtocolV2RuntimeState).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.any(Number),
+        { forceRuntimeContextRefresh: true }
+      );
+      expect(typedCall).toHaveBeenCalledWith(
+        'DeviceInfoGet',
+        'DeviceInfo',
+        expect.objectContaining({
+          targets: {
+            hw: true,
+            main_mcu: true,
+            coprocessor: true,
+            se1: true,
+            se2: true,
+            se3: true,
+            se4: true,
+          },
+        }),
+        expect.anything()
+      );
+    }
+  );
+
+  test.each([
+    {
+      scenario: 'finishes after five minutes',
+      terminalAt: 360_000,
+      terminalStatus: 2,
+      error: undefined,
+    },
+    {
+      scenario: 'finishes at the deadline',
+      terminalAt: 600_000,
+      terminalStatus: 2,
+      error: undefined,
+    },
+    {
+      scenario: 'remains in progress',
+      terminalAt: Infinity,
+      terminalStatus: 1,
+      error: 'FirmwareInstallTimeout',
+    },
+    {
+      scenario: 'fails at the deadline',
+      terminalAt: 600_000,
+      terminalStatus: 3,
+      error: 'FirmwareInstallFailed',
+    },
+    {
+      scenario: 'is cancelled at the deadline',
+      terminalAt: 600_000,
+      terminalStatus: -1,
+      error: 'cancelled',
+    },
+  ])(
+    'polls installation for ten minutes: $scenario',
+    async ({ terminalAt, terminalStatus, error }) => {
+      let now = 0;
+      jest.spyOn(Date, 'now').mockImplementation(() => now);
+      jest.spyOn(global, 'setTimeout').mockImplementation(((
+        callback: () => void,
+        delay: number
+      ) => {
+        now += delay;
+        callback();
+        return 0;
+      }) as typeof setTimeout);
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: { method: 'firmwareUpdateV4', connectId: 'pro2-ble' },
+      });
+      const targets = [{ target_id: 4, path: 'vol0:/application_p1.bin' }];
+      const typedCall = jest.fn().mockImplementation(() => {
+        if (now >= terminalAt && terminalStatus === -1) {
+          throw ERRORS.TypedError(HardwareErrorCode.ActionCancelled);
+        }
+        return {
+          type: 'DeviceFirmwareUpdateStatus',
+          message: { records: [{ ...targets[0], status: now >= terminalAt ? terminalStatus : 1 }] },
+        };
+      });
+      method.device = { getCommands: () => ({ typedCall }) } as unknown as Device;
+      method.postProgressMessage = jest.fn();
+      const firmwareUpdate = method as unknown as {
+        isBleReconnect: () => boolean;
+        waitForProtocolV2FirmwareUpdateComplete: (
+          value: typeof targets,
+          requireCurrentInstallStatus: boolean
+        ) => Promise<void>;
+      };
+      firmwareUpdate.isBleReconnect = () => true;
+      const polling = firmwareUpdate.waitForProtocolV2FirmwareUpdateComplete(targets, true);
+      if (error) {
+        await expect(polling).rejects.toMatchObject(
+          error === 'cancelled'
+            ? { errorCode: HardwareErrorCode.ActionCancelled }
+            : { params: { firmwareUpdateCode: error } }
+        );
+        expect(method.postProgressMessage).not.toHaveBeenCalledWith(100, 'installingFirmware');
+      } else {
+        await polling;
+        expect(method.postProgressMessage).toHaveBeenCalledWith(100, 'installingFirmware');
+      }
+      expect(now).toBe(Math.min(terminalAt, 600_000));
+      expect(typedCall).toHaveBeenCalledTimes(now / 1000 + 1);
+    }
+  );
 
   test('does not send Request when Stage is rejected', async () => {
     const method = new FirmwareUpdateV4({

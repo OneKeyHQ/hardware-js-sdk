@@ -38,3 +38,6 @@ jobs:
       - name: Build Target
         run: |
           yarn build
+
+      - name: Test Core
+        run: yarn --cwd packages/core test --runInBand
