@@ -271,7 +271,11 @@ export const mapProtocolV2DeviceInfoToState = (
     versions: definedEntries({
       firmware: imageVersion(info.main_mcu?.application),
       applicationP1: imageVersion(info.main_mcu?.application),
-      applicationP2: imageVersion(info.main_mcu?.application_data),
+      // The running application does not report P2; discard a loader-era version.
+      applicationP2:
+        mode === 'normal' || mode === 'notInitialized'
+          ? null
+          : imageVersion(info.main_mcu?.application_data),
       bootloader: imageVersion(info.main_mcu?.bootloader),
       board: imageVersion(info.main_mcu?.romloader),
       ble: imageVersion(info.coprocessor?.application),
@@ -289,8 +293,14 @@ export const mapProtocolV2DeviceInfoToState = (
       firmwareHash: imageHash(info.main_mcu?.application),
       applicationP1BuildId: imageBuildId(info.main_mcu?.application),
       applicationP1Hash: imageHash(info.main_mcu?.application),
-      applicationP2BuildId: imageBuildId(info.main_mcu?.application_data),
-      applicationP2Hash: imageHash(info.main_mcu?.application_data),
+      applicationP2BuildId:
+        mode === 'normal' || mode === 'notInitialized'
+          ? null
+          : imageBuildId(info.main_mcu?.application_data),
+      applicationP2Hash:
+        mode === 'normal' || mode === 'notInitialized'
+          ? null
+          : imageHash(info.main_mcu?.application_data),
       bootloaderBuildId: imageBuildId(info.main_mcu?.bootloader),
       bootloaderHash: imageHash(info.main_mcu?.bootloader),
       boardBuildId: imageBuildId(info.main_mcu?.romloader),

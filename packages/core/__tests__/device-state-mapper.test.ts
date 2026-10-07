@@ -110,7 +110,7 @@ describe('DeviceStateMapper', () => {
     expect(patch.identity?.firmwareType).toBe(EFirmwareType.Universal);
   });
 
-  test('maps Protocol V2 DeviceInfo without inventing runtime status', () => {
+  test('maps Protocol V2 bootloader DeviceInfo including P2', () => {
     const patch = mapProtocolV2DeviceInfoToState(
       {
         protocol_version: 2,
@@ -130,7 +130,7 @@ describe('DeviceStateMapper', () => {
           application: { version: '3.0.0', build_id: 'se1-build', hash: [0x05, 0x06] },
         },
       } as ProtocolV2DeviceInfo,
-      'normal'
+      'bootloader'
     );
 
     expect(patch.identity).toMatchObject({
@@ -157,8 +157,43 @@ describe('DeviceStateMapper', () => {
       se01: { type: 'THD89', state: 'APP' },
     });
     expect(patch).toMatchObject({ protocolVersion: 2 });
-    expect(patch.status?.unlocked).toBeUndefined();
+    expect(patch.status?.unlocked).toBeNull();
   });
+
+  test.each([
+    { mode: 'normal', applicationData: undefined },
+    {
+      mode: 'normal',
+      applicationData: { version: '1.0.2', build_id: 'old-p2', hash: [0x01, 0x02] },
+    },
+    { mode: 'notInitialized', applicationData: undefined },
+    {
+      mode: 'notInitialized',
+      applicationData: { version: '1.0.2', build_id: 'old-p2', hash: [0x01, 0x02] },
+    },
+  ] as const)(
+    'clears cached loader P2 version and verification in $mode application mode',
+    ({ mode, applicationData }) => {
+      const patch = mapProtocolV2DeviceInfoToState(
+        {
+          main_mcu: {
+            application: { version: '1.0.3' },
+            application_data: applicationData,
+          },
+        } as ProtocolV2DeviceInfo,
+        mode
+      );
+
+      expect(patch.versions).toMatchObject({
+        applicationP1: '1.0.3',
+        applicationP2: null,
+      });
+      expect(patch.verification).toMatchObject({
+        applicationP2BuildId: null,
+        applicationP2Hash: null,
+      });
+    }
+  );
 
   test('maps the Protocol V2 Neo device type without treating it as Pro2', () => {
     const patch = mapProtocolV2DeviceInfoToState({
