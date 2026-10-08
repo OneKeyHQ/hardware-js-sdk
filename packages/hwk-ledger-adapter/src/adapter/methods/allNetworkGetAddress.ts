@@ -32,11 +32,12 @@ export type LedgerInstallAppContext = {
   connection?: { connectId: string; sessionId: string };
   /**
    * Whether the bundle's session holds the wallet the caller meant. `expected` is set when any
-   * item names its wallet; `verified` turns true when an item's wallet check passes and false
-   * after an unlock, which may have opened another seed. Unchecked work needs it not false, and
-   * true when a wallet is expected.
+   * item names its wallet; `verified` turns true when an item's wallet check passes. `derived`
+   * turns true once the device returned a result; an unlock after that sets `verified` false,
+   * since a second PIN may have opened another seed than the earlier results. Unchecked work
+   * needs `verified` not false, and true when a wallet is expected.
    */
-  walletCheck?: { expected: boolean; verified?: boolean };
+  walletCheck?: { expected: boolean; verified?: boolean; derived?: boolean };
   deviceOutOfMemoryError?: Error;
   /**
    * Apps for which installApp has resolved (successfully or not) within

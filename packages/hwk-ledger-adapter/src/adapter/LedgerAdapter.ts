@@ -2828,7 +2828,9 @@ export class LedgerAdapter implements IHardwareWallet {
         });
       }
       businessCallStarted = true;
-      return await this._callConnector(sessionId, method, effectiveParams, signal);
+      const result = await this._callConnector(sessionId, method, effectiveParams, signal);
+      if (walletCheck) walletCheck.derived = true;
+      return result;
     } catch (err) {
       // If the abort fired, surface it directly — skip recovery paths.
       if (signal.aborted) throw err;
@@ -2883,8 +2885,9 @@ export class LedgerAdapter implements IHardwareWallet {
       ) {
         await this._waitForDeviceConnect(signal);
         assertSessionCurrent('Ledger connection ended while waiting for unlock');
-        // An unlock may open another seed (a second PIN), so the bundle's wallet is unproven again.
-        if (walletCheck) walletCheck.verified = false;
+        // An unlock may open another seed (a second PIN) than the bundle's earlier results, so
+        // the wallet is unproven again. Before any result there is nothing to differ from.
+        if (walletCheck?.derived) walletCheck.verified = false;
         return this._runConnectorCall(
           resolvedConnectId,
           method,
@@ -2903,7 +2906,9 @@ export class LedgerAdapter implements IHardwareWallet {
         await this._sleepAbortable(LedgerAdapter.STUCK_APP_RETRY_DELAY_MS, signal);
         assertSessionCurrent('Ledger connection ended during the app transition');
         try {
-          return await this._callConnector(sessionId, method, effectiveParams, signal);
+          const retried = await this._callConnector(sessionId, method, effectiveParams, signal);
+          if (walletCheck) walletCheck.derived = true;
+          return retried;
         } catch (retryErr) {
           if (isStuckAppStateError(retryErr)) throw err;
           if (isLostConnectionError(retryErr)) {
