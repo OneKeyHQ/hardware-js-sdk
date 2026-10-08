@@ -162,6 +162,14 @@ const ALL_NETWORK_COMMON_PARAM_KEYS = [
   'supportedTransports',
 ] as const;
 
+/** Routing is bundle-level: an item cannot move itself to another operation or device. */
+const ALL_NETWORK_ROUTING_PARAM_KEYS = [
+  'operationId',
+  'knownConnections',
+  'allowDeviceSelection',
+  'supportedTransports',
+] as const;
+
 const TREZOR_BTC_NETWORK_COIN_MAP: Partial<Record<string, string>> = {
   btc: 'Bitcoin',
   bitcoin: 'Bitcoin',
@@ -337,10 +345,10 @@ export class TrezorAdapter implements IHardwareWallet {
     commonParams: TrezorCommonParams
   ): AllNetworkAddressParams {
     const defined = ALL_NETWORK_COMMON_PARAM_KEYS.filter(key => commonParams?.[key] !== undefined);
-    if (!defined.length) return item;
     return {
       ...item,
       ...Object.fromEntries(defined.map(key => [key, commonParams?.[key]])),
+      ...Object.fromEntries(ALL_NETWORK_ROUTING_PARAM_KEYS.map(key => [key, commonParams?.[key]])),
     };
   }
 

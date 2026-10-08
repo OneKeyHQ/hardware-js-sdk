@@ -1496,6 +1496,61 @@ describe('TrezorAdapter', () => {
     expect(connector.call).not.toHaveBeenCalled();
   });
 
+  it('keeps every all-network item on the bundle device even when an item names another operation', async () => {
+    const devices: Record<string, string> = { 'usb-A': 'DEVICE-A', 'usb-B': 'DEVICE-B' };
+    const connector: IConnector = { ...createConnector(), connectionType: 'usb' };
+    (connector.connect as ConnectMock).mockImplementation(connectId =>
+      Promise.resolve({
+        sessionId: connectId ?? '',
+        deviceInfo: {
+          vendor: 'trezor',
+          model: 'T2T1',
+          firmwareVersion: '2.8.0',
+          deviceId: devices[connectId ?? ''],
+          connectId: connectId ?? '',
+          connectionType: 'usb',
+        },
+      })
+    );
+    (connector.call as CallMock).mockImplementation((sessionId: string, method: string) => {
+      if (method === 'getFeatures') {
+        return Promise.resolve({ device_id: devices[sessionId], unlocked: true });
+      }
+      if (method === 'evmGetAddress') {
+        return Promise.resolve({ address: `addr-from-${devices[sessionId]}` });
+      }
+      return Promise.resolve({ protocol: 'v1' });
+    });
+    const adapter = new TrezorAdapter(connector);
+    const opB = await adapter.connectDevice('usb-B');
+    expect(opB.success).toBe(true);
+    if (!opB.success) return;
+
+    const result = await adapter.allNetworkGetAddress('usb-A', 'DEVICE-A', {
+      useEmptyPassphrase: true,
+      bundle: [
+        {
+          network: 'evm',
+          methodName: 'evmGetAddress',
+          path: "m/44'/60'/0'/0/0",
+          operationId: opB.payload,
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.payload[0]).toMatchObject({
+      success: true,
+      payload: { address: 'addr-from-DEVICE-A' },
+    });
+    expect(
+      (connector.call as CallMock).mock.calls.some(
+        ([sessionId, method]) => sessionId === 'usb-B' && method === 'evmGetAddress'
+      )
+    ).toBe(false);
+  });
+
   it('keeps an open session while probing USB candidates for an absent wallet', async () => {
     const connector = createSeriallessUsbConnector();
     const adapter = new TrezorAdapter(connector);
