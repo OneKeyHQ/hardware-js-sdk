@@ -3572,6 +3572,22 @@ describe('LedgerAdapter', () => {
         expect(methodsCalled()).toEqual(['evmGetAddress', 'evmGetAddress', 'solGetAddress']);
       });
 
+      it('ends the bundle when the device stays locked past the unlock retries', async () => {
+        confirmUnlock();
+        connector.callImpl.mockRejectedValue(lockedErr());
+        await adapter.connectDevice('dev-1');
+
+        const result = await adapter.allNetworkGetAddress('dev-1', '', {
+          bundle: [evmItem, { ...uncheckedSolItem, deviceId: solFingerprint }],
+        });
+
+        expect(result).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.DeviceLocked },
+        });
+        expect(methodsCalled()).not.toContain('solGetAddress');
+      });
+
       it('still derives an onboarding bundle that names no wallet', async () => {
         connector.callImpl
           .mockResolvedValueOnce({ address: 'SOL' })

@@ -16,6 +16,7 @@ import {
   isHardwareOperationId,
   isHwkRecoveryHint,
   isUserRefusal,
+  isWalletSafetyFailure,
   operationMayHaveCompletedParams,
   rehydrateConnectorError,
   requestBleDeviceSelection,
@@ -1070,13 +1071,11 @@ export class TrezorAdapter implements IHardwareWallet {
           const isWholeChainForbidden =
             isSingleNetworkBundle &&
             response.payload?.code === HardwareErrorCode.DevicePathForbidden;
-          const isPassphrasePolicyFailure =
-            response.payload?.code === HardwareErrorCode.PassphraseAlwaysOnDevice;
           const { code } = response.payload ?? {};
           return (
             isSessionLevelFailure ||
             isWholeChainForbidden ||
-            isPassphrasePolicyFailure ||
+            isWalletSafetyFailure(code) ||
             isUserRefusal(code) ||
             isConnectionLost(code)
           );

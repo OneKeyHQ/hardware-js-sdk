@@ -27,6 +27,7 @@ import {
   isHardwareOperationId,
   isHwkRecoveryHint,
   isUserRefusal,
+  isWalletSafetyFailure,
   operationMayHaveCompletedParams,
   parseBip32MasterFingerprint,
   parseWalletMasterFingerprint,
@@ -849,10 +850,9 @@ export class KeystoneAdapter implements IHardwareWallet {
           return (
             cancelledIndexes.has(index) ||
             usbSessionLost ||
+            isWalletSafetyFailure(code) ||
             isUserRefusal(code) ||
-            isConnectionLost(code) ||
-            code === HardwareErrorCode.DeviceMismatch ||
-            code === HardwareErrorCode.DeviceLocked
+            isConnectionLost(code)
           );
         },
       });

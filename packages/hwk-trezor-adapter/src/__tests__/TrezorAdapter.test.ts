@@ -2681,6 +2681,33 @@ describe('TrezorAdapter', () => {
     }
   });
 
+  it('allNetworkGetAddress ends the bundle at a wrong PIN instead of prompting for the next chain', async () => {
+    const connector = createConnector();
+    const adapter = new TrezorAdapter(connector);
+    await adapter.connectDevice('safe-7');
+    (connector.call as CallMock)
+      .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty-1' })
+      .mockRejectedValueOnce(
+        Object.assign(new Error('PIN invalid'), { code: HardwareErrorCode.PinInvalid })
+      );
+
+    const result = await adapter.allNetworkGetAddress('safe-7', '', {
+      useEmptyPassphrase: true,
+      bundle: [
+        { network: 'eth', methodName: 'evmGetAddress', path: "m/44'/60'/0'/0/0" },
+        { network: 'btc', methodName: 'btcGetPublicKey', path: "m/44'/0'/0'" },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.PinInvalid },
+    });
+    expect(
+      (connector.call as CallMock).mock.calls.filter(([, method]) => method === 'btcGetPublicKey')
+    ).toHaveLength(0);
+  });
+
   it('allNetworkGetAddress returns per-item results with features.device_id fingerprint', async () => {
     const connector = createConnector();
     const adapter = new TrezorAdapter(connector);

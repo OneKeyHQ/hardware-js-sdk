@@ -271,6 +271,7 @@ export type {
 export {
   buildUnsupportedMethodResponse,
   isConnectionLost,
+  isWalletSafetyFailure,
   isUserRefusal,
   runAllNetworkGetAddress,
 } from './utils/allNetwork';
