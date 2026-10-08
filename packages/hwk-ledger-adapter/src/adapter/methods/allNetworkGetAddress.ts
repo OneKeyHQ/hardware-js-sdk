@@ -29,6 +29,13 @@ import type {
 export type LedgerInstallAppContext = {
   /** A bundle never reconnects between address derivation and identity attachment. */
   connection?: { connectId: string; sessionId: string };
+  /**
+   * Whether the bundle's session holds the wallet the caller meant. `expected` is set when any
+   * item names its wallet; `verified` turns true when an item's wallet check passes and false
+   * after an unlock, which may have opened another seed. Unchecked work needs it not false, and
+   * true when a wallet is expected.
+   */
+  walletCheck?: { expected: boolean; verified?: boolean };
   deviceOutOfMemoryError?: Error;
   /**
    * Apps for which installApp has resolved (successfully or not) within
@@ -130,7 +137,9 @@ export function createAllNetworkGetAddress({
       ledgerQueueKey({ operationId: target.payload.operationId, connectId: effectiveTargetId })
     );
 
-    const installContext: LedgerInstallAppContext = {};
+    const installContext: LedgerInstallAppContext = {
+      walletCheck: { expected: params.bundle.some(item => Boolean(getItemDeviceId(item))) },
+    };
     const commonParams: ICommonCallParams = {
       autoInstallApp: params.autoInstallApp,
       operationId: target.payload.operationId,

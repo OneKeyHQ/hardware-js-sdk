@@ -2713,6 +2713,18 @@ export class LedgerAdapter implements IHardwareWallet {
           undefined,
           connectionAttempt
         ));
+    const walletCheck = installContext?.walletCheck;
+    if (
+      walletCheck &&
+      !checksWallet &&
+      (walletCheck.verified === false || (walletCheck.expected && !walletCheck.verified))
+    ) {
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceMismatch,
+        message:
+          'Ledger wallet is not verified on this connection; refusing to derive an unverifiable address',
+      });
+    }
     const sessionId = this._sessions.get(resolvedConnectId);
     if (sessionId && installContext && !installContext.connection) {
       installContext.connection = { connectId: resolvedConnectId, sessionId };
@@ -2776,6 +2788,7 @@ export class LedgerAdapter implements IHardwareWallet {
             code: HardwareErrorCode.DeviceMismatch,
           });
         }
+        if (walletCheck) walletCheck.verified = true;
       }
       if (pendingBinding && bindingOwner) {
         bindingOwner.pendingBinding = undefined;
@@ -2867,6 +2880,8 @@ export class LedgerAdapter implements IHardwareWallet {
       ) {
         await this._waitForDeviceConnect(signal);
         assertSessionCurrent('Ledger connection ended while waiting for unlock');
+        // An unlock may open another seed (a second PIN), so the bundle's wallet is unproven again.
+        if (walletCheck) walletCheck.verified = false;
         return this._runConnectorCall(
           resolvedConnectId,
           method,
