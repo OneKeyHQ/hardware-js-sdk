@@ -3588,6 +3588,43 @@ describe('LedgerAdapter', () => {
         expect(methodsCalled()).not.toContain('solGetAddress');
       });
 
+      it('continues an onboarding bundle unlocked before any result', async () => {
+        confirmUnlock();
+        connector.callImpl
+          .mockRejectedValueOnce(lockedErr())
+          .mockResolvedValueOnce({ address: 'SOL' })
+          .mockResolvedValueOnce({ address: solFingerprintAddress });
+        await adapter.connectDevice('dev-1');
+
+        const result = await adapter.allNetworkGetAddress('dev-1', '', {
+          bundle: [uncheckedSolItem],
+        });
+
+        expect(result).toMatchObject({
+          success: true,
+          payload: [{ success: true, payload: { address: 'SOL' } }],
+        });
+      });
+
+      it('stops an onboarding bundle unlocked after a result, which may open another seed', async () => {
+        confirmUnlock();
+        connector.callImpl
+          .mockResolvedValueOnce({ address: 'SOL' })
+          .mockResolvedValueOnce({ address: solFingerprintAddress })
+          .mockRejectedValueOnce(lockedErr());
+        await adapter.connectDevice('dev-1');
+
+        const result = await adapter.allNetworkGetAddress('dev-1', '', {
+          bundle: [uncheckedSolItem, { ...evmItem, deviceId: undefined }],
+        });
+
+        expect(result).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.DeviceMismatch },
+        });
+        expect(methodsCalled()).toEqual(['solGetAddress', 'solGetAddress', 'evmGetAddress']);
+      });
+
       it('still derives an onboarding bundle that names no wallet', async () => {
         connector.callImpl
           .mockResolvedValueOnce({ address: 'SOL' })
