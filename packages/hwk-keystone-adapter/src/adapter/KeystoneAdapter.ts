@@ -715,16 +715,33 @@ export class KeystoneAdapter implements IHardwareWallet {
     if (!operationTarget.success) return operationTarget;
     const effectiveConnectId = operationTarget.payload.targetId ?? '';
     const { operationId } = operationTarget.payload;
+    // The wallet may be named at the top or on any item; every name must agree.
+    const namedWallets = new Set(
+      [deviceId, ...params.bundle.map(item => (item as { deviceId?: unknown }).deviceId)].filter(
+        (id): id is string => typeof id === 'string' && id.length > 0
+      )
+    );
+    if (namedWallets.size > 1) {
+      return failure(
+        HardwareErrorCode.InvalidParams,
+        'Keystone all-network items name different wallets'
+      );
+    }
+    const [expectedDeviceId = ''] = namedWallets;
     let cancelScope: CancelScopeHandle | undefined;
     try {
-      const prefetched = await this._prefetchAllNetworkAccounts(effectiveConnectId, deviceId, {
-        ...params,
-        operationId,
-      });
+      const prefetched = await this._prefetchAllNetworkAccounts(
+        effectiveConnectId,
+        expectedDeviceId,
+        {
+          ...params,
+          operationId,
+        }
+      );
       const { book } = prefetched;
       // On a cold start the prefetch established the wallet identity; route
       // per-item calls to it instead of re-syncing per item.
-      const itemDeviceId = deviceId || prefetched.masterFingerprint || '';
+      const itemDeviceId = expectedDeviceId || prefetched.masterFingerprint || '';
       // A cancel between two per-item jobs finds nothing to abort; the scope
       // carries it across that gap under the same queue key.
       const scope = this._jobQueue.createCancelScope(
