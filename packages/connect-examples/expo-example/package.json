@@ -1,6 +1,6 @@
 {
   "name": "expo-example",
-  "version": "1.2.6",
+  "version": "1.2.5",
   "scripts": {
     "start": "yarn expo start --dev-client",
     "android": "yarn expo run:android",
