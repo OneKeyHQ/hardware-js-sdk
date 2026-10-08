@@ -932,7 +932,23 @@ export class LedgerAdapter implements IHardwareWallet {
     retainOperation: operationId => this._operations.retain(operationId),
     errorToFailure: <T>(error: unknown) => this.errorToFailure<T>(error),
     createCancelScope: queueKey => this._jobQueue.createCancelScope(queueKey),
+    releaseBundle: (context, signal) => this._dropUncheckedBundlePick(context, signal),
   });
+
+  /** A bundle's BLE pick that no item got past the wallet check is not kept. */
+  private async _dropUncheckedBundlePick(
+    context: LedgerInstallAppContext,
+    signal: AbortSignal
+  ): Promise<void> {
+    const { connection } = context;
+    const owner = connection ? this._pendingPickBindings.get(connection.connectId) : undefined;
+    if (!connection || !owner) return;
+    this._pendingPickBindings.delete(connection.connectId);
+    this._discardPendingBinding(owner, signal.aborted ? 'cancelled' : 'failed');
+    if (this._sessions.get(connection.connectId) === connection.sessionId) {
+      await this._dropSession(connection.connectId, signal);
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Chain call helper
@@ -2511,14 +2527,23 @@ export class LedgerAdapter implements IHardwareWallet {
             );
           } catch (error) {
             const status = signal.aborted ? 'cancelled' : 'failed';
+            // An all-network item shares its pick with the rest of the bundle: a
+            // later item can still pass the wallet check and save it, and the
+            // bundle drops it if it ends unchecked.
+            const bundleConnectId = installContext?.connection?.connectId;
+            let keptBundlePick = false;
             // The call ended before its pick passed the wallet check; the next
             // call asks for a device again rather than reusing an unchecked one.
             for (const [pickedConnectId, owner] of this._pendingPickBindings) {
-              this._pendingPickBindings.delete(pickedConnectId);
-              this._discardPendingBinding(owner, status);
-              await this._dropSession(pickedConnectId, signal);
+              if (pickedConnectId === bundleConnectId) {
+                keptBundlePick = true;
+              } else {
+                this._pendingPickBindings.delete(pickedConnectId);
+                this._discardPendingBinding(owner, status);
+                await this._dropSession(pickedConnectId, signal);
+              }
             }
-            this._finishBleBinding(status);
+            if (!keptBundlePick) this._finishBleBinding(status);
             throw error;
           } finally {
             if (operationId) {

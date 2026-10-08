@@ -21,6 +21,7 @@ function createWithQueue(queue: DeviceJobQueue, callChain: LedgerCallChain) {
       throw error;
     },
     createCancelScope: queueKey => queue.createCancelScope(queueKey),
+    releaseBundle: () => Promise.resolve(),
   });
 }
 

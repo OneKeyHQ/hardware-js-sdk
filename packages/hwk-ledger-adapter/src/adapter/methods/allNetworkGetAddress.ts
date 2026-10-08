@@ -67,6 +67,12 @@ export type LedgerErrorToFailure = <T>(error: unknown) => Response<T>;
  */
 export type LedgerCreateCancelScope = (queueKey: string) => CancelScopeHandle;
 
+/** Settles connection state the bundle's items shared once the last item is done. */
+export type LedgerReleaseBundle = (
+  context: LedgerInstallAppContext,
+  signal: AbortSignal
+) => Promise<void>;
+
 const LEDGER_BTC_NETWORK_COIN_MAP: Partial<Record<string, string>> = {
   tbtc: 'Testnet',
   bch: 'Bcash',
@@ -82,12 +88,14 @@ export function createAllNetworkGetAddress({
   retainOperation,
   errorToFailure,
   createCancelScope,
+  releaseBundle,
 }: {
   callChain: LedgerCallChain;
   getChainFingerprint: LedgerGetChainFingerprint;
   retainOperation: LedgerRetainOperation;
   errorToFailure: LedgerErrorToFailure;
   createCancelScope: LedgerCreateCancelScope;
+  releaseBundle: LedgerReleaseBundle;
 }) {
   return async function allNetworkGetAddress(
     connectId: string,
@@ -184,6 +192,7 @@ export function createAllNetworkGetAddress({
       });
       return result;
     } finally {
+      await releaseBundle(installContext, cancelScope.signal).catch(() => undefined);
       cancelScope.release();
       releaseOperationRetention?.();
     }
