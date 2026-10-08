@@ -6,6 +6,8 @@ import TransportManager from '../src/data-manager/TransportManager';
 import { IFRAME } from '../src/events';
 import SearchDevices from '../src/api/SearchDevices';
 import { DeviceList } from '../src/device/DeviceList';
+import { Device } from '../src/device/Device';
+import { DevicePool } from '../src/device/DevicePool';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0-test'),
@@ -204,4 +206,113 @@ describe('Core 错误输出边界', () => {
     expect(stdout).not.toHaveBeenCalled();
     await core.dispose();
   });
+});
+
+describe('Portfolio firmware compatibility through Core', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test.each(
+    (['pro2', 'neo'] as const).flatMap(deviceType =>
+      (['silent', 'progress'] as const).map(uiMode => ({ deviceType, uiMode }))
+    )
+  )(
+    'checks the current $deviceType firmware before a $uiMode upload',
+    async ({ deviceType, uiMode }) => {
+      DevicePool.resetState();
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      const device = Device.fromDescriptor({
+        id: 'portfolio-device',
+        path: 'portfolio-device',
+        commType: 'ble',
+        protocolType: 'V2',
+      } as never);
+      jest.spyOn(Device, 'fromDescriptor').mockReturnValue(device);
+      jest.spyOn(device, 'acquire').mockResolvedValue(undefined);
+      jest.spyOn(device, 'initialize').mockResolvedValue(undefined);
+      jest.spyOn(device, 'release').mockResolvedValue(undefined);
+      jest.spyOn(device, 'ensureProtocolV2RuntimeContext').mockResolvedValue({
+        version: 2,
+        supported_messages: [60805, 61400],
+      });
+      const typedCall = jest.fn();
+      device.commands = {
+        typedCall,
+        disposed: false,
+        dispose: jest.fn(),
+        checkDisposed: jest.fn(),
+      } as never;
+      const core = initCore();
+      let id = 0;
+      const upload = () =>
+        core.handleMessage({
+          id: ++id,
+          type: IFRAME.CALL,
+          payload: {
+            method: 'uploadPortfolio',
+            connectId: 'portfolio-device',
+            connectProtocol: 'V2',
+            packageBase64: 'AQID',
+            uiMode,
+          },
+        } as never);
+
+      try {
+        // Reuse one device across version changes to cover a retry after upgrading.
+        for (const firmwareVersion of ['1.0.1', '1.0.2', '1.0.3', '1.0.10']) {
+          device.features = {
+            protocol: 'V2',
+            deviceType,
+            firmwareType: 'universal',
+            firmwareVersion,
+            mode: 'normal',
+            initialized: true,
+            bootloaderMode: false,
+            capabilities: [],
+          } as never;
+          typedCall.mockReset();
+          typedCall
+            .mockResolvedValueOnce({ message: { processed_byte: 3 } })
+            .mockResolvedValueOnce({ message: { message: 'Portfolio updated' } });
+
+          const response = await upload();
+          if (firmwareVersion === '1.0.1' || firmwareVersion === '1.0.2') {
+            expect(response).toMatchObject({
+              success: false,
+              payload: {
+                code: HardwareErrorCode.CallMethodNeedUpgradeFirmware,
+                params: { current: firmwareVersion, require: '1.0.3', method: 'uploadPortfolio' },
+              },
+            });
+            expect(typedCall).not.toHaveBeenCalled();
+          } else {
+            expect(response).toMatchObject({ success: true, payload: { portfolioUpdated: true } });
+            expect(typedCall).toHaveBeenCalledTimes(2);
+            expect(typedCall).toHaveBeenLastCalledWith('PortfolioUpdate', 'Success', {});
+          }
+        }
+
+        typedCall.mockReset();
+        typedCall
+          .mockResolvedValueOnce({ message: { processed_byte: 3 } })
+          .mockRejectedValueOnce(
+            ERRORS.TypedError(
+              HardwareErrorCode.RuntimeError,
+              'Failure_DataError,Invalid portfolio package'
+            )
+          );
+        await expect(upload()).resolves.toMatchObject({
+          success: false,
+          payload: {
+            code: HardwareErrorCode.RuntimeError,
+            error: 'Failure_DataError,Invalid portfolio package',
+          },
+        });
+      } finally {
+        await core.dispose();
+        DevicePool.resetState();
+      }
+    }
+  );
 });
