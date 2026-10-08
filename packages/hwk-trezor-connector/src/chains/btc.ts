@@ -27,21 +27,23 @@ import type {
 
 type BtcScriptType = NonNullable<BtcGetAddressParams['scriptType']>;
 
-const BTC_SCRIPT_TYPE_MAP: Record<BtcScriptType, string> = {
+// A single key has no p2wsh form: that needs a multisig redeem script, so it is refused rather
+// than mapped to another script type.
+type SingleKeyScriptType = Exclude<BtcScriptType, 'p2wsh'>;
+
+const BTC_SCRIPT_TYPE_MAP: Record<SingleKeyScriptType, string> = {
   p2pkh: 'SPENDADDRESS',
   p2sh: 'SPENDP2SHWITNESS',
   p2wpkh: 'SPENDWITNESS',
-  p2wsh: 'SPENDWITNESS',
   p2tr: 'SPENDTAPROOT',
 };
 
 // Change-output (internal) script types. Distinct from the input map above:
 // outputs use the PAYTO* enum, inputs use the SPEND* enum.
-const BTC_CHANGE_OUTPUT_SCRIPT_TYPE_MAP: Record<BtcScriptType, string> = {
+const BTC_CHANGE_OUTPUT_SCRIPT_TYPE_MAP: Record<SingleKeyScriptType, string> = {
   p2pkh: 'PAYTOADDRESS',
   p2sh: 'PAYTOP2SHWITNESS',
   p2wpkh: 'PAYTOWITNESS',
-  p2wsh: 'PAYTOWITNESS',
   p2tr: 'PAYTOTAPROOT',
 };
 
@@ -72,8 +74,9 @@ function normalizeBtcCoin(coin: string | undefined): string {
 }
 
 // Derive the scriptType from a BIP path's purpose, so callers may omit it.
-function deriveScriptTypeFromPath(path: string): BtcScriptType {
-  const normalized = path.startsWith('m/') ? path.slice(2) : path;
+function deriveScriptTypeFromPath(path: string): SingleKeyScriptType | undefined {
+  const trimmed = path.trim();
+  const normalized = /^m\//i.test(trimmed) ? trimmed.slice(2) : trimmed;
   const purpose = normalized.split('/')[0]?.replace(/['hH]$/, '');
   switch (purpose) {
     case '86':
@@ -85,8 +88,31 @@ function deriveScriptTypeFromPath(path: string): BtcScriptType {
     case '44':
       return 'p2pkh';
     default:
-      return 'p2wpkh';
+      return undefined;
   }
+}
+
+/**
+ * The firmware derives the address or change script from this type, so a guess would hand back
+ * another script's address: an unknown purpose needs an explicit scriptType, and p2wsh is refused.
+ */
+function resolveScriptType(
+  map: Record<SingleKeyScriptType, string>,
+  scriptType: BtcScriptType | undefined,
+  path: string
+): string {
+  const resolved = scriptType ?? deriveScriptTypeFromPath(path);
+  if (!resolved) {
+    throw createInvalidParamsError(
+      `Cannot infer the BTC script type from ${path}; pass scriptType`
+    );
+  }
+  if (resolved === 'p2wsh') {
+    throw createInvalidParamsError(
+      'BTC p2wsh needs a multisig script; a single key has no p2wsh form'
+    );
+  }
+  return map[resolved];
 }
 
 export async function btcGetAddress(ctx: TrezorChainContext, params: unknown): Promise<BtcAddress> {
@@ -95,7 +121,7 @@ export async function btcGetAddress(ctx: TrezorChainContext, params: unknown): P
     address_n: parseBip32Path(request.path),
     coin_name: normalizeBtcCoin(request.coin),
     show_display: request.showOnDevice ?? false,
-    script_type: BTC_SCRIPT_TYPE_MAP[request.scriptType ?? deriveScriptTypeFromPath(request.path)],
+    script_type: resolveScriptType(BTC_SCRIPT_TYPE_MAP, request.scriptType, request.path),
   });
 
   if (response.type !== 'Address') {
@@ -139,7 +165,7 @@ export async function btcSignMessage(
     address_n: parseBip32Path(request.path),
     message: normalizeBtcMessage(request.message, request.hex ?? false),
     coin_name: normalizeBtcCoin(request.coin),
-    script_type: BTC_SCRIPT_TYPE_MAP[deriveScriptTypeFromPath(request.path)],
+    script_type: resolveScriptType(BTC_SCRIPT_TYPE_MAP, undefined, request.path),
   };
   if (request.noScriptType) {
     message.no_script_type = true;
@@ -469,7 +495,7 @@ function inputToTrezor(input: BtcTxInput): Record<string, unknown> {
     prev_hash: input.prevHash,
     prev_index: input.prevIndex,
     amount: input.amount,
-    script_type: BTC_SCRIPT_TYPE_MAP[input.scriptType ?? deriveScriptTypeFromPath(input.path)],
+    script_type: resolveScriptType(BTC_SCRIPT_TYPE_MAP, input.scriptType, input.path),
   };
   if (input.sequence !== undefined) result.sequence = input.sequence;
   if (input.origHash !== undefined) result.orig_hash = input.origHash;
@@ -524,10 +550,11 @@ export function outputToTrezor(output: BtcTxOutput): Record<string, unknown> {
     return withOutputMetadata({
       address_n: parseBip32Path(output.path),
       amount: output.amount,
-      script_type:
-        BTC_CHANGE_OUTPUT_SCRIPT_TYPE_MAP[
-          output.scriptType ?? deriveScriptTypeFromPath(output.path)
-        ],
+      script_type: resolveScriptType(
+        BTC_CHANGE_OUTPUT_SCRIPT_TYPE_MAP,
+        output.scriptType,
+        output.path
+      ),
     });
   }
   throw createInvalidParamsError(

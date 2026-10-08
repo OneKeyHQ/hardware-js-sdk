@@ -3637,6 +3637,41 @@ describe('TrezorConnectorBase', () => {
     });
   });
 
+  test('btcGetAddress: derives the taproot script type from a path with surrounding spaces', async () => {
+    const connector = new SessionBackedTestTrezorConnector(
+      [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor', model: 'T3W1' }],
+      { vendor: 'trezor.io', device_id: 'device-1', model: 'T3W1' },
+      [{ type: 'Address', message: { address: 'bc1ptaproot' } }]
+    );
+
+    const session = await connector.connect('device-1');
+    await callConnector(connector, session.sessionId, 'btcGetAddress', {
+      path: " m/86'/0'/0'/0/0",
+      coin: 'btc',
+    });
+
+    expect(connector.fakeSessions[0].calls[0].data).toMatchObject({
+      script_type: 'SPENDTAPROOT',
+    });
+  });
+
+  test.each([
+    ['an unknown purpose without scriptType', { path: "m/45'/0'/0'/0/0" }],
+    ['a p2wsh scriptType', { path: "m/84'/0'/0'/0/0", scriptType: 'p2wsh' }],
+  ])('btcGetAddress: refuses %s instead of guessing', async (_name, request) => {
+    const connector = new SessionBackedTestTrezorConnector(
+      [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor', model: 'T3W1' }],
+      { vendor: 'trezor.io', device_id: 'device-1', model: 'T3W1' },
+      [{ type: 'Address', message: { address: 'bc1qguessed' } }]
+    );
+
+    const session = await connector.connect('device-1');
+    await expect(
+      callConnector(connector, session.sessionId, 'btcGetAddress', { ...request, coin: 'btc' })
+    ).rejects.toMatchObject({ code: HardwareErrorCode.InvalidParams });
+    expect(connector.fakeSessions[0].calls).toHaveLength(0);
+  });
+
   test('btcGetAddress: normalizes doge coin code to Dogecoin', async () => {
     const connector = new SessionBackedTestTrezorConnector(
       [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor', model: 'T3W1' }],
