@@ -2215,6 +2215,11 @@ export class TrezorAdapter implements IHardwareWallet {
     }
   }
 
+  /** An identity probe tears down only a session it opened; another caller's stays up. */
+  private _hasSessionOrConnect(connectId: string): boolean {
+    return this._sessions.has(connectId) || this._connectingPromises.has(connectId);
+  }
+
   private async _resolveExpectedDeviceConnectId(
     expectedDeviceId: string,
     signal: AbortSignal,
@@ -2262,6 +2267,7 @@ export class TrezorAdapter implements IHardwareWallet {
     // identify it, but never silently pair arbitrary nearby BLE devices.
     for (const candidate of usbCandidates) {
       let sessionId: string | undefined;
+      const probeOpensSession = !this._hasSessionOrConnect(candidate.connectId);
       try {
         // Connecting only initializes Features. No wallet or business method is
         // dispatched until the firmware device_id matches the stored identity.
@@ -2278,7 +2284,7 @@ export class TrezorAdapter implements IHardwareWallet {
         if (!TrezorAdapter._isConnectionUnavailableError(error)) throw error;
       }
 
-      if (sessionId) {
+      if (sessionId && probeOpensSession) {
         // eslint-disable-next-line no-await-in-loop
         await this._disconnectSession(candidate.connectId, sessionId);
       }
@@ -2311,10 +2317,11 @@ export class TrezorAdapter implements IHardwareWallet {
         signal,
         this._ensureDevicePermission(knownBleConnectId, expectedDeviceId, 'ble')
       );
+      const probeOpensSession = !this._hasSessionOrConnect(knownBleConnectId);
       await this._ensureSession(knownBleConnectId, signal, 'ble');
       const actualDeviceId = this._devices.get(knownBleConnectId)?.deviceId;
       if (actualDeviceId === expectedDeviceId) return { connectId: knownBleConnectId };
-      await this._disconnectSession(knownBleConnectId);
+      if (probeOpensSession) await this._disconnectSession(knownBleConnectId);
       throw createHwkError({
         code: HardwareErrorCode.DeviceMismatch,
         message: 'The bound Trezor Bluetooth device has a different identity',
@@ -2405,18 +2412,20 @@ export class TrezorAdapter implements IHardwareWallet {
           operationId: this._activeOperationId(),
         },
       });
+      let probeOpensSession = false;
       try {
         if (reason === 'manual-rebind') {
           this._operations.endByConnectionKey(selected.connectId, 'explicit');
           await this._releaseProvisionalConnection(selected.connectId, signal);
         }
+        probeOpensSession = !this._hasSessionOrConnect(selected.connectId);
         await this._ensureSession(selected.connectId, signal, selected.connectionType);
       } catch (error) {
         this._emitBindingStatus(requestId, signal.aborted ? 'cancelled' : 'failed');
         throw error;
       }
       if (this._devices.get(selected.connectId)?.deviceId !== expectedDeviceId) {
-        await this._disconnectSession(selected.connectId);
+        if (probeOpensSession) await this._disconnectSession(selected.connectId);
         rejectedConnectId = selected.connectId;
         rejectedConnectIds.add(selected.connectId);
         continue;
