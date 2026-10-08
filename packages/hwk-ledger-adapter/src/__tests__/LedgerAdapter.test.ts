@@ -3477,6 +3477,28 @@ describe('LedgerAdapter', () => {
           });
         });
 
+      it('ends an operation whose wallet check fails, so later calls cannot run unchecked on it', async () => {
+        connector.callImpl.mockResolvedValueOnce({ address: '0xANOTHERWALLET' });
+        const connected = await adapter.connectDevice('dev-1');
+        expect(connected.success).toBe(true);
+        if (!connected.success) return;
+
+        const mismatch = await adapter.evmGetAddress(connected.payload, evmFingerprint, {
+          path: evmItem.path,
+        });
+        const next = await adapter.evmGetAddress(connected.payload, '', { path: evmItem.path });
+
+        expect(mismatch).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.DeviceMismatch },
+        });
+        expect(next).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.OperationEnded },
+        });
+        expect(methodsCalled()).toEqual(['evmGetAddress']);
+      });
+
       it('does not derive an unchecked chain when no item has verified the wallet', async () => {
         connector.callImpl.mockRejectedValueOnce(makeAppNotInstalledErr('Ethereum'));
         await adapter.connectDevice('dev-1');
