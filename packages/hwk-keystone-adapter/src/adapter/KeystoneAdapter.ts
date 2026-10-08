@@ -165,13 +165,6 @@ type ExpectedWallet = { expectedMasterFingerprint?: string };
 const KEYSTONE_USB_REATTACH_PROBE_ATTEMPTS = 4;
 const KEYSTONE_USB_REATTACH_PROBE_INTERVAL_MS = 500;
 
-function resolveHardwareOperationTarget(
-  positionalTargetId: string | null | undefined,
-  operationId: string | null | undefined
-) {
-  return resolveGenericHardwareOperationTarget(positionalTargetId, operationId, 'keystone');
-}
-
 function keySchema(chain: string, path: string): KeystoneKeySchema {
   return { path, curve: chain === 'sol' ? 'ed25519' : 'secp256k1' };
 }
@@ -654,6 +647,10 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
   }
 
+  /**
+   * Derived from the wallet's master fingerprint, which the caller already holds as deviceId; the
+   * device is never asked. It names the wallet but cannot check which device is attached.
+   */
   getChainFingerprint(
     connectId: string,
     deviceId: string,
@@ -748,7 +745,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceId: string,
     params: AllNetworkGetAddressParams
   ): Promise<Response<AllNetworkAddressResponse[]>> => {
-    const operationTarget = resolveHardwareOperationTarget(connectId, params.operationId);
+    const operationTarget = this._resolveOperationTarget(connectId, params.operationId);
     if (!operationTarget.success) return operationTarget;
     const effectiveConnectId = operationTarget.payload.targetId ?? '';
     const { operationId } = operationTarget.payload;
@@ -873,7 +870,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     params?: NullableCallArg<IHardwareCallParams<EvmGetAddressParams>>,
     bundle?: BundleAccess
   ): Promise<Response<EvmAddress>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -911,7 +908,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<EvmSignTxParams>>
   ): Promise<Response<EvmSignedTx>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -964,7 +961,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<EvmSignMsgParams>>
   ): Promise<Response<EvmSignature>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1005,7 +1002,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<EvmSignTypedDataParams>>
   ): Promise<Response<EvmSignature>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1059,7 +1056,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     params?: NullableCallArg<IHardwareCallParams<BtcGetAddressParams>>,
     bundle?: BundleAccess
   ): Promise<Response<BtcAddress>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1119,7 +1116,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     params?: NullableCallArg<IHardwareCallParams<BtcGetPublicKeyParams>>,
     bundle?: BundleAccess
   ): Promise<Response<BtcPublicKey>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1177,7 +1174,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<BtcSignPsbtParams>>
   ): Promise<Response<BtcSignedPsbt>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1217,7 +1214,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<BtcSignMsgParams>>
   ): Promise<Response<BtcSignature>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1253,12 +1250,17 @@ export class KeystoneAdapter implements IHardwareWallet {
     });
   }
 
+  /**
+   * Returns the known master fingerprint for the named wallet without asking the device (a QR
+   * round trip only to repeat it would cost a scan). Use it to name the wallet, for example as a
+   * PSBT xfp, which the device itself checks when signing; it cannot check the attached device.
+   */
   async btcGetMasterFingerprint(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
     paramsArg?: NullableCallArg<IHardwareCommonCallParams>
   ): Promise<Response<{ masterFingerprint: string }>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, paramsArg?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, paramsArg?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1278,7 +1280,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     params?: NullableCallArg<IHardwareCallParams<SolGetAddressParams>>,
     bundle?: BundleAccess
   ): Promise<Response<SolAddress>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1317,7 +1319,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<SolSignTxParams>>
   ): Promise<Response<SolSignedTx>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1355,7 +1357,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<SolSignMsgParams>>
   ): Promise<Response<SolSignature>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1398,7 +1400,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     params?: NullableCallArg<IHardwareCallParams<TronGetAddressParams>>,
     bundle?: BundleAccess
   ): Promise<Response<TronAddress>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1435,7 +1437,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<TronSignTxParams>>
   ): Promise<Response<TronSignedTx>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1477,7 +1479,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<TronSignMsgParams>>
   ): Promise<Response<TronSignature>> {
-    const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
     const connectId = operationTarget.payload.targetId;
     const deviceId = deviceIdArg ?? undefined;
@@ -1720,6 +1722,40 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   /** Resolve the wallet's master fingerprint from the connectId and/or deviceId the caller passed. */
+  /**
+   * A positional wallet id and an operation id must name the same wallet: otherwise the call
+   * would run on the operation's wallet while the caller files the result under the other one.
+   * Ids that do not carry a master fingerprint cannot be compared and pass through.
+   */
+  private _resolveOperationTarget(
+    positionalTargetId: string | null | undefined,
+    operationId: string | null | undefined
+  ): ReturnType<typeof resolveGenericHardwareOperationTarget> {
+    const target = resolveGenericHardwareOperationTarget(
+      positionalTargetId,
+      operationId,
+      'keystone'
+    );
+    if (
+      !target.success ||
+      !operationId ||
+      !positionalTargetId ||
+      isHardwareOperationId(positionalTargetId)
+    ) {
+      return target;
+    }
+    const operation = this._operations.find(operationId);
+    const positionalMfp = keystoneMfpFromIdentifier(positionalTargetId);
+    const operationMfp = operation ? keystoneMfpFromIdentifier(operation.connectId) : undefined;
+    if (positionalMfp && operationMfp && positionalMfp !== operationMfp) {
+      return failure(
+        HardwareErrorCode.InvalidParams,
+        'Keystone connectId and operationId name different wallets'
+      );
+    }
+    return target;
+  }
+
   private _resolveTarget(
     connectId?: string,
     deviceId?: string
