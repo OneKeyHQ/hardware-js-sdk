@@ -2980,6 +2980,98 @@ describe('LedgerAdapter', () => {
       expect(save).toHaveBeenCalledTimes(1);
     });
 
+    describe('all-network bundle on an unchecked BLE pick', () => {
+      const evmAddress = '0x1111111111111111111111111111111111111111';
+      const solAddress = 'SoLExpectedFingerprintAddress';
+      const bundle = [
+        {
+          network: 'evm',
+          methodName: 'evmGetAddress' as const,
+          path: "m/44'/60'/0'/0/0",
+          chainId: 1,
+          deviceId: deriveDeviceFingerprint(evmAddress),
+        },
+        {
+          network: 'sol',
+          methodName: 'solGetAddress' as const,
+          path: "m/44'/501'/0'/0'",
+          deviceId: deriveDeviceFingerprint(solAddress),
+        },
+      ];
+      const appNotInstalled = () =>
+        Object.assign(new Error('Failed to open "Ethereum"'), {
+          _tag: 'OpenAppCommandError',
+          errorCode: '6807',
+          statusCode: '6807',
+          appName: 'Ethereum',
+        });
+
+      function pickDevOne(): jest.Mock {
+        const select = jest.fn();
+        adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+          select();
+          adapter.uiResponse({
+            type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+            payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
+          });
+        });
+        return select;
+      }
+
+      it('keeps the shared pick when the first item fails before its wallet check', async () => {
+        Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+        const save = acknowledgeBindings();
+        const select = pickDevOne();
+        connector.callImpl
+          .mockRejectedValueOnce(appNotInstalled())
+          .mockResolvedValueOnce({ address: solAddress })
+          .mockResolvedValueOnce({ address: 'business-address' });
+
+        const result = await adapter.allNetworkGetAddress('', '', {
+          autoInstallApp: false,
+          bundle,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.payload[0]).toMatchObject({
+            success: false,
+            payload: { code: HardwareErrorCode.AppNotInstalled },
+          });
+          expect(result.payload[1]).toMatchObject({
+            success: true,
+            payload: { address: 'business-address' },
+          });
+        }
+        expect(select).toHaveBeenCalledTimes(1);
+        expect(save).toHaveBeenCalledTimes(1);
+        expect(connector.disconnect).not.toHaveBeenCalled();
+      });
+
+      it('drops the shared pick when no item passes its wallet check', async () => {
+        Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+        const save = acknowledgeBindings();
+        const select = pickDevOne();
+        connector.callImpl.mockRejectedValueOnce(appNotInstalled());
+
+        const result = await adapter.allNetworkGetAddress('', '', {
+          autoInstallApp: false,
+          bundle: [bundle[0]],
+        });
+
+        expect(result.success).toBe(true);
+        expect(save).not.toHaveBeenCalled();
+        expect(connector.disconnect).toHaveBeenCalledTimes(1);
+
+        connector.callImpl
+          .mockResolvedValueOnce({ address: evmAddress })
+          .mockResolvedValueOnce({ address: 'business-address' });
+        expect((await adapter.evmGetAddress('', bundle[0].deviceId, bundle[0])).success).toBe(true);
+        expect(select).toHaveBeenCalledTimes(2);
+        expect(save).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it('connects the explicitly targeted device even when multiple USB devices are present', async () => {
       connector.searchDevices.mockResolvedValueOnce([
         { connectId: 'dev-A', deviceId: 'dev-A', name: 'Nano X', model: 'nanoX' },
