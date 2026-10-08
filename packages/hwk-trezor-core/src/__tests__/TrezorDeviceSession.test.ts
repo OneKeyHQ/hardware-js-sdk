@@ -540,6 +540,45 @@ describe('TrezorDeviceSession', () => {
     expect(createCall?.data.passphrase).not.toBe(PASSPHRASE_COMPOSED);
   });
 
+  test.each([
+    [true, true, true],
+    [true, false, false],
+    [false, true, false],
+  ])(
+    'v1 empty-passphrase session with protection=%s and always-on-device=%s refuses: %s',
+    async (passphraseProtection, alwaysOnDevice, refuses) => {
+      const calls: CallRecord[] = [];
+      const session = new TrezorDeviceSession({
+        transport: new EmptyTransport(),
+        connectionType: 'usb',
+        coreFactory: createFactory(calls, [
+          { type: 'Features', message: features },
+          {
+            type: 'Features',
+            message: {
+              ...features,
+              passphrase_protection: passphraseProtection,
+              passphrase_always_on_device: alwaysOnDevice,
+            },
+          },
+        ]),
+      });
+      await session.initialize();
+
+      const created = session.createV1AppSession({ passphraseMode: 'empty' });
+
+      if (refuses) {
+        await expect(created).rejects.toMatchObject({
+          name: 'TrezorFailureError',
+          code: 'Failure_DataError',
+          message: expect.stringContaining('PASSPHRASE_ALWAYS_ON_DEVICE'),
+        });
+      } else {
+        await expect(created).resolves.toBeUndefined();
+      }
+    }
+  );
+
   test('NFKD-normalizes the passphrase in PassphraseAck (v1)', async () => {
     const calls: CallRecord[] = [];
     const session = new TrezorDeviceSession({
