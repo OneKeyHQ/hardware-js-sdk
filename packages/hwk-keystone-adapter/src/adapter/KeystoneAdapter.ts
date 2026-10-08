@@ -1917,8 +1917,8 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   /**
-   * Decides QR vs USB for one UR round trip. A pinned 'usb' with no live session fails closed;
-   * otherwise a failed USB reattach leaves the call on QR.
+   * Decides QR vs USB for one UR round trip. A pinned 'usb' with no live session reattaches once
+   * and fails closed if that fails; otherwise a failed USB reattach leaves the call on QR.
    */
   private async _resolveUr(
     record: KeystoneDeviceRecord | undefined,
@@ -1966,10 +1966,11 @@ export class KeystoneAdapter implements IHardwareWallet {
       }
       interactionRoute = route;
     }
-    // One best-effort USB reattach; a failure is not surfaced and the call stays on QR.
+    // One USB reattach. Unpinned, a failure is not surfaced and the call stays on QR; pinned to
+    // USB, an enumeration error surfaces and a missing device fails closed below.
     if (
       !interactionRoute &&
-      !this._forcedTransport &&
+      this._forcedTransport !== 'qr' &&
       record &&
       !record.usbSessionId &&
       this._usbConnector
@@ -2128,25 +2129,12 @@ export class KeystoneAdapter implements IHardwareWallet {
     if (existingRecord && booked) {
       return { record: existingRecord, account: booked };
     }
-    if (
-      !operationConnectionType &&
-      existingRecord &&
-      !existingRecord.usbSessionId &&
-      this._forcedTransport === 'usb'
-    ) {
-      // Pinned to USB without a session: attach here so enumeration errors
-      // surface (resolveUr skips its probe for pinned transports).
-      await this._tryUsbAttach(signal, existingRecord.masterFingerprint, {
-        waitForReenumeration: existingRecord.hadUsbSession,
-      });
-      KeystoneAdapter._throwIfAborted(signal);
-      existingRecord = this._devices.get(existingRecord.masterFingerprint) ?? existingRecord;
-    }
-
-    // A leftover USB session must not change a QR operation's request.
+    // A leftover USB session must not change a QR operation's request. Pinned to USB, resolveUr
+    // reattaches a missing session or fails, so the request always goes over USB.
     const useSinglePathUsbExport = operationConnectionType
       ? operationConnectionType === 'usb'
-      : this._forcedTransport !== 'qr' && Boolean(existingRecord?.usbSessionId);
+      : this._forcedTransport === 'usb' ||
+        (this._forcedTransport !== 'qr' && Boolean(existingRecord?.usbSessionId));
     const schemas = [keySchema(hwkChain, syncPath)];
     const requestUr = this.urEngine.buildKeyDerivationRequest({ schemas, origin: this._origin });
     const responseUr = await this._resolveUr(existingRecord, requestUr, false, connectId, signal);
