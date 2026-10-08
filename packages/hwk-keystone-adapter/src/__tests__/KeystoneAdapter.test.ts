@@ -3087,6 +3087,8 @@ describe('KeystoneAdapter', () => {
       ['evmGetAddress', "m/44'/60'/0'/0/-1"],
       ['btcGetAddress', "m/84'/0'/0'/0H/0"],
       ['tronGetAddress', "m/44'/195'/0'/0/0'"],
+      ['solGetAddress', "m/44'/501'/0'/0"],
+      ['solGetAddress', "m/44'/501'/0h/0'"],
     ] as const)('refuses %s for a malformed leaf path %s', async (method, path) => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);

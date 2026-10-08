@@ -1213,6 +1213,13 @@ export class KeystoneAdapter implements IHardwareWallet {
     if (!params.path)
       return failure(HardwareErrorCode.InvalidParams, 'solGetAddress requires params.path');
     const path = normalizePath(params.path);
+    // Ed25519 keys only derive along hardened segments; do not rely on firmware to refuse others.
+    if (!/^m(\/\d+')+$/.test(path)) {
+      return failure(
+        HardwareErrorCode.InvalidParams,
+        "solGetAddress requires a fully hardened path, e.g. m/44'/501'/0'/0'"
+      );
+    }
 
     return this._runJob(connectId, deviceId, async signal => {
       const { account } = await this._fetchAccount(connectId, deviceId, 'sol', path, signal, book);
