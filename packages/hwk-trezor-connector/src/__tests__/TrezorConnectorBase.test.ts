@@ -3658,6 +3658,7 @@ describe('TrezorConnectorBase', () => {
   test.each([
     ['an unknown purpose without scriptType', { path: "m/45'/0'/0'/0/0" }],
     ['a p2wsh scriptType', { path: "m/84'/0'/0'/0/0", scriptType: 'p2wsh' }],
+    ['an addressIndex on top of the path', { path: "m/84'/0'/0'/0/0", addressIndex: 5 }],
   ])('btcGetAddress: refuses %s instead of guessing', async (_name, request) => {
     const connector = new SessionBackedTestTrezorConnector(
       [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor', model: 'T3W1' }],

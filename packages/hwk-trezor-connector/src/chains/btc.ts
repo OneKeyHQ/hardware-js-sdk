@@ -791,6 +791,14 @@ function readBtcGetAddressParams(params: unknown): BtcGetAddressParams {
     throw createInvalidParamsError('btcGetAddress requires a non-empty path');
   }
 
+  // The address comes from the full path alone; an index on top would be silently dropped.
+  const { addressIndex, change } = params as { addressIndex?: unknown; change?: unknown };
+  if (addressIndex !== undefined || change !== undefined) {
+    throw createInvalidParamsError(
+      'Trezor btcGetAddress takes the full address path; addressIndex and change are not supported'
+    );
+  }
+
   const { coin } = params as { coin?: unknown };
   if (coin !== undefined && typeof coin !== 'string') {
     throw createInvalidParamsError('btcGetAddress coin must be a string when provided');

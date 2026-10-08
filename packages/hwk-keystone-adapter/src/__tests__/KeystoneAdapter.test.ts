@@ -3106,6 +3106,42 @@ describe('KeystoneAdapter', () => {
       await adapter.dispose();
     });
 
+    it.each([
+      ['a non-mainnet coin', { coin: 'ltc' }, HardwareErrorCode.ChainNotSupported],
+      ['an addressIndex on top of the path', { addressIndex: 3 }, HardwareErrorCode.InvalidParams],
+    ] as const)('btcGetAddress refuses %s', async (_name, extra, code) => {
+      const adapter = newTestAdapter();
+      const qrFake = attachFakeDevice(adapter);
+
+      const result = await adapter.btcGetAddress(null, FIXTURE_MFP, {
+        path: "m/84'/0'/0'/0/0",
+        ...extra,
+      });
+
+      expect(result).toMatchObject({ success: false, payload: { code } });
+      expect(qrFake.requests).toHaveLength(0);
+    });
+
+    it('fails a non-BTC network item instead of labelling a mainnet key', async () => {
+      const adapter = newTestAdapter();
+      attachFakeDevice(adapter);
+
+      const result = await adapter.allNetworkGetAddress('', FIXTURE_MFP, {
+        bundle: [
+          { methodName: 'btcGetPublicKey', network: 'ltc', path: "m/84'/0'/0'" },
+          { methodName: 'btcGetPublicKey', network: 'btc', path: "m/84'/0'/0'" },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.payload[0]).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.ChainNotSupported },
+      });
+      expect(result.payload[1].success).toBe(true);
+    });
+
     it('checks a wallet named only on the bundle items', async () => {
       const adapter = newTestAdapter();
       attachFakeDevice(adapter, { root: OTHER_ROOT, mfpHex: mfpOf(OTHER_ROOT) });
