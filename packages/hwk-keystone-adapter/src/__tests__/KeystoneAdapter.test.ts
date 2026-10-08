@@ -2007,6 +2007,59 @@ describe('KeystoneAdapter', () => {
       }
     );
 
+    // Only the device declining a chain leaves that item to fail alone; every safety answer and an
+    // unattributed failure still end the whole bundle.
+    it.each([
+      ['the device declines the chain', HardwareErrorCode.ChainNotSupported, 'device', true],
+      ['the device is locked', HardwareErrorCode.DeviceLocked, 'device', false],
+      ['the wallet does not match', HardwareErrorCode.DeviceMismatch, 'device', false],
+      ['the device rejects the parameters', HardwareErrorCode.InvalidParams, 'device', false],
+      ['an unattributed chain failure', HardwareErrorCode.ChainNotSupported, undefined, false],
+    ] as const)(
+      'handles a USB bundle path failure where %s',
+      async (_name, code, origin, continues) => {
+        const usb = fakeUsbConnector();
+        const adapter = newTestAdapter(usb.connector);
+        const qrFake = attachFakeDevice(adapter);
+        expect((await connectUsbDevice(adapter)).success).toBe(true);
+        const solPath = "m/44'/501'/1'/0'";
+        const callUsb = usb.connector.call.bind(usb.connector);
+        jest.spyOn(usb.connector, 'call').mockImplementation((sessionId, method, params) => {
+          const { urType, urData } = params as { urType: string; urData: string };
+          if (urType === 'qr-hardware-call' && requestedPathsOfUr(urData).includes(solPath)) {
+            return Promise.resolve({
+              success: false,
+              error: { code, message: 'declined', params: origin ? { origin } : undefined },
+            });
+          }
+          return callUsb(sessionId, method, params);
+        });
+
+        const result = await adapter.allNetworkGetAddress(
+          `keystone-wallet:${FIXTURE_MFP}`,
+          FIXTURE_MFP,
+          {
+            bundle: [
+              { methodName: 'btcGetPublicKey', network: 'btc', path: "m/44'/0'/0'" },
+              { methodName: 'solGetAddress', network: 'sol', path: solPath },
+              { methodName: 'evmGetAddress', network: 'evm', path: "m/44'/60'/1'/0/0" },
+            ],
+          }
+        );
+
+        if (continues) {
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(result.payload.map(item => item.success)).toEqual([true, false, true]);
+          expect(result.payload[1].payload).toMatchObject({ code });
+        } else {
+          expect(result).toMatchObject({ success: false, payload: { code } });
+        }
+        expect(qrFake.requests).toHaveLength(0);
+        await adapter.dispose();
+      }
+    );
+
     it('a named cancel leaves a UI request that belongs to another flow alone', async () => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);
@@ -2683,6 +2736,30 @@ describe('KeystoneAdapter', () => {
       expect(qrFake.requests).toHaveLength(qrRequestsAfterConnect + 1);
     });
 
+    it("keeps a QR-routed all-network prefetch on QR after switchTransport('usb')", async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      const qrConnected = await connectQrDevice(adapter);
+      expect(qrConnected.success).toBe(true);
+      if (!qrConnected.success) return;
+      await adapter.switchTransport('usb');
+      const qrRequestsBefore = qrFake.requests.length;
+
+      const result = await adapter.allNetworkGetAddress(
+        `keystone-wallet:${FIXTURE_MFP}`,
+        FIXTURE_MFP,
+        {
+          operationId: qrConnected.payload,
+          bundle: [{ methodName: 'evmGetAddress', network: 'evm', path: "m/44'/60'/0'/0/0" }],
+        }
+      );
+
+      expect(result.success).toBe(true);
+      expect(usb.calls).toHaveLength(0);
+      expect(qrFake.requests).toHaveLength(qrRequestsBefore + 1);
+    });
+
     it('restores USB from a persisted wallet identity before a cold account sync', async () => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);
@@ -3041,6 +3118,31 @@ describe('KeystoneAdapter', () => {
       });
       // One re-enumeration wait, not one per layer.
       expect(usb.searchCalls).toHaveLength(4);
+      await adapter.dispose();
+    });
+
+    it('waits for re-enumeration once after a lost USB session, then probes once', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      expect((await adapter.importFromQr()).success).toBe(true);
+      const connected = await connectUsbDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      await adapter.releaseOperation(connected.payload);
+      usb.emitDisconnect();
+      usb.setAvailable(false);
+      usb.searchCalls.length = 0;
+      const params = { path: "m/44'/60'/0'/0/0", serializedTx: `02${'ab'.repeat(30)}` };
+
+      expect((await adapter.evmSignTransaction(null, FIXTURE_MFP, params)).success).toBe(true);
+      expect(usb.searchCalls).toHaveLength(4);
+      expect((await adapter.evmSignTransaction(null, FIXTURE_MFP, params)).success).toBe(true);
+      expect(usb.searchCalls).toHaveLength(5);
+      expect(qrFake.requests.slice(-2).map(r => r.data.urType)).toEqual([
+        'eth-sign-request',
+        'eth-sign-request',
+      ]);
       await adapter.dispose();
     });
 

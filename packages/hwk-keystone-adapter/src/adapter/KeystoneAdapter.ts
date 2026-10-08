@@ -1557,9 +1557,10 @@ export class KeystoneAdapter implements IHardwareWallet {
         return { book };
       }
       const requestedSchemas = Array.from(requestedByKey.values());
-      const assertAllBooked = () => {
+      const assertAllBooked = (unsupportedKeys?: Set<string>) => {
         for (const schema of requestedSchemas) {
-          if (!book.has(accountKey(schema.hwkChain, schema.path))) {
+          const key = accountKey(schema.hwkChain, schema.path);
+          if (!book.has(key) && !unsupportedKeys?.has(key)) {
             throw createHwkError({
               code: HardwareErrorCode.DeviceMismatch,
               message: `Keystone did not return the requested derivation path (${schema.path})`,
@@ -1601,25 +1602,35 @@ export class KeystoneAdapter implements IHardwareWallet {
             });
           }
         };
+        const unsupportedKeys = new Set<string>();
         for (const schema of requestedSchemas) {
-          if (!book.has(accountKey(schema.hwkChain, schema.path))) {
+          const key = accountKey(schema.hwkChain, schema.path);
+          if (!book.has(key)) {
             assertBundleSession();
-            const synced = await this._fetchAccount(
-              connectId,
-              deviceId,
-              schema.hwkChain,
-              schema.path,
-              signal,
-              book
-            );
-            record = synced.record;
+            try {
+              const synced = await this._fetchAccount(
+                connectId,
+                deviceId,
+                schema.hwkChain,
+                schema.path,
+                signal,
+                book
+              );
+              record = synced.record;
+            } catch (error) {
+              // Only the device declining this chain is left to its own item, which fails alone
+              // after a fresh wallet check. Every other failure still ends the bundle.
+              const { code, origin } = error as { code?: unknown; origin?: unknown };
+              if (code !== HardwareErrorCode.ChainNotSupported || origin !== 'device') throw error;
+              unsupportedKeys.add(key);
+            }
             assertBundleSession();
           }
         }
-        assertAllBooked();
+        assertAllBooked(unsupportedKeys);
         return { book, masterFingerprint: record.masterFingerprint };
       }
-      if (this._forcedTransport === 'usb') {
+      if (this._forcedTransport === 'usb' && !routedToQr) {
         throw createHwkError({
           code: HardwareErrorCode.TransportNotAvailable,
           message: 'USB channel is not connected for this Keystone wallet',
@@ -1895,6 +1906,12 @@ export class KeystoneAdapter implements IHardwareWallet {
       }
     }
     if (!availableDevices.length) {
+      // Waiting for re-enumeration is for the first call after a session was lost; once a full
+      // wait finds nothing, later calls probe once.
+      const record = options?.waitForReenumeration
+        ? this._devices.get(expectedMasterFingerprint)
+        : undefined;
+      if (record) record.hadUsbSession = false;
       if (this._forcedTransport === 'usb' && lastSearchError) {
         throw lastSearchError instanceof Error
           ? lastSearchError
