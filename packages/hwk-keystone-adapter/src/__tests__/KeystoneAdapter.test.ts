@@ -3210,6 +3210,24 @@ describe('KeystoneAdapter', () => {
       expect(requestedPathsOf(qrFake.requests[0])).toEqual(["m/44'/501'/0'/0'"]);
     });
 
+    it('refuses a positional wallet that differs from the operation wallet', async () => {
+      const adapter = newTestAdapter();
+      attachFakeDevice(adapter, { root: OTHER_ROOT, mfpHex: mfpOf(OTHER_ROOT) });
+      const otherWallet = await connectQrDevice(adapter);
+      expect(otherWallet.success).toBe(true);
+      if (!otherWallet.success) return;
+
+      const result = await adapter.evmGetAddress(`keystone-wallet:${FIXTURE_MFP}`, null, {
+        path: "m/44'/60'/0'/0/0",
+        operationId: otherWallet.payload,
+      });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.InvalidParams },
+      });
+    });
+
     it('checks a wallet named only on the bundle items', async () => {
       const adapter = newTestAdapter();
       attachFakeDevice(adapter, { root: OTHER_ROOT, mfpHex: mfpOf(OTHER_ROOT) });
