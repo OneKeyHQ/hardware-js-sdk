@@ -3,6 +3,7 @@ import {
   failure,
   isConnectionLost,
   isUserRefusal,
+  isWalletSafetyFailure,
   resolveHardwareOperationTarget,
   runAllNetworkGetAddress,
 } from '@onekeyfe/hwk-adapter-core';
@@ -224,9 +225,7 @@ function isTopLevelAllNetworkFailure(response: AllNetworkAddressResponse): boole
     return false;
   }
   const code = response.payload?.code;
-  // DeviceMismatch is Ledger-only: the rest of the bundle would derive against
-  // a device the caller did not ask for.
-  return code === HardwareErrorCode.DeviceMismatch || isUserRefusal(code) || isConnectionLost(code);
+  return isWalletSafetyFailure(code) || isUserRefusal(code) || isConnectionLost(code);
 }
 
 function getItemDeviceId(item: AllNetworkAddressParams): string | undefined {

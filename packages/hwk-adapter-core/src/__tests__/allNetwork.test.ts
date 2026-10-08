@@ -3,6 +3,7 @@ import {
   failure,
   isConnectionLost,
   isUserRefusal,
+  isWalletSafetyFailure,
   runAllNetworkGetAddress,
   success,
 } from '../index';
@@ -186,6 +187,24 @@ describe('shared bundle abort table', () => {
     expect(isConnectionLost(HardwareErrorCode.OperationNotFound)).toBe(true);
     expect(isConnectionLost(HardwareErrorCode.UserRejected)).toBe(false);
     expect(isConnectionLost(undefined)).toBe(false);
+  });
+
+  it('names a wallet that could not be shown to be the requested one', () => {
+    for (const code of [
+      HardwareErrorCode.DeviceMismatch,
+      HardwareErrorCode.DeviceSearchMismatch,
+      HardwareErrorCode.DeviceLocked,
+      HardwareErrorCode.PinInvalid,
+      HardwareErrorCode.PinMismatch,
+      HardwareErrorCode.PassphraseRejected,
+      HardwareErrorCode.PassphraseStateMismatch,
+      HardwareErrorCode.PassphraseAlwaysOnDevice,
+    ]) {
+      expect(isWalletSafetyFailure(code)).toBe(true);
+    }
+    expect(isWalletSafetyFailure(HardwareErrorCode.ChainNotSupported)).toBe(false);
+    expect(isWalletSafetyFailure(HardwareErrorCode.AppNotInstalled)).toBe(false);
+    expect(isWalletSafetyFailure(undefined)).toBe(false);
   });
 
   it('ends a bundle at the refused item instead of asking for the next chain', async () => {
