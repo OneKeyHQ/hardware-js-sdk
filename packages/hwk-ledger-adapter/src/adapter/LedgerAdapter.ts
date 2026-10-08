@@ -2775,14 +2775,15 @@ export class LedgerAdapter implements IHardwareWallet {
         if (!fp.success) {
           if (pendingBinding) {
             // A fresh pick holding another wallet is neither saved nor reused.
-            // Without an operation the DeviceMismatch handler below drops it.
             this._discardPendingBinding(bindingOwner, 'failed');
             this._pendingPickBindings.delete(resolvedConnectId);
-            if (operationId) {
-              this._pendingOperationBindings.delete(operationId);
-              this._operations.end(operationId, 'explicit');
-              await this._dropSession(resolvedConnectId, signal);
-            }
+          }
+          // An operation proven to hold another wallet ends, so a later call on it cannot run
+          // unchecked against that wallet. Without an operation the handler below drops it.
+          if (operationId) {
+            this._pendingOperationBindings.delete(operationId);
+            this._operations.end(operationId, 'explicit');
+            await this._dropSession(resolvedConnectId, signal);
           }
           throw Object.assign(new Error(formatDeviceMismatchError(fp.expected, fp.actual)), {
             code: HardwareErrorCode.DeviceMismatch,
