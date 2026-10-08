@@ -2991,6 +2991,59 @@ describe('KeystoneAdapter', () => {
       expect(qrFake.requests.at(-1)?.data.urType).toBe('eth-sign-request');
     });
 
+    it("reattaches USB for a signing call pinned with switchTransport('usb') after a disconnect", async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      const imported = await adapter.importFromQr();
+      expect(imported.success).toBe(true);
+      const connected = await connectUsbDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      await adapter.releaseOperation(connected.payload);
+      usb.emitDisconnect();
+      await adapter.switchTransport('usb');
+      usb.connectArgs.length = 0;
+      const qrRequestsBeforeSign = qrFake.requests.length;
+
+      const result = await adapter.evmSignTransaction(null, FIXTURE_MFP, {
+        path: "m/44'/60'/0'/0/0",
+        serializedTx: `02${'ab'.repeat(30)}`,
+      });
+
+      expect(result.success).toBe(true);
+      expect(usb.connectArgs).toEqual([FIXTURE_MFP]);
+      expect(qrFake.requests).toHaveLength(qrRequestsBeforeSign);
+      await adapter.dispose();
+    });
+
+    it('probes USB once for a pinned address call while the device is unplugged', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      attachFakeDevice(adapter);
+      expect((await adapter.importFromQr()).success).toBe(true);
+      const connected = await connectUsbDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      await adapter.releaseOperation(connected.payload);
+      usb.emitDisconnect();
+      await adapter.switchTransport('usb');
+      usb.setAvailable(false);
+      usb.searchCalls.length = 0;
+
+      const result = await adapter.evmGetAddress(null, FIXTURE_MFP, {
+        path: "m/44'/60'/0'/0/1",
+      });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.TransportNotAvailable },
+      });
+      // One re-enumeration wait, not one per layer.
+      expect(usb.searchCalls).toHaveLength(4);
+      await adapter.dispose();
+    });
+
     it('releaseOperation() demotes a QR+USB merged wallet back to QR-only, keeping the entry', async () => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);
