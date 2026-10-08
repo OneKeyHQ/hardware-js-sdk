@@ -67,6 +67,13 @@ export async function requestBleDeviceSelection({
     });
   };
   signal.addEventListener('abort', cancel, { once: true });
+  // A failed rescan keeps a published list the user can still pick from, and cannot undo a pick
+  // already made. With nothing listed yet, the error ends the selection.
+  const rescan = () =>
+    scan().catch((error: unknown) => {
+      if (stopped || signal.aborted || devices.length) return undefined;
+      throw error;
+    });
   let polling: Promise<DeviceInfo | undefined> | undefined;
   try {
     publish();
@@ -74,14 +81,16 @@ export async function requestBleDeviceSelection({
       // A host can answer the initial snapshot synchronously.
       await Promise.resolve();
       while (!stopped) {
-        const snapshot = await scan();
+        const snapshot = await rescan();
         if (stopped || signal.aborted) return;
         const usbFallback = allowUsbFallback
-          ? snapshot.find(device => device.connectionType === 'usb')
+          ? snapshot?.find(device => device.connectionType === 'usb')
           : undefined;
         if (usbFallback) return usbFallback;
-        devices = snapshot;
-        publish();
+        if (snapshot) {
+          devices = snapshot;
+          publish();
+        }
         await waitForNextScan();
       }
     })();

@@ -189,6 +189,32 @@ describe('SDK-owned BLE binding discovery', () => {
     expect(scan).not.toHaveBeenCalled();
   });
 
+  it('keeps a listed device selectable when a rescan fails', async () => {
+    const { run, scan, select, requests, registry } = setup([candidate]);
+    scan.mockRejectedValue(new Error('rescan failed'));
+    const pending = run();
+    await flush();
+    select(requests[0].requestId);
+    await expect(pending).resolves.toMatchObject({ device: candidate });
+    expect(registry.hasPending()).toBe(false);
+  });
+
+  it('keeps a pick made while a rescan that later fails was in flight', async () => {
+    const { run, scan, select, requests } = setup([candidate]);
+    let failScan!: (error: Error) => void;
+    scan.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        failScan = reject;
+      })
+    );
+    const pending = run();
+    await flush();
+    select(requests[0].requestId);
+    await flush();
+    failScan(new Error('rescan failed'));
+    await expect(pending).resolves.toMatchObject({ device: candidate });
+  });
+
   it('surfaces a discovery error and removes its unanswered UI request', async () => {
     const { run, scan, registry } = setup();
     scan.mockRejectedValue(new Error('scan failed'));
