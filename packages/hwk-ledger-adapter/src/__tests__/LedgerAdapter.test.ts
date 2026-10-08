@@ -3454,6 +3454,95 @@ describe('LedgerAdapter', () => {
       expect(methodsCalled()).not.toContain('installApp');
     });
 
+    describe('all-network wallet check', () => {
+      const evmItem = {
+        network: 'evm',
+        methodName: 'evmGetAddress' as const,
+        path: "m/44'/60'/0'/0/0",
+        chainId: 1,
+        deviceId: evmFingerprint,
+      };
+      const uncheckedSolItem = {
+        network: 'sol',
+        methodName: 'solGetAddress' as const,
+        path: "m/44'/501'/0'/0'",
+      };
+      const lockedErr = () =>
+        Object.assign(new Error('Ledger is locked'), { code: HardwareErrorCode.DeviceLocked });
+      const confirmUnlock = () =>
+        adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, () => {
+          adapter.uiResponse({
+            type: UI_RESPONSE.RECEIVE_DEVICE_CONNECT,
+            payload: { confirmed: true },
+          });
+        });
+
+      it('does not derive an unchecked chain when no item has verified the wallet', async () => {
+        connector.callImpl.mockRejectedValueOnce(makeAppNotInstalledErr('Ethereum'));
+        await adapter.connectDevice('dev-1');
+
+        const result = await adapter.allNetworkGetAddress('dev-1', '', {
+          autoInstallApp: false,
+          bundle: [evmItem, uncheckedSolItem],
+        });
+
+        expect(result).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.DeviceMismatch },
+        });
+        expect(methodsCalled()).toEqual(['evmGetAddress']);
+      });
+
+      it('derives an unchecked chain once an item has verified the wallet', async () => {
+        connector.callImpl
+          .mockResolvedValueOnce({ address: evmFingerprintAddress })
+          .mockResolvedValueOnce({ address: '0xEVM' })
+          .mockResolvedValueOnce({ address: 'SOL' })
+          .mockResolvedValueOnce({ address: solFingerprintAddress });
+        await adapter.connectDevice('dev-1');
+
+        const result = await adapter.allNetworkGetAddress('dev-1', '', {
+          bundle: [evmItem, uncheckedSolItem],
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.payload.map(item => item.success)).toEqual([true, true]);
+      });
+
+      it('stops deriving unchecked chains after an unlock, which may open another seed', async () => {
+        confirmUnlock();
+        connector.callImpl
+          .mockResolvedValueOnce({ address: evmFingerprintAddress })
+          .mockResolvedValueOnce({ address: '0xEVM' })
+          .mockRejectedValueOnce(lockedErr());
+        await adapter.connectDevice('dev-1');
+
+        const result = await adapter.allNetworkGetAddress('dev-1', '', {
+          bundle: [evmItem, uncheckedSolItem],
+        });
+
+        expect(result).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.DeviceMismatch },
+        });
+        expect(methodsCalled()).toEqual(['evmGetAddress', 'evmGetAddress', 'solGetAddress']);
+      });
+
+      it('still derives an onboarding bundle that names no wallet', async () => {
+        connector.callImpl
+          .mockResolvedValueOnce({ address: 'SOL' })
+          .mockResolvedValueOnce({ address: solFingerprintAddress });
+        await adapter.connectDevice('dev-1');
+
+        const result = await adapter.allNetworkGetAddress('dev-1', '', {
+          bundle: [uncheckedSolItem],
+        });
+
+        expect(result).toMatchObject({ success: true, payload: [{ success: true }] });
+      });
+    });
+
     it('allNetworkGetAddress returns item failures when install runs out of memory', async () => {
       connector.callImpl
         .mockResolvedValueOnce({ address: evmFingerprintAddress })
