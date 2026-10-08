@@ -871,6 +871,22 @@ export class TrezorDeviceSession {
     const response = await this.core!.call('Initialize', {});
     this.currentFeatures = expectMessage(response, 'Features').message;
     this.thpAppSessionActive = false;
+    // v1 firmware with the passphrase always entered on the device prompts on its own screen
+    // instead of sending PassphraseRequest, so an empty passphrase cannot be enforced; refuse
+    // as THP firmware does rather than return whichever wallet the user opens.
+    if (
+      passphraseMode === 'empty' &&
+      this.currentFeatures?.passphrase_protection === true &&
+      this.currentFeatures?.passphrase_always_on_device === true
+    ) {
+      throw new TrezorFailureError({
+        type: 'Failure',
+        message: {
+          code: 'Failure_DataError',
+          message: 'Empty passphrase cannot be enforced with PASSPHRASE_ALWAYS_ON_DEVICE enabled',
+        },
+      } as TrezorMessageResponse<'Failure'>);
+    }
     this.log('info', 'v1.appSession.create.done', {
       features: summarizeFeatures(this.currentFeatures),
     });
