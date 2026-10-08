@@ -1496,6 +1496,40 @@ describe('TrezorAdapter', () => {
     expect(connector.call).not.toHaveBeenCalled();
   });
 
+  it('keeps an open session while probing USB candidates for an absent wallet', async () => {
+    const connector = createSeriallessUsbConnector();
+    const adapter = new TrezorAdapter(connector);
+    const connected = await adapter.connectDevice('trezor-webusb-1209-53c1-0');
+    expect(connected.success).toBe(true);
+    if (!connected.success) return;
+
+    const result = await adapter.evmGetAddress('', 'a-wallet-that-is-not-plugged-in', {
+      path: "m/44'/60'/0'/0/0",
+      showOnDevice: false,
+      useEmptyPassphrase: true,
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.DeviceSearchMismatch },
+    });
+    // Only the session the probe opened is torn down.
+    expect(connector.disconnect).toHaveBeenCalledTimes(1);
+    expect(connector.disconnect).toHaveBeenCalledWith('trezor-webusb-1209-53c1-1-session');
+
+    const followUp = await adapter.evmGetAddress(connected.payload, '', {
+      path: "m/44'/60'/0'/0/0",
+      showOnDevice: false,
+      useEmptyPassphrase: true,
+    });
+    expect(followUp.success).toBe(true);
+    expect(connector.call).toHaveBeenLastCalledWith(
+      'trezor-webusb-1209-53c1-0-session',
+      'evmGetAddress',
+      expect.any(Object)
+    );
+  });
+
   it('does not claim the wrong device when no candidate could be opened at all', async () => {
     const connector = createSeriallessUsbConnector();
     (connector.connect as ConnectMock).mockImplementation(() =>
