@@ -386,6 +386,27 @@ describe('LedgerAdapter', () => {
     ).toBe(false);
   });
 
+  it.each([
+    ['without a wallet check', '', false],
+    ['with a wallet check', 'expected-wallet', true],
+  ])(
+    'uses the plugged USB Ledger for a stale target only when the call checks the wallet (%s)',
+    async (_name, deviceId, fallsBack) => {
+      Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
+      connector.searchDevices.mockImplementation(async (options?: ConnectorSearchDevicesOptions) =>
+        options?.transportType === 'usb'
+          ? [{ connectId: 'dev-B', deviceId: 'dev-B', name: 'Nano X', model: 'nanoX' }]
+          : []
+      );
+
+      await adapter.evmGetAddress('stale-usb-A', deviceId, { path: "m/44'/60'/0'/0/0" });
+
+      expect(connector.connect.mock.calls.some(([connectId]) => connectId === 'dev-B')).toBe(
+        fallsBack
+      );
+    }
+  );
+
   it('does not treat a legacy target without transport metadata as a missing BLE binding', async () => {
     Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
     connector.searchDevices.mockResolvedValue([]);
