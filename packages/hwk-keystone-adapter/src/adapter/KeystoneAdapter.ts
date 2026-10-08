@@ -121,6 +121,31 @@ import type {
   UiResponseEvent,
 } from '@onekeyfe/hwk-adapter-core';
 
+/**
+ * Keystone BTC addresses are always derived with mainnet parameters, and only from the full path:
+ * another coin, or an index the path does not carry, would label a different address.
+ */
+function keystoneBtcParamsFailure(params: {
+  coin?: unknown;
+  addressIndex?: unknown;
+  change?: unknown;
+}): Response<never> | undefined {
+  const { coin, addressIndex, change } = params;
+  if (coin !== undefined && !['btc', 'bitcoin'].includes(String(coin).toLowerCase())) {
+    return failure(
+      HardwareErrorCode.ChainNotSupported,
+      `Keystone BTC supports Bitcoin mainnet only, not ${String(coin)}`
+    );
+  }
+  if (addressIndex !== undefined || change !== undefined) {
+    return failure(
+      HardwareErrorCode.InvalidParams,
+      'Keystone BTC takes the full address path; addressIndex and change are not supported'
+    );
+  }
+  return undefined;
+}
+
 /** Key material for one operation, keyed by `accountKey()`; never retained. */
 type AccountBook = Map<string, KeystoneAccountEntry>;
 
@@ -767,9 +792,16 @@ export class KeystoneAdapter implements IHardwareWallet {
             case 'evmGetAddress':
               return this.evmGetAddress(effectiveConnectId, itemDeviceId, commonArgs, book);
             case 'btcGetAddress':
-              return this.btcGetAddress(effectiveConnectId, itemDeviceId, commonArgs, book);
-            case 'btcGetPublicKey':
-              return this.btcGetPublicKey(effectiveConnectId, itemDeviceId, commonArgs, book);
+            case 'btcGetPublicKey': {
+              // The item's network names the coin, so it is checked like a coin param.
+              const btcArgs = {
+                ...commonArgs,
+                coin: (item as { coin?: string }).coin ?? item.network,
+              };
+              return method === 'btcGetAddress'
+                ? this.btcGetAddress(effectiveConnectId, itemDeviceId, btcArgs, book)
+                : this.btcGetPublicKey(effectiveConnectId, itemDeviceId, btcArgs, book);
+            }
             case 'solGetAddress':
               return this.solGetAddress(effectiveConnectId, itemDeviceId, commonArgs, book);
             case 'tronGetAddress':
@@ -1014,6 +1046,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     if (!params) return failure(HardwareErrorCode.InvalidParams, 'btcGetAddress requires params');
     if (!params.path)
       return failure(HardwareErrorCode.InvalidParams, 'btcGetAddress requires params.path');
+    const btcParamsFailure = keystoneBtcParamsFailure(params);
+    if (btcParamsFailure) return btcParamsFailure;
 
     const scriptType = btcScriptTypeFromPath(params.path);
     if (!scriptType) {
@@ -1072,6 +1106,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     if (!params) return failure(HardwareErrorCode.InvalidParams, 'btcGetPublicKey requires params');
     if (!params.path)
       return failure(HardwareErrorCode.InvalidParams, 'btcGetPublicKey requires params.path');
+    const btcParamsFailure = keystoneBtcParamsFailure(params);
+    if (btcParamsFailure) return btcParamsFailure;
 
     const { accountPath, relativeDerivePath } = splitAccountPath(params.path);
     if (relativeDerivePath) {
