@@ -147,7 +147,13 @@ function keystoneBtcParamsFailure(params: {
 }
 
 /** Key material for one operation, keyed by `accountKey()`; never retained. */
-type AccountBook = Map<string, KeystoneAccountEntry>;
+/**
+ * How an all-network item reads its key. QR: from the bundle's one scan, never the device again.
+ * USB: straight from the device, on the session the bundle started with.
+ */
+type BundleAccess =
+  | { channel: 'qr'; scanned: ReadonlyMap<string, KeystoneAccountEntry> }
+  | { channel: 'usb'; usbSessionId: string };
 
 type OperationRoute = { operationId: string; connectionType: 'usb' | 'qr' };
 
@@ -193,13 +199,18 @@ const BIP44_COIN_TYPE_TO_CHAIN: Record<number, ChainCapability> = {
   195: 'tron',
 };
 
-/**
- * Classifies a returned account by BIP44 coin type (2nd segment), not by
- * purpose, so 44'/49'/84'/86' BTC entries all map to `btc`.
- */
-function inferHwkChainFromPath(path: string): ChainCapability | undefined {
+/** A path's BIP44 coin type (2nd segment) must belong to the chain asking for it. */
+function hasChainCoinType(chain: ChainCapability, path: string): boolean {
   const match = normalizePath(path).match(/^m\/\d+'\/(\d+)'/);
-  return match ? BIP44_COIN_TYPE_TO_CHAIN[Number(match[1])] : undefined;
+  return Boolean(match) && BIP44_COIN_TYPE_TO_CHAIN[Number(match?.[1])] === chain;
+}
+
+function coinTypeFailure(chain: ChainCapability, path: string): Response<never> | undefined {
+  if (hasChainCoinType(chain, path)) return undefined;
+  return failure(
+    HardwareErrorCode.InvalidParams,
+    `Keystone ${chain} needs a path with its own BIP44 coin type, not ${path}`
+  );
 }
 
 export interface ImportFromQrOptions {
@@ -755,18 +766,14 @@ export class KeystoneAdapter implements IHardwareWallet {
     const [expectedDeviceId = ''] = namedWallets;
     let cancelScope: CancelScopeHandle | undefined;
     try {
-      const prefetched = await this._prefetchAllNetworkAccounts(
-        effectiveConnectId,
-        expectedDeviceId,
-        {
-          ...params,
-          operationId,
-        }
-      );
-      const { book } = prefetched;
-      // On a cold start the prefetch established the wallet identity; route
+      const prepared = await this._prepareAllNetworkBundle(effectiveConnectId, expectedDeviceId, {
+        ...params,
+        operationId,
+      });
+      const { access } = prepared;
+      // On a cold start the QR scan established the wallet identity; route
       // per-item calls to it instead of re-syncing per item.
-      const itemDeviceId = expectedDeviceId || prefetched.masterFingerprint || '';
+      const itemDeviceId = expectedDeviceId || prepared.masterFingerprint || '';
       // A cancel between two per-item jobs finds nothing to abort; the scope
       // carries it across that gap under the same queue key.
       const scope = this._jobQueue.createCancelScope(
@@ -790,7 +797,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           };
           switch (method) {
             case 'evmGetAddress':
-              return this.evmGetAddress(effectiveConnectId, itemDeviceId, commonArgs, book);
+              return this.evmGetAddress(effectiveConnectId, itemDeviceId, commonArgs, access);
             case 'btcGetAddress':
             case 'btcGetPublicKey': {
               // The item's network names the coin, so it is checked like a coin param.
@@ -799,13 +806,13 @@ export class KeystoneAdapter implements IHardwareWallet {
                 coin: (item as { coin?: string }).coin ?? item.network,
               };
               return method === 'btcGetAddress'
-                ? this.btcGetAddress(effectiveConnectId, itemDeviceId, btcArgs, book)
-                : this.btcGetPublicKey(effectiveConnectId, itemDeviceId, btcArgs, book);
+                ? this.btcGetAddress(effectiveConnectId, itemDeviceId, btcArgs, access)
+                : this.btcGetPublicKey(effectiveConnectId, itemDeviceId, btcArgs, access);
             }
             case 'solGetAddress':
-              return this.solGetAddress(effectiveConnectId, itemDeviceId, commonArgs, book);
+              return this.solGetAddress(effectiveConnectId, itemDeviceId, commonArgs, access);
             case 'tronGetAddress':
-              return this.tronGetAddress(effectiveConnectId, itemDeviceId, commonArgs, book);
+              return this.tronGetAddress(effectiveConnectId, itemDeviceId, commonArgs, access);
             default:
               return failure(
                 HardwareErrorCode.MethodNotSupported,
@@ -831,11 +838,22 @@ export class KeystoneAdapter implements IHardwareWallet {
             },
           });
         },
-        // Cancel, refusal or a lost session ends the batch; other per-item
-        // failures carry on with the next chain.
+        // Cancel, refusal, a lost connection or a safety answer (another wallet, a locked
+        // device) ends the batch; other per-item failures carry on with the next chain.
         shouldAbortBundle: (response, { index }) => {
           const { code } = response.payload ?? {};
-          return cancelledIndexes.has(index) || isUserRefusal(code) || isConnectionLost(code);
+          const usbSessionLost =
+            access?.channel === 'usb' &&
+            this._resolveTarget(effectiveConnectId, itemDeviceId).record?.usbSessionId !==
+              access.usbSessionId;
+          return (
+            cancelledIndexes.has(index) ||
+            usbSessionLost ||
+            isUserRefusal(code) ||
+            isConnectionLost(code) ||
+            code === HardwareErrorCode.DeviceMismatch ||
+            code === HardwareErrorCode.DeviceLocked
+          );
         },
       });
     } catch (err) {
@@ -853,7 +871,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<EvmGetAddressParams>>,
-    book?: AccountBook
+    bundle?: BundleAccess
   ): Promise<Response<EvmAddress>> {
     const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
@@ -862,6 +880,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     if (!params) return failure(HardwareErrorCode.InvalidParams, 'evmGetAddress requires params');
     if (!params.path)
       return failure(HardwareErrorCode.InvalidParams, 'evmGetAddress requires params.path');
+    const evmCoinTypeFailure = coinTypeFailure('evm', params.path);
+    if (evmCoinTypeFailure) return evmCoinTypeFailure;
 
     const { accountPath, relativeDerivePath } = splitAccountPath(params.path);
     if (!relativeDerivePath) {
@@ -878,7 +898,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         'evm',
         accountPath,
         signal,
-        book
+        bundle
       );
       // showOnDevice is not wired; the address is derived offline from a device-verified xpub.
       const address = this.urEngine.deriveEvmAddressFromXpub(xpub, relativeDerivePath);
@@ -1037,7 +1057,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<BtcGetAddressParams>>,
-    book?: AccountBook
+    bundle?: BundleAccess
   ): Promise<Response<BtcAddress>> {
     const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
@@ -1082,7 +1102,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         'btc',
         accountPath,
         signal,
-        book
+        bundle
       );
       const address = this.urEngine.deriveBtcAddressFromXpub(xpub, relativeDerivePath, scriptType);
       return success<BtcAddress>({ address, path: normalizedPath });
@@ -1097,7 +1117,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<BtcGetPublicKeyParams>>,
-    book?: AccountBook
+    bundle?: BundleAccess
   ): Promise<Response<BtcPublicKey>> {
     const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
@@ -1127,7 +1147,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         'btc',
         accountPath,
         signal,
-        book
+        bundle
       );
       const meta = this.urEngine.parseXpubMeta(xpub);
       return success<BtcPublicKey>({
@@ -1256,7 +1276,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<SolGetAddressParams>>,
-    book?: AccountBook
+    bundle?: BundleAccess
   ): Promise<Response<SolAddress>> {
     const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
@@ -1265,6 +1285,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     if (!params) return failure(HardwareErrorCode.InvalidParams, 'solGetAddress requires params');
     if (!params.path)
       return failure(HardwareErrorCode.InvalidParams, 'solGetAddress requires params.path');
+    const solCoinTypeFailure = coinTypeFailure('sol', params.path);
+    if (solCoinTypeFailure) return solCoinTypeFailure;
     const path = normalizePath(params.path);
     // Ed25519 keys only derive along hardened segments; do not rely on firmware to refuse others.
     if (!/^m(\/\d+')+$/.test(path)) {
@@ -1275,7 +1297,14 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
 
     return this._runJob(connectId, deviceId, async signal => {
-      const { account } = await this._fetchAccount(connectId, deviceId, 'sol', path, signal, book);
+      const { account } = await this._fetchAccount(
+        connectId,
+        deviceId,
+        'sol',
+        path,
+        signal,
+        bundle
+      );
       KeystoneAdapter._throwIfAborted(signal);
       // The Ed25519 public key is the Solana address (base58).
       const address = bs58.encode(Buffer.from(account.publicKey, 'hex'));
@@ -1367,7 +1396,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
     params?: NullableCallArg<IHardwareCallParams<TronGetAddressParams>>,
-    book?: AccountBook
+    bundle?: BundleAccess
   ): Promise<Response<TronAddress>> {
     const operationTarget = resolveHardwareOperationTarget(connectIdArg, params?.operationId);
     if (!operationTarget.success) return operationTarget;
@@ -1376,6 +1405,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     if (!params) return failure(HardwareErrorCode.InvalidParams, 'tronGetAddress requires params');
     if (!params.path)
       return failure(HardwareErrorCode.InvalidParams, 'tronGetAddress requires params.path');
+    const tronCoinTypeFailure = coinTypeFailure('tron', params.path);
+    if (tronCoinTypeFailure) return tronCoinTypeFailure;
 
     const { accountPath, relativeDerivePath } = splitAccountPath(params.path);
     if (!relativeDerivePath) {
@@ -1392,7 +1423,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         'tron',
         accountPath,
         signal,
-        book
+        bundle
       );
       const address = this.urEngine.deriveTronAddressFromXpub(xpub, relativeDerivePath);
       return success<TronAddress>({ address, path: normalizePath(params.path) });
@@ -1508,7 +1539,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     hwkChain: ChainCapability,
     accountPath: string,
     signal: AbortSignal,
-    book: AccountBook | undefined
+    bundle: BundleAccess | undefined
   ): Promise<string> {
     const { account } = await this._fetchAccount(
       connectId,
@@ -1516,7 +1547,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       hwkChain,
       accountPath,
       signal,
-      book
+      bundle
     );
     KeystoneAdapter._throwIfAborted(signal);
     if (!account.extendedPublicKey) {
@@ -1572,8 +1603,9 @@ export class KeystoneAdapter implements IHardwareWallet {
     const method = item.methodName;
     const hwkChain = getAllNetworkMethodChain(method);
     const path = normalizePath(item.path);
-    // Unsignable BTC accounts are refused by the per-item call; keep them out
-    // of the prefetch so the device is not asked to export them.
+    // Paths the per-item call refuses (another chain's coin type, an unsignable BTC account) stay
+    // out of the QR request so the device is not asked to export them.
+    if (!hasChainCoinType(hwkChain, path)) return undefined;
     if (
       hwkChain === 'btc' &&
       !isKeystoneSignableBtcAccountPath(splitAccountPath(path).accountPath)
@@ -1594,14 +1626,14 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   /**
-   * QR answers the whole bundle with one request QR and one scan. USB exports one path per
-   * request because the device limits that channel.
+   * Picks the bundle's channel. QR answers every item with one request QR and one scan; USB items
+   * each ask the device directly, like other vendors, on the session found here.
    */
-  private async _prefetchAllNetworkAccounts(
+  private async _prepareAllNetworkBundle(
     connectId: string,
     deviceId: string,
     params: AllNetworkGetAddressParams
-  ): Promise<{ book: AccountBook; masterFingerprint?: string }> {
+  ): Promise<{ access?: BundleAccess; masterFingerprint?: string }> {
     return this._jobQueue.enqueue(keystoneQueueKey(connectId, deviceId), async signal => {
       const target = this._resolveTarget(connectId, deviceId);
       let { record } = target;
@@ -1611,26 +1643,13 @@ export class KeystoneAdapter implements IHardwareWallet {
         const schema = this._allNetworkSyncSchema(item);
         if (schema) requestedByKey.set(accountKey(schema.hwkChain, schema.path), schema);
       }
-
-      const book: AccountBook = new Map();
+      const scanned = new Map<string, KeystoneAccountEntry>();
+      // Nothing to export: no channel is opened, and no item can reach the device.
       if (!requestedByKey.size) {
-        return { book };
+        return { access: { channel: 'qr', scanned } };
       }
-      const requestedSchemas = Array.from(requestedByKey.values());
-      const assertAllBooked = (unsupportedKeys?: Set<string>) => {
-        for (const schema of requestedSchemas) {
-          const key = accountKey(schema.hwkChain, schema.path);
-          if (!book.has(key) && !unsupportedKeys?.has(key)) {
-            throw createHwkError({
-              code: HardwareErrorCode.DeviceMismatch,
-              message: `Keystone did not return the requested derivation path (${schema.path})`,
-            });
-          }
-        }
-      };
 
-      // An operation routed to QR at connectDevice must stay on QR: attaching
-      // USB here would export per path while `_resolveUr` still prompts a QR.
+      // An operation routed to QR at connectDevice must stay on QR.
       const operation = isHardwareOperationId(params.operationId)
         ? this._operations.find(params.operationId)
         : undefined;
@@ -1653,42 +1672,10 @@ export class KeystoneAdapter implements IHardwareWallet {
       // importFromQr keeps a leftover usbSessionId on the record; the route,
       // not that session, decides the channel.
       if (this._forcedTransport !== 'qr' && !routedToQr && record?.usbSessionId) {
-        const bundleSessionId = record.usbSessionId;
-        const assertBundleSession = () => {
-          if (record?.usbSessionId !== bundleSessionId) {
-            throw createHwkError({
-              code: HardwareErrorCode.TransportNotAvailable,
-              message: 'Keystone USB connection was lost during account export',
-            });
-          }
+        return {
+          access: { channel: 'usb', usbSessionId: record.usbSessionId },
+          masterFingerprint: record.masterFingerprint,
         };
-        const unsupportedKeys = new Set<string>();
-        for (const schema of requestedSchemas) {
-          const key = accountKey(schema.hwkChain, schema.path);
-          if (!book.has(key)) {
-            assertBundleSession();
-            try {
-              const synced = await this._fetchAccount(
-                connectId,
-                deviceId,
-                schema.hwkChain,
-                schema.path,
-                signal,
-                book
-              );
-              record = synced.record;
-            } catch (error) {
-              // Only the device declining this chain is left to its own item, which fails alone
-              // after a fresh wallet check. Every other failure still ends the bundle.
-              const { code, origin } = error as { code?: unknown; origin?: unknown };
-              if (code !== HardwareErrorCode.ChainNotSupported || origin !== 'device') throw error;
-              unsupportedKeys.add(key);
-            }
-            assertBundleSession();
-          }
-        }
-        assertAllBooked(unsupportedKeys);
-        return { book, masterFingerprint: record.masterFingerprint };
       }
       if (this._forcedTransport === 'usb' && !routedToQr) {
         throw createHwkError({
@@ -1697,7 +1684,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         });
       }
 
-      const schemas = requestedSchemas;
+      const schemas = Array.from(requestedByKey.values());
       const requestUr = this.urEngine.buildKeyDerivationRequest({
         schemas: schemas.map(schema => keySchema(schema.hwkChain, schema.path)),
         origin: this._origin,
@@ -1712,19 +1699,23 @@ export class KeystoneAdapter implements IHardwareWallet {
       const parsed = this.urEngine.parseAccountResponse(responseUr);
       this._assertParsedIdentity(parsed, target);
       record = this._upsertDeviceRecord(parsed);
-      const requestedChainByPath = new Map(
-        schemas.map(schema => [normalizePath(schema.path), schema.hwkChain] as const)
-      );
-      for (const account of parsed.accounts) {
-        const normalizedPath = normalizePath(account.path);
-        const hwkChain =
-          requestedChainByPath.get(normalizedPath) ?? inferHwkChainFromPath(normalizedPath);
-        if (hwkChain) {
-          book.set(accountKey(hwkChain, normalizedPath), { ...account, hwkChain });
+      // Only requested paths are taken from the scan, each under the chain that asked for it.
+      for (const schema of schemas) {
+        const account = parsed.accounts.find(
+          returned => normalizePath(returned.path) === schema.path
+        );
+        if (!account) {
+          throw createHwkError({
+            code: HardwareErrorCode.DeviceMismatch,
+            message: `Keystone did not return the requested derivation path (${schema.path})`,
+          });
         }
+        scanned.set(accountKey(schema.hwkChain, schema.path), {
+          ...account,
+          hwkChain: schema.hwkChain,
+        });
       }
-      assertAllBooked();
-      return { book, masterFingerprint: record.masterFingerprint };
+      return { access: { channel: 'qr', scanned }, masterFingerprint: record.masterFingerprint };
     });
   }
 
@@ -2180,8 +2171,9 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   /**
-   * Fetches one account's key material for this operation only; `book` reuses earlier fetches. A
-   * failed USB export ends the operation without replaying or switching transports.
+   * Fetches one account's key material. An all-network QR item takes it from the bundle's scan; a
+   * USB item asks the device on the bundle's session. A failed USB export ends the operation
+   * without replaying or switching transports.
    */
   private async _fetchAccount(
     connectId: string | undefined,
@@ -2189,22 +2181,32 @@ export class KeystoneAdapter implements IHardwareWallet {
     hwkChain: ChainCapability,
     syncPath: string,
     signal: AbortSignal,
-    book?: AccountBook
+    bundle?: BundleAccess
   ): Promise<{ record: KeystoneDeviceRecord; account: KeystoneAccountEntry }> {
     const target = this._resolveTarget(connectId, deviceId);
+    if (bundle?.channel === 'qr') {
+      const scanned = bundle.scanned.get(accountKey(hwkChain, syncPath));
+      if (!target.record || !scanned) {
+        throw createHwkError({
+          code: HardwareErrorCode.DeviceMismatch,
+          message: `Keystone did not return the requested derivation path (${syncPath})`,
+        });
+      }
+      return { record: target.record, account: scanned };
+    }
+    if (bundle?.channel === 'usb' && target.record?.usbSessionId !== bundle.usbSessionId) {
+      throw createHwkError({
+        code: HardwareErrorCode.TransportNotAvailable,
+        message: 'Keystone USB connection was lost during the bundle',
+      });
+    }
     const operationConnectionType = isHardwareOperationId(connectId)
       ? this._operations.resolve(connectId).connectionType
       : undefined;
-    const key = accountKey(hwkChain, syncPath);
-
     let existingRecord = target.record;
     if (!existingRecord) {
       existingRecord = await this._tryUsbAttach(signal, target.expectedMasterFingerprint);
       KeystoneAdapter._throwIfAborted(signal);
-    }
-    const booked = book?.get(key);
-    if (existingRecord && booked) {
-      return { record: existingRecord, account: booked };
     }
     // A leftover USB session must not change a QR operation's request. Pinned to USB, resolveUr
     // reattaches a missing session or fails, so the request always goes over USB.
@@ -2240,11 +2242,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         message: `Keystone did not return the requested derivation path (${syncPath})`,
       });
     }
-    const entry: KeystoneAccountEntry = { ...account, hwkChain };
-    // Only the requested key is kept: an account filed under a chain guessed from its path could
-    // carry another curve's key and replace a requested entry.
-    book?.set(key, entry);
-    return { record, account: entry };
+    return { record, account: { ...account, hwkChain } };
   }
 
   /**

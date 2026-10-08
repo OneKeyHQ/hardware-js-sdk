@@ -1982,9 +1982,8 @@ describe('KeystoneAdapter', () => {
       expect(qrFake.requests).toHaveLength(0);
     });
 
-    // Connect sends no export, so every call is a bundle item. On USB the refusal is raised inside
-    // the prefetch and reaches the bundle's outer catch; `shouldAbortBundle` itself is covered in
-    // hwk-adapter-core's allNetwork tests.
+    // Connect sends no export, so every call is a bundle item, and each USB item asks the device
+    // itself; `shouldAbortBundle` itself is covered in hwk-adapter-core's allNetwork tests.
     it.each([
       ['a rejection of the first item', 1, HardwareErrorCode.UserRejected],
       ['a mid-operation disconnect', 2, HardwareErrorCode.DeviceNotFound],
@@ -2020,13 +2019,14 @@ describe('KeystoneAdapter', () => {
       }
     );
 
-    // Only the device declining a chain leaves that item to fail alone; every safety answer and an
-    // unattributed failure still end the whole bundle.
+    // Each USB item asks the device itself, so a device answer about its own path fails it alone;
+    // a safety answer (lock, another wallet) or an unattributed failure, which drops the session,
+    // ends the whole bundle.
     it.each([
       ['the device declines the chain', HardwareErrorCode.ChainNotSupported, 'device', true],
       ['the device is locked', HardwareErrorCode.DeviceLocked, 'device', false],
       ['the wallet does not match', HardwareErrorCode.DeviceMismatch, 'device', false],
-      ['the device rejects the parameters', HardwareErrorCode.InvalidParams, 'device', false],
+      ['the device rejects the parameters', HardwareErrorCode.InvalidParams, 'device', true],
       ['an unattributed chain failure', HardwareErrorCode.ChainNotSupported, undefined, false],
     ] as const)(
       'handles a USB bundle path failure where %s',
@@ -2712,7 +2712,7 @@ describe('KeystoneAdapter', () => {
       expect(usb.connectArgs).toHaveLength(1);
     });
 
-    it('keeps an all-network prefetch on QR when the operation was routed to QR', async () => {
+    it('keeps an all-network bundle on QR when the operation was routed to QR', async () => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);
       const qrFake = attachFakeDevice(adapter);
@@ -2749,7 +2749,7 @@ describe('KeystoneAdapter', () => {
       expect(qrFake.requests).toHaveLength(qrRequestsAfterConnect + 1);
     });
 
-    it("keeps a QR-routed all-network prefetch on QR after switchTransport('usb')", async () => {
+    it("keeps a QR-routed all-network bundle on QR after switchTransport('usb')", async () => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);
       const qrFake = attachFakeDevice(adapter);
@@ -3142,6 +3142,74 @@ describe('KeystoneAdapter', () => {
       expect(result.payload[1].success).toBe(true);
     });
 
+    it('asks the device once per USB bundle item and keeps nothing between items', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      attachFakeDevice(adapter);
+      const connected = await connectUsbDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      const paths = ["m/44'/60'/0'/0/0", "m/44'/60'/0'/0/1"];
+      const singles = [];
+      for (const path of paths) {
+        // eslint-disable-next-line no-await-in-loop
+        singles.push(await adapter.evmGetAddress(connected.payload, FIXTURE_MFP, { path }));
+      }
+      usb.calls.length = 0;
+
+      const result = await adapter.allNetworkGetAddress(connected.payload, FIXTURE_MFP, {
+        bundle: paths.map(path => ({ methodName: 'evmGetAddress' as const, network: 'evm', path })),
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      // Same account path, yet each item asked the device itself.
+      expect(usb.calls).toHaveLength(2);
+      expect(result.payload.map(item => item.payload?.address)).toEqual(
+        singles.map(single => (single.success ? single.payload.address : undefined))
+      );
+      await adapter.dispose();
+    });
+
+    it.each([
+      ['evmGetAddress', "m/44'/501'/0'/0/0"],
+      ['solGetAddress', "m/44'/60'/0'/0'"],
+      ['tronGetAddress', "m/44'/60'/0'/0/0"],
+    ] as const)('refuses %s under another chain coin type (%s)', async (method, path) => {
+      const adapter = newTestAdapter();
+      const qrFake = attachFakeDevice(adapter);
+
+      const result = await adapter[method](null, FIXTURE_MFP, { path });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.InvalidParams },
+      });
+      expect(qrFake.requests).toHaveLength(0);
+    });
+
+    it('scans once and leaves a mistyped bundle item out of the QR request', async () => {
+      const adapter = newTestAdapter();
+      const qrFake = attachFakeDevice(adapter);
+
+      const result = await adapter.allNetworkGetAddress('', FIXTURE_MFP, {
+        bundle: [
+          { methodName: 'evmGetAddress', network: 'evm', path: "m/44'/501'/0'/0/0" },
+          { methodName: 'solGetAddress', network: 'sol', path: "m/44'/501'/0'/0'" },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.payload[0]).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.InvalidParams },
+      });
+      expect(result.payload[1].success).toBe(true);
+      expect(qrFake.requests).toHaveLength(1);
+      expect(requestedPathsOf(qrFake.requests[0])).toEqual(["m/44'/501'/0'/0'"]);
+    });
+
     it('checks a wallet named only on the bundle items', async () => {
       const adapter = newTestAdapter();
       attachFakeDevice(adapter, { root: OTHER_ROOT, mfpHex: mfpOf(OTHER_ROOT) });
@@ -3380,7 +3448,7 @@ describe('KeystoneAdapter', () => {
       (queue as unknown as { enqueue: EnqueueFn }).enqueue = async (deviceId, job, options) => {
         const result = await realEnqueue(deviceId, job, options);
         settledJobs += 1;
-        // Job 1 is the bundle prefetch, job 2 is the first chain.
+        // Job 1 is the bundle's QR scan, job 2 is the first chain.
         if (settledJobs === 2) {
           cancelled = true;
           expect(queue.getActiveJob()).toBeNull();
@@ -3399,7 +3467,7 @@ describe('KeystoneAdapter', () => {
 
       expect(cancelled).toBe(true);
       // The cancelled chains neither reached the device nor came back from the
-      // prefetched book: the bundle ends, it does not quietly finish.
+      // bundle's scan: the bundle ends, it does not quietly finish.
       expect(fake.requests).toHaveLength(1);
       expect(result.success).toBe(false);
       if (!result.success) {
