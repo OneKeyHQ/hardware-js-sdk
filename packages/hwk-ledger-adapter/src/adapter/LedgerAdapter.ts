@@ -2022,14 +2022,16 @@ export class LedgerAdapter implements IHardwareWallet {
       this._activeConnectionType = 'usb';
       const usbDevices = await this._searchDevices({ transportType: 'usb' }, internalSignal);
       LedgerAdapter._throwIfAborted(internalSignal);
-      if (usbDevices.length > 0) {
-        const knownUsb = context?.knownConnections?.find(
-          connection => connection.transport === 'usb'
-        );
-        const usbTarget =
-          knownUsb?.transport === 'usb'
-            ? knownUsb.connectId
-            : usbDevices.find(device => device.connectId === targetConnectId)?.connectId;
+      const knownUsb = context?.knownConnections?.find(
+        connection => connection.transport === 'usb'
+      );
+      const usbTarget =
+        knownUsb?.transport === 'usb'
+          ? knownUsb.connectId
+          : usbDevices.find(device => device.connectId === targetConnectId)?.connectId;
+      // A named target that is not on USB may only fall back to another USB Ledger when the call
+      // checks the wallet; an unchecked call would otherwise derive on whichever one is plugged in.
+      if (usbDevices.length > 0 && (usbTarget || !targetConnectId || allowUsbEphemeralFallback)) {
         return this._connectFirstOrSelect(
           usbDevices,
           usbTarget,
