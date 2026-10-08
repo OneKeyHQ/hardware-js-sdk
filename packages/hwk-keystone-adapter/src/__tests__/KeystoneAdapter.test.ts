@@ -3106,6 +3106,49 @@ describe('KeystoneAdapter', () => {
       await adapter.dispose();
     });
 
+    it('checks a wallet named only on the bundle items', async () => {
+      const adapter = newTestAdapter();
+      attachFakeDevice(adapter, { root: OTHER_ROOT, mfpHex: mfpOf(OTHER_ROOT) });
+
+      const result = await adapter.allNetworkGetAddress('', '', {
+        bundle: [
+          {
+            methodName: 'evmGetAddress',
+            network: 'evm',
+            path: "m/44'/60'/0'/0/0",
+            deviceId: FIXTURE_MFP,
+          },
+        ],
+      });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceMismatch },
+      });
+    });
+
+    it('refuses a bundle whose items name different wallets', async () => {
+      const adapter = newTestAdapter();
+      const qrFake = attachFakeDevice(adapter);
+
+      const result = await adapter.allNetworkGetAddress('', FIXTURE_MFP, {
+        bundle: [
+          {
+            methodName: 'evmGetAddress',
+            network: 'evm',
+            path: "m/44'/60'/0'/0/0",
+            deviceId: mfpOf(OTHER_ROOT),
+          },
+        ],
+      });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.InvalidParams },
+      });
+      expect(qrFake.requests).toHaveLength(0);
+    });
+
     it('keeps a SOL key apart from another chain exported at the same path in a USB bundle', async () => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);
