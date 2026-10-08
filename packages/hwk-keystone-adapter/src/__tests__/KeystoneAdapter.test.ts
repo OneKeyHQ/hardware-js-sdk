@@ -4,6 +4,7 @@ import {
   CryptoKeypath,
   CryptoMultiAccounts,
   CryptoPSBT,
+  Curve,
   PathComponent,
   QRHardwareCall,
 } from '@keystonehq/bc-ur-registry';
@@ -79,16 +80,23 @@ function pathComponents(path: string): PathComponent[] {
     });
 }
 
-function fixtureHdKey(path: string, mfpHex: string, root = FIXTURE_ROOT): CryptoHDKey {
+function fixtureHdKey(
+  path: string,
+  mfpHex: string,
+  root = FIXTURE_ROOT,
+  ed25519 = false
+): CryptoHDKey {
   const node = root.derive(normalizePath(path));
   if (!node.publicKey || !node.chainCode) {
     throw new Error('fixtureHdKey: derived node is missing publicKey/chainCode');
   }
+  // A stand-in Ed25519 key: 32 bytes, distinct from the secp256k1 key at the same path.
+  const key = ed25519 ? Buffer.from(node.publicKey).subarray(1) : node.publicKey;
   const parentFingerprint = Buffer.alloc(4);
   parentFingerprint.writeUInt32BE(node.parentFingerprint, 0);
   return new CryptoHDKey({
     isMaster: false,
-    key: node.publicKey,
+    key,
     chainCode: node.chainCode,
     // Required alongside chainCode for the SDK to populate extendedPublicKey
     // (see keystone-sdk's parseMultiAccounts: both must be non-empty).
@@ -379,7 +387,12 @@ function fakeUsbConnector({
           const keys = (call.getParams() as KeyDerivation)
             .getSchemas()
             .map(schema =>
-              fixtureHdKey(`m/${schema.getKeypath().getPath()}`, sessionMfp, sessionRoot)
+              fixtureHdKey(
+                `m/${schema.getKeypath().getPath()}`,
+                sessionMfp,
+                sessionRoot,
+                schema.getCurve() === Curve.ed25519
+              )
             );
           const response = new CryptoMultiAccounts(
             Buffer.from(sessionMfp, 'hex'),
@@ -3066,6 +3079,66 @@ describe('KeystoneAdapter', () => {
       expect(usb.connectArgs).toEqual([usb.searchTargetIds[0], FIXTURE_MFP]);
       expect(qrFake.requests).toHaveLength(qrRequestsBeforeDisconnect + 1);
       expect(qrFake.requests.at(-1)?.data.urType).toBe('eth-sign-request');
+    });
+
+    it.each([
+      ['evmGetAddress', "m/44'/60'/0'/0h/0"],
+      ['evmGetAddress', "m/44'/60'/0'/0/0abc"],
+      ['evmGetAddress', "m/44'/60'/0'/0/-1"],
+      ['btcGetAddress', "m/84'/0'/0'/0H/0"],
+      ['tronGetAddress', "m/44'/195'/0'/0/0'"],
+    ] as const)('refuses %s for a malformed leaf path %s', async (method, path) => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      attachFakeDevice(adapter);
+      const connected = await connectUsbDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+
+      const result = await adapter[method](connected.payload, FIXTURE_MFP, { path });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.InvalidParams },
+      });
+      await adapter.dispose();
+    });
+
+    it('keeps a SOL key apart from another chain exported at the same path in a USB bundle', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      attachFakeDevice(adapter);
+      const connected = await connectUsbDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      const solPath = "m/44'/501'/0'";
+      const single = await adapter.solGetAddress(connected.payload, FIXTURE_MFP, { path: solPath });
+      expect(single.success).toBe(true);
+      if (!single.success) return;
+
+      for (const bundle of [
+        [
+          { methodName: 'solGetAddress' as const, network: 'sol', path: solPath },
+          { methodName: 'evmGetAddress' as const, network: 'evm', path: `${solPath}/0/0` },
+        ],
+        [
+          { methodName: 'evmGetAddress' as const, network: 'evm', path: `${solPath}/0/0` },
+          { methodName: 'solGetAddress' as const, network: 'sol', path: solPath },
+        ],
+      ]) {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await adapter.allNetworkGetAddress(connected.payload, FIXTURE_MFP, {
+          bundle,
+        });
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        const solItem = result.payload.find(item => item.methodName === 'solGetAddress');
+        expect(solItem).toMatchObject({
+          success: true,
+          payload: { address: single.payload.address },
+        });
+      }
+      await adapter.dispose();
     });
 
     it("reattaches USB for a signing call pinned with switchTransport('usb') after a disconnect", async () => {

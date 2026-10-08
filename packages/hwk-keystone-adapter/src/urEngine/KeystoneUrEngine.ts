@@ -4,7 +4,11 @@ import bs58check from 'bs58check';
 import * as bitcoin from 'bitcoinjs-lib';
 import HDKey from 'hdkey';
 import { parse as uuidParse, stringify as uuidStringify } from 'uuid';
-import { parseWalletMasterFingerprint } from '@onekeyfe/hwk-adapter-core';
+import {
+  HardwareErrorCode,
+  createHwkError,
+  parseWalletMasterFingerprint,
+} from '@onekeyfe/hwk-adapter-core';
 
 import { TronSignRequest, TronSignType } from './TronSignRequest';
 import { TronSignature } from './TronSignature';
@@ -97,9 +101,25 @@ function toParsedAccount(key: ReturnType<KeystoneSDK['parseHDKey']>): KeystonePa
   };
 }
 
-/** Relative derivation path in the `m/`-prefixed form the xpub helpers expect. */
+const BIP32_HARDENED_OFFSET = 0x80000000;
+
+/**
+ * Relative derivation path in the `m/`-prefixed form the xpub helpers expect. Each segment must be
+ * a plain non-hardened index: the derivation library reads `0h` or `0abc` as index 0 instead of
+ * failing, which would hand back another path's address.
+ */
 function relativeHdPath(relativeDerivePath: string): string {
-  return `m/${relativeDerivePath.replace(/^m\//i, '')}`;
+  const segments = relativeDerivePath.replace(/^m\//i, '').split('/');
+  const valid = segments.every(
+    segment => /^\d+$/.test(segment) && Number(segment) < BIP32_HARDENED_OFFSET
+  );
+  if (!valid) {
+    throw createHwkError({
+      code: HardwareErrorCode.InvalidParams,
+      message: `Invalid change/index segments in derivation path (${relativeDerivePath})`,
+    });
+  }
+  return `m/${segments.join('/')}`;
 }
 
 /**

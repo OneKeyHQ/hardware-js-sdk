@@ -2181,19 +2181,9 @@ export class KeystoneAdapter implements IHardwareWallet {
       });
     }
     const entry: KeystoneAccountEntry = { ...account, hwkChain };
-    if (book) {
-      // Everything the device answered stays usable for this operation.
-      for (const returned of parsed.accounts) {
-        const returnedChain = inferHwkChainFromPath(returned.path);
-        if (returnedChain) {
-          book.set(accountKey(returnedChain, returned.path), {
-            ...returned,
-            hwkChain: returnedChain,
-          });
-        }
-      }
-      book.set(key, entry);
-    }
+    // Only the requested key is kept: an account filed under a chain guessed from its path could
+    // carry another curve's key and replace a requested entry.
+    book?.set(key, entry);
     return { record, account: entry };
   }
 
