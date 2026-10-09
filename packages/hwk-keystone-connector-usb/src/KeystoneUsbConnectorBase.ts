@@ -512,8 +512,10 @@ export class KeystoneUsbConnectorBase implements IConnector {
           const { urType, urData } = params as KeystoneUr;
           const encoded = toUrEncoded({ urType, urData });
           const isPublicDataRequest = urType === KEYSTONE_PUBLIC_DATA_UR_TYPE;
-          // Public-data export prompts once per wallet; signing always prompts.
+          // Public-data export prompts once per wallet; signing always prompts. A signing request
+          // leaves the device's export screen, so the next export may ask again and prompts again.
           const publicDataKey = session.mfp?.toLowerCase() ?? sessionId;
+          if (!isPublicDataRequest) this.publicDataConfirmedWallets.delete(publicDataKey);
           const shouldShowConfirmation =
             !isPublicDataRequest || !this.publicDataConfirmedWallets.has(publicDataKey);
           if (shouldShowConfirmation) {

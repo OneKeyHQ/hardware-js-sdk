@@ -592,6 +592,33 @@ describe('KeystoneUsbConnectorBase', () => {
       ]);
     });
 
+    it('prompts the next public-data export again after a signing request', async () => {
+      const connector = versionConnector(answerBytes);
+      const confirmations: string[] = [];
+      connector.on('ui-event', e => {
+        const { type } = e as { type: string };
+        if (type === EConnectorInteraction.ConfirmOnDevice) confirmations.push(type);
+      });
+      const session = await connector.connect();
+      const exportKeys = () =>
+        connector.call(session.sessionId, 'resolveUr', {
+          urType: 'qr-hardware-call',
+          urData: 'de',
+        });
+
+      await exportKeys();
+      await exportKeys();
+      expect(confirmations).toHaveLength(1);
+
+      await connector.call(session.sessionId, 'resolveUr', {
+        urType: 'eth-sign-request',
+        urData: 'beef',
+      });
+      await exportKeys();
+      await exportKeys();
+      expect(confirmations).toHaveLength(3);
+    });
+
     it('always closes the bracket, even when the device rejects', async () => {
       // A rejection without InteractionComplete would leave the host's
       // "confirm on device" toast up forever.
