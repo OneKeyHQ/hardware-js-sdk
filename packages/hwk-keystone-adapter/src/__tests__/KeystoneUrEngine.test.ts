@@ -16,7 +16,9 @@ import {
   EthSignRequest,
 } from '@keystonehq/bc-ur-registry-eth';
 import { SolSignRequest, SolSignature } from '@keystonehq/bc-ur-registry-sol';
+import * as bitcoin from 'bitcoinjs-lib';
 import HDKey from 'hdkey';
+import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 
 import { KeystoneUrEngine } from '../urEngine/KeystoneUrEngine';
 import { TronSignRequest } from '../urEngine/TronSignRequest';
@@ -58,6 +60,28 @@ function buildMultiAccountsUr(): KeystoneUr {
     '1.7.0'
   );
   return urFromSdk(multiAccounts.toUR());
+}
+
+/** A real PSBT paying `outputValue`; `signed` adds a partial signature, which signing may do. */
+function psbtFixtureHex(outputValue = 9000n, signed = false): string {
+  const psbt = new bitcoin.Psbt();
+  psbt.addInput({
+    hash: '11'.repeat(32),
+    index: 0,
+    witnessUtxo: { script: Buffer.from(`0014${'22'.repeat(20)}`, 'hex'), value: 10000n },
+  });
+  psbt.addOutput({ script: Buffer.from(`0014${'33'.repeat(20)}`, 'hex'), value: outputValue });
+  if (signed) {
+    psbt.updateInput(0, {
+      partialSig: [
+        {
+          pubkey: Buffer.from(`02${'44'.repeat(32)}`, 'hex'),
+          signature: Buffer.from('300602010102010101', 'hex'),
+        },
+      ],
+    });
+  }
+  return psbt.toHex();
 }
 
 describe('KeystoneUrEngine', () => {
@@ -239,14 +263,24 @@ describe('KeystoneUrEngine', () => {
   });
 
   describe('BTC PSBT round trip', () => {
-    it('wraps an unsigned PSBT as crypto-psbt and reads it back unchanged', () => {
-      const psbtHex = 'cHNidP8B'.padEnd(64, '0'); // arbitrary bytes; PSBT magic not required by the UR layer
-      const built = engine.buildBtcPsbtRequest(Buffer.from(psbtHex, 'utf8').toString('hex'));
+    it('wraps an unsigned PSBT as crypto-psbt and reads back the signed one for that transaction', () => {
+      const requestHex = psbtFixtureHex();
+      const built = engine.buildBtcPsbtRequest(requestHex);
       expect(built.urType).toBe('crypto-psbt');
 
-      const signedPsbtBytes = Buffer.from('signed-psbt-bytes-fixture');
-      const responseUr = urFromSdk(new CryptoPSBT(signedPsbtBytes).toUR());
-      expect(engine.parseBtcPsbt(responseUr)).toBe(signedPsbtBytes.toString('hex'));
+      const signedHex = psbtFixtureHex(9000n, true);
+      const responseUr = urFromSdk(new CryptoPSBT(Buffer.from(signedHex, 'hex')).toUR());
+      expect(engine.parseBtcPsbt(responseUr, requestHex)).toBe(signedHex);
+    });
+
+    it.each([
+      ['another transaction', psbtFixtureHex(8000n, true)],
+      ['bytes that are not a PSBT', Buffer.from('signed-psbt-bytes-fixture').toString('hex')],
+    ])('refuses a reply carrying %s', (_name, replyHex) => {
+      const responseUr = urFromSdk(new CryptoPSBT(Buffer.from(replyHex, 'hex')).toUR());
+      expect(() => engine.parseBtcPsbt(responseUr, psbtFixtureHex())).toThrow(
+        expect.objectContaining({ code: HardwareErrorCode.DeviceMismatch })
+      );
     });
   });
 

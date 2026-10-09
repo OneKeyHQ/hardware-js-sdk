@@ -19,6 +19,7 @@ import {
   createHardwareSearchTargetId,
   parseHardwareRuntimeId,
 } from '@onekeyfe/hwk-adapter-core';
+import * as bitcoin from 'bitcoinjs-lib';
 import HDKey from 'hdkey';
 
 import { KeystoneAdapter } from '../adapter/KeystoneAdapter';
@@ -121,6 +122,31 @@ function wrongUuidBuffer(): Buffer {
   return bytes;
 }
 
+/** A real PSBT paying `outputValue`; `signed` adds a partial signature, which signing may do. */
+function psbtFixtureHex(outputValue = 9000n, signed = false): string {
+  const psbt = new bitcoin.Psbt();
+  psbt.addInput({
+    hash: '11'.repeat(32),
+    index: 0,
+    witnessUtxo: { script: Buffer.from(`0014${'22'.repeat(20)}`, 'hex'), value: 10000n },
+  });
+  psbt.addOutput({ script: Buffer.from(`0014${'33'.repeat(20)}`, 'hex'), value: outputValue });
+  if (signed) {
+    psbt.updateInput(0, {
+      partialSig: [
+        {
+          pubkey: Buffer.from(`02${'44'.repeat(32)}`, 'hex'),
+          signature: Buffer.from('300602010102010101', 'hex'),
+        },
+      ],
+    });
+  }
+  return psbt.toHex();
+}
+
+const UNSIGNED_PSBT_HEX = psbtFixtureHex();
+const SIGNED_PSBT_HEX = psbtFixtureHex(9000n, true);
+
 /** The requestId the fixture device echoes back, per the options under test. */
 function echoedRequestId(
   options: FakeDeviceOptions,
@@ -144,6 +170,8 @@ interface FakeDeviceOptions {
   root?: HDKey;
   /** Master fingerprint the device reports; defaults to the fixture wallet's. */
   mfpHex?: string;
+  /** PSBT the device answers a crypto-psbt with; defaults to the signed fixture request. */
+  psbtReplyHex?: string;
 }
 
 /**
@@ -204,8 +232,8 @@ function attachFakeDevice(adapter: KeystoneAdapter, options: FakeDeviceOptions =
         return;
       }
       case 'crypto-psbt': {
-        const signed = new CryptoPSBT(Buffer.from('signed-psbt-fixture-bytes'));
-        respond(signed.toUR());
+        const signedHex = options.psbtReplyHex ?? SIGNED_PSBT_HEX;
+        respond(new CryptoPSBT(Buffer.from(signedHex, 'hex')).toUR());
         return;
       }
       case 'tron-sign-request': {
@@ -801,17 +829,30 @@ describe('KeystoneAdapter', () => {
       const fake = attachFakeDevice(adapter);
 
       const result = await adapter.btcSignPsbt(null, null, {
-        psbt: 'cafe'.repeat(4),
+        psbt: UNSIGNED_PSBT_HEX,
         coin: 'BTC',
         path: "m/84'/0'/0'",
       });
 
       expect(result.success).toBe(true);
       if (!result.success) return;
-      expect(result.payload.signedPsbt).toBe(
-        Buffer.from('signed-psbt-fixture-bytes').toString('hex')
-      );
+      expect(result.payload.signedPsbt).toBe(SIGNED_PSBT_HEX);
       expect(fake.requests.map(r => r.data.urType)).toEqual(['qr-hardware-call', 'crypto-psbt']);
+    });
+
+    it('refuses a scanned PSBT signing another transaction', async () => {
+      const adapter = newTestAdapter();
+      attachFakeDevice(adapter, { psbtReplyHex: psbtFixtureHex(8000n, true) });
+
+      const result = await adapter.btcSignPsbt(null, null, {
+        psbt: UNSIGNED_PSBT_HEX,
+        coin: 'BTC',
+        path: "m/84'/0'/0'",
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.payload.code).toBe(HardwareErrorCode.DeviceMismatch);
     });
   });
 
@@ -861,7 +902,7 @@ describe('KeystoneAdapter', () => {
       const fake = attachFakeDevice(adapter);
 
       const result = await adapter.btcSignPsbt(`keystone-wallet:${FIXTURE_MFP}`, FIXTURE_MFP, {
-        psbt: 'cafe'.repeat(4),
+        psbt: UNSIGNED_PSBT_HEX,
         coin: 'BTC',
         path: "m/84'/0'/0'",
       });
@@ -888,7 +929,7 @@ describe('KeystoneAdapter', () => {
         'btcSignPsbt',
         "m/44'/0'/0'",
         (a: KeystoneAdapter) =>
-          a.btcSignPsbt(null, null, { psbt: 'cafe'.repeat(4), coin: 'BTC', path: "m/84'/0'/0'" }),
+          a.btcSignPsbt(null, null, { psbt: UNSIGNED_PSBT_HEX, coin: 'BTC', path: "m/84'/0'/0'" }),
       ],
       [
         'solSignTransaction',
@@ -968,7 +1009,7 @@ describe('KeystoneAdapter', () => {
       [
         'btcSignPsbt',
         (a: KeystoneAdapter) =>
-          a.btcSignPsbt(null, null, { psbt: 'cafe'.repeat(4), coin: 'BTC', path: "m/84'/0'/1'" }),
+          a.btcSignPsbt(null, null, { psbt: UNSIGNED_PSBT_HEX, coin: 'BTC', path: "m/84'/0'/1'" }),
       ],
     ])('%s refuses a non-zero account before any round trip', async (_name, call) => {
       const adapter = newTestAdapter();
@@ -984,7 +1025,7 @@ describe('KeystoneAdapter', () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
       const result = await adapter.btcSignPsbt(null, null, {
-        psbt: 'cafe'.repeat(4),
+        psbt: UNSIGNED_PSBT_HEX,
         coin: 'BTC',
       });
       expect(result.success).toBe(false);
@@ -1141,6 +1182,35 @@ describe('KeystoneAdapter', () => {
         expect(fake.requests).toHaveLength(0);
       }
     );
+
+    it.each([
+      'm/44h/195h/0h/0/0',
+      "m/44'/195'/0'/0x1/0",
+      "m/44'/195'//0/0",
+      "m/44'/195'/0'/2147483648/0",
+    ])('refuses to sign with the malformed path %s before reaching the device', async path => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+      const results = await Promise.all([
+        adapter.tronSignMessage(null, null, { path, messageHex: 'deadbeef', messageType: 'V2' }),
+        adapter.tronSignTransaction(null, null, { path, rawTxHex: '0a02' }),
+        adapter.evmSignMessage(null, null, { path, message: 'hi' }),
+        adapter.solSignTransaction(null, null, { path, serializedTx: 'cafe' }),
+      ]);
+      for (const result of results) {
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.payload.code).toBe(HardwareErrorCode.InvalidParams);
+      }
+      expect(fake.requests).toHaveLength(0);
+    });
+
+    it('TronSignRequest.parsePath refuses a segment it cannot encode exactly', () => {
+      expect(() => TronSignRequest.parsePath("m/44h/195'/0'", FIXTURE_MFP)).toThrow();
+      expect(TronSignRequest.parsePath("m/44'/195'/0'/0/1", FIXTURE_MFP).getPath()).toBe(
+        "44'/195'/0'/0/1"
+      );
+    });
 
     it('cold start: syncs the mfp then signs, returning a bare 65-byte signature', async () => {
       const adapter = newTestAdapter();
@@ -1345,6 +1415,30 @@ describe('KeystoneAdapter', () => {
 
       adapter.cancel(connected.payload);
       expect((await pending).success).toBe(false);
+      await adapter.dispose();
+    });
+
+    it('ends a QR call queued under its operation when the operation is released', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+      const connected = await connectQrDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      // Leave the sign request unanswered: the call waits on the QR scan.
+      fake.detach();
+
+      const pending = adapter.evmSignTransaction(connected.payload, FIXTURE_MFP, {
+        path: "m/44'/60'/0'/0/0",
+        serializedTx: `02${'ab'.repeat(30)}`,
+        operationId: connected.payload,
+      });
+      await sleep(10);
+      await adapter.releaseOperation(connected.payload);
+
+      // Without this the call would hold the queue until the QR timeout.
+      const settled = await Promise.race([pending.then(() => true), sleep(200).then(() => false)]);
+      expect(settled).toBe(true);
+      await expect(pending).resolves.toMatchObject({ success: false });
       await adapter.dispose();
     });
 

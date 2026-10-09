@@ -51,6 +51,7 @@ import {
 import {
   KEYSTONE_BTC_ACCOUNT_FORBIDDEN_MESSAGE,
   btcScriptTypeFromPath,
+  isBip32Path,
   isKeystoneSignableBtcAccountPath,
   normalizePath,
   splitAccountPath,
@@ -238,6 +239,17 @@ export class KeystoneAdapter implements IHardwareWallet {
       const route = this._operationRoutes.get(operation.connectId);
       if (route?.operationId === operation.operationId) {
         this._operationRoutes.delete(operation.connectId);
+        // A QR operation has no connection whose loss stops its work, so its queued calls and
+        // prompts end with it; they could not be cancelled by name afterwards.
+        if (route.connectionType === 'qr') {
+          const ended = createHwkError({
+            code: HardwareErrorCode.OperationEnded,
+            message: 'Keystone operation has ended',
+            params: { operationId: operation.operationId, reason },
+          });
+          this._jobQueue.cancelActiveAndPending(operation.operationId, ended);
+          this._uiRegistry.cancel(undefined, undefined, operation.operationId);
+        }
       }
       this.emitter.emit(SDK.OPERATION_ENDED, {
         type: SDK.OPERATION_ENDED,
@@ -935,6 +947,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     return this._signWithWallet({
       connectId,
       deviceId,
+      path,
       chain: 'evm',
       operationName: 'evmSignTransaction',
       buildRequest: (requestId, xfp) =>
@@ -980,6 +993,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     return this._signWithWallet({
       connectId,
       deviceId,
+      path,
       chain: 'evm',
       operationName: 'evmSignMessage',
       buildRequest: (requestId, xfp) =>
@@ -1028,6 +1042,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     return this._signWithWallet({
       connectId,
       deviceId,
+      path,
       chain: 'evm',
       operationName: 'evmSignTypedData',
       buildRequest: (requestId, xfp) =>
@@ -1193,7 +1208,8 @@ export class KeystoneAdapter implements IHardwareWallet {
       const { record } = await this._ensureWalletKnown(connectId, deviceId, 'btc', signal);
       KeystoneAdapter._throwIfAborted(signal);
 
-      const requestUr = this.urEngine.buildBtcPsbtRequest(stripHex(params.psbt));
+      const requestPsbtHex = stripHex(params.psbt);
+      const requestUr = this.urEngine.buildBtcPsbtRequest(requestPsbtHex);
       const responseUr = await this._resolveUr(
         record,
         requestUr,
@@ -1204,7 +1220,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       );
       KeystoneAdapter._throwIfAborted(signal);
 
-      const signedPsbt = this.urEngine.parseBtcPsbt(responseUr);
+      const signedPsbt = this.urEngine.parseBtcPsbt(responseUr, requestPsbtHex);
       return success<BtcSignedPsbt>({ signedPsbt });
     });
   }
@@ -1236,6 +1252,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     return this._signWithWallet({
       connectId,
       deviceId,
+      path,
       chain: 'btc',
       operationName: 'btcSignMessage',
       buildRequest: (requestId, xfp) =>
@@ -1336,6 +1353,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     return this._signWithWallet({
       connectId,
       deviceId,
+      path,
       chain: 'sol',
       operationName: 'solSignTransaction',
       buildRequest: (requestId, xfp) =>
@@ -1373,6 +1391,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     return this._signWithWallet({
       connectId,
       deviceId,
+      path,
       chain: 'sol',
       operationName: 'solSignMessage',
       buildRequest: (requestId, xfp) =>
@@ -1458,6 +1477,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     return this._signWithWallet({
       connectId,
       deviceId,
+      path,
       chain: 'tron',
       operationName: 'tronSignTransaction',
       buildRequest: (requestId, xfp) =>
@@ -1503,6 +1523,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     return this._signWithWallet({
       connectId,
       deviceId,
+      path,
       chain: 'tron',
       operationName: 'tronSignMessage',
       buildRequest: (requestId, xfp) =>
@@ -1568,6 +1589,7 @@ export class KeystoneAdapter implements IHardwareWallet {
   private _signWithWallet<S extends { requestId?: string }, T>(args: {
     connectId: string | undefined;
     deviceId: string | undefined;
+    path: string;
     chain: ChainForFingerprint;
     operationName: string;
     buildRequest: (requestId: string, xfp: string) => KeystoneUr;
@@ -1575,6 +1597,11 @@ export class KeystoneAdapter implements IHardwareWallet {
     toPayload: (signature: S) => T;
   }): Promise<Response<T>> {
     const { connectId, deviceId } = args;
+    if (!isBip32Path(args.path)) {
+      return Promise.resolve(
+        failure(HardwareErrorCode.InvalidParams, `Invalid derivation path (${args.path})`)
+      );
+    }
     return this._runJob(connectId, deviceId, async signal => {
       const { record } = await this._ensureWalletKnown(connectId, deviceId, args.chain, signal);
       KeystoneAdapter._throwIfAborted(signal);

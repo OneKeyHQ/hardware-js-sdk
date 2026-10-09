@@ -6,6 +6,21 @@ export function normalizePath(path: string): string {
   return /^m\//i.test(trimmed) ? `m/${trimmed.slice(2)}` : `m/${trimmed}`;
 }
 
+const BIP32_HARDENED_OFFSET = 0x80000000;
+
+/**
+ * A `m/`-prefixed path whose every segment is a decimal index below 2^31 with an optional `'`.
+ * Request encoders read `44h` as the unhardened 44 and `0x1` as 0, which would sign with
+ * another path's key.
+ */
+export function isBip32Path(path: string): boolean {
+  const segments = normalizePath(path).slice(2).split('/');
+  return segments.every(segment => {
+    const match = /^(\d+)'?$/.exec(segment);
+    return match !== null && Number(match[1]) < BIP32_HARDENED_OFFSET;
+  });
+}
+
 /**
  * Splits a 5-segment BIP-44 leaf path into the 3-segment account path and the relative
  * `change/index`; a path of 3 or fewer segments is already an account path.
