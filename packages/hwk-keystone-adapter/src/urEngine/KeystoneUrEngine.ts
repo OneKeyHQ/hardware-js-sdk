@@ -269,9 +269,28 @@ export class KeystoneUrEngine {
     return fromSdkUr(ur);
   }
 
-  /** Returns the hex-encoded (possibly still-unsigned-in-part) PSBT the device replied with. */
-  parseBtcPsbt(ur: KeystoneUr): string {
-    return this.sdk.btc.parsePSBT(toSdkUr(ur));
+  /**
+   * Returns the hex-encoded (possibly still-unsigned-in-part) PSBT the device replied with. A PSBT
+   * carries no request id, so the reply is bound to the request by its unsigned transaction, which
+   * signing never changes (BIP-174); a scan of another PSBT's signature is refused.
+   */
+  parseBtcPsbt(ur: KeystoneUr, requestPsbtHex: string): string {
+    const signedPsbtHex = this.sdk.btc.parsePSBT(toSdkUr(ur));
+    let sameTransaction = false;
+    try {
+      const unsignedTx = (hex: string) =>
+        Buffer.from(bitcoin.Psbt.fromHex(hex).data.globalMap.unsignedTx.toBuffer());
+      sameTransaction = unsignedTx(signedPsbtHex).equals(unsignedTx(requestPsbtHex));
+    } catch {
+      sameTransaction = false;
+    }
+    if (!sameTransaction) {
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceMismatch,
+        message: 'Keystone returned a PSBT for another transaction than the one requested',
+      });
+    }
+    return signedPsbtHex;
   }
 
   buildBtcMessageSignRequest(params: {

@@ -111,11 +111,12 @@ export class TronSignRequest extends RegistryItem {
   static parsePath(path: string, xfp: string): CryptoKeypath {
     const segments = path.replace(/^[mM]\//, '').split('/');
     const components = segments.map(segment => {
-      const hardened = segment.endsWith("'");
-      return new PathComponent({
-        index: parseInt(hardened ? segment.slice(0, -1) : segment, 10),
-        hardened,
-      });
+      const match = /^(\d+)('?)$/.exec(segment);
+      const index = match ? Number(match[1]) : NaN;
+      if (!match || index >= 0x80000000) {
+        throw new Error(`Invalid TRON derivation path segment (${segment})`);
+      }
+      return new PathComponent({ index, hardened: match[2] === "'" });
     });
     return new CryptoKeypath(components, Buffer.from(xfp, 'hex'));
   }
