@@ -878,6 +878,7 @@ export abstract class TrezorConnectorBase implements IConnector {
           connectId: device.connectId,
           deviceId: device.deviceId,
           credentials: payload.credentials,
+          removed: payload.removed,
         });
       },
     };
