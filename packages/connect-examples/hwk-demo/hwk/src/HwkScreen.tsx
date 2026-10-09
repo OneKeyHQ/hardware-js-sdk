@@ -169,6 +169,7 @@ export const HwkScreen = () => {
   const [rememberedDevice, setRememberedDevice] = useState<DeviceInfo | null>(null);
   const [directConnectId, setDirectConnectId] = useState(DEFAULT_TREZOR_BLE_CONNECT_ID);
   const [connectedId, setConnectedId] = useState<string | null>(null);
+  const operationIdRef = useRef<string | null>(null);
   const [features, setFeatures] = useState<Record<string, unknown> | null>(null);
   const [btcAddress, setBtcAddress] = useState<BtcAddress | null>(null);
   const [address, setAddress] = useState<EvmAddress | null>(null);
@@ -360,7 +361,6 @@ export const HwkScreen = () => {
               const id = payload.connectId;
               if (!id) return;
               adapter.cancel(id);
-              adapter.disconnectDevice(id).catch(() => undefined);
             },
           },
           { text: 'OK' },
@@ -570,6 +570,7 @@ export const HwkScreen = () => {
           Alert.alert('Connect failed', responseError(result));
           return;
         }
+        operationIdRef.current = result.payload;
         setConnectedId(normalizedDevice.connectId);
         setSelected(normalizedDevice);
         setSelectedSource('handshake');
@@ -795,7 +796,8 @@ export const HwkScreen = () => {
     try {
       setBusy('disconnect');
       appendLog('info', `Disconnecting ${connectedId}...`);
-      await adapter.disconnectDevice(connectedId);
+      if (operationIdRef.current) await adapter.releaseOperation(operationIdRef.current);
+      operationIdRef.current = null;
       setConnectedId(null);
       setBtcAddress(null);
       setAddress(null);
@@ -1081,7 +1083,7 @@ export const HwkScreen = () => {
             onPress={onDisconnect}
             disabled={!connectedId || !!busy}
           >
-            <Text style={styles.btnText}>disconnectDevice</Text>
+            <Text style={styles.btnText}>releaseOperation</Text>
           </TouchableOpacity>
 
           {features ? (
