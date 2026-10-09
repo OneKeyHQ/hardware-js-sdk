@@ -111,3 +111,70 @@ describe('Trezor connector cancellation ownership', () => {
     }
   });
 });
+
+describe('Trezor reset with a connector prompt open', () => {
+  it.each(['dispose', 'searchDevices with resetSession'] as const)(
+    '%s ends a PIN prompt the host never answered',
+    async action => {
+      const ui = new UiRequestRegistry();
+      let waiting = false;
+      const connector: IConnector = {
+        connectionType: 'usb',
+        searchDevices: jest.fn().mockResolvedValue([]),
+        connect: jest.fn(async id => ({
+          sessionId: `session-${id}`,
+          deviceInfo: {
+            vendor: 'trezor' as const,
+            model: 'T2T1',
+            firmwareVersion: '',
+            deviceId: id ?? '',
+            connectId: id ?? '',
+            connectionType: 'usb' as const,
+          },
+        })),
+        disconnect: jest.fn().mockResolvedValue(undefined),
+        call: jest.fn(async (_sessionId, method) => {
+          if (method !== 'evmGetAddress') return {};
+          const answer = ui.wait(UI_REQUEST.REQUEST_PIN);
+          waiting = true;
+          await answer;
+          return { address: 'synthetic-address' };
+        }),
+        cancel: jest.fn().mockResolvedValue(undefined),
+        uiResponse: response => {
+          if (response.type === UI_RESPONSE.CANCEL) ui.cancel();
+          else ui.resolve(response.type, response.payload);
+        },
+        on: jest.fn(),
+        off: jest.fn(),
+        reset: jest.fn(),
+      };
+      const adapter = new TrezorAdapter(connector);
+      try {
+        const result = adapter.evmGetAddress('device-a', '', {
+          path: "m/44'/60'/0'/0/0",
+          useEmptyPassphrase: true,
+        });
+        for (let i = 0; i < 50 && !waiting; i += 1) {
+          await new Promise(resolve => setImmediate(resolve));
+        }
+        expect(waiting).toBe(true);
+
+        const reset =
+          action === 'dispose' ? adapter.dispose() : adapter.searchDevices({ resetSession: true });
+        const settled = await Promise.race([
+          Promise.resolve(reset).then(() => true),
+          new Promise<boolean>(resolve => {
+            setTimeout(() => resolve(false), 200);
+          }),
+        ]);
+        expect(settled).toBe(true);
+        expect(ui.hasPending(UI_REQUEST.REQUEST_PIN)).toBe(false);
+        expect((await result).success).toBe(false);
+      } finally {
+        ui.reset();
+        await adapter.dispose();
+      }
+    }
+  );
+});
