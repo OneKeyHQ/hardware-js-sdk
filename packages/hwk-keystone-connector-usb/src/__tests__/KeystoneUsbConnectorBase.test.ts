@@ -420,6 +420,19 @@ describe('KeystoneUsbConnectorBase', () => {
       expect(connectDevice).toHaveBeenCalledTimes(2);
     });
 
+    it('reports no device, not a wallet mismatch, when none is connected', async () => {
+      const connectDevice = jest.fn();
+      const connector = newConnector(exactTransportClass([], { connectDevice }));
+
+      await expect(
+        connector.connectTarget({
+          type: 'expected-device-identity',
+          deviceIdentity: FAKE_MFP,
+        })
+      ).rejects.toMatchObject({ code: HardwareErrorCode.DeviceNotFound });
+      expect(connectDevice).not.toHaveBeenCalled();
+    });
+
     it('keeps the transport session separate from the device-reported mfp', async () => {
       const session = await versionConnector().connect();
 

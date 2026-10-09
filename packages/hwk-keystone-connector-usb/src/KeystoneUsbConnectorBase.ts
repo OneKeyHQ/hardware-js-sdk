@@ -298,6 +298,12 @@ export class KeystoneUsbConnectorBase implements IConnector {
         }
 
         if (this.transportClass.connectDevice) {
+          if (availableDevices.length === 0) {
+            throw createHwkError({
+              code: HardwareErrorCode.DeviceNotFound,
+              message: 'No Keystone USB device is available',
+            });
+          }
           let readableDeviceFound = false;
           let lastError: unknown;
           let matched:
