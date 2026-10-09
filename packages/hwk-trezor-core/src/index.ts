@@ -875,9 +875,10 @@ export class TrezorDeviceSession {
     // instead of sending PassphraseRequest, so an empty passphrase cannot be enforced; refuse
     // as THP firmware does rather than return whichever wallet the user opens.
     if (passphraseMode === 'empty' && this.currentFeatures?.passphrase_protection == null) {
-      // Locked firmware hides these private settings. GetNonce needs only the PIN and opens no
-      // wallet, so unlock with it and read them before anything can prompt for a passphrase.
-      expectMessage(await this.call('GetNonce', {}), 'Nonce');
+      // Locked firmware (core >= 2.4.3) hides these private settings. CancelAuthorization exists in
+      // every such release, is not allowed while locked, and only clears a CoinJoin authorization,
+      // so the device asks for the PIN alone, opens no wallet, and the settings can then be read.
+      expectMessage(await this.call('CancelAuthorization', {}), 'Success');
       expectMessage(await this.call('GetFeatures', {}), 'Features');
       if (this.currentFeatures?.passphrase_protection == null) {
         throw new TrezorFailureError({

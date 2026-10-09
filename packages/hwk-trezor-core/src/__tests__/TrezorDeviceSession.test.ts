@@ -593,7 +593,7 @@ describe('TrezorDeviceSession', () => {
         coreFactory: createFactory(calls, [
           { type: 'Features', message: features },
           { type: 'Features', message: { ...features, unlocked: false } },
-          { type: 'Nonce', message: { nonce: 'aa' } },
+          { type: 'Success', message: { message: 'Authorization cancelled' } },
           {
             type: 'Features',
             message: {
@@ -620,7 +620,7 @@ describe('TrezorDeviceSession', () => {
       expect(calls.map(call => call.name)).toEqual([
         'Initialize',
         'Initialize',
-        'GetNonce',
+        'CancelAuthorization',
         'GetFeatures',
       ]);
     }
@@ -634,7 +634,7 @@ describe('TrezorDeviceSession', () => {
       coreFactory: createFactory(calls, [
         { type: 'Features', message: features },
         { type: 'Features', message: features },
-        { type: 'Nonce', message: { nonce: 'aa' } },
+        { type: 'Success', message: { message: 'Authorization cancelled' } },
         { type: 'Features', message: features },
       ]),
     });
