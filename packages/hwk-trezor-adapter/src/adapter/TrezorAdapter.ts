@@ -716,6 +716,9 @@ export class TrezorAdapter implements IHardwareWallet {
     this._stateGeneration += 1;
     this._operations.endAll('runtime-reset');
     this._uiRegistry.reset();
+    // PIN, passphrase and pairing prompts wait in the connector; the teardown below drains its
+    // calls, so end those prompts too or it waits for their timeout.
+    this._connector.uiResponse({ type: UI_RESPONSE.CANCEL });
     this._jobQueue.clear();
     this._devices.clear();
     this._sessions.clear();
