@@ -3553,6 +3553,28 @@ describe('LedgerAdapter', () => {
         expect(result.payload.map(item => item.success)).toEqual([true, true]);
       });
 
+      it('verifies the wallet first when an unchecked chain is listed before a checked one', async () => {
+        connector.callImpl
+          .mockResolvedValueOnce({ address: evmFingerprintAddress })
+          .mockResolvedValueOnce({ address: '0xEVM' })
+          .mockResolvedValueOnce({ address: 'SOL' })
+          .mockResolvedValueOnce({ address: solFingerprintAddress });
+        await adapter.connectDevice('dev-1');
+
+        const result = await adapter.allNetworkGetAddress('dev-1', '', {
+          bundle: [uncheckedSolItem, evmItem],
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.payload.map(item => item.methodName)).toEqual([
+          'solGetAddress',
+          'evmGetAddress',
+        ]);
+        expect(result.payload.map(item => item.success)).toEqual([true, true]);
+        expect(methodsCalled()[0]).toBe('evmGetAddress');
+      });
+
       it('stops deriving unchecked chains after an unlock, which may open another seed', async () => {
         confirmUnlock();
         connector.callImpl

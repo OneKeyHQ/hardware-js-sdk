@@ -6,6 +6,7 @@ import {
   isWalletSafetyFailure,
   resolveHardwareOperationTarget,
   runAllNetworkGetAddress,
+  success,
 } from '@onekeyfe/hwk-adapter-core';
 
 import { debugLog } from '../../utils/debugLog';
@@ -151,12 +152,21 @@ export function createAllNetworkGetAddress({
       supportedTransports: params.supportedTransports,
     };
     const chainFingerprints = new Map<ChainForFingerprint, string>();
+    // An item without a deviceId derives only after an item with one proved the wallet on this
+    // connection, so those run first; responses keep the caller's order.
+    const order = params.bundle
+      .map((_item, index) => index)
+      .sort(
+        (a, b) =>
+          Number(Boolean(getItemDeviceId(params.bundle[b]))) -
+          Number(Boolean(getItemDeviceId(params.bundle[a])))
+      );
 
     try {
-      const result = await runAllNetworkGetAddress({
+      const ordered = await runAllNetworkGetAddress({
         connectId: effectiveTargetId,
         deviceId: _deviceId,
-        params,
+        params: { ...params, bundle: order.map(index => params.bundle[index]) },
         normalizeItem: normalizeLedgerAllNetworkItem,
         buildUnsupportedNetworkResponse: item =>
           isUnsupportedLedgerAllNetworkNetwork(item)
@@ -196,6 +206,14 @@ export function createAllNetworkGetAddress({
           );
         },
       });
+      let result = ordered;
+      if (ordered.success) {
+        const responses: AllNetworkAddressResponse[] = [];
+        ordered.payload.forEach((response, position) => {
+          responses[order[position]] = response;
+        });
+        result = success(responses);
+      }
       debugLog('[LedgerAdapter][RES]', {
         method: 'allNetworkGetAddress',
         success: result.success,
