@@ -442,14 +442,6 @@ const resolveNegotiatedMtu = (
 type IOBleErrorRemap = Error | BleError | null | undefined;
 
 function remapError(error: IOBleErrorRemap) {
-  if (error instanceof BleError) {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore It's not documented but seems to match a refusal on Android pairing
-    if (error?.attErrorCode === 22) {
-      throw ERRORS.TypedError(HardwareErrorCode.BleDeviceBondError);
-    }
-  }
-
   if (isNativeBleDisconnectError(error)) {
     throw toBleDisconnectHardwareError(error);
   }

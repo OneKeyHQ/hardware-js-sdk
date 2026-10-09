@@ -432,6 +432,42 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(pairDeviceMock).toHaveBeenCalledTimes(1);
   });
 
+  test.each([
+    ['ios', 'V1'],
+    ['ios', 'V2'],
+    ['android', 'V1'],
+    ['android', 'V2'],
+  ] as const)(
+    'uses connection or disconnect errors instead of a legacy bond error for ATT 22 on %s %s',
+    async (platform, expectedProtocol) => {
+      setPlatformOS(platform);
+      const BleErrorMock = jest.requireMock('react-native-ble-plx').BleError as new (
+        message: string
+      ) => Error;
+
+      for (const [nativeCode, expectedCode] of [
+        [205, HardwareErrorCode.BleConnectedError],
+        [201, HardwareErrorCode.BleDeviceDisconnected],
+      ]) {
+        const { transport, uuid, device } = createHarness();
+        const nativeError = Object.assign(new BleErrorMock('GATT connect failed'), {
+          errorCode: nativeCode,
+          attErrorCode: 22,
+          reason: 'GATT connect failed',
+        });
+        device.isConnected.mockResolvedValueOnce(false);
+        device.connect.mockRejectedValueOnce(nativeError);
+
+        await expect(transport.acquire({ uuid, expectedProtocol })).rejects.toMatchObject({
+          errorCode: expectedCode,
+          message: expect.stringContaining('GATT connect failed'),
+        });
+        expect(device.connect).toHaveBeenCalledTimes(1);
+        expect(transport.getProtocolType(uuid)).toBeUndefined();
+      }
+    }
+  );
+
   test('does not connect Android GATT when the system cannot start bonding', async () => {
     setPlatformOS('android');
     const { transport, uuid, device, bleManager } = createHarness();
