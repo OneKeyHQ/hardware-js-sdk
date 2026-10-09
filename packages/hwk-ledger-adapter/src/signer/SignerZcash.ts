@@ -1,4 +1,4 @@
-import { deviceActionToPromise } from './deviceActionToPromise';
+import { INTERACTIVE_TIMEOUT_MS, deviceActionToPromise } from './deviceActionToPromise';
 
 import type { CancelReason } from './deviceActionToPromise';
 import type {
@@ -44,7 +44,7 @@ export class SignerZcash {
     return deviceActionToPromise<GetShieldedAddressDAOutput>(
       action,
       this.onInteraction,
-      undefined,
+      options?.checkOnDevice ? INTERACTIVE_TIMEOUT_MS : undefined,
       this.onRegisterCanceller
     );
   }

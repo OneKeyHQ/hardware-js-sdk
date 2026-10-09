@@ -1,4 +1,4 @@
-import { deviceActionToPromise } from './deviceActionToPromise';
+import { INTERACTIVE_TIMEOUT_MS, deviceActionToPromise } from './deviceActionToPromise';
 
 import type { CancelReason } from './deviceActionToPromise';
 import type { SignerTrx as ISdkSignerTrx } from '@ledgerhq/device-signer-kit-tron';
@@ -29,7 +29,7 @@ export class SignerTron {
     const result = await deviceActionToPromise<{ address: string; publicKey: string }>(
       action,
       this.onInteraction,
-      undefined,
+      options?.checkOnDevice ? INTERACTIVE_TIMEOUT_MS : undefined,
       this.onRegisterCanceller
     );
     return { address: result.address, publicKey: result.publicKey };
@@ -45,7 +45,7 @@ export class SignerTron {
     return deviceActionToPromise<Uint8Array>(
       action,
       this.onInteraction,
-      undefined,
+      INTERACTIVE_TIMEOUT_MS,
       this.onRegisterCanceller
     );
   }
@@ -60,7 +60,7 @@ export class SignerTron {
     return deviceActionToPromise<Uint8Array>(
       action,
       this.onInteraction,
-      undefined,
+      INTERACTIVE_TIMEOUT_MS,
       this.onRegisterCanceller
     );
   }

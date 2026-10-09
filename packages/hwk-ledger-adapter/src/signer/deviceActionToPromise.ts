@@ -12,6 +12,9 @@ import type { DeviceAction, DeviceActionState } from '../types';
  */
 const IDLE_WATCHDOG_MS = 65_000;
 
+/** Watchdog for a step the user confirms on the device (sign, show address): time to review. */
+export const INTERACTIVE_TIMEOUT_MS = 5 * 60_000;
+
 /** Optional context attached to the rejection when a canceller fires. */
 export interface CancelReason {
   code?: number;

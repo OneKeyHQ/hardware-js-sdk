@@ -1,6 +1,6 @@
 import { hexToBytes } from '@onekeyfe/hwk-adapter-core';
 
-import { deviceActionToPromise } from './deviceActionToPromise';
+import { INTERACTIVE_TIMEOUT_MS, deviceActionToPromise } from './deviceActionToPromise';
 import { debugError, debugLog } from '../utils/debugLog';
 
 import type { CancelReason } from './deviceActionToPromise';
@@ -19,7 +19,6 @@ function hexToUtf8(hex: string): string {
 }
 
 /** Timeout for user-interactive operations (sign, verify). */
-const INTERACTIVE_TIMEOUT_MS = 5 * 60_000;
 
 /**
  * Wraps Ledger's BTC SDK signer (Observable-based DeviceActions) into
@@ -45,7 +44,7 @@ export class SignerBtc {
     return deviceActionToPromise<SignerBtcAddress>(
       action,
       this.onInteraction,
-      undefined,
+      options?.checkOnDevice ? INTERACTIVE_TIMEOUT_MS : undefined,
       this.onRegisterCanceller
     );
   }
@@ -68,7 +67,7 @@ export class SignerBtc {
       const result = await deviceActionToPromise<string | { extendedPublicKey: string }>(
         action,
         this.onInteraction,
-        undefined,
+        options?.checkOnDevice ? INTERACTIVE_TIMEOUT_MS : undefined,
         this.onRegisterCanceller
       );
       debugLog(
