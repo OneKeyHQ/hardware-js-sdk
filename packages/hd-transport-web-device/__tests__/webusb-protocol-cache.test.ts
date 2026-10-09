@@ -112,6 +112,79 @@ describe('WebUsbTransport protocol probe cache', () => {
     });
   });
 
+  test.each(['LIBUSB_ERROR_ACCESS', "Failed to execute 'open' on 'USBDevice': Access denied."])(
+    'reports USB open permission failure: %s',
+    async message => {
+      const webusb = new WebUsbTransport();
+      const device = {
+        opened: false,
+        open: jest
+          .fn()
+          .mockRejectedValue(Object.assign(new Error(message), { name: 'SecurityError' })),
+      };
+      jest.spyOn(webusb, 'findDevice').mockResolvedValue(device as unknown as USBDevice);
+      await expect(webusb.connect('mock-usb', true)).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BridgeNeedsPermission,
+        params: {
+          operation: 'open',
+          nativeErrorName: 'SecurityError',
+          nativeErrorMessage: message,
+        },
+      });
+      expect(device.open).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  test('does not classify protected-interface SecurityError as missing OS permission', async () => {
+    const webusb = new WebUsbTransport();
+    const device = {
+      opened: false,
+      open: jest
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error('Protected interface'), { name: 'SecurityError' })
+        ),
+    };
+    jest.spyOn(webusb, 'findDevice').mockResolvedValue(device as unknown as USBDevice);
+    await expect(webusb.connectToDevice('mock-usb', true)).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.WebUsbDeviceAccessError,
+    });
+  });
+
+  test.each(['claimInterface', 'transferIn', 'transferOut'] as const)(
+    'preserves USB permission failures during %s',
+    async operation => {
+      const webusb = new WebUsbTransport() as unknown as {
+        throwWebUsbIoError(path: string, operation: string, error: unknown): Promise<never>;
+      };
+      await expect(
+        webusb.throwWebUsbIoError('mock-usb', operation, new Error('LIBUSB_ERROR_ACCESS'))
+      ).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BridgeNeedsPermission,
+        params: { operation, nativeErrorMessage: 'LIBUSB_ERROR_ACCESS' },
+      });
+    }
+  );
+
+  test('fails a stalled USB write without replaying the packet', async () => {
+    const webusb = new WebUsbTransport();
+    const device = {
+      opened: true,
+      transferOut: jest.fn().mockResolvedValue({ status: 'stall', bytesWritten: 0 }),
+    };
+    jest.spyOn(webusb, 'findDevice').mockResolvedValue(device as unknown as USBDevice);
+    const state = webusb as unknown as {
+      transferOutWithRetry(path: string, packet: Uint8Array): Promise<void>;
+    };
+    await expect(state.transferOutWithRetry('mock-usb', new Uint8Array([1]))).rejects.toMatchObject(
+      {
+        errorCode: HardwareErrorCode.WebUsbDeviceAccessError,
+        params: { operation: 'transferOut', nativeErrorMessage: 'transferOut status: stall' },
+      }
+    );
+    expect(device.transferOut).toHaveBeenCalledTimes(1);
+  });
+
   test('acquire skips the wire probe when the protocol is already cached', async () => {
     const webusb = buildAcquirableTransport();
     const path = 'pro-webusb';

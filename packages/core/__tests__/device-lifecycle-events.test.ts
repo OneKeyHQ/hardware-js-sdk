@@ -997,6 +997,28 @@ describe('public device lifecycle events', () => {
     expect(device.wasInterruptedByUser()).toBe(false);
   });
 
+  test.each(['V1', 'V2'] as const)(
+    'retires a failed USB %s session before the next user attempt',
+    async protocol => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('desktop-webusb' as never);
+      const device = createInitializedDevice(protocol);
+      device.originalDescriptor = { ...device.originalDescriptor, session: device.mainId };
+      const disconnect = jest.fn().mockResolvedValue(undefined);
+      const release = jest.fn().mockResolvedValue(undefined);
+      device.deviceConnector = { disconnect, release } as never;
+      device.commands = { disposed: false, dispose: jest.fn() } as never;
+      (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+      const error = ERRORS.TypedError(HardwareErrorCode.WebUsbDeviceAccessError);
+      await expect(device.run(() => Promise.reject(error))).rejects.toBe(error);
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+      expect(disconnect).toHaveBeenCalledWith(device.mainId);
+      expect(release).toHaveBeenCalledTimes(1);
+      expect(device.hasDeviceAcquire()).toBe(false);
+    }
+  );
+
   test('waits for the canceled run to finish releasing before cancellation completes', async () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
     const device = createInitializedDevice('V2');

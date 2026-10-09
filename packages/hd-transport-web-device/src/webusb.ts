@@ -71,7 +71,7 @@ interface TransferCancelToken {
   cancelled: boolean;
 }
 
-type WebUsbOperation = 'claimInterface' | 'transferIn' | 'transferOut';
+type WebUsbOperation = 'open' | 'claimInterface' | 'transferIn' | 'transferOut';
 
 /**
  * The navigator.usb disconnect listener is module-scoped and attached at most
@@ -519,6 +519,9 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       try {
         return await this.connectToDevice(path, first);
       } catch (e) {
+        if (e instanceof HardwareError && e.errorCode === HardwareErrorCode.BridgeNeedsPermission) {
+          throw e;
+        }
         if (i === maxRetries - 1) {
           throw e;
         }
@@ -567,7 +570,11 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   async connectToDevice(path: string, first: boolean) {
     let device: USBDevice = await this.findDevice(path);
     if (!device.opened) {
-      await device.open();
+      try {
+        await device.open();
+      } catch (error) {
+        return this.throwWebUsbIoError(path, 'open', error);
+      }
     }
     // A V1 packet retry continues an in-flight exchange. Preserve its endpoint
     // state as in the legacy transport; probing and V2 recovery still reset.
@@ -581,7 +588,11 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     await this.getConnectedDevices();
     device = await this.findDevice(path);
     if (!device.opened) {
-      await device.open();
+      try {
+        await device.open();
+      } catch (error) {
+        return this.throwWebUsbIoError(path, 'open', error);
+      }
     }
 
     if (
@@ -681,6 +692,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     return (
       error instanceof HardwareError &&
       (error.errorCode === HardwareErrorCode.BridgeDeviceDisconnected ||
+        error.errorCode === HardwareErrorCode.BridgeNeedsPermission ||
         error.errorCode === HardwareErrorCode.WebUsbDeviceAccessError)
     );
   }
@@ -709,6 +721,14 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
 
     const nativeErrorName = this.getErrorName(nativeError);
     const nativeErrorMessage = this.getErrorMessage(nativeError);
+    // SecurityError alone may indicate a protected interface, not OS permissions.
+    if (this.isWebUsbPermissionDeniedMessage(nativeErrorMessage)) {
+      throw ERRORS.TypedError(HardwareErrorCode.BridgeNeedsPermission, nativeErrorMessage, {
+        operation,
+        nativeErrorName: nativeErrorName || undefined,
+        nativeErrorMessage,
+      });
+    }
     const disconnectedByMessage =
       /(?:device )?disconnected|device not found|action was interrupted/i.test(
         `${nativeErrorName}: ${nativeErrorMessage}`
@@ -728,8 +748,14 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     });
   }
 
+  private isWebUsbPermissionDeniedMessage(message: string) {
+    return /LIBUSB_ERROR_ACCESS|\b(?:access|permission) denied\b/i.test(message);
+  }
+
   private isRetryablePacketIoError(error: unknown) {
+    if (this.isWebUsbIoHardwareError(error)) return false;
     const message = this.getErrorMessage(error).toLowerCase();
+    if (this.isWebUsbPermissionDeniedMessage(message)) return false;
     return (
       message.includes('transferout') ||
       message.includes('transferin') ||
@@ -835,7 +861,14 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     const transferBuffer = this.toArrayBuffer(
       packet.buffer.slice(packet.byteOffset, packet.byteOffset + packet.byteLength)
     );
-    await device.transferOut(endpointOut, transferBuffer);
+    const result = await device.transferOut(endpointOut, transferBuffer);
+    if (result.status !== 'ok') {
+      return this.throwWebUsbIoError(
+        path,
+        'transferOut',
+        new Error(`transferOut status: ${String(result.status)}`)
+      );
+    }
   }
 
   private async transferInWithRetry(

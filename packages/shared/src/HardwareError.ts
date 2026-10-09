@@ -456,7 +456,7 @@ export const HardwareErrorCode = {
   FirmwareVerificationFailed: 820,
 
   /**
-   * Web bridge coonect needs permission
+   * USB access needs OS permission (bridge/libusb or WebUSB).
    */
   BridgeNeedsPermission: 821,
 
@@ -525,7 +525,7 @@ export const HardwareErrorCode = {
 
   /**
    * WebUSB device is present, but its interface or endpoint is unavailable
-   * @params: { operation: 'claimInterface' | 'transferIn' | 'transferOut'; nativeErrorName?: string; nativeErrorMessage?: string }
+   * @params: { operation: 'open' | 'claimInterface' | 'transferIn' | 'transferOut'; nativeErrorName?: string; nativeErrorMessage?: string }
    */
   WebUsbDeviceAccessError: 903,
 } as const;

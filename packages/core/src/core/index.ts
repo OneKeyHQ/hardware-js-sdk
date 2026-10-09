@@ -1272,6 +1272,7 @@ const ensureConnected = async (
             HardwareErrorCode.BridgeNotInstalled,
             HardwareErrorCode.BridgeTimeoutError,
             HardwareErrorCode.BridgeNeedsPermission,
+            HardwareErrorCode.WebUsbDeviceAccessError,
           ].includes(error.errorCode)
         ) {
           _deviceList = undefined;
@@ -1358,6 +1359,7 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceDetectInBootloaderMode,
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
             HardwareErrorCode.BridgeNeedsPermission,
+            HardwareErrorCode.WebUsbDeviceAccessError,
             HardwareErrorCode.DeviceInterruptedFromUser,
             HardwareErrorCode.CallQueueActionCancelled,
           ].includes(error.errorCode) ||
