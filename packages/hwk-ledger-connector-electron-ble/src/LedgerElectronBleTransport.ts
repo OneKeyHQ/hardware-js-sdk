@@ -8,7 +8,7 @@ import {
   UnknownDeviceError,
 } from '@ledgerhq/device-management-kit';
 import { Left, Right } from 'purify-ts';
-import { defer, from, mergeMap } from 'rxjs';
+import { defer, from, mergeMap, repeat } from 'rxjs';
 import {
   LEDGER_BLE_MIN_FRAME_SIZE,
   LEDGER_BLE_VENDOR,
@@ -27,6 +27,7 @@ import type {
 import type { ElectronBleApi, ElectronBleDeviceInfo } from '@onekeyfe/hwk-adapter-core';
 
 const TRANSPORT_ID = 'ELECTRON_BLE';
+const DISCOVERY_POLL_MS = 500;
 const normalizeUuid = (uuid: string) => uuid.replace(/-/g, '').toLowerCase();
 const toHex = (bytes: Uint8Array) =>
   Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
@@ -115,8 +116,12 @@ export class LedgerElectronBleTransport implements Transport {
     return defer(() => this.discover()).pipe(mergeMap(devices => from(devices)));
   }
 
+  /**
+   * Re-scans while subscribed: the main process answers with what it has heard so far, so one
+   * snapshot from a cold cache is empty and a saved device would never show up in the window.
+   */
   listenToAvailableDevices() {
-    return defer(() => this.discover());
+    return defer(() => this.discover()).pipe(repeat({ delay: DISCOVERY_POLL_MS }));
   }
 
   async stopDiscovering(): Promise<void> {

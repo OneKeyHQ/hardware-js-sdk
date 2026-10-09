@@ -4,7 +4,7 @@ import {
   defaultApduSenderServiceStubBuilder,
 } from '@ledgerhq/device-management-kit';
 import { Nothing } from 'purify-ts';
-import { firstValueFrom } from 'rxjs';
+import { filter, firstValueFrom } from 'rxjs';
 
 import { LEDGER_BLE_MAX_FRAME_SIZE, LEDGER_BLE_VENDOR } from '../bleProfile';
 import { LedgerElectronBleTransport } from '../LedgerElectronBleTransport';
@@ -116,6 +116,20 @@ describe('Ledger Electron BLE lifecycle', () => {
       vendor: LEDGER_BLE_VENDOR,
       match: { serviceUuids: [profile.serviceUuid] },
     });
+  });
+
+  it('keeps scanning while subscribed so a device missing from a cold cache appears', async () => {
+    const { transport, bridge } = fixture();
+    const advertised = await (bridge.scan as jest.Mock)();
+    (bridge.scan as jest.Mock).mockReset();
+    (bridge.scan as jest.Mock).mockResolvedValueOnce([]).mockResolvedValue(advertised);
+    const found = firstValueFrom(
+      transport.listenToAvailableDevices().pipe(filter(devices => devices.length > 0))
+    );
+    await expect(found).resolves.toEqual([
+      expect.objectContaining({ id: 'ledger-test', transport: 'ELECTRON_BLE' }),
+    ]);
+    expect(bridge.scan).toHaveBeenCalledTimes(2);
   });
 
   it('uses the cached advertisement profile and negotiates a safe frame size', async () => {
