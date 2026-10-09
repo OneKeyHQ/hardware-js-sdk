@@ -685,11 +685,13 @@ export class NobleBleHandler {
     // A rejected caller can still have a native connect or disconnect in flight.
     attempt.settled = Promise.allSettled([nativeOperation, caller]).finally(() => {
       this._connectAttempts.delete(attempt);
+      // The connect cleared the idle stop; re-arm it so an owner left behind (a picker that
+      // connected without stopScan) still expires instead of keeping the radio on.
+      if (this._scanOwners.size > 0) this._armIdleStop();
       // Resume the radio only for a connect-scan (symbol) owner; a vendor's
       // idle scan owner must not restart it during pairing.
       const connectScanWaiting = [...this._scanOwners].some(owner => typeof owner === 'symbol');
       if (connectScanWaiting) {
-        this._armIdleStop();
         void this._setScanning(true).catch(() => undefined);
       }
     });

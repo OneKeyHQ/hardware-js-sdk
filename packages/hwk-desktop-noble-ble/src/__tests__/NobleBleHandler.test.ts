@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 
 import { NobleBleHandler } from '../NobleBleHandler';
 import { initThirdPartyBleSupport } from '../main';
-import { THIRD_PARTY_BLE_CHANNELS } from '../constants';
+import { THIRD_PARTY_BLE_CHANNELS, THIRD_PARTY_BLE_SCAN_IDLE_STOP_MS } from '../constants';
 
 import type { NoblePeripheralLike } from '../NobleBleHandler';
 
@@ -731,6 +731,35 @@ describe('reconnect scan ownership', () => {
       expect(noble.startScanningAsync).toHaveBeenCalledTimes(1);
       await handler.scan({ vendor: 'ledger' });
       expect(noble.scanning).toBe(true);
+    } finally {
+      await handler.dispose();
+    }
+  });
+
+  test('a picker scan still owned after a connect stops once it goes idle', async () => {
+    const picked = new FakePeripheral('picked', { localName: 'Trezor Safe 7' });
+    const later = new FakePeripheral('later', { localName: 'Trezor Safe 7' });
+    const noble = new FakeNoble();
+    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    try {
+      await handler.scan(PADDED_VENDOR);
+      noble.emit('discover', picked);
+      // The picker connects its pick without releasing its scan.
+      const first = handler.connect(picked.id, PADDED_PROFILE);
+      await flush();
+      jest.advanceTimersByTime(300);
+      await flush();
+      await first;
+      // A later connect to an uncached id scans for it; another owner keeps the radio on.
+      const second = handler.connect(later.id, PADDED_PROFILE);
+      await flush();
+      jest.advanceTimersByTime(300);
+      await flush();
+      noble.emit('discover', later);
+      await second;
+      jest.advanceTimersByTime(THIRD_PARTY_BLE_SCAN_IDLE_STOP_MS);
+      await flush();
+      expect(noble.scanning).toBe(false);
     } finally {
       await handler.dispose();
     }
