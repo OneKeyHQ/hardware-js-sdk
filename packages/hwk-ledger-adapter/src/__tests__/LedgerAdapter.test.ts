@@ -1854,6 +1854,32 @@ describe('LedgerAdapter', () => {
       expect((await pending).success).toBe(false);
     });
 
+    it('ends the prompt of a call cancelled by its connectId when no operation exists', async () => {
+      const prompts: unknown[] = [];
+      adapter.on(UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM, event => {
+        prompts.push(event);
+      });
+      const pending = adapter.btcGetPublicKey('dev-1', '', {
+        path: "m/84'/0'/100'",
+        coin: 'btc',
+      });
+      await waitForCondition(() => prompts.length === 1);
+
+      adapter.cancel('dev-1');
+
+      const settled = await Promise.race([
+        pending.then(() => true),
+        new Promise<boolean>(resolve => {
+          setTimeout(() => resolve(false), 200);
+        }),
+      ]);
+      expect(settled).toBe(true);
+      await expect(pending).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.UserAborted },
+      });
+    });
+
     it('rejects concurrent BTC high-index calls instead of queueing them', async () => {
       let resolveFirstCall: ((value: unknown) => void) | undefined;
       connector.callImpl.mockImplementationOnce(

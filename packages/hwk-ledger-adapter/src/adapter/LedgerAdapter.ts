@@ -1867,7 +1867,8 @@ export class LedgerAdapter implements IHardwareWallet {
    * promoted), or `null` if the user declined.
    */
   private async _gateBtcHighIndex(
-    params: BtcGetPublicKeyParams
+    params: BtcGetPublicKeyParams,
+    signal: AbortSignal
   ): Promise<BtcGetPublicKeyParams | null> {
     const accountIndex = btcAccountIndexFromPath(params.path);
     if (params.showOnDevice) return params;
@@ -1877,13 +1878,17 @@ export class LedgerAdapter implements IHardwareWallet {
     if (this._btcHighIndexConfirmedThisSession) {
       return { ...params, showOnDevice: true };
     }
-    const confirmed = await this._waitForBtcHighIndexConfirm(params.path, accountIndex);
+    const confirmed = await this._waitForBtcHighIndexConfirm(params.path, accountIndex, signal);
     if (!confirmed) return null;
     this._btcHighIndexConfirmedThisSession = true;
     return { ...params, showOnDevice: true };
   }
 
-  private async _waitForBtcHighIndexConfirm(path: string, accountIndex: number): Promise<boolean> {
+  private async _waitForBtcHighIndexConfirm(
+    path: string,
+    accountIndex: number,
+    signal: AbortSignal
+  ): Promise<boolean> {
     // Register the wait FIRST. A synchronous consumer that calls `uiResponse`
     // inside the emit handler would otherwise resolve before the registry
     // slot exists, and the response would be silently dropped (see
@@ -1905,7 +1910,11 @@ export class LedgerAdapter implements IHardwareWallet {
     });
 
     try {
-      const payload = await waitPromise;
+      const payload = await this._awaitUiAnswer(
+        UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM,
+        waitPromise,
+        signal
+      );
       return !!payload?.confirmed;
     } catch (err) {
       this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
@@ -1916,9 +1925,25 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
+  /** A cancel of the job ends its open prompt, even when no operation names that prompt. */
+  private async _awaitUiAnswer<T>(
+    requestType: string,
+    waitPromise: Promise<T>,
+    signal: AbortSignal
+  ): Promise<T> {
+    const onAbort = () => this._uiRegistry.cancel(requestType);
+    if (signal.aborted) onAbort();
+    signal.addEventListener('abort', onAbort, { once: true });
+    try {
+      return await waitPromise;
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+    }
+  }
+
   // Ask the user whether to install a missing app (autoInstallApp flow).
   // Same register-then-emit ordering as the BTC high-index gate.
-  private async _waitForInstallAppConfirm(appName: string): Promise<boolean> {
+  private async _waitForInstallAppConfirm(appName: string, signal: AbortSignal): Promise<boolean> {
     const operationId = this._activeOperationId();
     const waitPromise = this._uiRegistry.wait<{ confirmed: boolean }>(
       UI_REQUEST.REQUEST_INSTALL_APP,
@@ -1931,7 +1956,11 @@ export class LedgerAdapter implements IHardwareWallet {
     });
 
     try {
-      const payload = await waitPromise;
+      const payload = await this._awaitUiAnswer(
+        UI_REQUEST.REQUEST_INSTALL_APP,
+        waitPromise,
+        signal
+      );
       return !!payload?.confirmed;
     } catch (err) {
       this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
@@ -2654,7 +2683,7 @@ export class LedgerAdapter implements IHardwareWallet {
     LedgerAdapter._throwIfAborted(signal);
     let effectiveParams = params;
     if (method === 'btcGetPublicKey') {
-      const gatedParams = await this._gateBtcHighIndex(params as BtcGetPublicKeyParams);
+      const gatedParams = await this._gateBtcHighIndex(params as BtcGetPublicKeyParams, signal);
       if (gatedParams === null) {
         throw Object.assign(new Error('User cancelled BTC high-index confirmation'), {
           _tag: ERROR_TAG.UserAborted,
@@ -2967,7 +2996,7 @@ export class LedgerAdapter implements IHardwareWallet {
               appName,
             });
           }
-          const confirmed = await this._waitForInstallAppConfirm(appName);
+          const confirmed = await this._waitForInstallAppConfirm(appName, signal);
           if (!confirmed) {
             throw createHwkError({
               code: HardwareErrorCode.UserAborted,
