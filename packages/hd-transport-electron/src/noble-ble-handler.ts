@@ -16,7 +16,6 @@ import {
   ONEKEY_WRITE_CHARACTERISTIC_UUID,
   createKnownBleUuidAliases,
   hasOnekeyCommunicationService,
-  isBleStaleBondHardwareError,
   isOnekeyBluetoothDevice,
   isPro2FamilyBleName,
   matchesKnownBleUuid,
@@ -74,19 +73,6 @@ type NobleBleNativeError = Error & {
 
 export function createNobleBleConnectionError(error: NobleBleNativeError, messagePrefix = '') {
   const errorMessage = error.message;
-  const isInvalidMacOsBond =
-    error.nativeErrorCode === 14 && error.nativeErrorDomain === 'CBErrorDomain';
-  if (isInvalidMacOsBond) {
-    const nativeErrorMessage = `${messagePrefix}${errorMessage}`;
-    return ERRORS.TypedError(
-      HardwareErrorCode.BleBondInvalid,
-      `${HardwareErrorCodeMessage[HardwareErrorCode.BleBondInvalid]} (${nativeErrorMessage})`,
-      {
-        nativeErrorMessage,
-      }
-    );
-  }
-
   return ERRORS.TypedError(HardwareErrorCode.BleConnectedError, `${messagePrefix}${errorMessage}`);
 }
 
@@ -1634,7 +1620,6 @@ async function setupConnectionAndDiscoverServices(
     await forceReconnectPeripheral(peripheral, deviceId);
   } catch (resetError) {
     if (
-      isBleStaleBondHardwareError(resetError) ||
       (resetError as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleDeviceDisconnected
     ) {
       throw resetError;
@@ -1812,21 +1797,12 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       }
     };
 
-    let staleBondError: Error | undefined;
     const connectById = async () => {
-      try {
-        const found = await tryDirectConnectById(deviceId);
-        if (found) {
-          discoveredDevices.set(deviceId, found);
-        }
-        return found;
-      } catch (error) {
-        if ((error as { errorCode?: number }).errorCode !== HardwareErrorCode.BleBondInvalid) {
-          throw error;
-        }
-        staleBondError = error as Error;
-        return undefined;
+      const found = await tryDirectConnectById(deviceId);
+      if (found) {
+        discoveredDevices.set(deviceId, found);
       }
+      return found;
     };
 
     peripheral = byIdFirst ? await connectById() : await scanForPeripheral();
@@ -1835,7 +1811,6 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       // silent), or not reachable by id. Try the other one before giving up.
       peripheral = byIdFirst ? await scanForPeripheral() : await connectById();
     }
-    if (!peripheral && staleBondError) throw staleBondError;
   }
 
   assertBleActive();

@@ -142,55 +142,6 @@ than repeating the message predicate.
 Map once inside the selected system. Do not translate between `hd-core` and `hwk` inside the SDK,
 and do not reclassify an already canonical error from its fallback message.
 
-### Android Key Missing
-
-Android 16+ keeps its side of a bond the device no longer has keys for (device wiped, bond
-removed) and reports it only through the `ACTION_KEY_MISSING` broadcast. GATT shows an ordinary
-peer disconnect, and the same status is reported when a device reboots, so the disconnect status
-must never be used as the classifier.
-
-`hd-transport-react-native` re-reads a link loss as `BleBondInvalid` only when the broadcast
-belongs to the same link attempt (`bleKeyMissing.ts`): matching device, received after that link
-started, and the failure within `ANDROID_KEY_MISSING_LINK_WINDOW_MS` of it. Without the signal,
-or on an OS or native build that cannot report it, the original error is kept unchanged.
-
-Android 17 first re-pairs by itself and broadcasts key missing only if that fails. A failed
-re-pair restores the old bond (`BONDING -> BONDED`) and a successful one replaces it
-(`BONDING -> NONE -> BONDING -> BONDED`), so a bond-state wait that joins a system-initiated
-bonding relies on key missing, not on the final state, to detect failure.
-
-Android also encrypts a bonded link on its own right after connecting. A request that needs
-encryption sent before that attempt finishes (the notification CCCD write) is rejected, and the
-framework retries it by encrypting again with the same stale key; Pro 2 firmware allows one key
-failure per link and drops it on the second, before the system re-pair can finish. So when the
-device was bonded before the acquire, the transport waits for `ACTION_ENCRYPTION_CHANGE` before
-subscribing to notifications (`bleEncryption.ts`): success proceeds, key missing (HCI `0x06`)
-keeps GATT idle until the system re-pairs on the same link (or reports key missing, mapped to
-`BleBondInvalid`), and no result within `ANDROID_ENCRYPTION_RESULT_TIMEOUT_MS` proceeds as
-before. A link that is still up and was encrypted earlier does not wait. Firmware-install
-reconnects and bonds created by the same acquire skip the wait. Core's `ensureConnected` bounds
-each attempt by its call timeout, which a user-confirmed re-pair can exceed; the re-pair still
-completes and the next attempt reuses the link.
-
-### iOS Link Ended By The Device
-
-iOS names a bond the device no longer holds with `CBErrorPeerRemovedPairingInformation` (14),
-mapped to `BlePeerRemovedPairingInformation`. The iPhone 17 family does not: the device ends the
-link about a second after connecting (Pro 2 firmware drops a link on its second key failure), and
-the only trace is `CBErrorPeripheralDisconnected` (7) on whatever operation was in flight. The
-disconnect event has no reason on iOS, and a third-party scanner app gets the same code from the
-same device, so nothing the transport sends causes or avoids it.
-
-A device that reboots or powers off right after connecting ends one link the same way, so one
-drop keeps its original error and Core retries. `hd-transport-react-native` reports
-`BleBondInvalid` (`reason: 'peer_disconnected'`) only for the second acquire attempt in a row
-that the device ended with code 7, each on a link that attempt opened, within
-`IOS_PEER_TERMINATION_LINK_WINDOW_MS` of connecting and before any response
-(`bleIosStaleBond.ts`). An attempt that succeeds or fails any other way starts the count over, the
-first drop expires after `IOS_PEER_TERMINATION_REPEAT_WINDOW_MS`, and firmware-install reconnects
-are never counted. iOS does not re-pair on its own, so the user has to forget the device in
-system settings; there is no in-place recovery as on Android.
-
 ## Cross-Runtime Transport
 
 The legacy Core response path uses `serializeError()` through `createResponseMessage()`. HWK
@@ -213,7 +164,6 @@ For every changed cross-runtime error, prove that:
 | User abort | Stop the current flow; do not retry or replace it with a connection error |
 | Device rejection | Preserve the rejection; do not ask again automatically |
 | Permission or unavailable environment | Preserve the link state where possible; require user action |
-| Invalid/stale OS bond | End the failed link; require forget/re-pair; do not loop reconnect |
 | Timeout, disconnect, I/O, framing, sequence, generation | Treat as link-fatal and clean all affected link state |
 | Firmware business `Failure` | Keep the link unless the failure explicitly proves it unusable |
 | Side-effecting operation failure | Retry only in Core after idempotency is established |

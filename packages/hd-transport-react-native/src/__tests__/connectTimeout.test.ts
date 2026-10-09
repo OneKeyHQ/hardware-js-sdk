@@ -623,30 +623,6 @@ describe('BLE connect timeout', () => {
     expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(UUID);
   });
 
-  test.each([
-    {
-      nativeFields: { errorCode: BleErrorCode.DeviceDisconnected, iosErrorCode: 14 },
-      reason: 'Peer removed pairing information',
-      errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
-    },
-    {
-      nativeFields: { errorCode: 0, attErrorCode: 5 },
-      reason: 'GATT_INSUF_AUTHENTICATION',
-      errorCode: HardwareErrorCode.BleDeviceBondError,
-    },
-  ])(
-    'maps a stale bond during GATT discovery to canonical error $errorCode',
-    async ({ nativeFields, reason, errorCode }) => {
-      const { transport, device } = createHarness(() => Promise.resolve());
-      const nativeError = Object.assign(new Error(reason), nativeFields, { reason });
-      device.discoverAllServicesAndCharacteristics.mockRejectedValueOnce(nativeError);
-
-      await expect(
-        (transport as any).resolveCharacteristicsWithTimeout(UUID, device)
-      ).rejects.toMatchObject({ errorCode });
-    }
-  );
-
   test('normalizes an unstructured GATT disconnect instead of leaking an unknown error', async () => {
     const { transport, device } = createHarness(() => Promise.resolve());
     const nativeError = Object.assign(new Error(`BleError: Device ${UUID} was disconnected`), {
