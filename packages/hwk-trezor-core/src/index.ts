@@ -875,10 +875,18 @@ export class TrezorDeviceSession {
     // instead of sending PassphraseRequest, so an empty passphrase cannot be enforced; refuse
     // as THP firmware does rather than return whichever wallet the user opens.
     if (passphraseMode === 'empty' && this.currentFeatures?.passphrase_protection == null) {
-      // Locked firmware (core >= 2.4.3) hides these private settings. CancelAuthorization exists in
-      // every such release, is not allowed while locked, and only clears a CoinJoin authorization,
-      // so the device asks for the PIN alone, opens no wallet, and the settings can then be read.
-      expectMessage(await this.call('CancelAuthorization', {}), 'Success');
+      // Locked firmware (core >= 2.4.3) hides these private settings. Unlock with a silent testnet
+      // GetAddress, as hd-core does for older OneKey firmware; every build including bitcoin-only
+      // supports it. Its result is discarded, and the next session starts fresh via Initialize.
+      expectMessage(
+        await this.call('GetAddress', {
+          address_n: [0x8000002c, 0x80000001, 0x80000000, 0, 0],
+          coin_name: 'Testnet',
+          script_type: 'SPENDADDRESS',
+          show_display: false,
+        }),
+        'Address'
+      );
       expectMessage(await this.call('GetFeatures', {}), 'Features');
       if (this.currentFeatures?.passphrase_protection == null) {
         throw new TrezorFailureError({
