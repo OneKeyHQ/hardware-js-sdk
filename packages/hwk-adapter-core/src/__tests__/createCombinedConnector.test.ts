@@ -458,6 +458,33 @@ describe('createCombinedConnector', () => {
     expect(ble.knownCredentials).toEqual([creds]);
   });
 
+  test('a credential one transport saw rejected is dropped from every transport', async () => {
+    const usb = new FakeConnector('usb', [device('usb-1')], { supportsCredentials: true });
+    const ble = new FakeConnector('ble', [device('ble-1')], { supportsCredentials: true });
+    const combined = createCombinedConnector([usb, ble]);
+    const stale = { credential: 'stale' };
+    const fresh = { credential: 'fresh' };
+    await combined.setKnownCredentials?.([stale]);
+
+    // The device rejects the stale credential: the report carries only the removal.
+    usb.emit('device-trezor-thp-credentials-changed', {
+      connectId: 'usb-1',
+      credentials: [],
+      removed: [stale],
+    });
+    await Promise.resolve();
+    expect(ble.knownCredentials.at(-1)).toEqual([]);
+
+    // Pairing again mints a fresh one; the stale one must not come back with it.
+    usb.emit('device-trezor-thp-credentials-changed', {
+      connectId: 'usb-1',
+      credentials: [fresh],
+    });
+    await Promise.resolve();
+    expect(usb.knownCredentials.at(-1)).toEqual([fresh]);
+    expect(ble.knownCredentials.at(-1)).toEqual([fresh]);
+  });
+
   test('setKnownCredentials is undefined when no transport supports credentials', () => {
     const usb = new FakeConnector('usb', [device('usb-1')]);
     const ble = new FakeConnector('ble', [device('ble-1')]);

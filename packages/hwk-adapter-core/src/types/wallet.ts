@@ -256,7 +256,12 @@ export type DeviceEvent =
     }
   | {
       type: typeof DEVICE.TREZOR_THP_CREDENTIALS_CHANGED;
-      payload: { connectId: string; deviceId?: string; credentials: Record<string, unknown>[] };
+      payload: {
+        connectId: string;
+        deviceId?: string;
+        credentials: Record<string, unknown>[];
+        removed?: Record<string, unknown>[];
+      };
     };
 
 export type UiRequestEvent =
@@ -385,7 +390,13 @@ export interface HardwareEventMap {
   };
   [DEVICE.TREZOR_THP_CREDENTIALS_CHANGED]: {
     type: typeof DEVICE.TREZOR_THP_CREDENTIALS_CHANGED;
-    payload: { connectId: string; deviceId?: string; credentials: Record<string, unknown>[] };
+    payload: {
+      connectId: string;
+      deviceId?: string;
+      credentials: Record<string, unknown>[];
+      /** Credentials the device rejected; a list kept for several devices drops these. */
+      removed?: Record<string, unknown>[];
+    };
   };
 
   // UI request events

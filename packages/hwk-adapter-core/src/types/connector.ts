@@ -166,6 +166,8 @@ export interface ConnectorEventMap {
     connectId: string;
     deviceId?: string;
     credentials: Record<string, unknown>[];
+    /** Credentials the device rejected; a list kept for several devices drops these. */
+    removed?: Record<string, unknown>[];
   };
   'ui-request': { type: string; payload?: unknown };
   'ui-event': ConnectorUiEvent;
@@ -550,7 +552,13 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
   // autoconnects rather than re-pairing.
   for (const child of connectors) {
     child.on('device-trezor-thp-credentials-changed', data => {
-      if (mergeShared(data.credentials)) void broadcastCredentials();
+      // A credential the device rejected leaves the union too; otherwise the next broadcast
+      // hands it back to every child and each reconnect pairs again.
+      const removed = new Set((data.removed ?? []).map(credentialKey));
+      const kept = sharedCredentials.filter(cred => !removed.has(credentialKey(cred)));
+      const dropped = kept.length !== sharedCredentials.length;
+      sharedCredentials.splice(0, sharedCredentials.length, ...kept);
+      if (mergeShared(data.credentials) || dropped) void broadcastCredentials();
     });
   }
 
