@@ -964,6 +964,23 @@ describe('KeystoneAdapter', () => {
     });
   });
 
+  describe('solSignMessage', () => {
+    it('refuses the off-chain message format before reaching the device', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+      const result = await adapter.solSignMessage(null, null, {
+        path: "m/44'/501'/0'",
+        message: 'deadbeef',
+        messageVersion: 1,
+        requiredSigners: ['11'.repeat(32)],
+      });
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.payload.code).toBe(HardwareErrorCode.MethodNotSupported);
+      expect(fake.requests).toHaveLength(0);
+    });
+  });
+
   describe('solSignTransaction', () => {
     it('signs via the QR channel and returns a hex signature', async () => {
       const adapter = newTestAdapter();

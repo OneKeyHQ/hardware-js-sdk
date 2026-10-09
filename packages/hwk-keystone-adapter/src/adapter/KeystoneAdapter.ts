@@ -1386,6 +1386,14 @@ export class KeystoneAdapter implements IHardwareWallet {
         'solSignMessage requires params.path and params.message'
       );
     }
+    // The request carries only the message bytes; the off-chain message envelope and its signer
+    // set never reach the device, so the signature would not verify as one.
+    if (params.messageVersion !== undefined) {
+      return failure(
+        HardwareErrorCode.MethodNotSupported,
+        'Keystone signs Solana messages as raw bytes only; off-chain message format is not supported'
+      );
+    }
     const path = normalizePath(params.path);
 
     return this._signWithWallet({
