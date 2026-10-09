@@ -874,6 +874,22 @@ export class TrezorDeviceSession {
     // v1 firmware with the passphrase always entered on the device prompts on its own screen
     // instead of sending PassphraseRequest, so an empty passphrase cannot be enforced; refuse
     // as THP firmware does rather than return whichever wallet the user opens.
+    if (passphraseMode === 'empty' && this.currentFeatures?.passphrase_protection == null) {
+      // Locked firmware hides these private settings. GetNonce needs only the PIN and opens no
+      // wallet, so unlock with it and read them before anything can prompt for a passphrase.
+      expectMessage(await this.call('GetNonce', {}), 'Nonce');
+      expectMessage(await this.call('GetFeatures', {}), 'Features');
+      if (this.currentFeatures?.passphrase_protection == null) {
+        throw new TrezorFailureError({
+          type: 'Failure',
+          message: {
+            code: 'Failure_DataError',
+            message:
+              'Empty passphrase cannot be enforced: device did not report its passphrase setting',
+          },
+        } as TrezorMessageResponse<'Failure'>);
+      }
+    }
     if (
       passphraseMode === 'empty' &&
       this.currentFeatures?.passphrase_protection === true &&
