@@ -130,19 +130,6 @@ describe('DeviceCommands failure mapping', () => {
     );
   });
 
-  it('preserves the Protocol V2 peer-removed pairing error code', async () => {
-    const commands = createCommands();
-    const transportError = Object.assign(new Error('Peer removed pairing information'), {
-      errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
-    });
-    commands.mainId = 'main-id';
-    commands.transport = {
-      call: jest.fn().mockRejectedValue(transportError),
-    } as any;
-
-    await expect(commands._commonCall('DeviceInfoGet', {})).rejects.toBe(transportError);
-  });
-
   it('logs canonical DeviceStatus response fields without exposing the device ID', async () => {
     const commands = createCommands();
     const log = getLogger(LoggerNames.DeviceCommands);
@@ -414,6 +401,27 @@ describe('DeviceCommands failure mapping', () => {
     ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceBusy });
   });
 
+  it('maps commands rejected during a Protocol V2 firmware update to DeviceBusy', async () => {
+    const commands = createCommands();
+    const message = 'Requested command not allowed while a firmware update is in progress';
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: { code: 'Failure_ProcessError', message },
+        } as any,
+        'ProtocolInfoRequest'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceBusy,
+      params: {
+        failureCode: 'Failure_ProcessError',
+        firmwareMessage: message,
+      },
+    });
+  });
+
   it('maps the current AskPin passphrase-disabled response without relying on a subcode', async () => {
     const commands = createCommands();
 
@@ -550,6 +558,51 @@ describe('DeviceCommands failure mapping', () => {
       });
     }
   );
+
+  it('maps the Protocol V2 seed-session busy response to DeviceBusy', async () => {
+    const commands = createCommands();
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: {
+            code: 'Failure_ProcessError',
+            subcode: DeviceSessionErrorCode.DeviceSessionError_UserCancelled,
+            message: 'PIN cancelled',
+          },
+        } as any,
+        'SignTx'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceBusy,
+      params: {
+        failureCode: 'Failure_ProcessError',
+        subcode: DeviceSessionErrorCode.DeviceSessionError_UserCancelled,
+        firmwareMessage: 'PIN cancelled',
+      },
+    });
+  });
+
+  it('keeps the same Protocol V2 response as ActionCancelled for DeviceSession calls', async () => {
+    const commands = createCommands();
+
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: {
+            code: 'Failure_ProcessError',
+            subcode: DeviceSessionErrorCode.DeviceSessionError_UserCancelled,
+            message: 'PIN cancelled',
+          },
+        } as any,
+        'DeviceSessionAskPin'
+      )
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.ActionCancelled,
+    });
+  });
 
   it('does not use the legacy cancellation-message fallback for Protocol V1', async () => {
     const commands = createCommands();

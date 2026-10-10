@@ -16,7 +16,6 @@ import {
   ONEKEY_WRITE_CHARACTERISTIC_UUID,
   createKnownBleUuidAliases,
   hasOnekeyCommunicationService,
-  isBleStaleBondHardwareError,
   isOnekeyBluetoothDevice,
   isPro2FamilyBleName,
   matchesKnownBleUuid,
@@ -74,19 +73,6 @@ type NobleBleNativeError = Error & {
 
 export function createNobleBleConnectionError(error: NobleBleNativeError, messagePrefix = '') {
   const errorMessage = error.message;
-  const isInvalidMacOsBond =
-    error.nativeErrorCode === 14 && error.nativeErrorDomain === 'CBErrorDomain';
-  if (isInvalidMacOsBond) {
-    const nativeErrorMessage = `${messagePrefix}${errorMessage}`;
-    return ERRORS.TypedError(
-      HardwareErrorCode.BleBondInvalid,
-      `${HardwareErrorCodeMessage[HardwareErrorCode.BleBondInvalid]} (${nativeErrorMessage})`,
-      {
-        nativeErrorMessage,
-      }
-    );
-  }
-
   return ERRORS.TypedError(HardwareErrorCode.BleConnectedError, `${messagePrefix}${errorMessage}`);
 }
 
@@ -443,7 +429,18 @@ function updateBluetoothState(state: string): void {
 // Initialize Noble
 async function initializeNoble(): Promise<void> {
   assertBleActive();
-  if (noble) return;
+  if (noble) {
+    if (noble.state === 'poweredOff') {
+      throw ERRORS.TypedError(HardwareErrorCode.BlePoweredOff);
+    }
+    if (noble.state === 'unsupported') {
+      throw ERRORS.TypedError(HardwareErrorCode.BleUnsupported);
+    }
+    if (noble.state === 'unauthorized') {
+      throw ERRORS.TypedError(HardwareErrorCode.BleLocationError);
+    }
+    return;
+  }
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
@@ -496,7 +493,7 @@ async function initializeNoble(): Promise<void> {
           reject(ERRORS.TypedError(HardwareErrorCode.BlePoweredOff));
         } else if (state === 'unauthorized') {
           cleanup();
-          reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
+          reject(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
         }
       };
 
@@ -508,6 +505,7 @@ async function initializeNoble(): Promise<void> {
       };
       pendingCancellations.add(cancel);
       noble.on('stateChange', onStateChange);
+      onStateChange(noble.state);
     });
 
     assertBleActive();
@@ -522,7 +520,7 @@ async function initializeNoble(): Promise<void> {
     logger?.info('[NobleBLE] Noble initialized successfully');
   } catch (error) {
     logger?.error('[NobleBLE] Failed to initialize Noble:', error);
-    bluetoothState.unsupported = true;
+    bluetoothState.unsupported = noble?.state === 'unsupported';
     bluetoothState.initialized = true;
     throw error;
   }
@@ -1151,9 +1149,7 @@ async function performTargetedScan(
 
 // Enumerate devices
 async function enumerateDevices(isWindowDestroyed: () => boolean): Promise<DeviceInfo[]> {
-  if (!noble) {
-    await initializeNoble();
-  }
+  await initializeNoble();
 
   if (!noble) {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
@@ -1634,7 +1630,6 @@ async function setupConnectionAndDiscoverServices(
     await forceReconnectPeripheral(peripheral, deviceId);
   } catch (resetError) {
     if (
-      isBleStaleBondHardwareError(resetError) ||
       (resetError as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleDeviceDisconnected
     ) {
       throw resetError;
@@ -1745,10 +1740,6 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
       deviceId,
       error: String(error),
     });
-    const nativeError = error as NobleBleNativeError;
-    if (nativeError.nativeErrorCode === 14 && nativeError.nativeErrorDomain === 'CBErrorDomain') {
-      throw createNobleBleConnectionError(nativeError);
-    }
     directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
     return undefined;
   } finally {
@@ -1759,6 +1750,7 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
 
 // Connect to device - supports both discovered and direct connection modes
 async function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
+  await initializeNoble();
   logger?.info('[NobleBLE] Connect device request:', {
     deviceId,
     hasDiscovered: discoveredDevices.has(deviceId),
@@ -1776,11 +1768,6 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   }
 
   if (!peripheral) {
-    // Initialize Noble if not already done
-    if (!noble) {
-      await initializeNoble();
-    }
-
     if (!noble) {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
     }
@@ -1812,21 +1799,12 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       }
     };
 
-    let staleBondError: Error | undefined;
     const connectById = async () => {
-      try {
-        const found = await tryDirectConnectById(deviceId);
-        if (found) {
-          discoveredDevices.set(deviceId, found);
-        }
-        return found;
-      } catch (error) {
-        if ((error as { errorCode?: number }).errorCode !== HardwareErrorCode.BleBondInvalid) {
-          throw error;
-        }
-        staleBondError = error as Error;
-        return undefined;
+      const found = await tryDirectConnectById(deviceId);
+      if (found) {
+        discoveredDevices.set(deviceId, found);
       }
+      return found;
     };
 
     peripheral = byIdFirst ? await connectById() : await scanForPeripheral();
@@ -1835,7 +1813,6 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       // silent), or not reachable by id. Try the other one before giving up.
       peripheral = byIdFirst ? await scanForPeripheral() : await connectById();
     }
-    if (!peripheral && staleBondError) throw staleBondError;
   }
 
   assertBleActive();

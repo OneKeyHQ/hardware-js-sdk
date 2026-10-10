@@ -31,22 +31,17 @@ describe('Electron Noble BLE device discovery', () => {
     expect(NOBLE_BLE_SUBSCRIBE_TIMEOUT_MS).toBe(10_000);
   });
 
-  test('maps structured macOS stale pairing failures without parsing localized text', async () => {
+  test('maps native macOS connection failures to the generic connection error', async () => {
     const { createNobleBleConnectionError } = await import('../noble-ble-handler');
 
-    const staleBondError = createNobleBleConnectionError(
-      Object.assign(new Error('Peer removed pairing information on the device side'), {
-        nativeErrorCode: 14,
-        nativeErrorDomain: 'CBErrorDomain',
-      })
-    );
-    expect(staleBondError).toMatchObject({
-      errorCode: HardwareErrorCode.BleBondInvalid,
-      params: {
-        nativeErrorMessage: 'Peer removed pairing information on the device side',
-      },
-    });
-    expect(staleBondError.message).toContain('Peer removed pairing information on the device side');
+    expect(
+      createNobleBleConnectionError(
+        Object.assign(new Error('Peer removed pairing information on the device side'), {
+          nativeErrorCode: 14,
+          nativeErrorDomain: 'CBErrorDomain',
+        })
+      )
+    ).toMatchObject({ errorCode: HardwareErrorCode.BleConnectedError });
     expect(createNobleBleConnectionError(new Error('Encryption is insufficient'))).toMatchObject({
       errorCode: HardwareErrorCode.BleConnectedError,
     });
@@ -81,18 +76,16 @@ describe('Electron Noble BLE device discovery', () => {
     expect(
       createNobleBleIpcErrorResponse({
         name: 'HardwareError',
-        message: 'Bluetooth pairing information is no longer valid',
-        errorCode: HardwareErrorCode.BleBondInvalid,
-        params: { nativeErrorMessage: 'native message' },
+        message: 'Bluetooth connection failed',
+        errorCode: HardwareErrorCode.BleConnectedError,
       })
     ).toEqual({
       type: 'NobleBleIpcError',
       success: false,
       error: {
         name: 'HardwareError',
-        message: 'Bluetooth pairing information is no longer valid',
-        errorCode: HardwareErrorCode.BleBondInvalid,
-        params: { nativeErrorMessage: 'native message' },
+        message: 'Bluetooth connection failed',
+        errorCode: HardwareErrorCode.BleConnectedError,
       },
     });
 
@@ -135,14 +128,14 @@ describe('Electron Noble BLE device discovery', () => {
           success: false as const,
           error: {
             name: 'HardwareError',
-            message: 'Bluetooth pairing information is no longer valid',
-            errorCode: HardwareErrorCode.BleBondInvalid,
+            message: 'Bluetooth connection failed',
+            errorCode: HardwareErrorCode.BleConnectedError,
           },
         })
       )
     ).rejects.toMatchObject({
       name: 'HardwareError',
-      errorCode: HardwareErrorCode.BleBondInvalid,
+      errorCode: HardwareErrorCode.BleConnectedError,
     });
 
     await expect(invokeNobleBleIpc(Promise.resolve('connected'))).resolves.toBe('connected');
@@ -299,9 +292,13 @@ describe('Electron Noble BLE device discovery', () => {
     }
   );
 
-  test.each(['Pro A1B2', 'Pro2 A1B2'])(
-    'refreshes a retained disconnected %s peripheral before cold connecting',
-    async name => {
+  test.each([
+    ['Pro A1B2', 'unavailable'],
+    ['Pro2 A1B2', 'unavailable'],
+    ['Pro2 A1B2', 'native error 14'],
+  ])(
+    'refreshes a retained disconnected %s peripheral before cold connecting (direct: %s)',
+    async (name, directConnectResult) => {
       const handlers = new Map<string, IpcHandler>();
       const stalePeripheral = Object.assign(new EventEmitter(), createPeripheral('device', name), {
         connect: jest.fn(),
@@ -318,7 +315,16 @@ describe('Electron Noble BLE device discovery', () => {
           noble.emit('discover', freshPeripheral);
         }),
         stopScanning: jest.fn(callback => callback?.()),
-        connectAsync: jest.fn(() => Promise.resolve(undefined)),
+        connectAsync: jest.fn(() =>
+          directConnectResult === 'native error 14'
+            ? Promise.reject(
+                Object.assign(new Error('native direct connection failure'), {
+                  nativeErrorDomain: 'CBErrorDomain',
+                  nativeErrorCode: 14,
+                })
+              )
+            : Promise.resolve(undefined)
+        ),
       });
       jest.doMock('@stoprocent/noble', () => noble);
       jest.doMock('electron', () => ({
@@ -349,87 +355,6 @@ describe('Electron Noble BLE device discovery', () => {
       expect(freshPeripheral.connect).toHaveBeenCalledTimes(1);
       expect(noble.startScanning).toHaveBeenCalledTimes(1);
       expect(noble.connectAsync).toHaveBeenCalledTimes(name.startsWith('Pro2') ? 1 : 0);
-    }
-  );
-
-  test.each([
-    { rediscovered: false, expectedCode: HardwareErrorCode.BleBondInvalid },
-    { rediscovered: true, expectedCode: HardwareErrorCode.BleConnectedError },
-  ])(
-    'reports a macOS stale bond only when fallback scan misses (rediscovered=$rediscovered)',
-    async ({ rediscovered, expectedCode }) => {
-      jest.useFakeTimers({ doNotFake: ['performance'] });
-      const handlers = new Map<string, IpcHandler>();
-      const stalePeripheral = createPeripheral('device', 'Pro2 A1B2');
-      const freshPeripheral = Object.assign(
-        new EventEmitter(),
-        createPeripheral('device', 'Pro2 A1B2'),
-        {
-          connect: jest.fn((callback: (error?: Error) => void) => {
-            callback(new Error('fresh connection failed'));
-          }),
-        }
-      );
-      const staleBondError = Object.assign(new Error('Peer removed pairing information'), {
-        nativeErrorCode: 14,
-        nativeErrorDomain: 'CBErrorDomain',
-      });
-      let scanStarted: (() => void) | undefined;
-      const scanning = new Promise<void>(resolve => {
-        scanStarted = resolve;
-      });
-      const noble = Object.assign(new EventEmitter(), {
-        state: 'poweredOn',
-        startScanning: jest.fn((_services, _duplicates, callback) => {
-          callback?.();
-          if (rediscovered) noble.emit('discover', freshPeripheral);
-          scanStarted?.();
-        }),
-        stopScanning: jest.fn(callback => callback?.()),
-        connectAsync: jest.fn(() => Promise.reject(staleBondError)),
-      });
-      jest.doMock('@stoprocent/noble', () => noble);
-      jest.doMock('electron', () => ({
-        ipcMain: {
-          handle: (channel: string, handler: IpcHandler) => handlers.set(channel, handler),
-          removeHandler: (channel: string) => handlers.delete(channel),
-        },
-      }));
-      jest.doMock('electron-log', () => ({
-        info: jest.fn(),
-        debug: jest.fn(),
-        error: jest.fn(),
-      }));
-      const { setupNobleBleHandlers } = await import('../noble-ble-handler');
-      setupNobleBleHandlers({ on: jest.fn(), send: jest.fn() } as unknown as WebContents);
-      const availability = handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK);
-      const connect = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT);
-      if (!availability || !connect) throw new Error('Noble handlers were not registered');
-      await availability();
-      noble.emit('discover', stalePeripheral);
-
-      const connecting = Promise.resolve(connect(undefined, stalePeripheral.id));
-      await scanning;
-      jest.advanceTimersByTime(1500);
-      await expect(connecting).resolves.toMatchObject({
-        success: false,
-        error: { errorCode: expectedCode },
-      });
-      if (!rediscovered) {
-        const secondScan = new Promise<void>(resolve => {
-          scanStarted = resolve;
-        });
-        const retry = Promise.resolve(connect(undefined, stalePeripheral.id));
-        await secondScan;
-        jest.advanceTimersByTime(1500);
-        await expect(retry).resolves.toMatchObject({
-          success: false,
-          error: { errorCode: HardwareErrorCode.BleBondInvalid },
-        });
-      }
-      expect(noble.connectAsync).toHaveBeenCalledTimes(rediscovered ? 1 : 2);
-      expect(noble.startScanning).toHaveBeenCalledTimes(rediscovered ? 1 : 2);
-      expect(freshPeripheral.connect).toHaveBeenCalledTimes(rediscovered ? 1 : 0);
     }
   );
 
@@ -1004,6 +929,59 @@ describe('Noble BLE process shutdown', () => {
     await sdk.disposeNobleBleSupport();
     expect(native.stop).not.toHaveBeenCalled();
     expect(handlers.size).toBe(0);
+  });
+
+  test.each([
+    ['poweredOff', HardwareErrorCode.BlePoweredOff],
+    ['unauthorized', HardwareErrorCode.BleLocationError],
+    ['unsupported', HardwareErrorCode.BleUnsupported],
+  ])(
+    'preserves adapter state %s across repeated scans and connections',
+    async (state, errorCode) => {
+      jest.useFakeTimers({ doNotFake: ['performance'] });
+      const { sdk, native, handlers } = await setup(state);
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        for (const channel of [
+          EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE,
+          EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT,
+        ]) {
+          await expect(handlers.get(channel)?.({}, 'device')).resolves.toMatchObject({
+            success: false,
+            error: { errorCode },
+          });
+        }
+      }
+      expect(native.startScanning).not.toHaveBeenCalled();
+      expect(native.listenerCount('stateChange')).toBe(1);
+      expect(jest.getTimerCount()).toBe(0);
+      await sdk.disposeNobleBleSupport();
+    }
+  );
+
+  test.each([
+    ['poweredOff', HardwareErrorCode.BlePoweredOff],
+    ['unauthorized', HardwareErrorCode.BleLocationError],
+    ['unsupported', HardwareErrorCode.BleUnsupported],
+  ])('checks adapter state %s again after initialization', async (state, errorCode) => {
+    const { sdk, native, handlers } = await setup();
+    const checkAvailability = handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK);
+    await expect(checkAvailability?.({})).resolves.toMatchObject({ available: true });
+    native.state = state;
+    native.emit('stateChange', state);
+    for (const channel of [
+      EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE,
+      EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT,
+    ]) {
+      await expect(handlers.get(channel)?.({}, 'device')).resolves.toMatchObject({
+        success: false,
+        error: { errorCode },
+      });
+    }
+    expect(native.startScanning).not.toHaveBeenCalled();
+    native.state = 'poweredOn';
+    native.emit('stateChange', native.state);
+    await expect(checkAvailability?.({})).resolves.toMatchObject({ available: true });
+    await sdk.disposeNobleBleSupport();
   });
 
   test('cancels an active scan, ignores its late callback and releases native once', async () => {

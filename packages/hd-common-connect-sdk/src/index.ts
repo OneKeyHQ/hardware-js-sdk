@@ -188,6 +188,9 @@ const call = async (params: any) => {
         if (response.payload?.code === HardwareErrorCode.BlePermissionError) {
           postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_PERMISSION), false);
         }
+        if (response.payload?.code === HardwareErrorCode.BleLocationError) {
+          postMessage(createUiMessage(UI_REQUEST.LOCATION_PERMISSION), false);
+        }
       }
 
       return response;

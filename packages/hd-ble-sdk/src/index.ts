@@ -162,6 +162,12 @@ const call = async (params: any) => {
       Log.debug('response: ', blockLog ? '[REDACTED]' : response);
 
       if (!response.success) {
+        if (response.payload?.code === HardwareErrorCode.BlePoweredOff) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_POWERED_OFF), false);
+        }
+        if (response.payload?.code === HardwareErrorCode.BleUnsupported) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_UNSUPPORTED), false);
+        }
         if (response.payload?.code === HardwareErrorCode.BlePermissionError) {
           /**
            * Send message notification when there is no Bluetooth access permission

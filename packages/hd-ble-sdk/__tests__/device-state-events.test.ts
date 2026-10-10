@@ -1,8 +1,8 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import EventEmitter from 'events';
-import { CORE_EVENT, initCore } from '@onekeyfe/hd-core';
-import { createDeferred } from '@onekeyfe/hd-shared';
+import { CORE_EVENT, UI_REQUEST, initCore } from '@onekeyfe/hd-core';
+import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
 import sdkExport, { messagePromises } from '../src';
 
@@ -55,6 +55,17 @@ describe('SDK request cleanup', () => {
 
   afterEach(async () => {
     await sdk.dispose();
+  });
+
+  test.each([
+    [HardwareErrorCode.BlePoweredOff, UI_REQUEST.BLUETOOTH_POWERED_OFF],
+    [HardwareErrorCode.BleUnsupported, UI_REQUEST.BLUETOOTH_UNSUPPORTED],
+    [HardwareErrorCode.BleLocationError, UI_REQUEST.LOCATION_PERMISSION],
+  ])('emits the adapter UI request for error %s', async (code, type) => {
+    const response = { success: false, payload: { code, error: 'Adapter unavailable' } };
+    core.handleMessage.mockResolvedValueOnce(response);
+    await expect(sdk.call({ method: 'searchDevices' })).resolves.toEqual(response);
+    expect(core.handleMessage).toHaveBeenNthCalledWith(2, expect.objectContaining({ type }));
   });
 
   test('removes only the completed request when calls settle out of order', async () => {

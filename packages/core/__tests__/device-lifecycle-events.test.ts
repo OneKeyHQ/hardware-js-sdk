@@ -10,7 +10,6 @@ import {
   isMissingDetectedProtocolV2Error,
   isRetryableBleConnectionError,
   isRetryableBleProtocolV2ProbeError,
-  isTerminalBleStaleBondError,
   resolveBleConnectProtocol,
 } from '../src/core';
 import { DataManager } from '../src/data-manager';
@@ -611,7 +610,6 @@ describe('public device lifecycle events', () => {
   test.each([
     [HardwareErrorCode.RuntimeError, true],
     [HardwareErrorCode.BleDeviceBondError, false],
-    [HardwareErrorCode.BlePeerRemovedPairingInformation, false],
   ] as const)(
     'retries a Protocol V2 probe mismatch with error code %s: %s',
     (errorCode, expected) => {
@@ -631,8 +629,6 @@ describe('public device lifecycle events', () => {
     [HardwareErrorCode.BleTimeoutError, true],
     [HardwareErrorCode.PollingTimeout, false],
     [HardwareErrorCode.BleDeviceBondError, false],
-    [HardwareErrorCode.BlePeerRemovedPairingInformation, false],
-    [HardwareErrorCode.BleBondInvalid, false],
   ] as const)('retries a BLE connection error with error code %s: %s', (errorCode, expected) => {
     const method = { payload: { connectProtocol: 'V2' } } as never;
     const error = {
@@ -684,19 +680,6 @@ describe('public device lifecycle events', () => {
       expect(acquire).toHaveBeenCalledTimes(1);
     }
   );
-
-  test.each([
-    [HardwareErrorCode.BleDeviceBondError, true],
-    [HardwareErrorCode.BlePeerRemovedPairingInformation, true],
-    [HardwareErrorCode.BleBondInvalid, true],
-    [HardwareErrorCode.DeviceNotFound, false],
-  ] as const)('treats BLE stale-bond error code %s as terminal: %s', (errorCode, expected) => {
-    const error = {
-      errorCode,
-    };
-
-    expect(isTerminalBleStaleBondError(error)).toBe(expected);
-  });
 
   test.each([
     [HardwareErrorCode.DeviceCheckDeviceIdError, true],
@@ -1055,6 +1038,28 @@ describe('public device lifecycle events', () => {
     expect(device.hasDeviceAcquire()).toBe(false);
     expect(device.wasInterruptedByUser()).toBe(false);
   });
+
+  test.each(['V1', 'V2'] as const)(
+    'retires a failed USB %s session before the next user attempt',
+    async protocol => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('desktop-webusb' as never);
+      const device = createInitializedDevice(protocol);
+      device.originalDescriptor = { ...device.originalDescriptor, session: device.mainId };
+      const disconnect = jest.fn().mockResolvedValue(undefined);
+      const release = jest.fn().mockResolvedValue(undefined);
+      device.deviceConnector = { disconnect, release } as never;
+      device.commands = { disposed: false, dispose: jest.fn() } as never;
+      (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+      const error = ERRORS.TypedError(HardwareErrorCode.WebUsbDeviceAccessError);
+      await expect(device.run(() => Promise.reject(error))).rejects.toBe(error);
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+      expect(disconnect).toHaveBeenCalledWith(device.mainId);
+      expect(release).toHaveBeenCalledTimes(1);
+      expect(device.hasDeviceAcquire()).toBe(false);
+    }
+  );
 
   test('waits for the canceled run to finish releasing before cancellation completes', async () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
