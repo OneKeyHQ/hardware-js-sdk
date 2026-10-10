@@ -2,11 +2,11 @@
 
 import Image from 'next/image'
 
-export function OneKeyLogo({ size = 32, className = '' }) {
+export function OneKeyLogo({ size = 32, variant = 'green', className = '' }) {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH
     ? process.env.NEXT_PUBLIC_BASE_PATH.replace(/\/$/, '')
     : ''
-  const iconSrc = `${basePath}/icons/onekey.png`
+  const iconSrc = `${basePath}/brand/logo_${variant === 'white' ? 'white' : 'green'}.svg`
 
   return (
     <Image
@@ -14,7 +14,7 @@ export function OneKeyLogo({ size = 32, className = '' }) {
       alt="OneKey"
       width={size}
       height={size}
-      className={`rounded-lg ${className}`}
+      className={className}
       unoptimized
     />
   )

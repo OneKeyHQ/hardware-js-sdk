@@ -30,6 +30,10 @@ Before publishing, verify the build, local routes and heading anchors, mobile la
 - Update the corresponding locale when changing a public contract. Record untranslated changes explicitly instead of treating a translated title as a full review.
 - Reconcile any GitBook mirror deliberately, including internal page/file references and original slugs. GitBook has separate spaces and publication settings.
 
+## Brand assets
+
+Use the official SVGs in `public/brand` through `OneKeyLogo`. The green version is used in the header and favicon; the white version is used for assistant icons on dark backgrounds. Preserve the source artwork without recoloring or cropping. `public/icons/onekey.png` is a 256px raster export of the green SVG for Apple touch icons and PNG consumers.
+
 ## Publication
 
 The repository's `Build Developer Portal` GitHub Actions workflow builds and uploads an artifact. Its presence does not establish how `developer.onekey.so` is deployed. Confirm the actual hosting pipeline and environment before replacing the production site, then verify the live build, links, and search indexes after deployment.

@@ -1,6 +1,8 @@
 import 'nextra-theme-docs/style.css'
 import '../styles/globals.css'
 
+const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/$/, '')
+
 export const metadata = {
   title: {
     default: 'OneKey Developers',
@@ -8,8 +10,8 @@ export const metadata = {
   },
   description: 'Official developer documentation for OneKey hardware and software integration. Build secure Web3 experiences with OneKey hardware wallets.',
   icons: {
-    icon: '/icons/onekey.png',
-    apple: '/icons/onekey.png',
+    icon: { url: `${basePath}/brand/logo_green.svg`, type: 'image/svg+xml' },
+    apple: `${basePath}/icons/onekey.png`,
   },
   openGraph: {
     title: 'OneKey Developers',
