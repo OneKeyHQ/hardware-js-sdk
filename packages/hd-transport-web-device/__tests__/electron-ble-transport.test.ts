@@ -182,6 +182,20 @@ describe('ElectronBleTransport protocol detection', () => {
     jest.clearAllMocks();
   });
 
+  test.each([
+    { errorCode: HardwareErrorCode.BleLocationError, message: 'Permission denied' },
+    { code: HardwareErrorCode.BleLocationError },
+    { message: 'Bluetooth unauthorized' },
+  ])('preserves Bluetooth permission failures from the native bridge: %j', async error => {
+    const nobleBle = createNobleBle();
+    nobleBle.enumerate.mockRejectedValueOnce(error);
+    const bleTransport = configureTransport(nobleBle);
+
+    await expect(bleTransport.enumerate()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleLocationError,
+    });
+  });
+
   test('does not treat an error envelope from a legacy preload as a successful connect', async () => {
     const device = { id: 'legacy-error-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);

@@ -612,7 +612,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleScanError]: 'BLE scan error',
   [HardwareErrorCode.BlePermissionError]: 'Bluetooth required to be turned on',
   [HardwareErrorCode.BleLocationError]:
-    'Location permissions for the application are not available',
+    'Bluetooth or location permissions for the application are not available',
   [HardwareErrorCode.BleRequiredUUID]: 'uuid is required',
   [HardwareErrorCode.BleConnectedError]: 'connected error is always runtime error',
   [HardwareErrorCode.BleDeviceNotBonded]: 'device is not bonded',

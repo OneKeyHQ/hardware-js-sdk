@@ -918,6 +918,28 @@ describe('Noble BLE process shutdown', () => {
     expect(handlers.size).toBe(0);
   });
 
+  test.each([
+    ['poweredOff', HardwareErrorCode.BlePoweredOff],
+    ['unauthorized', HardwareErrorCode.BleLocationError],
+    ['unsupported', HardwareErrorCode.BleUnsupported],
+  ])(
+    'classifies the initial adapter state %s without waiting for another event',
+    async (state, errorCode) => {
+      jest.useFakeTimers({ doNotFake: ['performance'] });
+      const { sdk, native, handlers } = await setup(state);
+      await expect(
+        handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE)?.({})
+      ).resolves.toMatchObject({
+        success: false,
+        error: { errorCode },
+      });
+      expect(native.startScanning).not.toHaveBeenCalled();
+      expect(native.listenerCount('stateChange')).toBe(1);
+      expect(jest.getTimerCount()).toBe(0);
+      await sdk.disposeNobleBleSupport();
+    }
+  );
+
   test('cancels an active scan, ignores its late callback and releases native once', async () => {
     jest.useFakeTimers({ doNotFake: ['performance'] });
     const { sdk, native, handlers } = await setup();

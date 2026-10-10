@@ -28,7 +28,7 @@ export const subscribeBleOn = (bleManager: BlePlxManager, ms = 2000): Promise<vo
       } else if (state === 'Unsupported') {
         pendingError = ERRORS.TypedError(HardwareErrorCode.BleUnsupported);
       } else if (state === 'Unauthorized') {
-        pendingError = ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
+        pendingError = ERRORS.TypedError(HardwareErrorCode.BleLocationError);
       } else {
         pendingError = undefined;
       }

@@ -836,7 +836,7 @@ export default class ReactNativeBleTransport {
         resultConnect[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT] !== 'granted' ||
         resultConnect[PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN] !== 'granted'
       ) {
-        throw ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
+        throw ERRORS.TypedError(HardwareErrorCode.BleLocationError);
       }
     }
     await subscribeBleOn(blePlxManager);
@@ -887,7 +887,7 @@ export default class ReactNativeBleTransport {
             } else if (error.errorCode === BleErrorCode.BluetoothUnsupported) {
               finishScan(ERRORS.TypedError(HardwareErrorCode.BleUnsupported));
             } else if (error.errorCode === BleErrorCode.BluetoothUnauthorized) {
-              finishScan(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
+              finishScan(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
             } else if (error.errorCode === BleErrorCode.LocationServicesDisabled) {
               finishScan(ERRORS.TypedError(HardwareErrorCode.BleLocationServicesDisabled));
             } else if (error.errorCode === BleErrorCode.ScanStartFailed) {

@@ -482,7 +482,7 @@ async function initializeNoble(): Promise<void> {
           reject(ERRORS.TypedError(HardwareErrorCode.BlePoweredOff));
         } else if (state === 'unauthorized') {
           cleanup();
-          reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
+          reject(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
         }
       };
 
@@ -494,6 +494,7 @@ async function initializeNoble(): Promise<void> {
       };
       pendingCancellations.add(cancel);
       noble.on('stateChange', onStateChange);
+      onStateChange(noble.state);
     });
 
     assertBleActive();
@@ -508,7 +509,7 @@ async function initializeNoble(): Promise<void> {
     logger?.info('[NobleBLE] Noble initialized successfully');
   } catch (error) {
     logger?.error('[NobleBLE] Failed to initialize Noble:', error);
-    bluetoothState.unsupported = true;
+    bluetoothState.unsupported = noble?.state === 'unsupported';
     bluetoothState.initialized = true;
     throw error;
   }

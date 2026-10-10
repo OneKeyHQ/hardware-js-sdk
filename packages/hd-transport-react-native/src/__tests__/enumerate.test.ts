@@ -68,7 +68,7 @@ describe('ReactNativeBleTransport scan error mapping', () => {
     transport.init({ debug: jest.fn(), error: jest.fn() }, new EventEmitter());
 
     await expect(transport.enumerate()).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BlePermissionError,
+      errorCode: HardwareErrorCode.BleLocationError,
     });
     expect(subscribeBleOn).not.toHaveBeenCalled();
   });
@@ -77,7 +77,7 @@ describe('ReactNativeBleTransport scan error mapping', () => {
     [BleErrorCode.BluetoothPoweredOff, HardwareErrorCode.BlePoweredOff],
     [BleErrorCode.BluetoothUnsupported, HardwareErrorCode.BleUnsupported],
     [BleErrorCode.BluetoothInUnknownState, HardwareErrorCode.BleScanError],
-    [BleErrorCode.BluetoothUnauthorized, HardwareErrorCode.BlePermissionError],
+    [BleErrorCode.BluetoothUnauthorized, HardwareErrorCode.BleLocationError],
   ])('maps native BLE error %s to hardware error %s', async (nativeCode, errorCode) => {
     jest.mocked(getConnectedDeviceIds).mockResolvedValueOnce([]);
     const blePlxManager = {

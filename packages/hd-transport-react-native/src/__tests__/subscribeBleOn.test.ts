@@ -64,7 +64,7 @@ describe('subscribeBleOn', () => {
   test.each([
     ['PoweredOff', HardwareErrorCode.BlePoweredOff],
     ['Unsupported', HardwareErrorCode.BleUnsupported],
-    ['Unauthorized', HardwareErrorCode.BlePermissionError],
+    ['Unauthorized', HardwareErrorCode.BleLocationError],
   ] as const)('maps %s to hardware error %s', async (state, errorCode) => {
     const { bleManager, emitState, remove } = createBleManager();
     const result = subscribeBleOn(bleManager, 2000);

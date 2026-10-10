@@ -60,6 +60,7 @@ describe('SDK request cleanup', () => {
   test.each([
     [HardwareErrorCode.BlePoweredOff, UI_REQUEST.BLUETOOTH_POWERED_OFF],
     [HardwareErrorCode.BleUnsupported, UI_REQUEST.BLUETOOTH_UNSUPPORTED],
+    [HardwareErrorCode.BleLocationError, UI_REQUEST.LOCATION_PERMISSION],
   ])('emits the adapter UI request for error %s', async (code, type) => {
     const response = { success: false, payload: { code, error: 'Adapter unavailable' } };
     core.handleMessage.mockResolvedValueOnce(response);
