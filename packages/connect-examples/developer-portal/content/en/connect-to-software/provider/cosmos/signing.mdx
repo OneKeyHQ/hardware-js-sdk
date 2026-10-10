@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # Signing
 
+Enable the target chain before reading its key or requesting a signature. Use the account number, sequence, fees, and RPC endpoint for that chain; placeholder values in signing examples must be replaced before use.
+
 Learn how to sign transactions and messages using OneKey's Cosmos provider.
 
 ---
@@ -97,7 +99,7 @@ console.log('Signature valid:', isValid)
 
 ```typescript
 const chainId = 'cosmoshub-4'
-const txBytes = new Uint8Array([...]) // Signed transaction bytes
+// `txBytes` is the complete signed transaction as a Uint8Array.
 
 // Broadcast modes: 'block', 'sync', 'async'
 const result = await provider.sendTx(chainId, txBytes, 'sync')
@@ -116,7 +118,7 @@ const result = await provider.signEthereum(
   chainId,
   signer,
   data,       // Message to sign
-  'message'   // Type: 'message' | 'transaction'
+  'message'   // EthSignType: 'message', 'transaction', or 'eip-712'
 )
 
 console.log('Signature:', result)
@@ -139,4 +141,3 @@ try {
   }
 }
 ```
-

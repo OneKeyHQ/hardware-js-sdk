@@ -38,7 +38,7 @@ EIP-1559 必须同时提供两个费率字段，Legacy 使用 `gasPrice`。无�
 
 #### EIP1559（[伦敦升级后](https://ethereum.org/en/developers/docs/gas/#post-london)）
 
-如果同时定义了 `maxFeePerGas` 和 `maxPriorityFeePerGas` 参数，交易将按照 [EIP1559](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559) 中引入的新类型进行签名。
+如果同时定义了 `maxFeePerGas` 和 `maxPriorityFeePerGas` 参数，交易将按照 [EIP1559](https://eips.ethereum.org/EIPS/eip-1559) 中引入的新类型进行签名。
 
 ```typescript
 HardwareSDK.evmSignTransaction(connectId, deviceId, {

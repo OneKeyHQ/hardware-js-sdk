@@ -36,7 +36,7 @@ try {
 }
 ```
 
-`connect()` 调用将返回一个 [Promise](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise)，当用户接受连接请求时解析，当用户拒绝请求或关闭弹窗时拒绝（await 时抛出）。有关 OneKey 可能发出的错误消息的详细信息，请参阅[错误](/zh/connect-to-software/provider/solana/signing-a-message#errors)。
+`connect()` 调用将返回一个 [Promise](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise)，当用户接受连接请求时解析，当用户拒绝请求或关闭弹窗时拒绝（await 时抛出）。请捕获连接请求的异常，在用户主动重试时再次调用 `connect()`。
 
 当用户接受连接请求时，Provider 也会发出 `connect` 事件。
 
@@ -127,9 +127,9 @@ useEffect(() => {
 
 ## 切换账户
 
-OneKey 允许用户在单个扩展或移动应用中无缝管理多个账户（即[密钥对](https://solana-labs.github.io/solana-web3.js/classes/Keypair.html)）。每当用户切换账户时，OneKey 都会发出 `accountChanged` 事件。
+OneKey 允许用户在单个扩展或移动应用中无缝管理多个账户（即[密钥对](https://solana-foundation.github.io/solana-web3.js/v1.x/classes/Keypair.html)）。每当用户切换账户时，OneKey 都会发出 `accountChanged` 事件。
 
-如果用户在已连接到应用时切换账户，且新账户已将该应用加入白名单，则用户将保持连接状态，OneKey 将传递新账户的 [PublicKey](https://solana-labs.github.io/solana-web3.js/classes/PublicKey.html)：
+如果用户在已连接到应用时切换账户，且新账户已将该应用加入白名单，则用户将保持连接状态，OneKey 将传递新账户的 [PublicKey](https://solana-foundation.github.io/solana-web3.js/v1.x/classes/PublicKey.html)：
 
 ```javascript
 provider.on('accountChanged', (publicKey) => {

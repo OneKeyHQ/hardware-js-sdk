@@ -1,11 +1,12 @@
 ---
+description: "Set up the native OneKey BLE SDK, platform permissions, device discovery, and address confirmation."
 title: React Native BLE (hd-ble-sdk)
 ---
 
 # React Native BLE (hd-ble-sdk)
 
 > **Note:**
-Demo: React Native / Expo example → [react-native-demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/develop/packages/connect-examples/react-native-demo)
+Demo: React Native / Expo example → [react-native-demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo)
 
 
 This guide shows how to use the pure React Native BLE stack with `@onekeyfe/hd-ble-sdk` and `@onekeyfe/hd-transport-react-native`. No WebView or low-level adapter is required. The chain API usage stays the same as in Quick Start.
@@ -39,12 +40,11 @@ import HardwareSDK from '@onekeyfe/hd-ble-sdk';
 
 ## Android setup
 
-Add permissions in `AndroidManifest.xml` (Android 12+):
+For a BLE client that does not derive location, use the following permission declarations. Set `neverForLocation` only when that assertion is true for your app:
 
 ```xml
 <uses-permission android:name="android.permission.INTERNET"/>
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30"/>
 
 <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
 <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
@@ -52,7 +52,7 @@ Add permissions in `AndroidManifest.xml` (Android 12+):
 <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
 ```
 
-At runtime, request `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` (and location on Android 12+). Ensure the system Location toggle is ON.
+On Android 12+, request `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` at runtime. Location access depends on the target SDK, whether the app derives location, and the BLE library configuration; it is not universally required on Android 12+. On older Android versions, use the applicable legacy/location permissions. See the [Android permission guide](https://developer.android.com/develop/connectivity/bluetooth/bt-permissions).
 
 ## iOS setup
 
@@ -66,7 +66,7 @@ If using Expo, you can declare these in `app.json` under `expo.ios.infoPlist` an
 
 ## Metro config (polyfills & exports)
 
-Map Node core APIs and enable package exports for subpath imports like `@noble/hashes/blake2b`:
+If Metro reports missing Node core APIs, map only the modules your dependency graph requires. Install every package referenced by `require.resolve` before using a mapping. Merge these entries into your existing resolver configuration; do not replace framework defaults. The following is an optional mapping fragment, not a complete Metro configuration:
 
 ```js
 // metro.config.js
@@ -105,11 +105,12 @@ expo start --dev-client -c
 
 ```ts
 export async function setupBle() {
-  await HardwareSDK.init({
+  const initialized = await HardwareSDK.init({
     env: 'react-native',                 // React Native BLE transport
     debug: __DEV__,
     fetchConfig: true,
   });
+  if (!initialized) throw new Error('SDK initialization failed');
 
   // Subscribe to UI events (PIN / Passphrase / confirmations)
   // import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core'
@@ -142,7 +143,8 @@ Persist `connectId` and `deviceId` (most chain APIs require both).
 const res = await HardwareSDK.btcGetAddress(connectId, deviceId, {
   path: "m/44'/0'/0'/0/0",
   coin: 'btc',
-  showOnOneKey: false,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
 });
 
 if (res.success) {

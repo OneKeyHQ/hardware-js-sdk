@@ -6,18 +6,18 @@ title: getInscriptions
 
 List inscriptions of current account.
 
-### Method
+## Method
 
 ```typescript
-async function getInscriptions(cursor: number, size: number): InscriptionResponse
+declare function getInscriptions(cursor?: number, size?: number): Promise<InscriptionResponse>;
 ```
 
-### Params
+## Params
 
 * `cursor` — _optional_ `number`  Initial index, Default is `0`
 * `size` — _optional_ `number` Query quantity, Default is `20`
 
-### Response
+## Response
 
 ```typescript
 export type InscriptionResponse = {
@@ -42,17 +42,14 @@ export type InscriptionInfo = {
 };
 ```
 
-### Example
+## Example
 
 ```typescript
-const provider = (window.$onekey &#x26;&#x26; window.$onekey.btc) || window.unisat;
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
 
-const inscriptions = async provider.getInscriptions();
-
+const inscriptions = await provider.getInscriptions();
 ```
 
-### Demo
+## Demo
 
-
-<iframe src="https://codepen.io/OneKeyHQ/pen/MWLqvEv" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[Open example](https://codepen.io/OneKeyHQ/pen/MWLqvEv)

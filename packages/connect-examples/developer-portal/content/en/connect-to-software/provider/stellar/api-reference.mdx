@@ -5,7 +5,7 @@ description: OneKey Stellar provider API reference
 
 # API Reference
 
-Complete reference for methods and basic types on `window.$onekey.stellar`.
+Reference for methods and basic types on `window.$onekey.stellar`.
 
 ---
 
@@ -59,7 +59,7 @@ export type StellarSignAuthEntryOpts = {
 }
 export type StellarSignAuthEntryResponse = {
   signedAuthEntry: string
-  signerAddress: string
+  signerAddress?: string
 }
 
 export type StellarSignMessageOpts = {
@@ -69,7 +69,7 @@ export type StellarSignMessageOpts = {
 }
 export type StellarSignMessageResponse = {
   signedMessage: string
-  signerAddress: string
+  signerAddress?: string
 }
 ```
 
@@ -98,3 +98,5 @@ export type OneKeyStellarProvider = {
   ) => Promise<StellarSignMessageResponse>
 }
 ```
+
+All methods return promises. Handle rejected requests, and treat optional `signerAddress` as optional rather than assuming it is present. The provider also exposes `disconnect()` and emits `accountsChanged` with an address string or `null`; clear account-specific state when it changes.

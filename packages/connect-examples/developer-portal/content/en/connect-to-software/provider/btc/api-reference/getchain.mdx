@@ -6,21 +6,21 @@ title: getChain
 
 Get chain of current account
 
-### Method
+## Method
 
 ```typescript
-async function getChain(): {
+declare function getChain(): Promise<{
   enum: string;
   name: string;
   network: string;
-}
+}>;
 ```
 
-### Response
+## Response
 
 The chain object.
 
-### Example
+## Example
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
@@ -28,4 +28,3 @@ const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
 const chain = await provider.getChain();
 console.log(chain);
 ```
-

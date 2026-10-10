@@ -4,15 +4,15 @@ title: confluxGetAddress
 
 # confluxGetAddress
 
-## Use requirement
+## Requirements
 
-* Firmware version required
+* Minimum firmware versions
   * Touch: 3.0.0
   * Classic/Mini: 2.4.0
 
 ## Conflux: get address
 
-Display requested address derived by given BIP32 path on device and returns it to caller. User is presented with a description of the requested key and asked to confirm the export on OneKey.
+Derives and returns the address at the specified path. When `showOnOneKey` is `true`, the user must confirm the address on the device.
 
 ```typescript
 const response = await HardwareSDK.confluxGetAddress(connectId, deviceId, params)
@@ -22,19 +22,19 @@ const response = await HardwareSDK.confluxGetAddress(connectId, deviceId, params
 
 [Optional common params](/en/hardware-sdk/concepts/common-params)
 
-**Exporting single address**
+**Single address**
 
 * `path` - _required_ `string | Array<number>`  SDK minimum length is `3`. [more information](/en/hardware-sdk/concepts/common-params#hd-path)
-* `showOnOneKey` - _optional_ `boolean` determines if address will be displayed on device. Default is set to `true`
+* `showOnOneKey` - _optional_ `boolean` Whether to display the address on the device. Defaults to `true`.
 * `chainId` - _optional  `number`_ of the id of the chain, default is `1029` .
 
-**Exporting bundle of addresses**
+**Multiple addresses**
 
-* `bundle` - `Array` of Objects with `path` and `showOnOneKey` fields
+* `bundle` - array of objects with `path` and `showOnOneKey` fields
 
 #### Example
 
-Display address of first conflux account:
+Display the address for the first conflux account:
 
 ```typescript
 HardwareSDK.confluxGetAddress(connectId, deviceId, {
@@ -43,7 +43,7 @@ HardwareSDK.confluxGetAddress(connectId, deviceId, {
 });
 ```
 
-Return a bundle of conflux addresses without displaying them on device:
+Return a bundle of conflux addresses without displaying them on the device:
 
 ```typescript
 HardwareSDK.confluxGetAddress(connectId, deviceId, {
@@ -57,7 +57,7 @@ HardwareSDK.confluxGetAddress(connectId, deviceId, {
 
 #### Result
 
-Result with only one address
+Single-address response
 
 ```typescript
 {
@@ -69,7 +69,7 @@ Result with only one address
 }
 ```
 
-Result with bundle of addresses sorted by FIFO
+Batch response, in the same order as the request
 
 ```typescript
 {

@@ -1,5 +1,6 @@
 ---
 title: Agent Wallet Session
+description: Connect, inspect, and end an App Transfer or hardware wallet session.
 ---
 
 # Agent Wallet Session
@@ -29,11 +30,7 @@ onekey auth login --app-transfer
 
 The OneKey GUI provides the payload. The CLI imports the session into the local OneKey CLI vault and uses the operating system credential store for protected material.
 
-You can also pass a payload explicitly when an automation environment provides it:
-
-```bash
-onekey auth login --app-transfer --payload <json-or-base64-json>
-```
+The CLI also exposes a `payload` parameter for automation. Treat an App Transfer payload as a credential: do not paste it into agent chat, documentation, logs, or shared shell history. Inspect `onekey schema auth-login` and the current CLI guidance before automating credential import.
 
 ## Status
 

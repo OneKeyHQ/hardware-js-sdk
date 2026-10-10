@@ -4,11 +4,11 @@ title: RPC API 调用
 
 # RPC API 调用
 
-OneKey 使用 `provider.request({ method, params })` 方法来封装 [NEAR RPC API](https://docs.near.org/docs/api/rpc)。
+OneKey 使用 `provider.request({ method, params })` 方法来封装 [NEAR RPC API](https://docs.near.org/api/rpc/introduction)。
 
 你可以通过此方法调用任何 RPC API，例如：
 
-[https://docs.near.org/docs/api/rpc/network#node-status](https://docs.near.org/docs/api/rpc/network#node-status)
+[https://docs.near.org/api-reference/post-status](https://docs.near.org/api-reference/post-status)
 
 ```javascript
 const res = await provider.request({
@@ -17,7 +17,7 @@ const res = await provider.request({
 console.log('RPC Call: status', res);
 ```
 
-[https://docs.near.org/docs/api/rpc/gas#gas-price](https://docs.near.org/docs/api/rpc/gas#gas-price)
+[https://docs.near.org/api/rpc/gas#gas-price](https://docs.near.org/api/rpc/gas#gas-price)
 
 ```javascript
 const res = await provider.request({
@@ -27,7 +27,7 @@ const res = await provider.request({
 console.log('RPC Call: gas_price', res);
 ```
 
-[https://docs.near.org/docs/api/rpc/access-keys#view-access-key-list](https://docs.near.org/docs/api/rpc/access-keys#view-access-key-list)
+[https://docs.near.org/api/rpc/contracts#view-access-key-list](https://docs.near.org/api/rpc/contracts#view-access-key-list)
 
 ```javascript
 const res = await provider.request({

@@ -1,0 +1,28 @@
+---
+title: 排障指南
+description: 排查钱包连接、硬件发现、签名与二维码集成问题。
+---
+
+# 排障指南
+
+先确认问题发生在钱包 Provider、硬件传输还是二维码编解码层。记录失败的方法、错误码、版本与具体步骤。
+
+| 现象 | 检查项 |
+| --- | --- |
+| dApp 找不到 OneKey | 确认扩展已启用；安装后刷新页面；在浏览器端检测对应链的 Provider，不要在服务端访问 window。 |
+| 用户拒绝账户或签名请求 | 清除等待状态，允许用户主动重试，不要循环弹出请求。 |
+| USB 设备未显示 | 确认浏览器支持 WebUSB，页面处于安全上下文，由用户点击打开设备选择器；检查线缆并关闭占用设备的应用。 |
+| 请求一直等待 | 检查是否等待 PIN、Passphrase 或设备确认；在发起调用前注册 UI 处理器。 |
+| 方法不受支持 | 按方法核对设备型号、SDK 与固件版本，不要把某条链的支持等同于所有方法都可用。 |
+| 二维码无法解码 | 检查 registry 类型、分片是否齐全，以及响应是否对应原请求。 |
+
+参考 [WebUSB](/zh/hardware-sdk/transport/web-usb)、[Core API](/zh/hardware-sdk/core-api-guide)、[链支持](/zh/hardware-sdk/concepts/chain-support)与[二维码集成](/zh/air-gap/ethereum-and-evm)。断连后不要自动重放签名、升级或更改设备状态的操作。
+
+## Report an issue
+
+- 硬件 SDK 或开发者门户：[hardware-js-sdk issues](https://github.com/OneKeyHQ/hardware-js-sdk/issues)。
+- 钱包 Provider：[cross-inpage-provider issues](https://github.com/OneKeyHQ/cross-inpage-provider/issues)。
+- App 或浏览器扩展：[app-monorepo issues](https://github.com/OneKeyHQ/app-monorepo/issues)。
+- 产品使用问题：[帮助中心](https://help.onekey.so/)。
+
+提供预期和实际行为、最小复现步骤、软件包版本、运行环境、传输方式，以及相关设备型号与固件版本。仅使用测试数据，移除日志中的恢复短语、私钥、PIN、Passphrase、令牌和会话标识。安全漏洞请按对应仓库的安全政策报告，不要在公开 issue 披露利用细节。

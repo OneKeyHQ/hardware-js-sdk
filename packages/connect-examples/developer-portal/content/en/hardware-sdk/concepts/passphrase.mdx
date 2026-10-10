@@ -1,4 +1,5 @@
 ---
+description: "Select a standard or hidden wallet, preserve its fingerprint, and handle passphrase input safely."
 title: Passphrase
 ---
 
@@ -95,7 +96,8 @@ HardwareSDK.on(UI_EVENT, async (message) => {
   if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
     await HardwareSDK.uiResponse({
       type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-      payload: { passphraseOnDevice: true, value: '' },
+      ...message.payload.responseCorrelation,
+      payload: { passphraseOnDevice: true, value: '', save: false },
     });
   }
 });
@@ -128,7 +130,7 @@ On-device vs software passphrase input:
 payload: { passphraseOnDevice: true, value: '' }
 
 // Software
-payload: { value: userInput, passphraseOnDevice: false, save: true }
+payload: { value: userInput, passphraseOnDevice: false, save: false }
 ```
 
 ### Later process / reconnect

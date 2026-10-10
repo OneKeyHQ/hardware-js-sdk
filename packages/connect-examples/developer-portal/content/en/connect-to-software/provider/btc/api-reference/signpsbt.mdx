@@ -6,17 +6,17 @@ title: signPsbt
 
 This method will traverse all inputs that match the current address to sign.
 
-#### Wallet & Address Type Compatibility
+## Wallet & Address Type Compatibility
 
 | Wallet Type     | Model          | Address Types Supported                |
 | --------------- | -------------- | -------------------------------------- |
 | Software Wallet | -              | p2wpkh (Native Segwit), p2tr (Taproot) |
 | Hardware Wallet | Pro, Classic1S | p2tr (Taproot)                         |
 
-#### Method
+## Method
 
 ```typescript
-async function signPsbt(
+declare function signPsbt(
     psbtHex: string,
     options?: {
         autoFinalized?: boolean;
@@ -32,7 +32,7 @@ async function signPsbt(
 ): Promise<string>
 ```
 
-#### Params
+## Params
 
 * `psbtHex` — _required_ `string` the hex string of psbt to sign
 * `options` — _optional_ `object`
@@ -45,11 +45,11 @@ async function signPsbt(
     * `disableTweakSigner` — _optional_ `boolean`: default is false. Set true to use original private key when signing taproot inputs
     * `useTweakedSigner` — _optional_ `boolean`: force whether to use tweaked signer. Higher priority than disableTweakSigner
 
-#### Returns
+## Returns
 
 `Promise<string>` — the hex string of signed psbt
 
-#### Example
+## Example
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
@@ -88,8 +88,10 @@ try {
 }
 ```
 
-#### Demo
+## Demo
 
+[Open example](https://codepen.io/OneKeyHQ/pen/GRzXvXJ)
 
-<iframe src="https://codepen.io/OneKeyHQ/pen/GRzXvXJ" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+> Wallet and address compatibility depends on the wallet and firmware version. Confirm support for the target account before relying on the compatibility table.
 
+The abbreviated PSBTs, addresses, and public keys above are placeholders. Replace them with complete values. The published provider interface exposes `autoFinalized`; additional `toSignInputs` options depend on the wallet implementation and should be verified with your target version. Signing does not broadcast a transaction.

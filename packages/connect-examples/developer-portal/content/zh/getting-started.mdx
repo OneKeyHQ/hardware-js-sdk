@@ -1,0 +1,32 @@
+---
+title: 选择接入方式
+description: 根据 dApp、钱包或应用的需求，选择 OneKey 接入路径。
+---
+
+# 选择接入方式
+
+先确定应用需要连接 OneKey 钱包，还是直接连接硬件设备。
+
+| 你的目标 | 接入方式 | 起步指南 |
+| --- | --- | --- |
+| 让用户在 dApp 中连接 OneKey 钱包 | 钱包 Provider 或钱包连接组件 | [dApp 快速开始](/zh/connect-to-software) |
+| 在自己的钱包或应用中直接连接 OneKey 设备 | Hardware SDK | [硬件快速开始](/zh/hardware-sdk/getting-started) |
+| 通过二维码传递签名请求和结果 | Air-Gap SDK | [二维码签名](/zh/air-gap) |
+
+## 连接钱包
+
+安装 [OneKey](https://onekey.so/download/)，跟随 [dApp 快速开始](/zh/connect-to-software) 检测 Provider，并在用户操作后请求账户。不同链的方法与返回值不同，请查阅对应的 [Provider API](/zh/connect-to-software/provider)。
+
+处理钱包未安装、账户列表为空、用户拒绝，以及账户和网络变化。如果项目已有钱包连接组件，请使用其集成指南。
+
+## 直接连接硬件
+
+根据运行环境选择 [WebUSB](/zh/hardware-sdk/transport/web-usb)、[React Native BLE](/zh/hardware-sdk/transport/react-native-ble) 或[原生移动端集成](/zh/hardware-sdk/transport/native-ble)。
+
+先初始化 SDK、处理 UI 请求、选择设备并读取地址，再接入签名。按实际设备和方法核对[链支持范围](/zh/hardware-sdk/concepts/chain-support)。模拟器与本地构建不能代替真机验证。
+
+## 上线前检查
+
+测试拒绝、取消、断连和重连；向用户展示正在使用的账户与网络；保留设备确认步骤。不要收集恢复短语或私钥，也不要把 PIN、Passphrase、访问令牌或钱包会话信息写入日志。
+
+固定并记录经过验证的软件包与固件版本。出现问题时，查阅[排障指南](/zh/troubleshooting)。

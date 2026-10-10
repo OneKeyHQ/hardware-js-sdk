@@ -1,272 +1,111 @@
 ---
-slug: /hardware/transport/webusb
+description: "Authorize a OneKey USB device from the browser, read its identity, and confirm a wallet address."
+title: WebUSB Connection
 ---
 
-# WebUSB Connection Guide
+# WebUSB Connection
 
-> **Note:**
-Demo: Playground (supports emulator) → [hardware-example.onekey.so](https://hardware-example.onekey.so/)
+Connect a browser app directly to OneKey with `@onekeyfe/hd-common-connect-sdk`. This path does not require an iframe or OneKey Bridge.
 
+## Requirements
 
-Use this step‑by‑step guide to wire WebUSB in the browser with `@onekeyfe/hd-common-connect-sdk`. Once connected, you can call any chain API (BTC/EVM/etc.) as in Quick Start.
+- A WebUSB-capable browser and a secure context. Feature-detect `navigator.usb`; show a supported-browser message when it is unavailable.
+- A user gesture to open the USB chooser.
+- An initialized OneKey device and a data-capable USB cable.
+- [UI event handling](/en/hardware-sdk/core-api-guide#events-ui) for PIN, passphrase, and device confirmation.
 
-Focus: WebUSB only.
-
-## Step 1. Requirements
-
-- Serve your app over HTTPS (WebUSB is blocked on insecure origins)
-- A browser that supports WebUSB (Chrome/Edge desktop)
-- A connected and unlocked OneKey device
-
-## Step 2. Install
+## 1. Install and initialize
 
 ```bash
-npm i @onekeyfe/hd-common-connect-sdk @onekeyfe/hd-shared @onekeyfe/hd-core
+npm i @onekeyfe/hd-common-connect-sdk @onekeyfe/hd-core @onekeyfe/hd-shared
 ```
-## Step 3. Initialize and bind events
 
-Initialize the SDK during app startup and bind UI/device events so PIN/Passphrase and confirmations work end-to-end.
+Keep the SDK packages on the same version. Initialize once near app startup:
 
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
-import { UI_EVENT, UI_REQUEST, UI_RESPONSE, DEVICE } from '@onekeyfe/hd-core';
 
-export async function setupWebUsb() {
-  await HardwareSDK.init({
-    env: 'webusb',
-    debug: process.env.NODE_ENV !== 'production',
-    fetchConfig: true,
-  });
-
-  bindHardwareEvents();
-}
-
-function bindHardwareEvents() {
-  HardwareSDK.on(UI_EVENT, async (message: any) => {
-    switch (message.type) {
-      case UI_REQUEST.REQUEST_PIN: {
-        // Show your PIN UI and respond via uiResponse
-        const pinResult = await showPinDialog();
-        if (pinResult.mode === 'device') {
-          await HardwareSDK.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PIN,
-            payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
-          });
-        } else {
-          await HardwareSDK.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PIN,
-            payload: pinResult.value,
-          });
-        }
-        break;
-      }
-
-      case UI_REQUEST.REQUEST_PASSPHRASE: {
-        const passResult = await showPassphraseDialog();
-        if (passResult.mode === 'device') {
-          await HardwareSDK.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-            payload: { passphraseOnDevice: true, value: '' },
-          });
-        } else {
-          await HardwareSDK.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-            payload: { value: passResult.value, passphraseOnDevice: false, save: passResult.save },
-          });
-        }
-        break;
-      }
-
-      default:
-        break;
-    }
-  });
-
-  HardwareSDK.on(DEVICE.CONNECT, (payload: any) => {
-    console.log('Device connected:', payload);
-  });
-  HardwareSDK.on(DEVICE.DISCONNECT, (payload: any) => {
-    console.log('Device disconnected:', payload);
-  });
-}
+const initialized = await HardwareSDK.init({
+  env: 'webusb',
+  debug: false,
+  fetchConfig: true,
+});
+if (!initialized) throw new Error('SDK initialization failed');
 ```
 
-### Notes
-- Subscribe early to `UI_EVENT` so requests don't stall while waiting for PIN/Passphrase. See [Config Event](/en/hardware-sdk/core-api-guide#events-ui).
-- PIN: prefer on-device entry (`@@ONEKEY_INPUT_PIN_IN_DEVICE`). If you provide software input, use the blind keypad mapping (`7,8,9,4,5,6,1,2,3`).
-- Passphrase: support on-device input or software input, and optionally `save` for session caching.
-- Device events help you update UI if cables are unplugged.
+## 2. Register UI events
 
+Use the complete [Core API UI handler](/en/hardware-sdk/core-api-guide#events-ui) before reading an address or signing. It distinguishes input requests from device notifications and preserves response correlation.
 
-## Step 4. User authorization (chooser dialog with official filter)
+Your application supplies the dialogs. Host PIN entry needs a blind keypad; device-only PIN and button requests need an instruction screen, not a host approval button. Cancel the selected SDK operation when the user cancels, and remove listeners when your integration is torn down.
 
-Important: Must be triggered by a user gesture (e.g., clicking a button) due to Chrome security restrictions; automatic device discovery is not allowed before permission.
+## 3. Authorize from a user action
 
-Use the ONEKEY_WEBUSB_FILTER filters so the chooser only shows supported devices.
-
-```tsx
+```ts
 import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 
-export function AuthorizeUsbButton() {
-  return (
-    <button
-      onClick={async () => {
-        await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
-        // After authorization, enumerate via the SDK
-      }}
-    >
-      Authorize USB (WebUSB)
-    </button>
-  );
+// Call directly from the user's Connect button handler.
+async function authorizeUsb() {
+  if (!navigator.usb) throw new Error('WebUSB is unavailable in this browser');
+  await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
 }
 ```
-## Step 5. Enumerate and pick a device
+
+Handle chooser cancellation in your button handler. Opening the chooser does not prove that the device is initialized. Previously authorized devices may be enumerated without reopening it.
+
+## 4. Select the connection and read identity
 
 ```ts
 const result = await HardwareSDK.searchDevices();
 if (!result.success) throw new Error(result.payload.error);
+if (!result.payload.length) throw new Error('No OneKey device found');
 
-// Example: choose the first device
-const { connectId, deviceId } = result.payload[0] ?? {};
-```
+// This example requires one device. Use a device selector for multiple candidates.
+if (result.payload.length !== 1) throw new Error('Select a device before continuing');
+const { connectId } = result.payload[0];
+if (!connectId) throw new Error('Device connection is unavailable');
 
-- USB results usually include `deviceId` in `searchDevices()`.
-- Persist `connectId`/`deviceId` for subsequent calls.
-
-## Step 6. Read device state (confirm deviceId when needed)
-
-```ts
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
-
-const resolvedDeviceId = state.payload.identity.deviceId;
-if (!resolvedDeviceId) throw new Error("Device has no wallet identity");
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device has no wallet identity');
 ```
 
-## Step 7. First call example (BTC address)
+Do not assume discovery includes `deviceId`, and do not infer the protocol from USB descriptors. See [Search Devices](/en/hardware-sdk/basic-api/search-devices).
+
+## 5. Confirm a receiving address
 
 ```ts
-const res = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
-  path: "m/44'/0'/0'/0/0",
+const address = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: "m/84'/0'/0'/0/0",
   coin: 'btc',
-  showOnOneKey: false,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
 });
+if (!address.success) throw new Error(address.payload.error);
 
-if (res.success) {
-  console.log('BTC address:', res.payload.address);
-} else {
-  console.error('Error:', res.payload.error, res.payload.code);
-}
-```
-## Appendix: Minimal UI helpers
-
-```ts
-// Blind keypad map (matches hardware positional mapping)
-const BLIND_KEYBOARD_MAP = ['7', '8', '9', '4', '5', '6', '1', '2', '3'];
-
-function showPinDialog(): Promise<{ mode: 'device'|'software'; value?: string }>{
-  return new Promise(resolve => {
-    const overlay = document.createElement('div');
-    const dialog = document.createElement('div');
-
-    const title = document.createElement('div');
-    title.textContent = 'Enter PIN';
-
-    const hint = document.createElement('div');
-    hint.textContent = 'Use device input for best security, or enter via blind keypad.';
-
-    const display = document.createElement('div');
-
-    const keypad = document.createElement('div');
-    const pin: string[] = [];
-    BLIND_KEYBOARD_MAP.forEach((mapped, idx) => {
-      const btn = document.createElement('button');
-      btn.textContent = String(idx + 1);
-      btn.onclick = () => {
-        pin.push(mapped);
-        display.textContent = '•'.repeat(pin.length);
-      };
-      keypad.appendChild(btn);
-    });
-
-    const actions = document.createElement('div');
-    const useDeviceBtn = document.createElement('button');
-    useDeviceBtn.textContent = 'Enter on Device';
-    useDeviceBtn.onclick = () => { document.body.removeChild(overlay); resolve({ mode: 'device' }); };
-
-    const clearBtn = document.createElement('button');
-    clearBtn.textContent = 'Clear';
-    clearBtn.onclick = () => { pin.splice(0, pin.length); display.textContent = ''; };
-
-    const confirmBtn = document.createElement('button');
-    confirmBtn.textContent = 'Confirm';
-    confirmBtn.onclick = () => {
-      const value = pin.join('');
-      document.body.removeChild(overlay);
-      resolve({ mode: 'software', value });
-    };
-
-    actions.appendChild(useDeviceBtn);
-    actions.appendChild(clearBtn);
-    actions.appendChild(confirmBtn);
-
-    dialog.appendChild(title);
-    dialog.appendChild(hint);
-    dialog.appendChild(display);
-    dialog.appendChild(keypad);
-    dialog.appendChild(actions);
-
-    overlay.appendChild(dialog);
-    document.body.appendChild(overlay);
-  });
-}
-
-function showPassphraseDialog(): Promise<{ mode: 'device'|'software'; value: string; save: boolean }>{
-  return new Promise(resolve => {
-    const overlay = document.createElement('div');
-    const dialog = document.createElement('div');
-
-    const title = document.createElement('div');
-    title.textContent = 'Enter Passphrase';
-
-    const input = document.createElement('input');
-    input.type = 'password';
-
-    const saveWrap = document.createElement('label');
-    const saveBox = document.createElement('input');
-    saveBox.type = 'checkbox';
-    saveWrap.appendChild(saveBox);
-    saveWrap.appendChild(document.createTextNode(' Save for session'));
-
-    const actions = document.createElement('div');
-    const useDeviceBtn = document.createElement('button');
-    useDeviceBtn.textContent = 'Enter on Device';
-    useDeviceBtn.onclick = () => { document.body.removeChild(overlay); resolve({ mode: 'device', value: '', save: false }); };
-
-    const submitBtn = document.createElement('button');
-    submitBtn.textContent = 'Submit';
-    submitBtn.onclick = () => {
-      const value = input.value || '';
-      const save = !!saveBox.checked;
-      document.body.removeChild(overlay);
-      resolve({ mode: 'software', value, save });
-    };
-
-    actions.appendChild(useDeviceBtn);
-    actions.appendChild(submitBtn);
-
-    dialog.appendChild(title);
-    dialog.appendChild(input);
-    dialog.appendChild(saveWrap);
-    dialog.appendChild(actions);
-
-    overlay.appendChild(dialog);
-    document.body.appendChild(overlay);
-  });
-}
+// Display address.payload.address in your application after device confirmation.
 ```
 
-## Continue
+This example explicitly selects the standard wallet. For a hidden wallet, open it with [`openWalletSession`](/en/hardware-sdk/basic-api/open-wallet-session) and pass its `passphraseState` on both address and signing calls. Keep the wallet context and derivation path consistent.
 
-- [Introduction](/en/hardware-sdk)
-- [Error Code](/en/hardware-sdk/core-api-guide#error-codes), [Common Params](/en/hardware-sdk/concepts/common-params)
+## Disconnect and cleanup
+
+- Subscribe to `DEVICE.DISCONNECT` and invalidate the current connection in the UI.
+- Re-enumerate and read device state after reconnecting.
+- Serialize calls per device. Do not automatically repeat a signing or firmware-update request after a timeout.
+- Call `dispose()` when tearing down the SDK or switching transports, then initialize before further use.
+
+See [Reconnect and dispose](/en/hardware-sdk/transport/reconnect).
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| `navigator.usb` is missing | Browser support and secure context. |
+| Chooser does not open | Call it directly from a user gesture. |
+| Device cannot be acquired | Another tab, app, or Bridge may own it. Close that connection before retrying. |
+| Call waits for input | Register UI handlers, distinguish notifications, and preserve response correlation. |
+| Unexpected account | Check `deviceId`, path, and the explicit standard/hidden-wallet binding. |
+
+Continue with [Signer Guides](/en/hardware-sdk/signers) or [Error Codes](/en/hardware-sdk/core-api-guide#error-codes).

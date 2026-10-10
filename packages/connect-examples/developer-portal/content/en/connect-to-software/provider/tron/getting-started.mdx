@@ -7,10 +7,12 @@ import { Callout } from 'nextra/components'
 
 # Getting Started
 
+Connect the provider and use the TronWeb instance associated with that same wallet. Replace abbreviated addresses and contract methods with valid values. Check the selected network before preparing a transaction.
+
 Learn how to detect, connect, and interact with TRON using OneKey's provider.
 
 <Callout type="info">
-OneKey's TRON provider is fully compatible with TronLink, including TronWeb and SunWeb instances.
+OneKey exposes a TronLink-compatible provider and TronWeb integration. Feature availability depends on the wallet version and selected network.
 </Callout>
 
 ---
@@ -22,7 +24,7 @@ OneKey's TRON provider is fully compatible with TronLink, including TronWeb and 
 const provider = window.$onekey?.tron
 
 // TronWeb is available globally after connection
-const tronWeb = window.tronWeb
+let tronWeb = provider?.tronWeb
 
 if (!provider) {
   throw new Error('OneKey TRON provider not detected')
@@ -43,6 +45,8 @@ const result = await provider.request({
 })
 
 if (result.code === 200) {
+  tronWeb = provider.tronWeb
+  if (!tronWeb) throw new Error('OneKey TronWeb is not ready')
   console.log('Connected!')
   const address = tronWeb.defaultAddress.base58
   console.log('Address:', address)
@@ -57,7 +61,7 @@ if (result.code === 200) {
 
 ```typescript
 // Check if TronWeb is ready
-if (tronWeb && tronWeb.ready) {
+if (provider.ready && tronWeb && tronWeb.defaultAddress.base58) {
   console.log('Connected:', tronWeb.defaultAddress.base58)
 } else {
   console.log('Not connected')
@@ -68,7 +72,7 @@ if (tronWeb && tronWeb.ready) {
 
 ## Using TronWeb
 
-After connection, TronWeb instance is available globally:
+After connection, use `provider.tronWeb` to keep requests associated with OneKey:
 
 ### Get Balance
 
@@ -98,7 +102,7 @@ const contract = await tronWeb.contract().at(contractAddress)
 const decimals = await contract.decimals().call()
 
 // Transfer tokens
-const amount = 100 * (10 ** decimals) // 100 tokens
+const amount = (100n * 10n ** BigInt(decimals.toString())).toString() // 100 tokens, exact integer
 const tx = await contract.transfer(
   'TRecipientAddress...',
   amount
@@ -142,7 +146,7 @@ window.addEventListener('tronLink#initialized', () => {
 
 // Listen for messages
 window.addEventListener('message', (event) => {
-  if (event.data.isTronLink) {
+  if (event.source === window && event.data?.isTronLink && event.data?.message) {
     const { action, data } = event.data.message
     console.log('TronLink event:', action, data)
   }
@@ -161,6 +165,5 @@ const tronWeb = window.tronWeb
 
 // After (OneKey with TronLink fallback)
 const provider = window.$onekey?.tron || window.tronLink
-const tronWeb = window.tronWeb // Both inject this
+const tronWeb = window.tronWeb // Compatibility global; verify which wallet owns it
 ```
-

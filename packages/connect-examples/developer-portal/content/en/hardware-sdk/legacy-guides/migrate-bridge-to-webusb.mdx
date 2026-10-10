@@ -1,4 +1,5 @@
 ---
+description: "Replace OneKey Bridge with WebUSB while retaining an iframe-based Hardware Web SDK integration."
 title: Migrate to web-sdk + WebUSB
 ---
 
@@ -34,12 +35,13 @@ import HdWebSdk from '@onekeyfe/hd-web-sdk';
 // Same pattern as expo-example: default export → .HardwareWebSdk
 const HardwareSDK = HdWebSdk.HardwareWebSdk;
 
-await HardwareSDK.init({
+const initialized = await HardwareSDK.init({
   env: 'webusb',
   // omit connectSrc — SDK fills https://jssdk.onekey.so/<installed-hd-web-sdk-version>/
-  debug: true,
+  debug: false,
   fetchConfig: true,
 });
+if (!initialized) throw new Error('SDK initialization failed');
 ```
 
 ---
@@ -75,7 +77,8 @@ if (!resolvedDeviceId) throw new Error("Device has no wallet identity");
 const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
   path: "m/44'/0'/0'/0/0",
   coin: 'btc',
-  showOnOneKey: false,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
 });
 
 if (r.success) {

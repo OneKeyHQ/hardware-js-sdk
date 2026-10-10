@@ -1,10 +1,17 @@
 ---
+description: "Read structured device capabilities, including host PIN input and homescreen support."
 title: deviceSupportFeatures
 ---
 
 # deviceSupportFeatures
 
-### Detect hardware supported features.
+Check runtime capability objects. Read `.support`, not the truthiness of the object; `{ support: false }` is still a truthy JavaScript value. `require` may identify a minimum firmware version.
+
+```ts
+const result = await HardwareSDK.deviceSupportFeatures(connectId);
+if (!result.success) throw new Error(result.payload.error);
+const canEnterPinOnHost = result.payload.inputPinOnSoftware.support;
+```
 
 ```typescript
 const response = await HardwareSDK.deviceSupportFeatures(connectId);
@@ -26,9 +33,9 @@ Result
 {
     success: true,
     payload: {
-      inputPinOnSoftware: boolean, // You can unlock the device on the software side
-      modifyHomescreen: boolean, // Modify wallpaper 
-      device: Device // Device info
+      inputPinOnSoftware: { support: boolean, require?: string },
+      modifyHomescreen: { support: boolean, require?: string },
+      device: Device | null
     }
 }
 ```

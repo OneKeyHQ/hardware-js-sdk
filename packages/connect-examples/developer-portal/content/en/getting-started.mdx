@@ -1,0 +1,51 @@
+---
+title: Choose an integration
+description: Choose the right OneKey integration for your dApp, wallet, or application.
+---
+
+# Choose an integration
+
+Start with what your application needs to connect to. The wallet Provider API, Hardware SDK, and QR SDK serve different integration paths.
+
+| You want to… | Use | Start here |
+| --- | --- | --- |
+| Let users connect their OneKey wallet to a website or dApp | A chain-specific wallet provider or a wallet UI library | [dApp quickstart](/en/connect-to-software) |
+| Connect your own wallet or app directly to a OneKey device | Hardware SDK with a transport for your runtime | [Hardware SDK quickstart](/en/hardware-sdk/getting-started) |
+| Exchange signing requests with a QR-capable device | Air-Gap SDK | [QR signing overview](/en/air-gap) |
+
+A dApp integration asks the OneKey wallet to manage the user's accounts and signing flow. A direct hardware integration makes your application responsible for device discovery, connection state, UI events, and transaction preparation.
+
+## Connect a dApp
+
+1. Install [OneKey](https://onekey.so/download/) in your development environment.
+2. Follow the [dApp quickstart](/en/connect-to-software) to detect the provider and request accounts from a user action.
+3. Choose your chain in the [Provider API reference](/en/connect-to-software/provider). Methods and return values differ by chain.
+4. Handle a missing wallet, an empty account list, a rejected request, and account or network changes.
+
+If your application already uses a [wallet UI library](/en/connect-to-software/wallet-ui/web3modal), start with its OneKey integration. For mobile handoff, read [Mobile and deep links](/en/connect-to-software/mobile-deeplinks).
+
+## Connect hardware directly
+
+Choose your runtime before installing an SDK:
+
+| Runtime | Guide |
+| --- | --- |
+| Browser with WebUSB support | [WebUSB](/en/hardware-sdk/transport/web-usb) |
+| React Native with Bluetooth | [React Native BLE](/en/hardware-sdk/transport/react-native-ble) |
+| Native Android, iOS, or Flutter | [Native mobile integration](/en/hardware-sdk/transport/native-ble) |
+
+Then follow the [quickstart](/en/hardware-sdk/getting-started). Initialize the SDK, handle its UI requests, select a device, and retrieve an address before moving on to signing. Check [device and chain support](/en/hardware-sdk/concepts/chain-support) for the exact method and device you plan to use.
+
+The [hardware playground](https://hardware-example.onekey.so/) is useful for exploring APIs. An emulator or a successful build does not replace testing your integration with the intended device, firmware, and runtime.
+
+## Use QR signing
+
+Start with the [Air-Gap overview](/en/air-gap), then follow a chain-specific guide such as [Ethereum and EVM](/en/air-gap/ethereum-and-evm). Your app encodes a request, displays it as QR data, reads the device's response, and validates the result before broadcasting through its own network connection.
+
+## Before you ship
+
+- Test rejection, cancellation, disconnect, and reconnect as well as the successful path.
+- Show the account and network being used. Preserve the user's opportunity to review signing requests.
+- Never collect recovery phrases or private keys. Keep PINs, passphrases, tokens, and wallet-session data out of logs and bug reports.
+- Pin and record the versions used in your integration. Re-test after SDK, firmware, or wallet upgrades.
+- Use the [troubleshooting guide](/en/troubleshooting) when a request fails or stalls.

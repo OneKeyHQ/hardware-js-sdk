@@ -15,6 +15,30 @@ export default {
       copyPage: false,
     },
   },
+  'getting-started': { title: 'Start here', type: 'page' },
+  'connect-to-software': {
+    title: 'dApp Integration',
+    type: 'menu',
+    items: {
+      quickstart: { title: 'dApp quickstart', href: '/en/connect-to-software' },
+      provider: { title: 'Provider API', href: '/en/connect-to-software/provider' },
+      web3modal: { title: 'Web3Modal UI Kit', href: '/en/connect-to-software/wallet-ui/web3modal' },
+    },
+  },
+  'hardware-sdk': {
+    title: 'Hardware Integration',
+    type: 'menu',
+    items: {
+      'getting-started': { title: 'Getting Started', href: '/en/hardware-sdk/getting-started' },
+      'web-usb': { title: 'WebUSB Connection', href: '/en/hardware-sdk/transport/web-usb' },
+      'react-native-ble': { title: 'React Native BLE', href: '/en/hardware-sdk/transport/react-native-ble' },
+      'native-ble': { title: 'Native Mobile BLE', href: '/en/hardware-sdk/transport/native-ble' },
+    },
+  },
+  'air-gap': {
+    title: 'Offline Signing',
+    type: 'page',
+  },
   'agent-wallet': {
     title: AgentWalletBetaTitle({ betaLabel: 'Private Beta' }),
     type: 'menu',
@@ -46,29 +70,8 @@ export default {
       safety: { title: 'Safety Rules', href: '/en/agent-wallet/safety' },
     },
   },
+  troubleshooting: { title: 'Troubleshooting', display: 'hidden' },
   // Navigation menus with dropdown items
-  'hardware-sdk': {
-    title: 'Hardware Integration',
-    type: 'menu',
-    items: {
-      'getting-started': { title: 'Getting Started', href: '/en/hardware-sdk/getting-started' },
-      'web-usb': { title: 'WebUSB Connection', href: '/en/hardware-sdk/transport/web-usb' },
-      'react-native-ble': { title: 'React Native BLE', href: '/en/hardware-sdk/transport/react-native-ble' },
-      'native-ble': { title: 'Native Mobile BLE', href: '/en/hardware-sdk/transport/native-ble' },
-    },
-  },
-  'connect-to-software': {
-    title: 'dApp Integration',
-    type: 'menu',
-    items: {
-      provider: { title: 'Provider API', href: '/en/connect-to-software/provider' },
-      web3modal: { title: 'Web3Modal UI Kit', href: '/en/connect-to-software/wallet-ui/web3modal' },
-    },
-  },
-  'air-gap': {
-    title: 'Offline Signing',
-    type: 'page',
-  },
   changelog: {
     title: 'Changelog',
     display: 'hidden',

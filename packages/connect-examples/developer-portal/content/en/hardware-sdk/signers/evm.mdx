@@ -1,4 +1,5 @@
 ---
+description: "Confirm an EVM account and sign transactions, messages, and typed data with the same wallet context."
 title: EVM Signer
 ---
 
@@ -10,7 +11,7 @@ title: EVM Signer
 >
 > Prerequisite: [Request Basics](/en/hardware-sdk/core-api-guide#request-basics)
 
-End-to-end EVM signing guide. Covers address confirmation, EIP‑1559/Legacy transactions, personal_sign, and EIP‑712 typed data. Content is aligned with hardware-js-sdk behavior (Promise responses + UI events) and mirrors the Chinese page.
+End-to-end EVM signing guide. Covers address confirmation, EIP‑1559/Legacy transactions, personal_sign, and EIP‑712 typed data. The SDK returns Promise results and emits UI events for device interaction.
 
 ## Index
 
@@ -66,6 +67,7 @@ const tokenContract = '0x1111111111111111111111111111111111111111';
 const spender = '0x2222222222222222222222222222222222222222';
 const erc20 = new Interface(['function approve(address spender, uint256 amount)']);
 const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: "m/44'/60'/0'/0/0",
   transaction: {
     to: tokenContract,
@@ -112,6 +114,8 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 
 ## Initialization
 
+The examples use the **standard wallet** consistently. For a hidden wallet, replace `useEmptyPassphrase: true` with the verified `passphraseState` on every address and signing call. Register [UI handlers](/en/hardware-sdk/core-api-guide#events-ui) before protected calls, and check `success` before using any payload. Examples containing declared transaction inputs are preparation fragments, not standalone runnable applications.
+
 - Keep firmware up to date; Web requires HTTPS + user gestures; BLE needs proper permission.
 - Before signing, call `evmGetAddress(showOnOneKey: true)` once to confirm path/account on device.
 
@@ -136,10 +140,12 @@ if (!deviceId) throw new Error('Device identity unavailable');
 
 ```ts
 const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: "m/44'/60'/0'/0/0",
   showOnOneKey: true,
   chainId: 1,
 });
+if (!res.success) throw new Error(res.payload.error);
 // res.payload: { address, path }
 ```
 
@@ -167,6 +173,7 @@ const { success, payload } = await HardwareSDK.evmSignTransaction(connectId, dev
   transaction: tx,
   useEmptyPassphrase: true,
 });
+if (!success) throw new Error(payload.error);
 // payload: { v, r, s }
 ```
 
@@ -193,10 +200,12 @@ Promise<{ success, payload: { v, r, s } }>
 
 ```ts
 const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: "m/44'/60'/0'/0/0",
   messageHex,
   chainId: 1,
 });
+if (!res.success) throw new Error(res.payload.error);
 // res.payload.signature
 ```
 
@@ -220,11 +229,13 @@ Promise<{ success, payload: { address, signature } }>
 
 ```ts
 const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: "m/44'/60'/0'/0/0",
   data: typedData,
   metamaskV4Compat: true,
   chainId: 1,
 });
+if (!res.success) throw new Error(res.payload.error);
 // res.payload.signature
 ```
 
@@ -310,9 +321,11 @@ const legacyTx = {
 };
 
 const sig = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: accountPath,
   transaction: legacyTx,
 });
+if (!sig.success) throw new Error(sig.payload.error);
 ```
 
 ### Message (personal_sign / EIP-191)
@@ -324,6 +337,7 @@ const message = 'Hello OneKey';
 const messageHex = hexlify(toUtf8Bytes(message));
 
 const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: accountPath,
   messageHex,
   chainId: 1,
@@ -374,6 +388,7 @@ const typedData = {
 };
 
 const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: accountPath,
   data: typedData,
   metamaskV4Compat: true,
@@ -396,7 +411,7 @@ if (signer.toLowerCase() !== res.payload.address.toLowerCase()) {
 - Common issues:
   - Path mismatch: default `m/44'/60'/0'/0/0`, increment account/address as needed; confirm once with `showOnOneKey`.
 - ChainId mismatch: must match the target network.
-- Large `data` may be rejected; simplify if necessary.
+- Unsupported or oversized `data` may be rejected. Return the error; any change to the intended transaction needs a new user review.
 - Repeated passphrase prompts: call `openWalletSession` once, then pass `passphraseState` on later calls. Serialize per device. `keepSession` still holds the transport; it is not a wallet binding.
 - User reject/timeout: surface retry/cancel; do not auto-replay.
 See chain docs: [evmSignTransaction](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction) · [evmSignMessage](/en/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) · [evmSignTypedData](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata).

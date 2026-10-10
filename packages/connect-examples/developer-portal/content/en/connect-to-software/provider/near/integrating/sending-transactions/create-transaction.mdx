@@ -4,15 +4,15 @@ title: Create Transaction
 
 # Create Transaction
 
-You should create transaction object by [near-api-js](https://docs.near.org/docs/tutorials/create-transactions#constructing-the-transaction), and we provide some convenience methods to get nonce and lasted block hash that is required by transaction constructor.
+Create a transaction object with [near-api-js](https://docs.near.org/integrations/create-transactions), and we provide some convenience methods to get nonce and latest block hash that is required by transaction constructor.
 
 ```javascript
 import * as nearAPI from "near-api-js";
 
 // must equal to provider connected account
-const sender = 'c3be856133196da252d0f1083614cdc87a85c8aa8abeaf87daff1520355eec53'; 
+const sender = 'c3be856133196da252d0f1083614cdc87a85c8aa8abeaf87daff1520355eec53';
 // must equal to provider connected account
-const publicKey = 'ed25519:EB6zw1gAr4hV6NHuk9rhFPR8m8MwJbyqvZaweXiTNZ2J'; 
+const publicKey = 'ed25519:EB6zw1gAr4hV6NHuk9rhFPR8m8MwJbyqvZaweXiTNZ2J';
 const receiver = 'c3be856133196da252d0f1083614cdc87a85c8aa8abeaf87daff1520355eec53';
 
 const amount = nearAPI.utils.format.parseNearAmount('0.0001');
@@ -20,7 +20,12 @@ const actions = [nearAPI.transactions.transfer(amount)];
 
 const accessKey = await provider.request({
   method: 'query',
-  params: [`access_key/${sender}/${publicKey}`, '']
+  params: {
+    request_type: 'view_access_key',
+    finality: 'final',
+    account_id: sender,
+    public_key: publicKey,
+  }
 });
 // nonce increase 1
 const nonce = accessKey.nonce + 1;
@@ -40,7 +45,7 @@ const transaction = nearAPI.transactions.createTransaction(
 );
 ```
 
-Or just call `provider.createTransaction` method more easier.
+Alternatively, use `provider.createTransaction` to obtain the connected account, access-key nonce, and block hash.
 
 ```javascript
 const receiver = 'c3be856133196da252d0f1083614cdc87a85c8aa8abeaf87daff1520355eec53';

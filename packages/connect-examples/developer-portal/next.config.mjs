@@ -10,7 +10,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const getVersionInfo = () => {
   try {
     // Try to get SDK version from core package
-    const corePkgPath = resolve(__dirname, '../core/package.json')
+    const corePkgPath = resolve(__dirname, '../../core/package.json')
     const corePkg = JSON.parse(readFileSync(corePkgPath, 'utf-8'))
     const sdkVersion = corePkg.version || 'dev'
 

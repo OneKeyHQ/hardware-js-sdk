@@ -1,0 +1,49 @@
+.page { background: #111412; color: #f0f3f1; }
+.main { max-width: 1160px; margin: 0 auto; padding: 0 40px; }
+.hero { padding: 72px 0 62px; max-width: 790px; }
+.eyebrow { color: #8bea97; font-size: 13px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; margin-bottom: 20px; }
+.hero h1 { color: #f0f3f1; font-size: clamp(34px, 4.3vw, 54px); line-height: 1.1; letter-spacing: -.035em; text-wrap: balance; font-weight: 600; }
+.intro { color: #b0bab4; font-size: 18px; line-height: 1.65; max-width: 640px; margin-top: 22px; }
+.heroActions { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 28px; margin-top: 30px; }
+.page a { text-decoration: none; }
+.primary { display: inline-flex; align-items: center; gap: 18px; background: #9bea9c; color: #122417; border-radius: 6px; padding: 13px 18px; font-size: 15px; font-weight: 600; min-height: 46px; }
+.search { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; color: #b0bab4; cursor: pointer; min-height: 44px; }
+.sectionHeading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 20px; }
+.sectionHeading h2, .resources h2, .support h2 { color: #f0f3f1; font-size: 20px; font-weight: 600; letter-spacing: -.02em; }
+.sectionHeading span { font-size: 13px; color: #9aa89e; }
+.route { border-top: 1px solid #323d35; padding: 32px 0; display: grid; grid-template-columns: 40px minmax(0, 1fr) 230px; gap: 20px; }
+.number { color: #8e9c93; font-size: 13px; font-variant-numeric: tabular-nums; padding-top: 3px; }
+.audience { font-size: 12px; color: #9aa89e; margin-bottom: 9px; }
+.route h3 { font-size: 24px; line-height: 1.35; letter-spacing: -.025em; font-weight: 600; }
+.route h3 a { display: inline-flex; align-items: center; gap: 10px; color: #f0f3f1; }
+.description { color: #b0bab4; font-size: 15px; line-height: 1.7; max-width: 540px; margin-top: 12px; }
+.routeCta { color: #9bea9c; display: inline-flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 600; margin-top: 18px; min-height: 34px; }
+.routeLinks { display: flex; flex-direction: column; gap: 3px; border-left: 1px solid #2b352e; padding-left: 28px; align-self: center; }
+.routeLinks a { display: flex; align-items: center; justify-content: space-between; gap: 14px; font-size: 13px; line-height: 1.6; color: #c6cfc9; padding: 9px 0; }
+.page a:hover, .search:hover { color: #b4f3b6; }
+.page .primary:hover { background: #b4f3b6; color: #122417; }
+.page a:focus-visible, .page button:focus-visible { outline: 2px solid #9bea9c; outline-offset: 5px; border-radius: 3px; }
+.resources { border-top: 1px solid #323d35; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding: 42px 0; }
+.resources p, .support p { color: #a8b4ac; font-size: 14px; line-height: 1.65; margin-top: 10px; max-width: 540px; }
+.resourceLinks { display: flex; flex-direction: column; gap: 14px; }
+.resourceLinks a { display: flex; justify-content: space-between; align-items: center; color: #d4ddd7; font-size: 14px; padding: 6px 0; }
+.support { display: flex; align-items: center; justify-content: space-between; gap: 28px; background: #1a221d; padding: 28px; border-radius: 6px; margin-bottom: 48px; }
+.support h2 { font-size: 17px; }
+.support a { display: inline-flex; align-items: center; gap: 12px; color: #9bea9c; font-size: 14px; flex-shrink: 0; }
+.footerLinks { max-width: 1160px; padding: 26px 40px 0; border-top: 1px solid #2b352e; margin: auto; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.footerLinks nav { display: flex; flex-wrap: wrap; gap: 22px; font-size: 12px; color: #a8b4ac; }
+.footerLinks [aria-current] { color: #e4eee7; }
+@media (max-width: 760px) {
+ .main { padding: 0 24px; }
+ .hero { padding: 44px 0 42px; }
+ .intro { font-size: 16px; }
+ .route { grid-template-columns: 24px minmax(0, 1fr); gap: 12px; padding: 28px 0; }
+ .route h3 { font-size: 21px; }
+ .routeLinks { grid-column: 2; padding-left: 0; border-left: none; display: flex; flex-direction: row; flex-wrap: wrap; column-gap: 20px; }
+ .routeLinks a { gap: 8px; }
+ .resources { grid-template-columns: 1fr; gap: 24px; }
+ .support { flex-direction: column; align-items: flex-start; padding: 22px; }
+ .support a { flex-shrink: 1; }
+ .footerLinks { padding: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { .page * { scroll-behavior: auto; transition: none; } }

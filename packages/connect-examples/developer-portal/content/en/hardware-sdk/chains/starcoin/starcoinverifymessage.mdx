@@ -6,7 +6,7 @@ title: starcoinVerifyMessage
 
 ## Starcoin: verify message
 
-Asks device to verify a message using the signer address and signature.
+Verifies a message using the signer address and signature.
 
 ES6
 
@@ -19,7 +19,7 @@ const result = await HardwareSDK.starcoinVerifyMessage(connectId, deviceId, para
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
 * `publicKey` - _required_ `string` signer publicKey.
-* `messageHex` - _required_ `string` signed message in hex text
+* `messageHex` - _required_ `string` Signed message encoded as a hexadecimal string.
 * `signature` - _required_ `string` signature in hexadecimal format.
 
 ## Example

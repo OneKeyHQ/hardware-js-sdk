@@ -6,7 +6,7 @@ title: EthSignRequest
 
 The `EthSignRequest` class handles Ethereum signing requests.
 
-Used to send a signing request to the device.
+Encodes signing data for the device to scan. It does not create or broadcast the transaction.
 
 ## DataType Enum
 
@@ -23,12 +23,12 @@ enum DataType {
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `requestId` | `Buffer` | Unique request ID (UUID) |
+| `requestId` | `Buffer` | Optional constructor field: UUID bytes; the high-level helper below takes a UUID string |
 | `signData` | `Buffer` | Data to be signed |
 | `dataType` | `DataType` | Type of signing data |
 | `chainId` | `number` | Chain ID (optional) |
 | `derivationPath` | [`CryptoKeypath`](/en/air-gap/basic-api/cryptokeypath) | Derivation path |
-| `address` | `Buffer` | Address for signing (optional) |
+| `address` | `Buffer` | Signer address bytes (optional) |
 | `origin` | `string` | Request source (optional) |
 
 ## UR Example
@@ -39,12 +39,18 @@ UR:ETH-SIGN-REQUEST/ONADTPDAGDSWNNYAHGTOKPFPIAPANNROLNSAVYDTHHAOHDECAOWFLYLDLFAA
 
 ## Examples
 
+These examples use `KeystoneEthereumSDK.generateSignRequest`, which takes hex strings and a UUID string. Its parameter names differ from the registry constructor above. `unsignedTxHex` and `unsignedLegacyHex` are the unsigned signing bytes from your transaction library, without a `0x` prefix. For EIP-1559, include the `02` type byte. `typedDataJson` must contain the complete EIP-712 object.
+
+Use the actual path and master fingerprint exported by the device. Keep the request ID and original unsigned transaction until the response has been verified.
+
+
 ### EIP-1559 Transaction
 
 ```ts
 import { KeystoneEthereumSDK } from '@keystonehq/keystone-sdk';
 
 const eth = new KeystoneEthereumSDK();
+const requestId = globalThis.crypto.randomUUID();
 const ur = eth.generateSignRequest({
   requestId,                // uuid string
   signData: unsignedTxHex,  // hex without 0x
@@ -102,4 +108,3 @@ const ur = eth.generateSignRequest({
 ## Next Step
 
 After the device signs, decode the response using [EthSignature](/en/air-gap/ethereum-and-evm/ethsignature).
-

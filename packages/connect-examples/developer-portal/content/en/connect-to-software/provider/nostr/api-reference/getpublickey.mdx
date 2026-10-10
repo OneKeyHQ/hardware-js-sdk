@@ -4,27 +4,24 @@ title: getPublicKey
 
 # getPublicKey
 
-### Method
+## Method
 
 ```typescript
-async function getPublicKey(): string 
+declare function getPublicKey(): Promise<string>;
 ```
 
-### Response
+## Response
 
 returns a public key as hex
 
-### Example
+## Example
 
 ```typescript
-const provider = (window.$onekey &#x26;&#x26; window.$onekey.nostr) || window.nostr;
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
 
-const pubkey = async provider.getPublicKey()
-
+const pubkey = await provider.getPublicKey()
 ```
 
-### Demo
+## Demo
 
-
-<iframe src="https://codepen.io/OneKeyHQ/pen/ExremGa" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[Open example](https://codepen.io/OneKeyHQ/pen/ExremGa)

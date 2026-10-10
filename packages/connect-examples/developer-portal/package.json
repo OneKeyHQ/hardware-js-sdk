@@ -7,7 +7,7 @@
     "dev:webpack": "next dev --webpack -p 3001",
     "dev:ai-gateway": "node ./scripts/context7-chat-gateway.mjs",
     "sync:changelog": "node ./scripts/sync-changelog.mjs",
-    "build": "next build && pagefind --site out --output-subdir _pagefind",
+    "build": "next build && node scripts/build-search.mjs",
     "start": "npx serve@latest out",
     "clean": "rimraf out .next"
   },

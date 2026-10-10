@@ -1,4 +1,5 @@
 ---
+description: "Confirm a Solana address and sign serialized messages with a hardened derivation path and explicit wallet binding."
 title: Solana Signer
 ---
 
@@ -33,6 +34,8 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 
 ## Initialization
 
+The examples use the **standard wallet** consistently. For a hidden wallet, replace `useEmptyPassphrase: true` with the verified `passphraseState` on every address and signing call. Register [UI handlers](/en/hardware-sdk/core-api-guide#events-ui) before protected calls, and check `success` before using any payload. Examples containing declared transaction inputs are preparation fragments, not standalone runnable applications.
+
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
@@ -54,6 +57,7 @@ if (!deviceId) throw new Error("Device has no wallet identity");
 
 ```ts
 const res = await HardwareSDK.solGetAddress(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: "m/44'/501'/0'/0'",
   showOnOneKey: true,
 });
@@ -126,7 +130,12 @@ const deviceId = state.payload.identity.deviceId;
 if (!deviceId) throw new Error("Device has no wallet identity");
 
 const path = "m/44'/501'/0'/0'";
-await HardwareSDK.solGetAddress(connectId, deviceId, { path, showOnOneKey: true });
+const confirmedAddress = await HardwareSDK.solGetAddress(connectId, deviceId, {
+  path,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!confirmedAddress.success) throw new Error(confirmedAddress.payload.error);
 
 // Obtain these bytes from Transaction.serializeMessage() or
 // VersionedTransaction.message.serialize(), with a fresh recent blockhash.
@@ -139,9 +148,8 @@ const { success, payload } = await HardwareSDK.solSignTransaction(connectId, dev
   useEmptyPassphrase: true,
 });
 
-if (success) {
-  // Attach the signature and verify it against the address before broadcasting.
-}
+if (!success) throw new Error(payload.error);
+// Attach the signature and verify it against the confirmed address before broadcasting.
 ```
 
 ## Validation & Troubleshooting

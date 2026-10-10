@@ -1,4 +1,5 @@
 ---
+description: "Connect a Flutter host to OneKey through a JavaScript runtime and a native BLE transport bridge."
 title: "Flutter: Connect via Bluetooth (Native)"
 ---
 
@@ -27,7 +28,7 @@ Expose `enumerate/connect/disconnect/send/receive` from native to JS, keeping th
 
 ## Step 5. Handle UI events
 
-Show native dialogs for PIN/Passphrase/confirmations and respond via `HardwareSDK.uiResponse`.
+Show native dialogs for input requests and instructions for on-device prompts. Only input requests receive `HardwareSDK.uiResponse`; preserve their response correlation. Button confirmations and device-only PIN prompts are notifications. See [UI wiring](/en/hardware-sdk/core-api-guide#events-ui).
 
 ## BLE UUIDs
 

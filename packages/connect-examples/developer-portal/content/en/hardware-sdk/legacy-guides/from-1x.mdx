@@ -1,10 +1,11 @@
 ---
+description: "Migrate Hardware SDK 1.1.x integrations to normalized device state, explicit wallet sessions, and Protocol V2."
 title: From 1.1.x to 1.2.x
 ---
 
 # Migrate from 1.1.x to 1.2.x
 
-This page is for third-party apps already on Hardware SDK **1.1.x**. Target is the current **1.2.x** line (stable npm `1.2.1`).
+This page is for third-party apps already on Hardware SDK **1.1.x**. This guide targets the **1.2.x** line.
 
 You keep the same JavaScript methods. Protocol V2 (Pro 2 / Neo) is handled inside Core. Do not add a second SDK.
 
@@ -20,7 +21,7 @@ New projects should skip this page and use [Getting Started](/en/hardware-sdk/ge
 ## Upgrade
 
 ```bash
-npm i @onekeyfe/hd-common-connect-sdk@^1.2.1
+npm i --save-exact @onekeyfe/hd-common-connect-sdk@1.2
 ```
 
 Pin every `@onekeyfe/hd-*` package to the same 1.2.x version. If you still embed `@onekeyfe/hd-web-sdk`, **omit `connectSrc`** so the iframe matches the installed package.
@@ -39,7 +40,7 @@ Do not mix `@onekeyfe/hd-web-sdk` and `@onekeyfe/hd-common-connect-sdk` in one r
 | `env: 'web'` + Bridge | `env: 'webusb'` | See [Bridge → WebUSB](/en/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb) |
 | `firmwareUpdateV2` / `V3` on Pro 2 / Neo | [`firmwareUpdateV4`](/en/hardware-sdk/device-api/firmwareupdatev4) | Classic / Mini / Touch / Pro stay on V2 / V3 |
 
-Deprecated methods still run for existing apps. New code should not call them.
+`getFeatures` remains available on Protocol V1 only and is rejected on Protocol V2. `getPassphraseState` remains a compatibility API. New code should use the replacement methods.
 
 There is no `openWalletSession({ mode: 'resume-hidden' })`. After you have a binding, later address / sign calls that carry `passphraseState` resume inside Core.
 

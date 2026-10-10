@@ -59,7 +59,6 @@ const txHash = await window.$onekey.ethereum.request({
     from: '0xYourAddress...',
     to: '0xContractAddress...',
     data: '0xa9059cbb...', // Encoded function call
-    gas: '0x5208',
   }]
 })
 ```
@@ -97,3 +96,5 @@ const txHash = await window.$onekey.ethereum.request({
 - If `gas` is not provided, the wallet will estimate it
 - For EIP-1559 chains, prefer `maxFeePerGas` over `gasPrice`
 - The `from` address must be an account the user has connected
+
+Do not set a contract call gas limit to the 21,000-gas native-transfer baseline. Let the wallet estimate it or use `eth_estimateGas`. The sample addresses and call data are placeholders. A returned hash does not confirm execution; check the receipt on the same network.

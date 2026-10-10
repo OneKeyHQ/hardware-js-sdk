@@ -1,4 +1,5 @@
 ---
+description: "Choose a OneKey Hardware SDK package and transport, then connect a device with one API for Protocol V1 and V2."
 title: Introduction
 ---
 
@@ -8,7 +9,7 @@ import { ExternalLink, Play, Monitor } from 'lucide-react'
 
 Developer-focused documentation for integrating OneKey hardware in Web and Native apps.
 
-Hardware SDK **1.2.1** is the current stable line. It speaks Protocol V1 and Protocol V2 through the same JavaScript API. New here? Start with [Getting Started](/en/hardware-sdk/getting-started).
+Hardware SDK **1.2.x** supports Protocol V1 and Protocol V2 through the same JavaScript API. New here? Start with [Getting Started](/en/hardware-sdk/getting-started).
 
 This page is the **orientation layer** — pick the right SDK package for your platform and install it. For the end-to-end walkthrough (search → events → PIN/passphrase → first signing call) plus parameters, events, and error handling, see the [Core API Guide](/en/hardware-sdk/core-api-guide).
 
@@ -29,7 +30,7 @@ USB integrations should use `@onekeyfe/hd-common-connect-sdk`; use `@onekeyfe/hd
 | Platform (Stack) | Transport | SDK Package | Guide |
 |------------------|-----------|-------------|-------|
 | Web (Browser) | WebUSB | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [WebUSB Connection Guide](/en/hardware-sdk/transport/web-usb) |
-| React Native | BLE | [@onekeyfe/hd-ble-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/hd-ble-sdk) | [React Native BLE](/en/hardware-sdk/transport/react-native-ble) |
+| React Native | BLE | [@onekeyfe/hd-ble-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-ble-sdk) | [React Native BLE](/en/hardware-sdk/transport/react-native-ble) |
 | Android (Native) | BLE | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [Android BLE](/en/hardware-sdk/transport/android) |
 | iOS (Native) | BLE | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [iOS BLE](/en/hardware-sdk/transport/ios) |
 | Flutter | BLE | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [Flutter BLE](/en/hardware-sdk/transport/flutter) |
@@ -79,11 +80,12 @@ Use `@onekeyfe/hd-common-connect-sdk`:
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 
-await HardwareSDK.init({
+const initialized = await HardwareSDK.init({
   env: 'webusb',
-  debug: process.env.NODE_ENV !== 'production',
+  debug: false,
   fetchConfig: true,
 });
+if (!initialized) throw new Error('SDK initialization failed');
 ```
 
 ### React Native BLE
@@ -93,9 +95,10 @@ Use `@onekeyfe/hd-ble-sdk`:
 ```ts
 import HardwareSDK from '@onekeyfe/hd-ble-sdk';
 
-await HardwareSDK.init({
+const initialized = await HardwareSDK.init({
   debug: __DEV__,
 });
+if (!initialized) throw new Error('SDK initialization failed');
 ```
 
 ### Native Bridge / Low-level
@@ -105,11 +108,12 @@ Use `@onekeyfe/hd-common-connect-sdk`:
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 
-await HardwareSDK.init({
+const initialized = await HardwareSDK.init({
   env: 'lowlevel',
-  debug: process.env.NODE_ENV !== 'production',
+  debug: false,
   fetchConfig: true,
 });
+if (!initialized) throw new Error('SDK initialization failed');
 ```
 
 | Environment | Use Case |
@@ -132,10 +136,11 @@ import HdWebSdk from '@onekeyfe/hd-web-sdk';
 
 const HardwareSDK = HdWebSdk.HardwareWebSdk;
 
-await HardwareSDK.init({
-  debug: process.env.NODE_ENV !== 'production',
+const initialized = await HardwareSDK.init({
+  debug: false,
   // omit connectSrc — SDK fills https://jssdk.onekey.so/<installed-version>/
 });
+if (!initialized) throw new Error('SDK initialization failed');
 ```
 
 ## Next steps
@@ -150,7 +155,7 @@ After `HardwareSDK.init(...)` returns, follow [Getting Started](/en/hardware-sdk
 - Firmware V2 / V3 / V4: [Firmware Update](/en/hardware-sdk/firmware-update)
 
 - Standard lifecycle (`init → search → getDeviceState → subscribe → call + uiResponse → cleanup`): [Core API Guide → Standard lifecycle](/en/hardware-sdk/core-api-guide#standard-lifecycle)
-- Call parameters accepted by every method: [Common params](/en/hardware-sdk/concepts/common-params)
+- Shared parameters for address, signing and device methods: [Common params](/en/hardware-sdk/concepts/common-params)
 - Identifier reference (`connectId` / `deviceId` / `passphraseState` / …): [Identifiers](/en/hardware-sdk/concepts/identifiers)
 - PIN entry flow: [PIN Code](/en/hardware-sdk/concepts/pin)
 - Passphrase / hidden-wallet flow: [Passphrase](/en/hardware-sdk/concepts/passphrase)
@@ -161,7 +166,7 @@ import { DeviceCompatibilityTable } from '../../../components/DeviceCompatibilit
 
 <DeviceCompatibilityTable locale="en" />
 
-> **Air-Gap Mode:** OneKey Pro supports air-gapped signing via QR codes — no USB or Bluetooth connection required, providing the highest level of security. See [Air-Gap Integration](/en/air-gap) for details.
+> **Air-Gap Mode:** OneKey Pro and Pro 2 support air-gapped signing via QR codes — no USB or Bluetooth connection required, with details reviewed on the device before signing. See [Air-Gap Integration](/en/air-gap) for details.
 
 ## Core Packages
 
@@ -191,7 +196,6 @@ import { DeviceCompatibilityTable } from '../../../components/DeviceCompatibilit
 For users: This documentation is primarily for developers. If you encounter issues while using our products, please consult our Help Center or submit a support ticket.
 
 - [Help Center](https://help.onekey.so)
-- [Discussions](https://github.com/OneKeyHQ/hardware-js-sdk/discussions)
 - [Issues](https://github.com/OneKeyHQ/hardware-js-sdk/issues)
 
 ## Related Repositories

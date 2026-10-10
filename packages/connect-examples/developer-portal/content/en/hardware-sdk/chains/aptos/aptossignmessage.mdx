@@ -4,15 +4,15 @@ title: aptosSignMessage
 
 # aptosSignMessage
 
-## Use requirement
+## Requirements
 
-* Firmware version required
+* Minimum firmware versions
   * Touch: 3.0.0
   * Classic/Mini: 2.6.0
 
 ## Aptos: sign message <a href="#ethereum-sign-message" id="ethereum-sign-message"></a>
 
-Asks device to sign a message using the private key derived by given BIP32 path.
+Requests a message signature using the key derived from the specified path.
 
 ```typescript
 const result = await HardwareSDK.aptosSignMessage(connectId, deviceId, params);
@@ -22,7 +22,7 @@ const result = await HardwareSDK.aptosSignMessage(connectId, deviceId, params);
 
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
-* `path` - _required_ `string | Array<number>` minimum length is `3`. read more
+* `path` - _required_ `string | Array<number>` SDK minimum length is `3`. [Path format](/en/hardware-sdk/concepts/common-params#hd-path)
 * `payload` - `AptosMessagePayload` type
   * `address` - _optional  `string`_ of path Derived address
   * `chainId` - _optional  `string`_ of the id of the chain

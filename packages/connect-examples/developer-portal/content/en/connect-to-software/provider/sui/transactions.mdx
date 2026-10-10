@@ -7,7 +7,18 @@ import { Callout } from 'nextra/components'
 
 # Transactions
 
+Request permission before signing, select a connected account, and read the active chain. The legacy `TransactionBlock` examples use `@mysten/sui.js`; the newer `Transaction` API uses `@mysten/sui`. Match your SDK version and wallet capabilities rather than mixing these APIs.
+
 Learn how to sign and execute transactions on Sui.
+
+Initialize the account context before the following examples:
+
+```typescript
+await provider.requestPermissions()
+const [account] = await provider.getAccounts()
+if (!account) throw new Error('No Sui account is connected')
+const chain = await provider.getActiveChain()
+```
 
 ---
 
@@ -31,6 +42,8 @@ txb.transferObjects([coin], txb.pure('0xrecipient_address'))
 
 // Sign and execute
 const result = await provider.signAndExecuteTransactionBlock({
+  account,
+  chain,
   transactionBlock: txb,
   options: {
     showEffects: true,
@@ -55,6 +68,8 @@ const txb = new TransactionBlock()
 // ... build transaction
 
 const signedTxb = await provider.signTransactionBlock({
+  account,
+  chain,
   transactionBlock: txb,
 })
 
@@ -75,12 +90,16 @@ console.log({
 ## Sign and Execute Transaction (New API)
 
 ```typescript
-// Using the newer signAndExecuteTransaction API
+// Using the newer API with @mysten/sui (not legacy TransactionBlock)
+import { Transaction } from '@mysten/sui/transactions'
+
+const transaction = new Transaction()
+const [coin] = transaction.splitCoins(transaction.gas, [transaction.pure.u64(100000000)])
+transaction.transferObjects([coin], transaction.pure.address('RECIPIENT_SUI_ADDRESS'))
 const result = await provider.signAndExecuteTransaction({
-  transaction: txb,
-  options: {
-    showEffects: true,
-  },
+  account,
+  chain,
+  transaction,
 })
 ```
 
@@ -90,7 +109,9 @@ const result = await provider.signAndExecuteTransaction({
 
 ```typescript
 const signedTxn = await provider.signTransaction({
-  transaction: txb,
+  account,
+  chain,
+  transaction,
 })
 ```
 
@@ -114,6 +135,8 @@ txb.moveCall({
 })
 
 const result = await provider.signAndExecuteTransactionBlock({
+  account,
+  chain,
   transactionBlock: txb,
 })
 ```
@@ -136,6 +159,8 @@ const [upgradeCap] = txb.publish({
 txb.transferObjects([upgradeCap], txb.pure(senderAddress))
 
 const result = await provider.signAndExecuteTransactionBlock({
+  account,
+  chain,
   transactionBlock: txb,
 })
 ```
@@ -165,4 +190,3 @@ const txn = await client.getTransactionBlock({
   options: { showEffects: true },
 })
 ```
-

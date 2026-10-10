@@ -7,7 +7,18 @@ import { Callout } from 'nextra/components'
 
 # Signing
 
+Request permission before signing, select a connected account, and read the active chain. The legacy `TransactionBlock` examples use `@mysten/sui.js`; the newer `Transaction` API uses `@mysten/sui`. Match your SDK version and wallet capabilities rather than mixing these APIs.
+
 Learn how to sign messages for authentication.
+
+Initialize the account context before the following examples:
+
+```typescript
+await provider.requestPermissions()
+const [account] = await provider.getAccounts()
+if (!account) throw new Error('No Sui account is connected')
+const chain = await provider.getActiveChain()
+```
 
 ---
 
@@ -19,6 +30,8 @@ Sign arbitrary messages for authentication:
 const message = new TextEncoder().encode('Hello, Sui!')
 
 const result = await provider.signPersonalMessage({
+  account,
+  chain,
   message,
 })
 
@@ -36,6 +49,8 @@ console.log({
 const message = new TextEncoder().encode('Hello, Sui!')
 
 const result = await provider.signMessage({
+  account,
+  chain,
   message,
 })
 
@@ -50,16 +65,17 @@ console.log({
 ## Verify Signature
 
 ```typescript
-import { verifyPersonalMessage } from '@mysten/sui.js/verify'
+import { verifyPersonalMessageSignature } from '@mysten/sui/verify'
 
 const message = new TextEncoder().encode('Hello, Sui!')
-const { signature } = await provider.signPersonalMessage({ message })
+const { signature } = await provider.signPersonalMessage({ message, account, chain })
 
 const accounts = await provider.getAccounts()
 const publicKey = accounts[0].publicKey
 
-const isValid = await verifyPersonalMessage(message, signature)
-console.log('Signature valid:', isValid)
+const signerKey = await verifyPersonalMessageSignature(message, signature)
+const isExpectedSigner = signerKey.toSuiAddress() === accounts[0].address
+console.log('Expected signer:', isExpectedSigner)
 ```
 
 ---
@@ -87,4 +103,3 @@ try {
 | 4001 | User rejected request |
 | 4100 | Unauthorized |
 | -32603 | Internal error |
-

@@ -19,11 +19,11 @@ Requests that the wallet adds a new chain. If the chain already exists, the wall
 | `chainName` | `string` | Yes | Human-readable chain name |
 | `nativeCurrency` | `object` | Yes | Native currency info |
 | `nativeCurrency.name` | `string` | Yes | Currency name |
-| `nativeCurrency.symbol` | `string` | Yes | Currency symbol (2-6 chars) |
+| `nativeCurrency.symbol` | `string` | Yes | Native currency symbol |
 | `nativeCurrency.decimals` | `number` | Yes | Currency decimals (usually 18) |
 | `rpcUrls` | `string[]` | Yes | Array of RPC URLs (at least one) |
 | `blockExplorerUrls` | `string[]` | No | Array of block explorer URLs |
-| `iconUrls` | `string[]` | No | Array of icon URLs (currently ignored) |
+| `iconUrls` | `string[]` | No | Optional icon URLs; display depends on the wallet |
 
 ---
 
@@ -42,8 +42,8 @@ await window.$onekey.ethereum.request({
     chainId: '0x89',
     chainName: 'Polygon Mainnet',
     nativeCurrency: {
-      name: 'MATIC',
-      symbol: 'MATIC',
+      name: 'POL',
+      symbol: 'POL',
       decimals: 18
     },
     rpcUrls: ['https://polygon-rpc.com'],
@@ -103,9 +103,9 @@ await window.$onekey.ethereum.request({
 
 ## Notes
 
-- Only the first element of `rpcUrls` and `blockExplorerUrls` arrays is used
+- Supply valid RPC endpoints and use the metadata expected by the target network
 - The wallet validates that the RPC endpoint responds correctly
-- Cannot add chains with non-18 decimal native currencies (in some wallets)
+- Adding a chain does not guarantee that the wallet switches to it; read `eth_chainId` afterward
 - Specified by [EIP-3085](https://eips.ethereum.org/EIPS/eip-3085)
 
 ### Combined Add and Switch
@@ -122,6 +122,10 @@ async function switchToChain(chainConfig) {
       await window.$onekey.ethereum.request({
         method: 'wallet_addEthereumChain',
         params: [chainConfig]
+      })
+      await window.$onekey.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: chainConfig.chainId }]
       })
     } else {
       throw error

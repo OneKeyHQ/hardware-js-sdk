@@ -17,6 +17,7 @@ import MarkdownMessage, { sanitizeDocAIMessageText } from './DocAIMarkdownMessag
 import { OneKeyIcon } from './ChainIcons';
 import { DOCS_AI_OPEN_EVENT, DOCS_AI_TAB } from './docAIAssistEvents';
 import styles from './DocAIChatWidget.module.css';
+import { getSearchSuggestions, searchDocumentation } from './docsSearch.mjs';
 
 /**
  * Derive the RAG chat API URL.
@@ -121,77 +122,6 @@ const normalizeSources = rawSources => {
   return Array.from(map.values()).slice(0, 3);
 };
 
-const normalizeLocalHref = href => {
-  if (!href) return '';
-  try {
-    const url = new URL(href, window.location.origin);
-    if (url.origin !== window.location.origin) return '';
-    if (url.pathname.startsWith('/_next')) return '';
-    if (url.pathname.startsWith('/api')) return '';
-    if (/\.(png|jpg|jpeg|svg|gif|css|js|json|xml|ico|map)$/i.test(url.pathname)) return '';
-    if (!/^\/(en|zh)(\/|$)/.test(url.pathname)) return '';
-    return `${url.pathname}${url.search}${url.hash}`;
-  } catch {
-    return '';
-  }
-};
-
-const blockedSearchTitles = new Set([
-  'skip to content',
-  'home',
-  'view docs',
-  'project repository',
-  'github issues',
-  'submit a request',
-  'twitter',
-  'discord',
-  'github',
-]);
-
-const isSearchAnchorAllowed = anchor => {
-  if (!anchor) return false;
-  if (anchor.closest('header.nextra-navbar')) return false;
-  if (anchor.closest('footer')) return false;
-  if (anchor.closest('[aria-label="Menu"]')) return false;
-  return true;
-};
-
-const collectSearchEntries = () => {
-  if (typeof window === 'undefined') return [];
-
-  const anchors = Array.from(document.querySelectorAll('a[href]'));
-  const map = new Map();
-
-  for (const anchor of anchors) {
-    if (!isSearchAnchorAllowed(anchor)) continue;
-    const href = normalizeLocalHref(anchor.getAttribute('href'));
-    if (!href || href === '#') continue;
-    const path = href.replace(/[#?].*$/, '');
-    if (!/^\/(en|zh)\/.+/.test(path)) continue;
-
-    const rawTitle = normalizeText(anchor.textContent);
-    const cleanedTitle = rawTitle.replace(/\bview docs\b/gi, '').replace(/\s{2,}/g, ' ').trim();
-    if (!cleanedTitle || cleanedTitle.length < 2) continue;
-    if (blockedSearchTitles.has(cleanedTitle.toLowerCase())) continue;
-    if (/^onekeydevelopers$/i.test(cleanedTitle)) continue;
-    if (cleanedTitle === '/') continue;
-    const title =
-      cleanedTitle.length > 78 ? `${cleanedTitle.slice(0, 78).trimEnd()}…` : cleanedTitle;
-
-    const key = `${title.toLowerCase()}::${path.toLowerCase()}`;
-    if (map.has(key)) continue;
-
-    map.set(key, {
-      id: key,
-      title,
-      href,
-      path,
-    });
-  }
-
-  return Array.from(map.values());
-};
-
 const getWidgetCopy = isZh => {
   if (isZh) {
     return {
@@ -204,7 +134,7 @@ const getWidgetCopy = isZh => {
       searchCount: count => `${count} 条结果`,
       askHint: '找不到答案？切换 Ask AI 继续提问',
       askFromSearch: '转到 Ask AI',
-      askUnavailable: 'Ask AI 暂未配置服务端地址，请先设置 NEXT_PUBLIC_DOCS_AI_API_URL。',
+      askUnavailable: 'AI 助手暂时不可用，请使用文档导航。',
       assistantLabel: 'AI 助手',
       askDescription: '我会基于 OneKey Hardware SDK 文档回答并给出来源。',
       exampleQuestionsTitle: 'EXAMPLE QUESTIONS',
@@ -247,7 +177,7 @@ const getWidgetCopy = isZh => {
     searchTab: 'Search',
     askTab: 'Ask AI',
     searchPlaceholder: 'Search docs, APIs, and examples...',
-    searchEmpty: 'No matching docs yet. Try a shorter keyword.',
+    searchEmpty: 'No matching documentation. Try a method name or a different keyword.',
     searchListTitle: 'Documentation Results',
     searchCount: count => `${count} results`,
     askHint: 'Still blocked? continue in Ask AI.',
@@ -410,7 +340,8 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(DOCS_AI_TAB.SEARCH);
   const [searchInput, setSearchInput] = useState('');
-  const [searchEntries, setSearchEntries] = useState([]);
+  const [filteredSearchResults, setSearchResults] = useState([]);
+  const [searchStatus, setSearchStatus] = useState('idle');
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
 
   const [input, setInput] = useState('');
@@ -488,33 +419,6 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
 
   const isGenerating = status === 'submitted' || status === 'streaming';
 
-  const filteredSearchResults = useMemo(() => {
-    const query = normalizeText(searchInput).toLowerCase();
-    if (!query) {
-      return searchEntries.slice(0, 18);
-    }
-
-    const tokens = query.split(' ').filter(Boolean);
-    return searchEntries
-      .map(item => {
-        const title = item.title.toLowerCase();
-        const path = item.path.toLowerCase();
-
-        let score = 0;
-        for (const token of tokens) {
-          if (title.startsWith(token)) score += 10;
-          if (title.includes(token)) score += 5;
-          if (path.includes(token)) score += 3;
-        }
-
-        if (item.path === pathname || item.href === pathname) score += 1;
-        return { ...item, score };
-      })
-      .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title))
-      .slice(0, 24);
-  }, [pathname, searchEntries, searchInput]);
-
   const updateStickToBottom = useCallback(() => {
     const element = scrollRef.current;
     if (!element) return;
@@ -572,8 +476,30 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
 
   useEffect(() => {
     if (!isOpen) return;
-    setSearchEntries(collectSearchEntries());
-  }, [isOpen, pathname]);
+    if (activeTab !== DOCS_AI_TAB.SEARCH) return;
+    const query = searchInput.trim();
+    if (!query) {
+      setSearchResults(getSearchSuggestions(lang));
+      setSearchStatus('idle');
+      return;
+    }
+    let cancelled = false;
+    setSearchResults([]);
+    setSearchStatus('loading');
+    const timer = setTimeout(() => {
+      searchDocumentation(query, lang).then(results => {
+        if (cancelled) return;
+        setSearchResults(results);
+        setSearchStatus('ready');
+        setActiveSearchIndex(0);
+      }).catch(() => {
+        if (cancelled) return;
+        setSearchResults([]);
+        setSearchStatus('error');
+      });
+    }, 180);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [isOpen, activeTab, searchInput, lang]);
 
   useEffect(() => {
     setActiveSearchIndex(0);
@@ -599,6 +525,28 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
 
     return () => cancelAnimationFrame(timer);
   }, [activeTab, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previouslyFocused = document.activeElement;
+    const trapFocus = event => {
+      if (event.key !== 'Tab') return;
+      const controls = Array.from(panelRef.current?.querySelectorAll('button:not([disabled]), a[href], input, textarea, [tabindex="0"]') || []).filter(element => element.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (!first) return;
+      if (event.shiftKey && (document.activeElement === first || !panelRef.current?.contains(document.activeElement))) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !panelRef.current?.contains(document.activeElement))) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    document.addEventListener('keydown', trapFocus);
+    return () => {
+      document.removeEventListener('keydown', trapFocus);
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) previouslyFocused.focus();
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -817,41 +765,31 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
 
   const handleSearchInputKeyDown = useCallback(
     event => {
-      if (!isOpen || activeTab !== DOCS_AI_TAB.SEARCH) return;
+      if (!isOpen || activeTab !== DOCS_AI_TAB.SEARCH || event.target !== searchInputRef.current) return;
 
       if (event.key === 'ArrowDown') {
         event.preventDefault();
         setActiveSearchIndex(prev => {
-          // -1 = bridge row; move into first result (if any)
-          if (prev === -1) return filteredSearchResults.length > 0 ? 0 : -1;
-          return Math.min(prev + 1, filteredSearchResults.length - 1);
+          return Math.max(0, Math.min(prev + 1, filteredSearchResults.length - 1));
         });
       }
 
       if (event.key === 'ArrowUp') {
         event.preventDefault();
         setActiveSearchIndex(prev => {
-          // at or above first result → move to bridge row
-          if (prev <= 0) return -1;
-          return prev - 1;
+          return Math.max(0, prev - 1);
         });
       }
 
       if (event.key === 'Enter') {
         event.preventDefault();
-        // bridge row is selected → switch to Ask AI
-        if (activeSearchIndex === -1) {
-          handleOpenAskFromSearch();
-          return;
-        }
+        if (searchStatus === 'loading') return;
         const current = filteredSearchResults[activeSearchIndex];
         if (current) {
           handleOpenResult(current);
           return;
         }
-        if (normalizeText(searchInput)) {
-          handleOpenAskFromSearch();
-        }
+
       }
     },
     [
@@ -862,6 +800,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
       handleOpenResult,
       isOpen,
       searchInput,
+      searchStatus,
     ]
   );
 
@@ -898,6 +837,12 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                   value={searchInput}
                   onChange={event => setSearchInput(event.target.value)}
                   placeholder={copy.searchPlaceholder}
+                  aria-label={copy.searchPlaceholder}
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={true}
+                  aria-controls="docs-search-results"
+                  aria-activedescendant={filteredSearchResults[activeSearchIndex] ? `docs-search-result-${activeSearchIndex}` : undefined}
                 />
               </div>
             ) : (
@@ -957,14 +902,17 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                 <span className={styles.askAiBridgeText}>{copy.askAiBridgeLabel}</span>
                 {activeSearchIndex === -1 ? <kbd className={styles.askAiBridgeKbd}>↵</kbd> : null}
               </button>
-              <p className={styles.searchSectionTitle}>{copy.searchListTitle}</p>
-              <div className={styles.searchResultList}>
+              <p className={styles.searchSectionTitle}>{searchInput.trim() ? copy.searchListTitle : (isZh ? '从这里开始' : 'Start here')}</p>
+              <div id="docs-search-results" role="listbox" aria-label={isZh ? "文档搜索结果" : "Documentation results"} className={styles.searchResultList} aria-busy={searchStatus === 'loading'}>
                 {filteredSearchResults.length > 0 ? (
                   filteredSearchResults.map((item, index) => {
                     const isActive = index === activeSearchIndex;
                     return (
                       <button
                         key={item.id}
+                        id={`docs-search-result-${index}`}
+                        role="option"
+                        aria-selected={isActive}
                         ref={isActive ? activeResultRef : undefined}
                         type="button"
                         className={`${styles.searchResultItem} ${
@@ -980,11 +928,13 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                   })
                 ) : (
                   <div className={styles.searchEmpty}>
-                    <p>{copy.searchEmpty}</p>
-                    <p className={styles.askHint}>{hasChatApi ? copy.askHint : copy.askUnavailable}</p>
-                    <button type="button" className={styles.askFromSearch} onClick={handleOpenAskFromSearch}>
-                      {copy.askFromSearch}
-                    </button>
+                    <p role="status">{searchStatus === 'loading' ? (isZh ? '正在搜索全部文档…' : 'Searching all documentation…') : searchStatus === 'error' ? (isZh ? '暂时无法加载搜索索引。请重试或使用文档导航。' : 'Search is temporarily unavailable. Try again or browse the documentation navigation.') : copy.searchEmpty}</p>
+                    {searchStatus !== 'loading' && <>
+                      <p className={styles.askHint}>{hasChatApi ? copy.askHint : copy.askUnavailable}</p>
+                      <button type="button" className={styles.askFromSearch} onClick={handleOpenAskFromSearch}>
+                        {copy.askFromSearch}
+                      </button>
+                    </>}
                   </div>
                 )}
               </div>

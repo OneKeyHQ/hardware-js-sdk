@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # Transactions
 
+Connect the wallet before sending requests. Replace example addresses and manifest URLs with valid values. For authentication, use a server-generated, single-use challenge and verify the proof on your server.
+
 Learn how to send transactions on TON.
 
 ---
@@ -43,7 +45,7 @@ if ('result' in result) {
 
 ## Send Multiple Messages
 
-TON supports up to 4 messages per transaction:
+The provider currently advertises a maximum of four messages. Read `deviceInfo.features` for the wallet's advertised limit rather than treating it as a network-wide limit:
 
 ```typescript
 const result = await provider.send({
@@ -176,4 +178,3 @@ const nonBounceable = Address.parse(raw).toString({ bounceable: false })
 const addr = Address.parse('EQASdf...')
 const rawAddress = `${addr.workChain}:${addr.hash.toString('hex')}`
 ```
-

@@ -5,7 +5,7 @@ description: Complete API reference for OneKey's Cardano provider
 
 # API Reference
 
-Complete reference for OneKey's Cardano provider methods and types.
+Reference for OneKey's Cardano provider methods and types.
 
 ---
 
@@ -32,7 +32,7 @@ Complete reference for OneKey's Cardano provider methods and types.
 | `getUnusedAddresses()` | Get unused addresses |
 | `getChangeAddress()` | Get change address |
 | `getRewardAddresses()` | Get staking addresses |
-| `signTx(tx, partialSign?)` | Sign transaction |
+| `signTx(tx, partialSign?)` | Return the signed portions of a witness set |
 | `signData(addr, payload)` | Sign data (CIP-8) |
 | `submitTx(tx)` | Submit transaction |
 
@@ -80,7 +80,9 @@ type NetworkId = 0 | 1 // 0=testnet, 1=mainnet
 
 | Code | Description |
 |------|-------------|
-| -1 | User rejected |
-| -2 | Account not found |
-| -3 | Invalid network |
+| -1 | Invalid request |
+| -2 | Internal error |
+| -3 | Refused request |
+| -4 | Account changed |
 
+The current provider implementation returns an empty array from `experimental.getCollateral()`. Do not infer Plutus collateral availability from the method existing. The wallet-info `isEnabled()` helper also does not replace a successful `enable()` call. CIP-30 operation-specific errors differ from the general API errors above.

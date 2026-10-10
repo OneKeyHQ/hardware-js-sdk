@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # Transactions
 
+Connect the provider and read its network before preparing transactions. These examples are for Conflux Core Space. Replace abbreviated addresses and initialize any SDK client before using its methods.
+
 Learn how to send transactions on Conflux.
 
 ---
@@ -99,7 +101,7 @@ conflux.provider = provider
 
 ```typescript
 // Create and send transaction
-const tx = await conflux.cfx.sendTransaction({
+const tx = conflux.cfx.sendTransaction({
   from: senderAddress,
   to: recipientAddress,
   value: Conflux.Drip.fromCFX(1), // 1 CFX
@@ -124,7 +126,7 @@ const contract = conflux.Contract({
 const result = await contract.someViewFunction().call()
 
 // Write
-const tx = await contract.someWriteFunction(param1, param2).sendTransaction({
+const tx = contract.someWriteFunction(param1, param2).sendTransaction({
   from: senderAddress,
 })
 
@@ -150,4 +152,3 @@ try {
   }
 }
 ```
-

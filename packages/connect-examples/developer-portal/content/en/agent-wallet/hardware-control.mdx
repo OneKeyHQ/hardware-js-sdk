@@ -1,10 +1,11 @@
 ---
 title: Hardware Control
+description: Select a hardware-backed session and handle device confirmation explicitly.
 ---
 
 # Hardware Control
 
-Hardware control lets an Agent Wallet workflow escalate sensitive operations to a OneKey hardware wallet. This is OneKey's core difference from agent wallets that only rely on software custody or TEE signing.
+A hardware-backed session uses a connected OneKey device for supported signing requests. The user reviews and confirms requests on the device. Device capabilities and transaction details available for review depend on the chain, firmware, and CLI version.
 
 ## When To Escalate
 
@@ -14,7 +15,7 @@ Hardware control lets an Agent Wallet workflow escalate sensitive operations to 
 | Contract interaction | Agent runs simulation first, then the device displays clear-signing details when supported. |
 | Swap execution | Agent quotes and builds first; device confirmation happens only after the user approves execution. |
 | Hidden wallet | Passphrase mode is explicit so the agent does not guess whether a hidden wallet is active. |
-| Device trust check | `onekey device verify` confirms the connected device before using it for signing. |
+| Device trust check | `onekey device verify` runs device verification. A successful check does not validate the safety of a transaction. |
 
 ## Connect and Login
 
@@ -36,13 +37,15 @@ When multiple devices are connected, select one explicitly:
 onekey auth login --hardware --device-id <uuid>
 ```
 
-For hidden wallets, make passphrase handling explicit in non-interactive environments:
+Choose one passphrase mode for the intended wallet. These are alternatives, not a sequence:
 
-```bash
-onekey auth login --hardware --passphrase-mode none
-onekey auth login --hardware --passphrase-mode on-host
-onekey auth login --hardware --passphrase-mode on-device
-```
+| Mode | Wallet selection |
+| --- | --- |
+| `none` | Standard wallet, with no passphrase. |
+| `on-host` | Hidden wallet, with passphrase entry on the host. Keep the passphrase out of agent messages and logs. |
+| `on-device` | Hidden wallet, with passphrase entry on a device that supports it. |
+
+Inspect the installed CLI schema before selecting a mode. After login, verify the active address; a different passphrase selects a different wallet.
 
 ## Active Session
 
@@ -59,11 +62,15 @@ After login, follow-up commands use the active session automatically.
 
 ## Device Lifecycle
 
-```bash
-onekey device verify
-onekey device change-pin
-onekey device toggle-passphrase
-onekey device settings
-```
+Run only the action the user requested, after inspecting the installed CLI schema and explaining any setting change:
+
+| Action | Command family |
+| --- | --- |
+| Verify the connected device | `onekey device verify` |
+| Change the device PIN | `onekey device change-pin` |
+| Change passphrase protection | `onekey device toggle-passphrase` |
+| Inspect or change device settings | `onekey device settings` |
+
+If a command is absent from `onekey schema --list`, report the unsupported command instead of guessing its parameters.
 
 Do not bypass physical confirmation. If the device is locked, disconnected, asks for PIN or passphrase, or rejects a request, report that state and stop.

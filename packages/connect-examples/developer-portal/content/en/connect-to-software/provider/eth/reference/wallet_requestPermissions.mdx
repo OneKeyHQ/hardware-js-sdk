@@ -74,3 +74,5 @@ console.log('Has accounts permission:', hasAccountsPermission)
 - Calling this method triggers the connection prompt if not already connected
 - Permissions persist until revoked by the user
 - Specified by [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255)
+
+Handle unsupported-method errors in the target wallet version. Account permission is distinct from RPC connectivity and does not pre-approve signatures or transactions. For basic connection, use `eth_requestAccounts`.

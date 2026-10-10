@@ -1,4 +1,5 @@
 ---
+description: "Open a standard or hidden hardware wallet and reuse its public binding on later address and signing calls."
 title: Wallet Sessions
 ---
 
@@ -40,7 +41,7 @@ sequenceDiagram
     Note over App: persist deviceId + passphraseState
     App->>SDK: address / sign with passphraseState
   end
-  SDK->>Device: DeviceSessionGet
+  SDK->>Device: Resume the selected wallet context
   Device-->>SDK: session
   SDK-->>App: result
 ```
@@ -54,14 +55,23 @@ import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
 const standard = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.Standard,
 });
+if (!standard.success) throw new Error(standard.payload.error);
+```
 
-// User picks a hidden wallet on the device
+Or let the user select a hidden wallet:
+
+```ts
+// Choose this flow instead of the standard-wallet example.
 const hidden = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.SelectHidden,
 });
+if (!hidden.success) throw new Error(hidden.payload.error);
+if (hidden.payload.walletType !== 'hidden' || !hidden.payload.passphraseState) {
+  throw new Error('A hidden wallet was not opened');
+}
 ```
 
-Store `payload.deviceId`, `payload.walletType`, and `payload.passphraseState`. Then pass those values on address / signing calls. Core resumes the firmware session (`DeviceSessionGet`) inside that method. Do not call `openWalletSession` before every signer.
+Store `payload.deviceId`, `payload.walletType`, and `payload.passphraseState`. Then pass those values on address / signing calls. Core resumes the required wallet context inside that method. Do not call `openWalletSession` before every signer.
 
 `openWalletSession` has no `resume-hidden` mode. Passing `mode: 'resume-hidden'` returns `CallMethodInvalidParameter`. Load the stored binding and pass `passphraseState` on the next address / sign call.
 

@@ -10,7 +10,7 @@ import { Callout, Tabs } from 'nextra/components'
 Integrate Aptos blockchain using OneKey's Petra-compatible provider. Access via `window.$onekey.aptos`.
 
 <Callout type="info">
-OneKey's Aptos provider is fully compatible with the Petra wallet interface and Aptos Wallet Standard.
+OneKey exposes Petra-compatible methods and an Aptos Wallet Standard adapter. Their method signatures differ; use the interface documented for your integration.
 </Callout>
 
 ---
@@ -18,7 +18,7 @@ OneKey's Aptos provider is fully compatible with the Petra wallet interface and 
 ## Quick Links
 
 - [API Reference](#api-reference)
-- [Connecting](#connecting)
+- [Getting started](getting-started)
 - [Transactions](#transactions)
 - [Message Signing](#message-signing)
 
@@ -85,7 +85,7 @@ console.log({
 ### Get Network Info
 
 ```typescript
-const network = await provider.network()
+const network = await provider.getNetwork()
 
 console.log({
   name: network.name,       // 'mainnet', 'testnet', 'devnet'
@@ -99,7 +99,7 @@ console.log({
 ```typescript
 provider.onAccountChange((newAccount) => {
   if (newAccount) {
-    console.log('Account changed:', newAccount.address)
+    console.log('Account changed:', newAccount)
   } else {
     console.log('Wallet disconnected')
   }
@@ -110,7 +110,7 @@ provider.onAccountChange((newAccount) => {
 
 ```typescript
 provider.onNetworkChange((network) => {
-  console.log('Network changed:', network.name)
+  console.log('Network changed:', network)
 })
 ```
 
@@ -158,11 +158,9 @@ const signedTxn = await provider.signTransaction(payload)
 For advanced use cases with BCS-serialized transactions:
 
 ```typescript
-import { BCS } from 'aptos'
+const rawTransaction = '<BCS_SERIALIZED_TRANSACTION>'; // Use the encoding expected by your wallet version
 
-const rawTransaction = /* BCS serialized raw transaction */
-
-const signedTxn = await provider.signTransactionV2(rawTransaction)
+const signedTxn = await provider.signTransactionV2({ transaction: rawTransaction, transactionType: 'simple' })
 ```
 
 ### Transaction Options
@@ -175,13 +173,9 @@ const payload = {
   arguments: ['0x1234...', '100000000'],
 }
 
-const options = {
-  max_gas_amount: '10000',
-  gas_unit_price: '100',
-  expiration_timestamp_secs: Math.floor(Date.now() / 1000) + 600, // 10 min
-}
-
-const response = await provider.signAndSubmitTransaction(payload, options)
+// The legacy direct method takes only a payload.
+const response = await provider.signAndSubmitTransaction(payload)
+// For gas options, use signAndSubmitTransactionV2 with the matching Wallet Standard input.
 ```
 
 ---
@@ -197,7 +191,7 @@ const message = 'Welcome to MyApp!\n\nClick to sign in.\n\nNonce: abc123'
 
 const response = await provider.signMessage({
   message,
-  nonce: 'abc123',  // Optional nonce for replay protection
+  nonce: 12345, // Example only; obtain a single-use challenge from your server
 })
 
 console.log({
@@ -214,7 +208,7 @@ import nacl from 'tweetnacl'
 
 const { signature, fullMessage } = await provider.signMessage({
   message: 'Hello Aptos',
-  nonce: 'unique-nonce',
+  nonce: 12345,
 })
 
 const account = await provider.account()
@@ -277,9 +271,9 @@ const response = await provider.signAndSubmitTransaction(payload)
 | `account()` | Get current account info |
 | `network()` | Get current network info |
 | `signMessage(request)` | Sign arbitrary message |
-| `signAndSubmitTransaction(payload, options?)` | Sign and submit transaction |
-| `signTransaction(payload, options?)` | Sign transaction without submitting |
-| `signTransactionV2(rawTransaction)` | Sign BCS-serialized transaction |
+| `signAndSubmitTransaction(payload)` | Sign and submit transaction |
+| `signTransaction(payload)` | Sign transaction without submitting |
+| `signTransactionV2(params)` | Sign BCS-serialized transaction |
 | `onAccountChange(callback)` | Listen for account changes |
 | `onNetworkChange(callback)` | Listen for network changes |
 
@@ -293,13 +287,13 @@ interface AptosAccount {
 
 interface AptosNetwork {
   name: string       // Network name
-  chainId: string    // Chain ID
+  chainId: number    // Chain ID
   url: string        // RPC URL
 }
 
 interface SignMessageRequest {
   message: string    // Message to sign
-  nonce?: string     // Optional nonce
+  nonce: number      // Required by the direct provider API
   address?: boolean  // Include address in message
   application?: boolean // Include app info
   chainId?: boolean  // Include chain ID
@@ -312,7 +306,7 @@ interface SignMessageResponse {
   address?: string      // Signer address
   application?: string  // Application info
   chainId?: number      // Chain ID
-  nonce: string         // Nonce used
+  nonce: number         // Nonce used
 }
 
 interface TransactionPayload {
@@ -344,7 +338,7 @@ try {
       console.log('User rejected the request')
       break
     case 4100:
-      console.log('Unauthorized - wallet is locked')
+      console.log('The account or method is not authorized')
       break
     case 4200:
       console.log('Unsupported method')
@@ -387,7 +381,7 @@ function App() {
 }
 ```
 
-OneKey is automatically detected by the Aptos Wallet Adapter.
+Use a Wallet Standard-compatible adapter version and verify that OneKey appears in its discovered wallet list.
 
 ---
 
@@ -402,4 +396,3 @@ const provider = window.petra
 // After (OneKey with Petra fallback)
 const provider = window.$onekey?.aptos || window.petra
 ```
-

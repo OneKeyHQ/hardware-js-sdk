@@ -1,8 +1,11 @@
 ---
 title: OneKey Agent Wallet
+description: Choose an Agent Wallet integration and understand session and signing boundaries.
 ---
 
 # OneKey Agent Wallet
+
+> Private beta. Access, supported commands, and wallet flows depend on your OneKey and CLI versions. Inspect the installed CLI schema before using these examples.
 
 OneKey Agent Wallet is the wallet layer for AI agents that need real on-chain actions, market context, and user-controlled signing. Agents can read wallet state, find receive addresses, research tokens, quote and prepare swaps, run safety checks, and hand high-risk actions back to OneKey GUI or hardware for user confirmation.
 
@@ -15,8 +18,8 @@ Use this section when you are building AI agents, skills, MCP tools, automation,
 | Wallet | Check balances, show receive addresses, inspect history, prepare transfers, derive BTC address types | `Show my ETH balance and receiving address.` |
 | Swap & bridge | Quote, build, execute, track swaps, handle BTC sign-only PSBT, discover bridge networks | `Swap 1 ETH to USDC after showing me the quote.` |
 | Market & research | Search tokens, fetch prices, trending lists, K-line data, liquidity, holders, quick or deep research | `What Solana tokens are trending right now?` |
-| Security | Audit tokens, simulate transactions, review approvals, detect chain/address mismatch and fake contracts | `Is this token safe before I buy it?` |
-| Hardware control | Connect a OneKey device, verify authenticity, use passphrase mode, require clear signing for sensitive actions | `Use my hardware wallet for this transfer.` |
+| Security | Audit tokens, simulate transactions, review approvals, report chain/address mismatches and token risk signals | `Is this token safe before I buy it?` |
+| Hardware control | Connect a OneKey device, verify authenticity, use passphrase mode, review supported signing requests on the device | `Use my hardware wallet for this transfer.` |
 | Session control | Pair a GUI-managed Agent Wallet through App Transfer or switch to a hardware-backed session | `Connect my OneKey Agent Wallet.` |
 
 ## How It Works
@@ -28,10 +31,10 @@ flowchart LR
   CLI --> GUI["OneKey GUI Agent Wallet"]
   CLI --> Market["Market / swap / security APIs"]
   CLI --> Hardware["OneKey hardware wallet"]
-  Hardware --> Confirm["Clear signing + physical confirmation"]
+  Hardware --> Confirm["Device review + physical confirmation"]
 ```
 
-The agent talks to OneKey through the `onekey-wallet-skills` package and the `onekey` CLI. The user keeps control through OneKey GUI, keyless account binding, and optional hardware confirmation.
+The agent talks to OneKey through the `onekey-wallet-skills` package and the `onekey` CLI. App Transfer and hardware login select different session types. Inspect the active session before using wallet commands; hardware confirmation applies to hardware-backed signing requests.
 
 ## Choose Your Path
 

@@ -4,15 +4,15 @@ title: cardanoGetAddress
 
 # cardanoGetAddress
 
-## Use requirement
+## Requirements
 
-* Firmware version required
+* Minimum firmware versions
   * Touch: 4.1.0
   * Classic/Mini: 3.0.0
 
 ## Cardano: get address
 
-Display requested address derived by given BIP32-Ed25519 path on device and returns it to caller. User is presented with a description of the requested key and asked to confirm the export on OneKey.
+Derives and returns a Cardano address using the specified address parameters. When `showOnOneKey` is `true`, the user must confirm the address on the device.
 
 ```typescript
 const response = await HardwareSDK.cardanoGetAddress(connectId, deviceId, params)
@@ -22,23 +22,23 @@ const response = await HardwareSDK.cardanoGetAddress(connectId, deviceId, params
 
 [Optional common params](/en/hardware-sdk/concepts/common-params)
 
-**Exporting single address**
+**Single address**
 
 * `addressParameters` - _required_ see description below
 * `protocolMagic` - _required_ `Integer` 764824073 for Mainnet, 1 for Preprod Testnet, 2 for Preview Testnet
 * `networkId` - _required_ `Integer` 1 for Mainnet, 0 for Testnet
-* `address` - _optional_ `string` address for validation (read `Handle button request` section below)
-* `showOnOneKey` - _required_ `boolean` determines if address will be displayed on device. Default is set to `true`
-* `derivationType` - _required_ `CardanoDerivationType` enum. determines used derivation type. Default is set to ICARUS=1
+* `address` - _optional_ `string` Expected address, used for validation
+* `showOnOneKey` - _required_ `boolean` Whether to display the address on the device. Defaults to `true`.
+* `derivationType` - _required_ `CardanoDerivationType` enum. Selects the derivation algorithm. The runtime defaults to `ICARUS` (`1`).
 * `isCheck` - _optional_ `boolean` checks only the base address
 
-**Exporting bundle of addresses**
+**Multiple addresses**
 
-* `bundle` - `Array` of Objects with single address fields
+* `bundle` - array of objects with single address fields
 
 **Address Parameters**
 
-* `addressType` - _required_ `CardanoAddressType`/`number` - you can use the flow `PROTO.CardanoAddressType` object or typescript `CardanoAddressType` enum. Supports all address types.
+* `addressType` - _required_ `CardanoAddressType`/`number` - Use the exported `PROTO.CardanoAddressType` enum.
 * `path` - `string | Array<number>` Required for key-based payment addresses; omit for script payment/reward addresses. SDK minimum length when present is `3`.
 * `stakingPath` - _optional_ `string | Array<number>` SDK minimum length is `3`. Used for base and reward address derivation
 * `stakingKeyHash` - _optional_ `string` hex string of staking key hash. Used for base address derivation (as an alternative to `stakingPath`)
@@ -46,13 +46,11 @@ const response = await HardwareSDK.cardanoGetAddress(connectId, deviceId, params
 * `paymentScriptHash` - _optional_ `string` hex string of payment script hash.
 * `stakingScriptHash` - _optional_ `string` hex string of staking script hash.
 
-
-
 The current TypeScript API requires these fields explicitly even though the runtime defaults to ICARUS and `showOnOneKey: true`.
 
 ### Example
 
-Display byron address of first cardano account:
+Display the Byron address for the first Cardano account:
 
 ```javascript
 import { PROTO } from "@onekeyfe/hd-core";
@@ -69,7 +67,7 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
 });
 ```
 
-Display base address of first cardano account:
+Display the base address for the first Cardano account:
 
 ```javascript
 import { PROTO } from "@onekeyfe/hd-core";
@@ -227,7 +225,7 @@ import { PROTO } from "@onekeyfe/hd-core";
 HardwareSDK.cardanoGetAddress(connectId, deviceId, {
     addressParameters: {
         addressType: PROTO.CardanoAddressType.REWARD,
-        stakingPath: "m/1852'/1815'/0'/0/0",
+        stakingPath: "m/1852'/1815'/0'/2/0",
     },
     protocolMagic: 764824073,
     networkId: 1,
@@ -253,7 +251,7 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
 });
 ```
 
-Return a bundle of cardano addresses without displaying them on device:
+Return a bundle of Cardano addresses without displaying them on the device:
 
 ```javascript
 import { PROTO } from "@onekeyfe/hd-core";
@@ -300,7 +298,7 @@ HardwareSDK.cardanoGetAddress(connectId, deviceId, {
 
 #### Result <a href="#result" id="result"></a>
 
-Result with only one address
+Single-address response
 
 ```javascript
 {
@@ -308,8 +306,8 @@ Result with only one address
     payload: {
         addressParameters: {
             addressType: number,
-            path: Array<number>, // hardend path
-            stakingPath?: Array<number>, // hardend path
+            path: Array<number>, // hardened path
+            stakingPath?: Array<number>, // hardened path
             stakingKeyHash?: string,
             certificatePointer?: {
                 blockIndex: number,
@@ -318,7 +316,7 @@ Result with only one address
             },
             paymentScriptHash?: string,
             stakingScriptHash?: string,
-        }
+        },
         serializedPath?: string,
         serializedStakingPath?: string,
         protocolMagic: number,
@@ -330,7 +328,7 @@ Result with only one address
 }
 ```
 
-Result with bundle of addresses
+Batch address response
 
 ```javascript
 {
@@ -339,8 +337,8 @@ Result with bundle of addresses
         {
             addressParameters: {
                 addressType: number,
-                path: Array<number>, // hardend path
-                stakingPath?: Array<number>, // hardend path
+                path: Array<number>, // hardened path
+                stakingPath?: Array<number>, // hardened path
                 stakingKeyHash?: string,
                 certificatePointer?: {
                     blockIndex: number,
@@ -349,7 +347,7 @@ Result with bundle of addresses
                 },
                 paymentScriptHash?: string,
                 stakingScriptHash?: string,
-            }
+            },
             serializedPath?: string,
             serializedStakingPath?: string,
             protocolMagic: number,
@@ -359,8 +357,8 @@ Result with bundle of addresses
         {
             addressParameters: {
                 addressType: number,
-                path: Array<number>, // hardend path
-                stakingPath?: Array<number>, // hardend path
+                path: Array<number>, // hardened path
+                stakingPath?: Array<number>, // hardened path
                 stakingKeyHash?: string,
                 certificatePointer?: {
                     blockIndex: number,
@@ -369,7 +367,7 @@ Result with bundle of addresses
                 },
                 paymentScriptHash?: string,
                 stakingScriptHash?: string,
-            }
+            },
             serializedPath?: string,
             serializedStakingPath?: string,
             protocolMagic: number,
@@ -379,8 +377,8 @@ Result with bundle of addresses
         {
             addressParameters: {
                 addressType: number,
-                path: Array<number>, // hardend path
-                stakingPath?: Array<number>, // hardend path
+                path: Array<number>, // hardened path
+                stakingPath?: Array<number>, // hardened path
                 stakingKeyHash?: string,
                 certificatePointer?: {
                     blockIndex: number,
@@ -389,7 +387,7 @@ Result with bundle of addresses
                 },
                 paymentScriptHash?: string,
                 stakingScriptHash?: string,
-            }
+            },
             serializedPath?: string,
             serializedStakingPath?: string,
             protocolMagic: number,
