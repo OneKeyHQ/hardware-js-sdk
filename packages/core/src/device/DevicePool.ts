@@ -114,7 +114,11 @@ export class DevicePool extends EventEmitter {
         const exist = canPathIdentifyDevice(cachedPath)
           ? descriptorList.find(d => d.path === cachedPath)
           : undefined;
-        if (exist && !initOptions?.forceProtocolDetection) {
+        if (
+          exist &&
+          !initOptions?.forceProtocolDetection &&
+          !(device.needReloadDevice && device.isUnacquired())
+        ) {
           // Log.debug('find existed Device: ', connectId);
           device.updateDescriptor(exist, true);
           await this._refreshRuntimeState(device, initOptions);
@@ -170,7 +174,13 @@ export class DevicePool extends EventEmitter {
     const forceProtocolDetection = initOptions?.forceProtocolDetection === true;
     const isNewDevice = !cachedDevice;
     const device = cachedDevice ?? Device.fromDescriptor(descriptor);
-    if (isNewDevice || forceProtocolDetection) {
+    if (
+      isNewDevice ||
+      forceProtocolDetection ||
+      (device.needReloadDevice && device.isUnacquired())
+    ) {
+      // Wipe invalidates state while the same USB path can remain discoverable.
+      if (cachedDevice) device.updateDescriptor(descriptor, true);
       device.deviceConnector = this.connector;
       // Search/discovery acquires outside Device.run(). Start a new attempt so
       // a previous user cancel does not hide this device from later searches.
