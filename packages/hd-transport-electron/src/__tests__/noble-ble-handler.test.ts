@@ -923,22 +923,53 @@ describe('Noble BLE process shutdown', () => {
     ['unauthorized', HardwareErrorCode.BleLocationError],
     ['unsupported', HardwareErrorCode.BleUnsupported],
   ])(
-    'classifies the initial adapter state %s without waiting for another event',
+    'preserves adapter state %s across repeated scans and connections',
     async (state, errorCode) => {
       jest.useFakeTimers({ doNotFake: ['performance'] });
       const { sdk, native, handlers } = await setup(state);
-      await expect(
-        handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE)?.({})
-      ).resolves.toMatchObject({
-        success: false,
-        error: { errorCode },
-      });
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        for (const channel of [
+          EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE,
+          EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT,
+        ]) {
+          await expect(handlers.get(channel)?.({}, 'device')).resolves.toMatchObject({
+            success: false,
+            error: { errorCode },
+          });
+        }
+      }
       expect(native.startScanning).not.toHaveBeenCalled();
       expect(native.listenerCount('stateChange')).toBe(1);
       expect(jest.getTimerCount()).toBe(0);
       await sdk.disposeNobleBleSupport();
     }
   );
+
+  test.each([
+    ['poweredOff', HardwareErrorCode.BlePoweredOff],
+    ['unauthorized', HardwareErrorCode.BleLocationError],
+    ['unsupported', HardwareErrorCode.BleUnsupported],
+  ])('checks adapter state %s again after initialization', async (state, errorCode) => {
+    const { sdk, native, handlers } = await setup();
+    const checkAvailability = handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK);
+    await expect(checkAvailability?.({})).resolves.toMatchObject({ available: true });
+    native.state = state;
+    native.emit('stateChange', state);
+    for (const channel of [
+      EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE,
+      EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT,
+    ]) {
+      await expect(handlers.get(channel)?.({}, 'device')).resolves.toMatchObject({
+        success: false,
+        error: { errorCode },
+      });
+    }
+    expect(native.startScanning).not.toHaveBeenCalled();
+    native.state = 'poweredOn';
+    native.emit('stateChange', native.state);
+    await expect(checkAvailability?.({})).resolves.toMatchObject({ available: true });
+    await sdk.disposeNobleBleSupport();
+  });
 
   test('cancels an active scan, ignores its late callback and releases native once', async () => {
     jest.useFakeTimers({ doNotFake: ['performance'] });

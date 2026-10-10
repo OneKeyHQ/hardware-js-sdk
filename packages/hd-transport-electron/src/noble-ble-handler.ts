@@ -429,7 +429,18 @@ function updateBluetoothState(state: string): void {
 // Initialize Noble
 async function initializeNoble(): Promise<void> {
   assertBleActive();
-  if (noble) return;
+  if (noble) {
+    if (noble.state === 'poweredOff') {
+      throw ERRORS.TypedError(HardwareErrorCode.BlePoweredOff);
+    }
+    if (noble.state === 'unsupported') {
+      throw ERRORS.TypedError(HardwareErrorCode.BleUnsupported);
+    }
+    if (noble.state === 'unauthorized') {
+      throw ERRORS.TypedError(HardwareErrorCode.BleLocationError);
+    }
+    return;
+  }
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
@@ -1138,9 +1149,7 @@ async function performTargetedScan(
 
 // Enumerate devices
 async function enumerateDevices(isWindowDestroyed: () => boolean): Promise<DeviceInfo[]> {
-  if (!noble) {
-    await initializeNoble();
-  }
+  await initializeNoble();
 
   if (!noble) {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
@@ -1745,6 +1754,7 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
 
 // Connect to device - supports both discovered and direct connection modes
 async function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
+  await initializeNoble();
   logger?.info('[NobleBLE] Connect device request:', {
     deviceId,
     hasDiscovered: discoveredDevices.has(deviceId),
@@ -1762,11 +1772,6 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   }
 
   if (!peripheral) {
-    // Initialize Noble if not already done
-    if (!noble) {
-      await initializeNoble();
-    }
-
     if (!noble) {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
     }
