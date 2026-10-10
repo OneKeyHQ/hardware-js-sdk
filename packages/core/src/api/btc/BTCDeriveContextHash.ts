@@ -49,7 +49,7 @@ export default class BTCDeriveContextHash extends BaseMethod<BabylonDeriveContex
           path
             .split('/')
             .slice(1)
-            .some(index => Number(index.replace("'", '')) >= 0x80000000))) ||
+            .some(index => Number(index.replace(/'/g, '')) >= 0x80000000))) ||
       (Array.isArray(path) &&
         path.some(index => !Number.isInteger(index) || index < 0 || index > 0xffffffff))
     ) {
