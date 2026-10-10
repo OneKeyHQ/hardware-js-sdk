@@ -11,6 +11,7 @@ export const LogBlockEvent: Set<string> = new Set([
 // These resource/file APIs did not exist in 1.1.32. Skip the payload so
 // the log layer does not copy huge Base64 or binary data.
 const LogPayloadBlockMethod: Set<string> = new Set([
+  'btcDeriveContextHash',
   'deviceUploadNft',
   'deviceUploadWallpaper',
   'uploadPortfolio',

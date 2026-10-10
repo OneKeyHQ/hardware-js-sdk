@@ -1,6 +1,12 @@
 const { createTransportCallLog, getSafeTransportLogPayload } = require('../src/utils/transportLog');
 
 describe('transport log sanitization', () => {
+  test('redacts Babylon derived secrets from response logs', () => {
+    expect(
+      getSafeTransportLogPayload({ secret: '00'.repeat(32) }, 'BabylonDerivedContextHash')
+    ).toEqual({ secret: '[REDACTED]' });
+  });
+
   test('logs non-sensitive request fields and redacts passphrases recursively', () => {
     expect(
       createTransportCallLog('DeviceSessionAskPassphrase', 'V2', {

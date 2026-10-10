@@ -6,6 +6,7 @@ export const METHODS_REQUIRING_PASSPHRASE_CHECK = [
   'evmSignTypedData',
   'btcGetAddress',
   'btcGetPublicKey',
+  'btcDeriveContextHash',
   'btcSignMessage',
   'btcSignTransaction',
   'cosmosGetAddress',
