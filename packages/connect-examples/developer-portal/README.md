@@ -34,6 +34,10 @@ Before publishing, verify the build, local routes and heading anchors, mobile la
 
 Use the official SVGs in `public/brand` through `OneKeyLogo`. The green version is used in the header and favicon; the white version is used for assistant icons on dark backgrounds. Preserve the source artwork without recoloring or cropping. `public/icons/onekey.png` is a 256px raster export of the green SVG for Apple touch icons and PNG consumers.
 
+Use Roobert for interface and editorial text, matching the main OneKey website. The 400, 500, and 600 WOFF2 faces in `public/fonts/Roobert` are loaded by `next/font/local` in the root layout with preloading and `font-display: swap`. Chinese glyphs use the system fallback stack, and code keeps Geist Mono. Font and product asset provenance is recorded beside the files.
+
+The homepage uses the official Pro 2 artwork in `public/brand/pro2`. Its source and maintenance notes are recorded in that directory. Product imagery does not establish SDK or firmware compatibility; retain the version-specific support guidance in the documentation.
+
 ## Publication
 
 The repository's `Build Developer Portal` GitHub Actions workflow builds and uploads an artifact. Its presence does not establish how `developer.onekey.so` is deployed. Confirm the actual hosting pipeline and environment before replacing the production site, then verify the live build, links, and search indexes after deployment.

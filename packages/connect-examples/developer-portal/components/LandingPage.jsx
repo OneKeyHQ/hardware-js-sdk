@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight, ArrowUpRight, Search } from 'lucide-react'
 import { DOCS_AI_TAB, emitDocsAIOpen } from './docAIAssistEvents'
 import Footer from './Footer'
@@ -9,6 +10,7 @@ import styles from './LandingPage.module.css'
 export function LandingPage({ locale = 'en' }) {
   const isZh = locale === 'zh'
   const root = `/${locale}`
+  const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/$/, '')
   const routes = [
     {
       number: '01',
@@ -55,13 +57,27 @@ export function LandingPage({ locale = 'en' }) {
     <div className={`landing-page ${styles.page}`}>
       <main id="nextra-skip-nav" tabIndex={-1} className={styles.main}>
         <section className={styles.hero} aria-labelledby="developer-title">
-          <p className={styles.eyebrow}>{isZh ? 'OneKey 开发者文档' : 'OneKey developer docs'}</p>
-          <h1 id="developer-title">{isZh ? '从连接钱包，到完成签名。' : 'From wallet connection to signing.'}</h1>
-          <p className={styles.intro}>{isZh ? '为你的 dApp、钱包或应用接入 OneKey。先选择集成方式，再跟随指南完成第一次调用。' : 'Build with OneKey in your dApp, wallet, or application. Choose an integration below and follow the guide to your first request.'}</p>
-          <div className={styles.heroActions}>
-            <Link className={styles.primary} href={`${root}/getting-started`}>{isZh ? '选择接入方式' : 'Find your integration'}<ArrowRight size={17} /></Link>
-            <button className={styles.search} type="button" onClick={() => emitDocsAIOpen(DOCS_AI_TAB.SEARCH)}><Search size={17} />{isZh ? '搜索文档、方法或错误' : 'Search docs, methods, or errors'}</button>
+          <div className={styles.heroCopy}>
+            <p className={styles.eyebrow}>{isZh ? 'OneKey 开发者文档' : 'OneKey developer docs'}</p>
+            <h1 id="developer-title">{isZh ? '从连接钱包，到完成签名。' : 'From wallet connection to signing.'}</h1>
+            <p className={styles.intro}>{isZh ? '为你的 dApp、钱包或应用接入 OneKey。先选择集成方式，再跟随指南完成第一次调用。' : 'Build with OneKey in your dApp, wallet, or application. Choose an integration below and follow the guide to your first request.'}</p>
+            <div className={styles.heroActions}>
+              <Link className={styles.primary} href={`${root}/getting-started`}>{isZh ? '选择接入方式' : 'Find your integration'}<ArrowRight size={17} /></Link>
+              <button className={styles.search} type="button" onClick={() => emitDocsAIOpen(DOCS_AI_TAB.SEARCH)}><Search size={17} />{isZh ? '搜索文档、方法或错误' : 'Search docs, methods, or errors'}</button>
+            </div>
           </div>
+          <figure className={styles.hardware}>
+            <div className={styles.hardwareImage}>
+              <Image
+                src={`${basePath}/brand/pro2/onekey-pro2-hero.webp`}
+                alt={isZh ? 'OneKey Pro 2 硬件钱包，展示设备上的资产概览与交易确认界面' : 'OneKey Pro 2 hardware wallets showing the portfolio and transaction confirmation screens'}
+                width={3200}
+                height={2400}
+                preload
+              />
+            </div>
+            <figcaption><a href="https://onekey.so/products/onekey-pro-2/">OneKey Pro 2<ArrowUpRight size={14} /></a></figcaption>
+          </figure>
         </section>
 
         <section className={styles.integrations} aria-labelledby="integration-title">

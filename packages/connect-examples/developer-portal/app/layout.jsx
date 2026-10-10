@@ -1,5 +1,18 @@
 import 'nextra-theme-docs/style.css'
 import '../styles/globals.css'
+import localFont from 'next/font/local'
+
+const roobert = localFont({
+  src: [
+    { path: '../public/fonts/Roobert/Roobert-Regular.woff2', weight: '400', style: 'normal' },
+    { path: '../public/fonts/Roobert/Roobert-Medium.woff2', weight: '500', style: 'normal' },
+    { path: '../public/fonts/Roobert/Roobert-SemiBold.woff2', weight: '600', style: 'normal' },
+  ],
+  variable: '--font-roobert',
+  display: 'swap',
+  adjustFontFallback: false,
+  fallback: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+})
 
 const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/$/, '')
 
@@ -40,12 +53,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" dir="ltr" className="dark" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
-      </head>
+    <html lang="en" dir="ltr" className={`dark ${roobert.variable}`} suppressHydrationWarning>
       <body>
         {children}
       </body>

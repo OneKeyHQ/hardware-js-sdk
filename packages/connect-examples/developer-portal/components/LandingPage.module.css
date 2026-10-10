@@ -1,8 +1,15 @@
 .page { background: #111412; color: #f0f3f1; }
 .main { max-width: 1160px; margin: 0 auto; padding: 0 40px; }
-.hero { padding: 72px 0 62px; max-width: 790px; }
+.hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: center; gap: 32px; padding: 52px 0 62px; }
+.heroCopy { position: relative; z-index: 1; }
+.hardware { min-width: 0; margin: 0; }
+.hardwareImage { position: relative; aspect-ratio: 1; overflow: hidden; }
+/* The official artwork includes generous transparent space around the devices. */
+.hardwareImage img { position: absolute; width: 260%; max-width: none; height: auto; left: -79%; top: -67%; }
+.hardware figcaption { display: flex; justify-content: center; margin-top: 12px; }
+.hardware figcaption a { display: inline-flex; align-items: center; gap: 7px; color: #9aa89e; font-size: 13px; min-height: 32px; }
 .eyebrow { color: #8bea97; font-size: 13px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; margin-bottom: 20px; }
-.hero h1 { color: #f0f3f1; font-size: clamp(34px, 4.3vw, 54px); line-height: 1.1; letter-spacing: -.035em; text-wrap: balance; font-weight: 600; }
+.hero h1 { color: #f0f3f1; font-size: clamp(34px, 4.3vw, 58px); line-height: 1.08; letter-spacing: -.035em; text-wrap: balance; font-weight: 500; }
 .intro { color: #b0bab4; font-size: 18px; line-height: 1.65; max-width: 640px; margin-top: 22px; }
 .heroActions { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 28px; margin-top: 30px; }
 .page a { text-decoration: none; }
@@ -35,7 +42,9 @@
 .footerLinks [aria-current] { color: #e4eee7; }
 @media (max-width: 760px) {
  .main { padding: 0 24px; }
- .hero { padding: 44px 0 42px; }
+ .hero { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 44px 0 42px; }
+ .hardware { width: min(100%, 380px); justify-self: center; }
+ .hardware figcaption { margin-top: 0; }
  .intro { font-size: 16px; }
  .route { grid-template-columns: 24px minmax(0, 1fr); gap: 12px; padding: 28px 0; }
  .route h3 { font-size: 21px; }
