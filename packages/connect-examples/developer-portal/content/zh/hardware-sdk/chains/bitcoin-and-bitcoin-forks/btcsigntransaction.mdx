@@ -6,7 +6,7 @@ title: btcSignTransaction
 
 ## Bitcoin：签名交易
 
-对预构建交易的指定输入和输出进行签名。用户需要在 OneKey 上确认所有交易详情。
+对已构建交易的输入和输出请求签名。用户在设备上核对并确认请求。
 
 ```typescript
 const result = await HardwareSDK.btcSignTransaction(connectId, deviceId, params);
@@ -28,12 +28,14 @@ const result = await HardwareSDK.btcSignTransaction(connectId, deviceId, params)
 * `timestamp` - _可选_ `number` 仅用于 Capricoin，交易时间戳
 * `branchId` - _可选_ `number`，仅用于 Zcash，当设置 overwintered 时的 BRANCH_ID
 
-## 辅助工具
+<span id="辅助工具" />
+
+## 构建交易参数
 
 ### 构建输入
 
 ```
-private buildHardwareInput = async (
+const buildHardwareInput = async (
   input: TxInput,
   path: string,
 ): Promise<Messages.TxInputType> => {
@@ -42,8 +44,7 @@ private buildHardwareInput = async (
   const scriptType = getScriptType(addressN);
   const utxo = input.utxo as UTXO;
 
-  // @ts-expect-error
-  return {
+    return {
     prev_index: utxo.vout,
     prev_hash: utxo.txid,
     amount: utxo.value.integerValue().toString(),
@@ -56,7 +57,7 @@ private buildHardwareInput = async (
 ### 构建输出
 
 ```
-private buildHardwareOutput = async (
+const buildHardwareOutput = async (
   output: TxOutput,
 ): Promise<Messages.TxOutputType> => {
   const { isCharge, bip44Path } = output.payload || {};
@@ -84,21 +85,21 @@ private buildHardwareOutput = async (
 
 ```
 import * as BitcoinJS from 'bitcoinjs-lib';
-private buildPrevTx = (rawTx: string): RefTransaction => {
+const buildPrevTx = (rawTx: string): RefTransaction => {
     const tx = BitcoinJS.Transaction.fromHex(rawTx);
 
     return {
       hash: tx.getId(),
       version: tx.version,
       inputs: tx.ins.map((i) => ({
-        prev_hash: i.hash.reverse().toString('hex'),
+        prev_hash: Buffer.from(i.hash).reverse().toString('hex'),
         prev_index: i.index,
-        script_sig: i.script.toString('hex'),
+        script_sig: Buffer.from(i.script).toString('hex'),
         sequence: i.sequence,
       })),
       bin_outputs: tx.outs.map((o) => ({
-        amount: o.value,
-        script_pubkey: o.script.toString('hex'),
+        amount: o.value.toString(),
+        script_pubkey: Buffer.from(o.script).toString('hex'),
       })),
       lock_time: tx.locktime,
     };
@@ -236,9 +237,9 @@ HardwareSDK.btcSignTransaction(connectId, deviceId, {
 {
     success: true,
     payload: {
-        signatures: Array<string>, // 签名者签名数组
-        serializedTx: string,        // 序列化的交易
-        txid?: string,             // 广播的交易 ID
+        signatures: Array<string>, // Array of signer signatures
+        serializedTx: string,        // serialized transaction
+        txid?: string,             // transaction ID, if returned; signing does not broadcast
     }
 }
 ```
@@ -249,8 +250,8 @@ HardwareSDK.btcSignTransaction(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

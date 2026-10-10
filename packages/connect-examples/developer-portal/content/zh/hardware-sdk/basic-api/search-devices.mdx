@@ -1,59 +1,62 @@
 ---
 title: 搜索设备
+description: 发现可用连接，显式选择设备并读取统一身份。
 ---
 
 # 搜索设备
 
+`searchDevices()` 发现候选连接，返回结果对象。只有 `success` 为 `true` 时，`payload` 才是设备列表。
+
+发现设备不代表设备已初始化或钱包已解锁。BLE 扫描可能在建立连接前就返回广播名称和连接 ID；USB 发现也可能只返回尚未补齐身份字段的描述符。
+
 ## 搜索设备
 
-搜索已连接的设备，并以数组形式将搜索结果返回给开发者。
+```ts
+const result = await HardwareSDK.searchDevices();
+if (!result.success) throw new Error(result.payload.error);
+if (!result.payload.length) throw new Error('No OneKey device found');
 
-对于 USB 连接，返回的数据已包含设备详细信息。
+// For this example, select the only connected device.
+// In an app, ask the user to choose when multiple devices are present.
+if (result.payload.length !== 1) throw new Error('Select a device before continuing');
+const { connectId } = result.payload[0];
+if (!connectId) throw new Error('Device connection is unavailable');
 
-对于蓝牙设备搜索，返回的数据仅包含设备名称和设备 connectId，开发者需要先选择要配对的设备才能获取设备信息。
-
-```typescript
-const response = await HardwareSDK.searchDevices();
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device has no wallet identity');
 ```
+
+WebUSB 授权必须由用户主动操作触发。BLE 扫描需要平台要求的蓝牙权限。参见 [WebUSB](/zh/hardware-sdk/transport/web-usb) 或 [React Native BLE](/zh/hardware-sdk/transport/react-native-ble)。
 
 ### 参数
 
-* 无
+参数对象可省略。请对照所安装版本的 [`searchDevices` 类型](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/api/searchDevices.ts)和[通用参数](/zh/hardware-sdk/concepts/common-params)。
 
 ### 示例
 
-```typescript
-HardwareSDK.searchDevices().then(result => {
-    console.log(`设备列表: ${result}`)
-});
-```
+上面的示例只接受一个候选设备。实际应用在发现多个候选设备时，应让用户选择，再用非空 `connectId` 读取设备状态。
 
 ### 返回结果
 
-```typescript
-{
-    success: true,
-    payload: [
-        {
-            "connectId": string, // 设备连接 ID（同一设备稳定不变，设备重置不影响）
-            "uuid": string, // 设备唯一 ID
-            "deviceType": string, // 设备类型：'classic' | 'mini' | 'touch' | 'pro'
-            "deviceId": string, // 设备 ID，设备重置/擦除/恢复后会变，仅在使用 @onekeyfe/hd-common-connect-sdk 的 webusb 传输时返回
-            "path": string, // 通过 WebUSB 连接 USB 时的设备序列号
-            "name": string, // 设备的蓝牙名称
-        },
-    ]
-}
-```
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `connectId` | `string \| null` | 传输路由标识；后续设备调用需要非空值。 |
+| `connectProtocol` | `'V1' \| 'V2' \| undefined` | 主动探测协议后才可用，不要根据广播名称推断。 |
+| `serialNo` | `string \| null \| undefined` | 初始化后可获取的设备物理序列号。 |
+| `deviceId` | `string \| null` | 种子生命周期内的身份；通过 `getDeviceState` 刷新。 |
+| `uuid` | `string` | 已废弃的兼容字段，初始化前可能为空；物理身份优先用 `serialNo`。 |
+| `deviceType` | `IDeviceType` | 探测出的机型，初始化前可能未知。 |
+| `name` | `string` | 用于显示的名称，不是唯一标识。 |
+| `commType` | `OneKeyDeviceCommType` | 传输层报告的通信类型。 |
+
+完整公开类型为 [`SearchDevice`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/device.ts)。不要依赖 `path` 等内部附加字段。
+
+同一物理设备的 USB 与 BLE `connectId` 不同。重连后重新枚举并刷新状态，再复用钱包绑定。参见[标识符](/zh/hardware-sdk/concepts/identifiers)。
 
 ### 错误
 
-```typescript
-{
-    success: false,
-    payload: {
-        error: string, // 错误消息
-        code?: string | number // 错误码
-    }
-}
-```
+失败时，`payload` 包含 `error` 和可选的 `code`。根据错误码处理，不要匹配错误文案。成功但列表为空表示没有发现候选设备，不是 SDK 调用失败。
+
+不要记录完整设备列表或设备对象。诊断信息仅保留操作状态和不敏感的数量等数据。

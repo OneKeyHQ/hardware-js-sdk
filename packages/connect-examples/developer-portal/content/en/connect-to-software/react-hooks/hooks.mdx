@@ -19,7 +19,7 @@ Type-safe React hooks for Ethereum. Build your own custom wallet connection UI w
 
 | Library | Description |
 |---------|-------------|
-| [Wagmi](/en/connect-to-software/react-hooks/wagmi) | The most popular React hooks library for Ethereum |
+| [Wagmi](/en/connect-to-software/react-hooks/wagmi) | React hooks for EVM account, signing, and transaction state |
 
 ---
 
@@ -35,13 +35,14 @@ Use React Hooks when you:
 
 ## Quick Example
 
+Set up `WagmiProvider` and `QueryClientProvider` using the [wagmi guide](/en/connect-to-software/react-hooks/wagmi) first. This component uses the configured connectors.
+
 ```tsx
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
-import { injected } from 'wagmi/connectors'
 
 function ConnectButton() {
   const { address, isConnected } = useAccount()
-  const { connect } = useConnect()
+  const { connect, connectors, isPending, error } = useConnect()
   const { disconnect } = useDisconnect()
 
   if (isConnected) {
@@ -54,9 +55,14 @@ function ConnectButton() {
   }
 
   return (
-    <button onClick={() => connect({ connector: injected() })}>
-      Connect Wallet
-    </button>
+    <div>
+      {connectors.map((connector) => (
+        <button key={connector.uid} disabled={isPending} onClick={() => connect({ connector })}>
+          Connect {connector.name}
+        </button>
+      ))}
+      {error && <p role="alert">{error.message}</p>}
+    </div>
   )
 }
 ```
@@ -66,6 +72,5 @@ function ConnectButton() {
 ## Alternative: With Wallet UI
 
 If you want a pre-built wallet selection modal, consider:
-- [RainbowKit](/en/connect-to-software/wallet-ui/rainbowkit) - Beautiful React wallet modal
-- [Web3Modal](/en/connect-to-software/wallet-ui/web3modal) - WalletConnect's official UI
-
+- [RainbowKit](/en/connect-to-software/wallet-ui/rainbowkit) - React wallet chooser
+- [Web3Modal](/en/connect-to-software/wallet-ui/web3modal) - Reown wallet connection UI

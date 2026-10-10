@@ -4,24 +4,24 @@ title: 安装 Provider SDK
 
 # 安装 Provider SDK
 
-> **注意：**
-Provider SDK 需要安装 [OneKey 浏览器扩展](https://www.onekey.so/low-level-transport-plugin)（版本 >= 2.3.2）才能使用
-
+> 使用 SDK 前，请先安装 [OneKey 浏览器扩展](https://onekey.so/download/)。
 
 我们提供了一个名为 [onekey-near-provider](https://www.npmjs.com/package/@onekeyfe/onekey-near-provider) 的 npm 包作为 SDK，同时还需要安装 [near-api-js](https://www.npmjs.com/package/near-api-js)。
 
-你可以在 [Github](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/providers/onekey-near-provider) 查看 SDK 源代码，完整示例代码在[这里](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/example)。
+SDK 源码见 [GitHub](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/providers/onekey-near-provider)，完整示例见[示例目录](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/example)。
 
 ```bash
-# 使用 npm
-npm install near-api-js @onekeyfe/onekey-near-provider
+# with npm
+npm install near-api-js@^0.44.2 @onekeyfe/onekey-near-provider
 
-# 使用 yarn
-yarn add near-api-js @onekeyfe/onekey-near-provider
+# with yarn
+yarn add near-api-js@^0.44.2 @onekeyfe/onekey-near-provider
 
 ```
 
-然后你可以创建 provider 实例。
+provider 源码将 `near-api-js` `^0.44.2` 声明为 peer dependency。这些示例使用该旧版 API，安装其他主版本可能导致集成失效。请核对所安装 provider 版本的 peer dependencies。
+
+在浏览器代码中创建 provider。
 
 ```javascript
 import { OneKeyNearProvider } from '@onekeyfe/onekey-near-provider';
@@ -30,8 +30,6 @@ const provider = new OneKeyNearProvider();
 
 ```
 
-> **警告：**
-**注意：** Provider SDK 不兼容 SSR。
-
-如果你使用包含 SSR 功能的 [next.js](https://nextjs.org/)，可以查看这篇文档了解如何[无 SSR 动态导入](https://nextjs.org/docs/advanced-features/dynamic-import#with-no-ssr)。
-
+> **注意：** Provider SDK 不兼容 SSR。
+>
+> 使用 [Next.js](https://nextjs.org/) 服务端渲染时，可参考[关闭 SSR 的动态导入方式](https://nextjs.org/docs/app/guides/lazy-loading#skipping-ssr)。

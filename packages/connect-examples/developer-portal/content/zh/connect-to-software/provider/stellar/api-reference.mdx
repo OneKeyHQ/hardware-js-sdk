@@ -5,7 +5,7 @@ description: OneKey Stellar provider 完整 API 参考
 
 # API 参考
 
-`window.$onekey.stellar` 的方法与基础类型参考。
+`window.$onekey.stellar` 的方法和基础类型参考。
 
 ---
 
@@ -59,7 +59,7 @@ export type StellarSignAuthEntryOpts = {
 }
 export type StellarSignAuthEntryResponse = {
   signedAuthEntry: string
-  signerAddress: string
+  signerAddress?: string
 }
 
 export type StellarSignMessageOpts = {
@@ -69,7 +69,7 @@ export type StellarSignMessageOpts = {
 }
 export type StellarSignMessageResponse = {
   signedMessage: string
-  signerAddress: string
+  signerAddress?: string
 }
 ```
 
@@ -81,7 +81,7 @@ export type StellarSignMessageResponse = {
 export type OneKeyStellarProvider = {
   isOneKey: boolean
 
-  // 与 Stellar Wallets Kit（KitActions）保持一致
+  // Align with Stellar Wallets Kit (KitActions)
   getAddress: (params?: StellarGetAddressParams) => Promise<StellarGetAddressResponse>
   getNetwork: () => Promise<StellarNetworkInfo>
   signTransaction: (
@@ -98,3 +98,5 @@ export type OneKeyStellarProvider = {
   ) => Promise<StellarSignMessageResponse>
 }
 ```
+
+所有方法均返回 Promise。请处理请求被拒绝的情况，并按可选字段处理 `signerAddress`，不要假定它总会出现。provider 还提供 `disconnect()`，并通过 `accountsChanged` 发出地址字符串或 `null`；账户变化后应清除相关状态。

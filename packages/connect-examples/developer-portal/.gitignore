@@ -10,3 +10,5 @@ node_modules
 _pagefind
 
 out/
+# Local translation recovery journals; resume sync before committing.
+i18n/.pending-*.json

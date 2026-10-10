@@ -4,34 +4,32 @@ title: inscribeTransfer (已弃用)
 
 # inscribeTransfer (已弃用)
 
-铭刻转账
+用于创建代币转账铭文的旧版方法。本页为已有集成保留，不建议在新集成中使用。
 
-### 方法
+## 方法
 
 ```typescript
-async function inscribeTransfer(
+declare function inscribeTransfer(
     ticker: string,
     amount: string,
-): string
+): Promise<string>;
 ```
 
-### 参数
+## 参数
 
-* `ticker` — _必填_ `string` 代币符号
-* `amount` — _必填_ `string` 数量
+* `ticker` — _必填_ `string`，代币代码。
+* `amount` — _必填_ `string`。
 
-### 响应
+## 响应
 
 `txid` — `string`
 
-### 示例
+## 示例
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
 
-const ticker = "010203"
+const ticker = "<TOKEN_TICKER>";
 const amount = "100"
-const txid = async provider.signPsbt(psbtHex);
-
+const txid = await provider.inscribeTransfer(ticker, amount);
 ```
-

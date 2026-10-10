@@ -7,7 +7,7 @@ import { Callout } from 'nextra/components'
 
 # dApp Integration
 
-Connect your dApp to OneKey wallet with support for EVM and 20+ non-EVM chains.
+Connect your dApp to OneKey wallet through a chain-specific provider or a wallet connection library.
 
 ## Choose Your Method
 
@@ -17,7 +17,7 @@ Connect your dApp to OneKey wallet with support for EVM and 20+ non-EVM chains.
 | [**Web3Modal**](/en/connect-to-software/wallet-ui/web3modal) | Multi-framework wallet UI | React / Vue / JS |
 | [**Web3-Onboard**](/en/connect-to-software/wallet-ui/web3-onboard) | Extensive customization, multi-framework | React / Vue / JS |
 | [**Wagmi**](/en/connect-to-software/react-hooks/wagmi) | Custom UI with React hooks | React |
-| [**Provider API**](/en/connect-to-software/provider/eth) | Full control, no dependencies | Any |
+| [**Provider API**](/en/connect-to-software/provider) | Full control, no dependencies | Any |
 
 <Callout>
 **Quick recommendation:** Use RainbowKit for React apps, Web3Modal or Web3-Onboard for Vue/vanilla JS.
@@ -30,26 +30,30 @@ Connect your dApp to OneKey wallet with support for EVM and 20+ non-EVM chains.
 ### RainbowKit (React)
 
 ```bash
-npm install @rainbow-me/rainbowkit wagmi viem @tanstack/react-query
+npm install @rainbow-me/rainbowkit@^2 wagmi@^2 viem@^2 @tanstack/react-query@^5
 ```
 
 ```tsx filename="App.tsx"
 import '@rainbow-me/rainbowkit/styles.css'
 import { getDefaultConfig, RainbowKitProvider, ConnectButton } from '@rainbow-me/rainbowkit'
+import { oneKeyWallet, injectedWallet, walletConnectWallet } from '@rainbow-me/rainbowkit/wallets'
 import { WagmiProvider } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const config = getDefaultConfig({
   appName: 'My dApp',
-  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // Get from cloud.walletconnect.com
+  wallets: [{ groupName: 'Wallets', wallets: [oneKeyWallet, injectedWallet, walletConnectWallet] }],
+  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // Get from cloud.reown.com
   chains: [mainnet],
 })
+
+const queryClient = new QueryClient()
 
 export default function App() {
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
           <ConnectButton />
         </RainbowKitProvider>
@@ -63,15 +67,24 @@ export default function App() {
 
 ### Provider API (No Dependencies)
 
-```typescript
+```javascript
 // Detect OneKey using EIP-6963
-const providers = []
-window.addEventListener('eip6963:announceProvider', (e) => providers.push(e.detail))
+let onekeyProvider = null
+const onAnnounce = (event) => {
+  if (event.detail.info.rdns === 'so.onekey.app.wallet') {
+    onekeyProvider = event.detail.provider
+  }
+}
+window.addEventListener('eip6963:announceProvider', onAnnounce)
 window.dispatchEvent(new Event('eip6963:requestProvider'))
 
-// Find and connect to OneKey
-const onekey = providers.find(p => p.info.rdns === 'so.onekey.app.wallet')
-const accounts = await onekey.provider.request({ method: 'eth_requestAccounts' })
+// Call from your Connect button after the user selects OneKey.
+async function connectOneKey() {
+  if (!onekeyProvider) throw new Error('OneKey has not announced a provider yet')
+  return onekeyProvider.request({ method: 'eth_requestAccounts' })
+}
+// On component cleanup:
+// window.removeEventListener('eip6963:announceProvider', onAnnounce)
 ```
 
 [Full Guide](/en/connect-to-software/provider/eth)
@@ -89,11 +102,11 @@ const accounts = await onekey.provider.request({ method: 'eth_requestAccounts' }
 
 ## Supported Chains
 
-**EVM:** Ethereum, Polygon, BSC, Arbitrum, Optimism, Base, and all EVM-compatible chains
+**EVM:** Ethereum and supported EVM networks, including Polygon, BSC, Arbitrum, Optimism, and Base
 
 **Non-EVM:** [Bitcoin](/en/connect-to-software/provider/btc), [Solana](/en/connect-to-software/provider/solana), [Cosmos](/en/connect-to-software/provider/cosmos), [Aptos](/en/connect-to-software/provider/aptos), [Sui](/en/connect-to-software/provider/sui), [TON](/en/connect-to-software/provider/ton), [TRON](/en/connect-to-software/provider/tron), [Polkadot](/en/connect-to-software/provider/polkadot), [Cardano](/en/connect-to-software/provider/cardano), [NEAR](/en/connect-to-software/provider/near), and more
 
-[View all Provider APIs](/en/connect-to-software/provider/eth)
+[View all Provider APIs](/en/connect-to-software/provider)
 
 ---
 

@@ -5,7 +5,7 @@ description: Sign typed structured data (EIP-712)
 
 # eth_signTypedData_v4
 
-Signs typed structured data according to EIP-712. This is the recommended method for signing structured data as it provides better security and user experience.
+Signs typed structured data according to EIP-712. The domain and schema make the signing context explicit; the verifier must still check them and enforce replay protection.
 
 ---
 
@@ -125,7 +125,7 @@ const permitData = {
     owner: accounts[0],
     spender: '0xSpenderAddress...',
     value: '1000000000', // 1000 USDC
-    nonce: 0,
+    nonce: tokenNonce, // Read the current permit nonce for this owner.
     deadline: Math.floor(Date.now() / 1000) + 3600
   }
 }
@@ -153,3 +153,5 @@ const signature = await window.$onekey.ethereum.request({
 - `chainId` in domain should match the connected chain
 - User will see a human-readable representation of the data
 - Specified by [EIP-712](https://eips.ethereum.org/EIPS/eip-712)
+
+The permit example requires the token contract’s actual EIP-712 domain, current nonce, intended spender, amount, and deadline. Replace placeholders and fetch `tokenNonce` before requesting the signature.

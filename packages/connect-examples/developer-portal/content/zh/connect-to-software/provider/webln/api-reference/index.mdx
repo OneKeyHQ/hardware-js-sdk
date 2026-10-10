@@ -2,5 +2,15 @@
 title: API 参考
 ---
 
-# API 参考
+# Lightning（WebLN）API 参考
 
+所有方法均为异步方法。调用前请检查 provider 是否存在，并处理 Promise 拒绝，包括用户拒绝钱包请求的情况。使用顶层 await 的示例必须在 ES 模块或 async 函数中运行。
+
+- [enable](/zh/connect-to-software/provider/webln/api-reference/enable)
+- [getBalance](/zh/connect-to-software/provider/webln/api-reference/getbalance)
+- [getInfo](/zh/connect-to-software/provider/webln/api-reference/getinfo)
+- [lnurl](/zh/connect-to-software/provider/webln/api-reference/lnurl)
+- [makeInvoice](/zh/connect-to-software/provider/webln/api-reference/makeinvoice)
+- [sendPayment](/zh/connect-to-software/provider/webln/api-reference/sendpayment)
+- [signMessage](/zh/connect-to-software/provider/webln/api-reference/signmessage)
+- [verifyMessage](/zh/connect-to-software/provider/webln/api-reference/verifymessage)

@@ -7,10 +7,12 @@ import { Callout } from 'nextra/components'
 
 # 快速开始
 
+启用扩展、选择账户，并将 API 客户端连接到目标链。根据链的当前元数据构建交易 payload；本指南中省略的十六进制数据均为占位值。
+
 了解如何检测、连接和与 Polkadot 及 Substrate 链进行交互。
 
 <Callout type="info">
-OneKey 实现了 Polkadot.js 扩展接口，确保与所有 Substrate dApp 兼容。
+OneKey 通过 Polkadot.js 扩展接口提供本文列出的操作。
 </Callout>
 
 ---
@@ -18,10 +20,10 @@ OneKey 实现了 Polkadot.js 扩展接口，确保与所有 Substrate dApp 兼�
 ## Provider 检测
 
 ```typescript
-// OneKey 注册为 Polkadot.js 扩展
+// OneKey registers as a Polkadot.js extension
 const provider = window.$onekey?.polkadot
 
-// 或使用标准的 web3Enable API
+// Or use the standard web3Enable API
 import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
 ```
 
@@ -30,12 +32,12 @@ import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
 ## 启用扩展
 
 ```typescript
-// 直接使用 OneKey provider
+// Using OneKey provider directly
 const enabled = await provider.web3Enable('My dApp')
 
 if (enabled) {
   const accounts = await provider.web3Accounts()
-  console.log('账户:', accounts)
+  console.log('Accounts:', accounts)
 }
 ```
 
@@ -46,16 +48,16 @@ if (enabled) {
 ```typescript
 import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
 
-// 启用所有扩展（包括 OneKey）
+// Enable all extensions (including OneKey)
 const extensions = await web3Enable('My dApp')
 
 if (extensions.length === 0) {
-  throw new Error('未找到扩展')
+  throw new Error('No extension found')
 }
 
-// 获取所有账户
+// Get all accounts
 const allAccounts = await web3Accounts()
-console.log('账户:', allAccounts)
+console.log('Accounts:', allAccounts)
 ```
 
 ---
@@ -67,10 +69,10 @@ const accounts = await provider.web3Accounts()
 
 accounts.forEach(account => {
   console.log({
-    address: account.address,     // Substrate 地址
-    name: account.name,           // 账户名称
+    address: account.address,     // Substrate address
+    name: account.name,           // Account name
     type: account.type,           // 'sr25519' | 'ed25519' | 'ecdsa'
-    genesisHash: account.genesisHash, // 可选的链创世哈希
+    genesisHash: account.genesisHash, // Optional chain genesis
   })
 })
 ```
@@ -81,10 +83,10 @@ accounts.forEach(account => {
 
 ```typescript
 const unsubscribe = provider.web3AccountsSubscribe((accounts) => {
-  console.log('账户已变更:', accounts)
+  console.log('Accounts changed:', accounts)
 })
 
-// 稍后: unsubscribe()
+// Later: unsubscribe()
 ```
 
 ---
@@ -103,32 +105,32 @@ npm install @polkadot/api @polkadot/extension-dapp
 import { ApiPromise, WsProvider } from '@polkadot/api'
 import { web3Enable, web3FromAddress, web3Accounts } from '@polkadot/extension-dapp'
 
-// 启用扩展
+// Enable extensions
 await web3Enable('My dApp')
 
-// 获取账户
+// Get accounts
 const accounts = await web3Accounts()
 const account = accounts[0]
+if (!account) throw new Error("No account was selected")
 
-// 连接到链
+// Connect to chain
 const wsProvider = new WsProvider('wss://rpc.polkadot.io')
 const api = await ApiPromise.create({ provider: wsProvider })
 
-// 获取注入器
+// Get injector
 const injector = await web3FromAddress(account.address)
 
-// 创建并签署交易
-const tx = api.tx.balances.transfer(
+// Create and sign transaction
+const tx = api.tx.balances.transferKeepAlive(
   recipientAddress,
-  1000000000000 // 1 DOT (10^12 planck)
+  '10000000000' // 1 DOT = 10^10 planck on Polkadot
 )
 
-// 签署并发送
+// Sign and send
 const hash = await tx.signAndSend(
   account.address,
   { signer: injector.signer }
 )
 
-console.log('交易哈希:', hash.toHex())
+console.log('Transaction hash:', hash.toHex())
 ```
-

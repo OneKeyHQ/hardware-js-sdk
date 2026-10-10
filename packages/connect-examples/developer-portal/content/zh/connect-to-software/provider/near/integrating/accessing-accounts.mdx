@@ -4,7 +4,7 @@ title: 访问账户
 
 # 访问账户
 
-建立钱包连接后，你可以访问与 OneKey 钱包连接的账户。
+钱包连接建立后，即可访问已连接到 OneKey 的账户。
 
 用户账户在 OneKey 中有多种用途，包括作为标识符和用于签署交易。
 
@@ -15,7 +15,6 @@ const res = await provider.request({
 const accountId = res?.accounts?.[0]?.accountId || '';
 const publicKey = res?.accounts?.[0]?.publicKey || '';
 
-// 如果用户拒绝钱包连接，res?.accounts 应为 []
+// An empty accounts array means no account is exposed to this site
 console.log('near_accounts', res?.accounts, accountId, publicKey);
 ```
-

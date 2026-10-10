@@ -4,14 +4,14 @@ title: 创建交易
 
 # 创建交易
 
-你应该通过 [near-api-js](https://docs.near.org/docs/tutorials/create-transactions#constructing-the-transaction) 创建交易对象，我们提供了一些便捷方法来获取交易构造函数所需的 nonce 和最新区块哈希。
+使用 [near-api-js](https://docs.near.org/integrations/create-transactions) 构建交易对象。provider 也提供了便捷方法，用于获取交易构造所需的 nonce 和最新区块哈希。
 
 ```javascript
 import * as nearAPI from "near-api-js";
 
-// 必须等于 provider 连接的账户
+// must equal to provider connected account
 const sender = 'c3be856133196da252d0f1083614cdc87a85c8aa8abeaf87daff1520355eec53';
-// 必须等于 provider 连接的账户
+// must equal to provider connected account
 const publicKey = 'ed25519:EB6zw1gAr4hV6NHuk9rhFPR8m8MwJbyqvZaweXiTNZ2J';
 const receiver = 'c3be856133196da252d0f1083614cdc87a85c8aa8abeaf87daff1520355eec53';
 
@@ -20,9 +20,14 @@ const actions = [nearAPI.transactions.transfer(amount)];
 
 const accessKey = await provider.request({
   method: 'query',
-  params: [`access_key/${sender}/${publicKey}`, '']
+  params: {
+    request_type: 'view_access_key',
+    finality: 'final',
+    account_id: sender,
+    public_key: publicKey,
+  }
 });
-// nonce 加 1
+// nonce increase 1
 const nonce = accessKey.nonce + 1;
 const recentBlockHash = nearAPI.utils.serialize.base_decode(
   accessKey.block_hash
@@ -40,7 +45,7 @@ const transaction = nearAPI.transactions.createTransaction(
 );
 ```
 
-或者直接调用 `provider.createTransaction` 方法更简单。
+也可使用 `provider.createTransaction`，自动读取已连接账户、access key nonce 和区块哈希。
 
 ```javascript
 const receiver = 'c3be856133196da252d0f1083614cdc87a85c8aa8abeaf87daff1520355eec53';
@@ -50,8 +55,7 @@ const actions = [nearAPI.transactions.transfer(amount)];
 const transaction = await provider.createTransaction({
   receiverId: receiver,
   actions,
-  // nonce 加 1
+  // nonce increase 1
   nonceOffset: 1,
 });
 ```
-

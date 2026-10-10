@@ -11,15 +11,14 @@ title: 签名消息
 * 提供 UTF-8 编码的字符串。
 * 由用户的 OneKey 钱包进行签名。
 
-方法调用将返回一个 [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)，其中包含 `signatures` 对象。
+方法调用将返回一个 [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)，成功返回包含 `signatures` 的对象。
 
 ```javascript
 const res = await provider.request({
   method: 'near_signMessages',
   params: {
-    messages: ['hello world', 'onekey near wallet'], // 必须是数组类型
+    messages: ['hello world', 'onekey near wallet'], // must be Array type
   },
 });
 console.log('near_signMessages', res, res.signatures);
 ```
-

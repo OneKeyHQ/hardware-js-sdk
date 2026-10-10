@@ -1,0 +1,22 @@
+---
+title: "Aptos WalletConnect v1"
+description: "历史自定义方法集成。WalletConnect v1 的 `@1` URI、Bridge 地址和 `sendCustomRequest` 不兼容当前 WalletConnect SDK。浏览器接入请使用 [Aptos Wallet Adapter](/zh/connect-to-software/wallet-ui/aptos-wallet-adapter)。"
+---
+
+# Aptos WalletConnect v1
+
+> 历史自定义方法集成。WalletConnect v1 的 `@1` URI、Bridge 地址和 `sendCustomRequest` 不兼容当前 WalletConnect SDK。浏览器接入请使用 [Aptos Wallet Adapter](/zh/connect-to-software/wallet-ui/aptos-wallet-adapter)。
+
+旧集成在连接 URI 上追加 `network` 参数，并在用户授权后使用以下自定义方法：
+
+| 方法 | 历史用途 |
+| --- | --- |
+| `account` | 返回账户公钥与地址。 |
+| `network` | 返回所选网络名称。 |
+| `getChainId` | 返回链 ID。 |
+| `signAndSubmitTransaction` | 对 Aptos 交易载荷签名并提交。 |
+| `signMessage` | 对含 nonce 的消息签名，可包含地址、应用与链上下文。 |
+
+`signMessage` 的响应包含 `fullMessage`、`signature` 及可选上下文。应验证返回的完整签名消息和预期 nonce、账户，不要只验证未加前缀的输入。旧集成没有明确的事件契约，不要套用以太坊事件名。
+
+此归档不声称这些自定义方法已有受支持的 WalletConnect v2 替代方案。维护旧应用时保留对应旧版本的兼容性测试。完整的历史请求和响应示例仍可在[原始参考](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-software/using-walletconnect/aptos/wallet-connect-api.md)中查看。

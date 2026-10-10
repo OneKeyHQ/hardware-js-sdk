@@ -6,7 +6,7 @@ title: tronSignMessage
 
 ## TRON: sign message <a href="#ethereum-sign-message" id="ethereum-sign-message"></a>
 
-Asks device to sign a message using the private key derived by given BIP32 path.
+Requests a message signature using the key derived from the specified path.
 
 ```typescript
 const result = await HardwareSDK.tronSignMessage(connectId, deviceId, params);
@@ -16,9 +16,10 @@ const result = await HardwareSDK.tronSignMessage(connectId, deviceId, params);
 
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
-* `path` - _required_ `string | Array<number>` minimum length is `3`. read more
-* `messageHex` - _required_ `string` message to sign in hex text
-* `messageType` - _optional_ `string` TRON message signing algorithm type. Recommended `'V2'` for better compatibility and security. Allowed: `'v1' | 'V2'`. Unless you have a legacy constraint, use `'V2'`.
+* `path` - _required_ `string | Array<number>` SDK minimum length is `3`. [Path format](/en/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _required_ `string` Message to sign, encoded as a hexadecimal string.
+
+* `messageType` - `"V2"`. Pass this explicitly: the current runtime rejects omitted values and legacy `"V1"` requests. The public type still includes both values.
 
 ### Example
 

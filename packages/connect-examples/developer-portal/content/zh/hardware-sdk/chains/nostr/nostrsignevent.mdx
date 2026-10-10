@@ -6,14 +6,11 @@ title: nostrSignEvent
 
 ### 使用要求
 
-* 固件版本要求
-  * Touch: 4.6.0
-  * Classic/Mini: 3.5.0
-  * Classic1s: 3.6.0
+当前 SDK 声明的固件版本校验范围为：`model_touch` ≥ 4.7.0、`model_mini` ≥ 3.6.0。这些名称是 SDK 的范围键；接入时还需确认其对应的设备型号，以及已发布固件的实际支持情况。
 
 ## Nostr：签名 Nostr 事件
 
-使用指定 BIP32 路径派生的私钥对 Nostr 事件进行签名。用户需要在 OneKey 上确认签名详情。
+使用指定路径的密钥请求 Nostr 事件签名。用户在设备上确认请求。
 
 ```typescript
 const result = await HardwareSDK.nostrSignEvent(connectId, deviceId, params);
@@ -23,7 +20,7 @@ const result = await HardwareSDK.nostrSignEvent(connectId, deviceId, params);
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `5`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `5`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
 * `event` - _必需_ `NostrEvent` Nostr 事件。
 
 ```
@@ -63,8 +60,6 @@ type NostrEvent = {
 };
 ```
 
-
-
 ### 示例
 
 ```typescript
@@ -89,12 +84,13 @@ const response = await HardwareSDK.nostrSignEvent(
 {
   success: true,
   payload: {
+    path: string,
     event: {
       kind: 1,
       content: 'Hello world',
       tags: [],
       created_at: 1702268010,
-      sig: '',
+      sig: 'signature returned by the device',
     },
   }
 }
@@ -106,8 +102,8 @@ const response = await HardwareSDK.nostrSignEvent(
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

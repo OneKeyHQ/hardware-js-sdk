@@ -49,9 +49,9 @@ const receipt = await window.$onekey.ethereum.request({
 
 if (receipt) {
   const success = receipt.status === '0x1'
-  console.log('交易', success ? '成功' : '失败')
-  console.log('使用 Gas:', parseInt(receipt.gasUsed, 16))
-  console.log('日志数量:', receipt.logs.length)
+  console.log('Transaction', success ? 'succeeded' : 'failed')
+  console.log('Gas used:', parseInt(receipt.gasUsed, 16))
+  console.log('Logs:', receipt.logs.length)
 }
 ```
 
@@ -74,34 +74,36 @@ async function waitForReceipt(txHash, timeout = 60000) {
     await new Promise(r => setTimeout(r, 2000))
   }
 
-  throw new Error('等待交易回执超时')
+  throw new Error('Transaction receipt timeout')
 }
 
-// 使用
+// Usage
 const txHash = await window.$onekey.ethereum.request({
   method: 'eth_sendTransaction',
   params: [txParams]
 })
 
 const receipt = await waitForReceipt(txHash)
-console.log('交易状态:', receipt.status === '0x1' ? '成功' : '失败')
+console.log('Transaction status:', receipt.status === '0x1' ? 'Success' : 'Failed')
 ```
 
 ### 解析合约事件
 
 ```typescript
-// 获取回执后，解析 Transfer 事件日志
+// Set tokenAddress to the intended ERC-20 contract before parsing its Transfer logs.
 const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
 
 const transferLogs = receipt.logs.filter(
-  log => log.topics[0] === transferTopic
+  log => log.address.toLowerCase() === tokenAddress.toLowerCase()
+    && log.topics[0] === transferTopic
+    && log.topics.length === 3
 )
 
 transferLogs.forEach(log => {
   const from = '0x' + log.topics[1].slice(26)
   const to = '0x' + log.topics[2].slice(26)
-  const value = parseInt(log.data, 16)
-  console.log(`转账: ${from} -> ${to}: ${value}`)
+  const value = BigInt(log.data).toString()
+  console.log(`Transfer: ${from} -> ${to}: ${value}`)
 })
 ```
 
@@ -121,3 +123,5 @@ transferLogs.forEach(log => {
 - `status` 字段：`0x1` = 成功，`0x0` = 回滚
 - `contractAddress` 仅在合约创建交易中存在
 - 使用 `logs` 解析交易中触发的事件
+
+解码日志时，请核对发出日志的合约和预期 ABI。仅凭 topic 匹配无法确认代币身份；ERC-721 也使用相同的 Transfer 事件签名，但 indexed 参数布局不同。

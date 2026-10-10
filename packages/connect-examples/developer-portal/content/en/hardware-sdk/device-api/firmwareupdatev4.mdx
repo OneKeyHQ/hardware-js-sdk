@@ -1,4 +1,5 @@
 ---
+description: "Install verified Protocol V2 firmware artifacts on Pro 2 or Neo and recover safely after reboot."
 title: firmwareUpdateV4
 ---
 
@@ -7,6 +8,8 @@ title: firmwareUpdateV4
 Protocol V2 firmware update for **OneKey Pro 2** and **OneKey Neo**.
 
 Do not call this on Classic / Mini / Touch / Pro. Those devices use [`firmwareUpdateV2`](/en/hardware-sdk/device-api/firmwareupdatev2) or [`firmwareUpdateV3`](/en/hardware-sdk/device-api/firmwareupdatev3).
+
+Run this only after the user selects the target device and approves the update. The binary variables below must contain verified artifacts for that model; they are supplied by your release flow.
 
 ```ts
 const res = await HardwareSDK.firmwareUpdateV4(connectId, {
@@ -17,6 +20,7 @@ const res = await HardwareSDK.firmwareUpdateV4(connectId, {
   coprocessorBinary,
   resourceArchiveBinary,
 });
+if (!res.success) throw new Error(res.payload.error);
 ```
 
 The method installs the binaries you pass, then reports progress through `FIRMWARE_PROGRESS` / `FIRMWARE_TIP`. After `DeviceFirmwareUpdateRequest` the device may reboot; the SDK reconnects on the same protocol.

@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # Transactions
 
+Connect the provider before signing and confirm the selected network. The direct injected provider and the Aptos Wallet Standard adapter have different argument types; do not interchange their examples. Replace abbreviated addresses and provide an SDK client for read-only calls.
+
 Learn how to sign and submit transactions on Aptos.
 
 ---
@@ -55,9 +57,7 @@ const signedTxn = await provider.signTransaction(payload)
 For advanced use cases with BCS-serialized transactions:
 
 ```typescript
-import { BCS } from 'aptos'
-
-const rawTransaction = /* BCS serialized raw transaction */
+const rawTransaction = '<BCS_SERIALIZED_TRANSACTION>'; // Use the encoding expected by your wallet version
 
 const signedTxn = await provider.signTransactionV2({
   transaction: rawTransaction,
@@ -78,13 +78,9 @@ const payload = {
   arguments: ['0x1234...', '100000000'],
 }
 
-const options = {
-  max_gas_amount: '10000',
-  gas_unit_price: '100',
-  expiration_timestamp_secs: Math.floor(Date.now() / 1000) + 600, // 10 min
-}
-
-const response = await provider.signAndSubmitTransaction(payload, options)
+// The legacy direct method takes only a payload.
+const response = await provider.signAndSubmitTransaction(payload)
+// For gas options, use signAndSubmitTransactionV2 with the matching Wallet Standard input.
 ```
 
 ---
@@ -150,4 +146,3 @@ const signedTxn = await provider.signTransactionV2({
   asFeePayer: true,
 })
 ```
-

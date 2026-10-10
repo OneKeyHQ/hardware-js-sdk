@@ -6,14 +6,14 @@ title: nostrDecryptMessage
 
 ### 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Touch: 4.6.0
   * Classic/Mini: 3.5.0
   * Classic1s: 3.6.0
 
 ## Nostr：解密消息
 
-使用指定 BIP32 路径派生的私钥解密消息。用户需要在 OneKey 上确认操作。
+使用指定路径的密钥和对方的公钥请求消息解密。
 
 ```typescript
 const result = await HardwareSDK.nostrDecryptMessage(connectId, deviceId, params);
@@ -23,12 +23,10 @@ const result = await HardwareSDK.nostrDecryptMessage(connectId, deviceId, params
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `5`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `pubkey` - _必需_ `string` 公钥。
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `5`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `pubkey` - _必需_ `string`。对方的公钥。
 * `ciphertext` - _必需_ `string` 加密的消息。
-* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`。
-
-
+* `showOnOneKey` - _可选_ `boolean`。是否在设备上显示请求，默认为 `true`。
 
 ### 示例
 
@@ -39,7 +37,7 @@ const response = await HardwareSDK.nostrDecryptMessage(
   {
      path: "m/44'/1237'/0'/0/0",
      pubkey: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
-     ciphertext: 'VpWFJ7JDFv16jL7pBZ1shw==?iv=$1tPpwGD3Ic1RTVXJx1ZG7Q==',
+     ciphertext: encryptedMessage,
      showOnOneKey: true,
   }
 );
@@ -65,8 +63,8 @@ const response = await HardwareSDK.nostrDecryptMessage(
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

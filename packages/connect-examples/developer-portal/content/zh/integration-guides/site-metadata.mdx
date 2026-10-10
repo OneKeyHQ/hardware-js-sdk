@@ -1,0 +1,19 @@
+---
+title: "站点元信息"
+description: "提供 favicon，帮助钱包和浏览器标识你的站点。在 HTML 的 `<head>` 中加入图标链接，图片地址应能公开访问："
+---
+
+# 站点元信息
+
+提供 favicon，帮助钱包和浏览器标识你的站点。在 HTML 的 `<head>` 中加入图标链接，图片地址应能公开访问：
+
+```html
+<head>
+  <link rel="icon" href="https://example.com/icon.png" type="image/png" />
+  <link rel="shortcut icon" href="https://example.com/icon.png" />
+</head>
+```
+
+钱包连接库的元信息应填写真实应用名称、来源和图标。元信息用于识别请求方，并不证明站点可信。
+
+不同钱包版本获取和缓存元信息的方式可能不同。部署后检查实际连接提示；更新 favicon 不一定立即更新已有钱包会话中的图标。

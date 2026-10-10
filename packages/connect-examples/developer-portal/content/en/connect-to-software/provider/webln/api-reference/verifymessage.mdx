@@ -6,26 +6,25 @@ title: verifyMessage
 
 Request the client to verify if the signature is correct, with the results displayed on the client side.
 
-### Method
+## Method
 
 ```typescript
-async function verifyMessage(signature: string, message: string): void
+declare function verifyMessage(signature: string, message: string): Promise<void>;
 ```
 
-### Example
+## Example
 
 ```typescript
-const provider = (window.$onekey &#x26;&#x26; window.$onekey.webln) || window.webln;
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
 
 const message = "Plain Message";
 await provider.enable();
-const signature = await provider.signMessage(message)
+const { signature } = await provider.signMessage(message);
 await provider.verifyMessage(signature, message);
-
 ```
 
-### Demo
+## Demo
 
+[Open example](https://codepen.io/OneKeyHQ/pen/eYxLvXK)
 
-<iframe src="https://codepen.io/OneKeyHQ/pen/eYxLvXK" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+The promise resolves without a value. This method does not return a boolean; handle a rejected promise as a failed verification request.

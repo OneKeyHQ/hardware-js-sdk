@@ -1,0 +1,16 @@
+---
+title: "Original firmwareUpdate API"
+description: "Historical API. Start with the current [firmware update guide](/en/hardware-sdk/firmware-update) and use the method appropriate to the SDK, transport, device, and release."
+---
+
+# Original firmwareUpdate API
+
+> Historical API. Start with the current [firmware update guide](/en/hardware-sdk/firmware-update) and use the method appropriate to the SDK, transport, device, and release.
+
+The original `firmwareUpdate(connectId, params)` reference accepted `updateType` (`firmware` or `ble`), optional `binary` (`ArrayBuffer`), and an optional version array. It described either release-resource selection or a supplied binary.
+
+The version array in an old example is not a current release recommendation. Do not reuse a hardcoded target or an unverified binary. Firmware update methods named V2, V3, or V4 are API versions, not a declaration of device Protocol V2 compatibility.
+
+Use official release metadata and verify the chosen device, firmware, and transport. Ask the user to deliberately start the update, preserve device verification and confirmation, await the operation, and handle reconnects. A successful download or transport call alone does not establish that an update completed.
+
+The [original source](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-hardware/hardware-sdk/api-reference/device-api/firmwareupdate.md) is retained for maintaining old applications.

@@ -6,11 +6,11 @@ title: benfenGetAddress
 
 ### Benfen：获取地址
 
-显示指定 BIP32 路径派生的地址，并返回给调用者。用户需要在 OneKey 上确认导出。
+派生并返回指定路径的地址。`showOnOneKey` 为 `true` 时，用户必须在设备上确认地址。
 
 **使用要求**
 
-* 固件版本要求
+* 最低固件版本
   * Pro: 4.12.0
   * Classic 1S / Classic 1S Pure: 3.11.0
 
@@ -22,7 +22,7 @@ const result = await HardwareSDK.benfenGetAddress(connectId, deviceId, params);
 
 **可选通用参数**
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
 * `showOnOneKey` - _可选_ `boolean` 是否在设备上显示地址
 
 #### 返回值
@@ -41,10 +41,10 @@ const params = {
   showOnOneKey: false
 };
 
-// 单个地址
+// Single address
 const response = await HardwareSDK.benfenGetAddress(connectId, deviceId, params);
 
-// 批量地址
+// Batch addresses
 const batchParams = {
   bundle: [
     {
@@ -62,28 +62,28 @@ const batchResponse = await HardwareSDK.benfenGetAddress(connectId, deviceId, ba
 
 **返回结果**
 
-仅返回一个地址的结果
+单个地址响应
 
 ```typescript
 {
     success: true,
     payload: {
-        address: string,     // 显示的地址
+        address: string,     // displayed address
         pub?: string,
-        path: string // 序列化 BIP32 路径
+        path: string // serialized BIP32 path
     }
 }
 ```
 
-返回批量地址的结果（按 FIFO 排序）
+批量响应，顺序与请求一致
 
 ```typescript
 {
     success: true,
     payload: [
-        { address: string, pub?: string, path: string }, // 账户 1
-        { address: string, pub?: string, path: string }, // 账户 2
-        { address: string, pub?: string, path: string }  // 账户 3
+        { address: string, pub?: string, path: string }, // account 1
+        { address: string, pub?: string, path: string }, // account 2
+        { address: string, pub?: string, path: string }  // account 3
     ]
 }
 ```
@@ -94,8 +94,8 @@ const batchResponse = await HardwareSDK.benfenGetAddress(connectId, deviceId, ba
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

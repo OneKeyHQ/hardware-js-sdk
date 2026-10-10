@@ -1,0 +1,1186 @@
+{
+  "669ea6ae1af369c967b7a112ce8170e1c508dcb13d9f13fbfb275af3078aa402": {
+    "source": "Edit this page",
+    "translation": "编辑此页面"
+  },
+  "9d56132edd497a9a3de99e0e658d0e025d2e76c6fc3ad86568b0b18295abd585": {
+    "source": "On This Page",
+    "translation": "本页内容"
+  },
+  "4e0739cdf17aa252eec7d788e284a9e13b64d6ef177277930bcf04d5807352c4": {
+    "source": "On this page",
+    "translation": "本页目录"
+  },
+  "f920a02686f41844ee0269e91f28e08a62af23156246b83fa60d7f1ba83f7d87": {
+    "source": "Back to top",
+    "translation": "返回顶部"
+  },
+  "0637b4fae00aa90b6529a3e9694a1f7838ce3164727d2045c3831cda2683ef59": {
+    "source": "Light",
+    "translation": "浅色"
+  },
+  "04993f72a8d64f32317b686210aebffdbe1bd86a16725b41a4634b8685f8934f": {
+    "source": "Dark",
+    "translation": "深色"
+  },
+  "2786bf59ab63c3d53747c9bfeb65d8daa1b53447c31875bf56c8d78b834b0e8f": {
+    "source": "System",
+    "translation": "跟随系统"
+  },
+  "34e3790474b2a68adb76b89d350b2f7adcc3ae375455bf239045cd430e272871": {
+    "source": "Search",
+    "translation": "搜索"
+  },
+  "14194bb0a8901068f08121919d34f7f239831dd944c6a926c3d329bf4812c4d4": {
+    "source": "Search documentation",
+    "translation": "搜索文档"
+  },
+  "de2015b245cbd6266c5c49d62550b4fe2d7b05068e6fa397d37b3b2333e23efa": {
+    "source": "Open search",
+    "translation": "打开搜索"
+  },
+  "3ad824b1d12ddb43fdb6c9ae9a3abf2bcf32e357f48526b92a40230e36180b11": {
+    "source": "Open navigation menu",
+    "translation": "打开导航菜单"
+  },
+  "9da0864ab75752e83b63cad83b1cc587c320ff80c414c2f129f63949de7cc27a": {
+    "source": "Switch theme",
+    "translation": "切换主题"
+  },
+  "3abe65294ed4e4aa7c8874ea83552571623d9fa6725f52f45e64ccda0e35b85f": {
+    "source": "Switch to light mode",
+    "translation": "切换浅色模式"
+  },
+  "809a68991dc515e42f5f3c489bb121e9053e5a4b4ac9a7d83a9299973e60e302": {
+    "source": "Switch to dark mode",
+    "translation": "切换深色模式"
+  },
+  "7931a4cfc1203d1258936237f0d1d80fa2de0846919942255b6b424d23ce3580": {
+    "source": "Language",
+    "translation": "语言"
+  },
+  "d2f4c10da3b613e522ed747adacfa5ce905d1a7f6af193ef2d3e5c4b239f77f1": {
+    "source": "Copy page",
+    "translation": "复制页面"
+  },
+  "35152e8123c5500023da7d3804d142e243f23c0dc1939dff869bb2aa4ba1654f": {
+    "source": "Copied",
+    "translation": "已复制"
+  },
+  "33213345b82d261d4cd608539585ff674ea981a51fbaf0363cd8c306605db45c": {
+    "source": "Copy failed. Try again",
+    "translation": "复制失败，请重试"
+  },
+  "d1cc9479da455b8c897d310fe134bcc8a58b19dcea72a46062509ce4f4951739": {
+    "source": "More page actions",
+    "translation": "更多页面操作"
+  },
+  "199f49d98ec9c854d2b8aec1dd6752392052fda9875bb0419f32efa1814c8573": {
+    "source": "Open in ChatGPT",
+    "translation": "在 ChatGPT 中打开"
+  },
+  "aba28f738764153803403bd66c5969279bb9a61aa61b9e6cc7bcaaaa15fd9e88": {
+    "source": "Open in Claude",
+    "translation": "在 Claude 中打开"
+  },
+  "2dc14af41c6ad3bc1d76d4737477ed6d066d278121fb73fc9bd63f1847c63ea3": {
+    "source": "Choose an integration",
+    "translation": "选择接入方式"
+  },
+  "c700440b9a312244b296aa99ae3bb37377220ae600dd63daa2cbb13cf14de385": {
+    "source": "Connect a dApp",
+    "translation": "dApp 快速开始"
+  },
+  "28e96787f325ae4bfcfe2c18c64297ce90b310f723d069ce48878f898e436a17": {
+    "source": "Hardware SDK quickstart",
+    "translation": "硬件 SDK 快速开始"
+  },
+  "a972c97c730f2011834ced4b03ec52ef0f0a852e60b86086fcef929555f0df10": {
+    "source": "Troubleshoot an integration",
+    "translation": "排查集成问题"
+  },
+  "29b4ebe2680216400eafdfc7df4b79dbe4a36f3801bdaa7dd326228d840d6452": {
+    "source": "Search chains...",
+    "translation": "搜索链..."
+  },
+  "b6c4b80859ca2b03c39a7a919d9a18abf223e308f395fda267389cfbdb4e6ca2": {
+    "source": "No chains found",
+    "translation": "未找到链"
+  },
+  "1e32be5d18086ae6d260e378c6ef55289dc401b448e72dfe159d8e16fd4f25ec": {
+    "source": "Select a chain",
+    "translation": "选择链"
+  },
+  "4854c12affbc7e0b76433c6e26caa1c63163582f161597e42a493da003439e4a": {
+    "source": "Chain Methods",
+    "translation": "链方法"
+  },
+  "6bb4ae886cc79da056c2c3e1e31ff68a1110a45520549f6fe40b31dc5cfd5fe2": {
+    "source": "Home page",
+    "translation": "首页"
+  },
+  "0eb9fe951e871bccb0b74de48015436aadcbee4b1a3344fb3f6676aaef9e5fe8": {
+    "source": "Start here",
+    "translation": "从这里开始"
+  },
+  "6140dc5f9e2477a09b5acb6c6cab3cb376197c3b3b2f9dd2c6748677ccc1db3c": {
+    "source": "Documentation results",
+    "translation": "文档搜索结果"
+  },
+  "e10b865fff7571a16c865249cb012f5a3e7c100858cbf75af5fd356fa97262ad": {
+    "source": "Searching all documentation…",
+    "translation": "正在搜索全部文档…"
+  },
+  "d7214cfa597a23a439aa97640362add7244097293351d29e3bc1419d0ac49776": {
+    "source": "Read docs",
+    "translation": "查看文档"
+  },
+  "d52b845bf803a3b1f14580fec627a2415ea9a24b38fc15389abb6ca8b9f1ffe2": {
+    "source": "Search is temporarily unavailable. Try again or browse the documentation navigation.",
+    "translation": "暂时无法加载搜索索引。请重试或使用文档导航。"
+  },
+  "575557f90fb8297c80f39d31c511debf47b6058f4e342ed0303238b963388db5": {
+    "source": "Ask me anything about ",
+    "translation": "向我询问任何关于 "
+  },
+  "d9c3b179cb9c993dc71a7b7857b1c32ee0bab28bbb8ced896d059e4b316087bc": {
+    "source": ".",
+    "translation": " 的问题。"
+  },
+  "674926a8f1231d74c29758ccee25842ef642e2d11df85ec1e0191e56b9b3f379": {
+    "source": "Connect to the OneKey wallet",
+    "translation": "连接 OneKey 钱包"
+  },
+  "89de02c19117839e69f0ab8ba09cd66fdac6ce45385cc76a5443b9e1e5fa8b92": {
+    "source": "Let your dApp request accounts, signatures, and transactions through OneKey. Use a wallet provider or a connection UI library.",
+    "translation": "让 dApp 请求账户、签名和交易。使用钱包 Provider，或接入已有的钱包连接组件。"
+  },
+  "f9e88b1f3f731ffcb6e011b2197eb751ed845dddb56f9219a36939733237e3ae": {
+    "source": "For dApps and websites",
+    "translation": "适合 dApp 与网站"
+  },
+  "9e7cf71932d855bb511a2d26e86f49f7a83197ac2f7ee32fa9eab7639e7a37fe": {
+    "source": "Chain provider APIs",
+    "translation": "各链 Provider API"
+  },
+  "0dcdf63a46d72ff2810b608641df9f2665eb096c65248703d84feb843942d61c": {
+    "source": "Wallet UI libraries",
+    "translation": "钱包连接组件"
+  },
+  "56dcff5b42a1c7169a7cab3d4bd03d9ccd865edc681bb0df9c57792456e8fc53": {
+    "source": "Mobile and deep links",
+    "translation": "移动端与深度链接"
+  },
+  "f2d5b8f2c79b404b57028ac8d81a1beedbe7eb8e977dff52ff0fac69aed4e7bd": {
+    "source": "Connect directly to a device",
+    "translation": "直接连接硬件钱包"
+  },
+  "9c9a1b551eea339e36880a552c5297528f39d97bf8eabf3088af92b6c256f8fe": {
+    "source": "Add OneKey hardware signing to your wallet or app over USB or Bluetooth, with user confirmation on the device.",
+    "translation": "在你的钱包或应用中，通过 USB 或蓝牙与 OneKey 硬件通信，由用户在设备上确认操作。"
+  },
+  "04de8e3992eee13561f1cfab7cd265e63c78ce478a742124900713d705a78d59": {
+    "source": "For wallet and app developers",
+    "translation": "适合钱包与应用开发者"
+  },
+  "5e4d3d44bdeede1342335a5b16d2b146f0bca2759dad21e8d1d3cef867229c2f": {
+    "source": "Start with the Hardware SDK",
+    "translation": "硬件 SDK 快速开始"
+  },
+  "7d9eeba1bfb0a2e58d24f96452d6fb96042797038bf834ed6350b95eeb296fe1": {
+    "source": "Native mobile",
+    "translation": "原生移动端"
+  },
+  "c7aca427580c15da10ba1f2bc0096e08272be41b72f2a40982c83a9f428ca28f": {
+    "source": "Device and chain support",
+    "translation": "设备与链支持"
+  },
+  "816884809d65ea981f4be0387ded91555baa67a2b0914642009e555a674481a6": {
+    "source": "Exchange signing data over QR",
+    "translation": "通过二维码离线签名"
+  },
+  "29507e411f238eb16bfdd1b03f1f5b3466de31276be00cefc155fdc12c232b40": {
+    "source": "Exchange signing requests and responses with a QR-capable OneKey device without a USB or Bluetooth connection.",
+    "translation": "在应用与支持二维码的 OneKey 硬件之间传递签名请求与结果，无需 USB 或蓝牙连接。"
+  },
+  "4df2ecb31a3a0b05a88f810420ec2b7aec2adb1ab31bf837d0c093ea1153ee0c": {
+    "source": "For QR-based wallet integrations",
+    "translation": "适合二维码钱包集成"
+  },
+  "60aee2d698598df703406951384a57e282f26f37f44c85ae3c6859249af1b288": {
+    "source": "Explore QR signing",
+    "translation": "了解二维码签名"
+  },
+  "313f200c63c471c210df6ea9999b9caed10de918145b5457f3bffe8fb75fc9b6": {
+    "source": "THE ONEKEY DEVELOPER PLATFORM",
+    "translation": "ONEKEY 开发者平台"
+  },
+  "281fac54a155598e7842e5a2de33064a35f24bce03d2d4396127e34ace1532d0": {
+    "source": "Build with OneKey in your dApp, wallet, or application. Choose an integration below and follow the guide to your first request.",
+    "translation": "为你的 dApp、钱包或应用接入 OneKey。先选择集成方式，再跟随指南完成第一次调用。"
+  },
+  "22cf9f373ddbf9e8b94f7f4b3dd8530a6254edbc02a1dab13a6981a549d2a12b": {
+    "source": "Start building",
+    "translation": "开始构建"
+  },
+  "03daee1c1832d7d785d47e44768c5e26c75a10dcb52dd3ce15886aa276b675c2": {
+    "source": "Explore the API",
+    "translation": "探索 API"
+  },
+  "82e77cd322bad8f458b26459bb270c2deddd49032570ed876efc7505bed76b25": {
+    "source": "OneKey Pro 2 hardware wallets showing the portfolio and transaction confirmation screens",
+    "translation": "OneKey Pro 2 硬件钱包，展示设备上的资产概览与交易确认界面"
+  },
+  "7c1a03a81428f988bbc00a9dc2ac7103c53822bab861062d36488f8669ac15fc": {
+    "source": "INTRODUCING",
+    "translation": "认识新一代硬件"
+  },
+  "f2ead64e4256043c3524fc9c843fc8ab6d944970b722b4171cbdad318668eeb6": {
+    "source": "Explore OneKey Pro 2",
+    "translation": "了解 OneKey Pro 2"
+  },
+  "a675f1f1cb6b5dd933bc78b28b1ac3f2e360dd7ac096d04d330933066f5e6461": {
+    "source": "What are you building?",
+    "translation": "你在构建什么？"
+  },
+  "46e269aaa23e1b0cff1b50e94072007afac00a9b1477cbd24f1290bb011d2c71": {
+    "source": "Choose a path to get started",
+    "translation": "三个入口，一步开始"
+  },
+  "64c3fe38aed84f8577dc098182048819885b676b1fa0bd1b242141105a7c2142": {
+    "source": "FROM ZERO TO CONNECTED",
+    "translation": "从连接到确认"
+  },
+  "a52e86d34e0a1a009684248ca153e5e6ffb772f86251032d35d80c9cd5486397": {
+    "source": "Follow the quickstart",
+    "translation": "跟随快速开始"
+  },
+  "c33075fa7a157a81734e3c3fd2e11b4f57dcda3b43abc49b114b1928241ff0f0": {
+    "source": "While you build",
+    "translation": "开发过程中"
+  },
+  "450694e4810db0beba1a69ebf2968a935adfe068c988ae3ea9e1a0cddce123de": {
+    "source": "Try an example, resolve an error, or check what changed.",
+    "translation": "查示例、解决问题、跟进 SDK 变更。"
+  },
+  "8a309f93d6935f0e8c96330aa8c2bbb25307eee5819e48e4e0427073ac2848da": {
+    "source": "Search docs, methods, or errors",
+    "translation": "搜索文档、方法或错误"
+  },
+  "0abb3c2f4b1d3b152d9289f6bec183d3f6dd65225e2ed838b26a1e0e4094ed88": {
+    "source": "Open the hardware playground",
+    "translation": "打开硬件 Playground"
+  },
+  "d6eedf9733d5674b72ab024457e2384ad8259ef5734f2d18a8f131fc3c2b8ff1": {
+    "source": "Read the SDK changelog",
+    "translation": "查看 SDK 更新日志"
+  },
+  "a983649ec249ef8ec3be67b432f0fcf7ff16dbafb9170b8c29a26bf202638460": {
+    "source": "Browse SDK source and examples",
+    "translation": "查看源码与示例"
+  },
+  "88c4d0b0bd11a8c9b797c0384f28ee8203c1a88a37f4d91a13b6b7ecdee90823": {
+    "source": "Need help with an integration?",
+    "translation": "需要帮助？"
+  },
+  "ae246692d707f1be8affb296e73c10ed681dfe7019a31c1361e10e9ebad0ebe5": {
+    "source": "Include your SDK version, runtime, and a minimal reproduction when reporting an issue.",
+    "translation": "报告问题时，请提供 SDK 版本、运行环境与最小复现示例。"
+  },
+  "287c46d7305b59fd002415c13bcec1fb060818894941d861c4a0cd548d325555": {
+    "source": "Find the right support channel",
+    "translation": "找到正确的反馈入口"
+  },
+  "c8eac468bfad4798b3b28f6d0e116587f539acf0295cf2cd86ae06eac2556b5e": {
+    "source": "OneKey resources",
+    "translation": "OneKey 资源"
+  },
+  "dae0e0a77085739595f353a1c0c9a2b28d4860b5e9a9fb2d5632fd739d241046": {
+    "source": "Help center",
+    "translation": "帮助中心"
+  },
+  "286cdd85db79f780df6ce205cbd546c80f44171602fd53c0331701b485938492": {
+    "source": "User agreement",
+    "translation": "用户协议"
+  },
+  "0995fe3936f6192346253e1082a21e2e17e19aab280b623072ddab5dc786ede2": {
+    "source": "Privacy policy",
+    "translation": "隐私政策"
+  },
+  "716cad8733bad53abc3208537b2263bce43fb31ce23e72ae8cc93fa12f2d8c01": {
+    "source": "Guide",
+    "translation": "操作指引"
+  },
+  "fcf7ff2ce3a4f1c9bb4025a58e1b1e46761e5620affe5a27dadf6d28db74d77b": {
+    "source": "Pick a command/params, then click “Send”.",
+    "translation": "请选择命令/参数，然后点击「发送命令」。"
+  },
+  "50868710b53c38330b7cab0ee67c5cbf6a084322acfd23b22c95978639eb3e4a": {
+    "source": "The result will appear in the Result panel on the right.",
+    "translation": "结果会显示在右侧 Result 面板。"
+  },
+  "d0c2bed5ac1cb84a906182f34425ce53f5513092ec27c74d4311ea6c2d356ea3": {
+    "source": "Tour is idle. Click “Guide” and send your first command.",
+    "translation": "导览未开始。点击「导览」并发送第一个命令。"
+  },
+  "23f9d2eaa7f51e86ba7fc86fe6cdf54d033c0063efb6f0574bc3e150ff4b515d": {
+    "source": "You can preview examples and callbacks on the right.",
+    "translation": "右侧可先预览示例与回调，了解下一步。"
+  },
+  "92ba4adf593487e894cefc3bc34e65ad98fb0b4b9ad9a20f8bab86d02526509f": {
+    "source": "PIN is requested. Completing it advances the flow.",
+    "translation": "PIN 已请求，完成后会进入下一步。"
+  },
+  "3314402c5af71b3179a9d0a473560c3cef8333328be51a6b98d85a2027ce3c51": {
+    "source": "Submitting moves to the next step automatically.",
+    "translation": "提交后会自动推进。"
+  },
+  "4a81c842e73259d58b4482fc90066f596db59f069aa285f0529c228c0cab483e": {
+    "source": "Confirm the interaction on the device.",
+    "translation": "在设备上确认交互。"
+  },
+  "5425430b0ac84442ff34de1984fd661d3b40b2353995db42cb20401fd7269e4f": {
+    "source": "Wait for the result to appear in the Result tab.",
+    "translation": "等待结果自动返回。"
+  },
+  "1acd78b6e38bca325aa06f7e8ba058eef7596f36eaff314f3d71d49245b26b8a": {
+    "source": "Waiting for the result to arrive.",
+    "translation": "等待结果自动呈现。"
+  },
+  "66d80f0282053f77b4b727bd13e0f59ca682a96f5e72fda1894edc715a6b65b1": {
+    "source": "Result output appears on the right.",
+    "translation": "可在 Result 面板中查看 payload。"
+  },
+  "4d28ef4e70663a5d29363f1f2fe2a205c0d399ac39bfe4007ec73911519c956e": {
+    "source": "Payload is ready—review it on the right.",
+    "translation": "结果已准备好，从右侧阅读 payload。"
+  },
+  "63cb9eaaf8105ff9608a9aa5cf4ed9b3ecb88fe24c28aef4ef99400197568c6c": {
+    "source": "Switch to Callbacks if you need UI_EVENT guidance.",
+    "translation": "若需要，切换到 Callbacks 查阅 UI_EVENT。"
+  },
+  "9bfd61172693f0b42aba979ec7b0c2c1bc7caf4d9a9fc8fe1de2e00e0c44219a": {
+    "source": "Callback template lives on the right.",
+    "translation": "回调模板在右侧，复盘 UI_EVENT。"
+  },
+  "21572597015d8e1ad4e276c34ecf30958e3a0a4f2e13b4c4e3c2daf6b9f0b85c": {
+    "source": "Handle the REQUEST_* events based on UI hints.",
+    "translation": "参考 `REQUEST_*` 事件处理流程。"
+  },
+  "52b6092cae8f453f3c7f16a84e0be95520d5dd8c709ae333b3f0fdf4452e14f5": {
+    "source": "// For real hardware, authorize WebUSB and register UI_EVENT handlers first; see Getting Started.",
+    "translation": "// 真实硬件需要先授权 WebUSB 并注册 UI_EVENT 处理器；参见快速开始。"
+  },
+  "f9a89beb3734f5bf7185a21b3cb7502cb12ed47bd4de830e8d64024e2ea24283": {
+    "source": "  throw new Error('Connect one authorized device, or let the user select among connected devices.')",
+    "translation": "  throw new Error('请连接一台已授权的设备；有多台设备时应先让用户选择。')"
+  },
+  "a022c1a28ddc21a7f91d67ca021aee3d66d93e85f427eb87a228fd741398d397": {
+    "source": "PIN Panel",
+    "translation": "PIN 面板"
+  },
+  "f214fdb77d64709f455f9b510ee36896bdc8d600b864bcb7f5f9bd0184b14145": {
+    "source": "Match the PIN matrix on the device. Any 4 digits work (mock does not validate).",
+    "translation": "对照设备上的 PIN 矩阵输入，任意 4 位即可提交（Mock 不校验）。"
+  },
+  "3fc07fc7ef15a829e608e5e3c480f13fedac969e2deaf66daddd88d2eb568e5c": {
+    "source": "Close",
+    "translation": "关闭导览"
+  },
+  "73a6e3a4b49f1a3fadbc8ef878dd0de415c8a7a340fc8aad062d0b17509e73e6": {
+    "source": "Delete",
+    "translation": "删除"
+  },
+  "f2c52350ea4d12483d5617cee55ba1785a8cdcfb6aea1b72ef37d571f2a892ec": {
+    "source": "Confirm",
+    "translation": "确认"
+  },
+  "8668ddaf210b892dff6c17b02d77e56f1ddf57208c9dca62b782c9fc094ac0ef": {
+    "source": "Use device input",
+    "translation": "使用设备输入"
+  },
+  "3264822565f843a1f04f60a0a8370e9b3c5888046da41ff6e6701d306297331a": {
+    "source": "Mock error",
+    "translation": "Mock 错误"
+  },
+  "3135a6ba635aeeb85387eb7682f9da4bf6954dfaf57e34cadc74345801c944a2": {
+    "source": "Error",
+    "translation": "最近错误"
+  },
+  "fc7843b627bce96c157e93e463ac2a9070d5340bf6e8424f7a1547cccb20f0e0": {
+    "source": "Locked",
+    "translation": "已锁定"
+  },
+  "6ae091c643d81d424e718f1f04bf4ecb955e025dbfe86a8099fed453ea65d72b": {
+    "source": "Press Power to unlock",
+    "translation": "按电源键解锁"
+  },
+  "8fb9bc53c6a747d092e12f3a6454dd07c910517de161a8b1c19e1df478b38545": {
+    "source": "Enter PIN",
+    "translation": "输入 PIN 码"
+  },
+  "4f606b0c8656f31be85d49314603f7d1951e662357febd08fced7a2fe25d2621": {
+    "source": "In app",
+    "translation": "在页面输入"
+  },
+  "9a74d3ed5bd8eca215714278bcbfc39e634096ccc6f5886a0631f71642972f5b": {
+    "source": "On device",
+    "translation": "在设备输入"
+  },
+  "091a893fa12be30d8a599ca8f82677e91857e64f52a51f59a8e45a617661bc27": {
+    "source": "PIN (any 4 digits)",
+    "translation": "PIN（任意 4 位）"
+  },
+  "7be061bae47889375cbb5e93fea739890b9cd5def1500355ba3eb46cbdee0432": {
+    "source": "Submit",
+    "translation": "提交"
+  },
+  "a6f437b0291574b8c0f22078be0991ee1e0e7d5f334de6b44722bdfcb7d1d1d6": {
+    "source": "I've entered on device",
+    "translation": "我已在设备输入"
+  },
+  "4d01c895cfaa6861d210e362709211130fb9aed3850629fdd1de3767f030eb7c": {
+    "source": "Confirm on device",
+    "translation": "请在设备上确认"
+  },
+  "e9bc83e22ba5695834c9cdf8b2bd7b5ffee5d8688ad993a0ef90380969be482e": {
+    "source": "Approve",
+    "translation": "同意"
+  },
+  "b434d2a952a039691afd7139c59a12ac540bac5f42e3479913bef229bd4afc91": {
+    "source": "Reject",
+    "translation": "拒绝"
+  },
+  "4a6c95a768be6e96ce21ebc5a0b16451bc02c3a19c4e2b7f176969adefa21252": {
+    "source": "Verifying PIN…",
+    "translation": "校验 PIN 中…"
+  },
+  "e53d48c631b74bd41fc18015a5c468d5a0dfcdc3490928e73bff59230d468111": {
+    "source": "Address:",
+    "translation": "地址:"
+  },
+  "ce2824955396c94666588aebaad3e60dcc43b37f5cd383c4cd60d6562d6e8e6c": {
+    "source": "Confirm address",
+    "translation": "确认地址"
+  },
+  "b1e1f8bf670e105ec3d2e2ccd0ab0625400bdaa982de6171a1db2a2f964c8aaf": {
+    "source": "Confirm signing",
+    "translation": "确认签名"
+  },
+  "ca1966d50c806929c2848b3524f199a5b6b711d7ff4fc9fb1916fce1ae141e0a": {
+    "source": "Use device buttons:",
+    "translation": "使用设备按键："
+  },
+  "4a1feb18664492430370beb0ab9060945cc550f79fcfaf39f0f1b22dd12263c7": {
+    "source": "Enter = Approve · Power = Reject",
+    "translation": "Enter = 同意 · Power = 拒绝"
+  },
+  "1d7835a47880182d06b0af36788f35fdce6b3bfa872a3138884ae94b5aad5a03": {
+    "source": "Waiting for confirmation…",
+    "translation": "等待设备确认…"
+  },
+  "2948e872b78ae2945c058cd0c4b9522835b47ef8ea6c14ce72222221f988f97b": {
+    "source": "Ready",
+    "translation": "就绪"
+  },
+  "35976c61d1debc0c7085b17234953857aa9956858d924ec5775c3bcce710fd0a": {
+    "source": "Send a command.",
+    "translation": "发送命令。"
+  },
+  "383e81eb0b710bbc3e70a5bd2fa250f6c63081a1098113f07904e02f2edc2dcb": {
+    "source": "Cancel",
+    "translation": "取消"
+  },
+  "aa663d8189469409d9e251f22fce0de98c92f805fb00a59dc8cf7c95710ada6f": {
+    "source": "Hardware Mock",
+    "translation": "硬件 Mock"
+  },
+  "ded8c22eee33e61a2377d3b040a121faf4f4b8be976b226bef158d7cd9f65903": {
+    "source": "Triggered",
+    "translation": "已触发"
+  },
+  "8aab83a293af62a0988144e72beffc08d0b3210f0ad82f5e54ab292fec57d816": {
+    "source": "Ready to Start",
+    "translation": "准备开始"
+  },
+  "7cb5cc37c85fafd6531101c90721191104f76fc0649e55ef8b1118935d1e2724": {
+    "source": "Select a command and click Send to begin the interactive tour.",
+    "translation": "选择命令并点击发送，开始交互式导览。"
+  },
+  "b861b5a21358b7bcf10e03f8dbae0150ad8812244b6391442463278b215a6582": {
+    "source": "Searching Devices",
+    "translation": "搜索设备"
+  },
+  "fe8a8a1f86749f2c6642ed044f7414b9652d7a0c20fe49795a4b987e2bc52eb3": {
+    "source": "SDK is scanning for connected OneKey hardware devices.",
+    "translation": "SDK 正在扫描已连接的 OneKey 硬件设备。"
+  },
+  "d12685d0a7a301935953b1f0f82459975ec19444f31c5a5e5d5261706c999139": {
+    "source": "Waiting for Result",
+    "translation": "等待结果"
+  },
+  "628989326afe0eb9bd9289ad374dfe2aa1d0fd19aa60c69c16752691c3b6b3af": {
+    "source": "Device list will appear here once scanning completes.",
+    "translation": "扫描完成后，设备列表将显示在这里。"
+  },
+  "18240c9a984f80a14250e1aa615a29968e5328c2ea3622c2c792a1227a8b2307": {
+    "source": "Devices Found",
+    "translation": "设备已找到"
+  },
+  "36d9419911305a7301e8077baf5b6a7224c88eded3f0e095bd53e078239fafd4": {
+    "source": "Device list is ready. Try `btcGetAddress` or `btcSignMessage` next.",
+    "translation": "设备列表已就绪。接下来可以尝试 `btcGetAddress` 或 `btcSignMessage`。"
+  },
+  "d6b7e667255dc8a040ee48241eb854b063787d1367a01d99681f67afc530b753": {
+    "source": "Result Ready",
+    "translation": "结果已返回"
+  },
+  "e37948f9612cbab88e35aeb16a066680ef4130c790a959d4a3e21c485f62a8b0": {
+    "source": "The SDK response payload is shown here.",
+    "translation": "SDK 返回的 payload 显示在这里。"
+  },
+  "20aa282cdb444f662d3e0bfde8d7f1b9532b1ad23a7cafa88c7f873bdc49500c": {
+    "source": "Event Callbacks",
+    "translation": "事件回调"
+  },
+  "bea7d390fbaf4c9fe232a35af2e0ee3e05e8eb2eee1d12e531d57bb4749782d5": {
+    "source": "This template shows how to handle `UI_EVENT` in your app.",
+    "translation": "这个模板展示如何在应用中处理 `UI_EVENT`。"
+  },
+  "9d00891bd23ee86c48afd8d66807647273e838d3e5b480be9ce244f321a555fd": {
+    "source": "Try `btcGetAddress` or `btcSignMessage` for the full interactive experience.",
+    "translation": "尝试 `btcGetAddress` 或 `btcSignMessage` 获得完整的交互体验。"
+  },
+  "a707f1ccb05a55cefe359375f85b815df3482b602096288bbd529e7c01d69a82": {
+    "source": "Back",
+    "translation": "上一步"
+  },
+  "d5108d556c51ad79795535bfe698416b443b72f3359610a7ec1353b686d519e7": {
+    "source": "Next",
+    "translation": "下一步"
+  },
+  "692bae9254472ba1e5ce9025fdcf8abc1172f71ec4d9d38715b33858a15f63f6": {
+    "source": "Done",
+    "translation": "完成"
+  },
+  "517d6b8662c8a2be9da149e68c35f9181fc1cd080371c856e3c8cb59c95bfd2c": {
+    "source": "Waiting…",
+    "translation": "等待中…"
+  },
+  "eb19f31c944e8a5c51f9f686ea898093fe67b303e8cfe86e1558847716c45174": {
+    "source": "Request Sent",
+    "translation": "请求已发送"
+  },
+  "330493c7664da13f099910214d8e445ffcaadbe71b1579af080d7f73851b3371": {
+    "source": "PIN Matrix on Device",
+    "translation": "设备上的 PIN 矩阵"
+  },
+  "4e9c0fb76e6e0368458292e0814930d2b543a4451320d7b0a9d785fbf2caa884": {
+    "source": "Classic 1s displays a shuffled PIN matrix on the device screen. Match the positions when entering PIN.",
+    "translation": "Classic 1s 在设备屏幕上显示乱序的 PIN 矩阵。输入 PIN 时需对照位置。"
+  },
+  "1a1f87a31b311857450ecc7949640c71e44d61948a0472169b252cc0f22bcd2f": {
+    "source": "Enter PIN on Panel",
+    "translation": "在面板上输入 PIN"
+  },
+  "13801ff8de8fbd8f8e9593d7c7e924319b0de83c68d8aa9a6355b0b770ebdc3d": {
+    "source": "Look at the PIN matrix on the device screen (left), then enter 4 digits on this panel matching the positions.",
+    "translation": "查看左侧设备屏幕上的 PIN 矩阵，然后在此面板上按对应位置输入 4 位数字。"
+  },
+  "ee96d9a265542a65e31f8f5e8a31c16e956edf6eb57c1c166c46e2a2a3beab75": {
+    "source": "REQUEST_BUTTON Event",
+    "translation": "REQUEST_BUTTON 事件"
+  },
+  "d3377bef3fc5e693a27950fa5658df23d4b9a700867798c9389b58f8d663b580": {
+    "source": "Confirm on Device",
+    "translation": "在设备上确认"
+  },
+  "436d74c07eff32ffd01a4e58189a08f30c5d83dd03a5a6d044142d69ad3aa6d9": {
+    "source": "Review the information and tap Confirm on the device to approve.",
+    "translation": "查看信息后，在设备上点击确认按钮。"
+  },
+  "b27d3ed386394246c4b34a9630d74a10265131f492aa7c7821fb09ec7b50a025": {
+    "source": "SDK is processing the request. Result will appear shortly.",
+    "translation": "SDK 正在处理请求，结果即将返回。"
+  },
+  "ad7fc89cab5318d4e5f7ae4a8728c7103229cd322e02a1a2b4a48240ec8651d3": {
+    "source": "The SDK response is shown here. You can inspect the payload data structure.",
+    "translation": "SDK 返回的结果显示在这里，可以查看 payload 数据结构。"
+  },
+  "405ee92cb43cf42455f999b7e49b61b2ed3f42af8c2e493c065e8463cff30d66": {
+    "source": "This template shows how to handle `UI_EVENT` including `REQUEST_PIN` for Classic 1s.",
+    "translation": "这个模板展示如何处理 `UI_EVENT`，包括 Classic 1s 的 `REQUEST_PIN`。"
+  },
+  "df1470aa5b207bf9ff4e716f69bb6d3b5e2304d17760d73f10af881c895532aa": {
+    "source": "Try Real Device Emulator",
+    "translation": "试试真实设备模拟器"
+  },
+  "196c9c605390e9d0ea7ecb67bc7455beb18ca78c71641aeda1cded49408711a2": {
+    "source": "Want to debug with a real OneKey device online? Click here to open the Device Emulator.",
+    "translation": "想要在线调试真实的 OneKey 设备？点击这里打开设备模拟器。"
+  },
+  "a6dd24e1726b6e02ece5f8e9531317a7e9e66627bf37c3b5a975841940acc1ad": {
+    "source": "Device requires PIN verification. Enter any 4 digits on the device screen.",
+    "translation": "设备需要 PIN 验证。在设备屏幕上输入任意 4 位数字。"
+  },
+  "8705c634b764b7560b3167a28251089f5c8bfbaa3cfc8cc6116f4e22d0fb41eb": {
+    "source": "This template shows how to handle `UI_EVENT` in your app. Copy and adapt as needed.",
+    "translation": "这个模板展示如何在应用中处理 `UI_EVENT`。可复制并根据需要调整。"
+  },
+  "79dd91b62ae3066bf5803313757d145c5601154f29b045ce5283660a383c8b41": {
+    "source": "Private beta disclaimer",
+    "translation": "内测免责声明"
+  },
+  "63449309d2903780c6bbb3a6cb587fff85cb0556c122f3f59327d080807902e6": {
+    "source": "Agent Wallet is currently in private beta. When testing transfers, swaps, approvals, or other on-chain operations, use a dedicated test wallet and only small amounts you can afford to lose. Always verify the network, asset, amount, recipient, fees, and confirmation details before approving.",
+    "translation": "Agent Wallet 当前处于内测阶段。测试转账、兑换、授权或其他链上操作时，请使用专用测试钱包，并仅使用可承受损失的小额资金。确认前请务必核对网络、币种、金额、收款地址、手续费及确认信息。"
+  },
+  "60d54c079b4b002d72b4d624981ceb44253332131cb439eec10d2dc5cc6b7128": {
+    "source": "OneKey Agent Wallet · Private beta",
+    "translation": "OneKey Agent Wallet · 私密测试"
+  },
+  "6868dd6e94b87b028d91a39095d6c8e8db1acfc6a952b5e32a4e38edb234488d": {
+    "source": "Wallets, built for AI agents.",
+    "translation": "为 AI Agent 打造的钱包。"
+  },
+  "db8083f00f445bd0b475ba1a6012237b1d8ca27adbafa6e22b9668c5a92a431d": {
+    "source": "Skills let agents read balances, research markets, and prepare transactions. Choose an App Transfer or hardware wallet session, review the request, and confirm supported hardware signing on your OneKey device.",
+    "translation": "Skills 让 Agent 读余额、研究行情、准备交易。选择 App Transfer 或硬件钱包会话，审阅请求；受支持的硬件签名由用户在 OneKey 设备上确认。"
+  },
+  "a41d3838bcf5ab2b5f4009ca7a6b4999d1454a910c31aabc90c3658ad3af8c0a": {
+    "source": "Install skills",
+    "translation": "安装 Skills"
+  },
+  "42cc01c4b232b952f76d8619fa79ce8fc3e2eba748cbc014e641a1178743c55b": {
+    "source": "Explore capabilities",
+    "translation": "查看能力"
+  },
+  "1cc31c4dc0de320fbab52b16208b54e56b1cd9e72bde28aab18d534cb2f77f2c": {
+    "source": "Install",
+    "translation": "安装"
+  },
+  "9a38b185ee30d31290293e89a2290f0aa425af2e97166fad0333e12acd9017a3": {
+    "source": "Install skills for your agent.",
+    "translation": "为你的 Agent 安装 Skills。"
+  },
+  "90b045afcd438a81456a3fabce4d088ce961cfaf39446bc8af7b29271a9d1cf8": {
+    "source": "Use the open skills CLI to choose a supported agent and installation scope. Check its current compatibility before installing.",
+    "translation": "通过开源 skills CLI 选择受支持的 Agent 和安装范围，安装前查看其当前兼容列表。"
+  },
+  "60a9a937c6d3599959bbd67c6a0eb270894d28bd500162113f5fc48fcb674084": {
+    "source": "Copy",
+    "translation": "复制"
+  },
+  "b9268c18e80b5c19a2a95f72dbf41ad8b2f3c3ae6574f76abc975bca8a3c8a57": {
+    "source": "Install command",
+    "translation": "安装命令"
+  },
+  "80ddb9c277041bbe9713bbe3f834a3a1ede621f2734b3eda808c08db6fe411b8": {
+    "source": "Running multiple AI agents on the same machine? Pass --agent <name> to target a specific one.",
+    "translation": "一台机器装了多个 AI agent？加上 --agent <name> 参数指定其中一个。"
+  },
+  "7f7be37c147f40ea8b0632253fd6163571069694bdf6c563040a40b7f219c983": {
+    "source": "Skill-first wallet layer",
+    "translation": "Skill-first 钱包能力层"
+  },
+  "45639453fc6a28897c769df9f3ab80144b20af9e4cffd65e0fc4ded9962e601f": {
+    "source": "Everything an agent needs at the wallet boundary.",
+    "translation": "Agent 在钱包边界需要的能力，一次装好。"
+  },
+  "50313c78747201403bc8a6eaf88197c8360899312989a72ca570c5528e95f0bb": {
+    "source": "Wallet Skills",
+    "translation": "Wallet Skills"
+  },
+  "3be648f06d4b518e8ff84d0e0bb92b9f3e618d23c1ec34b62ecec603e8b69ee7": {
+    "source": "Install once, then ask for balances, receive addresses, transfers, swaps, markets, and safety checks in natural language.",
+    "translation": "安装一次后，用户用自然语言处理余额、收款地址、转账、swap、行情和安全检查。"
+  },
+  "87d1b72dd9c622ecb6a4220ecd3026d05b73ec0dc8796057a0ad7d661368c3cf": {
+    "source": "Agent Wallet Session",
+    "translation": "Agent Wallet 会话"
+  },
+  "888c2d71cf82261354d631dde59fe32d4a3930a8351446e391d6375abb8594ce": {
+    "source": "Pair a GUI-managed Agent Wallet through App Transfer without asking users to paste private keys into prompts.",
+    "translation": "通过 App Transfer 配对 OneKey GUI 管理的钱包，不要求用户把私钥粘贴进 prompt。"
+  },
+  "44b601fe0e4676c7d48b8b9b18c3e65c8a6e527e89ae77a17de9c350ddc5dd9f": {
+    "source": "Swap & Market Skills",
+    "translation": "Swap 和行情 Skills"
+  },
+  "214cc141c7c9fffc9582cb4761b5dedb1a749e39ad1592a9a4a75e2e85aa7bbe": {
+    "source": "Quote trades, research tokens, inspect liquidity, and stage execution only after the user sees the result.",
+    "translation": "报价交易、研究 token、查看流动性，并且只在用户确认后进入执行。"
+  },
+  "103137c784141ddc24038daff87db43d5f8a20e1cee86db581269a974b3d1b17": {
+    "source": "Security Checks",
+    "translation": "安全检查"
+  },
+  "cda331b6869d2618375770b02a6835af830c636249da996c2430aca4da8a3953": {
+    "source": "Token audits, transaction simulation, approval risk review, and chain/address mismatch blocking.",
+    "translation": "Token audit、交易模拟、授权风险审查，以及链和地址不匹配阻断。"
+  },
+  "f0692a251c83bbac55ea782c346c05278a6fba640ed239877017d1ceaafff5c7": {
+    "source": "Hardware Control",
+    "translation": "硬件控制"
+  },
+  "74b21fa61afcb09f04ef4597e6bb0c76c82f682112189e7611c875da281a90e9": {
+    "source": "Use a hardware-backed session for supported signing requests. The details shown on device depend on the chain, firmware, and CLI version.",
+    "translation": "通过硬件钱包会话处理受支持的签名请求。设备显示的交易详情取决于链、固件和 CLI 版本。"
+  },
+  "b658883b9e3ce1854d22d0bdd3a60930dc47f88ef45e51a53e0e79bc73d55da4": {
+    "source": "Schema-Backed Routing",
+    "translation": "Schema 路由"
+  },
+  "7aaf4155c286d152ca82dfa2c45e2f96ea1b88b773ea6a1b210771d6827680fa": {
+    "source": "Skills read the live command schema before choosing parameters, so docs do not need to lead with raw CLI recipes.",
+    "translation": "Skills 先读取实时命令 schema 再选择参数，文档不需要把原始 CLI recipes 放在最前面。"
+  },
+  "556df0e4b13e0f6dc704b8437f5d52f40b344215962341250213fe3e334ad973": {
+    "source": "Start now",
+    "translation": "现在开始"
+  },
+  "2ec9d0b5f75e3f47840ad4d03f1e990357d3970f720ec7335f0aae15389b9afd": {
+    "source": "Install skills. Test your first workflow.",
+    "translation": "安装 Skills，测试第一个流程。"
+  },
+  "898d8688546ba3fc7b84404a0fcdd81863780e41a449b8044d43b866abf54d2e": {
+    "source": "Read the quickstart",
+    "translation": "查看快速开始"
+  },
+  "5d51802015eed78fa02bcb4b01929fba862dac0e2a84db51b45b600b619ff97d": {
+    "source": "Browse the GitHub repo",
+    "translation": "在 GitHub 查看源码"
+  },
+  "0a031163535f32800237a9ecc2146880493e51e35d6c0966f20b5be4cf663f38": {
+    "source": "A OneKey hardware wallet displaying a Gnosis Safe transaction flagged as a high-risk delegatecall, awaiting user approval on device.",
+    "translation": "OneKey 硬件钱包显示一笔被识别为高风险 delegatecall 的 Gnosis Safe 交易，等待用户在设备上确认。"
+  },
+  "ac83f0fac74725fcea5144eb6110abf9df6b9a8068bf2493d84c706dbfd1cc40": {
+    "source": "OneKey Classic 1s",
+    "translation": "经典款 Classic 1s"
+  },
+  "13cbf1d9aa6a75b90b5ffa4c3041badfdefab38deb9df1c3d36ed11ee6331b31": {
+    "source": "Battery-free edition",
+    "translation": "Classic 1s Pure 无电池版本"
+  },
+  "bb23ed4611674c63c796a0dc7a16a53b6437a05c9980f5b82844d7326a297f6e": {
+    "source": "Compact USB-only wallet",
+    "translation": "紧凑型 USB 钱包"
+  },
+  "3fb7a0ac11ab410b4b4d054aa94db2d98eeaa00c4de833009beafa7b883158cf": {
+    "source": "Full touchscreen experience",
+    "translation": "全触屏体验"
+  },
+  "143712951e388f974e4b8248d8b0cb990983a492010015b6053966b821a36019": {
+    "source": "Premium with fingerprint security",
+    "translation": "旗舰版，支持指纹识别"
+  },
+  "179561e8122cdf9486d16d9d242f7127dda1678a8beb1b40a92a8c1857486395": {
+    "source": "Protocol V2 professional edition",
+    "translation": "Protocol V2 专业版"
+  },
+  "70abcbf856c59d9486879c6a2213568b0b33c1a89dc9ba65590e4ed8d6ecefb0": {
+    "source": "Protocol V2 compact edition, no camera",
+    "translation": "Protocol V2 轻量版，无摄像头"
+  },
+  "c25e2dced0dd975bd3e6b87f54936e0af6982c4d1d0e619e8e4cc24b81d3fda4": {
+    "source": "Support status for Bluetooth, USB, Air-Gap, and protocol family",
+    "translation": "蓝牙、USB、Air-Gap 与协议族支持状态"
+  },
+  "4853c77e7203fef97c2d6b892ccd5229736db324f9efaa954d1000bb73ba3bbd": {
+    "source": "Device",
+    "translation": "设备"
+  },
+  "48807522d424a85130aafe00eb20365e59f180ff32eb81eb1b15cfe7dc38f61e": {
+    "source": "Bluetooth",
+    "translation": "蓝牙"
+  },
+  "35019766daafd2cd766b80e3317609e1909037d403b88803b0f773742552ec4e": {
+    "source": "USB",
+    "translation": "USB"
+  },
+  "8000c0466021ba3a6a311fd840938a665d7f223c5b3ecd93fe25cd4c45b1c8b0": {
+    "source": "Air-Gap",
+    "translation": "Air-Gap"
+  },
+  "ceebdea0aa8bc0874ec4b67d7b58a796f97970268a2428924277a1ee62794313": {
+    "source": "Protocol",
+    "translation": "协议"
+  },
+  "acfa197ce6ff35c5d6d7e87691ff0103903087c1340af14ea72b1085ef136581": {
+    "source": "Docs Assistant",
+    "translation": "文档助手"
+  },
+  "b013aa01346d38891d8c2ab96a74575039c642f3a1a56c328709df0ce144377a": {
+    "source": "Ask AI",
+    "translation": "向 AI 提问"
+  },
+  "6e3ffaf5a90e2d4fe862500ec6e00bc3cfbf5e529178adb2437e0a338ee24da1": {
+    "source": "Search docs, APIs, and examples...",
+    "translation": "搜索文档、API 与示例..."
+  },
+  "baf9037e9fd8d74c1db9f297516a12474a4ad1a589a6bd1947f21bb8dcd215b6": {
+    "source": "No matching documentation. Try a method name or a different keyword.",
+    "translation": "没有匹配结果，试试更短的关键词。"
+  },
+  "0883c74bd34025d4f45eef55e13d9f3d6ca44ea0ced1246e97c5faa67ade1dda": {
+    "source": "Documentation Results",
+    "translation": "文档结果"
+  },
+  "0ebda98a7987a4924e46fcebe7e88610587c1053b0022cab8778837a20b11551": {
+    "source": "Still blocked? continue in Ask AI.",
+    "translation": "找不到答案？切换 Ask AI 继续提问"
+  },
+  "a1777cbc0d73ec8f493d621560d9a2db5288620d368f56312c09f87968da680e": {
+    "source": "Ask AI with this query",
+    "translation": "向 AI 提问"
+  },
+  "0ecb3094d27c859b0ef26c422d7ef0f5bb83eb0553e194f443cb9b7071bbd079": {
+    "source": "Ask AI is not configured. Set NEXT_PUBLIC_DOCS_AI_API_URL first.",
+    "translation": "AI 助手暂时不可用，请使用文档导航。"
+  },
+  "1845797e8d3485a7f074441bb372ffec337550c4afe481253870dd3c5fbed173": {
+    "source": "AI assistant",
+    "translation": "AI 助手"
+  },
+  "7d877ffe824cc38b91bf63d8f10cb6c227de4ff448684e9113a5e310ba894046": {
+    "source": "I answer with OneKey Hardware SDK docs and source citations.",
+    "translation": "我会基于 OneKey Hardware SDK 文档回答并给出来源。"
+  },
+  "21fdb7ef249af0aa707a0e4859097b2f5f1b10f5cec95c17a39de1209af9bf8f": {
+    "source": "EXAMPLE QUESTIONS",
+    "translation": "EXAMPLE QUESTIONS"
+  },
+  "7687b4d1120f96f57806021c5263c01ce2f05d5dccfbc34c35f2aa9149b1a593": {
+    "source": "I found the most relevant documentation sources below. Ask a more specific follow-up for a grounded answer.",
+    "translation": "我先找到了这些相关文档来源，你可以继续追问更具体的问题。"
+  },
+  "d6e6fbf6657181813b7e59fa2fccefa20686d6febc2efe6d60832c59edd679d0": {
+    "source": "Ask your question, e.g. How do I connect a device?",
+    "translation": "输入问题，例如：如何初始化 SDK？"
+  },
+  "ca96c2c83cbb3b89fd5201f7253daccc17fde7052391f5cbd16421b28c162e7e": {
+    "source": "Generating",
+    "translation": "生成中"
+  },
+  "a1807193e5d05d80249b6e444e06b481b165f25b4d7c3f0bccc8cf2d72cd3233": {
+    "source": "Send",
+    "translation": "发送命令"
+  },
+  "add982482ed8c016a67214c15a8a23d4b7254cac4a84794f68e2d13cd6f45402": {
+    "source": "Stop",
+    "translation": "停止"
+  },
+  "e259e046e453c2e1c76ca26073137507e9105ec62dc9075a8bf24608e11d4cf4": {
+    "source": "Retry",
+    "translation": "重试"
+  },
+  "7c17e2e641e70f20971558322c7d124e57dd0d549ae9666b13b4ef9b965d04dc": {
+    "source": "Request failed. Please retry.",
+    "translation": "请求失败，请重试。"
+  },
+  "32d300dc8fc5d954005135b307c9615c2697d169d20207c394fa97ffeff8d6dc": {
+    "source": "Sources",
+    "translation": "资料来源"
+  },
+  "43d2ac8d31cae15385846ed5ac108d77b52e8e7941d47d62aa7cebc29817dd35": {
+    "source": "Powered by OneKey",
+    "translation": "Powered by OneKey"
+  },
+  "ec4222b05f4aa0dd5dd7249bf01c4281df5777c9f79876add5edd6ed247f0d0f": {
+    "source": "WebUSB connection",
+    "translation": "WebUSB 连接"
+  },
+  "ba56d0ce13f2478fb56693ac38022c8e83823f877d168e9d5bc4942195ff028b": {
+    "source": "How do I connect to a OneKey hardware device via WebUSB in the browser? Give me a complete code example from SDK install, initialization, device authorization to the first API call.",
+    "translation": "如何在浏览器中通过 WebUSB 连接 OneKey 硬件设备？请给出从安装 SDK、初始化、设备授权到首次调用的完整代码示例。"
+  },
+  "fc903dabc160fec89c044c63f91037df0133c78b41bb0aa77647a8d8ade1f5cb": {
+    "source": "React Native BLE",
+    "translation": "React Native 蓝牙连接"
+  },
+  "436b8373655ee63f9f7fafdaecc011812fa35d9a375924618acf26152ed29f07": {
+    "source": "How do I establish a BLE connection to a OneKey hardware device in a React Native app using @onekeyfe/hd-ble-sdk? Include installation, permission setup, and a full initialization example.",
+    "translation": "如何在 React Native 项目中使用 @onekeyfe/hd-ble-sdk 通过蓝牙 BLE 连接 OneKey 硬件设备？请包含安装、权限配置和完整初始化示例。"
+  },
+  "6bbe3bb5fed0959e01f523d32ca7aeefab5f2a118fe3f386805a7e2d81a5ee02": {
+    "source": "EVM transaction signing",
+    "translation": "EVM 交易签名"
+  },
+  "fb6e4d1fcee499c43fb24509d4c5c095adf83e1dad919602803ad41aafcad6e9": {
+    "source": "Show me the complete flow and code example for signing an EVM transaction using the OneKey Hardware SDK, including PIN/Passphrase handling.",
+    "translation": "请给出使用 OneKey Hardware SDK 签名一笔 EVM 交易的完整流程和代码示例，包括 PIN/Passphrase 处理。"
+  },
+  "faa8881de36deb0d153234843c16852dd01ae8197f80d6c18fdeacf7121ee373": {
+    "source": "AI Agent integration",
+    "translation": "AI Agent 集成"
+  },
+  "6352b3ab1fe977575889d154d176131847871666814c9c6cdeb410f7b94b3eef": {
+    "source": "How can AI agents like Claude Code interact with OneKey hardware wallets via the CLI? Explain the installation, supported chains, and security model.",
+    "translation": "如何让 AI Agent（如 Claude Code）通过 CLI 与 OneKey 硬件钱包交互？请介绍安装、支持的链和安全模型。"
+  },
+  "915c65ad0dc426f328eb43ca22a2e054430f91a13dc378705be42e57024539c0": {
+    "source": "Good ideas.",
+    "translation": "让好想法，"
+  },
+  "836b0a482a48e732d3e004711a4de7221744e7f2f3e12c09ed08e75362ca40bd": {
+    "source": "Built on trust.",
+    "translation": "安心落地。"
+  },
+  "0bb45ac069b934564c04f124acd74b172f6231fde415bfdc9bf2dc04d827616c": {
+    "source": "HARDWARE, MEET SOFTWARE.",
+    "translation": "硬件与软件，相互连接。"
+  },
+  "61cb70dfe587bca274c57b38457ef940b7fef36f1c5ec1481a2507b208b3cf91": {
+    "source": "Your first device.",
+    "translation": "连接第一台设备。"
+  },
+  "bac6dbd04a9e754c6bd14372b04cb5c8b341c46f4cf3e70d79a453301f02cac0": {
+    "source": "Your first address.",
+    "translation": "确认第一个地址。"
+  },
+  "23f6b10180f243b0ef69786cce23ad736a0d3f7f1ca9c43186b9f883a7f84eb1": {
+    "source": "Initializing Mock...",
+    "translation": "初始化 Mock..."
+  },
+  "12a71908655111984f444461b72ed5e58ea5568c4aa07ec20d9ed701c49aefac": {
+    "source": "Mock not ready",
+    "translation": "Mock 未就绪"
+  },
+  "e8b94ae3969d2272fe23b49890940f422932dc3f5d13a0c70862a47e5fe7984d": {
+    "source": "Mock unavailable",
+    "translation": "Mock 不可用"
+  },
+  "84a49f2ab871ee1eed31fcf154bd0bc90ed3326d826ffa938ad126e1692eaa21": {
+    "source": "Canceling...",
+    "translation": "取消中..."
+  },
+  "4d4b0c7d8bab2abc2558cbd83ea7a6bf9bfa0abe037b46a93ebf6d4eb87cb855": {
+    "source": "In progress...",
+    "translation": "交互中..."
+  },
+  "ee3dd9c29d40bc2edd08ac56a45c401d0d75112614f32d6251f408c6b12210ae": {
+    "source": "Waiting for PIN...",
+    "translation": "等待输入 PIN..."
+  },
+  "f36e2b8e4e3cee94d3bfc23a6b94b951b955960a77be7bea7a0933ae8bf89ced": {
+    "source": "Verifying PIN...",
+    "translation": "校验 PIN..."
+  },
+  "c4b78ecf71eafa2c3f368843c67fb880cec053c59f4098bdb0346c3aebcb8b2c": {
+    "source": "Waiting for confirmation...",
+    "translation": "等待确认..."
+  },
+  "1cd984e75d4914668b244587c871c5d8c61093e91f2f6305a009e5c0bcdc429c": {
+    "source": "Confirming...",
+    "translation": "确认中..."
+  },
+  "004fbc0c38d77a1c2668443d6a56b3bcc6d5fcfab64015f96113ff10f594c410": {
+    "source": "Mock",
+    "translation": "Mock"
+  },
+  "20520947192a6ff4325244f68cb63054499b01e36b2c30e40726f0722dab1451": {
+    "source": "Failed",
+    "translation": "失败"
+  },
+  "857bde26f84c783a49424a068a959f577f6565fd75cb4bb29386f17f3b9dc983": {
+    "source": "Unlocked",
+    "translation": "已解锁"
+  },
+  "c90d2c587de61b295d18f740be6fa4899468a91e7fb73b99db0e8f3c70d6f81e": {
+    "source": "Model",
+    "translation": "设备型号"
+  },
+  "c2a0a0c5c421f36a01c1ebeb9e5df3d24c9a4d3e690dc4d0b58e42a4796374d1": {
+    "source": "Device stage",
+    "translation": "设备台"
+  },
+  "edd44c602b47b1bc691fec7d4d15a20556423a30ec3efddfa415ca292ca35bab": {
+    "source": "Interaction builder",
+    "translation": "交互编排"
+  },
+  "2afa98086ed0982468f0a12df7dba8a963af4a6207f57cefa93918eb434ffe1e": {
+    "source": "Choose command",
+    "translation": "选择命令"
+  },
+  "fd8d0f46e720a0be56fc50dd94bc377aea309e4e2436119816ec560596d99cdc": {
+    "source": "Parameters",
+    "translation": "参数设置"
+  },
+  "23c61c8fa622a475988230bcb4e2a8521d6fc1d707ffbe33bf7103a10b91c3e7": {
+    "source": "No parameters needed for this command.",
+    "translation": "该命令无需参数。"
+  },
+  "0bbd89ebca43da470abbc1cb8f60dd512987a9afb47883419900c22782c5353b": {
+    "source": "Clear logs",
+    "translation": "清空日志"
+  },
+  "c93b0f3e5052b6d232190e661ff5dcc15e4366bf73524a93ffd4e49ee6981e96": {
+    "source": "Example code",
+    "translation": "示例代码"
+  },
+  "18c2a66f8efd2245b83ac8b759ce7bbc9e78f5d70198cc0fc5ec87fb30a91d9c": {
+    "source": "Current example",
+    "translation": "当前示例"
+  },
+  "ff49c679b4aecff4b61be3bdeaee553ad120ff22b7ca87f179dbc161351098c0": {
+    "source": "Command panel",
+    "translation": "交互面板"
+  },
+  "781b6345545a64ee94958ecb1fb0b8d2760405749bf23cd303027dc70f8174ca": {
+    "source": "showOnOneKey (confirm on device)",
+    "translation": "showOnOneKey（在设备上显示并确认）"
+  },
+  "31e8730d962941e4080b3d83f1d9d00e4b0f87ff61b21f64a5bd72949c2682f8": {
+    "source": "Device screen (Mock)",
+    "translation": "设备屏幕（Mock）"
+  },
+  "c278e82fb9b7920df13d2c6db440f029b46df0881e7f8e370bfbd0ee7846995e": {
+    "source": "Terminal logs",
+    "translation": "终端日志"
+  },
+  "21ae529ca570af387ea5668e636ae88fde1e858f344a644f57a6af368cd0df2e": {
+    "source": "No logs yet. Try unlocking the device or send a command to start.",
+    "translation": "暂无日志。试试先解锁设备并输入 PIN，或发送命令触发交互。"
+  },
+  "2cbb5b286cf4990fbec8aeb0b19f4349c8298ee297ddedfcb3b9640cd8f9ebb3": {
+    "source": "Mock demo (no real hardware)",
+    "translation": "Mock 演示（不连接真实硬件）"
+  },
+  "c6c82ff3221c85a0d4e0c921e017d24c850f26dd4a52b04aef08b05037579806": {
+    "source": "PIN: any 4 digits (not validated)",
+    "translation": "PIN：任意 4 位（Mock 不校验）"
+  },
+  "0acfa56c3f38291e79ec06ee0fbc9340b968ace490dd46889944a76928cd75c3": {
+    "source": "Open OneKey Emulator",
+    "translation": "打开 OneKey Emulator"
+  },
+  "3d0cd5ce43463bb984188ce893a919e656424626458709496105ac86aef5f2f5": {
+    "source": "Developer View",
+    "translation": "开发者视角"
+  },
+  "25f31e3abaae6657895fd8173ac82cd639f1e8eddd4a4e6ce90e0569f62c5b2e": {
+    "source": "Example",
+    "translation": "示例代码"
+  },
+  "43771eea82283882a9cb73814a5c9b0ced777ddb8b27be816d7944ec7022091c": {
+    "source": "Callbacks",
+    "translation": "回调处理"
+  },
+  "aadbf1386ff26b74f120f4f2e2fba63d6e6c95ebf768e3ea8019bf6bc1ef9b67": {
+    "source": "Result",
+    "translation": "结果"
+  },
+  "7e6b0c01716f7d770dadb14475a54d282a9d0eccde0b124340659335b02589b1": {
+    "source": "No result yet. Send a command to see output.",
+    "translation": "暂无结果。发送命令后这里会展示返回值。"
+  },
+  "75eb02856c0d27c006360d6b44cac1ca2883883b1040133edbbd0d0d377f525a": {
+    "source": "Show raw logs",
+    "translation": "查看完整日志"
+  },
+  "a3dd7753267500e33761506a917c41d479dc6edbf8bc3498d4d1fc92d132cfa6": {
+    "source": "No payload.",
+    "translation": "无返回数据。"
+  },
+  "3a4b5b1bd4df3c200ce3f78e1a91b1603629a550d117cb93d14e317af2848438": {
+    "source": "Interaction guide",
+    "translation": "交互导览"
+  },
+  "bd9cfe1f735700a60f194c3012401b2837e15532dbd9924cbe7bbcd88598fbeb": {
+    "source": "Wait for the result to return.",
+    "translation": "确认后等待结果回传。"
+  },
+  "9cd4034fdc4e3469e7bfd14ee890e24053edef21264c98c11406f14478d57b17": {
+    "source": "The Result panel will show the payload.",
+    "translation": "Result 面板会显示 payload。"
+  },
+  "6c93ff20c98dd1cae0ee68ba69924f8447fd3db7c826804070fadb7df704a600": {
+    "source": "Result returned. Review the payload on the right.",
+    "translation": "结果已返回，请查看右侧 payload。"
+  },
+  "1339525ec4af3ac766512b4a55e8da0817f27a2092936c48ac00307c2025b840": {
+    "source": "Switch to Callbacks for UI_EVENT details.",
+    "translation": "需要事件细节可切到 Callbacks。"
+  },
+  "31d3a08968d571d7cb9eb6d9aca1a499b7e522168696bddc5219438a6f68d7b5": {
+    "source": "Callback templates are on the right.",
+    "translation": "右侧是回调模板，复盘 UI_EVENT。"
+  },
+  "d9c312ee3cae5c4b80d4e9abebddb56ba28ff8acb9db9a60413e19ecb61b29b1": {
+    "source": "Handle the REQUEST_* events as indicated.",
+    "translation": "按 REQUEST_* 事件处理即可。"
+  },
+  "5e633d14b74ea120a12be6e72125dedb5e11b6a1169ac37d4d4c3f6e899120fd": {
+    "source": "searchDevices",
+    "translation": "searchDevices"
+  },
+  "8980bc04ee083a93a633b7c5e7d8d58711a21ec7e82bdff9684e3f1b1b904221": {
+    "source": "btcGetAddress",
+    "translation": "btcGetAddress"
+  },
+  "c2980e98b8bd87d959c623f487a782de279d137a61412180e1ba55514aafb9a6": {
+    "source": "btcSignMessage",
+    "translation": "btcSignMessage"
+  },
+  "6024f177d0a53f0e98983d80ae1e4c27922c699959324bca50cf404d5fee93b3": {
+    "source": "Swipe up to show apps",
+    "translation": "向上滑动查看应用程序"
+  },
+  "a5e30ebdad5f25669eacae54f19500232885d50637fb7216afa9810f915840fe": {
+    "source": "Processing...",
+    "translation": "处理中..."
+  },
+  "dfca34ad54fe2a4ab86aa4c0ada072a32566926b7fbb7c54fe8f295f99c27478": {
+    "source": "Tap to unlock",
+    "translation": "轻触屏幕以解锁"
+  },
+  "b52929c048dee5ca7d54d93c65ed2f1700abf1896da3dd18eed765cf9a8067bd": {
+    "source": "QR Code",
+    "translation": "二维码"
+  },
+  "08bb9a43f76af92f65114bec01a5430a5fba45fd8eaa6fb4116e509ac5dfb1d9": {
+    "source": "Address",
+    "translation": "地址"
+  },
+  "64b38a8b3369c4ae5bc4b463297196c1133cc6cb8a7eb1bcabbf288f5131a254": {
+    "source": "My Address",
+    "translation": "我的地址"
+  },
+  "2b348244a85c16934199a7e1ae38777180e1f90b5d222b3fd4206e9173e94c45": {
+    "source": "Open source",
+    "translation": "开放源码"
+  },
+  "6eca923375f26a3301e0c4b545bd230399daf72faf47020d873055a442f7c3fb": {
+    "source": "TypeScript SDKs",
+    "translation": "TypeScript SDK"
+  },
+  "b58ec81c1260cc3e74398cff7215656b98f9145f5a116995e07d7c97ec0c35d2": {
+    "source": "User-confirmed signing",
+    "translation": "设备端确认签名"
+  },
+  "7093136b9c7a0e347f9cd6f0cf0670992274632263f369077c461a069f1389b8": {
+    "source": "SDK is calling `{command}`. Check the example code on the right.",
+    "translation": "SDK 正在调用 `{command}`。右侧是示例代码。"
+  },
+  "fabe419a3aa16df329a11342752ac2fbf3b93bbdfeddb327803cc55734b25c89": {
+    "source": "SDK emits `UI_EVENT: REQUEST_BUTTON`. Device shows address for confirmation.",
+    "translation": "SDK 触发 `UI_EVENT: REQUEST_BUTTON`。设备显示地址等待确认。"
+  },
+  "83ebab7074c961e683b79e5b81beb0fa6be87f9e32c6d94f1887b340cd0b380d": {
+    "source": "SDK emits `UI_EVENT: REQUEST_BUTTON`. Device awaits user confirmation.",
+    "translation": "SDK 触发 `UI_EVENT: REQUEST_BUTTON`。设备等待用户确认。"
+  },
+  "1c00cf86b876956685ce93216898952e9b05c16afd73f261abcf940f5aa53303": {
+    "source": "Results: {count}",
+    "translation": "{count} 条结果"
+  },
+  "05c3fd4c7bf0b4e9ab563c7ef18f32dc4fe0fc53158ac9c4c257f6d06b0ab7eb": {
+    "source": "{network} Address",
+    "translation": "{network} 地址"
+  },
+  "ff143c923bdc7fef14b50b0436e618c05fe561c45165ced2bd6b1bf9c86d00dc": {
+    "source": "Last updated on",
+    "translation": "最后更新于"
+  }
+}

@@ -41,13 +41,13 @@ description: 发送交易到网络
 const txHash = await window.$onekey.ethereum.request({
   method: 'eth_sendTransaction',
   params: [{
-    from: '0x你的地址...',
-    to: '0x接收方地址...',
-    value: '0xDE0B6B3A7640000', // 1 ETH（wei）
+    from: '0xYourAddress...',
+    to: '0xRecipientAddress...',
+    value: '0xDE0B6B3A7640000', // 1 ETH in wei
   }]
 })
 
-console.log('交易哈希:', txHash)
+console.log('Transaction hash:', txHash)
 ```
 
 ### 调用合约方法
@@ -56,10 +56,9 @@ console.log('交易哈希:', txHash)
 const txHash = await window.$onekey.ethereum.request({
   method: 'eth_sendTransaction',
   params: [{
-    from: '0x你的地址...',
-    to: '0x合约地址...',
-    data: '0xa9059cbb...', // 编码后的函数调用
-    gas: '0x5208',
+    from: '0xYourAddress...',
+    to: '0xContractAddress...',
+    data: '0xa9059cbb...', // Encoded function call
   }]
 })
 ```
@@ -70,8 +69,8 @@ const txHash = await window.$onekey.ethereum.request({
 const txHash = await window.$onekey.ethereum.request({
   method: 'eth_sendTransaction',
   params: [{
-    from: '0x你的地址...',
-    to: '0x接收方地址...',
+    from: '0xYourAddress...',
+    to: '0xRecipientAddress...',
     value: '0xDE0B6B3A7640000',
     maxFeePerGas: '0x2540BE400',      // 10 Gwei
     maxPriorityFeePerGas: '0x3B9ACA00', // 1 Gwei
@@ -97,3 +96,5 @@ const txHash = await window.$onekey.ethereum.request({
 - 如未提供 `gas`，钱包会自动估算
 - 对于支持 EIP-1559 的链，建议使用 `maxFeePerGas` 而非 `gasPrice`
 - `from` 地址必须是用户已连接的账户
+
+不要将合约调用的 gas 上限直接设为原生币转账常见的 21,000。应让钱包估算，或调用 `eth_estimateGas`。示例地址和调用数据均为占位值。返回交易哈希不代表执行成功，请在同一网络查询交易回执。

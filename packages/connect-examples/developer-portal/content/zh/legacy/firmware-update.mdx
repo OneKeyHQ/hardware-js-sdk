@@ -1,0 +1,16 @@
+---
+title: "原始 firmwareUpdate API"
+description: "历史 API。请先阅读当前[固件更新指南](/zh/hardware-sdk/firmware-update)，按 SDK、传输方式、设备和发布版本选择适用方法。"
+---
+
+# 原始 firmwareUpdate API
+
+> 历史 API。请先阅读当前[固件更新指南](/zh/hardware-sdk/firmware-update)，按 SDK、传输方式、设备和发布版本选择适用方法。
+
+原始 `firmwareUpdate(connectId, params)` 文档接受 `updateType`（`firmware` 或 `ble`）、可选 `binary`（`ArrayBuffer`）和可选版本数组，描述了根据发布资源选择版本或提供二进制文件两种方式。
+
+旧示例中的版本数组不是当前版本推荐。不要复用写死的升级目标或未验证的二进制文件。V2、V3、V4 固件方法名称表示 API 版本，不代表设备 Protocol V2 兼容性。
+
+使用官方发布元信息，核对设备、固件与传输方式。更新应由用户明确发起，保留设备验证与确认，等待操作结果并处理重连。下载成功或传输调用成功本身不代表升级完成。
+
+[原始源码文档](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-hardware/hardware-sdk/api-reference/device-api/firmwareupdate.md)保留供维护旧应用时查阅。

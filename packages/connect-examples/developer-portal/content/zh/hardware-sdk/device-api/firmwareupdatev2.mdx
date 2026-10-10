@@ -1,26 +1,33 @@
 ---
 title: firmwareUpdateV2
+description: 按发布信息更新受支持设备的固件或蓝牙固件。
 ---
 
 # firmwareUpdateV2
 
 ## 固件更新 (V2)
 
-新一代固件更新流程。支持下载和更新主固件及蓝牙固件。必须显式传入 `platform` 参数。
+Protocol V1 固件更新流程。支持下载和更新主固件及蓝牙固件。必须显式传入 `platform` 参数。
 
 ```typescript
+// Select versions from verified release metadata for this device.
+declare const targetFirmwareVersion: number[];
+
 const res = await HardwareSDK.firmwareUpdateV2(connectId, {
   platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
-  updateType: 'firmware', // 或 'ble'
-  // 方式 A：基于版本号更新（推荐）
-  version: [2, 10, 0],
-  // 方式 B：自定义二进制文件（谨慎使用）
+  updateType: 'firmware', // or 'ble'
+  // Option A: version-based update (recommended)
+  version: targetFirmwareVersion,
+  // Option B: custom binary (use with caution)
   // binary: ArrayBuffer,
-  // 可选标志
+  // Optional flags
   forcedUpdateRes: false,
   isUpdateBootloader: false,
 });
+if (!res.success) throw new Error(res.payload.error);
 ```
+
+示例假定用户已经选择目标设备并批准本次升级。目标版本应来自该设备的已验证发布元数据，不要硬编码从文档复制的版本号。
 
 ### 参数
 

@@ -5,11 +5,11 @@ description: Integrate OneKey wallet in mobile web apps and WebViews using deepl
 
 # Mobile & Deeplinks
 
-Integrate OneKey wallet in mobile web apps and WebViews using deeplinks and universal links.
+Open OneKey from a mobile dApp with a WalletConnect pairing URI. A deep link opens the wallet app; connection succeeds only after the user approves the WalletConnect session.
 
 ## Overview
 
-When building mobile web apps or integrating within WebViews, you can use OneKey's deeplink system to connect to the wallet app directly.
+Create a fresh pairing URI with your WalletConnect integration, then open one of the links below from a user action. Keep the session proposal active and wait for its approval or rejection. Inside the OneKey dApp browser, use the injected provider for the target chain instead.
 
 ## Deeplink Formats
 
@@ -19,13 +19,13 @@ When building mobile web apps or integrating within WebViews, you can use OneKey
 onekey-wallet://wc?uri={encodeURIComponent(wcUri)}
 ```
 
-### Universal Link (Recommended)
+### Universal Link
 
 ```
 https://app.onekey.so/wc/connect/wc?uri={encodeURIComponent(wcUri)}
 ```
 
-> **Tip:** Universal links are recommended as they work more reliably across different mobile platforms and browsers.
+> Test app opening and the fallback on the iOS/Android versions and browsers you support. App installation, operating-system link settings, and embedded browser restrictions affect the result.
 
 ## Usage Example
 
@@ -39,46 +39,22 @@ const customSchemeLink = `onekey-wallet://wc?uri=${encodeURIComponent(wcUri)}`
 // Option 2: Universal link (recommended)
 const universalLink = `https://app.onekey.so/wc/connect/wc?uri=${encodeURIComponent(wcUri)}`
 
-// Open the link
-window.location.href = universalLink
-```
-
-## Platform-Specific Notes
-
-### iOS
-
-- Universal links work best when the OneKey app is installed
-- If the app is not installed, the universal link will redirect to the App Store
-
-### Android
-
-- Custom scheme links require the OneKey app to be installed
-- Universal links fall back gracefully to web if the app is not present
-
-## Best Practices
-
-1. **Detect mobile environment** - Only show deeplink options on mobile devices
-2. **Provide fallback** - Offer alternative connection methods if deeplinks fail
-3. **Use universal links** - They provide better UX than custom schemes
-4. **Handle timeouts** - If the user doesn't return to your app, show a retry option
-
-```javascript
-// Detect mobile environment
-const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-
-if (isMobile) {
-  // Use deeplinks for mobile
+// Call this from the user's Connect button.
+function openOneKey() {
   window.location.href = universalLink
-} else {
-  // Use regular WalletConnect QR for desktop
-  showQRCode(wcUri)
 }
 ```
+
+## Connection and fallback handling
+
+- Open the link from an explicit Connect button. Some browsers block app launches without a user action.
+- Handle WalletConnect session approval, rejection, expiration, and disconnect events. Returning to the browser alone does not prove that a session was approved.
+- Offer a QR code on desktop and an install or retry option when app opening fails. Do not assume a universal link always redirects to an app store.
+- Generate a new pairing URI when the old one expires. Do not put a live pairing URI in analytics or application logs.
+- Prefer your wallet connection library's mobile flow when available; it manages the pairing and session lifecycle.
 
 ## Related
 
 - [RainbowKit](/en/connect-to-software/wallet-ui/rainbowkit/) - Handles mobile detection automatically
 - [Web3Modal](/en/connect-to-software/wallet-ui/web3modal/) - Built-in mobile support
 - [Provider API](/en/connect-to-software/provider/eth/) - Direct provider integration
-
-

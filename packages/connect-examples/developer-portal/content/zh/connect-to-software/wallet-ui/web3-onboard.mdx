@@ -1,21 +1,205 @@
 ---
+title: Web3-Onboard
 description: 将 OneKey 集成到 Web3 Onboard (EVM)
 ---
 
-# Web3 Onboard
+import { Callout } from 'nextra/components'
 
-## 文档
+# Web3-Onboard
 
-- 官方文档：https://onboard.blocknative.com/docs/overview/introduction
+Blocknative 的多钱包连接库，可用于 React、Vue 和原生 JavaScript。
+
+<Callout type="info">
+注入式钱包模块可自动检测 OneKey。请使用实际安装的 OneKey 和库版本验证检测结果。
+</Callout>
+
+---
 
 ## 安装
 
 ```bash
-yarn add @web3-onboard/core @web3-onboard/injected-wallets
-# 或
 npm install @web3-onboard/core @web3-onboard/injected-wallets
 ```
 
-## 快速开始 / Demo
+---
 
-<iframe src="https://codesandbox.io/embed/web3-onboard-demo-g462j4?autoresize=1&fontsize=14&hidenavigation=1&theme=dark" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+<span id="快速开始--demo" />
+
+## 基础设置
+
+```javascript
+import Onboard from '@web3-onboard/core'
+import injectedModule from '@web3-onboard/injected-wallets'
+
+const injected = injectedModule()
+
+const onboard = Onboard({
+  wallets: [injected],
+  chains: [
+    {
+      id: '0x1',
+      token: 'ETH',
+      label: 'Ethereum Mainnet',
+      rpcUrl: 'https://mainnet.infura.io/v3/YOUR_INFURA_KEY',
+    },
+    {
+      id: '0x89',
+      token: 'POL',
+      label: 'Polygon',
+      rpcUrl: 'https://polygon-rpc.com',
+    },
+  ],
+  appMetadata: {
+    name: 'My dApp',
+    icon: '<svg>...</svg>',
+    description: 'My dApp description',
+  },
+})
+
+// Connect wallet
+async function connect() {
+  const wallets = await onboard.connectWallet()
+  console.log('Connected wallets:', wallets)
+}
+```
+
+---
+
+## React 集成
+
+运行 `npm install @web3-onboard/react`，安装 React 模块。
+
+```tsx filename="App.tsx"
+import { init, useConnectWallet, useWallets } from '@web3-onboard/react'
+import injectedModule from '@web3-onboard/injected-wallets'
+
+const injected = injectedModule()
+
+init({
+  wallets: [injected],
+  chains: [
+    {
+      id: '0x1',
+      token: 'ETH',
+      label: 'Ethereum',
+      rpcUrl: 'https://mainnet.infura.io/v3/YOUR_KEY',
+    },
+  ],
+})
+
+function App() {
+  const [{ wallet, connecting }, connect, disconnect] = useConnectWallet()
+  // useWallets() is available when managing multiple connections.
+
+  if (wallet) {
+    return (
+      <div>
+        <p>Connected: {wallet.accounts[0].address}</p>
+        <button onClick={() => disconnect({ label: wallet.label })}>
+          Disconnect
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button disabled={connecting} onClick={() => connect()}>
+      {connecting ? 'Connecting...' : 'Connect Wallet'}
+    </button>
+  )
+}
+```
+
+---
+
+## 其他钱包模块
+
+支持 WalletConnect 移动端钱包时：
+
+```bash
+npm install @web3-onboard/walletconnect
+```
+
+```javascript
+import walletConnectModule from '@web3-onboard/walletconnect'
+
+const walletConnect = walletConnectModule({
+  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID',
+})
+
+const onboard = Onboard({
+  wallets: [injected, walletConnect],
+  // ...
+})
+```
+
+---
+
+## 获取 Provider
+
+此示例使用 ethers 6（`npm install ethers@^6`）。连接后，通过所选钱包的 provider 发送交易。发送前替换收款地址占位值：
+
+```javascript
+import { ethers } from 'ethers'
+
+const wallets = await onboard.connectWallet()
+
+if (wallets[0]) {
+  const provider = new ethers.BrowserProvider(wallets[0].provider)
+  const signer = await provider.getSigner()
+
+  // Send transaction
+  const tx = await signer.sendTransaction({
+    to: '0x...',
+    value: ethers.parseEther('0.1'),
+  })
+}
+```
+
+---
+
+## 自定义界面
+
+### 主题
+
+```javascript
+const onboard = Onboard({
+  // ...
+  // Use a custom theme object, or replace it with 'dark', 'light', or 'system'.
+  theme: {
+    '--w3o-background-color': '#1a1a1a',
+    '--w3o-foreground-color': '#ffffff',
+    '--w3o-text-color': '#ffffff',
+    '--w3o-border-color': '#333333',
+    '--w3o-action-color': '#00B812',
+  },
+})
+```
+
+### 账户中心
+
+```javascript
+const onboard = Onboard({
+  // ...
+  accountCenter: {
+    desktop: {
+      enabled: true,
+      position: 'topRight',
+    },
+    mobile: {
+      enabled: true,
+      position: 'topRight',
+    },
+  },
+})
+```
+
+---
+
+<span id="文档" />
+
+## 资源
+
+- [Web3-Onboard 文档](https://onboard.blocknative.com/docs/overview/introduction)
+- [React 模块](https://onboard.blocknative.com/docs/modules/react)
+- [GitHub 仓库](https://github.com/blocknative/web3-onboard)

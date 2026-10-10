@@ -1,54 +1,37 @@
 ---
-title: Response UI Event
+description: "Respond to current SDK input requests with correlation fields and distinguish device notifications."
+title: Respond to UI Events
 ---
 
-# Response UI Event
+# Respond to UI Events
 
-### Transfer data to the device
+Use `HardwareSDK.uiResponse()` to answer a pending SDK input request. It returns `void`; await the original address, signing, or device-operation Promise for the operation result.
 
-Transfer data to the device, currently supporting data transfer for PIN and passphrase.
+Register the [UI event handler](/en/hardware-sdk/core-api-guide#events-ui) before a protected call. Respond only to the current request, and preserve `payload.responseCorrelation` when the request includes it. The `interactionId` and `deviceId` correlation fields belong at the top level of the response; they are not a replacement for the positional wallet `deviceId` in signing calls.
 
-```typescript
-import type { UiResponseEvent } from "@onekeyfe/hd-core";
+## PIN input
 
-// Construct a response for the current input request using your UI.
-declare const uiResponse: UiResponseEvent;
-HardwareSDK.uiResponse(uiResponse);
+This fragment belongs inside the `UI_REQUEST.REQUEST_PIN` handler. `message` is that request, and `pinValue` is the completed blind-PIN position sequence collected by your UI.
 
-```
-
-### Params
-
-[**Optional common params**](/en/hardware-sdk/concepts/common-params)
-
-* `type` - _required_ `string`. type to respond to `ui-receive_pin` or `ui-receive_passphrase`
-* `payload` - _required_ `object`
-
-#### Return the PIN code result
-
-```typescript
-import { UI_RESPONSE } from "@onekeyfe/hd-core";
-
-// Value collected by the host PIN input UI.
-declare const pinValue: string;
-
+```ts
 HardwareSDK.uiResponse({
+  ...message.payload.responseCorrelation,
   type: UI_RESPONSE.RECEIVE_PIN,
   payload: pinValue,
 });
 ```
 
-* If entering the PIN on the software side, replace the content of `pinValue`. If the PIN needs to be entered on the hardware side, set `pinValue` as `@@ONEKEY_INPUT_PIN_IN_DEVICE`.
+For a host-input request that offers on-device entry, the response value is `@@ONEKEY_INPUT_PIN_IN_DEVICE`. A request marked `deviceOnly`, `ButtonRequest_PinEntry`, or `ButtonRequest_AttachPin` is an on-device notification: display instructions and wait without replying.
 
-#### Return the Passphrase result
+See [PIN](/en/hardware-sdk/concepts/pin) for the blind keypad mapping and model constraints.
 
-```typescript
-import { UI_RESPONSE } from "@onekeyfe/hd-core";
+## Passphrase input
 
-// Value collected by the host passphrase input UI.
-declare const passphraseValue: string;
+This fragment belongs inside `UI_REQUEST.REQUEST_PASSPHRASE`. `passphraseValue` is supplied by the user's current input, never by a hard-coded or logged value.
 
+```ts
 HardwareSDK.uiResponse({
+  ...message.payload.responseCorrelation,
   type: UI_RESPONSE.RECEIVE_PASSPHRASE,
   payload: {
     value: passphraseValue,
@@ -58,6 +41,16 @@ HardwareSDK.uiResponse({
 });
 ```
 
-* If the passphrase needs to be entered on the device, set value to '' and set passphraseOnDevice to true.
+To choose device entry, use `{ value: '', passphraseOnDevice: true, save: false }` instead. Honor `deviceOnly` by selecting device entry. `REQUEST_PASSPHRASE_ON_DEVICE` is a subsequent notification and needs no response.
 
-Only reply to input requests. `REQUEST_PASSPHRASE_ON_DEVICE` and device-only PIN prompts are notifications; see [UI wiring](/en/hardware-sdk/core-api-guide#events-ui).
+Keep host-entered secrets out of logs, analytics, persistent storage, and error reports. Use `save: false` unless the user explicitly opts into a supported session-caching flow.
+
+## Cancel and close
+
+Cancel the operation on the selected connection with `HardwareSDK.cancel(connectId)` when the user cancels input. Invalidate the pending modal submission when the operation finishes or the SDK closes its UI, so a late response cannot answer another request.
+
+`REQUEST_BUTTON`, firmware progress, and device-only PIN prompts do not accept an “OK” response. A host button must never stand in for device confirmation.
+
+## Other input requests
+
+WebUSB bootloader-selection requests use their matching `UI_RESPONSE.SELECT_DEVICE_*` response and a selected device ID in `payload`. The public union [`UiResponseEvent`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/events/ui-response.ts) defines the accepted shapes. Lifecycle APIs such as `uiResponse` do not take the general [Common Params](/en/hardware-sdk/concepts/common-params) object.

@@ -7,7 +7,7 @@ import { Callout } from 'nextra/components'
 
 # React Hooks
 
-类型安全的 React hooks。构建你自己的自定义钱包连接 UI，完全控制用户体验。
+用于以太坊的类型安全 React hooks。自行构建钱包连接 UI，控制完整的交互流程。
 
 <Callout>
 **最适合自定义 UI。** 当你想要设计自己的钱包连接流程时，使用 React Hooks。
@@ -17,9 +17,9 @@ import { Callout } from 'nextra/components'
 
 ## 可用库
 
-| 库 | 描述 |
+| 库 | 说明 |
 |---------|-------------|
-| [Wagmi](/zh/connect-to-software/react-hooks/wagmi) | 最流行的以太坊 React hooks 库 |
+| [Wagmi](/zh/connect-to-software/react-hooks/wagmi) | 管理 EVM 账户、签名和交易状态的 React hooks |
 
 ---
 
@@ -35,28 +35,34 @@ import { Callout } from 'nextra/components'
 
 ## 快速示例
 
+先按 [wagmi 指南](/zh/connect-to-software/react-hooks/wagmi)配置 `WagmiProvider` 和 `QueryClientProvider`。此组件使用已配置的连接器。
+
 ```tsx
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
-import { injected } from 'wagmi/connectors'
 
 function ConnectButton() {
   const { address, isConnected } = useAccount()
-  const { connect } = useConnect()
+  const { connect, connectors, isPending, error } = useConnect()
   const { disconnect } = useDisconnect()
 
   if (isConnected) {
     return (
       <div>
         <p>{address}</p>
-        <button onClick={() => disconnect()}>断开连接</button>
+        <button onClick={() => disconnect()}>Disconnect</button>
       </div>
     )
   }
 
   return (
-    <button onClick={() => connect({ connector: injected() })}>
-      连接钱包
-    </button>
+    <div>
+      {connectors.map((connector) => (
+        <button key={connector.uid} disabled={isPending} onClick={() => connect({ connector })}>
+          Connect {connector.name}
+        </button>
+      ))}
+      {error && <p role="alert">{error.message}</p>}
+    </div>
   )
 }
 ```
@@ -65,7 +71,7 @@ function ConnectButton() {
 
 ## 替代方案：带钱包 UI
 
-如果想要预构建的钱包选择弹窗，可以考虑：
-- [RainbowKit](/zh/connect-to-software/wallet-ui/rainbowkit) - 精美的 React 钱包弹窗
-- [Web3Modal](/zh/connect-to-software/wallet-ui/web3modal) - WalletConnect 官方 UI
+如果需要现成的钱包选择弹窗，可使用：
 
+- [RainbowKit](/zh/connect-to-software/wallet-ui/rainbowkit) — React 钱包选择界面。
+- [Web3Modal](/zh/connect-to-software/wallet-ui/web3modal) — Reown 钱包连接界面。

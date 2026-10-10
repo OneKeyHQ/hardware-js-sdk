@@ -6,7 +6,7 @@ title: evmGetPublicKey
 
 ## 以太坊：获取公钥
 
-获取指定 BIP32 路径派生的扩展公钥。用户需要确认导出。
+返回指定路径派生的公钥。可通过 `showOnOneKey` 请求用户在设备上确认。
 
 ```typescript
 const result = await HardwareSDK.evmGetPublicKey(connectId, deviceId, params);
@@ -18,17 +18,17 @@ const result = await HardwareSDK.evmGetPublicKey(connectId, deviceId, params);
 
 ### 导出单个公钥
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _可选_ `boolean`。是否在设备上显示公钥，默认为 `true`。
 * `chainId` - _可选_ `number` ETH 中的 ChainId 是特定以太坊网络的唯一标识符，用于区分不同版本的区块链。[参考](https://github.com/ethereum-lists/chains/tree/master/_data/chains)
 
 #### 导出批量公钥
 
-* `bundle` - 包含 `path`、`chainId`、`showOnOneKey` 字段的对象 `Array`
+* `bundle` - 对象数组，每个对象包含 `path`、`chainId`、`showOnOneKey` 字段。
 
 ### 示例
 
-返回第一个以太坊账户的公钥：
+返回第一个 以太坊 账户的公钥：
 
 ```typescript
 HardwareSDK.evmGetPublicKey(connectId, deviceId, {
@@ -38,45 +38,45 @@ HardwareSDK.evmGetPublicKey(connectId, deviceId, {
 });
 ```
 
-返回多个以太坊账户的批量公钥：
+批量返回多个 以太坊 账户的公钥：
 
 ```typescript
 HardwareSDK.evmGetPublicKey(connectId, deviceId, {
     bundle: [
-        { path: "m/44'/60'/0'/0/0", chainId: 1 }, // 账户 1
-        { path: "m/44'/60'/0'", chainId: 1 }, // 账户 2
-        { path: "m/44'/60'/0'/0/1", chainId: 1 }  // 账户 3
+        { path: "m/44'/60'/0'/0/0", chainId: 1 }, // account 1
+        { path: "m/44'/60'/1'/0/0", chainId: 1 }, // account 2
+        { path: "m/44'/60'/2'/0/0", chainId: 1 }  // account 3
     ]
 });
 ```
 
 ### 返回结果
 
-只有一个公钥的结果
+单个公钥响应
 
 ```typescript
 {
     success: true,
     payload: {
-        path: string, // 序列化 BIP32 路径
-        xpub: string,        // 传统格式的 xpub
-        pub: string,
-        publicKey: string,   // BIP32 序列化格式
+        path: string, // serialized BIP32 path
+        xpub?: string,        // xpub in legacy format
+        pub: string, // hexadecimal public key
+        publicKey: string, // alias of pub
     }
 }
 ```
 
-[了解更多关于 BIP32 序列化格式](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization_format)
+[了解更多关于 BIP32 序列化格式](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization\_format)
 
-批量公钥的结果
+批量公钥响应
 
 ```typescript
 {
     success: true,
     payload: [
-        { path, xpub, publicKey }, // 账户 1
-        { path, xpub, publicKey }, // 账户 2
-        { path, xpub, publicKey }, // 账户 3
+        { path, xpub, pub }, // account 1
+        { path, xpub, pub }, // account 2
+        { path, xpub, pub }, // account 3
     ]
 }
 ```
@@ -87,8 +87,8 @@ HardwareSDK.evmGetPublicKey(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

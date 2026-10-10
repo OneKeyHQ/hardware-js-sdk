@@ -4,19 +4,30 @@ title: Accessing Accounts
 
 # Accessing Accounts
 
-## Accessing Accounts
+Detect an Ethereum provider before requesting account access; see [Provider API](/en/connect-to-software/provider/eth/provider-api). Call `eth_requestAccounts` from a user action such as a Connect button. Use `eth_accounts` when you only need the accounts already exposed to your site.
 
-User accounts are used in a variety of contexts in Ethereum, including as identifiers and for signing transactions. In order to request a signature from the user or have the user approve a transaction, one must be able to access the user's accounts. The `wallet methods` below involve a signature or transaction approval and all require the sending account as a function parameter.
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
 
-* `eth_sendTransaction`
-* `eth_sign` (insecure and unadvised to use)
-* `eth_personalSign`
-* `eth_signTypedData`
+try {
+  const accounts = await provider.request({ method: 'eth_requestAccounts' });
+  const address = accounts[0];
+  if (!address) throw new Error('No account was selected.');
+  console.log('Connected address:', address);
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('The user declined the connection request.');
+  } else {
+    console.error(error);
+  }
+}
+```
 
+Disable the Connect button while the request is pending. A connected account does not pre-approve transactions or signatures. Pass the selected address to `eth_sendTransaction`, `personal_sign`, or `eth_signTypedData_v4`, as required by each method.
 
+Listen for `accountsChanged` and handle an empty array by clearing the connected account in your application.
 
-**Connect Account Example:**
+## Demo
 
-
-<iframe src="https://codesandbox.io/embed/ethereum-provider-demo-rwgl5l?fontsize=14&hidenavigation=1&theme=dark" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[Open example](https://codesandbox.io/embed/ethereum-provider-demo-rwgl5l?fontsize=14&hidenavigation=1&theme=dark)

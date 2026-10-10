@@ -1,4 +1,5 @@
 import React from 'react'
+import { translateCopy } from '../i18n/ui.mjs'
 
 export function AgentWalletBetaTitle({ betaLabel }) {
   return React.createElement(
@@ -27,7 +28,7 @@ const disclaimerContent = {
 }
 
 export function AgentWalletDisclaimer({ locale }) {
-  const content = disclaimerContent[locale] || disclaimerContent.en
+  const content = translateCopy(locale, disclaimerContent.en)
 
   return React.createElement(
     'aside',

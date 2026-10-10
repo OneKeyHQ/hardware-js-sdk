@@ -5,14 +5,14 @@ description: OneKey Aptos provider 完整 API 参考
 
 # API 参考
 
-OneKey Aptos provider 方法和类型的完整参考。
+OneKey Aptos provider 的方法和类型参考。
 
 ---
 
 ## 方法
 
-| 方法 | 描述 |
-|------|------|
+| 方法 | 说明 |
+|--------|-------------|
 | `connect()` | 连接钱包并获取账户 |
 | `disconnect()` | 断开钱包连接 |
 | `isConnected()` | 检查连接状态 |
@@ -20,15 +20,15 @@ OneKey Aptos provider 方法和类型的完整参考。
 | `network()` | 获取当前网络名称 |
 | `getNetwork()` | 获取完整网络信息 |
 | `getNetworkURL()` | 获取网络 RPC URL |
-| `signMessage(request)` | 签署任意消息 |
-| `signAndSubmitTransaction(payload, options?)` | 签署并提交交易 |
-| `signTransaction(payload, options?)` | 签署交易但不提交 |
-| `signTransactionV2(params)` | 签署 BCS 序列化的交易 |
-| `signAndSubmitTransactionV2(params)` | 签署并提交（Standard V1.1.0） |
+| `signMessage(request)` | 签署消息 |
+| `signAndSubmitTransaction(payload)` | 签名并提交交易 |
+| `signTransaction(payload)` | 仅签名，不提交交易 |
+| `signTransactionV2(params)` | 签署经 BCS 序列化的交易 |
+| `signAndSubmitTransactionV2(params)` | 签名并提交交易（Standard V1.1.0） |
 | `signIn(payload)` | AIP 登录流程 |
-| `onAccountChange(callback)` | 监听账户变更 |
-| `onNetworkChange(callback)` | 监听网络变更 |
-| `onDisconnect(callback)` | 监听断开连接 |
+| `onAccountChange(callback)` | 监听账户变化 |
+| `onNetworkChange(callback)` | 监听网络变化 |
+| `onDisconnect(callback)` | 监听连接断开 |
 
 ---
 
@@ -38,8 +38,8 @@ OneKey Aptos provider 方法和类型的完整参考。
 
 ```typescript
 interface AptosAccountInfo {
-  address: string    // 带 0x 前缀的十六进制地址
-  publicKey: string  // Ed25519 公钥
+  address: string    // Hex address with 0x prefix
+  publicKey: string  // Ed25519 public key
 }
 ```
 
@@ -47,8 +47,8 @@ interface AptosAccountInfo {
 
 ```typescript
 interface AptosNetwork {
-  name: string       // 网络名称
-  chainId: string    // 链 ID
+  name: string       // Network name
+  chainId: number    // Chain ID
   url: string        // RPC URL
 }
 ```
@@ -57,11 +57,11 @@ interface AptosNetwork {
 
 ```typescript
 interface SignMessageRequest {
-  message: string    // 要签署的消息
-  nonce?: string     // 可选的 nonce
-  address?: boolean  // 在消息中包含地址
-  application?: boolean // 包含应用信息
-  chainId?: boolean  // 包含链 ID
+  message: string    // Message to sign
+  nonce: number      // Required by the direct provider API
+  address?: boolean  // Include address in message
+  application?: boolean // Include app info
+  chainId?: boolean  // Include chain ID
 }
 ```
 
@@ -69,13 +69,13 @@ interface SignMessageRequest {
 
 ```typescript
 interface SignMessageResponse {
-  signature: string     // 十六进制签名
-  fullMessage: string   // 完整的已签名消息
-  prefix: string        // APTOS 前缀
-  address?: string      // 签名者地址
-  application?: string  // 应用信息
-  chainId?: number      // 链 ID
-  nonce: string         // 使用的 nonce
+  signature: string     // Hex signature
+  fullMessage: string   // Complete signed message
+  prefix: string        // APTOS prefix
+  address?: string      // Signer address
+  application?: string  // Application info
+  chainId?: number      // Chain ID
+  nonce: number         // Nonce used
 }
 ```
 
@@ -84,7 +84,7 @@ interface SignMessageResponse {
 ```typescript
 interface TransactionPayload {
   type: 'entry_function_payload' | 'script_payload' | 'module_bundle_payload'
-  function: string       // Module::function 格式
+  function: string       // Module::function format
   type_arguments: string[]
   arguments: any[]
 }
@@ -94,9 +94,9 @@ interface TransactionPayload {
 
 ```typescript
 interface SignTransactionV2Params {
-  transaction: string        // BCS 序列化的交易
+  transaction: string        // BCS serialized transaction
   transactionType: 'simple' | 'multi_agent'
-  asFeePayer?: boolean       // 作为代付方签署
+  asFeePayer?: boolean       // Sign as fee payer
 }
 ```
 
@@ -132,4 +132,3 @@ interface SignTransactionV2Params {
 | 4200 | 不支持的方法 |
 | 4201 | 不支持的网络 |
 | -32603 | 内部错误 |
-

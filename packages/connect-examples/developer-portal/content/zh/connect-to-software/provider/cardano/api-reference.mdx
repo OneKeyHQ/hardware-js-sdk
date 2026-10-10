@@ -5,7 +5,7 @@ description: OneKey Cardano provider 完整 API 参考
 
 # API 参考
 
-OneKey Cardano provider 方法和类型的完整参考。
+OneKey Cardano provider 的方法和类型参考。
 
 ---
 
@@ -23,17 +23,17 @@ OneKey Cardano provider 方法和类型的完整参考。
 
 ## dApp API (enable 之后)
 
-| 方法 | 描述 |
-|------|------|
-| `getNetworkId()` | 获取网络 (0=测试网, 1=主网) |
-| `getBalance()` | 获取总余额 (CBOR) |
+| 方法 | 说明 |
+|--------|-------------|
+| `getNetworkId()` | 获取网络（0 为测试网，1 为主网） |
+| `getBalance()` | 获取总余额（CBOR） |
 | `getUtxos(amount?, paginate?)` | 获取 UTxO |
 | `getUsedAddresses()` | 获取已使用的地址 |
 | `getUnusedAddresses()` | 获取未使用的地址 |
 | `getChangeAddress()` | 获取找零地址 |
-| `getRewardAddresses()` | 获取质押地址 |
-| `signTx(tx, partialSign?)` | 签署交易 |
-| `signData(addr, payload)` | 签署数据 (CIP-8) |
+| `getRewardAddresses()` | 获取质押奖励地址 |
+| `signTx(tx, partialSign?)` | 返回 witness set 中已签名的部分 |
+| `signData(addr, payload)` | 签署数据（CIP-8） |
 | `submitTx(tx)` | 提交交易 |
 
 ---
@@ -51,7 +51,7 @@ OneKey Cardano provider 方法和类型的完整参考。
 ## 类型
 
 ```typescript
-type Cbor = string // 十六进制编码的 CBOR
+type Cbor = string // Hex-encoded CBOR
 
 interface Paginate {
   page: number
@@ -59,11 +59,11 @@ interface Paginate {
 }
 
 interface Cip30DataSignature {
-  signature: string // COSE_Sign1 十六进制
-  key: string       // COSE_Key 十六进制
+  signature: string // COSE_Sign1 hex
+  key: string       // COSE_Key hex
 }
 
-type NetworkId = 0 | 1 // 0=测试网, 1=主网
+type NetworkId = 0 | 1 // 0=testnet, 1=mainnet
 ```
 
 ---
@@ -78,9 +78,11 @@ type NetworkId = 0 | 1 // 0=测试网, 1=主网
 
 ## 错误码
 
-| 错误码 | 描述 |
-|--------|------|
-| -1 | 用户拒绝 |
-| -2 | 未找到账户 |
-| -3 | 无效的网络 |
+| 错误码 | 说明 |
+|------|-------------|
+| -1 | 请求无效 |
+| -2 | 内部错误 |
+| -3 | 请求被拒绝 |
+| -4 | 账户已变更 |
 
+当前 provider 的 `experimental.getCollateral()` 实现返回空数组。该方法存在，并不代表可获取 Plutus 抵押输入。钱包信息接口的 `isEnabled()` 也不能代替成功调用 `enable()`。CIP-30 各操作的专用错误码与上方通用 API 错误码不同。

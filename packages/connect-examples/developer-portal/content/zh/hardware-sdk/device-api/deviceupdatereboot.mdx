@@ -1,15 +1,19 @@
 ---
 title: deviceUpdateReboot
+description: 让受支持的 V1 设备进入 Bootloader，并重新发现连接。
 ---
 
 # deviceUpdateReboot
 
 ## 重启设备
 
-将设备启动到引导加载程序模式。
+在用户明确发起的固件升级流程中，请求 **Protocol V1** 设备进入 bootloader 模式。本方法未声明 Protocol V2 支持；Pro 2 和 Neo 使用 [Protocol V2 升级流程](/zh/hardware-sdk/device-api/firmwareupdatev4)。
+
+设备可能断开，并以不同的连接 ID 重新枚举。继续前重新发现设备并验证状态。
 
 ```typescript
-const result = await HardwareSDK.deviceUpdateReboot(connectId);
+const response = await HardwareSDK.deviceUpdateReboot(connectId);
+if (!response.success) throw new Error(response.payload.error);
 ```
 
 ## 参数
@@ -19,17 +23,13 @@ const result = await HardwareSDK.deviceUpdateReboot(connectId);
 ## 示例
 
 ```typescript
-HardwareSDK.deviceUpdateReboot(connectId);
+const response = await HardwareSDK.deviceUpdateReboot(connectId);
+if (!response.success) throw new Error(response.payload.error);
 ```
 
 ## 返回结果
 
-```typescript
-{
-    success: true,
-    payload: {}
-}
-```
+SDK 成功结果表示请求已被接受。不要通过写死的 payload 结构推断新模式；设备重连后重新读取状态。
 
 错误
 

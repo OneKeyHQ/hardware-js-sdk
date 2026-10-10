@@ -1,5 +1,6 @@
 ---
 title: 迁移到 common-connect-sdk
+description: 将 Bridge 应用迁移到 common-connect-sdk 的 WebUSB 环境。
 ---
 
 # 迁移到 common-connect-sdk
@@ -39,11 +40,12 @@ npm i @onekeyfe/hd-common-connect-sdk @onekeyfe/hd-core @onekeyfe/hd-shared
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 
-await HardwareSDK.init({
+const initialized = await HardwareSDK.init({
   env: 'webusb',
-  debug: process.env.NODE_ENV !== 'production',
+  debug: false,
   fetchConfig: true,
 });
+if (!initialized) throw new Error('SDK initialization failed');
 ```
 
 - 与 `hd-web-sdk` 不同，这里不需要 `connectSrc`（无 iframe 依赖）。
@@ -53,49 +55,9 @@ await HardwareSDK.init({
 
 ## 绑定 UI 和设备事件（PIN / Passphrase / 插拔）
 
-```ts
-import { UI_EVENT, UI_REQUEST, UI_RESPONSE, DEVICE } from '@onekeyfe/hd-core';
+受保护调用前，注册 [Core API UI 处理器](/zh/hardware-sdk/core-api-guide#events-ui)。保留请求关联字段，只回复输入请求；用户取消时取消所选连接上的操作。设备端 PIN 和按键提示不需要 `uiResponse`。
 
-function bindHardwareEvents() {
-  HardwareSDK.on(UI_EVENT, async (message: any) => {
-    switch (message.type) {
-      case UI_REQUEST.REQUEST_PIN: {
-        // 生产环境中，替换为您的 PIN 输入 UI
-        await HardwareSDK.uiResponse({
-          type: UI_RESPONSE.RECEIVE_PIN,
-          // 优先在设备上输入 PIN（更安全）
-          payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
-        });
-        break;
-      }
-
-      case UI_REQUEST.REQUEST_PASSPHRASE: {
-        // 生产环境中，替换为您的 Passphrase UI（设备或软件输入）
-        await HardwareSDK.uiResponse({
-          type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-          payload: { passphraseOnDevice: true, value: '' },
-        });
-        break;
-      }
-
-      default:
-        break;
-    }
-  });
-
-  HardwareSDK.on(DEVICE.CONNECT, (payload: any) => {
-    console.log('设备已连接:', payload);
-  });
-  HardwareSDK.on(DEVICE.DISCONNECT, (payload: any) => {
-    console.log('设备已断开:', payload);
-  });
-}
-
-bindHardwareEvents();
-```
-
-- 尽早订阅 `UI_EVENT`，以便处理 PIN/Passphrase 提示，避免流程卡住。
-- 详情参见：[配置事件](/zh/hardware-sdk/core-api-guide#events-ui)
+订阅 `DEVICE.CONNECT` 和 `DEVICE.DISCONNECT` 来刷新连接状态，不要记录完整设备对象或 UI 事件 payload。
 
 ---
 
@@ -113,29 +75,32 @@ await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
 ## 枚举设备并进行首次调用
 
 ```ts
-// 1) 枚举设备
+// 1) Enumerate
 const list = await HardwareSDK.searchDevices();
 if (!list.success) throw new Error(list.payload.error);
+// Select explicitly in the application when more than one device is available.
+if (list.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = list.payload[0] ?? {};
 if (!connectId) throw new Error("No device connection");
 
-// 2) 确认 deviceId
+// 2) Confirm deviceId
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const resolvedDeviceId = state.payload.identity.deviceId;
 if (!resolvedDeviceId) throw new Error("Device has no wallet identity");
 
-// 3) 示例：获取 BTC 地址
+// 3) Example: get a BTC address
 const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
   path: "m/44'/0'/0'/0/0",
   coin: 'btc',
-  showOnOneKey: false,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
 });
 
 if (r.success) {
-  console.log('BTC 地址:', r.payload.address);
+  console.log('BTC address:', r.payload.address);
 } else {
-  console.error('错误:', r.payload.error, r.payload.code);
+  console.error('Error:', r.payload.error, r.payload.code);
 }
 ```
 
@@ -149,7 +114,7 @@ if (r.success) {
   - 新：`env: 'webusb'`（无 `connectSrc`）
 - 移除 Bridge 相关逻辑：如 `checkBridgeStatus()`、Bridge 安装/重启提示
 - 绑定 `UI_EVENT / DEVICE`：确保处理 PIN/Passphrase 和设备插拔事件
-- 不要在获得权限前自动枚举：`requestDevice()` 必须通过用户手势调用
+- 未授权的设备需要用户授权：`requestDevice()` 必须由用户手势触发；已授权设备可直接枚举
 - 兼容性提示：如果 `navigator.usb` 不存在，提示用户切换到支持 WebUSB 的浏览器
 
 ---
@@ -157,7 +122,7 @@ if (r.success) {
 ## 常见问题
 
 - HTTP 下没有权限提示？→ 使用 HTTPS
-- UI 请求似乎卡住？→ 尽早订阅 `UI_EVENT` 并通过 `uiResponse` 响应
+- UI 请求似乎卡住？→ 尽早订阅 `UI_EVENT`，仅对输入请求回复 `uiResponse`，设备通知显示提示即可
 - 还在使用 `connectSrc` 或 `HdWebSdk.HardwareWebSdk`？→ 已迁移到 `hd-common-connect-sdk`；不再需要 iframe
 - 在用户手势之外调用 `requestDevice`？→ Chrome 会阻止；必须由点击等手势触发
 

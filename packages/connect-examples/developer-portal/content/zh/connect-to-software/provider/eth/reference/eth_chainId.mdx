@@ -28,8 +28,8 @@ const chainId = await window.$onekey.ethereum.request({
   method: 'eth_chainId'
 })
 
-console.log('链 ID (十六进制):', chainId)
-console.log('链 ID (十进制):', parseInt(chainId, 16))
+console.log('Chain ID (hex):', chainId)
+console.log('Chain ID (decimal):', parseInt(chainId, 16))
 ```
 
 ### 检查网络
@@ -51,13 +51,13 @@ async function checkNetwork() {
 
   switch (chainId) {
     case CHAIN_IDS.ETHEREUM:
-      console.log('已连接到以太坊主网')
+      console.log('Connected to Ethereum Mainnet')
       break
     case CHAIN_IDS.POLYGON:
-      console.log('已连接到 Polygon')
+      console.log('Connected to Polygon')
       break
     default:
-      console.log('已连接到链:', parseInt(chainId, 16))
+      console.log('Connected to chain:', parseInt(chainId, 16))
   }
 
   return chainId
@@ -80,15 +80,15 @@ async function requireNetwork(requiredChainId) {
       })
     } catch (error) {
       if (error.code === 4902) {
-        throw new Error('请先将此网络添加到钱包')
+        throw new Error('Please add this network to your wallet')
       }
       throw error
     }
   }
 }
 
-// 使用
-await requireNetwork('0x1') // 要求以太坊主网
+// Usage
+await requireNetwork('0x1') // Require Ethereum Mainnet
 ```
 
 ---
@@ -96,9 +96,8 @@ await requireNetwork('0x1') // 要求以太坊主网
 ## 常用链 ID
 
 | 网络 | 十六进制 | 十进制 |
-|------|---------|--------|
+|---------|-----|---------|
 | Ethereum 主网 | `0x1` | 1 |
-| Goerli 测试网 | `0x5` | 5 |
 | Sepolia 测试网 | `0xaa36a7` | 11155111 |
 | Polygon | `0x89` | 137 |
 | BSC | `0x38` | 56 |
@@ -125,8 +124,8 @@ await requireNetwork('0x1') // 要求以太坊主网
 
 ```typescript
 window.$onekey.ethereum.on('chainChanged', (chainId) => {
-  console.log('网络已切换到:', chainId)
-  // 建议：重新加载页面
+  console.log('Network changed to:', chainId)
+  // Recommended: reload the page
   window.location.reload()
 })
 ```

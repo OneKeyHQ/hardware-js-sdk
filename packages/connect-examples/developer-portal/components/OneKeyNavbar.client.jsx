@@ -1,5 +1,7 @@
 'use client'
 
+import { ui } from '../i18n/ui.mjs'
+import { localeFromPath } from '../i18n/locales.mjs'
 import { useCallback } from 'react'
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react'
 import cn from 'clsx'
@@ -8,6 +10,7 @@ import { Anchor, Button } from 'nextra/components'
 import { useFSRoute } from 'nextra/hooks'
 import { ArrowRightIcon, MenuIcon } from 'nextra/icons'
 import { setMenu, useConfig, useMenu } from 'nextra-theme-docs'
+import { ThemeToggle } from './NavbarExtras'
 import { DOCS_AI_TAB, emitDocsAIOpen } from './docAIAssistEvents'
 import styles from './OneKeyNavbar.client.module.css'
 
@@ -43,7 +46,6 @@ const menuAnchor = {
 }
 
 const NavbarMenu = ({ menu, children }) => {
-  // Site is always dark mode (forcedTheme: 'dark' in layout)
   const menuKey = sanitizeMenuKey(menu)
   const routes =
     menu.children?.reduce((acc, child) => {
@@ -61,8 +63,8 @@ const NavbarMenu = ({ menu, children }) => {
         <span
           className="block py-1.5 transition-colors ps-3 pe-9"
           style={{
-            color: active ? '#f4f4f5' : '#d4d4d8',
-            backgroundColor: active ? '#27272a' : 'transparent'
+            color: 'var(--portal-ink)',
+            backgroundColor: active ? 'var(--portal-surface)' : 'transparent'
           }}
         >
           {item.title}
@@ -92,7 +94,7 @@ const NavbarMenu = ({ menu, children }) => {
               styles.menuTrigger,
               'x:items-center x:flex x:gap-1.5 x:cursor-pointer x:outline-none'
             )}
-            style={{ color: open ? '#ffffff' : '#a1a1aa' }}
+            style={{ color: open ? 'var(--portal-ink)' : 'var(--portal-muted)' }}
           >
             {children}
             <ArrowRightIcon
@@ -106,8 +108,8 @@ const NavbarMenu = ({ menu, children }) => {
             className={cn(menuItemsClass, styles.menuSurface)}
             anchor={menuAnchor}
             style={{
-              backgroundColor: '#0B0F14',
-              color: '#E4E4E7'
+              backgroundColor: 'var(--portal-paper)',
+              color: 'var(--portal-ink)'
             }}
           >
             {menuItems}
@@ -118,12 +120,25 @@ const NavbarMenu = ({ menu, children }) => {
   )
 }
 
+export function OneKeySidebarSearch({ lang }) {
+  return (
+    <button
+      type="button"
+      className={`${styles.assistButton} ${styles.searchButton} ${styles.sidebarSearch}`}
+      onClick={() => emitDocsAIOpen(DOCS_AI_TAB.SEARCH)}
+    >
+      <SearchIcon size={15} aria-hidden="true" />
+      <span>{ui(lang, 'Search documentation')}</span>
+    </button>
+  )
+}
+
 export function OneKeyClientNavbar({ children, className }) {
   const items = useConfig().normalizePagesResult.topLevelNavbarItems
   const pathname = useFSRoute()
   const menu = useMenu()
-  const isZh = pathname?.startsWith('/zh')
-  const searchText = isZh ? '搜索' : 'Search'
+  const locale = localeFromPath(pathname || '/')
+  const searchText = ui(locale, 'Search')
 
   const handleOpenSearch = useCallback(() => {
     emitDocsAIOpen(DOCS_AI_TAB.SEARCH)
@@ -161,7 +176,7 @@ export function OneKeyClientNavbar({ children, className }) {
         )}
         aria-current={isCurrentPage || undefined}
         style={{
-          color: isCurrentPage ? '#e4e4e7' : '#a1a1aa'
+          color: isCurrentPage ? 'var(--portal-ink)' : 'var(--portal-muted)'
         }}
       >
         {page.title}
@@ -175,7 +190,7 @@ export function OneKeyClientNavbar({ children, className }) {
         type="button"
         className={`${styles.assistButton} ${styles.searchButton}`}
         onClick={handleOpenSearch}
-        aria-label="Open search"
+        aria-label={ui(locale, 'Open search')}
       >
         <SearchIcon size={15} />
         <span className={styles.buttonLabel}>{searchText}</span>
@@ -193,9 +208,11 @@ export function OneKeyClientNavbar({ children, className }) {
     <>
       <div className={navClass}>{navItems}</div>
       {assistActions}
+      <ThemeToggle locale={locale} />
       {children}
       <Button
-        aria-label="Menu"
+        aria-label={ui(locale, 'Open navigation menu')}
+        aria-expanded={menu}
         className={cn('nextra-hamburger x:lg:hidden', menu && 'x:bg-gray-400/20')}
         onClick={() => setMenu((prev) => !prev)}
       >

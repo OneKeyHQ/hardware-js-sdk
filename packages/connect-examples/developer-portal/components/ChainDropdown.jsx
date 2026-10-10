@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useId } from 'react'
 import { ChevronDown, X } from 'lucide-react'
 import { ChainIcon } from './ChainIcons'
 
@@ -32,6 +32,8 @@ export function ChainDropdown({
   const [mounted, setMounted] = useState(false)
   const dropdownRef = useRef(null)
   const inputRef = useRef(null)
+  const triggerRef = useRef(null)
+  const listId = useId()
 
   const selectedChain = selectedChainId
     ? chains.find(c => c.id === selectedChainId)
@@ -56,30 +58,42 @@ export function ChainDropdown({
       }
     }
 
-    // Close on Escape key
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') {
-        setIsOpen(false)
-        setSearchQuery('')
-      }
-    }
-
     document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (isOpen) inputRef.current?.focus()
+  }, [isOpen])
+
+  const handleKeys = (event) => {
+    if (!isOpen) return
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      setIsOpen(false)
+      setSearchQuery('')
+      triggerRef.current?.focus()
+      return
+    }
+    const options = Array.from(dropdownRef.current?.querySelectorAll('[role="option"]') || [])
+    const index = options.indexOf(event.target)
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      const direction = event.key === 'ArrowDown' ? 1 : -1
+      const next = index < 0 ? (direction > 0 ? 0 : options.length - 1) : (index + direction + options.length) % options.length
+      options[next]?.focus()
+    } else if (index >= 0 && (event.key === 'Home' || event.key === 'End')) {
+      event.preventDefault()
+      options[event.key === 'Home' ? 0 : options.length - 1]?.focus()
+    } else if (event.key === 'Enter' && event.target === inputRef.current && filteredChains.length) {
+      event.preventDefault()
+      handleSelect(filteredChains[0])
+    }
+  }
 
   const handleToggle = () => {
     if (!disabled && mounted) {
       setIsOpen(!isOpen)
-      if (!isOpen) {
-        // Focus search input when opening
-        setTimeout(() => inputRef.current?.focus(), 50)
-      }
     }
   }
 
@@ -87,6 +101,7 @@ export function ChainDropdown({
     setIsOpen(false)
     setSearchQuery('')
     onSelect?.(chain)
+    triggerRef.current?.focus()
   }
 
   const clearSearch = () => {
@@ -95,9 +110,17 @@ export function ChainDropdown({
   }
 
   return (
-    <div ref={dropdownRef} className={`chain-dropdown relative ${className}`}>
+    <div ref={dropdownRef} onKeyDown={handleKeys} onBlur={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) {
+        setIsOpen(false)
+        setSearchQuery('')
+      }
+    }} className={`chain-dropdown relative ${className}`}>
       {/* Trigger Button */}
       <button
+        type="button"
+        ref={triggerRef}
+        aria-controls={isOpen ? listId : undefined}
         onClick={handleToggle}
         disabled={disabled}
         className={`
@@ -147,7 +170,6 @@ export function ChainDropdown({
             border border-zinc-200 dark:border-neutral-700
             bg-white dark:bg-neutral-900
           "
-          role="listbox"
         >
           {/* Search */}
           <div className="p-2 border-b border-zinc-100 dark:border-neutral-800">
@@ -155,6 +177,8 @@ export function ChainDropdown({
               <input
                 ref={inputRef}
                 type="text"
+                aria-label={searchPlaceholder}
+                aria-controls={listId}
                 placeholder={searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -171,6 +195,8 @@ export function ChainDropdown({
               />
               {searchQuery && (
                 <button
+                  type="button"
+                  aria-label={searchPlaceholder.includes('搜索') ? '清除搜索' : 'Clear search'}
                   onClick={clearSearch}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 
                     text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300
@@ -183,18 +209,20 @@ export function ChainDropdown({
           </div>
 
           {/* Chain List */}
-          <div className="max-h-64 overflow-y-auto p-1">
+          <div id={listId} role="listbox" aria-label={placeholder} className="max-h-64 overflow-y-auto p-1">
             {filteredChains.length > 0 ? (
               filteredChains.map((chain) => {
                 const isSelected = chain.id === selectedChainId
                 return (
                   <button
+                    type="button"
+                    tabIndex={-1}
                     key={chain.id}
                     onClick={() => handleSelect(chain)}
                     role="option"
                     aria-selected={isSelected}
                     className={`
-                      chain-dropdown-item
+                      chain-dropdown-item focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px]
                       w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md
                       text-sm transition-colors text-left
                       ${isSelected

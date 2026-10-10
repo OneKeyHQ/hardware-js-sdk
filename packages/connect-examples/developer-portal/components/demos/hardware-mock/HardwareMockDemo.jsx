@@ -1,5 +1,7 @@
 'use client'
 
+import { ui, translateCopy } from '../../../i18n/ui.mjs'
+
 import { useMachine } from '@xstate/react'
 import gsap from 'gsap'
 import { Check, ChevronDown, Compass, Copy, Delete, ExternalLink, Info, Play, X } from 'lucide-react'
@@ -164,7 +166,7 @@ const I18N = {
 }
 
 function getDict(locale) {
-  return I18N[locale] ?? I18N.zh
+  return translateCopy(locale, I18N.en)
 }
 
 const COMMAND_OPTIONS = {
@@ -240,22 +242,22 @@ const TOUR_HINT_ACCENTS = {
 }
 
 function buildTourHintPayload({ locale, dict, stepId, tourEnabled, tourStarted }) {
-  const isEn = locale === 'en'
+
   const tourDict = dict?.tour ?? {}
   const safeString = (key, fallback) => (tourDict[key] ?? fallback)
 
-  const defaultActionTitle = isEn ? 'Guide' : '操作指引'
-  const defaultReviewTitle = isEn ? 'Guide' : '操作指引'
-  const defaultSendPrimary = isEn ? 'Pick a command/params, then click “Send”.' : '请选择命令/参数，然后点击「发送命令」。'
-  const defaultSendSecondary = isEn ? 'The result will appear in the Result panel on the right.' : '结果会显示在右侧 Result 面板。'
-  const defaultIdlePrimary = isEn ? 'Tour is idle. Click “Guide” and send your first command.' : '导览未开始。点击「导览」并发送第一个命令。'
-  const defaultIdleSecondary = isEn ? 'You can preview examples and callbacks on the right.' : '右侧可先预览示例与回调，了解下一步。'
+  const defaultActionTitle = ui(locale, "Guide", "操作指引")
+  const defaultReviewTitle = ui(locale, "Guide", "操作指引")
+  const defaultSendPrimary = ui(locale, "Pick a command/params, then click “Send”.", "请选择命令/参数，然后点击「发送命令」。")
+  const defaultSendSecondary = ui(locale, "The result will appear in the Result panel on the right.", "结果会显示在右侧 Result 面板。")
+  const defaultIdlePrimary = ui(locale, "Tour is idle. Click “Guide” and send your first command.", "导览未开始。点击「导览」并发送第一个命令。")
+  const defaultIdleSecondary = ui(locale, "You can preview examples and callbacks on the right.", "右侧可先预览示例与回调，了解下一步。")
 
   if (!tourEnabled || !tourStarted) {
     return {
       type: 'idle',
       accent: TOUR_HINT_ACCENTS.idle,
-      title: safeString('idleTitle', isEn ? 'Guide' : '操作指引'),
+      title: safeString('idleTitle', ui(locale, "Guide", "操作指引")),
       primary: safeString('idlePrimary', defaultIdlePrimary),
       secondary: safeString('idleSecondary', defaultIdleSecondary)
     }
@@ -282,33 +284,33 @@ function buildTourHintPayload({ locale, dict, stepId, tourEnabled, tourStarted }
     case 'pin':
       return {
         ...actionBase,
-        primary: safeString('pinPrimary', isEn ? 'PIN is requested. Completing it advances the flow.' : 'PIN 已请求，完成后会进入下一步。'),
-        secondary: safeString('pinSecondary', isEn ? 'Submitting moves to the next step automatically.' : '提交后会自动推进。')
+        primary: safeString('pinPrimary', ui(locale, "PIN is requested. Completing it advances the flow.", "PIN 已请求，完成后会进入下一步。")),
+        secondary: safeString('pinSecondary', ui(locale, "Submitting moves to the next step automatically.", "提交后会自动推进。"))
       }
     case 'callback-request-button':
     case 'confirm':
       return {
         ...actionBase,
-        primary: safeString('confirmPrimary', isEn ? 'Confirm the interaction on the device.' : '在设备上确认交互。'),
-        secondary: safeString('confirmSecondary', isEn ? 'Wait for the result to appear in the Result tab.' : '等待结果自动返回。')
+        primary: safeString('confirmPrimary', ui(locale, "Confirm the interaction on the device.", "在设备上确认交互。")),
+        secondary: safeString('confirmSecondary', ui(locale, "Wait for the result to appear in the Result tab.", "等待结果自动返回。"))
       }
     case 'wait-result':
       return {
         ...reviewBase,
-        primary: safeString('waitResultPrimary', isEn ? 'Waiting for the result to arrive.' : '等待结果自动呈现。'),
-        secondary: safeString('waitResultSecondary', isEn ? 'Result output appears on the right.' : '可在 Result 面板中查看 payload。')
+        primary: safeString('waitResultPrimary', ui(locale, "Waiting for the result to arrive.", "等待结果自动呈现。")),
+        secondary: safeString('waitResultSecondary', ui(locale, "Result output appears on the right.", "可在 Result 面板中查看 payload。"))
       }
     case 'result':
       return {
         ...reviewBase,
-        primary: safeString('resultPrimary', isEn ? 'Payload is ready—review it on the right.' : '结果已准备好，从右侧阅读 payload。'),
-        secondary: safeString('resultSecondary', isEn ? 'Switch to Callbacks if you need UI_EVENT guidance.' : '若需要，切换到 Callbacks 查阅 UI_EVENT。')
+        primary: safeString('resultPrimary', ui(locale, "Payload is ready—review it on the right.", "结果已准备好，从右侧阅读 payload。")),
+        secondary: safeString('resultSecondary', ui(locale, "Switch to Callbacks if you need UI_EVENT guidance.", "若需要，切换到 Callbacks 查阅 UI_EVENT。"))
       }
     case 'callback-code':
       return {
         ...reviewBase,
-        primary: safeString('callbackPrimary', isEn ? 'Callback template lives on the right.' : '回调模板在右侧，复盘 UI_EVENT。'),
-        secondary: safeString('callbackSecondary', isEn ? 'Handle the REQUEST_* events based on UI hints.' : '参考 `REQUEST_*` 事件处理流程。')
+        primary: safeString('callbackPrimary', ui(locale, "Callback template lives on the right.", "回调模板在右侧，复盘 UI_EVENT。")),
+        secondary: safeString('callbackSecondary', ui(locale, "Handle the REQUEST_* events based on UI hints.", "参考 `REQUEST_*` 事件处理流程。"))
       }
     default:
       return actionBase
@@ -319,6 +321,7 @@ function buildExampleCode({ locale, command, btcPath, addressShowOnOneKey, messa
   const init = [
     "import HardwareSDK from '@onekeyfe/hd-common-connect-sdk'",
     '',
+    ui(locale, "// For real hardware, authorize WebUSB and register UI_EVENT handlers first; see Getting Started.", "// 真实硬件需要先授权 WebUSB 并注册 UI_EVENT 处理器；参见快速开始。"),
     'await HardwareSDK.init({',
     "  env: 'webusb',",
     '  fetchConfig: true,',
@@ -341,6 +344,9 @@ function buildExampleCode({ locale, command, btcPath, addressShowOnOneKey, messa
     ...init,
     'const devicesRes = await HardwareSDK.searchDevices()',
     'if (!devicesRes.success) throw new Error(devicesRes.payload.error)',
+    'if (devicesRes.payload.length !== 1) {',
+    ui(locale, "  throw new Error('Connect one authorized device, or let the user select among connected devices.')", "  throw new Error('请连接一台已授权的设备；有多台设备时应先让用户选择。')"),
+    '}',
     'const connectId = devicesRes.payload[0].connectId',
     '',
     'const stateRes = await HardwareSDK.getDeviceState(connectId)',
@@ -587,7 +593,7 @@ export function HardwareMockDemo({ locale = 'zh' }) {
   }, [locale, dict, currentTourStepId, tourEnabled, tourStarted])
 
   const callbackCode = useMemo(() => {
-    const isEn = locale === 'en'
+    const isEn = locale !== 'zh'
     const isPro = (deviceTypeControl ?? 'pro') !== 'classic1s'
     const extraHint =
       command === 'btcGetAddress' && !addressShowOnOneKey
@@ -978,12 +984,10 @@ ${extraHint}`
         <div className="flex items-start justify-between gap-4 px-5 py-4">
           <div className="min-w-0">
             <div className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-              {locale === 'en' ? 'PIN Panel' : 'PIN 面板'}
+              {ui(locale, "PIN Panel", "PIN 面板")}
             </div>
             <div className="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-              {locale === 'en'
-                ? 'Match the PIN matrix on the device. Any 4 digits work (mock does not validate).'
-                : '对照设备上的 PIN 矩阵输入，任意 4 位即可提交（Mock 不校验）。'}
+              {ui(locale, "Match the PIN matrix on the device. Any 4 digits work (mock does not validate).", "对照设备上的 PIN 矩阵输入，任意 4 位即可提交（Mock 不校验）。")}
             </div>
           </div>
 
@@ -996,7 +1000,7 @@ ${extraHint}`
               send({ type: 'CANCEL' })
             }}
             className="grid h-9 w-9 place-items-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
-            aria-label={locale === 'en' ? 'Close' : '关闭'}
+            aria-label={ui(locale, "Close", "关闭")}
           >
             <X className="h-5 w-5" />
           </button>
@@ -1043,7 +1047,7 @@ ${extraHint}`
                         'disabled:pointer-events-none disabled:opacity-50',
                         'dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700 dark:active:bg-zinc-600'
                       ].join(' ')}
-                      aria-label={locale === 'en' ? 'Delete' : '删除'}
+                      aria-label={ui(locale, "Delete", "删除")}
                     >
                       <Delete className="h-5 w-5" />
                     </button>
@@ -1082,7 +1086,7 @@ ${extraHint}`
                         'disabled:pointer-events-none disabled:opacity-50',
                         'dark:bg-zinc-300 dark:text-zinc-900 dark:hover:bg-zinc-200 dark:active:bg-zinc-100'
                       ].join(' ')}
-                      aria-label={locale === 'en' ? 'Confirm' : '确认'}
+                      aria-label={ui(locale, "Confirm", "确认")}
                     >
                       <Check className="h-6 w-6" />
                     </button>
@@ -1137,7 +1141,7 @@ ${extraHint}`
             }}
             className="mt-4 w-full text-center text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-100"
           >
-            {locale === 'en' ? 'Use device input' : '使用设备输入'}
+            {ui(locale, "Use device input", "使用设备输入")}
           </button>
         </div>
       </div>
@@ -1152,9 +1156,9 @@ ${extraHint}`
 
         {(mockError || lastError) && (
           <div className="mt-2 rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-200">
-            {mockError ? `${locale === 'en' ? 'Mock error' : 'Mock 错误'}：${mockError}` : null}
+            {mockError ? `${ui(locale, "Mock error", "Mock 错误")}：${mockError}` : null}
             {mockError && lastError ? ' · ' : null}
-            {lastError ? `${locale === 'en' ? 'Error' : '最近错误'}：${lastError}` : null}
+            {lastError ? `${ui(locale, "Error", "最近错误")}：${lastError}` : null}
           </div>
         )}
 

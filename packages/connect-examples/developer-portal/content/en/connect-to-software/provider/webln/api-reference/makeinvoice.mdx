@@ -4,23 +4,23 @@ title: makeInvoice
 
 # makeInvoice
 
-Request that the user creates an invoice to be used by the web app. This will return a [BOLT-11](https://github.com/lightningnetwork/lightning-rfc/blob/master/11-payment-encoding) invoice. Invoices can be requested in a few forms:
+Request that the user creates an invoice to be used by the web app. This will return a [BOLT-11](https://github.com/lightningnetwork/lightning-rfc/blob/master/11-payment-encoding.md) invoice. Invoices can be requested in a few forms:
 
 * By specifying an explicit `amount`, the user's provider should enforce that the user generate an invoice with a specific amount
 * By specifying a `minimumAmount` and / or `maximumAmount`, the user's provider should enforce that the user generate an invoice with an amount field constrained by that amount
-* When an explicit `amount` is _not_ set, the us
+* When no explicit `amount` is set, the user can choose an amount within any requested bounds.
 
-Amounts are denominated in satoshis. For large amounts, it's recommended you use a big number library such as [bn.js](https://www.npmjs.com/package/bn.js) or [big.js](https://www.npmjs.com/package/big.js) because JavaScript numbers are IEEE-754 doubles and can lose precision for large integers.
+Amounts are denominated in satoshis. JavaScript numbers represent integers exactly only up to `Number.MAX_SAFE_INTEGER` (`2^53 - 1`). Use a decimal string for values that exceed this range; the API accepts both strings and numbers.
 
-### Method
+## Method
 
 ```typescript
-async function makeInvoice(args: RequestInvoiceArgs): RequestInvoiceResponse
+declare function makeInvoice(args: RequestInvoiceArgs): Promise<RequestInvoiceResponse>;
 ```
 
-### Params
+## Params
 
-* `event` — _required_ `object`
+* `args` — _required_ `object`
   * `amount` — _optional_ `string|number`  the satoshis to send
   * `defaultAmount` — _optional_ `string|number`
   * `minimumAmount` — _optional_ `string|number`
@@ -37,7 +37,7 @@ interface RequestInvoiceArgs {
 }
 ```
 
-### Response
+## Response
 
 ```typescript
 interface RequestInvoiceResponse {
@@ -47,7 +47,7 @@ interface RequestInvoiceResponse {
 }
 ```
 
-### Example
+## Example
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.webln) || window.webln;
@@ -58,8 +58,6 @@ const invoice = await provider.makeInvoice({
 });
 ```
 
-### Demo
+## Demo
 
-
-<iframe src="https://codepen.io/OneKeyHQ/pen/ZEwMKvw" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[Open example](https://codepen.io/OneKeyHQ/pen/ZEwMKvw)

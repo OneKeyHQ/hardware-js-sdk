@@ -1,4 +1,5 @@
 ---
+description: "Change a user-selected device setting with the parameter and capability constraints of its protocol."
 title: deviceSettings
 ---
 
@@ -16,27 +17,37 @@ const result = await HardwareSDK.deviceSettings(connectId, params);
 
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
-* `language` - _optional_ `string` Device language, [ISO 639-1 codes](https://en.wikipedia.org/wiki/List\_of\_ISO\_639-1\_codes)
-* `label` - _optional_ `string` Device name
-* `usePassphrase` - _optional_ `boolean` Open passphrase or not
-* `homescreen` - _optional_ `string` Change homescreen by hex string (Protocol V1 only)
-* `autoLockDelayMs` - _optional_ `number` Auto lock time in ms
-* `displayRotation` - _optional_ `number` In degrees from North (Protocol V1 only)
-* `passphraseAlwaysOnDevice` - _optional_ `boolean` Do not prompt for passphrase, enforce device entry (Protocol V1 only)
-*   `safetyChecks` - _optional_ `number` Enum_SafetyCheckLevel numeric value (Protocol V1 only)
+| Parameter | Type | Availability / meaning |
+| --- | --- | --- |
+| `language` | `string` | Supported device language code; inspect the installed SDK's settings capabilities. |
+| `label` | `string` | Device display name. |
+| `usePassphrase` | `boolean` | Request a passphrase-protection setting change with device confirmation. |
+| `autoLockDelayMs` | `number` | Auto-lock delay; Protocol V2 accepts enumerated options, not every millisecond value. |
+| `autoShutdownDelayMs` | `number` | Auto-shutdown delay; Protocol V2 accepts enumerated options. |
+| `hapticFeedback`, `bluetoothEnabled` | `boolean` | Device-dependent haptics and Bluetooth settings. |
+| `homescreen` | `string` | Protocol V1 homescreen payload. |
+| `passphraseSource` | `number` | Protocol V1 passphrase-source setting. |
+| `passphraseAlwaysOnDevice` | `boolean` | Protocol V1 device-entry policy. |
+| `displayRotation` | `number` | Protocol V1 display rotation. |
+| `safetyChecks` | `Enum_SafetyCheckLevel` | Protocol V1 safety policy. Preserve strict checks unless the user explicitly requests a supported change. |
+| `experimentalFeatures` | `boolean` | Protocol V1 experimental message support. |
+| `changeBrightness` | `boolean` | Protocol V1 device-side brightness flow. |
+| `brightness` | `number` | Protocol V2 brightness, within the supported range. |
+| `airgapMode` | `boolean` | Protocol V2 device-side Air-Gap setting flow. |
+| `animationEnabled`, `tapToWake`, `deviceNameDisplayEnabled` | `boolean` | Protocol V2 display/interaction settings. |
+| `fidoEnabled`, `usbLockEnabled`, `randomKeypad` | `boolean` | Protocol V2 security-related settings. |
 
-    0: Strict
-    1: PromptAlways
-    2: PromptTemporarily
+The current [`DeviceSettingsParams` type](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/api/deviceSettings.ts) defines the public keys. Unsupported protocol-specific fields are rejected. Read settings/capabilities for the connected device before offering a control; a field in the type is not proof that every model supports it.
 
-* `experimentalFeatures` - _optional_ `boolean` Enable experimental message types (Protocol V1 only)
+Change only the setting the user selected. Changes to passphrase protection or connectivity may alter the active flow; refresh state afterward and do not infer success from a host dialog closing.
 
 ## Example
 
 ```typescript
-HardwareSDK.deviceSettings(connectId, {
+const result = await HardwareSDK.deviceSettings(connectId, {
     label: 'My OneKey Wallet'
 });
+if (!result.success) throw new Error(result.payload.error);
 ```
 
 ## Result

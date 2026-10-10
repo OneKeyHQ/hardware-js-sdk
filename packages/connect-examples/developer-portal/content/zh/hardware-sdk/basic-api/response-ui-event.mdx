@@ -1,54 +1,43 @@
 ---
 title: 响应 UI 事件
+description: 关联当前 UI 请求并返回输入，区分设备通知与宿主交互。
 ---
 
 # 响应 UI 事件
 
 ### 向设备传输数据
 
-向设备传输数据，目前支持 PIN 和密码短语的数据传输。
+用 `HardwareSDK.uiResponse()` 回答待处理的 SDK 输入请求。此方法返回 `void`；实际操作结果需要等待原来的地址、签名或设备操作 Promise。
 
-```typescript
-import type { UiResponseEvent } from "@onekeyfe/hd-core";
-
-// Construct a response for the current input request using your UI.
-declare const uiResponse: UiResponseEvent;
-HardwareSDK.uiResponse(uiResponse);
-
-```
+受保护调用前注册 [UI 事件处理器](/zh/hardware-sdk/core-api-guide#events-ui)。只回答当前请求；请求带有 `payload.responseCorrelation` 时，原样转发其中的关联字段。
 
 ### 参数
 
-[**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
-
-* `type` - _必填_ `string`。响应类型：`ui-receive_pin` 或 `ui-receive_passphrase`
-* `payload` - _必填_ `object`
+`interactionId` 与 `deviceId` 关联字段位于响应对象顶层。这里的 `deviceId` 不替代签名方法位置参数中的钱包 `deviceId`。`uiResponse` 等生命周期 API 不接受一般的[通用参数](/zh/hardware-sdk/concepts/common-params)。
 
 #### 返回 PIN 码结果
 
-```typescript
-import { UI_RESPONSE } from "@onekeyfe/hd-core";
+下例放在 `UI_REQUEST.REQUEST_PIN` 处理器中。`message` 是当前请求，`pinValue` 是 UI 收集完整后得到的盲输 PIN 位置序列。
 
-// Value collected by the host PIN input UI.
-declare const pinValue: string;
-
+```ts
 HardwareSDK.uiResponse({
+  ...message.payload.responseCorrelation,
   type: UI_RESPONSE.RECEIVE_PIN,
   payload: pinValue,
 });
 ```
 
-* 如果在软件端输入 PIN，替换 `pinValue` 的内容。如果需要在硬件端输入 PIN，将 `pinValue` 设置为 `@@ONEKEY_INPUT_PIN_IN_DEVICE`。
+当宿主输入请求提供设备输入选项时，可用 `@@ONEKEY_INPUT_PIN_IN_DEVICE` 选择在设备输入。带 `deviceOnly` 标记的请求，以及 `ButtonRequest_PinEntry`、`ButtonRequest_AttachPin`，均是设备端输入通知：显示提示并等待，不要回复。
+
+盲输键盘映射和机型限制见 [PIN](/zh/hardware-sdk/concepts/pin)。
 
 #### 返回密码短语结果
 
-```typescript
-import { UI_RESPONSE } from "@onekeyfe/hd-core";
+下例放在 `UI_REQUEST.REQUEST_PASSPHRASE` 处理器中。`passphraseValue` 必须来自用户本次输入，不能硬编码或记录到日志。
 
-// Value collected by the host passphrase input UI.
-declare const passphraseValue: string;
-
+```ts
 HardwareSDK.uiResponse({
+  ...message.payload.responseCorrelation,
   type: UI_RESPONSE.RECEIVE_PASSPHRASE,
   payload: {
     value: passphraseValue,
@@ -58,6 +47,16 @@ HardwareSDK.uiResponse({
 });
 ```
 
-* 如果需要在设备上输入密码短语，将 value 设置为 '' 并将 passphraseOnDevice 设置为 true。
+选择设备输入时改用 `{ value: '', passphraseOnDevice: true, save: false }`。请求含 `deviceOnly` 时必须选择设备输入。后续的 `REQUEST_PASSPHRASE_ON_DEVICE` 是通知，不需要回复。
 
-只回复输入请求。`REQUEST_PASSPHRASE_ON_DEVICE` 和仅在设备输入 PIN 的提示是通知，参见 [UI 事件处理](/zh/hardware-sdk/core-api-guide#events-ui)。
+不要把宿主端输入的秘密写入日志、分析系统、持久化存储或错误报告。除非用户明确选择受支持的会话缓存流程，否则使用 `save: false`。
+
+## 取消与关闭
+
+用户取消输入时，调用 `HardwareSDK.cancel(connectId)` 取消所选连接上的操作。操作结束或 SDK 关闭 UI 后，应使待提交的弹窗回调失效，防止延迟响应回答了另一个请求。
+
+`REQUEST_BUTTON`、固件进度和设备端 PIN 提示都不接受“确定”响应。宿主按钮不能替代设备上的物理确认。
+
+## 其他输入请求
+
+WebUSB bootloader 选择请求应使用对应的 `UI_RESPONSE.SELECT_DEVICE_*`，并在 `payload` 中传入所选设备 ID。公开联合类型 [`UiResponseEvent`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/events/ui-response.ts) 定义了允许的响应结构。

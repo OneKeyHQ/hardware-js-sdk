@@ -7,10 +7,12 @@ import { Callout } from 'nextra/components'
 
 # 快速开始
 
+使用 dApp API 前先调用 `enable()`。CIP-30 返回的地址是十六进制编码的字节；交易和 value 参数是十六进制编码的 CBOR。在浏览器示例中使用 `Buffer` 时，需要显式导入 `buffer` 或使用字节转换工具。
+
 了解如何检测、连接和与 Cardano 进行交互。
 
 <Callout type="info">
-OneKey 实现了 CIP-30（Cardano dApp 连接器），确保与所有 Cardano dApp 兼容。它还提供 Nami 钱包兼容性。
+OneKey 通过 CIP-30（Cardano dApp Connector）提供本文列出的操作，并提供 Nami 钱包兼容接口。
 </Callout>
 
 ---
@@ -18,19 +20,19 @@ OneKey 实现了 CIP-30（Cardano dApp 连接器），确保与所有 Cardano dA
 ## Provider 检测
 
 ```typescript
-// OneKey 同时提供 onekey 和 nami 接口
+// OneKey provides both onekey and nami interfaces
 const onekey = window.cardano?.onekey
 const nami = window.cardano?.nami
 
-// 检查可用性
+// Check availability
 if (!onekey) {
-  throw new Error('未检测到 OneKey Cardano provider')
+  throw new Error('OneKey Cardano provider not detected')
 }
 
-// 获取钱包信息
-console.log('名称:', onekey.name) // 'OneKey'
-console.log('API 版本:', onekey.apiVersion) // '0.1.0'
-console.log('图标:', onekey.icon)
+// Get wallet info
+console.log('Name:', onekey.name) // 'OneKey'
+console.log('API Version:', onekey.apiVersion) // '0.1.0'
+console.log('Icon:', onekey.icon)
 ```
 
 ---
@@ -38,12 +40,12 @@ console.log('图标:', onekey.icon)
 ## 启用钱包
 
 ```typescript
-// 请求钱包访问
+// Request wallet access
 const api = await window.cardano.onekey.enable()
 
-// 现在可以使用完整的 API
+// Now you can use the full API
 const networkId = await api.getNetworkId()
-console.log('网络:', networkId === 1 ? '主网' : '测试网')
+console.log('Network:', networkId === 1 ? 'Mainnet' : 'Testnet')
 ```
 
 ---
@@ -55,7 +57,7 @@ const isEnabled = await window.cardano.onekey.isEnabled()
 
 if (isEnabled) {
   const api = await window.cardano.onekey.enable()
-  // 使用 API...
+  // Use API...
 }
 ```
 
@@ -67,8 +69,8 @@ if (isEnabled) {
 const api = await window.cardano.onekey.enable()
 const networkId = await api.getNetworkId()
 
-// 0 = 测试网, 1 = 主网
-console.log('网络:', networkId)
+// 0 = Testnet, 1 = Mainnet
+console.log('Network:', networkId)
 ```
 
 ---
@@ -77,14 +79,14 @@ console.log('网络:', networkId)
 
 ```typescript
 const balance = await api.getBalance()
-// 返回 CBOR 编码的值（十六进制字符串）
-console.log('余额 (CBOR):', balance)
+// Returns CBOR-encoded value (hex string)
+console.log('Balance (CBOR):', balance)
 
-// 使用 cardano-serialization-lib 解码
-import { Value } from '@emurgo/cardano-serialization-lib-browser'
+// Decode using cardano-serialization-lib
+import { Value, BigNum } from '@emurgo/cardano-serialization-lib-browser'
 const value = Value.from_bytes(Buffer.from(balance, 'hex'))
 const lovelace = value.coin().to_str()
-console.log('余额:', parseInt(lovelace) / 1000000, 'ADA')
+console.log('Balance in lovelace:', lovelace) // Keep the exact integer string.
 ```
 
 ---
@@ -92,21 +94,21 @@ console.log('余额:', parseInt(lovelace) / 1000000, 'ADA')
 ## 获取地址
 
 ```typescript
-// 获取已使用的地址（有交易历史的地址）
+// Get used addresses (addresses with transaction history)
 const usedAddresses = await api.getUsedAddresses()
-console.log('已使用的地址:', usedAddresses)
+console.log('Used addresses:', usedAddresses)
 
-// 获取未使用的地址（新地址）
+// Get unused addresses (fresh addresses)
 const unusedAddresses = await api.getUnusedAddresses()
-console.log('未使用的地址:', unusedAddresses)
+console.log('Unused addresses:', unusedAddresses)
 
-// 获取找零地址
+// Get change address
 const changeAddress = await api.getChangeAddress()
-console.log('找零地址:', changeAddress)
+console.log('Change address:', changeAddress)
 
-// 获取奖励/质押地址
+// Get reward/staking addresses
 const rewardAddresses = await api.getRewardAddresses()
-console.log('奖励地址:', rewardAddresses)
+console.log('Reward addresses:', rewardAddresses)
 ```
 
 ---
@@ -114,16 +116,17 @@ console.log('奖励地址:', rewardAddresses)
 ## 获取 UTxO
 
 ```typescript
-// 获取所有 UTxO
+// Get all UTxOs
 const utxos = await api.getUtxos()
 console.log('UTxOs:', utxos)
 
-// 获取具有最小金额的 UTxO
+// Get UTxOs with minimum amount
 const utxosWithAmount = await api.getUtxos(
-  '1000000' // 最小 1 ADA（以 lovelace 计，CBOR 编码）
+  Buffer.from(Value.new(BigNum.from_str('1000000')).to_bytes()).toString('hex')
+  // CBOR-encoded Value for 1 ADA; import Value and BigNum from the serialization SDK.
 )
 
-// 带分页
+// With pagination
 const paginatedUtxos = await api.getUtxos(undefined, {
   page: 0,
   limit: 10,
@@ -137,9 +140,9 @@ const paginatedUtxos = await api.getUtxos(undefined, {
 ```typescript
 const api = await window.cardano.onekey.enable()
 
-// Nami 兼容的事件 API
+// Nami-compatible event API
 api.experimental.on('accountChange', (addresses) => {
-  console.log('账户已变更:', addresses)
+  console.log('Account changed:', addresses)
 })
 ```
 
@@ -147,14 +150,13 @@ api.experimental.on('accountChange', (addresses) => {
 
 ## Nami 兼容性
 
-OneKey 提供 Nami 钱包兼容性：
+兼容别名可能属于其他扩展。请使用 `window.cardano.onekey` 明确选择 OneKey。
 
 ```typescript
-// 通过 Nami 接口访问
+// Access via Nami interface
 const nami = window.cardano.nami
 const api = await nami.enable()
 
-// 与 OneKey 相同的 API
+// Same API as OneKey
 const balance = await api.getBalance()
 ```
-

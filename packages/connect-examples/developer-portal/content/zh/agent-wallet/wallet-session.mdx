@@ -1,8 +1,11 @@
 ---
 title: Agent Wallet 会话
+description: 连接、检查及结束 App Transfer 或硬件钱包会话。
 ---
 
 # Agent Wallet 会话
+
+> 当前为私有测试版。访问资格、支持的命令与钱包流程取决于 OneKey 和 CLI 版本。使用示例前，先检查已安装 CLI 的 schema。
 
 Agent Wallet 会话是 AI Agent 通过 `onekey` CLI 使用的活动钱包上下文。在当前 CLI 源码里，这条流程暴露为 App Transfer / App Bot Wallet login。
 
@@ -29,11 +32,7 @@ onekey auth login --app-transfer
 
 OneKey GUI 提供 payload。CLI 会将会话导入本地 OneKey CLI vault，并使用操作系统凭据存储保护敏感材料。
 
-如果自动化环境已经拿到 payload，也可以显式传入：
-
-```bash
-onekey auth login --app-transfer --payload <json-or-base64-json>
-```
+CLI 也提供自动化使用的 `payload` 参数。App Transfer payload 属于凭据，不要粘贴到 Agent 对话、文档、日志或共享 shell 历史。自动导入凭据前，先检查 `onekey schema auth-login` 和当前 CLI 的说明。
 
 ## 状态
 

@@ -7,10 +7,10 @@ import { Callout } from 'nextra/components'
 
 # Wallet UI Libraries
 
-Pre-built wallet connection libraries that provide beautiful wallet selection modals, mobile support, and handle edge cases automatically.
+Wallet UI libraries provide a wallet chooser and connection state. Choose a library for your framework and target chains, then test account changes, rejected requests, and mobile connections.
 
 <Callout type="info">
-**Recommended for most projects.** These libraries save development time and provide battle-tested wallet connection flows.
+The guides below cover EVM integrations. For Aptos, use the [Aptos Wallet Adapter](/en/connect-to-software/wallet-ui/aptos-wallet-adapter). For other chains, start with the [chain-specific provider](/en/connect-to-software/provider).
 </Callout>
 
 ---
@@ -19,29 +19,27 @@ Pre-built wallet connection libraries that provide beautiful wallet selection mo
 
 | Library | Framework | Features |
 |---------|-----------|----------|
-| [RainbowKit](/en/connect-to-software/wallet-ui/rainbowkit) | React only | Beautiful modal, highly customizable, wagmi integration |
-| [Web3Modal](/en/connect-to-software/wallet-ui/web3modal) | React/Vue/JS | WalletConnect ecosystem, mobile QR codes, AppKit |
+| [RainbowKit](/en/connect-to-software/wallet-ui/rainbowkit) | React only | Wallet chooser, theming, wagmi integration |
+| [AppKit (formerly Web3Modal)](/en/connect-to-software/wallet-ui/web3modal) | React/Vue/JS | WalletConnect ecosystem, mobile QR codes, AppKit |
 | [Web3-Onboard](/en/connect-to-software/wallet-ui/web3-onboard) | React/Vue/JS | Blocknative, extensive customization |
 
 ---
 
-## Quick Comparison
+## Framework and Connection Support
 
-| Feature | RainbowKit | Web3Modal | Web3-Onboard |
+| Feature | RainbowKit | AppKit | Web3-Onboard |
 |---------|------------|-----------|--------------|
 | React | ✅ | ✅ | ✅ |
 | Vue | ❌ | ✅ | ✅ |
 | Vanilla JS | ❌ | ✅ | ✅ |
 | Mobile QR | ✅ | ✅ | ✅ |
-| Theming | High | Medium | High |
-| Bundle size | Medium | Medium | Medium |
 
 ---
 
 ## When to Use
 
 Use Wallet UI Libraries when you:
-- Want a polished wallet selection experience out of the box
+- Need a wallet chooser with connection state
 - Need mobile wallet support with QR codes
 - Don't want to build custom wallet connection UI
 - Want WalletConnect integration

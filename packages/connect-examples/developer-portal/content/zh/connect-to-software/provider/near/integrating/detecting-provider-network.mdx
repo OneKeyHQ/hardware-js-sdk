@@ -4,7 +4,7 @@ title: 检测 Provider 网络
 
 # 检测 Provider 网络
 
-你可以检测在 OneKey 钱包中选择的 provider 网络，目前支持 `mainnet` 和 `testnet`。
+可以读取 OneKey 钱包中所选的 provider 网络，目前支持 `mainnet` 和 `testnet`。
 
 ```javascript
 const res = await provider.request({
@@ -13,4 +13,3 @@ const res = await provider.request({
 console.log('near_networkInfo', res, res?.networkId);
 
 ```
-

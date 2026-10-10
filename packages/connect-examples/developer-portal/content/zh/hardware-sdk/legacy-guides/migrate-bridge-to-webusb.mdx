@@ -1,5 +1,6 @@
 ---
 title: 迁移到 web-sdk + WebUSB
+description: 将 Bridge 应用迁移到 web-sdk 的 WebUSB 模式。
 ---
 
 # 迁移到 web-sdk + WebUSB
@@ -20,7 +21,7 @@ title: 迁移到 web-sdk + WebUSB
 - 使用 `env: 'webusb'` 初始化 SDK
   - （Bridge (env: `web`) → WebUSB (env: `webusb`)）
 - 优先省略 `connectSrc`，让 `@onekeyfe/hd-web-sdk` 填 `https://jssdk.onekey.so/<安装版本>/`。只有自建 iframe 时才覆盖。
-- 通过 `navigator.usb.requestDevice()` 配合官方 OneKey 过滤器请求用户授权 — 由于 Chrome 安全限制，必须由用户手势触发（如按钮点击）；在获得权限前不允许自动设备发现
+- 通过 `navigator.usb.requestDevice()` 配合官方 OneKey 过滤器请求用户授权 — 由于 Chrome 安全限制，必须由用户手势触发（如按钮点击）；未授权设备需要先授权，已授权设备可直接枚举
 - Bridge 相关检查已弃用（如 `checkBridgeStatus()`）
 - 其他 SDK 用法保持不变
 
@@ -31,15 +32,16 @@ title: 迁移到 web-sdk + WebUSB
 ```ts
 import HdWebSdk from '@onekeyfe/hd-web-sdk';
 
-// 与 expo-example 相同的模式：默认导出 → .HardwareWebSdk
+// Same pattern as expo-example: default export → .HardwareWebSdk
 const HardwareSDK = HdWebSdk.HardwareWebSdk;
 
-await HardwareSDK.init({
+const initialized = await HardwareSDK.init({
   env: 'webusb',
-  // 省略 connectSrc — SDK 会填 https://jssdk.onekey.so/<安装的 hd-web-sdk 版本>/
-  debug: true,
+  // omit connectSrc — SDK fills https://jssdk.onekey.so/<installed-hd-web-sdk-version>/
+  debug: false,
   fetchConfig: true,
 });
+if (!initialized) throw new Error('SDK initialization failed');
 ```
 
 ---
@@ -50,7 +52,7 @@ await HardwareSDK.init({
 import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 
 // 重要：必须由用户手势触发（如按钮点击）
-// Chrome 安全策略不允许在获得权限前自动发现 USB 设备
+// Request permission for an unauthorized device from a user gesture.
 await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
 ```
 
@@ -59,29 +61,32 @@ await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
 ## 枚举设备并进行首次调用
 
 ```ts
-// 1) 枚举设备
+// 1) Enumerate
 const list = await HardwareSDK.searchDevices();
 if (!list.success) throw new Error(list.payload.error);
+// Select explicitly in the application when more than one device is available.
+if (list.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = list.payload[0] ?? {};
 if (!connectId) throw new Error("No device connection");
 
-// 2) 确认 deviceId
+// 2) Confirm deviceId
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const resolvedDeviceId = state.payload.identity.deviceId;
 if (!resolvedDeviceId) throw new Error("Device has no wallet identity");
 
-// 3) 示例：获取 BTC 地址
+// 3) Example: BTC address
 const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
   path: "m/44'/0'/0'/0/0",
   coin: 'btc',
-  showOnOneKey: false,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
 });
 
 if (r.success) {
-  console.log('BTC 地址:', r.payload.address);
+  console.log('BTC address:', r.payload.address);
 } else {
-  console.error('错误:', r.payload.error, r.payload.code);
+  console.error('Error:', r.payload.error, r.payload.code);
 }
 ```
 

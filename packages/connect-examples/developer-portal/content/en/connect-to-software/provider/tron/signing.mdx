@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # Signing
 
+Connect the provider and use the TronWeb instance associated with that same wallet. Replace abbreviated addresses and contract methods with valid values. Check the selected network before preparing a transaction.
+
 Learn how to sign messages on TRON.
 
 ---
@@ -58,15 +60,12 @@ try {
     method: 'tron_requestAccounts'
   })
 
-  if (result.code !== 200) {
-    throw new Error(result.message)
+  if (result.code === 4001) {
+    console.log('A connection request is already pending')
+  } else if (result.code !== 200) {
+    console.log('Connection was not approved:', result.message)
   }
 } catch (error) {
-  if (error.code === 4001) {
-    console.log('User rejected the request')
-  } else {
-    console.error('Error:', error.message)
-  }
+  console.error('Request failed:', error)
 }
 ```
-

@@ -1,14 +1,29 @@
 ---
+description: "Install the OneKey Hardware SDK, authorize WebUSB, read device state, and confirm a standard-wallet address."
 title: Getting Started
 ---
 
-# Getting Started
+import { Tabs } from 'nextra/components'
+import Link from 'next/link'
 
-Five minutes from install to a first address on Hardware SDK **1.2.x** (current stable `1.2.1`).
+<div className="doc-eyebrow">HARDWARE SDK · WEBUSB</div>
+
+# Connect your first device
+
+Install Hardware SDK **1.2.x**, connect a device, and confirm your first address.
 
 This page is the first-run path. After it works, pick a [transport guide](/en/hardware-sdk/transport/web-usb) and read the [Core API Guide](/en/hardware-sdk/core-api-guide) for PIN, passphrase, events, and signing.
 
 Hardware SDK 1.2.0 speaks Protocol V1 (Classic / Mini / Touch / Pro) and Protocol V2 (Pro 2 / Neo) through the **same JavaScript API**. You do not choose the protocol in `init()`.
+
+<div className="doc-prerequisites">
+<strong>BEFORE YOU START</strong>
+<ul>
+<li>A set-up OneKey device and a data-capable USB cable</li>
+<li>A WebUSB-capable browser, such as desktop Chrome or Edge</li>
+<li>An HTTPS origin, or localhost for development</li>
+</ul>
+</div>
 
 ## 1. Pick a package
 
@@ -17,13 +32,37 @@ Hardware SDK 1.2.0 speaks Protocol V1 (Classic / Mini / Touch / Pro) and Protoco
 | Browser / desktop WebUSB | `@onekeyfe/hd-common-connect-sdk` | [WebUSB](/en/hardware-sdk/transport/web-usb) |
 | React Native BLE | `@onekeyfe/hd-ble-sdk` | [React Native BLE](/en/hardware-sdk/transport/react-native-ble) |
 | Android / iOS / Flutter native bridge | `@onekeyfe/hd-common-connect-sdk` (`env: 'lowlevel'`) | [Native BLE](/en/hardware-sdk/transport/native-ble) |
-| Browser iframe host only | `@onekeyfe/hd-web-sdk` | Overview → plugin iframe |
+| Browser iframe host only | `@onekeyfe/hd-web-sdk` | [Plugin iframe host](/en/hardware-sdk#plugin-iframe-host) |
 
-```bash
-npm i @onekeyfe/hd-common-connect-sdk
+<Tabs items={['npm', 'pnpm', 'yarn']} className="doc-example-tabs">
+
+<Tabs.Tab>
+
+```bash filename="Terminal"
+npm i --save-exact @onekeyfe/hd-common-connect-sdk@1.2 @onekeyfe/hd-core@1.2 @onekeyfe/hd-shared@1.2
 ```
 
-Pin the installed version to the current stable `1.2.x` line. If you embed `@onekeyfe/hd-web-sdk`, omit `connectSrc` so it matches the installed package.
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```bash filename="Terminal"
+pnpm add --save-exact @onekeyfe/hd-common-connect-sdk@1.2 @onekeyfe/hd-core@1.2 @onekeyfe/hd-shared@1.2
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```bash filename="Terminal"
+yarn add --exact @onekeyfe/hd-common-connect-sdk@1.2 @onekeyfe/hd-core@1.2 @onekeyfe/hd-shared@1.2
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+The command selects published `1.2.x` packages and saves exact versions. Keep the SDK, core, and shared packages on the same release and commit your lockfile. If you embed `@onekeyfe/hd-web-sdk`, omit `connectSrc` so it matches the installed package.
 
 ## 2. Initialize once
 
@@ -32,7 +71,7 @@ import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 
 const initialized = await HardwareSDK.init({
   env: 'webusb',
-  debug: process.env.NODE_ENV !== 'production',
+  debug: false,
   fetchConfig: true,
 });
 if (!initialized) throw new Error('SDK initialization failed');
@@ -42,7 +81,17 @@ Call `init()` once at app entry. Do not mix `@onekeyfe/hd-web-sdk` and `@onekeyf
 
 ## 3. Search, identify, read an address
 
-Register the [UI event handler](/en/hardware-sdk/core-api-guide#events-ui) before protected calls so locked devices can complete PIN input.
+Register the [UI event handler](/en/hardware-sdk/core-api-guide#events-ui) before protected calls so locked devices can complete PIN input. For WebUSB, authorize the device from the user's Connect button before discovery:
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// Run directly in the Connect button handler.
+if (!navigator.usb) throw new Error('WebUSB is unavailable in this browser');
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+Then discover devices. This example selects the first candidate; present a device selector when multiple candidates are available.
 
 ```ts
 const devices = await HardwareSDK.searchDevices();
@@ -50,20 +99,23 @@ if (!devices.success || !devices.payload.length) {
   throw new Error('No OneKey device found');
 }
 
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 
 const state = await HardwareSDK.getDeviceState(connectId);
-if (!state.success) throw new Error(state.payload.error);
+if (state.success === false) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
 if (!deviceId) throw new Error("Device has no wallet identity");
 
 const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
   useEmptyPassphrase: true,
+  showOnOneKey: true,
 });
 
-if (!address.success) throw new Error(address.payload.error);
+if (address.success === false) throw new Error(address.payload.error);
 console.log(address.payload.address);
 ```
 
@@ -80,6 +132,8 @@ WebUSB requires HTTPS and a user gesture. BLE requires OS Bluetooth permission.
 - Open or switch a wallet with `openWalletSession`. `getPassphraseState` is deprecated. See [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session).
 
 ## Next
+
+<Link className="doc-next" href="/en/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction"><span><small>ETHEREUM &amp; EVM</small><strong>Sign your first transaction</strong><span>Parameters, fee types, and the signature response.</span></span><span aria-hidden="true">↗</span></Link>
 
 1. Already on 1.1.x: [From 1.1.x to 1.2.x](/en/hardware-sdk/legacy-guides/from-1x)
 2. Wire PIN / passphrase UI events: [Core API Guide](/en/hardware-sdk/core-api-guide)

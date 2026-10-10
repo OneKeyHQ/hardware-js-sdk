@@ -4,15 +4,13 @@ title: benfenSignTransaction
 
 # benfenSignTransaction
 
-
-
 ### Benfen: Sign transaction
 
-Asks device to sign given transaction using the private key derived by given BIP32 path. User is asked to confirm all transaction details on OneKey.
+Requests a transaction signature using the key derived from the specified path. The user reviews and confirms the request on the device.
 
-**Use requirement**
+**Requirements**
 
-* Firmware version required
+* Minimum firmware versions
   * Pro: 4.12.0
   * Classic 1S / Classic 1S Pure: 3.11.0
 
@@ -28,8 +26,8 @@ const result = await HardwareSDK.benfenSignTransaction(connectId, deviceId, {
 
 **Optional common params**
 
-* `path` - _required_ `string | Array<number>` minimum length is `3`. read more
-* `rawTx` - _required_ `string` type of serialized transaction string in hex format
+* `path` - _required_ `string | Array<number>` SDK minimum length is `3`. [Path format](/en/hardware-sdk/concepts/common-params#hd-path)
+* `rawTx` - _required_ `string` Serialized transaction encoded as a hexadecimal string.
 * `coinType` - _optional_ `string` coin type identifier
 
 #### Returns

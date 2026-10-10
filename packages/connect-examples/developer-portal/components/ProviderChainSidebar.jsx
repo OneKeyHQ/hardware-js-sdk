@@ -1,5 +1,7 @@
 'use client'
 
+import { ui } from '../i18n/ui.mjs'
+
 import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { ChevronRight } from 'lucide-react'
@@ -256,9 +258,9 @@ export function ProviderChainSidebar({ lang = 'en' }) {
     setExpandedSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] }))
   }
 
-  const searchPlaceholder = lang === 'zh' ? '搜索链...' : 'Search chains...'
-  const noResults = lang === 'zh' ? '未找到链' : 'No chains found'
-  const placeholder = lang === 'zh' ? '选择链' : 'Select a chain'
+  const searchPlaceholder = ui(lang, 'Search chains...', '搜索链...')
+  const noResults = ui(lang, 'No chains found', '未找到链')
+  const placeholder = ui(lang, 'Select a chain', '选择链')
 
   return (
     <div className="provider-chain-sidebar">

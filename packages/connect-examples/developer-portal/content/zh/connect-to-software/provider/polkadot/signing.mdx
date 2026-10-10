@@ -7,21 +7,23 @@ import { Callout } from 'nextra/components'
 
 # 签名
 
+启用扩展、选择账户，并将 API 客户端连接到目标链。根据链的当前元数据构建交易 payload；本指南中省略的十六进制数据均为占位值。
+
 了解如何在 Polkadot 上签署交易和消息。
 
 ---
 
 ## 签署交易 Payload
 
-签署外部调用 payload：
+签署交易 payload（extrinsic payload）：
 
 ```typescript
 import { web3FromAddress } from '@polkadot/extension-dapp'
 
-// 获取特定账户的注入器
+// Get injector for specific account
 const injector = await web3FromAddress(accountAddress)
 
-// 签署 payload
+// Sign payload
 const payload = {
   address: accountAddress,
   blockHash: '0x...',
@@ -33,7 +35,7 @@ const payload = {
   specVersion: '0x...',
   tip: '0x...',
   transactionVersion: '0x...',
-  signedExtensions: [...],
+  signedExtensions: [], // Populate from current chain metadata; do not sign this placeholder
   version: 4,
 }
 
@@ -41,7 +43,7 @@ const result = await provider.web3SignPayload(payload)
 
 console.log({
   id: result.id,
-  signature: result.signature, // 十六进制签名
+  signature: result.signature, // Hex signature
 })
 ```
 
@@ -52,7 +54,7 @@ console.log({
 ```typescript
 const payload = {
   address: accountAddress,
-  data: '0x48656c6c6f', // 十六进制编码的消息
+  data: '0x48656c6c6f', // Hex-encoded message
   type: 'bytes',
 }
 
@@ -74,17 +76,17 @@ await tx.signAndSend(
   { signer: injector.signer },
   ({ status, events }) => {
     if (status.isInBlock) {
-      console.log('已入块:', status.asInBlock.toHex())
+      console.log('In block:', status.asInBlock.toHex())
     }
     if (status.isFinalized) {
-      console.log('已最终确认:', status.asFinalized.toHex())
+      console.log('Finalized:', status.asFinalized.toHex())
 
       events.forEach(({ event }) => {
         if (api.events.system.ExtrinsicSuccess.is(event)) {
-          console.log('交易成功')
+          console.log('Transaction succeeded')
         }
         if (api.events.system.ExtrinsicFailed.is(event)) {
-          console.log('交易失败')
+          console.log('Transaction failed')
         }
       })
     }
@@ -104,7 +106,7 @@ const response = await provider.web3RpcSend({
   params: [],
 })
 
-console.log('最新区块头:', response.result)
+console.log('Latest header:', response.result)
 ```
 
 ### 订阅 RPC 事件
@@ -116,11 +118,11 @@ const subscriptionId = await provider.web3RpcSubscribe(
     params: [],
   },
   (response) => {
-    console.log('新区块:', response.result)
+    console.log('New block:', response.result)
   }
 )
 
-// 稍后取消订阅
+// Unsubscribe later
 await provider.web3RpcUnSubscribe()
 ```
 
@@ -133,9 +135,9 @@ try {
   const result = await provider.web3SignPayload(payload)
 } catch (error) {
   if (error.message === 'Cancelled') {
-    console.log('用户取消了签名')
+    console.log('User cancelled signing')
   } else {
-    console.error('签名失败:', error)
+    console.error('Signing failed:', error)
   }
 }
 ```
@@ -164,4 +166,3 @@ function usePolkadotWallet() {
   return { accounts, isConnected, connect }
 }
 ```
-

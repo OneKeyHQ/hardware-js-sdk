@@ -13,8 +13,9 @@ title: 建立连接
 连接到 OneKey 的**推荐**且**最简单**的方式是调用 `window.$onekey.solana.connect()`。不过，Provider 也暴露了 `request` JSON RPC 接口。
 
 ### 使用 connect 方法
+
 ```javascript
-const provider = getProvider(); // 参见"检测 Provider"
+const provider = getProvider(); // see "Detecting the Provider"
 try {
     const resp = await provider.connect();
     console.log(resp.publicKey.toString());
@@ -25,29 +26,30 @@ try {
 ```
 
 ### 使用 request 方法
+
 ```javascript
-const provider = getProvider(); // 参见"检测 Provider"
+const provider = getProvider(); // see "Detecting the Provider"
 try {
     const resp = await provider.request({ method: "connect" });
     console.log(resp.publicKey.toString());
-    // 26qv4GCcx98RihuK3c4T6ozB3J7L6VwCuFVc7Ta2A3Uo 
+    // 26qv4GCcx98RihuK3c4T6ozB3J7L6VwCuFVc7Ta2A3Uo
 } catch (err) {
     // { code: 4001, message: 'User rejected the request.' }
 }
 ```
 
-`connect()` 调用将返回一个 [Promise](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise)，当用户接受连接请求时解析，当用户拒绝请求或关闭弹窗时拒绝（await 时抛出）。有关 OneKey 可能发出的错误消息的详细信息，请参阅[错误](/zh/connect-to-software/provider/solana/signing-a-message#errors)。
+`connect()` 返回 [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)。用户批准连接请求时，Promise 成功完成；用户拒绝或关闭弹窗时，Promise 被拒绝，在 await 时抛出异常。请捕获错误并显示其 `code` 和 `message`；用户拒绝通常使用错误码 `4001`。
 
 当用户接受连接请求时，Provider 也会发出 `connect` 事件。
 
 ```javascript
-provider.on("connect", () => console.log("已连接！"));
+provider.on("connect", () => console.log("connected!"));
 ```
 
 Web 应用连接到 OneKey 后，将能够读取已连接账户的公钥并提示用户进行其他交易。它还暴露了一个便捷的 `isConnected` 布尔值。
 
 ```javascript
-console.log(provider.publicKey.toString()); 
+console.log(provider.publicKey.toString());
 console.log(provider.isConnected);
 // true
 ```
@@ -59,32 +61,34 @@ Web 应用首次连接到 OneKey 后，它就成为已授权的应用。获得�
 要实现这一点，应用应在 `connect()` 调用中传递 `onlyIfTrusted` 选项。
 
 ### 使用 connect 方法
+
 ```javascript
 provider.connect({ onlyIfTrusted: true });
 ```
 
 ### 使用 request 方法
+
 ```javascript
 window.$onekey.solana.request({ method: "connect", params: { onlyIfTrusted: true }});
 ```
 
 如果存在此标志，OneKey 只会在应用已获授权时自动重连并发出 `connect` 事件。如果应用未获授权，OneKey 将抛出 `4001` 错误并保持断开连接状态，直到提示用户在没有 `onlyIfTrusted` 标志的情况下连接。无论哪种情况，OneKey 都不会打开弹窗，这使得在所有页面加载时使用都很方便。
 
-以下是 React 应用如何自动重连到 OneKey 的示例。
+下方 effect 应在 React 组件中、且 `provider` 已可用时运行。
 
 ```javascript
 import { useEffect } from "react";
 
 useEffect(() => {
-    // 将自动连接到 OneKey，或不执行任何操作。
+    // Will either automatically connect to OneKey, or do nothing.
     provider.connect({ onlyIfTrusted: true })
         .then(({ publicKey }) => {
-            // 处理成功的自动重连
-        });
-        .catch(() => {
-            // 照常处理连接失败
+            // Handle successful eager connection
         })
-}, []);
+        .catch(() => {
+            // Handle connection failure as usual
+        })
+}, [provider]);
 ```
 
 有关实时演示，请参阅我们沙盒中的 `handleConnect` 部分。
@@ -96,13 +100,15 @@ useEffect(() => {
 断开连接与连接的过程相同。但是，钱包也可以发起断开连接，而不是应用本身。
 
 ### 使用 disconnect 方法
+
 ```javascript
-provider.disconnect();
+await provider.disconnect();
 ```
 
 ### 使用 request 方法
+
 ```javascript
-provider.request({ method: "disconnect" });
+await provider.request({ method: "disconnect" });
 ```
 
 以下是 React 应用如何优雅地处理 `disconnect` 事件的示例。
@@ -110,33 +116,33 @@ provider.request({ method: "disconnect" });
 ```javascript
 import { useState, useEffect } from "react";
 
+// Inside a React component:
 const [pubKey, setPubKey] = useState(null);
 
 useEffect(() => {
-  // 用户连接后存储其公钥
-  provider.on("connect", (publicKey) => {
-    setPubKey(publicKey);
-  });
-
-  // 用户断开连接后清除其公钥
-  provider.on("disconnect", () => {
-    setPubKey(null);
-  });
+  const onConnect = (publicKey) => setPubKey(publicKey);
+  const onDisconnect = () => setPubKey(null);
+  provider.on("connect", onConnect);
+  provider.on("disconnect", onDisconnect);
+  return () => {
+    provider.off("connect", onConnect);
+    provider.off("disconnect", onDisconnect);
+  };
 }, [provider]);
 ```
 
 ## 切换账户
 
-OneKey 允许用户在单个扩展或移动应用中无缝管理多个账户（即[密钥对](https://solana-labs.github.io/solana-web3.js/classes/Keypair.html)）。每当用户切换账户时，OneKey 都会发出 `accountChanged` 事件。
+OneKey 允许用户在单个扩展或移动应用中无缝管理多个账户（即[密钥对](https://solana-foundation.github.io/solana-web3.js/v1.x/classes/Keypair.html)）。每当用户切换账户时，OneKey 都会发出 `accountChanged` 事件。
 
-如果用户在已连接到应用时切换账户，且新账户已将该应用加入白名单，则用户将保持连接状态，OneKey 将传递新账户的 [PublicKey](https://solana-labs.github.io/solana-web3.js/classes/PublicKey.html)：
+如果用户在已连接到应用时切换账户，且新账户已将该应用加入白名单，则用户将保持连接状态，OneKey 将传递新账户的 [PublicKey](https://solana-foundation.github.io/solana-web3.js/v1.x/classes/PublicKey.html)：
 
 ```javascript
 provider.on('accountChanged', (publicKey) => {
     if (publicKey) {
-        // 设置新公钥并照常继续
-        console.log(`已切换到账户 ${publicKey.toBase58()}`);
-    } 
+        // Set new public key and continue as usual
+        console.log(`Switched to account ${publicKey.toBase58()}`);
+    }
 });
 ```
 
@@ -145,12 +151,12 @@ provider.on('accountChanged', (publicKey) => {
 ```javascript
 provider.on('accountChanged', (publicKey) => {
     if (publicKey) {
-      // 设置新公钥并照常继续
-      console.log(`已切换到账户 ${publicKey.toBase58()}`);
+      // Set new public key and continue as usual
+      console.log(`Switched to account ${publicKey.toBase58()}`);
     } else {
-      // 尝试重新连接到 OneKey
+      // Attempt to reconnect to OneKey
       provider.connect().catch((error) => {
-        // 处理连接失败
+        // Handle connection failure
       });
     }
 });

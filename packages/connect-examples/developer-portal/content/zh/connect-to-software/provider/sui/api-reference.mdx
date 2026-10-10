@@ -5,7 +5,7 @@ description: OneKey Sui provider 完整 API 参考
 
 # API 参考
 
-OneKey Sui provider 方法和类型的完整参考。
+OneKey Sui provider 的方法和类型参考。
 
 ---
 
@@ -23,8 +23,8 @@ OneKey Sui provider 方法和类型的完整参考。
 | `signTransactionBlock(input)` | 仅签署交易，需传入 `account`/`chain` |
 | `signAndExecuteTransaction(input)` | 签署并执行（新 API，使用 `Transaction`，需 `account`/`chain`） |
 | `signTransaction(input)` | 签署交易（新 API，使用 `Transaction`，需 `account`/`chain`） |
-| `signMessage(input)` | 签署消息（旧版，需 `account`/`chain`） |
-| `signPersonalMessage(input)` | 签署个人消息（需 `account`/`chain`） |
+| `signMessage(input)` | 签署消息（旧版，需 `account`） |
+| `signPersonalMessage(input)` | 签署个人消息（需 `account`，`chain` 可选） |
 | `onAccountChange(callback)` | 监听账户变更 |
 | `onNetworkChange(callback)` | 监听网络变更 |
 
@@ -34,20 +34,28 @@ OneKey Sui provider 方法和类型的完整参考。
 
 ### 钱包账户
 
+`getAccounts()` 返回 `AccountInfo[]`。签名参数需要 Wallet Standard 的 `WalletAccount`，其 `publicKey` 为字节数组，并包含 `chains` 和 `features`。请通过 `standard:connect` 获取，不能将 `AccountInfo` 强制转换为 `WalletAccount`。
+
 ```typescript
-interface WalletAccount {
+import type { WalletAccount, IdentifierString } from '@mysten/wallet-standard'
+import type { Transaction } from '@mysten/sui/transactions'
+
+// provider.getAccounts()
+interface AccountInfo {
   address: string
-  publicKey: Uint8Array
-  chains: string[]
-  features: string[]
+  publicKey: string // Hex-encoded public key
 }
 ```
 
 ### 签署并执行交易块输入
 
+当前注入式 provider 不会转发 `signAndExecuteTransactionBlock` 中的 `options`。如需 effects、events 或 object changes，请使用同一链上的 Sui 客户端，根据返回的 digest 查询交易。
+
 ```typescript
 interface SignAndExecuteTransactionBlockInput {
-  transactionBlock: TransactionBlock
+  account: WalletAccount
+  chain: IdentifierString
+  transactionBlock: Transaction
   options?: {
     showEffects?: boolean
     showEvents?: boolean
@@ -72,6 +80,8 @@ interface SignTransactionBlockOutput {
 
 ```typescript
 interface SignPersonalMessageInput {
+  account: WalletAccount
+  chain?: IdentifierString
   message: Uint8Array
 }
 ```
@@ -89,8 +99,9 @@ interface SignPersonalMessageOutput {
 
 ## 支持的链
 
-| 链 | 标识符 |
-|----|--------|
+| 网络 | 标识 |
+|-------|------------|
+| 主网 | `sui:mainnet` |
 | 测试网 | `sui:testnet` |
 | 开发网 | `sui:devnet` |
 

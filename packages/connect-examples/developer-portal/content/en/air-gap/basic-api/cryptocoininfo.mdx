@@ -4,7 +4,7 @@ title: CryptoCoinInfo
 
 # CryptoCoinInfo
 
-The `CryptoCoinInfo` class represents cryptocurrency information.
+The `CryptoCoinInfo` class represents cryptocurrency information. This page describes the legacy export from `@onekeyfe/onekey-air-gap`, including its Ethereum enum value. Other registry packages can expose different enums; use the constructor and types from the same installed package.
 
 ## Types
 
@@ -24,12 +24,9 @@ export enum Network {
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `Type` | `enum` | Currency type (e.g., `bitcoin = 0`, `ethereum = 60`) |
-| `Network` | `enum` | Network type (`mainnet` or `testnet`) |
+| `type` | `Type` | First constructor argument; currency type (e.g., `bitcoin = 0`, `ethereum = 60`) |
+| `network` | `Network` | Second constructor argument; network type (`mainnet` or `testnet`) |
 
-## UR Example
+## UR type
 
-```
-ur:crypto-coin-info/xxxxx
-```
-
+The UR type is `crypto-coin-info`. Generate the encoded payload with the registry encoder.

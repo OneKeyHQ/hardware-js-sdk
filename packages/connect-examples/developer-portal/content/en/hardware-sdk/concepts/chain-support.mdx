@@ -1,4 +1,5 @@
 ---
+description: "Check hardware signing method support by protocol and review device compatibility-test limitations."
 title: Chain Support
 ---
 
@@ -39,19 +40,19 @@ These methods declare Protocol V1 only. **Do not call them on Pro 2 or Neo.** St
 | Family | Public methods | Notes |
 | --- | --- | --- |
 | Stellar | `stellarGetAddress` `stellarSignTransaction` | **Not on Pro 2 / Neo** |
-| Alephium | `alephiumGetAddress` `alephiumSignMessage` `alephiumSignTransaction` | **Not on Pro 2 / Neo**. Classic / Mini / Touch signing often fails |
-| Benfen | `benfenGetAddress` `benfenGetPublicKey` `benfenSignMessage` `benfenSignTransaction` | **Not on Pro 2 / Neo**. Classic expected fail |
+| Alephium | `alephiumGetAddress` `alephiumSignMessage` `alephiumSignTransaction` | **Not on Pro 2 / Neo**. Classic / Mini / Touch signing is listed in compatibility test exceptions |
+| Benfen | `benfenGetAddress` `benfenGetPublicKey` `benfenSignMessage` `benfenSignTransaction` | **Not on Pro 2 / Neo**. Classic is listed in compatibility test exceptions |
 | Nexa | `nexaGetAddress` `nexaSignTransaction` | **Not on Pro 2 / Neo** |
-| Dynex | `dnxGetAddress` `dnxSignTransaction` | **Not on Pro 2 / Neo**. Pro / Classic 1s / Mini / Touch often fail |
+| Dynex | `dnxGetAddress` `dnxSignTransaction` | **Not on Pro 2 / Neo**. Pro / Classic 1s / Mini / Touch are listed in compatibility test exceptions |
 | Nervos | `nervosGetAddress` `nervosSignTransaction` | **Not on Pro 2 / Neo** |
-| SCDO | `scdoGetAddress` `scdoSignMessage` `scdoSignTransaction` | **Not on Pro 2 / Neo**. Classic / Mini / Touch often fail |
-| Neo (chain) | `neoGetAddress` `neoSignTransaction` | **Not on Pro 2 / Neo**. Classic / Mini / Touch often fail. Not the OneKey Neo device |
+| SCDO | `scdoGetAddress` `scdoSignMessage` `scdoSignTransaction` | **Not on Pro 2 / Neo**. Classic / Mini / Touch are listed in compatibility test exceptions |
+| Neo (chain) | `neoGetAddress` `neoSignTransaction` | **Not on Pro 2 / Neo**. Classic / Mini / Touch are listed in compatibility test exceptions. Not the OneKey Neo device |
 | Lightning | `lnurlAuth` | **Not on Pro 2 / Neo** |
 | EVM extra | `evmSignMessageEIP712` | Legacy typed-data path; prefer `evmSignTypedData` (V1+V2) |
 
 ## Device caveats (compatibility tests)
 
-These are methods current device tests **accept as failing**. Treat them as unsupported on that model until firmware + tests change.
+These are method/model combinations that repository compatibility tests permit to fail. This is a test-coverage limitation, not a fresh hardware test result. Do not advertise support for these combinations without validating the exact firmware and method on the device.
 
 | Model | Do not rely on |
 | --- | --- |

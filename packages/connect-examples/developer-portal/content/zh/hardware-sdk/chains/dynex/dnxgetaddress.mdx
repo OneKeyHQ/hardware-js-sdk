@@ -6,7 +6,7 @@ title: dnxGetAddress
 
 ### Dynex：获取地址
 
-显示指定 BIP32 路径派生的地址，并返回给调用者。用户需要在 OneKey 上确认导出。
+派生并返回指定路径的地址。`showOnOneKey` 为 `true` 时，用户必须在设备上确认地址。
 
 ```typescript
 const result = await HardwareSDK.dnxGetAddress(connectId, deviceId, params);
@@ -14,7 +14,7 @@ const result = await HardwareSDK.dnxGetAddress(connectId, deviceId, params);
 
 #### 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Classic: 3.8.0
 
 #### 参数
@@ -39,13 +39,13 @@ params: `object`
 #### 示例
 
 ```typescript
-// 获取单个地址
+// Get single address
 const response = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
     path: "m/44'/29538'/0'/0/0",
     showOnOneKey: true
 });
 
-// 获取多个地址
+// Get multiple addresses
 const bundle = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
     bundle: [
         { path: "m/44'/29538'/0'/0/0", showOnOneKey: false },
@@ -54,7 +54,9 @@ const bundle = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
 });
 ```
 
-#### 返回结果
+<span id="返回结果" />
+
+#### 返回值
 
 单个地址的成功响应：
 
@@ -62,8 +64,8 @@ const bundle = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
 {
     success: true,
     payload: {
-        address: string,     // Dynex 地址
-        path: string        // 使用的 BIP32 路径
+        address: string,     // Dynex address
+        path: string        // BIP32 path used
     }
 }
 ```

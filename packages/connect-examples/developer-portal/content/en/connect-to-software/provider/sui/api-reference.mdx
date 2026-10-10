@@ -5,7 +5,7 @@ description: Complete API reference for OneKey's Sui provider
 
 # API Reference
 
-Complete reference for OneKey's Sui provider methods and types.
+Reference for OneKey's Sui provider methods and types.
 
 ---
 
@@ -34,20 +34,28 @@ Complete reference for OneKey's Sui provider methods and types.
 
 ### Wallet Account
 
+`getAccounts()` returns `AccountInfo[]`. Signing inputs require the Wallet Standard `WalletAccount`, whose `publicKey` is a byte array and which also carries `chains` and `features`. Obtain it through `standard:connect`; do not cast `AccountInfo` to `WalletAccount`.
+
 ```typescript
-interface WalletAccount {
+import type { WalletAccount, IdentifierString } from '@mysten/wallet-standard'
+import type { Transaction } from '@mysten/sui/transactions'
+
+// provider.getAccounts()
+interface AccountInfo {
   address: string
-  publicKey: Uint8Array
-  chains: string[]
-  features: string[]
+  publicKey: string // Hex-encoded public key
 }
 ```
 
 ### Sign and Execute Transaction Block Input
 
+The current injected provider does not forward `options` in `signAndExecuteTransactionBlock`. Query the returned digest with a Sui client on the same chain to request effects, events, or object changes.
+
 ```typescript
 interface SignAndExecuteTransactionBlockInput {
-  transactionBlock: TransactionBlock
+  account: WalletAccount
+  chain: IdentifierString
+  transactionBlock: Transaction
   options?: {
     showEffects?: boolean
     showEvents?: boolean
@@ -72,6 +80,8 @@ interface SignTransactionBlockOutput {
 
 ```typescript
 interface SignPersonalMessageInput {
+  account: WalletAccount
+  chain?: IdentifierString
   message: Uint8Array
 }
 ```
@@ -91,6 +101,7 @@ interface SignPersonalMessageOutput {
 
 | Chain | Identifier |
 |-------|------------|
+| Mainnet | `sui:mainnet` |
 | Testnet | `sui:testnet` |
 | Devnet | `sui:devnet` |
 

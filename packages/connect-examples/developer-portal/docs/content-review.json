@@ -1,0 +1,1274 @@
+{
+  "version": 1,
+  "description": "Reviewed English and Chinese MDX pairs; hashes detect subsequent drift, not translation quality. See content-maintenance.md.",
+  "pages": {
+    "agent-wallet/capabilities.mdx": {
+      "en": "520ff7c705c282c32c77d792189e10ed0b13ec15ae74ec442b71eaf6c965ff54",
+      "zh": "5d8c10334230d26e4cc1f4cff2ca65b759a4c8126b463aa1c3efa0a0e3a7dfb2"
+    },
+    "agent-wallet/hardware-control.mdx": {
+      "en": "db0bf47077a0f6ab8fd7bcaeac2232bb7341556d57cac2116ca5dc509a3579ff",
+      "zh": "f8708e44d3875f96bfe3d8d6b0187ad64f4663bc4ef971344bab13f3d19030be"
+    },
+    "agent-wallet/index.mdx": {
+      "en": "08519ccf37c396176761db1450a1679a796c4668b9693f660281a4b69fabb1be",
+      "zh": "41f41ed0319d66cb3d9fe14f4bb0d0f5b8b22dfe312f88217a1b91fc64453ee4"
+    },
+    "agent-wallet/keyless-binding.mdx": {
+      "en": "6449a87575d4eb6dbe3a523db11d6b8f2de2e14195e6ea7b2a73164839a1e015",
+      "zh": "cb86f83f4e85f9ad3753b6f16307aa69d853e2db3976e90ae6131fafee1538eb"
+    },
+    "agent-wallet/overview.mdx": {
+      "en": "45e7f9ab1d7e080a36b41bd781614f4fe3d1cc5292e3e407ab1d83ba077e0729",
+      "zh": "70875a0f1a709a249264c3d0f00faa54e50138c31ddec83c39789ea71611685f"
+    },
+    "agent-wallet/quickstart.mdx": {
+      "en": "d09e500e5214dc30eb80c5f0f41e6730cf227c2f0bc4501883ff05021e186cbe",
+      "zh": "66041f34808122b24e555ad479a00405a2b31e2a53c17e0510416e4ddb0e0c0b"
+    },
+    "agent-wallet/recipes.mdx": {
+      "en": "e37b2da8ae9dc1cf98152deb63668b25e69ef346eab40a1ea85e1c9f5842e959",
+      "zh": "5f22856fa919b0f12e98fe61437b056938558ce6e686657579c3ea382929908a"
+    },
+    "agent-wallet/safety.mdx": {
+      "en": "cc2b54e6f077cf7edee6b723ea183f5905b7ccffcac6fdee19e7234006b60063",
+      "zh": "658bb21411265468e51df1b172527272780568a0d6b12c7c2d3c332ab0c50f92"
+    },
+    "agent-wallet/wallet-session.mdx": {
+      "en": "316fe61eaa1598b0dbcc29a3d3b66da4e2c4c8edd491875504e4286174a2b371",
+      "zh": "3b891d32caf6ec02eb3e1260ece71bc86a0a685287705ff2243e545a467095a5"
+    },
+    "agent-wallet/wallet-skills.mdx": {
+      "en": "4b7bf03171bcb0773473d1814fbf5e0d1fe35e7c3f8420bc054a5123b92c8797",
+      "zh": "c5d8bcb62315cde46032ba96a3d1705210be61dfee73203c2a8fe572a346b92b"
+    },
+    "air-gap/basic-api/cryptocoininfo.mdx": {
+      "en": "6ab09731d04ccce0e0cdca810d63f9db7b6c1ae44fa7b294f1008e4e7a738625",
+      "zh": "c49d8969bc7c54925d84422b060e5d0cb8407b1489eaa5a1ed19c4e7250b0e43"
+    },
+    "air-gap/basic-api/cryptohdkey.mdx": {
+      "en": "a42cb9043733beb66f1f9f19b588191a5e743c26088e83e867486ac586048f49",
+      "zh": "5716ce9330193317019e7e5fafa12a4ed23f401b6b0fa84f57fec8982b246814"
+    },
+    "air-gap/basic-api/cryptokeypath.mdx": {
+      "en": "613d7e2cc15f7e17b405dca4bbcb55322bf7185556c0b7094d5d18d4e11e5bd1",
+      "zh": "067caffaa2b48ffd6ca1fc3488adf522d431183e307f0eab7cdbb385539b716c"
+    },
+    "air-gap/basic-api/index.mdx": {
+      "en": "80aa094223a92159583d7a194853131cfceb3ed7263adbcc47f24e28b354d86a",
+      "zh": "61b488c580a45fc5a47dc8a9447ed2ed1782e673edb1d64990bbae3779610b4e"
+    },
+    "air-gap/bitcoin.mdx": {
+      "en": "d5e671cc3a4150f6e30dd2d540b00e91723613549aa9299e49d2c763e2c3e800",
+      "zh": "05cd38f5942db3af6de15e032ff7d5a4b3b6d57d59df654f09e4b46dcada7e96"
+    },
+    "air-gap/ethereum-and-evm/ethsignature.mdx": {
+      "en": "b5e54bb2dae5d36441e14a36f3fb3bbb541f5a50272bf3bf2605fb66a8e17895",
+      "zh": "35679f6f85a861ca0cd5d04c285b55b3a6ba54880b831b0697bb5f25f062a60c"
+    },
+    "air-gap/ethereum-and-evm/ethsignrequest.mdx": {
+      "en": "7d499ecb042cdbbe7658d32149f282462dac280ee8dbd35c63685591f823ab78",
+      "zh": "3f7748f78dd3da20cef6931c3eecc82c4a80a2014cefa307d24adcdce77309f0"
+    },
+    "air-gap/ethereum-and-evm/index.mdx": {
+      "en": "87f6d253ddc463f28e803ff29b8bf0fc5363d58c06ea6ba83df5dfce712e9b78",
+      "zh": "a886fdb503ad6630ade98feb87cc82f1443ba3e18b7be43c9894f8db67906dc3"
+    },
+    "air-gap/index.mdx": {
+      "en": "969899c2f8cc85e3fe0a5440b8ceca37dffc00cc16b62f12375ce874342e449f",
+      "zh": "7c04012741a2df64a59a91a2020a945b7acafff20017dc405f844f9a7104c179"
+    },
+    "air-gap/solana.mdx": {
+      "en": "61531c8ae1318f749812c357d09614a69214e08822ad572098e74e405d4a6abc",
+      "zh": "b914c78df44fba746c7e1f08c8c55eef099a728939c5f0c56c346d01658ce513"
+    },
+    "air-gap/tron.mdx": {
+      "en": "49f3763d1116d108bc037a22a7c6ce01de30128b1966c6e7609c14849fb3e67f",
+      "zh": "e554d8cab560f172a1a7f0b8af817ce6924d4e7f85395d85b11257fc573145f5"
+    },
+    "changelog.mdx": {
+      "en": "b6ac07949ba61b476d6a262f609396af3cbee95686c130e7ec9c9b30c3a56104",
+      "zh": "ccdfd2dc950069ceb8dfb7f9bbfa7a5027415c6cbc9f39f021e04283ea10c4cc"
+    },
+    "connect-to-software/index.mdx": {
+      "en": "d7e966a12847352a626bf73e5a695a84e8eae139518b93eb1120af7a2095a9c1",
+      "zh": "994d61cce72da40bbc0dea8202da04f4bbd62b229d3faf5b6df42b9e930cfbeb"
+    },
+    "connect-to-software/mobile-deeplinks.mdx": {
+      "en": "f9a48684be8fa5c7ffa0634a0d944c29d39009d8e6704d4e106aedddeb649b36",
+      "zh": "900ccdf275cf16e6cfae090ca136f195ed706ebcc5007a1e956719f260fc989e"
+    },
+    "connect-to-software/provider/algorand/api-reference.mdx": {
+      "en": "7d5d2ddb5c6b94aca032cd315ca93fba6104a79f5193e092aff915867b56196f",
+      "zh": "0fb35efbcf95b93e8187bbf486074d066bf201dbfeaea6f1e1f62df6a879998d"
+    },
+    "connect-to-software/provider/algorand/getting-started.mdx": {
+      "en": "bc69f2d5ab91abe30043d0fe597ffd178c343c0be745b49f8996ff7815895203",
+      "zh": "9656c915feafc2f624283162ef624afba5f1f7bd6f6dab017c8923d214c8cf9b"
+    },
+    "connect-to-software/provider/algorand/index.mdx": {
+      "en": "461a57ad3bd31d53e9e760ee4f10fb5de1ff4b25ba53366a3eb62ac84d6db691",
+      "zh": "2800e6ce706ec20f407f4fdc71afff7c6cb2e3fac7d646c15250510b8f65278f"
+    },
+    "connect-to-software/provider/algorand/signing.mdx": {
+      "en": "3da64771b42a2f9b46a3a9c645b5f70b06cd76af1d5d97dcd84e476ea5d301eb",
+      "zh": "409b6664e5570269d56e02940225d49ba97669dc2ef894b74524c0b1d688925d"
+    },
+    "connect-to-software/provider/algorand/transactions.mdx": {
+      "en": "ec03e1192e282339d2929e4c6ed8853eace279796f625c28aae4b49af410a098",
+      "zh": "08ff2651ddc741d482e0c30c7ce2262c3e68d2a80e7c0be485829cc3bfee1a2f"
+    },
+    "connect-to-software/provider/aptos/api-reference.mdx": {
+      "en": "fc36899886a3e5d73403d92183ac4418c9de841817bc179418c2602e89a76b58",
+      "zh": "a3bf4c3e07f0c032acafe1ab341a7c90ca925954fac1196f037c59f14b524528"
+    },
+    "connect-to-software/provider/aptos/getting-started.mdx": {
+      "en": "5c33e399972af285312414c419365a6a2ed03412b8f6efdad3c693f2dc439aac",
+      "zh": "af480326c13edc114b80374504d67453fa7113eec7cf0e32e0f839f1fe8536d0"
+    },
+    "connect-to-software/provider/aptos/index.mdx": {
+      "en": "af017cd38cbc448d3bd2d1215ce7e8104dc3d16e1cf048ba2f197f80fe0f303d",
+      "zh": "cba3323099948d9ed331583ea5b5c4ab6cf3e2408201cf82a8403fd7959da732"
+    },
+    "connect-to-software/provider/aptos/signing.mdx": {
+      "en": "4d17ab9c26c6c8431578df7696d2169539ce03c9165826707ef852c6df27e227",
+      "zh": "c102b15f427dd39824c5dd12ed368edf2b2b1bcbc61f9e8a883dfb44be30c844"
+    },
+    "connect-to-software/provider/aptos/transactions.mdx": {
+      "en": "e3996078f49ec497786f067561d24b625f2aaaa63674234b1b8ca05e1b04ad2a",
+      "zh": "0ac11022741efc9cf1ec93935948f9adea5e68fda2d72458bb48e0739677a389"
+    },
+    "connect-to-software/provider/btc/api-reference/getaccounts.mdx": {
+      "en": "ad08565f84761ce3b577b5af86a0bc2a47fd27416d73d1e5efeb8d41e76641c5",
+      "zh": "8e1f8ea171c2626a8bbfc8d2459f761985c2866a3f59912b296abdae55e912c7"
+    },
+    "connect-to-software/provider/btc/api-reference/getbalance.mdx": {
+      "en": "4ce8f439c55f644604a38a922d20cc95525d0627814adb7612bc1afa0ee8a1fb",
+      "zh": "8e9981bf1468a8d9d609a04e6c9c85da85e9ba394f8d5a7084cada0ca648df3e"
+    },
+    "connect-to-software/provider/btc/api-reference/getchain.mdx": {
+      "en": "811d8763e0250a89b3f92b4663dd5975cd94c2c11776e79ca6d37636eb3cf119",
+      "zh": "8f216abf365755bfccdb0d4b5589f14aa7e3a261f29b0e43d59627f7b9ff4c77"
+    },
+    "connect-to-software/provider/btc/api-reference/getinscriptions.mdx": {
+      "en": "33727d5c7f0c3da874431b50e5635947835954f05e2f109cf271fd66b3eea69f",
+      "zh": "6453d6f193b361ce0579d917e3562d70c764f6af22dfa35d9d8567ee0c52310c"
+    },
+    "connect-to-software/provider/btc/api-reference/getnetwork.mdx": {
+      "en": "457b76b70c8bf3721e4d08a581151fb5dd2160f20b9a62efa25485b9e0cb8352",
+      "zh": "8485705e5652dde0fd3ec9d7cc3824ed52cc179770d3cb0340f053368d4df83c"
+    },
+    "connect-to-software/provider/btc/api-reference/getpublickey.mdx": {
+      "en": "54b429d125ebc2bb1a08b0f04d300214529e84030e64692918284711fb47107d",
+      "zh": "5f5c4d549e702a72f7013ad8e79afd570b8fde1d9a042ef3779294374edb6ce7"
+    },
+    "connect-to-software/provider/btc/api-reference/index.mdx": {
+      "en": "3e5596f49d9e886e175e36b55bee9f883f9ee7812b2f2555cc1ca36d6388dc26",
+      "zh": "5ada26eb92960c58bcd5f47f4f5563fe007f09d4363fc49dc95489b5281c3aa9"
+    },
+    "connect-to-software/provider/btc/api-reference/inscribetransfer-deprecated.mdx": {
+      "en": "d0d84e3745840b7d3f87583fe7ac0e2e1227d4fd206dae6b40b44873840f1c86",
+      "zh": "d10a66746b8a36a576434f5b89cd3927dce50336e2239ccff6a8351686788c26"
+    },
+    "connect-to-software/provider/btc/api-reference/pushpsbt.mdx": {
+      "en": "154d12aada95c49e50f42cfd0d16f0887865f82db5cb6a6f64a567f51cf8fc47",
+      "zh": "f1bb4085a8b2c9c37a725240d3dcb702856bfb5b341c53ae39d45b53bdbf9101"
+    },
+    "connect-to-software/provider/btc/api-reference/pushtx.mdx": {
+      "en": "3269977df48114d43ee02baa4078f56145caf0056ace0911813e58ea189bf3f0",
+      "zh": "ff04df095ff3dda9c39526bb1d8f39e15478be9e6f533131c8c38a95d7f74bdb"
+    },
+    "connect-to-software/provider/btc/api-reference/requestaccounts.mdx": {
+      "en": "a3ff1e03b857c71eca4a68437bec02de4b028bc931d4f9367e97ce4ba70b9801",
+      "zh": "584def1d19a4bedfc5a1748816aa87440192b2709aa38a969f48360f647fca59"
+    },
+    "connect-to-software/provider/btc/api-reference/sendbitcoin.mdx": {
+      "en": "03a066a4e393bf821648991801a35fe4491915b25dd1facb7afffa0de10b0743",
+      "zh": "8c8efaf9a3e9010913997c9f24a80c260d62420ae7baa8e3d990447ae68fe621"
+    },
+    "connect-to-software/provider/btc/api-reference/sendinscription.mdx": {
+      "en": "f9e68170f2ce1f0e74f687810c07e55d478cca3f82978fa40ccfb3c6c0d05d15",
+      "zh": "10a5978c2c37501a1b6976b798b18f3e1ecdde17424fc003cbaf5440aa6e119a"
+    },
+    "connect-to-software/provider/btc/api-reference/signmessage.mdx": {
+      "en": "7f971f0edb3bf5078c593e467d4e6846703c3df452e4e629785bd3ae146aaef7",
+      "zh": "820b8adfa7bfa344f3d28b6c5a0615aece5869e98e53796fb0fe4ebddc5ab52e"
+    },
+    "connect-to-software/provider/btc/api-reference/signpsbt.mdx": {
+      "en": "ec0035308677c2eeb9ddd89b025b1c31bcdc275cc123607360665a6d0c36eca7",
+      "zh": "df8bc3cea1b3a0702e347f8a22d706782e2434c4f4ce04fc1e8398b2cf7b5c76"
+    },
+    "connect-to-software/provider/btc/api-reference/signpsbts.mdx": {
+      "en": "e4ebd1db7e54d817cbf1ee638188afed7c16404d0f18263a7195f1cc5c1070ab",
+      "zh": "ec07b47bd35fc94bad4cb2c3bdc254efab7a8881431b3159655d292620c9ac29"
+    },
+    "connect-to-software/provider/btc/api-reference/switchchain.mdx": {
+      "en": "34d3fb26bdc2113174a4c4533b8330005d0a896818ec7b56f25e25600acc6f11",
+      "zh": "60a8e5e505e166e911e79cf684a7cfcc6e226d248c2c035c33f5fac0c25e280b"
+    },
+    "connect-to-software/provider/btc/api-reference/switchnetwork.mdx": {
+      "en": "4ecdd8c133f131e9ee32a0f8f7b431191957328def909930e1beb8136ebe8b84",
+      "zh": "6786f31703385831a771badbaab45f04e4a52e631a062f358992a874c214cab6"
+    },
+    "connect-to-software/provider/btc/event.mdx": {
+      "en": "4c6dd4969522fad98a654fd5078bf0b02d18a44d0a11ba62c30f545a1ab1f61e",
+      "zh": "fc898a840022e06137349919406b4e2720e208ae11e6a58c3961b70d5832b424"
+    },
+    "connect-to-software/provider/btc/guide.mdx": {
+      "en": "7399424b2c4299dd9b78eb3e1d9955650c8081e673e20e21d7d90874b0d530f1",
+      "zh": "1b7e2850d6895e83e78c327f440e8525bd08c37079217973b76a42c7133e4fb0"
+    },
+    "connect-to-software/provider/btc/index.mdx": {
+      "en": "ffea26be8a2e178e59318133d53ead2e5e4ef367d54719c6a0d7f9fa9d73239b",
+      "zh": "efd8b500359235c71408d20bbf4f52a38c83d73b702b88a749795946204b1e84"
+    },
+    "connect-to-software/provider/cardano/api-reference.mdx": {
+      "en": "6d8eb258cbb4689201308e66e9a0de3ec28d141d76ded9d286090dca5897dea1",
+      "zh": "c509b78ce287eb0bb7700a5710b12b17ada8e41b9aaeb10347a9eb7617a97ce4"
+    },
+    "connect-to-software/provider/cardano/getting-started.mdx": {
+      "en": "605a73e52d4bef162780b2b3b6e26e3b26823ae876a92828b15ff12a892685b1",
+      "zh": "f3e88120a86ddd61c49d26d9d3904a81c9f535058b01d1aec4b45b4e10b7819e"
+    },
+    "connect-to-software/provider/cardano/index.mdx": {
+      "en": "b67f4df38f6e393dc241558e8444f78cf724f7cb8f732949c30625330c4e3e56",
+      "zh": "63975e64713f636d860b867729c1fc27fc94d9c5df1897f4ea84daaef1408c14"
+    },
+    "connect-to-software/provider/cardano/signing.mdx": {
+      "en": "025609d378b1a84a3f757304e58d16bb54315cfd69fe3d0b8910fd364d43355c",
+      "zh": "a32e68b79578fcad3e648cacc3393da1192ac15b7fb0e3422fdff3782da3dc21"
+    },
+    "connect-to-software/provider/cardano/transactions.mdx": {
+      "en": "3af278a71737c0442a59710f5726bbb6056fc214edb0a58f6a5e2e50563f7a35",
+      "zh": "f78e7d8577bc8ae49449b99719c45562fcf3321d8ef40cf058a9b38d77ea8e5d"
+    },
+    "connect-to-software/provider/conflux/api-reference.mdx": {
+      "en": "80f3f03137776affa179e828fb11de64e20b8932137622b5f407c958123cb729",
+      "zh": "b505e68585b3d568abd459959eb77d1286b0752a12403c692fce5cac153f0c51"
+    },
+    "connect-to-software/provider/conflux/getting-started.mdx": {
+      "en": "c1ae6946522d42f308b83ff3bac48cf8534c29ca62bc44147d13ab1847fec3bb",
+      "zh": "d8d31d79410dae49a9c2517103038f2ff75291fd3b5c1fa354e0b544eb38d143"
+    },
+    "connect-to-software/provider/conflux/index.mdx": {
+      "en": "4a68116d3a58e15a958b485a841e86f7b64bff290696311d40d1929d71f1c0ca",
+      "zh": "f91e3077bf815f4e4d083cb18352100cda43b6673789424748350b0b765f0ebd"
+    },
+    "connect-to-software/provider/conflux/transactions.mdx": {
+      "en": "960fe21cd3fe132b50b933aa8b30336fda8e8e4e9a61d6646a38fd8c2890d646",
+      "zh": "ca2ce72e679fc994e1d8a77e0f3fc752faf54ee95fecc5aa0c8b027688341200"
+    },
+    "connect-to-software/provider/cosmos/api-reference.mdx": {
+      "en": "f1b93070165d77752f484a119154f2f280b5e7232e729b56ae5ba6390bbc065e",
+      "zh": "ac592121689725edf89382526f6686d36853afb34df5f923772aa1965b1c60f6"
+    },
+    "connect-to-software/provider/cosmos/getting-started.mdx": {
+      "en": "9439026caabe52e0f4b270e6f27f3b5cacaa489779f717403c80914693f1b099",
+      "zh": "92158eff24be3ff860cc75ef1824527aa834fd742ea8784d9bb370a504ec65e6"
+    },
+    "connect-to-software/provider/cosmos/index.mdx": {
+      "en": "647d36e375e55f81e708b9de7b256ca4507e27ae2cfa7f40154941de62e3bb8c",
+      "zh": "db2506354602792e1b112c8589c9cc1c8919b83fa12180a0d01ccb54e58924aa"
+    },
+    "connect-to-software/provider/cosmos/signing.mdx": {
+      "en": "54dc370c375c8eda49bf53e60642011e2b5bc159963fb33bde638fb443a40e0c",
+      "zh": "1b7733683110f787f870e22e6146cf971b51ac75f0761c979c013514fc8ec0fc"
+    },
+    "connect-to-software/provider/eth/accessing-accounts.mdx": {
+      "en": "cec7c6b4c6bd0d5dd5c61a2e178dbf7a2a6007c4c715cd89d17254ca29d46e45",
+      "zh": "57ea2a6472dcf0bc8aa87affcf156bc3ee57412fc21e4b39c74494f754a20b4a"
+    },
+    "connect-to-software/provider/eth/index.mdx": {
+      "en": "1632085cef29bdd16485dcb059b29c0ec40d822d856c26bef20742bb2a78aa58",
+      "zh": "bd3e18ca24b2282a2c0da3c139cfd9f2ad2b87dd359d412f807bb88a5978d224"
+    },
+    "connect-to-software/provider/eth/provider-api.mdx": {
+      "en": "3afa8be6b65bc46a98e849bad79ccbaa2bbd5e85545f90632824d78c9dfa6a29",
+      "zh": "04ea0c2aa1971b9d07279e1573430ae01c7052b3f49c5a5c21f7c238809e29cd"
+    },
+    "connect-to-software/provider/eth/reference/eth_accounts.mdx": {
+      "en": "5df826f86cb8991998e5311ef9a052653e5494ebc27639191a20996da7b3edc0",
+      "zh": "996a3eb8e4f4d3a958d2b6a79e8bc11952e13da19085418f6e707a033429a653"
+    },
+    "connect-to-software/provider/eth/reference/eth_call.mdx": {
+      "en": "61b8a0a5107f8f6a0fc1f11c310b87d86112288c42e9b608cab95e5772b4e572",
+      "zh": "a50dac0530590b659143c47fe180756dbf2dfc82c848da63a8b0bfa684d8d935"
+    },
+    "connect-to-software/provider/eth/reference/eth_chainId.mdx": {
+      "en": "8334130bbde75d49f296187227e5434505eadbcac0fd2534f62478f487a4cc18",
+      "zh": "e59369fa823a31e61629368514d07be7de75aa2d04c6256ce1dea0c16e8387a6"
+    },
+    "connect-to-software/provider/eth/reference/eth_estimateGas.mdx": {
+      "en": "7c5c27589487752c8aaa226eae7e34e4da93708e34f14100df8a8e9e4eefdfd6",
+      "zh": "fe7ad18dc3ed1aa1328f0602725465d44e0f5d7a3fc7f988dbbba18f43089529"
+    },
+    "connect-to-software/provider/eth/reference/eth_getTransactionByHash.mdx": {
+      "en": "d3d15e21ac846cd697939e3828bbf4c24fe6081360154c8c6a4b80072fea9cd2",
+      "zh": "9a3890e83c9790f625fd82d2e7094304d357424b24d68a232f707c8f9325e338"
+    },
+    "connect-to-software/provider/eth/reference/eth_getTransactionReceipt.mdx": {
+      "en": "e407639ee39051069a65161fb349a8233f8ed17ae8be336bd89916ff8fead9dd",
+      "zh": "bfb2993bc5e05da02ca5abc0cf3f03d46665277458fd7ed9505db7acd62eb548"
+    },
+    "connect-to-software/provider/eth/reference/eth_requestAccounts.mdx": {
+      "en": "e977690661e59807c2ba3999de9301f0decb91ded71e1d860737ba364a426398",
+      "zh": "e9d540b4c6ef2d3b13d2f83428544838aae2a78fbab19bddcbcf8f64280166b8"
+    },
+    "connect-to-software/provider/eth/reference/eth_sendTransaction.mdx": {
+      "en": "ea3832ff869c5b3de02bcf642fb52c0568b73f8ce0bee910ea911620b17e0547",
+      "zh": "609ca9c389085a57a15f8deaed8c83bc4333b364e5b62fc2a792e11054650acc"
+    },
+    "connect-to-software/provider/eth/reference/eth_signTypedData_v4.mdx": {
+      "en": "6a3a2f28819eacb72aa94d88f348d1e65f5ad25103145c2b1a86c2ac2e5f37d7",
+      "zh": "ec7706b2815a529a569ae3565caac2bf6e19ad9731f7134440b9655f04cf978d"
+    },
+    "connect-to-software/provider/eth/reference/index.mdx": {
+      "en": "4f6d073a5f266b745be2a14b7137dbde395011ab08af0d93200ed2e0f92c2132",
+      "zh": "9de8cc833a2b81c0860fec981e549ddf4b60e52d25fdd9f1fab48e10581d0b44"
+    },
+    "connect-to-software/provider/eth/reference/personal_sign.mdx": {
+      "en": "3c348ec37d281b9fedcfe23d2d936b4dd15071312b814ba1d6553a8e93dea880",
+      "zh": "1d39fbfd919f5a8b9956eb6a749e68bb1aff6b1167a27df0ca54be7c2f5c4ab5"
+    },
+    "connect-to-software/provider/eth/reference/wallet_addEthereumChain.mdx": {
+      "en": "9557376799849578b87a6746e67a470fc026c00b47cbcdf9f0e501901c91cbdf",
+      "zh": "d863cb51265e6e74d2036838a3949dd9d048e2337bd6da7ee234950e3c7244e7"
+    },
+    "connect-to-software/provider/eth/reference/wallet_getPermissions.mdx": {
+      "en": "7cc9ee4b773ca9a50631019aafbd969968b5545072937461d01296c913d119e8",
+      "zh": "01de6158806607068c5f29f44f421e96e7a8a8672039672f7afa8b15439ec87a"
+    },
+    "connect-to-software/provider/eth/reference/wallet_requestPermissions.mdx": {
+      "en": "d0bc9e95d08488568b9a652ddf7e7b89e0cad1fed5b15b4d1c5428e5921d139c",
+      "zh": "1f783de9eb998892966c8c6c0875f8e8c823a0487c375551f60e8cb0b188b723"
+    },
+    "connect-to-software/provider/eth/reference/wallet_switchEthereumChain.mdx": {
+      "en": "ad564138da7814f32e00f4893ca5e537ed05cf84736c9a9466932e497664bcc1",
+      "zh": "e477043775b5a1d29c5c1d39720b282decbe4f42c2a63a4da814060b18827f44"
+    },
+    "connect-to-software/provider/eth/reference/wallet_watchAsset.mdx": {
+      "en": "b937fe6293ab1a7ad995161fa28f8e0b0d4e1a7a4c3b4a7d12b99ae5b3ac9635",
+      "zh": "1922d9bae1d0fcb427691d709a64bfb9ea4d3f74eb191b8095949e429fd08921"
+    },
+    "connect-to-software/provider/eth/sending-transactions.mdx": {
+      "en": "aa502aabfc175358318d2d2ae225d5ddb7e296148fce4106e4fdf019b3de298a",
+      "zh": "25336d5acf66cfb0ebb0e6e4899f7bdc7a9563fb7a2b96a9c60a70ee1d6d4d0d"
+    },
+    "connect-to-software/provider/eth/signing-data.mdx": {
+      "en": "8be2aae1cbb1a4dfcb794fdd6e428e4703167f6a261fd657ea8f231343e20929",
+      "zh": "b814d2499098e4f59443a7b7c52307593da467fe3a12fc479913212f29b15b1e"
+    },
+    "connect-to-software/provider/index.mdx": {
+      "en": "72770d62cd300eaff0e9f215a9a26a26536caee872a751523f3b7d35045dbcd7",
+      "zh": "56c99a930c049982e9511d5f838120e82670f13baa782cfb57ca724a3c1c4997"
+    },
+    "connect-to-software/provider/near/index.mdx": {
+      "en": "f65a74c53b95d1c97acaa3cbd6fc6a22492d5322fd749d5550f48a20fd8b7bf5",
+      "zh": "0152820897b2722c85d73887e66bb0a1d5c6cf5dcb6c0226b5530eababd36862"
+    },
+    "connect-to-software/provider/near/integrating/accessing-accounts.mdx": {
+      "en": "2c4498ee5c3194faa37b86b9d6f9a75097d0fe8506a71eba4f9c0ddf7698a860",
+      "zh": "52f77bc9b0193e77166b736c15d23cd044cdd274f34f967e24acf58646d6de5d"
+    },
+    "connect-to-software/provider/near/integrating/debug-logging.mdx": {
+      "en": "4f90e3c0c17919bfe10617a9d8c30e271b0858feed820c417d99731c7aae560c",
+      "zh": "0bf87380fa103fe8d75758cbdbb778123b33b0fdf1cf7eea567a8b5951d50d01"
+    },
+    "connect-to-software/provider/near/integrating/detecting-provider-network.mdx": {
+      "en": "c651d733296bb044c3f1ceed169bfb880f0a6272c7f48c20c95d9b1806a9b218",
+      "zh": "008582774e02a85446a236346b3003d662ffdf949f5d02f9f3b4289851da932a"
+    },
+    "connect-to-software/provider/near/integrating/detecting-the-provider.mdx": {
+      "en": "4bb13ee03456d866e38660b53f647e9be27b928da40ccdd8b9872dd7b9f83659",
+      "zh": "f0faaa78a27ffa35b0aa293944815c53d74981f9da02a849073f0a32032140cc"
+    },
+    "connect-to-software/provider/near/integrating/establishing-a-connection.mdx": {
+      "en": "08dd9542f089d01e7f84ea8cc008ee5ad7ee72df4b81cd44e2cf35f71b08e343",
+      "zh": "5de2a208db826277a87e818910ad4d16bc4a8a6c5f2d19afb05b901319078012"
+    },
+    "connect-to-software/provider/near/integrating/index.mdx": {
+      "en": "3f7f8179a5a7810b4363c34e2160884ad00614e94d38f00321b2e996567c4660",
+      "zh": "c9d4206f6dd8b4f416f428d37308e1fb661325a55eb23c9105fa72c93df73de6"
+    },
+    "connect-to-software/provider/near/integrating/install-the-provider-sdk.mdx": {
+      "en": "595672a77751267de48e97b61e7116b8ee2bcb2608c5e1e2044611c43469a713",
+      "zh": "eb8a97ed3549bf29c76fe45d5a4947a2339cc92a885636736d9aac2e6e3d7002"
+    },
+    "connect-to-software/provider/near/integrating/migrate-from-near-web-wallet.mdx": {
+      "en": "6f6ebc8c475e8e700ca366eaee9888bd62309f2625971a211c138f30411a6cd2",
+      "zh": "a97d6729b6d4128848bf2e6cc18a1be2851f65526c3a91da30f88548640daf8e"
+    },
+    "connect-to-software/provider/near/integrating/rpc-api-calling.mdx": {
+      "en": "e94a3406c477175fb0bdfa223e123d829f087d57924ae291d3a906ec0e86039f",
+      "zh": "82e2774d1d9f3b45a078490b348af63247f6c767356a7ea64fa26fabc2be7b11"
+    },
+    "connect-to-software/provider/near/integrating/sending-transactions/create-transaction.mdx": {
+      "en": "7ed93cbc008a0fdc3281693b77daecd43bca68fb5301ea5ab8868521d42ded57",
+      "zh": "ea8bd023037779553a5b99ec0de3692471ed078b5da66b67e1a30a8aa1c7202a"
+    },
+    "connect-to-software/provider/near/integrating/sending-transactions/index.mdx": {
+      "en": "c0ac3261b8b7834b0072f3c772d0232e22345c38d07828d8405c0d4d27850f34",
+      "zh": "ebd6a5e80cb6c69a75f221624cf589a97a066262b7ade5aa8f1706546cf4b383"
+    },
+    "connect-to-software/provider/near/integrating/sending-transactions/sign-and-send-transaction.mdx": {
+      "en": "b63f9ec934790362ec38f118b8f4f37a4e4110b4122e8be6773db5c26a557fc4",
+      "zh": "7d572fdc7503003d7780705b44c904c7baa196f6f9724f8277f948342ffa03aa"
+    },
+    "connect-to-software/provider/near/integrating/sending-transactions/signing-transaction.mdx": {
+      "en": "74bdbbaccce881e4b1c2a0ede360e8ebda0c8b53498e7f74ab097632dd7849c1",
+      "zh": "0ed351f67e280ac85cccd7134c1de13115e8c47d663b40ed2880a73d5116d3f5"
+    },
+    "connect-to-software/provider/near/integrating/signing-messages.mdx": {
+      "en": "a629a508d341d0c352cdc67f8e6bcd267f8bade6cb59af3e9ca5cfaf3dbf54e9",
+      "zh": "75be1993ede7f0178391029f26daa5f8504b5b924f001885c681200734d9e459"
+    },
+    "connect-to-software/provider/near/integrating/watch-accounts-and-network-status.mdx": {
+      "en": "9c63fec23027d23167967bdcf94adaf7274bdec7ff0d486db0d427a009b6ca3d",
+      "zh": "1f99d286c4cbf90d813cb0ffca8c5e908ed728ff1fd22d2f8bed913cb91252d8"
+    },
+    "connect-to-software/provider/near/introduction.mdx": {
+      "en": "58cb6f08f11b4af0e9e4665b96cb9c2c9909dfe45b97006bba42f8128d709fd8",
+      "zh": "eac151a5b1925663e5ac6caefb4f1e38780c081c132ba0f3458580804083e52a"
+    },
+    "connect-to-software/provider/near/reference/api-reference.mdx": {
+      "en": "b7ae5e206a5c15f6dde519a00770b19c6d6eea7403eb678f7e6d8d09fb8b4fc6",
+      "zh": "397d039aeaa7dbeed95ef2443c4c1fe556b951bc070536e8a88b551dfb9a651f"
+    },
+    "connect-to-software/provider/near/reference/index.mdx": {
+      "en": "b83fb2e0f5810251574a9ed9931cf59cd2e94b5af0f664a454d276921d7f544f",
+      "zh": "377a6f24cfe780ad0fc0811e0ba4f16d09682b617d5ef66675e328ce88e3847e"
+    },
+    "connect-to-software/provider/near/reference/trouble-shooting.mdx": {
+      "en": "9881043c4460179d7ff018e7999a41bb9efafc6b6f139205570adeb3fbdc8781",
+      "zh": "be18a538680fa5f9207517fbe13a03ac4db2bb5c466c30173a3a193d4065bc12"
+    },
+    "connect-to-software/provider/near/resources/example-and-demo.mdx": {
+      "en": "f85b1622460170a25c973aa5859141ad78789d6e58d4f6af25d8891361758679",
+      "zh": "36f65a6498693b4ad1d60bd619dbb098f48ec785031bfd0c6f6d9264aa4e9d9d"
+    },
+    "connect-to-software/provider/near/resources/faq.mdx": {
+      "en": "77bbb6c967dc76cba98ac147ad9f3029b084428b28dc93ef2f598626787d4edc",
+      "zh": "4e26583ec897285187f6f99175090bf27fa411498392c268a7312588ed8b387a"
+    },
+    "connect-to-software/provider/near/resources/index.mdx": {
+      "en": "2352751613213373f50f7f9c88b62f68c3fe545e8478db1e85a3c8b921d4ce17",
+      "zh": "b780dabecb88a79bef7832219da8ee1639ff521235fc2020f2686564458d3681"
+    },
+    "connect-to-software/provider/nostr/api-reference/getpublickey.mdx": {
+      "en": "3cb9522a1c4cde31442b0f6dfe83af17b9d9953233f59a9ca5534355f817e241",
+      "zh": "fb9b1bf83c6ab8ba395ac7148e39f5339f0db058bc39a24810a6b284eb8fd783"
+    },
+    "connect-to-software/provider/nostr/api-reference/getrelays.mdx": {
+      "en": "e39fa83ebaa79dda9402f67426799c761ae198018d1134cbb195e73db8f39fba",
+      "zh": "7b0be9e84ca47b04edf0b384809f3f401497312482cf176111c1d4a25e724fc9"
+    },
+    "connect-to-software/provider/nostr/api-reference/index.mdx": {
+      "en": "1d6895e9ad716f12ba5f4e4504318afd76224286436753473e9d1d874f155dc5",
+      "zh": "ac95ad480c92e46c424d3b710d881c84f2340570896bdc7e2f26b9f587490855"
+    },
+    "connect-to-software/provider/nostr/api-reference/nip04.decrypt.mdx": {
+      "en": "d7d729a3c1f27a3dcec0a6ae2861b5743954ad8ae8f134756e5e4485d110a1a2",
+      "zh": "82652fa1d8141fd0b81d7ec87cd910b13eacfe79f5f054dd6401a7a6bc459112"
+    },
+    "connect-to-software/provider/nostr/api-reference/nip04.encrypt.mdx": {
+      "en": "d2b1ee61e34192ee3f190027c8235e7f8b8cd0138d24207eb5294ceac7976a26",
+      "zh": "fa7bf5f9ad815620ca9a4190849b35852d0bbe4e84daae51a089f7c299a8d0b9"
+    },
+    "connect-to-software/provider/nostr/api-reference/signevent.mdx": {
+      "en": "ff58946e064b10346d4042dcff58b141c8bf52da7525751ab304df6c6cfc852a",
+      "zh": "3d85d4961455e2fb5480c2d2f54bb5faf34912ad2849c283dc6b543dcc788ab2"
+    },
+    "connect-to-software/provider/nostr/api-reference/signschnorr.mdx": {
+      "en": "faedf46b54e04f8cd7cd4e74cd711d0fe8f762f54d625405565ccc43398d52b7",
+      "zh": "58f8737e12dae1624237a1a1f6840745351cd460d1b1da9bb0f5baab11623b63"
+    },
+    "connect-to-software/provider/nostr/event.mdx": {
+      "en": "be3228a4d10108140117386fb6674ebfea89d6bbf2f901bd9fa6ac129256a317",
+      "zh": "ecd68c6dc61b13af70c542ee9ed7c289c7fccf618a474e8075e037d10c076205"
+    },
+    "connect-to-software/provider/nostr/guide.mdx": {
+      "en": "b717c2cb7ab03331fad5231984d872b4b4ee56448ed65cdf35428763dfff7809",
+      "zh": "87c034e05fa6dfcbb064905eae3b7f71710637450183ac3def5880f71963a931"
+    },
+    "connect-to-software/provider/nostr/index.mdx": {
+      "en": "d994b0a21c28cceb60a8cbbba14276e3db8aad563202879f799885db56cc3835",
+      "zh": "444fe8412c84bb6e3b95e6fd4e848a44ffbaeba2506ffcc9f754bd0207fd2be9"
+    },
+    "connect-to-software/provider/polkadot/api-reference.mdx": {
+      "en": "af30c0d2c4cc364817ead1f35680629f84dd52415f5d967ab2328a03dd142e2e",
+      "zh": "a27119c39fc09470000b1ddfd0b9ce4b41b07b8a825c023c6b87e0c910d90a55"
+    },
+    "connect-to-software/provider/polkadot/getting-started.mdx": {
+      "en": "e9d885414cf9089c56bb9d0c85a829b888007d1a2ac61c2659cffa575591f0bb",
+      "zh": "868c936a6d057aacd1b3fb72a90551a4342bb1c78f47f62288d701c78e7f02d0"
+    },
+    "connect-to-software/provider/polkadot/index.mdx": {
+      "en": "ea277c9ba9c88d829baf4ab3d7c992cc0262386e5738f50cec28536992853f95",
+      "zh": "addcba4ccef8d58e9de7bd79c304065af4d3da30df34c7ff531e9bff4915ec4a"
+    },
+    "connect-to-software/provider/polkadot/signing.mdx": {
+      "en": "daadb4145a43824ec1df9381401337ab95612821c2d7e8473c9c7aacca11847b",
+      "zh": "f3af139b5d9b174e3af6e228cd4cc6670771fb809ff15bc061733bae4fd60dcf"
+    },
+    "connect-to-software/provider/solana/detecting-the-provider.mdx": {
+      "en": "9869d1af3f5d674d2daf063e0b54e5f71149378c190cdd3ebb7ea39be9df1375",
+      "zh": "14026909413a8a86e35e222bc2ad4cc3166dd7dc69408e58dceaa3b12a7b13ec"
+    },
+    "connect-to-software/provider/solana/establishing-a-connection.mdx": {
+      "en": "b9b48b7af0bbf2d5c747554cd9c4f8b52b83b05c6c6811169c65a0f5cec236e9",
+      "zh": "b3bbcfc60802a0ac63456d072ad5a0ee943681c632f7172721ed9529b1f59183"
+    },
+    "connect-to-software/provider/solana/index.mdx": {
+      "en": "e8f12fb15883c77b9ac66c6a9c0d6be1448b4a0f1630615bb9a6a4f53bab73ed",
+      "zh": "2ed3e9107ad67a0fffb711ebf0ff9fe618f004c866f389a5ac10ea4f88fcfad3"
+    },
+    "connect-to-software/provider/solana/sending-a-transaction.mdx": {
+      "en": "d0d601a82fba9fec55bf3ba282559f34b9e8ed7675479e32826a99d65b909330",
+      "zh": "d040bb9e59d5fb099532abd9b0812f127b5cd72b869493adf5b37ea79afcd61b"
+    },
+    "connect-to-software/provider/solana/signing-a-message.mdx": {
+      "en": "fb0bef00a1b282118145e4c9fd797ba534682758e49ed0abbef2065e00991475",
+      "zh": "84aaea0915dc61c8341e61dafef354e1b5110684700aaee003bbd1b642593a4b"
+    },
+    "connect-to-software/provider/stellar/api-reference.mdx": {
+      "en": "1dbb3fd8c18451afb0075836d8a5e528465115e8b5322e80c962cf9ad7639d93",
+      "zh": "f3f6dd7843ffc0a91c7cc0aa1fb1b8aa57898d3311f4d8160bb7d1683a643b60"
+    },
+    "connect-to-software/provider/stellar/getting-started.mdx": {
+      "en": "1fa1bc42d352cafc18cb84a252aeabae3d06b3e5fc3b8892ca24c4f6f18eae7f",
+      "zh": "b0a54de51b8cef1619a19cdef9c5adc5ed91b78b63bf182515379e65ece98a72"
+    },
+    "connect-to-software/provider/stellar/index.mdx": {
+      "en": "29ae4b61dc59fa1fa3a85c5673cf2303088f4efb68f110ea4ead730f6592ddbe",
+      "zh": "dabc9ee0b5b6726ab82b837f133f76a99423b29efd710ead166fcdfaceb8f936"
+    },
+    "connect-to-software/provider/stellar/signing.mdx": {
+      "en": "212f5c6f1c9922a2954cb2a2d2325c372467a172ef78e3c9747b2878fbddb67b",
+      "zh": "2af003dcb52e9e470a14b45f724e864461e53ead92deefbe1023dae65f35d96f"
+    },
+    "connect-to-software/provider/sui/api-reference.mdx": {
+      "en": "9ccc28e29b6012704a09600e5b78e38acb644f376765940e0241092345a723ac",
+      "zh": "f9b1fb9637a60c2a766f43d02ded08896f9e37cea6a436e8088943c8853275c3"
+    },
+    "connect-to-software/provider/sui/getting-started.mdx": {
+      "en": "eb4ed4341019e5a26ea4f1901c42532ccb27bad2d2beace097fb23d2825ced27",
+      "zh": "838432def5e7622e93df0842c1d7e5977dd2be1cac5c3e497e1e73b2839bf8f1"
+    },
+    "connect-to-software/provider/sui/index.mdx": {
+      "en": "880fc07d76e31927583d07a6d644f93041d5d503f39a670ec7349507b885c8ad",
+      "zh": "c92cbac79cfb13955238144c1523aa8836fe79ec407940914f41b580f0081581"
+    },
+    "connect-to-software/provider/sui/signing.mdx": {
+      "en": "9dd5cce8f1b6cf4acc4c37c18ddf2eb88dcb641b4af562cffc6ac71e65be9401",
+      "zh": "11aa025d14a494f692c9399ca882d330298b04322059e72c1da2b0d9f484a008"
+    },
+    "connect-to-software/provider/sui/transactions.mdx": {
+      "en": "005153d419ad3d102743a77c7d24a07921deacc67ca5f71c7fbbc69122539c7d",
+      "zh": "19991e901557eef67b9a6e110e118ca5bd3f27e36069f449ba97f9d2549d0a0d"
+    },
+    "connect-to-software/provider/ton/api-reference.mdx": {
+      "en": "9c299d375068303fa0f0ef10a8d9b84eb67cb6daa4ecc97fa8dd17e583459613",
+      "zh": "bf0213e58a3453ffe69c1059754c1c6694ebd72e599e4a9e796a5be4dc565ff1"
+    },
+    "connect-to-software/provider/ton/getting-started.mdx": {
+      "en": "c6e09728bff300699979d771ba65dd70de99f513f9c9a275d28f19995b0dccac",
+      "zh": "4a1281bcc879ee2eaf36f0899f1e74212e45a3a7f22eac6c6a0604f513e427d1"
+    },
+    "connect-to-software/provider/ton/index.mdx": {
+      "en": "ac73d26dbd5acb14ef7c7be022176f385127e0b4dc84688b12f5522bae037f5c",
+      "zh": "8db200cc55936f54e9e83e3d1426eabb610c57d2de5cbce91a776ee995622943"
+    },
+    "connect-to-software/provider/ton/signing.mdx": {
+      "en": "b3db098b00fce277e310d070ce37b07d00799068938c7f82afedebc74897b5a1",
+      "zh": "3790b8db96b6740f5e2f7f37883bcf1e3f8d5b9a1b046f178a5a3e5bd5797e91"
+    },
+    "connect-to-software/provider/ton/transactions.mdx": {
+      "en": "5a992081f76247f14ef297cb702cdbefcb1bf46256cf70b1ea9b6a1adeaf03c0",
+      "zh": "967b184be4acabd21bcc1c3f43ab875da1632d05be2e90e65bc083e29c265d97"
+    },
+    "connect-to-software/provider/tron/api-reference.mdx": {
+      "en": "bb9a7d021b1e63ef0e4c1a07cd1b5644c7a9a05f4ec2c2a0a6f60bd1c547d99c",
+      "zh": "98f17c5f6bfa8741cb5844393fca438b4152cc3ce8805658657bf9ebb0e5ec8c"
+    },
+    "connect-to-software/provider/tron/getting-started.mdx": {
+      "en": "4e80b8c51d7dd2ba157e6ab04d7c5d75fa6707c673995150ba23cd3f14a159d6",
+      "zh": "87a1515e4c2b05529c5839a57b19018343c75533f0318283542ef7353c3f3f83"
+    },
+    "connect-to-software/provider/tron/index.mdx": {
+      "en": "fe2513c39bf1129f569679b903ca15345b02df24c2fa16e2d390a66bada00d71",
+      "zh": "8c6e9a56190d81a0d023bc3e6333f8bd66ece480f3e30b0e251801077d2ef2a1"
+    },
+    "connect-to-software/provider/tron/signing.mdx": {
+      "en": "71c43ef83742db22c4ca1e80cc4b0b57c62e9a33d6dd3be3f47e68624f270086",
+      "zh": "6a222899751a057af65efd48fb604f4ec8fbed3756c8fd499f9eb3f63125bda0"
+    },
+    "connect-to-software/provider/tron/transactions.mdx": {
+      "en": "33f716e494c8e37566b33f2c5f385de8ed6e3878df9903349755e5a456d5f2e0",
+      "zh": "8389125756bf6653083979ab2bd77c249afb10e17ccfcce2c9f9b2a8ca7da1d3"
+    },
+    "connect-to-software/provider/webln/api-reference/enable.mdx": {
+      "en": "e00e15367ecf3da639b543d97633a1fa5c6634958f8112d7b1601e59b41432d8",
+      "zh": "0376019cab141f8ad8137e925d01bd94c6fc6c76f7a4e88fad213ec8747a79b0"
+    },
+    "connect-to-software/provider/webln/api-reference/getbalance.mdx": {
+      "en": "1418205b3e2dd5d22db1982547d47572f8b81a4192b8e0f6b1f0a5716cbfd1f9",
+      "zh": "1c8aea66005f6f95fd07c7224522371d0ae5881806e32ef0b0c736ebb2c2ff2d"
+    },
+    "connect-to-software/provider/webln/api-reference/getinfo.mdx": {
+      "en": "2019bad9411f2a14aa507c4459df91e4c3ae5e26c270a7b533ba3ebb94a39a51",
+      "zh": "a6ac947916e4ff207296cfdb38989ae91b0380f71fd3374575bcd87f6cad8899"
+    },
+    "connect-to-software/provider/webln/api-reference/index.mdx": {
+      "en": "0a2fdde3cc554cae7d359e280e9445caf83ddbae714a4137ccda490328a4a50a",
+      "zh": "2d25d18b8f782c359f293a507cb40ce9700f212307fbc8e106895ab8a4c445ae"
+    },
+    "connect-to-software/provider/webln/api-reference/lnurl.mdx": {
+      "en": "4dc518c74b6791072e352294279529a7aaed85200b7b1d77027daa3c9a86a1a7",
+      "zh": "1fda33ae75f90fbeb4c5f3d8ef226b3ddd09d885a7f395b8658049a1bf9cbd48"
+    },
+    "connect-to-software/provider/webln/api-reference/makeinvoice.mdx": {
+      "en": "5edfc284a59001b5e6ad0417d9be6e9cb739cb7dd4a247fcd22f39efbc2101d1",
+      "zh": "066700fcc6d19db175b4eca716400958c1165806499130b933fa8d93c59335ec"
+    },
+    "connect-to-software/provider/webln/api-reference/sendpayment.mdx": {
+      "en": "99d4a4f3592329e024b31648a8b780c05747cc210254ea465f4aae3630df1464",
+      "zh": "583da8c83e5bcbe0fd87f07e75f1b3400c083d9c540cd348f448001f7d61e768"
+    },
+    "connect-to-software/provider/webln/api-reference/signmessage.mdx": {
+      "en": "8053abdc88e3adf838a3cb91014cf934bd9fc2121f4d436dbc7f5124e24d338a",
+      "zh": "16bab3b4b9a55b555dbe4d03450c02092f5e3bc324a697c428b2b3f670e275bc"
+    },
+    "connect-to-software/provider/webln/api-reference/verifymessage.mdx": {
+      "en": "60880825cc381f31ac6afbda027fe9d8d03613b731fb2db12da6a67077b0d445",
+      "zh": "29167e2ac2fc8efd052640d40f550a23864b60c71277849f09d385b86bb28705"
+    },
+    "connect-to-software/provider/webln/event.mdx": {
+      "en": "d67d020f627f766387ca47f498c187d9fd068a424f016bb88e8e617140a55f51",
+      "zh": "f8eb7e433c3b95ea9a9ebec945d856c63ecf9ba1cd058afa313f6fea072733b9"
+    },
+    "connect-to-software/provider/webln/guide.mdx": {
+      "en": "c73363eeee068efd33b14be7bcf5bacdb1e11b6ec930934da1111a34d763c154",
+      "zh": "900a67e419e106d86dd563d209951d16048b4981259bb045514ff306474b16db"
+    },
+    "connect-to-software/provider/webln/index.mdx": {
+      "en": "9d4d9b51edfa1b7b3f20cee27b860f2796011cb851e6568c1fdf7b59276fc30e",
+      "zh": "7707b3304c23e1b22ed5920f592918cca46c10fb33b4314122c8906d812756a7"
+    },
+    "connect-to-software/react-hooks/hooks.mdx": {
+      "en": "9beb9c098c1619117388288c26ed68c1dd3fa5249eabb1527d67ba13fc1bd27e",
+      "zh": "c88086910b8b8cb4aabeeb5e6cbaf2f5835b03a7ae40891435e3e360954ebf3b"
+    },
+    "connect-to-software/react-hooks/wagmi.mdx": {
+      "en": "41717cdac8bccd0d4dd744257c716ea1f7481d5568c4f81cfe67dcae68c782dd",
+      "zh": "e53dee499acad67554c28fd790754dff7922701c4503d62fcfcc876f743b925c"
+    },
+    "connect-to-software/wallet-ui/aptos-wallet-adapter.mdx": {
+      "en": "43a5ef40bc955797a6e9f0ce2cd4b151d44fefaded4778d2dbed84beb8312c4e",
+      "zh": "e8e3526894ceae52789e3e196b967f3741110e22b2ed622bbc7d94284dc3f657"
+    },
+    "connect-to-software/wallet-ui/rainbowkit.mdx": {
+      "en": "5594a5689962e172675bf34610b09f32521a2a8049d878651b08d6e5fde2743b",
+      "zh": "c5bfc7e528b29d7bb7b1c8f4c3abc71338156399a7d6ae5eeb40b96d055db104"
+    },
+    "connect-to-software/wallet-ui/wallet-kits.mdx": {
+      "en": "5573610328cb0f88609f2e7c05c05a47b0cbf36790dc7a1d313497eb06e7224c",
+      "zh": "bcdb618c7ebeeeb96fc7d5a7588f8ffe3f6c0d637bab67d6506aa539c5fc824c"
+    },
+    "connect-to-software/wallet-ui/web3-onboard.mdx": {
+      "en": "40dba0a5f646c6e2de0a82a0691603b2173dd5c6a57472edd13abe897ecca36c",
+      "zh": "c432452d2fcfee2b6e77314f1ccee6eed82fd0e02286cfc2e6ba42cb3dcc551c"
+    },
+    "connect-to-software/wallet-ui/web3modal.mdx": {
+      "en": "6b01bc32eca952dee85ccb7b2028f92bd539fd39961229b924ae1fde9099e483",
+      "zh": "26e6aa054a6ef5002f7a2010b7837c3b47a1937f73c5c6a1bce350471c208ae5"
+    },
+    "getting-started.mdx": {
+      "en": "8e53859b053c4606f205950fd0a054d930b445260ec0692d7cc104a5d1fc996d",
+      "zh": "e54a3671e0a59200105d5871d5d21f5b024d00fe8d7413a8ec9a4004ce95ba9f"
+    },
+    "hardware-sdk/agent-integration.mdx": {
+      "en": "0691c50c46850c0ff6d8970656dda388fabf1e0aa7c34d70c25bbd644e035467",
+      "zh": "ec50d96a912570a73c910934d6f06d38eaeb8b8d015495c07f4e913bd3dc82f0"
+    },
+    "hardware-sdk/basic-api/cancel-request.mdx": {
+      "en": "4fbb9e545acf3251f3df235cd07097450b1b1fd135e462821a038db103abeb5e",
+      "zh": "d661e973ca4676dd40f5da28ddc45d1e1901ff133795982f2425118582feb344"
+    },
+    "hardware-sdk/basic-api/get-device-state.mdx": {
+      "en": "db7298b828dde74ee05a3b660d6a98c58a93ffa2edc04bd48965c663aeb7b0e8",
+      "zh": "8f4e184f8b71cfecccecfa55d76567ad7e1b067ca9172bc4990b903aa78c895b"
+    },
+    "hardware-sdk/basic-api/get-features.mdx": {
+      "en": "9ae43b4f06952fd1fe7af5d7f6681143cd263f8029cc9a8f5c597a1a5e5aac69",
+      "zh": "adb4f8b14efb5861c31ceba66b33e27dca4f81b65e024f9a1325babea313ef5e"
+    },
+    "hardware-sdk/basic-api/get-passphrase-state.mdx": {
+      "en": "4bbe6c200287a713182f904ab4b9da79a0f234eb617361fa9d57d7d15339a871",
+      "zh": "b02856a36496415408acd6a573be4b686fec911402594df3a5c60eb27316b006"
+    },
+    "hardware-sdk/basic-api/index.mdx": {
+      "en": "c4eb31283e2f4d3f9a4d2b2153190455db04744f44a96d93fe09c3b2b6bf4ecc",
+      "zh": "11b630de0a3d5c03b1351272a127399ca9053f0b77829da8dfc8c9fe221dd6d7"
+    },
+    "hardware-sdk/basic-api/open-wallet-session.mdx": {
+      "en": "4c87ad354eadc73ac0886296ed29d650fd975611a69295c5838d531cd8d0d476",
+      "zh": "6115bdfd3896509abfdc840b7b00d8b7bc4e5ea25e36ebc82de14fa7ce1a8418"
+    },
+    "hardware-sdk/basic-api/response-ui-event.mdx": {
+      "en": "1240a670acb5dbd6fd8d0fb1686c200fe3ed77f249b03b027c1788c16b6484ce",
+      "zh": "f72173c15254981d497565e92dc8ee59947403dbeb226a1821c64459f502f09b"
+    },
+    "hardware-sdk/basic-api/search-devices.mdx": {
+      "en": "db2f548e1669107cd6d844e08816bf0c38ef85074974612ddd89f5ad8fd3e050",
+      "zh": "d4e1684f3bb35fd8d9cd1d310a519532cf863c7c5b06215e96ea9dd337dd7f65"
+    },
+    "hardware-sdk/chains/alephium/alephiumgetaddress.mdx": {
+      "en": "3cab6103754bbdeab2598e489399010a56d1be7eda404851b0c74f26be6f6196",
+      "zh": "03abd2ff052fa64a2e2b359cf5b68483a9bc1753fd2c1cf2772e89da419aead9"
+    },
+    "hardware-sdk/chains/alephium/alephiumsignmessage.mdx": {
+      "en": "ca42723ada6aa5a721f706ac0f34c7415aa37b1dd77e78483e911c504cf62b27",
+      "zh": "db9aea6797269dee637b2b2866340694ebdc34258160da2ac140e125327f2d47"
+    },
+    "hardware-sdk/chains/alephium/alephiumsigntransaction.mdx": {
+      "en": "06a010fab005f03a77827ca1dc8d5bd4242338dc24067a9a138e1274a7fc9c2b",
+      "zh": "a5dae7dfb7c88d5187d6283d195f6f1b42004c0230d75981c0651015a889de76"
+    },
+    "hardware-sdk/chains/algorand/algogetaddress.mdx": {
+      "en": "3774f98ee958e5521c0101105ee705d4a60adad9231c7a30a6a9cfda2db3e417",
+      "zh": "b1408900717eaee96fdebcef5204f09300953833d5db9270a960a143ca3dffdf"
+    },
+    "hardware-sdk/chains/algorand/algosigntransaction.mdx": {
+      "en": "b96942c3580e2481ed0d58fe74fd779dfc22331777771d98ac69c55f0c035e56",
+      "zh": "23efc0f96e9ce57114158c36d53cbeb2f70e2c6c90cbe37c4b59a0bea0bc643e"
+    },
+    "hardware-sdk/chains/aptos/aptosgetaddress.mdx": {
+      "en": "e04f64813921b845a0b990cea6a5a8bdf6e5cfc7f3c4e84cb6c45952ea2da485",
+      "zh": "64de322f2cb89c8c0443065e0d744f81758612397ded0ed3058d6c7808fbde53"
+    },
+    "hardware-sdk/chains/aptos/aptosgetpublickey.mdx": {
+      "en": "9ba6854f79f9d086b8dde6b12e464897807e247f06b89cfd82156f8d3c010de4",
+      "zh": "3db17fafbd744404409f8cd73d40efd04e4f3f286be253d85546d9d37f071f9a"
+    },
+    "hardware-sdk/chains/aptos/aptossignmessage.mdx": {
+      "en": "3110b101c495668f2a3fec70d14828a664ad17f5a5e0f6d7d9798d276fdc2131",
+      "zh": "ea23b74b8072911030cb50552c2415dfab365cb03af9d12a1fe42a29fc32cad7"
+    },
+    "hardware-sdk/chains/aptos/aptossigntransaction.mdx": {
+      "en": "3f2b5704ad3c0a427f4f9d702bda0afb4792791cdecb35b6acf4d97dcf4e3d28",
+      "zh": "8088025267101a124d9fd75d1e6282c6490f17db1dbb1333faef536b965a89fa"
+    },
+    "hardware-sdk/chains/benfen/benfengetaddress.mdx": {
+      "en": "0264d5ed3de6b0c5c6502e55d6d0dfac2b7cf3627460a1eaad3b4f72cef4717b",
+      "zh": "827a108af5cac0b2e3ff7d3f4ec7a9e7d10e5b8b7b4d7c8701bbe0a0b8f625bb"
+    },
+    "hardware-sdk/chains/benfen/benfengetpublickey.mdx": {
+      "en": "d5cbef956ac6439ace30ebdbfeba93b488d27012764b2142dff8cebeb0ca4b87",
+      "zh": "91ec9c78ad832beee909425332a286f1374ba9d966135041cbc873a4294461a2"
+    },
+    "hardware-sdk/chains/benfen/benfensignmessage.mdx": {
+      "en": "a0afae2d389b2fcd9881f39a620aa40bdbcca379619555118d8ae5957d96ffea",
+      "zh": "a563609777c617ed531104438b907983b6152eb988e5b33ffd70c9b7329a47da"
+    },
+    "hardware-sdk/chains/benfen/benfensigntransaction.mdx": {
+      "en": "93427845cc93877a2526207a5ab53e47101d4e246dfedf6b7351353ec3640fa9",
+      "zh": "4c956fa4c928b74d32d5ee561f6cb9d5646aa698ecada4cbcd5ebb2b28962c92"
+    },
+    "hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress.mdx": {
+      "en": "4670f443abd91ce5f7da4222ce7a1694228595f4313f601346e78c5f2907db8b",
+      "zh": "0a0d787debe3e953152ace2b72f3ed686f61291d59ab0d4adc20cc3d29645f3c"
+    },
+    "hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetpublickey.mdx": {
+      "en": "632208b3be4212adf7a20dd1be3f78d6ec9f771c37befbfb3417f00a01376694",
+      "zh": "86981e66481116eaf87f8eafc5980bfd45f8cceba03f7d3ed65456719070a57a"
+    },
+    "hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsignmessage.mdx": {
+      "en": "4d811cb8dd661c29104fdae86da97a63fb0f1e7dd051017b099ac97e2a309bf1",
+      "zh": "083218a74706a0ce161322b42d2672fb3b7f9435c942ee1a9010902b57ea00e9"
+    },
+    "hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction.mdx": {
+      "en": "254553c2879dbf0955f7e7133cae43502a00a302209c75d0aa8f9083857e2962",
+      "zh": "0dc473c8cf4c4f6e5d975516d03a926ac7aee4ad7c81165e94ed026f84b1ad01"
+    },
+    "hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcverifymessage.mdx": {
+      "en": "e1d670adb8e64280a08861f104e91e7e50709d95608d71793c42cb112de392e5",
+      "zh": "27b5c5959ffd9cd0a7fb406ea8085b6721aba1893bd9e66e80d19097a067705d"
+    },
+    "hardware-sdk/chains/cardano/cardanogetaddress.mdx": {
+      "en": "71051b14acdf22976dcdac53d72af9cc552e3803b062e842df7151a57f2efedf",
+      "zh": "ded115366910e553af86badc424150dabbf57c9019c78932b5ade80810d7ca4f"
+    },
+    "hardware-sdk/chains/cardano/cardanogetpublickey.mdx": {
+      "en": "071cc848f3bb8eb02cb1815d5c2062d0c744522fe4a4fed0dc2b2ffe0fe4e06c",
+      "zh": "8c1f26a860cdeff7ea5691f57d9af8a7b9c89737ff2f6558fa47a1e5795dd494"
+    },
+    "hardware-sdk/chains/cardano/cardanosignmessage.mdx": {
+      "en": "5333f9ca53ac410e6ad611a9743effda352f2b6b3ba6c464b52baa289aafeaf9",
+      "zh": "b6d6cd0fb224298214ce2fbb4e48dc1ca5687ed7c61ce188a8a2c567c58f34d7"
+    },
+    "hardware-sdk/chains/cardano/cardanosigntransaction.mdx": {
+      "en": "0f15605a26a3f62992f9e3ddc30aa5cd7c78184b573d2a4d9c5c37541826fa45",
+      "zh": "7ace87ebf2161a75ea21d6418f8176f1114e992afac458880a599375bc98db5a"
+    },
+    "hardware-sdk/chains/conflux/confluxgetaddress.mdx": {
+      "en": "6fcf6ba5a4ed20b4f24c638a158733c02a9df8ca665883575608e825ce74b693",
+      "zh": "1a54aa408f2e38b70f83744e5f7140ab35f734972e42c5dbf08c94d3fa04a43d"
+    },
+    "hardware-sdk/chains/conflux/confluxsignmessage.mdx": {
+      "en": "de3a40f4e466d97b86bc0d2dcf7ac8983185c10ecc68c518cdbe868b85465f3c",
+      "zh": "6f3e881dd486a090576008f95f57a5acc3dad2b54f69307942664abd015832c4"
+    },
+    "hardware-sdk/chains/conflux/confluxsignmessagecip23.mdx": {
+      "en": "6e7094d661b1d3ae262bc172c024df49817cd303ffdaab704f0e0f5446895f38",
+      "zh": "b412790ff2dc74ed1f35460278c08797f87e89bb232ba770a81f9868586cc4cf"
+    },
+    "hardware-sdk/chains/conflux/confluxsigntransaction.mdx": {
+      "en": "bd00dc47504de0bf701942ddcaa100de5ac7812d860f8452e26571bc3019b8e5",
+      "zh": "8e9923a8f29f5e6779b5eb089114b08f345a0b62dca41851d7161bd9f56235f9"
+    },
+    "hardware-sdk/chains/cosmos/cosmosgetaddress.mdx": {
+      "en": "4a35cf7461c3d3a0f4f9264a0cf67fe97dee3a08dee18396e7c04d9df3da307c",
+      "zh": "135cb83705889fba9099942bf76035de221c75750474465899796b81b5704698"
+    },
+    "hardware-sdk/chains/cosmos/cosmosgetpublickey.mdx": {
+      "en": "11e16aa6457829fc48706793cecc1a9a00e93223605c4ab00b97c626eb15dd75",
+      "zh": "14dce70b6f27f44b067098e2a19ec90e678dbd83452905b4e9742c2138f25914"
+    },
+    "hardware-sdk/chains/cosmos/cosmossigntransaction.mdx": {
+      "en": "3ab93ca7e618935551c38a67290111dd5cc43ef3805a281c98c0a5b668c10669",
+      "zh": "56f9fb45baea735a932a6607e5a0d564d0463ea5c10af05306e8e92cacd50a6f"
+    },
+    "hardware-sdk/chains/dynex/dnxgetaddress.mdx": {
+      "en": "b11bb116c62214c9eeadfee2394b871e17604288d40c00e52ec3d0c557819aa0",
+      "zh": "10f757774bd6f85d5c221a903a6571cfef42a2d81a445367cf60ec48b3342d6a"
+    },
+    "hardware-sdk/chains/dynex/dnxsigntransaction.mdx": {
+      "en": "74a73dd4851b0779675384320577324caad3ea44659511dd5931195abad9fc40",
+      "zh": "67650c012406fb615dedbf19b17fdaf742b1e3df7086910c20f5295d35652832"
+    },
+    "hardware-sdk/chains/ethereum-and-evm/evmgetaddress.mdx": {
+      "en": "0160f8a93e721aa5ac0ce77a05f35824a67ea3059f3a0101213cf68356b5aaa4",
+      "zh": "5c04c373322a2efa0dbcf5e96f5eafcd46285023b90161ee32ef250b7ed514c0"
+    },
+    "hardware-sdk/chains/ethereum-and-evm/evmgetpublickey.mdx": {
+      "en": "6bf55155dc348c0cb1c0c5bcf9ec4b9e38c474f85c208ddede12fe9f513b07cd",
+      "zh": "00b73013bd46fc72c16cfdc7243a97f51557ac244b08b9e55fe49908df512708"
+    },
+    "hardware-sdk/chains/ethereum-and-evm/evmsignmessage.mdx": {
+      "en": "8ba8b8b48b6a4a1a0d9e392ede8aa4231a88adc012d4b6f366677f7ba521ac4b",
+      "zh": "9abea3652ef9939efb548bdb9383ed9b7eac1257de4ff42848345c0896c6b455"
+    },
+    "hardware-sdk/chains/ethereum-and-evm/evmsigntransaction.mdx": {
+      "en": "5c7abc92d5146390388dfb6608e54291c6ca447c7061698bf4e95859da1cdfea",
+      "zh": "b122fc66a22232b1293d3182d62018bbfc81a559b55e6f1b410b3d867f90576d"
+    },
+    "hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata.mdx": {
+      "en": "ae7335f3f9dac7e10a20de2fd654b4ba0c143d74f6a5acc8a33b684ea7bfccee",
+      "zh": "40cd2805b245ea6e504d0d820bbc41ecd721588c32676aab9c9f4ea5dd60d468"
+    },
+    "hardware-sdk/chains/ethereum-and-evm/evmverifymessage.mdx": {
+      "en": "1c4f92f573ef0d1c1a1fcdbf25ba659eed19c184f39b605692bca6e5b9d460cd",
+      "zh": "59d1a4455aa3f02da91aef2e08fcd6cfb5f4b5ce982fca017d352861c9574945"
+    },
+    "hardware-sdk/chains/filecoin/filecoingetaddress.mdx": {
+      "en": "37960d61676187cc2a986e561bfa7b190b2fa87db96412fc72886087ebe02b5a",
+      "zh": "9fc617abbb70fc31f2462622d6c762253f62226cf67844c462b1b79db3d9ab25"
+    },
+    "hardware-sdk/chains/filecoin/filecoinsigntransaction.mdx": {
+      "en": "559f524c6e8cbaf8d20dac65e79ef63fe760fa17b6eca535cc9b393110f7d0dc",
+      "zh": "8d3915975a99cb25d28f941e5a689ce6fce4072818c151c5c429265f831b3d9f"
+    },
+    "hardware-sdk/chains/kaspa/kaspagetaddress.mdx": {
+      "en": "61123fa97470db0b3697276949fce5d3e825dae7687a4b529bf847cf08f2b188",
+      "zh": "6372d70f8ebff19f2d85fa368fc20146ada6a56cd68f41a5fe2fc9c350cca63f"
+    },
+    "hardware-sdk/chains/kaspa/kaspasigntransaction.mdx": {
+      "en": "ef84248f21f0361059157591659598c529a2e306922ce7d8e80255bae1e3a546",
+      "zh": "664a82232208a45ac4d50f1acaefddfd476ab90784056fdbdaa1a2b0ce704324"
+    },
+    "hardware-sdk/chains/near/neargetaddress.mdx": {
+      "en": "ab54f12409abbba852b5ca2226a2b18ac27fe447cb34af0dd46305b91e0a63d8",
+      "zh": "d48a3ca5e1d31d3674de84ab68ea141137c954a335be101a4081675cabf2b37d"
+    },
+    "hardware-sdk/chains/near/nearsigntransaction.mdx": {
+      "en": "fcdc1bdce6cb35d94dd941a9a6881a1d95275293dc1a47a5f7babfd14287664e",
+      "zh": "1a0cb43460edd3f3aa8f98323b6f10fd8f6b25d5a829330593f5597163191e91"
+    },
+    "hardware-sdk/chains/nem/nemgetaddress.mdx": {
+      "en": "09b41827ad08d8288d5ea68fa8e5eca7f0e40f36cc9265cc1a11e7b369dcc657",
+      "zh": "a25e75fa86e1984f9d1a01098d050540a2b361814de732cf58af050e56d08fdd"
+    },
+    "hardware-sdk/chains/nem/nemsigntransaction.mdx": {
+      "en": "2e61b44862897756678e39b3f87c3d99b20f903770173af8421e280f4dc6db0a",
+      "zh": "5551906b36dee35c35e1b6391737bdccaa7f44ece9473ab02e31e3a0c5b2bae9"
+    },
+    "hardware-sdk/chains/nervos/nervosgetaddress.mdx": {
+      "en": "80320f0baa4439404e0be606b9d754dadfacd4218bb9a21abeb4fbf88ff7debe",
+      "zh": "0b58428a7d6c1de15c5ccad1d54a3b032b6276f05d2948f5512ace0c70c86ec4"
+    },
+    "hardware-sdk/chains/nervos/nervossigntransaction.mdx": {
+      "en": "3ab8f3ce43f0fbe1421b437ab095e96707f5e19952e618e093a177e3a2bd56a9",
+      "zh": "a625e4b513cd24394449fb2287020876dff5a454dfe4cec5ba8a35610c0f6750"
+    },
+    "hardware-sdk/chains/nexa/nexagetaddress.mdx": {
+      "en": "2d9afe10958d6d85b3fbfebe587d028847585d19f7d3b2a6fe9c699d33ef7ff6",
+      "zh": "c675059336a60fa14425d6a1575962afd00f5c1304b487bf3acb22d5db635658"
+    },
+    "hardware-sdk/chains/nexa/nexasigntransaction.mdx": {
+      "en": "2ceaeb6a1628803fe730639b7148adcacbe9b34f6631182dd83d9e696187693c",
+      "zh": "432dd3b853fc98b490c9aa077d882c20633e002d5366faa9dca99dfe7bd1de3d"
+    },
+    "hardware-sdk/chains/nostr/nostrdecryptmessage.mdx": {
+      "en": "49ab718c68160b91b63803fbe2cc03b7518c44dbcb408e226be5473a0eefd367",
+      "zh": "c4fab39ef7e118ff1f307699b7f57b46514bfe9183c8bc7dd31503197e417a30"
+    },
+    "hardware-sdk/chains/nostr/nostrencryptmessage.mdx": {
+      "en": "4a98e977f7ff3f42d51cbf66ae86c6ef9289060e58a54e64446ff63309dbe51e",
+      "zh": "9ddf5c0c31b592de1e046d9d23982fb1a61dcca85399ca1329ef50a54e9c3008"
+    },
+    "hardware-sdk/chains/nostr/nostrgetpublickey.mdx": {
+      "en": "22d325ffb78a2c5ea2021ae655abe7074febad1eba7f1bee978077689db4dedf",
+      "zh": "f989c667da68640517e6ba0bb3dc6b42aa5d8fdd0132eac47e20298d69116d55"
+    },
+    "hardware-sdk/chains/nostr/nostrsignevent.mdx": {
+      "en": "cdc8ff538aab0c7ac2aa717d8ba0752e8b1cabc0019cdcce329108e72bf1c97c",
+      "zh": "0f5c58434fcb6b9eb5b336f67ffc190b8a3d12877da7ac4aaf3990d357db281a"
+    },
+    "hardware-sdk/chains/nostr/nostrsignschnorr.mdx": {
+      "en": "93f6ee7083ee69c2fee125a48d15c78d8eb8c73bdac5fccdc7d2be7064a4ebf5",
+      "zh": "614c10a28efaa1d75a78a81a33a1bb2b203251a98dfb7eeeb1ece2138a512ae5"
+    },
+    "hardware-sdk/chains/polkadot/polkadotgetaddress.mdx": {
+      "en": "aca27b0fa787301008abb417178ba6ff7dd03a918f1e2f35288e57fb9d53cf2a",
+      "zh": "77e1efe518556c100f81b78da4efaddd6a554ba9b8a3d0b29bc789bf48032bc7"
+    },
+    "hardware-sdk/chains/polkadot/polkadotsigntransaction.mdx": {
+      "en": "7b722f09cdc41ec43df79d18daa3527924eb1e198b51181d0cab44e681604c8b",
+      "zh": "de8c6980c7f3f3506af1753fadfb03134e1e1d834c9387fddb49a7ff6a4c210a"
+    },
+    "hardware-sdk/chains/ripple/xrpgetaddress.mdx": {
+      "en": "8821ffdc815e933fcf2728444fed770748cff4cdea7190a9231bca8c8c68e63b",
+      "zh": "9d4ce4e85b8f7800db70ecd523e0338d44781b1313d10b8678a6f97b82514c52"
+    },
+    "hardware-sdk/chains/ripple/xrpsigntransaction.mdx": {
+      "en": "798424384c177930c48d95213996ba91806eb1594ec478390972ef17d91e3466",
+      "zh": "8ad5580b76c3c84b3ac0f7a860f954bca5496c3347b19f936885463ff50cc692"
+    },
+    "hardware-sdk/chains/scdo/scdogetaddress.mdx": {
+      "en": "c68c0a19cef8a77dcfd24be864b685338b9799f4dd32d0709c5588a08f2ac2ef",
+      "zh": "28219f85194afc31573651e883989fbbacbf1600595e89c0d93c9f0853cff4a6"
+    },
+    "hardware-sdk/chains/scdo/scdosignmessage.mdx": {
+      "en": "8bdd069beb0eaa92844e8528defe85e14b6563d2fd3f04f78a33867737e008f0",
+      "zh": "6e7054b6e4acb2cd954412e13e7fd195ea9a4fb98caabfd9f975e855e3d2405f"
+    },
+    "hardware-sdk/chains/scdo/scdosigntransaction.mdx": {
+      "en": "413299a8eb619fbc2cf159b9e0928daafb2a87b1a887df5f3a7b72a0b73069a5",
+      "zh": "2d117b1fe948990fe6de808eba49e44023a0f95b89dd669a5ccadb2cfacdad91"
+    },
+    "hardware-sdk/chains/solana/solgetaddress.mdx": {
+      "en": "7818df6bb8c642b5d152da5152cf8c588859fc738f16d919017c352b94f823c1",
+      "zh": "dab5a123d473ae9ba21ca03bf94e6e80095fb3809b01a16d83b368fd4b2572ea"
+    },
+    "hardware-sdk/chains/solana/solsignoffchainmessage.mdx": {
+      "en": "6addc2e54e8ec431185d5e69ff984941046bfdd6699f7badb3ee55e1cd48bdbd",
+      "zh": "b365aa9084057d3af3bdf91a2d5e4a48b26ec93d298de1d6949a20a2d273d8c3"
+    },
+    "hardware-sdk/chains/solana/solsigntransaction.mdx": {
+      "en": "27ef90ccb4d012611ae484ebf4b70bff4b0eb5e5a79b65085314f1e16bcd75ee",
+      "zh": "afa6a877f32222be8dcf7cdd43508d76dd4b0b869db9728cc881ae1750961472"
+    },
+    "hardware-sdk/chains/starcoin/starcoingetpublickey.mdx": {
+      "en": "736905f792c99c296c4c1f8b802d00cd9e5263e86b3f7be66c0dc4d414098502",
+      "zh": "1f0c8c518a2ec4509ae22085cf31c71e106bbc8d3356baa0e12f16c21cfe7e79"
+    },
+    "hardware-sdk/chains/starcoin/starcoinsignmessage.mdx": {
+      "en": "a0964543414d4808fb04fee693e120ec238e6f3fd940f290bc0311e8442432c3",
+      "zh": "879af369766aec6c67adbf04bd3568f4d94a9fab087a99d74c37a8ed53f39cea"
+    },
+    "hardware-sdk/chains/starcoin/starcoinsigntransaction.mdx": {
+      "en": "88a967d71df46c8e7f23c857fc81800a26778485533fe6a0dde7211ffe5faf1b",
+      "zh": "4a9ed48fcc0d547f83293ea11c86739c58e7027dbf0ec8256f5354abbf6d3dca"
+    },
+    "hardware-sdk/chains/starcoin/starcoinverifymessage.mdx": {
+      "en": "fd691ed0395720aa3a930d49f85126b144c0b497f546c051cdb19efaf2438eab",
+      "zh": "afc794d7c8eec59e83c253a4f7a0503e39b5c243cb2f51c72ffa9a3f97ad62d7"
+    },
+    "hardware-sdk/chains/starcoin/startcoingetaddress.mdx": {
+      "en": "bf7782e0102f269868ad37169e4692204a88d8862e5f58630b5fd20d19675a55",
+      "zh": "40d413e018d85cf82ec9e504b096e516793d9de0e0fafe2ec365d0feac15d3a4"
+    },
+    "hardware-sdk/chains/stellar/stellargetaddress.mdx": {
+      "en": "d15a0e130500ee96945cfb175ede24aa11eee0a6f1a68b180eda4e762cd41064",
+      "zh": "2223485c5b616690dfec32341626a1a5b40f08572b42ca0a2614a07df27a5e55"
+    },
+    "hardware-sdk/chains/stellar/stellarsigntransaction.mdx": {
+      "en": "cf8265d32d297c49f8ab16d56c9009a0508be44f09bac2f40adca170542ab62e",
+      "zh": "025909878e69e6356a3b7a0470e52c3db44463587734eb100e7a7596b7d39e96"
+    },
+    "hardware-sdk/chains/sui/suigetaddress.mdx": {
+      "en": "60c431760dd8f58cd5237708970b6a7c4f82952d2355d68807a39d3999a7fd2b",
+      "zh": "356aad39041a194a7c2ddb94526ca1381aed69a6d15a1cc741e6b39706d69dc4"
+    },
+    "hardware-sdk/chains/sui/suigetpublickey.mdx": {
+      "en": "2d639ade5393f13a2577a9f2445815eba9707f9507e4c76fd63228d202f56617",
+      "zh": "e9a5cfd9c2608e546ca36f9f6b70a235049b66a124463ac257bea2a6924dfb22"
+    },
+    "hardware-sdk/chains/sui/suisignmessage.mdx": {
+      "en": "8d03603dc0d7eae47ae5f597660258c8768f3ea8da90ae4839dd67d6360d1d43",
+      "zh": "ddcee005370aae747d74a2178f2368b844938272cb1e6729b78d46df3349eba4"
+    },
+    "hardware-sdk/chains/sui/suisigntransaction.mdx": {
+      "en": "73d6947f5f7e2bdb136e39e400f57e7d175e2b6876595ff2f9b2c8f6b2315863",
+      "zh": "4b3234dfdb88527d823546ba39fe8846eaba46f82040862dca7fec692a443c4e"
+    },
+    "hardware-sdk/chains/ton/tongetaddress.mdx": {
+      "en": "50a7bc9e5bfe30c9a7f59124a88440a4a462ca662113c03aa129496efefa7029",
+      "zh": "5eaff8d67a35e9dad8ce94ac2775a2018dec05f9e051d683a5ad7d14d5a84185"
+    },
+    "hardware-sdk/chains/ton/tonsignmessage.mdx": {
+      "en": "e11cc559b072734b174c95a323eb35d58b4620e5e2804ba2d08d6b5a8d00b3a2",
+      "zh": "cc2826bb742f33a40ef0a8e84bbba243d552b2b829fc9cceca40bfcec9127949"
+    },
+    "hardware-sdk/chains/ton/tonsignproof.mdx": {
+      "en": "e7f5d632023e2ffc2c90c6f1d921f77d13f0d9c4768e93ccb540b9c5a84efc48",
+      "zh": "efdc701b4eb3c73c2826770e0c84b6700ca14d8b99ba3843ca9a39c36140db67"
+    },
+    "hardware-sdk/chains/tron/trongetaddress.mdx": {
+      "en": "c9fa4746a5f676dedfb5f358a6154f30227fbfdca9f9cefea1a93c64f70cf34f",
+      "zh": "af20dbc437e04452a8c3dd2948df5b20c8ee7aab9cdf41b6f94f26ef88770ac6"
+    },
+    "hardware-sdk/chains/tron/tronsignmessage.mdx": {
+      "en": "ee750e6229c829023de07301435179d4c1e9d0b8961cd806c70d7889234c694b",
+      "zh": "4bd71370283fa2961e33e06b260aab4f6ec09d0ca1245d9f6f8da94e477c1348"
+    },
+    "hardware-sdk/chains/tron/tronsigntransaction.mdx": {
+      "en": "4c75f1467507ce38b6e35da6d109ac9608496133afd88ca16b3c73caefef5ae7",
+      "zh": "7152bea3ecdeb8b4d8647ef67a4533d10abc1f74a66b480288cb8f3db0339118"
+    },
+    "hardware-sdk/concepts/chain-support.mdx": {
+      "en": "ba41a16ba049f2bbb602ed2be74cc35446e70905a55529cb5835bfd0e08bb287",
+      "zh": "f94a1d2e5776c22b632581beba66d617fbde4ba71f04af9b30793c5e55fe6730"
+    },
+    "hardware-sdk/concepts/common-params.mdx": {
+      "en": "7c1dcfa290a9347fe6c99a4600fa39c9d44e637eabe9a7001f268bfba3478bcc",
+      "zh": "80698c0e6cfa4a4c6906249c0c7008730191691a8a73ed34f304e3bc92110f76"
+    },
+    "hardware-sdk/concepts/devices.mdx": {
+      "en": "cfe6806e45dbdceb54dab119eca91ffb47770198a40f4c3af65bf85408dfc39c",
+      "zh": "d45da5aa51fc44792ace2ccb1c51c0a394f8fee4c686defe1293150cdbe429ae"
+    },
+    "hardware-sdk/concepts/identifiers.mdx": {
+      "en": "b9b08b67c4943458081af5548a6e1992d09f029d4f9f7f9dbb0d54335f09b25c",
+      "zh": "f8e3b0c61be33afbf43f2fcb51b01f1ec89e107f6f725f2c0c602b160f033f12"
+    },
+    "hardware-sdk/concepts/low-level-plugin.mdx": {
+      "en": "2a218f16729b64af88b88d4024188be9b5f904f0dec8b11234ec4c5bf8bd86f8",
+      "zh": "08e8f6817cb08dd19c6bd625b0199cbd960067ede61c2cfd542cd97ac692e5a8"
+    },
+    "hardware-sdk/concepts/passphrase.mdx": {
+      "en": "69bc797d69d7787d759c9d340618f6e382b923f1d42f5c1256d48b34a370f712",
+      "zh": "3c0dad32e4ebe473fe199838f897f78a5d20ca57066e8488201b5776b0da9cee"
+    },
+    "hardware-sdk/concepts/pin.mdx": {
+      "en": "512c3b033e9ce3c7e5cc5c9683df0037d4e639f32270896fb313300516fe73f8",
+      "zh": "3792de040d8d3ffed2d9b6b420daff70d5f56394cb5e259c6083757e105207c6"
+    },
+    "hardware-sdk/concepts/protocol.mdx": {
+      "en": "fb87496818fd1439bb2e6ddeac29fc237ab167e94b1df5473f1bd6074a9b1e66",
+      "zh": "314b2427d0426e41f3b10e74c568910830bc5060cf666873c86596d48a711bd2"
+    },
+    "hardware-sdk/concepts/wallet-session.mdx": {
+      "en": "059323f635318d57eaa059a11ef1790cda4b0ebbe81468229a4b171a83ed7c3c",
+      "zh": "7136dbd71d8b376e4d58bc0bd33b3447ac1c9fcff2ecccc49db984ed150ee4c6"
+    },
+    "hardware-sdk/core-api-guide.mdx": {
+      "en": "99b40bc4a3c8478a381850f83e0adabe92e7a056915d7db978e79cc7d5ffc5df",
+      "zh": "bae28efae89983e95d1bb7cd61e9b9f7c7b320114159c11fbfbff50f83fd007b"
+    },
+    "hardware-sdk/device-api/checkblefirmwarerelease.mdx": {
+      "en": "36f5c34e837b3c1a5b64ddb0141fd54f2d8605ac16ca014331536442f228fdc5",
+      "zh": "c342ce5d6e1a8208a98044bbf9ab0ec1cd86f8944850ba7f49bd0737d3157f7e"
+    },
+    "hardware-sdk/device-api/checkfirmwarerelease.mdx": {
+      "en": "8344cd23a6150d7f0e9895b8f0fa24dd911bfa695ef04e1fb019f60c7a78026d",
+      "zh": "25269a4e238ee904e922490e0d3a2834d370589c0f97e3f1126f3b75d804af9f"
+    },
+    "hardware-sdk/device-api/devicechangepin.mdx": {
+      "en": "bbd673e53ace4c8b47e4888eb08afccc8ff44d09affbfcbd10e6b450883883a4",
+      "zh": "73202f60399210fd36ae2bee435320989aca2b94a78329b0573895460d3248c7"
+    },
+    "hardware-sdk/device-api/devicesettings.mdx": {
+      "en": "e0e6d3181d9670abf651e5e08a7700f538eeab66750e8e0a7ffa13c7b1ac4b5d",
+      "zh": "89db358173633cbb0aca033c5db1ffe641d9d084898fa8023e7e335dce9b14ac"
+    },
+    "hardware-sdk/device-api/devicesupportfeatures.mdx": {
+      "en": "ff7bdf4b85979d38f545fd9122e12b1d0dd9408113d5315608578947ce54d5f1",
+      "zh": "a8c6eb9761a21dda4d0fb7f91bfab5c9f4400867eb9429becd13590e4df3c380"
+    },
+    "hardware-sdk/device-api/deviceupdatereboot.mdx": {
+      "en": "82768c934fb99b8cde7f512f2aae3dc310afa9efa9606679fb2a2c9590230e39",
+      "zh": "ac931c863b9fb70b5874b75d669f8c0f2e69557859728721ac126d4e1c308f28"
+    },
+    "hardware-sdk/device-api/deviceverify.mdx": {
+      "en": "a1a4e2824aa6af272ac56efa9bd8e8e613cb39cc88e7a22292019988ffc69719",
+      "zh": "f5d850223078fd11e1ad38e75b858f857a88facee78872c68dcf57cc14ad9ddb"
+    },
+    "hardware-sdk/device-api/firmwareupdatev2.mdx": {
+      "en": "0e2135654b6a04c2538aa684a2a3947c96d10d935830472e67b9025c4f0e9c78",
+      "zh": "e1a0af8be435854fc74276edec282fecea6db733eebd0d1c7ff2f2c4202998ac"
+    },
+    "hardware-sdk/device-api/firmwareupdatev3.mdx": {
+      "en": "995768ef3a115ab9780567fc9ab08fbbb3064a911bb599ffeddc2f0dfc6b2061",
+      "zh": "02385e84310224c65f4f2b6cfc248576ebc410187db3a118ac44c2e5daeffc29"
+    },
+    "hardware-sdk/device-api/firmwareupdatev4.mdx": {
+      "en": "817ddb56c935393a2fc702c072145fb7c0b4cc28f58907970a4c83f3f0898e66",
+      "zh": "5e7e3c3801a1c13f992cb01184c61fe05a617be11582ff2bda33489c05d088e1"
+    },
+    "hardware-sdk/device-api/index.mdx": {
+      "en": "207de8f86179f877d185c27e308bc34734daf386abbf742575733869316cae92",
+      "zh": "2eeb6644d1de474f39c2a97c586f37a5ec55f7c68f349c2f93471c28f7992416"
+    },
+    "hardware-sdk/firmware-update.mdx": {
+      "en": "35edd11b422007e0cb95d208cde3b47bf72364f7a69f50c68ca1294543b084ce",
+      "zh": "2ded59eead5bddfc902d925451fc452232d4ea42c3e053a0428d5214907df4b5"
+    },
+    "hardware-sdk/getting-started.mdx": {
+      "en": "3db9be5ef34f466a9cf945fc664eba8b36abdc01e6602e79c49caca1962880dd",
+      "zh": "486eee45bc22acc0b054f14fec44ddf24f44c4488c34bfc5d0da9c4daccdb6db"
+    },
+    "hardware-sdk/index.mdx": {
+      "en": "eb2f9c74271a5ee00d82c4b1c1206370ccb4394785c4646fa4aeb273aa59f9bd",
+      "zh": "a9645df88262fde56a8cf715702fb23800ffac562b82211c4ba45d15fe4f8f79"
+    },
+    "hardware-sdk/legacy-guides/from-1x.mdx": {
+      "en": "5c3daf5060a0d17b2de4de739e8d31b8e8d74212c8932aefef6f211fb16f2282",
+      "zh": "72503fc58be0ed2421a6eea17a6c657dc99bb82c8f9a0de9dc64a121f9b5a388"
+    },
+    "hardware-sdk/legacy-guides/index.mdx": {
+      "en": "4476e6481f3b8bbd06e9977e04f89c49d39009f2b65ffbd5bf3efbb8a49cef40",
+      "zh": "db9c3fc387650c294b347b8f16ebc3c5cd1d17f6aa7c7fc19d261cf6632cfbaf"
+    },
+    "hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb.mdx": {
+      "en": "6ad6d3dc7acc54c041351b7a421a1088b86e04d60e2b1d443e713c99921b94d4",
+      "zh": "098bdf21f1dcea3094c99024b1fbf0b385ac0324924cd3873afbf826feafe19b"
+    },
+    "hardware-sdk/legacy-guides/migrate-bridge-to-webusb.mdx": {
+      "en": "c029c9684e8905b131a47f0174ac1d964591ca0362c61af6c65e242be64a2038",
+      "zh": "7704e78425baa14a9cdac3c1be4fbac37bf3651fda5e42ceecd1e7b232917aa3"
+    },
+    "hardware-sdk/playground.mdx": {
+      "en": "166b78416ac1fb67570df48f1140276765f66153fd650ddbbebdd285328851d5",
+      "zh": "ebb53543047e0d9257f16ccff26328695b8298ca146c33b41149ad790d28131b"
+    },
+    "hardware-sdk/signers/btc.mdx": {
+      "en": "e99c6a8001d6f0bb604aae41301f9abc4c76432b3ca9de19d37c333e00d86f1d",
+      "zh": "426d49471be4cec93bc37d1473fd48bd9313ce99d7549d4e9f95c177c21f94b8"
+    },
+    "hardware-sdk/signers/evm.mdx": {
+      "en": "4ef9a0cc12b2d2d46b41e3a44e43aecfdc75c83e61761ea2a31d82a896cafdba",
+      "zh": "661f79ed4404fe2b3c16c954ebb64f6e09a8420695f6ace0f2c7deed08f245bc"
+    },
+    "hardware-sdk/signers/index.mdx": {
+      "en": "0766d84c1dd208c89ec5f6f8b52dafd295fba5377ed1b3e160c2a28a5a2f6b72",
+      "zh": "0bfea93d9e217e0cb7d7625091272074832477c71b22e11a85a7dc56ab12807e"
+    },
+    "hardware-sdk/signers/solana.mdx": {
+      "en": "6f236b6cf6dec93e6b2697c27f1578db8c2286690b3d0a63de12f9b99441eee7",
+      "zh": "35b4f5be1e8d9333503202a2e6e74b18d8bad220eb7e685643919a6fbdba80c4"
+    },
+    "hardware-sdk/transport/android.mdx": {
+      "en": "f62b039bc5eaa2f8c278db015af6828b2cab6ac242bf3327b173d4329ef52e99",
+      "zh": "335938d4732ab77da2d40bb3ea014d53b7b9456f9206b27e3e3d32b57ed42df5"
+    },
+    "hardware-sdk/transport/flutter.mdx": {
+      "en": "636f332a87a785c5ea83ce6ff0813101c65a57e10b9a9e713d13cb90bb331a8a",
+      "zh": "6f7ae84c1b8f16b120b7254dc5a10b8b48e3b5cb5dc6a11007dc076598ab73c9"
+    },
+    "hardware-sdk/transport/index.mdx": {
+      "en": "ae36e4e7db142d921f7c64918645014f8a94f2dcd8638a588ed09df5ea7a995e",
+      "zh": "11b2af0afaf6e1a87e445b356049d05aa313ff7ee3b567c86e6417e8369c46e2"
+    },
+    "hardware-sdk/transport/ios.mdx": {
+      "en": "801df558af74e7fe590b4c9dd3720346a0da25c271ec0310ac32208070494dab",
+      "zh": "28a5046a2ce555a4084bacd8dc8a04642b111aea42780040dbcfd1dfd762b184"
+    },
+    "hardware-sdk/transport/native-ble.mdx": {
+      "en": "2f5e9b5b826109af4e5317d134b36226f199814e48d1858112343fc70a8559ea",
+      "zh": "df00d9029bd2fd5284cf6452ce7c7f9243b10d36234ef47702236648f5156de7"
+    },
+    "hardware-sdk/transport/react-native-ble.mdx": {
+      "en": "ad4f4367db7b35df1c54e8848531780ec20566e88b9cc1056936c080c2f9640f",
+      "zh": "2d512764fca7e824653bbefe4532cfb20302d476f91285f45a26f0071970682d"
+    },
+    "hardware-sdk/transport/reconnect.mdx": {
+      "en": "db998d7ce990c7d666f0200c37e2e600b42de5c7acb2f1cce7aeed1aeae3a626",
+      "zh": "5587296287856e993783bb5a63535056ddb73455f6b88dc4aecd269c6cb1e4de"
+    },
+    "hardware-sdk/transport/web-usb.mdx": {
+      "en": "159a580d23e71b3a470ff2254b537aeb76f3cb19f37e34c25b975b803614cc2d",
+      "zh": "bbef048a6866447a2e96346a5c26d6b72153789b29d4676ec3d10d1a67d99642"
+    },
+    "index.mdx": {
+      "en": "270e55cbd575ed293cf9c184f9a600215abbd46a34b176749f16bf397dacf089",
+      "zh": "7b1d8d18c2941bf49e8f3999830e052d7215bf3424068048f1b4240909965332"
+    },
+    "integration-guides/contract-metadata.mdx": {
+      "en": "5c202b92665fe983899ae53538497ed7f994d9b71e7eac55b6920c6b7a45de35",
+      "zh": "41013fdeb353fbaf3a8fa6c04c5de8b49c21647ca559cd2611c3fef3bc5ef296"
+    },
+    "integration-guides/contributing.mdx": {
+      "en": "9976b1ddd7e2112d7914599c969950cbaed6251690b75f5bcc6c11704f4dfeff",
+      "zh": "b064e3153115abe00f76ec57807f1946b281d2f1141a2c5612910f7a75d45740"
+    },
+    "integration-guides/device-management.mdx": {
+      "en": "cff20bcd97aab5aad9bad28863d33919df1c53229e6522b9de871ad2eee525a9",
+      "zh": "ba827a46f1b04a0cc06fdd39a95660466fb2edc3a1b5226e46be9b3717ebffd2"
+    },
+    "integration-guides/glossary.mdx": {
+      "en": "61551726243a8fe35c7ba67e10ae2e3132566d3cb99bb859fef98decf580e9b7",
+      "zh": "4152ff31a4133519b12740688e036f10faacb4821889b74bf8b3ee2bebc7f8ad"
+    },
+    "integration-guides/index.mdx": {
+      "en": "5f18baade808f227ccea95ed1fe98fa0d55f2b3ec4e1959ecfa467001d907c56",
+      "zh": "0ea1b8e04b4ae8cec26fd6889f9fef0470c9e7bdef25d070a1d9c801a330aaa5"
+    },
+    "integration-guides/provider-selection.mdx": {
+      "en": "3a0990abc3da69ea041ce4c7d215d192f09f0ed54371d8140e11aa87296a6f45",
+      "zh": "1e5dbc23b6a8af95cb066321d2e9738af7f880ede39d234f14ebc7b21ac35062"
+    },
+    "integration-guides/site-metadata.mdx": {
+      "en": "12cf129573c66fb9cb9b83d2e17cacec142678aa1dd8271dcaec40933d3b7c42",
+      "zh": "f5421dd475737c7e1c48aeb123efc7fca0e5be506b0f063211905ef7a15c3468"
+    },
+    "integration-guides/token-metadata.mdx": {
+      "en": "f14bddadb9fef7a7b174d2b484de8397fb2794a6d2ed5e9e6068926ed96edfdf",
+      "zh": "fe2b61a7df48dc272d95c2985bc59877ea831a94c2fadfc97d5e79df53d42bfe"
+    },
+    "integration-guides/walletconnect.mdx": {
+      "en": "b134ea4a33865f84cc0534fcde49c64ba268d3ea1a55cac68932e49fd1c1d4b9",
+      "zh": "8528622e1c55b1aa9f997876c280863993c4df4109e765acd8a36db1b977ce5d"
+    },
+    "legacy/aptos-walletconnect.mdx": {
+      "en": "16f72c507d5aae8abc5fdc09b36ff362151758dc5d91bf63fe0cfef66e79b2e3",
+      "zh": "977c538a5bcdc7ed509a150acb75b3ac13ff35e4b36aef5327c50862e33094e8"
+    },
+    "legacy/bridge.mdx": {
+      "en": "05b15fbaf65eaebd39903578c10be33652c59f57bec25f76876c30d76f834ba7",
+      "zh": "22da7c72607f50bc4df647693ff7b078f144d1e9b8ce1654ae8f688c5f466f37"
+    },
+    "legacy/firmware-update.mdx": {
+      "en": "f8c05ca86c8955c4f6d0f933b7b278f54f66326c543caf7d9874d20be9e8a53c",
+      "zh": "c48304a7e6cfe18cf5463b0c3bd8d51e6a669b732af63b3f8dad898203afc4f8"
+    },
+    "legacy/index.mdx": {
+      "en": "5513e1f3884d5c7608db6473bd2041aac78c939cc7a0b5d1665e0f02051216b6",
+      "zh": "2e874d4499b114ca564fdbad989564312836f7bfbd50896c9c2db23ddb5452ad"
+    },
+    "troubleshooting.mdx": {
+      "en": "3d387b2f42cee6fdbd560230bdeac35b9421859e15795128aa2a3c630f6f5877",
+      "zh": "8570a69995364c02ebb4afe2082c275d15ad6f8741921d9116069184c03c42c4"
+    }
+  }
+}

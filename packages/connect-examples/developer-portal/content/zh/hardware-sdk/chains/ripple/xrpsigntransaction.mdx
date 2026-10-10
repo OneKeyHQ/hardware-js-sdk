@@ -4,9 +4,13 @@ title: xrpSignTransaction
 
 # xrpSignTransaction
 
-### Ripple：签名交易 <a href="#cardano-sign-transaction" id="cardano-sign-transaction"></a>
+<span id="cardano-sign-transaction" />
 
-对指定交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+<span id="ripple签名交易-" />
+
+### Ripple：签名交易
+
+请求交易签名。用户在设备上核对并确认请求。
 
 ```typescript
 const response = await HardwareSDK.xrpSignTransaction(connectId, deviceId, params)
@@ -16,7 +20,7 @@ const response = await HardwareSDK.xrpSignTransaction(connectId, deviceId, param
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `5`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `5`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
 * `transaction` - _必需_ `XrpTransaction` 类型
 
 #### XrpTransaction 类型
@@ -37,13 +41,13 @@ type XrpPayment = {
 }
 ```
 
-### 示例
+当前 SDK 运行时接收 `{ path, transaction }`，并将 `transaction.payment.amount` 校验为数字。导出的 TypeScript 声明与该运行时结构不一致。以下示例遵循运行时接口；编译接入代码前，请检查所安装 SDK 版本的声明。金额单位为 drops。不要为了满足错误的声明而将 `transaction` 字段移到顶层。
 
-下方调用描述当前运行时契约。当前 SDK 的 TypeScript 声明错误地将交易字段展开到顶层，并将 `payment.amount` 声明为 string，与运行时结构不一致。不要为满足该声明而把 `transaction` 内的字段移到顶层。
+### 示例
 
 ```typescript
 HardwareSDK.xrpSignTransaction(connectId, deviceId, {
-    path: "m/44'/144'/0'/0'/0",
+    path: "m/44'/144'/0'/0/0",
     transaction: {
         fee: '12',
         flags: 0,
@@ -75,8 +79,8 @@ HardwareSDK.xrpSignTransaction(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

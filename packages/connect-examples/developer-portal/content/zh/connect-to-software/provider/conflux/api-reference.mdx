@@ -5,7 +5,7 @@ description: OneKey Conflux provider 完整 API 参考
 
 # API 参考
 
-OneKey Conflux provider 方法和类型的完整参考。
+OneKey Conflux provider 的方法和类型参考。
 
 ---
 
@@ -53,20 +53,20 @@ OneKey Conflux provider 方法和类型的完整参考。
 这些方法仍然有效但已弃用：
 
 ```typescript
-// 已弃用：使用 request({ method: 'cfx_requestAccounts' })
+// Deprecated: use request({ method: 'cfx_requestAccounts' })
 await provider.enable()
 
-// 已弃用：使用 request()
+// Deprecated: use request()
 await provider.send({ method: 'cfx_accounts' })
 await provider.sendAsync({ method: 'cfx_accounts' }, callback)
 
-// 已弃用：使用 request({ method: 'cfx_chainId' })
+// Deprecated: use request({ method: 'cfx_chainId' })
 provider.chainId
 
-// 已弃用：使用 request({ method: 'net_version' })
+// Deprecated: use request({ method: 'net_version' })
 provider.networkVersion
 
-// 已弃用：使用 request({ method: 'cfx_accounts' })
+// Deprecated: use request({ method: 'cfx_accounts' })
 provider.selectedAddress
 ```
 
@@ -82,4 +82,3 @@ provider.selectedAddress
 | -32601 | 方法未找到 |
 | -32602 | 无效的参数 |
 | -32603 | 内部错误 |
-

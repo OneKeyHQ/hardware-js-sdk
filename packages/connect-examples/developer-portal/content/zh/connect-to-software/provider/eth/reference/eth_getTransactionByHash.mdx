@@ -49,38 +49,40 @@ const tx = await window.$onekey.ethereum.request({
 })
 
 if (tx) {
-  console.log('发送方:', tx.from)
-  console.log('接收方:', tx.to)
-  console.log('金额:', parseInt(tx.value, 16))
-  console.log('状态:', tx.blockHash ? '已确认' : '待处理')
+  console.log('From:', tx.from)
+  console.log('To:', tx.to)
+  console.log('Value:', BigInt(tx.value).toString())
+  console.log('Status:', tx.blockHash ? 'Mined' : 'Pending')
 }
 ```
 
 ### 发送后追踪交易
 
 ```typescript
-async function sendAndTrack(txParams) {
-  // 发送交易
+async function sendAndTrack(txParams, timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs
+  // Send transaction
   const txHash = await window.$onekey.ethereum.request({
     method: 'eth_sendTransaction',
     params: [txParams]
   })
 
-  console.log('交易已发送:', txHash)
+  console.log('Transaction sent:', txHash)
 
-  // 轮询交易详情
+  // Poll for transaction details
   const checkTx = async () => {
+    if (Date.now() >= deadline) throw new Error("Transaction lookup timed out")
     const tx = await window.$onekey.ethereum.request({
       method: 'eth_getTransactionByHash',
       params: [txHash]
     })
 
     if (tx && tx.blockHash) {
-      console.log('交易已在区块中确认:', parseInt(tx.blockNumber, 16))
+      console.log('Transaction mined in block:', parseInt(tx.blockNumber, 16))
       return tx
     }
 
-    // 仍在待处理，继续检查
+    // Still pending, check again
     await new Promise(r => setTimeout(r, 2000))
     return checkTx()
   }

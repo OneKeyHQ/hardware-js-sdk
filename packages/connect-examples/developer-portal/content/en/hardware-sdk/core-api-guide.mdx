@@ -1,4 +1,5 @@
 ---
+description: "Initialize the Hardware SDK, identify devices, handle correlated UI events, and recover safely from errors."
 title: Core API Guide
 ---
 
@@ -44,7 +45,7 @@ sequenceDiagram
   App->>SDK: openWalletSession(standard or select-hidden)
   SDK-->>App: deviceId + passphraseState
   App->>SDK: address / sign with passphraseState or useEmptyPassphrase
-  SDK->>Device: DeviceSessionGet
+  SDK->>Device: Resume the selected wallet context
   Device-->>SDK: session
   SDK-->>App: result
 ```
@@ -87,6 +88,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success || !devices.payload.length) throw new Error('No device');
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 
@@ -108,7 +111,6 @@ if (!address.success) throw new Error(address.payload.error);
 Serialize per device. Refresh `getDeviceState` after a device switch. Remove listeners on unmount. Call `HardwareSDK.dispose()` only when tearing down the transport — see [Reconnect and dispose](/en/hardware-sdk/transport/reconnect).
 
 ## Common params
-<div id="common-params" />
 
 The full table, transport matrix, combos, and HD paths moved to [Common Params](/en/hardware-sdk/concepts/common-params).
 
@@ -121,7 +123,7 @@ For PIN and passphrase UX see [PIN](/en/hardware-sdk/concepts/pin) and [Passphra
 ## Events & UI wiring
 <div id="events-ui" />
 
-Subscribe once near app start. Only call `uiResponse` for input requests.
+Subscribe once near app start. Only call `uiResponse` for input requests. Copy `payload.responseCorrelation` onto each response when present; it identifies the pending interaction. Invalidate modal callbacks after cancellation or a UI-close event, and cancel the selected connection when the user dismisses input. Do not log UI event payloads or input values.
 
 **UI requests that require `uiResponse`**
 
@@ -169,12 +171,13 @@ const handleUiEvent = (msg: UiEventMessage) => {
         return;
       }
       openPinModal(({ value }) =>
-        HardwareSDK.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload: value })
+        HardwareSDK.uiResponse({ ...msg.payload.responseCorrelation, type: UI_RESPONSE.RECEIVE_PIN, payload: value })
       );
       return;
     case UI_REQUEST.REQUEST_PASSPHRASE:
       if (msg.payload.deviceOnly) {
         HardwareSDK.uiResponse({
+          ...msg.payload.responseCorrelation,
           type: UI_RESPONSE.RECEIVE_PASSPHRASE,
           payload: { value: '', passphraseOnDevice: true, save: false },
         });
@@ -182,6 +185,7 @@ const handleUiEvent = (msg: UiEventMessage) => {
       }
       openPassphraseModal(({ value, onDevice, save }) =>
         HardwareSDK.uiResponse({
+          ...msg.payload.responseCorrelation,
           type: UI_RESPONSE.RECEIVE_PASSPHRASE,
           payload: { value: onDevice ? "" : value, passphraseOnDevice: onDevice, attachPinOnDevice: false, save },
         })
@@ -205,7 +209,7 @@ HardwareSDK.on(UI_EVENT, handleUiEvent);
 | Method/Firmware (400–418) | Bad params, firmware required, forbidden path | Validate HD path; [Firmware Update](/en/hardware-sdk/firmware-update) |
 | Transport (600–603) | Transport not configured, concurrent call | Check `env`, serialize calls |
 | Bluetooth (700–722) | Scan/permission/connect/timeout | Permission, proximity; do not loop on a stale bond |
-| Runtime/Bridge (800–822) | PIN cancelled, Bridge timeout | Retry or start Bridge |
+| Runtime/Bridge (800–822) | PIN cancelled, Bridge timeout | Respect cancellation; recover the connection without automatically replaying signing |
 | Web device (901–902) | WebUSB not authorized | HTTPS + user gesture |
 
 Map `payload.code`, not `payload.error` text. Definitions: [`HardwareError.ts`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/shared/src/HardwareError.ts).

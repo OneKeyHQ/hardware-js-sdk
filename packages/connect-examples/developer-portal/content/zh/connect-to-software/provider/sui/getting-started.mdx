@@ -7,10 +7,12 @@ import { Callout } from 'nextra/components'
 
 # 快速开始
 
+签名前请求权限、选择已连接账户，并读取当前链。这些示例使用 `@mysten/sui@1.28.2`，与当前 provider 接受的 `@mysten/wallet-standard@0.14.7` 匹配。
+
 了解如何检测、连接和与 Sui 进行交互。
 
 <Callout type="info">
-OneKey 实现了 Sui Wallet Standard，确保与所有 Sui dApp 兼容。
+OneKey 实现 Sui Wallet Standard，可用于兼容该标准的集成。
 </Callout>
 
 ---
@@ -18,11 +20,11 @@ OneKey 实现了 Sui Wallet Standard，确保与所有 Sui dApp 兼容。
 ## Provider 检测
 
 ```typescript
-// 检测 OneKey Sui provider
+// Detect OneKey Sui provider
 const provider = window.$onekey?.sui
 
 if (!provider) {
-  throw new Error('未检测到 OneKey Sui provider')
+  throw new Error('OneKey Sui provider not detected')
 }
 ```
 
@@ -31,12 +33,12 @@ if (!provider) {
 ## 检查权限
 
 ```typescript
-// 检查是否已连接
+// Check if already connected
 const hasPermission = await provider.hasPermissions()
 
 if (hasPermission) {
   const accounts = await provider.getAccounts()
-  console.log('已连接的账户:', accounts)
+  console.log('Connected accounts:', accounts)
 }
 ```
 
@@ -45,12 +47,39 @@ if (hasPermission) {
 ## 请求连接
 
 ```typescript
-// 请求连接权限
+// Request permissions to connect
 const result = await provider.requestPermissions()
 
 if (result) {
   const accounts = await provider.getAccounts()
-  console.log('已连接:', accounts[0].address)
+  console.log('Connected:', accounts[0].address)
+}
+```
+
+---
+
+<span id="获取签名账户" />
+
+## 签名所需的账户上下文
+
+安装 `@mysten/wallet-standard@0.14.7`。注入式 provider 的 `getAccounts()` 返回 `AccountInfo[]`，不是签名方法要求的 `WalletAccount`。下方辅助函数通过 Wallet Standard 获取完整账户。在钱包注册后，由用户操作触发调用；处理拒绝请求，并在账户或网络变化后重新连接。
+
+```typescript
+import { getWallets, isWalletWithRequiredFeatureSet } from '@mysten/wallet-standard'
+
+async function connectSuiAccount() {
+  const wallet = getWallets().get().find(wallet => wallet.name === 'OneKey Wallet')
+  if (!wallet || !isWalletWithRequiredFeatureSet(wallet)) {
+    throw new Error('OneKey Sui Wallet Standard is not available')
+  }
+
+  const { accounts } = await wallet.features['standard:connect'].connect()
+  const [account] = accounts
+  const chain = await provider.getActiveChain()
+  if (!account || !chain || !account.chains.includes(chain)) {
+    throw new Error('No connected Sui account for the active chain')
+  }
+  return { account, chain }
 }
 ```
 
@@ -63,8 +92,8 @@ const accounts = await provider.getAccounts()
 
 accounts.forEach(account => {
   console.log({
-    address: account.address,     // Sui 地址
-    publicKey: account.publicKey, // 公钥（hex 字符串）
+    address: account.address,     // Sui address
+    publicKey: account.publicKey, // Public key (hex string)
   })
 })
 ```
@@ -76,7 +105,7 @@ accounts.forEach(account => {
 ```typescript
 const chain = await provider.getActiveChain()
 
-console.log('当前链:', chain) // 例如 'sui:testnet'
+console.log('Active chain:', chain) // e.g., 'sui:testnet'
 ```
 
 ---
@@ -85,7 +114,7 @@ console.log('当前链:', chain) // 例如 'sui:testnet'
 
 ```typescript
 const isConnected = provider.isConnected()
-console.log('已连接:', isConnected)
+console.log('Connected:', isConnected)
 ```
 
 ---
@@ -105,9 +134,9 @@ await provider.disconnect()
 ```typescript
 provider.onAccountChange((account) => {
   if (account) {
-    console.log('账户已变更:', account.address)
+    console.log('Account changed:', account.address)
   } else {
-    console.log('已断开连接')
+    console.log('Disconnected')
   }
 })
 ```
@@ -116,7 +145,7 @@ provider.onAccountChange((account) => {
 
 ```typescript
 provider.onNetworkChange((network) => {
-  console.log('网络已变更:', network)
+  console.log('Network changed:', network)
 })
 ```
 
@@ -124,15 +153,15 @@ provider.onNetworkChange((network) => {
 
 ## 使用 Sui Wallet Kit
 
-对于 React 应用，使用官方的 Sui Wallet Kit：
+此 React 示例使用下方锁定的兼容版本：
 
 ```bash
-npm install @mysten/dapp-kit @mysten/sui.js @tanstack/react-query
+npm install @mysten/dapp-kit@0.16.0 @mysten/sui@1.28.2 @tanstack/react-query@^5
 ```
 
 ```tsx
 import { SuiClientProvider, WalletProvider } from '@mysten/dapp-kit'
-import { getFullnodeUrl } from '@mysten/sui.js/client'
+import { getFullnodeUrl } from '@mysten/sui/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const queryClient = new QueryClient()

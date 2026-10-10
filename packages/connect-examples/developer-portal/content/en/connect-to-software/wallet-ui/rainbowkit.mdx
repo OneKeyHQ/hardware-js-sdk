@@ -7,10 +7,10 @@ import { Callout } from 'nextra/components'
 
 # RainbowKit
 
-React wallet connection UI with built-in OneKey support. RainbowKit provides a beautiful, customizable wallet modal that works out of the box.
+RainbowKit provides a React wallet chooser and a built-in OneKey connector.
 
 <Callout type="info">
-OneKey is included in RainbowKit's default wallet list. No additional configuration is required for basic integration.
+RainbowKit provides a built-in `oneKeyWallet` connector. Include it explicitly in your wallet list, as shown below.
 </Callout>
 
 ---
@@ -18,25 +18,27 @@ OneKey is included in RainbowKit's default wallet list. No additional configurat
 ## Installation
 
 ```bash
-npm install @rainbow-me/rainbowkit wagmi viem @tanstack/react-query
+npm install @rainbow-me/rainbowkit@^2 wagmi@^2 viem@^2 @tanstack/react-query@^5
 ```
 
 ---
 
 ## Basic Setup
 
-OneKey is automatically available in RainbowKit's wallet list:
+This example uses RainbowKit 2, wagmi 2, viem 2, and TanStack Query 5. It explicitly includes OneKey in the wallet chooser:
 
 ```tsx filename="App.tsx"
 import '@rainbow-me/rainbowkit/styles.css'
 import { getDefaultConfig, RainbowKitProvider, ConnectButton } from '@rainbow-me/rainbowkit'
+import { oneKeyWallet, injectedWallet, walletConnectWallet } from '@rainbow-me/rainbowkit/wallets'
 import { WagmiProvider } from 'wagmi'
 import { mainnet, polygon, arbitrum, optimism } from 'wagmi/chains'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const config = getDefaultConfig({
   appName: 'My dApp',
-  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // Get from cloud.walletconnect.com
+  wallets: [{ groupName: 'Wallets', wallets: [oneKeyWallet, injectedWallet, walletConnectWallet] }],
+  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // Get from cloud.reown.com
   chains: [mainnet, polygon, arbitrum, optimism],
 })
 
@@ -104,12 +106,16 @@ import { darkTheme, lightTheme } from '@rainbow-me/rainbowkit'
     borderRadius: 'medium',
   })}
 >
+  <ConnectButton />
+</RainbowKitProvider>
 ```
 
 ### Modal Size
 
 ```tsx
 <RainbowKitProvider modalSize="compact">
+  <ConnectButton />
+</RainbowKitProvider>
 ```
 
 ---
@@ -119,12 +125,12 @@ import { darkTheme, lightTheme } from '@rainbow-me/rainbowkit'
 Use wagmi hooks after connection:
 
 ```tsx
-import { useAccount, useBalance, useSendTransaction } from 'wagmi'
+import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { useAccount, useBalance } from 'wagmi'
 
 function Wallet() {
   const { address, isConnected } = useAccount()
   const { data: balance } = useBalance({ address })
-  const { sendTransaction } = useSendTransaction()
 
   if (!isConnected) return <ConnectButton />
 
@@ -143,4 +149,4 @@ function Wallet() {
 
 - [RainbowKit Documentation](https://www.rainbowkit.com/docs/introduction)
 - [Wagmi Documentation](https://wagmi.sh)
-- [Get WalletConnect Project ID](https://cloud.walletconnect.com)
+- [Get WalletConnect Project ID](https://cloud.reown.com)

@@ -4,9 +4,9 @@ title: 检测 Provider
 
 # 检测 Provider
 
-只有在终端用户浏览器中安装了 OneKey 扩展时，你才能调用某些 provider 方法。
+部分 provider 方法需要用户在浏览器中安装 OneKey 扩展后才能调用。
 
-要检测扩展是否已安装，你可以调用异步方法 `detectWalletInstalled`。
+调用异步方法 `detectWalletInstalled`，检查扩展是否已安装。
 
 如果未安装 OneKey，我们建议将用户重定向到[我们的网站](https://www.onekey.so)。完整代码如下所示。
 
@@ -18,4 +18,3 @@ if (installed) {
   window.open('https://www.onekey.so');
 }
 ```
-

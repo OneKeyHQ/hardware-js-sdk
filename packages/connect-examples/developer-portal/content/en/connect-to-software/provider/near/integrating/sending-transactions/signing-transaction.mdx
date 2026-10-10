@@ -4,12 +4,12 @@ title: Signing Transaction
 
 # Signing Transaction
 
-Signing transactions without sending.&#x20;
+Signing transactions without sending.
 
-The method call will return a [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global\_Objects/Promise) for an object containing the `signatures`.
+The method returns a Promise. Its response shape needs version-specific verification: the public provider declaration names `transactionHashes`, while the public example reads `signatures`. Do not depend on either field until you have checked the installed provider and wallet version. This signing-only request does not broadcast the transaction.
 
 ```javascript
-const transaction = ... // create Transaction first
+// `transaction` is created in the Create Transaction guide.
 
 const res = await provider.request({
   method: 'near_signTransactions',
@@ -17,5 +17,5 @@ const res = await provider.request({
     transactions: [transaction], // must be Array type
   },
 });
-console.log('near_signTransactions', res, res.signatures);
+console.log('near_signTransactions', res);
 ```

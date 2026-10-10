@@ -1,4 +1,5 @@
 ---
+description: "Select the standard or a hidden wallet and read the public identity returned by the SDK."
 title: Open Wallet Session
 ---
 
@@ -16,6 +17,7 @@ import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
 const res = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.Standard,
 });
+if (!res.success) throw new Error(res.payload.error);
 ```
 
 ### Params

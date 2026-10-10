@@ -1,10 +1,19 @@
 ---
 title: deviceSupportFeatures
+description: 读取设备功能支持对象及固件要求，避免假定全部功能可用。
 ---
 
 # deviceSupportFeatures
 
 ### 检测硬件支持的功能
+
+返回值中的能力是对象，应读取 `.support`，不能直接判断对象真假：`{ support: false }` 在 JavaScript 中仍为真值。`require` 可能表示最低固件版本。
+
+```ts
+const result = await HardwareSDK.deviceSupportFeatures(connectId);
+if (!result.success) throw new Error(result.payload.error);
+const canEnterPinOnHost = result.payload.inputPinOnSoftware.support;
+```
 
 ```typescript
 const response = await HardwareSDK.deviceSupportFeatures(connectId);
@@ -26,9 +35,9 @@ const response = await HardwareSDK.deviceSupportFeatures(connectId);
 {
     success: true,
     payload: {
-      inputPinOnSoftware: boolean, // 可以在软件端解锁设备
-      modifyHomescreen: boolean, // 可以修改壁纸
-      device: Device // 设备信息
+      inputPinOnSoftware: { support: boolean, require?: string },
+      modifyHomescreen: { support: boolean, require?: string },
+      device: Device | null
     }
 }
 ```

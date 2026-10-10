@@ -8,11 +8,9 @@ Benfen: get public key
 
 Get public key from device using BIP32 path.
 
+**Requirements**
 
-
-**Use requirement**
-
-* Firmware version required
+* Minimum firmware versions
   * Pro: 4.12.0
   * Classic 1S / Classic 1S Pure: 3.11.0
 
@@ -27,7 +25,7 @@ const result = await HardwareSDK.benfenGetPublicKey(connectId, deviceId, {
 
 **Optional common params**
 
-* `path` - _required_ `string | Array<number>` minimum length is `3`. read more
+* `path` - _required_ `string | Array<number>` SDK minimum length is `3`. [Path format](/en/hardware-sdk/concepts/common-params#hd-path)
 * `showOnOneKey` - _optional_ `boolean` whether to display public key on device
 
 Returns:

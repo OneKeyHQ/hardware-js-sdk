@@ -20,28 +20,36 @@ Solana 离线签名的 UR 注册表类型。
 
 ## 示例
 
+安装 `@keystonehq/bc-ur-registry-sol` 和 `@ngraveio/bc-ur`，并提供 Buffer 实现。能够编码注册表对象不代表设备支持该操作；请确认目标固件接受的 UR 类型。
+
+钱包应用负责提供未签名交易数据，以及设备导出的实际账户路径和主指纹。二维码渲染器应通过定时器调用 `nextFrame()`，并在签名对话框关闭时停止。以下片段只演示传输数据的编码与解码，不会提交交易。
+
+
 ### 构建 Solana 签名请求（UR）
 
 ```ts
-import { SolSignRequest, SignType } from '@keystonehq/bc-ur-registry-sol';
-import { CryptoKeypath, PathComponent } from '@keystonehq/bc-ur-registry';
-import { airGapUrUtils } from '@keystonehq/keystone-sdk';
+import { SolSignRequest, SignType, CryptoKeypath, PathComponent } from '@keystonehq/bc-ur-registry-sol';
+
 
 // BIP44: m/44'/501'/0'
 const keypath = new CryptoKeypath([
   new PathComponent({ index: 44, hardened: true }),
   new PathComponent({ index: 501, hardened: true }),
   new PathComponent({ index: 0, hardened: true }),
-]);
+], Buffer.from(masterFingerprintHex, 'hex'));
+
+const requestId = globalThis.crypto.randomUUID();
+const requestIdBytes = Buffer.from(requestId.replace(/-/g, ''), 'hex');
 
 const req = new SolSignRequest({
-  signData: Buffer.from(rawTxBytes), // 交易或消息字节
+  requestId: requestIdBytes,
+  signData: Buffer.from(rawTxBytes), // transaction or message bytes
   derivationPath: keypath,
-  signType: SignType.Transaction,    // 或 SignType.Message
+  signType: SignType.Transaction,    // or SignType.Message
 });
 
-const ur = req.toUR();
-const frames = airGapUrUtils.urToQrcode(ur);
+const encoder = req.toUREncoder(200);
+const nextFrame = () => encoder.nextPart(); // Call from your QR animation timer.
 ```
 
 ### 解码 Solana 签名（UR）
@@ -51,12 +59,18 @@ import { URDecoder } from '@ngraveio/bc-ur';
 import { SolSignature } from '@keystonehq/bc-ur-registry-sol';
 
 const dec = new URDecoder();
-// 对每个扫描的帧执行 dec.receivePart(frameString)
-if (dec.isComplete()) {
-  const ur = dec.resultUR();           // 'sol-signature'
+// dec.receivePart(frameString) for each scanned frame
+if (dec.isError()) throw new Error('QR decoding failed');
+if (dec.isSuccess()) {
+  const ur = dec.resultUR();
+  if (ur.type !== 'sol-signature') throw new Error('Expected sol-signature');
   const sig = SolSignature.fromCBOR(ur.cbor);
+  const returnedId = sig.getRequestId();
+  if (!returnedId || !returnedId.equals(requestIdBytes)) {
+    throw new Error('Signature request ID does not match');
+  }
   const signature = sig.getSignature();
-  // 将签名附加到交易并提交
+  // Verify the signer and signature against the original payload before use.
+  // Attach transaction signatures to the original transaction; return message signatures to the caller.
 }
 ```
-

@@ -5,7 +5,7 @@ description: 签名结构化数据 (EIP-712)
 
 # eth_signTypedData_v4
 
-根据 EIP-712 规范签名结构化数据。这是签名结构化数据的推荐方法，能提供更好的安全性和用户体验。
+按照 EIP-712 签署结构化数据。domain 和 schema 明确了签名上下文，但验证方仍需检查这些字段并实现重放保护。
 
 ---
 
@@ -92,7 +92,7 @@ const signature = await window.$onekey.ethereum.request({
   params: [accounts[0], JSON.stringify(typedData)]
 })
 
-console.log('签名:', signature)
+console.log('Signature:', signature)
 ```
 
 ### Permit 签名 (ERC-2612)
@@ -125,7 +125,7 @@ const permitData = {
     owner: accounts[0],
     spender: '0xSpenderAddress...',
     value: '1000000000', // 1000 USDC
-    nonce: 0,
+    nonce: tokenNonce, // Read the current permit nonce for this owner.
     deadline: Math.floor(Date.now() / 1000) + 3600
   }
 }
@@ -153,3 +153,5 @@ const signature = await window.$onekey.ethereum.request({
 - domain 中的 `chainId` 应与当前连接的链匹配
 - 用户将看到数据的可读表示形式
 - 遵循 [EIP-712](https://eips.ethereum.org/EIPS/eip-712) 规范
+
+permit 示例需要代币合约实际使用的 EIP-712 domain、当前 nonce、目标 spender、金额和截止时间。请求签名前，请替换占位值并获取 `tokenNonce`。

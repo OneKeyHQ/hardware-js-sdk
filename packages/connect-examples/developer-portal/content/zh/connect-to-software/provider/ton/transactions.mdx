@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # 交易
 
+发送请求前先连接钱包。将示例地址和 manifest URL 替换为有效值。用于身份验证时，使用服务器生成的一次性挑战，并在服务器验证证明。
+
 了解如何在 TON 上发送交易。
 
 ---
@@ -21,11 +23,11 @@ const result = await provider.send({
   id: Date.now().toString(),
   params: [
     JSON.stringify({
-      valid_until: Math.floor(Date.now() / 1000) + 600, // 10 分钟有效期
+      valid_until: Math.floor(Date.now() / 1000) + 600, // 10 min validity
       messages: [
         {
-          address: '0:1234...', // 接收地址（原始格式）
-          amount: '1000000000', // 金额（nanotons，1 TON = 10^9 nanotons）
+          address: '0:1234...', // Recipient address (raw format)
+          amount: '1000000000', // Amount in nanotons (1 TON = 10^9 nanotons)
         }
       ]
     })
@@ -33,9 +35,9 @@ const result = await provider.send({
 })
 
 if ('result' in result) {
-  console.log('交易 BOC:', result.result)
+  console.log('Transaction BOC:', result.result)
 } else {
-  console.error('交易失败:', result.error.message)
+  console.error('Transaction failed:', result.error.message)
 }
 ```
 
@@ -43,7 +45,7 @@ if ('result' in result) {
 
 ## 发送多条消息
 
-TON 每笔交易最多支持 4 条消息：
+provider 当前声明最多支持四条消息。请读取 `deviceInfo.features` 中钱包声明的上限，不要将其视为整个网络的限制：
 
 ```typescript
 const result = await provider.send({
@@ -76,10 +78,10 @@ const result = await provider.send({
 ```typescript
 import { beginCell } from '@ton/core'
 
-// 创建评论 cell
+// Create a comment cell
 const comment = beginCell()
-  .storeUint(0, 32) // 评论操作码
-  .storeStringTail('来自 dApp 的问候！')
+  .storeUint(0, 32) // comment op code
+  .storeStringTail('Hello from dApp!')
   .endCell()
 
 const result = await provider.send({
@@ -117,7 +119,7 @@ const result = await provider.send({
         {
           address: '0:contract...',
           amount: '50000000',
-          stateInit: stateInitBoc.toString('base64'), // Base64 编码的 StateInit
+          stateInit: stateInitBoc.toString('base64'), // Base64 encoded StateInit
         }
       ]
     })
@@ -148,7 +150,7 @@ function SendButton() {
     console.log('BOC:', result.boc)
   }
 
-  return <button onClick={handleSend}>发送 1 TON</button>
+  return <button onClick={handleSend}>Send 1 TON</button>
 }
 ```
 
@@ -161,19 +163,18 @@ TON 使用不同的地址格式：
 ```typescript
 import { Address } from '@ton/core'
 
-// 原始格式（provider 中使用）
+// Raw format (used in provider)
 const raw = '0:1234567890abcdef...'
 
-// 用户友好格式（可弹回）
+// User-friendly format (bounceable)
 const friendly = Address.parse(raw).toString()
-// 例如 'EQASdf...'
+// e.g., 'EQASdf...'
 
-// 不可弹回格式
+// Non-bounceable format
 const nonBounceable = Address.parse(raw).toString({ bounceable: false })
-// 例如 'UQASdf...'
+// e.g., 'UQASdf...'
 
-// 从友好格式转换为原始格式
+// Convert from friendly to raw
 const addr = Address.parse('EQASdf...')
 const rawAddress = `${addr.workChain}:${addr.hash.toString('hex')}`
 ```
-

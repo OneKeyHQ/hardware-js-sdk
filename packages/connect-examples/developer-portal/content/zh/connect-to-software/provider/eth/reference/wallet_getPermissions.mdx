@@ -34,13 +34,13 @@ const permissions = await window.$onekey.ethereum.request({
   method: 'wallet_getPermissions'
 })
 
-console.log('当前权限:', permissions)
+console.log('Current permissions:', permissions)
 
-// 检查是否已连接
+// Check if connected
 const isConnected = permissions.some(
   p => p.parentCapability === 'eth_accounts'
 )
-console.log('是否已连接:', isConnected)
+console.log('Is connected:', isConnected)
 ```
 
 ### 权限检查工具
@@ -59,7 +59,7 @@ async function checkPermissions() {
 
 const { hasAccounts } = await checkPermissions()
 if (!hasAccounts) {
-  // 请求连接
+  // Request connection
   await window.$onekey.ethereum.request({
     method: 'eth_requestAccounts'
   })
@@ -82,3 +82,5 @@ if (!hasAccounts) {
 - 不会提示用户进行任何操作
 - 适合在不触发弹窗的情况下检查连接状态
 - 遵循 [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255) 规范
+
+请处理目标钱包版本不支持该方法时返回的错误。账户权限与 RPC 连接状态不同，也不代表用户预先批准了签名或交易。基础账户连接使用 `eth_requestAccounts`。

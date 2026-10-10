@@ -1,4 +1,5 @@
 import nextra from 'nextra'
+import { publishedLocaleCodes } from './i18n/locales.mjs'
 import { execSync } from 'child_process'
 import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
@@ -10,7 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const getVersionInfo = () => {
   try {
     // Try to get SDK version from core package
-    const corePkgPath = resolve(__dirname, '../core/package.json')
+    const corePkgPath = resolve(__dirname, '../../core/package.json')
     const corePkg = JSON.parse(readFileSync(corePkgPath, 'utf-8'))
     const sdkVersion = corePkg.version || 'dev'
 
@@ -45,6 +46,7 @@ const normalizedAssetPrefix =
   (normalizedBasePath ? normalizedBasePath : '')
 
 const withNextra = nextra({
+  defaultShowCopyCode: true,
   contentDirBasePath: '/',
   unstable_shouldAddLocaleToLinks: true,
   // Syntax highlighting configuration
@@ -75,7 +77,7 @@ export default withNextra({
   // Required by Nextra for page-map generation
   // Note: This is Nextra-specific, not standard App Router i18n
   i18n: {
-    locales: ['en', 'zh'],
+    locales: publishedLocaleCodes,
     defaultLocale: 'en'
   },
   // Version info - CI env vars take precedence over local git info

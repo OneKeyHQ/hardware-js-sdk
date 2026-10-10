@@ -6,7 +6,7 @@ title: nemSignTransaction
 
 ### NEM：签名交易 <a href="#cardano-sign-transaction" id="cardano-sign-transaction"></a>
 
-对指定交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+请求交易签名。用户在设备上核对并确认请求。
 
 ```typescript
 const response = await HardwareSDK.nemSignTransaction(connectId, deviceId, params)
@@ -16,7 +16,7 @@ const response = await HardwareSDK.nemSignTransaction(connectId, deviceId, param
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
 * `transaction` - _必需_ `NEMTransaction` 类型
 
 #### NEMTransaction 类型
@@ -164,8 +164,8 @@ HardwareSDK.nemSignTransaction(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

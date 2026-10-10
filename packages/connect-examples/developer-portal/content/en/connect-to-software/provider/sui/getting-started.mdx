@@ -7,10 +7,12 @@ import { Callout } from 'nextra/components'
 
 # Getting Started
 
+Request permission before signing, select a connected account, and read the active chain. These examples use `@mysten/sui@1.28.2`, matching `@mysten/wallet-standard@0.14.7` accepted by the current provider.
+
 Learn how to detect, connect, and interact with Sui using OneKey's provider.
 
 <Callout type="info">
-OneKey implements the Sui Wallet Standard, ensuring compatibility with all Sui dApps.
+OneKey implements the Sui Wallet Standard, for compatible wallet-standard integrations.
 </Callout>
 
 ---
@@ -51,6 +53,31 @@ const result = await provider.requestPermissions()
 if (result) {
   const accounts = await provider.getAccounts()
   console.log('Connected:', accounts[0].address)
+}
+```
+
+---
+
+## Account Context for Signing
+
+Install `@mysten/wallet-standard@0.14.7`. The injected provider's `getAccounts()` returns `AccountInfo[]`, not the `WalletAccount` required by signing methods. The following helper obtains the full account through Wallet Standard. Call it from a user action after wallet registration; handle rejection and reconnect after account or network changes.
+
+```typescript
+import { getWallets, isWalletWithRequiredFeatureSet } from '@mysten/wallet-standard'
+
+async function connectSuiAccount() {
+  const wallet = getWallets().get().find(wallet => wallet.name === 'OneKey Wallet')
+  if (!wallet || !isWalletWithRequiredFeatureSet(wallet)) {
+    throw new Error('OneKey Sui Wallet Standard is not available')
+  }
+
+  const { accounts } = await wallet.features['standard:connect'].connect()
+  const [account] = accounts
+  const chain = await provider.getActiveChain()
+  if (!account || !chain || !account.chains.includes(chain)) {
+    throw new Error('No connected Sui account for the active chain')
+  }
+  return { account, chain }
 }
 ```
 
@@ -124,15 +151,15 @@ provider.onNetworkChange((network) => {
 
 ## Using with Sui Wallet Kit
 
-For React applications, use the official Sui Wallet Kit:
+This React example uses the compatible package versions pinned below:
 
 ```bash
-npm install @mysten/dapp-kit @mysten/sui.js @tanstack/react-query
+npm install @mysten/dapp-kit@0.16.0 @mysten/sui@1.28.2 @tanstack/react-query@^5
 ```
 
 ```tsx
 import { SuiClientProvider, WalletProvider } from '@mysten/dapp-kit'
-import { getFullnodeUrl } from '@mysten/sui.js/client'
+import { getFullnodeUrl } from '@mysten/sui/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const queryClient = new QueryClient()

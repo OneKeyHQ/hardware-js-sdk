@@ -4,9 +4,9 @@ title: Watch Accounts & Network Status
 
 # Watch Accounts & Network Status
 
-The OneKey provider emit some events, which you can watch the connected accounts or network changed from, and update states to your web applications.
+The provider emits account and network events. Listen for these events to refresh account state and network-specific data in your application.
 
-### Add Event Listerners
+## Add Event Listeners
 
 ```javascript
 // accountsChanged
@@ -24,7 +24,7 @@ const onNetworkChanged = (payload) => {
 provider.on('networkChanged', onNetworkChanged);
 ```
 
-### Remove Event Listerners
+### Remove Event Listeners
 
 Also, don't forget to remove listeners once you are done listening to them (for example on component unmount in React):
 

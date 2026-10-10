@@ -7,10 +7,12 @@ import { Callout } from 'nextra/components'
 
 # Getting Started
 
+Connect the provider before signing and confirm the selected network. The direct injected provider and the Aptos Wallet Standard adapter have different argument types; do not interchange their examples. Replace abbreviated addresses and provide an SDK client for read-only calls.
+
 Learn how to detect, connect, and interact with Aptos using OneKey's provider.
 
 <Callout type="info">
-OneKey's Aptos provider is fully compatible with the Petra wallet interface and Aptos Wallet Standard.
+OneKey exposes Petra-compatible methods and an Aptos Wallet Standard adapter. Their method signatures differ; use the interface documented for your integration.
 </Callout>
 
 ---
@@ -100,7 +102,7 @@ await provider.disconnect()
 ```typescript
 provider.onAccountChange((newAccount) => {
   if (newAccount) {
-    console.log('Account changed:', newAccount.address)
+    console.log('Account changed:', newAccount)
   } else {
     console.log('Wallet disconnected')
   }
@@ -151,5 +153,4 @@ function App() {
 }
 ```
 
-OneKey is automatically detected by the Aptos Wallet Adapter.
-
+Use a Wallet Standard-compatible adapter version and verify that OneKey appears in its discovered wallet list.

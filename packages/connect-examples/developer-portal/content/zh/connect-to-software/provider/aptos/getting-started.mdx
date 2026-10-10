@@ -7,10 +7,12 @@ import { Callout } from 'nextra/components'
 
 # 快速开始
 
+签名前先连接 provider，并确认所选网络。直接注入的 provider 与 Aptos Wallet Standard 适配器使用不同的参数类型，请勿混用示例。请替换省略的地址，并为只读请求初始化 SDK 客户端。
+
 了解如何检测、连接和与 Aptos 进行交互。
 
 <Callout type="info">
-OneKey 的 Aptos provider 完全兼容 Petra 钱包接口和 Aptos Wallet Standard。
+OneKey 提供 Petra 兼容方法和 Aptos Wallet Standard 适配器。两者的方法签名不同，请使用对应集成方式的接口。
 </Callout>
 
 ---
@@ -18,15 +20,15 @@ OneKey 的 Aptos provider 完全兼容 Petra 钱包接口和 Aptos Wallet Standa
 ## Provider 检测
 
 ```typescript
-// 检测 OneKey Aptos provider
+// Detect OneKey Aptos provider
 const provider = window.$onekey?.aptos
 
 if (!provider) {
-  throw new Error('未检测到 OneKey Aptos provider')
+  throw new Error('OneKey Aptos provider not detected')
 }
 
-// 检查 provider 信息
-console.log('Provider:', provider.isOneKey ? 'OneKey' : '未知')
+// Check provider info
+console.log('Provider:', provider.isOneKey ? 'OneKey' : 'Unknown')
 ```
 
 ---
@@ -34,12 +36,12 @@ console.log('Provider:', provider.isOneKey ? 'OneKey' : '未知')
 ## 连接钱包
 
 ```typescript
-// 连接并获取账户信息
+// Connect and get account info
 const response = await provider.connect()
 
 console.log({
-  address: response.address,     // 账户地址
-  publicKey: response.publicKey, // 公钥
+  address: response.address,     // Account address
+  publicKey: response.publicKey, // Public key
 })
 ```
 
@@ -49,7 +51,7 @@ console.log({
 
 ```typescript
 const isConnected = await provider.isConnected()
-console.log('已连接:', isConnected)
+console.log('Connected:', isConnected)
 ```
 
 ---
@@ -72,9 +74,9 @@ console.log({
 ```typescript
 const network = await provider.network()
 
-console.log('网络:', network) // 'mainnet', 'testnet', 'devnet'
+console.log('Network:', network) // 'mainnet', 'testnet', 'devnet'
 
-// 获取完整网络信息
+// For full network info
 const networkInfo = await provider.getNetwork()
 console.log({
   name: networkInfo.name,
@@ -100,9 +102,9 @@ await provider.disconnect()
 ```typescript
 provider.onAccountChange((newAccount) => {
   if (newAccount) {
-    console.log('账户已变更:', newAccount.address)
+    console.log('Account changed:', newAccount)
   } else {
-    console.log('钱包已断开连接')
+    console.log('Wallet disconnected')
   }
 })
 ```
@@ -111,7 +113,7 @@ provider.onAccountChange((newAccount) => {
 
 ```typescript
 provider.onNetworkChange((network) => {
-  console.log('网络已变更:', network)
+  console.log('Network changed:', network)
 })
 ```
 
@@ -122,10 +124,10 @@ provider.onNetworkChange((network) => {
 OneKey 的 Aptos provider 与 Petra 兼容。更新您的 provider 检测方式：
 
 ```typescript
-// 之前 (仅 Petra)
+// Before (Petra only)
 const provider = window.petra
 
-// 之后 (OneKey 优先，Petra 作为备选)
+// After (OneKey with Petra fallback)
 const provider = window.$onekey?.aptos || window.petra
 ```
 
@@ -151,5 +153,4 @@ function App() {
 }
 ```
 
-OneKey 会被 Aptos Wallet Adapter 自动检测。
-
+使用兼容 Wallet Standard 的适配器版本，并确认自动发现的钱包列表中包含 OneKey。

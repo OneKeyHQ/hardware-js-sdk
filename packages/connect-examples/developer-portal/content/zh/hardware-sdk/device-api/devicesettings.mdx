@@ -1,5 +1,6 @@
 ---
 title: deviceSettings
+description: 按协议及功能支持情况修改用户选择的设备设置。
 ---
 
 # deviceSettings
@@ -16,27 +17,37 @@ const result = await HardwareSDK.deviceSettings(connectId, params);
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `language` - _可选_ `string` 设备语言，[ISO 639-1 代码](https://en.wikipedia.org/wiki/List\_of\_ISO\_639-1\_codes)
-* `label` - _可选_ `string` 设备名称
-* `usePassphrase` - _可选_ `boolean` 是否开启 Passphrase
-* `homescreen` - _可选_ `string` 通过十六进制字符串修改主屏幕壁纸（仅 Protocol V1）
-* `autoLockDelayMs` - _可选_ `number` 自动锁定时间（毫秒）
-* `displayRotation` - _可选_ `number` 屏幕旋转角度（仅 Protocol V1）
-* `passphraseAlwaysOnDevice` - _可选_ `boolean` 不提示输入 Passphrase，强制在设备上输入（仅 Protocol V1）
-*   `safetyChecks` - _可选_ `number` Enum_SafetyCheckLevel 数值（仅 Protocol V1）
+| 参数 | 类型 | 可用范围与含义 |
+| --- | --- | --- |
+| `language` | `string` | 设备支持的语言代码；核对所安装 SDK 的设置能力。 |
+| `label` | `string` | 设备显示名称。 |
+| `usePassphrase` | `boolean` | 请求更改密码短语保护设置，需要设备确认。 |
+| `autoLockDelayMs` | `number` | 自动锁定延迟；Protocol V2 只接受列举的选项，不是任意毫秒值。 |
+| `autoShutdownDelayMs` | `number` | 自动关机延迟；Protocol V2 只接受列举的选项。 |
+| `hapticFeedback`、`bluetoothEnabled` | `boolean` | 随设备能力变化的触觉反馈和蓝牙设置。 |
+| `homescreen` | `string` | Protocol V1 主屏幕数据。 |
+| `passphraseSource` | `number` | Protocol V1 密码短语输入源设置。 |
+| `passphraseAlwaysOnDevice` | `boolean` | Protocol V1 设备端输入策略。 |
+| `displayRotation` | `number` | Protocol V1 显示旋转。 |
+| `safetyChecks` | `Enum_SafetyCheckLevel` | Protocol V1 安全策略。除非用户明确请求受支持的变更，否则保留严格检查。 |
+| `experimentalFeatures` | `boolean` | Protocol V1 实验性消息支持。 |
+| `changeBrightness` | `boolean` | Protocol V1 设备端亮度调整流程。 |
+| `brightness` | `number` | Protocol V2 亮度，必须在支持范围内。 |
+| `airgapMode` | `boolean` | Protocol V2 设备端 Air-Gap 设置流程。 |
+| `animationEnabled`、`tapToWake`、`deviceNameDisplayEnabled` | `boolean` | Protocol V2 显示与交互设置。 |
+| `fidoEnabled`、`usbLockEnabled`、`randomKeypad` | `boolean` | Protocol V2 安全相关设置。 |
 
-    0: Strict
-    1: PromptAlways
-    2: PromptTemporarily
+当前 [`DeviceSettingsParams` 类型](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/api/deviceSettings.ts)定义了公开字段。不支持当前协议的字段会被拒绝。展示设置控件前，读取已连接设备的设置和能力；类型中存在某字段不代表所有机型都支持它。
 
-* `experimentalFeatures` - _可选_ `boolean` 启用实验性消息类型（仅 Protocol V1）
+只更改用户选中的设置。密码短语保护或连接设置可能影响当前流程，操作后应刷新状态；宿主弹窗关闭不代表设备操作成功。
 
 ## 示例
 
 ```typescript
-HardwareSDK.deviceSettings(connectId, {
+const result = await HardwareSDK.deviceSettings(connectId, {
     label: 'My OneKey Wallet'
 });
+if (!result.success) throw new Error(result.payload.error);
 ```
 
 ## 返回结果
