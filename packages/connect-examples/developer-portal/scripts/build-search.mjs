@@ -1,4 +1,5 @@
 import { createIndex, close } from 'pagefind';
+import { publishedLocaleCodes } from '../i18n/locales.mjs';
 import { mkdtemp, readdir, readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -6,7 +7,7 @@ import { join, dirname } from 'node:path';
 // Include example code while leaving ignored navigation and controls out of search.
 const staging = await mkdtemp(join(tmpdir(), 'onekey-docs-search-'));
 try {
-  for (const language of ['en', 'zh']) {
+  for (const language of publishedLocaleCodes) {
     const source = `out/${language}`;
     const directory = join(staging, language);
     for (const file of await readdir(source, { recursive: true })) {

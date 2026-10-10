@@ -1,5 +1,7 @@
 'use client';
 
+import { ui, translateCopy } from '../i18n/ui.mjs'
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
@@ -333,7 +335,11 @@ const sanitizeOutgoingMessages = messages => {
 function ChatWidgetRuntime({ apiUrl, lang }) {
   const pathname = usePathname();
   const isZh = lang === 'zh';
-  const copy = useMemo(() => getWidgetCopy(isZh), [isZh]);
+  const copy = useMemo(() => {
+    const result = translateCopy(lang, getWidgetCopy(false));
+    result.searchCount = count => ui(lang, 'Results: {count}', '{count} 条结果').replace('{count}', new Intl.NumberFormat(lang).format(count));
+    return result;
+  }, [isZh, lang]);
   const hasChatApi = Boolean(apiUrl);
   const chatApiUrl = apiUrl;
 
@@ -902,8 +908,8 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                 <span className={styles.askAiBridgeText}>{copy.askAiBridgeLabel}</span>
                 {activeSearchIndex === -1 ? <kbd className={styles.askAiBridgeKbd}>↵</kbd> : null}
               </button>
-              <p className={styles.searchSectionTitle}>{searchInput.trim() ? copy.searchListTitle : (isZh ? '从这里开始' : 'Start here')}</p>
-              <div id="docs-search-results" role="listbox" aria-label={isZh ? "文档搜索结果" : "Documentation results"} className={styles.searchResultList} aria-busy={searchStatus === 'loading'}>
+              <p className={styles.searchSectionTitle}>{searchInput.trim() ? copy.searchListTitle : (ui(lang, "Start here", "从这里开始"))}</p>
+              <div id="docs-search-results" role="listbox" aria-label={ui(lang, "Documentation results", "文档搜索结果")} className={styles.searchResultList} aria-busy={searchStatus === 'loading'}>
                 {filteredSearchResults.length > 0 ? (
                   filteredSearchResults.map((item, index) => {
                     const isActive = index === activeSearchIndex;
@@ -928,7 +934,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                   })
                 ) : (
                   <div className={styles.searchEmpty}>
-                    <p role="status">{searchStatus === 'loading' ? (isZh ? '正在搜索全部文档…' : 'Searching all documentation…') : searchStatus === 'error' ? (isZh ? '暂时无法加载搜索索引。请重试或使用文档导航。' : 'Search is temporarily unavailable. Try again or browse the documentation navigation.') : copy.searchEmpty}</p>
+                    <p role="status">{searchStatus === 'loading' ? (ui(lang, "Searching all documentation…", "正在搜索全部文档…")) : searchStatus === 'error' ? (ui(lang, "Search is temporarily unavailable. Try again or browse the documentation navigation.", "暂时无法加载搜索索引。请重试或使用文档导航。")) : copy.searchEmpty}</p>
                     {searchStatus !== 'loading' && <>
                       <p className={styles.askHint}>{hasChatApi ? copy.askHint : copy.askUnavailable}</p>
                       <button type="button" className={styles.askFromSearch} onClick={handleOpenAskFromSearch}>
@@ -957,9 +963,9 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                     <span className={styles.assistantLabelText}>{copy.assistantLabel}</span>
                   </div>
                   <p className={styles.greeting}>
-                    {isZh ? '向我询问任何关于\u00a0' : 'Ask me anything about\u00a0'}
+                    {ui(lang, "Ask me anything about ", "向我询问任何关于 ")}
                     <span className={styles.brandChip}>OneKey</span>
-                    {isZh ? '\u00a0的问题。' : '.'}
+                    {ui(lang, ".", " 的问题。")}
                   </p>
                   <p className={styles.askDesc}>{copy.askDescription}</p>
                   <p className={styles.emptySection}>{copy.exampleQuestionsTitle}</p>

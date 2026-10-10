@@ -1,0 +1,134 @@
+{
+  "669ea6ae1af369c967b7a112ce8170e1c508dcb13d9f13fbfb275af3078aa402": {
+    "source": "Edit this page",
+    "translation": "Editar esta página"
+  },
+  "9d56132edd497a9a3de99e0e658d0e025d2e76c6fc3ad86568b0b18295abd585": {
+    "source": "On This Page",
+    "translation": "En esta página"
+  },
+  "4e0739cdf17aa252eec7d788e284a9e13b64d6ef177277930bcf04d5807352c4": {
+    "source": "On this page",
+    "translation": "En esta página"
+  },
+  "f920a02686f41844ee0269e91f28e08a62af23156246b83fa60d7f1ba83f7d87": {
+    "source": "Back to top",
+    "translation": "Volver arriba"
+  },
+  "0637b4fae00aa90b6529a3e9694a1f7838ce3164727d2045c3831cda2683ef59": {
+    "source": "Light",
+    "translation": "Claro"
+  },
+  "04993f72a8d64f32317b686210aebffdbe1bd86a16725b41a4634b8685f8934f": {
+    "source": "Dark",
+    "translation": "Oscuro"
+  },
+  "2786bf59ab63c3d53747c9bfeb65d8daa1b53447c31875bf56c8d78b834b0e8f": {
+    "source": "System",
+    "translation": "Sistema"
+  },
+  "34e3790474b2a68adb76b89d350b2f7adcc3ae375455bf239045cd430e272871": {
+    "source": "Search",
+    "translation": "Buscar"
+  },
+  "14194bb0a8901068f08121919d34f7f239831dd944c6a926c3d329bf4812c4d4": {
+    "source": "Search documentation",
+    "translation": "Buscar en la documentación"
+  },
+  "de2015b245cbd6266c5c49d62550b4fe2d7b05068e6fa397d37b3b2333e23efa": {
+    "source": "Open search",
+    "translation": "Abrir búsqueda"
+  },
+  "3ad824b1d12ddb43fdb6c9ae9a3abf2bcf32e357f48526b92a40230e36180b11": {
+    "source": "Open navigation menu",
+    "translation": "Abrir menú de navegación"
+  },
+  "9da0864ab75752e83b63cad83b1cc587c320ff80c414c2f129f63949de7cc27a": {
+    "source": "Switch theme",
+    "translation": "Cambiar tema"
+  },
+  "3abe65294ed4e4aa7c8874ea83552571623d9fa6725f52f45e64ccda0e35b85f": {
+    "source": "Switch to light mode",
+    "translation": "Cambiar al modo claro"
+  },
+  "809a68991dc515e42f5f3c489bb121e9053e5a4b4ac9a7d83a9299973e60e302": {
+    "source": "Switch to dark mode",
+    "translation": "Cambiar al modo oscuro"
+  },
+  "7931a4cfc1203d1258936237f0d1d80fa2de0846919942255b6b424d23ce3580": {
+    "source": "Language",
+    "translation": "Idioma"
+  },
+  "d2f4c10da3b613e522ed747adacfa5ce905d1a7f6af193ef2d3e5c4b239f77f1": {
+    "source": "Copy page",
+    "translation": "Copiar página"
+  },
+  "35152e8123c5500023da7d3804d142e243f23c0dc1939dff869bb2aa4ba1654f": {
+    "source": "Copied",
+    "translation": "Copiado"
+  },
+  "33213345b82d261d4cd608539585ff674ea981a51fbaf0363cd8c306605db45c": {
+    "source": "Copy failed. Try again",
+    "translation": "No se pudo copiar. Inténtalo de nuevo"
+  },
+  "d1cc9479da455b8c897d310fe134bcc8a58b19dcea72a46062509ce4f4951739": {
+    "source": "More page actions",
+    "translation": "Más acciones de página"
+  },
+  "199f49d98ec9c854d2b8aec1dd6752392052fda9875bb0419f32efa1814c8573": {
+    "source": "Open in ChatGPT",
+    "translation": "Abrir en ChatGPT"
+  },
+  "aba28f738764153803403bd66c5969279bb9a61aa61b9e6cc7bcaaaa15fd9e88": {
+    "source": "Open in Claude",
+    "translation": "Abrir en Claude"
+  },
+  "2dc14af41c6ad3bc1d76d4737477ed6d066d278121fb73fc9bd63f1847c63ea3": {
+    "source": "Choose an integration",
+    "translation": "Elegir una integración"
+  },
+  "c700440b9a312244b296aa99ae3bb37377220ae600dd63daa2cbb13cf14de385": {
+    "source": "Connect a dApp",
+    "translation": "Conectar una dApp"
+  },
+  "28e96787f325ae4bfcfe2c18c64297ce90b310f723d069ce48878f898e436a17": {
+    "source": "Hardware SDK quickstart",
+    "translation": "Inicio rápido del SDK de hardware"
+  },
+  "a972c97c730f2011834ced4b03ec52ef0f0a852e60b86086fcef929555f0df10": {
+    "source": "Troubleshoot an integration",
+    "translation": "Solucionar problemas de integración"
+  },
+  "29b4ebe2680216400eafdfc7df4b79dbe4a36f3801bdaa7dd326228d840d6452": {
+    "source": "Search chains...",
+    "translation": "Buscar una blockchain…"
+  },
+  "b6c4b80859ca2b03c39a7a919d9a18abf223e308f395fda267389cfbdb4e6ca2": {
+    "source": "No chains found",
+    "translation": "No se encontraron blockchains"
+  },
+  "1e32be5d18086ae6d260e378c6ef55289dc401b448e72dfe159d8e16fd4f25ec": {
+    "source": "Select a chain",
+    "translation": "Seleccionar una blockchain"
+  },
+  "4854c12affbc7e0b76433c6e26caa1c63163582f161597e42a493da003439e4a": {
+    "source": "Chain Methods",
+    "translation": "Métodos por blockchain"
+  },
+  "6bb4ae886cc79da056c2c3e1e31ff68a1110a45520549f6fe40b31dc5cfd5fe2": {
+    "source": "Home page",
+    "translation": "Inicio"
+  },
+  "0eb9fe951e871bccb0b74de48015436aadcbee4b1a3344fb3f6676aaef9e5fe8": {
+    "source": "Start here",
+    "translation": "Empieza aquí"
+  },
+  "6140dc5f9e2477a09b5acb6c6cab3cb376197c3b3b2f9dd2c6748677ccc1db3c": {
+    "source": "Documentation results",
+    "translation": "Resultados de documentación"
+  },
+  "e10b865fff7571a16c865249cb012f5a3e7c100858cbf75af5fd356fa97262ad": {
+    "source": "Searching all documentation…",
+    "translation": "Buscando en toda la documentación…"
+  }
+}

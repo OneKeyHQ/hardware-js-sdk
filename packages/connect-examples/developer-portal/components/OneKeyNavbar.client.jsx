@@ -1,5 +1,7 @@
 'use client'
 
+import { ui } from '../i18n/ui.mjs'
+import { localeFromPath } from '../i18n/locales.mjs'
 import { useCallback } from 'react'
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react'
 import cn from 'clsx'
@@ -126,7 +128,7 @@ export function OneKeySidebarSearch({ lang }) {
       onClick={() => emitDocsAIOpen(DOCS_AI_TAB.SEARCH)}
     >
       <SearchIcon size={15} aria-hidden="true" />
-      <span>{lang === 'zh' ? '搜索文档' : 'Search documentation'}</span>
+      <span>{ui(lang, 'Search documentation')}</span>
     </button>
   )
 }
@@ -135,8 +137,8 @@ export function OneKeyClientNavbar({ children, className }) {
   const items = useConfig().normalizePagesResult.topLevelNavbarItems
   const pathname = useFSRoute()
   const menu = useMenu()
-  const isZh = pathname?.startsWith('/zh')
-  const searchText = isZh ? '搜索' : 'Search'
+  const locale = localeFromPath(pathname || '/')
+  const searchText = ui(locale, 'Search')
 
   const handleOpenSearch = useCallback(() => {
     emitDocsAIOpen(DOCS_AI_TAB.SEARCH)
@@ -188,7 +190,7 @@ export function OneKeyClientNavbar({ children, className }) {
         type="button"
         className={`${styles.assistButton} ${styles.searchButton}`}
         onClick={handleOpenSearch}
-        aria-label={isZh ? '打开搜索' : 'Open search'}
+        aria-label={ui(locale, 'Open search')}
       >
         <SearchIcon size={15} />
         <span className={styles.buttonLabel}>{searchText}</span>
@@ -206,10 +208,10 @@ export function OneKeyClientNavbar({ children, className }) {
     <>
       <div className={navClass}>{navItems}</div>
       {assistActions}
-      <ThemeToggle locale={isZh ? 'zh' : 'en'} />
+      <ThemeToggle locale={locale} />
       {children}
       <Button
-        aria-label={isZh ? '打开导航菜单' : 'Open navigation menu'}
+        aria-label={ui(locale, 'Open navigation menu')}
         aria-expanded={menu}
         className={cn('nextra-hamburger x:lg:hidden', menu && 'x:bg-gray-400/20')}
         onClick={() => setMenu((prev) => !prev)}

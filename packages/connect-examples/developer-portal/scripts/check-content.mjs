@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 export const contentHash = value => createHash('sha256').update(value).digest('hex');
 
 // Review hashes detect drift; they do not certify translation quality.
-export function validateContent(files, review, migration, hash = contentHash) {
+export function validateContent(files, review, migration, hash = contentHash, synchronized = {}) {
   const errors = [];
   const names = new Set(Object.keys(files).map(file => file.replace(/^content\/(en|zh)\//, '')));
   for (const name of names) {
@@ -15,7 +15,9 @@ export function validateContent(files, review, migration, hash = contentHash) {
     if (en === undefined) errors.push(`Missing English page: ${name}`);
     if (zh === undefined) errors.push(`Missing Chinese page: ${name}`);
     const recorded = review.pages[name];
-    if (en !== undefined && zh !== undefined && (!recorded || recorded.en !== hash(en) || recorded.zh !== hash(zh))) {
+    const generated = synchronized[name];
+    const synchronizedPair = generated?.mode === 'generated' && generated.sourceHash === hash(en || '') && generated.outputHash === hash(zh || '');
+    if (en !== undefined && zh !== undefined && !synchronizedPair && (!recorded || recorded.en !== hash(en) || recorded.zh !== hash(zh))) {
       errors.push(`Bilingual review required: ${name}`);
     }
   }
@@ -52,7 +54,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const files = await readContent(root);
   const review = JSON.parse(await readFile(join(root, 'docs/content-review.json'), 'utf8'));
   const migration = JSON.parse(await readFile(join(root, 'docs/gitbook-migration.json'), 'utf8'));
-  const errors = validateContent(files, review, migration);
+  const translationManifest = JSON.parse(await readFile(join(root, 'i18n/manifest.json'), 'utf8'));
+  const errors = validateContent(files, review, migration, contentHash, translationManifest.locales.zh);
   if (errors.length) {
     console.error(errors.join('\n'));
     console.error('\nReview both languages, then update only the reviewed entries in docs/content-review.json. See docs/content-maintenance.md.');

@@ -3,6 +3,7 @@ import { AgentWalletDisclaimer } from './components/AgentWalletBetaTitle.js'
 import MdxImage from './components/MdxImage.jsx'
 import DocPageTools from './components/DocPageTools.client.jsx'
 import { removeLinks } from 'nextra/remove-links'
+import { localeCodes } from './i18n/locales.mjs'
 
 const docsComponents = getDocsMDXComponents()
 const docsWrapper = docsComponents.wrapper
@@ -14,12 +15,13 @@ export function useMDXComponents(components) {
     wrapper: (props) => {
       const filePath = props?.metadata?.filePath || ''
       const isLanding =
-        filePath.endsWith('content/zh/index.mdx') || filePath.endsWith('content/en/index.mdx')
+        /content\/[^/]+\/index\.mdx$/.test(filePath)
       if (isLanding) {
         return <>{props.children}</>
       }
 
-      const locale = filePath.includes('content/zh/') ? 'zh' : 'en'
+      const pageLocale = filePath.match(/content\/([^/]+)\//)?.[1]
+      const locale = localeCodes.includes(pageLocale) ? pageLocale : 'en'
       const isAgentWallet = /\/agent-wallet\//.test(filePath)
       const isCampaign = filePath.endsWith('/agent-wallet/index.mdx')
       const isInteractive = filePath.endsWith('/hardware-sdk/playground.mdx') || filePath.endsWith('/changelog.mdx')

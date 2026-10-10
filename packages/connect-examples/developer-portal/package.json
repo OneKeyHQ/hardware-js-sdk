@@ -7,10 +7,14 @@
     "dev:webpack": "next dev --webpack -p 3001",
     "dev:ai-gateway": "node ./scripts/context7-chat-gateway.mjs",
     "sync:changelog": "node ./scripts/sync-changelog.mjs",
-    "build": "yarn check:content && next build && node scripts/build-search.mjs",
+    "build": "yarn check:content && yarn i18n:check && next build && node scripts/build-search.mjs",
     "start": "npx serve@latest out",
     "clean": "rimraf out .next",
-    "check:content": "node --test scripts/check-content.test.mjs && node scripts/check-content.mjs"
+    "check:content": "node --test scripts/check-content.test.mjs && node scripts/check-content.mjs",
+    "i18n:plan": "node scripts/i18n/sync.mjs",
+    "i18n:sync": "node scripts/i18n/sync.mjs --write",
+    "i18n:check": "node --test scripts/i18n/*.test.mjs && node scripts/i18n/sync.mjs --check",
+    "i18n:extract-ui": "node scripts/i18n/extract-ui.mjs"
   },
   "dependencies": {
     "@ai-sdk/react": "3.0.110",
@@ -42,6 +46,13 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
-    "baseline-browser-mapping": "^2.9.7"
+    "baseline-browser-mapping": "^2.9.7",
+    "@babel/parser": "7.29.9",
+    "unified": "11.0.5",
+    "remark-parse": "11.0.0",
+    "remark-mdx": "3.1.1",
+    "remark-frontmatter": "5.0.0",
+    "yaml": "2.9.1",
+    "github-slugger": "2.0.0"
   }
 }

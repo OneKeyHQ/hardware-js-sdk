@@ -1,5 +1,7 @@
 'use client'
 
+import { ui, translateCopy } from '../i18n/ui.mjs'
+
 import Image from 'next/image'
 import { Check, X } from 'lucide-react'
 
@@ -111,7 +113,7 @@ export function DeviceCompatibilityTable({ locale = 'en' }) {
     }
   }
 
-  const t = labels[isZh ? 'zh' : 'en']
+  const t = translateCopy(locale, labels.en)
 
   return (
     <div className="my-6">
@@ -174,7 +176,7 @@ export function DeviceCompatibilityTable({ locale = 'en' }) {
                         {device.name}
                       </div>
                       <div className="text-sm text-zinc-500">
-                        {device.description[isZh ? 'zh' : 'en']}
+                        {isZh ? device.description.zh : ui(locale, device.description.en)}
                       </div>
                     </div>
                   </div>

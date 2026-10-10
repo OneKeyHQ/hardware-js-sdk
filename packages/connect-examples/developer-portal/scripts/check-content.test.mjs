@@ -24,3 +24,11 @@ test('rejects unreviewed additions, removed pages, and duplicate source entries'
   assert.ok(validateContent({}, review, mapping, value => value).some(error => error.includes('Stale review entry')));
   assert.ok(validateContent(pages, review, { ...mapping, pages: [...mapping.pages, ...mapping.pages] }, value => value).some(error => error.includes('Duplicate GitBook source')));
 });
+
+test('generated translation hashes allow synchronized pairs but never stale or missing content', () => {
+  const changed = { ...pages, 'content/en/a.mdx': 'Updated', 'content/zh/a.mdx': '已更新' };
+  const generated = { 'a.mdx': { mode: 'generated', sourceHash: 'Updated', outputHash: '已更新' } };
+  assert.deepEqual(validateContent(changed, review, mapping, value => value, generated), []);
+  assert.ok(validateContent({ ...changed, 'content/zh/a.mdx': 'stale' }, review, mapping, value => value, generated).some(error => error.includes('Bilingual review')));
+  assert.ok(validateContent({ 'content/en/a.mdx': 'Updated' }, review, mapping, value => value, generated).some(error => error.includes('Missing Chinese')));
+});

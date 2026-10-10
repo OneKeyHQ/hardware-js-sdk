@@ -1,11 +1,13 @@
 'use client'
 
+import { ui } from '../i18n/ui.mjs'
+
 import { useEffect, useRef, useState } from 'react'
 import { Copy, Check, ChevronDown, ArrowUpRight } from 'lucide-react'
 import { useConfig } from 'nextra-theme-docs'
 
 export default function DocPageTools({ sourceCode, locale, toc = [] }) {
-  const isZh = locale === 'zh'
+
   const { normalizePagesResult: { activeThemeContext } } = useConfig()
   const toolsRef = useRef(null)
   const [copyState, setCopyState] = useState('idle')
@@ -49,17 +51,17 @@ export default function DocPageTools({ sourceCode, locale, toc = [] }) {
   }
 
   const copyLabel = copyState === 'copied'
-    ? (isZh ? '已复制' : 'Copied')
+    ? (ui(locale, 'Copied', '已复制'))
     : copyState === 'failed'
-      ? (isZh ? '复制失败，请重试' : 'Copy failed. Try again')
-      : (isZh ? '复制页面' : 'Copy page')
+      ? (ui(locale, 'Copy failed. Try again', '复制失败，请重试'))
+      : (ui(locale, 'Copy page', '复制页面'))
 
   return (
     <div ref={toolsRef} className="doc-page-tools" data-pagefind-ignore>
       {activeThemeContext.toc && toc.length > 0 && (
         <details className="doc-mobile-toc">
-          <summary>{isZh ? '本页目录' : 'On this page'}<ChevronDown size={14} aria-hidden="true" /></summary>
-          <nav aria-label={isZh ? '本页目录' : 'On this page'}>
+          <summary>{ui(locale, 'On this page', '本页目录')}<ChevronDown size={14} aria-hidden="true" /></summary>
+          <nav aria-label={ui(locale, 'On this page', '本页目录')}>
             {toc.map(item => (
               <a key={item.id} href={`#${item.id}`} data-depth={item.depth}
                 onClick={event => { event.currentTarget.closest('details').open = false }}>
@@ -76,10 +78,10 @@ export default function DocPageTools({ sourceCode, locale, toc = [] }) {
             {copyLabel}
           </button>
           <details className="doc-assistant-links">
-            <summary aria-label={isZh ? '更多页面操作' : 'More page actions'}><ChevronDown size={14} aria-hidden="true" /></summary>
+            <summary aria-label={ui(locale, 'More page actions', '更多页面操作')}><ChevronDown size={14} aria-hidden="true" /></summary>
             <div>
-              <button type="button" onClick={() => openAssistant('chatgpt')}>{isZh ? '在 ChatGPT 中打开' : 'Open in ChatGPT'}<ArrowUpRight size={13} aria-hidden="true" /></button>
-              <button type="button" onClick={() => openAssistant('claude')}>{isZh ? '在 Claude 中打开' : 'Open in Claude'}<ArrowUpRight size={13} aria-hidden="true" /></button>
+              <button type="button" onClick={() => openAssistant('chatgpt')}>{ui(locale, 'Open in ChatGPT', '在 ChatGPT 中打开')}<ArrowUpRight size={13} aria-hidden="true" /></button>
+              <button type="button" onClick={() => openAssistant('claude')}>{ui(locale, 'Open in Claude', '在 Claude 中打开')}<ArrowUpRight size={13} aria-hidden="true" /></button>
             </div>
           </details>
         </div>

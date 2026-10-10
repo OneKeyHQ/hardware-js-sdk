@@ -1,4 +1,6 @@
+import { ui } from '../../i18n/ui.mjs'
 import { Layout, LastUpdated } from 'nextra-theme-docs'
+import { publishedLocales, publishedLocaleCodes } from '../../i18n/locales.mjs'
 import { getPageMap } from 'nextra/page-map'
 import { OneKeyWordmark } from '../../components/OneKeyLogo'
 import { NavbarMenuActiveMarker } from '../../components/NavbarMenuActiveMarker'
@@ -10,7 +12,7 @@ import DocAIChatWidget from '../../components/DocAIChatWidget.client'
 // Static params for i18n routing (Next.js App Router pattern)
 // See: https://nextjs.org/docs/app/guides/internationalization#static-rendering
 export async function generateStaticParams() {
-  return [{ lang: 'en' }, { lang: 'zh' }]
+  return publishedLocaleCodes.map(lang => ({ lang }))
 }
 
 // Menu structure is defined in content/{lang}/_meta.js using type: 'menu'
@@ -41,24 +43,21 @@ export default async function LocaleLayout({ children, params }) {
         search={<OneKeySidebarSearch lang={lang} />}
         pageMap={pageMap}
         docsRepositoryBase="https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/developer-portal"
-        i18n={[
-          { locale: 'en', name: 'English' },
-          { locale: 'zh', name: '简体中文' }
-        ]}
+        i18n={publishedLocales.map(({ code, name }) => ({ locale: code, name }))}
         sidebar={{
           defaultMenuCollapseLevel: 1,
           toggleButton: true
         }}
-        editLink={lang === 'zh' ? '编辑此页面' : 'Edit this page'}
+        editLink={ui(lang, 'Edit this page', '编辑此页面')}
         feedback={{ content: null }}
         toc={{
-          title: lang === 'zh' ? '本页内容' : 'On This Page',
-          backToTop: lang === 'zh' ? '返回顶部' : 'Back to top'
+          title: ui(lang, 'On This Page', '本页内容'),
+          backToTop: ui(lang, 'Back to top', '返回顶部')
         }}
-        lastUpdated={<LastUpdated locale={lang}>{lang === 'zh' ? '最后更新于' : 'Last updated on'}</LastUpdated>}
+        lastUpdated={<LastUpdated locale={lang}>{ui(lang, 'Last updated on', '最后更新于')}</LastUpdated>}
         navigation={true}
         copyPageButton={false}
-        themeSwitch={{ light: lang === 'zh' ? '浅色' : 'Light', dark: lang === 'zh' ? '深色' : 'Dark', system: lang === 'zh' ? '跟随系统' : 'System' }}
+        themeSwitch={{ light: ui(lang, 'Light', '浅色'), dark: ui(lang, 'Dark', '深色'), system: ui(lang, 'System', '跟随系统') }}
         darkMode={true}
         nextThemes={{ defaultTheme: 'light' }}
         footer={<Footer key="onekey-footer" />}

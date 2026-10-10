@@ -1,6 +1,9 @@
 'use client'
 
+import { ui } from '../i18n/ui.mjs'
+
 import { useTheme } from 'next-themes'
+import { publishedLocales, localizedPath } from '../i18n/locales.mjs'
 import { usePathname, useRouter } from 'next/navigation'
 import { Sun, Moon, Monitor, Globe, ChevronDown } from 'lucide-react'
 import { useState, useEffect } from 'react'
@@ -15,7 +18,7 @@ export function ThemeToggle({ locale = 'en' }) {
 
   if (!mounted) {
     return (
-      <button type="button" disabled aria-label={locale === 'zh' ? '切换主题' : 'Switch theme'} className="portal-theme-toggle p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group">
+      <button type="button" disabled aria-label={ui(locale, 'Switch theme', '切换主题')} className="portal-theme-toggle p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group">
         <Monitor className="w-4 h-4 text-zinc-500 group-hover:text-zinc-900 dark:group-hover:text-zinc-200 transition-colors" />
       </button>
     )
@@ -34,10 +37,10 @@ export function ThemeToggle({ locale = 'en' }) {
   return (
     <button
       type="button"
-      aria-label={locale === 'zh' ? (resolvedTheme === 'dark' ? '切换浅色模式' : '切换深色模式') : (resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode')}
+      aria-label={ui(locale, resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode')}
       onClick={cycleTheme}
       className="portal-theme-toggle p-2 rounded-lg bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group"
-      title={locale === 'zh' ? (resolvedTheme === 'dark' ? '切换浅色模式' : '切换深色模式') : (resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode')}
+      title={ui(locale, resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode')}
     >
       {resolvedTheme === 'dark' ? (
         <Moon className="w-4 h-4 text-zinc-400 group-hover:text-zinc-200 transition-colors" />
@@ -53,15 +56,12 @@ export function LanguageToggle({ locale }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
-  const languages = [
-    { code: 'en', label: 'English' },
-    { code: 'zh', label: '简体中文' }
-  ]
+  const languages = publishedLocales.map(({ code, name }) => ({ code, label: name }))
 
   const currentLang = languages.find(l => l.code === locale) || languages[0]
 
   const switchLanguage = (langCode) => {
-    const newPath = pathname.replace(`/${locale}`, `/${langCode}`)
+    const newPath = localizedPath(`${pathname}${window.location.search}${window.location.hash}`, langCode)
     router.push(newPath)
     setOpen(false)
   }
@@ -104,7 +104,7 @@ export function NavbarExtras({ locale }) {
     <div className="flex items-center gap-2">
       {/* Separator */}
       <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700 mx-1" />
-      <ThemeToggle />
+      <ThemeToggle locale={locale} />
       <LanguageToggle locale={locale} />
     </div>
   )

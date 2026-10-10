@@ -1,5 +1,7 @@
 'use client'
 
+import { ui } from '../../../../i18n/ui.mjs'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Lottie from 'lottie-react'
@@ -115,12 +117,12 @@ function PortalTourProvider({ children, defaultOpen = false, startAt = 0, steps:
 }
 
 function getDict(locale) {
-  const isEn = locale === 'en'
+
   return {
-    tourTitle: isEn ? 'Hardware Mock' : '硬件 Mock',
-    justTriggered: isEn ? 'Triggered' : '已触发',
-    guide: isEn ? 'Guide' : '操作指引',
-    close: isEn ? 'Close' : '关闭导览'
+    tourTitle: ui(locale, "Hardware Mock", "硬件 Mock"),
+    justTriggered: ui(locale, "Triggered", "已触发"),
+    guide: ui(locale, "Guide", "操作指引"),
+    close: ui(locale, "Close", "关闭导览")
   }
 }
 
@@ -224,69 +226,69 @@ function isEventStep(step) {
 
 
 function createWaitingModelSteps(locale) {
-  const isEn = locale === 'en'
+
   return [
     eventStep({
       id: 'waiting-start',
       selector: '[data-tour="send-button"]',
       placement: 'bottom',
-      tips: isEn ? 'Ready to Start' : '准备开始',
-      desc: isEn ? 'Select a command and click Send to begin the interactive tour.' : '选择命令并点击发送，开始交互式导览。',
+      tips: ui(locale, "Ready to Start", "准备开始"),
+      desc: ui(locale, "Select a command and click Send to begin the interactive tour.", "选择命令并点击发送，开始交互式导览。"),
       expect: (evt) => evt?.type === 'command.sent'
     })
   ]
 }
 
 function createSearchDevicesSteps(locale) {
-  const isEn = locale === 'en'
+
   return [
     hintStep({
       id: 'example-code',
       selector: '[data-tour="example-code"]',
       placement: 'left',
-      tips: isEn ? 'Searching Devices' : '搜索设备',
-      desc: isEn ? 'SDK is scanning for connected OneKey hardware devices.' : 'SDK 正在扫描已连接的 OneKey 硬件设备。'
+      tips: ui(locale, "Searching Devices", "搜索设备"),
+      desc: ui(locale, "SDK is scanning for connected OneKey hardware devices.", "SDK 正在扫描已连接的 OneKey 硬件设备。")
     }),
     eventStep({
       id: 'wait-result',
       selector: '[data-tour="result-panel"]',
       placement: 'left',
-      tips: isEn ? 'Waiting for Result' : '等待结果',
-      desc: isEn ? 'Device list will appear here once scanning completes.' : '扫描完成后，设备列表将显示在这里。',
+      tips: ui(locale, "Waiting for Result", "等待结果"),
+      desc: ui(locale, "Device list will appear here once scanning completes.", "扫描完成后，设备列表将显示在这里。"),
       expect: (evt) => evt?.type === 'command.result'
     }),
     hintStep({
       id: 'result',
       selector: '[data-tour="result-panel"]',
       placement: 'left',
-      tips: isEn ? 'Devices Found' : '设备已找到',
-      desc: isEn ? 'Device list is ready. Try `btcGetAddress` or `btcSignMessage` next.' : '设备列表已就绪。接下来可以尝试 `btcGetAddress` 或 `btcSignMessage`。'
+      tips: ui(locale, "Devices Found", "设备已找到"),
+      desc: ui(locale, "Device list is ready. Try `btcGetAddress` or `btcSignMessage` next.", "设备列表已就绪。接下来可以尝试 `btcGetAddress` 或 `btcSignMessage`。")
     })
   ]
 }
 
 function createCallbackAndResultSteps(locale) {
-  const isEn = locale === 'en'
+
   return [
     hintStep({
       id: 'result',
       selector: '[data-tour="result-panel"]',
       placement: 'left',
-      tips: isEn ? 'Result Ready' : '结果已返回',
-      desc: isEn ? 'The SDK response payload is shown here.' : 'SDK 返回的 payload 显示在这里。'
+      tips: ui(locale, "Result Ready", "结果已返回"),
+      desc: ui(locale, "The SDK response payload is shown here.", "SDK 返回的 payload 显示在这里。")
     }),
     hintStep({
       id: 'callback-code',
       selector: '[data-tour="callback-code"]',
       placement: 'left',
-      tips: isEn ? 'Event Callbacks' : '事件回调',
-      desc: isEn ? 'This template shows how to handle `UI_EVENT` in your app.' : '这个模板展示如何在应用中处理 `UI_EVENT`。'
+      tips: ui(locale, "Event Callbacks", "事件回调"),
+      desc: ui(locale, "This template shows how to handle `UI_EVENT` in your app.", "这个模板展示如何在应用中处理 `UI_EVENT`。")
     })
   ]
 }
 
 function createFlowSteps(locale, startEvent) {
-  const isEn = locale === 'en'
+  const isEn = locale !== 'zh'
   const command = startEvent?.command ?? null
   const params = startEvent?.params ?? null
   const deviceType = normalizeDeviceType(startEvent?.deviceType)
@@ -304,7 +306,7 @@ function createFlowSteps(locale, startEvent) {
       selector: '[data-tour="example-code"]',
       placement: 'left',
       tips: isEn ? `Command: ${command ?? '-'}` : `命令：${command ?? '-'}`,
-      desc: isEn ? 'Try `btcGetAddress` or `btcSignMessage` for the full interactive experience.' : '尝试 `btcGetAddress` 或 `btcSignMessage` 获得完整的交互体验。'
+      desc: ui(locale, "Try `btcGetAddress` or `btcSignMessage` for the full interactive experience.", "尝试 `btcGetAddress` 或 `btcSignMessage` 获得完整的交互体验。")
     }),
     ...createCallbackAndResultSteps(locale)
   ]
@@ -527,7 +529,7 @@ function createReactourSteps({ locale, dict, modelStepsRef, lastEventRef, curren
                     border: '1px solid var(--ok-tour-border)'
                   }}
                 >
-                  {locale === 'en' ? 'Back' : '上一步'}
+                  {ui(locale, "Back", "上一步")}
                 </button>
               ) : null}
 
@@ -552,7 +554,7 @@ function createReactourSteps({ locale, dict, modelStepsRef, lastEventRef, curren
                     color: 'var(--ok-tour-bg)'
                   }}
                 >
-                  {locale === 'en' ? 'Next' : '下一步'} →
+                  {ui(locale, "Next", "下一步")} →
                 </button>
               ) : isLast ? (
                 <button
@@ -564,7 +566,7 @@ function createReactourSteps({ locale, dict, modelStepsRef, lastEventRef, curren
                     color: 'var(--ok-tour-bg)'
                   }}
                 >
-                  {locale === 'en' ? 'Done' : '完成'}
+                  {ui(locale, "Done", "完成")}
                 </button>
               ) : isEvent ? (
                 <button
@@ -581,7 +583,7 @@ function createReactourSteps({ locale, dict, modelStepsRef, lastEventRef, curren
                     className="inline-flex h-1.5 w-1.5 animate-pulse rounded-full"
                     style={{ background: 'var(--ok-tour-muted)' }}
                   />
-                  {locale === 'en' ? 'Waiting…' : '等待中…'}
+                  {ui(locale, "Waiting…", "等待中…")}
                 </button>
               ) : null}
             </div>

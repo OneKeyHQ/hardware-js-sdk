@@ -1,0 +1,109 @@
+name: Sync Developer Documentation Translations
+
+on:
+  push:
+    branches: [onekey]
+    paths:
+      - packages/connect-examples/developer-portal/content/en/**
+      - packages/connect-examples/developer-portal/i18n/ui/en.json
+      - packages/connect-examples/developer-portal/i18n/manifest.json
+      - packages/connect-examples/developer-portal/components/**
+      - packages/connect-examples/developer-portal/app/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: developer-docs-translations
+  cancel-in-progress: false
+
+jobs:
+  translate:
+    if: github.ref == 'refs/heads/onekey' && vars.DOCS_TRANSLATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: packages/connect-examples/developer-portal
+    steps:
+      # Never check out or execute an unreviewed translation PR with credentials.
+      - uses: actions/checkout@v4
+        with:
+          ref: onekey
+          fetch-depth: 0
+      - name: Check pending translation review
+        id: pending
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          existing=$(gh pr list --state open --base onekey --limit 100 --json headRefName --jq '[.[] | select(.headRefName | startswith("docs/automated-translations-"))] | length')
+          if test "$existing" -gt 0; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+            echo 'A translation PR is awaiting review. Merge or close it before the next sync. Merging its manifest triggers a fresh check.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.pending.outputs.skip != 'true'
+        with:
+          node-version: '22'
+      - name: Install locked portal dependencies
+        if: steps.pending.outputs.skip != 'true'
+        run: yarn install --frozen-lockfile --ignore-scripts
+      - name: Test translation pipeline
+        if: steps.pending.outputs.skip != 'true'
+        run: node --test scripts/i18n/*.test.mjs
+      - name: Extract UI source messages
+        if: steps.pending.outputs.skip != 'true'
+        run: yarn i18n:extract-ui
+      - name: Translate changed English content
+        if: steps.pending.outputs.skip != 'true'
+        env:
+          DOCS_TRANSLATION_API_KEY: ${{ secrets.DOCS_TRANSLATION_API_KEY }}
+          DOCS_TRANSLATION_BASE_URL: ${{ vars.DOCS_TRANSLATION_BASE_URL }}
+          DOCS_TRANSLATION_MODEL: ${{ vars.DOCS_TRANSLATION_MODEL }}
+          DOCS_TRANSLATION_MAX_REQUESTS: ${{ vars.DOCS_TRANSLATION_MAX_REQUESTS }}
+        run: yarn i18n:sync
+      - name: Validate synchronized content
+        if: steps.pending.outputs.skip != 'true'
+        run: yarn i18n:check
+      - name: Build translated portal
+        if: steps.pending.outputs.skip != 'true'
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: yarn build
+      - name: Preserve completed batches for recovery
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: translation-progress-${{ github.run_id }}
+          path: packages/connect-examples/developer-portal/i18n/catalogs/
+          retention-days: 7
+      - name: Open translation review
+        if: steps.pending.outputs.skip != 'true'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TRANSLATION_BRANCH: docs/automated-translations-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          git add packages/connect-examples/developer-portal/content packages/connect-examples/developer-portal/i18n
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$TRANSLATION_BRANCH"
+          git commit -m 'docs: synchronize developer portal translations'
+          git push origin "$TRANSLATION_BRANCH"
+          body_file=$(mktemp)
+          cat > "$body_file" <<'BODY'
+          Updates translated developer documentation from the current English source. Unchanged translation units are reused; code and technical placeholders are preserved.
+
+          Translation pipeline tests, source/output consistency checks and the production portal build passed in this workflow. Review terminology, warnings and rendered pages before merging. This workflow does not merge or deploy.
+          BODY
+          gh pr create --draft --base onekey --head "$TRANSLATION_BRANCH" --title 'docs: synchronize developer portal translations' --body-file "$body_file"

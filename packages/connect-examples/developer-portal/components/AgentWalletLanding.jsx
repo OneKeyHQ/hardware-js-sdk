@@ -1,5 +1,7 @@
 'use client'
 
+import { ui, translateCopy } from '../i18n/ui.mjs'
+
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -166,7 +168,7 @@ const copyByLocale = {
   },
 }
 
-const getCopy = (locale) => copyByLocale[locale] ?? copyByLocale.en
+const getCopy = (locale) => translateCopy(locale, copyByLocale.en)
 
 const getCardHref = (basePath, href) =>
   href.includes('#')
@@ -350,7 +352,7 @@ export function AgentWalletLanding({ locale = 'en' }) {
                   </p>
                 </div>
                 <span className="mt-7 inline-flex items-center gap-1.5 text-[16px] font-semibold text-[#16D629]">
-                  {locale === 'zh' ? '查看文档' : 'Read docs'}
+                  {ui(locale, "Read docs", "查看文档")}
                   <ArrowUpRight className="size-4" aria-hidden="true" />
                 </span>
               </Link>
