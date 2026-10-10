@@ -13,6 +13,12 @@ import type { CancelReason } from '../../signer/deviceActionToPromise';
 export interface ConnectorContext {
   emit<K extends ConnectorEventType>(event: K, data: ConnectorEventMap[K]): void;
   invalidateSession(sessionId: string): void;
+  /**
+   * Teardown for OS-level actions that open a manager-api secure channel.
+   * Fires the in-flight canceller so DMK closes that channel, then invalidates
+   * the session's cached managers. Keeps the DMK device session alive.
+   */
+  teardownSecureChannelSession(sessionId: string): void;
   wrapError(err: unknown, opts?: WrapErrorOptions): Error;
   getOrCreateDmk(): Promise<DeviceManagementKit>;
   getDeviceManager(): Promise<LedgerDeviceManager>;

@@ -1,4 +1,4 @@
-import { HardwareErrorCode, failure, success } from '../index';
+import { HardwareErrorCode, defaultRecoveryForCode, failure, success } from '../index';
 
 import type { Response } from '../index';
 
@@ -19,6 +19,7 @@ describe('response helpers', () => {
       expect(result.success).toBe(false);
       expect(result.payload.code).toBe(HardwareErrorCode.DeviceNotFound);
       expect(result.payload.error).toBe('No device detected');
+      expect(result.payload.recovery).toEqual({ scope: 'operation' });
     });
 
     it('should create a failure response for user rejection', () => {
@@ -32,7 +33,24 @@ describe('response helpers', () => {
     it('should keep Failure payload vendor-agnostic (no appName / Ledger fields)', () => {
       const result = failure(HardwareErrorCode.DeviceNotFound, 'msg');
       expect('appName' in result.payload).toBe(false);
-      expect(Object.keys(result.payload).sort()).toEqual(['code', 'error']);
+      expect(Object.keys(result.payload).sort()).toEqual(['code', 'error', 'recovery']);
+    });
+
+    it('allows an adapter to override the default recovery scope', () => {
+      // The override must differ from this code's default, or the assertion
+      // cannot tell an honoured override from a fallthrough.
+      expect(defaultRecoveryForCode(HardwareErrorCode.TransportError)).toEqual({
+        scope: 'operation',
+      });
+      const result = failure(
+        HardwareErrorCode.TransportError,
+        'Transient transport error',
+        undefined,
+        undefined,
+        { scope: 'call' }
+      );
+
+      expect(result.payload.recovery).toEqual({ scope: 'call' });
     });
   });
 

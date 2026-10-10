@@ -4,6 +4,8 @@ import {
   HardwareErrorCode,
   UI_REQUEST,
   UI_RESPONSE,
+  bytesToHex,
+  prepareSolanaOffchainMessageV1,
   rehydrateConnectorError,
 } from '@onekeyfe/hwk-adapter-core';
 import { protobufManager } from '@onekeyfe/hwk-trezor-protobuf';
@@ -171,6 +173,10 @@ describe('TrezorConnectorBase device resolution', () => {
     });
 
     await connector.connect('safe-7');
+    // A second confirmation step keeps the device in confirmation.
+    await capturedThpOptions?.onButtonRequestComplete?.({
+      responseType: 'ButtonRequest',
+    });
     await capturedThpOptions?.onButtonRequestComplete?.({
       responseType: 'Address',
     });
@@ -178,9 +184,7 @@ describe('TrezorConnectorBase device resolution', () => {
     expect(events).toEqual([
       {
         type: EConnectorInteraction.InteractionComplete,
-        payload: {
-          sessionId: 'safe-7',
-        },
+        payload: { sessionId: '' },
       },
     ]);
   });
@@ -1939,7 +1943,7 @@ describe('TrezorConnectorBase', () => {
     ).toBeUndefined();
   });
 
-  test('solSignMessage: surfaces MethodNotSupported (Trezor firmware lacks it)', async () => {
+  test('solSignMessage: rejects unsafe message signing without an OCMS v1 payload', async () => {
     const connector = new SessionBackedTestTrezorConnector(
       [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor', model: 'T3T1' }],
       { vendor: 'trezor.io', device_id: 'device-1', model: 'T3W1' },
@@ -1954,6 +1958,73 @@ describe('TrezorConnectorBase', () => {
       })
     ).rejects.toMatchObject({ code: 10004 });
     expect(connector.fakeSessions[0].deviceStateCalls).toEqual([]);
+  });
+
+  test('solSignMessage: sends finalized OCMS v1 and verifies signed_data', async () => {
+    const signerA = '01'.repeat(32);
+    const signerB = '02'.repeat(32);
+    const message = Buffer.from('Hello, Solana').toString('hex');
+    const signedData = bytesToHex(
+      prepareSolanaOffchainMessageV1({
+        message: Buffer.from(message, 'hex'),
+        requiredSigners: [signerB, signerA],
+      }).serializedMessage
+    );
+    const connector = new SessionBackedTestTrezorConnector(
+      [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor', model: 'T3T1' }],
+      { vendor: 'trezor.io', device_id: 'device-1', model: 'T3T1' },
+      [
+        {
+          type: 'SolanaMessageSignature',
+          message: { signature: 'ab'.repeat(64), signed_data: signedData },
+        },
+      ]
+    );
+
+    const session = await connector.connect('device-1');
+    await expect(
+      callConnector(connector, session.sessionId, 'solSignMessage', {
+        path: "m/44'/501'/0'/0'",
+        message,
+        messageVersion: 1,
+        requiredSigners: [signerB, signerA],
+      })
+    ).resolves.toEqual({ signature: 'ab'.repeat(64) });
+    expect(connector.fakeSessions[0].calls).toEqual([
+      {
+        name: 'SolanaSignMessage',
+        data: {
+          address_n: [0x8000002c, 0x800001f5, 0x80000000, 0x80000000],
+          message: {
+            message: 'Hello, Solana',
+            signers: [signerA, signerB],
+          },
+        },
+      },
+    ]);
+  });
+
+  test('solSignMessage: rejects a response that signed different OCMS bytes', async () => {
+    const connector = new SessionBackedTestTrezorConnector(
+      [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor', model: 'T3T1' }],
+      { vendor: 'trezor.io', device_id: 'device-1', model: 'T3T1' },
+      [
+        {
+          type: 'SolanaMessageSignature',
+          message: { signature: 'ab'.repeat(64), signed_data: 'ff' },
+        },
+      ]
+    );
+
+    const session = await connector.connect('device-1');
+    await expect(
+      callConnector(connector, session.sessionId, 'solSignMessage', {
+        path: "m/44'/501'/0'/0'",
+        message: Buffer.from('Hello, Solana').toString('hex'),
+        messageVersion: 1,
+        requiredSigners: ['01'.repeat(32)],
+      })
+    ).rejects.toThrow('does not match');
   });
 
   test('solGetAddress: reports invalid params with HardwareErrorCode.InvalidParams', async () => {
@@ -3566,6 +3637,42 @@ describe('TrezorConnectorBase', () => {
     });
   });
 
+  test('btcGetAddress: derives the taproot script type from a path with surrounding spaces', async () => {
+    const connector = new SessionBackedTestTrezorConnector(
+      [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor', model: 'T3W1' }],
+      { vendor: 'trezor.io', device_id: 'device-1', model: 'T3W1' },
+      [{ type: 'Address', message: { address: 'bc1ptaproot' } }]
+    );
+
+    const session = await connector.connect('device-1');
+    await callConnector(connector, session.sessionId, 'btcGetAddress', {
+      path: " m/86'/0'/0'/0/0",
+      coin: 'btc',
+    });
+
+    expect(connector.fakeSessions[0].calls[0].data).toMatchObject({
+      script_type: 'SPENDTAPROOT',
+    });
+  });
+
+  test.each([
+    ['an unknown purpose without scriptType', { path: "m/45'/0'/0'/0/0" }],
+    ['a p2wsh scriptType', { path: "m/84'/0'/0'/0/0", scriptType: 'p2wsh' }],
+    ['an addressIndex on top of the path', { path: "m/84'/0'/0'/0/0", addressIndex: 5 }],
+  ])('btcGetAddress: refuses %s instead of guessing', async (_name, request) => {
+    const connector = new SessionBackedTestTrezorConnector(
+      [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor', model: 'T3W1' }],
+      { vendor: 'trezor.io', device_id: 'device-1', model: 'T3W1' },
+      [{ type: 'Address', message: { address: 'bc1qguessed' } }]
+    );
+
+    const session = await connector.connect('device-1');
+    await expect(
+      callConnector(connector, session.sessionId, 'btcGetAddress', { ...request, coin: 'btc' })
+    ).rejects.toMatchObject({ code: HardwareErrorCode.InvalidParams });
+    expect(connector.fakeSessions[0].calls).toHaveLength(0);
+  });
+
   test('btcGetAddress: normalizes doge coin code to Dogecoin', async () => {
     const connector = new SessionBackedTestTrezorConnector(
       [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor', model: 'T3W1' }],
@@ -3776,6 +3883,61 @@ describe('TrezorConnectorBase', () => {
     });
 
     await expect(pairingPromise).resolves.toEqual({ tag: '123456' });
+  });
+
+  test('drops a rejected THP credential and keeps other devices credentials', async () => {
+    const staleCredential = { credential: 'stale' };
+    const freshCredential = { credential: 'fresh' };
+    const otherDeviceCredential = { credential: 'other-device' };
+    let capturedThp: TrezorThpSessionOptions | undefined;
+    const onPairingCredentialsChanged = jest.fn();
+
+    class CredentialConnector extends TrezorConnectorBase {
+      constructor() {
+        super({
+          connectionType: 'ble',
+          thp: {
+            knownCredentials: [staleCredential, otherDeviceCredential],
+            onPairingCredentialsChanged,
+          },
+          deviceSessionFactory: ({ thp }) => {
+            capturedThp = thp;
+            return new FakeDeviceSession(new MemoryByteTransport([]), {
+              device_id: 'device-1',
+              model: 'T3W1',
+            }) as unknown as TrezorDeviceSession;
+          },
+        });
+      }
+
+      protected async enumerateDevices() {
+        return [
+          { connectId: 'device-1', deviceId: 'device-1', name: 'Trezor Safe 7', model: 'T3W1' },
+        ];
+      }
+
+      protected async createByteTransport() {
+        return new MemoryByteTransport([]);
+      }
+    }
+
+    const connector = new CredentialConnector();
+    await connector.connect('device-1');
+
+    expect(capturedThp?.knownCredentials).toEqual([staleCredential, otherDeviceCredential]);
+    // Handshake: the device rejected its stored credential.
+    await capturedThp?.onPairingCredentialsChanged?.({
+      credentials: [],
+      removed: [staleCredential],
+    });
+    expect(capturedThp?.knownCredentials).toEqual([otherDeviceCredential]);
+    // Pairing: core reports only the new credential for this device.
+    await capturedThp?.onPairingCredentialsChanged?.({ credentials: [freshCredential] });
+
+    expect(capturedThp?.knownCredentials).toEqual([otherDeviceCredential, freshCredential]);
+    expect(onPairingCredentialsChanged).toHaveBeenLastCalledWith({
+      credentials: [freshCredential],
+    });
   });
 
   test('bridges Trezor PIN matrix request through uiResponse', async () => {

@@ -161,6 +161,29 @@ const device = (connectId: string, extra: Partial<ConnectorDevice> = {}): Connec
 });
 
 describe('createCombinedConnector', () => {
+  test('USB-only discovery never starts BLE scanning', async () => {
+    const usb = new FakeConnector('usb', [device('usb-1')]);
+    const ble = new FakeConnector('ble', [device('ble-1')]);
+    const combined = createCombinedConnector([usb, ble]);
+    expect(combined.availableTransports).toEqual(['usb', 'ble']);
+    await expect(combined.searchDevices({ transportType: 'usb' })).resolves.toEqual([
+      expect.objectContaining({ connectId: 'usb-1', connectionType: 'usb' }),
+    ]);
+    expect(usb.searchCalls).toBe(1);
+    expect(ble.searchCalls).toBe(0);
+  });
+
+  test('a known BLE locator connects directly without scanning or attempting USB', async () => {
+    const usb = new FakeConnector('usb', [device('usb-1')]);
+    const ble = new FakeConnector('ble', [device('ble-1')]);
+    const combined = createCombinedConnector([usb, ble]);
+    await combined.connect('ble-1', { transportType: 'ble' });
+    expect(ble.connectCalls).toEqual(['ble-1']);
+    expect(usb.connectCalls).toEqual([]);
+    expect(usb.searchCalls).toBe(0);
+    expect(ble.searchCalls).toBe(0);
+  });
+
   test('merges devices from every transport and stamps connectionType', async () => {
     const usb = new FakeConnector('usb', [device('usb-1')]);
     const ble = new FakeConnector('ble', [device('ble-1')]);
@@ -195,6 +218,16 @@ describe('createCombinedConnector', () => {
     const devices = await combined.searchDevices();
 
     expect(devices.map(d => d.connectId)).toEqual(['usb-1']);
+  });
+
+  test('does not disguise a transport-specific discovery error as an empty result', async () => {
+    const usb = new FakeConnector('usb', [], { scanError: new Error('USB unavailable') });
+    const ble = new FakeConnector('ble', [device('ble-1')]);
+    const combined = createCombinedConnector([usb, ble]);
+    await expect(combined.searchDevices({ transportType: 'usb' })).rejects.toThrow(
+      'USB unavailable'
+    );
+    expect(ble.searchCalls).toBe(0);
   });
 
   test('returns shortly after USB transport finds devices', async () => {
@@ -246,6 +279,17 @@ describe('createCombinedConnector', () => {
     expect(session.sessionId).toBe('usb-1');
     expect(usb.connectCalls).toEqual(['usb-1']);
     expect(ble.connectCalls).toEqual([]);
+  });
+
+  test('an explicit transport remains authoritative without a locator', async () => {
+    const usb = new FakeConnector('usb', [device('usb-1')]);
+    const ble = new FakeConnector('ble', [device('ble-1')]);
+    const combined = createCombinedConnector([usb, ble]);
+    const session = await combined.connect(undefined, { transportType: 'ble' });
+    expect(session.sessionId).toBe('ble-1');
+    expect(usb.searchCalls).toBe(0);
+    expect(usb.connectCalls).toEqual([]);
+    expect(ble.connectCalls).toEqual(['ble-1']);
   });
 
   test('connect with no devices keeps DeviceNotFound', async () => {
@@ -412,6 +456,33 @@ describe('createCombinedConnector', () => {
 
     expect(usb.knownCredentials).toEqual([creds]);
     expect(ble.knownCredentials).toEqual([creds]);
+  });
+
+  test('a credential one transport saw rejected is dropped from every transport', async () => {
+    const usb = new FakeConnector('usb', [device('usb-1')], { supportsCredentials: true });
+    const ble = new FakeConnector('ble', [device('ble-1')], { supportsCredentials: true });
+    const combined = createCombinedConnector([usb, ble]);
+    const stale = { credential: 'stale' };
+    const fresh = { credential: 'fresh' };
+    await combined.setKnownCredentials?.([stale]);
+
+    // The device rejects the stale credential: the report carries only the removal.
+    usb.emit('device-trezor-thp-credentials-changed', {
+      connectId: 'usb-1',
+      credentials: [],
+      removed: [stale],
+    });
+    await Promise.resolve();
+    expect(ble.knownCredentials.at(-1)).toEqual([]);
+
+    // Pairing again mints a fresh one; the stale one must not come back with it.
+    usb.emit('device-trezor-thp-credentials-changed', {
+      connectId: 'usb-1',
+      credentials: [fresh],
+    });
+    await Promise.resolve();
+    expect(usb.knownCredentials.at(-1)).toEqual([fresh]);
+    expect(ble.knownCredentials.at(-1)).toEqual([fresh]);
   });
 
   test('setKnownCredentials is undefined when no transport supports credentials', () => {

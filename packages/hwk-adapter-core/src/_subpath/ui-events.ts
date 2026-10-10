@@ -17,6 +17,7 @@ export { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '../events/ui-request';
 export type {
   DevicePermissionDeniedReason,
   DevicePermissionResponse,
+  UiRequestOperationAttribution,
   UiResponseEvent,
 } from '../events/ui-request';
 

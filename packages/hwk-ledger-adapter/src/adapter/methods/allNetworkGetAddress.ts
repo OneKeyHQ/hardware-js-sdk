@@ -1,6 +1,16 @@
-import { HardwareErrorCode, failure, runAllNetworkGetAddress } from '@onekeyfe/hwk-adapter-core';
+import {
+  HardwareErrorCode,
+  failure,
+  isConnectionLost,
+  isUserRefusal,
+  isWalletSafetyFailure,
+  resolveHardwareOperationTarget,
+  runAllNetworkGetAddress,
+  success,
+} from '@onekeyfe/hwk-adapter-core';
 
 import { debugLog } from '../../utils/debugLog';
+import { ledgerQueueKey } from '../../utils/queueKey';
 
 import type {
   AllNetworkAddressParams,
@@ -9,6 +19,7 @@ import type {
   AllNetworkMethodName,
   BtcAddress,
   BtcPublicKey,
+  CancelScopeHandle,
   ChainForFingerprint,
   EvmAddress,
   ICommonCallParams,
@@ -18,6 +29,16 @@ import type {
 } from '@onekeyfe/hwk-adapter-core';
 
 export type LedgerInstallAppContext = {
+  /** A bundle never reconnects between address derivation and identity attachment. */
+  connection?: { connectId: string; sessionId: string };
+  /**
+   * Whether the bundle's session holds the wallet the caller meant. `expected` is set when any
+   * item names its wallet; `verified` turns true when an item's wallet check passes. `derived`
+   * turns true once the device returned a result; an unlock after that sets `verified` false,
+   * since a second PIN may have opened another seed than the earlier results. Unchecked work
+   * needs `verified` not false, and true when a wallet is expected.
+   */
+  walletCheck?: { expected: boolean; verified?: boolean; derived?: boolean };
   deviceOutOfMemoryError?: Error;
   /**
    * Apps for which installApp has resolved (successfully or not) within
@@ -42,8 +63,25 @@ export type LedgerCallChain = <T>(
 
 export type LedgerGetChainFingerprint = (
   connectId: string,
-  chain: ChainForFingerprint
+  chain: ChainForFingerprint,
+  context: LedgerInstallAppContext
 ) => Promise<Response<string>>;
+
+export type LedgerRetainOperation = (operationId: string) => () => void;
+
+export type LedgerErrorToFailure = <T>(error: unknown) => Response<T>;
+
+/**
+ * Bundle-wide cancel scope: each item enqueues its own job, so a cancel landing
+ * between two items has no job to abort and only the scope sees it.
+ */
+export type LedgerCreateCancelScope = (queueKey: string) => CancelScopeHandle;
+
+/** Settles connection state the bundle's items shared once the last item is done. */
+export type LedgerReleaseBundle = (
+  context: LedgerInstallAppContext,
+  signal: AbortSignal
+) => Promise<void>;
 
 const LEDGER_BTC_NETWORK_COIN_MAP: Partial<Record<string, string>> = {
   tbtc: 'Testnet',
@@ -57,9 +95,17 @@ const LEDGER_UNSUPPORTED_ALLNETWORK_NETWORKS = new Set(['doge', 'dogecoin']);
 export function createAllNetworkGetAddress({
   callChain,
   getChainFingerprint,
+  retainOperation,
+  errorToFailure,
+  createCancelScope,
+  releaseBundle,
 }: {
   callChain: LedgerCallChain;
   getChainFingerprint: LedgerGetChainFingerprint;
+  retainOperation: LedgerRetainOperation;
+  errorToFailure: LedgerErrorToFailure;
+  createCancelScope: LedgerCreateCancelScope;
+  releaseBundle: LedgerReleaseBundle;
 }) {
   return async function allNetworkGetAddress(
     connectId: string,
@@ -69,61 +115,128 @@ export function createAllNetworkGetAddress({
     // Bundle-level REQ/RES. Each item inside still produces its own [REQ]/[RES]
     // pair via connectorCall — this top-level trace shows the batch shape so a
     // log reader can correlate the user's intent with the per-item activity.
-    debugLog('[LedgerAdapter][REQ]', { method: 'allNetworkGetAddress', connectId, params });
+    debugLog('[LedgerAdapter][REQ]', {
+      method: 'allNetworkGetAddress',
+      connectId,
+      itemCount: params.bundle.length,
+    });
 
-    const installContext: LedgerInstallAppContext = {};
+    const target = resolveHardwareOperationTarget(connectId, params.operationId, 'ledger');
+    if (!target.success) return target;
+
+    const effectiveTargetId = target.payload.targetId ?? '';
+    let releaseOperationRetention: (() => void) | undefined;
+    try {
+      releaseOperationRetention = target.payload.operationId
+        ? retainOperation(target.payload.operationId)
+        : undefined;
+    } catch (error) {
+      return errorToFailure(error);
+    }
+
+    // Same key connectorCall enqueues under, so LedgerAdapter.cancel() reaches
+    // this scope with the queue key it already computes.
+    const cancelScope = createCancelScope(
+      ledgerQueueKey({ operationId: target.payload.operationId, connectId: effectiveTargetId })
+    );
+
+    const installContext: LedgerInstallAppContext = {
+      walletCheck: { expected: params.bundle.some(item => Boolean(getItemDeviceId(item))) },
+    };
     const commonParams: ICommonCallParams = {
       autoInstallApp: params.autoInstallApp,
+      operationId: target.payload.operationId,
+      knownConnections: params.knownConnections,
+      extra: params.extra,
+      allowDeviceSelection: params.allowDeviceSelection,
+      supportedTransports: params.supportedTransports,
     };
     const chainFingerprints = new Map<ChainForFingerprint, string>();
+    // An item without a deviceId derives only after an item with one proved the wallet on this
+    // connection, so those run first; responses keep the caller's order.
+    const order = params.bundle
+      .map((_item, index) => index)
+      .sort(
+        (a, b) =>
+          Number(Boolean(getItemDeviceId(params.bundle[b]))) -
+          Number(Boolean(getItemDeviceId(params.bundle[a])))
+      );
 
-    const result = await runAllNetworkGetAddress({
-      connectId,
-      deviceId: _deviceId,
-      params,
-      normalizeItem: normalizeLedgerAllNetworkItem,
-      buildUnsupportedNetworkResponse: item =>
-        isUnsupportedLedgerAllNetworkNetwork(item)
-          ? buildUnsupportedNetworkResponse(item)
-          : undefined,
-      callItem: async ({ method, chain, item }) => {
-        const itemDeviceId = getItemDeviceId(item) ?? chainFingerprints.get(chain) ?? '';
-        return callAllNetworkMethod(
-          callChain,
-          connectId,
-          itemDeviceId,
-          method,
-          item,
-          commonParams,
-          installContext
-        );
-      },
-      attachIdentity: async ({ item, chain, payload }) =>
-        attachLedgerIdentity(
-          getChainFingerprint,
-          connectId,
-          item,
-          chain,
-          payload,
-          chainFingerprints
-        ),
-      shouldAbortBundle: isTopLevelAllNetworkFailure,
-      buildTopLevelFailure: response => {
-        const code = response.payload?.code ?? HardwareErrorCode.DeviceMismatch;
-        return failure(
-          code as HardwareErrorCode,
-          response.payload?.error ?? 'All-network get-address aborted',
-          response.payload?.params
-        );
-      },
-    });
-    debugLog('[LedgerAdapter][RES]', {
-      method: 'allNetworkGetAddress',
-      success: result.success,
-      payload: result,
-    });
-    return result;
+    try {
+      const ordered = await runAllNetworkGetAddress({
+        connectId: effectiveTargetId,
+        deviceId: _deviceId,
+        params: { ...params, bundle: order.map(index => params.bundle[index]) },
+        normalizeItem: normalizeLedgerAllNetworkItem,
+        buildUnsupportedNetworkResponse: item =>
+          isUnsupportedLedgerAllNetworkNetwork(item)
+            ? buildUnsupportedNetworkResponse(item)
+            : undefined,
+        callItem: async ({ method, chain, item }) => {
+          if (cancelScope.signal.aborted) return buildCancelledFailure(cancelScope.signal);
+          const itemDeviceId = getItemDeviceId(item) ?? chainFingerprints.get(chain) ?? '';
+          return callAllNetworkMethod(
+            callChain,
+            effectiveTargetId,
+            itemDeviceId,
+            method,
+            item,
+            commonParams,
+            installContext
+          );
+        },
+        attachIdentity: async ({ item, chain, payload }) =>
+          attachLedgerIdentity(
+            getChainFingerprint,
+            effectiveTargetId,
+            item,
+            chain,
+            payload,
+            chainFingerprints,
+            installContext,
+            cancelScope.signal
+          ),
+        shouldAbortBundle: isTopLevelAllNetworkFailure,
+        buildTopLevelFailure: response => {
+          const code = response.payload?.code ?? HardwareErrorCode.DeviceMismatch;
+          return failure(
+            code as HardwareErrorCode,
+            response.payload?.error ?? 'All-network get-address aborted',
+            response.payload?.params
+          );
+        },
+      });
+      let result = ordered;
+      if (ordered.success) {
+        const responses: AllNetworkAddressResponse[] = [];
+        ordered.payload.forEach((response, position) => {
+          responses[order[position]] = response;
+        });
+        result = success(responses);
+      }
+      debugLog('[LedgerAdapter][RES]', {
+        method: 'allNetworkGetAddress',
+        success: result.success,
+        payload: result,
+      });
+      return result;
+    } finally {
+      await releaseBundle(installContext, cancelScope.signal).catch(() => undefined);
+      cancelScope.release();
+      releaseOperationRetention?.();
+    }
   };
+}
+
+/** UserAborted is a top-level abort code, so this ends the bundle. */
+function buildCancelledFailure<T>(signal: AbortSignal): Response<T> {
+  const reason = signal.reason as { code?: unknown; message?: unknown } | undefined;
+  const code =
+    typeof reason?.code === 'number'
+      ? (reason.code as HardwareErrorCode)
+      : HardwareErrorCode.UserAborted;
+  const message = typeof reason?.message === 'string' ? reason.message : '';
+  return failure(code, message || 'All-network get-address cancelled');
 }
 
 function isTopLevelAllNetworkFailure(response: AllNetworkAddressResponse): boolean {
@@ -131,12 +244,7 @@ function isTopLevelAllNetworkFailure(response: AllNetworkAddressResponse): boole
     return false;
   }
   const code = response.payload?.code;
-  // User said "no" — SDK-dialog cancel and on-device reject both end the batch.
-  return (
-    code === HardwareErrorCode.DeviceMismatch ||
-    code === HardwareErrorCode.UserAborted ||
-    code === HardwareErrorCode.UserRejected
-  );
+  return isWalletSafetyFailure(code) || isUserRefusal(code) || isConnectionLost(code);
 }
 
 function getItemDeviceId(item: AllNetworkAddressParams): string | undefined {
@@ -184,12 +292,24 @@ async function attachLedgerIdentity(
   item: AllNetworkAddressParams,
   chain: ChainForFingerprint,
   payload: Record<string, unknown>,
-  chainFingerprints: Map<ChainForFingerprint, string>
+  chainFingerprints: Map<ChainForFingerprint, string>,
+  context: LedgerInstallAppContext,
+  cancelSignal: AbortSignal
 ): Promise<AllNetworkAddressResponse> {
+  const knownFingerprint = getItemDeviceId(item) || chainFingerprints.get(chain) || '';
+  // Bootstrapping is another device round trip, so it needs the same gap check.
+  if (!knownFingerprint && cancelSignal.aborted) {
+    const cancelled = buildCancelledFailure<never>(cancelSignal);
+    return { ...item, success: false, payload: cancelled.payload };
+  }
   const fingerprint =
-    getItemDeviceId(item) ||
-    chainFingerprints.get(chain) ||
-    (await bootstrapChainFingerprint(getChainFingerprint, connectId, chain));
+    knownFingerprint ||
+    (await bootstrapChainFingerprint(
+      getChainFingerprint,
+      context.connection?.connectId ?? connectId,
+      chain,
+      context
+    ));
 
   if (!fingerprint) {
     return buildFingerprintBootstrapFailure(item, chain);
@@ -216,9 +336,10 @@ async function attachLedgerIdentity(
 async function bootstrapChainFingerprint(
   getChainFingerprint: LedgerGetChainFingerprint,
   connectId: string,
-  chain: ChainForFingerprint
+  chain: ChainForFingerprint,
+  context: LedgerInstallAppContext
 ): Promise<string> {
-  const response = await getChainFingerprint(connectId, chain);
+  const response = await getChainFingerprint(connectId, chain, context);
   return response.success ? response.payload : '';
 }
 

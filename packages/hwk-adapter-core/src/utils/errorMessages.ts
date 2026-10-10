@@ -34,6 +34,12 @@ export function enrichErrorMessage(code: HardwareErrorCode, originalMessage: str
       return `${originalMessage}. Ensure the device bridge/transport is available and running.`;
     case HardwareErrorCode.NetworkError:
       return `${originalMessage}. Network error — check your internet connection and try again.`;
+    case HardwareErrorCode.LedgerSecureChannelError:
+      return `${originalMessage}. The secure connection to Ledger's servers was interrupted. Keep the device unlocked on the dashboard and try again.`;
+    case HardwareErrorCode.LedgerFirmwareMetadataError:
+      return `${originalMessage}. Ledger's app catalog returned an unusable response. Please try again later.`;
+    case HardwareErrorCode.AppAlreadyInstalled:
+      return `${originalMessage}. The app is already installed on the device.`;
     case HardwareErrorCode.FirmwareTooOld:
       return `${originalMessage}. Please update your device firmware.`;
     case HardwareErrorCode.DeviceNotInitialized:

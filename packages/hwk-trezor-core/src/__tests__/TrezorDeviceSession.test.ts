@@ -540,6 +540,140 @@ describe('TrezorDeviceSession', () => {
     expect(createCall?.data.passphrase).not.toBe(PASSPHRASE_COMPOSED);
   });
 
+  test.each([
+    [true, true, true],
+    [true, false, false],
+    [false, true, false],
+  ])(
+    'v1 empty-passphrase session with protection=%s and always-on-device=%s refuses: %s',
+    async (passphraseProtection, alwaysOnDevice, refuses) => {
+      const calls: CallRecord[] = [];
+      const session = new TrezorDeviceSession({
+        transport: new EmptyTransport(),
+        connectionType: 'usb',
+        coreFactory: createFactory(calls, [
+          { type: 'Features', message: features },
+          {
+            type: 'Features',
+            message: {
+              ...features,
+              passphrase_protection: passphraseProtection,
+              passphrase_always_on_device: alwaysOnDevice,
+            },
+          },
+        ]),
+      });
+      await session.initialize();
+
+      const created = session.createV1AppSession({ passphraseMode: 'empty' });
+
+      if (refuses) {
+        await expect(created).rejects.toMatchObject({
+          name: 'TrezorFailureError',
+          code: 'Failure_DataError',
+          message: expect.stringContaining('PASSPHRASE_ALWAYS_ON_DEVICE'),
+        });
+      } else {
+        await expect(created).resolves.toBeUndefined();
+      }
+    }
+  );
+
+  test.each([
+    [true, true],
+    [true, false],
+    [false, false],
+  ])(
+    'v1 empty-passphrase session on a locked device unlocks without a wallet, then with protection=%s refuses always-on-device=%s',
+    async (passphraseProtection, alwaysOnDevice) => {
+      const calls: CallRecord[] = [];
+      const session = new TrezorDeviceSession({
+        transport: new EmptyTransport(),
+        connectionType: 'usb',
+        coreFactory: createFactory(calls, [
+          { type: 'Features', message: features },
+          { type: 'Features', message: { ...features, unlocked: false } },
+          { type: 'Address', message: { address: 'tb1q' } },
+          {
+            type: 'Features',
+            message: {
+              ...features,
+              unlocked: true,
+              passphrase_protection: passphraseProtection,
+              passphrase_always_on_device: alwaysOnDevice,
+            },
+          },
+        ]),
+      });
+      await session.initialize();
+
+      const created = session.createV1AppSession({ passphraseMode: 'empty' });
+
+      if (passphraseProtection && alwaysOnDevice) {
+        await expect(created).rejects.toMatchObject({
+          code: 'Failure_DataError',
+          message: expect.stringContaining('PASSPHRASE_ALWAYS_ON_DEVICE'),
+        });
+      } else {
+        await expect(created).resolves.toBeUndefined();
+      }
+      expect(calls.map(call => call.name)).toEqual([
+        'Initialize',
+        'Initialize',
+        'GetAddress',
+        'GetFeatures',
+      ]);
+    }
+  );
+
+  test('v1 empty-passphrase unlock answers a host passphrase request with the standard wallet', async () => {
+    const calls: CallRecord[] = [];
+    const session = new TrezorDeviceSession({
+      transport: new EmptyTransport(),
+      connectionType: 'usb',
+      coreFactory: createFactory(calls, [
+        { type: 'Features', message: features },
+        { type: 'Features', message: { ...features, unlocked: false } },
+        { type: 'PassphraseRequest', message: {} },
+        { type: 'Address', message: { address: 'tb1q' } },
+        {
+          type: 'Features',
+          message: { ...features, passphrase_protection: true, passphrase_always_on_device: false },
+        },
+      ]),
+    });
+    await session.initialize();
+
+    await expect(session.createV1AppSession({ passphraseMode: 'empty' })).resolves.toBeUndefined();
+    expect(calls.map(call => call.name)).toEqual([
+      'Initialize',
+      'Initialize',
+      'GetAddress',
+      'PassphraseAck',
+      'GetFeatures',
+    ]);
+    expect(calls.find(call => call.name === 'PassphraseAck')?.data).toEqual({ passphrase: '' });
+  });
+
+  test('v1 empty-passphrase session refuses when an unlocked device still hides its passphrase setting', async () => {
+    const calls: CallRecord[] = [];
+    const session = new TrezorDeviceSession({
+      transport: new EmptyTransport(),
+      connectionType: 'usb',
+      coreFactory: createFactory(calls, [
+        { type: 'Features', message: features },
+        { type: 'Features', message: features },
+        { type: 'Address', message: { address: 'tb1q' } },
+        { type: 'Features', message: features },
+      ]),
+    });
+    await session.initialize();
+
+    await expect(session.createV1AppSession({ passphraseMode: 'empty' })).rejects.toMatchObject({
+      code: 'Failure_DataError',
+    });
+  });
+
   test('NFKD-normalizes the passphrase in PassphraseAck (v1)', async () => {
     const calls: CallRecord[] = [];
     const session = new TrezorDeviceSession({

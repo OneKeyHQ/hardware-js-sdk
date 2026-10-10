@@ -115,6 +115,45 @@ export async function runAllNetworkGetAddress({
   return success(responses);
 }
 
+/** An SDK-dialog cancel or on-device reject ends the bundle; the user already answered "no". */
+export function isUserRefusal(code: HardwareErrorCode | number | undefined): boolean {
+  return (
+    code === HardwareErrorCode.UserAborted ||
+    code === HardwareErrorCode.UserRejected ||
+    code === HardwareErrorCode.PinCancelled
+  );
+}
+
+/**
+ * The device or wallet could not be shown to be the one asked for: another wallet, a locked
+ * device, a wrong PIN or passphrase. No later item may derive on it, and a PIN is not retried.
+ */
+export function isWalletSafetyFailure(code: HardwareErrorCode | number | undefined): boolean {
+  const codes: (HardwareErrorCode | number)[] = [
+    HardwareErrorCode.DeviceMismatch,
+    HardwareErrorCode.DeviceSearchMismatch,
+    HardwareErrorCode.DeviceLocked,
+    HardwareErrorCode.PinInvalid,
+    HardwareErrorCode.PinMismatch,
+    HardwareErrorCode.PassphraseRejected,
+    HardwareErrorCode.PassphraseStateMismatch,
+    HardwareErrorCode.PassphraseAlwaysOnDevice,
+  ];
+  return code !== undefined && codes.includes(code);
+}
+
+/** The bundle's session is gone, so the remaining items have nothing to run against. */
+export function isConnectionLost(code: HardwareErrorCode | number | undefined): boolean {
+  const codes: (HardwareErrorCode | number)[] = [
+    HardwareErrorCode.DeviceDisconnected,
+    HardwareErrorCode.OperationTimeout,
+    HardwareErrorCode.TransportError,
+    HardwareErrorCode.OperationEnded,
+    HardwareErrorCode.OperationNotFound,
+  ];
+  return code !== undefined && codes.includes(code);
+}
+
 export function buildUnsupportedMethodResponse(
   item: AllNetworkAddressParams
 ): AllNetworkAddressResponse {

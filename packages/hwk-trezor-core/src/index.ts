@@ -504,7 +504,10 @@ export type TrezorThpSessionOptions = {
    * it back via `knownCredentials` on the next connect to skip pairing UX.
    */
   onPairingCredentialsChanged?: (payload: {
+    /** This device's credentials only, never other devices'. */
     credentials: TrezorThpCredentials[];
+    /** Credentials the device rejected; a host keeping one list for all devices drops these. */
+    removed?: TrezorThpCredentials[];
   }) => Promise<void> | void;
   logger?: TrezorDebugLogger;
 };
@@ -868,6 +871,47 @@ export class TrezorDeviceSession {
     const response = await this.core!.call('Initialize', {});
     this.currentFeatures = expectMessage(response, 'Features').message;
     this.thpAppSessionActive = false;
+    // v1 firmware with the passphrase always entered on the device prompts on its own screen
+    // instead of sending PassphraseRequest, so an empty passphrase cannot be enforced; refuse
+    // as THP firmware does rather than return whichever wallet the user opens.
+    if (passphraseMode === 'empty' && this.currentFeatures?.passphrase_protection == null) {
+      // Locked firmware (core >= 2.4.3) hides these private settings. Unlock with a silent testnet
+      // GetAddress, as hd-core does for older OneKey firmware; every build including bitcoin-only
+      // supports it. Its result is discarded, and the next session starts fresh via Initialize.
+      expectMessage(
+        await this.call('GetAddress', {
+          address_n: [0x8000002c, 0x80000001, 0x80000000, 0, 0],
+          coin_name: 'Testnet',
+          script_type: 'SPENDADDRESS',
+          show_display: false,
+        }),
+        'Address'
+      );
+      expectMessage(await this.call('GetFeatures', {}), 'Features');
+      if (this.currentFeatures?.passphrase_protection == null) {
+        throw new TrezorFailureError({
+          type: 'Failure',
+          message: {
+            code: 'Failure_DataError',
+            message:
+              'Empty passphrase cannot be enforced: device did not report its passphrase setting',
+          },
+        } as TrezorMessageResponse<'Failure'>);
+      }
+    }
+    if (
+      passphraseMode === 'empty' &&
+      this.currentFeatures?.passphrase_protection === true &&
+      this.currentFeatures?.passphrase_always_on_device === true
+    ) {
+      throw new TrezorFailureError({
+        type: 'Failure',
+        message: {
+          code: 'Failure_DataError',
+          message: 'Empty passphrase cannot be enforced with PASSPHRASE_ALWAYS_ON_DEVICE enabled',
+        },
+      } as TrezorMessageResponse<'Failure'>);
+    }
     this.log('info', 'v1.appSession.create.done', {
       features: summarizeFeatures(this.currentFeatures),
     });
@@ -1118,6 +1162,7 @@ class TrezorThpSession {
       this.thpState.removePairingCredential(handshakeCredentials.credentials);
       await this.options.onPairingCredentialsChanged?.({
         credentials: this.thpState.pairingCredentials as TrezorThpCredentials[],
+        removed: [handshakeCredentials.credentials as TrezorThpCredentials],
       });
     }
 
