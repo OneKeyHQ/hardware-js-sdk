@@ -127,7 +127,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'btcDeriveContextHash',
-    description: 'Derive a Babylon context hash on Classic 1s firmware 3.21.0 or later.',
+    description: 'Derive a Babylon context hash on Classic 1s / Pure firmware 3.21.0 or later.',
     presupposes: [
       {
         title: 'Derive Context Hash (Mainnet)',

@@ -67,7 +67,10 @@ export default class BTCDeriveContextHash extends BaseMethod<BabylonDeriveContex
   }
 
   getVersionRange() {
-    return { classic1s: { min: '3.21.0' } };
+    return {
+      classic1s: { min: '3.21.0' },
+      classicpure: { min: '3.21.0' },
+    };
   }
 
   async run() {

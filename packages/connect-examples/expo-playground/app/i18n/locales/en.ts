@@ -259,7 +259,7 @@ export const en = {
     methodDescriptions: {
       btcGetAddress: 'Get address for your account.',
       btcGetPublicKey: 'Get public key for your account.',
-      btcDeriveContextHash: 'Derive a Babylon context hash (Classic 1s firmware 3.21.0+).',
+      btcDeriveContextHash: 'Derive a Babylon context hash (Classic 1s / Pure firmware 3.21.0+).',
       btcSignMessage: 'Sign a message with your private key.',
       btcSignPsbt: 'Sign a PSBT (Partially Signed Bitcoin Transaction).',
       btcSignTransaction: 'Sign a transaction with your private key.',

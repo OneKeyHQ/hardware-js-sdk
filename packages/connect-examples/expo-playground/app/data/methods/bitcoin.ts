@@ -585,7 +585,7 @@ const api: UnifiedMethodConfig[] = [
   {
     method: 'btcDeriveContextHash',
     description: 'methodDescriptions.btcDeriveContextHash',
-    supportedDevices: ['classic1s'],
+    supportedDevices: ['classic1s', 'classicpure'],
     presets: [
       {
         title: 'Derive Babylon Context Hash',

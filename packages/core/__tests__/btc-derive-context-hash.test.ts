@@ -1,11 +1,12 @@
-import { EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import BTCDeriveContextHash from '../src/api/btc/BTCDeriveContextHash';
 import { findMethod } from '../src/api/utils';
 import { getLogBlockLabel, getSafeLogPayload } from '../src/events/logBlockEvent';
 import { createCoreApi } from '../src/inject';
+import { Device } from '../src/device/Device';
 
-import type { Device } from '../src/device/Device';
+import type { DeviceFirmwareRange } from '../src/types';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -133,11 +134,35 @@ describe('btcDeriveContextHash', () => {
     method.init();
     expect(method).toBeInstanceOf(BTCDeriveContextHash);
     expect(method.strictCheckDeviceSupport).toBe(true);
-    expect(method.getVersionRange()).toEqual({ classic1s: { min: '3.21.0' } });
     expect(() => method.assertProtocolSupported('V2', EFirmwareType.Universal)).toThrow(
       expect.objectContaining({ errorCode: HardwareErrorCode.DeviceNotSupportMethod })
     );
   });
+
+  test.each([EDeviceType.Classic1s, EDeviceType.ClassicPure])(
+    'resolves the firmware requirement for %s through the device support check',
+    deviceType => {
+      const method = createMethod();
+      const device = Object.create(Device.prototype) as Device;
+      device.getCurrentDeviceType = jest.fn(() => deviceType);
+      const range: DeviceFirmwareRange = method.getVersionRange();
+
+      expect(device.getCurrentMethodVersionRange(type => range[type])).toEqual({ min: '3.21.0' });
+      expect(() => method.assertProtocolSupported('V1', EFirmwareType.Universal)).not.toThrow();
+    }
+  );
+
+  test.each([EDeviceType.Classic, EDeviceType.Mini, EDeviceType.Touch, EDeviceType.Pro])(
+    'keeps %s outside the supported firmware range',
+    deviceType => {
+      const method = createMethod();
+      const device = Object.create(Device.prototype) as Device;
+      device.getCurrentDeviceType = jest.fn(() => deviceType);
+      const range: DeviceFirmwareRange = method.getVersionRange();
+
+      expect(device.getCurrentMethodVersionRange(type => range[type])).toBeUndefined();
+    }
+  );
 
   test('propagates device rejection without returning a secret', async () => {
     const method = createMethod();
