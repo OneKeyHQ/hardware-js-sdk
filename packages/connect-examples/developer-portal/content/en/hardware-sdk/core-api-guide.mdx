@@ -88,6 +88,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success || !devices.payload.length) throw new Error('No device');
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 
@@ -109,7 +111,6 @@ if (!address.success) throw new Error(address.payload.error);
 Serialize per device. Refresh `getDeviceState` after a device switch. Remove listeners on unmount. Call `HardwareSDK.dispose()` only when tearing down the transport — see [Reconnect and dispose](/en/hardware-sdk/transport/reconnect).
 
 ## Common params
-<div id="common-params" />
 
 The full table, transport matrix, combos, and HD paths moved to [Common Params](/en/hardware-sdk/concepts/common-params).
 

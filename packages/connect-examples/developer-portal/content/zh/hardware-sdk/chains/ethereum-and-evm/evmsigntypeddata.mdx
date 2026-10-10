@@ -23,7 +23,7 @@ const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, params);
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
 * `data` - _必需_ `Object` 类型为 `EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>`。JSON Schema 定义可在 EIP-712 规范中找到。
 * `metamaskV4Compat` - _必需_ `boolean` 设置为 `true` 以兼容 [MetaMask 的 signTypedData_v4](https://docs.metamask.io/metamask-connect/evm/guides/sign-data/#sign-typed-data-v4)。
 * `chainId` - _可选_ `number` ETH 中的 ChainId 是特定以太坊网络的唯一标识符，用于区分不同版本的区块链。[参考](https://github.com/ethereum-lists/chains/tree/master/_data/chains)
@@ -32,7 +32,9 @@ const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, params);
 
 传入完整的 EIP-712 对象（包括 `types.EIP712Domain`），并让 `metamaskV4Compat` 与原始请求一致。在解析流程中，设备向 SDK 请求类型定义和字段值。可展示的详情取决于机型与固件，参见 [Clear Signing 指南](/zh/hardware-sdk/signers/evm#clear-signing)。
 
-### Hash signing fallback
+<span id="hash-signing-fallback" />
+
+### 退回哈希签名
 
 SDK 选择哈希签名时，设备收到的是预先计算的哈希，而不是结构化消息。这属于盲签，不能提供结构化 Clear Signing。哈希必须使用相同编码模式从**完全相同的数据**计算；SDK 不会代为计算，也不会交叉校验传入的哈希与 `data` 是否一致。
 
@@ -49,9 +51,9 @@ SDK 选择哈希签名时，设备收到的是预先计算的哈希，而不是�
 
 上述大小检查针对 `message.data`，不是整个 JSON 文档。Classic/Mini 系列另有格式限制：每个结构最多 16 个字段、类型名/字段名最多 63 字符、数组类型字段最多 24 个、访问路径深度最多 6 层、自定义依赖结构最多 8 个（不含主类型和域）、每个 string/bytes 值最多 1,536 字节。基础类型数组最多 24 个元素；v4 模式下结构数组也有此限制。类型循环依赖同样会触发退回。
 
-提供哈希不会在解析签名可用时强制切换到哈希路径。需要退回但缺少哈希时，调用会失败。应用应明确处理此情况，不应自动替换原始请求，也不能用签名成功证明所有字段都已展示。
-
 Touch/Pro 的哈希签名要求固件 4.2.0 或更高版本。低于该版本时，进入此分支会返回 `CallMethodNeedUpgradeFirmware`。
+
+提供哈希不会在解析签名可用时强制切换到哈希路径。需要退回但缺少哈希时，调用会失败。应用应明确处理此情况，不应自动替换原始请求，也不能用签名成功证明所有字段都已展示。
 
 ### 示例
 
@@ -87,7 +89,7 @@ const eip712Data = {
     },
     message: {
         "wallet": "OneKey Wallet",
-        // 注意 JavaScript 数字：MAX_SAFE_INTEGER 相当低
+        // be careful with JavaScript numbers: MAX_SAFE_INTEGER is quite low
         "number": `${2n ** 55n}`,
     },
 };
@@ -104,7 +106,7 @@ const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
     messageHash,
     chainId: eip712Data.domain.chainId,
 });
-if (!result.success) throw new Error(result.payload.error);
+if (result.success === false) throw new Error(result.payload.error);
 ```
 
 ### Safe Tx
@@ -156,7 +158,7 @@ const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
   metamaskV4Compat: true,
   chainId: safeTypedData.domain.chainId,
 });
-if (!result.success) throw new Error(result.payload.error);
+if (result.success === false) throw new Error(result.payload.error);
 ```
 
 这里返回 owner 签名，不会广播交易。验签和收集签名时必须保留相同 Typed Data。与链上 Safe 调用的区别见 [Safe Tx 接入](/zh/hardware-sdk/signers/evm#eip-712-与-safe-tx)。
@@ -168,7 +170,7 @@ if (!result.success) throw new Error(result.payload.error);
     success: true,
     payload: {
         address: string,
-        signature: string, // 不带 "0x" 前缀的十六进制字符串
+        signature: string, // hexadecimal string without the "0x" prefix
     }
 }
 ```
@@ -179,8 +181,8 @@ if (!result.success) throw new Error(result.payload.error);
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

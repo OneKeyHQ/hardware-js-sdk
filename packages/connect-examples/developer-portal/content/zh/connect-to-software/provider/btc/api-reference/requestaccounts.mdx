@@ -4,24 +4,22 @@ title: requestAccounts
 
 # requestAccounts
 
-要开始交互，首先需要获取相应的权限。调用 requestAccounts() 会提示用户允许使用浏览器的 Web 访问功能。之后，你可以自由调用任何其他 API 方法。
+开始交互前，需要先获得相应权限。调用 `requestAccounts()` 会请求用户将 Bitcoin 账户连接到本站。请在用户点击“连接”等操作后调用。连接成功不代表用户预先批准了后续签名或付款。
 
-### 方法
+## 方法
 
 ```typescript
-async function requestAccounts(): string[]
+declare function requestAccounts(): Promise<string[]>;
 ```
 
-### 示例
+## 示例
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
 
-const accounts = async provider.requestAccounts()
-
+const accounts = await provider.requestAccounts()
 ```
 
-### 演示
+## 演示
 
-<iframe src="https://codepen.io/OneKeyHQ/pen/mdvGwga" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[打开示例](https://codepen.io/OneKeyHQ/pen/mdvGwga)

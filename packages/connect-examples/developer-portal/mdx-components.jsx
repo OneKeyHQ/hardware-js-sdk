@@ -1,6 +1,8 @@
 import { useMDXComponents as getDocsMDXComponents } from 'nextra-theme-docs'
 import { AgentWalletDisclaimer } from './components/AgentWalletBetaTitle.js'
 import MdxImage from './components/MdxImage.jsx'
+import DocPageTools from './components/DocPageTools.client.jsx'
+import { removeLinks } from 'nextra/remove-links'
 
 const docsComponents = getDocsMDXComponents()
 const docsWrapper = docsComponents.wrapper
@@ -17,25 +19,26 @@ export function useMDXComponents(components) {
         return <>{props.children}</>
       }
 
-      const agentWalletMatch = filePath.match(/content\/(en|zh)\/agent-wallet\//)
-      if (agentWalletMatch) {
-        return docsWrapper({
-          ...props,
-          children: (
-            <>
-              <AgentWalletDisclaimer locale={agentWalletMatch[1]} />
-              {props.children}
-            </>
-          ),
-        })
-      }
-
+      const locale = filePath.includes('content/zh/') ? 'zh' : 'en'
+      const isAgentWallet = /\/agent-wallet\//.test(filePath)
+      const isCampaign = filePath.endsWith('/agent-wallet/index.mdx')
+      const isInteractive = filePath.endsWith('/hardware-sdk/playground.mdx') || filePath.endsWith('/changelog.mdx')
       const design = filePath.endsWith('/hardware-sdk/getting-started.mdx')
         ? 'quickstart'
-        : filePath.endsWith('/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction.mdx')
+        : /\/(chains|basic-api|device-api|provider)\//.test(filePath)
           ? 'api'
-          : undefined
-      return docsWrapper({ ...props, 'data-onekey-design': design })
+          : 'guide'
+      return docsWrapper({
+        ...props,
+        'data-onekey-design': isCampaign || isInteractive ? undefined : design,
+        children: <>
+          {isAgentWallet && <AgentWalletDisclaimer locale={locale} />}
+          {!isCampaign && <DocPageTools locale={locale} sourceCode={props.sourceCode}
+            toc={(props.toc || []).filter(item => item.depth >= 2 && item.depth <= 4)
+              .map(item => ({ ...item, value: removeLinks(item.value) }))} />}
+          {props.children}
+        </>,
+      })
     },
     ...components,
   }

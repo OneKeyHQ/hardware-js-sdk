@@ -1,5 +1,6 @@
 ---
 title: firmwareUpdateV4
+description: 为 Protocol V2 设备提供匹配且经过验证的固件二进制。
 ---
 
 # firmwareUpdateV4
@@ -7,6 +8,8 @@ title: firmwareUpdateV4
 Protocol V2 固件升级，用于 **OneKey Pro 2** 和 **OneKey Neo**。
 
 不要在 Classic / Mini / Touch / Pro 上调用。那些设备使用 [`firmwareUpdateV2`](/zh/hardware-sdk/device-api/firmwareupdatev2) 或 [`firmwareUpdateV3`](/zh/hardware-sdk/device-api/firmwareupdatev3)。
+
+仅在用户选择目标设备并批准升级后执行。下列二进制变量应由你的发布流程提供，包含已为该机型验证的固件文件。
 
 ```ts
 const res = await HardwareSDK.firmwareUpdateV4(connectId, {
@@ -17,6 +20,7 @@ const res = await HardwareSDK.firmwareUpdateV4(connectId, {
   coprocessorBinary,
   resourceArchiveBinary,
 });
+if (!res.success) throw new Error(res.payload.error);
 ```
 
 方法会安装你传入的二进制，并通过 `FIRMWARE_PROGRESS` / `FIRMWARE_TIP` 报告进度。`DeviceFirmwareUpdateRequest` 之后设备可能重启；SDK 会在同一协议上重连。

@@ -1,4 +1,5 @@
 ---
+title: WebLN
 description: 通过 OneKey 集成 WebLN — enable、getInfo、makeInvoice、sendPayment、签名/验证消息
 slug: /dapp/chains/webln
 ---
@@ -16,8 +17,8 @@ slug: /dapp/chains/webln
 ## 最小示例
 
 ```js
-const provider = window?.$onekey?.webln || window?.webln
-if (!provider) throw new Error('未检测到 OneKey WebLN Provider')
+const provider = window.$onekey?.webln
+if (!provider) throw new Error('OneKey WebLN provider not detected')
 
 await provider.enable()
 const info = await provider.getInfo()
@@ -25,7 +26,7 @@ const info = await provider.getInfo()
 
 ## 事件
 
-- 查看 [事件](event) 了解账户/网络更新
+- 通知限制见[事件](event)。
 
 ## 常见错误
 

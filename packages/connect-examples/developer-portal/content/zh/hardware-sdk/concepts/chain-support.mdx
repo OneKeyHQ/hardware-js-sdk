@@ -1,5 +1,6 @@
 ---
 title: 链支持
+description: 查询链方法与设备支持矩阵，并验证目标固件组合。
 ---
 
 # 链支持
@@ -39,19 +40,19 @@ Pro 2 / Neo 的事实源是每个 Core 方法的 `getSupportedProtocols()`。默
 | 系列 | 公开方法 | 说明 |
 | --- | --- | --- |
 | Stellar | `stellarGetAddress` `stellarSignTransaction` | **Pro 2 / Neo 不支持** |
-| Alephium | `alephiumGetAddress` `alephiumSignMessage` `alephiumSignTransaction` | **Pro 2 / Neo 不支持**。Classic / Mini / Touch 签名经常失败 |
-| Benfen | `benfenGetAddress` `benfenGetPublicKey` `benfenSignMessage` `benfenSignTransaction` | **Pro 2 / Neo 不支持**。Classic 预期失败 |
+| Alephium | `alephiumGetAddress` `alephiumSignMessage` `alephiumSignTransaction` | **Pro 2 / Neo 不支持**。Classic / Mini / Touch 的签名列入兼容性测试例外 |
+| Benfen | `benfenGetAddress` `benfenGetPublicKey` `benfenSignMessage` `benfenSignTransaction` | **Pro 2 / Neo 不支持**。Classic 列入兼容性测试例外 |
 | Nexa | `nexaGetAddress` `nexaSignTransaction` | **Pro 2 / Neo 不支持** |
-| Dynex | `dnxGetAddress` `dnxSignTransaction` | **Pro 2 / Neo 不支持**。Pro / Classic 1s / Mini / Touch 经常失败 |
+| Dynex | `dnxGetAddress` `dnxSignTransaction` | **Pro 2 / Neo 不支持**。Pro / Classic 1s / Mini / Touch 列入兼容性测试例外 |
 | Nervos | `nervosGetAddress` `nervosSignTransaction` | **Pro 2 / Neo 不支持** |
-| SCDO | `scdoGetAddress` `scdoSignMessage` `scdoSignTransaction` | **Pro 2 / Neo 不支持**。Classic / Mini / Touch 经常失败 |
-| Neo（链） | `neoGetAddress` `neoSignTransaction` | **Pro 2 / Neo 不支持**。Classic / Mini / Touch 经常失败。不是 OneKey Neo 设备 |
+| SCDO | `scdoGetAddress` `scdoSignMessage` `scdoSignTransaction` | **Pro 2 / Neo 不支持**。Classic / Mini / Touch 列入兼容性测试例外 |
+| Neo（链） | `neoGetAddress` `neoSignTransaction` | **Pro 2 / Neo 不支持**。Classic / Mini / Touch 列入兼容性测试例外。不是 OneKey Neo 设备 |
 | Lightning | `lnurlAuth` | **Pro 2 / Neo 不支持** |
 | EVM 额外 | `evmSignMessageEIP712` | 旧 typed-data 路径；优先用 `evmSignTypedData`（V1+V2） |
 
 ## 机型注意（兼容性测试）
 
-下面是当前测试**接受失败**的方法。在固件和测试改口之前，按该机型不支持处理。
+下表是仓库兼容性测试允许失败的方法/机型组合。这表示测试覆盖存在限制，不是本次真机测试结果。未在对应设备上验证准确固件版本和方法前，不应宣称这些组合受支持。
 
 | 机型 | 不要依赖 |
 | --- | --- |

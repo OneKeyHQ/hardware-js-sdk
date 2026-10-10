@@ -10,7 +10,7 @@ import { Callout } from 'nextra/components'
 在 Web 应用中使用 OneKey 的 Stellar Provider。通过 `window.$onekey.stellar` 访问。
 
 <Callout type="info">
-该 Provider 设计上与 Stellar Wallets Kit 的 <code>KitActions</code> 形状保持一致：<code>getAddress</code>、<code>signTransaction</code>、<code>signAuthEntry</code>、<code>signMessage</code>、<code>getNetwork</code>。
+该 Provider 的接口结构与 Stellar Wallets Kit 的 <code>KitActions</code> 保持一致：<code>getAddress</code>、<code>signTransaction</code>、<code>signAuthEntry</code>、<code>signMessage</code>、<code>getNetwork</code>。
 </Callout>
 
 ## 快速链接
@@ -23,7 +23,7 @@ import { Callout } from 'nextra/components'
 
 ```ts
 const stellar = window.$onekey?.stellar
-if (!stellar?.isOneKey) throw new Error('未检测到 OneKey Stellar Provider')
+if (!stellar?.isOneKey) throw new Error('OneKey Stellar provider not detected')
 
 const { address } = await stellar.getAddress()
 const network = await stellar.getNetwork()

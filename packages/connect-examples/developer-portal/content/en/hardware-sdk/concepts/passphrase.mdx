@@ -16,17 +16,16 @@ Rules and best practices for handling passphrases (hidden wallets).
 
 ## Device support
 
-| Device | On-device input | Software input (host) |
-|--------|----------------|----------------------|
-| Classic | Yes | Yes |
-| Classic 1S | Yes | Yes |
-| Mini | Yes | Yes |
-| Touch | Yes (touch keyboard) | Yes |
-| Pro | Yes (touch keyboard) | Yes |
-| Pro 2 | Yes | Yes |
-| Neo | Yes | Yes |
+Do not infer host or on-device input support from a model name alone. Read `getDeviceState` to identify the device, firmware, and current state, then follow the actual UI request. Availability depends on the device, firmware, SDK, and runtime.
 
-All OneKey devices support passphrase. Persist `deviceId + passphraseState`, not firmware `session_id`.
+| Request or condition | Host behavior |
+| --- | --- |
+| `REQUEST_PASSPHRASE` | Present only the input choices supported by the request and target device. Preserve response correlation. |
+| A request marked `deviceOnly` | Ask the user to continue on the device; do not collect the passphrase on the host. |
+| `REQUEST_PASSPHRASE_ON_DEVICE` | Notification only; show device guidance and do not send `uiResponse`. |
+| Requested input mode unavailable | Explain the limitation; do not silently switch input methods. |
+
+Persist the wallet binding (`deviceId` and `passphraseState`) where appropriate, not a firmware `session_id`.
 
 ## Interaction flow
 
@@ -47,8 +46,8 @@ sequenceDiagram
   SDK->>Device: open standard wallet
   SDK-->>App: walletType standard
   App->>SDK: evmGetAddress(..., useEmptyPassphrase true)
-  SDK->>Device: DeviceSessionGet
-  Device-->>SDK: session
+  SDK->>Device: Restore selected wallet context
+  Device-->>SDK: Wallet context ready
   SDK-->>App: address
 ```
 
@@ -83,9 +82,9 @@ sequenceDiagram
   SDK-->>App: deviceId + passphraseState
   Note over App: persist deviceId + passphraseState
   App->>SDK: evmGetAddress(..., passphraseState)
-  SDK->>Device: DeviceSessionGet
+  SDK->>Device: Restore selected wallet context
   Note over SDK,Device: Core resumes. App does not call resume-hidden
-  Device-->>SDK: session
+  Device-->>SDK: Wallet context ready
   SDK-->>App: address
 ```
 

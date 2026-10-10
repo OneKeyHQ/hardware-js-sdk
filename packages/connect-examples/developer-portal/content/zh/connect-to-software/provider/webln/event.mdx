@@ -2,36 +2,13 @@
 title: 事件
 ---
 
-# 事件
+<span id="accountschanged" />
+<span id="chainchanged-已弃用" />
 
-OneKey 浏览器扩展 Provider 实现了 [Node.js `EventEmitter`](https://nodejs.org/api/events.html) API。
+# WebLN 事件
 
-本节详细介绍通过该 API 发出的事件。
+不要通过账户或网络事件判断 WebLN 请求是否成功。应等待每次方法调用完成，并处理结果或异常。
 
-网上有大量关于 `EventEmitter` 的指南，你可以像这样监听事件：
+provider 类型声明包含 `accountChanged`（单数）和 `disconnect`，但当前 WebLN 实现没有建立账户变化事件订阅。未经目标钱包版本验证，不应依赖这些通知。
 
-## accountsChanged
-
-当切换账户时触发。
-
-```
-window.webln.on('accountsChanged', (accounts) => {
-    // 处理新账户，或没有账户的情况。
-    // "accounts" 始终是一个数组，但可能为空。
-});
-window.webln.off('accountsChanged');
-```
-
-## chainChanged **（已弃用）**
-
-当链变更时触发。
-
-```
-window.webln.on('chainChanged', (chainId) => {
-    // 处理新链。
-    // 正确处理链变更可能比较复杂。
-    // 我们建议重新加载页面，除非你有充分的理由不这样做。
-    window.location.reload();
-});
-window.webln.off('chainChanged');
-```
+必要的连接步骤见[快速开始](/zh/connect-to-software/provider/webln/guide)。

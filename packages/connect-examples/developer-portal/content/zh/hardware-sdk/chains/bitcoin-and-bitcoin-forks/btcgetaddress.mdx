@@ -6,7 +6,7 @@ title: btcGetAddress
 
 ## Bitcoin：获取地址
 
-显示指定 BIP32 路径派生的地址，并返回给调用者。用户需要在 OneKey 上确认导出。
+派生并返回指定路径的地址。`showOnOneKey` 为 `true` 时，用户必须在设备上确认地址。
 
 ```typescript
 const result = await HardwareSDK.btcGetAddress(connectId, deviceId, params);
@@ -18,26 +18,26 @@ const result = await HardwareSDK.btcGetAddress(connectId, deviceId, params);
 
 #### 导出单个地址
 
-* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `1`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `1`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _可选_ `boolean`。是否在设备上显示地址，默认为 `true`。
 * `coin` - _可选_ `string` 决定 [coins.json](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/data/coins/bitcoin.json) 文件中指定的网络定义。可以使用币种的 `shortcut`、`name` 或 `label`。如果未设置 `coin`，API 将尝试从 `path` 获取网络定义。
 * `multisig` - _可选_ MultisigRedeemScriptType，赎回脚本信息（仅用于多签地址）
 * `scriptType` - _可选_ InputScriptType，地址脚本类型
 
 #### 导出批量地址
 
-* `bundle` - 包含 `path`、`showOnOneKey`、`coin` 字段的对象 `Array`
+* `bundle` - 对象数组，每个对象包含 `path`、`showOnOneKey`、`coin` 字段。
 
 ### 获取不同类型的地址
 
 不同的 BTC 地址类型需要不同的派生路径参数。
 
 | 类型                | 路径            | 示例                                                        |
-| ------------------- | --------------- | ----------------------------------------------------------- |
+| ------------------- | --------------- | ------------------------------------------------------------ |
 | Legacy BIP44        | m/44'/0'/x'/x/x | 以 "1" 开头，由 26 到 35 个字符组成                         |
 | Nested SegWit BIP49 | m/49'/0'/x'/x/x | 以 "3" 开头，由 26 到 35 个字符组成                         |
-| Native SegWit BIP84 | m/84'/0'/x'/x/x | 以 "bc1" 或 "tb1" 开头，由 41 到 62 个字符组成              |
-| Taproot BIP86       | m/86'/0'/x'/x/x | 以 "bc1" 开头，由 41 到 62 个字符组成                       |
+| Native SegWit BIP84 | m/84'/0'/x'/x/x | 主网以 `bc1q` 开头；测试网以 `tb1q` 开头 |
+| Taproot BIP86 | m/86'/0'/x'/x/x | 主网以 `bc1p` 开头；测试网以 `tb1p` 开头 |
 
 ## 示例
 
@@ -55,36 +55,36 @@ HardwareSDK.btcGetAddress(connectId, deviceId, {
 ```typescript
 HardwareSDK.btcGetAddress(connectId, deviceId, {
     bundle: [
-        { path: "m/49'/0'/0'/0/0", showOnOneKey: false }, // 地址 1
-        { path: "m/49'/0'/0'/0/1", showOnOneKey: false }, // 地址 2
-        { path: "m/49'/0'/0'/0/2", showOnOneKey: false }  // 地址 3
+        { path: "m/49'/0'/0'/0/0", showOnOneKey: false }, // address 1
+        { path: "m/49'/0'/0'/0/1", showOnOneKey: false }, // address 2
+        { path: "m/49'/0'/0'/0/2", showOnOneKey: false }  // address 3
     ]
 });
 ```
 
 #### 返回结果
 
-只有一个地址的结果
+单个地址响应
 
 ```typescript
 {
     success: true,
     payload: {
-        address: string,     // 显示的地址
-        path: string // 序列化 BIP32 路径
+        address: string,     // displayed address
+        path: string // serialized BIP32 path
     }
 }
 ```
 
-批量地址的结果
+批量地址响应
 
 ```typescript
 {
     success: true,
     payload: [
-        { address: string, path: string }, // 地址 1
-        { address: string, path: string }, // 地址 2
-        { address: string, path: string }, // 地址 3
+        { address: string, path: string }, // address 1
+        { address: string, path: string }, // address 2
+        { address: string, path: string }, // address 3
     ]
 }
 ```
@@ -95,8 +95,8 @@ HardwareSDK.btcGetAddress(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

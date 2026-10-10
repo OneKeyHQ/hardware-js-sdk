@@ -1,10 +1,11 @@
 ---
 title: 底层传输插件
+description: 实现原生 BLE 插件的连接完成条件、有序收发和断开清理。
 ---
 
 # 底层传输插件（Low-level Transport Plugin）
 
-> 仅在 WebUSB / React Native BLE 无法满足需求时使用。你需要自管原生 BLE 生命周期和有序收发，维护成本更高。
+> 仅在 WebUSB / React Native BLE / 官方原生适配器无法满足需求时使用。你需要自管原生 BLE 生命周期和有序收发，维护成本更高。
 
 > **注意：** `lowlevel` 环境和 `LowlevelTransportSharedPlugin` 仅用于 **BLE（蓝牙）** 通信。对于 Node.js/CLI 环境下的 **USB** 通信，请使用 `NodeUsbTransport`（env 为 `node-usb`）—— 它通过 libusb 直接处理协议编解码和 USB I/O，不需要插件。
 
@@ -133,6 +134,6 @@ if (!result) throw new Error('SDK initialization failed');
 
 ## 下一步
 
-- [Android 指南](/zh/hardware-sdk/transport/android) — 配对流程、延时、重试
+- [Android 指南](/zh/hardware-sdk/transport/android) — 配对、权限与连接完成条件
 - [iOS 指南](/zh/hardware-sdk/transport/ios) — CoreBluetooth 实现
 - [Flutter 指南](/zh/hardware-sdk/transport/flutter) — Platform channel 桥接

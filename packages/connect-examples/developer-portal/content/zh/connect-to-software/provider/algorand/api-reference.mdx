@@ -5,7 +5,7 @@ description: OneKey Algorand provider 完整 API 参考
 
 # API 参考
 
-OneKey Algorand provider 方法和类型的完整参考。
+OneKey Algorand provider 的方法和类型参考。
 
 ---
 
@@ -23,7 +23,7 @@ OneKey Algorand provider 方法和类型的完整参考。
 | `signAndSendTransaction(txns)` | 签署并发送（旧版） |
 | `signMessage(message, encoding?)` | 签署任意消息 |
 | `getAlgodv2Client()` | 获取 Algod 客户端 |
-| `getIndexerClient()` | 获取 Indexer 客户端 |
+| `getIndexerClient()` | 获取 Indexer HTTP 传输客户端 |
 
 ---
 
@@ -52,29 +52,26 @@ interface EnableResult {
 
 ```typescript
 interface WalletTransaction {
-  txn: string                  // Base64 编码的未签名交易
-  signers?: string[]           // 应该签名的地址（空 = 跳过）
-  stxn?: string                // 预签名的交易
-  message?: string             // 要显示的消息
+  txn: string                  // Base64 encoded unsigned transaction
+  signers?: string[]           // Addresses that should sign (empty = skip)
+  stxn?: string                // Pre-signed transaction
+  message?: string             // Message to display
   msig?: MultisigMetadata
-  authAddr?: string            // 重新授权的认证地址
+  authAddr?: string            // Rekeyed auth address
 }
 ```
 
 ### SignTxns 结果
 
 ```typescript
-interface SignTxnsResult {
-  // Base64 已签名交易数组（跳过的为 null）
-  [index: number]: string | null
-}
+type SignTxnsResult = (string | null)[]; // Base64 signed transactions; null means skipped.
 ```
 
 ### PostTxns 结果
 
 ```typescript
 interface PostTxnsResult {
-  txIDs: string[]
+  txnIDs: string[]
 }
 ```
 
@@ -102,10 +99,9 @@ interface PostTxnsResult {
 
 ## 错误码
 
-| 错误码 | 描述 |
-|--------|------|
+| 错误码 | 说明 |
+|------|-------------|
 | 4001 | 用户拒绝请求 |
 | 4100 | 未授权 |
 | 4200 | 不支持的方法 |
-| 4300 | 无效的输入 |
-
+| -32602 | 参数无效 |

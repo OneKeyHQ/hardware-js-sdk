@@ -1,0 +1,20 @@
+---
+title: "合约元信息"
+description: "钱包可能解码 calldata，在确认页面显示方法名。函数选择器是标准函数签名（如 `transfer(address,uint256)`）的 Keccak-256 哈希值的前四个字节。"
+---
+
+# 合约元信息
+
+钱包可能解码 calldata，在确认页面显示方法名。函数选择器是标准函数签名（如 `transfer(address,uint256)`）的 Keccak-256 哈希值的前四个字节。
+
+## 发布可核验的元信息
+
+在相应区块浏览器上公开并验证合约源码和 ABI，并让应用使用正确 ABI 编码调用。单独显示一个方法名不能证明合约身份或实际行为；选择器可能碰撞。
+
+## 签名注册表
+
+历史 GitBook 指南曾介绍向 Parity 链上注册表登记签名。目前的 Provider 源码不能证明 OneKey 使用该注册表解码交易，不应为了改变 OneKey 确认页面而支付注册交易费用。
+
+方法名未显示时，可通过 [OneKey 问题追踪](https://github.com/OneKeyHQ/app-monorepo/issues) 提供网络、合约地址、方法签名、已有的交易哈希和钱包版本。不要提供私钥或恢复短语。
+
+硬件集成请参阅 [Clear Signing](/zh/hardware-sdk/signers/evm#clear-signing)。设备解码取决于固件和 calldata；应用元信息不能覆盖设备确认内容。

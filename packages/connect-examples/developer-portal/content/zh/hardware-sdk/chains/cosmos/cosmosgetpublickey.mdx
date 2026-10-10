@@ -6,13 +6,13 @@ title: cosmosGetPublicKey
 
 ## 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Touch: 4.0.0
   * Classic/Mini: 2.10.0
 
 ## Cosmos：获取公钥
 
-获取指定 BIP32 路径派生的扩展公钥。用户需要确认导出。
+返回指定路径派生的公钥。可通过 `showOnOneKey` 请求用户在设备上确认。
 
 ```typescript
 const result = await HardwareSDK.cosmosGetPublicKey(connectId, deviceId, params);
@@ -26,15 +26,15 @@ const result = await HardwareSDK.cosmosGetPublicKey(connectId, deviceId, params)
 
 * `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。
 * `curve` - _可选_ `string` 椭圆曲线算法，默认为 `secp256k1`
-* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `showOnOneKey` - _可选_ `boolean`。是否在设备上显示公钥，默认为 `true`。
 
 #### 导出批量公钥
 
-* `bundle` - 包含 `path`、`showOnOneKey`、`curve` 字段的对象 `Array`
+* `bundle` - 对象数组，每个对象包含 `path`、`showOnOneKey`、`curve` 字段。
 
 ### 示例
 
-返回第五个 Cosmos 账户的公钥：
+返回第一个 Cosmos 账户的公钥：
 
 ```typescript
 HardwareSDK.cosmosGetPublicKey(connectId, deviceId, {
@@ -44,43 +44,42 @@ HardwareSDK.cosmosGetPublicKey(connectId, deviceId, {
 });
 ```
 
-返回多个 Cosmos 账户的批量公钥：
+批量返回多个 Cosmos 账户的公钥：
 
 ```typescript
 HardwareSDK.cosmosGetPublicKey(connectId, deviceId, {
     bundle: [
-        { path: "m/44'/118'/0'/0/0" }, // 账户 1
-        { path: "m/44'/118'/1'/0/0" }, // 账户 2
-        { path: "m/44'/118'/2'/0/0" }, // 账户 3
+        { path: "m/44'/118'/0'/0/0" }, // account 1
+        { path: "m/44'/118'/1'/0/0" }, // account 2
+        { path: "m/44'/118'/2'/0/0" }, // account 3
     ]
 });
 ```
 
 ### 返回结果
 
-只有一个公钥的结果
+单个公钥响应
 
 ```typescript
 {
     success: true,
     payload: {
-        path: string, // 序列化 BIP32 路径
-        publicKey: string
+        path: string, // serialized BIP32 path
+        pub: string
     }
 }
 ```
 
-[了解更多关于 BIP32 序列化格式](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization\_format)
 
-批量公钥的结果
+批量公钥响应
 
 ```typescript
 {
     success: true,
     payload: [
-        { path: serializedPath, publicKey }, // 账户 1
-        { path: serializedPath, publicKey }, // 账户 2
-        { path: serializedPath, publicKey }, // 账户 3
+        { path: serializedPath, pub }, // account 1
+        { path: serializedPath, pub }, // account 2
+        { path: serializedPath, pub }, // account 3
     ]
 }
 ```
@@ -91,8 +90,8 @@ HardwareSDK.cosmosGetPublicKey(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

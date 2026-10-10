@@ -107,7 +107,7 @@ expo start --dev-client -c
 export async function setupBle() {
   const initialized = await HardwareSDK.init({
     env: 'react-native',                 // React Native BLE transport
-    debug: __DEV__,
+    debug: false,
     fetchConfig: true,
   });
   if (!initialized) throw new Error('SDK initialization failed');
@@ -125,6 +125,8 @@ const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 
 // BLE returns id + name; read identity via getDeviceState
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const candidate = devices.payload[0];
 const connectId = candidate?.connectId;
 if (!connectId) throw new Error("No device connection");

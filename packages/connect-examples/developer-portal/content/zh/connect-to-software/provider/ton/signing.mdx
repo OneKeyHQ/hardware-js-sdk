@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # 签名
 
+发送请求前先连接钱包。将示例地址和 manifest URL 替换为有效值。用于身份验证时，使用服务器生成的一次性挑战，并在服务器验证证明。
+
 了解如何签署数据用于链下验证。
 
 ---
@@ -21,15 +23,15 @@ const result = await provider.send({
   id: Date.now().toString(),
   params: [
     JSON.stringify({
-      schema_crc: 0, // 自定义 schema 标识符
-      cell: cellBoc.toString('base64'), // Base64 编码的待签名 cell
+      schema_crc: 0, // Custom schema identifier
+      cell: cellBoc.toString('base64'), // Base64 encoded cell to sign
     })
   ]
 })
 
 if ('result' in result) {
-  console.log('签名:', result.result.signature) // Base64 签名
-  console.log('时间戳:', result.result.timestamp) // UNIX 时间戳
+  console.log('Signature:', result.result.signature) // Base64 signature
+  console.log('Timestamp:', result.result.timestamp) // UNIX timestamp
 }
 ```
 
@@ -46,7 +48,7 @@ const connectEvent = await provider.connect(2, {
     { name: 'ton_addr' },
     {
       name: 'ton_proof',
-      payload: 'your-server-generated-challenge' // 用于防重放的 Nonce
+      payload: 'your-server-generated-challenge' // Nonce for replay protection
     }
   ]
 })
@@ -54,8 +56,8 @@ const connectEvent = await provider.connect(2, {
 if (connectEvent.event === 'connect') {
   const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
 
-  if (proofItem) {
-    // 将证明发送到后端进行验证
+  if (proofItem && "proof" in proofItem) {
+    // Send proof to your backend for verification
     const proof = proofItem.proof
     console.log({
       signature: proof.signature,
@@ -81,19 +83,19 @@ const result = await provider.send({
 if ('error' in result) {
   switch (result.error.code) {
     case 300:
-      console.log('用户拒绝了交易')
+      console.log('User rejected the transaction')
       break
     case 1:
-      console.log('请求错误 - 检查参数')
+      console.log('Bad request - check parameters')
       break
     case 400:
-      console.log('不支持的方法')
+      console.log('Method not supported')
       break
     default:
-      console.error('错误:', result.error.message)
+      console.error('Error:', result.error.message)
   }
 } else {
-  console.log('成功:', result.result)
+  console.log('Success:', result.result)
 }
 ```
 
@@ -108,4 +110,3 @@ if ('error' in result) {
 | 100 | 未知应用 |
 | 300 | 用户拒绝请求 |
 | 400 | 不支持的方法 |
-

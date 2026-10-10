@@ -44,6 +44,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -142,6 +144,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -204,8 +208,8 @@ if (!success) throw new Error(payload.error);
 - Verify on device: inputs, outputs, change, fee must match your UI.
 - Host verify: rebuild with `bitcoinjs-lib` / `@scure/btc-signer`, check `serializedTx`/txid and signatures.
 - Common issues:
-  - Too many inputs: split transactions or simplify.
-  - Fee anomalies: recalc outputs/change; respect dust rules.
+  - Too many inputs: report the limit. Splitting or simplifying a transaction requires rebuilding it and obtaining a new user review.
+  - Fee anomaly: stop signing. Recalculate outputs, change, and dust limits with the user; do not silently alter a reviewed transaction.
   - User reject/timeout: offer retry/cancel; no auto-resubmission.
 
 See method docs: [btcSignTransaction](/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction) · [btcGetAddress](/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress).

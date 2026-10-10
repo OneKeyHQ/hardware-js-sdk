@@ -7,44 +7,45 @@ import { Callout } from 'nextra/components'
 
 # 钱包 UI 库
 
-预构建的钱包连接库，提供精美的钱包选择弹窗、移动端支持，并自动处理各种边界情况。
+钱包 UI 库提供钱包选择界面和连接状态管理。根据应用框架和目标链选择库，并测试账户变化、请求拒绝和移动端连接。
 
 <Callout type="info">
-**推荐大多数项目使用。** 这些库可以节省开发时间，并提供经过实战检验的钱包连接流程。
+下方指南介绍 EVM 集成。Aptos 请使用 [Aptos Wallet Adapter](/zh/connect-to-software/wallet-ui/aptos-wallet-adapter)；其他链请从[对应链的 provider](/zh/connect-to-software/provider)开始。
 </Callout>
 
 ---
 
 ## 选择你的库
 
-| 库 | 框架支持 | 特性 |
+| 库 | 框架 | 功能 |
 |---------|-----------|----------|
-| [RainbowKit](/zh/connect-to-software/wallet-ui/rainbowkit) | 仅 React | 精美弹窗、高度可定制、wagmi 集成 |
-| [Web3Modal](/zh/connect-to-software/wallet-ui/web3modal) | React/Vue/JS | WalletConnect 生态、移动端二维码、AppKit |
-| [Web3-Onboard](/zh/connect-to-software/wallet-ui/web3-onboard) | React/Vue/JS | Blocknative、高度可定制 |
+| [RainbowKit](/zh/connect-to-software/wallet-ui/rainbowkit) | 仅 React | 钱包选择、主题、wagmi 集成 |
+| [AppKit（原 Web3Modal）](/zh/connect-to-software/wallet-ui/web3modal) | React/Vue/JS | WalletConnect 生态、移动端二维码、AppKit |
+| [Web3-Onboard](/zh/connect-to-software/wallet-ui/web3-onboard) | React/Vue/JS | Blocknative、丰富的自定义选项 |
 
 ---
 
-## 快速对比
+<span id="快速对比" />
 
-| 特性 | RainbowKit | Web3Modal | Web3-Onboard |
+## 框架与连接方式
+
+| 功能 | RainbowKit | AppKit | Web3-Onboard |
 |---------|------------|-----------|--------------|
 | React | ✅ | ✅ | ✅ |
 | Vue | ❌ | ✅ | ✅ |
-| 原生 JS | ❌ | ✅ | ✅ |
+| 原生 JavaScript | ❌ | ✅ | ✅ |
 | 移动端二维码 | ✅ | ✅ | ✅ |
-| 主题定制 | 高 | 中等 | 高 |
-| 包体积 | 中等 | 中等 | 中等 |
 
 ---
 
 ## 何时使用
 
-在以下情况使用钱包 UI 库：
-- 想要开箱即用的精美钱包选择体验
-- 需要移动端钱包支持和二维码
-- 不想自己构建钱包连接 UI
-- 需要 WalletConnect 集成
+以下情况适合使用钱包 UI 库：
+
+- 需要钱包选择界面和连接状态管理。
+- 需要通过二维码连接移动端钱包。
+- 不希望自行构建钱包连接界面。
+- 需要 WalletConnect 集成。
 
 ---
 
@@ -53,4 +54,3 @@ import { Callout } from 'nextra/components'
 如果需要完全控制钱包 UI，可以考虑：
 - [Wagmi](/zh/connect-to-software/react-hooks/wagmi) - 无 UI 的 React hooks
 - [Provider API](/zh/connect-to-software/provider/eth) - 直接访问钱包
-

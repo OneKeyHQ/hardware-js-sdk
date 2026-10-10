@@ -209,7 +209,8 @@ export function OneKeyClientNavbar({ children, className }) {
       <ThemeToggle locale={isZh ? 'zh' : 'en'} />
       {children}
       <Button
-        aria-label="Menu"
+        aria-label={isZh ? '打开导航菜单' : 'Open navigation menu'}
+        aria-expanded={menu}
         className={cn('nextra-hamburger x:lg:hidden', menu && 'x:bg-gray-400/20')}
         onClick={() => setMenu((prev) => !prev)}
       >

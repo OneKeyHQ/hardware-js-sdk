@@ -6,13 +6,13 @@ title: cardanoSignTransaction
 
 ## 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Touch: 4.1.0
   * Classic/Mini: 3.0.0
 
 ### Cardano：签名交易 <a href="#cardano-sign-transaction" id="cardano-sign-transaction"></a>
 
-对指定交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+请求交易签名。用户在设备上核对并确认请求。
 
 ```javascript
 const response = await HardwareSDK.cardanoSignTransaction(connectId, deviceId, params);
@@ -56,7 +56,7 @@ CardanoSignTransaction 类型
 该交易
 
 * _应该_ 在所有 `inputs` 上具有有效的 `path` 属性
-* _不能_ 包含矿池注册证书
+* _不能_ 包含质押池注册证书
 * _不能_ 包含 `collateralInputs`、`collateralReturn`、`totalCollateral` 和 `referenceInputs`
 * _必须_ 在证书和提款中包含路径作为质押凭证（不能使用密钥哈希或脚本哈希）
 * _可以_ 仅包含 1852 和 1855 路径
@@ -64,14 +64,18 @@ CardanoSignTransaction 类型
 
 #### 质押池注册证书说明 <a href="#stake-pool-registration-certificate-specifics" id="stake-pool-registration-certificate-specifics"></a>
 
-OneKey 支持以矿池所有者身份签署质押池注册证书。交易可能包含外部输入（例如属于矿池运营者），OneKey 无法验证它们是否确实是外部的，因此如果我们允许使用支出密钥签署交易，则存在从用户不打算支出的输入中损失资金的风险。此外，如果交易中有任何提款，也存在意外签署提款的风险。为了降低这些风险，我们为质押池注册交易引入了特殊的验证规则，这些规则也在 OneKey 上进行验证。验证规则如下：
+OneKey 支持以质押池所有者身份签署质押池注册证书。交易可能包含外部输入（例如属于质押池运营者），OneKey 无法验证它们是否确实是外部的，因此如果我们允许使用支出密钥签署交易，则存在从用户不打算支出的输入中损失资金的风险。此外，如果交易中有任何提款，也存在意外签署提款的风险。为了降低这些风险，我们为质押池注册交易引入了特殊的验证规则，这些规则也在 OneKey 上进行验证。验证规则如下：
 
 1. 交易不能包含任何其他证书，甚至不能包含另一个质押池注册
 2. 交易不能包含任何提款
 3. 交易输入必须全部是外部的，即 path 必须是 undefined 或 null
 4. 必须恰好有一个所有者作为质押路径传递，其余所有者应作为 bech32 编码的奖励地址传递
 
-#### 治理注册（Catalyst 和其他） <a href="#governance-registration-catalyst-and-other" id="governance-registration-catalyst-and-other"></a>
+<span id="治理注册catalyst-和其他" />
+
+<span id="治理注册catalyst-和其他-" />
+
+#### 治理注册（Catalyst 等） <a href="#governance-registration-catalyst-and-other" id="governance-registration-catalyst-and-other"></a>
 
 OneKey 支持签署包含治理注册的辅助数据的交易。治理注册曾经遵循 [CIP-15](https://cips.cardano.org/cips/cip15/)，现已被 [CIP-36](https://cips.cardano.org/cips/cip36/) 取代。目前，OneKey 支持 CIP-15 和 CIP-36 格式，可以在 `format` 字段中指定预期标准（默认为 CIP-15）。它们的区别如下：
 
@@ -184,7 +188,7 @@ HardwareSDK.cardanoSignTransaction(connectId, deviceId, {
     signingMode: PROTO.CardanoTxSigningMode.POOL_REGISTRATION_AS_OWNER,
     inputs: [
         {
-            // 注意此处不提供 path
+            // notice no path is provided here
             prev_hash: '3b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b7',
             prev_index: 0,
         },
@@ -205,27 +209,27 @@ HardwareSDK.cardanoSignTransaction(connectId, deviceId, {
             poolParameters: {
                 poolId: 'f61c42cbf7c8c53af3f520508212ad3e72f674f957fe23ff0acb4973',
                 vrfKeyHash: '198890ad6c92e80fbdab554dda02da9fb49d001bbd96181f3e07f7a6ab0d0640',
-                pledge: '500000000', // lovelace 金额
-                cost: '340000000', // lovelace 金额
+                pledge: '500000000', // amount in lovelace
+                cost: '340000000', // amount in lovelace
                 margin: {
-                    // numerator/denominator 应该 <= 1，然后转换为百分比
+                    // numerator/denominator should be <= 1 which is translated then to a percentage
                     numerator: '1',
                     denominator: '2',
                 },
-                rewardAccount: 'stake1uya87zwnmax0v6nnn8ptqkl6ydx4522kpsc3l3wmf3yswygwx45el', // bech32 编码的质押池奖励账户
+                rewardAccount: 'stake1uya87zwnmax0v6nnn8ptqkl6ydx4522kpsc3l3wmf3yswygwx45el', // bech32-encoded stake pool reward account
                 owners: [
                     {
-                        stakingKeyPath: "m/1852'/1815'/0'/2/0", // 这是将在 OneKey 上签署交易的所有者密钥的路径
+                        stakingKeyPath: "m/1852'/1815'/0'/2/0", // this is the path to the owner's key that will be signing the tx on OneKey
                     },
                     {
-                        stakingKeyHash: '3a7f09d3df4cf66a7399c2b05bfa234d5a29560c311fc5db4c490711', // 其他所有者
+                        stakingKeyHash: '3a7f09d3df4cf66a7399c2b05bfa234d5a29560c311fc5db4c490711', // other owner
                     },
                 ],
                 relays: [
                     {
                         type: PROTO.CardanoPoolRelayType.SINGLE_HOST_IP,
                         ipv4Address: '192.168.0.1',
-                        ipv6Address: '2001:0db8:85a3:0000:0000:8a2e:0370:7334', // 完整形式的 ipv6 地址
+                        ipv6Address: '2001:0db8:85a3:0000:0000:8a2e:0370:7334', // ipv6 address in full form
                         port: 1234,
                     },
                     {
@@ -245,11 +249,11 @@ HardwareSDK.cardanoSignTransaction(connectId, deviceId, {
                     },
                     {
                         type: PROTO.CardanoPoolRelayType.MULTIPLE_HOST_NAME,
-                        hostName: 'www.test2.test', // 最长 64 个字符
+                        hostName: 'www.test2.test', // max 64 characters long
                     },
                 ],
                 metadata: {
-                    url: 'https://www.test.test', // 最长 64 个字符
+                    url: 'https://www.test.test', // max 64 characters long
                     hash: '914c57c1f12bbf4a82b12d977d4f274674856a11ed4b9b95bd70f5d41c5064a6',
                 },
             },
@@ -315,7 +319,7 @@ CardanoSignedTxData 类型
 }
 ```
 
-#### 示例：
+#### 示例
 
 ```javascript
 {
@@ -356,10 +360,8 @@ CardanoSignedTxData 类型
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```
-
-

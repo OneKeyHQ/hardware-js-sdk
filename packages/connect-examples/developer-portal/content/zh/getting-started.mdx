@@ -13,20 +13,28 @@ description: 根据 dApp、钱包或应用的需求，选择 OneKey 接入路径
 | 在自己的钱包或应用中直接连接 OneKey 设备 | Hardware SDK | [硬件快速开始](/zh/hardware-sdk/getting-started) |
 | 通过二维码传递签名请求和结果 | Air-Gap SDK | [二维码签名](/zh/air-gap) |
 
+dApp 集成由 OneKey 钱包管理用户账户和签名流程。直接硬件集成则由你的应用负责设备发现、连接状态、UI 事件和交易准备。
+
 ## 连接钱包
 
 安装 [OneKey](https://onekey.so/download/)，跟随 [dApp 快速开始](/zh/connect-to-software) 检测 Provider，并在用户操作后请求账户。不同链的方法与返回值不同，请查阅对应的 [Provider API](/zh/connect-to-software/provider)。
 
-处理钱包未安装、账户列表为空、用户拒绝，以及账户和网络变化。如果项目已有钱包连接组件，请使用其集成指南。
+处理钱包未安装、账户列表为空、用户拒绝，以及账户和网络变化。如果项目已有[钱包连接组件](/zh/connect-to-software/wallet-ui/web3modal)，请使用其 OneKey 集成指南。移动端跳转请阅读[移动端与深度链接](/zh/connect-to-software/mobile-deeplinks)。
 
 ## 直接连接硬件
 
 根据运行环境选择 [WebUSB](/zh/hardware-sdk/transport/web-usb)、[React Native BLE](/zh/hardware-sdk/transport/react-native-ble) 或[原生移动端集成](/zh/hardware-sdk/transport/native-ble)。
 
-先初始化 SDK、处理 UI 请求、选择设备并读取地址，再接入签名。按实际设备和方法核对[链支持范围](/zh/hardware-sdk/concepts/chain-support)。模拟器与本地构建不能代替真机验证。
+跟随[硬件快速开始](/zh/hardware-sdk/getting-started)，先初始化 SDK、处理 UI 请求、选择设备并读取地址，再接入签名。按实际设备和方法核对[链支持范围](/zh/hardware-sdk/concepts/chain-support)。
+
+[硬件 Playground](https://hardware-example.onekey.so/) 可用于探索 API。模拟器与本地构建不能代替目标设备、固件及运行环境上的真机验证。
+
+## 使用二维码签名
+
+从 [Air-Gap 概览](/zh/air-gap)开始，再阅读具体链指南，例如[以太坊与 EVM](/zh/air-gap/ethereum-and-evm)。应用将请求编码为二维码，读取设备响应，校验结果后通过自己的网络连接广播。
 
 ## 上线前检查
 
 测试拒绝、取消、断连和重连；向用户展示正在使用的账户与网络；保留设备确认步骤。不要收集恢复短语或私钥，也不要把 PIN、Passphrase、访问令牌或钱包会话信息写入日志。
 
-固定并记录经过验证的软件包与固件版本。出现问题时，查阅[排障指南](/zh/troubleshooting)。
+固定并记录经过验证的软件包与固件版本。SDK、固件或钱包升级后重新测试。出现问题时，查阅[排障指南](/zh/troubleshooting)。

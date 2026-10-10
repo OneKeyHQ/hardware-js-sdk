@@ -78,6 +78,8 @@ await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
 // 1) Enumerate
 const list = await HardwareSDK.searchDevices();
 if (!list.success) throw new Error(list.payload.error);
+// Select explicitly in the application when more than one device is available.
+if (list.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = list.payload[0] ?? {};
 if (!connectId) throw new Error("No device connection");
 
@@ -112,7 +114,7 @@ if (r.success) {
   - New: `env: 'webusb'` (no `connectSrc`)
 - Remove Bridge-only logic: e.g., `checkBridgeStatus()`, Bridge install/restart prompts
 - Bind `UI_EVENT / DEVICE`: ensure PIN/Passphrase and device plug/unplug events are handled
-- Don't auto-enumerate before permission: `requestDevice()` must be called via a user gesture
+- A new USB authorization requires `requestDevice()` from a user gesture. Previously authorized devices can be enumerated without opening the chooser again.
 - Compatibility tip: if `navigator.usb` is missing, ask users to switch to a WebUSB-capable browser
 
 ---

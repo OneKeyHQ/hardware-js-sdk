@@ -1,11 +1,12 @@
 ---
 title: React Native BLE (hd-ble-sdk)
+description: 配置 React Native 权限与 BLE 环境，选择设备并确认地址。
 ---
 
 # React Native BLE (hd-ble-sdk)
 
 > **注意：**
-> 演示：React Native / Expo 示例 → [react-native-demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/develop/packages/connect-examples/react-native-demo)
+> 演示：React Native / Expo 示例 → [react-native-demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo)
 
 
 本指南展示如何使用纯 React Native BLE 堆栈与 `@onekeyfe/hd-ble-sdk` 和 `@onekeyfe/hd-transport-react-native`。无需 WebView 或底层适配器。链 API 的使用方式与快速开始中相同。
@@ -39,12 +40,11 @@ import HardwareSDK from '@onekeyfe/hd-ble-sdk';
 
 ## Android 设置
 
-在 `AndroidManifest.xml` 中添加权限（Android 12+）：
+下面的声明适用于不通过 BLE 扫描推断位置的客户端。只有应用确实满足该条件时，才使用 `neverForLocation`：
 
 ```xml
 <uses-permission android:name="android.permission.INTERNET"/>
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30"/>
 
 <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
 <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
@@ -52,7 +52,7 @@ import HardwareSDK from '@onekeyfe/hd-ble-sdk';
 <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
 ```
 
-在运行时请求 `BLUETOOTH_SCAN` 和 `BLUETOOTH_CONNECT`（Android 12+ 还需要位置权限）。确保系统位置开关已打开。
+Android 12+ 在运行时请求 `BLUETOOTH_SCAN` 和 `BLUETOOTH_CONNECT`。是否需要位置权限取决于目标 SDK、应用是否推断位置以及 BLE 库配置，并非所有 Android 12+ 应用都需要。旧版 Android 使用对应的旧版蓝牙与位置权限。参见 [Android 权限指南](https://developer.android.com/develop/connectivity/bluetooth/bt-permissions)。
 
 ## iOS 设置
 
@@ -66,7 +66,7 @@ import HardwareSDK from '@onekeyfe/hd-ble-sdk';
 
 ## Metro 配置（polyfills 和 exports）
 
-映射 Node 核心 API 并为像 `@noble/hashes/blake2b` 这样的子路径导入启用包导出：
+如果 Metro 报告缺少 Node 核心 API，只映射依赖树实际需要的模块。先安装每个 `require.resolve` 引用的包，再将条目合并进现有 resolver，不要覆盖框架默认配置。下面只是可选的映射片段，不是完整 Metro 配置：
 
 ```js
 // metro.config.js
@@ -105,15 +105,16 @@ expo start --dev-client -c
 
 ```ts
 export async function setupBle() {
-  await HardwareSDK.init({
+  const initialized = await HardwareSDK.init({
     env: 'react-native',                 // React Native BLE transport
-    debug: __DEV__,
+    debug: false,
     fetchConfig: true,
   });
+  if (!initialized) throw new Error('SDK initialization failed');
 
-  // 订阅 UI 事件（PIN / 密码短语 / 确认）
+  // Subscribe to UI events (PIN / Passphrase / confirmations)
   // import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core'
-  // HardwareSDK.on(UI_EVENT, (msg) => { /* 打开对话框并通过 HardwareSDK.uiResponse(...) 回复 */ });
+  // HardwareSDK.on(UI_EVENT, (msg) => { /* open dialogs and reply via HardwareSDK.uiResponse(...) */ });
 }
 ```
 
@@ -124,6 +125,8 @@ const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 
 // BLE 返回 id + name；用 getDeviceState 读 identity
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const candidate = devices.payload[0];
 const connectId = candidate?.connectId;
 if (!connectId) throw new Error("No device connection");
@@ -142,13 +145,14 @@ if (!deviceId) throw new Error("Device has no wallet identity");
 const res = await HardwareSDK.btcGetAddress(connectId, deviceId, {
   path: "m/44'/0'/0'/0/0",
   coin: 'btc',
-  showOnOneKey: false,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
 });
 
 if (res.success) {
-  console.log('BTC 地址:', res.payload.address);
+  console.log('BTC address:', res.payload.address);
 } else {
-  console.error('错误:', res.payload.error, res.payload.code);
+  console.error('Error:', res.payload.error, res.payload.code);
 }
 ```
 

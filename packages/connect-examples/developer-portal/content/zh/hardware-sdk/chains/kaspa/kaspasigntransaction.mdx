@@ -6,13 +6,13 @@ title: kaspaSignTransaction
 
 ### 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Touch: 4.3.0
   * Classic/Mini: 3.0.0
 
 ## Kaspa：签名交易
 
-使用指定 BIP32 路径派生的私钥对交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+使用指定路径派生的密钥请求交易签名。用户在设备上核对并确认请求。
 
 ```typescript
 const result = await HardwareSDK.kaspaSignTransaction(connectId, deviceId, params);
@@ -25,8 +25,8 @@ const result = await HardwareSDK.kaspaSignTransaction(connectId, deviceId, param
 * `version` - _必需_ `number` 交易版本。
 * `inputs` - _必需_ [KaspaSignInputParams](https://github.com/OneKeyHQ/hardware-js-sdk/blob/269ee367141ae2186a9a63d1d89e9f4c70428623/packages/core/src/types/api/kaspaSignTransaction.ts#L9C1-L19C3) 的 `Array`。
 * `outputs` - _必需_ [KaspaSignOutputParams](https://github.com/OneKeyHQ/hardware-js-sdk/blob/269ee367141ae2186a9a63d1d89e9f4c70428623/packages/core/src/types/api/kaspaSignTransaction.ts#L21C1-L26C1) 的 `Array`。
-* `lockTime` - _必需_ `number`
-* `sigHashType` - _必需_ `number`
+* `lockTime` - _必需_ `number | string`
+* `sigHashType` - _可选_ `number`
   * ```
     SIGHASH_ALL = 0x01,
     SIGHASH_NONE = 0x02,
@@ -37,9 +37,7 @@ const result = await HardwareSDK.kaspaSignTransaction(connectId, deviceId, param
 * `sigOpCount` - _可选_ `number`
 * `subNetworkID` - _可选_ `string`
 * `prefix` - _可选_ `string` 地址前缀。默认设置为 `kaspa`
-* `scheme` - _可选_ `string` 加密算法模式。默认设置为 `schnorr`
-
-
+* `scheme` - _可选_ `string`。签名算法，默认为 `schnorr`。
 
 ### 示例
 
@@ -53,7 +51,7 @@ const response = await HardwareSDK.kaspaSignTransaction(
     sigHashType: 0x1,
     sigOpCount: 1,
     subNetworkID: "00000000000000000000000000000000",
-    prefix: "prefix",
+    prefix: "kaspa",
     scheme: "schnorr",
     inputs: [
       {
@@ -89,10 +87,9 @@ const response = await HardwareSDK.kaspaSignTransaction(
 ```typescript
 {
   success: true,
-  payload: {
-    index: 0,
-    signature: "signed data"
-  }
+  payload: [
+    { index: 0, signature: "signed data" }
+  ]
 }
 ```
 
@@ -102,8 +99,8 @@ const response = await HardwareSDK.kaspaSignTransaction(
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

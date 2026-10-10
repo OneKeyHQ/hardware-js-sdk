@@ -17,7 +17,7 @@ export default {
   },
   'getting-started': { title: 'Start here', type: 'page' },
   'connect-to-software': {
-    title: 'dApp Integration',
+    title: 'dApps',
     type: 'menu',
     items: {
       quickstart: { title: 'dApp quickstart', href: '/en/connect-to-software' },
@@ -26,7 +26,7 @@ export default {
     },
   },
   'hardware-sdk': {
-    title: 'Hardware Integration',
+    title: 'Hardware',
     type: 'menu',
     items: {
       'getting-started': { title: 'Getting Started', href: '/en/hardware-sdk/getting-started' },
@@ -36,7 +36,7 @@ export default {
     },
   },
   'air-gap': {
-    title: 'Offline Signing',
+    title: 'QR signing',
     type: 'page',
   },
   'agent-wallet': {
@@ -70,6 +70,18 @@ export default {
       safety: { title: 'Safety Rules', href: '/en/agent-wallet/safety' },
     },
   },
+  'integration-guides': {
+    title: 'Resources',
+    type: 'menu',
+    items: {
+      guides: { title: 'Integration guides', href: '/en/integration-guides' },
+      glossary: { title: 'Glossary', href: '/en/integration-guides/glossary' },
+      troubleshooting: { title: 'Troubleshooting', href: '/en/troubleshooting' },
+      contributing: { title: 'Contributing', href: '/en/integration-guides/contributing' },
+      legacy: { title: 'Legacy integrations', href: '/en/legacy' },
+    },
+  },
+  legacy: { title: 'Legacy integrations', display: 'hidden' },
   troubleshooting: { title: 'Troubleshooting', display: 'hidden' },
   // Navigation menus with dropdown items
   changelog: {

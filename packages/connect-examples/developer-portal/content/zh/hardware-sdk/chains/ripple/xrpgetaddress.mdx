@@ -6,7 +6,7 @@ title: xrpGetAddress
 
 ## Ripple：获取地址
 
-显示指定 BIP32 路径派生的地址，并返回给调用者。用户需要在 OneKey 上确认导出。
+派生并返回指定路径的地址。`showOnOneKey` 为 `true` 时，用户必须在设备上确认地址。
 
 ```typescript
 const response = await HardwareSDK.xrpGetAddress(connectId, deviceId, params)
@@ -18,12 +18,12 @@ const response = await HardwareSDK.xrpGetAddress(connectId, deviceId, params)
 
 **导出单个地址**
 
-* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `path` - _必需_ `string | Array<number>`  SDK 校验的最小长度为 `3`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _可选_ `boolean`。是否在设备上显示地址，默认为 `true`。
 
 **导出批量地址**
 
-* `bundle` - 包含 `path` 和 `showOnOneKey` 字段的对象 `Array`
+* `bundle` - 对象数组，每个对象包含 `path`、`showOnOneKey` 字段。
 
 #### 示例
 
@@ -35,42 +35,42 @@ HardwareSDK.xrpGetAddress(connectId, deviceId, {
 });
 ```
 
-返回一批 Ripple 地址而不在设备上显示：
+批量返回 Ripple 地址，不在设备上显示：
 
 ```typescript
 HardwareSDK.xrpGetAddress(connectId, deviceId, {
     bundle: [
-        { path: "m/44'/144'/0'/0/0", showOnOneKey: false }, // 账户 1
-        { path: "m/44'/144'/1'/0/0", showOnOneKey: false }, // 账户 2
-        { path: "m/44'/144'/2'/0/0", showOnOneKey: false }  // 账户 3
+        { path: "m/44'/144'/0'/0/0", showOnOneKey: false }, // account 1
+        { path: "m/44'/144'/1'/0/0", showOnOneKey: false }, // account 2
+        { path: "m/44'/144'/2'/0/0", showOnOneKey: false }  // account 3
     ]
 });
 ```
 
 #### 返回结果
 
-只有一个地址的结果
+单个地址响应
 
 ```typescript
 {
     success: true,
     payload: {
-        address: string,     // 显示的地址
-        publicKey: string,   // 账户公钥
-        path: string  // 序列化 BIP32 路径
+        address: string,     // displayed address
+        publicKey: string,   // account public key
+        path: string  // serialized BIP32 path
     }
 }
 ```
 
-按 FIFO 排序的批量地址结果
+批量响应，顺序与请求一致
 
 ```typescript
 {
     success: true,
     payload: [
-        { address: string, publicKey: string, path: string }, // 账户 1
-        { address: string, publicKey: string, path: string }, // 账户 2
-        { address: string, publicKey: string, path: string }  // 账户 3
+        { address: string, publicKey: string, path: string }, // account 1
+        { address: string, publicKey: string, path: string }, // account 2
+        { address: string, publicKey: string, path: string }  // account 3
     ]
 }
 ```
@@ -81,8 +81,8 @@ HardwareSDK.xrpGetAddress(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

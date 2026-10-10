@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # 交易
 
+使用 dApp API 前先调用 `enable()`。CIP-30 返回的地址是十六进制编码的字节；交易和 value 参数是十六进制编码的 CBOR。在浏览器示例中使用 `Buffer` 时，需要显式导入 `buffer` 或使用字节转换工具。
+
 了解如何在 Cardano 上签署和提交交易。
 
 ---
@@ -14,14 +16,14 @@ import { Callout } from 'nextra/components'
 ## 签署交易
 
 ```typescript
-// transaction 应该是 CBOR 编码的十六进制字符串
-const signedTx = await api.signTx(transactionCbor, partialSign)
+// transaction should be CBOR-encoded hex string
+const witnessSetCbor = await api.signTx(transactionCbor, partialSign)
 
 // partialSign: boolean
-// - false: 签署钱包拥有的所有输入
-// - true: 仅签署明确拥有的输入（用于多签）
+// - false: reject if the wallet cannot provide every required signature
+// - true: return the signatures the wallet can provide
 
-console.log('已签名的交易:', signedTx)
+console.log('Witness set:', witnessSetCbor)
 ```
 
 ---
@@ -29,78 +31,30 @@ console.log('已签名的交易:', signedTx)
 ## 提交交易
 
 ```typescript
-// 提交已签名的交易
+// Submit signed transaction
 const txHash = await api.submitTx(signedTransactionCbor)
-console.log('交易哈希:', txHash)
+console.log('Transaction hash:', txHash)
 ```
 
 ---
 
-## 完整的交易流程
+<span id="完整的交易流程" />
+
+### 构建、签名并提交
+
+`signTx` 返回 witness set，不是完整的已签名交易。使用 Cardano 交易库构建未签名交易，将返回的 witness 与原有 witness set 合并，再提交合并后的完整交易。
 
 ```typescript
-import {
-  TransactionBuilder,
-  TransactionBuilderConfigBuilder,
-  LinearFee,
-  BigNum,
-  Address,
-  TransactionOutput,
-  Value,
-} from '@emurgo/cardano-serialization-lib-browser'
-
-async function sendAda(recipientAddress, amountLovelace) {
-  const api = await window.cardano.onekey.enable()
-
-  // 获取 UTxO
-  const utxos = await api.getUtxos()
-  const changeAddress = await api.getChangeAddress()
-
-  // 构建交易
-  const txBuilder = TransactionBuilder.new(
-    TransactionBuilderConfigBuilder.new()
-      .fee_algo(LinearFee.new(
-        BigNum.from_str('44'),
-        BigNum.from_str('155381')
-      ))
-      .pool_deposit(BigNum.from_str('500000000'))
-      .key_deposit(BigNum.from_str('2000000'))
-      .max_value_size(5000)
-      .max_tx_size(16384)
-      .coins_per_utxo_byte(BigNum.from_str('4310'))
-      .build()
-  )
-
-  // 从 UTxO 添加输入
-  utxos.forEach(utxo => {
-    // 添加 UTxO 作为输入...
-  })
-
-  // 添加输出
-  txBuilder.add_output(
-    TransactionOutput.new(
-      Address.from_bech32(recipientAddress),
-      Value.new(BigNum.from_str(amountLovelace))
-    )
-  )
-
-  // 设置找零地址
-  txBuilder.add_change_if_needed(Address.from_bech32(changeAddress))
-
-  // 构建交易
-  const tx = txBuilder.build_tx()
-  const txCbor = Buffer.from(tx.to_bytes()).toString('hex')
-
-  // 签名
-  const signedTxCbor = await api.signTx(txCbor, false)
-
-  // 提交
-  const txHash = await api.submitTx(signedTxCbor)
-  console.log('交易哈希:', txHash)
-
-  return txHash
-}
+// `unsignedTransactionCbor` is a complete transaction built with current
+// protocol parameters, selected inputs, outputs, fees, and change.
+const witnessSetCbor = await api.signTx(unsignedTransactionCbor, false)
+// Merge witnessSetCbor into the original transaction using your Cardano SDK.
+// Preserve existing witnesses, scripts, datums, redeemers, and auxiliary data.
+// Submit the serialized complete transaction, never witnessSetCbor alone.
+const txHash = await api.submitTx(completeSignedTransactionCbor)
 ```
+
+如果应用尚未实现交易构建和 witness 合并，可使用下方 Lucid 或 Mesh 流程。SDK 示例与版本有关，请以所安装版本的文档为准。
 
 ---
 
@@ -113,19 +67,19 @@ npm install lucid-cardano
 ```
 
 ```typescript
-import { Lucid } from 'lucid-cardano'
+import { Lucid, Blockfrost } from 'lucid-cardano'
 
-// 使用 OneKey 初始化 Lucid
+// Initialize Lucid with OneKey
 const lucid = await Lucid.new(
   new Blockfrost('https://cardano-mainnet.blockfrost.io/api', 'your-api-key'),
   'Mainnet'
 )
 
-// 连接 OneKey
+// Connect OneKey
 const api = await window.cardano.onekey.enable()
 lucid.selectWallet(api)
 
-// 发送 ADA
+// Send ADA
 const tx = await lucid
   .newTx()
   .payToAddress('addr1...', { lovelace: 5000000n })
@@ -134,7 +88,7 @@ const tx = await lucid
 const signedTx = await tx.sign().complete()
 const txHash = await signedTx.submit()
 
-console.log('交易哈希:', txHash)
+console.log('TX Hash:', txHash)
 ```
 
 ---
@@ -150,14 +104,14 @@ npm install @meshsdk/core
 ```typescript
 import { BrowserWallet, Transaction } from '@meshsdk/core'
 
-// 连接到 OneKey
+// Connect to OneKey
 const wallet = await BrowserWallet.enable('onekey')
 
-// 获取钱包信息
+// Get wallet info
 const balance = await wallet.getBalance()
 const addresses = await wallet.getUsedAddresses()
 
-// 构建并发送交易
+// Build and send transaction
 const tx = new Transaction({ initiator: wallet })
   .sendLovelace('addr1...', '5000000')
 
@@ -165,4 +119,3 @@ const unsignedTx = await tx.build()
 const signedTx = await wallet.signTx(unsignedTx)
 const txHash = await wallet.submitTx(signedTx)
 ```
-

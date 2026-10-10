@@ -25,7 +25,7 @@ const result = await HardwareSDK.nexaSignTransaction(connectId, deviceId, params
 * `inputs` - _required_ `Array` transaction inputs
   * `path` - _required_ `string` SDK minimum length is `3`. [Path format](/en/hardware-sdk/concepts/common-params#hd-path)
   * `message` - _required_ `string` Serialized transaction encoded as a hexadecimal string.
-  * `prefix` - _required_ `string` Address prefix. Default is set to `nexatest`
+  * `prefix` - _required_ `string` Address prefix for the intended network. The SDK does not supply a default; the example explicitly selects `nexatest`.
 ### Examples
 
 ```typescript

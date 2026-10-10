@@ -2,5 +2,22 @@
 title: API 参考
 ---
 
-# API 参考
+# Bitcoin API 参考
 
+所有方法均为异步方法。调用前请检查 provider 是否存在，并处理 Promise 拒绝，包括用户拒绝钱包请求的情况。使用顶层 await 的示例必须在 ES 模块或 async 函数中运行。
+
+- [getAccounts](/zh/connect-to-software/provider/btc/api-reference/getaccounts)
+- [getBalance](/zh/connect-to-software/provider/btc/api-reference/getbalance)
+- [getInscriptions](/zh/connect-to-software/provider/btc/api-reference/getinscriptions)
+- [getNetwork](/zh/connect-to-software/provider/btc/api-reference/getnetwork)
+- [getPublicKey](/zh/connect-to-software/provider/btc/api-reference/getpublickey)
+- [inscribeTransfer （已弃用）](/zh/connect-to-software/provider/btc/api-reference/inscribetransfer-deprecated)
+- [pushPsbt](/zh/connect-to-software/provider/btc/api-reference/pushpsbt)
+- [pushTx](/zh/connect-to-software/provider/btc/api-reference/pushtx)
+- [requestAccounts](/zh/connect-to-software/provider/btc/api-reference/requestaccounts)
+- [sendBitcoin](/zh/connect-to-software/provider/btc/api-reference/sendbitcoin)
+- [sendInscription](/zh/connect-to-software/provider/btc/api-reference/sendinscription)
+- [signMessage](/zh/connect-to-software/provider/btc/api-reference/signmessage)
+- [signPsbt](/zh/connect-to-software/provider/btc/api-reference/signpsbt)
+- [signPsbts](/zh/connect-to-software/provider/btc/api-reference/signpsbts)
+- [switchNetwork](/zh/connect-to-software/provider/btc/api-reference/switchnetwork)

@@ -7,9 +7,10 @@
     "dev:webpack": "next dev --webpack -p 3001",
     "dev:ai-gateway": "node ./scripts/context7-chat-gateway.mjs",
     "sync:changelog": "node ./scripts/sync-changelog.mjs",
-    "build": "next build && node scripts/build-search.mjs",
+    "build": "yarn check:content && next build && node scripts/build-search.mjs",
     "start": "npx serve@latest out",
-    "clean": "rimraf out .next"
+    "clean": "rimraf out .next",
+    "check:content": "node --test scripts/check-content.test.mjs && node scripts/check-content.mjs"
   },
   "dependencies": {
     "@ai-sdk/react": "3.0.110",

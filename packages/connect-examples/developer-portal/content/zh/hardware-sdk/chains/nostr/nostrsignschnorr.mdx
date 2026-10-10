@@ -6,14 +6,11 @@ title: nostrSignSchnorr
 
 ### 使用要求
 
-* 固件版本要求
-  * Touch: 4.6.0
-  * Classic/Mini: 3.5.0
-  * Classic1s: 3.6.0
+当前 SDK 声明的固件版本校验范围为：`model_touch` ≥ 4.7.0、`model_mini` ≥ 3.6.0。这些名称是 SDK 的范围键；接入时还需确认其对应的设备型号，以及已发布固件的实际支持情况。
 
 ## Nostr：签名 Schnorr
 
-使用指定 BIP32 路径派生的私钥对 Schnorr 交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+使用指定路径的密钥，对传入的哈希请求 Schnorr 签名。用户在设备上确认请求。
 
 ```typescript
 const result = await HardwareSDK.nostrSignSchnorr(connectId, deviceId, params);
@@ -23,10 +20,8 @@ const result = await HardwareSDK.nostrSignSchnorr(connectId, deviceId, params);
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `5`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `hash` - _必需_ `string` Schnorr 哈希。
-
-
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `5`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `hash` - _必需_ `string`。以十六进制编码的 32 字节哈希。
 
 ### 示例
 
@@ -60,8 +55,8 @@ const response = await HardwareSDK.nostrSignSchnorr(
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

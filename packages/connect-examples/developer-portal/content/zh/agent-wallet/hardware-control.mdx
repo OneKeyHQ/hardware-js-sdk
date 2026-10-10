@@ -1,10 +1,13 @@
 ---
 title: 硬件控制
+description: 选择硬件钱包会话，并明确处理设备确认、密码短语模式与设置变更。
 ---
 
 # 硬件控制
 
-硬件控制让 Agent Wallet 工作流可以把敏感操作升级到 OneKey 硬件钱包。这是 OneKey 和只依赖软件托管或 TEE 签名的 agent wallet 的核心差异。
+> 当前为私有测试版。访问资格、支持的命令与钱包流程取决于 OneKey 和 CLI 版本。使用示例前，先检查已安装 CLI 的 schema。
+
+硬件会话使用已连接的 OneKey 设备处理受支持的签名请求，用户在设备上审阅并确认。设备能力和可展示的交易详情取决于链、固件及 CLI 版本。
 
 ## 什么时候升级到硬件
 
@@ -14,7 +17,7 @@ title: 硬件控制
 | 合约交互 | Agent 先运行 simulation；支持时设备展示 clear-signing 信息。 |
 | Swap 执行 | Agent 先 quote/build；只有用户确认执行后才进入设备确认。 |
 | 隐藏钱包 | 显式声明 passphrase mode，Agent 不猜当前是否为隐藏钱包。 |
-| 设备可信检查 | 使用 `onekey device verify` 验证已连接设备后再签名。 |
+| 设备可信检查 | `onekey device verify` 进行设备验证；验证成功不代表某笔交易安全。 |
 
 ## 连接并登录
 
@@ -36,13 +39,15 @@ onekey auth login --hardware
 onekey auth login --hardware --device-id <uuid>
 ```
 
-隐藏钱包场景下，非交互环境必须明确 passphrase 处理方式：
+为目标钱包选择一种密码短语模式。以下是互斥选项，不是连续执行的步骤：
 
-```bash
-onekey auth login --hardware --passphrase-mode none
-onekey auth login --hardware --passphrase-mode on-host
-onekey auth login --hardware --passphrase-mode on-device
-```
+| 模式 | 钱包选择 |
+| --- | --- |
+| `none` | 不使用密码短语的标准钱包。 |
+| `on-host` | 在宿主端输入密码短语的隐藏钱包；密码短语不得进入 Agent 消息或日志。 |
+| `on-device` | 在支持设备端输入的硬件上输入密码短语，进入隐藏钱包。 |
+
+选择前检查已安装 CLI 的 schema；登录后核对活动地址。不同密码短语对应不同钱包。
 
 ## 活动会话
 
@@ -59,11 +64,15 @@ onekey auth login --hardware --passphrase-mode on-device
 
 ## 设备生命周期
 
-```bash
-onekey device verify
-onekey device change-pin
-onekey device toggle-passphrase
-onekey device settings
-```
+先检查已安装 CLI 的 schema，并说明设置变化；仅执行用户要求的操作：
+
+| 操作 | 命令族 |
+| --- | --- |
+| 验证已连接设备 | `onekey device verify` |
+| 修改设备 PIN | `onekey device change-pin` |
+| 修改密码短语保护设置 | `onekey device toggle-passphrase` |
+| 查看或修改设备设置 | `onekey device settings` |
+
+如果 `onekey schema --list` 中没有该命令，报告当前版本不支持，不猜测参数。
 
 不要绕过物理确认。如果设备锁定、断开、要求 PIN/passphrase，或拒绝请求，Agent 应报告状态并停止。

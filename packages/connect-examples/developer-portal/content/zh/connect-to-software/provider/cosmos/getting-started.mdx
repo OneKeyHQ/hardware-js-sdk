@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # 快速开始
 
+读取密钥信息或请求签名前，先启用目标链。使用该链的账户编号、sequence、手续费和 RPC 端点；运行签名示例前，请替换其中的占位值。
+
 了解如何检测、连接和与 Cosmos 链进行交互。
 
 ---
@@ -14,15 +16,15 @@ import { Callout } from 'nextra/components'
 ## Provider 检测
 
 ```typescript
-// 检测 OneKey Cosmos provider
+// Detect OneKey Cosmos provider
 const provider = window.$onekey?.cosmos
 
 if (!provider) {
-  throw new Error('未检测到 OneKey Cosmos provider')
+  throw new Error('OneKey Cosmos provider not detected')
 }
 
-// 检查是否为 OneKey
-console.log('Provider:', provider.isOneKey ? 'OneKey' : '未知')
+// Check if it's OneKey
+console.log('Provider:', provider.isOneKey ? 'OneKey' : 'Unknown')
 ```
 
 ---
@@ -32,10 +34,10 @@ console.log('Provider:', provider.isOneKey ? 'OneKey' : '未知')
 ```typescript
 const chainId = 'cosmoshub-4'
 
-// 启用链 - 返回密钥信息
-const key = await provider.enable(chainId)
+// Request access to the chain. Read key information separately with getKey().
+await provider.enable(chainId)
 
-// 或一次启用多条链
+// Or enable multiple chains at once
 await provider.enable(['cosmoshub-4', 'osmosis-1', 'juno-1'])
 ```
 
@@ -48,12 +50,12 @@ const chainId = 'cosmoshub-4'
 const key = await provider.getKey(chainId)
 
 console.log({
-  name: key.name,           // 账户名称
-  algo: key.algo,           // 签名算法 (secp256k1)
-  pubKey: key.pubKey,       // 公钥 (Uint8Array)
-  address: key.address,     // 地址 (Uint8Array)
-  bech32Address: key.bech32Address,  // Bech32 格式地址
-  isNanoLedger: key.isNanoLedger,    // 是否为硬件钱包
+  name: key.name,           // Account name
+  algo: key.algo,           // Signing algorithm (secp256k1)
+  pubKey: key.pubKey,       // Public key (Uint8Array)
+  address: key.address,     // Raw address bytes
+  bech32Address: key.bech32Address,  // Bech32 formatted address
+  isNanoLedger: key.isNanoLedger,    // Ledger compatibility flag
 })
 ```
 
@@ -116,20 +118,20 @@ import { SigningStargateClient } from '@cosmjs/stargate'
 
 const chainId = 'cosmoshub-4'
 
-// 自动检测最佳签名器类型
+// Auto-detect best signer type
 const offlineSigner = await provider.getOfflineSignerAuto(chainId)
 
-// 或使用特定的签名器类型
+// Or use specific signer types
 const aminoSigner = provider.getOfflineSignerOnlyAmino(chainId)
 const directSigner = provider.getOfflineSigner(chainId)
 
-// 与 CosmJS 配合使用
+// Use with CosmJS
 const client = await SigningStargateClient.connectWithSigner(
   'https://rpc.cosmos.network',
   offlineSigner
 )
 
-// 发送代币
+// Send tokens
 const result = await client.sendTokens(
   senderAddress,
   recipientAddress,
@@ -145,10 +147,9 @@ const result = await client.sendTokens(
 OneKey 的 Cosmos provider 与 Keplr 兼容。只需更改您的 provider 检测方式：
 
 ```typescript
-// 之前 (仅 Keplr)
+// Before (Keplr only)
 const provider = window.keplr
 
-// 之后 (OneKey 优先，Keplr 作为备选)
+// After (OneKey with Keplr fallback)
 const provider = window.$onekey?.cosmos || window.keplr
 ```
-

@@ -1,0 +1,2073 @@
+{
+  "sourceRepository": "OneKeyHQ/docs",
+  "sourceRevision": "e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b",
+  "changeRequest": 229,
+  "reviewedSourcePages": 227,
+  "pages": [
+    {
+      "source": "README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/index.mdx",
+        "content/zh/index.mdx"
+      ],
+      "reason": "The main portal landing page retains the three integration choices."
+    },
+    {
+      "source": "best-practice/defining-your-apps-icon.md",
+      "disposition": "integrated",
+      "targets": [
+        "content/en/integration-guides/site-metadata.mdx",
+        "content/zh/integration-guides/site-metadata.mdx"
+      ],
+      "reason": "Site icon guidance and actual prompt verification."
+    },
+    {
+      "source": "best-practice/migration-from-metamask.md",
+      "disposition": "integrated",
+      "targets": [
+        "content/en/integration-guides/provider-selection.mdx",
+        "content/zh/integration-guides/provider-selection.mdx"
+      ],
+      "reason": "Explicit provider selection, events, and legacy switching boundary."
+    },
+    {
+      "source": "best-practice/registering-tokens-with-users.md",
+      "disposition": "integrated",
+      "targets": [
+        "content/en/integration-guides/token-metadata.mdx",
+        "content/zh/integration-guides/token-metadata.mdx"
+      ],
+      "reason": "User-initiated wallet_watchAsset with verified token metadata."
+    },
+    {
+      "source": "best-practice/registering-your-contracts-method-names.md",
+      "disposition": "integrated",
+      "targets": [
+        "content/en/integration-guides/contract-metadata.mdx",
+        "content/zh/integration-guides/contract-metadata.mdx"
+      ],
+      "reason": "ABI/source verification and unsupported paid-registry promise removed."
+    },
+    {
+      "source": "connect-to-hardware/air-gap-sdk/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/air-gap/index.mdx",
+        "content/zh/air-gap/index.mdx"
+      ],
+      "reason": "Current per-chain QR guides retain the encoding/decoding and wallet-integration corrections; package-version caveats remain explicit."
+    },
+    {
+      "source": "connect-to-hardware/air-gap-sdk/api-reference/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/air-gap/index.mdx",
+        "content/zh/air-gap/index.mdx"
+      ],
+      "reason": "Current per-chain QR guides retain the encoding/decoding and wallet-integration corrections; package-version caveats remain explicit."
+    },
+    {
+      "source": "connect-to-hardware/air-gap-sdk/api-reference/basic-api/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/air-gap/basic-api/index.mdx",
+        "content/zh/air-gap/basic-api/index.mdx"
+      ],
+      "reason": "Current per-chain QR guides retain the encoding/decoding and wallet-integration corrections; package-version caveats remain explicit."
+    },
+    {
+      "source": "connect-to-hardware/air-gap-sdk/api-reference/basic-api/cryptocoininfo.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/air-gap/basic-api/cryptocoininfo.mdx",
+        "content/zh/air-gap/basic-api/cryptocoininfo.mdx"
+      ],
+      "reason": "Current per-chain QR guides retain the encoding/decoding and wallet-integration corrections; package-version caveats remain explicit."
+    },
+    {
+      "source": "connect-to-hardware/air-gap-sdk/api-reference/basic-api/cryptohdkey.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/air-gap/basic-api/cryptohdkey.mdx",
+        "content/zh/air-gap/basic-api/cryptohdkey.mdx"
+      ],
+      "reason": "Current per-chain QR guides retain the encoding/decoding and wallet-integration corrections; package-version caveats remain explicit."
+    },
+    {
+      "source": "connect-to-hardware/air-gap-sdk/api-reference/basic-api/cryptokeypath.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/air-gap/basic-api/cryptokeypath.mdx",
+        "content/zh/air-gap/basic-api/cryptokeypath.mdx"
+      ],
+      "reason": "Current per-chain QR guides retain the encoding/decoding and wallet-integration corrections; package-version caveats remain explicit."
+    },
+    {
+      "source": "connect-to-hardware/air-gap-sdk/api-reference/ethereum-and-evm/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/air-gap/ethereum-and-evm/index.mdx",
+        "content/zh/air-gap/ethereum-and-evm/index.mdx"
+      ],
+      "reason": "Current per-chain QR guides retain the encoding/decoding and wallet-integration corrections; package-version caveats remain explicit."
+    },
+    {
+      "source": "connect-to-hardware/air-gap-sdk/api-reference/ethereum-and-evm/ethsignature.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/air-gap/ethereum-and-evm/ethsignature.mdx",
+        "content/zh/air-gap/ethereum-and-evm/ethsignature.mdx"
+      ],
+      "reason": "Current per-chain QR guides retain the encoding/decoding and wallet-integration corrections; package-version caveats remain explicit."
+    },
+    {
+      "source": "connect-to-hardware/air-gap-sdk/api-reference/ethereum-and-evm/ethsignrequest.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/air-gap/ethereum-and-evm/ethsignrequest.mdx",
+        "content/zh/air-gap/ethereum-and-evm/ethsignrequest.mdx"
+      ],
+      "reason": "Current per-chain QR guides retain the encoding/decoding and wallet-integration corrections; package-version caveats remain explicit."
+    },
+    {
+      "source": "connect-to-hardware/air-gap-sdk/started.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/air-gap/index.mdx",
+        "content/zh/air-gap/index.mdx"
+      ],
+      "reason": "Current per-chain QR guides retain the encoding/decoding and wallet-integration corrections; package-version caveats remain explicit."
+    },
+    {
+      "source": "connect-to-hardware/air-gap-sdk/tutorial-wallet-integration.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/air-gap/index.mdx",
+        "content/zh/air-gap/index.mdx"
+      ],
+      "reason": "Current per-chain QR guides retain the encoding/decoding and wallet-integration corrections; package-version caveats remain explicit."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/advanced/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/concepts/low-level-plugin.mdx",
+        "content/zh/hardware-sdk/concepts/low-level-plugin.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/advanced/common-sdk-guide.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/core-api-guide.mdx",
+        "content/zh/hardware-sdk/core-api-guide.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/advanced/low-level-transport-plugin.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/concepts/low-level-plugin.mdx",
+        "content/zh/hardware-sdk/concepts/low-level-plugin.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/advanced/onekey-message-protocol.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/concepts/protocol.mdx",
+        "content/zh/hardware-sdk/concepts/protocol.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/advanced/passphrase.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/concepts/passphrase.mdx",
+        "content/zh/hardware-sdk/concepts/passphrase.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/index.mdx",
+        "content/zh/hardware-sdk/index.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/algorand/algogetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/algorand/algogetaddress.mdx",
+        "content/zh/hardware-sdk/chains/algorand/algogetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/algorand/algosigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/algorand/algosigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/algorand/algosigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/aptos/aptosgetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/aptos/aptosgetaddress.mdx",
+        "content/zh/hardware-sdk/chains/aptos/aptosgetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/aptos/aptosgetpublickey.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/aptos/aptosgetpublickey.mdx",
+        "content/zh/hardware-sdk/chains/aptos/aptosgetpublickey.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/aptos/aptossignmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/aptos/aptossignmessage.mdx",
+        "content/zh/hardware-sdk/chains/aptos/aptossignmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/aptos/aptossigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/aptos/aptossigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/aptos/aptossigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/basic-api/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/basic-api/index.mdx",
+        "content/zh/hardware-sdk/basic-api/index.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/basic-api/cancel-request.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/basic-api/cancel-request.mdx",
+        "content/zh/hardware-sdk/basic-api/cancel-request.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/basic-api/get-features.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/basic-api/get-features.mdx",
+        "content/zh/hardware-sdk/basic-api/get-features.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/basic-api/get-passphrase-state.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/basic-api/get-passphrase-state.mdx",
+        "content/zh/hardware-sdk/basic-api/get-passphrase-state.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/basic-api/response-ui-event.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/basic-api/response-ui-event.mdx",
+        "content/zh/hardware-sdk/basic-api/response-ui-event.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/basic-api/search-devices.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/basic-api/search-devices.mdx",
+        "content/zh/hardware-sdk/basic-api/search-devices.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/bitcoin-and-bitcoin-forks/btcgetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress.mdx",
+        "content/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/bitcoin-and-bitcoin-forks/btcgetpublickey.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetpublickey.mdx",
+        "content/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetpublickey.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/bitcoin-and-bitcoin-forks/btcsignmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsignmessage.mdx",
+        "content/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsignmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/bitcoin-and-bitcoin-forks/btcsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/bitcoin-and-bitcoin-forks/btcverifymessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcverifymessage.mdx",
+        "content/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcverifymessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/cardano/cardanogetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/cardano/cardanogetaddress.mdx",
+        "content/zh/hardware-sdk/chains/cardano/cardanogetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/cardano/cardanogetpublickey.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/cardano/cardanogetpublickey.mdx",
+        "content/zh/hardware-sdk/chains/cardano/cardanogetpublickey.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/cardano/cardanosignmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/cardano/cardanosignmessage.mdx",
+        "content/zh/hardware-sdk/chains/cardano/cardanosignmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/cardano/cardanosigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/cardano/cardanosigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/cardano/cardanosigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/common-params.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/concepts/common-params.mdx",
+        "content/zh/hardware-sdk/concepts/common-params.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/conflux/confluxgetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/conflux/confluxgetaddress.mdx",
+        "content/zh/hardware-sdk/chains/conflux/confluxgetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/conflux/confluxsignmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/conflux/confluxsignmessage.mdx",
+        "content/zh/hardware-sdk/chains/conflux/confluxsignmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/conflux/confluxsignmessagecip23.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/conflux/confluxsignmessagecip23.mdx",
+        "content/zh/hardware-sdk/chains/conflux/confluxsignmessagecip23.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/conflux/confluxsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/conflux/confluxsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/conflux/confluxsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/cosmos/cosmosgetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/cosmos/cosmosgetaddress.mdx",
+        "content/zh/hardware-sdk/chains/cosmos/cosmosgetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/cosmos/cosmosgetpublickey.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/cosmos/cosmosgetpublickey.mdx",
+        "content/zh/hardware-sdk/chains/cosmos/cosmosgetpublickey.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/cosmos/cosmossigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/cosmos/cosmossigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/cosmos/cosmossigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/device-api/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/device-api/index.mdx",
+        "content/zh/hardware-sdk/device-api/index.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/device-api/checkblefirmwarerelease.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/device-api/checkblefirmwarerelease.mdx",
+        "content/zh/hardware-sdk/device-api/checkblefirmwarerelease.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/device-api/checkbridgestatus.md",
+      "disposition": "archived",
+      "targets": [
+        "content/en/legacy/bridge.mdx",
+        "content/zh/legacy/bridge.mdx"
+      ],
+      "reason": "Historical API summary, immutable original reference, and current migration path."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/device-api/checkfirmwarerelease.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/device-api/checkfirmwarerelease.mdx",
+        "content/zh/hardware-sdk/device-api/checkfirmwarerelease.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/device-api/checktransportrelease.md",
+      "disposition": "archived",
+      "targets": [
+        "content/en/legacy/bridge.mdx",
+        "content/zh/legacy/bridge.mdx"
+      ],
+      "reason": "Historical API summary, immutable original reference, and current migration path."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/device-api/devicechangepin.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/device-api/devicechangepin.mdx",
+        "content/zh/hardware-sdk/device-api/devicechangepin.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/device-api/devicereset.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/integration-guides/device-management.mdx",
+        "content/zh/integration-guides/device-management.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/device-api/devicesettings.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/device-api/devicesettings.mdx",
+        "content/zh/hardware-sdk/device-api/devicesettings.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/device-api/devicesupportfeatures.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/device-api/devicesupportfeatures.mdx",
+        "content/zh/hardware-sdk/device-api/devicesupportfeatures.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/device-api/deviceupdatereboot.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/device-api/deviceupdatereboot.mdx",
+        "content/zh/hardware-sdk/device-api/deviceupdatereboot.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/device-api/deviceverify.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/device-api/deviceverify.mdx",
+        "content/zh/hardware-sdk/device-api/deviceverify.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/device-api/devicewipe.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/integration-guides/device-management.mdx",
+        "content/zh/integration-guides/device-management.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/device-api/firmwareupdate.md",
+      "disposition": "archived",
+      "targets": [
+        "content/en/legacy/firmware-update.mdx",
+        "content/zh/legacy/firmware-update.mdx"
+      ],
+      "reason": "Historical API summary, immutable original reference, and current migration path."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/ethereum-and-evm/evmgetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/ethereum-and-evm/evmgetaddress.mdx",
+        "content/zh/hardware-sdk/chains/ethereum-and-evm/evmgetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/ethereum-and-evm/evmgetpublickey.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/ethereum-and-evm/evmgetpublickey.mdx",
+        "content/zh/hardware-sdk/chains/ethereum-and-evm/evmgetpublickey.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/ethereum-and-evm/evmsignmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/ethereum-and-evm/evmsignmessage.mdx",
+        "content/zh/hardware-sdk/chains/ethereum-and-evm/evmsignmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/ethereum-and-evm/evmsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/ethereum-and-evm/evmsigntypeddata.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata.mdx",
+        "content/zh/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/ethereum-and-evm/evmverifymessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/ethereum-and-evm/evmverifymessage.mdx",
+        "content/zh/hardware-sdk/chains/ethereum-and-evm/evmverifymessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/filecoin/filecoingetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/filecoin/filecoingetaddress.mdx",
+        "content/zh/hardware-sdk/chains/filecoin/filecoingetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/filecoin/filecoinsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/filecoin/filecoinsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/filecoin/filecoinsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/init.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/getting-started.mdx",
+        "content/zh/hardware-sdk/getting-started.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/kaspa/kaspagetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/kaspa/kaspagetaddress.mdx",
+        "content/zh/hardware-sdk/chains/kaspa/kaspagetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/kaspa/kaspasigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/kaspa/kaspasigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/kaspa/kaspasigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/near/neargetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/near/neargetaddress.mdx",
+        "content/zh/hardware-sdk/chains/near/neargetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/near/nearsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/near/nearsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/near/nearsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/nem/nemgetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/nem/nemgetaddress.mdx",
+        "content/zh/hardware-sdk/chains/nem/nemgetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/nem/nemsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/nem/nemsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/nem/nemsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/nexa/nexagetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/nexa/nexagetaddress.mdx",
+        "content/zh/hardware-sdk/chains/nexa/nexagetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/nexa/nexasigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/nexa/nexasigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/nexa/nexasigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/nostr/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/concepts/chain-support.mdx",
+        "content/zh/hardware-sdk/concepts/chain-support.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/nostr/nostrdecryptmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/nostr/nostrdecryptmessage.mdx",
+        "content/zh/hardware-sdk/chains/nostr/nostrdecryptmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/nostr/nostrencryptmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/nostr/nostrencryptmessage.mdx",
+        "content/zh/hardware-sdk/chains/nostr/nostrencryptmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/nostr/nostrgetpublickey.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/nostr/nostrgetpublickey.mdx",
+        "content/zh/hardware-sdk/chains/nostr/nostrgetpublickey.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/nostr/nostrsignevent.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/nostr/nostrsignevent.mdx",
+        "content/zh/hardware-sdk/chains/nostr/nostrsignevent.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/nostr/nostrsignschnorr.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/nostr/nostrsignschnorr.mdx",
+        "content/zh/hardware-sdk/chains/nostr/nostrsignschnorr.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/path.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/concepts/common-params.mdx",
+        "content/zh/hardware-sdk/concepts/common-params.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/polkadot/polkadotgetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/polkadot/polkadotgetaddress.mdx",
+        "content/zh/hardware-sdk/chains/polkadot/polkadotgetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/polkadot/polkadotsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/polkadot/polkadotsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/polkadot/polkadotsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/ripple/xrpgetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/ripple/xrpgetaddress.mdx",
+        "content/zh/hardware-sdk/chains/ripple/xrpgetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/ripple/xrpsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/ripple/xrpsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/ripple/xrpsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/solana/solgetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/solana/solgetaddress.mdx",
+        "content/zh/hardware-sdk/chains/solana/solgetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/solana/solsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/solana/solsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/solana/solsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/starcoin/starcoingetpublickey.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/starcoin/starcoingetpublickey.mdx",
+        "content/zh/hardware-sdk/chains/starcoin/starcoingetpublickey.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/starcoin/starcoinsignmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/starcoin/starcoinsignmessage.mdx",
+        "content/zh/hardware-sdk/chains/starcoin/starcoinsignmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/starcoin/starcoinsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/starcoin/starcoinsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/starcoin/starcoinsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/starcoin/starcoinverifymessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/starcoin/starcoinverifymessage.mdx",
+        "content/zh/hardware-sdk/chains/starcoin/starcoinverifymessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/starcoin/startcoingetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/starcoin/startcoingetaddress.mdx",
+        "content/zh/hardware-sdk/chains/starcoin/startcoingetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/stellar/stellargetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/stellar/stellargetaddress.mdx",
+        "content/zh/hardware-sdk/chains/stellar/stellargetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/stellar/stellarsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/stellar/stellarsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/stellar/stellarsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/sui/suigetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/sui/suigetaddress.mdx",
+        "content/zh/hardware-sdk/chains/sui/suigetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/sui/suigetpublickey.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/sui/suigetpublickey.mdx",
+        "content/zh/hardware-sdk/chains/sui/suigetpublickey.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/sui/suisignmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/sui/suisignmessage.mdx",
+        "content/zh/hardware-sdk/chains/sui/suisignmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/sui/suisigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/sui/suisigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/sui/suisigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/tron/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/concepts/chain-support.mdx",
+        "content/zh/hardware-sdk/concepts/chain-support.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/tron/trongetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/tron/trongetaddress.mdx",
+        "content/zh/hardware-sdk/chains/tron/trongetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/tron/tronsignmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/tron/tronsignmessage.mdx",
+        "content/zh/hardware-sdk/chains/tron/tronsignmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/api-reference/tron/tronsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/tron/tronsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/tron/tronsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/config-event.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/core-api-guide.mdx",
+        "content/zh/hardware-sdk/core-api-guide.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/install-sdk.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/getting-started.mdx",
+        "content/zh/hardware-sdk/getting-started.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/started.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/getting-started.mdx",
+        "content/zh/hardware-sdk/getting-started.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/hardware-sdk/tutorial.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/getting-started.mdx",
+        "content/zh/hardware-sdk/getting-started.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/index.mdx",
+        "content/zh/hardware-sdk/index.mdx"
+      ],
+      "reason": "Current SDK overview replaces GitBook-specific section landing."
+    },
+    {
+      "source": "connect-to-hardware/page-1/advanced/pin.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/concepts/pin.mdx",
+        "content/zh/hardware-sdk/concepts/pin.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/alephium/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/concepts/chain-support.mdx",
+        "content/zh/hardware-sdk/concepts/chain-support.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/alephium/alephiumgetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/alephium/alephiumgetaddress.mdx",
+        "content/zh/hardware-sdk/chains/alephium/alephiumgetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/alephium/alephiumsignmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/alephium/alephiumsignmessage.mdx",
+        "content/zh/hardware-sdk/chains/alephium/alephiumsignmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/alephium/alephiumsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/alephium/alephiumsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/alephium/alephiumsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/benfen/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/concepts/chain-support.mdx",
+        "content/zh/hardware-sdk/concepts/chain-support.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/benfen/benfengetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/benfen/benfengetaddress.mdx",
+        "content/zh/hardware-sdk/chains/benfen/benfengetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/benfen/benfengetpublickey.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/benfen/benfengetpublickey.mdx",
+        "content/zh/hardware-sdk/chains/benfen/benfengetpublickey.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/benfen/benfensignmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/benfen/benfensignmessage.mdx",
+        "content/zh/hardware-sdk/chains/benfen/benfensignmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/benfen/benfensigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/benfen/benfensigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/benfen/benfensigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/dynex/dnxgetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/dynex/dnxgetaddress.mdx",
+        "content/zh/hardware-sdk/chains/dynex/dnxgetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/dynex/dnxsigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/dynex/dnxsigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/dynex/dnxsigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/nervos/nervosgetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/nervos/nervosgetaddress.mdx",
+        "content/zh/hardware-sdk/chains/nervos/nervosgetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/nervos/nervossigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/nervos/nervossigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/nervos/nervossigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/scdo/scdogetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/scdo/scdogetaddress.mdx",
+        "content/zh/hardware-sdk/chains/scdo/scdogetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/scdo/scdosignmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/scdo/scdosignmessage.mdx",
+        "content/zh/hardware-sdk/chains/scdo/scdosignmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/scdo/scdosigntransaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/scdo/scdosigntransaction.mdx",
+        "content/zh/hardware-sdk/chains/scdo/scdosigntransaction.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/ton/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/concepts/chain-support.mdx",
+        "content/zh/hardware-sdk/concepts/chain-support.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/ton/tongetaddress.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/ton/tongetaddress.mdx",
+        "content/zh/hardware-sdk/chains/ton/tongetaddress.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/ton/tonsignmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/ton/tonsignmessage.mdx",
+        "content/zh/hardware-sdk/chains/ton/tonsignmessage.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-hardware/page-1/api-reference/ton/tonsignproof.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/chains/ton/tonsignproof.mdx",
+        "content/zh/hardware-sdk/chains/ton/tonsignproof.mdx"
+      ],
+      "reason": "Verified hardware contract integrated into the current guide/API structure; device support remains firmware-dependent."
+    },
+    {
+      "source": "connect-to-software/compatible-with-metamask/README.md",
+      "disposition": "integrated",
+      "targets": [
+        "content/en/integration-guides/provider-selection.mdx",
+        "content/zh/integration-guides/provider-selection.mdx"
+      ],
+      "reason": "EIP-1193 compatibility without unsupported wallet-wide guarantees."
+    },
+    {
+      "source": "connect-to-software/compatible-with-metamask/detectethereumprovider.md",
+      "disposition": "integrated",
+      "targets": [
+        "content/en/integration-guides/provider-selection.mdx",
+        "content/zh/integration-guides/provider-selection.mdx"
+      ],
+      "reason": "Namespaced provider and EIP-6963 discovery."
+    },
+    {
+      "source": "connect-to-software/support-wallet-kit/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/wallet-ui/wallet-kits.mdx",
+        "content/zh/connect-to-software/wallet-ui/wallet-kits.mdx"
+      ],
+      "reason": "Verified wallet UI guidance; framework-specific source and examples retained."
+    },
+    {
+      "source": "connect-to-software/support-wallet-kit/aptos-wallet-adapter.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/wallet-ui/aptos-wallet-adapter.mdx",
+        "content/zh/connect-to-software/wallet-ui/aptos-wallet-adapter.mdx"
+      ],
+      "reason": "Verified wallet UI guidance; framework-specific source and examples retained."
+    },
+    {
+      "source": "connect-to-software/support-wallet-kit/rainbowkit.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/wallet-ui/rainbowkit.mdx",
+        "content/zh/connect-to-software/wallet-ui/rainbowkit.mdx"
+      ],
+      "reason": "Verified wallet UI guidance; framework-specific source and examples retained."
+    },
+    {
+      "source": "connect-to-software/support-wallet-kit/web3-onboard.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/wallet-ui/web3-onboard.mdx",
+        "content/zh/connect-to-software/wallet-ui/web3-onboard.mdx"
+      ],
+      "reason": "Verified wallet UI guidance; framework-specific source and examples retained."
+    },
+    {
+      "source": "connect-to-software/support-wallet-kit/web3modal.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/wallet-ui/web3modal.mdx",
+        "content/zh/connect-to-software/wallet-ui/web3modal.mdx"
+      ],
+      "reason": "Verified wallet UI guidance; framework-specific source and examples retained."
+    },
+    {
+      "source": "connect-to-software/using-walletconnect/README.md",
+      "disposition": "integrated",
+      "targets": [
+        "content/en/integration-guides/walletconnect.mdx",
+        "content/zh/integration-guides/walletconnect.mdx"
+      ],
+      "reason": "Current connector/session guidance and clear v1 archive."
+    },
+    {
+      "source": "connect-to-software/using-walletconnect/aptos/README.md",
+      "disposition": "archived",
+      "targets": [
+        "content/en/legacy/aptos-walletconnect.mdx",
+        "content/zh/legacy/aptos-walletconnect.mdx"
+      ],
+      "reason": "v1 custom methods retained as historical reference with a current adapter route."
+    },
+    {
+      "source": "connect-to-software/using-walletconnect/aptos/wallet-connect-api.md",
+      "disposition": "archived",
+      "targets": [
+        "content/en/legacy/aptos-walletconnect.mdx",
+        "content/zh/legacy/aptos-walletconnect.mdx"
+      ],
+      "reason": "Historical method/response summary; complete original examples linked at immutable Git revision."
+    },
+    {
+      "source": "connect-to-software/using-walletconnect/eth.md",
+      "disposition": "integrated",
+      "targets": [
+        "content/en/integration-guides/walletconnect.mdx",
+        "content/zh/integration-guides/walletconnect.mdx"
+      ],
+      "reason": "Selected connector context and EVM UI entry points."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/index.mdx",
+        "content/zh/connect-to-software/provider/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/index.mdx",
+        "content/zh/connect-to-software/provider/btc/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/index.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/getaccounts.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/getaccounts.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/getaccounts.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/getbalance.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/getbalance.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/getbalance.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/getinscriptions.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/getinscriptions.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/getinscriptions.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/getnetwork.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/getnetwork.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/getnetwork.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/getpublickey.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/getpublickey.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/getpublickey.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/inscribetransfer-deprecated.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/inscribetransfer-deprecated.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/inscribetransfer-deprecated.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/pushpsbt.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/pushpsbt.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/pushpsbt.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/pushtx.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/pushtx.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/pushtx.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/requestaccounts.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/requestaccounts.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/requestaccounts.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/sendbitcoin.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/sendbitcoin.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/sendbitcoin.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/sendinscription.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/sendinscription.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/sendinscription.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/signmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/signmessage.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/signmessage.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/signpsbt.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/signpsbt.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/signpsbt.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/signpsbts.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/signpsbts.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/signpsbts.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/api-reference/switchnetwork.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/api-reference/switchnetwork.mdx",
+        "content/zh/connect-to-software/provider/btc/api-reference/switchnetwork.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/event.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/event.mdx",
+        "content/zh/connect-to-software/provider/btc/event.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/btc/guide.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/btc/guide.mdx",
+        "content/zh/connect-to-software/provider/btc/guide.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/eth/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/eth/index.mdx",
+        "content/zh/connect-to-software/provider/eth/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/eth/accessing-accounts.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/eth/accessing-accounts.mdx",
+        "content/zh/connect-to-software/provider/eth/accessing-accounts.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/eth/provider-api.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/eth/provider-api.mdx",
+        "content/zh/connect-to-software/provider/eth/provider-api.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/eth/rpc-api.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/eth/reference/index.mdx",
+        "content/zh/connect-to-software/provider/eth/reference/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/eth/sending-transactions.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/eth/sending-transactions.mdx",
+        "content/zh/connect-to-software/provider/eth/sending-transactions.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/eth/signing-data.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/eth/signing-data.mdx",
+        "content/zh/connect-to-software/provider/eth/signing-data.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/index.mdx",
+        "content/zh/connect-to-software/provider/near/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/index.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/accessing-accounts.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/accessing-accounts.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/accessing-accounts.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/debug-logging.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/debug-logging.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/debug-logging.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/detecting-provider-network.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/detecting-provider-network.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/detecting-provider-network.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/detecting-the-provider.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/detecting-the-provider.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/detecting-the-provider.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/establishing-a-connection.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/establishing-a-connection.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/establishing-a-connection.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/install-the-provider-sdk.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/install-the-provider-sdk.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/install-the-provider-sdk.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/migrate-from-near-web-wallet.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/migrate-from-near-web-wallet.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/migrate-from-near-web-wallet.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/rpc-api-calling.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/rpc-api-calling.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/rpc-api-calling.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/sending-transactions/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/sending-transactions/index.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/sending-transactions/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/sending-transactions/create-transaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/sending-transactions/create-transaction.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/sending-transactions/create-transaction.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/sending-transactions/sign-and-send-transaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/sending-transactions/sign-and-send-transaction.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/sending-transactions/sign-and-send-transaction.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/sending-transactions/signing-transaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/sending-transactions/signing-transaction.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/sending-transactions/signing-transaction.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/signing-messages.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/signing-messages.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/signing-messages.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/integrating/watch-accounts-and-network-status.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/integrating/watch-accounts-and-network-status.mdx",
+        "content/zh/connect-to-software/provider/near/integrating/watch-accounts-and-network-status.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/introduction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/introduction.mdx",
+        "content/zh/connect-to-software/provider/near/introduction.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/reference/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/reference/index.mdx",
+        "content/zh/connect-to-software/provider/near/reference/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/reference/api-reference.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/reference/api-reference.mdx",
+        "content/zh/connect-to-software/provider/near/reference/api-reference.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/reference/trouble-shooting.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/reference/trouble-shooting.mdx",
+        "content/zh/connect-to-software/provider/near/reference/trouble-shooting.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/resources/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/resources/index.mdx",
+        "content/zh/connect-to-software/provider/near/resources/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/near/resources/faq.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/near/resources/faq.mdx",
+        "content/zh/connect-to-software/provider/near/resources/faq.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/nostr/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/nostr/index.mdx",
+        "content/zh/connect-to-software/provider/nostr/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/nostr/api-reference/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/nostr/api-reference/index.mdx",
+        "content/zh/connect-to-software/provider/nostr/api-reference/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/nostr/api-reference/getpublickey.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/nostr/api-reference/getpublickey.mdx",
+        "content/zh/connect-to-software/provider/nostr/api-reference/getpublickey.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/nostr/api-reference/getrelays.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/nostr/api-reference/getrelays.mdx",
+        "content/zh/connect-to-software/provider/nostr/api-reference/getrelays.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/nostr/api-reference/nip04.decrypt.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/nostr/api-reference/nip04.decrypt.mdx",
+        "content/zh/connect-to-software/provider/nostr/api-reference/nip04.decrypt.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/nostr/api-reference/nip04.encrypt.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/nostr/api-reference/nip04.encrypt.mdx",
+        "content/zh/connect-to-software/provider/nostr/api-reference/nip04.encrypt.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/nostr/api-reference/signevent.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/nostr/api-reference/signevent.mdx",
+        "content/zh/connect-to-software/provider/nostr/api-reference/signevent.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/nostr/api-reference/signschnorr.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/nostr/api-reference/signschnorr.mdx",
+        "content/zh/connect-to-software/provider/nostr/api-reference/signschnorr.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/nostr/event.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/nostr/event.mdx",
+        "content/zh/connect-to-software/provider/nostr/event.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/nostr/guide.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/nostr/guide.mdx",
+        "content/zh/connect-to-software/provider/nostr/guide.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/solana/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/solana/index.mdx",
+        "content/zh/connect-to-software/provider/solana/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/solana/detecting-the-provider.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/solana/detecting-the-provider.mdx",
+        "content/zh/connect-to-software/provider/solana/detecting-the-provider.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/solana/establishing-a-connection.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/solana/establishing-a-connection.mdx",
+        "content/zh/connect-to-software/provider/solana/establishing-a-connection.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/solana/sending-a-transaction.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/solana/sending-a-transaction.mdx",
+        "content/zh/connect-to-software/provider/solana/sending-a-transaction.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/solana/signing-a-message.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/solana/signing-a-message.mdx",
+        "content/zh/connect-to-software/provider/solana/signing-a-message.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/webln/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/webln/index.mdx",
+        "content/zh/connect-to-software/provider/webln/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/webln/api-reference/README.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/webln/api-reference/index.mdx",
+        "content/zh/connect-to-software/provider/webln/api-reference/index.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/webln/api-reference/enable.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/webln/api-reference/enable.mdx",
+        "content/zh/connect-to-software/provider/webln/api-reference/enable.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/webln/api-reference/getbalance.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/webln/api-reference/getbalance.mdx",
+        "content/zh/connect-to-software/provider/webln/api-reference/getbalance.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/webln/api-reference/getinfo.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/webln/api-reference/getinfo.mdx",
+        "content/zh/connect-to-software/provider/webln/api-reference/getinfo.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/webln/api-reference/lnurl.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/webln/api-reference/lnurl.mdx",
+        "content/zh/connect-to-software/provider/webln/api-reference/lnurl.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/webln/api-reference/makeinvoice.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/webln/api-reference/makeinvoice.mdx",
+        "content/zh/connect-to-software/provider/webln/api-reference/makeinvoice.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/webln/api-reference/sendpayment.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/webln/api-reference/sendpayment.mdx",
+        "content/zh/connect-to-software/provider/webln/api-reference/sendpayment.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/webln/api-reference/signmessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/webln/api-reference/signmessage.mdx",
+        "content/zh/connect-to-software/provider/webln/api-reference/signmessage.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/webln/api-reference/verifymessage.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/webln/api-reference/verifymessage.mdx",
+        "content/zh/connect-to-software/provider/webln/api-reference/verifymessage.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/webln/event.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/webln/event.mdx",
+        "content/zh/connect-to-software/provider/webln/event.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "connect-to-software/webapp-connect-onekey/webln/guide.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/provider/webln/guide.mdx",
+        "content/zh/connect-to-software/provider/webln/guide.mdx"
+      ],
+      "reason": "Reviewed provider contract and examples adapted to existing MDX routes; richer main-site detail retained."
+    },
+    {
+      "source": "contribute.md",
+      "disposition": "integrated",
+      "targets": [
+        "content/en/integration-guides/contributing.mdx",
+        "content/zh/integration-guides/contributing.mdx"
+      ],
+      "reason": "Repository ownership and contribution workflow."
+    },
+    {
+      "source": "guide/common-terms.md",
+      "disposition": "integrated",
+      "targets": [
+        "content/en/integration-guides/glossary.mdx",
+        "content/zh/integration-guides/glossary.mdx"
+      ],
+      "reason": "Complete glossary, including wallet/account/key and signing/broadcast distinctions."
+    },
+    {
+      "source": "guide/external-contribution-guide.md",
+      "disposition": "integrated",
+      "targets": [
+        "content/en/integration-guides/contributing.mdx",
+        "content/zh/integration-guides/contributing.mdx"
+      ],
+      "reason": "Repository ownership and contribution workflow."
+    },
+    {
+      "source": "guide/hardware-integration-developer.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/hardware-sdk/getting-started.mdx",
+        "content/zh/hardware-sdk/getting-started.mdx"
+      ],
+      "reason": "Current package, authorization, discovery and first address flow."
+    },
+    {
+      "source": "guide/web-app-integration-developer.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/connect-to-software/index.mdx",
+        "content/zh/connect-to-software/index.mdx"
+      ],
+      "reason": "Current dApp quickstart and provider choices."
+    },
+    {
+      "source": "trouble-shooting.md",
+      "disposition": "adapted",
+      "targets": [
+        "content/en/troubleshooting.mdx",
+        "content/zh/troubleshooting.mdx"
+      ],
+      "reason": "Troubleshooting and issue-reporting checklist."
+    }
+  ],
+  "navigation": [
+    {
+      "source": "GUIDE",
+      "target": "content/{en,zh}/_meta.js",
+      "destination": "Start here / 开始接入"
+    },
+    {
+      "source": "Connect To Software",
+      "target": "content/{en,zh}/_meta.js",
+      "destination": "dApp Integration / dApp 接入"
+    },
+    {
+      "source": "Connect to Hardware",
+      "target": "content/{en,zh}/_meta.js",
+      "destination": "Hardware Integration / 硬件接入"
+    },
+    {
+      "source": "Best Practice",
+      "target": "content/{en,zh}/integration-guides/_meta.js",
+      "destination": "Integration guides / 集成指南"
+    }
+  ]
+}

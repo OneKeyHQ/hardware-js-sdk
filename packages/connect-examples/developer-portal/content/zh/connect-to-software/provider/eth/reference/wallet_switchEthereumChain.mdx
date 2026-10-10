@@ -33,14 +33,20 @@ try {
     method: 'wallet_switchEthereumChain',
     params: [{ chainId: '0x89' }] // Polygon
   })
-  console.log('已切换到 Polygon')
+  console.log('Switched to Polygon')
 } catch (error) {
   if (error.code === 4902) {
-    // 链未添加，尝试添加
+    // Chain not added, try adding it
     await window.$onekey.ethereum.request({
       method: 'wallet_addEthereumChain',
-      params: [{ /* 链配置 */ }]
+      params: [chainConfig] // Define the full configuration for this chain first.
     })
+    await window.$onekey.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: "0x89" }]
+    })
+  } else {
+    throw error
   }
 }
 ```
@@ -77,8 +83,8 @@ try {
 
 ```typescript
 window.$onekey.ethereum.on('chainChanged', (chainId) => {
-  console.log('已切换到链:', chainId)
-  // 建议：重新加载页面
+  console.log('Chain changed to:', chainId)
+  // Recommended: reload the page
   window.location.reload()
 })
 ```

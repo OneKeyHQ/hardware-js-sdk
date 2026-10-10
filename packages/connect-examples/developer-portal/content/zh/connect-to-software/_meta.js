@@ -8,7 +8,7 @@ export default {
     title: '链',
     display: 'children',
   },
-  'mobile-deeplinks': '移动端 & Deeplinks',
+  'mobile-deeplinks': '移动端与深层链接',
   '---2': {
     type: 'separator',
     title: 'UI 组件库',

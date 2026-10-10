@@ -4,9 +4,11 @@ title: tronSignTransaction
 
 # tronSignTransaction
 
-### TRON：签名交易
+<span id="tron签名交易" />
 
-对指定交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+### TRON：签名交易 <a href="#cardano-sign-transaction" id="cardano-sign-transaction"></a>
+
+请求交易签名。用户在设备上核对并确认请求。
 
 ```typescript
 const response = await HardwareSDK.tronSignTransaction(connectId, deviceId, params)
@@ -16,7 +18,7 @@ const response = await HardwareSDK.tronSignTransaction(connectId, deviceId, para
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
 * `transaction` - _必需_ `TronTransaction` 类型
 
 #### TronTransaction 类型
@@ -56,7 +58,7 @@ type TronTriggerSmartContract = {
 
 ```typescript
 HardwareSDK.tronSignTransaction(connectId, deviceId, {
-    path: "m/44'/195'/0'/0'/0",
+    path: "m/44'/195'/0'/0/0",
     transaction: {
         refBlockBytes: 'ddf1',
         refBlockHash: 'd04764f22469a0b8',
@@ -90,18 +92,18 @@ HardwareSDK.tronSignTransaction(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```
 
+<span id="交易签名和广播" />
 
-
-### 交易签名和广播
+### 交易签名与广播
 
 ```typescript
-// 通过 TronWeb 创建原始交易
+// Create the original transaction via TronWeb
 const tronWeb = new TronWeb({
     fullHost: 'https://api.trongrid.io'
 });
@@ -112,7 +114,7 @@ const encodedTx = await tronWeb.transactionBuilder.sendTrx(
     1000000
 );
 
-// 交易 ID
+//  txid
 const txid = encodedTx.txID;
 
 const result = await HardwareSDK.tronSignTransaction(connectId, deviceId, {
@@ -132,8 +134,11 @@ const result = await HardwareSDK.tronSignTransaction(connectId, deviceId, {
     }
 });
 
-// 原始交易数据
-if (!result.success) throw new Error(result.payload.error);
+if (result.success === false) {
+    throw new Error(result.payload.error);
+}
+
+// Build the signed transaction JSON.
 
 const rawTx = JSON.stringify({
     txID: txid,
@@ -142,4 +147,3 @@ const rawTx = JSON.stringify({
     signature: [result.payload.signature]
 });
 ```
-

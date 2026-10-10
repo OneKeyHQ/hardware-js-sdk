@@ -99,6 +99,8 @@ if (!devices.success || !devices.payload.length) {
   throw new Error('No OneKey device found');
 }
 
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 

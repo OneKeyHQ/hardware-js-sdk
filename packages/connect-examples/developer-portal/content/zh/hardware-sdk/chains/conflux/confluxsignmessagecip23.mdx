@@ -6,7 +6,7 @@ title: confluxSignMessageCIP23
 
 ## 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Touch: 3.0.0
   * Classic/Mini: 2.4.0
 
@@ -18,8 +18,8 @@ title: confluxSignMessageCIP23
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `messageHash` - _必需_ `string` 要签名的十六进制文本消息
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `messageHash` - _必需_ `string`。以十六进制编码的 CIP-23 消息哈希。
 * `domainHash` - _必需_ `string` CIP-23 域的十六进制编码的 32 字节哈希。
 
 ### 示例
@@ -50,8 +50,8 @@ HardwareSDK.confluxSignMessageCIP23(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

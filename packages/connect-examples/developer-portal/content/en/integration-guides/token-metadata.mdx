@@ -1,0 +1,35 @@
+---
+title: "Suggest a token"
+description: "Use `wallet_watchAsset` to ask the wallet to track a token. The user decides whether to add it. This does not transfer tokens or establish that a token is trustworthy."
+---
+
+# Suggest a token
+
+Use `wallet_watchAsset` to ask the wallet to track a token. The user decides whether to add it. This does not transfer tokens or establish that a token is trustworthy.
+
+Confirm the selected network and verify the contract address, symbol, and decimals. Call the method from a user action.
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const wasAdded = await provider.request({
+    method: 'wallet_watchAsset',
+    params: {
+      type: 'ERC20',
+      options: {
+        address: '<TOKEN_CONTRACT_ADDRESS>',
+        symbol: 'TOKEN',
+        decimals: 18, // Replace with the token's actual decimals.
+        image: 'https://example.com/token.png',
+      },
+    },
+  });
+  console.log(wasAdded ? 'Token added.' : 'Token was not added.');
+} catch (error) {
+  console.error(error.code, error.message);
+}
+```
+
+Replace all example metadata. Handle unsupported-method and user-rejection errors in your interface. See the [method reference](/en/connect-to-software/provider/eth/reference/wallet_watchAsset).

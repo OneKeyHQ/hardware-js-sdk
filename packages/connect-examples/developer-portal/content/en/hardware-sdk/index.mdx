@@ -21,7 +21,7 @@ USB integrations should use `@onekeyfe/hd-common-connect-sdk`; use `@onekeyfe/hd
 
 | Method | Description | Supported devices |
 |--------|-------------|-------------------|
-| **USB / WebUSB** | Wired USB; Web via WebUSB, native via low-level plugin | All OneKey devices |
+| **USB / WebUSB** | Wired USB; browser via WebUSB; Node.js / CLI via node-usb | Devices with a compatible USB interface and firmware |
 | **Bluetooth BLE (native)** | Native apps over BLE (not Web Bluetooth); requires OS Bluetooth & permission | Pro, Pro 2, Neo, Touch, Classic 1s / Classic 1s Pure; **Mini does not support BLE** |
 | **Air-Gap (QR)** | Offline QR signing | OneKey Pro and Pro 2; **Neo has no camera** |
 
@@ -96,7 +96,7 @@ Use `@onekeyfe/hd-ble-sdk`:
 import HardwareSDK from '@onekeyfe/hd-ble-sdk';
 
 const initialized = await HardwareSDK.init({
-  debug: __DEV__,
+  debug: false,
 });
 if (!initialized) throw new Error('SDK initialization failed');
 ```
@@ -107,12 +107,15 @@ Use `@onekeyfe/hd-common-connect-sdk`:
 
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 
+// Provide an implemented native BLE bridge; this is a preparation fragment.
+declare const plugin: LowlevelTransportSharedPlugin;
 const initialized = await HardwareSDK.init({
   env: 'lowlevel',
   debug: false,
   fetchConfig: true,
-});
+}, undefined, plugin);
 if (!initialized) throw new Error('SDK initialization failed');
 ```
 

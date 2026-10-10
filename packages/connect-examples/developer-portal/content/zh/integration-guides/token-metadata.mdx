@@ -1,0 +1,34 @@
+---
+title: "建议添加代币"
+description: "通过 `wallet_watchAsset` 请求钱包关注某种代币，是否添加由用户决定。这不会转移代币，也不代表代币可信。"
+---
+
+# 建议添加代币
+
+通过 `wallet_watchAsset` 请求钱包关注某种代币，是否添加由用户决定。这不会转移代币，也不代表代币可信。
+
+先确认当前网络，并核对合约地址、符号和精度。由用户操作触发调用。
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const wasAdded = await provider.request({
+    method: 'wallet_watchAsset',
+    params: {
+      type: 'ERC20',
+      options: {
+        address: '<TOKEN_CONTRACT_ADDRESS>',
+        symbol: 'TOKEN',
+        decimals: 18, // 替换为代币的实际精度。
+        image: 'https://example.com/token.png',
+      },
+    },
+  });
+  console.log(wasAdded ? 'Token added.' : 'Token was not added.');
+} catch (error) {
+  console.error(error.code, error.message);
+}
+```
+
+替换所有示例元信息，并在界面中处理方法不受支持和用户拒绝等错误。详见[方法参考](/zh/connect-to-software/provider/eth/reference/wallet_watchAsset)。

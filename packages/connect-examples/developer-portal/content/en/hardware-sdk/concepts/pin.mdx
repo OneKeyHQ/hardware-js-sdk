@@ -10,7 +10,7 @@ How to handle PIN entry on OneKey devices with recommended UX.
 ## Essentials
 
 - Protected calls trigger `UI_REQUEST.REQUEST_PIN` when the device is locked.
-- Pro/Touch/Pro 2/Neo require on-device PIN entry; other models allow blind PIN but on-device is preferred.
+- Pro/Touch/Pro 2/Neo require on-device PIN entry. For other models, inspect `inputPinOnSoftware.support`; host blind-PIN support depends on firmware. Prefer on-device entry when it is available.
 - Close the prompt on `UI_REQUEST.CLOSE_UI_PIN_WINDOW` / `CLOSE_UI_WINDOW` or when the originating operation settles. Invalidate its pending submission callback.
 
 ## Support matrix (software blind PIN)
@@ -24,7 +24,7 @@ How to handle PIN entry on OneKey devices with recommended UX.
 
 ## UI design notes
 
-- Single dialog with two actions: **Enter on device** (default) and **Enter here (blind PIN)**.
+- Offer only the input methods supported by the current device, firmware, and UI request. When both are available, use one dialog with **Enter on device** as the default and **Enter here (blind PIN)** as an alternative.
 - Blind PIN keypad is a fixed 3x3 layout; never echo real digits.
 
 ### Blind PIN mapping example

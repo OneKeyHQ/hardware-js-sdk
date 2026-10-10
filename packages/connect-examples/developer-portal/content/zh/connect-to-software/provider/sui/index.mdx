@@ -7,12 +7,12 @@ import { Callout, Tabs } from 'nextra/components'
 
 # Sui
 
-下方签名示例使用[快速开始](/zh/connect-to-software/provider/sui/getting-started#获取签名账户)中的 `connectSuiAccount()`，获取 Wallet Standard 账户与当前链。示例使用 `@mysten/sui@1.28.2`。在 `@mysten/wallet-standard@0.14.7` 中，旧 `*TransactionBlock` 方法的输入类型也已是 `Transaction`。
+下方签名示例使用[快速开始](/zh/connect-to-software/provider/sui/getting-started#签名所需的账户上下文)中的 `connectSuiAccount()`，获取 Wallet Standard 账户及其当前链。示例使用 `@mysten/sui@1.28.2`；在 `@mysten/wallet-standard@0.14.7` 中，即使旧版 `*TransactionBlock` 方法也声明接收 `Transaction`。
 
 使用 OneKey 的 Provider 集成 Sui 区块链。通过 `window.$onekey.sui` 访问。
 
 <Callout type="info">
-OneKey 实现了 Sui Wallet Standard，确保与所有 Sui dApp 兼容。
+OneKey 实现 Sui Wallet Standard，可用于兼容该标准的集成。
 </Callout>
 
 ---
@@ -20,7 +20,7 @@ OneKey 实现了 Sui Wallet Standard，确保与所有 Sui dApp 兼容。
 ## 快速链接
 
 - [API 参考](#api-参考)
-- [连接钱包](#快速开始)
+- [快速开始](getting-started)
 - [交易](#交易)
 - [消息签名](#消息签名)
 
@@ -29,11 +29,11 @@ OneKey 实现了 Sui Wallet Standard，确保与所有 Sui dApp 兼容。
 ## Provider 检测
 
 ```typescript
-// 检测 OneKey Sui provider
+// Detect OneKey Sui provider
 const provider = window.$onekey?.sui
 
 if (!provider) {
-  throw new Error('未检测到 OneKey Sui provider')
+  throw new Error('OneKey Sui provider not detected')
 }
 ```
 
@@ -44,24 +44,24 @@ if (!provider) {
 ### 检查权限
 
 ```typescript
-// 检查是否已连接
+// Check if already connected
 const hasPermission = await provider.hasPermissions()
 
 if (hasPermission) {
   const accounts = await provider.getAccounts()
-  console.log('已连接账户:', accounts)
+  console.log('Connected accounts:', accounts)
 }
 ```
 
 ### 请求连接
 
 ```typescript
-// 请求连接权限
+// Request permissions to connect
 const result = await provider.requestPermissions()
 
 if (result) {
   const accounts = await provider.getAccounts()
-  console.log('已连接:', accounts[0].address)
+  console.log('Connected:', accounts[0].address)
 }
 ```
 
@@ -82,8 +82,8 @@ const accounts = await provider.getAccounts()
 
 accounts.forEach(account => {
   console.log({
-    address: account.address,     // Sui 地址
-    publicKey: account.publicKey, // 公钥（hex 字符串）
+    address: account.address,     // Sui address
+    publicKey: account.publicKey, // Public key (hex string)
   })
 })
 ```
@@ -93,7 +93,7 @@ accounts.forEach(account => {
 ```typescript
 const chain = await provider.getActiveChain()
 
-console.log('当前链:', chain) // 例如 'sui:testnet'
+console.log('Active chain:', chain) // e.g., 'sui:testnet'
 ```
 
 ---
@@ -102,27 +102,27 @@ console.log('当前链:', chain) // 例如 'sui:testnet'
 
 ### 签名并执行交易块
 
-当前注入 Provider 的 `signAndExecuteTransactionBlock` 不会转发 `options`。若需 effects、events 或 object changes，请使用同一链的 Sui client 按返回的 digest 查询交易。
+当前注入式 provider 不会转发 `signAndExecuteTransactionBlock` 中的 `options`。如需 effects、events 或 object changes，请使用同一链上的 Sui 客户端，根据返回的 digest 查询交易。
 
 ```typescript
 import { Transaction } from '@mysten/sui/transactions'
 
-// 创建交易块
+// Create transaction block
 const txb = new Transaction()
 
-// 添加转账
+// Add a transfer
 txb.transferObjects(
   [txb.object('0xobject_id')],
   txb.pure.address('RECIPIENT_SUI_ADDRESS')
 )
 
-// 或发送 SUI
+// Or send SUI
 const [coin] = txb.splitCoins(txb.gas, [txb.pure.u64(1000000000)]) // 1 SUI
 txb.transferObjects([coin], txb.pure.address('RECIPIENT_SUI_ADDRESS'))
 
-// 签名并执行
 const { account, chain } = await connectSuiAccount()
 
+// Sign and execute
 const result = await provider.signAndExecuteTransactionBlock({
   account,
   chain,
@@ -138,7 +138,7 @@ console.log({
 
 ```typescript
 const txb = new Transaction()
-// ... 构建交易
+// ... build transaction
 
 const { account, chain } = await connectSuiAccount()
 
@@ -153,7 +153,7 @@ console.log({
   signature: signedTxb.signature,
 })
 
-// 稍后使用 Sui SDK 执行
+// Execute later using Sui SDK
 // const result = await suiClient.executeTransactionBlock({
 //   transactionBlock: signedTxb.transactionBlockBytes,
 //   signature: signedTxb.signature,
@@ -163,18 +163,18 @@ console.log({
 ### 签名并执行交易（新 API）
 
 ```typescript
-// 使用新的 signAndExecuteTransaction API（注意使用 Transaction 类型）
+// Using the newer signAndExecuteTransaction API (Transaction type)
 import { Transaction } from '@mysten/sui/transactions'
 
 const tx = new Transaction()
-// ... 构建交易
+// ... build transaction
 
 const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signAndExecuteTransaction({
-  transaction: tx,
   account,
   chain,
+  transaction: tx,
 })
 ```
 
@@ -184,14 +184,14 @@ const result = await provider.signAndExecuteTransaction({
 import { Transaction } from '@mysten/sui/transactions'
 
 const tx = new Transaction()
-// ... 构建交易
+// ... build transaction
 
 const { account, chain } = await connectSuiAccount()
 
 const signedTxn = await provider.signTransaction({
-  transaction: tx,
   account,
   chain,
+  transaction: tx,
 })
 ```
 
@@ -208,14 +208,14 @@ const message = new TextEncoder().encode('Hello, Sui!')
 const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signPersonalMessage({
-  message,
   account,
   chain,
+  message,
 })
 
 console.log({
-  signature: result.signature,   // Base64 编码的签名
-  bytes: result.bytes,           // 已签名的消息字节
+  signature: result.signature,   // Base64 encoded signature
+  bytes: result.bytes,           // Signed message bytes
 })
 ```
 
@@ -226,8 +226,8 @@ const message = new TextEncoder().encode('Hello, Sui!')
 const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signMessage({
-  message,
   account,
+  message,
 })
 
 console.log({
@@ -247,7 +247,7 @@ const { signature } = await provider.signPersonalMessage({ message, account, cha
 
 const signerKey = await verifyPersonalMessageSignature(message, signature)
 const isExpectedSigner = signerKey.toSuiAddress() === account.address
-console.log('签名者是否为预期账户:', isExpectedSigner)
+console.log('Expected signer:', isExpectedSigner)
 ```
 
 ---
@@ -259,7 +259,7 @@ console.log('签名者是否为预期账户:', isExpectedSigner)
 ```typescript
 const txb = new Transaction()
 
-// 调用 Move 函数
+// Call a Move function
 txb.moveCall({
   target: '0xpackage::module::function',
   arguments: [
@@ -308,22 +308,22 @@ const result = await provider.signAndExecuteTransactionBlock({
 ### 方法
 
 | 方法 | 说明 |
-|------|------|
+|--------|-------------|
 | `hasPermissions()` | 检查是否已连接 |
 | `requestPermissions()` | 请求连接 |
 | `disconnect()` | 断开钱包连接 |
-| `getAccounts()` | 获取已连接账户（返回 `address`、`publicKey`） |
+| `getAccounts()` | 获取已连接账户，仅包含 `address` 和 `publicKey` |
 | `getActiveChain()` | 获取当前链 |
-| `signAndExecuteTransactionBlock(input)` | 签名并执行交易，需传入 `account`/`chain` |
-| `signTransactionBlock(input)` | 仅签名交易，需传入 `account`/`chain` |
-| `signAndExecuteTransaction(input)` | 签名并执行（新 API，使用 `Transaction`，需 `account`/`chain`） |
-| `signTransaction(input)` | 签名交易（新 API，使用 `Transaction`，需 `account`/`chain`） |
-| `signMessage(input)` | 签名消息（旧版，需 `account`） |
-| `signPersonalMessage(input)` | 签名个人消息（需 `account`/`chain`） |
+| `signAndExecuteTransactionBlock(input)` | 签名并执行；需要 `account` / `chain` |
+| `signTransactionBlock(input)` | 仅签名；需要 `account` / `chain` |
+| `signAndExecuteTransaction(input)` | 新版签名并执行 API；使用 `Transaction`，需要 `account` / `chain` |
+| `signTransaction(input)` | 新版交易签名 API；使用 `Transaction`，需要 `account` / `chain` |
+| `signMessage(input)` | 旧版消息签名；需要 `account` |
+| `signPersonalMessage(input)` | 签署个人消息；需要 `account` / `chain` |
 
 ### 类型
 
-`getAccounts()` 返回 `AccountInfo[]`。签名参数需要 Wallet Standard 的 `WalletAccount`：公钥为字节数组，且包含 `chains` 和 `features`。请通过 `standard:connect` 获取，不要将 `AccountInfo` 强制转换为 `WalletAccount`。
+`getAccounts()` 返回 `AccountInfo[]`。签名参数需要 Wallet Standard 的 `WalletAccount`，其 `publicKey` 为字节数组，并包含 `chains` 和 `features`。请通过 `standard:connect` 获取，不能将 `AccountInfo` 强制转换为 `WalletAccount`。
 
 ```typescript
 import type { WalletAccount, IdentifierString } from '@mysten/wallet-standard'
@@ -368,10 +368,11 @@ interface SignPersonalMessageOutput {
 
 ### 支持的链
 
-| 链 | 标识符 |
-|----|--------|
-| Testnet | `sui:testnet` |
-| Devnet | `sui:devnet` |
+| 网络 | 标识 |
+|-------|------------|
+| 主网 | `sui:mainnet` |
+| 测试网 | `sui:testnet` |
+| 开发网 | `sui:devnet` |
 
 ---
 
@@ -382,9 +383,9 @@ try {
   await provider.requestPermissions()
 } catch (error) {
   if (error.code === 4001) {
-    console.log('用户拒绝了连接请求')
+    console.log('User rejected the connection request')
   } else {
-    console.error('连接错误:', error.message)
+    console.error('Connection error:', error.message)
   }
 }
 ```
@@ -401,7 +402,7 @@ try {
 
 ## 使用 Sui Wallet Kit
 
-对于 React 应用，使用官方的 Sui Wallet Kit：
+此 React 示例使用下方锁定的兼容版本：
 
 ```bash
 npm install @mysten/dapp-kit@0.16.0 @mysten/sui@1.28.2 @tanstack/react-query@^5
@@ -442,17 +443,17 @@ import { SuiClient } from '@mysten/sui/client'
 
 const client = new SuiClient({ url: 'https://fullnode.mainnet.sui.io' })
 
-// 获取余额
+// Get balance
 const balance = await client.getBalance({
   owner: accountAddress,
 })
 
-// 获取对象
+// Get objects
 const objects = await client.getOwnedObjects({
   owner: accountAddress,
 })
 
-// 获取交易
+// Get transaction
 const txn = await client.getTransactionBlock({
   digest: txDigest,
   options: { showEffects: true },

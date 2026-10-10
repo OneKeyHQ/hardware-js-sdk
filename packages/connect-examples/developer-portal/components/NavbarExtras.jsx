@@ -37,7 +37,7 @@ export function ThemeToggle({ locale = 'en' }) {
       aria-label={locale === 'zh' ? (resolvedTheme === 'dark' ? '切换浅色模式' : '切换深色模式') : (resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode')}
       onClick={cycleTheme}
       className="portal-theme-toggle p-2 rounded-lg bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group"
-      title={theme === 'dark' ? 'Switch to light mode' : theme === 'light' ? 'Switch to dark mode' : 'Switch theme'}
+      title={locale === 'zh' ? (resolvedTheme === 'dark' ? '切换浅色模式' : '切换深色模式') : (resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode')}
     >
       {resolvedTheme === 'dark' ? (
         <Moon className="w-4 h-4 text-zinc-400 group-hover:text-zinc-200 transition-colors" />

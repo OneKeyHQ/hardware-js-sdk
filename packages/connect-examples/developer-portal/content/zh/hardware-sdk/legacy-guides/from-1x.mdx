@@ -1,10 +1,11 @@
 ---
 title: 从 1.1.x 迁到 1.2.x
+description: 从早期 1.x 接口迁移到统一状态、钱包会话和 UI 契约。
 ---
 
 # 从 1.1.x 迁到 1.2.x
 
-给已经接入 Hardware SDK **1.1.x** 的第三方。目标是当前 **1.2.x** 线（npm 稳定版 `1.2.1`）。
+给已经接入 Hardware SDK **1.1.x** 的第三方。本指南面向 **1.2.x** 版本。
 
 JavaScript 方法不用换。Protocol V2（Pro 2 / Neo）在 Core 内部处理。不要再接一套 SDK。
 
@@ -15,12 +16,12 @@ JavaScript 方法不用换。Protocol V2（Pro 2 / Neo）在 Core 内部处理�
 - 调用形状：`HardwareSDK.method(connectId, deviceId?, params)` → `{ success, payload }`
 - 各链方法（`evmGetAddress`、`btcSignTransaction` 等）
 - `init({ env })` 仍然选**传输**（USB / BLE / 底层插件），不是 Protocol V1 / V2
-- PIN / passphrase / 按键仍走 `UI_EVENT` + `uiResponse`
+- 提示仍通过 `UI_EVENT` 传递；只有输入请求调用 `uiResponse`，按键通知不回复
 
 ## 升级包
 
 ```bash
-npm i @onekeyfe/hd-common-connect-sdk@^1.2.1
+npm i --save-exact @onekeyfe/hd-common-connect-sdk@1.2
 ```
 
 所有 `@onekeyfe/hd-*` 钉到同一条 1.2.x。如果还在嵌 `@onekeyfe/hd-web-sdk`，**不要传 `connectSrc`**，让 iframe 跟已安装包一致。
@@ -39,7 +40,7 @@ npm i @onekeyfe/hd-common-connect-sdk@^1.2.1
 | `env: 'web'` + Bridge | `env: 'webusb'` | 见 [Bridge → WebUSB](/zh/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb) |
 | Pro 2 / Neo 上的 `firmwareUpdateV2` / `V3` | [`firmwareUpdateV4`](/zh/hardware-sdk/device-api/firmwareupdatev4) | Classic / Mini / Touch / Pro 仍用 V2 / V3 |
 
-已废弃方法现有应用还能跑。新代码不要再调。
+`getFeatures` 仅在 Protocol V1 上保留，Protocol V2 会拒绝。`getPassphraseState` 仍是兼容 API，新代码应使用替代方法。
 
 没有 `openWalletSession({ mode: 'resume-hidden' })`。已经有绑定之后，后续地址 / 签名带上 `passphraseState`，Core 会在方法里恢复。
 
@@ -82,7 +83,7 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 });
 ```
 
-**1.2.x** — `mode` 开一次，之后方法带指纹：
+**1.2.x** — 用明确的 `mode` 打开一次，之后方法带指纹。下方标准与隐藏钱包是两种备选流程，按用户选择执行一种：
 
 ```ts
 import { OpenWalletSessionMode } from '@onekeyfe/hd-core';

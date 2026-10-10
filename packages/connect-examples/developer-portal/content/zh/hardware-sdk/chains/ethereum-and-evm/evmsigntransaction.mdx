@@ -156,7 +156,7 @@ if (result.success === false) throw new Error(result.payload.error);
 
 ## 交易签名和广播示例
 
-此示例使用 `@ethersproject/*` v5 和已初始化的 SDK，签名并序列化 EIP-1559（Type 2）交易。广播前应恢复签名者并与选定账户核对。
+此示例使用 `@ethersproject/*` v5 和已初始化的 SDK，签名并序列化 EIP-1559（Type 2）交易。广播前应恢复签名者并与选定账户核对。用户签名后，必须保持原始交易字段不变。
 
 ```typescript
 import type { EVMTransactionEIP1559 } from '@onekeyfe/hd-core';
@@ -242,3 +242,5 @@ const { rawTx, txid } = buildSignedTxFromSignatureEvm({
 // const receipt = await broadcastedTx.wait();
 // console.log('交易已确认:', receipt);
 ```
+
+Legacy 交易使用 `gasPrice`，不要传入 EIP-1559 的两个费率字段，并应按 Legacy 格式序列化。

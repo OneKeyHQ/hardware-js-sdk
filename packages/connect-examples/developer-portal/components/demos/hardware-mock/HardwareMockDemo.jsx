@@ -319,6 +319,9 @@ function buildExampleCode({ locale, command, btcPath, addressShowOnOneKey, messa
   const init = [
     "import HardwareSDK from '@onekeyfe/hd-common-connect-sdk'",
     '',
+    locale === 'zh'
+      ? '// 真实硬件需要先授权 WebUSB 并注册 UI_EVENT 处理器；参见快速开始。'
+      : '// For real hardware, authorize WebUSB and register UI_EVENT handlers first; see Getting Started.',
     'await HardwareSDK.init({',
     "  env: 'webusb',",
     '  fetchConfig: true,',
@@ -341,6 +344,11 @@ function buildExampleCode({ locale, command, btcPath, addressShowOnOneKey, messa
     ...init,
     'const devicesRes = await HardwareSDK.searchDevices()',
     'if (!devicesRes.success) throw new Error(devicesRes.payload.error)',
+    'if (devicesRes.payload.length !== 1) {',
+    locale === 'zh'
+      ? "  throw new Error('请连接一台已授权的设备；有多台设备时应先让用户选择。')"
+      : "  throw new Error('Connect one authorized device, or let the user select among connected devices.')",
+    '}',
     'const connectId = devicesRes.payload[0].connectId',
     '',
     'const stateRes = await HardwareSDK.getDeviceState(connectId)',

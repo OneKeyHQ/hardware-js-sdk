@@ -4,9 +4,9 @@ title: 监听账户和网络状态
 
 # 监听账户和网络状态
 
-OneKey provider 会发出一些事件，你可以监听已连接账户或网络的变化，并更新 Web 应用的状态。
+provider 会发出账户和网络事件。监听这些事件，以刷新应用中的账户状态和与网络有关的数据。
 
-### 添加事件监听器
+## 添加事件监听器
 
 ```javascript
 // accountsChanged
@@ -32,4 +32,3 @@ provider.on('networkChanged', onNetworkChanged);
 provider.off('accountsChanged', onAccountsChanged);
 provider.off('networkChanged', onNetworkChanged);
 ```
-

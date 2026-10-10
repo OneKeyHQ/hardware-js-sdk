@@ -6,38 +6,36 @@ title: sendBitcoin
 
 发送 BTC
 
-### 方法
+## 方法
 
 ```typescript
-async function sendBitcoin(
+declare function sendBitcoin(
     toAddress: string,
     satoshis: number,
-    options?: { feeRate: number }
-): string
+    options?: { feeRate?: number; memo?: string; memos?: string[] }
+): Promise<string>;
 ```
 
-### 参数
+## 参数
 
-* `toAddress` — _必填_ `string` 接收地址
-* `satoshis` — _必填_ `number` 发送的聪数
-* `options` — _可选_
-  * `feeRate` — _必填_ `number` 网络费率
+* `toAddress` — _必填_ `string`，收款地址。
+* `satoshis` — _必填_ `number`，发送金额，单位为 satoshi。
+* `options` — _可选_。
+  * `feeRate` — _可选_ `number`，网络费率。
 
-### 响应
+## 响应
 
 `txid` — `string`
 
-### 示例
+## 示例
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
 
-const address = "010203"
-const txid = async provider.sendBitcoin(address, 1000);
-
+const address = "<RECIPIENT_BITCOIN_ADDRESS>"; // Replace with a valid address
+const txid = await provider.sendBitcoin(address, 1000);
 ```
 
-### 演示
+## 演示
 
-<iframe src="https://codepen.io/OneKeyHQ/pen/RwvYZjX" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[打开示例](https://codepen.io/OneKeyHQ/pen/RwvYZjX)

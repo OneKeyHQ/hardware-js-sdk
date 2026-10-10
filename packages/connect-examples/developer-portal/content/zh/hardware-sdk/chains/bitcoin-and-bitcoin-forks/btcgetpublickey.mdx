@@ -6,7 +6,7 @@ title: btcGetPublicKey
 
 ## Bitcoin：获取公钥
 
-获取指定 BIP32 路径派生的扩展公钥。用户需要确认导出。
+返回指定路径派生的公钥。可通过 `showOnOneKey` 请求用户在设备上确认。
 
 ```typescript
 const result = await HardwareSDK.btcGetPublicKey(connectId, deviceId, params);
@@ -18,18 +18,18 @@ const result = await HardwareSDK.btcGetPublicKey(connectId, deviceId, params);
 
 ### 导出单个公钥
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `1`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `1`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _可选_ `boolean`。是否在设备上显示公钥，默认为 `true`。
 * `coin` - _可选_ `string` 决定 coins.json 文件中指定的网络定义。可以使用币种的 `shortcut`、`name` 或 `label`。如果未设置 `coin`，API 将尝试从 `path` 获取网络定义。
 * `scriptType` - _可选_ InputScriptType，地址脚本类型
 
 #### 导出批量公钥
 
-* `bundle` - 包含 `path`、`coin` 字段的对象 `Array`
+* `bundle` - 对象数组，每个对象包含 `path`、`coin` 字段。
 
 ### 示例
 
-返回第五个比特币账户的公钥：
+返回第五个 Bitcoin 账户的公钥：
 
 ```typescript
 HardwareSDK.btcGetPublicKey(connectId, deviceId, {
@@ -38,29 +38,29 @@ HardwareSDK.btcGetPublicKey(connectId, deviceId, {
 });
 ```
 
-返回多个比特币账户的批量公钥：
+批量返回多个 Bitcoin 账户的公钥：
 
 ```typescript
 HardwareSDK.btcGetPublicKey(connectId, deviceId, {
     bundle: [
-        { path: "m/49'/0'/0'" }, // 账户 1
-        { path: "m/49'/0'/1'" }, // 账户 2
-        { path: "m/49'/0'/2'" }  // 账户 3
+        { path: "m/49'/0'/0'" }, // account 1
+        { path: "m/49'/0'/1'" }, // account 2
+        { path: "m/49'/0'/2'" }  // account 3
     ]
 });
 ```
 
 ### 返回结果
 
-只有一个公钥的结果
+单个公钥响应
 
 ```typescript
 {
     success: true,
     payload: {
-        path: string, // 序列化 BIP32 路径
-        xpub: string,        // 传统格式的 xpub
-        xpubSegwit?: string, // segwit 账户可选：segwit 格式的 xpub
+        path: string, // serialized BIP32 path
+        xpub: string,        // xpub in legacy format
+        xpubSegwit?: string, // optional for segwit accounts: xpub in segwit format
         root_fingerprint?: number,
         node: {
             depth: number,
@@ -75,15 +75,15 @@ HardwareSDK.btcGetPublicKey(connectId, deviceId, {
 
 [了解更多关于 BIP32 序列化格式](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization\_format)
 
-批量公钥的结果
+批量公钥响应
 
 ```typescript
 {
     success: true,
     payload: [
-        { path, xpub, xpubSegwit, root_fingerprint, node }, // 账户 1
-        { path, xpub, xpubSegwit, root_fingerprint, node }, // 账户 2
-        { path, xpub, xpubSegwit, root_fingerprint, node }  // 账户 3
+        { path, xpub, xpubSegwit, root_fingerprint, node }, // account 1
+        { path, xpub, xpubSegwit, root_fingerprint, node }, // account 2
+        { path, xpub, xpubSegwit, root_fingerprint, node }  // account 3
     ]
 }
 ```
@@ -94,8 +94,8 @@ HardwareSDK.btcGetPublicKey(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

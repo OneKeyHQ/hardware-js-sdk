@@ -1,4 +1,4 @@
-import { Layout } from 'nextra-theme-docs'
+import { Layout, LastUpdated } from 'nextra-theme-docs'
 import { getPageMap } from 'nextra/page-map'
 import { OneKeyWordmark } from '../../components/OneKeyLogo'
 import { NavbarMenuActiveMarker } from '../../components/NavbarMenuActiveMarker'
@@ -55,7 +55,10 @@ export default async function LocaleLayout({ children, params }) {
           title: lang === 'zh' ? '本页内容' : 'On This Page',
           backToTop: lang === 'zh' ? '返回顶部' : 'Back to top'
         }}
-        navigation={false}
+        lastUpdated={<LastUpdated locale={lang}>{lang === 'zh' ? '最后更新于' : 'Last updated on'}</LastUpdated>}
+        navigation={true}
+        copyPageButton={false}
+        themeSwitch={{ light: lang === 'zh' ? '浅色' : 'Light', dark: lang === 'zh' ? '深色' : 'Dark', system: lang === 'zh' ? '跟随系统' : 'System' }}
         darkMode={true}
         nextThemes={{ defaultTheme: 'light' }}
         footer={<Footer key="onekey-footer" />}

@@ -1,5 +1,6 @@
-/* Shared brand tokens; content-specific layouts remain scoped to the refreshed pages. */
+/* Shared brand tokens and reading styles across the developer portal. */
 :root {
+  --portal-danger: #a53227;
   --portal-paper: #fafbf8; --portal-ink: #19231d; --portal-muted: #637069;
   --portal-line: #dfe5df; --portal-surface: #f0f3ed; --portal-green-ink: #24502c;
   --nextra-bg: 250, 251, 248;
@@ -7,13 +8,15 @@
   --onekey-logo-color: var(--portal-ink); --onekey-logo-subtitle: var(--portal-muted);
 }
 .dark {
+  --portal-danger: #ffb2a9;
   --portal-paper: #141a16; --portal-ink: #e9eee7; --portal-muted: #a2afa4;
   --portal-line: #303b32; --portal-surface: #1e2821; --portal-green-ink: #b3ef78;
   --nextra-bg: 20, 26, 22; --nextra-primary-lightness: 70%;
   --onekey-logo-color: var(--portal-ink); --onekey-logo-subtitle: var(--portal-muted);
 }
 html, body { background: var(--portal-paper); }
-html { scroll-padding-top: 100px; }
+/* Nextra also sets this on html:not(:has(*:focus)); keep hash targets below the sticky header. */
+html, html:not(:has(*:focus)) { scroll-padding-top: 100px; }
 .nextra-navbar-blur { background: var(--portal-paper); border-color: var(--portal-line); }
 .onekey-navbar-inner { padding-inline: clamp(20px, 3vw, 48px); }
 .onekey-primary-nav { gap: 20px; }
@@ -75,7 +78,7 @@ html { scroll-padding-top: 100px; }
 }
 @media(prefers-reduced-motion:reduce) { html { scroll-behavior: auto; } .landing-page *, [data-onekey-design] * { animation: none !important; transition: none !important; } }
 /* Keep built-in and custom chain navigation in the same brand palette. */
-.nextra-sidebar a[class*="x:bg-primary-100"],
+a[class*="x:bg-primary-100"][class*="x:font-semibold"],
 .provider-chain-sidebar a.sidebar-link-active,
 .hardware-product-sidebar a.sidebar-link-active,
 .dark .provider-chain-sidebar a.sidebar-link-active,
@@ -92,3 +95,48 @@ html.dark .nextra-navbar-blur { background: var(--portal-paper) !important; }
 .agent-wallet-disclaimer p { color: #765b34 !important; }
 html.dark .agent-wallet-disclaimer strong { color: #fcd34d !important; }
 html.dark .agent-wallet-disclaimer p { color: #d4d4d8 !important; }
+
+/* Shared reading tools, with the TOC available on smaller screens. */
+.doc-page-tools { display: flex; justify-content: flex-end; align-items: flex-start; gap: 12px; margin: 18px 0 24px; position: relative; z-index: 2; }
+.doc-page-tools button, .doc-page-tools summary { font: inherit; font-size: 12px; color: var(--portal-muted); cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.doc-page-tools summary { list-style: none; }
+.doc-page-tools summary::-webkit-details-marker { display: none; }
+.doc-copy-actions { display: flex; align-items: stretch; margin-left: auto; border: 1px solid var(--portal-line); border-radius: 6px; background: var(--portal-paper); }
+.doc-copy-actions > button { padding: 7px 11px; }
+.doc-copy-actions button:hover, .doc-page-tools summary:hover { color: var(--portal-ink); background: var(--portal-surface); }
+.doc-assistant-links { position: relative; border-left: 1px solid var(--portal-line); }
+.doc-assistant-links > summary { padding: 9px 7px; height: 100%; }
+.doc-assistant-links > div { position: absolute; right: 0; top: calc(100% + 8px); width: 215px; background: var(--portal-paper); border: 1px solid var(--portal-line); border-radius: 6px; padding: 5px; box-shadow: 0 12px 32px #19231d15; }
+.doc-assistant-links button { padding: 10px; width: 100%; }
+.doc-mobile-toc { display: none; }
+[data-onekey-design] article h1 { overflow-wrap: anywhere; }
+[data-onekey-design] article :is(p,li,td) { color: var(--portal-ink); }
+[data-onekey-design] article blockquote { border-color: var(--portal-line); font-style: normal; }
+[data-onekey-design] article code:not(pre code) { background: var(--portal-surface); }
+[data-onekey-design] .nextra-card { background: var(--portal-surface); border-color: var(--portal-line); box-shadow: none; transition: border-color 150ms ease, background-color 150ms ease; }
+[data-onekey-design] .nextra-card:hover { transform: none; border-color: var(--portal-green-ink); }
+[data-onekey-design] .nextra-card :is(h3,span:first-child) { color: var(--portal-ink) !important; }
+[data-onekey-design] .nextra-card p { color: var(--portal-muted) !important; }
+.nextra-mobile-nav { background: var(--portal-paper) !important; }
+.nextra-navbar-blur { background: var(--portal-paper) !important; }
+.nextra-sidebar, .nextra-toc { color: var(--portal-muted); }
+.nextra-sidebar a:hover { color: var(--portal-green-ink); }
+@media(max-width:1279px) {
+  .doc-page-tools { justify-content: space-between; }
+  .doc-mobile-toc { display: block; max-width: 55%; }
+  .doc-mobile-toc > summary { padding-block: 8px; }
+  .doc-mobile-toc nav { position: absolute; left: 0; right: 0; top: calc(100% + 8px); background: var(--portal-paper); border: 1px solid var(--portal-line); border-radius: 6px; max-height: 55vh; overflow-y: auto; padding: 12px; box-shadow: 0 12px 32px #19231d15; }
+  .doc-mobile-toc nav a { display: block; padding: 8px 10px; font-size: 13px; text-decoration: none; }
+  .doc-mobile-toc nav a[data-depth='3'] { padding-left: 24px; color: var(--portal-muted); }
+}
+@media(max-width:767px) {
+  .doc-page-tools { margin-top: 10px; gap: 6px; }
+  [data-onekey-design] .nextra-cards { grid-template-columns: minmax(0,1fr); }
+  [data-onekey-design] article :is(th,td) { padding: 10px 12px; }
+}
+
+/* Keep the wordmark and navigation distinct as the header narrows. */
+.onekey-navbar-inner { column-gap: 16px; }
+.onekey-navbar-inner > a[aria-label="Home page"] { flex-shrink: 0; }
+
+.doc-mobile-toc a[data-depth="4"] { padding-left: 30px; font-size: 12px; }

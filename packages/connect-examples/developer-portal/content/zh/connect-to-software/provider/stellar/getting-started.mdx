@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # 快速开始
 
+签名前先检测 provider 并请求地址。使用所选钱包网络返回的 network passphrase，以及由 Stellar SDK 构造的完整 XDR 数据。
+
 了解如何检测 OneKey Stellar Provider，并请求 Stellar 地址。
 
 <Callout type="warning">
@@ -21,7 +23,7 @@ Stellar 的签名通常依赖正确的 network passphrase（例如 Public / Test
 const stellar = window.$onekey?.stellar
 
 if (!stellar?.isOneKey) {
-  throw new Error('未检测到 OneKey Stellar Provider')
+  throw new Error('OneKey Stellar provider not detected')
 }
 ```
 
@@ -30,7 +32,7 @@ if (!stellar?.isOneKey) {
 ## 获取地址（连接）
 
 ```ts
-// 触发授权/连接流程，并返回地址（G...）
+// Triggers wallet permission / connect flow and returns the address (G...)
 const { address } = await stellar.getAddress()
 console.log('Address:', address)
 ```

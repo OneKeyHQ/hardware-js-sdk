@@ -126,14 +126,14 @@ const getWidgetCopy = isZh => {
   if (isZh) {
     return {
       title: '文档助手',
-      searchTab: 'Search',
-      askTab: 'Ask AI',
+      searchTab: '搜索',
+      askTab: '问 AI',
       searchPlaceholder: '搜索文档、API 与示例...',
       searchEmpty: '没有匹配结果，试试更短的关键词。',
       searchListTitle: '文档结果',
       searchCount: count => `${count} 条结果`,
       askHint: '找不到答案？切换 Ask AI 继续提问',
-      askFromSearch: '转到 Ask AI',
+      askFromSearch: '向 AI 提问',
       askUnavailable: 'AI 助手暂时不可用，请使用文档导航。',
       assistantLabel: 'AI 助手',
       askDescription: '我会基于 OneKey Hardware SDK 文档回答并给出来源。',

@@ -82,4 +82,4 @@ For higher-risk actions, ask:
 Use my OneKey hardware wallet for this transfer.
 ```
 
-The wallet skill switches to a hardware-backed session and fund-moving actions can be escalated to device-side clear signing. After hardware login, normal wallet, transfer, swap, and signing prompts use the active hardware-backed session automatically.
+The wallet skill switches to a hardware-backed session, where supported signing requests require the user to review and confirm on the device. Available Clear Signing details depend on the chain, firmware, and CLI version. After hardware login, wallet, transfer, swap, and signing prompts use the active hardware-backed session; verify its address before preparing a fund-moving action.

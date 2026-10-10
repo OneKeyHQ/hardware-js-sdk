@@ -1,5 +1,6 @@
 ---
 title: 快速开始
+description: 选择传输方式、连接设备并完成第一次地址确认。
 ---
 
 import { Tabs } from 'nextra/components'
@@ -31,7 +32,7 @@ Hardware SDK 1.2.0 用**同一套 JavaScript API** 同时支持 Protocol V1（Cl
 | 浏览器 / 桌面 WebUSB | `@onekeyfe/hd-common-connect-sdk` | [WebUSB](/zh/hardware-sdk/transport/web-usb) |
 | React Native BLE | `@onekeyfe/hd-ble-sdk` | [React Native BLE](/zh/hardware-sdk/transport/react-native-ble) |
 | Android / iOS / Flutter 原生桥 | `@onekeyfe/hd-common-connect-sdk`（`env: 'lowlevel'`） | [原生 BLE](/zh/hardware-sdk/transport/native-ble) |
-| 仅 iframe 插件宿主 | `@onekeyfe/hd-web-sdk` | 概览 → 插件 iframe |
+| 仅 iframe 插件宿主 | `@onekeyfe/hd-web-sdk` | [插件 iframe 宿主](/zh/hardware-sdk#plugin-iframe-host) |
 
 <Tabs items={['npm', 'pnpm', 'yarn']} className="doc-example-tabs">
 
@@ -99,6 +100,8 @@ if (!devices.success || !devices.payload.length) {
   throw new Error('No OneKey device found');
 }
 
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 

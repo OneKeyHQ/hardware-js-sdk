@@ -993,16 +993,16 @@ button[aria-label="Collapse sidebar"] {
 /* Target the specific active link class pattern from Nextra */
 aside a.x\:bg-primary-100,
 aside a[class*="x:bg-primary-100"] {
-  background-color: #dbeafe !important; /* blue-100 */
-  color: #1e40af !important; /* blue-800 */
+  background-color: var(--portal-surface) !important;
+  color: var(--portal-green-ink) !important;
   font-weight: 600 !important;
   border-radius: 6px;
 }
 
 .dark aside a.x\:bg-primary-100,
 .dark aside a[class*="x:bg-primary-100"] {
-  background-color: rgba(59, 130, 246, 0.2) !important; /* blue-500/20 - more visible */
-  color: #93c5fd !important; /* blue-300 - lighter for dark mode */
+  background-color: var(--portal-surface) !important;
+  color: var(--portal-green-ink) !important;
 }
 
 /* ============================================

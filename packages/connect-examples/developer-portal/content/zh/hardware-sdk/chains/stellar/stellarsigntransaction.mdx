@@ -6,7 +6,7 @@ title: stellarSignTransaction
 
 ## Stellar：签名交易
 
-使用指定 BIP32 路径派生的私钥对交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+使用指定路径派生的密钥请求交易签名。用户在设备上核对并确认请求。
 
 ```typescript
 const result = await HardwareSDK.stellarSignTransaction(connectId, deviceId, params);
@@ -16,7 +16,7 @@ const result = await HardwareSDK.stellarSignTransaction(connectId, deviceId, par
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` **长度为 `3`，这是一个特殊的链。** [更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _必需_ `string | Array<number>`。完全硬化的 Stellar 账户路径，例如 `m/44'/148'/0'`。
 * `networkPassphrase` - _必需_ `string` 网络密码短语
 * `transaction` - _必需_ `Object` StellarTransaction 类型
 
@@ -77,7 +77,7 @@ const response = await HardwareSDK.stellarSignTransaction(
   success: true,
   payload: {
     public_key: string,
-    signature: string.
+    signature: string,
   }
 }
 ```
@@ -88,8 +88,8 @@ const response = await HardwareSDK.stellarSignTransaction(
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

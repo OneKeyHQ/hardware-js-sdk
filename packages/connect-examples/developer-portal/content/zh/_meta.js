@@ -20,6 +20,7 @@ export default {
     title: 'dApp 接入',
     type: 'menu',
     items: {
+      quickstart: { title: 'dApp 快速开始', href: '/zh/connect-to-software' },
       provider: { title: 'Provider API', href: '/zh/connect-to-software/provider' },
       web3modal: { title: 'Web3Modal UI 组件', href: '/zh/connect-to-software/wallet-ui/web3modal' },
     },
@@ -69,6 +70,18 @@ export default {
       safety: { title: '安全规则', href: '/zh/agent-wallet/safety' },
     },
   },
+  'integration-guides': {
+    title: '资源',
+    type: 'menu',
+    items: {
+      guides: { title: '集成指南', href: '/zh/integration-guides' },
+      glossary: { title: '术语表', href: '/zh/integration-guides/glossary' },
+      troubleshooting: { title: '排障指南', href: '/zh/troubleshooting' },
+      contributing: { title: '参与贡献', href: '/zh/integration-guides/contributing' },
+      legacy: { title: '历史集成', href: '/zh/legacy' },
+    },
+  },
+  legacy: { title: '历史集成', display: 'hidden' },
   // 导航菜单及下拉项
   troubleshooting: { title: '排障指南', display: 'hidden' },
   changelog: {

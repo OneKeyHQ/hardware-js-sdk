@@ -1,5 +1,6 @@
 ---
 title: Passphrase（核心指南）
+description: 处理标准与隐藏钱包、输入方式、指纹绑定和关联交互。
 ---
 
 # Passphrase（核心指南）
@@ -15,17 +16,15 @@ title: Passphrase（核心指南）
 
 ## 设备支持
 
-| 设备 | 设备端输入 | 软件端输入（主机） |
-|------|----------|-----------------|
-| Classic | 是 | 是 |
-| Classic 1S | 是 | 是 |
-| Mini | 是 | 是 |
-| Touch | 是（触屏键盘） | 是 |
-| Pro | 是（触屏键盘） | 是 |
-| Pro 2 | 是 | 是 |
-| Neo | 是 | 是 |
+不要仅凭机型名称假定设备端或宿主端输入可用。先读取 `getDeviceState` 确认设备、固件和当前状态，再按实际 UI 请求提供输入方式；功能可用性取决于设备、固件、SDK 和运行环境。
 
-所有 OneKey 设备均支持 Passphrase。只持久化 `deviceId + passphraseState`，不要存固件 `session_id`。
+| 当前请求 | 应用行为 |
+| --- | --- |
+| `REQUEST_PASSPHRASE` | 按当前输入流程提供选择，并转发请求的响应关联字段。 |
+| 请求带 `deviceOnly` | 必须选择设备端输入，不显示宿主输入入口。 |
+| `REQUEST_PASSPHRASE_ON_DEVICE` | 只显示“在设备上输入”的提示，不调用 `uiResponse`。 |
+
+若目标输入方式不可用，应向用户报告，不自动切换输入方式。只保存成功返回的 `deviceId + passphraseState` 绑定，不保存密码短语或固件 `session_id`。
 
 ## 交互流程
 
@@ -46,7 +45,7 @@ sequenceDiagram
   SDK->>Device: 打开标准钱包
   SDK-->>App: walletType standard
   App->>SDK: evmGetAddress(..., useEmptyPassphrase true)
-  SDK->>Device: DeviceSessionGet
+  SDK->>Device: 恢复所选钱包上下文
   Device-->>SDK: session
   SDK-->>App: address
 ```
@@ -82,7 +81,7 @@ sequenceDiagram
   SDK-->>App: deviceId + passphraseState
   Note over App: 持久化 deviceId + passphraseState
   App->>SDK: evmGetAddress(..., passphraseState)
-  SDK->>Device: DeviceSessionGet
+  SDK->>Device: 恢复所选钱包上下文
   Note over SDK,Device: Core 内部恢复。应用不调 resume-hidden
   Device-->>SDK: session
   SDK-->>App: address
@@ -95,7 +94,8 @@ HardwareSDK.on(UI_EVENT, async (message) => {
   if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
     await HardwareSDK.uiResponse({
       type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-      payload: { passphraseOnDevice: true, value: '' },
+      ...message.payload.responseCorrelation,
+      payload: { passphraseOnDevice: true, value: '', save: false },
     });
   }
 });
@@ -121,14 +121,14 @@ await HardwareSDK.btcGetAddress(connectId, deviceId, {
 });
 ```
 
-设备端 vs 软件输入：
+设备端与软件输入示例：默认不缓存秘密值。只有用户明确选择受支持的会话缓存流程时，才启用 `save`。
 
 ```ts
 // 设备端
 payload: { passphraseOnDevice: true, value: '' }
 
 // 软件
-payload: { value: userInput, passphraseOnDevice: false, save: true }
+payload: { value: userInput, passphraseOnDevice: false, save: false }
 ```
 
 ### 之后的进程 / 重连

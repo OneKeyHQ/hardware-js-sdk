@@ -126,6 +126,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error('No device connected');
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error('Device connection unavailable');
 const state = await HardwareSDK.getDeviceState(connectId);

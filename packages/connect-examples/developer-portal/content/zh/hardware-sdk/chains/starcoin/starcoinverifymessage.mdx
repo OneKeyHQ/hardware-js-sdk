@@ -6,7 +6,7 @@ title: starcoinVerifyMessage
 
 ## Starcoin：验证消息
 
-使用签名者地址和签名验证消息。
+使用签名者公钥和签名验证消息。
 
 ES6
 
@@ -49,8 +49,8 @@ HardwareSDK.starcoinVerifyMessage(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

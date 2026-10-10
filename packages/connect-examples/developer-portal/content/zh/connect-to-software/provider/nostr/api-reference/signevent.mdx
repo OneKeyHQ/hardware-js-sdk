@@ -4,19 +4,19 @@ title: signEvent
 
 # signEvent
 
-### 方法
+## 方法
 
 ```
-async function signEvent(event: UnsignedEvent): Event
+declare function signEvent(event: UnsignedEvent): Promise<Event>;
 ```
 
-### 参数
+## 参数
 
-* `event` — _必填_ `object`
-  * `kind` — _必填_ `number`
-  * `content` — _必填_ `string`
-  * `tags` — _必填_ `Array<Array<string>>`
-  * `created_at` — _必填_ `number`
+* `event` — _必填_ `object`。
+  * `kind` — _必填_ `number`。
+  * `content` — _必填_ `string`。
+  * `tags` — _必填_ `Array<Array<string>>`。
+  * `created_at` — _必填_ `number`，以秒为单位的 Unix 时间戳。
 
 ```typescript
 export type UnsignedEvent = {
@@ -27,20 +27,20 @@ export type UnsignedEvent = {
 };
 
 export enum EventKind {
-  Metadata = 0,   // 元数据
-  Text = 1,       // 文本
-  RelayRec = 2,   // 中继推荐
-  Contacts = 3,   // 联系人
-  DM = 4,         // 私信
-  Deleted = 5,    // 已删除
+  Metadata = 0,
+  Text = 1,
+  RelayRec = 2,
+  Contacts = 3,
+  DM = 4,
+  Deleted = 5,
 }
 ```
 
-### 响应
+## 响应
 
 接受一个事件对象，添加 `id`、`pubkey` 和 `sig` 后返回
 
-### 结果
+## 结果
 
 ```typescript
 export type Event = {
@@ -54,13 +54,13 @@ export type Event = {
 };
 ```
 
-### 示例
+## 示例
 
 ```typescript
 const event = {
-  created_at: 1700000000,
+  created_at: Math.floor(Date.now() / 1000),
   kind: 1,
-  content: "OneKey",
+  content: "OneKey 🚀",
   tags: [],
 };
 const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
@@ -68,7 +68,6 @@ const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
 const signedEvent = await provider.signEvent(event);
 ```
 
-### 演示
+## 演示
 
-<iframe src="https://codepen.io/OneKeyHQ/pen/YzBOVgV" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[打开示例](https://codepen.io/OneKeyHQ/pen/YzBOVgV)
