@@ -32,6 +32,8 @@ export const getBondedDevices = () => BleUtils.getBondedPeripherals();
 
 export const pairDevice = (macAddress: string) => BleUtils.pairDevice(macAddress);
 
+const SYSTEM_BONDING_RESTART_WINDOW_MS = 1500;
+
 const createBondFailureError = (bondState: Peripheral['bondState']) => {
   const nativeReason =
     'reason' in bondState && typeof bondState.reason === 'number' ? bondState.reason : undefined;
@@ -66,17 +68,20 @@ const createBondFailureError = (bondState: Peripheral['bondState']) => {
 
 export const onDeviceBondState = (
   bleMacAddress: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: { systemInitiated?: boolean }
 ): Promise<Peripheral | undefined> =>
   new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
       return;
     }
+    let pendingFailure: ReturnType<typeof setTimeout> | undefined;
     const cleanup = () => {
       if (timeout) {
         clearTimeout(timeout);
       }
+      if (pendingFailure) clearTimeout(pendingFailure);
       if (cleanupListener) cleanupListener();
       signal?.removeEventListener('abort', onAbort);
     };
@@ -105,10 +110,22 @@ export const onDeviceBondState = (
 
       const hasBonded = bondState.preState === 'BOND_BONDING' && bondState.state === 'BOND_BONDED';
       const hasFailed = bondState.preState === 'BOND_BONDING' && bondState.state === 'BOND_NONE';
+      const hasRestarted = bondState.preState === 'BOND_NONE' && bondState.state === 'BOND_BONDING';
       Logger.debug('onDeviceBondState bondState:', bondState);
       if (hasBonded) {
         cleanup();
         resolve(peripheral);
+      } else if (hasRestarted && pendingFailure) {
+        clearTimeout(pendingFailure);
+        pendingFailure = undefined;
+      } else if (hasFailed && options?.systemInitiated) {
+        // Android can briefly remove the old bond before continuing an
+        // already-running system pairing. The original overall deadline stays.
+        if (pendingFailure) clearTimeout(pendingFailure);
+        pendingFailure = setTimeout(() => {
+          cleanup();
+          reject(createBondFailureError(bondState));
+        }, SYSTEM_BONDING_RESTART_WINDOW_MS);
       } else if (hasFailed) {
         cleanup();
         reject(createBondFailureError(bondState));

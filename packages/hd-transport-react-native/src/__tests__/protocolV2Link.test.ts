@@ -363,9 +363,16 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(new ReactNativeBleTransport({}).scanTimeout).toBe(3000);
   });
 
-  test.each(['V1', 'V2'] as const)(
-    'waits for Android bonding before connecting the %s GATT link',
-    async protocol => {
+  test.each([
+    { protocol: 'V1', initiated: true },
+    { protocol: 'V1', initiated: false },
+    { protocol: 'V1', initiated: undefined },
+    { protocol: 'V2', initiated: true },
+    { protocol: 'V2', initiated: false },
+    { protocol: 'V2', initiated: undefined },
+  ] as const)(
+    'waits for Android bonding before connecting $protocol GATT, initiated=$initiated',
+    async ({ protocol, initiated }) => {
       setPlatformOS('android');
       const { transport, uuid, device } = protocol === 'V1' ? createV1Harness() : createHarness();
       const operationOrder: string[] = [];
@@ -380,7 +387,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       });
       pairDeviceMock.mockImplementationOnce(() => {
         operationOrder.push('bond');
-        return Promise.resolve({ bonded: false, bonding: true });
+        return Promise.resolve({ bonded: false, bonding: true, initiated });
       });
       bondStateMock.mockImplementationOnce(() => bonding.promise);
 
@@ -390,6 +397,9 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       });
       expect(operationOrder).toEqual(['bond']);
       expect(device.connect).not.toHaveBeenCalled();
+      expect(bondStateMock).toHaveBeenLastCalledWith(uuid, expect.any(AbortSignal), {
+        systemInitiated: initiated === false,
+      });
 
       bonding.resolve();
       await expect(acquiring).resolves.toEqual({

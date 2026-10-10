@@ -129,6 +129,102 @@ describe('Android bond failure reasons', () => {
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
+  test('lets system-initiated bonding restart before accepting the replacement bond', async () => {
+    const result = onDeviceBondState(UUID, undefined, { systemInitiated: true });
+    const outcome = result.catch(error => error);
+    emitBondState({
+      id: UUID,
+      advertising: {},
+      bondState: { preState: 'BOND_BONDING', state: 'BOND_NONE', reason: 9 },
+    });
+    jest.advanceTimersByTime(1499);
+    expect(cleanup).not.toHaveBeenCalled();
+
+    emitBondState({
+      id: UUID,
+      advertising: {},
+      bondState: { preState: 'BOND_NONE', state: 'BOND_BONDING' },
+    });
+    jest.advanceTimersByTime(1500);
+    expect(cleanup).not.toHaveBeenCalled();
+    const bonded: Peripheral = {
+      id: UUID,
+      advertising: {},
+      bondState: { preState: 'BOND_BONDING', state: 'BOND_BONDED' },
+    };
+    emitBondState(bonded);
+
+    await expect(outcome).resolves.toBe(bonded);
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('rejects a genuine system bond failure when the restart window expires', async () => {
+    const result = onDeviceBondState(UUID, undefined, { systemInitiated: true });
+    const rejection = expect(result).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceNotBonded,
+      params: { phase: 'bond', reason: 'authentication_failed', nativeReason: 1 },
+    });
+    emitBondState({
+      id: UUID,
+      advertising: {},
+      bondState: { preState: 'BOND_BONDING', state: 'BOND_NONE', reason: 1 },
+    });
+    jest.advanceTimersByTime(1499);
+    expect(cleanup).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
+
+    await rejection;
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('aborts a pending system restart without leaving either timer or listener', async () => {
+    const controller = new AbortController();
+    const result = onDeviceBondState(UUID, controller.signal, { systemInitiated: true });
+    const outcome = result.catch(error => error);
+    emitBondState({
+      id: UUID,
+      advertising: {},
+      bondState: { preState: 'BOND_BONDING', state: 'BOND_NONE', reason: 9 },
+    });
+    expect(cleanup).not.toHaveBeenCalled();
+
+    controller.abort();
+    await expect(outcome).resolves.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('keeps the overall deadline when system bonding repeatedly restarts', async () => {
+    const result = onDeviceBondState(UUID, undefined, { systemInitiated: true });
+    const outcome = result.catch(error => error);
+    for (let index = 0; index < 40; index += 1) {
+      emitBondState({
+        id: UUID,
+        advertising: {},
+        bondState: { preState: 'BOND_BONDING', state: 'BOND_NONE', reason: 9 },
+      });
+      emitBondState({
+        id: UUID,
+        advertising: {},
+        bondState: { preState: 'BOND_NONE', state: 'BOND_BONDING' },
+      });
+      jest.advanceTimersByTime(1000);
+    }
+    expect(cleanup).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(20_000);
+
+    await expect(outcome).resolves.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceNotBonded,
+      params: { phase: 'bond', reason: 'timeout' },
+    });
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
   test('aborts the bond wait and removes its listener and deadline', async () => {
     const controller = new AbortController();
     const result = onDeviceBondState(UUID, controller.signal);

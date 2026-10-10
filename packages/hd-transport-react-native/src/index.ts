@@ -1136,7 +1136,9 @@ export default class ReactNativeBleTransport {
       try {
         const bondState = await pairDevice(uuid);
         if (bondState.bonding) {
-          await onDeviceBondState(uuid, this.bondAbortController.signal);
+          await onDeviceBondState(uuid, this.bondAbortController.signal, {
+            systemInitiated: bondState.initiated === false,
+          });
         } else if (!bondState.bonded) {
           throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
         }
