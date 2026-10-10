@@ -583,6 +583,55 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
+    method: 'btcDeriveContextHash',
+    description: 'methodDescriptions.btcDeriveContextHash',
+    supportedDevices: ['classic1s'],
+    presets: [
+      {
+        title: 'Derive Babylon Context Hash',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'Connected Bitcoin key path; use coin type 1 for test networks',
+            value: "m/84'/0'/0'/0/0",
+          },
+          {
+            name: 'appName',
+            type: 'string',
+            required: true,
+            label: 'Application Name',
+            description: '1..64 ASCII lowercase letters, digits or hyphens',
+            value: 'babylon-example',
+          },
+          {
+            name: 'context',
+            type: 'textarea',
+            required: true,
+            label: 'Context (Hex)',
+            description: '1..1024 bytes of lowercase hex without a 0x prefix',
+            value: '48656c6c6f',
+          },
+          {
+            name: 'network',
+            type: 'select',
+            required: true,
+            label: 'Bitcoin Network',
+            value: 'bitcoin-mainnet',
+            options: [
+              'bitcoin-mainnet',
+              'bitcoin-testnet',
+              'bitcoin-signet',
+              'bitcoin-regtest',
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
     method: 'btcSignMessage',
     description: 'methodDescriptions.btcSignMessage',
     presets: [

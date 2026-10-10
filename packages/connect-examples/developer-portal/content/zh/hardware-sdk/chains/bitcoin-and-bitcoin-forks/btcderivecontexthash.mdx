@@ -1,0 +1,35 @@
+---
+title: btcDeriveContextHash
+---
+
+# btcDeriveContextHash
+
+在设备上为当前连接的 Bitcoin 密钥、应用、上下文和网络派生 32 字节的 Babylon context hash。要求 **Classic 1s 固件 3.21.0 或更高版本**，使用 **Protocol V1**。此方法暂不支持其他设备系列或 Protocol V2。
+
+```typescript
+const result = await HardwareSDK.btcDeriveContextHash(connectId, deviceId, {
+  path: "m/84'/0'/0'/0/0",
+  appName: 'babylon-example',
+  context: '48656c6c6f',
+  network: 'bitcoin-mainnet',
+});
+```
+
+## 参数
+
+[可选通用参数](/zh/hardware-sdk/concepts/common-params)
+
+| 参数      | 类型                 | 说明                                                                                                                                                          |
+| --------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `path`    | `string \| number[]` | 必填。当前连接的 Bitcoin 密钥的 BIP32 路径，至少包含三段索引。脚本类型由路径推导。应传入当前连接密钥的路径，而非内部 IKM 派生路径。                           |
+| `appName` | `string`             | 必填。1–64 个 ASCII 字符，仅允许 `[a-z0-9-]`。                                                                                                                |
+| `context` | `string`             | 必填。无 `0x` 前缀、长度为偶数的小写十六进制字符串，解码后为 1–1024 字节。SDK 向设备发送解码后的字节。                                                        |
+| `network` | `string`             | 必填。仅接受 `bitcoin-mainnet`、`bitcoin-testnet`、`bitcoin-signet` 或 `bitcoin-regtest`。Testnet3 和 testnet4 均使用 `bitcoin-testnet`。网络不会从路径推断。 |
+
+## 返回值
+
+成功时，`result.success` 为 `true`，`result.payload.secret` 为 64 位小写十六进制字符串（32 字节）。用户在设备上取消时，返回 SDK 标准失败响应。
+
+调用前应取得用户对请求应用及来源的授权。SDK 保留正常的 PIN、passphrase 和设备确认流程。返回的 `secret` 属于敏感数据，不应记录日志或持久化。派生由设备执行，SDK 不导出或派生内部钱包密钥。
+
+参见 [Babylon derive-context-hash 规范](https://github.com/babylonlabs-io/babylon-toolkit/blob/main/docs/specs/derive-context-hash.md)。

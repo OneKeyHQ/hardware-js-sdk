@@ -1,0 +1,35 @@
+---
+title: btcDeriveContextHash
+---
+
+# btcDeriveContextHash
+
+Derives a 32-byte Babylon context hash on the device for the connected Bitcoin key, application, context and network. Requires **Classic 1s firmware 3.21.0 or later**, using **Protocol V1**. Other device families and Protocol V2 are not supported by this method.
+
+```typescript
+const result = await HardwareSDK.btcDeriveContextHash(connectId, deviceId, {
+  path: "m/84'/0'/0'/0/0",
+  appName: 'babylon-example',
+  context: '48656c6c6f',
+  network: 'bitcoin-mainnet',
+});
+```
+
+## Params
+
+[Optional common params](/en/hardware-sdk/concepts/common-params)
+
+| Parameter | Type                 | Description                                                                                                                                                                                   |
+| --------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `path`    | `string \| number[]` | Required. BIP32 path of the connected Bitcoin key, with at least three components. Script type is inferred from the path. Use the connected key's path, not the internal IKM derivation path. |
+| `appName` | `string`             | Required. 1–64 ASCII characters matching `[a-z0-9-]`.                                                                                                                                         |
+| `context` | `string`             | Required. Lowercase, even-length hex without `0x`, representing 1–1024 bytes. The SDK sends decoded bytes to the device.                                                                      |
+| `network` | `string`             | Required. Exactly `bitcoin-mainnet`, `bitcoin-testnet`, `bitcoin-signet` or `bitcoin-regtest`. Testnet3 and testnet4 both use `bitcoin-testnet`. Network is not inferred from the path.       |
+
+## Result
+
+On success, `result.success` is `true` and `result.payload.secret` is a 64-character lowercase hex string (32 bytes). Device cancellation returns the SDK's standard unsuccessful response.
+
+Obtain user approval for the requesting application and origin before calling this API. The SDK retains the normal PIN, passphrase and device confirmation flow. Treat the returned `secret` as sensitive: do not log or persist it. Derivation is performed by the device; the SDK does not export or derive the internal wallet key.
+
+See the [Babylon derive-context-hash specification](https://github.com/babylonlabs-io/babylon-toolkit/blob/main/docs/specs/derive-context-hash.md).

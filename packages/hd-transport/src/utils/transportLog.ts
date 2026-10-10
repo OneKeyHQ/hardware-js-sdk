@@ -19,6 +19,7 @@ const SENSITIVE_LOG_KEYS = new Set([
   'privatekey',
   'publickey',
   'seed',
+  'secret',
   'serialnumber',
   'session',
   'sessionid',

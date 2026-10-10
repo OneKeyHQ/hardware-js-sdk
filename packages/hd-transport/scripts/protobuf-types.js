@@ -55,6 +55,7 @@ const hasParsedType = name => types.some(t => t && t.name === name);
 // enums used as keys (string), used as values (number) by default
 const ENUM_KEYS = [
   'InputScriptType',
+  'CanonicalBitcoinNetwork',
   'OutputScriptType',
   'RequestType',
   'KaspaInputScriptType',
