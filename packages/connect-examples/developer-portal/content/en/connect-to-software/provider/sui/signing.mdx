@@ -7,17 +7,16 @@ import { Callout } from 'nextra/components'
 
 # Signing
 
-Request permission before signing, select a connected account, and read the active chain. The legacy `TransactionBlock` examples use `@mysten/sui.js`; the newer `Transaction` API uses `@mysten/sui`. Match your SDK version and wallet capabilities rather than mixing these APIs.
+The signing examples below use `connectSuiAccount()` from [Getting Started](/en/connect-to-software/provider/sui/getting-started#account-context-for-signing). It returns a Wallet Standard account and its active chain. The examples use `@mysten/sui@1.28.2`. Even the legacy `*TransactionBlock` methods now declare `Transaction` inputs in `@mysten/wallet-standard@0.14.7`.
+
+Request permission before signing, select a connected account, and read the active chain. These examples use `@mysten/sui@1.28.2`, matching `@mysten/wallet-standard@0.14.7` accepted by the current provider.
 
 Learn how to sign messages for authentication.
 
 Initialize the account context before the following examples:
 
 ```typescript
-await provider.requestPermissions()
-const [account] = await provider.getAccounts()
-if (!account) throw new Error('No Sui account is connected')
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 ```
 
 ---
@@ -50,7 +49,6 @@ const message = new TextEncoder().encode('Hello, Sui!')
 
 const result = await provider.signMessage({
   account,
-  chain,
   message,
 })
 
@@ -70,11 +68,8 @@ import { verifyPersonalMessageSignature } from '@mysten/sui/verify'
 const message = new TextEncoder().encode('Hello, Sui!')
 const { signature } = await provider.signPersonalMessage({ message, account, chain })
 
-const accounts = await provider.getAccounts()
-const publicKey = accounts[0].publicKey
-
 const signerKey = await verifyPersonalMessageSignature(message, signature)
-const isExpectedSigner = signerKey.toSuiAddress() === accounts[0].address
+const isExpectedSigner = signerKey.toSuiAddress() === account.address
 console.log('Expected signer:', isExpectedSigner)
 ```
 

@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # 签名
 
+下方签名示例使用[快速开始](/zh/connect-to-software/provider/sui/getting-started#获取签名账户)中的 `connectSuiAccount()`，获取 Wallet Standard 账户与当前链。示例使用 `@mysten/sui@1.28.2`。在 `@mysten/wallet-standard@0.14.7` 中，旧 `*TransactionBlock` 方法的输入类型也已是 `Transaction`。
+
 了解如何签署消息用于身份验证。
 
 ---
@@ -17,8 +19,7 @@ import { Callout } from 'nextra/components'
 
 ```typescript
 const message = new TextEncoder().encode('Hello, Sui!')
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signPersonalMessage({
   message,
@@ -38,13 +39,11 @@ console.log({
 
 ```typescript
 const message = new TextEncoder().encode('Hello, Sui!')
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signMessage({
   message,
   account,
-  chain,
 })
 
 console.log({
@@ -58,18 +57,15 @@ console.log({
 ## 验证签名
 
 ```typescript
-import { verifyPersonalMessage } from '@mysten/sui.js/verify'
+import { verifyPersonalMessageSignature } from '@mysten/sui/verify'
 
 const message = new TextEncoder().encode('Hello, Sui!')
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 const { signature } = await provider.signPersonalMessage({ message, account, chain })
 
-const accounts = await provider.getAccounts()
-const publicKey = accounts[0].publicKey
-
-const isValid = await verifyPersonalMessage(message, signature)
-console.log('签名有效:', isValid)
+const signerKey = await verifyPersonalMessageSignature(message, signature)
+const isExpectedSigner = signerKey.toSuiAddress() === account.address
+console.log('签名者是否为预期账户:', isExpectedSigner)
 ```
 
 ---

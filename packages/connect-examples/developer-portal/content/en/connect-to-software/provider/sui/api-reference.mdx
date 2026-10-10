@@ -34,20 +34,28 @@ Reference for OneKey's Sui provider methods and types.
 
 ### Wallet Account
 
+`getAccounts()` returns `AccountInfo[]`. Signing inputs require the Wallet Standard `WalletAccount`, whose `publicKey` is a byte array and which also carries `chains` and `features`. Obtain it through `standard:connect`; do not cast `AccountInfo` to `WalletAccount`.
+
 ```typescript
-interface WalletAccount {
+import type { WalletAccount, IdentifierString } from '@mysten/wallet-standard'
+import type { Transaction } from '@mysten/sui/transactions'
+
+// provider.getAccounts()
+interface AccountInfo {
   address: string
-  publicKey: string // Hex-encoded public key returned by the injected provider
+  publicKey: string // Hex-encoded public key
 }
 ```
 
 ### Sign and Execute Transaction Block Input
 
+The current injected provider does not forward `options` in `signAndExecuteTransactionBlock`. Query the returned digest with a Sui client on the same chain to request effects, events, or object changes.
+
 ```typescript
 interface SignAndExecuteTransactionBlockInput {
   account: WalletAccount
-  chain?: string
-  transactionBlock: TransactionBlock
+  chain: IdentifierString
+  transactionBlock: Transaction
   options?: {
     showEffects?: boolean
     showEvents?: boolean
@@ -73,7 +81,7 @@ interface SignTransactionBlockOutput {
 ```typescript
 interface SignPersonalMessageInput {
   account: WalletAccount
-  chain?: string
+  chain?: IdentifierString
   message: Uint8Array
 }
 ```

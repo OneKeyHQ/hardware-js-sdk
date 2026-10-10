@@ -118,6 +118,19 @@ const NavbarMenu = ({ menu, children }) => {
   )
 }
 
+export function OneKeySidebarSearch({ lang }) {
+  return (
+    <button
+      type="button"
+      className={`${styles.assistButton} ${styles.searchButton} ${styles.sidebarSearch}`}
+      onClick={() => emitDocsAIOpen(DOCS_AI_TAB.SEARCH)}
+    >
+      <SearchIcon size={15} aria-hidden="true" />
+      <span>{lang === 'zh' ? '搜索文档' : 'Search documentation'}</span>
+    </button>
+  )
+}
+
 export function OneKeyClientNavbar({ children, className }) {
   const items = useConfig().normalizePagesResult.topLevelNavbarItems
   const pathname = useFSRoute()

@@ -56,6 +56,31 @@ if (result) {
 
 ---
 
+## 获取签名账户
+
+安装 `@mysten/wallet-standard@0.14.7`。注入 Provider 的 `getAccounts()` 返回 `AccountInfo[]`，不是签名接口要求的 `WalletAccount`。下面通过 Wallet Standard 获取完整账户。在钱包注册完成后由用户操作触发，处理拒绝请求，并在账户或网络变化后重新获取上下文。
+
+```typescript
+import { getWallets, isWalletWithRequiredFeatureSet } from '@mysten/wallet-standard'
+
+async function connectSuiAccount() {
+  const wallet = getWallets().get().find(wallet => wallet.name === 'OneKey Wallet')
+  if (!wallet || !isWalletWithRequiredFeatureSet(wallet)) {
+    throw new Error('OneKey Sui Wallet Standard is not available')
+  }
+
+  const { accounts } = await wallet.features['standard:connect'].connect()
+  const [account] = accounts
+  const chain = await provider.getActiveChain()
+  if (!account || !chain || !account.chains.includes(chain)) {
+    throw new Error('No connected Sui account for the active chain')
+  }
+  return { account, chain }
+}
+```
+
+---
+
 ## 获取账户
 
 ```typescript
@@ -127,12 +152,12 @@ provider.onNetworkChange((network) => {
 对于 React 应用，使用官方的 Sui Wallet Kit：
 
 ```bash
-npm install @mysten/dapp-kit @mysten/sui.js @tanstack/react-query
+npm install @mysten/dapp-kit@0.16.0 @mysten/sui@1.28.2 @tanstack/react-query@^5
 ```
 
 ```tsx
 import { SuiClientProvider, WalletProvider } from '@mysten/dapp-kit'
-import { getFullnodeUrl } from '@mysten/sui.js/client'
+import { getFullnodeUrl } from '@mysten/sui/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const queryClient = new QueryClient()

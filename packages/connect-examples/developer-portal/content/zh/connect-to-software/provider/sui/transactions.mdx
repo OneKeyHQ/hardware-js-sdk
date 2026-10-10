@@ -7,47 +7,43 @@ import { Callout } from 'nextra/components'
 
 # 交易
 
+下方签名示例使用[快速开始](/zh/connect-to-software/provider/sui/getting-started#获取签名账户)中的 `connectSuiAccount()`，获取 Wallet Standard 账户与当前链。示例使用 `@mysten/sui@1.28.2`。在 `@mysten/wallet-standard@0.14.7` 中，旧 `*TransactionBlock` 方法的输入类型也已是 `Transaction`。
+
 了解如何在 Sui 上签署和执行交易。
 
 ---
 
 ## 签署并执行交易块
 
+当前注入 Provider 的 `signAndExecuteTransactionBlock` 不会转发 `options`。若需 effects、events 或 object changes，请使用同一链的 Sui client 按返回的 digest 查询交易。
+
 ```typescript
-import { TransactionBlock } from '@mysten/sui.js/transactions'
+import { Transaction } from '@mysten/sui/transactions'
 
 // 创建交易块
-const txb = new TransactionBlock()
+const txb = new Transaction()
 
 // 添加转账
 txb.transferObjects(
   [txb.object('0xobject_id')],
-  txb.pure('0xrecipient_address')
+  txb.pure.address('RECIPIENT_SUI_ADDRESS')
 )
 
 // 或发送 SUI
-const [coin] = txb.splitCoins(txb.gas, [txb.pure(1000000000)]) // 1 SUI
-txb.transferObjects([coin], txb.pure('0xrecipient_address'))
+const [coin] = txb.splitCoins(txb.gas, [txb.pure.u64(1000000000)]) // 1 SUI
+txb.transferObjects([coin], txb.pure.address('RECIPIENT_SUI_ADDRESS'))
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 // 签署并执行
 const result = await provider.signAndExecuteTransactionBlock({
   account,
   chain,
   transactionBlock: txb,
-  options: {
-    showEffects: true,
-    showEvents: true,
-    showObjectChanges: true,
-  },
 })
 
 console.log({
   digest: result.digest,
-  effects: result.effects,
-  events: result.events,
 })
 ```
 
@@ -56,11 +52,10 @@ console.log({
 ## 签署交易块（不执行）
 
 ```typescript
-const txb = new TransactionBlock()
+const txb = new Transaction()
 // ... 构建交易
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const signedTxb = await provider.signTransactionBlock({
   account,
@@ -86,21 +81,17 @@ console.log({
 
 ```typescript
 // 使用较新的 signAndExecuteTransaction API（Transaction 类型）
-import { Transaction } from '@mysten/sui.js/transactions'
+import { Transaction } from '@mysten/sui/transactions'
 
 const tx = new Transaction()
 // ... 构建交易
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signAndExecuteTransaction({
   transaction: tx,
   account,
   chain,
-  options: {
-    showEffects: true,
-  },
 })
 ```
 
@@ -109,13 +100,12 @@ const result = await provider.signAndExecuteTransaction({
 ## 签署交易（新 API）
 
 ```typescript
-import { Transaction } from '@mysten/sui.js/transactions'
+import { Transaction } from '@mysten/sui/transactions'
 
 const tx = new Transaction()
 // ... 构建交易
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const signedTxn = await provider.signTransaction({
   transaction: tx,
@@ -131,20 +121,19 @@ const signedTxn = await provider.signTransaction({
 ### Move 调用
 
 ```typescript
-const txb = new TransactionBlock()
+const txb = new Transaction()
 
 // 调用 Move 函数
 txb.moveCall({
   target: '0xpackage::module::function',
   arguments: [
-    txb.pure('arg1'),
+    txb.pure.string('arg1'),
     txb.object('0xobject_id'),
   ],
   typeArguments: ['0x2::sui::SUI'],
 })
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signAndExecuteTransactionBlock({
   account,
@@ -158,7 +147,7 @@ const result = await provider.signAndExecuteTransactionBlock({
 ## 发布包
 
 ```typescript
-const txb = new TransactionBlock()
+const txb = new Transaction()
 
 const [upgradeCap] = txb.publish({
   modules: compiledModules,
@@ -168,10 +157,8 @@ const [upgradeCap] = txb.publish({
   ],
 })
 
-txb.transferObjects([upgradeCap], txb.pure(senderAddress))
-
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
+txb.transferObjects([upgradeCap], txb.pure.address(account.address))
 
 const result = await provider.signAndExecuteTransactionBlock({
   account,
@@ -185,7 +172,7 @@ const result = await provider.signAndExecuteTransactionBlock({
 ## 与 Sui SDK 配合使用
 
 ```typescript
-import { SuiClient } from '@mysten/sui.js/client'
+import { SuiClient } from '@mysten/sui/client'
 
 const client = new SuiClient({ url: 'https://fullnode.mainnet.sui.io' })
 

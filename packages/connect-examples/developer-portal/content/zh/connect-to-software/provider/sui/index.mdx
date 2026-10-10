@@ -7,6 +7,8 @@ import { Callout, Tabs } from 'nextra/components'
 
 # Sui
 
+下方签名示例使用[快速开始](/zh/connect-to-software/provider/sui/getting-started#获取签名账户)中的 `connectSuiAccount()`，获取 Wallet Standard 账户与当前链。示例使用 `@mysten/sui@1.28.2`。在 `@mysten/wallet-standard@0.14.7` 中，旧 `*TransactionBlock` 方法的输入类型也已是 `Transaction`。
+
 使用 OneKey 的 Provider 集成 Sui 区块链。通过 `window.$onekey.sui` 访问。
 
 <Callout type="info">
@@ -100,52 +102,45 @@ console.log('当前链:', chain) // 例如 'sui:testnet'
 
 ### 签名并执行交易块
 
+当前注入 Provider 的 `signAndExecuteTransactionBlock` 不会转发 `options`。若需 effects、events 或 object changes，请使用同一链的 Sui client 按返回的 digest 查询交易。
+
 ```typescript
-import { TransactionBlock } from '@mysten/sui.js/transactions'
+import { Transaction } from '@mysten/sui/transactions'
 
 // 创建交易块
-const txb = new TransactionBlock()
+const txb = new Transaction()
 
 // 添加转账
 txb.transferObjects(
   [txb.object('0xobject_id')],
-  txb.pure('0xrecipient_address')
+  txb.pure.address('RECIPIENT_SUI_ADDRESS')
 )
 
 // 或发送 SUI
-const [coin] = txb.splitCoins(txb.gas, [txb.pure(1000000000)]) // 1 SUI
-txb.transferObjects([coin], txb.pure('0xrecipient_address'))
+const [coin] = txb.splitCoins(txb.gas, [txb.pure.u64(1000000000)]) // 1 SUI
+txb.transferObjects([coin], txb.pure.address('RECIPIENT_SUI_ADDRESS'))
 
 // 签名并执行
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signAndExecuteTransactionBlock({
   account,
   chain,
   transactionBlock: txb,
-  options: {
-    showEffects: true,
-    showEvents: true,
-    showObjectChanges: true,
-  },
 })
 
 console.log({
   digest: result.digest,
-  effects: result.effects,
-  events: result.events,
 })
 ```
 
 ### 签名交易块（不执行）
 
 ```typescript
-const txb = new TransactionBlock()
+const txb = new Transaction()
 // ... 构建交易
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const signedTxb = await provider.signTransactionBlock({
   account,
@@ -169,34 +164,29 @@ console.log({
 
 ```typescript
 // 使用新的 signAndExecuteTransaction API（注意使用 Transaction 类型）
-import { Transaction } from '@mysten/sui.js/transactions'
+import { Transaction } from '@mysten/sui/transactions'
 
 const tx = new Transaction()
 // ... 构建交易
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signAndExecuteTransaction({
   transaction: tx,
   account,
   chain,
-  options: {
-    showEffects: true,
-  },
 })
 ```
 
 ### 签名交易（新 API）
 
 ```typescript
-import { Transaction } from '@mysten/sui.js/transactions'
+import { Transaction } from '@mysten/sui/transactions'
 
 const tx = new Transaction()
 // ... 构建交易
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const signedTxn = await provider.signTransaction({
   transaction: tx,
@@ -215,8 +205,7 @@ const signedTxn = await provider.signTransaction({
 
 ```typescript
 const message = new TextEncoder().encode('Hello, Sui!')
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signPersonalMessage({
   message,
@@ -234,13 +223,11 @@ console.log({
 
 ```typescript
 const message = new TextEncoder().encode('Hello, Sui!')
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signMessage({
   message,
   account,
-  chain,
 })
 
 console.log({
@@ -252,18 +239,15 @@ console.log({
 ### 验证签名
 
 ```typescript
-import { verifyPersonalMessage } from '@mysten/sui.js/verify'
+import { verifyPersonalMessageSignature } from '@mysten/sui/verify'
 
 const message = new TextEncoder().encode('Hello, Sui!')
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 const { signature } = await provider.signPersonalMessage({ message, account, chain })
 
-const accounts = await provider.getAccounts()
-const publicKey = accounts[0].publicKey
-
-const isValid = await verifyPersonalMessage(message, signature)
-console.log('签名有效:', isValid)
+const signerKey = await verifyPersonalMessageSignature(message, signature)
+const isExpectedSigner = signerKey.toSuiAddress() === account.address
+console.log('签名者是否为预期账户:', isExpectedSigner)
 ```
 
 ---
@@ -273,20 +257,19 @@ console.log('签名有效:', isValid)
 ### Move 调用
 
 ```typescript
-const txb = new TransactionBlock()
+const txb = new Transaction()
 
 // 调用 Move 函数
 txb.moveCall({
   target: '0xpackage::module::function',
   arguments: [
-    txb.pure('arg1'),
+    txb.pure.string('arg1'),
     txb.object('0xobject_id'),
   ],
   typeArguments: ['0x2::sui::SUI'],
 })
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signAndExecuteTransactionBlock({
   account,
@@ -298,7 +281,7 @@ const result = await provider.signAndExecuteTransactionBlock({
 ### 发布包
 
 ```typescript
-const txb = new TransactionBlock()
+const txb = new Transaction()
 
 const [upgradeCap] = txb.publish({
   modules: compiledModules,
@@ -308,10 +291,8 @@ const [upgradeCap] = txb.publish({
   ],
 })
 
-txb.transferObjects([upgradeCap], txb.pure(senderAddress))
-
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
+txb.transferObjects([upgradeCap], txb.pure.address(account.address))
 
 const result = await provider.signAndExecuteTransactionBlock({
   account,
@@ -337,21 +318,27 @@ const result = await provider.signAndExecuteTransactionBlock({
 | `signTransactionBlock(input)` | 仅签名交易，需传入 `account`/`chain` |
 | `signAndExecuteTransaction(input)` | 签名并执行（新 API，使用 `Transaction`，需 `account`/`chain`） |
 | `signTransaction(input)` | 签名交易（新 API，使用 `Transaction`，需 `account`/`chain`） |
-| `signMessage(input)` | 签名消息（旧版，需 `account`/`chain`） |
+| `signMessage(input)` | 签名消息（旧版，需 `account`） |
 | `signPersonalMessage(input)` | 签名个人消息（需 `account`/`chain`） |
 
 ### 类型
 
+`getAccounts()` 返回 `AccountInfo[]`。签名参数需要 Wallet Standard 的 `WalletAccount`：公钥为字节数组，且包含 `chains` 和 `features`。请通过 `standard:connect` 获取，不要将 `AccountInfo` 强制转换为 `WalletAccount`。
+
 ```typescript
-interface WalletAccount {
+import type { WalletAccount, IdentifierString } from '@mysten/wallet-standard'
+import type { Transaction } from '@mysten/sui/transactions'
+
+// provider.getAccounts()
+interface AccountInfo {
   address: string
-  publicKey: string
+  publicKey: string // Hex-encoded public key
 }
 
 interface SignAndExecuteTransactionBlockInput {
   account: WalletAccount
-  chain?: string
-  transactionBlock: TransactionBlock
+  chain: IdentifierString
+  transactionBlock: Transaction
   options?: {
     showEffects?: boolean
     showEvents?: boolean
@@ -369,7 +356,7 @@ interface SignTransactionBlockOutput {
 
 interface SignPersonalMessageInput {
   account: WalletAccount
-  chain?: string
+  chain?: IdentifierString
   message: Uint8Array
 }
 
@@ -417,12 +404,12 @@ try {
 对于 React 应用，使用官方的 Sui Wallet Kit：
 
 ```bash
-npm install @mysten/dapp-kit @mysten/sui.js @tanstack/react-query
+npm install @mysten/dapp-kit@0.16.0 @mysten/sui@1.28.2 @tanstack/react-query@^5
 ```
 
 ```tsx
 import { SuiClientProvider, WalletProvider } from '@mysten/dapp-kit'
-import { getFullnodeUrl } from '@mysten/sui.js/client'
+import { getFullnodeUrl } from '@mysten/sui/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const queryClient = new QueryClient()
@@ -451,7 +438,7 @@ OneKey 会通过 Sui Wallet Standard 自动被检测到。
 ## 使用 Sui SDK
 
 ```typescript
-import { SuiClient } from '@mysten/sui.js/client'
+import { SuiClient } from '@mysten/sui/client'
 
 const client = new SuiClient({ url: 'https://fullnode.mainnet.sui.io' })
 

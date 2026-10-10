@@ -3,6 +3,7 @@ import { getPageMap } from 'nextra/page-map'
 import { OneKeyWordmark } from '../../components/OneKeyLogo'
 import { NavbarMenuActiveMarker } from '../../components/NavbarMenuActiveMarker'
 import OneKeyNavbar from '../../components/OneKeyNavbar'
+import { OneKeySidebarSearch } from '../../components/OneKeyNavbar.client'
 import Footer from '../../components/Footer'
 import DocAIChatWidget from '../../components/DocAIChatWidget.client'
 
@@ -37,6 +38,7 @@ export default async function LocaleLayout({ children, params }) {
       />
       <Layout
         navbar={navbar}
+        search={<OneKeySidebarSearch lang={lang} />}
         pageMap={pageMap}
         docsRepositoryBase="https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/developer-portal"
         i18n={[
