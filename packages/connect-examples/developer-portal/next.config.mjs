@@ -45,6 +45,7 @@ const normalizedAssetPrefix =
   (normalizedBasePath ? normalizedBasePath : '')
 
 const withNextra = nextra({
+  defaultShowCopyCode: true,
   contentDirBasePath: '/',
   unstable_shouldAddLocaleToLinks: true,
   // Syntax highlighting configuration

@@ -56,8 +56,8 @@ export default async function LocaleLayout({ children, params }) {
           backToTop: lang === 'zh' ? '返回顶部' : 'Back to top'
         }}
         navigation={false}
-        darkMode={false}
-        nextThemes={{ defaultTheme: 'dark', forcedTheme: 'dark' }}
+        darkMode={true}
+        nextThemes={{ defaultTheme: 'light' }}
         footer={<Footer key="onekey-footer" />}
       >
         {children}

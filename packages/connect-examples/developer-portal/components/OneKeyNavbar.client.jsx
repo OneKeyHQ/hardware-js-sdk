@@ -8,6 +8,7 @@ import { Anchor, Button } from 'nextra/components'
 import { useFSRoute } from 'nextra/hooks'
 import { ArrowRightIcon, MenuIcon } from 'nextra/icons'
 import { setMenu, useConfig, useMenu } from 'nextra-theme-docs'
+import { ThemeToggle } from './NavbarExtras'
 import { DOCS_AI_TAB, emitDocsAIOpen } from './docAIAssistEvents'
 import styles from './OneKeyNavbar.client.module.css'
 
@@ -43,7 +44,6 @@ const menuAnchor = {
 }
 
 const NavbarMenu = ({ menu, children }) => {
-  // Site is always dark mode (forcedTheme: 'dark' in layout)
   const menuKey = sanitizeMenuKey(menu)
   const routes =
     menu.children?.reduce((acc, child) => {
@@ -61,8 +61,8 @@ const NavbarMenu = ({ menu, children }) => {
         <span
           className="block py-1.5 transition-colors ps-3 pe-9"
           style={{
-            color: active ? '#f4f4f5' : '#d4d4d8',
-            backgroundColor: active ? '#27272a' : 'transparent'
+            color: 'var(--portal-ink)',
+            backgroundColor: active ? 'var(--portal-surface)' : 'transparent'
           }}
         >
           {item.title}
@@ -92,7 +92,7 @@ const NavbarMenu = ({ menu, children }) => {
               styles.menuTrigger,
               'x:items-center x:flex x:gap-1.5 x:cursor-pointer x:outline-none'
             )}
-            style={{ color: open ? '#ffffff' : '#a1a1aa' }}
+            style={{ color: open ? 'var(--portal-ink)' : 'var(--portal-muted)' }}
           >
             {children}
             <ArrowRightIcon
@@ -106,8 +106,8 @@ const NavbarMenu = ({ menu, children }) => {
             className={cn(menuItemsClass, styles.menuSurface)}
             anchor={menuAnchor}
             style={{
-              backgroundColor: '#0B0F14',
-              color: '#E4E4E7'
+              backgroundColor: 'var(--portal-paper)',
+              color: 'var(--portal-ink)'
             }}
           >
             {menuItems}
@@ -174,7 +174,7 @@ export function OneKeyClientNavbar({ children, className }) {
         )}
         aria-current={isCurrentPage || undefined}
         style={{
-          color: isCurrentPage ? '#e4e4e7' : '#a1a1aa'
+          color: isCurrentPage ? 'var(--portal-ink)' : 'var(--portal-muted)'
         }}
       >
         {page.title}
@@ -188,7 +188,7 @@ export function OneKeyClientNavbar({ children, className }) {
         type="button"
         className={`${styles.assistButton} ${styles.searchButton}`}
         onClick={handleOpenSearch}
-        aria-label="Open search"
+        aria-label={isZh ? '打开搜索' : 'Open search'}
       >
         <SearchIcon size={15} />
         <span className={styles.buttonLabel}>{searchText}</span>
@@ -206,6 +206,7 @@ export function OneKeyClientNavbar({ children, className }) {
     <>
       <div className={navClass}>{navItems}</div>
       {assistActions}
+      <ThemeToggle locale={isZh ? 'zh' : 'en'} />
       {children}
       <Button
         aria-label="Menu"

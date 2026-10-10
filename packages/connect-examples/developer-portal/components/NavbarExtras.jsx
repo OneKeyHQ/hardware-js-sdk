@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Sun, Moon, Monitor, Globe, ChevronDown } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
-export function ThemeToggle() {
+export function ThemeToggle({ locale = 'en' }) {
   const { theme, setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
@@ -15,7 +15,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <button className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group">
+      <button type="button" disabled aria-label={locale === 'zh' ? '切换主题' : 'Switch theme'} className="portal-theme-toggle p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group">
         <Monitor className="w-4 h-4 text-zinc-500 group-hover:text-zinc-900 dark:group-hover:text-zinc-200 transition-colors" />
       </button>
     )
@@ -33,8 +33,10 @@ export function ThemeToggle() {
 
   return (
     <button
+      type="button"
+      aria-label={locale === 'zh' ? (resolvedTheme === 'dark' ? '切换浅色模式' : '切换深色模式') : (resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode')}
       onClick={cycleTheme}
-      className="p-2 rounded-lg bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group"
+      className="portal-theme-toggle p-2 rounded-lg bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group"
       title={theme === 'dark' ? 'Switch to light mode' : theme === 'light' ? 'Switch to dark mode' : 'Switch theme'}
     >
       {resolvedTheme === 'dark' ? (

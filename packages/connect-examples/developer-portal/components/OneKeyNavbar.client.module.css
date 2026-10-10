@@ -132,3 +132,10 @@
   justify-content: flex-start;
   padding: 0 12px;
 }
+/* Match both reading themes while keeping the existing search dialog. */
+.assistButton { color: var(--portal-muted); border-radius: 7px; font-size: 13px; font-weight: 400; }
+.searchButton { border-color: var(--portal-line); background: var(--portal-surface); }
+.searchButton:hover { border-color: var(--portal-muted); background: var(--portal-surface); }
+.searchHotkey { color: var(--portal-muted); border: 0; background: transparent; box-shadow: none; padding: 0; min-width: 10px; }
+.searchHotkeyWrap { border: 0; padding-left: 10px; gap: 2px; }
+.menuSurface { border-color: var(--portal-line); box-shadow: 0 12px 32px #14261914; }

@@ -2,13 +2,27 @@
 title: 快速开始
 ---
 
-# 快速开始
+import { Tabs } from 'nextra/components'
+import Link from 'next/link'
 
-从安装到读出第一个地址，大约五分钟。目标版本是 Hardware SDK **1.2.x**（当前稳定 `1.2.1`）。
+<div className="doc-eyebrow">HARDWARE SDK · WEBUSB</div>
+
+# 连接你的第一台设备
+
+安装 Hardware SDK **1.2.x**，通过 USB 连接 OneKey，并在设备上确认第一个以太坊地址。
 
 本页只覆盖第一次跑通。跑通之后再选 [传输指南](/zh/hardware-sdk/transport/web-usb)，并阅读 [Core API Guide](/zh/hardware-sdk/core-api-guide) 了解 PIN、passphrase、事件和签名。
 
 Hardware SDK 1.2.0 用**同一套 JavaScript API** 同时支持 Protocol V1（Classic / Mini / Touch / Pro）和 Protocol V2（Pro 2 / Neo）。`init()` 里不需要选择协议。
+
+<div className="doc-prerequisites">
+<strong>开始前准备</strong>
+<ul>
+<li>已完成初始化的 OneKey 设备，以及可传输数据的 USB 线</li>
+<li>支持 WebUSB 的浏览器，例如桌面版 Chrome 或 Edge</li>
+<li>HTTPS 站点，或用于本地开发的 localhost</li>
+</ul>
+</div>
 
 ## 1. 选择 SDK 包
 
@@ -19,11 +33,35 @@ Hardware SDK 1.2.0 用**同一套 JavaScript API** 同时支持 Protocol V1（Cl
 | Android / iOS / Flutter 原生桥 | `@onekeyfe/hd-common-connect-sdk`（`env: 'lowlevel'`） | [原生 BLE](/zh/hardware-sdk/transport/native-ble) |
 | 仅 iframe 插件宿主 | `@onekeyfe/hd-web-sdk` | 概览 → 插件 iframe |
 
-```bash
-npm i @onekeyfe/hd-common-connect-sdk
+<Tabs items={['npm', 'pnpm', 'yarn']} className="doc-example-tabs">
+
+<Tabs.Tab>
+
+```bash filename="Terminal"
+npm i --save-exact @onekeyfe/hd-common-connect-sdk@1.2 @onekeyfe/hd-core@1.2 @onekeyfe/hd-shared@1.2
 ```
 
-请把安装版本钉在当前稳定的 `1.2.x`。如果嵌入 `@onekeyfe/hd-web-sdk`，省略 `connectSrc`，让它跟安装包版本一致。
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```bash filename="Terminal"
+pnpm add --save-exact @onekeyfe/hd-common-connect-sdk@1.2 @onekeyfe/hd-core@1.2 @onekeyfe/hd-shared@1.2
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```bash filename="Terminal"
+yarn add --exact @onekeyfe/hd-common-connect-sdk@1.2 @onekeyfe/hd-core@1.2 @onekeyfe/hd-shared@1.2
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+这些命令选择已发布的 `1.2.x`，并保存精确版本。SDK、core 和 shared 应使用同一版本，并提交 lockfile。如果嵌入 `@onekeyfe/hd-web-sdk`，省略 `connectSrc`，让它跟安装包版本一致。
 
 ## 2. 只初始化一次
 
@@ -32,7 +70,7 @@ import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 
 const initialized = await HardwareSDK.init({
   env: 'webusb',
-  debug: process.env.NODE_ENV !== 'production',
+  debug: false,
   fetchConfig: true,
 });
 if (!initialized) throw new Error('SDK initialization failed');
@@ -44,6 +82,17 @@ if (!initialized) throw new Error('SDK initialization failed');
 
 受保护调用前先注册 [UI 事件处理器](/zh/hardware-sdk/core-api-guide#events-ui)，以便锁定设备完成 PIN 输入。
 
+直接在“连接设备”按钮的点击处理器中请求 USB 授权。浏览器需要用户手势才能打开设备选择器：
+
+```ts filename="authorize.ts"
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+if (!navigator.usb) throw new Error('WebUSB is unavailable in this browser');
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+授权后发现设备并读取钱包身份。下例选取第一个候选设备；存在多个候选设备时，请让用户选择。
+
 ```ts
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success || !devices.payload.length) {
@@ -54,16 +103,17 @@ const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 
 const state = await HardwareSDK.getDeviceState(connectId);
-if (!state.success) throw new Error(state.payload.error);
+if (state.success === false) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
 if (!deviceId) throw new Error("Device has no wallet identity");
 
 const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
   useEmptyPassphrase: true,
+  showOnOneKey: true,
 });
 
-if (!address.success) throw new Error(address.payload.error);
+if (address.success === false) throw new Error(address.payload.error);
 console.log(address.payload.address);
 ```
 
@@ -80,6 +130,8 @@ WebUSB 需要 HTTPS 和用户手势。BLE 需要系统蓝牙权限。
 - 打开或切换钱包用 `openWalletSession`。`getPassphraseState` 已废弃。见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
 
 ## 下一步
+
+<Link className="doc-next" href="/zh/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction"><span><small>ETHEREUM &amp; EVM</small><strong>签署第一笔交易</strong><span>参数、费率类型和签名结果。</span></span><span aria-hidden="true">↗</span></Link>
 
 1. 已经在 1.1.x：[从 1.1.x 迁到 1.2.x](/zh/hardware-sdk/legacy-guides/from-1x)
 2. 接 PIN / passphrase UI 事件：[Core API Guide](/zh/hardware-sdk/core-api-guide)

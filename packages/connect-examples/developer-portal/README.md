@@ -41,3 +41,9 @@ The homepage uses the official Pro 2 artwork in `public/brand/pro2`. Its source 
 ## Publication
 
 The repository's `Build Developer Portal` GitHub Actions workflow builds and uploads an artifact. Its presence does not establish how `developer.onekey.so` is deployed. Confirm the actual hosting pipeline and environment before replacing the production site, then verify the live build, links, and search indexes after deployment.
+
+## Integrated design
+
+The homepage, Hardware SDK getting-started guide, and `evmSignTransaction` reference use the refreshed design in both English and Chinese. Their original URLs and heading anchors remain stable. `styles/portal-design.css` supplies shared brand tokens; detailed guide styles are scoped with `data-onekey-design`. Nextra still owns routing, page maps, search integration, accessible code tabs, copy controls, and document navigation. No Fumadocs dependency or `/docs/` routes are introduced.
+
+Light mode is the default and readers can switch themes from the header or sidebar. The existing search/AI dialog and device simulator retain their interactions. Keep the chain selectors, Agent Wallet disclaimer, changelog synchronization, locale search indexes, base-path support, and static export pipeline when extending this design.

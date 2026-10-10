@@ -2,47 +2,79 @@
 title: evmSignTransaction
 ---
 
+import { Tabs } from 'nextra/components'
+
+<div className="doc-eyebrow">HARDWARE SDK / ETHEREUM &amp; EVM</div>
+
 # evmSignTransaction
 
-### Ethereum: Sign transaction
+<span id="ethereum-sign-transaction" />
 
-* Use `evmSignTransaction` for signing transactions
-* This page covers Legacy and EIP-1559 (Type 2) transactions. Make sure your RPC node supports the transaction type you use.
-
-Asks device to sign given transaction using the private key derived from the specified BIP32 path. The device asks the user to confirm the transaction; decoded detail depends on the firmware and calldata.
+Request a device-confirmed signature for a Legacy or EIP-1559 (Type 2) transaction. The device derives the key from your BIP32 path; your application serializes and broadcasts the result. Decoded transaction details depend on the firmware and calldata.
 
 ```typescript
 const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
 ```
 
-### Params
+<div className="doc-method-flow"><span>01 <strong>Prepare</strong></span><span aria-hidden="true">→</span><span>02 <strong>Confirm on device</strong></span><span aria-hidden="true">→</span><span>03 <strong>Serialize & send</strong></span></div>
+
+## Before you call
+
+- [Initialize the SDK and select a device](/en/hardware-sdk/getting-started).
+- Register [UI event handlers](/en/hardware-sdk/core-api-guide#events-ui) and explicitly select the intended wallet.
+- Fetch current nonce, gas, and fee values from the target network.
+
+## Params
+
+<div className="doc-parameters">
+<div className="doc-parameter"><div><code>connectId</code><span>string</span><b>required</b></div><p>The connection identifier returned by device discovery.</p></div>
+<div className="doc-parameter"><div><code>deviceId</code><span>string</span><b>required</b></div><p>The wallet identity returned by getDeviceState.</p></div>
+<div className="doc-parameter"><div><code>params.path</code><span>string | number[]</span><b>required</b></div><p>BIP32 derivation path with at least three path components.</p></div>
+<div className="doc-parameter"><div><code>params.transaction</code><span>object</span><b>required</b></div><p>A Legacy or EIP-1559 transaction. Numeric quantities use hex strings; chainId is a number.</p></div>
+</div>
 
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
-* `path` - _required_ `string | Array<number>` SDK minimum length is `3`. [read more](/en/hardware-sdk/concepts/common-params#hd-path)
-* `transaction` - _required_ `Object`. The types covered on this page are `EVMTransaction` (Legacy) and `EVMTransactionEIP1559`. Numeric transaction quantities are hex strings; `transaction.chainId` is a number
-* `transaction.chainId` - _required_ `number`. Must match the network used to construct and broadcast the transaction. It is not a top-level parameter.
-* `transaction.data` - _optional_ `string`. Full hex-encoded calldata; use `0x` for an empty payload.
+### Transaction fields
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `chainId` | `number` | Target network chain ID. Lives inside transaction. |
+| `to` | `string` | Destination address; the token contract for ERC-20 calls. |
+| `value` | `string` | Hex-encoded amount in wei. Use 0x0 for ERC-20 calls. |
+| `nonce` | `string` | Transaction count for the sending account, as a hex quantity. |
+| `gasLimit` | `string` | Gas limit, as a hex quantity. |
+| `data` | `string · optional` | Full hex-encoded calldata; use 0x for no calldata. |
+| `maxFeePerGas` | `string · EIP-1559` | Maximum total fee per gas, as hex-encoded wei. |
+| `maxPriorityFeePerGas` | `string · EIP-1559` | Maximum priority fee per gas, as hex-encoded wei. |
+| `gasPrice` | `string · Legacy` | Legacy gas price, as hex-encoded wei. |
+
+This page covers `EVMTransaction` and `EVMTransactionEIP1559`. See [HD paths](/en/hardware-sdk/concepts/common-params#hd-path) for path formatting. Make sure your target RPC supports the transaction type.
 
 EIP-1559 requires both fee fields; Legacy uses `gasPrice`. Do not pass `type: 2` to the SDK; select the type when serializing the signed transaction.
 
-### Clear Signing
+## Clear Signing
 
 Use this same method for native transfers, ERC-20 transfers, approvals/revocations, and contract calls. For ERC-20 calls, `to` is the token contract and `value` is zero; calldata carries the recipient/spender and token amount. Supporting firmware decodes recognized formats automatically. There is no `clearSigning`, token-metadata, or contract-label parameter.
 
 See the [Clear Signing guide](/en/hardware-sdk/signers/evm#clear-signing) for the input/display matrix and unknown-contract behavior. For EIP-712 and Safe owner signatures, use [evmSignTypedData](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata).
 
-### Examples
+## Examples
 
 The fragments below assume an initialized SDK and selected wallet. Replace the sample recipient and fetch nonce, gas, and fees from the target network before signing.
 
-#### EIP1559 ([after The London Upgrade](https://ethereum.org/en/developers/docs/gas/#post-london))
+<span id="eip1559-after-the-london-upgrade" />
 
-If both parameters `maxFeePerGas` and `maxPriorityFeePerGas` are defined, transaction will be signed as the new type introduced in [EIP1559](https://eips.ethereum.org/EIPS/eip-1559).
+EIP-1559 requires both `maxFeePerGas` and `maxPriorityFeePerGas`. Legacy uses `gasPrice`.
+
+<Tabs items={['EIP-1559', 'Legacy']} className="doc-example-tabs">
+
+<Tabs.Tab>
 
 ```typescript
-HardwareSDK.evmSignTransaction(connectId, deviceId, {
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
     path: "m/44'/60'/0'/0/0",
+    useEmptyPassphrase: true,
     transaction: {
         to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
         value: '0xf4240',
@@ -55,13 +87,17 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
     },
 });
 
+if (result.success === false) throw new Error(result.payload.error);
 ```
 
-Legacy
+</Tabs.Tab>
+
+<Tabs.Tab>
 
 ```typescript
-HardwareSDK.evmSignTransaction(connectId, deviceId, {
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
     path: "m/44'/60'/0'/0/0",
+    useEmptyPassphrase: true,
     transaction: {
         to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
         value: "0xf4240",
@@ -72,9 +108,22 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
         gasPrice: "0xbebc200"
     },
 });
+if (result.success === false) throw new Error(result.payload.error);
 ```
 
-Result
+</Tabs.Tab>
+
+</Tabs>
+
+These examples select the standard wallet. For a hidden wallet, pass the same wallet common parameters used when confirming the account.
+
+## Response
+
+Check `success` before reading the payload. A successful response contains `v`, `r`, and `s`; the SDK does not broadcast the transaction.
+
+<Tabs items={['Success', 'Error']} className="doc-example-tabs">
+
+<Tabs.Tab>
 
 ```typescript
 {
@@ -87,7 +136,9 @@ Result
 }
 ```
 
-Error
+</Tabs.Tab>
+
+<Tabs.Tab>
 
 ```typescript
 {
@@ -99,7 +150,11 @@ Error
 }
 ```
 
-### Serialize the signed transaction
+</Tabs.Tab>
+
+</Tabs>
+
+## Serialize the signed transaction
 
 The SDK returns a signature; your application assembles and broadcasts the transaction. This example uses ethers v5 packages. Keep the original transaction fields unchanged after the user signs.
 

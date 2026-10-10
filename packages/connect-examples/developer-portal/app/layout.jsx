@@ -1,5 +1,6 @@
 import 'nextra-theme-docs/style.css'
 import '../styles/globals.css'
+import '../styles/portal-design.css'
 import localFont from 'next/font/local'
 
 const roobert = localFont({
@@ -48,12 +49,12 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#000000',
+  themeColor: '#fafbf8',
 }
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" dir="ltr" className={`dark ${roobert.variable}`} suppressHydrationWarning>
+    <html lang="en" dir="ltr" className={roobert.variable} suppressHydrationWarning>
       <body>
         {children}
       </body>

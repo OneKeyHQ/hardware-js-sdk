@@ -30,7 +30,12 @@ export function useMDXComponents(components) {
         })
       }
 
-      return docsWrapper(props)
+      const design = filePath.endsWith('/hardware-sdk/getting-started.mdx')
+        ? 'quickstart'
+        : filePath.endsWith('/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction.mdx')
+          ? 'api'
+          : undefined
+      return docsWrapper({ ...props, 'data-onekey-design': design })
     },
     ...components,
   }
