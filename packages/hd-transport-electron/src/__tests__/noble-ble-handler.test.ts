@@ -292,9 +292,13 @@ describe('Electron Noble BLE device discovery', () => {
     }
   );
 
-  test.each(['Pro A1B2', 'Pro2 A1B2'])(
-    'refreshes a retained disconnected %s peripheral before cold connecting',
-    async name => {
+  test.each([
+    ['Pro A1B2', 'unavailable'],
+    ['Pro2 A1B2', 'unavailable'],
+    ['Pro2 A1B2', 'native error 14'],
+  ])(
+    'refreshes a retained disconnected %s peripheral before cold connecting (direct: %s)',
+    async (name, directConnectResult) => {
       const handlers = new Map<string, IpcHandler>();
       const stalePeripheral = Object.assign(new EventEmitter(), createPeripheral('device', name), {
         connect: jest.fn(),
@@ -311,7 +315,16 @@ describe('Electron Noble BLE device discovery', () => {
           noble.emit('discover', freshPeripheral);
         }),
         stopScanning: jest.fn(callback => callback?.()),
-        connectAsync: jest.fn(() => Promise.resolve(undefined)),
+        connectAsync: jest.fn(() =>
+          directConnectResult === 'native error 14'
+            ? Promise.reject(
+                Object.assign(new Error('native direct connection failure'), {
+                  nativeErrorDomain: 'CBErrorDomain',
+                  nativeErrorCode: 14,
+                })
+              )
+            : Promise.resolve(undefined)
+        ),
       });
       jest.doMock('@stoprocent/noble', () => noble);
       jest.doMock('electron', () => ({

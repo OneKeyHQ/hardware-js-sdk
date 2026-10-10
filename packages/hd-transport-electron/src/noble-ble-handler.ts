@@ -1740,10 +1740,6 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
       deviceId,
       error: String(error),
     });
-    const nativeError = error as NobleBleNativeError;
-    if (nativeError.nativeErrorCode === 14 && nativeError.nativeErrorDomain === 'CBErrorDomain') {
-      throw createNobleBleConnectionError(nativeError);
-    }
     directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
     return undefined;
   } finally {
