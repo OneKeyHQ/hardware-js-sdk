@@ -1010,6 +1010,7 @@ export default class ReactNativeBleTransport {
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
 
     Log?.debug('[ReactNativeBleTransport] BLE MTU ready', {
+      connectionId: monitorToken,
       platform: Platform.OS,
       requested: getRequestedBleMtu(),
       actual: transport.mtuSize,

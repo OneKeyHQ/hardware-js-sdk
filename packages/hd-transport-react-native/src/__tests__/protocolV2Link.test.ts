@@ -303,6 +303,45 @@ const createV1Harness = ({
 };
 
 describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
+  test.each(['ios', 'android'] as const)(
+    'identifies MTU logs for concurrent devices and reconnects on %s',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid, device, bleManager, logger } = createHarness();
+      const otherUuid = 'rn-pro2-other-id';
+      const otherDevice = { ...device, id: otherUuid };
+
+      try {
+        await transport.acquire({ uuid, expectedProtocol: 'V2' });
+        await transport.acquire({ uuid, expectedProtocol: 'V2' });
+        bleManager.devices.mockResolvedValue([otherDevice]);
+        await transport.acquire({ uuid: otherUuid, expectedProtocol: 'V2' });
+        await transport.release(uuid, true);
+        bleManager.devices.mockResolvedValue([device]);
+        await transport.acquire({ uuid, expectedProtocol: 'V2' });
+
+        const mtuLogs = logger.debug.mock.calls
+          .filter(([message]) => message === '[ReactNativeBleTransport] BLE MTU ready')
+          .map(([, params]) => params as { connectionId: number; actual: number });
+        expect(mtuLogs).toHaveLength(3);
+        expect(new Set(mtuLogs.map(({ connectionId }) => connectionId)).size).toBe(3);
+        for (const params of mtuLogs) {
+          expect(params).toEqual({
+            platform,
+            requested: expect.any(Number),
+            actual: device.mtu,
+            connectionId: expect.any(Number),
+          });
+          expect(Number.isSafeInteger(params.connectionId)).toBe(true);
+          expect(params.connectionId).toBeGreaterThan(0);
+        }
+      } finally {
+        await transport.release(uuid, true);
+        await transport.release(otherUuid, true);
+      }
+    }
+  );
+
   test('does not classify disconnects as retryable firmware writes', () => {
     expect(
       getFirmwareUploadWriteRetryType({
