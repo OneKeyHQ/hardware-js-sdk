@@ -85,6 +85,56 @@ describe('DevicePool state lifecycle', () => {
     expect(result.deviceList).toEqual([device]);
   });
 
+  test.each([
+    ['V1', undefined],
+    ['V1', 'wipe-path'],
+    ['V2', undefined],
+    ['V2', 'wipe-path'],
+  ] as const)('rediscovers a wiped %s device with connect id %s', async (protocol, connectId) => {
+    const descriptor = { path: 'wipe-path', protocolType: protocol } as never;
+    const device = Device.fromDescriptor(descriptor);
+    device.features = {
+      protocol,
+      deviceType: protocol === 'V2' ? 'pro2' : 'classic',
+      deviceId: 'old-device-id',
+      serialNo: 'wipe-path',
+      initialized: true,
+      mode: 'normal',
+    } as never;
+    DevicePool.devicesCache = { 'wipe-path': device };
+    device.invalidateAfterWipe();
+    expect(device.toMessageObject()).toBeNull();
+    const connect = jest.spyOn(device, 'connect').mockResolvedValue(true);
+    const initialize = jest.spyOn(device, 'initialize').mockImplementation(() => {
+      device.features = {
+        protocol,
+        deviceType: protocol === 'V2' ? 'pro2' : 'classic',
+        deviceId: 'new-device-id',
+        serialNo: 'wipe-path',
+        initialized: false,
+        mode: 'notInitialized',
+      } as never;
+      return Promise.resolve();
+    });
+    const release = jest.spyOn(device, 'release').mockResolvedValue(undefined);
+
+    try {
+      const result = await DevicePool.getDevices([descriptor], connectId);
+      expect(initialize).toHaveBeenCalledTimes(1);
+      expect(connect).toHaveBeenCalledTimes(1);
+      expect(release).toHaveBeenCalledTimes(1);
+      expect(result.deviceList[0].toMessageObject()).toMatchObject({
+        deviceId: 'new-device-id',
+        mode: 'notInitialized',
+        features: { initialized: false },
+      });
+      await DevicePool.getDevices([descriptor], connectId);
+      expect(initialize).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+
   test('keeps a discovered device when its Protocol V2 label cannot be read', async () => {
     const labelError = new Error('settings unavailable');
     const getDeviceState = jest

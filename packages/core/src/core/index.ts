@@ -1589,7 +1589,7 @@ const onDeviceConnectHandler = (device: Device) => {
 
 const onDeviceDisconnectHandler = (device: Device) => {
   device.clearPreInitialized();
-  const deviceObject = device.toMessageObject();
+  const deviceObject = device.toDisconnectMessageObject();
   if (!deviceObject) return;
   postMessage(createDeviceMessage(DEVICE.DISCONNECT, { device: deviceObject }));
 };

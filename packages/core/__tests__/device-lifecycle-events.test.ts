@@ -712,6 +712,48 @@ describe('public device lifecycle events', () => {
     expect(() => JSON.stringify(disconnectMessage?.payload.device)).not.toThrow();
   });
 
+  test.each(['V1', 'V2'] as const)(
+    'preserves the %s connection identity for a transport disconnect after wipe',
+    protocol => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('webusb' as never);
+      core = initCore();
+      initConnector();
+      const messages: CoreMessage[] = [];
+      core.on(CORE_EVENT, message => messages.push(message));
+      const device = createInitializedDevice(protocol);
+      const connectId = device.getConnectId();
+      DevicePool.devicesCache[connectId] = device;
+
+      device.invalidateAfterWipe();
+      expect(device.toMessageObject()).toBeNull();
+      DevicePool.emitter.emit(DEVICE.CONNECT, device);
+      expect(messages.some(message => message.type === DEVICE.CONNECT)).toBe(false);
+      DevicePool.emitter.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, { connectId });
+
+      const disconnects = messages.filter(message => message.type === DEVICE.DISCONNECT);
+      expect(disconnects).toHaveLength(1);
+      expect(disconnects[0].payload.device).toMatchObject({
+        connectId,
+        serialNo: 'SERIAL-001',
+        deviceId: 'wallet-device-id',
+      });
+      expect(() => JSON.stringify(disconnects[0].payload.device)).not.toThrow();
+
+      device.features = {
+        ...createInitializedDevice(protocol).features,
+        deviceId: 'new-device-id',
+        initialized: false,
+        mode: 'notInitialized',
+      } as never;
+      DevicePool.emitter.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, { connectId });
+      const nextDisconnects = messages.filter(message => message.type === DEVICE.DISCONNECT);
+      expect(nextDisconnects[1].payload.device).toMatchObject({
+        deviceId: 'new-device-id',
+        mode: 'notInitialized',
+      });
+    }
+  );
+
   test('treats an acquired BLE device as reusable until the transport disconnects', async () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('desktop-web-ble' as never);
     const device = createInitializedDevice('V2');
