@@ -51,7 +51,7 @@ export default class BTCDeriveContextHash extends BaseMethod<BabylonDeriveContex
             .slice(1)
             .some(index => Number(index.replace(/'/g, '')) >= 0x80000000))) ||
       (Array.isArray(path) &&
-        path.some(index => !Number.isInteger(index) || index < 0 || index > 0xffffffff))
+        path.findIndex(index => !Number.isInteger(index) || index < 0 || index > 0xffffffff) !== -1)
     ) {
       throw invalidParameter('Not a valid BIP-32 path');
     }

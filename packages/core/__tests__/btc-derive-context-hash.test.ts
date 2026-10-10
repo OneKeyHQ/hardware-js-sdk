@@ -117,6 +117,17 @@ describe('btcDeriveContextHash', () => {
     );
   });
 
+  test('rejects sparse numeric paths before a device call', () => {
+    const sparsePath = [2147483732, 2147483648, 2147483648, 0, 5];
+    delete sparsePath[3];
+
+    [Array<number>(3), sparsePath].forEach(path => {
+      expect(() => createMethod({ path }).init()).toThrow(
+        expect.objectContaining({ errorCode: HardwareErrorCode.CallMethodInvalidParameter })
+      );
+    });
+  });
+
   test('registers the public method and restricts it to supported firmware and protocol', () => {
     const method = findMethod({ id: 1, payload: { ...createMethod().payload } });
     method.init();
