@@ -8,6 +8,7 @@ import OneKeyNavbar from '../../components/OneKeyNavbar'
 import { OneKeySidebarSearch } from '../../components/OneKeyNavbar.client'
 import Footer from '../../components/Footer'
 import DocAIChatWidget from '../../components/DocAIChatWidget.client'
+import DocumentLanguage from '../../components/DocumentLanguage.client'
 
 // Static params for i18n routing (Next.js App Router pattern)
 // See: https://nextjs.org/docs/app/guides/internationalization#static-rendering
@@ -34,11 +35,7 @@ export default async function LocaleLayout({ children, params }) {
 
   return (
     <>
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `document.documentElement.lang="${lang}";`
-        }}
-      />
+      <DocumentLanguage locale={lang} />
       <Layout
         navbar={navbar}
         search={<OneKeySidebarSearch lang={lang} />}
