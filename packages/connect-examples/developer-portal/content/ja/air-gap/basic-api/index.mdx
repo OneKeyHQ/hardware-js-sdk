@@ -1,0 +1,31 @@
+---
+title: "基本 API"
+---
+
+<span id="basic-api" />
+
+# 基本 API
+
+Air-Gap によるオフライン署名で、すべてのチェーン統合に共通して使用する基本 UR タイプ。
+
+## 型 [#types]
+
+| 型 | 説明 |
+|------|-------------|
+| [CryptoHDKey](./cryptohdkey) | 階層的決定性鍵の情報 (拡張公開鍵) |
+| [CryptoCoinInfo](./cryptocoininfo) | 暗号資産の種類とネットワーク情報 |
+| [CryptoKeypath](./cryptokeypath) | BIP-44 導出パスの表現 |
+
+## 使用方法 [#usage]
+
+これらの型は、各チェーンの署名リクエストを構成する基本要素です:
+
+- `CryptoHDKey` – デバイスから取得し、アドレス導出用の xpub を含みます
+- `CryptoKeypath` – 署名に使用する鍵を指定します
+- `CryptoCoinInfo` – 対象のチェーン/ネットワークを識別します
+
+## パッケージ [#packages]
+
+```bash
+npm install @keystonehq/bc-ur-registry
+```

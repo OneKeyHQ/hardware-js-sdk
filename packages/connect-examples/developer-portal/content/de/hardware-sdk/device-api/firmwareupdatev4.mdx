@@ -1,0 +1,74 @@
+---
+description: "Geprüfte Protocol-V2-Firmware-Artefakte auf Pro 2 oder Neo installieren und nach dem Neustart sicher wieder verbinden."
+title: "firmwareUpdateV4"
+---
+
+# firmwareUpdateV4
+
+Protocol-V2-Firmware-Update für **OneKey Pro 2** und **OneKey Neo**.
+
+Rufen Sie dies nicht auf Classic / Mini / Touch / Pro auf. Diese Geräte verwenden [`firmwareUpdateV2`](/de/hardware-sdk/device-api/firmwareupdatev2) oder [`firmwareUpdateV3`](/de/hardware-sdk/device-api/firmwareupdatev3).
+
+Führen Sie dies erst aus, nachdem der Nutzer das Zielgerät ausgewählt und das Update genehmigt hat. Die folgenden Binärvariablen müssen geprüfte Artefakte für dieses Modell enthalten; sie werden von Ihrem Release-Ablauf bereitgestellt.
+
+```ts
+const res = await HardwareSDK.firmwareUpdateV4(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+  bootloaderBinary,
+  applicationP1Binary,
+  applicationP2Binary,
+  coprocessorBinary,
+  resourceArchiveBinary,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+Die Methode installiert die übergebenen Binärdateien und meldet Fortschritt über `FIRMWARE_PROGRESS` / `FIRMWARE_TIP`. Nach `DeviceFirmwareUpdateRequest` kann das Gerät neu starten; das SDK verbindet sich mit demselben Protokoll erneut.
+
+### Parameter [#params]
+
+[Optionale gemeinsame Parameter](/de/hardware-sdk/concepts/common-params)
+
+| Parameter | Typ | Erforderlich | Hinweise |
+| --- | --- | --- | --- |
+| `platform` | `'native' \| 'desktop' \| 'ext' \| 'web' \| 'web-embed'` | Ja | Host-Umgebung |
+| `bootloaderBinary` | `ArrayBuffer` | Nein | Bootloader-Abbild |
+| `applicationP1Binary` | `ArrayBuffer` | Nein | Anwendungspartition 1 |
+| `applicationP2Binary` | `ArrayBuffer` | Nein | Anwendungspartition 2 |
+| `coprocessorBinary` | `ArrayBuffer` | Nein | BLE-/Koprozessor-Abbild |
+| `resourceArchiveBinary` | `ArrayBuffer` | Nein | Vollständiges Protocol-V2-Ressourcen-ZIP. Core schreibt nur geänderte Dateien |
+| `forcedUpdateRes` | `boolean` | Nein | Ressourcenaktualisierung erzwingen |
+| `expectedDeviceId` | `string` | Nein | Fortsetzung verweigern, wenn sich die Geräteidentität während des Updates geändert hat |
+
+Romloader kann nicht installiert werden über `firmwareUpdateV4`. SE-Abbilder (`se01Binary` … `se04Binary`) werden vom Typ akzeptiert, sind aber kein allgemeiner Integrationsweg.
+
+Die OneKey-App verwendet für offizielle Releases einen Ablauf mit vorbereitetem Plan und Host-Bindung. Drittanbieter-Hosts sollten bereits geprüfte Binärdateien übergeben.
+
+### Ergebnis [#result]
+
+```ts
+{
+  success: true,
+  payload: {
+    bleVersion: string,
+    firmwareVersion: string,
+    bootloaderVersion: string,
+  }
+}
+```
+
+### Fehler [#error]
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code?: string | number,
+  }
+}
+```
+
+Wiederholen Sie `firmwareUpdateV4` nach einer Transportzeitüberschreitung oder Trennung **nicht automatisch**. Das Gerät installiert möglicherweise bereits. Lesen Sie den Gerätestatus erneut und entscheiden Sie dann.
+
+Die Tastenbestätigung während des Updates dient der Information (`REQUEST_BUTTON` mit `reason='firmware-update'`). Rufen Sie `uiResponse()` für diesen Hinweis nicht erneut auf. Wenn der Nutzer den Hinweis abbricht, brechen Sie den SDK-Aufruf ab; senden Sie keinen zweiten Cancel.

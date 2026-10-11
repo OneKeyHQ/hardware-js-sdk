@@ -1,0 +1,146 @@
+---
+title: "wallet_watchAsset"
+description: "Ajouter un jeton à la liste suivie par le portefeuille"
+---
+
+# wallet_watchAsset
+
+Demande au portefeuille de suivre un nouveau jeton. L’utilisateur est invité à ajouter le jeton spécifié à la liste des jetons suivis par son portefeuille.
+
+---
+
+## Paramètres [#parameters]
+
+`object` contenant :
+
+| Champ | Type | Obligatoire | Description |
+|-------|------|----------|-------------|
+| `type` | `string` | Oui | Type de jeton ; cette page présente `ERC20` |
+| `options` | `object` | Oui | Détails du jeton |
+| `options.address` | `string` | Oui | Adresse du contrat du jeton |
+| `options.symbol` | `string` | Oui | Symbole du jeton (1-11 caractères) |
+| `options.decimals` | `number` | Oui | Décimales du jeton |
+| `options.image` | `string` | Non | URL de l’image du jeton |
+
+---
+
+## Valeur de retour [#returns]
+
+`boolean` - `true` si le jeton a été ajouté, `false` sinon
+
+---
+
+## Exemple [#example]
+
+```typescript
+const wasAdded = await window.$onekey.ethereum.request({
+  method: 'wallet_watchAsset',
+  params: {
+    type: 'ERC20',
+    options: {
+      address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+      symbol: 'USDC',
+      decimals: 6,
+      image: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png'
+    }
+  }
+})
+
+if (wasAdded) {
+  console.log('Token added to wallet')
+} else {
+  console.log('User declined to add token')
+}
+```
+
+### Ajouter plusieurs jetons [#add-multiple-tokens]
+
+```typescript
+const tokens = [
+  {
+    address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    symbol: 'USDC',
+    decimals: 6
+  },
+  {
+    address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    symbol: 'USDT',
+    decimals: 6
+  },
+  {
+    address: '<TOKEN_CONTRACT_ADDRESS>',
+    symbol: 'DAI',
+    decimals: 18
+  }
+]
+
+async function addTokens(tokenList) {
+  for (const token of tokenList) {
+    try {
+      await window.$onekey.ethereum.request({
+        method: 'wallet_watchAsset',
+        params: {
+          type: 'ERC20',
+          options: token
+        }
+      })
+    } catch (error) {
+      console.error(`Failed to add ${token.symbol}:`, error)
+    }
+  }
+}
+```
+
+### Ajouter un jeton de projet personnalisé [#add-custom-project-token]
+
+```typescript
+async function suggestToken() {
+  const chainId = await window.$onekey.ethereum.request({
+    method: 'eth_chainId'
+  })
+
+  // Different addresses per network
+  const tokenAddresses = {
+    '0x1': '0x...MainnetAddress',
+    '0x89': '0x...PolygonAddress',
+    '0xa4b1': '0x...ArbitrumAddress'
+  }
+
+  const address = tokenAddresses[chainId]
+  if (!address) {
+    throw new Error('Token not available on this network')
+  }
+
+  return window.$onekey.ethereum.request({
+    method: 'wallet_watchAsset',
+    params: {
+      type: 'ERC20',
+      options: {
+        address,
+        symbol: 'TOKEN',
+        decimals: 18,
+        image: 'https://example.com/token-logo.png'
+      }
+    }
+  })
+}
+```
+
+---
+
+## Erreurs [#errors]
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | L’utilisateur a rejeté la demande | L’utilisateur a refusé d’ajouter le jeton |
+| -32602 | Paramètres non valides | Paramètres de jeton non valides |
+
+---
+
+## Remarques [#notes]
+
+- Cette page couvre `ERC20` ; vérifiez tout autre type de jeton avec la version cible du portefeuille
+- Le portefeuille peut déjà suivre le jeton (renvoie tout de même `true`)
+- L’URL de l’image doit être en HTTPS et accessible
+- Le symbole doit correspondre à celui sur la chaîne pour une meilleure expérience utilisateur
+- Défini par [EIP-747](https://eips.ethereum.org/EIPS/eip-747)

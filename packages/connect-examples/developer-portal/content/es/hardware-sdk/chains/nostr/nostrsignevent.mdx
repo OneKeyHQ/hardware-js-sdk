@@ -1,0 +1,109 @@
+---
+title: "nostrSignEvent"
+---
+
+# nostrSignEvent
+
+### Requisitos [#requirements]
+
+El SDK actual declara estos requisitos de firmware: `model_touch` ≥ 4.7.0 y `model_mini` ≥ 3.6.0. Son claves de rangos del SDK; confirma su correspondencia con los modelos de dispositivos y la compatibilidad del firmware publicado para tu integración.
+
+## Nostr: firmar evento de Nostr [#nostr-sign-nostr-event]
+
+Solicita la firma de un evento de Nostr con la clave de la ruta especificada. El usuario confirma la solicitud en el dispositivo.
+
+```typescript
+const result = await HardwareSDK.nostrSignEvent(connectId, deviceId, params);
+```
+
+### Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `5`. [leer más](/es/hardware-sdk/concepts/common-params#hd-path)
+* `event` - _obligatorio_ `NostrEvent` evento de Nostr.
+
+```
+enum EventKind {
+  Metadata = 0,
+  Text = 1,
+  RelayRec = 2,
+  Contacts = 3,
+  DM = 4,
+  Deleted = 5,
+  Reaction = 7,
+  BadgeAward = 8,
+  ChannelCreation = 40,
+  ChannelMetadata = 41,
+  ChannelMessage = 42,
+  ChannelHideMessage = 43,
+  Reporting = 1984,
+  ZapRequest = 9734,
+  Zap = 9735,
+  RelayListMetadata = 10002,
+  ClientAuthentication = 22242,
+  NostrConnect = 24133,
+  ProfileBadges = 30008,
+  BadgeDefinition = 30009,
+  LongFormContent = 30023,
+  ApplicationSpecificData = 30078,
+}
+
+type NostrEvent = {
+  id?: string;
+  kind: EventKind;
+  pubkey?: string;
+  content: string;
+  tags: string[][];
+  created_at: number;
+  sig?: string;
+};
+```
+
+### Ejemplos [#examples]
+
+```typescript
+const response = await HardwareSDK.nostrSignEvent(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/1237'/0'/0/0",
+    event: {
+      kind: 1,
+      content: 'Hello world',
+      tags: [],
+      created_at: 1702268010,
+    },
+  }
+);
+```
+
+Resultado
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: string,
+    event: {
+      kind: 1,
+      content: 'Hello world',
+      tags: [],
+      created_at: 1702268010,
+      sig: 'signature returned by the device',
+    },
+  }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

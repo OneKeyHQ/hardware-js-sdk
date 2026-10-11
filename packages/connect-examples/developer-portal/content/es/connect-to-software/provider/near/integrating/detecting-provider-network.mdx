@@ -1,0 +1,17 @@
+---
+title: "Detectar la red del proveedor"
+---
+
+<span id="detecting-provider-network" />
+
+# Detectar la red del proveedor
+
+Puedes detectar la red del proveedor seleccionada en OneKey Wallet; actualmente admite tanto `mainnet` como `testnet`.
+
+```javascript
+const res = await provider.request({
+  method: 'near_networkInfo',
+});
+console.log('near_networkInfo', res, res?.networkId);
+
+```

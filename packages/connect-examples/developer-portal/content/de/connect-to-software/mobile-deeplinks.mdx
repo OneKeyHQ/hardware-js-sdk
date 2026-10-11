@@ -1,0 +1,62 @@
+---
+title: "Mobilgeräte & Deeplinks"
+description: "Die OneKey-Wallet über Deeplinks in mobile Web-Apps und WebViews integrieren"
+---
+
+<span id="mobile--deeplinks" />
+
+# Mobilgeräte &amp; Deeplinks
+
+Öffnen Sie OneKey aus einer mobilen dApp mit einem WalletConnect-Kopplungs-URI. Ein Deeplink öffnet die Wallet-App; die Verbindung wird erst hergestellt, nachdem der Nutzer die WalletConnect-Sitzung genehmigt hat.
+
+## Übersicht [#overview]
+
+Erstellen Sie mit Ihrer WalletConnect-Integration einen neuen Kopplungs-URI und öffnen Sie anschließend einen der folgenden Links durch eine Nutzeraktion. Halten Sie den Sitzungsvorschlag aktiv und warten Sie auf dessen Genehmigung oder Ablehnung. Verwenden Sie im OneKey-dApp-Browser stattdessen den injizierten Provider für die Ziel-Chain.
+
+## Deeplink-Formate [#deeplink-formats]
+
+### Benutzerdefiniertes Schema [#custom-scheme]
+
+```
+onekey-wallet://wc?uri={encodeURIComponent(wcUri)}
+```
+
+### Universal Link [#universal-link]
+
+```
+https://app.onekey.so/wc/connect/wc?uri={encodeURIComponent(wcUri)}
+```
+
+> Testen Sie das Öffnen der App und den Ausweichablauf auf den von Ihnen unterstützten iOS-/Android-Versionen und Browsern. App-Installation, Link-Einstellungen des Betriebssystems und Einschränkungen eingebetteter Browser beeinflussen das Ergebnis.
+
+## Anwendungsbeispiel [#usage-example]
+
+```javascript
+// Generate WalletConnect URI from your dApp
+const wcUri = 'wc:a281...' // Your WalletConnect URI
+
+// Option 1: Custom scheme
+const customSchemeLink = `onekey-wallet://wc?uri=${encodeURIComponent(wcUri)}`
+
+// Option 2: Universal link (recommended)
+const universalLink = `https://app.onekey.so/wc/connect/wc?uri=${encodeURIComponent(wcUri)}`
+
+// Call this from the user's Connect button.
+function openOneKey() {
+  window.location.href = universalLink
+}
+```
+
+## Verbindung und Ausweichablauf behandeln [#connection-and-fallback-handling]
+
+- Öffnen Sie den Link über eine ausdrückliche Verbinden-Schaltfläche. Einige Browser blockieren App-Starts ohne Nutzeraktion.
+- Behandeln Sie Genehmigung, Ablehnung, Ablauf und Trennung von WalletConnect-Sitzungen. Die bloße Rückkehr in den Browser beweist nicht, dass eine Sitzung genehmigt wurde.
+- Bieten Sie auf dem Desktop einen QR-Code sowie eine Installations- oder Wiederholungsoption an, wenn das Öffnen der App fehlschlägt. Gehen Sie nicht davon aus, dass ein Universal Link immer zu einem App-Store weiterleitet.
+- Erstellen Sie einen neuen Kopplungs-URI, wenn der alte abläuft. Speichern Sie keinen aktiven Kopplungs-URI in Analyse- oder Anwendungsprotokollen.
+- Bevorzugen Sie, sofern verfügbar, den mobilen Ablauf Ihrer Wallet-Verbindungsbibliothek; er verwaltet den Kopplungs- und Sitzungslebenszyklus.
+
+## Verwandte Themen [#related]
+
+- [RainbowKit](/de/connect-to-software/wallet-ui/rainbowkit/) - Erkennt Mobilgeräte automatisch
+- [Web3Modal](/de/connect-to-software/wallet-ui/web3modal/) - Integrierte Unterstützung für Mobilgeräte
+- [Provider-API](/de/connect-to-software/provider/eth/) - Direkte Provider-Integration

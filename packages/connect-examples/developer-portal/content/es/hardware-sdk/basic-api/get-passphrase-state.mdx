@@ -1,0 +1,69 @@
+---
+description: "Comprende la API obsoleta de huella digital de cartera oculta y migra a openWalletSession."
+title: "Obtener el estado de passphrase"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="get-passphrase-state" />
+
+# Obtener el estado de passphrase
+
+<Callout type="warning">
+  **Obsoleto.** Usa [`openWalletSession`](/es/hardware-sdk/basic-api/open-wallet-session) para Protocol V1 y V2. Este método sigue funcionando para las aplicaciones existentes.
+</Callout>
+
+## Obtener el passphraseState del dispositivo [#get-the-passphrasestate-of-the-device]
+
+Pide al usuario que introduzca su passphrase (en el dispositivo o mediante software) y devuelve una cadena `passphraseState`: la huella digital pública de la cartera oculta. Guarda de forma persistente `deviceId + passphraseState`. No guardes el valor de firmware `session_id`.
+
+Consulta [Sesiones de cartera](/es/hardware-sdk/concepts/wallet-session).
+
+Pasa `passphraseState` en las llamadas posteriores de dirección o firma para que permanezcan en esa cartera oculta. Es una **huella digital de cartera**, no el valor de firmware `session_id`. No guardes `session_id`.
+
+```
+  getPassphraseState(connectId)   ← user enters passphrase once
+    → passphraseState = "<fingerprint>"
+
+  evmGetAddress(..., { passphraseState })
+  btcGetAddress(..., { passphraseState })
+```
+
+> **Error 112 (passphrase state mismatch)**: la vinculación no coincide con la cartera desbloqueada actualmente (dispositivo bloqueado, semilla cambiada o huella digital obsoleta). Detén la operación y permite que el usuario vuelva a seleccionar la cartera prevista con `openWalletSession`. Confirma la asociación recuperada antes de una nueva solicitud; no omitas la comprobación ni repitas la firma automáticamente.
+
+```typescript
+const response = await HardwareSDK.getPassphraseState(connectId);
+```
+
+### Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+### Ejemplo [#example]
+
+```typescript
+const response = await HardwareSDK.getPassphraseState(connectId);
+```
+
+Resultado
+
+```
+{
+    success: true,
+    payload: string | null | undefined
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+La huella digital de una cartera oculta es una cadena no vacía. Los flujos de compatibilidad pueden devolver `undefined` en V1 cuando la protección está desactivada, o `null` para una cartera estándar V2; no los guardes como vinculación de una cartera oculta.

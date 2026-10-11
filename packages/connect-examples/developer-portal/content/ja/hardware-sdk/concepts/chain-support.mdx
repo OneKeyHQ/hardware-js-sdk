@@ -1,0 +1,95 @@
+---
+description: "プロトコル別のハードウェア署名メソッドの対応状況と、デバイス互換性テストの制限を確認します。"
+title: "対応チェーン"
+---
+
+<span id="chain-support" />
+
+# 対応チェーン
+
+このページは **Hardware SDK の公開メソッド** の対応表であり、OneKey アプリのコイン一覧ではありません。アプリの宣伝上の数字 (100+ チェーン、30,000+ トークン) はウォレットのカタログの数です。統合では、`HardwareSDK` から呼び出せるメソッドのみを数えてください。
+
+Pro 2 / Neo の正しい情報源は、各 Core メソッドの `getSupportedProtocols()` です。デフォルトは Protocol V1 のみです。Pro 2 / Neo でチェーンを利用できるのは、メソッドが `['V1', 'V2']` を返す場合のみです。ファームウェアの `min` バージョン情報は古くなるため、ここにコピーせず、メソッドのページとデバイスのファームウェアを確認してください。
+
+## Protocol V1 と V2 (Pro 2 / Neo) [#protocol-v1-and-v2-pro-2--neo]
+
+| ファミリー | 公開メソッド | Classic 1s / Touch / Pro | Mini | Pro 2 / Neo |
+| --- | --- | --- | --- | --- |
+| EVM | `evmGetAddress` `evmGetPublicKey` `evmSignMessage` `evmSignTransaction` `evmSignTypedData` `evmVerifyMessage` | はい | はい | **V1+V2** |
+| Bitcoin とフォーク | `btcGetAddress` `btcGetPublicKey` `btcSignMessage` `btcSignTransaction` `btcVerifyMessage` `btcSignPsbt` | はい (注意事項を参照) | はい | **V1+V2** (Bitcoin). **Neurai は V1 のみ** |
+| Solana | `solGetAddress` `solSignMessage` `solSignTransaction` `solSignOffchainMessage` | はい | はい | **V1+V2** |
+| Aptos | `aptosGetAddress` `aptosGetPublicKey` `aptosSignMessage` `aptosSignTransaction` `aptosSignInMessage` | はい (注意事項を参照) | はい | **V1+V2** |
+| Sui | `suiGetAddress` `suiGetPublicKey` `suiSignMessage` `suiSignTransaction` | はい | はい | **V1+V2** |
+| Cosmos | `cosmosGetAddress` `cosmosGetPublicKey` `cosmosSignTransaction` | はい | はい | **V1+V2** |
+| NEAR | `nearGetAddress` `nearSignTransaction` | はい | はい | **V1+V2** |
+| TON | `tonGetAddress` `tonSignMessage` `tonSignProof` `tonSignData` | はい。 **Classic (1s ではないモデル): いいえ** | アドレス取得は可; **署名/証明: 不可** | **V1+V2** |
+| TRON | `tronGetAddress` `tronSignMessage` `tronSignTransaction` | はい | アドレス取得は可; **メッセージ署名: 不可** | **V1+V2** |
+| Cardano | `cardanoGetAddress` `cardanoGetPublicKey` `cardanoSignMessage` `cardanoSignTransaction` | はい | はい | **V1+V2** |
+| Polkadot | `polkadotGetAddress` `polkadotSignTransaction` | はい | はい | **V1+V2** |
+| Ripple (XRP) | `xrpGetAddress` `xrpSignTransaction` | はい | はい | **V1+V2** |
+| Filecoin | `filecoinGetAddress` `filecoinSignTransaction` | はい | はい | **V1+V2** |
+| Conflux | `confluxGetAddress` `confluxSignMessage` `confluxSignMessageCIP23` `confluxSignTransaction` | はい | はい | **V1+V2** |
+| Kaspa | `kaspaGetAddress` `kaspaSignTransaction` | はい | はい | **V1+V2** |
+| Algorand | `algoGetAddress` `algoSignTransaction` | はい | はい | **V1+V2** |
+| NEM | `nemGetAddress` `nemSignTransaction` | はい | はい | **V1+V2** |
+| Nostr | `nostrGetPublicKey` `nostrSignEvent` `nostrSignSchnorr` `nostrEncryptMessage` `nostrDecryptMessage` | はい | はい | **V1+V2** |
+| Starcoin | `starcoinGetAddress` `starcoinGetPublicKey` `starcoinSignMessage` `starcoinSignTransaction` `starcoinVerifyMessage` | はい | はい | **V1+V2** |
+
+## Protocol V1 のみ — Pro 2 / Neo は未対応 [#protocol-v1-only--not-supported-on-pro-2--neo]
+
+これらのメソッドは Protocol V1 のみを宣言しています。 **Pro 2 または Neo で呼び出さないでください。** Stellar、Alephium、Neo (OneKey Neo デバイスではなくチェーン) は、Pro 2 / Neo の対象から明示的に除外されています。
+
+| ファミリー | 公開メソッド | 注意事項 |
+| --- | --- | --- |
+| Stellar | `stellarGetAddress` `stellarSignTransaction` | **Pro 2 / Neo では不可** |
+| Alephium | `alephiumGetAddress` `alephiumSignMessage` `alephiumSignTransaction` | **Pro 2 / Neo では不可**。Classic / Mini / Touch の署名は、互換性テストの例外に含まれます |
+| Benfen | `benfenGetAddress` `benfenGetPublicKey` `benfenSignMessage` `benfenSignTransaction` | **Pro 2 / Neo では不可**。Classic は互換性テストの例外に含まれます |
+| Nexa | `nexaGetAddress` `nexaSignTransaction` | **Pro 2 / Neo では不可** |
+| Dynex | `dnxGetAddress` `dnxSignTransaction` | **Pro 2 / Neo では不可**。Pro / Classic 1s / Mini / Touch は互換性テストの例外に含まれます |
+| Nervos | `nervosGetAddress` `nervosSignTransaction` | **Pro 2 / Neo では不可** |
+| SCDO | `scdoGetAddress` `scdoSignMessage` `scdoSignTransaction` | **Pro 2 / Neo では不可**。Classic / Mini / Touch は互換性テストの例外に含まれます |
+| Neo (チェーン) | `neoGetAddress` `neoSignTransaction` | **Pro 2 / Neo では不可**。Classic / Mini / Touch は互換性テストの例外に含まれます。OneKey Neo デバイスのことではありません |
+| Lightning | `lnurlAuth` | **Pro 2 / Neo では不可** |
+| EVM の追加機能 | `evmSignMessageEIP712` | 従来の型付きデータ経路。次を優先: `evmSignTypedData` (V1+V2) |
+
+## デバイスの注意事項 (互換性テスト) [#device-caveats-compatibility-tests]
+
+以下は、リポジトリの互換性テストで失敗を許容しているメソッドとモデルの組み合わせです。テスト範囲の制限を示すもので、新たな実機テストの結果ではありません。正確なファームウェアとメソッドをデバイス上で検証せずに、対応していると案内しないでください。
+
+| モデル | 依存しないでください: |
+| --- | --- |
+| Classic | TON、Alephium、SCDO、Benfen、Neo (チェーン)、 `btcSignPsbt`, `aptosSignInMessage` |
+| Classic 1s / Pure | Dynex |
+| Mini | Alephium 署名、Dynex 署名、Neo (チェーン) 署名、SCDO 署名、TON 署名/証明、TRON メッセージ署名。 **BLE なし** |
+| Touch | Alephium 署名、Dynex 署名、Neo (チェーン) 署名、SCDO 署名 |
+| Pro | Dynex |
+| Pro 2 | 上記の `['V1', 'V2']` を持つチェーンメソッド。**カメラあり** (Air-Gap) |
+| Neo | Pro 2 と同じチェーンメソッド。 **カメラ、NFC、指紋、Find My なし** — Air-Gap QR なし |
+
+EIP-7702 (`authorizationList`) は Classic に対応していません。
+
+## アドレス一括取得ヘルパー [#batch-address-helper]
+
+`allNetworkGetAddress` / `allNetworkGetAddressByLoop` は V1+V2 のヘルパーです。ただし、Protocol V2 接続上で、固有メソッドが V1 のみのネットワークを指定すると失敗します。
+
+## Bitcoin のフォーク [#bitcoin-forks]
+
+`btc*` メソッドは `coin` / `coin_name` を受け取ります。ほとんどのフォークは Bitcoin の行に従います (V1+V2)。**Neurai は Protocol V1 のみです。**
+
+## 実行時の判断方法 [#how-to-decide-at-runtime]
+
+`getSupportedProtocols()` は Core のメソッドクラスのフックであり、公開の `HardwareSDK` 呼び出しではありません。このページと実際のデバイスを使って確認します:
+
+1. SDK はそのメソッドをエクスポートしているか?
+2. デバイスは `connectProtocol` `'V1'` または `'V2'`?
+3. このページではそのメソッドを V1+V2 と記載しているか、V1 のみか?
+4. このモデルは注意事項の表にあるか?
+5. ファームウェアはメソッドのページにあるバージョン要件を満たしているか?
+
+USB PID や BLE 名で分岐させないでください。参照: [Protocol V1 と V2](/ja/hardware-sdk/concepts/protocol) および [デバイス](/ja/hardware-sdk/concepts/devices).
+
+## 次へ [#next]
+
+- メソッドのページ: サイドバーの Chain Methods セレクターを使用
+- [署名者ガイド](/ja/hardware-sdk/signers)
+- [はじめに](/ja/hardware-sdk/getting-started)

@@ -1,0 +1,74 @@
+---
+title: "nervosGetAddress"
+---
+
+# nervosGetAddress
+
+### Nervos: obtener una dirección [#nervos-get-address]
+
+Deriva y devuelve la dirección de la ruta especificada. Cuando `showOnOneKey` es `true`, el usuario debe confirmar la dirección en el dispositivo.
+
+```typescript
+const result = await HardwareSDK.nervosGetAddress(connectId, deviceId, params);
+```
+
+#### Requisitos [#requirements]
+
+* Versiones mínimas de firmware
+  * Touch: 4.9.0
+  * mini: 3.7.0
+
+#### Parámetros [#parameters]
+
+connectId: `string`
+
+* Identificador único de la conexión
+
+deviceId: `string`
+
+* Identificador único del dispositivo físico
+
+params: `object`
+
+* path: _obligatorio_ `string` - Ruta BIP32 de la dirección solicitada (p. ej., "m/44'/309'/0'/0/0")
+* network: _obligatorio_`string` - Nombre de red (p. ej., "ckb")
+* showOnOneKey: _opcional_ `boolean` - Si se muestra la dirección en el dispositivo
+
+#### Ejemplo [#example]
+
+```typescript
+const response = await HardwareSDK.nervosGetAddress('connect1', 'device1', {
+    path: "m/44'/309'/0'/0/0",
+    showOnOneKey: true,
+    network: "ckb"
+});
+
+if (response.success === false) throw new Error(response.payload.error);
+console.log(response.payload.address);
+```
+
+#### Devuelve [#returns]
+
+Devuelve una Promise que se resuelve con:
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // Nervos address
+        path: string  // BIP32 path used for derivation
+    }
+}
+```
+
+Respuesta de error:
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string,  // Error message
+        code?: string | number    // Error code
+    }
+}
+```

@@ -1,0 +1,49 @@
+---
+title: "はじめに"
+description: "OneKey の Stellar プロバイダーを検出して使用"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# はじめに
+
+署名前にプロバイダーを検出し、アドレスを要求してください。選択したウォレットのネットワークが返すネットワークパスフレーズと、Stellar SDK で構築した完全な XDR ペイロードを使用します。
+
+OneKey の Stellar プロバイダーを検出し、Stellar アドレスを要求する方法を説明します。
+
+<Callout type="warning">
+Stellar の署名では、通常、正しいネットワークパスフレーズ (Public または Testnet など) が必要です。署名時に正しいものを渡してください。
+</Callout>
+
+---
+
+## プロバイダーの検出 [#provider-detection]
+
+```ts
+const stellar = window.$onekey?.stellar
+
+if (!stellar?.isOneKey) {
+  throw new Error('OneKey Stellar provider not detected')
+}
+```
+
+---
+
+## アドレスを取得 (接続) [#get-address-connect]
+
+```ts
+// Triggers wallet permission / connect flow and returns the address (G...)
+const { address } = await stellar.getAddress()
+console.log('Address:', address)
+```
+
+---
+
+## ネットワークを取得 [#get-network]
+
+```ts
+const { network, networkPassphrase } = await stellar.getNetwork()
+console.log({ network, networkPassphrase })
+```

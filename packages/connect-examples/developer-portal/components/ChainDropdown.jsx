@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useId } from 'react'
 import { ChevronDown, X } from 'lucide-react'
 import { ChainIcon } from './ChainIcons'
+import { ui } from '../i18n/ui.mjs'
 
 /**
  * ChainDropdown - A reusable dropdown component for selecting blockchain chains
@@ -17,6 +18,7 @@ import { ChainIcon } from './ChainIcons'
  * @param {boolean} props.disabled - Whether the dropdown is disabled
  */
 export function ChainDropdown({
+  locale = 'en',
   chains = [],
   selectedChainId,
   onSelect,
@@ -196,7 +198,7 @@ export function ChainDropdown({
               {searchQuery && (
                 <button
                   type="button"
-                  aria-label={searchPlaceholder.includes('搜索') ? '清除搜索' : 'Clear search'}
+                  aria-label={ui(locale, 'Clear search', '清除搜索')}
                   onClick={clearSearch}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 
                     text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300

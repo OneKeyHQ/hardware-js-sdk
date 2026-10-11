@@ -1,0 +1,76 @@
+---
+title: "Firma"
+description: "Firma mensajes en Algorand con OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Firma
+
+Conecta el proveedor antes de firmar. Los ejemplos de transacciones usan los campos de algosdk 2 `from`/`to`; usa la versión principal correspondiente del SDK. `algodClient`, las direcciones y las transacciones agrupadas deben prepararse antes de ejecutar los fragmentos. Los ejemplos para navegador que usan `Buffer` necesitan una importación explícita de `buffer` o un codificador base64 equivalente.
+
+Aprende a firmar mensajes para autenticarte en Algorand.
+
+---
+
+## Firmar un mensaje arbitrario [#sign-arbitrary-message]
+
+```typescript
+const message = new TextEncoder().encode('Hello Algorand!')
+
+const { signature, address } = await provider.signMessage(
+  message,
+  'utf8' // or 'hex'
+)
+
+console.log('Signature:', signature)
+console.log('Signer:', address)
+```
+
+---
+
+## Verificar la firma [#verify-signature]
+
+```typescript
+import nacl from 'tweetnacl'
+
+const message = new TextEncoder().encode('Hello Algorand!')
+const { signature } = await provider.signMessage(message)
+
+// Get public key from address
+const publicKey = algosdk.decodeAddress(provider.address).publicKey
+
+const isValid = nacl.sign.detached.verify(message, signature, publicKey)
+console.log('Valid:', isValid)
+```
+
+---
+
+## Gestión de errores [#error-handling]
+
+```typescript
+try {
+  const signedTxns = await provider.signTxns(walletTxns)
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the request')
+  } else if (error.code === 4100) {
+    console.log('The account or method is not authorized')
+  } else {
+    console.error('Error:', error.message)
+  }
+}
+```
+
+---
+
+## Códigos de error habituales [#common-error-codes]
+
+| Código | Descripción |
+|------|-------------|
+| 4001 | El usuario rechazó la solicitud |
+| 4100 | Sin autorización |
+| 4200 | Método no compatible |
+| -32602 | Parámetros no válidos |

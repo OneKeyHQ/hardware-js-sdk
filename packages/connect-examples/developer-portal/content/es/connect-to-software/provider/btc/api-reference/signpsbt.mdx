@@ -1,0 +1,97 @@
+---
+title: "signPsbt"
+---
+
+# signPsbt
+
+Este método recorre todas las entradas que coinciden con la dirección actual para firmarlas.
+
+## Compatibilidad de carteras y tipos de direcciones [#wallet--address-type-compatibility]
+
+| Tipo de cartera     | Modelo          | Tipos de direcciones compatibles                |
+| --------------- | -------------- | -------------------------------------- |
+| Cartera de software | -              | p2wpkh (Segwit nativo), p2tr (Taproot) |
+| Cartera física | Pro, Classic1S | p2tr (Taproot)                         |
+
+## Método [#method]
+
+```typescript
+declare function signPsbt(
+    psbtHex: string,
+    options?: {
+        autoFinalized?: boolean;
+        toSignInputs?: Array<{
+            index: number;
+            address?: string;
+            publicKey?: string;
+            sighashTypes?: number[];
+            disableTweakSigner?: boolean;
+            useTweakedSigner?: boolean;
+        }>;
+    }
+): Promise<string>
+```
+
+## Parámetros [#params]
+
+* `psbtHex` — _obligatorio_ `string` la cadena hexadecimal de la PSBT que se va a firmar
+* `options` — _opcional_ `object`
+  * `autoFinalized` — _opcional_ `boolean`: si se finaliza la PSBT tras firmarla; el valor predeterminado es `true`
+  * `toSignInputs` — _opcional_ `Array`: especifica qué entradas firmar
+    * `index` — _obligatorio_ `number`: qué entrada firmar
+    * `address` — _opcional_ `string`: qué clave privada correspondiente usar para firmar (especifica address o publicKey)
+    * `publicKey` — _opcional_ `string`: qué clave privada correspondiente usar para firmar (especifica address o publicKey)
+    * `sighashTypes` — _opcional_ `number[]`: tipos sighash opcionales para la entrada
+    * `disableTweakSigner` — _opcional_ `boolean`: el valor predeterminado es false. Establece true para usar la clave privada original al firmar entradas taproot
+    * `useTweakedSigner` — _opcional_ `boolean`: fuerza si se usa un firmante ajustado. Tiene prioridad sobre disableTweakSigner
+
+## Devuelve [#returns]
+
+`Promise<string>` — la cadena hexadecimal de la PSBT firmada
+
+## Ejemplo [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+try {
+    // Basic signing
+    const signedBasic = await provider.signPsbt("70736274ff01007d....");
+
+    // Advanced signing with options
+    const signedAdvanced = await provider.signPsbt(
+        "70736274ff01007d....",
+        {
+            autoFinalized: false,
+            toSignInputs: [
+                {
+                    index: 0,
+                    address: "bc1qxxx...xxx",
+                },
+                {
+                    index: 1,
+                    publicKey: "02xxx...xxx",
+                    sighashTypes: [1]
+                },
+                {
+                    index: 2,
+                    publicKey: "02xxx...xxx",
+                    disableTweakSigner: true
+                }
+            ]
+        }
+    );
+    console.log('Signed PSBT:', signedAdvanced);
+} catch (error) {
+    console.error('Failed to sign PSBT:', error);
+    // Handle signing errors appropriately
+}
+```
+
+## Demostración [#demo]
+
+[Abrir ejemplo](https://codepen.io/OneKeyHQ/pen/GRzXvXJ)
+
+> La compatibilidad de carteras y direcciones depende de las versiones de la cartera y del firmware. Confirma la compatibilidad de la cuenta de destino antes de basarte en la tabla.
+
+Las PSBT, direcciones y claves públicas abreviadas anteriores son marcadores de posición. Sustitúyelas por valores completos. La interfaz publicada del proveedor ofrece `autoFinalized`; las opciones adicionales de `toSignInputs` dependen de la implementación de la cartera y deben verificarse con la versión de destino. Firmar no difunde una transacción.

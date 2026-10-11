@@ -51,7 +51,7 @@ if (dec.isSuccess()) {
   if (ur.type !== 'crypto-hdkey') throw new Error('Expected crypto-hdkey');
   const hdkey = CryptoHDKey.fromCBOR(ur.cbor);
   if (hdkey.isPrivateKey()) throw new Error('Expected a public account export');
-  
+
   const name = hdkey.getName();
   const note = hdkey.getNote();
   const chainCode = hdkey.getChainCode();

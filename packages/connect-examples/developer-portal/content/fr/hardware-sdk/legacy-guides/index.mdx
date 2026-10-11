@@ -1,0 +1,23 @@
+---
+title: "Guide de migration"
+description: "Choisissez un parcours de migration depuis Hardware SDK 1.1.x ou OneKey Bridge vers le modèle d’intégration actuel."
+---
+
+<span id="migration-guide" />
+
+# Guide de migration
+
+Commencez ici si vous distribuez déjà Hardware SDK **1.1.x** et avez besoin de **1.2.x**.
+
+## 1.1.x → 1.2.x [#11x--12x]
+
+- [Passer de 1.1.x à 1.2.x](./from-1x) — `getDeviceState`, `openWalletSession`, Pro 2 / Neo, micrologiciel V4
+
+## Bridge → WebUSB [#bridge--webusb]
+
+Uniquement si vous utilisez encore OneKey Bridge (`env: 'web'`).
+
+- [Bridge vers WebUSB (hd-common-connect-sdk)](./migrate-bridge-to-common-connect-webusb) — recommandé
+- [Bridge vers WebUSB (hd-web-sdk)](./migrate-bridge-to-webusb) — conserver l’hôte iframe
+
+Nouveaux projets : [Premiers pas](/fr/hardware-sdk/getting-started) avec `@onekeyfe/hd-common-connect-sdk`.

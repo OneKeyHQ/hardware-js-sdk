@@ -1,0 +1,152 @@
+---
+title: "RainbowKit"
+description: "React dApp で OneKey と RainbowKit を統合"
+---
+
+import { Callout } from 'nextra/components'
+
+# RainbowKit
+
+RainbowKit は React のウォレット選択 UI と、組み込みの OneKey コネクターを提供します。
+
+<Callout type="info">
+RainbowKit は組み込みの `oneKeyWallet` コネクターを提供します。以下のように、ウォレット一覧に明示的に含めてください。
+</Callout>
+
+---
+
+## インストール [#installation]
+
+```bash
+npm install @rainbow-me/rainbowkit@^2 wagmi@^2 viem@^2 @tanstack/react-query@^5
+```
+
+---
+
+## 基本設定 [#basic-setup]
+
+この例では RainbowKit 2、wagmi 2、viem 2、TanStack Query 5 を使用します。ウォレット選択 UI に OneKey を明示的に含めています:
+
+```tsx filename="App.tsx"
+import '@rainbow-me/rainbowkit/styles.css'
+import { getDefaultConfig, RainbowKitProvider, ConnectButton } from '@rainbow-me/rainbowkit'
+import { oneKeyWallet, injectedWallet, walletConnectWallet } from '@rainbow-me/rainbowkit/wallets'
+import { WagmiProvider } from 'wagmi'
+import { mainnet, polygon, arbitrum, optimism } from 'wagmi/chains'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const config = getDefaultConfig({
+  appName: 'My dApp',
+  wallets: [{ groupName: 'Wallets', wallets: [oneKeyWallet, injectedWallet, walletConnectWallet] }],
+  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // Get from cloud.reown.com
+  chains: [mainnet, polygon, arbitrum, optimism],
+})
+
+const queryClient = new QueryClient()
+
+export default function App() {
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <RainbowKitProvider>
+          <ConnectButton />
+        </RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
+}
+```
+
+---
+
+## 独自のウォレット一覧 [#custom-wallet-list]
+
+OneKey を優先するか、ウォレットの順序をカスタマイズする場合:
+
+```tsx filename="config.ts"
+import { connectorsForWallets } from '@rainbow-me/rainbowkit'
+import {
+  oneKeyWallet,
+  metaMaskWallet,
+  coinbaseWallet,
+  walletConnectWallet,
+} from '@rainbow-me/rainbowkit/wallets'
+
+const connectors = connectorsForWallets(
+  [
+    {
+      groupName: 'Recommended',
+      wallets: [oneKeyWallet, metaMaskWallet, coinbaseWallet],
+    },
+    {
+      groupName: 'Other',
+      wallets: [walletConnectWallet],
+    },
+  ],
+  {
+    appName: 'My dApp',
+    projectId: 'YOUR_WALLETCONNECT_PROJECT_ID',
+  }
+)
+```
+
+---
+
+## カスタマイズ [#customization]
+
+### テーマ [#theme]
+
+```tsx
+import { darkTheme, lightTheme } from '@rainbow-me/rainbowkit'
+
+<RainbowKitProvider
+  theme={darkTheme({
+    accentColor: '#00B812', // OneKey green
+    accentColorForeground: 'white',
+    borderRadius: 'medium',
+  })}
+>
+  <ConnectButton />
+</RainbowKitProvider>
+```
+
+### モーダルのサイズ [#modal-size]
+
+```tsx
+<RainbowKitProvider modalSize="compact">
+  <ConnectButton />
+</RainbowKitProvider>
+```
+
+---
+
+## フック [#hooks]
+
+接続後に wagmi フックを使用します:
+
+```tsx
+import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { useAccount, useBalance } from 'wagmi'
+
+function Wallet() {
+  const { address, isConnected } = useAccount()
+  const { data: balance } = useBalance({ address })
+
+  if (!isConnected) return <ConnectButton />
+
+  return (
+    <div>
+      <p>Address: {address}</p>
+      <p>Balance: {balance?.formatted} {balance?.symbol}</p>
+    </div>
+  )
+}
+```
+
+---
+
+## リソース [#resources]
+
+- [RainbowKit ドキュメント](https://www.rainbowkit.com/docs/introduction)
+- [Wagmi ドキュメント](https://wagmi.sh)
+- [WalletConnect プロジェクト ID を取得](https://cloud.reown.com)

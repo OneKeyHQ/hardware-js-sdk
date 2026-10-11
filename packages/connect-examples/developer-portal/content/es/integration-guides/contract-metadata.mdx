@@ -1,0 +1,22 @@
+---
+title: "Metadatos de contrato"
+description: "Las carteras pueden decodificar los datos de llamada para mostrar el nombre del método durante la confirmación. Un selector de función son los primeros cuatro bytes del hash Keccak-256 de su firma canónica, como `transfer(address,uint256)`."
+---
+
+<span id="contract-metadata" />
+
+# Metadatos de contrato
+
+Las carteras pueden decodificar los datos de llamada para mostrar el nombre del método durante la confirmación. Un selector de función son los primeros cuatro bytes del hash Keccak-256 de su firma canónica, como `transfer(address,uint256)`.
+
+## Publicar metadatos verificables [#publish-verifiable-metadata]
+
+Publica y verifica el código fuente y ABI del contrato en el explorador correspondiente. Mantén el ABI disponible para que tu aplicación codifique las llamadas correctamente. Un nombre de método mostrado no demuestra por sí solo la identidad o el comportamiento del contrato; los selectores pueden colisionar.
+
+## Registros de firmas [#signature-registries]
+
+La guía histórica de GitBook describía el registro de firmas en el registro en cadena de Parity. El código actual del proveedor no demuestra que OneKey use ese registro para decodificar transacciones. No pagues una transacción de registro suponiendo que cambiará la pantalla de confirmación de OneKey.
+
+Si falta un nombre de método, comunica cadena, dirección de contrato, firma del método, hash de transacción si existe y versión de cartera mediante el [registro de incidencias de OneKey](https://github.com/OneKeyHQ/app-monorepo/issues). Nunca incluyas claves privadas ni frases de recuperación.
+
+Para integraciones de hardware, consulta [Clear Signing](/es/hardware-sdk/signers/evm#clear-signing). La decodificación del dispositivo depende del firmware y de calldata; los metadatos de tu aplicación no sustituyen la confirmación en el dispositivo.

@@ -23,6 +23,7 @@ export default async function LocaleLayout({ children, params }) {
 
   const navbar = (
     <OneKeyNavbar
+      locale={lang}
       logo={<OneKeyWordmark />}
       logoLink={`/${lang}`}
       projectLink="https://github.com/OneKeyHQ/hardware-js-sdk"
@@ -60,7 +61,7 @@ export default async function LocaleLayout({ children, params }) {
         themeSwitch={{ light: ui(lang, 'Light', '浅色'), dark: ui(lang, 'Dark', '深色'), system: ui(lang, 'System', '跟随系统') }}
         darkMode={true}
         nextThemes={{ defaultTheme: 'light' }}
-        footer={<Footer key="onekey-footer" />}
+        footer={<Footer key="onekey-footer" locale={lang} />}
       >
         {children}
       </Layout>

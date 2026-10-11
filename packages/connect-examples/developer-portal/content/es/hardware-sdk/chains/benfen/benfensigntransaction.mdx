@@ -1,0 +1,77 @@
+---
+title: "benfenSignTransaction"
+---
+
+# benfenSignTransaction
+
+### Benfen: firmar una transacción [#benfen-sign-transaction]
+
+Solicita una firma de transacción con la clave derivada de la ruta especificada. El usuario revisa y confirma la solicitud en el dispositivo.
+
+**Requisitos**
+
+* Versiones mínimas de firmware
+  * Pro: 4.12.0
+  * Classic 1S / Classic 1S Pure: 3.11.0
+
+```typescript
+const result = await HardwareSDK.benfenSignTransaction(connectId, deviceId, {
+  path: "m/44'/728'/0'/0'/0'",
+  rawTx: "0x00000000000200088096980000000000002017f3a9bd36da0639153d3c38032217ea298eb1991e0a62cc5924e2dd712937350202000101000001010300000000010100b4ced58018b75d7ba72a10fa97c09b7bf66533ff104bf9db1bfdb004b17d8eaa0183006eb3c5499c3cb4b022f20955f387312ed312389c552fa39e35d6423d0c74f785b7000000000020497f41fdfb22d2ae32111dcdc21c16d27f48f47b7ca7aba240b684db5ca74c0fb4ced58018b75d7ba72a10fa97c09b7bf66533ff104bf9db1bfdb004b17d8eaa640000000000000060ad38000000000000", // Raw transaction hex
+  coinType: "0x2::bfc::BFC"
+});
+```
+
+#### Parámetros [#params]
+
+**Parámetros comunes opcionales**
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `3`. [Formato de ruta](/es/hardware-sdk/concepts/common-params#hd-path)
+* `rawTx` - _obligatorio_ `string` Transacción serializada y codificada como cadena hexadecimal.
+* `coinType` - _opcional_ `string` identificador del tipo de moneda
+
+#### Devuelve [#returns]
+
+* success: boolean - True si la operación tiene éxito
+* payload:
+  * signature: string - Firma de la transacción en formato hexadecimal
+  * public\_key: string - Clave pública de firma en formato hexadecimal
+
+#### Ejemplo [#example]
+
+```typescript
+const params = {
+  path: "m/44'/728'/0'/0'/0'",
+  rawTx: "0x00000000000200088096980000000000002017f3a9bd36da0639153d3c38032217ea298eb1991e0a62cc5924e2dd712937350202000101000001010300000000010100b4ced58018b75d7ba72a10fa97c09b7bf66533ff104bf9db1bfdb004b17d8eaa0183006eb3c5499c3cb4b022f20955f387312ed312389c552fa39e35d6423d0c74f785b7000000000020497f41fdfb22d2ae32111dcdc21c16d27f48f47b7ca7aba240b684db5ca74c0fb4ced58018b75d7ba72a10fa97c09b7bf66533ff104bf9db1bfdb004b17d8eaa640000000000000060ad38000000000000",
+  // Raw transaction hex
+  coinType: "0x2::bfc::BFC"
+};
+
+const response = await HardwareSDK.benfenSignTransaction(connectId, deviceId, params);
+```
+
+Resultado
+
+```typescript
+{
+  success: true,
+  payload: {
+    signature: string,
+    public_key: string,
+  }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+El entorno de ejecución devuelve `public_key` y `signature`. Aunque la declaración actual del SDK también incluye `path` y `coinType`, no se incluyen en esta respuesta; consérvalos de la solicitud si los necesitas.

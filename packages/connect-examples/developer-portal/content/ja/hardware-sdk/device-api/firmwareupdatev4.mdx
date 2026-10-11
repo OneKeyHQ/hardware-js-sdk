@@ -1,0 +1,74 @@
+---
+description: "検証済みの Protocol V2 ファームウェアを Pro 2 または Neo にインストールし、再起動後に安全に復旧します。"
+title: "firmwareUpdateV4"
+---
+
+# firmwareUpdateV4
+
+次のデバイス向けの Protocol V2 ファームウェア更新: **OneKey Pro 2** および **OneKey Neo**.
+
+Classic / Mini / Touch / Pro では呼び出さないでください。これらのデバイスは次を使用します: [`firmwareUpdateV2`](/ja/hardware-sdk/device-api/firmwareupdatev2) または [`firmwareUpdateV3`](/ja/hardware-sdk/device-api/firmwareupdatev3).
+
+ユーザーが対象デバイスを選択し、更新を承認した後にのみ実行してください。以下のバイナリ変数には、リリースフローから提供された、そのモデル用の検証済みファイルを含める必要があります。
+
+```ts
+const res = await HardwareSDK.firmwareUpdateV4(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+  bootloaderBinary,
+  applicationP1Binary,
+  applicationP2Binary,
+  coprocessorBinary,
+  resourceArchiveBinary,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+渡したバイナリをインストールし、`FIRMWARE_PROGRESS` / `FIRMWARE_TIP` で進捗を通知します。`DeviceFirmwareUpdateRequest` の後にデバイスが再起動する場合があります。SDK は同じプロトコルで再接続します。
+
+### パラメーター [#params]
+
+[任意の共通パラメーター](/ja/hardware-sdk/concepts/common-params)
+
+| パラメーター | 型 | 必須 | 注意事項 |
+| --- | --- | --- | --- |
+| `platform` | `'native' \| 'desktop' \| 'ext' \| 'web' \| 'web-embed'` | はい | ホスト環境 |
+| `bootloaderBinary` | `ArrayBuffer` | いいえ | Bootloader イメージ |
+| `applicationP1Binary` | `ArrayBuffer` | いいえ | アプリケーションパーティション 1 |
+| `applicationP2Binary` | `ArrayBuffer` | いいえ | アプリケーションパーティション 2 |
+| `coprocessorBinary` | `ArrayBuffer` | いいえ | BLE / コプロセッサーのイメージ |
+| `resourceArchiveBinary` | `ArrayBuffer` | いいえ | 完全な Protocol V2 リソース ZIP。Core は変更されたファイルのみを書き込みます |
+| `forcedUpdateRes` | `boolean` | いいえ | リソース更新を強制 |
+| `expectedDeviceId` | `string` | いいえ | 更新中にデバイス識別情報が変わった場合は続行を拒否 |
+
+`firmwareUpdateV4` では Romloader をインストールできません。SE イメージ (`se01Binary` … `se04Binary`) は型では許可されますが、一般的な統合向けの経路ではありません。
+
+OneKey アプリは公式リリースに準備済み計画 / ホスト関連付けのフローを使用します。サードパーティのホストは、検証済みのバイナリを渡してください。
+
+### 結果 [#result]
+
+```ts
+{
+  success: true,
+  payload: {
+    bleVersion: string,
+    firmwareVersion: string,
+    bootloaderVersion: string,
+  }
+}
+```
+
+### エラー [#error]
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code?: string | number,
+  }
+}
+```
+
+トランスポートのタイムアウトや切断後に、`firmwareUpdateV4` を**自動再試行しないでください**。デバイスがすでにインストール中の可能性があります。状態を再取得してから判断してください。
+
+更新中のボタン確認は情報通知です (`reason='firmware-update'` を伴う `REQUEST_BUTTON`)。この通知に `uiResponse()` を送らないでください。ユーザーが通知をキャンセルした場合は SDK 呼び出しをキャンセルし、2 回目の Cancel を送信しないでください。

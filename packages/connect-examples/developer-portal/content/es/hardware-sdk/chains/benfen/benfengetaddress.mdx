@@ -1,0 +1,101 @@
+---
+title: "benfenGetAddress"
+---
+
+# benfenGetAddress
+
+### Benfen: obtener una dirección [#benfen-get-address]
+
+Deriva y devuelve la dirección de la ruta especificada. Cuando `showOnOneKey` es `true`, el usuario debe confirmar la dirección en el dispositivo.
+
+**Requisitos**
+
+* Versiones mínimas de firmware
+  * Pro: 4.12.0
+  * Classic 1S / Classic 1S Pure: 3.11.0
+
+```typescript
+const result = await HardwareSDK.benfenGetAddress(connectId, deviceId, params);
+```
+
+#### Parámetros [#params]
+
+**Parámetros comunes opcionales**
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `3`. [Formato de ruta](/es/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _opcional_ `boolean` si se muestra la dirección en el dispositivo
+
+#### Devuelve [#returns]
+
+* success: boolean - True si la operación tiene éxito
+* payload:
+  * address: string - Dirección derivada en formato BFC
+  * path: string - Ruta BIP32 usada
+  * pub?: string - Clave pública, si está disponible
+
+Ejemplo:
+
+```typescript
+const params = {
+  path: "m/44'/728'/0'/0'/0'",
+  showOnOneKey: false
+};
+
+// Single address
+const response = await HardwareSDK.benfenGetAddress(connectId, deviceId, params);
+
+// Batch addresses
+const batchParams = {
+  bundle: [
+    {
+      path: "m/44'/728'/0'/0'/0'",
+      showOnOneKey: false
+    },
+    {
+      path: "m/44'/728'/1'/0'/0'",
+      showOnOneKey: false
+    }
+  ]
+};
+const batchResponse = await HardwareSDK.benfenGetAddress(connectId, deviceId, batchParams);
+```
+
+**Resultado**
+
+Respuesta de una dirección
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // displayed address
+        pub?: string,
+        path: string // serialized BIP32 path
+    }
+}
+```
+
+Respuesta por lotes, en el mismo orden que la solicitud
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, pub?: string, path: string }, // account 1
+        { address: string, pub?: string, path: string }, // account 2
+        { address: string, pub?: string, path: string }  // account 3
+    ]
+}
+```
+
+Error
+
+```
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

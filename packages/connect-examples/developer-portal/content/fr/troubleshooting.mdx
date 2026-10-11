@@ -1,0 +1,66 @@
+---
+title: "Dépannage"
+description: "Diagnostiquez les problèmes de connexion au portefeuille, de découverte matérielle, de signature et d’intégration QR."
+---
+
+<span id="troubleshooting" />
+
+# Dépannage
+
+Identifiez d’abord la couche en échec : fournisseur de portefeuille OneKey, transport matériel ou encodage/décodage QR. Consignez la méthode, le code d’erreur, la version du SDK ou du portefeuille et l’étape ayant échoué.
+
+## Une dApp ne trouve pas OneKey [#a-dapp-cannot-find-onekey]
+
+- Confirmez que OneKey est installé et activé dans le profil de navigateur testé. Rechargez la dApp après l’installation.
+- Détectez le fournisseur dans le code du navigateur, une fois la page disponible. N’accédez pas à `window` pendant le rendu serveur.
+- Utilisez le fournisseur de votre chaîne. Ne supposez pas qu’un fournisseur injecté par un autre portefeuille appartient à OneKey.
+- Suivez le [Démarrage rapide dApp](/fr/connect-to-software) ou le [guide de votre bibliothèque d’interface de portefeuille](/fr/connect-to-software/wallet-ui/web3modal).
+
+## L’accès au compte ou la signature est refusé [#account-access-or-signing-is-rejected]
+
+Un refus est une issue utilisateur valide. Effacez l’état d’attente et laissez l’utilisateur réessayer explicitement ; ne continuez pas à ouvrir des demandes d’autorisation ou de signature.
+
+Si le compte ou le réseau change, actualisez l’état de votre application avant de créer la prochaine demande. Pour Ethereum, consultez [Accès aux comptes](/fr/connect-to-software/provider/eth/accessing-accounts) et l’[API du fournisseur](/fr/connect-to-software/provider/eth).
+
+## Un appareil USB n’apparaît pas dans la liste [#a-usb-device-is-not-listed]
+
+1. Vérifiez que votre navigateur prend en charge WebUSB et que la page est servie dans un contexte sécurisé.
+2. Ouvrez le sélecteur USB à partir d’une action utilisateur, comme un bouton de connexion, et sélectionnez l’appareil souhaité.
+3. Vérifiez le câble et fermez toute autre application ou tout autre onglet susceptible d’utiliser l’appareil.
+4. Relancez la découverte et gérez un résultat vide avant d’appeler une méthode d’appareil.
+
+Suivez le [Guide WebUSB](/fr/hardware-sdk/transport/web-usb). Les exigences diffèrent pour [mobile natif](/fr/hardware-sdk/transport/native-ble) et [BLE React Native](/fr/hardware-sdk/transport/react-native-ble) ; les instructions USB de navigateur ne s’appliquent pas à tous les transports.
+
+## Une demande attend indéfiniment [#a-request-waits-indefinitely]
+
+Vérifiez si le SDK attend une réponse d’interface, comme un PIN ou un choix de phrase secrète, ou une confirmation sur l’appareil. Enregistrez les gestionnaires avant de lancer un appel et répondez à la demande précise comme décrit dans le [guide de l’API Core](/fr/hardware-sdk/core-api-guide).
+
+Gardez les opérations d’appareil sérialisées. Si l’utilisateur annule ou si le transport se déconnecte, effacez l’état d’interface en attente et signalez le résultat. Ne rejouez pas automatiquement une demande de signature ou une opération modifiant l’appareil après un résultat incertain.
+
+## Une méthode n’est pas prise en charge [#a-method-is-unsupported]
+
+Vérifiez la méthode dans la [référence de prise en charge des appareils et chaînes](/fr/hardware-sdk/concepts/chain-support), puis vérifiez vos versions du SDK et du micrologiciel. La prise en charge d’une chaîne, d’un appareil ou d’un transport n’implique pas celle de toutes les méthodes.
+
+## Une réponse QR ne se décode pas [#a-qr-response-does-not-decode]
+
+Vérifiez que vous utilisez le type de registre attendu et que tous les fragments d’une réponse QR multipartie ont été reçus. Faites correspondre la réponse à la demande initiale lorsque le format fournit un identifiant de requête. Consultez le [guide QR Ethereum et EVM](/fr/air-gap/ethereum-and-evm).
+
+## Signaler un problème [#report-an-issue]
+
+Choisissez le dépôt responsable de l’intégration en échec :
+
+| Problème | Où le signaler |
+| --- | --- |
+| Hardware SDK, transports ou ce portail développeur | [Issues du Hardware SDK](https://github.com/OneKeyHQ/hardware-js-sdk/issues) |
+| Fournisseur de portefeuille injecté | [Issues du fournisseur Cross-inpage](https://github.com/OneKeyHQ/cross-inpage-provider/issues) |
+| Comportement de OneKey App ou de l’extension de navigateur | [Issues de l’application](https://github.com/OneKeyHQ/app-monorepo/issues) |
+| Aide à l’utilisation d’un produit OneKey | [Centre d’aide OneKey](https://help.onekey.so/) |
+
+Incluez :
+
+- Le comportement attendu et le comportement observé.
+- Une reproduction minimale avec des données de test et les étapes exactes.
+- La version du SDK/paquet, l’environnement d’exécution, le système, le transport et, si pertinent, le modèle et le micrologiciel de l’appareil.
+- Le nom de la méthode, le code d’erreur et un message d’erreur expurgé des données sensibles.
+
+Ne publiez pas de phrases de récupération, clés privées, PIN, phrases secrètes, identifiants d’accès, identifiants de session ni journaux de portefeuille non expurgés. Pour une faille de sécurité présumée, suivez la politique de sécurité du dépôt concerné au lieu de révéler les détails d’exploitation dans une issue publique.

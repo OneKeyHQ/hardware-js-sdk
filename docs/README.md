@@ -4,6 +4,8 @@
 
 公开文档的信息架构与 1.2.0 缺口见 [developer-portal 1.2.0 IA](../packages/connect-examples/developer-portal/docs/1.2.0-information-architecture.md)。内部机制文档不要直接复制进 portal；只翻译接入方必须遵守的公开契约。
 
+六种语言的目录、英文变更同步和验收流程见 [多语言维护指南](../packages/connect-examples/developer-portal/i18n/README.md)。英文为源，AI 或维护者在同一变更中更新各语言的对应 MDX、导航和 UI 文案。
+
 当前事实的优先级为：验证后的代码与生成源 > 本索引列出的长期维护文档 > package README
 中的接入说明。阶段性设计和实施计划由 Git、提交记录、Issue 和 PR 保留，不作为当前事实源。
 

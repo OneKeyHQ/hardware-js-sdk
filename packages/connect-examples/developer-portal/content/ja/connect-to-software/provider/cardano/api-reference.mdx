@@ -1,0 +1,90 @@
+---
+title: "API リファレンス"
+description: "OneKey の Cardano プロバイダーの完全な API リファレンス"
+---
+
+<span id="api-reference" />
+
+# API リファレンス
+
+OneKey の Cardano プロバイダーのメソッドと型のリファレンス。
+
+---
+
+## ウォレットインターフェース (CIP-30) [#wallet-interface-cip-30]
+
+| プロパティ/メソッド | 説明 |
+|-----------------|-------------|
+| `name` | ウォレット名 ('OneKey') |
+| `icon` | ウォレットアイコンの URL |
+| `apiVersion` | API バージョン |
+| `isEnabled()` | 有効化されているか確認 |
+| `enable()` | ウォレットへのアクセスを要求 |
+
+---
+
+## dApp API (有効化後) [#dapp-api-after-enable]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `getNetworkId()` | ネットワークを取得 (0=テストネット、1=メインネット) |
+| `getBalance()` | 総残高を取得 (CBOR) |
+| `getUtxos(amount?, paginate?)` | UTxO を取得 |
+| `getUsedAddresses()` | 使用済みアドレスを取得 |
+| `getUnusedAddresses()` | 未使用アドレスを取得 |
+| `getChangeAddress()` | お釣りアドレスを取得 |
+| `getRewardAddresses()` | ステーキングアドレスを取得 |
+| `signTx(tx, partialSign?)` | ウィットネスセットの署名済み部分を返す |
+| `signData(addr, payload)` | データに署名 (CIP-8) |
+| `submitTx(tx)` | トランザクションを送信 |
+
+---
+
+## 実験的 API [#experimental-api]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `experimental.getCollateral()` | 担保 UTxO を取得 |
+| `experimental.on(event, cb)` | イベントを購読 |
+| `experimental.off()` | 購読を解除 |
+
+---
+
+## 型 [#types]
+
+```typescript
+type Cbor = string // Hex-encoded CBOR
+
+interface Paginate {
+  page: number
+  limit: number
+}
+
+interface Cip30DataSignature {
+  signature: string // COSE_Sign1 hex
+  key: string       // COSE_Key hex
+}
+
+type NetworkId = 0 | 1 // 0=testnet, 1=mainnet
+```
+
+---
+
+## イベント [#events]
+
+| イベント | 説明 |
+|-------|-------------|
+| `accountChange` | アカウント変更時 |
+
+---
+
+## エラーコード [#error-codes]
+
+| コード | 説明 |
+|------|-------------|
+| -1 | 無効なリクエスト |
+| -2 | 内部エラー |
+| -3 | 拒否されたリクエスト |
+| -4 | アカウント変更時 |
+
+現在のプロバイダー実装では、次は空の配列を返します: `experimental.getCollateral()`。メソッドが存在するだけで Plutus 担保が利用できると推測しないでください。ウォレット情報の `isEnabled()` ヘルパーも、正常な `enable()` 呼び出しの代わりにはなりません。CIP-30 の操作固有のエラーは、上記の一般的な API エラーとは異なります。

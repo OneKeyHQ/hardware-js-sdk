@@ -1,0 +1,53 @@
+---
+title: "Establecer una conexión"
+---
+
+<span id="establishing-a-connection" />
+
+# Establecer una conexión
+
+Para empezar a interactuar con OneKey, primero debes establecer una conexión. Esta solicitud pide permiso al usuario para compartir su identificador de cuenta y su clave pública, lo que indica que acepta continuar la interacción.
+
+Una vez concedido el permiso por primera vez, el dominio de la aplicación web se añade a la lista de permitidos para futuras solicitudes de conexión.
+
+También es posible finalizar la conexión tanto desde la aplicación como por parte del usuario.
+
+## Conectar (SignIn) [#connecting-signin]
+
+El método **recomendado** y **más sencillo** para conectarse a OneKey es llamar a `provider.requestSignIn()`. Sin embargo, el proveedor también expone una interfaz JSON RPC mediante `request`.
+
+### requestSignIn() [#requestsignin]
+```javascript
+try {
+  const res = await provider.requestSignIn();
+  console.log('requestSignIn', res.accounts);
+} catch(error){
+  // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+### request() [#request]
+```javascript
+try {
+  const res = await provider.request({
+    method: 'near_requestAccounts',
+  });
+  console.log('near_requestAccounts', res.accounts);
+} catch(error){
+  // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+## Desconectar (SignOut) [#disconnecting-signout]
+
+Desconectar es similar a conectar, aunque la desconexión puede iniciarse desde la cartera.
+
+### signOut() [#signout]
+```javascript
+provider.signOut();
+```
+
+### request() [#request-1]
+```javascript
+provider.request({ method: 'near_signOut' });
+```

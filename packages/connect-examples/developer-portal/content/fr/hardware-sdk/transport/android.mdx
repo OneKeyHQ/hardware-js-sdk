@@ -1,0 +1,80 @@
+---
+description: "Reliez le SDK OneKey au BLE Android avec la gestion des autorisations et des parcours GATT de connexion et de notification complets."
+title: "Android : connexion par Bluetooth"
+---
+
+<span id="android-connect-via-bluetooth" />
+
+# Android : connexion par Bluetooth
+
+Exécutez `@onekeyfe/hd-common-connect-sdk` dans une WebView et reliez son transport de bas niveau au BLE natif. Commencez par l’[exemple Android natif](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-android-example) et le contrat du [plugin de transport de bas niveau](/fr/hardware-sdk/concepts/low-level-plugin).
+
+La couche native gère les autorisations, l’appairage, la connexion GATT, les E/S des caractéristiques et le nettoyage. Le SDK gère la détection du protocole, le cadrage et la signature. N’ajoutez pas de deuxième décodeur V1/V2 dans le pont natif.
+
+## Autorisations [#permissions]
+
+Pour une application ciblant Android 12 ou ultérieur, demandez `BLUETOOTH_SCAN` et `BLUETOOTH_CONNECT` à l’exécution. `BLUETOOTH_ADVERTISE` est inutile pour un client qui effectue uniquement des scans et des connexions.
+
+Utilisez `neverForLocation` uniquement si l’application ne déduit pas la localisation à partir du scan BLE. Les anciennes versions d’Android nécessitent les autorisations Bluetooth historiques et de localisation applicables. Ne demandez pas systématiquement les autorisations propres à Android 12 sur les anciens appareils. Suivez le [guide des autorisations Bluetooth Android](https://developer.android.com/develop/connectivity/bluetooth/bt-permissions) pour votre SDK cible et votre usage de la localisation.
+
+Ne lancez pas de scan pendant qu’une autorisation est en attente. Renvoyez un échec d’autorisation à l’appelant JS si l’utilisateur refuse, et autorisez une nouvelle tentative initiée ultérieurement par l’utilisateur.
+
+## Construire et charger le bundle JavaScript [#build-and-load-the-javascript-bundle]
+
+Depuis la copie de travail hardware-js-sdk :
+
+```bash
+cd packages/connect-examples/native-android-example/web
+yarn
+yarn build
+```
+
+Copiez `web_dist/` vers `app/src/main/assets/web_dist/`. Enregistrez les gestionnaires du pont natif avant de charger `file:///android_asset/web_dist/index.html`. Conservez les chemins des ressources et chargez uniquement le bundle de confiance de votre application dans une WebView ayant accès au pont de l’appareil.
+
+La démonstration fournit ses dépendances et son implémentation du pont. Utilisez sa configuration de paquets/Gradle comme point de départ au lieu de combiner des extraits de versions différentes de Nordic BLE.
+
+## Terminer la connexion BLE avant la résolution [#complete-the-ble-connection-before-resolving]
+
+Un délai fixe ne garantit pas la réussite de l’appairage, de la connexion GATT, de la découverte ou de l’abonnement aux notifications. Suivez les rappels ou les API suspendues de fin d’opération de la bibliothèque BLE :
+
+1. Terminez l’appairage requis et signalez les refus utilisateur ou délais dépassés.
+2. Attendez la réussite de la connexion GATT.
+3. Découvrez le service OneKey et les deux caractéristiques requises.
+4. Activez les notifications et attendez la fin de la configuration du descripteur/de l’abonnement.
+5. Résolvez l’appel du pont `connect` uniquement lorsque la connexion peut envoyer et recevoir.
+
+Android expose les résultats des opérations via [`BluetoothGattCallback`](https://developer.android.com/reference/android/bluetooth/BluetoothGattCallback). Un appel réussi pour démarrer une opération ne signifie pas qu’elle est terminée. Limitez chaque opération en attente par un délai ; en cas d’échec, fermez la connexion et rejetez les appels de pont en attente.
+
+| Rôle | UUID |
+| --- | --- |
+| Service | `00000001-0000-1000-8000-00805f9b34fb` |
+| Écriture | `00000002-0000-1000-8000-00805f9b34fb` |
+| Notification | `00000003-0000-1000-8000-00805f9b34fb` |
+
+## Contrat du pont [#bridge-contract]
+
+| Méthode | Condition de fin |
+| --- | --- |
+| `enumerate()` | Renvoyer un instantané dédupliqué des candidats ; arrêter le scan et terminer la demande une seule fois. |
+| `connect(uuid)` | La connexion, les caractéristiques et les notifications sont prêtes. |
+| `send(uuid, data, options)` | Valider l’hexadécimal, écrire les octets dans l’ordre, respecter `withoutResponse`, et propager les échecs d’écriture. |
+| `receive(uuid)` | Renvoyer le bloc de notification suivant en file, en hexadécimal, y compris les blocs reçus avant qu’un lecteur commence à attendre. |
+| `disconnect(uuid)` | Annuler les abonnements, fermer la connexion sélectionnée, rejeter les lectures en attente et supprimer les anciennes données de notification. |
+
+Conservez les files et rappels par connexion. Rejetez une caractéristique manquante au lieu de considérer une écriture nullable comme réussie. Envoyez les rappels du pont WebView sur le thread d’interface approprié.
+
+Exposez la capacité réelle d’écriture BLE via `getProtocolV2PacketCapacity` lors de l’implémentation de Protocol V2. Ne renvoyez pas le MTU ATT incluant son surcoût. Consultez l’interface complète du [plugin](/fr/hardware-sdk/concepts/low-level-plugin#lowleveltransportsharedplugin-interface).
+
+## Cycle de vie du SDK et de l’interface [#sdk-and-ui-lifecycle]
+
+Le bundle initialise `env: 'lowlevel'` avec votre plugin. Vérifiez le résultat de l’initialisation, découvrez une connexion, puis appelez `getDeviceState(connectId)` pour l’identité liée à la durée de vie de la graine `deviceId`.
+
+Enregistrez les [gestionnaires d’événements d’interface](/fr/hardware-sdk/core-api-guide#events-ui) avant les appels protégés. Répondez uniquement aux demandes de saisie et copiez leur corrélation de réponse. `REQUEST_BUTTON` et les demandes de PIN uniquement sur l’appareil sont des notifications ; un bouton « OK » natif ne peut pas confirmer l’opération sur le matériel.
+
+Transmettez `useEmptyPassphrase: true` pour le portefeuille standard ou l’empreinte du portefeuille caché sélectionné `passphraseState` dans les appels d’adresse et de signature. Sérialisez les appels par appareil.
+
+## Vérifier l’intégration [#verify-the-integration]
+
+Testez sur un appareil physique le refus d’autorisation, l’annulation d’appairage, l’échec de découverte, l’échec des notifications, la saisie sur appareil verrouillé, le débranchement/la déconnexion et la reconnexion. Confirmez une adresse sur l’appareil et examinez le résultat du SDK. La seule détection d’une annonce BLE ne valide pas le parcours complet.
+
+Ne rejouez pas automatiquement une signature ou une mise à jour du micrologiciel après un délai dépassé. Consultez [Reconnexion et libération](/fr/hardware-sdk/transport/reconnect).

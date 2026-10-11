@@ -1,0 +1,71 @@
+---
+title: "Agent-Wallet-Sitzung"
+description: "Eine App-Transfer- oder Hardware-Wallet-Sitzung verbinden, prüfen und beenden."
+---
+
+<span id="agent-wallet-session" />
+
+# Agent-Wallet-Sitzung
+
+Eine Agent-Wallet-Sitzung ist der aktive Wallet-Kontext, den ein KI-Agent über die CLI `onekey` verwendet. Im aktuellen CLI-Quellcode wird dieser Ablauf als App-Transfer-/App-Bot-Wallet-Anmeldung bereitgestellt.
+
+## Was dadurch möglich wird [#what-it-unlocks]
+
+Sobald die Sitzung aktiv ist, kann der Agent denselben Wallet-Kontext für rein lesende und schreibende Abläufe verwenden:
+
+| Funktion | Beispiel |
+| --- | --- |
+| Wallet-Status | `onekey balance --chain eth` |
+| Empfangsadresse | `onekey get-address` |
+| Verlauf | `onekey history --chain eth --detail` |
+| Marktkontext | `onekey token trending --chain sol` |
+| Swap-Vorbereitung | `onekey swap quote --chain eth --from ETH --to USDC --amount 1` |
+| Sicherheitsprüfungen | `onekey security audit --chain eth --token 0x...` |
+
+Deshalb muss der Nutzer keine privaten Schlüssel einfügen oder in jedem Prompt manuell eine Adresse angeben. Der Agent sollte die aktive Sitzung lesen und erklären, welche Wallet er verwendet.
+
+## Anmelden [#login]
+
+```bash
+onekey auth login --app-transfer
+```
+
+Die OneKey-GUI stellt die Nutzlast bereit. Die CLI importiert die Sitzung in den lokalen OneKey-CLI-Tresor und verwendet für geschütztes Material den Zugangsdaten-Speicher des Betriebssystems.
+
+Die CLI stellt außerdem einen Parameter `payload` für die Automatisierung bereit. Behandeln Sie eine App-Transfer-Nutzlast wie Zugangsdaten: Fügen Sie sie nicht in Agentenchats, Dokumentation, Protokolle oder gemeinsam genutzte Shell-Verläufe ein. Prüfen Sie `onekey schema auth-login` und die aktuellen CLI-Hinweise, bevor Sie den Import von Zugangsdaten automatisieren.
+
+## Status [#status]
+
+Verwenden Sie `auth status` vor jeder Gruppe von Vorgängen:
+
+```bash
+onekey auth status
+```
+
+Das aktuelle Schema meldet:
+
+| Feld | Bedeutung |
+| --- | --- |
+| `authStatus` | `authenticated` oder `unauthenticated` |
+| `loginMethod` | `app_transfer` oder `hardware` |
+| `walletKind` | `hd` für App-Transfer-Sitzungen, `hw` für Hardware-Sitzungen |
+| `displayAddress` | Aktive Wallet-Adresse, die dem Nutzer angezeigt wird |
+| `storageBackend` | Von der CLI verwendeter Zugangsdaten-Speicher des Betriebssystems |
+
+## Lebenszyklus [#lifecycle]
+
+| Schritt | Agentenverhalten |
+| --- | --- |
+| Vor jeder Aktion | Ausführen: `onekey auth status` und einen nicht authentifizierten Zustand eindeutig melden. |
+| Vor rein lesenden Aktionen | Die aktive Adresse und die Chain-Standardwerte verwenden; nur fehlenden Chain- oder Token-Kontext erfragen. |
+| Vor Aktionen, die Gelder bewegen | Die aktive Adresse, Chain, Betrag, Empfänger sowie Gebühren-/Risikostatus anzeigen und eine Bestätigung anfordern. |
+| Nach Sitzungsänderungen | Erneut ausführen: `onekey auth status`; nicht davon ausgehen, dass die vorherige Adresse weiterhin gilt. |
+| Beim Abmelden | Den bisherigen Wallet-Kontext sofort nicht mehr verwenden. |
+
+## Abmelden [#logout]
+
+```bash
+onekey auth logout
+```
+
+Agenten sollten die Abmeldung nur aufrufen, wenn der Nutzer ausdrücklich darum bittet, die aktive Sitzung zu beenden.

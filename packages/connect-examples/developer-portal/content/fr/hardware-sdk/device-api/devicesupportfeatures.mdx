@@ -1,0 +1,53 @@
+---
+description: "Lisez les capacités structurées de l’appareil, dont la saisie du PIN sur l’hôte et la prise en charge de l’écran d’accueil."
+title: "deviceSupportFeatures"
+---
+
+# deviceSupportFeatures
+
+Vérifiez les objets de capacités à l’exécution. Lisez `.support`, et non la valeur de vérité de l’objet ; `{ support: false }` reste une valeur JavaScript évaluée comme vraie. `require` peut indiquer une version minimale du micrologiciel.
+
+```ts
+const result = await HardwareSDK.deviceSupportFeatures(connectId);
+if (!result.success) throw new Error(result.payload.error);
+const canEnterPinOnHost = result.payload.inputPinOnSoftware.support;
+```
+
+```typescript
+const response = await HardwareSDK.deviceSupportFeatures(connectId);
+```
+
+### Paramètres [#params]
+
+[Paramètres communs facultatifs](/fr/hardware-sdk/concepts/common-params)
+
+### Exemple [#example]
+
+```typescript
+const response = await HardwareSDK.deviceSupportFeatures(connectId);
+```
+
+Résultat
+
+```typescript
+{
+    success: true,
+    payload: {
+      inputPinOnSoftware: { support: boolean, require?: string },
+      modifyHomescreen: { support: boolean, require?: string },
+      device: Device | null
+    }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

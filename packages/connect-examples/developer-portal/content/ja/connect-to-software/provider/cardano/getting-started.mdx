@@ -1,0 +1,164 @@
+---
+title: "はじめに"
+description: "OneKey の CIP-30 互換プロバイダーで Cardano に接続"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# はじめに
+
+dApp API の使用前に `enable()` を呼び出してください。CIP-30 API が返すアドレスは 16 進数エンコードされたバイト列です。トランザクションと値のパラメーターは、16 進数エンコードされた CBOR です。`Buffer` を使用するブラウザーの例には、明示的な `buffer` インポート、またはバイト変換ヘルパーが必要です。
+
+OneKey のプロバイダーを検出して接続し、Cardano を操作する方法を説明します。
+
+<Callout type="info">
+OneKey は、ここで説明する操作について CIP-30 (Cardano dApp Connector) を実装しています。Nami ウォレットとの互換性も提供します。
+</Callout>
+
+---
+
+## プロバイダーの検出 [#provider-detection]
+
+```typescript
+// OneKey provides both onekey and nami interfaces
+const onekey = window.cardano?.onekey
+const nami = window.cardano?.nami
+
+// Check availability
+if (!onekey) {
+  throw new Error('OneKey Cardano provider not detected')
+}
+
+// Get wallet info
+console.log('Name:', onekey.name) // 'OneKey'
+console.log('API Version:', onekey.apiVersion) // '0.1.0'
+console.log('Icon:', onekey.icon)
+```
+
+---
+
+## ウォレットを有効化 [#enable-wallet]
+
+```typescript
+// Request wallet access
+const api = await window.cardano.onekey.enable()
+
+// Now you can use the full API
+const networkId = await api.getNetworkId()
+console.log('Network:', networkId === 1 ? 'Mainnet' : 'Testnet')
+```
+
+---
+
+## 有効化されているか確認 [#check-if-enabled]
+
+```typescript
+const isEnabled = await window.cardano.onekey.isEnabled()
+
+if (isEnabled) {
+  const api = await window.cardano.onekey.enable()
+  // Use API...
+}
+```
+
+---
+
+## ネットワーク ID を取得 [#get-network-id]
+
+```typescript
+const api = await window.cardano.onekey.enable()
+const networkId = await api.getNetworkId()
+
+// 0 = Testnet, 1 = Mainnet
+console.log('Network:', networkId)
+```
+
+---
+
+## 残高を取得 [#get-balance]
+
+```typescript
+const balance = await api.getBalance()
+// Returns CBOR-encoded value (hex string)
+console.log('Balance (CBOR):', balance)
+
+// Decode using cardano-serialization-lib
+import { Value, BigNum } from '@emurgo/cardano-serialization-lib-browser'
+const value = Value.from_bytes(Buffer.from(balance, 'hex'))
+const lovelace = value.coin().to_str()
+console.log('Balance in lovelace:', lovelace) // Keep the exact integer string.
+```
+
+---
+
+## アドレスを取得 [#get-addresses]
+
+```typescript
+// Get used addresses (addresses with transaction history)
+const usedAddresses = await api.getUsedAddresses()
+console.log('Used addresses:', usedAddresses)
+
+// Get unused addresses (fresh addresses)
+const unusedAddresses = await api.getUnusedAddresses()
+console.log('Unused addresses:', unusedAddresses)
+
+// Get change address
+const changeAddress = await api.getChangeAddress()
+console.log('Change address:', changeAddress)
+
+// Get reward/staking addresses
+const rewardAddresses = await api.getRewardAddresses()
+console.log('Reward addresses:', rewardAddresses)
+```
+
+---
+
+## UTxO を取得 [#get-utxos]
+
+```typescript
+// Get all UTxOs
+const utxos = await api.getUtxos()
+console.log('UTxOs:', utxos)
+
+// Get UTxOs with minimum amount
+const utxosWithAmount = await api.getUtxos(
+  Buffer.from(Value.new(BigNum.from_str('1000000')).to_bytes()).toString('hex')
+  // CBOR-encoded Value for 1 ADA; import Value and BigNum from the serialization SDK.
+)
+
+// With pagination
+const paginatedUtxos = await api.getUtxos(undefined, {
+  page: 0,
+  limit: 10,
+})
+```
+
+---
+
+## イベント処理 [#event-handling]
+
+```typescript
+const api = await window.cardano.onekey.enable()
+
+// Nami-compatible event API
+api.experimental.on('accountChange', (addresses) => {
+  console.log('Account changed:', addresses)
+})
+```
+
+---
+
+## Nami との互換性 [#nami-compatibility]
+
+互換用のエイリアスは、別の拡張機能に属している場合があります。`window.cardano.onekey` を使用して OneKey を明示的に選択してください。
+
+```typescript
+// Access via Nami interface
+const nami = window.cardano.nami
+const api = await nami.enable()
+
+// Same API as OneKey
+const balance = await api.getBalance()
+```

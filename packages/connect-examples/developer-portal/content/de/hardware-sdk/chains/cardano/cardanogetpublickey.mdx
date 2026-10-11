@@ -1,0 +1,84 @@
+---
+title: "cardanoGetPublicKey"
+---
+
+# cardanoGetPublicKey
+
+## Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * Touch: 4.1.0
+  * Classic/Mini: 3.0.0
+
+## Cardano: Öffentlichen Schlüssel abrufen [#cardano-get-public-key]
+
+Gibt den aus dem angegebenen Cardano-Pfad abgeleiteten erweiterten öffentlichen Schlüssel zurück.
+
+```typescript
+const result = await HardwareSDK.cardanoGetPublicKey(connectId, deviceId, params);
+```
+
+## Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+### Einzelner öffentlicher Schlüssel [#single-public-key]
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`. [Pfadformat](/de/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _optional_ `boolean` Ob der öffentliche Schlüssel auf dem Gerät angezeigt werden soll. Standard ist `false`.
+* `derivationType` - _optional_ `CardanoDerivationType`-Enum. Bestimmt den verwendeten Ableitungstyp. Standard ist ICARUS=1
+
+#### Mehrere öffentliche Schlüssel [#multiple-public-keys]
+
+* `bundle` - Array von Objekten mit `path`, `showOnOneKey`-Feldern
+
+### Beispiel [#example]
+
+Öffentlichen Schlüssel des ersten Cardano-Kontos zurückgeben:
+
+```typescript
+HardwareSDK.cardanoGetPublicKey(connectId, deviceId, {
+    path: "m/1852'/1815'/0'/0/0",
+    showOnOneKey: true
+});
+```
+
+Ein Bündel öffentlicher Schlüssel mehrerer Cardano-Konten zurückgeben:
+
+```typescript
+HardwareSDK.cardanoGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/1852'/1815'/0'/0/0", }, // account 1
+        { path: "m/1852'/1815'/1'/0/0", }, // account 2
+        { path: "m/1852'/1815'/2'/0/0", }  // account 3
+    ]
+});
+```
+
+### Ergebnis [#result]
+
+Antwort für einen einzelnen öffentlichen Schlüssel
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: Array<number>, // hardened path
+        serializedPath: string,
+        xpub: string,
+        node: HDNodeType,
+    }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

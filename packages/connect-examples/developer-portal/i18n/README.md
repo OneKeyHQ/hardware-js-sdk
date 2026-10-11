@@ -1,48 +1,51 @@
-# Developer portal localization
+# Maintaining six-language documentation
 
-## Current delivery state
+English is the source of truth. Translations are ordinary, readable MDX files committed alongside it. There is no translation service, API key, background generation job or hidden English fallback for published documentation. An AI assistant or a person updates the related files together in one reviewed change.
 
-Only English and Simplified Chinese are published. The additional locale definitions and translation pipeline are preparation for French, German, Spanish and Japanese. Their full document translations have not been generated or reviewed. Do not enable these locales or describe this checkpoint as deployment-ready multilingual documentation.
+## Where to edit
 
-`ui/` contains the source UI catalog and partial translated catalogs. `manifest.json` records the existing Chinese baseline without rewriting it. `catalogs/` stores reusable translated units; these are machine translation memory, not evidence of human review.
+| Content | Location |
+| --- | --- |
+| English source | `content/en/<section>/<page>.mdx` |
+| Chinese, French, German, Spanish, Japanese | The same relative path under `content/zh`, `fr`, `de`, `es`, `ja` |
+| Navigation names and order | `_meta.js` / `_meta.jsx` in the matching content directory |
+| Shared interface text | `i18n/ui/{en,zh,fr,de,es,ja}.json` |
+| Language names, routes and publication | `i18n/locales.mjs` |
+| Shared layouts and interactions | `components/`; do not duplicate components per language |
+| Release versions, dates and highlights | `data/hardware-sdk-releases.json`, `data/provider-releases.json`; translated highlights are also UI catalog entries |
+| Translation source/output fingerprints | `i18n/manifest.json`; maintained by the explicit review command below |
+| Historical bilingual and GitBook audit | `docs/content-review.json`, `docs/gitbook-migration.json` |
 
-## Provider configuration
+UI catalog keys are the readable English source text, not opaque IDs. Keep the same keys in all six catalogs. Preserve `{count}`, `{command}` and other placeholders exactly. Known product names, API methods, package names, schema keys and code samples remain in their original form.
 
-The repository owner must configure an OpenAI-compatible Chat Completions endpoint that accepts `response_format: json_object` and `max_completion_tokens`:
+## Updating English and its translations
 
-- Secret `DOCS_TRANSLATION_API_KEY`, accessible to this repository's Actions jobs.
-- Variable `DOCS_TRANSLATION_BASE_URL`: an HTTPS base URL ending at the API version, without `/chat/completions`, credentials, query or fragment.
-- Variable `DOCS_TRANSLATION_MODEL`: an explicitly selected model available through that service.
-- Variable `DOCS_TRANSLATION_MAX_REQUESTS`: an explicit integer request cap per run, 1–2000. This limits logical batches, not currency. A batch can retry twice on HTTP 429/5xx. Configure the provider's own spending cap as well.
-- Variable `DOCS_TRANSLATION_ENABLED=true` only after initial translation and acceptance are complete.
+1. Read the English page and relevant SDK source before changing technical claims. Edit the English page first, then every corresponding translated page. Preserve conditions, negation, warnings, numeric limits and units; do not shorten a technical explanation into a summary.
+2. Keep filenames, import paths, code fences and inline code identical. Rewrite only the language prefix of internal links. Preserve original English anchors with Nextra’s explicit heading syntax, for example `## Paramètres [#parameters]`. A translated page title may use `<span id="original-title" />` before its H1. This keeps repeated headings and existing cross-page fragments stable. Do not change other URL components.
+3. For component copy, use `ui(locale, 'English source')` with a literal source key, or a known dictionary collected by the extractor. Run `yarn i18n:extract-ui`; translate every new key in the other five catalogs. Dynamic release highlights are collected from the release data files. Avoid hard-coded two-language branches.
+4. Review the changed translated files in context. Record only the files actually reviewed, for example:
 
-A Secret name is not a credential or confirmation that a repository can access it. No model, provider URL or billing authorization is assumed. Never put the API key in chat, source control or any `NEXT_PUBLIC_*` variable.
+   ```sh
+   yarn i18n:record fr hardware-sdk/getting-started.mdx
+   yarn i18n:record de hardware-sdk/getting-started.mdx
+   yarn i18n:record es hardware-sdk/getting-started.mdx
+   yarn i18n:record ja hardware-sdk/getting-started.mdx
+   # A UI-only review uses the logical path _ui.json:
+   yarn i18n:record fr _ui.json
+   ```
 
-## Commands
+   For an English/Chinese MDX review, `node scripts/record-content-review.mjs <path>` records both the historical bilingual ledger and the Chinese localization baseline.
+5. Run `yarn i18n:check`, `yarn check:content` and `yarn build`. `yarn i18n:plan` returns actionable missing/stale paths as JSON without making network requests. The build must fail if a published translation is missing, stale or changed without being recorded, or if UI keys/placeholders no longer match.
+6. Check rendered navigation, links, desktop/mobile wrapping and language-specific search for every affected language. Commit source, translations, UI catalogs and updated review fingerprints together. Updating a fingerprint acknowledges your review; it does not prove linguistic accuracy.
 
-From this package:
+When adding or removing a page, update all six language directories, each affected `_meta.js` / `_meta.jsx`, incoming links and the historical migration destinations. Remove obsolete manifest entries explicitly. Do not invent an English copy as a translated page, silently delete a manual translation, or refresh all fingerprints to conceal drift.
 
-```sh
-yarn i18n:extract-ui
-yarn i18n:plan
-# With provider configuration supplied securely in the process environment:
-yarn i18n:sync
-yarn i18n:check
-yarn build
-```
+## Translation conventions
 
-`i18n:plan` makes no API request. The default target set is Chinese, French, German, Spanish and Japanese. Unchanged Chinese pages retain their existing reviewed content. For the initial four-language fill, pass `--locales=fr,de,es,ja` to `scripts/i18n/sync.mjs`. A run resumes from saved successful batches. Initial planning currently requires 124 logical batches per new language (496 total), excluding retries and remaining custom-copy work; this is not a currency estimate. Model errors, missing units, altered placeholders, truncation and missing configuration fail closed.
+Use direct, natural developer documentation language. French uses clear imperatives; German uses consistent formal instructions; Spanish uses consistent second-person instructions; Japanese uses concise polite technical prose. Preserve OneKey branding and protocol/chain names. Translate explanations, navigation, tables, warnings, metadata and controls; English inside executable examples is intentional.
 
-A translated document is rendered from English by positional patches: executable code, imports, inline code, paths and structural metadata are not sent for translation. Original English heading anchors are added when headings change, and internal locale paths are rewritten. New prose is escaped before entering MDX; parsed structure is compared with the source to reject added code, expressions, links or formatting. A malformed batch stops generation and must be corrected before retrying. These checks do not prove semantic equivalence; review terminology, negation, conditions and security guidance.
+The document extractor/renderer in `scripts/i18n/extract.mjs` is an optional offline aid for bulk edits. Its structural checks reject added MDX code or links. Final MDX files are authoritative and can be edited directly; no translation memory database is needed to regenerate the website.
 
-Manual changes in target files stop automatic replacement. Unrecorded existing files are never overwritten. Deletion conflicts are checked before calling the provider; a write-ahead journal permits interrupted file/manifest updates to resume, while still rejecting intervening human edits. Apply a correction to the translation-memory entry and regenerate in a reviewed change, or explicitly review and update the target's manifest entry; never silently refresh hashes to hide differences.
+## Review boundaries
 
-## Synchronization and publication
-
-The workflow runs only on trusted `onekey` code after relevant source changes or a manual dispatch. It executes only the reviewed `onekey` checkout, translates changed units, validates, builds, and then creates a unique `docs/automated-translations-*` branch and draft PR. While a previous translation PR is open it waits; merging that PR triggers a fresh check through the manifest path. Closing it without merging requires manual dispatch. It never checks out a pending translation branch or force pushes. It neither merges nor deploys. Failed runs upload completed translation batches for recovery, without credentials.
-
-UI extraction updates only the English source catalog, never Chinese or other target catalogs. English changes may temporarily make the translation manifest stale. The production build must remain blocked until the translation update is reviewed and merged. Do not remove this check to publish stale translations. If required PR checks prevent a source-only merge, generate translations on the source branch before merging; the post-merge workflow is a backstop. This dependency must be verified against repository branch rules before enabling the workflow. Page deletion also requires an explicit update to the historical review ledger and GitBook migration destinations; automation must not erase that audit trail.
-
-Before adding a language to `publishedLocaleCodes`, complete all 317 pages, 32 navigation files, UI strings and dynamic/custom page copy. Verify translated release data, metadata and embedded JSX expressions as well as ordinary Markdown. The current UI extraction deliberately covers explicit `ui()` calls and known bilingual dictionaries; it is not a claim that every remaining hard-coded string has been migrated.
-
-Acceptance must include six-language production export and Pagefind indexes, original EN/ZH routes and anchors, localized internal links, locale-preserving navigation, keyboard controls, simulator Mock paths, desktop/mobile wrapping, Roobert/asset loading, and independent technical/linguistic review. Send the deployment handoff only after those checks and the relevant CI results pass.
+Structural checks do not certify API correctness, translation quality, hardware behavior, signing or broadcasting. Review technical meaning and security warnings independently. Deployment remains a separate action after source review, all-language acceptance and CI; no script here publishes the site.

@@ -1,0 +1,24 @@
+---
+title: "トランザクションの送信"
+---
+
+<span id="sending-transactions" />
+
+# トランザクションの送信
+
+Web アプリケーションが OneKey に接続すると、ユーザーの許可を得て、ユーザーに代わってトランザクションを送信できます。
+
+トランザクションを送信するには、Web アプリケーションで次を行います:
+
+* 1 つ以上の未署名トランザクションを作成します。
+* ユーザーの OneKey ウォレットで署名し、ネットワークに送信します。
+
+Near のトランザクションについて詳しくは、次を参照することを推奨します: `near-api-js` [ドキュメント](https://docs.near.org/tools/near-api) および公式の [Near ドキュメント](https://docs.near.org/).
+
+[create-transaction.md](/ja/connect-to-software/provider/near/integrating/sending-transactions/create-transaction)
+
+[sign-and-send-transaction.md](/ja/connect-to-software/provider/near/integrating/sending-transactions/sign-and-send-transaction)
+
+ブロードキャストせずに署名するには、署名専用メソッドを使い、署名済みトランザクションをアプリケーションから送信してください。
+
+[signing-transaction.md](/ja/connect-to-software/provider/near/integrating/sending-transactions/signing-transaction)

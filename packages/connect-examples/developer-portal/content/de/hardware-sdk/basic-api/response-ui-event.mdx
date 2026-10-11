@@ -1,0 +1,58 @@
+---
+description: "Aktuelle SDK-Eingabeanfragen mit Zuordnungsfeldern beantworten und Gerätebenachrichtigungen unterscheiden."
+title: "Auf UI-Ereignisse antworten"
+---
+
+<span id="respond-to-ui-events" />
+
+# Auf UI-Ereignisse antworten
+
+Verwenden Sie `HardwareSDK.uiResponse()`, um eine ausstehende SDK-Eingabeanfrage zu beantworten. Es gibt `void` zurück; warten Sie für das Vorgangsergebnis auf das ursprüngliche Promise des Adress-, Signier- oder Gerätevorgangs.
+
+Registrieren Sie den [UI-Ereignishandler](/de/hardware-sdk/core-api-guide#events-ui) vor einem geschützten Aufruf. Antworten Sie nur auf die aktuelle Anfrage und behalten Sie `payload.responseCorrelation` bei, wenn die Anfrage es enthält. Die `interactionId` und `deviceId`-Zuordnungsfelder gehören auf die oberste Ebene der Antwort; sie ersetzen nicht die positionsgebundene Wallet-`deviceId` in Signieraufrufen.
+
+## PIN-Eingabe [#pin-input]
+
+Dieses Fragment gehört in den `UI_REQUEST.REQUEST_PIN`-Handler. `message` ist diese Anfrage und `pinValue` ist die vollständige Positionsfolge der blinden PIN-Eingabe, die Ihre Oberfläche erfasst hat.
+
+```ts
+HardwareSDK.uiResponse({
+  ...message.payload.responseCorrelation,
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: pinValue,
+});
+```
+
+Bei einer Host-Eingabeanfrage, die eine Eingabe auf dem Gerät anbietet, lautet der Antwortwert `@@ONEKEY_INPUT_PIN_IN_DEVICE`. Eine Anfrage mit der Markierung `deviceOnly`, `ButtonRequest_PinEntry`, oder `ButtonRequest_AttachPin` ist eine Gerätebenachrichtigung: Zeigen Sie Anweisungen an und warten Sie ohne Antwort.
+
+Siehe [PIN](/de/hardware-sdk/concepts/pin) zur blinden Tastenfeldzuordnung und zu Modellbeschränkungen.
+
+## Passphrase-Eingabe [#passphrase-input]
+
+Dieses Fragment gehört in `UI_REQUEST.REQUEST_PASSPHRASE`. `passphraseValue` stammt aus der aktuellen Eingabe des Nutzers, niemals aus einem fest codierten oder protokollierten Wert.
+
+```ts
+HardwareSDK.uiResponse({
+  ...message.payload.responseCorrelation,
+  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+  payload: {
+    value: passphraseValue,
+    passphraseOnDevice: false,
+    save: false,
+  },
+});
+```
+
+Um die Geräteeingabe zu wählen, verwenden Sie `{ value: '', passphraseOnDevice: true, save: false }` stattdessen. Beachten Sie `deviceOnly`, indem Sie die Geräteeingabe auswählen. `REQUEST_PASSPHRASE_ON_DEVICE` ist eine nachfolgende Benachrichtigung und benötigt keine Antwort.
+
+Halten Sie auf dem Host eingegebene Geheimnisse aus Protokollen, Analysen, dauerhaftem Speicher und Fehlerberichten heraus. Verwenden Sie `save: false`, sofern der Nutzer nicht ausdrücklich einen unterstützten Ablauf zum Zwischenspeichern von Sitzungen wählt.
+
+## Abbrechen und schließen [#cancel-and-close]
+
+Brechen Sie den Vorgang auf der ausgewählten Verbindung ab mit `HardwareSDK.cancel(connectId)`, wenn der Nutzer die Eingabe abbricht. Machen Sie die ausstehende Dialogübermittlung ungültig, sobald der Vorgang endet oder das SDK seine Oberfläche schließt, damit eine verspätete Antwort keine andere Anfrage beantworten kann.
+
+`REQUEST_BUTTON`, Firmware-Fortschrittsmeldungen und reine Geräte-PIN-Aufforderungen akzeptieren keine „OK“-Antwort. Eine Host-Schaltfläche darf niemals die Gerätebestätigung ersetzen.
+
+## Weitere Eingabeanfragen [#other-input-requests]
+
+WebUSB-Anfragen zur Bootloader-Auswahl verwenden die passende `UI_RESPONSE.SELECT_DEVICE_*`-Antwort und eine ausgewählte Geräte-ID in `payload`. Die öffentliche Union [`UiResponseEvent`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/events/ui-response.ts) definiert die akzeptierten Formate. Lebenszyklus-APIs wie `uiResponse` akzeptieren nicht das allgemeine Objekt aus [Gemeinsame Parameter](/de/hardware-sdk/concepts/common-params).

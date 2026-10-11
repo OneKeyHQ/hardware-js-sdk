@@ -1,0 +1,76 @@
+---
+title: "Solana"
+---
+
+# Solana
+
+UR-Registry-Typen zum Offline-Signieren auf Solana.
+
+## Datentypen [#data-types]
+
+- Anfrage-UR: `sol-sign-request` (Transaktions-/Nachrichtenbytes + BIP-44-Pfad)
+- Antwort-UR: `sol-signature`
+
+## Ablauf [#flow]
+
+1. Solana-Transaktions- oder Nachrichtenbytes vorbereiten und den Pfad ableiten
+2. Erstellen: `sol-sign-request` und als animierten QR-Code anzeigen
+3. Geräteantwort scannen → dekodieren `sol-signature` → an die Transaktion anhängen
+4. An das Solana-Netzwerk übermitteln
+
+## Beispiele [#examples]
+
+Installieren Sie `@keystonehq/bc-ur-registry-sol` und `@ngraveio/bc-ur`. Die Beispiele benötigen eine Buffer-Implementierung. Registry-Kodierung allein belegt keine Geräteunterstützung; prüfen Sie die von der Zielfirmware akzeptierten UR-Typen.
+
+Die Wallet liefert die unsignierten Transaktionsdaten sowie den tatsächlichen Kontopfad und Master-Fingerabdruck, die vom Gerät exportiert wurden. Der QR-Renderer sollte `nextFrame()` zeitgesteuert aufrufen und anhalten, sobald der Signierdialog geschlossen wird. Diese Ausschnitte kodieren und dekodieren den Transport; sie reichen keine Transaktion ein.
+
+
+### Solana-Signieranfrage erstellen (UR) [#build-solana-sign-request-ur]
+
+```ts
+import { SolSignRequest, SignType, CryptoKeypath, PathComponent } from '@keystonehq/bc-ur-registry-sol';
+
+
+// BIP44: m/44'/501'/0'
+const keypath = new CryptoKeypath([
+  new PathComponent({ index: 44, hardened: true }),
+  new PathComponent({ index: 501, hardened: true }),
+  new PathComponent({ index: 0, hardened: true }),
+], Buffer.from(masterFingerprintHex, 'hex'));
+
+const requestId = globalThis.crypto.randomUUID();
+const requestIdBytes = Buffer.from(requestId.replace(/-/g, ''), 'hex');
+
+const req = new SolSignRequest({
+  requestId: requestIdBytes,
+  signData: Buffer.from(rawTxBytes), // transaction or message bytes
+  derivationPath: keypath,
+  signType: SignType.Transaction,    // or SignType.Message
+});
+
+const encoder = req.toUREncoder(200);
+const nextFrame = () => encoder.nextPart(); // Call from your QR animation timer.
+```
+
+### Solana-Signatur dekodieren (UR) [#decode-solana-signature-ur]
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { SolSignature } from '@keystonehq/bc-ur-registry-sol';
+
+const dec = new URDecoder();
+// dec.receivePart(frameString) for each scanned frame
+if (dec.isError()) throw new Error('QR decoding failed');
+if (dec.isSuccess()) {
+  const ur = dec.resultUR();
+  if (ur.type !== 'sol-signature') throw new Error('Expected sol-signature');
+  const sig = SolSignature.fromCBOR(ur.cbor);
+  const returnedId = sig.getRequestId();
+  if (!returnedId || !returnedId.equals(requestIdBytes)) {
+    throw new Error('Signature request ID does not match');
+  }
+  const signature = sig.getSignature();
+  // Verify the signer and signature against the original payload before use.
+  // Attach transaction signatures to the original transaction; return message signatures to the caller.
+}
+```

@@ -1,0 +1,64 @@
+---
+description: "検証済みのリリースバージョンまたはバイナリを使い、対応する Protocol V1 のメイン/BLE ファームウェアを更新します。"
+title: "firmwareUpdateV2"
+---
+
+# firmwareUpdateV2
+
+## ファームウェア更新 (V2) [#firmware-update-v2]
+
+Protocol V1 のファームウェア更新フロー。メインおよび BLE ファームウェアのダウンロードと更新に対応します。次を明示的に渡す必要があります: `platform`.
+
+```typescript
+// Select versions from verified release metadata for this device.
+declare const targetFirmwareVersion: number[];
+
+const res = await HardwareSDK.firmwareUpdateV2(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+  updateType: 'firmware', // or 'ble'
+  // Option A: version-based update (recommended)
+  version: targetFirmwareVersion,
+  // Option B: custom binary (use with caution)
+  // binary: ArrayBuffer,
+  // Optional flags
+  forcedUpdateRes: false,
+  isUpdateBootloader: false,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+この例は、ユーザーがデバイスを選択して更新を承認済みであることを前提とします。対象バージョンは検証済みリリースメタデータから取得し、ドキュメントからコピーしたバージョンをハードコードしないでください。
+
+### パラメーター [#params]
+
+[任意の共通パラメーター](/ja/hardware-sdk/concepts/common-params)
+
+- `platform` - 必須 `"native" | "desktop" | "ext" | "web" | "web-embed"` 実行環境
+- `updateType` - 必須 `'firmware' | 'ble'` 更新対象 (メインファームウェアまたは BLE)
+- `version` - 任意 `number[]` 3 要素の配列で指定する対象バージョン。そのバージョンの公式ファームウェアをダウンロードします
+- `binary` - 任意 `ArrayBuffer` カスタムファームウェアのバイナリ。慎重に使用してください
+- `forcedUpdateRes` - 任意 `boolean` リソースパッケージの更新を強制
+- `isUpdateBootloader` - 任意 `boolean` Bootloader の更新を含める
+
+### 結果 [#result]
+
+```typescript
+{
+  success: true,
+  payload: {
+    // success indicator from lower layer
+  }
+}
+```
+
+### エラー [#error]
+
+```typescript
+{
+  success: false,
+  payload: {
+    error: string, // error message
+    code?: string | number   // error code
+  }
+}
+```

@@ -1,0 +1,371 @@
+---
+title: "Polkadot"
+description: "OneKey の Polkadot.js 互換プロバイダーによる Polkadot の統合"
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Polkadot
+
+OneKey のプロバイダーで Polkadot と Substrate ベースのチェーンを統合します。アクセス先: `window.$onekey.polkadot` または Polkadot.js Extension API。
+
+<Callout type="info">
+OneKey は、ここで説明する操作について Polkadot.js 拡張機能インターフェースを実装しています。
+</Callout>
+
+---
+
+## クイックリンク [#quick-links]
+
+- [API リファレンス](#api-reference)
+- [はじめに](getting-started)
+- [署名](#signing)
+- [Polkadot.js との併用](#using-with-polkadotjs-api)
+
+---
+
+## プロバイダーの検出 [#provider-detection]
+
+```typescript
+// OneKey registers as a Polkadot.js extension
+const provider = window.$onekey?.polkadot
+
+// Or use the standard web3Enable API
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+```
+
+---
+
+## クイックスタート [#quick-start]
+
+### 拡張機能を有効化 [#enable-extension]
+
+```typescript
+// Using OneKey provider directly
+const enabled = await provider.web3Enable('My dApp')
+
+if (enabled) {
+  const accounts = await provider.web3Accounts()
+  console.log('Accounts:', accounts)
+}
+```
+
+### Polkadot.js Extension API の使用 (推奨) [#using-polkadotjs-extension-api-recommended]
+
+```typescript
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+
+// Enable all extensions (including OneKey)
+const extensions = await web3Enable('My dApp')
+
+if (extensions.length === 0) {
+  throw new Error('No extension found')
+}
+
+// Get all accounts
+const allAccounts = await web3Accounts()
+console.log('Accounts:', allAccounts)
+```
+
+---
+
+## アカウント管理 [#account-management]
+
+### アカウントを取得 [#get-accounts]
+
+```typescript
+const accounts = await provider.web3Accounts()
+
+accounts.forEach(account => {
+  console.log({
+    address: account.address,     // Substrate address
+    name: account.name,           // Account name
+    type: account.type,           // 'sr25519' | 'ed25519' | 'ecdsa'
+    genesisHash: account.genesisHash, // Optional chain genesis
+  })
+})
+```
+
+### アカウント変更を購読 [#subscribe-to-account-changes]
+
+```typescript
+const unsubscribe = provider.web3AccountsSubscribe((accounts) => {
+  console.log('Accounts changed:', accounts)
+})
+
+// Later: unsubscribe()
+```
+
+---
+
+## 署名 [#signing]
+
+### トランザクションペイロードに署名 [#sign-transaction-payload]
+
+extrinsic ペイロードに署名します:
+
+```typescript
+import { web3FromAddress } from '@polkadot/extension-dapp'
+
+// Get injector for specific account
+const injector = await web3FromAddress(accountAddress)
+
+// Sign payload
+const payload = {
+  address: accountAddress,
+  blockHash: '0x...',
+  blockNumber: '0x...',
+  era: '0x...',
+  genesisHash: '0x...',
+  method: '0x...',
+  nonce: '0x...',
+  specVersion: '0x...',
+  tip: '0x...',
+  transactionVersion: '0x...',
+  signedExtensions: [], // Populate from current chain metadata; do not sign this placeholder
+  version: 4,
+}
+
+const result = await provider.web3SignPayload(payload)
+
+console.log({
+  id: result.id,
+  signature: result.signature, // Hex signature
+})
+```
+
+### 生のメッセージに署名 [#sign-raw-message]
+
+```typescript
+const payload = {
+  address: accountAddress,
+  data: '0x48656c6c6f', // Hex-encoded message
+  type: 'bytes',
+}
+
+const result = await provider.web3SignRaw(payload)
+
+console.log({
+  id: result.id,
+  signature: result.signature,
+})
+```
+
+---
+
+## Polkadot.js API との併用 [#using-with-polkadotjs-api]
+
+### セットアップ [#setup]
+
+```bash
+npm install @polkadot/api @polkadot/extension-dapp
+```
+
+### 接続してトランザクションに署名 [#connect-and-sign-transaction]
+
+```typescript
+import { ApiPromise, WsProvider } from '@polkadot/api'
+import { web3Enable, web3FromAddress, web3Accounts } from '@polkadot/extension-dapp'
+
+// Enable extensions
+await web3Enable('My dApp')
+
+// Get accounts
+const accounts = await web3Accounts()
+const account = accounts[0]
+if (!account) throw new Error("No account was selected")
+
+// Connect to chain
+const wsProvider = new WsProvider('wss://rpc.polkadot.io')
+const api = await ApiPromise.create({ provider: wsProvider })
+
+// Get injector
+const injector = await web3FromAddress(account.address)
+
+// Create and sign transaction
+const tx = api.tx.balances.transferKeepAlive(
+  recipientAddress,
+  '10000000000' // 1 DOT = 10^10 planck on Polkadot
+)
+
+// Sign and send
+const hash = await tx.signAndSend(
+  account.address,
+  { signer: injector.signer }
+)
+
+console.log('Transaction hash:', hash.toHex())
+```
+
+### トランザクションイベントを監視 [#listen-for-transaction-events]
+
+```typescript
+await tx.signAndSend(
+  account.address,
+  { signer: injector.signer },
+  ({ status, events }) => {
+    if (status.isInBlock) {
+      console.log('In block:', status.asInBlock.toHex())
+    }
+    if (status.isFinalized) {
+      console.log('Finalized:', status.asFinalized.toHex())
+
+      events.forEach(({ event }) => {
+        if (api.events.system.ExtrinsicSuccess.is(event)) {
+          console.log('Transaction succeeded')
+        }
+        if (api.events.system.ExtrinsicFailed.is(event)) {
+          console.log('Transaction failed')
+        }
+      })
+    }
+  }
+)
+```
+
+---
+
+## RPC メソッド [#rpc-methods]
+
+### RPC リクエストを送信 [#send-rpc-request]
+
+```typescript
+const response = await provider.web3RpcSend({
+  method: 'chain_getHeader',
+  params: [],
+})
+
+console.log('Latest header:', response.result)
+```
+
+### RPC イベントを購読 [#subscribe-to-rpc-events]
+
+```typescript
+const subscriptionId = await provider.web3RpcSubscribe(
+  {
+    method: 'chain_subscribeNewHeads',
+    params: [],
+  },
+  (response) => {
+    console.log('New block:', response.result)
+  }
+)
+
+// Unsubscribe later
+await provider.web3RpcUnSubscribe()
+```
+
+### 利用可能なプロバイダーを一覧表示 [#list-available-providers]
+
+```typescript
+const providers = await provider.web3RpcListProviders()
+console.log('Available providers:', providers)
+```
+
+---
+
+## API リファレンス [#api-reference]
+
+### メソッド [#methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `web3Enable(dappName)` | dApp 用に拡張機能を有効化 |
+| `web3Accounts(anyType?)` | すべてのアカウントを取得 |
+| `web3AccountsSubscribe(callback)` | アカウント変更を購読 |
+| `web3SignPayload(payload)` | トランザクションペイロードに署名 |
+| `web3SignRaw(payload)` | 生のメッセージに署名 |
+| `web3RpcSend(request)` | RPC リクエストを送信 |
+| `web3RpcSubscribe(request, callback)` | RPC イベントを購読 |
+| `web3RpcUnSubscribe()` | すべての購読を解除 |
+| `web3RpcListProviders()` | RPC プロバイダーを一覧表示 |
+| `web3RpcStartProvider(key)` | 特定のプロバイダーを開始 |
+
+### 型 [#types]
+
+```typescript
+interface InjectedAccount {
+  address: string          // Substrate address
+  name?: string            // Account name
+  type?: 'sr25519' | 'ed25519' | 'ecdsa'
+  genesisHash?: string     // Optional chain restriction
+}
+
+interface SignerPayloadJSON {
+  address: string
+  blockHash: string
+  blockNumber: string
+  era: string
+  genesisHash: string
+  method: string
+  nonce: string
+  specVersion: string
+  tip: string
+  transactionVersion: string
+  signedExtensions: string[]
+  version: number
+}
+
+interface SignerPayloadRaw {
+  address: string
+  data: string             // Hex-encoded data
+  type: 'bytes' | 'payload'
+}
+
+interface SignerResult {
+  id: number
+  signature: string        // Hex signature
+}
+```
+
+### 対応チェーン [#supported-chains]
+
+| チェーン | 説明 |
+|-------|-------------|
+| Polkadot | メインリレーチェーン |
+| Kusama | カナリアネットワーク |
+| Acala | DeFi ハブ |
+| Moonbeam | EVM 互換 |
+| Astar | スマートコントラクトプラットフォーム |
+| その他の Substrate チェーン | 使用前にウォレットとランタイムの対応状況を確認 |
+
+---
+
+## エラー処理 [#error-handling]
+
+```typescript
+try {
+  const result = await provider.web3SignPayload(payload)
+} catch (error) {
+  if (error.message === 'Cancelled') {
+    console.log('User cancelled signing')
+  } else {
+    console.error('Signing failed:', error)
+  }
+}
+```
+
+---
+
+## React との併用 [#using-with-react]
+
+```tsx
+import { useState, useEffect } from 'react'
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+
+function usePolkadotWallet() {
+  const [accounts, setAccounts] = useState([])
+  const [isConnected, setIsConnected] = useState(false)
+
+  const connect = async () => {
+    const extensions = await web3Enable('My dApp')
+    if (extensions.length > 0) {
+      const allAccounts = await web3Accounts()
+      setAccounts(allAccounts)
+      setIsConnected(true)
+    }
+  }
+
+  return { accounts, isConnected, connect }
+}
+```

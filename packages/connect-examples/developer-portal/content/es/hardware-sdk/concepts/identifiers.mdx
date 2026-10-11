@@ -1,0 +1,100 @@
+---
+description: "Distingue los ID de conexión, los números de serie físicos, la identidad de la semilla, las huellas de carteras ocultas y las sesiones internas."
+title: "Identificadores"
+---
+
+<span id="identifiers" />
+
+# Identificadores
+
+Usa `connectId` para dirigir una solicitud, `deviceId` para vincularla a la semilla actual del dispositivo y `passphraseState` para vincularla a una cartera oculta. Estos valores no son intercambiables.
+
+## Referencia de identificadores [#identifier-reference]
+
+| Campo | Finalidad | Dónde leerlo | Cómo usarlo |
+| --- | --- | --- | --- |
+| `connectId` | Clave de enrutamiento del transporte | Una entrada de `searchDevices().payload` obtenida correctamente | Primer argumento de los métodos de dispositivo y cartera. Vuelve a enumerar los dispositivos tras reconectar. |
+| `serialNo` | Identidad física del hardware, cuando está disponible | Descubrimiento tras la inicialización; `getDeviceState().payload.identity.serialNo` | Muestra o identifica la unidad independientemente de USB/BLE. No lo uses como clave de enrutamiento. |
+| `deviceId` | Identidad actual asociada a la vida útil de la semilla | `getDeviceState().payload.identity.deviceId`; resultado correcto de `openWalletSession` | Segundo argumento de los métodos de cartera. Detecta un restablecimiento, una recuperación o una cartera diferente. |
+| `passphraseState` | Huella de la cartera oculta | Apertura de cartera oculta mediante `openWalletSession` completada correctamente | Pásalo en cada solicitud de dirección/firma de esa cartera oculta. Guárdalo de forma persistente junto con `deviceId`. |
+| `uuid` | Identificador de compatibilidad obsoleto | Algunos resultados de dispositivo/búsqueda | Usa preferentemente `serialNo` para la identidad del hardware y `connectId` para el enrutamiento. Puede estar vacío antes de la inicialización. |
+| firmware `session_id` | Identificador interno de desbloqueo | Gestionado dentro de SDK Core | No lo leas, registres, guardes de forma persistente ni envíes en llamadas públicas. |
+| `name`, `label`, `deviceType` | Información de visualización y capacidades | Descubrimiento/estado del dispositivo | No son identificadores únicos ni pruebas del protocolo o de la identidad de la cartera. |
+
+## `connectId` — la clave de enrutamiento [#connectid--the-routing-key]
+
+<div id="connectid" />
+
+Las conexiones USB y BLE a una misma unidad física tienen distintos valores de `connectId`. Mantén registros de conexión separados por transporte. No se garantiza que un ID de conexión sea el número de serie físico: un descriptor USB puede proporcionar una ruta de enrutamiento antes de que la identidad del hardware esté disponible.
+
+Trata el valor como opaco. Los formatos BLE dependen de la plataforma del host (por ejemplo, una dirección de Android o un UUID de periférico de iOS). Nunca lo conviertas al formato de otro transporte ni lo uses como prueba de autenticidad del dispositivo.
+
+`searchDevices` puede devolver `connectId: null`. Selecciona un candidato con un identificador de conexión utilizable antes de realizar una llamada al dispositivo.
+
+## `deviceId` — la comprobación de identidad de la cartera [#deviceid--the-wallet-identity-check]
+
+```ts
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device has no wallet identity');
+
+const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+  showOnOneKey: true,
+});
+if (!address.success) throw new Error(address.payload.error);
+```
+
+La cartera estándar y las carteras ocultas de una misma semilla comparten la identidad asociada a la vida útil de la semilla `deviceId`. Una cartera oculta necesita además su `passphraseState`.
+
+Ante `DeviceCheckDeviceIdError`, detén la operación y actualiza el estado del dispositivo. Pide al usuario que confirme la cartera prevista antes de actualizar una vinculación existente; sustituir silenciosamente el ID en caché podría dirigir una solicitud posterior a otra cartera.
+
+### `device_id` frente a `deviceId` [#device_id-versus-deviceid]
+
+`device_id` es el campo antiguo de los resultados de Protocol V1 `getFeatures()`. El código nuevo lee el campo normalizado `identity.deviceId` de `getDeviceState()`, que admite ambas familias de protocolos. El descubrimiento puede devolver `deviceId: null` antes de la inicialización.
+
+## Vinculación de cartera oculta [#hidden-wallet-binding]
+
+```ts
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: 'select-hidden',
+});
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden' || !opened.payload.passphraseState) {
+  throw new Error('A hidden wallet was not opened');
+}
+
+const address = await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  passphraseState: opened.payload.passphraseState,
+  showOnOneKey: true,
+});
+if (!address.success) throw new Error(address.payload.error);
+```
+
+Guarda la vinculación de forma persistente solo tras una respuesta correcta. Protégela como un dato de la aplicación relacionado con la cartera; nunca guardes de forma persistente la frase de contraseña ni los identificadores de sesión del firmware.
+
+Omitir `passphraseState` no vincula una llamada a la cartera oculta prevista. Usa una huella verificada de cartera oculta o `useEmptyPassphrase: true` para la cartera estándar, nunca ambos.
+
+Si la vinculación no coincide, detén la operación y deja que el usuario seleccione de nuevo la cartera prevista. No sobrescribas la vinculación para repetir automáticamente una solicitud de firma.
+
+## Firmas de métodos [#method-signatures]
+
+| Patrón | Ejemplos |
+| --- | --- |
+| Ciclo de vida del SDK, sin argumento de conexión | `init`, `searchDevices`, `on`/`off`, `dispose` |
+| Selección de dispositivo o cartera, `connectId` | `getDeviceState`, `openWalletSession`, `deviceSettings`, `deviceVerify` |
+| Operación de cartera, `connectId` + `deviceId` | `evmGetAddress`, `btcSignTransaction`, `solSignTransaction` |
+| Operación de cartera oculta | La operación de cartera más `passphraseState` en sus parámetros |
+
+Algunos métodos permiten omitir identificadores por compatibilidad. Sigue la firma pública de cada método y selecciona un dispositivo concreto en aplicaciones con varios dispositivos. La correlación de respuestas de interfaz usa una identidad de solicitud independiente; copia `responseCorrelation` del evento como se describe en [Eventos de interfaz](/es/hardware-sdk/core-api-guide#events-ui).
+
+## Relacionado [#related]
+
+- [Buscar dispositivos](/es/hardware-sdk/basic-api/search-devices)
+- [Obtener el estado del dispositivo](/es/hardware-sdk/basic-api/get-device-state)
+- [Sesiones de cartera](/es/hardware-sdk/concepts/wallet-session)
+- [Parámetros comunes](/es/hardware-sdk/concepts/common-params)
+- [Reconexión y liberación de recursos](/es/hardware-sdk/transport/reconnect)

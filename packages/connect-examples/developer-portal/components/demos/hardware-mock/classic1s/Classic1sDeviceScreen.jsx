@@ -295,16 +295,7 @@ function PinOnDeviceScreen({ locale, inputDigit, inputMask }) {
 function AddressConfirmScreen({ locale, details }) {
   const address = details?.address ?? ''
   const network = String(details?.network ?? '')
-  const title =
-    locale === 'en'
-      ? 'Address'
-      : network === 'Ethereum'
-        ? 'EVM 地址'
-        : network === 'Solana'
-          ? 'SOL 地址'
-          : network === 'Bitcoin'
-            ? 'BTC 地址'
-            : '地址'
+  const title = ui(locale, 'Address', '地址')
   const raw = String(address ?? '')
   const maxChars = 22
   const firstLine = raw.slice(0, maxChars)
@@ -318,7 +309,7 @@ function AddressConfirmScreen({ locale, details }) {
     <ScreenContainer>
       <div className="relative h-full w-full overflow-hidden px-2 py-1 text-[#9fe3ff]">
         <div className="rounded-[4px] bg-[#8ecfff] py-[2px] text-center text-[10px] font-semibold leading-none text-black">
-          {locale === 'en' ? `${title}:` : `${title}:`}
+          {title}:
         </div>
 
         <div className="mt-1 text-[10px] font-semibold leading-none text-white/90">

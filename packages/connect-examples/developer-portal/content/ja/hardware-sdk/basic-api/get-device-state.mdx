@@ -1,0 +1,68 @@
+---
+description: "Protocol V1 と V2 共通の正規化されたデバイススナップショットを、実行状態、設定、ファームウェアのスコープで読み取ります。"
+title: "デバイス状態を取得"
+---
+
+<span id="get-device-state" />
+
+# デバイス状態を取得
+
+V1 / V2 共通のデバイススナップショットを読み取ります。非推奨の次の API の代わりに使用します: [`getFeatures`](/ja/hardware-sdk/basic-api/get-features).
+
+`getFeatures()` は引き続き Protocol V1 のみで動作します。Pro 2 と Neo では `getDeviceState()` を呼び出し、`payload.identity.deviceId` を読み取る必要があります。ファームウェア/バージョンのフィールドには、`getOnekeyFeatures` の代わりに `scope: 'firmware'` を使用します。
+
+```ts
+const res = await HardwareSDK.getDeviceState(connectId);
+```
+
+### パラメーター [#params]
+
+[任意の共通パラメーター](/ja/hardware-sdk/concepts/common-params)
+
+| パラメーター | 型 | 必須 | 注意事項 |
+| --- | --- | --- | --- |
+| `scope` | `'runtime' \| 'settings' \| 'firmware'` | いいえ | デフォルトは `'runtime'`。スコープは、この読み取りで更新する部分だけを選択します。ペイロードは引き続き完全なスナップショットです |
+
+- `runtime` — 現在のロック / PIN / パスフレーズ状態 (V1 `GetFeatures`, V2 `DeviceStatusGet` アプリケーションモード時)
+- `settings` — 設定も更新
+- `firmware` — ID、バージョン、検証情報も更新
+
+Bootloader / romloader では未対応の状態コマンドをスキップし、取得可能なスナップショットを返します。
+
+### 結果 [#result]
+
+```ts
+{
+  success: true,
+  payload: {
+    protocol: 'V1' | 'V2',
+    identity: {
+      deviceId: string | null, // seed lifetime — pass as the second SDK argument
+      serialNo: string,
+      deviceType: string,
+      // ...
+    },
+    status: { initialized, unlocked, passphraseProtection, attachToPinEnabled, ... },
+    settings: { language, airgapMode, ... },
+    versions: { firmware, bootloader, ble, applicationP1, applicationP2, ... },
+  }
+}
+```
+
+`payload.identity.deviceId` を読み取り、署名呼び出しの第 2 引数に使用します。互換 Features のファームウェア `session_id` を永続化しないでください。
+
+ペイロードには、ファームウェアのウォレット `session_id` や生のプロトコルメッセージは**含まれません**。ウォレットの識別情報は [`openWalletSession`](/ja/hardware-sdk/basic-api/open-wallet-session) から取得します。
+
+### エラー [#error]
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code?: string | number,
+  }
+}
+```
+
+参照: [Protocol V1 と V2](/ja/hardware-sdk/concepts/protocol).

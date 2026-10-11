@@ -1,0 +1,70 @@
+---
+title: "lnurl"
+---
+
+# lnurl
+
+Demander l’exécution d’une requête [LNURL](https://github.com/lnurl/luds). L’application doit transmettre une chaîne [LNURL](https://github.com/lnurl/luds/blob/luds/01.md) qui doit être fournie, par exemple, par son backend. La fonction lnurl peut également accepter un identifiant statique [LUD-16](https://github.com/lnurl/luds/blob/luds/16.md) (par exemple, user@example.com) à la place d’une chaîne LNURL.
+
+La méthode renvoie une promesse qui se résout une fois le processus LNURL terminé. Elle renvoie la dernière réponse du serveur LNURL. Pour les demandes LNURL-pay, elle contient aussi les informations de paiement (préimage, hash de paiement) et, pour les demandes LNURL-auth, les informations d’authentification (message, signature)
+
+## Méthode [#method]
+
+```typescript
+declare function lnurl(lnurl: string): Promise<LNURLResponse>;;
+```
+
+## Réponse [#response]
+
+```typescript
+type LNURLResponse =
+  | {
+      status: "OK";
+      data?: unknown
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+## Réponse LNURL-pay [#lnurl-pay-response]
+
+```typescript
+type LNURLPayResponse =
+  | {
+      status: "OK";
+      data: {
+        preimage: string,
+        paymentHash: string,
+        paymentRequest: string
+      }
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+## Réponse LNURL-auth [#lnurl-auth-response]
+
+```typescript
+type LNURLAuthResponse =
+  | {
+      status: "OK";
+      data: {
+        message: string,
+        signature: string
+      }
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+## Exemple [#example]
+
+```typescript
+const lnurl = "<LNURL_OR_LIGHTNING_ADDRESS>";
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+if (!provider || typeof provider.lnurl !== "function") {
+  throw new Error("LNURL is not supported by this provider.");
+}
+
+await provider.enable();
+const result = await provider.lnurl(lnurl); // promise resolves once the LNURL process is finished (e.g. a payment is sent or the login is complete)
+```
+
+Vérifiez `result.status` : une réponse `ERROR` contient un champ `reason`. Interceptez aussi les promesses rejetées, notamment les échecs de connexion ou d’approbation utilisateur. L’élément facultatif `data` dépend du processus LNURL ; ne supposez pas une structure fixe sans la vérifier.

@@ -1,0 +1,97 @@
+---
+title: "nexaGetAddress"
+---
+
+# nexaGetAddress
+
+### Exigences [#requirements]
+
+* Versions minimales du micrologiciel
+  * Touch : 4.4.0
+  * Classic/Mini : 3.2.0
+
+## Nexa : obtenir une adresse [#nexa-get-address]
+
+Dérive et renvoie l’adresse au chemin spécifié. Utilisez `showOnOneKey` pour demander confirmation sur l’appareil.
+
+```typescript
+const result = await HardwareSDK.nexaGetAddress(connectId, deviceId, params);
+```
+
+## Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+### Adresse unique [#single-address]
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `3`. [en savoir plus](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _facultatif_ `boolean` Indique s’il faut afficher l’adresse sur l’appareil. Valeur par défaut : `true`.
+* `prefix` - _facultatif_ `string` Préfixe d’adresse, par exemple `nexa` pour mainnet ; spécifiez explicitement le réseau souhaité
+* `scheme` - _facultatif_ `string` Mode de l’algorithme de chiffrement. La valeur par défaut est `schnorr`
+
+#### Plusieurs adresses [#multiple-addresses]
+
+* `bundle` - tableau d’objets contenant les champs `path`, `prefix`, `scheme`, `showOnOneKey`
+
+### Exemple [#example]
+
+Renvoyer l’adresse du premier compte Nexa :
+
+```typescript
+HardwareSDK.nexaGetAddress(connectId, deviceId, {
+    path: "m/44'/29223'/0'/0/0",
+    showOnOneKey: true,
+    prefix: "nexa"
+});
+```
+
+Renvoyer un lot d’adresses de plusieurs comptes Nexa :
+
+```typescript
+HardwareSDK.nexaGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/29223'/0'/0/0" }, // account 1
+        { path: "m/44'/29223'/0'" }, // account 2
+        { path: "m/44'/29223'/0'/0/1" }  // account 3
+    ]
+});
+```
+
+### Résultat [#result]
+
+Réponse pour une seule adresse
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        address: string,   // address
+    }
+}
+```
+
+Réponse d’adresses par lot
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, address }, // account 1
+        { path, address }, // account 2
+        { path, address }, // account 3
+    ]
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

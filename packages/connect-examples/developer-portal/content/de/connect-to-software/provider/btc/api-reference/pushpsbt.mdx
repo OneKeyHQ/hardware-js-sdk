@@ -1,0 +1,34 @@
+---
+title: "pushPsbt"
+---
+
+# pushPsbt
+
+Eine finalisierte PSBT übertragen.
+
+## Methode [#method]
+
+```typescript
+declare function pushPsbt(psbtHex: string): Promise<string>;
+```
+
+## Parameter [#params]
+
+* `psbtHex` — _erforderlich_ `string`  die Hex-Zeichenfolge der zu übertragenden PSBT
+
+## Antwort [#response]
+
+`txid` — `string`
+
+## Beispiel [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const psbtHex = "<FINALIZED_PSBT_HEX>"; // Supply a complete finalized PSBT
+const txid = await provider.pushPsbt(psbtHex);
+```
+
+## Demo [#demo]
+
+[Beispiel öffnen](https://codepen.io/OneKeyHQ/pen/dyaqzgE)

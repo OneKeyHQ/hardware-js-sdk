@@ -1,0 +1,70 @@
+---
+title: "nostrEncryptMessage"
+---
+
+# nostrEncryptMessage
+
+### Exigences [#requirements]
+
+* Versions minimales du micrologiciel
+  * Touch : 4.6.0
+  * Classic/Mini : 3.5.0
+  * Classic1s : 3.6.0
+
+## Nostr : chiffrer un message [#nostr-encrypt-message]
+
+Demande le chiffrement d’un message à l’aide de la clé au chemin spécifié et de la clé publique de l’autre participant.
+
+```typescript
+const result = await HardwareSDK.nostrEncryptMessage(connectId, deviceId, params);
+```
+
+### Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `5`. [en savoir plus](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `pubkey` - _obligatoire_ `string`. La clé publique de l’autre participant.
+* `plaintext` - _obligatoire_ `string`. Le message en clair à chiffrer.
+* `showOnOneKey` - _facultatif_ `boolean` Indique s’il faut afficher la demande sur l’appareil. Valeur par défaut : `true`.
+
+### Exemples [#examples]
+
+```typescript
+const response = await HardwareSDK.nostrEncryptMessage(
+  connectId,
+  deviceId,
+  {
+     path: "m/44'/1237'/0'/0/0",
+     pubkey: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
+     plaintext: 'Hello world',
+     showOnOneKey: true,
+  }
+);
+```
+
+Résultat
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: string;
+    pubkey: string;
+    plaintext: string;
+    encryptedMessage: string;
+  }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

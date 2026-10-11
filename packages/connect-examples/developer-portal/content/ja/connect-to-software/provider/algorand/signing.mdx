@@ -1,0 +1,76 @@
+---
+title: "署名"
+description: "OneKey で Algorand のメッセージに署名"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# 署名
+
+署名前にプロバイダーに接続してください。トランザクションの例では、algosdk 2 形式の `from`/`to` フィールドを使用しています。インストールする SDK のメジャーバージョンに合わせてください。 `algodClient`, アドレス、グループ化したトランザクションは、スニペットの実行前に準備する必要があります。`Buffer` を使用するブラウザーの例には、明示的な `buffer` インポート、または同等の base64 エンコーダーが必要です。
+
+Algorand で認証用メッセージに署名する方法を説明します。
+
+---
+
+## 任意のメッセージに署名 [#sign-arbitrary-message]
+
+```typescript
+const message = new TextEncoder().encode('Hello Algorand!')
+
+const { signature, address } = await provider.signMessage(
+  message,
+  'utf8' // or 'hex'
+)
+
+console.log('Signature:', signature)
+console.log('Signer:', address)
+```
+
+---
+
+## 署名を検証 [#verify-signature]
+
+```typescript
+import nacl from 'tweetnacl'
+
+const message = new TextEncoder().encode('Hello Algorand!')
+const { signature } = await provider.signMessage(message)
+
+// Get public key from address
+const publicKey = algosdk.decodeAddress(provider.address).publicKey
+
+const isValid = nacl.sign.detached.verify(message, signature, publicKey)
+console.log('Valid:', isValid)
+```
+
+---
+
+## エラー処理 [#error-handling]
+
+```typescript
+try {
+  const signedTxns = await provider.signTxns(walletTxns)
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the request')
+  } else if (error.code === 4100) {
+    console.log('The account or method is not authorized')
+  } else {
+    console.error('Error:', error.message)
+  }
+}
+```
+
+---
+
+## 主なエラーコード [#common-error-codes]
+
+| コード | 説明 |
+|------|-------------|
+| 4001 | ユーザーがリクエストを拒否 |
+| 4100 | 未認証 |
+| 4200 | 未対応のメソッド |
+| -32602 | 無効なパラメーター |

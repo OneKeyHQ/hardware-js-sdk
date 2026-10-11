@@ -1,0 +1,157 @@
+---
+title: "Primeros pasos"
+description: "Conéctate a Conflux con el proveedor de OneKey compatible con Fluent"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# Primeros pasos
+
+Conecta el proveedor y consulta su red antes de preparar transacciones. Estos ejemplos son para Conflux Core Space. Sustituye las direcciones abreviadas e inicializa cualquier cliente SDK antes de usar sus métodos.
+
+Aprende a detectar, conectar e interactuar con Conflux mediante el proveedor de OneKey.
+
+<Callout type="info">
+El proveedor de Conflux de OneKey es compatible con las interfaces de ConfluxPortal y Fluent.
+</Callout>
+
+---
+
+## Detección del proveedor [#provider-detection]
+
+```typescript
+// Detect OneKey Conflux provider
+const provider = window.$onekey?.conflux
+
+if (!provider) {
+  throw new Error('OneKey Conflux provider not detected')
+}
+
+// Check compatibility flags
+console.log('isConfluxPortal:', provider.isConfluxPortal) // true
+console.log('isFluent:', provider.isFluent) // true
+console.log('isOneKey:', provider.isOneKey) // true
+```
+
+---
+
+## Solicitar cuentas [#request-accounts]
+
+```typescript
+const accounts = await provider.request({
+  method: 'cfx_requestAccounts'
+})
+
+console.log('Connected:', accounts[0])
+```
+
+---
+
+## Comprobar la conexión [#check-connection]
+
+```typescript
+if (provider.isConnected()) {
+  const accounts = await provider.request({ method: 'cfx_accounts' })
+  console.log('Accounts:', accounts)
+}
+```
+
+---
+
+## Obtener el ID de cadena [#get-chain-id]
+
+```typescript
+const chainId = await provider.request({ method: 'cfx_chainId' })
+console.log('Chain ID:', chainId) // e.g., '0x405' for mainnet
+```
+
+---
+
+## Obtener la versión de red [#get-network-version]
+
+```typescript
+const networkId = await provider.request({ method: 'net_version' })
+console.log('Network ID:', networkId) // e.g., '1029' for mainnet
+```
+
+---
+
+## Obtener el saldo [#get-balance]
+
+```typescript
+const balance = await provider.request({
+  method: 'cfx_getBalance',
+  params: [address, 'latest_state']
+})
+
+console.log('Balance:', balance) // In Drip (1 CFX = 10^18 Drip)
+```
+
+---
+
+## Gestión de eventos [#event-handling]
+
+### Escuchar cambios de cuenta [#listen-for-account-changes]
+
+```typescript
+provider.on('accountsChanged', (accounts) => {
+  if (accounts.length === 0) {
+    console.log('Disconnected')
+  } else {
+    console.log('Account changed:', accounts[0])
+  }
+})
+```
+
+### Escuchar cambios de cadena [#listen-for-chain-changes]
+
+```typescript
+provider.on('chainChanged', (chainId) => {
+  console.log('Chain changed:', chainId)
+  // Recommend reloading the page
+  window.location.reload()
+})
+```
+
+### Escuchar conexiones [#listen-for-connection]
+
+```typescript
+provider.on('connect', ({ chainId, networkId }) => {
+  console.log('Connected to:', chainId, networkId)
+})
+
+provider.on('disconnect', () => {
+  console.log('Disconnected')
+})
+```
+
+---
+
+## Formato de dirección [#address-format]
+
+Conflux usa direcciones base32 (CIP-37):
+
+```typescript
+// Mainnet: cfx:...
+// Testnet: cfxtest:...
+
+// Example mainnet address
+const address = 'cfx:aak2rra2njvd77ezwjvx04kkds9fzagfe6ku8scz91'
+
+// Convert between formats using js-conflux-sdk
+import { format } from 'js-conflux-sdk'
+
+const hexAddress = format.hexAddress(address)
+const base32Address = format.address(hexAddress, 1029) // networkId
+```
+
+---
+
+## Redes [#networks]
+
+| Red | ID de cadena (hexadecimal) | ID de red |
+|---------|---------------|------------|
+| Red principal | `0x405` | 1029 |
+| Red de pruebas | `0x1` | 1 |

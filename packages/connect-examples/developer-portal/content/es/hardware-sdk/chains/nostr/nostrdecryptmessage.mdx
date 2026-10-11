@@ -1,0 +1,70 @@
+---
+title: "nostrDecryptMessage"
+---
+
+# nostrDecryptMessage
+
+### Requisitos [#requirements]
+
+* Versiones mínimas de firmware
+  * Touch: 4.6.0
+  * Classic/Mini: 3.5.0
+  * Classic1s: 3.6.0
+
+## Nostr: descifrar mensaje [#nostr-decrypt-message]
+
+Solicita el descifrado de un mensaje con la clave de la ruta especificada y la clave pública del otro participante.
+
+```typescript
+const result = await HardwareSDK.nostrDecryptMessage(connectId, deviceId, params);
+```
+
+### Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `5`. [leer más](/es/hardware-sdk/concepts/common-params#hd-path)
+* `pubkey` - _obligatorio_ `string`. La clave pública del otro participante.
+* `ciphertext` - _obligatorio_ `string` mensaje cifrado.
+* `showOnOneKey` - _opcional_ `boolean` Indica si se debe mostrar la solicitud en el dispositivo. El valor predeterminado es `true`.
+
+### Ejemplos [#examples]
+
+```typescript
+const response = await HardwareSDK.nostrDecryptMessage(
+  connectId,
+  deviceId,
+  {
+     path: "m/44'/1237'/0'/0/0",
+     pubkey: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
+     ciphertext: encryptedMessage,
+     showOnOneKey: true,
+  }
+);
+```
+
+Resultado
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: string;
+    pubkey: string;
+    ciphertext: string;
+    decryptedMessage: string;
+  }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

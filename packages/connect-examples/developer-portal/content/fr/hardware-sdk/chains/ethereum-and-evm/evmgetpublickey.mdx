@@ -1,0 +1,96 @@
+---
+title: "evmGetPublicKey"
+---
+
+# evmGetPublicKey
+
+## Ethereum : obtenir une clé publique [#ethereum-get-public-key]
+
+Renvoie la clé publique dérivée du chemin spécifié. Utilisez `showOnOneKey` pour demander confirmation sur l’appareil.
+
+```typescript
+const result = await HardwareSDK.evmGetPublicKey(connectId, deviceId, params);
+```
+
+## Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+### Clé publique unique [#single-public-key]
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `3`. [en savoir plus](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _facultatif_ `boolean` Indique s’il faut afficher la clé publique sur l’appareil. Valeur par défaut : `true`.
+* `chainId` - _facultatif_ `number` Le ChainId dans ETH est un identifiant unique d’un réseau Ethereum précis, utilisé pour distinguer les différentes versions de la blockchain. [Référence](https://github.com/ethereum-lists/chains/tree/master/\_data/chains).
+
+#### Plusieurs clés publiques [#multiple-public-keys]
+
+* `bundle` - tableau d’objets contenant les champs `path`, `chainId`, `showOnOneKey`
+
+### Exemple [#example]
+
+Renvoyer la clé publique du premier compte ethereum :
+
+```typescript
+HardwareSDK.evmGetPublicKey(connectId, deviceId, {
+    path: "m/44'/60'/0'/0/0",
+    showOnOneKey: true,
+    chainId: 1
+});
+```
+
+Renvoyer un lot de clés publiques de plusieurs comptes ethereum :
+
+```typescript
+HardwareSDK.evmGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/60'/0'/0/0", chainId: 1 }, // account 1
+        { path: "m/44'/60'/1'/0/0", chainId: 1 }, // account 2
+        { path: "m/44'/60'/2'/0/0", chainId: 1 }  // account 3
+    ]
+});
+```
+
+### Résultat [#result]
+
+Réponse pour une seule clé publique
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        xpub?: string,        // xpub in legacy format
+        pub: string, // hexadecimal public key
+        publicKey: string, // alias of pub
+    }
+}
+```
+
+[En savoir plus sur le format de sérialisation BIP32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization\_format)
+
+Réponse de clés publiques par lot
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, xpub, pub }, // account 1
+        { path, xpub, pub }, // account 2
+        { path, xpub, pub }, // account 3
+    ]
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+Pour les requêtes `bundle` avec `useBatch: true`, un parcours par lot pris en charge renvoie `{ path, pub, publicKey }` sans `xpub` ou `node`. Le parcours ordinaire renvoie la clé publique étendue et le nœud ; n’exigez pas ces champs dans une réponse par lot.

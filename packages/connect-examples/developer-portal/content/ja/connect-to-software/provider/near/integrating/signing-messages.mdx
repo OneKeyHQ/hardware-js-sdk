@@ -1,0 +1,26 @@
+---
+title: "メッセージへの署名"
+---
+
+<span id="signing-messages" />
+
+# メッセージへの署名
+
+OneKey に接続した Web アプリケーションは、特定のメッセージへの署名をユーザーに要求することもできます。
+
+署名対象のメッセージをユーザーに送るには、Web アプリケーションで次を行います:
+
+* UTF-8 エンコードされた文字列を用意します。
+* ユーザーの OneKey ウォレットで署名します。
+
+メソッドの呼び出しは `signatures` を含むオブジェクトの [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) を返します。
+
+```javascript
+const res = await provider.request({
+  method: 'near_signMessages',
+  params: {
+    messages: ['hello world', 'onekey near wallet'], // must be Array type
+  },
+});
+console.log('near_signMessages', res, res.signatures);
+```

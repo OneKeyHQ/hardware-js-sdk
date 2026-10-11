@@ -1,0 +1,62 @@
+---
+title: "Mobile et liens profonds"
+description: "Intégrez le portefeuille OneKey dans des applications web mobiles et des WebViews à l’aide de liens profonds"
+---
+
+<span id="mobile--deeplinks" />
+
+# Mobile et liens profonds
+
+Ouvrez OneKey depuis une dApp mobile avec un URI d’association WalletConnect. Un lien profond ouvre l’application du portefeuille ; la connexion n’aboutit qu’après l’approbation de la session WalletConnect par l’utilisateur.
+
+## Vue d’ensemble [#overview]
+
+Créez un nouvel URI d’association avec votre intégration WalletConnect, puis ouvrez l’un des liens ci-dessous à partir d’une action utilisateur. Maintenez la proposition de session active et attendez son approbation ou son rejet. Dans le navigateur de dApps OneKey, utilisez plutôt le fournisseur injecté pour la chaîne cible.
+
+## Formats de liens profonds [#deeplink-formats]
+
+### Schéma personnalisé [#custom-scheme]
+
+```
+onekey-wallet://wc?uri={encodeURIComponent(wcUri)}
+```
+
+### Lien universel [#universal-link]
+
+```
+https://app.onekey.so/wc/connect/wc?uri={encodeURIComponent(wcUri)}
+```
+
+> Testez l’ouverture de l’application et le mécanisme de repli sur les versions iOS/Android et les navigateurs pris en charge. L’installation de l’application, les paramètres de liens du système d’exploitation et les restrictions des navigateurs intégrés influent sur le résultat.
+
+## Exemple d’utilisation [#usage-example]
+
+```javascript
+// Generate WalletConnect URI from your dApp
+const wcUri = 'wc:a281...' // Your WalletConnect URI
+
+// Option 1: Custom scheme
+const customSchemeLink = `onekey-wallet://wc?uri=${encodeURIComponent(wcUri)}`
+
+// Option 2: Universal link (recommended)
+const universalLink = `https://app.onekey.so/wc/connect/wc?uri=${encodeURIComponent(wcUri)}`
+
+// Call this from the user's Connect button.
+function openOneKey() {
+  window.location.href = universalLink
+}
+```
+
+## Gestion de la connexion et du repli [#connection-and-fallback-handling]
+
+- Ouvrez le lien depuis un bouton de connexion explicite. Certains navigateurs bloquent le lancement d’applications sans action de l’utilisateur.
+- Gérez les événements d’approbation, de rejet, d’expiration et de déconnexion de session WalletConnect. Le simple retour au navigateur ne prouve pas qu’une session a été approuvée.
+- Proposez un QR code sur ordinateur et une option d’installation ou de nouvelle tentative si l’ouverture de l’application échoue. Ne supposez pas qu’un lien universel redirige toujours vers une boutique d’applications.
+- Générez un nouvel URI d’association lorsque le précédent expire. N’incluez pas d’URI d’association actif dans les outils d’analyse ou les journaux de l’application.
+- Privilégiez le parcours mobile de votre bibliothèque de connexion de portefeuilles lorsqu’il est disponible ; il gère l’association et le cycle de vie des sessions.
+
+## Voir aussi [#related]
+
+- [RainbowKit](/fr/connect-to-software/wallet-ui/rainbowkit/) - Gère automatiquement la détection des mobiles
+- [Web3Modal](/fr/connect-to-software/wallet-ui/web3modal/) - Prise en charge mobile intégrée
+- [API du fournisseur](/fr/connect-to-software/provider/eth/) - Intégration directe du fournisseur

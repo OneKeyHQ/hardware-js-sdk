@@ -1,0 +1,130 @@
+---
+title: "API-Referenz"
+description: "Vollständige API-Referenz für den TON-Provider von OneKey"
+---
+
+<span id="api-reference" />
+
+# API-Referenz
+
+Referenz der Methoden und Typen des TON-Providers von OneKey.
+
+---
+
+## Methoden [#methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `connect(version?, request?)` | Wallet verbinden |
+| `restoreConnection()` | Vorherige Sitzung wiederherstellen |
+| `disconnect()` | Wallet trennen |
+| `send(message)` | RPC-Anfrage senden |
+| `listen(callback)` | Auf Wallet-Ereignisse reagieren |
+
+---
+
+## Sendemethoden [#send-methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `sendTransaction` | TON senden oder mit Verträgen interagieren |
+| `signData` | Beliebige Datenzellen signieren |
+| `disconnect` | Über RPC trennen |
+
+---
+
+## Typen [#types]
+
+### Kontoinformationen [#account-info]
+
+```typescript
+interface AccountInfo {
+  address: string      // Raw address (0:<hex>)
+  network: string      // Network ID (-239 mainnet, -3 testnet)
+  publicKey: string    // Hex public key (no 0x)
+  walletStateInit: string // Base64 encoded state init
+}
+```
+
+### Transaktionsanfrage [#transaction-request]
+
+```typescript
+interface TransactionRequest {
+  valid_until?: number  // UNIX timestamp for validity
+  network?: string      // Network ID
+  from?: string         // Sender address
+  messages: Message[]   // Respect the wallet-advertised maximum
+}
+```
+
+### Nachricht [#message]
+
+```typescript
+interface Message {
+  address: string      // Recipient (raw format)
+  amount: string       // Amount in nanotons
+  payload?: string     // Base64 BOC for contract calls
+  stateInit?: string   // Base64 StateInit for deployment
+}
+```
+
+### Anfrage zum Signieren von Daten [#sign-data-request]
+
+```typescript
+interface SignDataRequest {
+  schema_crc: number   // Schema identifier
+  cell: string         // Base64 encoded cell
+  publicKey?: string   // Optional specific key
+}
+```
+
+### Ergebnis der Datensignierung [#sign-data-result]
+
+```typescript
+interface SignDataResult {
+  signature: string    // Base64 signature
+  timestamp: number    // UNIX timestamp (UTC)
+}
+```
+
+### Geräteinformationen [#device-info]
+
+```typescript
+interface DeviceInfo {
+  platform: string     // 'iphone' | 'android' | 'windows' | 'mac' | 'linux'
+  appName: string      // 'onekey'
+  appVersion: string   // Wallet version
+  maxProtocolVersion: number // 2
+  features: Array<string | { name: string; maxMessages?: number; [key: string]: unknown }> // Advertised capabilities
+}
+```
+
+---
+
+## Netzwerke [#networks]
+
+| Netzwerk | Netzwerk-ID |
+|---------|------------|
+| Mainnet | -239 |
+| Testnet | -3 |
+
+---
+
+## Ereignisse [#events]
+
+| Ereignis | Beschreibung |
+|-------|-------------|
+| `accountChanged` | Konto geändert |
+| `disconnect` | Wallet getrennt |
+
+---
+
+## Fehlercodes [#error-codes]
+
+| Code | Beschreibung |
+|------|-------------|
+| 0 | Unbekannter Fehler |
+| 1 | Fehlerhafte Anfrage |
+| 100 | Unbekannte App |
+| 300 | Nutzer hat die Anfrage abgelehnt |
+| 400 | Methode nicht unterstützt |

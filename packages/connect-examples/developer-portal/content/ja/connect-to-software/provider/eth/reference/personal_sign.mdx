@@ -1,0 +1,77 @@
+---
+title: "personal_sign"
+description: "Ethereum アカウントでメッセージに署名"
+---
+
+# personal_sign
+
+指定されたアカウントでメッセージに署名します。署名前にメッセージに `"\x19Ethereum Signed Message:\n"` というプレフィックスを付加することで、メッセージ署名を生トランザクションへの署名と区別します。
+
+---
+
+## パラメーター [#parameters]
+
+| インデックス | 型 | 説明 |
+|-------|------|-------------|
+| 0 | `string` | 署名するメッセージ (16 進数エンコード) |
+| 1 | `string` | 署名に使用するアドレス |
+
+---
+
+## 戻り値 [#returns]
+
+`string` - 署名 (65 バイトの 16 進数文字列)
+
+---
+
+## 例 [#example]
+
+```typescript
+const message = 'Hello, OneKey!'
+const hexMessage = '0x' + Array.from(new TextEncoder().encode(message), byte => byte.toString(16).padStart(2, '0')).join('')
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'personal_sign',
+  params: [hexMessage, accounts[0]]
+})
+
+console.log('Signature:', signature)
+```
+
+### ethers.js の使用 [#using-ethersjs]
+
+```typescript
+import { hashMessage, recoverAddress } from 'ethers'
+
+const message = 'Hello, OneKey!'
+const hexMessage = '0x' + Array.from(new TextEncoder().encode(message), byte => byte.toString(16).padStart(2, '0')).join('')
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'personal_sign',
+  params: [hexMessage, accounts[0]]
+})
+
+// Verify signature
+const recoveredAddress = recoverAddress(hashMessage(message), signature)
+console.log('Verified:', recoveredAddress.toLowerCase() === accounts[0].toLowerCase())
+```
+
+---
+
+## エラー [#errors]
+
+| コード | メッセージ | 説明 |
+|------|---------|-------------|
+| 4001 | ユーザーがリクエストを拒否 | ユーザーが署名リクエストを拒否 |
+| -32602 | 無効なパラメーター | 無効なメッセージまたはアドレス |
+
+---
+
+## 注意事項 [#notes]
+
+- メッセージは 16 進数エンコードし、`0x` プレフィックスを付ける必要があります
+- 実際に署名されるメッセージ: `"\x19Ethereum Signed Message:\n" + len(message) + message`
+- 型付きデータの署名には [eth_signTypedData_v4](/ja/connect-to-software/provider/eth/reference/eth_signTypedData_v4) を使用してください
+- 次で規定されています: [EIP-191](https://eips.ethereum.org/EIPS/eip-191)
+
+認証には、意図したドメイン、アカウント、有効期限、サーバーが発行する 1 回限りのチャレンジを検証してください。固定された例のメッセージに対する有効な署名だけでは、完全なサインインフローにはなりません。

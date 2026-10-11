@@ -288,7 +288,6 @@ function createCallbackAndResultSteps(locale) {
 }
 
 function createFlowSteps(locale, startEvent) {
-  const isEn = locale !== 'zh'
   const command = startEvent?.command ?? null
   const params = startEvent?.params ?? null
   const deviceType = normalizeDeviceType(startEvent?.deviceType)
@@ -305,7 +304,7 @@ function createFlowSteps(locale, startEvent) {
       id: 'example-code',
       selector: '[data-tour="example-code"]',
       placement: 'left',
-      tips: isEn ? `Command: ${command ?? '-'}` : `命令：${command ?? '-'}`,
+      tips: ui(locale, 'Command: {command}', '命令：{command}').replace('{command}', () => command ?? '-'),
       desc: ui(locale, "Try `btcGetAddress` or `btcSignMessage` for the full interactive experience.", "尝试 `btcGetAddress` 或 `btcSignMessage` 获得完整的交互体验。")
     }),
     ...createCallbackAndResultSteps(locale)

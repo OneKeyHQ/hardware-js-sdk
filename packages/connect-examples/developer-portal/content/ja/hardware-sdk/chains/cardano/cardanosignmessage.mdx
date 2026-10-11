@@ -1,0 +1,73 @@
+---
+title: "cardanoSignMessage"
+---
+
+# cardanoSignMessage
+
+## 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.1.0
+  * Classic/Mini: 3.0.0
+
+## Cardano: メッセージに署名 <a href="#ethereum-sign-message" id="ethereum-sign-message"></a> [#cardano-sign-message-]
+
+指定パスから導出した鍵でメッセージの署名を要求します。
+
+```typescript
+const result = await HardwareSDK.cardanoSignMessage(connectId, deviceId, params);
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`. [パス形式](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `message` - _必須_ `string` 署名するメッセージ。16 進数文字列にエンコードします。
+* `networkId` - _必須_ `Integer` メインネットは 1、テストネットは 0
+* `derivationType` - _必須_ `CardanoDerivationType` 列挙型。導出アルゴリズムを選択します。実行時のデフォルトは `ICARUS` (`1`).
+
+現在の TypeScript API では `derivationType` を明示する必要があります。実行時のデフォルトは ICARUS です。
+
+### 例 [#example]
+
+```typescript
+import { PROTO } from "@onekeyfe/hd-core";
+
+// Original message
+const message = "Hello World";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.cardanoSignMessage(connectId, deviceId, {
+    path: "m/1852'/1815'/0'/0/0",
+    message: messageHex,
+    networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS
+});
+```
+
+結果
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        key: string;
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

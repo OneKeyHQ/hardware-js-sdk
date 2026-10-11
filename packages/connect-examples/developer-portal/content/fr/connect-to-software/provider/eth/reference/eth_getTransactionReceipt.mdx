@@ -1,0 +1,127 @@
+---
+title: "eth_getTransactionReceipt"
+description: "Obtenir le reçu de transaction avec le résultat de l’exécution"
+---
+
+# eth_getTransactionReceipt
+
+Renvoie le reçu d’une transaction à partir de son hash. Le reçu contient des informations sur l’exécution de la transaction, dont le statut et les journaux.
+
+---
+
+## Paramètres [#parameters]
+
+| Indice | Type | Description |
+|-------|------|-------------|
+| 0 | `string` | Hash de transaction (32 octets) |
+
+---
+
+## Valeur de retour [#returns]
+
+`object | null` - Objet de reçu ou null si la transaction n’est pas encore minée
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `transactionHash` | `string` | Hash de transaction |
+| `transactionIndex` | `string` | Indice dans le bloc (hex) |
+| `blockHash` | `string` | Hash de bloc |
+| `blockNumber` | `string` | Numéro de bloc (hex) |
+| `from` | `string` | Adresse de l’expéditeur |
+| `to` | `string` | Adresse du destinataire |
+| `cumulativeGasUsed` | `string` | Gas total utilisé dans le bloc jusqu’à cette transaction |
+| `gasUsed` | `string` | Gas utilisé par cette transaction (hex) |
+| `contractAddress` | `string` | Adresse du contrat créé (le cas échéant) |
+| `logs` | `array` | Tableau d’objets de journal |
+| `logsBloom` | `string` | Filtre de Bloom pour les journaux |
+| `status` | `string` | `0x1` (réussite) ou `0x0` (échec) |
+| `effectiveGasPrice` | `string` | Prix du gas effectivement payé (hex) |
+
+---
+
+## Exemple [#example]
+
+```typescript
+const receipt = await window.$onekey.ethereum.request({
+  method: 'eth_getTransactionReceipt',
+  params: ['0x88df016429689c079f3b2f6ad39fa052532c56795b733da78a91ebe6a713944b']
+})
+
+if (receipt) {
+  const success = receipt.status === '0x1'
+  console.log('Transaction', success ? 'succeeded' : 'failed')
+  console.log('Gas used:', parseInt(receipt.gasUsed, 16))
+  console.log('Logs:', receipt.logs.length)
+}
+```
+
+### Attendre le reçu [#wait-for-receipt]
+
+```typescript
+async function waitForReceipt(txHash, timeout = 60000) {
+  const start = Date.now()
+
+  while (Date.now() - start < timeout) {
+    const receipt = await window.$onekey.ethereum.request({
+      method: 'eth_getTransactionReceipt',
+      params: [txHash]
+    })
+
+    if (receipt) {
+      return receipt
+    }
+
+    await new Promise(r => setTimeout(r, 2000))
+  }
+
+  throw new Error('Transaction receipt timeout')
+}
+
+// Usage
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [txParams]
+})
+
+const receipt = await waitForReceipt(txHash)
+console.log('Transaction status:', receipt.status === '0x1' ? 'Success' : 'Failed')
+```
+
+### Analyser les événements du contrat [#parse-contract-events]
+
+```typescript
+// Set tokenAddress to the intended ERC-20 contract before parsing its Transfer logs.
+const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+
+const transferLogs = receipt.logs.filter(
+  log => log.address.toLowerCase() === tokenAddress.toLowerCase()
+    && log.topics[0] === transferTopic
+    && log.topics.length === 3
+)
+
+transferLogs.forEach(log => {
+  const from = '0x' + log.topics[1].slice(26)
+  const to = '0x' + log.topics[2].slice(26)
+  const value = BigInt(log.data).toString()
+  console.log(`Transfer: ${from} -> ${to}: ${value}`)
+})
+```
+
+---
+
+## Erreurs [#errors]
+
+| Code | Message | Description |
+|------|---------|-------------|
+| -32602 | Paramètres non valides | Hash de transaction non valide |
+
+---
+
+## Remarques [#notes]
+
+- Renvoie `null` pour les transactions en attente (pas encore minées)
+- Champ `status` : `0x1` = réussite, `0x0` = annulée
+- `contractAddress` n’est présent que pour les transactions de création de contrat
+- Utilisez `logs` pour analyser les événements émis par la transaction
+
+Vérifiez le contrat émetteur et l’ABI attendue lors du décodage des journaux. Un sujet correspondant ne suffit pas à identifier un jeton, et ERC-721 utilise la même signature d’événement Transfer avec une disposition différente des champs indexés.

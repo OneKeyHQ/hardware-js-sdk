@@ -1,0 +1,67 @@
+---
+title: "Firma de datos"
+---
+
+<span id="signing-data" />
+
+# Firma de datos
+
+Usa `personal_sign` para un mensaje legible por personas o `eth_signTypedData_v4` para datos estructurados descritos por [EIP-712](https://eips.ethereum.org/EIPS/eip-712). Solicita firmas después de conectar una cuenta y explica qué está autorizando el usuario antes de abrir el aviso de la cartera.
+
+## Mensajes personales [#personal-messages]
+
+`personal_sign` recibe primero el mensaje codificado en hexadecimal y después la dirección del firmante. El valor devuelto es una cadena de firma. Una solicitud de firma no envía una transacción ni paga una comisión de red.
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+const [address] = await provider.request({ method: 'eth_requestAccounts' });
+const message = 'Sign in to example.com. Nonce: <SERVER_GENERATED_NONCE>';
+const bytes = new TextEncoder().encode(message);
+const data = '0x' + Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+
+try {
+  const signature = await provider.request({
+    method: 'personal_sign',
+    params: [data, address],
+  });
+  // Verify the signature and one-time challenge on your server.
+  console.log(signature);
+} catch (error) {
+  console.error(error.code, error.message);
+}
+```
+
+Para iniciar sesión, sustituye el valor de ejemplo por un desafío de un solo uso generado en el servidor y valida el dominio previsto, la caducidad y el firmante. Nunca consideres que la mera existencia de una firma autentica al usuario sin verificarla.
+
+## Datos tipados v4 [#typed-data-v4]
+
+Llama a `eth_signTypedData_v4` con `[address, JSON.stringify(typedData)]`. El objeto `typedData` contiene `types`, `primaryType`, `domain`, y `message`. Cada campo del mensaje debe coincidir con su tipo declarado.
+
+| Campo del dominio | Finalidad |
+| --- | --- |
+| `name` | Nombre legible de la aplicación o del protocolo |
+| `version` | Versión del dominio de firma |
+| `chainId` | Cadena a la que se destina la firma |
+| `verifyingContract` | Dirección del contrato que verifica la firma; es una dirección, no una URL |
+| `salt` | Separador de dominio opcional cuando lo requiere el protocolo |
+
+La separación de dominios ayuda a distinguir los contextos de firma. Aun así, la aplicación o el contrato verificador debe validar el dominio y aplicar su propia protección contra ataques de repetición; EIP-712 no ofrece esa protección por sí solo.
+
+```javascript
+// `typedData` must be built from your protocol's complete EIP-712 schema.
+const signature = await provider.request({
+  method: 'eth_signTypedData_v4',
+  params: [address, JSON.stringify(typedData)],
+});
+```
+
+## Métodos de firma heredados [#legacy-signing-methods]
+
+Las integraciones existentes pueden usar `eth_signTypedData` o `eth_signTypedData_v3`. Sus codificaciones difieren de v4; cambiar el método RPC requiere también cambiar y probar el verificador. Los nombres de los métodos RPC incluyen el `eth_` como prefijo.
+
+Evita `eth_sign` para iniciar sesión en aplicaciones. Firma datos opacos y puede dificultar la verificación de la intención del usuario. La compatibilidad de métodos puede variar según el tipo de cuenta, el modelo de hardware, el firmware y la versión de la cartera; gestiona los errores de método no compatible en lugar de asumir que todas las cuentas conectadas pueden firmar cualquier formato.
+
+## Ejemplo [#example]
+
+[Abrir ejemplo](https://codesandbox.io/embed/ethereum-provider-signdata-demo-67nn3q?autoresize=1&fontsize=14&hidenavigation=1&theme=dark)

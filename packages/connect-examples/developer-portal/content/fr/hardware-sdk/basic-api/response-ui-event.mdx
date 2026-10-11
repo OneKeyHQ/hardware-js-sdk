@@ -1,0 +1,58 @@
+---
+description: "Répondez aux demandes de saisie actuelles du SDK avec les champs de corrélation et distinguez les notifications de l’appareil."
+title: "Répondre aux événements d’interface"
+---
+
+<span id="respond-to-ui-events" />
+
+# Répondre aux événements d’interface
+
+Utilisez `HardwareSDK.uiResponse()` pour répondre à une demande de saisie SDK en attente. Cette méthode renvoie `void` ; attendez la Promise initiale d’adresse, de signature ou d’opération sur l’appareil pour obtenir le résultat de l’opération.
+
+Enregistrez le [gestionnaire d’événements d’interface](/fr/hardware-sdk/core-api-guide#events-ui) avant un appel protégé. Répondez uniquement à la demande actuelle et conservez `payload.responseCorrelation` lorsque la demande l’inclut. Les champs de corrélation `interactionId` et `deviceId` appartiennent au niveau supérieur de la réponse ; ils ne remplacent pas l’argument positionnel de portefeuille `deviceId` dans les appels de signature.
+
+## Saisie du PIN [#pin-input]
+
+Ce fragment se place dans le gestionnaire `UI_REQUEST.REQUEST_PIN`. `message` est cette demande, et `pinValue` est la séquence complète de positions du PIN à l’aveugle recueillie par votre interface.
+
+```ts
+HardwareSDK.uiResponse({
+  ...message.payload.responseCorrelation,
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: pinValue,
+});
+```
+
+Pour une demande de saisie sur l’hôte proposant la saisie sur l’appareil, la valeur de réponse est `@@ONEKEY_INPUT_PIN_IN_DEVICE`. Une demande marquée `deviceOnly`, `ButtonRequest_PinEntry`, ou `ButtonRequest_AttachPin` est une notification de saisie sur l’appareil : affichez les instructions et attendez sans répondre.
+
+Voir [PIN](/fr/hardware-sdk/concepts/pin) pour la correspondance du clavier à l’aveugle et les contraintes propres aux modèles.
+
+## Saisie de la phrase secrète [#passphrase-input]
+
+Ce fragment se place dans `UI_REQUEST.REQUEST_PASSPHRASE`. `passphraseValue` est fourni par la saisie actuelle de l’utilisateur, jamais par une valeur codée en dur ou journalisée.
+
+```ts
+HardwareSDK.uiResponse({
+  ...message.payload.responseCorrelation,
+  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+  payload: {
+    value: passphraseValue,
+    passphraseOnDevice: false,
+    save: false,
+  },
+});
+```
+
+Pour choisir la saisie sur l’appareil, utilisez `{ value: '', passphraseOnDevice: true, save: false }` à la place. Respectez `deviceOnly` en sélectionnant la saisie sur l’appareil. `REQUEST_PASSPHRASE_ON_DEVICE` est une notification ultérieure qui ne nécessite aucune réponse.
+
+Excluez les secrets saisis sur l’hôte des journaux, analyses, stockages persistants et rapports d’erreurs. Utilisez `save: false` sauf si l’utilisateur choisit explicitement un parcours pris en charge de mise en cache de session.
+
+## Annuler et fermer [#cancel-and-close]
+
+Annulez l’opération sur la connexion sélectionnée avec `HardwareSDK.cancel(connectId)` lorsque l’utilisateur annule la saisie. Invalidez la soumission de la fenêtre en attente lorsque l’opération se termine ou que le SDK ferme son interface, pour qu’une réponse tardive ne puisse pas répondre à une autre demande.
+
+`REQUEST_BUTTON`, la progression du micrologiciel et les demandes de PIN uniquement sur l’appareil n’acceptent pas de réponse « OK ». Un bouton sur l’hôte ne doit jamais remplacer une confirmation sur l’appareil.
+
+## Autres demandes de saisie [#other-input-requests]
+
+Les demandes WebUSB de sélection du bootloader utilisent leur réponse correspondante `UI_RESPONSE.SELECT_DEVICE_*` et un ID d’appareil sélectionné dans `payload`. L’union publique [`UiResponseEvent`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/events/ui-response.ts) définit les structures acceptées. Les API de cycle de vie telles que `uiResponse` n’acceptent pas les paramètres généraux présentés dans [Paramètres communs](/fr/hardware-sdk/concepts/common-params).

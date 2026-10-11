@@ -1,0 +1,129 @@
+---
+title: "Referencia de la API"
+description: "Referencia completa de la API del proveedor de Sui de OneKey"
+---
+
+<span id="api-reference" />
+
+# Referencia de la API
+
+Referencia de los métodos y tipos del proveedor de Sui de OneKey.
+
+---
+
+## Métodos [#methods]
+
+| Método | Descripción |
+|--------|-------------|
+| `hasPermissions()` | Comprobar si está conectado |
+| `requestPermissions()` | Solicitar conexión |
+| `disconnect()` | Desconectar la cartera |
+| `getAccounts()` | Obtener las cuentas conectadas |
+| `getActiveChain()` | Obtener la cadena actual |
+| `isConnected()` | Comprobar el estado de conexión |
+| `signAndExecuteTransactionBlock(input)` | Firmar y ejecutar una transacción |
+| `signTransactionBlock(input)` | Solo firmar una transacción |
+| `signAndExecuteTransaction(input)` | Firmar y ejecutar (API nueva) |
+| `signTransaction(input)` | Firmar una transacción (API nueva) |
+| `signMessage(input)` | Firmar un mensaje (heredado) |
+| `signPersonalMessage(input)` | Firmar un mensaje personal |
+| `onAccountChange(callback)` | Escuchar cambios de cuenta |
+| `onNetworkChange(callback)` | Escuchar cambios de red |
+
+---
+
+## Tipos [#types]
+
+### Cuenta de cartera [#wallet-account]
+
+`getAccounts()` devuelve `AccountInfo[]`. Las entradas de firma requieren la cuenta de Wallet Standard `WalletAccount`, cuyo campo `publicKey` es una matriz de bytes y que también incluye `chains` y `features`. Obtenla mediante `standard:connect`; no conviertas `AccountInfo` a `WalletAccount`.
+
+```typescript
+import type { WalletAccount, IdentifierString } from '@mysten/wallet-standard'
+import type { Transaction } from '@mysten/sui/transactions'
+
+// provider.getAccounts()
+interface AccountInfo {
+  address: string
+  publicKey: string // Hex-encoded public key
+}
+```
+
+### Entrada de firma y ejecución de un bloque de transacción [#sign-and-execute-transaction-block-input]
+
+El proveedor inyectado actual no reenvía `options` en `signAndExecuteTransactionBlock`. Consulta el digest devuelto con un cliente Sui en la misma cadena para solicitar efectos, eventos o cambios de objetos.
+
+```typescript
+interface SignAndExecuteTransactionBlockInput {
+  account: WalletAccount
+  chain: IdentifierString
+  transactionBlock: Transaction
+  options?: {
+    showEffects?: boolean
+    showEvents?: boolean
+    showObjectChanges?: boolean
+    showBalanceChanges?: boolean
+    showInput?: boolean
+    showRawInput?: boolean
+  }
+}
+```
+
+### Salida de firma de un bloque de transacción [#sign-transaction-block-output]
+
+```typescript
+interface SignTransactionBlockOutput {
+  transactionBlockBytes: string
+  signature: string
+}
+```
+
+### Entrada de firma de mensaje personal [#sign-personal-message-input]
+
+```typescript
+interface SignPersonalMessageInput {
+  account: WalletAccount
+  chain?: IdentifierString
+  message: Uint8Array
+}
+```
+
+### Salida de firma de mensaje personal [#sign-personal-message-output]
+
+```typescript
+interface SignPersonalMessageOutput {
+  signature: string
+  bytes: string
+}
+```
+
+---
+
+## Cadenas compatibles [#supported-chains]
+
+| Cadena | Identificador |
+|-------|------------|
+| Red principal | `sui:mainnet` |
+| Red de pruebas | `sui:testnet` |
+| Red de desarrollo | `sui:devnet` |
+
+---
+
+## Eventos [#events]
+
+| Evento | Parámetros del callback | Descripción |
+|-------|---------------------|-------------|
+| `accountChanged` | `{ address, publicKey } \| null` | Cuenta cambiada |
+| `networkChange` | `network: string \| null` | Red cambiada |
+| `connect` | `address: string` | Conectado |
+| `disconnect` | - | Desconectado |
+
+---
+
+## Códigos de error [#error-codes]
+
+| Código | Descripción |
+|------|-------------|
+| 4001 | El usuario rechazó la solicitud |
+| 4100 | Sin autorización |
+| -32603 | Error interno |

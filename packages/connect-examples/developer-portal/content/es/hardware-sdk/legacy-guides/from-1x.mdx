@@ -1,0 +1,173 @@
+---
+description: "Migra las integraciones de Hardware SDK 1.1.x al estado normalizado del dispositivo, las sesiones de cartera explícitas y Protocol V2."
+title: "De 1.1.x a 1.2.x"
+---
+
+<span id="migrate-from-11x-to-12x" />
+
+# Migrar de 1.1.x a 1.2.x
+
+Esta página está dirigida a aplicaciones de terceros que ya usan Hardware SDK **1.1.x**. El destino de esta migración es **1.2.x**.
+
+Mantienes los mismos métodos de JavaScript. Core gestiona Protocol V2 (Pro 2 / Neo) internamente. No añadas un segundo SDK.
+
+Los proyectos nuevos deben omitir esta página y usar [Primeros pasos](/es/hardware-sdk/getting-started).
+
+## Lo que no cambia [#what-stays-the-same]
+
+- Estructura de las llamadas: `HardwareSDK.method(connectId, deviceId?, params)` → `{ success, payload }`
+- Métodos de cadenas (`evmGetAddress`, `btcSignTransaction`, …)
+- `init({ env })` sigue seleccionando **transporte** (USB / BLE / bajo nivel), no Protocol V1 o V2
+- `UI_EVENT` para los avisos; `uiResponse` solo para solicitudes de entrada, no para notificaciones de botón
+
+## Actualizar [#upgrade]
+
+```bash
+npm i --save-exact @onekeyfe/hd-common-connect-sdk@1.2
+```
+
+Fija todos los paquetes `@onekeyfe/hd-*` en la misma versión 1.2.x. Si todavía integras `@onekeyfe/hd-web-sdk`, **omite `connectSrc`** para que el iframe coincida con el paquete instalado.
+
+No mezcles `@onekeyfe/hd-web-sdk` y `@onekeyfe/hd-common-connect-sdk` en un mismo entorno de ejecución.
+
+## Sustituye estas API [#replace-these-apis]
+
+| 1.1.x | 1.2.x | Notas |
+| --- | --- | --- |
+| `getFeatures()` | [`getDeviceState()`](/es/hardware-sdk/basic-api/get-device-state) | Consulta `payload.identity.deviceId`, no el texto de `payload.device_id` |
+| `getOnekeyFeatures()` | `getDeviceState({ scope: 'firmware' })` | Instantánea de versión / identidad |
+| `getPassphraseState()` | [`openWalletSession({ mode })`](/es/hardware-sdk/basic-api/open-wallet-session) | `standard` o `select-hidden` una sola vez |
+| `keepSession` | **sin cambios** | Solo retención del transporte. **No** lo elimines ni lo sustituyas por `passphraseState` / `openWalletSession`. |
+| firmware `session_id` en tu base de datos | **no lo guardes** | Core lo mantiene internamente |
+| `env: 'web'` + Bridge | `env: 'webusb'` | Consulta [Bridge → WebUSB](/es/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb) |
+| `firmwareUpdateV2` / `V3` en Pro 2 / Neo | [`firmwareUpdateV4`](/es/hardware-sdk/device-api/firmwareupdatev4) | Classic / Mini / Touch / Pro siguen usando V2 / V3 |
+
+`getFeatures` sigue disponible solo en Protocol V1 y se rechaza en Protocol V2. `getPassphraseState` sigue siendo una API de compatibilidad. El código nuevo debe usar los métodos que la sustituyen.
+
+El SDK no admite `openWalletSession({ mode: 'resume-hidden' })`. Una vez que tengas una asociación, las llamadas posteriores de dirección / firma que incluyan `passphraseState` reanudan la sesión dentro de Core.
+
+## 1. Instantánea del dispositivo [#1-device-snapshot]
+
+**1.1.x**
+
+```ts
+const features = await HardwareSDK.getFeatures(connectId);
+if (!features.success) throw new Error(features.payload.error);
+const deviceId = features.payload.device_id;
+```
+
+**1.2.x**
+
+```ts
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+```
+
+`searchDevices` sigue siendo `{ success, payload }`. Comprueba `success` antes de interpretar `payload` como la lista de dispositivos.
+
+## 2. Sesión de cartera [#2-wallet-session]
+
+**1.1.x** — abre una cartera oculta y sigue pasando su huella en las llamadas:
+
+```ts
+const ps = await HardwareSDK.getPassphraseState(connectId, {
+  initSession: true,
+});
+if (!ps.success) throw new Error(ps.payload.error);
+if (typeof ps.payload !== "string" || !ps.payload) throw new Error("No hidden wallet fingerprint");
+const passphraseState = ps.payload;
+
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  passphraseState,
+});
+```
+
+**1.2.x** — abre una vez con un modo explícito y después pasa la huella a los métodos:
+
+```ts
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
+
+// Standard wallet
+const standard = await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.Standard,
+});
+if (!standard.success) throw new Error(standard.payload.error);
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+
+// Hidden wallet — user selects on the device
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.SelectHidden,
+});
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden') {
+  throw new Error('A hidden wallet was not opened');
+}
+const hiddenDeviceId = opened.payload.deviceId;
+const passphraseState = opened.payload.passphraseState;
+
+await HardwareSDK.evmGetAddress(connectId, hiddenDeviceId, {
+  path: "m/44'/60'/0'/0/0",
+  passphraseState,
+});
+```
+
+No mezcles `openWalletSession({ mode })` con `useEmptyPassphrase` / `initSession` en la **misma** llamada.
+
+Si omites `passphraseState` en una cartera oculta, la llamada de dirección / firma puede completarse en la cartera **estándar** sin ningún error.
+
+Contrato: [Sesiones de cartera](/es/hardware-sdk/concepts/wallet-session).
+
+## 3. Protocol V1 y V2 [#3-protocol-v1-and-v2]
+
+Classic / Mini / Touch / Pro siguen usando Protocol V1. Pro 2 / Neo usan Protocol V2. Tu aplicación sigue llamando a los mismos métodos.
+
+El SDK establece `connectProtocol` a partir de una **consulta al dispositivo conectado**. No deduzcas V1/V2 a partir del PID de USB, el nombre BLE ni la carcasa.
+
+Pasar `connectProtocol` en una llamada constituye una expectativa estricta: el SDK no cambiará de protocolo de forma silenciosa.
+
+Las cadenas exclusivas de V1 (Stellar, Alephium, Nexa, Dynex, Nervos, SCDO, Benfen y la cadena Neo) **no son compatibles** con Pro 2 / Neo. Consulta [Protocol V1 y V2](/es/hardware-sdk/concepts/protocol) y [Compatibilidad de cadenas](/es/hardware-sdk/concepts/chain-support).
+
+## 4. Firmware [#4-firmware]
+
+| Dispositivo | API de 1.2.x |
+| --- | --- |
+| Classic / Mini / Touch | `firmwareUpdateV2` |
+| Pro | `firmwareUpdateV3` |
+| Pro 2 / Neo | `firmwareUpdateV4` |
+
+No repitas una actualización de firmware, un borrado ni una firma después de una interrupción del transporte.
+
+## 5. Transporte [#5-transport]
+
+Si todavía usas OneKey Bridge (`env: 'web'` + `checkBridgeStatus`), migra a WebUSB:
+
+- Recomendado: [Bridge → `@onekeyfe/hd-common-connect-sdk`](/es/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb)
+- Conservar el iframe: [Bridge → `@onekeyfe/hd-web-sdk`](/es/hardware-sdk/legacy-guides/migrate-bridge-to-webusb)
+
+WebUSB necesita HTTPS y una acción del usuario. BLE necesita permiso de Bluetooth del sistema operativo.
+
+## Lista de comprobación [#checklist]
+
+1. Actualiza todos los paquetes `@onekeyfe/hd-*` a la misma versión 1.2.x.
+2. Sustituye `getFeatures` / `getOnekeyFeatures` con `getDeviceState`.
+3. Sustituye `getPassphraseState` con `openWalletSession({ mode: 'standard' | 'select-hidden' })`.
+4. Guarda de forma persistente solo `deviceId + passphraseState`. Deja de guardar el valor de firmware `session_id`.
+5. Pasa `passphraseState` o `useEmptyPassphrase: true` en cada llamada posterior de dirección o firma.
+6. Conserva `keepSession` durante firmas consecutivas por USB, comprobaciones seguidas de actualizaciones y operaciones de firmware por BLE en Electron. No es un indicador de sesión de cartera.
+7. Ejecuta las llamadas de cada dispositivo en serie.
+8. Confirma la cobertura de cadenas de Pro 2 / Neo antes de ofrecer compatibilidad con esos dispositivos.
+
+## Siguiente [#next]
+
+- [Primeros pasos](/es/hardware-sdk/getting-started)
+- [Guía de la API Core](/es/hardware-sdk/core-api-guide)
+- [Sesiones de cartera](/es/hardware-sdk/concepts/wallet-session)
+- [Reconexión y liberación de recursos](/es/hardware-sdk/transport/reconnect)
+
+En Protocol V1, `select-hidden` puede devolver una cartera estándar cuando la protección por frase de contraseña está desactivada. Comprueba `walletType` antes de guardar o usar `passphraseState`.

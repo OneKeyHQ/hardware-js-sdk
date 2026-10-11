@@ -1,0 +1,24 @@
+---
+title: "Transaktionen senden"
+---
+
+<span id="sending-transactions" />
+
+# Transaktionen senden
+
+Sobald die Webanwendung mit OneKey verbunden ist, kann sie mit Erlaubnis des Nutzers Transaktionen in dessen Namen senden.
+
+Zum Senden einer Transaktion muss die Webanwendung:
+
+* Eine oder mehrere unsignierte Transaktionen erstellen.
+* Diese von der OneKey-Wallet des Nutzers signieren und an das Netzwerk senden lassen.
+
+Für weitere Informationen zur Funktionsweise von Transaktionen auf Near empfehlen wir die `near-api-js` [Dokumentation](https://docs.near.org/tools/near-api) sowie die offizielle [Near-Dokumentation](https://docs.near.org/).
+
+[create-transaction.md](/de/connect-to-software/provider/near/integrating/sending-transactions/create-transaction)
+
+[sign-and-send-transaction.md](/de/connect-to-software/provider/near/integrating/sending-transactions/sign-and-send-transaction)
+
+Zum Signieren ohne Übertragung verwenden Sie die reine Signiermethode und reichen die signierte Transaktion aus Ihrer Anwendung ein.
+
+[signing-transaction.md](/de/connect-to-software/provider/near/integrating/sending-transactions/signing-transaction)

@@ -47,7 +47,7 @@
       "zh": "c49d8969bc7c54925d84422b060e5d0cb8407b1489eaa5a1ed19c4e7250b0e43"
     },
     "air-gap/basic-api/cryptohdkey.mdx": {
-      "en": "a42cb9043733beb66f1f9f19b588191a5e743c26088e83e867486ac586048f49",
+      "en": "d1f0865deb0b9b172c0f07358450b9a1ecd737bc04960da883d559de92eaaa38",
       "zh": "5716ce9330193317019e7e5fafa12a4ed23f401b6b0fa84f57fec8982b246814"
     },
     "air-gap/basic-api/cryptokeypath.mdx": {
@@ -87,8 +87,8 @@
       "zh": "e554d8cab560f172a1a7f0b8af817ce6924d4e7f85395d85b11257fc573145f5"
     },
     "changelog.mdx": {
-      "en": "b6ac07949ba61b476d6a262f609396af3cbee95686c130e7ec9c9b30c3a56104",
-      "zh": "ccdfd2dc950069ceb8dfb7f9bbfa7a5027415c6cbc9f39f021e04283ea10c4cc"
+      "en": "4d4c8fcbcddc220b543b7b4006f7eab130cd5fb52c484c71b293ccc49f9a28f7",
+      "zh": "0a04f3a6747744bdad1fa5540b6e308c76531928535c9561f428808e9c1cbf4e"
     },
     "connect-to-software/index.mdx": {
       "en": "d7e966a12847352a626bf73e5a695a84e8eae139518b93eb1120af7a2095a9c1",
@@ -671,7 +671,7 @@
       "zh": "c5bfc7e528b29d7bb7b1c8f4c3abc71338156399a7d6ae5eeb40b96d055db104"
     },
     "connect-to-software/wallet-ui/wallet-kits.mdx": {
-      "en": "5573610328cb0f88609f2e7c05c05a47b0cbf36790dc7a1d313497eb06e7224c",
+      "en": "6a4ca1cfd5e7ec47d71aac5b1caeaf587d188127f12c545bfc47f8416182fdbb",
       "zh": "bcdb618c7ebeeeb96fc7d5a7588f8ffe3f6c0d637bab67d6506aa539c5fc824c"
     },
     "connect-to-software/wallet-ui/web3-onboard.mdx": {
@@ -771,7 +771,7 @@
       "zh": "a563609777c617ed531104438b907983b6152eb988e5b33ffd70c9b7329a47da"
     },
     "hardware-sdk/chains/benfen/benfensigntransaction.mdx": {
-      "en": "93427845cc93877a2526207a5ab53e47101d4e246dfedf6b7351353ec3640fa9",
+      "en": "20280d2cce69eaf88e09dbcbcd3dd65d149481004ba4e4e208b3e60386d6fc1c",
       "zh": "4c956fa4c928b74d32d5ee561f6cb9d5646aa698ecada4cbcd5ebb2b28962c92"
     },
     "hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress.mdx": {
@@ -955,7 +955,7 @@
       "zh": "8ad5580b76c3c84b3ac0f7a860f954bca5496c3347b19f936885463ff50cc692"
     },
     "hardware-sdk/chains/scdo/scdogetaddress.mdx": {
-      "en": "c68c0a19cef8a77dcfd24be864b685338b9799f4dd32d0709c5588a08f2ac2ef",
+      "en": "e4e15a4f699e9f1bc07d7ee661607a04eb12b25dd1d7390de724215101166a4d",
       "zh": "28219f85194afc31573651e883989fbbacbf1600595e89c0d93c9f0853cff4a6"
     },
     "hardware-sdk/chains/scdo/scdosignmessage.mdx": {
@@ -963,7 +963,7 @@
       "zh": "6e7054b6e4acb2cd954412e13e7fd195ea9a4fb98caabfd9f975e855e3d2405f"
     },
     "hardware-sdk/chains/scdo/scdosigntransaction.mdx": {
-      "en": "413299a8eb619fbc2cf159b9e0928daafb2a87b1a887df5f3a7b72a0b73069a5",
+      "en": "21dbce66299010be818f22aa84e969db63925ed0fb08651ca1d5423a98c825d2",
       "zh": "2d117b1fe948990fe6de808eba49e44023a0f95b89dd669a5ccadb2cfacdad91"
     },
     "hardware-sdk/chains/solana/solgetaddress.mdx": {
@@ -1135,8 +1135,8 @@
       "zh": "2ded59eead5bddfc902d925451fc452232d4ea42c3e053a0428d5214907df4b5"
     },
     "hardware-sdk/getting-started.mdx": {
-      "en": "3db9be5ef34f466a9cf945fc664eba8b36abdc01e6602e79c49caca1962880dd",
-      "zh": "486eee45bc22acc0b054f14fec44ddf24f44c4488c34bfc5d0da9c4daccdb6db"
+      "en": "5016e5069384183a9c35aae2929ee2e1c53737dcbf0d429c709be5322d7962cc",
+      "zh": "433cfaa37a816fd9972952504412ba674a468d29d06427a0ddb28b7e1ca5fb0a"
     },
     "hardware-sdk/index.mdx": {
       "en": "eb2f9c74271a5ee00d82c4b1c1206370ccb4394785c4646fa4aeb273aa59f9bd",
@@ -1183,7 +1183,7 @@
       "zh": "335938d4732ab77da2d40bb3ea014d53b7b9456f9206b27e3e3d32b57ed42df5"
     },
     "hardware-sdk/transport/flutter.mdx": {
-      "en": "636f332a87a785c5ea83ce6ff0813101c65a57e10b9a9e713d13cb90bb331a8a",
+      "en": "8b1caa9fc6e297660ef025410a6ed3355b08b35e61e9a737c8d7b764b0869a54",
       "zh": "6f7ae84c1b8f16b120b7254dc5a10b8b48e3b5cb5dc6a11007dc076598ab73c9"
     },
     "hardware-sdk/transport/index.mdx": {

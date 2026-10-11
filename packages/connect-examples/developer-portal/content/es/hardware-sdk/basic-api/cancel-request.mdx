@@ -1,0 +1,85 @@
+---
+description: "Cancela el trabajo del SDK en una conexión seleccionada y distingue la cancelación del cierre del transporte."
+title: "Cancelar una solicitud"
+---
+
+<span id="cancel-request" />
+
+# Cancelar una solicitud
+
+## Descripción general [#overview]
+
+`cancel(connectId)` cancela las solicitudes del SDK en cola y activas asociadas a esa conexión y cierra la interfaz pendiente del SDK. Si se omite `connectId`, cancela todas las solicitudes pendientes. Úsalo cuando el usuario cancele una solicitud de PIN o passphrase, abandone el flujo o se alcance el tiempo de espera de la aplicación.
+
+## Método [#method]
+
+```typescript
+HardwareSDK.cancel(connectId);
+// Cancel all pending requests:
+HardwareSDK.cancel();
+```
+
+### Parámetros [#parameters]
+
+| Parámetro | Tipo | Obligatorio | Descripción |
+|-----------|------|----------|-------------|
+| `connectId` | `string` | No | Conexión de destino; omítela para cancelar todas las solicitudes pendientes. |
+
+### Valor devuelto [#return-value]
+
+`cancel()` devuelve `void`. Espera la Promise del método original para observar el resultado. El SDK público normalmente resuelve una solicitud cancelada con `success: false`; la cancelación de la cola usa `HardwareErrorCode.CallQueueActionCancelled` (`822`). Un rechazo del dispositivo o un error que se adelante a la cancelación puede devolver otro código. No compares el texto del mensaje de error ni supongas que toda cancelación tiene el mismo código.
+
+## Ejemplos [#examples]
+
+### Cancelación básica [#basic-cancellation]
+
+```typescript
+import type { EVMSignTransactionParams } from '@onekeyfe/hd-core';
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+
+// Use a fully prepared transaction from your application's transaction builder.
+declare const params: EVMSignTransactionParams;
+const signPromise = HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+
+// Invoke from the user's Cancel action.
+HardwareSDK.cancel(connectId);
+
+const result = await signPromise;
+if (!result.success) {
+  if (result.payload.code === HardwareErrorCode.CallQueueActionCancelled) {
+    // Close the cancelled operation's UI.
+  } else {
+    throw new Error(result.payload.error);
+  }
+}
+```
+
+### Cancelar por tiempo de espera [#cancel-with-timeout]
+
+Este temporizador cancela todas las solicitudes pendientes en la conexión seleccionada, por lo que debes ejecutar las operaciones de cada dispositivo de forma secuencial.
+
+```typescript
+import type { EVMSignTransactionParams } from '@onekeyfe/hd-core';
+
+async function signWithTimeout(
+  connectId: string,
+  deviceId: string,
+  params: EVMSignTransactionParams,
+  timeoutMs = 60_000,
+) {
+  const timer = setTimeout(() => HardwareSDK.cancel(connectId), timeoutMs);
+  try {
+    return await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+```
+
+## Cancelación frente a cierre del transporte [#cancel-vs-transport-teardown]
+
+La cancelación interrumpe la operación y puede activar la limpieza del dispositivo o del enlace. No garantiza que la conexión siga siendo utilizable ni que se pueda iniciar otra llamada de inmediato. Espera al resultado original; si se perdió el enlace, vuelve a detectar el dispositivo y actualiza `getDeviceState` antes de otra acción del usuario. No repitas automáticamente firmas ni actualizaciones de firmware.
+
+Usa `HardwareSDK.dispose()` al cerrar el SDK o cambiar de transporte, y después `init()` antes de volver a usarlo. Una desconexión física se comunica mediante `DEVICE.DISCONNECT`; las llamadas pendientes a métodos públicos devuelven resultados de error.
+
+Consulta [Reconexión y liberación de recursos](/es/hardware-sdk/transport/reconnect) y [Códigos de error](/es/hardware-sdk/core-api-guide#error-codes).

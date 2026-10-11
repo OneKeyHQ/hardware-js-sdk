@@ -1,0 +1,56 @@
+---
+title: "nearSignTransaction"
+---
+
+# nearSignTransaction
+
+## Near: トランザクションに署名 [#near-sign-transaction]
+
+指定パスから導出した鍵でトランザクションの署名を要求します。ユーザーはデバイス上でリクエストを確認して承認します。
+
+```typescript
+const result = await HardwareSDK.nearSignTransaction(connectId, deviceId, params);
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`. [パス形式](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `rawTx` - _必須_ `string` 16 進数文字列にエンコードされたシリアライズ済みトランザクション。
+
+### 例 [#examples]
+
+```typescript
+const response = await HardwareSDK.nearSignTransaction(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/397'/0'/0'/0'",
+    rawTx: "400000003630323130393034396561313633656561326634386365616238303634363932373538323730323938333863666163303865633463363330303431353639613600602109049ea163eea2f48ceab806469275827029838cfac08ec4c630041569a644255eea2d4200004000000034376464643364346536393632343535386266313135643438313763336566303861386264393864313832666466666637373465353065643937626637626437d2a5c8e15cadc0476f5f07a02b2a3b9c1699847996b1bc55142b881a3ff1accd010000000301000000000000000000000000000000"
+  }
+);
+```
+
+結果
+
+```typescript
+{
+  success: true,
+  payload: {
+    signature: string,
+  }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

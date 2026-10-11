@@ -1,0 +1,143 @@
+---
+description: "Implementa un plugin BLE nativo con fragmentos ordenados, capacidad de escritura y tramas de protocolo gestionadas por el SDK."
+title: "Plugin de transporte de bajo nivel"
+---
+
+<span id="low-level-transport-plugin" />
+
+# Plugin de transporte de bajo nivel
+
+> Úsalo solo cuando WebUSB / React Native BLE / los adaptadores nativos oficiales no cubran tu caso de uso. Tendrás que gestionar el ciclo de vida BLE nativo y las E/S ordenadas, por lo que debes prever un mayor coste de mantenimiento.
+
+> **Nota:** El entorno `lowlevel` y `LowlevelTransportSharedPlugin` están diseñados exclusivamente para la comunicación **BLE (Bluetooth)**. Para la comunicación **USB** en entornos Node.js/CLI, usa `NodeUsbTransport` (entorno `node-usb`) en su lugar: gestiona la codificación del protocolo y las E/S USB directamente mediante libusb, sin necesidad de un plugin.
+
+Nuestro SDK Bluetooth está desarrollado con React Native. Puede que utilices otra tecnología para desarrollar tu aplicación, como Swift, Kotlin o Flutter. En ese caso, añadir una dependencia de React Native a tu proyecto quizá no sea una buena opción.
+
+Ofrecemos un nuevo método de comunicación que permite usar LowlevelTransportSharedPlugin para comunicarse con el hardware. Puedes elegir libremente tu pila tecnológica. Tendrás que implementar el protocolo de conexión, desconexión, envío y recepción de datos del dispositivo.
+
+## Referencia rápida [#quick-reference]
+
+### UUID BLE de OneKey [#onekey-ble-uuids]
+
+| Finalidad | UUID |
+|---------|------|
+| Servicio | `00000001-0000-1000-8000-00805f9b34fb` |
+| Característica de escritura | `00000002-0000-1000-8000-00805f9b34fb` |
+| Característica de notificación | `00000003-0000-1000-8000-00805f9b34fb` |
+
+### Ejemplo de datos de cabecera BLE de Protocol V1 [#protocol-v1-ble-header-data-example]
+
+La siguiente cabecera es específica de Protocol V1; no la uses para analizar notificaciones de Protocol V2.
+
+```
+Raw data: 3F 23 23 00 02 00 00 00 0A 12 08 ...
+          │  │  │  │  │  │        │  └─ Protobuf payload starts
+          │  │  │  │  │  └────────┴─ Payload length: 0x0000000A = 10 bytes
+          │  │  │  └──┴─ Message type: 0x0002
+          └──┴──┴─ Magic: 0x3F 0x23 0x23 (fixed identifier)
+```
+
+Detectar el paquete de cabecera: **Los primeros 3 bytes son `3F 23 23`**
+
+Ejemplos nativos (todos basados en el plugin de transporte de bajo nivel):
+
+- [Android nativo](/es/hardware-sdk/transport/android) — WebView + JSBridge + Nordic BLE
+- [iOS nativo](/es/hardware-sdk/transport/ios) — WebView + JSBridge + CoreBluetooth
+- [Flutter nativo](/es/hardware-sdk/transport/flutter) — WebView + canal de plataforma + BLE
+
+## Interfaz LowlevelTransportSharedPlugin [#lowleveltransportsharedplugin-interface]
+
+```typescript
+import type { OneKeyDeviceInfoBase } from '@onekeyfe/hd-transport';
+
+export type LowLevelDevice = OneKeyDeviceInfoBase & { id: string; name: string };
+export type LowlevelTransportSharedPlugin = {
+  enumerate: () => Promise<LowLevelDevice[]>;
+  send: (uuid: string, data: string, options?: { withoutResponse?: boolean }) => Promise<void>;
+  receive: (uuid?: string) => Promise<string>;
+  connect: (uuid: string) => Promise<void>;
+  disconnect: (uuid: string) => Promise<void>;
+  getProtocolV2PacketCapacity?: (uuid: string) => number | undefined | Promise<number | undefined>;
+  init: () => Promise<void>;
+  version: string;
+};
+```
+
+## WebUSB frente a BLE: tramas de Protocol V1 [#webusb-vs-ble-protocol-v1-framing]
+
+Estos son detalles del transporte de Protocol V1. El plugin de bajo nivel es un adaptador BLE; el SDK se encarga de detectar el protocolo, codificar y reensamblar los datos.
+
+| | WebUSB (escritorio) | BLE (móvil nativo) |
+|---|---|---|
+| Tamaño del paquete | Fijo: 64 bytes | Variable (depende del MTU) |
+| Prefijo del paquete | `0x3F` en cada paquete | `0x3F 0x23 0x23` solo en la cabecera |
+| Relleno | Rellenar con ceros hasta 64 bytes | No necesita relleno |
+| `receive()` devuelve | Una trama de 64 bytes cada vez | Fragmento sin procesar de una notificación BLE (hex) |
+
+---
+
+## WebUSB Protocol V1 (escritorio) [#webusb-protocol-v1-desktop]
+
+El transporte usa tramas fijas de 64 bytes; el SDK se encarga de ensamblar los mensajes.
+
+> **Bytes mágicos:** `0x3F 0x23 0x23` son bytes fijos de identificación del protocolo que se usan para detectar los límites de los paquetes.
+
+**Primer paquete:**
+
+| Desplazamiento | Longitud | Contenido |
+|--------|--------|---------|
+| 0 | 3 | Marca mágica: `0x3F 0x23 0x23` |
+| 3 | 2 | Tipo de mensaje (uint16 BE) |
+| 5 | 4 | Longitud de los datos (uint32 BE) |
+| 9 | 55 | Primeros 55 bytes de protobuf (rellenados con ceros) |
+
+**Paquetes posteriores:**
+
+| Desplazamiento | Longitud | Contenido |
+|--------|--------|---------|
+| 0 | 1 | Marca mágica: `0x3F` |
+| 1 | 63 | Bytes restantes de protobuf (rellenados con ceros) |
+
+---
+
+## Protocolo BLE (móvil nativo) [#ble-protocol-native-mobile]
+
+Devuelve en hexadecimal un fragmento de notificación BLE en cola, sin modificar, en cada llamada a `receive(uuid)`. Mantén el orden de las notificaciones y conserva los fragmentos recibidos antes de que haya un lector en espera. No elimines las cabeceras del protocolo, no rellenes los fragmentos hasta los 64 bytes de los paquetes USB ni decodifiques protobuf en el plugin.
+
+- **Protocol V1:** el SDK reconoce la cabecera `3F2323`, lee la longitud de los datos y recoge los fragmentos de continuación. También acepta el mensaje antiguo preensamblado `type + length + payload` para la compatibilidad con V1.
+- **Protocol V2:** el SDK ensambla los fragmentos sin procesar en tramas y gestiona el CRC, la secuencia y el reensamblado de mensajes. Un detector de cabeceras o ensamblador exclusivo de V1 no debe procesar estos datos.
+- `send(uuid, data, options)` recibe los datos hexadecimales preparados por el SDK. Escribe los bytes en orden, propaga los fallos de E/S y respeta `withoutResponse` cuando se proporcione.
+- Indica el máximo real de bytes que admite una escritura de característica BLE mediante `getProtocolV2PacketCapacity`. El SDK usa 192 bytes como valor alternativo y limita los paquetes V2 a 244 bytes. Devuelve la capacidad de escritura, no el MTU ATT con su sobrecarga incluida.
+- Al desconectar, rechaza las lecturas pendientes y descarta las notificaciones en cola de la conexión anterior. No las entregues tras reconectar.
+
+## Ejemplo de inicialización [#initialization-example]
+
+Este fragmento de adaptador delega en un puente nativo que debe implementar la interfaz anterior. Sus métodos solo deben resolverse cuando termine la operación correspondiente, o rechazarse si esta falla.
+
+```typescript
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
+
+// Implement these methods in your native BLE bridge before initialization.
+declare const nativeBle: LowlevelTransportSharedPlugin;
+
+const plugin: LowlevelTransportSharedPlugin = {
+  enumerate: () => nativeBle.enumerate(),
+  send: (uuid, data, options) => nativeBle.send(uuid, data, options),
+  receive: uuid => nativeBle.receive(uuid),
+  connect: uuid => nativeBle.connect(uuid),
+  disconnect: uuid => nativeBle.disconnect(uuid),
+  getProtocolV2PacketCapacity: uuid => nativeBle.getProtocolV2PacketCapacity?.(uuid),
+  init: () => nativeBle.init(),
+  version: nativeBle.version,
+};
+
+const result = await HardwareSDK.init({ env: 'lowlevel', debug: false }, undefined, plugin);
+if (!result) throw new Error('SDK initialization failed');
+```
+
+## Próximos pasos [#next-steps]
+
+- [Guía de Android](/es/hardware-sdk/transport/android) — Emparejamiento, permisos y finalización de la conexión
+- [Guía de iOS](/es/hardware-sdk/transport/ios) — Implementación de CoreBluetooth
+- [Guía de Flutter](/es/hardware-sdk/transport/flutter) — Puente mediante canal de plataforma

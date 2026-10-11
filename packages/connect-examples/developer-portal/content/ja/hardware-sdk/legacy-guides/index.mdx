@@ -1,0 +1,23 @@
+---
+title: "移行ガイド"
+description: "Hardware SDK 1.1.x または OneKey Bridge から、現在の統合モデルへの移行経路を選択します。"
+---
+
+<span id="migration-guide" />
+
+# 移行ガイド
+
+すでに Hardware SDK **1.1.x** を使用しているアプリを **1.2.x** に更新する場合は、ここから始めます。
+
+## 1.1.x → 1.2.x [#11x--12x]
+
+- [1.1.x から 1.2.x へ](./from-1x) — `getDeviceState`, `openWalletSession`, Pro 2 / Neo、ファームウェア V4
+
+## Bridge → WebUSB [#bridge--webusb]
+
+OneKey Bridge を使用している場合のみ (`env: 'web'`).
+
+- [Bridge から WebUSB へ (hd-common-connect-sdk)](./migrate-bridge-to-common-connect-webusb) — 推奨
+- [Bridge から WebUSB へ (hd-web-sdk)](./migrate-bridge-to-webusb) — iframe ホストを維持
+
+新規プロジェクト: [はじめに](/ja/hardware-sdk/getting-started) とともに `@onekeyfe/hd-common-connect-sdk`.

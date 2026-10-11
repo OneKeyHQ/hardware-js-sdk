@@ -1,0 +1,98 @@
+---
+title: "Ethereum / EVM"
+description: "OneKey が注入する EIP-1193 プロバイダーによる Ethereum と EVM の統合"
+---
+
+import { Callout } from 'nextra/components'
+
+# Ethereum / EVM
+
+注入された EIP-1193 プロバイダーを使って、OneKey 対応の EVM dApp を構築します。EVM 互換チェーン (Ethereum、Polygon、BSC、Arbitrum、Optimism、Base など) はすべて同じプロバイダーを使用します。
+
+---
+
+## プロバイダーの検出 [#provider-detection]
+
+### EIP-6963 (推奨) [#eip-6963-recommended]
+
+競合を避ける最新のマルチウォレット検出:
+
+```typescript
+let onekeyProvider = null
+const onAnnounce = (event) => {
+  if (event.detail.info.rdns === 'so.onekey.app.wallet') {
+    onekeyProvider = event.detail.provider
+  }
+}
+window.addEventListener('eip6963:announceProvider', onAnnounce)
+window.dispatchEvent(new Event('eip6963:requestProvider'))
+
+// Call from your Connect button after the user selects OneKey.
+async function connectOneKey() {
+  if (!onekeyProvider) throw new Error('OneKey has not announced a provider yet')
+  return onekeyProvider.request({ method: 'eth_requestAccounts' })
+}
+// On component cleanup:
+// window.removeEventListener('eip6963:announceProvider', onAnnounce)
+```
+
+### 直接アクセス (フォールバック) [#direct-access-fallback]
+
+```typescript
+const provider = window.$onekey?.ethereum
+if (!provider) throw new Error('OneKey not detected')
+
+const accounts = await provider.request({ method: 'eth_requestAccounts' })
+```
+
+---
+
+## イベント [#events]
+
+```typescript
+// Account changed
+provider.on('accountsChanged', (accounts) => {
+  console.log('Account:', accounts[0])
+})
+
+// Network changed
+provider.on('chainChanged', (chainId) => {
+  console.log('Chain:', chainId)
+  window.location.reload() // Recommended
+})
+
+// Connected
+provider.on('connect', (info) => {
+  console.log('Connected to chain:', info.chainId)
+})
+```
+
+---
+
+## エラーコード [#error-codes]
+
+| コード | 説明 | 対処方法 |
+|------|-------------|----------|
+| 4001 | ユーザーが拒否 | 拒否を適切に処理 |
+| 4902 | 不明なチェーン | 次でチェーンを追加: `wallet_addEthereumChain` |
+| -32602 | 無効なパラメーター | `0x` プレフィックス付きの 16 進数文字列を使用 |
+| -32603 | 内部エラー | リクエストの形式を確認 |
+
+---
+
+## チェーン ID [#chain-ids]
+
+| ネットワーク | チェーン ID | 16 進数 |
+|---------|----------|-----|
+| Ethereum メインネット | 1 | 0x1 |
+| Polygon | 137 | 0x89 |
+| BSC | 56 | 0x38 |
+| Arbitrum One | 42161 | 0xa4b1 |
+| Optimism | 10 | 0xa |
+| Base | 8453 | 0x2105 |
+
+参照: [chainlist.org](https://chainlist.org) で他のチェーンを確認できます。
+
+<Callout type="info">
+UI コンポーネントで素早く統合するには、[RainbowKit](/ja/connect-to-software/wallet-ui/rainbowkit) または [Web3Modal](/ja/connect-to-software/wallet-ui/web3modal) を使用してください。
+</Callout>

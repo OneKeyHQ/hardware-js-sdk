@@ -1,0 +1,58 @@
+---
+description: "検証サービスで検証するため、デバイス証明書とチャレンジ署名を要求します。"
+title: "deviceVerify"
+---
+
+# deviceVerify
+
+## デバイスを検証 [#verify-device]
+
+検証チャレンジに対する `cert` と `signature` をデバイスから取得します。ホスト側で検証サービスへ送信する必要があり、この API はサーバー検証を行いません。署名データの取得にはデバイス上での確認が必要です。
+
+```typescript
+const result = await HardwareSDK.deviceVerify(connectId, params);
+```
+
+## パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)\
+
+
+* `dataHex` - _必須_ `string` 検証フローが提供する、空でない 16 進数エンコードの検証チャレンジ。
+
+## 例 [#example]
+
+```typescript
+// Obtain a fresh challenge from your verification flow.
+declare const challengeHex: string;
+
+const result = await HardwareSDK.deviceVerify(connectId, {
+    dataHex: challengeHex
+});
+if (!result.success) throw new Error(result.payload.error);
+// Submit the result to the verification service and check its verdict.
+```
+
+## 結果 [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        cert: string
+        signature: string
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

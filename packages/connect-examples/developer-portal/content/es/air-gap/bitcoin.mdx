@@ -1,0 +1,61 @@
+---
+title: "Bitcoin (PSBT)"
+---
+
+# Bitcoin (PSBT)
+
+Gestión de datos PSBT para firmar sin conexión con códigos UR animados.
+
+## Tipos de datos [#data-types]
+
+- Tipo UR de solicitud/respuesta: `crypto-psbt`
+- Consulta también: [API básica](/es/air-gap/basic-api) (primitivas y estructuras UR)
+
+## Flujo [#flow]
+
+1. Construye una PSBT sin firmar con el backend de tu cartera
+2. Codifica la PSBT → UR (`crypto-psbt`) y muéstrala como QR animado
+3. El dispositivo la escanea → devuelve la PSBT firmada como `crypto-psbt`
+4. Finaliza y difunde
+
+> **Consejo**: Mantén el tamaño de la PSBT dentro de límites prácticos para QR; divídela en fotogramas según sea necesario.
+
+## Ejemplos [#examples]
+
+Instala `@keystonehq/bc-ur-registry` y `@ngraveio/bc-ur`. Los ejemplos requieren una implementación de Buffer. Verifica la compatibilidad con PSBT en el dispositivo y el firmware de destino.
+
+La cartera proporciona los datos de la transacción sin firmar, la ruta real de la cuenta y la huella digital maestra exportadas por el dispositivo. El renderizador de QR debe llamar a `nextFrame()` con un temporizador y detenerse cuando se cierre el diálogo de firma. Estos fragmentos codifican y decodifican el transporte; no envían ninguna transacción.
+
+
+### Codificar PSBT sin firmar → QR animado [#encode-unsigned-psbt--animated-qr]
+
+```ts
+import { CryptoPSBT } from '@keystonehq/bc-ur-registry';
+
+
+const psbtBytes = Buffer.from(unsignedPsbtBase64, 'base64');
+const req = new CryptoPSBT(psbtBytes);
+const encoder = req.toUREncoder(200);
+const nextFrame = () => encoder.nextPart(); // Call from your QR animation timer.
+```
+
+### Decodificar QR animado → PSBT firmada [#decode-animated-qr--signed-psbt]
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { CryptoPSBT } from '@keystonehq/bc-ur-registry';
+
+const dec = new URDecoder();
+// For each scanned frame string from camera:
+// dec.receivePart(frameString)
+
+if (dec.isError()) throw new Error('QR decoding failed');
+if (dec.isSuccess()) {
+  const ur = dec.resultUR();
+  if (ur.type !== 'crypto-psbt') throw new Error('Expected crypto-psbt');
+  const psbt = CryptoPSBT.fromCBOR(ur.cbor);
+  const signedPsbt = psbt.getPSBT();      // Buffer of PSBT (signed or partially signed)
+  // Check that the unsigned transaction, inputs, and outputs match the original PSBT.
+  // Verify signatures before finalizing and broadcasting with your backend.
+}
+```

@@ -1,0 +1,55 @@
+---
+title: "Règles de sécurité"
+description: "Définissez les confirmations, le traitement des secrets et les conditions d’arrêt des processus d’agent."
+---
+
+<span id="safety-rules" />
+
+# Règles de sécurité
+
+Les processus Agent Wallet peuvent lire les soldes, construire des transactions et exécuter des échanges. Définissez clairement les limites de sécurité.
+
+## Lecture et écriture [#read-versus-write]
+
+| Type de demande | Exemples | Comportement requis |
+| --- | --- | --- |
+| Lecture seule | Solde, adresse de réception, prix, jetons tendance, historique, informations sur un jeton | Renvoyer des résultats concis et une prochaine étape utile. |
+| Préparation | Cotation d’échange, construction de transaction, audit de jeton, simulation | Afficher le résultat et le contexte de risque ; ne pas soumettre. |
+| Écriture | Transfert, exécution d’échange, autorisation, diffusion, signature | Demander une confirmation explicite avant l’exécution. |
+| Écriture soumise à confirmation matérielle | Transfert de montant élevé, appel de contrat sensible, signature avec un portefeuille caché | Exiger une confirmation sur l’appareil OneKey et s’arrêter si l’appareil refuse. |
+
+## Ne jamais exposer de secrets [#never-expose-secrets]
+
+Les agents ne doivent jamais révéler :
+
+- Les clés privées ou phrases de récupération.
+- Les identifiants Agent Wallet déchiffrés.
+- Les phrases secrètes matérielles.
+- Les jetons d’accès.
+- Le contenu du trousseau ou les données d’identifiants.
+
+## Confirmer les écritures [#confirm-writes]
+
+Avant toute demande de transfert, d’exécution d’échange, d’autorisation ou de signature, affichez une confirmation concise :
+
+| Champ | Obligatoire |
+| --- | --- |
+| Action | Transfert, échange, signature, autorisation ou diffusion |
+| Source | Adresse du portefeuille et chaîne |
+| Destination | Destinataire, contrat ou chaîne cible |
+| Montant | Montant en actif natif ou en jeton |
+| Frais | Estimation du gas ou des frais, si disponible |
+| Résultat du contrôle des risques | Résultat de l’audit de sécurité ou de la simulation, si disponible |
+| Étape matérielle | Exigence de confirmation sur l’appareil, le cas échéant |
+
+Ne soumettez rien avant confirmation par l’utilisateur.
+
+## Conditions d’arrêt [#stop-conditions]
+
+Arrêtez-vous et signalez l’état lorsque :
+
+- `onekey auth status` n’est pas authentifié.
+- L’adresse active ne correspond pas au portefeuille attendu par l’utilisateur.
+- L’appareil est verrouillé, déconnecté, a refusé la demande ou attend un PIN/une phrase secrète.
+- Le schéma de la CLI n’expose pas le paramètre que l’agent souhaite utiliser.
+- Une commande de sécurité signale un risque élevé que l’utilisateur n’a pas explicitement accepté.

@@ -1,0 +1,64 @@
+---
+description: "Mettez à jour le micrologiciel principal ou BLE Protocol V1 pris en charge avec des versions ou binaires vérifiés."
+title: "firmwareUpdateV2"
+---
+
+# firmwareUpdateV2
+
+## Mise à jour du micrologiciel (V2) [#firmware-update-v2]
+
+Parcours de mise à jour du micrologiciel Protocol V1. Permet de télécharger et mettre à jour les micrologiciels principal et BLE. Vous devez transmettre explicitement un paramètre `platform`.
+
+```typescript
+// Select versions from verified release metadata for this device.
+declare const targetFirmwareVersion: number[];
+
+const res = await HardwareSDK.firmwareUpdateV2(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+  updateType: 'firmware', // or 'ble'
+  // Option A: version-based update (recommended)
+  version: targetFirmwareVersion,
+  // Option B: custom binary (use with caution)
+  // binary: ArrayBuffer,
+  // Optional flags
+  forcedUpdateRes: false,
+  isUpdateBootloader: false,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+L’exemple suppose que l’utilisateur a sélectionné cet appareil et approuvé la mise à jour. Déterminez les versions cibles à partir de métadonnées de publication vérifiées ; ne codez pas en dur une version copiée depuis la documentation.
+
+### Paramètres [#params]
+
+[Paramètres communs facultatifs](/fr/hardware-sdk/concepts/common-params)
+
+- `platform` - obligatoire `"native" | "desktop" | "ext" | "web" | "web-embed"` environnement d’exécution
+- `updateType` - obligatoire `'firmware' | 'ble'` cible de la mise à jour (micrologiciel principal ou BLE)
+- `version` - facultatif `number[]` version cible sous forme de tableau à 3 éléments ; télécharge le micrologiciel officiel de cette version
+- `binary` - facultatif `ArrayBuffer` binaire de micrologiciel personnalisé ; utiliser avec prudence
+- `forcedUpdateRes` - facultatif `boolean` forcer la mise à jour du paquet de ressources
+- `isUpdateBootloader` - facultatif `boolean` inclure la mise à jour du bootloader
+
+### Résultat [#result]
+
+```typescript
+{
+  success: true,
+  payload: {
+    // success indicator from lower layer
+  }
+}
+```
+
+### Erreur [#error]
+
+```typescript
+{
+  success: false,
+  payload: {
+    error: string, // error message
+    code?: string | number   // error code
+  }
+}
+```

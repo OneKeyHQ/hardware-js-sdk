@@ -1,0 +1,21 @@
+---
+title: "Website-Metadaten"
+description: "Stellen Sie ein Favicon bereit, damit Wallets und Browser Ihre Website erkennen können. Fügen Sie im `<head>` des Dokuments einen Symbol-Link mit einer öffentlich erreichbaren Bild-URL ein:"
+---
+
+<span id="site-metadata" />
+
+# Website-Metadaten
+
+Stellen Sie ein Favicon bereit, damit Wallets und Browser Ihre Website erkennen können. Fügen Sie einen Symbol-Link ein im `<head>` des Dokuments und verwenden Sie eine öffentlich erreichbare Bild-URL:
+
+```html
+<head>
+  <link rel="icon" href="https://example.com/icon.png" type="image/png" />
+  <link rel="shortcut icon" href="https://example.com/icon.png" />
+</head>
+```
+
+Verwenden Sie den tatsächlichen Anwendungsnamen, Ursprung und das tatsächliche Symbol in den Metadaten der Wallet-Verbindungsbibliothek. Metadaten identifizieren die anfragende Website; sie beweisen nicht deren Vertrauenswürdigkeit.
+
+Wallet-Versionen können Metadaten unterschiedlich abrufen oder zwischenspeichern. Prüfen Sie nach der Bereitstellung den tatsächlichen Verbindungsdialog; eine Favicon-Aktualisierung ändert eine bestehende Wallet-Sitzung möglicherweise nicht sofort.

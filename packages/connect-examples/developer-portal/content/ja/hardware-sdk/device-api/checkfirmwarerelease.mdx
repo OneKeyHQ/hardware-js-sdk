@@ -1,0 +1,49 @@
+---
+description: "接続中のデバイスに更新を案内する前に、メインファームウェアのリリース状態を確認します。"
+title: "checkFirmwareRelease"
+---
+
+# checkFirmwareRelease
+
+## ファームウェアのリリースを確認 [#check-firmware-release]
+
+デバイスの現在のメインファームウェアのバージョン状態を確認します。
+
+```typescript
+const response = await HardwareSDK.checkFirmwareRelease(connectId);
+```
+
+### パラメーター [#params]
+
+[任意の共通パラメーター](/ja/hardware-sdk/concepts/common-params)
+
+### 例 [#example]
+
+```typescript
+const response = await HardwareSDK.checkFirmwareRelease(connectId);
+```
+
+結果
+
+```typescript
+import type { FirmwareReleaseCheckResult } from '@onekeyfe/hd-core';
+
+type ReleaseResult = {
+  success: true;
+  payload: FirmwareReleaseCheckResult | null;
+};
+```
+
+`payload` は `null` の場合があります。それ以外の場合は `status`、任意の `shouldUpdate`、任意の `changelog`、および `release` (`undefined` の場合もあります) を含みます。使用前に結果とリリースデータの両方が存在するか確認してください。リリースの形式はファームウェア/コンポーネントによって異なります。
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

@@ -1,0 +1,110 @@
+---
+title: "eth_call"
+description: "読み取り専用のコントラクト呼び出しを実行"
+---
+
+# eth_call
+
+ブロックチェーン上にトランザクションを作成せず、新しいメッセージ呼び出しを即座に実行します。スマートコントラクトからデータを読み取るために使用します。
+
+---
+
+## パラメーター [#parameters]
+
+| インデックス | 型 | 説明 |
+|-------|------|-------------|
+| 0 | `object` | トランザクション呼び出しオブジェクト |
+| 1 | `string` | ブロック番号またはタグ (`latest`, `earliest`, `pending`) |
+
+### トランザクション呼び出しオブジェクト [#transaction-call-object]
+
+| フィールド | 型 | 必須 | 説明 |
+|-------|------|----------|-------------|
+| `to` | `string` | はい | コントラクトアドレス |
+| `data` | `string` | いいえ | エンコードされた関数呼び出しデータ |
+| `from` | `string` | いいえ | 送信者アドレス (コンテキスト用) |
+| `gas` | `string` | いいえ | ガスリミット (16 進数) |
+| `gasPrice` | `string` | いいえ | ガス価格 (16 進数) |
+| `value` | `string` | いいえ | wei 単位の値 (16 進数) |
+
+---
+
+## 戻り値 [#returns]
+
+`string` - 呼び出しの戻りデータ (16 進数エンコード)
+
+---
+
+## 例 [#example]
+
+### ERC-20 残高を読み取る [#read-erc-20-balance]
+
+```typescript
+// balanceOf(address) selector: 0x70a08231
+const address = '0xYourAddress...'.slice(2).padStart(64, '0')
+const data = '0x70a08231' + address
+
+const balance = await window.$onekey.ethereum.request({
+  method: 'eth_call',
+  params: [{
+    to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
+    data: data
+  }, 'latest']
+})
+
+console.log('Balance:', BigInt(balance).toString())
+```
+
+### コントラクト名を読み取る [#read-contract-name]
+
+```typescript
+// name() selector: 0x06fdde03
+const name = await window.$onekey.ethereum.request({
+  method: 'eth_call',
+  params: [{
+    to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    data: '0x06fdde03'
+  }, 'latest']
+})
+
+// Decode the result (ABI encoded string)
+// Decode `name` with your ABI library's string decoder.
+console.log('ABI-encoded contract name:', name)
+```
+
+### ethers.js の使用 [#using-ethersjs]
+
+```typescript
+import { Contract, BrowserProvider } from 'ethers'
+
+const provider = new BrowserProvider(window.$onekey.ethereum)
+
+const contract = new Contract(
+  '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  ['function balanceOf(address) view returns (uint256)'],
+  provider
+)
+
+const balance = await contract.balanceOf('0xYourAddress...')
+console.log('USDC Balance:', balance.toString())
+```
+
+---
+
+## エラー [#errors]
+
+| コード | メッセージ | 説明 |
+|------|---------|-------------|
+| -32000 | 実行がリバート | コントラクト呼び出しがリバート |
+| -32602 | 無効なパラメーター | 無効な呼び出しパラメーター |
+
+---
+
+## 注意事項 [#notes]
+
+- このメソッドはガスを消費せず、状態も変更しません
+- この `from` アドレスは任意ですが、一部のコントラクトでは結果に影響する場合があります
+- 用途に適したブロックタグを選択してください; `latest` はエンドポイントが認識している最新ブロックを反映します
+- 複雑なコントラクト操作には、ethers.js または web3.js の使用を検討してください
+
+トークンアドレスの例は Ethereum メインネット用です。チェーンを確認し、`balanceOf` をエンコードする前に、完全な 20 バイトのアカウントアドレスに置き換えてください。

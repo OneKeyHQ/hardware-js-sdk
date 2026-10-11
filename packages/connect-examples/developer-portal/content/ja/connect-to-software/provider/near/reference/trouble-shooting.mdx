@@ -1,0 +1,29 @@
+---
+title: "トラブルシューティング"
+---
+
+<span id="troubleshooting" />
+
+# トラブルシューティング
+
+OneKey に[接続の確立](/ja/connect-to-software/provider/near/integrating/establishing-a-connection)、[トランザクションの送信](/ja/connect-to-software/provider/near/integrating/sending-transactions)、[メッセージへの署名](/ja/connect-to-software/provider/near/integrating/signing-messages)、[RPC 呼び出し](/ja/connect-to-software/provider/near/integrating/rpc-api-calling) を要求すると、エラーが返る場合があります。以下のエラーコードと意味は、Ethereum の [EIP-1474](https://eips.ethereum.org/EIPS/eip-1474#error-codes) と [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193#provider-errors) の対応するエラーに基づいています。
+
+| **コード** | **タイトル**             | **説明**                                                          |
+| -------- | --------------------- | ------------------------------------------------------------------------ |
+| 4001     | ユーザーがリクエストを拒否 | ユーザーが OneKey を通じてリクエストを拒否しました。                                |
+| 4100     | 未認証          | 要求されたメソッドおよび/またはアカウントがユーザーに承認されていません。 |
+| 4500     | リクエストのタイムアウト       | プロバイダーへのリクエストがタイムアウトしました。                            |
+| -32603   | 内部エラー        | OneKey 内部で問題が発生しました。                                      |
+| -32000   | 無効な入力         | パラメーターが不足しているか、無効です。                                           |
+| -32601   | メソッドが見つからない      | OneKey がメソッドを認識できません。                                    |
+
+通常、これらのエラーは容易に解析でき、コードと説明の両方を含みます。例:
+
+```javascript
+try {
+  await provider.requestSignTransactions({ transactions: [transaction] });
+} catch (err) {
+  //  {code: 4100, message: 'The requested method and/or account has not been authorized by the user.'}
+}
+
+```

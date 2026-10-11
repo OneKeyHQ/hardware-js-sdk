@@ -1,0 +1,36 @@
+---
+title: "Solana"
+description: "Solana-Integration über den OneKey-Provider — erkennen, verbinden, Transaktionen senden und Nachrichten signieren"
+slug: /dapp/chains/solana
+---
+
+# Solana
+
+Den Solana-Provider von OneKey in Web-Apps verwenden.
+
+## Direktlinks [#quick-links]
+
+- [Provider erkennen](detecting-the-provider)
+- [Verbindung herstellen](establishing-a-connection)
+- [Eine Transaktion senden](sending-a-transaction)
+- [Eine Nachricht signieren](signing-a-message)
+
+## Minimales Muster [#minimal-pattern]
+
+```js
+// Detect
+const provider = window?.$onekey?.solana || window?.solana
+if (!provider?.isOneKey) throw new Error('OneKey Solana provider not detected')
+
+// Connect
+const { publicKey } = await provider.connect()
+console.log(publicKey.toString())
+```
+
+## Ereignisse [#events]
+
+- `connect`, `disconnect`, `accountChanged`
+
+## Häufige Fehler [#common-errors]
+
+- 4001: Nutzer hat die Anfrage abgelehnt

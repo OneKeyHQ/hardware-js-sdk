@@ -1,0 +1,20 @@
+---
+description: "Retrouvez les méthodes de découverte d’appareils, d’état normalisé, de sélection de portefeuille, de réponse d’interface et d’annulation."
+title: "API de base"
+---
+
+<span id="basic-api" />
+
+# API de base
+
+Méthodes fondamentales du SDK pour la découverte d’appareils, la gestion des sessions et le traitement des événements.
+
+| Méthode | Description |
+|--------|-------------|
+| [Rechercher des appareils](./search-devices) | Scanner et découvrir les appareils matériels OneKey connectés |
+| [Obtenir l’état de l’appareil](./get-device-state) | Instantané unifié V1/V2 de l’appareil |
+| [Ouvrir une session de portefeuille](./open-wallet-session) | Ouvrir ou sélectionner le portefeuille standard / caché |
+| [Obtenir les fonctionnalités](./get-features) | **Obsolète** — utiliser Obtenir l’état de l’appareil |
+| [Obtenir l’état de phrase secrète](./get-passphrase-state) | **Obsolète** — utiliser Ouvrir une session de portefeuille |
+| [Répondre à un événement d’interface](./response-ui-event) | Gérer les événements d’interface des interactions avec l’appareil |
+| [Annuler une demande](./cancel-request) | Annuler une opération en cours sur l’appareil |

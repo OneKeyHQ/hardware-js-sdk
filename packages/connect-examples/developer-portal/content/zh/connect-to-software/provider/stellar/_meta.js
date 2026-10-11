@@ -4,4 +4,3 @@ export default {
   signing: '签名',
   'api-reference': 'API 参考',
 };
-

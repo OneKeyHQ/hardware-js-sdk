@@ -1,0 +1,77 @@
+---
+title: "Fonctionnalités"
+description: "Associez les demandes concernant le portefeuille, les échanges, le marché et la sécurité aux compétences prises en charge."
+---
+
+<span id="capabilities" />
+
+# Fonctionnalités
+
+Utilisez les quatre compétences de portefeuille OneKey pour orienter les demandes vers les commandes de portefeuille, d’échange, de marché et de sécurité. Consultez le schéma de la CLI installée pour connaître les chaînes, les paramètres et les champs de réponse pris en charge.
+
+## Opérations de portefeuille [#wallet-operations]
+
+À utiliser lorsque l’utilisateur souhaite consulter des soldes, des adresses de réception, l’historique des transactions, les types d’adresses BTC ou effectuer des transferts.
+
+| Intention de l’utilisateur | Langage naturel | Compétence à utiliser |
+| --- | --- | --- |
+| Vérifier le portefeuille actif | `What wallet am I using?` | `onekey-wallet` lit l’état de la session active. |
+| Afficher une adresse de réception | `Show my ETH receiving address.` | `onekey-wallet` renvoie l’adresse de réception actuelle. |
+| Vérifier les soldes | `Show my wallet balance on Ethereum.` | `onekey-wallet` vérifie les soldes du portefeuille actif. |
+| Consulter l’historique | `Show my last 5 BTC transactions.` | `onekey-wallet` récupère l’historique récent. |
+| Types d’adresses BTC | `Show my BTC taproot address.` | `onekey-wallet` conserve le type d’adresse BTC demandé. |
+| Transférer des fonds | `Send 50 USDC to this address.` | `onekey-wallet` valide, prépare et demande confirmation. |
+
+Les demandes de transfert doivent présenter une confirmation avant l’exécution. Celle-ci doit inclure l’actif, le montant, le destinataire, la chaîne, les frais lorsqu’ils sont connus, l’état du solde et la prochaine étape de sécurité.
+
+## Échanges et ponts [#swap-and-bridge]
+
+À utiliser lorsque l’utilisateur demande de négocier, acheter, vendre, convertir, transférer via un pont ou signer une PSBT BTC.
+
+| Intention de l’utilisateur | Langage naturel | Compétence à utiliser |
+| --- | --- | --- |
+| Obtenir une cotation d’échange | `Quote 1 ETH to USDC.` | `onekey-swap` fournit une cotation sans exécuter l’opération. |
+| Construire une transaction | `Prepare the swap, but do not submit.` | `onekey-swap` prépare l’ordre après vérification. |
+| Exécuter après confirmation | `Yes, execute the swap.` | `onekey-swap` exécute uniquement l’ordre confirmé. |
+| Vérifier le statut | `What happened to this swap?` | `onekey-swap` suit l’ordre existant. |
+| Découvrir les ponts | `Can I bridge USDC from Ethereum to Base?` | `onekey-swap` vérifie la prise en charge du pont avant d’établir une cotation. |
+| Signature BTC uniquement | `Swap BTC to USDC using taproot and sign only.` | `onekey-swap` préserve taproot et renvoie une PSBT signée ou un aperçu de PSBT. |
+
+Le déroulement normal est : cotation, contrôle de sécurité, confirmation, construction et exécution. La cotation et l’exécution ne doivent pas être regroupées dans un seul tour de l’assistant.
+
+## Marché et recherche [#market-and-research]
+
+À utiliser lorsque l’utilisateur demande des prix, les jetons tendance, des informations sur un jeton, des données de chandeliers, la liquidité, les détenteurs ou une recherche.
+
+| Intention de l’utilisateur | Langage naturel | Compétence à utiliser |
+| --- | --- | --- |
+| Prix unique | `What is the SOL price?` | `onekey-market` renvoie le prix et le contexte sur 24h. |
+| Jetons tendance | `What tokens are trending on Solana?` | `onekey-market` renvoie une courte liste des jetons tendance. |
+| Recherche de jeton | `Search BONK on Solana.` | `onekey-market` conserve le contexte Solana. |
+| Détails du jeton | `Show token info for USDC on Ethereum.` | `onekey-market` récupère les détails du jeton. |
+| Chandeliers | `Show ETH 1H candles.` | `onekey-market` renvoie les données du graphique. |
+| Liquidité / détenteurs | `Show liquidity for PEPE.` | `onekey-market` résume les données de liquidité ou de détenteurs. |
+
+Les réponses sur le marché doivent être en lecture seule par défaut. Si l’utilisateur demande ensuite d’acheter ou d’échanger, l’agent doit terminer la recherche, puis préparer l’opération dans un processus de confirmation distinct.
+
+## Contrôles de sécurité [#security-checks]
+
+À utiliser avant toute action déplaçant des fonds ou interagissant avec un contrat, et chaque fois que l’utilisateur demande si un jeton ou une transaction est sûr.
+
+| Intention de l’utilisateur | Langage naturel | Compétence à utiliser |
+| --- | --- | --- |
+| Audit de jeton | `Is this token safe?` | `onekey-security` indique le niveau de risque et ses raisons. |
+| Simuler une transaction | `What happens if I sign this?` | `onekey-security` simule avant de signer. |
+| Risque d’autorisation | `Review this unlimited USDC approval.` | `onekey-security` signale le risque d’une autorisation illimitée. |
+| Incompatibilité de chaîne | `Send SOL to 0x...` | Arrêter et signaler l’incompatibilité d’adresse Solana/EVM |
+| Risque de faux contrat | `Swap 500 USDC to WETH at 0x...` | Arrêter en cas d’incohérence entre le jeton et le contrat |
+
+Un risque élevé ou des données incomplètes doivent bloquer les processus de déplacement de fonds qui en dépendent jusqu’à ce que l’utilisateur accepte explicitement le risque.
+
+## Contrôle du matériel [#hardware-control]
+
+À utiliser lorsque l’utilisateur souhaite signer avec un appareil, vérifier un appareil, modifier le PIN ou la phrase secrète, ou utiliser la signature lisible pour des actions sensibles.
+
+Le parcours visible par l’utilisateur reste en langage naturel : connecter un appareil, le vérifier, passer à une session reposant sur le matériel, choisir le comportement de la phrase secrète si nécessaire et vérifier les actions sensibles sur l’appareil.
+
+La connexion matérielle change la session active. Après la connexion, les commandes de portefeuille, de transfert, d’échange et de signature utilisent automatiquement la session reposant sur le matériel.

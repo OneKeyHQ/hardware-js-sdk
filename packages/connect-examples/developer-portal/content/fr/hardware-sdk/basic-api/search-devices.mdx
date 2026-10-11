@@ -1,0 +1,60 @@
+---
+description: "Découvrez les connexions candidates, gérez les champs d’identité facultatifs et lisez l’état de l’appareil initialisé."
+title: "Rechercher des appareils"
+---
+
+<span id="search-devices" />
+
+# Rechercher des appareils
+
+Découvrir les connexions candidates. `searchDevices()` renvoie un objet résultat ; la liste des appareils se trouve dans `payload` uniquement lorsque `success` vaut `true`.
+
+La découverte ne prouve pas qu’un appareil est initialisé ni que son portefeuille est déverrouillé. La découverte BLE peut renvoyer un nom annoncé et un ID de connexion avant qu’une connexion existe. La découverte USB peut aussi renvoyer un descripteur sans champs d’identité initialisés.
+
+## Méthode [#method]
+
+```ts
+const result = await HardwareSDK.searchDevices();
+if (!result.success) throw new Error(result.payload.error);
+if (!result.payload.length) throw new Error('No OneKey device found');
+
+// For this example, select the only connected device.
+// In an app, ask the user to choose when multiple devices are present.
+if (result.payload.length !== 1) throw new Error('Select a device before continuing');
+const { connectId } = result.payload[0];
+if (!connectId) throw new Error('Device connection is unavailable');
+
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device has no wallet identity');
+```
+
+L’autorisation WebUSB doit faire partie d’un parcours initié par l’utilisateur. Le scan BLE nécessite les autorisations Bluetooth de la plateforme. Consultez [WebUSB](/fr/hardware-sdk/transport/web-usb) ou [BLE React Native](/fr/hardware-sdk/transport/react-native-ble).
+
+## Paramètres [#parameters]
+
+L’objet de paramètres est facultatif. Consultez le [type `searchDevices`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/api/searchDevices.ts) et [Paramètres communs](/fr/hardware-sdk/concepts/common-params) pour la version du SDK installée.
+
+## Champs du résultat [#result-fields]
+
+| Champ | Type | Signification |
+| --- | --- | --- |
+| `connectId` | `string \| null` | Clé d’orientation du transport. Transmettez une valeur non nulle aux appels ultérieurs à l’appareil. |
+| `connectProtocol` | `'V1' \| 'V2' \| undefined` | Disponible après une interrogation active du protocole ; ne le déduisez pas du nom annoncé. |
+| `serialNo` | `string \| null \| undefined` | Numéro de série physique lorsqu’il est disponible après initialisation. |
+| `deviceId` | `string \| null` | Identité liée à la durée de vie de la graine lorsqu’elle est disponible ; actualisez avec `getDeviceState`. |
+| `uuid` | `string` | Champ de compatibilité obsolète. Il peut être vide avant l’initialisation ; privilégiez `serialNo` pour l’identité physique. |
+| `deviceType` | `IDeviceType` | Modèle détecté, ou inconnu avant l’initialisation. |
+| `name` | `string` | Nom d’affichage ; ce n’est pas un identifiant unique. |
+| `commType` | `OneKeyDeviceCommType` | Type de communication signalé par le transport. |
+
+La structure publique exacte est [`SearchDevice`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/device.ts). Ne dépendez pas de champs internes supplémentaires tels que `path`.
+
+USB et BLE utilisent des valeurs de `connectId` différentes pour le même appareil physique. Réénumérez les appareils après reconnexion et actualisez l’état avant de réutiliser une association de portefeuille. Consultez [Identifiants](/fr/hardware-sdk/concepts/identifiers).
+
+## Gestion des échecs [#failure-handling]
+
+En cas d’échec, `payload` contient `error` et un élément facultatif `code`. Gérez le code plutôt que de comparer le texte de l’erreur. Une liste vide réussie signifie qu’aucun candidat n’a été trouvé ; ce n’est pas un échec du SDK.
+
+Ne journalisez pas la liste complète des appareils ni les objets appareil. Limitez les diagnostics au statut de l’opération et aux décomptes non sensibles.

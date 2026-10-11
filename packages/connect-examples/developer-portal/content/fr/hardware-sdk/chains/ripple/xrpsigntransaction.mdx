@@ -1,0 +1,82 @@
+---
+title: "xrpSignTransaction"
+---
+
+# xrpSignTransaction
+
+### Ripple : signer une transaction [#ripple-sign-transaction]
+
+Demande une signature de transaction. L’utilisateur vérifie et confirme la demande sur l’appareil.
+
+```typescript
+const response = await HardwareSDK.xrpSignTransaction(connectId, deviceId, params)
+```
+
+### Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `5`. [Format du chemin](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `transaction` - _obligatoire_ type `XrpTransaction`
+
+#### Type XrpTransaction [#xrptransaction-type]
+
+```typescript
+type XrpTransaction = {
+    fee: string;
+    flags?: number;
+    sequence: number;
+    maxLedgerVersion?: number; // Proto: "last_ledger_sequence"
+    payment: XrpPayment;
+}
+
+type XrpPayment = {
+    amount: number;
+    destination: string;
+    destinationTag?: number;
+}
+```
+
+L’environnement d’exécution actuel du SDK attend `{ path, transaction }` et valide `transaction.payment.amount` comme nombre. Sa déclaration TypeScript exportée ne correspond pas à cette structure d’exécution. L’exemple ci-dessous suit le contrat d’exécution ; vérifiez la déclaration de votre version installée du SDK avant de compiler l’intégration. Les montants sont exprimés en drops.
+
+### Exemple [#example]
+
+```typescript
+HardwareSDK.xrpSignTransaction(connectId, deviceId, {
+    path: "m/44'/144'/0'/0/0",
+    transaction: {
+        fee: '12',
+        flags: 0,
+        sequence: 32841006,
+        maxLedgerVersion: 32841630,
+        payment: {
+            amount: 1000000,
+            destination: 'rwgumKP89VhMrJ4dRkGVS4tafRfAmZmKf8',
+        }
+    }
+});
+```
+
+Résultat
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        serializedTx: string;
+    }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

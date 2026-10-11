@@ -1,0 +1,35 @@
+---
+title: "Nostr"
+description: "Integración con Nostr mediante el proveedor de OneKey: getPublicKey, signEvent, signSchnorr y más"
+slug: /dapp/chains/nostr
+---
+
+# Nostr
+
+Integra funciones de Nostr mediante el proveedor de OneKey.
+
+## Enlaces rápidos [#quick-links]
+
+- [Guía](guide)
+- [Referencia de la API](api-reference)
+- [Eventos](event)
+
+## Patrón mínimo [#minimal-pattern]
+
+```js
+const provider = window.$onekey?.nostr
+if (!provider) throw new Error('OneKey Nostr provider not detected')
+
+const pubkey = await provider.getPublicKey()
+// Example: sign an event (fill your own event fields)
+// const signed = await provider.signEvent(event)
+```
+
+## Eventos [#events]
+
+- Consulta [Eventos](event) para la notificación `accountChanged`
+
+## Errores habituales [#common-errors]
+
+- 4001: rechazado por el usuario
+- Parámetros no válidos: cumple los requisitos de NIP-07

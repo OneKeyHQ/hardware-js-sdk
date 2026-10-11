@@ -1,0 +1,63 @@
+---
+title: "makeInvoice"
+---
+
+# makeInvoice
+
+Demander à l’utilisateur de créer une facture à utiliser par l’application web. Cela renvoie une facture [BOLT-11](https://github.com/lightningnetwork/lightning-rfc/blob/master/11-payment-encoding.md). Les factures peuvent être demandées de plusieurs façons :
+
+* En spécifiant un élément explicite `amount`, le fournisseur de l’utilisateur doit imposer la génération d’une facture avec un montant précis
+* En spécifiant un `minimumAmount` et / ou `maximumAmount`, le fournisseur de l’utilisateur doit imposer la génération d’une facture dont le montant est limité par cette valeur
+* Lorsqu’aucun montant explicite `amount` n’est défini, l’utilisateur peut choisir un montant dans les limites demandées.
+
+Les montants sont exprimés en satoshis. Les nombres JavaScript ne représentent exactement les entiers que jusqu’à `Number.MAX_SAFE_INTEGER` (`2^53 - 1`). Utilisez une chaîne décimale pour les valeurs dépassant cette plage ; l’API accepte les chaînes comme les nombres.
+
+## Méthode [#method]
+
+```typescript
+declare function makeInvoice(args: RequestInvoiceArgs): Promise<RequestInvoiceResponse>;
+```
+
+## Paramètres [#params]
+
+* `args` — _obligatoire_ `object`
+  * `amount` — _facultatif_ `string|number`  le nombre de satoshis à envoyer
+  * `defaultAmount` — _facultatif_ `string|number`
+  * `minimumAmount` — _facultatif_ `string|number`
+  * `maximumAmount` — _facultatif_ `string|number`
+  * `defaultMemo` — _facultatif_ `string`
+
+```typescript
+interface RequestInvoiceArgs {
+  amount?: string | number; // unit is sats
+  defaultAmount?: string | number; // unit is sats
+  minimumAmount?: string | number; // unit is sats
+  maximumAmount?: string | number; // unit is sats
+  defaultMemo?: string;
+}
+```
+
+## Réponse [#response]
+
+```typescript
+interface RequestInvoiceResponse {
+  paymentRequest: string;
+  paymentHash: string;
+  rHash: string;
+}
+```
+
+## Exemple [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable();
+const invoice = await provider.makeInvoice({
+  amount: 1000,
+});
+```
+
+## Démonstration [#demo]
+
+[Ouvrir l’exemple](https://codepen.io/OneKeyHQ/pen/ZEwMKvw)

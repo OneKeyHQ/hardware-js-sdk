@@ -1,0 +1,36 @@
+---
+title: "signMessage"
+---
+
+# signMessage
+
+Demander à l’utilisateur de signer un message sous forme de chaîne.
+
+## Méthode [#method]
+
+```typescript
+declare function signMessage(message: string): Promise<SignMessageResponse>;
+```
+
+## Réponse [#response]
+
+```typescript
+interface SignMessageResponse {
+  message: string;
+  signature: string;
+}
+```
+
+## Exemple [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+const message = "Plain Message";
+await provider.enable();
+const signature = await provider.signMessage(message);
+```
+
+## Démonstration [#demo]
+
+[Ouvrir l’exemple](https://codepen.io/OneKeyHQ/pen/mdvGmLm)

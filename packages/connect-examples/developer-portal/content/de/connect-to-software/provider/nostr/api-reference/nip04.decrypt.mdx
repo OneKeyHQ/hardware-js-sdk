@@ -1,0 +1,37 @@
+---
+title: "nip04.decrypt"
+---
+
+# nip04.decrypt
+
+## Methode [#method]
+
+```typescript
+// provider.nip04.decrypt
+(pubkey: string, ciphertext: string) => Promise<string>
+```
+
+## Parameter [#params]
+
+* `pubkey` — _erforderlich_ `string`  der öffentliche Schlüssel des Absenders
+* `ciphertext` — _erforderlich_ `string` die verschlüsselte Nutzlast
+
+## Antwort [#response]
+
+Gibt den entschlüsselten Klartext zurück.
+
+## Beispiel [#example]
+
+```javascript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const message = "Data to be encrypted";
+const encrypted = await provider.nip04.encrypt(pubkey, message);
+const decrypted = await provider.nip04.decrypt(pubkey, encrypted); // Data to be encrypted
+```
+
+## Demo [#demo]
+
+[Beispiel öffnen](https://codepen.io/OneKeyHQ/pen/rNPZwaa)
+
+[NIP-04](https://github.com/nostr-protocol/nips/blob/master/04.md) ist laut Nostr-Spezifikation veraltet. Diese Methoden bleiben für bestehende Integrationen dokumentiert; ihr Vorhandensein belegt keine Unterstützung neuerer NIPs.

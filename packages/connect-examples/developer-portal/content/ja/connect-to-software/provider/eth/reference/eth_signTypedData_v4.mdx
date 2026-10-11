@@ -1,0 +1,157 @@
+---
+title: "eth_signTypedData_v4"
+description: "型付き構造化データに署名 (EIP-712)"
+---
+
+# eth_signTypedData_v4
+
+EIP-712 に従って型付き構造化データに署名します。ドメインとスキーマによって署名のコンテキストが明示されますが、検証側ではそれらの確認とリプレイ防止を行う必要があります。
+
+---
+
+## パラメーター [#parameters]
+
+| インデックス | 型 | 説明 |
+|-------|------|-------------|
+| 0 | `string` | 署名に使用するアドレス |
+| 1 | `string` | 型付きデータの JSON 文字列 |
+
+---
+
+## 戻り値 [#returns]
+
+`string` - 署名 (65 バイトの 16 進数文字列)
+
+---
+
+## 型付きデータの構造 [#typed-data-structure]
+
+```typescript
+interface TypedData {
+  types: {
+    EIP712Domain: Array<{ name: string; type: string }>
+    [typeName: string]: Array<{ name: string; type: string }>
+  }
+  primaryType: string
+  domain: {
+    name?: string
+    version?: string
+    chainId?: number
+    verifyingContract?: string
+    salt?: string
+  }
+  message: Record<string, any>
+}
+```
+
+---
+
+## 例 [#example]
+
+```typescript
+const typedData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' }
+    ],
+    Person: [
+      { name: 'name', type: 'string' },
+      { name: 'wallet', type: 'address' }
+    ],
+    Mail: [
+      { name: 'from', type: 'Person' },
+      { name: 'to', type: 'Person' },
+      { name: 'contents', type: 'string' }
+    ]
+  },
+  primaryType: 'Mail',
+  domain: {
+    name: 'My dApp',
+    version: '1',
+    chainId: 1,
+    verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC'
+  },
+  message: {
+    from: {
+      name: 'Alice',
+      wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826'
+    },
+    to: {
+      name: 'Bob',
+      wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
+    },
+    contents: 'Hello, Bob!'
+  }
+}
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'eth_signTypedData_v4',
+  params: [accounts[0], JSON.stringify(typedData)]
+})
+
+console.log('Signature:', signature)
+```
+
+### Permit 署名 (ERC-2612) [#permit-signature-erc-2612]
+
+```typescript
+const permitData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' }
+    ],
+    Permit: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'nonce', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' }
+    ]
+  },
+  primaryType: 'Permit',
+  domain: {
+    name: 'USD Coin',
+    version: '2',
+    chainId: 1,
+    verifyingContract: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+  },
+  message: {
+    owner: accounts[0],
+    spender: '0xSpenderAddress...',
+    value: '1000000000', // 1000 USDC
+    nonce: tokenNonce, // Read the current permit nonce for this owner.
+    deadline: Math.floor(Date.now() / 1000) + 3600
+  }
+}
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'eth_signTypedData_v4',
+  params: [accounts[0], JSON.stringify(permitData)]
+})
+```
+
+---
+
+## エラー [#errors]
+
+| コード | メッセージ | 説明 |
+|------|---------|-------------|
+| 4001 | ユーザーがリクエストを拒否 | ユーザーが署名リクエストを拒否 |
+| -32602 | 無効なパラメーター | 無効な型付きデータ構造 |
+
+---
+
+## 注意事項 [#notes]
+
+- 型付きデータは有効な JSON 文字列である必要があります
+- `chainId` はドメイン内で接続中のチェーンと一致する必要があります
+- ユーザーには読みやすい形式でデータが表示されます
+- 次で規定されています: [EIP-712](https://eips.ethereum.org/EIPS/eip-712)
+
+permit の例では、トークンコントラクトの実際の EIP-712 ドメイン、現在の nonce、意図した spender、金額、有効期限が必要です。プレースホルダーを置き換え、署名を要求する前に `tokenNonce` を取得してください。

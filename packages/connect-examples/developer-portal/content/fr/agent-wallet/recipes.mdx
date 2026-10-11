@@ -1,0 +1,137 @@
+---
+title: "Exemples pratiques"
+description: "Suivez les exemples par étapes pour les lectures du portefeuille, la préparation des échanges et la signature confirmée."
+---
+
+<span id="recipes" />
+
+# Exemples pratiques
+
+Ces exemples montrent la séquence prévue derrière une demande utilisateur. Avant d’exécuter des commandes, consultez `onekey schema --list` et le schéma de la commande concernée dans la CLI installée. Remplacez les adresses et identifiants d’ordre des exemples par des valeurs validées. La disponibilité varie selon la version bêta.
+
+## Vérifier l’état du portefeuille [#check-wallet-state]
+
+Utilisateur :
+
+```text
+Show my wallet balance and receiving address.
+```
+
+Déroulement attendu :
+
+```bash
+onekey auth status
+onekey get-address
+onekey balance --chain eth
+```
+
+Forme de réponse recommandée :
+
+```text
+Active wallet: 0x...
+Ethereum balance: ...
+Receiving address: 0x...
+Next: I can show history, quote a swap, or prepare a transfer.
+```
+
+## Rechercher avant d’acheter [#research-before-buying]
+
+Utilisateur :
+
+```text
+What Solana tokens are trending, and is BONK worth a closer look?
+```
+
+Déroulement attendu :
+
+```bash
+onekey token trending --chain sol
+onekey token search --query BONK --chain sol
+onekey token info --chain sol --token BONK
+```
+
+L’agent doit d’abord fournir le contexte du marché. Il ne doit pas lancer d’échange tant que l’utilisateur ne demande pas de négocier dans un tour ultérieur.
+
+## Coter, confirmer, exécuter [#quote-confirm-execute]
+
+Utilisateur :
+
+```text
+Swap 1 ETH to USDC, but show me the quote before execution.
+```
+
+Déroulement attendu :
+
+```bash
+onekey balance --chain eth
+onekey swap quote --chain eth --from ETH --to USDC --amount 1
+onekey security audit --chain eth --token USDC
+onekey swap build --chain eth --from ETH --to USDC --amount 1
+```
+
+La confirmation doit afficher :
+
+| Champ | Exemple |
+| --- | --- |
+| Action | Échange |
+| Itinéraire | ETH -&gt ; USDC sur Ethereum |
+| Montant | 1 ETH |
+| Montant de sortie estimé | D’après le résultat de la cotation |
+| Frais | D’après le résultat de la cotation/construction, lorsqu’il est disponible |
+| Risque | Statut de l’audit ou de la simulation |
+| Étape suivante | `Proceed? (yes/no)` |
+
+Uniquement après confirmation par l’utilisateur :
+
+```bash
+onekey swap execute --chain eth --order <orderId>
+```
+
+## Transfert avec signature matérielle [#hardware-backed-transfer]
+
+Utilisateur :
+
+```text
+Use my OneKey hardware wallet to send 50 USDC to 0x...
+```
+
+Déroulement attendu :
+
+```bash
+onekey device search
+onekey auth login --hardware
+onekey auth status
+onekey balance --chain eth --token USDC
+```
+
+Affichez le portefeuille actif, l’adresse complète du destinataire, la chaîne, le jeton, le montant, les frais estimés et l’étape de confirmation sur l’appareil. Uniquement après confirmation du transfert par l’utilisateur :
+
+```bash
+onekey transfer --to <verified-full-address> --amount 50 --token USDC --chain eth
+```
+
+La confirmation du transfert doit mentionner l’étape de confirmation sur l’appareil. Si l’appareil est verrouillé, déconnecté, demande un PIN/une phrase secrète ou rejette la demande, l’agent doit s’arrêter et signaler cet état.
+
+## PSBT BTC en signature seule [#btc-sign-only-psbt]
+
+Utilisateur :
+
+```text
+Swap 0.01 BTC to USDC using taproot and sign only.
+```
+
+Déroulement attendu :
+
+```bash
+onekey wallet address --chain btc --address-type taproot
+onekey swap quote --chain btc --from BTC --to USDC --amount 0.01
+onekey swap build --chain btc --from BTC --to USDC --amount 0.01
+```
+
+Affichez l’ordre préparé, le type d’adresse, le montant, le montant de sortie et les frais. La signature exige une confirmation explicite même si aucune transaction ne sera diffusée. Uniquement après confirmation par l’utilisateur :
+
+```bash
+onekey swap execute --chain btc --order <orderId> --from-address-type taproot --sign-only
+```
+
+La réponse doit être une PSBT signée ou prête à être prévisualisée, et non le hash d’une transaction diffusée.

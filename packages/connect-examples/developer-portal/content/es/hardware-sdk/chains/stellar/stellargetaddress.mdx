@@ -1,0 +1,87 @@
+---
+title: "stellarGetAddress"
+---
+
+# stellarGetAddress
+
+## Stellar: obtener dirección [#stellar-get-address]
+
+Deriva y devuelve la dirección de la ruta especificada. Cuando `showOnOneKey` es `true`, el usuario debe confirmar la dirección en el dispositivo.
+
+```typescript
+const response = await HardwareSDK.stellarGetAddress(connectId, deviceId, params)
+```
+
+### Parámetros [#params]
+
+[Parámetros comunes opcionales](/es/hardware-sdk/concepts/common-params)
+
+**Una dirección**
+
+* `path` - _obligatorio_ `string | Array<number>`  Una ruta de cuenta de Stellar completamente endurecida, como `m/44'/148'/0'`. [más información](/es/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _opcional_ `boolean` Si se muestra la dirección en el dispositivo. El valor predeterminado es `true`.
+
+**Varias direcciones**
+
+* `bundle` - matriz de objetos que incluyen `path` y `showOnOneKey` como campos
+
+#### Ejemplo [#example]
+
+Muestra la dirección de la primera cuenta de Stellar:
+
+```typescript
+HardwareSDK.stellarGetAddress(connectId, deviceId, {
+    path: "m/44'/148'/0'"
+});
+```
+
+Devuelve un lote de direcciones de Stellar sin mostrarlas en el dispositivo:
+
+```typescript
+HardwareSDK.stellarGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/148'/0'", showOnOneKey: false }, // account 1
+        { path: "m/44'/148'/1'", showOnOneKey: false }, // account 2
+        { path: "m/44'/148'/2'", showOnOneKey: false }  // account 3
+    ]
+});
+```
+
+#### Resultado [#result]
+
+Respuesta de una dirección
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // displayed address
+        path: string // serialized BIP32 path
+    }
+}
+```
+
+Respuesta por lotes, en el mismo orden que la solicitud
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, path: string }, // account 1
+        { address: string, path: string }, // account 2
+        { address: string, path: string }  // account 3
+    ]
+}
+```
+
+Error
+
+```
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

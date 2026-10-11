@@ -1,0 +1,37 @@
+---
+title: "Provider erkennen"
+---
+
+<span id="detecting-the-provider" />
+
+# Provider erkennen
+
+Um zu erkennen, ob ein Nutzer OneKey bereits installiert hat, sollte eine Webanwendung prüfen, ob ein `window.$onekey.solana`-Objekt vorhanden ist.
+
+Die OneKey-Browsererweiterung, OneKey Mobile App und der integrierte Browser von OneKey Desktop können ein `$onekey.solana`-Objekt in unterstützte Browserkontexte injizieren.
+
+Wenn ein `window.$onekey.solana`-Objekt vorhanden ist, können Solana-Apps mit OneKey über die API interagieren unter `window.$onekey.solana`. Dieses `solana`-Objekt ist auch verfügbar unter `window.solana`, um ältere Integrationen zu unterstützen.
+
+Um zu erkennen, ob OneKey installiert ist, sollte eine Anwendung zusätzlich das Flag `isOneKey` prüfen.
+
+```javascript
+const isOneKeyInstalled = window.$onekey?.solana?.isOneKey;
+```
+
+Wenn OneKey nicht installiert ist, empfehlen wir, Ihre Nutzer weiterzuleiten auf [https://onekey.so/download/?client=browserExtension](https://onekey.so/download/?client=browserExtension). Insgesamt kann dies wie folgt aussehen.
+
+```javascript
+const getProvider = () => {
+  if ('$onekey' in window) {
+    const provider = window.$onekey?.solana;
+
+    if (provider?.isOneKey) {
+      return provider;
+    }
+  }
+
+  return undefined; // Show an installation link in the application UI.
+};
+```
+
+Wenn `getProvider()` den Wert `undefined` zurückgibt, zeigen Sie eine Aktion zur Installation oder Aktivierung der Wallet an und stoppen Sie den Verbindungsablauf. Öffnen Sie externe Links nur als Reaktion auf eine Nutzeraktion.

@@ -1,0 +1,55 @@
+---
+title: "Signer et envoyer une transaction"
+---
+
+<span id="sign-and-send-transaction" />
+
+# Signer et envoyer une transaction
+
+Une fois une transaction créée, l’application web peut demander au portefeuille OneKey de l’utilisateur de la signer et de l’envoyer à l’aide de la clé privée de son compte et de la connexion JSON RPC NEAR.
+
+La façon **la plus simple** et **recommandée** de procéder consiste à utiliser la méthode `requestSignTransactions` sur le fournisseur, mais il est également possible d’utiliser `request`.
+
+Dans les deux cas, l’appel renvoie une [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) pour un objet contenant `transactionHashes`.
+
+## requestSignTransactions() [#requestsigntransactions]
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const res = await provider.requestSignTransactions({
+  transactions: [transaction], // must be Array type
+});
+console.log('requestSignTransactions', res, res.transactionHashes);
+
+```
+
+## request() [#request]
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const res = await provider.request({
+  method: 'near_sendTransactions',
+  params: {
+    transactions: [transaction], // must be Array type
+  },
+});
+console.log('near_sendTransactions', res, res.transactionHashes);
+```
+
+La transaction peut aussi être sérialisée en une chaîne **`base64`** avant l’appel de la méthode.
+
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const transactionSerialized = btoa(String.fromCharCode(...transaction.encode()));
+
+const res = await provider.request({
+  method: 'near_sendTransactions',
+  params: {
+    transactions: [transactionSerialized], // must be Array type
+  },
+});
+console.log('near_sendTransactions', res, res.transactionHashes);
+```
+
+Gérez les demandes rejetées dans un bloc `try`/`catch`. Un hash de transaction renvoyé est un identifiant, pas une garantie de réussite de l’exécution ; vérifiez le résultat de la transaction via le RPC du réseau.

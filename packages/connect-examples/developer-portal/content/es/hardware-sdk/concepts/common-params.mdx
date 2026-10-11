@@ -1,0 +1,101 @@
+---
+description: "Consulta las vinculaciones de cartera compartidas, las opciones de transporte y los parámetros de rutas de derivación."
+title: "Parámetros comunes"
+---
+
+# Parámetros comunes
+
+La mayoría de los métodos de cadena y de dispositivo aceptan un objeto `params`; las API de inicialización, eventos y ciclo de vida tienen sus propias firmas. Las claves de esta página forman el conjunto compartido por los métodos de dirección, firma y dispositivo. Estas claves **no** son universales: `openWalletSession` rechaza `useEmptyPassphrase`, `initSession`, `deviceId`, y `passphraseState` incluso cuando esos valores son `false` o proceden de la expansión de un objeto compartido de valores predeterminados. Los campos específicos de cada cadena y dispositivo (`path`, `coin`, `tx`, `message`, …) se describen en la página de cada método.
+
+Esta página es la **referencia**. Para el ciclo de vida de las llamadas, consulta la [Guía de la API Core](/es/hardware-sdk/core-api-guide). Para los identificadores de respuesta (`connectId`, `deviceId`, `uuid`, `session_id`, …), consulta [Identificadores](/es/hardware-sdk/concepts/identifiers).
+
+<div id="common-params" />
+
+| Parámetro | Tipo | Finalidad | Notas |
+| --- | --- | --- | --- |
+| `passphraseState` | `string` | Vincular la llamada a una cartera oculta concreta | Obtén el valor una vez mediante `openWalletSession` (o el método obsoleto `getPassphraseState`); pásalo en cada llamada posterior que deba permanecer en esa cartera. No se puede combinar con `useEmptyPassphrase`. Es una huella de cartera, no el valor de firmware `session_id`. |
+| `useEmptyPassphrase` | `boolean` | Forzar la cartera estándar | Evita que una sesión residual de cartera oculta cambie la dirección de forma silenciosa. No se puede combinar con `passphraseState`. |
+| `initSession` | `boolean` | Forzar la inicialización de la sesión antes de la llamada | Combínalo con `passphraseState` en el flujo de compatibilidad. El código nuevo debe dar preferencia a `openWalletSession({ mode })` en lugar de mezclar `mode` con este indicador. |
+| `deriveCardano` | `boolean` | Prederivar el subárbol de Cardano | Defínelo en la primera llamada de Cardano de una sesión. |
+| `retryCount` | `number` | Límite de reintentos para establecer la conexión | Core lo usa al establecer o inicializar la conexión. No repite una operación de firma completada o fallida. |
+| `pollIntervalTime` | `number` | Intervalo de consulta (ms) entre reintentos | Se combina con `retryCount` durante la configuración de la conexión. |
+| `timeout` | `number` | Tiempo de espera del intento de conexión (ms) | No establece el tiempo de espera de la firma ni de la transferencia de firmware. |
+| `detectBootloaderDevice` | `boolean` | Fallar de inmediato si el dispositivo está en Bootloader | Úsalo en flujos de firma en los que Bootloader nunca sea válido. |
+| `skipWebDevicePrompt` | `boolean` | Omitir el selector WebUSB al volver a acceder | **Solo WebUSB.** Reutiliza la autorización WebUSB anterior. |
+| `keepSession` | `boolean` | Mantener el transporte después de la llamada | Controla si `Device.run()` libera la conexión. No es una vinculación de cartera y **no** se sustituye por `passphraseState` o `openWalletSession`. Consérvalo durante firmas USB consecutivas, comprobaciones seguidas de actualización y ventanas de actualización del firmware BLE en Electron. |
+
+## Notas específicas del transporte [#transport-specific-notes]
+
+| Parámetro | WebUSB | Bridge | node-usb | BLE en Android | BLE en iOS | BLE de escritorio |
+| --- | --- | --- | --- | --- | --- | --- |
+| `skipWebDevicePrompt` | ✅ | — | — | — | — | — |
+| `retryCount` / `pollIntervalTime` / `timeout` | Configuración de la conexión | Configuración de la conexión | Configuración de la conexión | Configuración de la conexión | Configuración de la conexión | Configuración de la conexión |
+| `passphraseState` / `useEmptyPassphrase` / `initSession` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `deriveCardano` / `detectBootloaderDevice` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+## Combinaciones habituales [#common-combos]
+
+**Cartera estándar: evitar solicitudes involuntarias de cartera oculta**
+
+```ts
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+```
+
+**Cartera oculta: reutilizar una vinculación entre llamadas**
+
+```ts
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: 'select-hidden',
+});
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden') {
+  throw new Error('A hidden wallet was not opened');
+}
+const hiddenWallet = {
+  passphraseState: opened.payload.passphraseState,
+};
+
+await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  ...hiddenWallet,
+});
+```
+
+Flujo de compatibilidad obsoleto: `getPassphraseState(connectId, { initSession: true })`, después pasa `{ initSession: true, passphraseState }` en las llamadas posteriores. Consulta [Sesiones de cartera](/es/hardware-sdk/concepts/wallet-session).
+
+**Reintentos prudentes de BLE (solo descubrimiento / dirección / firma)**
+
+```ts
+const bleDefaults = {
+  retryCount: 3,
+  pollIntervalTime: 1000,
+  timeout: 30_000,
+};
+```
+
+No propagues `bleDefaults` a `firmwareUpdateV2` / `V3` / `V4`. Consulta [Reconexión y liberación de recursos](/es/hardware-sdk/transport/reconnect).
+
+## Ruta HD [#hd-path]
+
+
+La longitud mínima de ruta de un método es una validación de entrada del SDK, no una garantía de que se admita cualquier ruta de esa longitud. El firmware también aplica reglas de derivación y endurecimiento propias de cada cadena.
+
+`path: string | number[]` sigue BIP44. Las cadenas ed25519 (Solana, NEAR, …) requieren una derivación completamente endurecida.
+
+| Cadena | Ruta de ejemplo | Notas |
+| --- | --- | --- |
+| EVM | `m/44'/60'/0'/0/0` | Cuenta EVM estándar |
+| BTC (SegWit anidado) | `m/49'/0'/0'/0/0` | Usa `84'` para SegWit nativo |
+| Solana | `m/44'/501'/0'/0'` | Completamente endurecida |
+| NEAR | `m/44'/397'/0'/0'/1'` | Completamente endurecida |
+| Cardano | `m/1852'/1815'/0'/0/0` | Staking en `.../2/0` |
+| TRON | `m/44'/195'/0'/0/0` | Ruta de estilo EVM |
+
+Ejemplo de array de números: `[(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0x80000000, 0, 0]`
+
+Errores de ruta prohibida: comprueba la longitud y el endurecimiento en la página del método de la cadena.
+
+En Protocol V1, `select-hidden` puede devolver una cartera estándar cuando la protección por frase de contraseña está desactivada. Comprueba `walletType` antes de guardar o usar `passphraseState`.

@@ -1,0 +1,274 @@
+---
+title: "API del proveedor"
+---
+
+<span id="provider-api" />
+
+# API del proveedor
+
+La extensión de navegador de OneKey inyecta una API global en los sitios web que visitan sus usuarios en `window.$onekey.ethereum`. Esta API permite a los sitios web solicitar las cuentas Ethereum del usuario, leer datos de las blockchains a las que está conectado y proponerle que firme mensajes y transacciones. Detectar un proveedor no significa que el usuario haya conectado una cuenta ni autorizado una solicitud.
+
+La API del proveedor JavaScript de Ethereum está definida por [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193). Para aplicaciones modernas, se recomienda encarecidamente usar [EIP-6963](https://eips.ethereum.org/EIPS/eip-6963) para detectar varios proveedores de cartera, lo que evita conflictos entre extensiones de navegador.
+
+## Detección del proveedor [#provider-detection]
+
+Para garantizar la compatibilidad y una buena experiencia en entornos con varias carteras, se recomienda encarecidamente detectar proveedores con el estándar **EIP-6963**.
+
+### Recomendado: EIP-6963 para admitir varias carteras [#recommended-eip-6963-for-multi-wallet-support]
+
+OneKey es totalmente compatible con **EIP-6963**, que permite a las dApps detectar varios proveedores de cartera instalados sin conflictos. Es el enfoque moderno recomendado para todas las dApps.
+
+```javascript
+// This code snippet demonstrates how to listen for announced providers
+// and store them for your dApp to use.
+
+let onekeyProvider = null;
+
+const onAnnounceProvider = (event) => {
+  // The event.detail contains the provider info and the provider object itself.
+  // event.detail = { info: { uuid, name, icon, rdns }, provider }
+  if (event.detail.info.rdns === 'so.onekey.app.wallet') {
+    onekeyProvider = event.detail.provider;
+  }
+  // You can also store all providers in an array to let users choose.
+};
+
+// Listen for the announcement event from all wallets
+window.addEventListener('eip6963:announceProvider', onAnnounceProvider);
+
+// It's also good practice to dispatch a request event to prompt wallets
+// that may have loaded after the initial page load.
+window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+// Use the discovered provider when the user selects OneKey and clicks Connect.
+// Announcements are asynchronous; do not treat a fixed timeout as proof that
+// the wallet is not installed. Remove the event listener when your UI unmounts.
+```
+
+#### Detección heredada y objetos de proveedor [#legacy-detection--provider-objects]
+
+Por compatibilidad con dApps antiguas, OneKey también inyecta su proveedor en `window.ethereum`.
+
+* `window.ethereum`: Es el objeto de proveedor de uso habitual. Sin embargo, si el usuario tiene varias carteras instaladas, esta variable puede sobrescribirse y causar conflictos. OneKey la usa para maximizar la compatibilidad.
+* `window.$onekey.ethereum`: Para evitar conflictos, OneKey también ofrece su proveedor mediante esta variable privada con espacio de nombres. Esto permite a una dApp seleccionar OneKey específicamente cuando sea necesario, aunque se prefiere EIP-6963.
+
+### Uso básico [#basic-usage]
+
+Para que funcione una aplicación web de Ethereum (dApp) que no sea trivial, debes realizar tres tareas fundamentales:
+
+1. **Detectar un proveedor de Ethereum:** Primero debes comprobar si el usuario tiene instalada una cartera como OneKey. La forma recomendada es usar el estándar **EIP-6963**, como se detalla en la sección **Detección del proveedor** anterior.
+2. **Acceder a las cuentas del usuario:** Tras detectar un proveedor, debes solicitar permiso para consultar las cuentas del usuario. Normalmente se hace llamando al método `eth_requestAccounts` del objeto de proveedor.
+3. **Supervisar los cambios de red:** El usuario puede cambiar de red (por ejemplo, entre la red principal de Ethereum y Sepolia) en cualquier momento. Tu dApp debe escuchar el evento `chainChanged` para conocer la red conectada en cada momento.
+
+El objeto de proveedor es la herramienta esencial para crear una aplicación Web3 completa. Aunque puedes usar directamente la API del proveedor para todas las interacciones, muchos desarrolladores prefieren una biblioteca que simplifique el desarrollo. Recomendamos bibliotecas sólidas y probadas por la comunidad, como [**ethers.js**](https://ethers.io/) o [**viem**](https://viem.sh/), que ofrecen abstracciones y utilidades de nivel superior.
+
+### Identificadores de cadena [#chain-ids]
+
+Consulta la cadena seleccionada en lugar de fijar una lista de compatibilidad de carteras en el código. Los identificadores de cadena que devuelve el proveedor son cadenas hexadecimales.
+
+```javascript
+const chainId = await provider.request({ method: 'eth_chainId' });
+console.log(chainId); // For example, '0x1' for Ethereum mainnet.
+```
+
+Comprueba que la cadena figure entre las redes compatibles con tu aplicación antes de construir una transacción. Consulta [API RPC](/es/connect-to-software/provider/eth/reference) para añadir una red.
+
+### Métodos [#methods]
+
+Una vez obtenido un objeto de proveedor (por ejemplo, mediante EIP-6963), puedes usar los siguientes métodos EIP-1193 para interactuar con la cartera del usuario.
+
+#### `eth_requestAccounts` [#eth_requestaccounts]
+
+Usa `eth_requestAccounts` para solicitar una o varias cuentas de la cartera del usuario. La llamada normalmente muestra una solicitud de conexión al usuario.
+
+```javascript
+try {
+  const accounts = await window.$onekey.ethereum.request({ method: 'eth_requestAccounts' });
+  // handle accounts
+} catch (error) {
+  // handle error, e.g., user rejected request
+}
+```
+
+#### `window.$onekey.ethereum.isConnected()` [#windowonekeyethereumisconnected]
+
+> **Consejo**\
+> Este método no tiene relación con las cuentas del usuario.\
+> Es habitual encontrar la palabra «conectado» para indicar si un sitio Web3 puede acceder a las cuentas del usuario. Sin embargo, en la interfaz del proveedor, «conectado» y «desconectado» indican si el proveedor puede realizar solicitudes RPC a la cadena actual.
+
+```typescript
+interface EthereumProvider {
+  isConnected(): boolean;
+}
+```
+
+Devuelve `true` si el proveedor está conectado a la cadena actual, y `false` en caso contrario.
+
+Si el proveedor no está conectado, hay que recargar la página para restablecer la conexión. Consulta los eventos `connect` y `disconnect` para obtener más información.
+
+#### `window.$onekey.ethereum.request(args)` [#windowonekeyethereumrequestargs]
+
+```typescript
+interface RequestArguments {
+  method: string;
+  params?: unknown[] | object;
+}
+
+interface EthereumProvider {
+  request(args: RequestArguments): Promise<unknown>;
+}
+```
+
+Usa `request` para enviar solicitudes RPC a Ethereum mediante la extensión de navegador de OneKey. Devuelve una `Promise` que se resuelve con el resultado de la llamada al método RPC.
+
+El parámetro `params` y el valor devuelto varían según el método RPC. En la práctica, si un método tiene `params`, casi siempre son de tipo `Array<any>`.
+
+Si la solicitud falla por cualquier motivo, la `Promise` se rechaza con un error RPC de Ethereum.
+
+La extensión de navegador de OneKey admite la mayoría de los métodos RPC estandarizados de Ethereum, además de varios métodos que otras carteras pueden no admitir.
+
+Consulta [API RPC](/es/connect-to-software/provider/eth/reference) para consultar los detalles de los métodos.
+
+**Ejemplo**
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+const [from] = await provider.request({ method: 'eth_requestAccounts' });
+const to = '<RECIPIENT_EVM_ADDRESS>'; // Replace with a valid 20-byte address.
+
+try {
+  const transactionHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{ from, to, value: '0x0' }],
+  });
+  console.log('Submitted transaction:', transactionHash);
+} catch (error) {
+  console.error(error.code, error.message);
+}
+```
+
+### Eventos [#events]
+
+El proveedor de la extensión de navegador de OneKey implementa [Node.js `EventEmitter` API](https://nodejs.org/api/events.html#events_class_eventemitter). Esta sección detalla los eventos emitidos mediante esa API.
+
+Existen innumerables guías de `EventEmitter` en otros sitios, pero puedes escuchar eventos de esta forma:
+
+```javascript
+window.$onekey.ethereum.on('accountsChanged', (accounts) => {
+  // Handle the new accounts, or lack thereof.
+  // "accounts" will always be an array, but it can be empty.
+});
+
+window.$onekey.ethereum.on('chainChanged', (chainId) => {
+  // Handle the new chain.
+  // Correctly handling chain changes can be complicated.
+  // We recommend reloading the page unless you have good reason not to.
+  window.location.reload();
+});
+```
+
+#### `connect` [#connect]
+
+```typescript
+interface ConnectInfo {
+  chainId: string;
+}
+
+const handler = (connectInfo: ConnectInfo) => {
+  console.log(connectInfo);
+};
+window.$onekey.ethereum.on('connect', handler);
+```
+
+El proveedor de la extensión de navegador de OneKey emite este evento cuando puede enviar solicitudes RPC a una cadena por primera vez.
+
+Recomendamos usar un controlador del evento `connect` y el método `window.$onekey.ethereum.isConnected()` para determinar si el proveedor está conectado y cuándo lo está.
+
+#### `disconnect` [#disconnect]
+
+```typescript
+const handler = (error: ProviderRpcError) => {
+  console.log(error);
+};
+window.$onekey.ethereum.on('disconnect', handler);
+```
+
+El proveedor de OneKey emite este evento si deja de poder enviar solicitudes RPC a cualquier cadena. Por lo general, esto solo ocurre por problemas de conectividad de red o por un error imprevisto.
+
+Una vez emitido `disconnect`, el proveedor no acepta nuevas solicitudes hasta que se restablece la conexión con la cadena, lo que requiere recargar la página. También puedes usar el método `window.$onekey.ethereum.isConnected()` para determinar si el proveedor está desconectado.
+
+#### `accountsChanged` [#accountschanged]
+
+```typescript
+const handler = (accounts: Array<string>) => {
+  console.log(accounts);
+};
+window.$onekey.ethereum.on('accountsChanged', handler);
+```
+
+El proveedor de OneKey emite este evento cada vez que cambia el valor devuelto por el método RPC `eth_accounts`. `eth_accounts` devuelve una matriz de direcciones de cuentas expuestas, que puede estar vacía. Cada dirección devuelta corresponde a una cuenta a la que el solicitante tiene permiso para acceder. Los solicitantes se identifican por el origen de su URL, de modo que todos los sitios con el mismo origen comparten los mismos permisos.
+
+Esto significa que `accountsChanged` se emite cada vez que cambia la dirección de cuenta expuesta del usuario.
+
+#### `chainChanged` [#chainchanged]
+
+> **Consejo**\
+> Consulta `eth_chainId` para obtener la cadena seleccionada.
+
+```typescript
+const handler = (chainId: string) => {
+  console.log(chainId);
+};
+window.$onekey.ethereum.on('chainChanged', handler);
+```
+
+El proveedor de la extensión de navegador de OneKey emite este evento cuando cambia la cadena conectada.
+
+Todas las solicitudes RPC se envían a la cadena conectada en ese momento. Por eso es esencial conocer el ID de la cadena actual escuchando este evento.
+
+Una forma habitual de gestionarlo es recargar la página:
+
+```javascript
+window.$onekey.ethereum.on('chainChanged', (_chainId) => window.location.reload());
+```
+
+#### `message` [#message]
+
+```typescript
+interface ProviderMessage {
+  type: string;
+  data: unknown;
+}
+
+const handler = (message: ProviderMessage) => {
+  console.log(message);
+};
+window.$onekey.ethereum.on('message', handler);
+```
+
+El proveedor de OneKey emite este evento cuando recibe un mensaje del que debe informarse al consumidor. El tipo de mensaje se identifica mediante la cadena `type`.
+
+EIP-1193 define `message` para las notificaciones del proveedor. No des por hecho que un proveedor inyectado admite `eth_subscribe`; verifica el método solicitado en la cartera y la red de destino.
+
+### Errores [#errors]
+
+Todos los errores que lanza o devuelve el proveedor de OneKey siguen esta interfaz:
+
+```typescript
+interface ProviderRpcError extends Error {
+  message: string;
+  code: number;
+  data?: unknown;
+}
+```
+
+La llamada a `request(args)` se rechaza cuando falla una solicitud. A menudo puedes usar la propiedad `code` para determinar por qué falló la solicitud.
+
+Estos son algunos códigos habituales y su significado:
+
+* **4001**: El usuario rechazó la solicitud.
+* **-32602**: Los parámetros no eran válidos.
+* **-32603**: Error interno.
+
+Para consultar la lista completa de errores, consulta [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193#provider-errors) y [EIP-1474](https://eips.ethereum.org/EIPS/eip-1474).

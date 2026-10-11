@@ -1,0 +1,73 @@
+---
+title: "signEvent"
+---
+
+# signEvent
+
+## Méthode [#method]
+
+```
+declare function signEvent(event: UnsignedEvent): Promise<Event>;
+```
+
+## Paramètres [#params]
+
+* `event` — _obligatoire_ `object`
+  * `kind` — _obligatoire_ `number`
+  * `content`— _obligatoire_ `string`
+  * `tags` — _obligatoire_ `Array<Array<string>>`
+  * `created_at` — _obligatoire_ `number` Horodatage Unix en secondes
+
+```typescript
+export type UnsignedEvent = {
+  kind: EventKind;
+  content: string;
+  tags: string[][];
+  created_at: number;
+};
+
+export enum EventKind {
+  Metadata = 0,
+  Text = 1,
+  RelayRec = 2,
+  Contacts = 3,
+  DM = 4,
+  Deleted = 5,
+}
+```
+
+## Réponse [#response]
+
+Accepte un objet événement, ajoute `id`, `pubkey` et `sig`, puis le renvoie.
+
+## Résultat [#result]
+
+```typescript
+export type Event = {
+  id: string;
+  kind: EventKind;
+  pubkey: string;
+  content: string;
+  tags: string[][];
+  created_at: number;
+  sig: string;
+};
+```
+
+## Exemple [#example]
+
+```typescript
+const event = {
+  created_at: Math.floor(Date.now() / 1000),
+  kind: 1,
+  content: "OneKey 🚀",
+  tags: [],
+};
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const signedEvent = await provider.signEvent(event);
+```
+
+## Démonstration [#demo]
+
+[Ouvrir l’exemple](https://codepen.io/OneKeyHQ/pen/YzBOVgV)

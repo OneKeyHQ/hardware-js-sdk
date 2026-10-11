@@ -1,0 +1,87 @@
+---
+title: "Démarrage rapide"
+description: "Installez les compétences de portefeuille OneKey, connectez une session et essayez une demande en lecture seule."
+---
+
+<span id="quickstart" />
+
+# Démarrage rapide
+
+> Bêta privée. L’accès, les commandes prises en charge et les parcours de portefeuille dépendent de vos versions de OneKey et de la CLI. Consultez le schéma de la CLI installée avant d’utiliser ces exemples.
+
+Commencez par installer les compétences de portefeuille OneKey dans votre client IA. Les utilisateurs pourront ensuite poser des questions sur leur portefeuille en langage naturel ; les compétences gèrent en arrière-plan les vérifications préalables de la CLI, la découverte du schéma et l’orientation sécurisée des commandes.
+
+Les demandes en lecture seule doivent renvoyer des résultats immédiatement. Les cotations, constructions, audits et simulations expliquent ce qui se produirait sans déplacer de fonds. Les transferts, l’exécution des échanges, les autorisations, les diffusions et la signature exigent un tour de confirmation explicite.
+
+## 1. Installer les compétences [#1-install-the-skills]
+
+### Claude Code [#claude-code]
+
+```text
+/plugin marketplace add OneKeyHQ/onekey-wallet-skills
+/plugin install onekey-wallet-skills
+```
+
+### Codex [#codex]
+
+Indiquez à Codex :
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md
+```
+
+### Cursor [#cursor]
+
+Clonez le pack de compétences et indiquez à Cursor le répertoire du plugin :
+
+```bash
+git clone https://github.com/OneKeyHQ/onekey-wallet-skills
+```
+
+### OpenCode et OpenClaw [#opencode-and-openclaw]
+
+Utilisez le guide d’installation du dépôt [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) pour chaque client. Tous les clients utilisent les quatre mêmes compétences : portefeuille, échange, marché et sécurité.
+
+## 2. Connecter un Agent Wallet [#2-connect-an-agent-wallet]
+
+Demandez à votre client IA :
+
+```text
+Connect my OneKey Agent Wallet.
+```
+
+La compétence associe la session locale via App Transfer dans l’interface graphique OneKey et résume le portefeuille actif. Si la CLI `onekey` est absente, la vérification préalable de la compétence l’installe avant de poursuivre ; les utilisateurs ne devraient pas avoir à configurer manuellement les commandes CLI.
+
+## 3. Essayer des instructions en lecture seule [#3-try-read-only-prompts]
+
+Commencez par des instructions qui ne déplacent pas de fonds :
+
+| Demander au client IA | Compétence à utiliser |
+| --- | --- |
+| `Show my wallet balance.` | Portefeuille |
+| `Show my receiving address for ETH.` | Portefeuille |
+| `What tokens are trending right now?` | Marché |
+| `What is the price of SOL?` | Marché |
+| `Is this token safe before I buy it?` | Sécurité |
+
+La réponse doit commencer par le résultat : état du portefeuille, itinéraire, risque et une prochaine étape utile. Elle ne doit pas afficher la sortie brute du terminal.
+
+## 4. Obtenir une cotation avant de négocier [#4-quote-before-trading]
+
+Demandez :
+
+```text
+Quote a swap from 1 ETH to USDC. Do not execute yet.
+```
+
+La compétence d’échange doit obtenir une cotation, effectuer les contrôles de sécurité pertinents, afficher l’itinéraire et le montant de sortie attendus, puis s’arrêter avant l’exécution. Une confirmation ultérieure telle que `Yes, execute the swap` ne doit exécuter que l’ordre déjà examiné.
+
+## 5. Utiliser la confirmation matérielle [#5-use-hardware-confirmation]
+
+Pour les actions à risque plus élevé, demandez :
+
+```text
+Use my OneKey hardware wallet for this transfer.
+```
+
+La compétence de portefeuille passe à une session reposant sur le matériel, dans laquelle les demandes de signature prises en charge nécessitent une vérification et une confirmation par l’utilisateur sur l’appareil. Les détails de Clear Signing disponibles dépendent de la chaîne, du micrologiciel et de la version de la CLI. Après la connexion matérielle, les instructions de portefeuille, de transfert, d’échange et de signature utilisent la session matérielle active ; vérifiez son adresse avant de préparer une action déplaçant des fonds.

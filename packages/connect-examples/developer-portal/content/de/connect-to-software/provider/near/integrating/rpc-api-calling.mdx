@@ -1,0 +1,45 @@
+---
+title: "RPC-API-Aufrufe"
+---
+
+<span id="rpc-api-calling" />
+
+# RPC-API-Aufrufe
+
+OneKey verwendet die Methode `provider.request({ method, params })` als Wrapper für die [NEAR-RPC-API](https://docs.near.org/api/rpc/introduction).
+
+Sie können RPC-Methoden über den ausgewählten Netzwerkendpunkt aufrufen, zum Beispiel:
+
+[https://docs.near.org/api-reference/post-status](https://docs.near.org/api-reference/post-status)
+
+```javascript
+const res = await provider.request({
+  'method': 'status',
+});
+console.log('RPC Call: status', res);
+```
+
+[https://docs.near.org/api/rpc/gas#gas-price](https://docs.near.org/api/rpc/gas#gas-price)
+
+```javascript
+const res = await provider.request({
+  'method': 'gas_price',
+  'params': [null],
+});
+console.log('RPC Call: gas_price', res);
+```
+
+[https://docs.near.org/api/rpc/contracts#view-access-key-list](https://docs.near.org/api/rpc/contracts#view-access-key-list)
+
+```javascript
+const res = await provider.request({
+  'method': 'query',
+  'params': {
+    'request_type': 'view_access_key_list',
+    'account_id':
+      'c3be856133196da252d0f1083614cdc87a85c8aa8abeaf87daff1520355eec53',
+    'finality': 'optimistic',
+  },
+});
+console.log('RPC Call: view_access_key_list', res);
+```

@@ -1,0 +1,54 @@
+---
+title: "eth_accounts"
+description: "Verbundene Ethereum-Konten abrufen"
+---
+
+# eth_accounts
+
+Gibt eine Liste der von der Wallet freigegebenen Adressen zurück, auf die der Aufrufer zugreifen darf. Anders als `eth_requestAccounts` öffnet diese Methode kein Verbindungs-Popup.
+
+---
+
+## Parameter [#parameters]
+
+Keine
+
+---
+
+## Rückgabe [#returns]
+
+`string[]` - Ein Array von Ethereum-Adressen oder ein leeres Array, wenn kein Konto für die Website freigegeben ist.
+
+---
+
+## Beispiel [#example]
+
+```typescript
+const accounts = await window.$onekey.ethereum.request({
+  method: 'eth_accounts'
+})
+
+if (accounts.length > 0) {
+  console.log('Connected:', accounts[0])
+} else {
+  console.log('Not connected')
+}
+```
+
+---
+
+## Hinweise [#notes]
+
+- Gibt ein leeres Array zurück `[]`, wenn der Nutzer nicht verbunden ist
+- Verwenden Sie `eth_requestAccounts`, um eine Verbindung herzustellen
+- Auf das Ereignis `accountsChanged` reagieren, um Kontoänderungen zu erkennen
+
+```typescript
+window.$onekey.ethereum.on('accountsChanged', (accounts) => {
+  if (accounts.length === 0) {
+    console.log('Disconnected')
+  } else {
+    console.log('Account changed:', accounts[0])
+  }
+})
+```

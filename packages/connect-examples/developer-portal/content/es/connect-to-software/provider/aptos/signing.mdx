@@ -1,0 +1,116 @@
+---
+title: "Firma"
+description: "Firma mensajes en Aptos con OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Firma
+
+Conecta el proveedor antes de firmar y confirma la red seleccionada. El proveedor inyectado directo y el adaptador Aptos Wallet Standard usan tipos de argumentos distintos; no intercambies sus ejemplos. Sustituye las direcciones abreviadas y proporciona un cliente SDK para las llamadas de solo lectura.
+
+Aprende a firmar mensajes para autenticación o verificación.
+
+---
+
+## Firmar un mensaje [#sign-message]
+
+Firma mensajes arbitrarios para autenticación o verificación:
+
+```typescript
+const message = 'Welcome to MyApp!\n\nClick to sign in.\n\nNonce: abc123'
+
+const response = await provider.signMessage({
+  message,
+  nonce: 12345, // Example only; obtain a single-use challenge from your server
+})
+
+console.log({
+  signature: response.signature,   // Hex-encoded signature
+  fullMessage: response.fullMessage, // Full signed message
+  prefix: response.prefix,         // Message prefix used
+})
+```
+
+---
+
+## Opciones de firma de mensajes [#sign-message-options]
+
+```typescript
+const response = await provider.signMessage({
+  message: 'Hello Aptos',
+  nonce: 12345,
+  address: true,      // Include address in message
+  application: true,  // Include app info
+  chainId: true,      // Include chain ID
+})
+```
+
+---
+
+## Verificar un mensaje (fuera de la cadena) [#verify-message-off-chain]
+
+```typescript
+import nacl from 'tweetnacl'
+
+const { signature, fullMessage } = await provider.signMessage({
+  message: 'Hello Aptos',
+  nonce: 12345,
+})
+
+const account = await provider.account()
+const pubKeyBytes = Buffer.from(account.publicKey.slice(2), 'hex')
+const signatureBytes = Buffer.from(signature.slice(2), 'hex')
+const messageBytes = Buffer.from(fullMessage)
+
+const isValid = nacl.sign.detached.verify(messageBytes, signatureBytes, pubKeyBytes)
+console.log('Signature valid:', isValid)
+```
+
+---
+
+## Iniciar sesión (estándar AIP) [#sign-in-aip-standard]
+
+Para un flujo de inicio de sesión estandarizado:
+
+```typescript
+const signInInput = {
+  // Sign-in parameters
+}
+
+const result = await provider.signIn(signInInput)
+
+console.log({
+  address: result.account.address,
+  publicKey: result.account.publicKey,
+  signature: result.signature,
+})
+```
+
+---
+
+## Gestión de errores [#error-handling]
+
+```typescript
+try {
+  await provider.signMessage({ message: 'Hello', nonce: 12345 })
+} catch (error) {
+  switch (error.code) {
+    case 4001:
+      console.log('User rejected the request')
+      break
+    case 4100:
+      console.log('The account or method is not authorized')
+      break
+    case 4200:
+      console.log('Unsupported method')
+      break
+    default:
+      console.error('Error:', error.message)
+  }
+}
+```
+
+El método directo `signMessage` usa un nonce numérico. `signMessageCompatible` y las integraciones Wallet Standard usan un nonce de tipo cadena. Verifica el valor devuelto de `fullMessage`, el firmante y el desafío, e invalida el desafío tras su uso. Los datos de inicio de sesión anteriores son un ejemplo esquemático; construye el objeto completo `AptosSignInInput` que requiera tu versión del adaptador.

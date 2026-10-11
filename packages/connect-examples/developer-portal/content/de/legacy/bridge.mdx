@@ -1,0 +1,23 @@
+---
+title: "OneKey-Bridge-Referenz"
+description: "Historische Integration. Neue Browserintegrationen sollten [WebUSB](/en/hardware-sdk/transport/web-usb) verwenden. Machen Sie die Bridge-Installation nicht zur Voraussetzung des aktuellen WebUSB-Ablaufs."
+---
+
+<span id="onekey-bridge-reference" />
+
+# OneKey-Bridge-Referenz
+
+> Historische Integration. Neue Browserintegrationen sollten verwenden: [WebUSB](/de/hardware-sdk/transport/web-usb). Machen Sie die Bridge-Installation nicht zur Voraussetzung des aktuellen WebUSB-Ablaufs.
+
+Der alte Bridge-Transport stellte zwei Prüfungen bereit:
+
+| Methode | Frühere Erfolgsnutzlast | Zweck |
+| --- | --- | --- |
+| `checkBridgeStatus()` | `boolean` | Ob der lokale Bridge-Client betriebsbereit ist. |
+| `checkTransportRelease()` | `string` | Versionsstatus der lokalen Bridge, dokumentiert als `valid` oder `outdated`. |
+
+Beide historischen Referenzen verwenden `success` und `payload`, mit `payload.error` und einem optionalen Fehlercode bei einem Fehler. Eine erfolgreiche Bridge-Prüfung beweist weder Geräteerkennung noch Wallet-Zugriff oder Signierberechtigung.
+
+Prüfen Sie vor der Wartung dieses Ablaufs diese Exporte und Transportanforderungen in der exakt von Ihrer Anwendung verwendeten SDK-Version. Entfernen Sie bei der Migration Bridge-spezifische Prüfungen und Aufforderungen und folgen Sie [Bridge zu common-connect WebUSB](/de/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb).
+
+Ursprüngliche Referenzen: [checkBridgeStatus](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-hardware/hardware-sdk/api-reference/device-api/checkbridgestatus.md), [checkTransportRelease](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-hardware/hardware-sdk/api-reference/device-api/checktransportrelease.md).

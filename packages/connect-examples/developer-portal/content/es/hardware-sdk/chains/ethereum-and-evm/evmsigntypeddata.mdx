@@ -1,0 +1,186 @@
+---
+title: "evmSignTypedData"
+---
+
+# evmSignTypedData
+
+### Ethereum: firmar datos tipados [#ethereum-sign-typed-data]
+
+Solicita al dispositivo que firme un mensaje de datos tipados [EIP-712](https://eips.ethereum.org/EIPS/eip-712) con la clave privada derivada de la ruta BIP32 especificada.
+
+El dispositivo pide al usuario que confirme la solicitud. El nivel de detalle mostrado depende de si se usa firma de datos interpretados o firma de hashes.
+
+* **Compatible con EIP-712 (v3 y v4)**
+* **Usa `evmSignTypedData` para firmar datos estructurados tipados**
+* **No se usa para firmar datos tipados EIP-191**
+* **Usa** [evmSignMessage](/es/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) **para firmar EIP-191 (**&#x70;ersonal\_sign)
+
+```typescript
+const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, params);
+```
+
+### Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `3`. [leer más](/es/hardware-sdk/concepts/common-params#hd-path)
+* `data` - _obligatorio_ `Object` del tipo `EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>`. La especificación EIP-712 contiene una definición de JSON Schema.
+* `metamaskV4Compat` - _obligatorio_ `boolean` establecido en `true` para mantener la compatibilidad con [signTypedData\_v4 de MetaMask](https://docs.metamask.io/metamask-connect/evm/guides/sign-data/#sign-typed-data-v4).
+* `chainId` - _opcional_ `number` ChainId en ETH es un identificador único de una red Ethereum específica, usado para distinguir distintas versiones de la cadena de bloques. [Referencia](https://github.com/ethereum-lists/chains/tree/master/_data/chains).
+
+### Firma de datos interpretados [#parsed-signing]
+
+Pasa el objeto EIP-712 completo, incluido `types.EIP712Domain`, y establece `metamaskV4Compat` para que coincida con la solicitud original. En el flujo de firma de datos interpretados, el dispositivo solicita al SDK las definiciones de tipos y los valores de los campos. El detalle disponible depende del dispositivo y del firmware; consulta la [guía de Clear Signing](/es/hardware-sdk/signers/evm#clear-signing).
+
+### Alternativa de firma de hashes [#hash-signing-fallback]
+
+Cuando el SDK selecciona la firma de hashes, el dispositivo recibe hashes precalculados en lugar del mensaje estructurado. Esto es firma ciega, no Clear Signing estructurado. Los hashes deben derivarse de **exactamente los mismos datos** con el mismo modo de codificación; el SDK no calcula ni compara los hashes proporcionados con `data`.
+
+- `domainHash`: opcional para la firma de datos interpretados; obligatorio para la alternativa de hashes. Hash de 32 bytes del dominio EIP-712, codificado en hexadecimal.
+- `messageHash`: opcional en el tipo público, pero obligatorio en las ramas actuales de selección automática de la alternativa. Hash de 32 bytes de la estructura del mensaje EIP-712, codificado en hexadecimal; no es el resumen final de firma `0x1901`. Una solicitud que solo contiene el dominio (`primaryType: 'EIP712Domain'`) puede omitirlo durante la firma de datos interpretados; la validación actual de la alternativa sigue exigiendo ambos hashes.
+
+El SDK actual selecciona la alternativa en estos casos:
+
+| Condición | Alcance |
+| --- | --- |
+| No hay capacidad para interpretar EIP-712 o se supera un límite de formato | Classic, Mini, Classic1s y Classic Pure; Classic1s/Pure no son dispositivos que siempre usen firma ciega |
+| Matrices anidadas en los datos proporcionados | Todas las familias de dispositivos |
+| Los bytes hexadecimales de `message.data` superan el límite aplicable | 1,536 bytes para Classic1s/Pure y Pro2/Neo; 1,536 bytes para Touch/Pro con firmware 4.4.0 o posterior; 1,024 bytes en los demás casos |
+
+La comprobación de tamaño anterior mide `message.data`, no el documento JSON completo. La familia Classic/Mini también tiene límites de formato: 16 campos por estructura, 63 caracteres por nombre de tipo o miembro, 24 campos de tipo matriz, una profundidad de ruta de acceso de 6, 8 estructuras de dependencias personalizadas sin contar el tipo principal ni el dominio, y 1,536 bytes por valor string/bytes. Las matrices de valores primitivos se limitan a 24 elementos; las matrices de estructuras tienen ese límite en modo v4. Las dependencias cíclicas de tipos también activan la alternativa.
+
+En Touch/Pro, la firma de hashes requiere firmware 4.2.0 o posterior. El firmware anterior devuelve `CallMethodNeedUpgradeFirmware` cuando se selecciona esta vía.
+
+Proporcionar hashes no fuerza la vía de hashes si está disponible la firma de datos interpretados. Si se requiere la alternativa y faltan hashes, la llamada falla. Gestiona esto explícitamente en la política de firma de la aplicación; no sustituyas silenciosamente la solicitud original ni afirmes que una firma correcta demuestra que se mostraron todos los campos.
+
+### Ejemplo [#example]
+
+Este fragmento usa `ethers` v6 para preparar hashes alternativos compatibles con v4. Reutiliza un SDK inicializado y la cartera seleccionada. Los hashes no evitan la confirmación en el dispositivo.
+
+```typescript
+import { TypedDataEncoder } from 'ethers';
+
+const eip712Data = {
+    types: {
+        EIP712Domain: [
+            {
+                name: 'name',
+                type: 'string',
+            },
+            { name: 'chainId', type: 'uint256' },
+        ],
+        Message: [
+            {
+                name: "wallet",
+                type: "string"
+            },
+            {
+                name: "number",
+                type: "uint64"
+            }
+        ]
+    },
+    primaryType: 'Message',
+    domain: {
+        name: 'example.onekey.io',
+        chainId: 1,
+    },
+    message: {
+        "wallet": "OneKey Wallet",
+        // be careful with JavaScript numbers: MAX_SAFE_INTEGER is quite low
+        "number": `${2n ** 55n}`,
+    },
+};
+
+const { EIP712Domain, ...messageTypes } = eip712Data.types;
+const domainHash = TypedDataEncoder.hashDomain(eip712Data.domain);
+const messageHash = TypedDataEncoder.from(messageTypes).hash(eip712Data.message);
+
+const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+    path: "m/44'/60'/0'/0/0",
+    data: eip712Data,
+    metamaskV4Compat: true,
+    domainHash,
+    messageHash,
+    chainId: eip712Data.domain.chainId,
+});
+if (result.success === false) throw new Error(result.payload.error);
+```
+
+### Safe Tx [#safe-tx]
+
+Usa el esquema canónico de Safe v1.3.0 `SafeTx` que aparece a continuación en firmware compatible. Establece `domain.verifyingContract` en la dirección de Safe, usa la red real y proporciona los diez campos del mensaje. `operation` es `0` para CALL o `1` para DELEGATECALL. Este ejemplo usa direcciones de ejemplo y un nonce de Safe de cero; sustitúyelos por la transacción exacta propuesta por tu aplicación. Omite los hashes alternativos, de modo que las solicitudes que requieran firma de hashes fallen en lugar de proporcionar esos hashes automáticamente.
+
+```typescript
+const safeTypedData = {
+  types: {
+    EIP712Domain: [
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' },
+    ],
+    SafeTx: [
+      { name: 'to', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'data', type: 'bytes' },
+      { name: 'operation', type: 'uint8' },
+      { name: 'safeTxGas', type: 'uint256' },
+      { name: 'baseGas', type: 'uint256' },
+      { name: 'gasPrice', type: 'uint256' },
+      { name: 'gasToken', type: 'address' },
+      { name: 'refundReceiver', type: 'address' },
+      { name: 'nonce', type: 'uint256' },
+    ],
+  },
+  primaryType: 'SafeTx',
+  domain: {
+    chainId: 1,
+    verifyingContract: '0x1111111111111111111111111111111111111111',
+  },
+  message: {
+    to: '0x2222222222222222222222222222222222222222',
+    value: '0',
+    data: '0x',
+    operation: '0',
+    safeTxGas: '0',
+    baseGas: '0',
+    gasPrice: '0',
+    gasToken: '0x0000000000000000000000000000000000000000',
+    refundReceiver: '0x0000000000000000000000000000000000000000',
+    nonce: '0',
+  },
+};
+
+const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  data: safeTypedData,
+  metamaskV4Compat: true,
+  chainId: safeTypedData.domain.chainId,
+});
+if (result.success === false) throw new Error(result.payload.error);
+```
+
+Esto devuelve una firma de propietario, no una transacción difundida. Mantén intactos los datos tipados al verificar y recopilar firmas. Consulta [integración de Safe Tx](/es/hardware-sdk/signers/evm#eip-712-and-safe-tx) para distinguirla de las llamadas a Safe en la cadena.
+
+#### Resultado [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,
+        signature: string, // hexadecimal string without the "0x" prefix
+    }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

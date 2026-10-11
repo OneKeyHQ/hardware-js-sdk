@@ -1,0 +1,69 @@
+---
+description: "Die veraltete API für den Fingerabdruck versteckter Wallets verstehen und zu openWalletSession migrieren."
+title: "Passphrase-Status abrufen"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="get-passphrase-state" />
+
+# Passphrase-Status abrufen
+
+<Callout type="warning">
+  **Veraltet.** Verwenden Sie [`openWalletSession`](/de/hardware-sdk/basic-api/open-wallet-session) für Protocol V1 und V2. Diese Methode funktioniert weiterhin für bestehende Apps.
+</Callout>
+
+## Den passphraseState des Geräts abrufen [#get-the-passphrasestate-of-the-device]
+
+Fordert den Nutzer zur Passphrase-Eingabe auf (auf dem Gerät oder per Software) und gibt dann eine `passphraseState`-Zeichenfolge zurück — den öffentlichen Fingerabdruck der versteckten Wallet. Speichern Sie `deviceId + passphraseState`. Speichern Sie keine Firmware-`session_id`.
+
+Siehe [Wallet-Sitzungen](/de/hardware-sdk/concepts/wallet-session).
+
+Übergeben Sie `passphraseState` bei späteren Adress-/Signieraufrufen, damit sie dieselbe versteckte Wallet verwenden. Dies ist ein **Wallet-Fingerabdruck**, keine Firmware-`session_id`. Speichern Sie nicht `session_id`.
+
+```
+  getPassphraseState(connectId)   ← user enters passphrase once
+    → passphraseState = "<fingerprint>"
+
+  evmGetAddress(..., { passphraseState })
+  btcGetAddress(..., { passphraseState })
+```
+
+> **Fehler 112 (Passphrase-Status stimmt nicht überein)**: Die Bindung entspricht nicht der aktuell entsperrten Wallet (Gerät gesperrt, Seed geändert oder veralteter Fingerabdruck). Stoppen Sie den Vorgang und lassen Sie den Nutzer die vorgesehene Wallet erneut auswählen mit `openWalletSession`. Bestätigen Sie die wiederhergestellte Bindung vor einer neuen Anfrage; umgehen Sie die Prüfung nicht und wiederholen Sie Signieren nicht automatisch.
+
+```typescript
+const response = await HardwareSDK.getPassphraseState(connectId);
+```
+
+### Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+### Beispiel [#example]
+
+```typescript
+const response = await HardwareSDK.getPassphraseState(connectId);
+```
+
+Ergebnis
+
+```
+{
+    success: true,
+    payload: string | null | undefined
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+Der Fingerabdruck einer versteckten Wallet ist eine nicht leere Zeichenfolge. Kompatibilitätsabläufe können `undefined` auf V1 zurückgeben, wenn der Schutz deaktiviert ist, oder `null` für eine Standard-V2-Wallet; speichern Sie diese Werte nicht als Bindung einer versteckten Wallet.

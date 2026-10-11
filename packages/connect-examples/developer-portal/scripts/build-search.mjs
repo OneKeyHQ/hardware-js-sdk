@@ -1,8 +1,11 @@
-import { createIndex, close } from 'pagefind';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { publishedLocaleCodes } from '../i18n/locales.mjs';
 import { mkdtemp, readdir, readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
+
+const pagefindCli = fileURLToPath(new URL('runner/bin.cjs', import.meta.resolve('pagefind')));
 
 // Include example code while leaving ignored navigation and controls out of search.
 const staging = await mkdtemp(join(tmpdir(), 'onekey-docs-search-'));
@@ -12,7 +15,9 @@ try {
     const directory = join(staging, language);
     for (const file of await readdir(source, { recursive: true })) {
       if (!file.endsWith('.html')) continue;
-      const html = await readFile(join(source, file), 'utf8');
+      const original = await readFile(join(source, file), 'utf8');
+      const html = original.replace(/(<html\b[^>]*\blang=")[^"]*(")/, `$1${language}$2`);
+      if (html !== original) await writeFile(join(source, file), html);
       const content = html.replace(/<div\b[^>]*>/g, tag =>
         /class="[^"]*\bnextra-code\b[^"]*"/.test(tag)
           ? tag.replace(/\sdata-pagefind-ignore="all"/, '')
@@ -22,17 +27,26 @@ try {
       await mkdir(dirname(target), { recursive: true });
       await writeFile(target, content);
     }
-    const created = await createIndex({ forceLanguage: language });
-    if (created.errors.length || !created.index) throw new Error(created.errors.join('\n'));
-    const { index } = created;
-    const added = await index.addDirectory({ path: directory });
-    if (added.errors.length || !added.page_count) throw new Error(added.errors.join('\n') || `No ${language} pages indexed`);
-    const written = await index.writeFiles({ outputPath: `out/_pagefind/${language}` });
-    if (written.errors.length) throw new Error(written.errors.join('\n'));
-    console.log(`Search: indexed ${added.page_count} ${language} pages, including code examples`);
-    await index.deleteIndex();
+    // The CLI exposes punctuation settings that Pagefind 1.4's Node API omits.
+    // Preserve underscores so API constants do not degrade into broad keyword matches.
+    execFileSync(
+      process.execPath,
+      [
+        pagefindCli,
+        '--site',
+        directory,
+        '--force-language',
+        language,
+        '--include-characters',
+        '_',
+        '--output-path',
+        `out/_pagefind/${language}`,
+        '--quiet',
+      ],
+      { stdio: 'inherit' }
+    );
+    console.log(`Search: indexed ${language} pages, including code examples and API constants`);
   }
 } finally {
-  await close();
   await rm(staging, { recursive: true, force: true });
 }

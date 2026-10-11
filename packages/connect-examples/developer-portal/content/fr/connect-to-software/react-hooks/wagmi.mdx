@@ -1,0 +1,181 @@
+---
+title: "React + wagmi"
+description: "Connecter OneKey depuis des applications React avec wagmi et le fournisseur EIP-1193 injecté"
+---
+
+# React + wagmi
+
+Ce guide présente une approche minimale basée sur EIP-1193 pour connecter OneKey depuis des applications React avec wagmi. Utilisez le fournisseur dédié de OneKey (`window.$onekey.ethereum`) pour qu’un bouton nommé OneKey se connecte bien à OneKey.
+
+## Installation [#install]
+
+```bash
+npm i wagmi@^2 viem@^2 @tanstack/react-query@^5
+```
+
+wagmi v2 repose sur viem. Ce guide utilise le connecteur Injected pour les portefeuilles injectés (OneKey / autres fournisseurs EIP-1193).
+
+## Créer un connecteur injecté OneKey [#create-a-onekey-injected-connector]
+
+Privilégiez l’injection dédiée de OneKey pour éviter toute ambiguïté lorsque plusieurs portefeuilles sont installés.
+
+```ts
+// onekeyConnector.ts
+import { createConfig, http } from 'wagmi'
+import { mainnet, polygon, arbitrum, base, optimism } from 'wagmi/chains'
+import { injected } from 'wagmi/connectors'
+
+import type { EIP1193Provider } from 'viem'
+
+function getOneKeyProvider(): EIP1193Provider | undefined {
+  if (typeof window === 'undefined') return undefined
+  const walletWindow = window as Window & {
+    $onekey?: { ethereum?: EIP1193Provider }
+  }
+  return walletWindow.$onekey?.ethereum
+}
+
+export const config = createConfig({
+  chains: [mainnet, polygon, arbitrum, base, optimism],
+  connectors: [
+    injected({
+      target() {
+        return {
+          id: 'onekey',
+          name: 'OneKey',
+          provider: getOneKeyProvider(),
+        }
+      },
+      shimDisconnect: true,
+    }),
+  ],
+  transports: {
+    [mainnet.id]: http(),
+    [polygon.id]: http(),
+    [arbitrum.id]: http(),
+    [base.id]: http(),
+    [optimism.id]: http(),
+  },
+})
+```
+
+Remarques
+
+- Privilégiez `window.$onekey.ethereum` pour conserver un comportement déterministe dans les environnements à plusieurs portefeuilles.
+- Si OneKey est indisponible, proposez une option d’installation ou de nouvelle tentative. Les autres portefeuilles découverts par wagmi conservent leur nom.
+- Déclenchez `eth_requestAccounts` à partir d’une action utilisateur et gérez `4001` (refus de l’utilisateur), sans réessayer automatiquement.
+
+## Configuration de l’application [#app-setup]
+
+```tsx
+// main.tsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { WagmiProvider } from 'wagmi'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { config } from './onekeyConnector'
+import App from './App'
+
+const queryClient = new QueryClient()
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </WagmiProvider>
+  </React.StrictMode>,
+)
+```
+
+## Connecter et lire le compte [#connect-and-read-account]
+
+```tsx
+// App.tsx
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
+
+export default function App() {
+  const { address, isConnected } = useAccount()
+  const { connect, connectors, isPending, error } = useConnect()
+  const { disconnect } = useDisconnect()
+
+  if (isConnected) {
+    return (
+      <div>
+        <p>Connected: {address}</p>
+        <button onClick={() => disconnect()}>Disconnect</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {error && <p role="alert">{error.message}</p>}
+      {connectors.map((c) => (
+        <button key={c.uid} disabled={isPending} onClick={() => connect({ connector: c })}>
+          Connect with {c.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+```
+
+## Signer et envoyer [#sign-and-send]
+
+Utilisez la connexion wagmi active pour signer. Déclenchez les requêtes de portefeuille à partir d’actions utilisateur et affichez les refus dans votre interface.
+
+```tsx
+import { useState } from 'react'
+import { useWalletClient } from 'wagmi'
+
+function SignMessageButton() {
+  const { data: walletClient } = useWalletClient()
+  const [result, setResult] = useState('')
+  const [pending, setPending] = useState(false)
+
+  async function sign() {
+    if (!walletClient) return
+    setPending(true)
+    try {
+      const signature = await walletClient.signMessage({ message: 'Hello from my dApp' })
+      setResult(signature)
+    } catch (error) {
+      setResult(error instanceof Error ? error.message : 'Signature request failed')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return <>
+    <button disabled={!walletClient || pending} onClick={sign}>Sign message</button>
+    <p role="status">{result}</p>
+  </>
+}
+```
+
+Pour les transactions, utilisez la méthode wagmi `useSendTransaction` avec un destinataire, un montant et une chaîne sélectionnée validés. Un hash de transaction renvoyé signifie qu’elle a été soumise ; attendez un reçu pour déterminer la réussite de l’exécution. Consultez [Envoi de transactions](/fr/connect-to-software/provider/eth/sending-transactions).
+
+## Événements et réseau [#events-and-network]
+
+- Écoutez les événements `accountsChanged` / `chainChanged` et actualisez l’état de la session en conséquence.
+- Changement/ajout de réseau : `wallet_switchEthereumChain` et `wallet_addEthereumChain`.
+
+## Mobile et découverte [#mobile-and-discovery]
+
+Pour les portefeuilles mobiles hors d’un navigateur avec injection, utilisez un connecteur WalletConnect ou une [bibliothèque d’interface de portefeuille](/fr/connect-to-software/wallet-ui/wallet-kits). Un [lien profond](/fr/connect-to-software/mobile-deeplinks) ouvre le portefeuille ; la session WalletConnect établit la connexion.
+
+wagmi peut découvrir les portefeuilles EIP-6963 via `createConfig` et son option `multiInjectedProviderDiscovery`. Pour une implémentation directe, consultez [Découverte du fournisseur](/fr/connect-to-software/provider/eth/provider-api).
+
+## Dépannage [#troubleshooting]
+
+- Si le fournisseur est absent, vérifiez que OneKey est installé et activé pour ce site, puis réessayez depuis le bouton de connexion.
+- Gérez le refus de l’utilisateur (`4001`) en permettant une nouvelle tentative initiée par l’utilisateur.
+- Accédez au fournisseur du navigateur côté client. La protection `typeof window` ci-dessus évite les erreurs de rendu côté serveur.
+- Une déconnexion simulée efface l’état de connexion de wagmi ; elle ne révoque pas nécessairement les autorisations dans le portefeuille.
+
+## Ressources [#resources]
+
+- [Connecteur injecté wagmi](https://wagmi.sh/react/api/connectors/injected)
+- [Client de portefeuille wagmi](https://wagmi.sh/react/api/hooks/useWalletClient)

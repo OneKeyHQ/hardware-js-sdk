@@ -1,0 +1,37 @@
+---
+title: "プロバイダーの検出"
+---
+
+<span id="detecting-the-provider" />
+
+# プロバイダーの検出
+
+OneKey がインストール済みかを検出するには、Web アプリケーションで次の `window.$onekey.solana` オブジェクトの存在を確認してください。
+
+OneKey ブラウザー拡張機能、OneKey モバイルアプリ、OneKey デスクトップのアプリ内ブラウザーは、次の `$onekey.solana` オブジェクトを対応するブラウザーコンテキストに注入できます。
+
+`window.$onekey.solana` オブジェクトが存在すれば、Solana アプリは `window.$onekey.solana` を通じて OneKey を操作できます。従来の統合に対応するため、この `solana` オブジェクトは `window.solana` からも利用できます。
+
+OneKey のインストールを検出するには、アプリケーションは追加の次の `isOneKey` フラグを確認してください。
+
+```javascript
+const isOneKeyInstalled = window.$onekey?.solana?.isOneKey;
+```
+
+OneKey がインストールされていない場合は、ユーザーを次へ案内することを推奨します: [https://onekey.so/download/?client=browserExtension](https://onekey.so/download/?client=browserExtension)。全体では次のようになります。
+
+```javascript
+const getProvider = () => {
+  if ('$onekey' in window) {
+    const provider = window.$onekey?.solana;
+
+    if (provider?.isOneKey) {
+      return provider;
+    }
+  }
+
+  return undefined; // Show an installation link in the application UI.
+};
+```
+
+`getProvider()` が `undefined` を返した場合は、インストールまたはウォレット有効化の操作を表示し、接続フローを停止してください。外部リンクはユーザー操作に応じてのみ開いてください。

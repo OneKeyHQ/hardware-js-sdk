@@ -1,0 +1,75 @@
+---
+title: "Anleitung"
+---
+
+<span id="guide" />
+
+# Anleitung
+
+## Übersicht [#overview]
+
+Diese Anleitung zeigt, wie Sie Bitcoin-Lightning-Network-Anwendungen mit der OneKey-Lightning-Network-Provider-API erstellen.
+
+
+### Web-Apps entwickeln **Anwendungsfälle** [#building-web-apps-use-cases]
+
+* Lightning-Network-Zahlungen annehmen
+* Anwendungen für dezentrale Identitäten
+
+## Installieren [#install]
+
+### 1. OneKey Wallet herunterladen [#1-download-onekey-wallet]
+
+Laden Sie [OneKey Wallet](https://onekey.so/download?client=browserExtension). Installieren Sie die OneKey-Browsererweiterung.
+
+#### 2. Erklärung der API-Injektion [#2-api-injection-explanation]
+
+* Die OneKey-Browsererweiterung injiziert `Provider API` in besuchte Websites.
+* Es werden zwei API-Typen bereitgestellt: `window.webln` und `window.$onekey.webln`.
+* Empfohlen wird `window.$onekey.webln`.
+
+> Bevorzugen Sie `window.$onekey.webln`, um gezielt OneKey auszuwählen. Die globale Variable `window.webln` kann zu einer anderen Wallet gehören, wenn mehrere Erweiterungen installiert sind.
+
+### Unterstützung der Provider-API erkennen [#detecting-provider-api-support]
+
+Prüfen Sie vor Anfragen, ob ein Provider verfügbar ist:
+
+```javascript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+if (!provider) {
+  throw new Error("No provider is available.");
+}
+```
+
+### Mit OneKey verbinden [#connecting-to-onekey]
+
+Bevor Sie die folgende API verwenden, müssen Sie beim Nutzer mit der Methode `provider.enable` Zugriff auf das entsprechende Konto anfordern.
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable();
+```
+
+Andere APIs können erst nach Autorisierung durch den Nutzer aufgerufen werden.
+
+## API [#api]
+
+Wählen Sie die API für den Vorgang, den Ihre Anwendung benötigt.
+
+* Informationen zum Bitcoin-Lightning-Knoten des Nutzers abrufen: [`provider.getInfo`](/de/connect-to-software/provider/webln/api-reference/getinfo)
+* Zahlung senden: [`provider.sendPayment`](/de/connect-to-software/provider/webln/api-reference/sendpayment)
+* Eine Rechnung zum Empfangen einer Zahlung anfordern: [`provider.makeInvoice`](/de/connect-to-software/provider/webln/api-reference/makeinvoice)
+* Signatur für eine beliebige Nachricht anfordern: [`provider.signMessage`](/de/connect-to-software/provider/webln/api-reference/signmessage)
+
+**Weitere Schnittstellen**: [Details anzeigen](/de/connect-to-software/provider/webln/api-reference)
+
+## Ereignis [#event]
+
+* **Wichtige Vorgänge**: Zum Beispiel Kontowechsel
+* **Weitere Informationen**: [Mehr anzeigen](/de/connect-to-software/provider/webln/event)
+
+## Anfragen behandeln [#handling-requests]
+
+Führen Sie Wallet-Anfragen in einer asynchronen Funktion oder einem ES-Modul aus. Fangen Sie abgelehnte Promises ab und zeigen Sie den Fehler in Ihrer Anwendung an. Fordern Sie Verbindungen, Signaturen und Zahlungen über eine Nutzeraktion an und deaktivieren Sie die auslösende Schaltfläche, solange eine Anfrage aussteht.

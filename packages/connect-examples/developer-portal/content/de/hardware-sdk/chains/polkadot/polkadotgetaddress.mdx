@@ -1,0 +1,105 @@
+---
+title: "polkadotGetAddress"
+---
+
+# polkadotGetAddress
+
+## Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * Touch: 4.3.0
+  * Classic/Mini: 3.0.0
+* Mindest-Firmware-Versionen für Joystream Chain
+  * Touch: 4.7.0
+  * Classic/Mini: 3.6.0
+* Mindest-Firmware-Versionen für Manta Chain
+  * Touch: 4.9.0
+  * Classic/Mini: 3.7.0
+
+## Polkadot: Adresse abrufen [#polkadot-get-address]
+
+Leitet die Adresse am angegebenen Pfad ab und gibt sie zurück. Verwenden Sie `showOnOneKey`, um eine Bestätigung auf dem Gerät anzufordern.
+
+```typescript
+const result = await HardwareSDK.polkadotGetAddress(connectId, deviceId, params);
+```
+
+## Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+### Einzelne Adresse [#single-address]
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`. [Mehr erfahren](/de/hardware-sdk/concepts/common-params#hd-path)
+* `prefix` - _erforderlich_ `number` SS58-Adresspräfix; verwenden Sie `0` für Polkadot
+* `network` - _erforderlich_ `string` Netzwerkname, zum Beispiel `polkadot`
+* `showOnOneKey` - _optional_ `boolean` Ob die Adresse auf dem Gerät angezeigt werden soll. Standard ist `true`.
+
+#### Mehrere Adressen [#multiple-addresses]
+
+* `bundle` - Array von Objekten mit `path`, `prefix`, `network`, `showOnOneKey`-Feldern
+
+### Beispiel [#example]
+
+Adresse des ersten Polkadot-Kontos zurückgeben:
+
+```typescript
+HardwareSDK.polkadotGetAddress(connectId, deviceId, {
+    path: "m/44'/354'/0'/0'/0'",
+    showOnOneKey: true,
+    network: "polkadot",
+    prefix: 0
+});
+```
+
+Ein Bündel von Adressen mehrerer Polkadot-Konten zurückgeben:
+
+```typescript
+HardwareSDK.polkadotGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/354'/0'/0'/1'", network: "polkadot", prefix: 0 }, // account 1
+        { path: "m/44'/354'/0'/0'/2'", network: "polkadot", prefix: 0 }, // account 2
+        { path: "m/44'/354'/0'/0'/3'", network: "polkadot", prefix: 0 }  // account 3
+    ]
+});
+```
+
+### Ergebnis [#result]
+
+Antwort für eine einzelne Adresse
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        address: string,   // address
+        publicKey: string, // publicKey
+    }
+}
+```
+
+Batch-Antwort für Adressen
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, address, publicKey }, // account 1
+        { path, address, publicKey }, // account 2
+        { path, address, publicKey }, // account 3
+    ]
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

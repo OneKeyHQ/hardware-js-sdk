@@ -1,0 +1,35 @@
+---
+title: "nip04.encrypt"
+---
+
+# nip04.encrypt
+
+## Méthode [#method]
+
+```typescript
+// provider.nip04.encrypt
+(pubkey: string, plaintext: string) => Promise<string>
+```
+
+## Réponse [#response]
+
+Renvoie le texte chiffré et l’IV conformément à NIP-04.
+
+## Paramètres [#params]
+
+* `pubkey` — _obligatoire_ `string`  la clé publique du destinataire
+* `plaintext` — _obligatoire_ `string` le texte en clair à chiffrer
+
+## Exemple [#example]
+
+```javascript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const encrypted = await provider.nip04.encrypt(pubkey, "Data to be encrypted")
+```
+
+## Démonstration [#demo]
+
+[Ouvrir l’exemple](https://codepen.io/OneKeyHQ/pen/rNPZwaa)
+
+[NIP-04](https://github.com/nostr-protocol/nips/blob/master/04.md) est obsolète dans la spécification Nostr. Ces méthodes restent documentées pour les intégrations existantes ; leur présence ne prouve pas la prise en charge de NIP plus récents.

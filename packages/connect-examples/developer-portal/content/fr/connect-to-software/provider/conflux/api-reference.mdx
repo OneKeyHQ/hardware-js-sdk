@@ -1,0 +1,86 @@
+---
+title: "Référence de l’API"
+description: "Référence complète de l’API du fournisseur Conflux OneKey"
+---
+
+<span id="api-reference" />
+
+# Référence de l’API
+
+Référence des méthodes et types du fournisseur Conflux OneKey.
+
+---
+
+## Méthodes [#methods]
+
+| Méthode | Description |
+|--------|-------------|
+| `request({ method, params })` | Envoyer une requête JSON-RPC |
+| `isConnected()` | Vérifier l’état de connexion |
+| `on(event, callback)` | S’abonner aux événements |
+| `off(event, callback)` | Se désabonner des événements |
+
+---
+
+## Méthodes RPC [#rpc-methods]
+
+| Méthode | Description |
+|--------|-------------|
+| `cfx_requestAccounts` | Demander une connexion |
+| `cfx_accounts` | Obtenir les comptes connectés |
+| `cfx_chainId` | Obtenir l’ID de chaîne |
+| `cfx_sendTransaction` | Envoyer une transaction |
+| `cfx_call` | Appeler un contrat (lecture seule) |
+| `cfx_estimateGasAndCollateral` | Estimer le gas |
+| `cfx_getBalance` | Obtenir le solde du compte |
+| `cfx_getTransactionByHash` | Obtenir une transaction |
+| `cfx_getTransactionReceipt` | Obtenir un reçu |
+| `net_version` | Obtenir l’ID du réseau |
+
+---
+
+## Événements [#events]
+
+| Événement | Paramètres | Description |
+|-------|------------|-------------|
+| `connect` | `{ chainId, networkId }` | Connecté au réseau |
+| `disconnect` | - | Déconnecté |
+| `chainChanged` | `chainId` | Réseau modifié |
+| `accountsChanged` | `accounts[]` | Comptes modifiés |
+
+---
+
+## Méthodes obsolètes [#deprecated-methods]
+
+Ces méthodes fonctionnent encore mais sont obsolètes :
+
+```typescript
+// Deprecated: use request({ method: 'cfx_requestAccounts' })
+await provider.enable()
+
+// Deprecated: use request()
+await provider.send({ method: 'cfx_accounts' })
+await provider.sendAsync({ method: 'cfx_accounts' }, callback)
+
+// Deprecated: use request({ method: 'cfx_chainId' })
+provider.chainId
+
+// Deprecated: use request({ method: 'net_version' })
+provider.networkVersion
+
+// Deprecated: use request({ method: 'cfx_accounts' })
+provider.selectedAddress
+```
+
+---
+
+## Codes d’erreur [#error-codes]
+
+| Code | Description |
+|------|-------------|
+| 4001 | Demande rejetée par l’utilisateur |
+| -32700 | Erreur d’analyse |
+| -32600 | Requête non valide |
+| -32601 | Méthode introuvable |
+| -32602 | Paramètres non valides |
+| -32603 | Erreur interne |

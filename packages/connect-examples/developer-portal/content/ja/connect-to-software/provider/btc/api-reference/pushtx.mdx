@@ -1,0 +1,34 @@
+---
+title: "pushTx"
+---
+
+# pushTx
+
+署名済みの生トランザクションをブロードキャストします。
+
+## メソッド [#method]
+
+```typescript
+declare function pushTx(rawtx: string): Promise<string>;
+```
+
+## パラメーター [#params]
+
+* `rawtx` — _必須_ `string`  送信する rawtx
+
+## レスポンス [#response]
+
+`txid` — `string`
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const rawtx = "<SIGNED_RAW_TRANSACTION_HEX>";
+const txid = await provider.pushTx(rawtx);
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/VwgGzxO)

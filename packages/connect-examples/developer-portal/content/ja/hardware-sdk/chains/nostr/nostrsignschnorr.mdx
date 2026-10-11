@@ -1,0 +1,62 @@
+---
+title: "nostrSignSchnorr"
+---
+
+# nostrSignSchnorr
+
+### 要件 [#requirements]
+
+現在の SDK には次のファームウェア制約が宣言されています: `model_touch` ≥ 4.7.0 および `model_mini` ≥ 3.6.0。これらは SDK のバージョン範囲キーです。統合対象のデバイスモデルとの対応関係と、リリース済みファームウェアでの対応を確認してください。
+
+## Nostr: Schnorr 署名 [#nostr-sign-schnorr]
+
+指定パスの鍵で、指定されたハッシュへの Schnorr 署名を要求します。ユーザーはデバイス上でリクエストを確認します。
+
+```typescript
+const result = await HardwareSDK.nostrSignSchnorr(connectId, deviceId, params);
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `5`. [詳細を読む](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `hash` - _必須_ `string`。16 進数エンコードされた 32 バイトのハッシュ。
+
+### 例 [#examples]
+
+```typescript
+const response = await HardwareSDK.nostrSignSchnorr(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/1237'/0'/0/0",
+    hash: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
+  }
+);
+```
+
+結果
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: string;
+    rawHash: string,
+    signature: string,
+  }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

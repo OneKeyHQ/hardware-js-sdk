@@ -1,0 +1,130 @@
+---
+title: "API リファレンス"
+description: "OneKey の TON プロバイダーの完全な API リファレンス"
+---
+
+<span id="api-reference" />
+
+# API リファレンス
+
+OneKey の TON プロバイダーのメソッドと型のリファレンス。
+
+---
+
+## メソッド [#methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `connect(version?, request?)` | ウォレットに接続 |
+| `restoreConnection()` | 以前のセッションを復元 |
+| `disconnect()` | ウォレットを切断 |
+| `send(message)` | RPC リクエストを送信 |
+| `listen(callback)` | ウォレットイベントを監視 |
+
+---
+
+## 送信メソッド [#send-methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `sendTransaction` | TON を送信またはコントラクトを操作 |
+| `signData` | 任意のデータセルに署名 |
+| `disconnect` | RPC 経由で切断 |
+
+---
+
+## 型 [#types]
+
+### アカウント情報 [#account-info]
+
+```typescript
+interface AccountInfo {
+  address: string      // Raw address (0:<hex>)
+  network: string      // Network ID (-239 mainnet, -3 testnet)
+  publicKey: string    // Hex public key (no 0x)
+  walletStateInit: string // Base64 encoded state init
+}
+```
+
+### トランザクションリクエスト [#transaction-request]
+
+```typescript
+interface TransactionRequest {
+  valid_until?: number  // UNIX timestamp for validity
+  network?: string      // Network ID
+  from?: string         // Sender address
+  messages: Message[]   // Respect the wallet-advertised maximum
+}
+```
+
+### メッセージ [#message]
+
+```typescript
+interface Message {
+  address: string      // Recipient (raw format)
+  amount: string       // Amount in nanotons
+  payload?: string     // Base64 BOC for contract calls
+  stateInit?: string   // Base64 StateInit for deployment
+}
+```
+
+### データ署名リクエスト [#sign-data-request]
+
+```typescript
+interface SignDataRequest {
+  schema_crc: number   // Schema identifier
+  cell: string         // Base64 encoded cell
+  publicKey?: string   // Optional specific key
+}
+```
+
+### データ署名の結果 [#sign-data-result]
+
+```typescript
+interface SignDataResult {
+  signature: string    // Base64 signature
+  timestamp: number    // UNIX timestamp (UTC)
+}
+```
+
+### デバイス情報 [#device-info]
+
+```typescript
+interface DeviceInfo {
+  platform: string     // 'iphone' | 'android' | 'windows' | 'mac' | 'linux'
+  appName: string      // 'onekey'
+  appVersion: string   // Wallet version
+  maxProtocolVersion: number // 2
+  features: Array<string | { name: string; maxMessages?: number; [key: string]: unknown }> // Advertised capabilities
+}
+```
+
+---
+
+## ネットワーク [#networks]
+
+| ネットワーク | ネットワーク ID |
+|---------|------------|
+| メインネット | -239 |
+| テストネット | -3 |
+
+---
+
+## イベント [#events]
+
+| イベント | 説明 |
+|-------|-------------|
+| `accountChanged` | アカウント変更時 |
+| `disconnect` | ウォレット切断時 |
+
+---
+
+## エラーコード [#error-codes]
+
+| コード | 説明 |
+|------|-------------|
+| 0 | 不明なエラー |
+| 1 | 不正なリクエスト |
+| 100 | 不明なアプリ |
+| 300 | ユーザーがリクエストを拒否 |
+| 400 | 未対応のメソッド |

@@ -1,0 +1,52 @@
+---
+description: "ユーザーが要求したデバイス PIN の変更を開始し、Protocol V2 の PIN 削除制限を理解します。"
+title: "deviceChangePin"
+---
+
+# deviceChangePin
+
+## デバイスの PIN を変更 [#change-device-pin]
+
+ユーザーの要求後にデバイスの PIN 変更フローを開きます。保護された手順はユーザーがデバイス上で行います。このフローの代わりに実際のデバイス PIN を収集したり、ログに記録したりしてはいけません。
+
+```typescript
+const result = await HardwareSDK.deviceChangePin(connectId, params);
+```
+
+## パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `remove` - 任意 `boolean`. `false` は PIN を変更します。 `true` は対応する Protocol V1 デバイスで PIN の削除を要求します。Protocol V2 は次を拒否します: `remove: true`.
+
+## 例 [#example]
+
+```typescript
+const result = await HardwareSDK.deviceChangePin(connectId, {
+    remove: false
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+## 結果 [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        message: string
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

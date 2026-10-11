@@ -1,0 +1,35 @@
+---
+title: "nip04.encrypt"
+---
+
+# nip04.encrypt
+
+## メソッド [#method]
+
+```typescript
+// provider.nip04.encrypt
+(pubkey: string, plaintext: string) => Promise<string>
+```
+
+## レスポンス [#response]
+
+nip-04 で規定された暗号文と iv を返します
+
+## パラメーター [#params]
+
+* `pubkey` — _必須_ `string`  受取人の公開鍵
+* `plaintext` — _必須_ `string` 暗号化する平文
+
+## 例 [#example]
+
+```javascript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const encrypted = await provider.nip04.encrypt(pubkey, "Data to be encrypted")
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/rNPZwaa)
+
+[NIP-04](https://github.com/nostr-protocol/nips/blob/master/04.md) は Nostr 仕様で非推奨となっています。これらのメソッドは既存の統合のために記載しており、メソッドの存在が新しい NIP への対応を意味するわけではありません。

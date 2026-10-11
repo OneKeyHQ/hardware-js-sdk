@@ -1,0 +1,26 @@
+---
+title: "Registros de depuración"
+---
+
+<span id="debug-logging" />
+
+# Registros de depuración
+
+Puedes mostrar los mensajes de comunicación interna entre el proveedor y la cartera OneKey. Usa esta función durante el desarrollo. Revisa los registros antes de compartirlos, ya que pueden contener datos de cuentas o solicitudes.
+
+Los mensajes de registro se agrupan por **jsBridge**, **providerBase** y **extInjected.** Puedes activarlos o desactivarlos como se indica a continuación; los cambios surten efecto tras recargar la página:
+
+```javascript
+// turn on all groups logging
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', '*');
+
+// turn off all groups logging
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', '');
+
+// turn on `jsBridge` group only
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', 'jsBridge');
+
+// turn on both `jsBridge` and `providerBase` group
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', 'jsBridge,providerBase');
+
+```

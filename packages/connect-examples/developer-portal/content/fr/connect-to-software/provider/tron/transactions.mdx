@@ -1,0 +1,96 @@
+---
+title: "Transactions"
+description: "Envoyer des transactions sur TRON avec OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+# Transactions
+
+Connectez le fournisseur et utilisez l’instance TronWeb associée au même portefeuille. Remplacez les adresses abrégées et les méthodes de contrat par des valeurs valides. Vérifiez le réseau sélectionné avant de préparer une transaction.
+
+Découvrez comment signer et envoyer des transactions sur TRON.
+
+---
+
+## Signer une transaction [#sign-transaction]
+
+Signer une transaction sans la diffuser :
+
+```typescript
+// Build transaction
+const tx = await tronWeb.transactionBuilder.sendTrx(
+  'TRecipientAddress...',
+  tronWeb.toSun(10),
+  tronWeb.defaultAddress.base58
+)
+
+// Sign via provider
+const signedTx = await provider.sign(tx)
+
+console.log('Signed transaction:', signedTx)
+
+// Broadcast manually
+const result = await tronWeb.trx.sendRawTransaction(signedTx)
+```
+
+---
+
+## Interaction avec un contrat intelligent [#smart-contract-interaction]
+
+```typescript
+const contract = await tronWeb.contract().at(contractAddress)
+
+// Read (view function)
+const result = await contract.someViewFunction().call()
+
+// Write (requires signing)
+const tx = await contract.someWriteFunction(param1, param2).send({
+  feeLimit: 100_000_000, // 100 TRX
+  callValue: 0,
+})
+```
+
+---
+
+## Déclencher un contrat intelligent [#trigger-smart-contract]
+
+```typescript
+const tx = await tronWeb.transactionBuilder.triggerSmartContract(
+  contractAddress,
+  'transfer(address,uint256)',
+  { feeLimit: 100_000_000 },
+  [
+    { type: 'address', value: recipientAddress },
+    { type: 'uint256', value: amount }
+  ],
+  tronWeb.defaultAddress.base58
+)
+
+const signedTx = await provider.sign(tx.transaction)
+const result = await tronWeb.trx.sendRawTransaction(signedTx)
+```
+
+---
+
+## Utilisation de SunWeb [#using-sunweb]
+
+Pour les opérations DappChain (chaîne latérale) :
+
+```typescript
+const sunWeb = window.sunWeb
+
+// Main chain to side chain
+await sunWeb.depositTrx(
+  amount,
+  depositFee,
+  feeLimit
+)
+
+// Side chain to main chain
+await sunWeb.withdrawTrx(
+  amount,
+  withdrawFee,
+  feeLimit
+)
+```

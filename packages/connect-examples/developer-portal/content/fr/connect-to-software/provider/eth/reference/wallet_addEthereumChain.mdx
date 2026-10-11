@@ -1,0 +1,135 @@
+---
+title: "wallet_addEthereumChain"
+description: "Ajouter une nouvelle chaîne Ethereum au portefeuille"
+---
+
+# wallet_addEthereumChain
+
+Demande au portefeuille d’ajouter une nouvelle chaîne. Si la chaîne existe déjà, le portefeuille peut y basculer.
+
+---
+
+## Paramètres [#parameters]
+
+`Array` contenant un seul objet de configuration de chaîne :
+
+| Champ | Type | Obligatoire | Description |
+|-------|------|----------|-------------|
+| `chainId` | `string` | Oui | ID de chaîne (chaîne hexadécimale avec préfixe 0x) |
+| `chainName` | `string` | Oui | Nom de chaîne lisible |
+| `nativeCurrency` | `object` | Oui | Informations sur la devise native |
+| `nativeCurrency.name` | `string` | Oui | Nom de la devise |
+| `nativeCurrency.symbol` | `string` | Oui | Symbole de la devise native |
+| `nativeCurrency.decimals` | `number` | Oui | Décimales de la devise (généralement 18) |
+| `rpcUrls` | `string[]` | Oui | Tableau d’URL RPC (au moins une) |
+| `blockExplorerUrls` | `string[]` | Non | Tableau d’URL d’explorateurs de blocs |
+| `iconUrls` | `string[]` | Non | URL d’icônes facultatives ; l’affichage dépend du portefeuille |
+
+---
+
+## Valeur de retour [#returns]
+
+`null` en cas de réussite
+
+---
+
+## Exemple [#example]
+
+```typescript
+await window.$onekey.ethereum.request({
+  method: 'wallet_addEthereumChain',
+  params: [{
+    chainId: '0x89',
+    chainName: 'Polygon Mainnet',
+    nativeCurrency: {
+      name: 'POL',
+      symbol: 'POL',
+      decimals: 18
+    },
+    rpcUrls: ['https://polygon-rpc.com'],
+    blockExplorerUrls: ['https://polygonscan.com']
+  }]
+})
+```
+
+### Ajouter Base [#add-base]
+
+```typescript
+await window.$onekey.ethereum.request({
+  method: 'wallet_addEthereumChain',
+  params: [{
+    chainId: '0x2105',
+    chainName: 'Base',
+    nativeCurrency: {
+      name: 'Ethereum',
+      symbol: 'ETH',
+      decimals: 18
+    },
+    rpcUrls: ['https://mainnet.base.org'],
+    blockExplorerUrls: ['https://basescan.org']
+  }]
+})
+```
+
+### Ajouter Arbitrum [#add-arbitrum]
+
+```typescript
+await window.$onekey.ethereum.request({
+  method: 'wallet_addEthereumChain',
+  params: [{
+    chainId: '0xa4b1',
+    chainName: 'Arbitrum One',
+    nativeCurrency: {
+      name: 'Ethereum',
+      symbol: 'ETH',
+      decimals: 18
+    },
+    rpcUrls: ['https://arb1.arbitrum.io/rpc'],
+    blockExplorerUrls: ['https://arbiscan.io']
+  }]
+})
+```
+
+---
+
+## Erreurs [#errors]
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | L’utilisateur a rejeté la demande | L’utilisateur a refusé l’ajout de la chaîne |
+| -32602 | Paramètres non valides | Configuration de chaîne non valide |
+
+---
+
+## Remarques [#notes]
+
+- Fournissez des points de terminaison RPC valides et utilisez les métadonnées attendues par le réseau cible
+- Le portefeuille vérifie que le point de terminaison RPC répond correctement
+- L’ajout d’une chaîne ne garantit pas que le portefeuille y bascule ; lisez `eth_chainId` ensuite
+- Défini par [EIP-3085](https://eips.ethereum.org/EIPS/eip-3085)
+
+### Ajout et changement combinés [#combined-add-and-switch]
+
+```typescript
+async function switchToChain(chainConfig) {
+  try {
+    await window.$onekey.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: chainConfig.chainId }]
+    })
+  } catch (error) {
+    if (error.code === 4902) {
+      await window.$onekey.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [chainConfig]
+      })
+      await window.$onekey.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: chainConfig.chainId }]
+      })
+    } else {
+      throw error
+    }
+  }
+}
+```

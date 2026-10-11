@@ -1,0 +1,113 @@
+---
+description: "検出したプロトコルに適したファームウェア更新 API を選び、進捗、再起動、失敗を処理します。"
+title: "ファームウェア更新"
+---
+
+<span id="firmware-update" />
+
+# ファームウェア更新
+
+更新 API は次から選びます: **プロトコルファミリー**, 製品名だけでは判断しません。Hardware SDK 1.2.0 は JavaScript の共通インターフェースを保ち、有効なメソッドはデバイスのプロトコルが決定します。
+
+| 現在のデバイス | プロトコル | 方法 | 更新するもの |
+| --- | --- | --- | --- |
+| Classic, Mini, Touch | V1 | [`firmwareUpdateV2`](/ja/hardware-sdk/device-api/firmwareupdatev2) | メインファームウェアおよび/または BLE |
+| OneKey Pro | V1 | [`firmwareUpdateV3`](/ja/hardware-sdk/device-api/firmwareupdatev3) | Bootloader + メイン + BLE + リソースを 1 つのフローで更新 |
+| OneKey Pro 2, Neo | V2 | [`firmwareUpdateV4`](/ja/hardware-sdk/device-api/firmwareupdatev4) | Bootloader、アプリのパーティション、コプロセッサー、リソース ZIP |
+
+デバイスオブジェクトの `connectProtocol`、または [`getDeviceState`](/ja/hardware-sdk/basic-api/get-device-state) で実際のプロトコルを確認します。USB PID や BLE 名で分岐させないでください。[デバイス](/ja/hardware-sdk/concepts/devices)と [Protocol V1 と V2](/ja/hardware-sdk/concepts/protocol)を参照してください。
+
+対象デバイスをユーザーが選択し、操作を承認してから更新を開始してください。そのモデルの公式リリースメタデータと検証済みファイルを使い、例示されたバージョンでインストール対象を決めてはいけません。
+
+## 1. 更新が必要か確認 [#1-check-whether-an-update-is-needed]
+
+```ts
+const release = await HardwareSDK.checkFirmwareRelease(connectId);
+if (!release.success) throw new Error(release.payload.error);
+
+// payload.status: 'valid' | 'outdated' | 'required' | 'unknown' | 'none'
+const updateAvailable = release.payload !== null &&
+  (release.payload.status === 'outdated' || release.payload.status === 'required');
+// Offer an update only when updateAvailable is true and release metadata exists.
+```
+
+BLE コプロセッサー: [`checkBLEFirmwareRelease`](/ja/hardware-sdk/device-api/checkblefirmwarerelease)。`FIRMWARE_EVENT` (`RELEASE_INFO` / `BLE_RELEASE_INFO`) を購読すると、初回接続を妨げず、後で通知できます。
+
+## 2. 更新の呼び出し前に進捗を購読 [#2-subscribe-to-progress-before-you-call-update]
+
+```ts
+import { UI_EVENT, UI_REQUEST } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(UI_EVENT, (msg) => {
+  if (
+    msg.type === UI_REQUEST.FIRMWARE_PROGRESS ||
+    msg.type === UI_REQUEST.FIRMWARE_TIP ||
+    msg.type === UI_REQUEST.FIRMWARE_PROCESSING
+  ) {
+    renderFirmwareProgress(msg.payload);
+  }
+  // firmwareUpdateV4 may emit REQUEST_BUTTON with reason 'firmware-update'.
+  // Show "confirm on device". Do not uiResponse() that hint.
+});
+```
+
+## 3. 対応するメソッドを呼び出す [#3-call-the-matching-method]
+
+Classic / Mini / Touch。接続中のモデルの検証済みリリースメタデータから対象を選択します:
+
+```ts
+declare const targetFirmwareVersion: number[];
+const result = await HardwareSDK.firmwareUpdateV2(connectId, {
+  platform: 'web',
+  updateType: 'firmware',
+  version: targetFirmwareVersion,
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+Pro:
+
+```ts
+declare const targetFirmwareVersion: number[];
+const result = await HardwareSDK.firmwareUpdateV3(connectId, {
+  platform: 'desktop',
+  firmwareVersion: targetFirmwareVersion,
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+Pro 2 / Neo — 検証済みのバイナリを渡します:
+
+```ts
+const result = await HardwareSDK.firmwareUpdateV4(connectId, {
+  platform: 'desktop',
+  bootloaderBinary,
+  applicationP1Binary,
+  applicationP2Binary,
+  coprocessorBinary,
+  resourceArchiveBinary,
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+`platform` は 3 つのメソッドすべてで必須です: `'native' | 'desktop' | 'ext' | 'web' | 'web-embed'`.
+
+## 4. 呼び出し後 [#4-after-the-call]
+
+1. デバイスが再起動する場合があります。`DEVICE.CONNECT` を待つか、再検索してください。通常の再接続では確認済みプロトコルを維持します。[再接続と破棄](/ja/hardware-sdk/transport/reconnect)を参照してください。
+2. 新しいビルドを信頼する前に、[`getDeviceState`](/ja/hardware-sdk/basic-api/get-device-state) を再取得して確認します (バージョンが必要な場合は `scope: 'firmware'` を指定)。
+3. トランスポートのタイムアウトで失敗し、 **すでに** インストールリクエストを送信済みの場合、 **再実行しないでください:** 同じ更新を再実行せず、再接続して状態を読み取り、判断してください。
+
+## 禁止事項 [#do-not]
+
+- Pro 2 / Neo で `firmwareUpdateV3`、Classic / Pro で `firmwareUpdateV4` を呼び出すこと。
+- 切断やタイムアウト後に更新を自動再試行すること。
+- BLE の次の `retryCount` ヘルパーを更新呼び出しに展開すること。
+- 次で romloader をインストールすること: `firmwareUpdateV4`.
+
+## 次へ [#next]
+
+- [firmwareUpdateV2](/ja/hardware-sdk/device-api/firmwareupdatev2)
+- [firmwareUpdateV3](/ja/hardware-sdk/device-api/firmwareupdatev3)
+- [firmwareUpdateV4](/ja/hardware-sdk/device-api/firmwareupdatev4)
+- [Core API ガイド → イベント](/ja/hardware-sdk/core-api-guide#events-ui)

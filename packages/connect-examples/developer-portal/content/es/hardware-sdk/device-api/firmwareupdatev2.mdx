@@ -1,0 +1,64 @@
+---
+description: "Actualiza el firmware principal o BLE de Protocol V1 compatible mediante versiones publicadas o binarios verificados."
+title: "firmwareUpdateV2"
+---
+
+# firmwareUpdateV2
+
+## Actualización del firmware (V2) [#firmware-update-v2]
+
+Flujo de actualización del firmware de Protocol V1. Permite descargar y actualizar el firmware principal y BLE. Debes pasar explícitamente el parámetro `platform`.
+
+```typescript
+// Select versions from verified release metadata for this device.
+declare const targetFirmwareVersion: number[];
+
+const res = await HardwareSDK.firmwareUpdateV2(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+  updateType: 'firmware', // or 'ble'
+  // Option A: version-based update (recommended)
+  version: targetFirmwareVersion,
+  // Option B: custom binary (use with caution)
+  // binary: ArrayBuffer,
+  // Optional flags
+  forcedUpdateRes: false,
+  isUpdateBootloader: false,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+El ejemplo presupone que el usuario ha seleccionado este dispositivo y ha aprobado la actualización. Obtén las versiones de destino de metadatos de publicación verificados; no fijes en el código una versión copiada de la documentación.
+
+### Parámetros [#params]
+
+[Parámetros comunes opcionales](/es/hardware-sdk/concepts/common-params)
+
+- `platform` - obligatorio `"native" | "desktop" | "ext" | "web" | "web-embed"` entorno de ejecución
+- `updateType` - obligatorio `'firmware' | 'ble'` destino de la actualización (firmware principal o BLE)
+- `version` - opcional `number[]` versión de destino como array de 3 elementos; descarga el firmware oficial de esa versión
+- `binary` - opcional `ArrayBuffer` binario de firmware personalizado; úsalo con precaución
+- `forcedUpdateRes` - opcional `boolean` forzar la actualización del paquete de recursos
+- `isUpdateBootloader` - opcional `boolean` incluir la actualización de Bootloader
+
+### Resultado [#result]
+
+```typescript
+{
+  success: true,
+  payload: {
+    // success indicator from lower layer
+  }
+}
+```
+
+### Error [#error]
+
+```typescript
+{
+  success: false,
+  payload: {
+    error: string, // error message
+    code?: string | number   // error code
+  }
+}
+```

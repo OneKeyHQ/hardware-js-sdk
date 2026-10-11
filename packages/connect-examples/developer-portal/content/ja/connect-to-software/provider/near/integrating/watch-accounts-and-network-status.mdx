@@ -1,0 +1,36 @@
+---
+title: "アカウントとネットワークの状態を監視"
+---
+
+<span id="watch-accounts--network-status" />
+
+# アカウントとネットワークの状態を監視
+
+プロバイダーはアカウントとネットワークのイベントを発行します。これらを監視し、アプリケーションのアカウント状態やネットワーク固有のデータを更新してください。
+
+## イベントリスナーを追加 [#add-event-listeners]
+
+```javascript
+// accountsChanged
+const onAccountsChanged = (payload) => {
+  const accountId = payload?.accounts?.[0]?.accountId || '';
+  console.log('onAccountsChanged', accountId);
+}
+provider.on('accountsChanged', onAccountsChanged);
+
+
+// networkChanged
+const onNetworkChanged = (payload) => {
+  console.log('onNetworkChanged', payload.networkId);
+}
+provider.on('networkChanged', onNetworkChanged);
+```
+
+### イベントリスナーを削除 [#remove-event-listeners]
+
+監視が不要になったら、リスナーの削除を忘れないでください (React でコンポーネントをアンマウントするときなど):
+
+```javascript
+provider.off('accountsChanged', onAccountsChanged);
+provider.off('networkChanged', onNetworkChanged);
+```

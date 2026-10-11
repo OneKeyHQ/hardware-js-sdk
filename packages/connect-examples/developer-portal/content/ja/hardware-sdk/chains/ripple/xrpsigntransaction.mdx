@@ -1,0 +1,82 @@
+---
+title: "xrpSignTransaction"
+---
+
+# xrpSignTransaction
+
+### Ripple: トランザクションに署名 [#ripple-sign-transaction]
+
+トランザクションの署名を要求します。ユーザーはデバイス上でリクエストを確認して承認します。
+
+```typescript
+const response = await HardwareSDK.xrpSignTransaction(connectId, deviceId, params)
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `5`. [パス形式](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `transaction` - _必須_ `XrpTransaction` 型
+
+#### XrpTransaction 型 [#xrptransaction-type]
+
+```typescript
+type XrpTransaction = {
+    fee: string;
+    flags?: number;
+    sequence: number;
+    maxLedgerVersion?: number; // Proto: "last_ledger_sequence"
+    payment: XrpPayment;
+}
+
+type XrpPayment = {
+    amount: number;
+    destination: string;
+    destinationTag?: number;
+}
+```
+
+現在の SDK の実行時処理は `{ path, transaction }` を想定し、`transaction.payment.amount` を数値として検証します。エクスポートされた TypeScript 型宣言は、実行時の形式と一致していません。以下の例は実行時の仕様に従います。統合をコンパイルする前に、インストール済み SDK の型宣言を確認してください。金額は drops 単位です。
+
+### 例 [#example]
+
+```typescript
+HardwareSDK.xrpSignTransaction(connectId, deviceId, {
+    path: "m/44'/144'/0'/0/0",
+    transaction: {
+        fee: '12',
+        flags: 0,
+        sequence: 32841006,
+        maxLedgerVersion: 32841630,
+        payment: {
+            amount: 1000000,
+            destination: 'rwgumKP89VhMrJ4dRkGVS4tafRfAmZmKf8',
+        }
+    }
+});
+```
+
+結果
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        serializedTx: string;
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

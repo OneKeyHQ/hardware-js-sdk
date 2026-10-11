@@ -1,0 +1,30 @@
+---
+title: "verifyMessage"
+---
+
+# verifyMessage
+
+Den Client auffordern, die Richtigkeit der Signatur zu prüfen; die Ergebnisse werden clientseitig angezeigt.
+
+## Methode [#method]
+
+```typescript
+declare function verifyMessage(signature: string, message: string): Promise<void>;
+```
+
+## Beispiel [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+const message = "Plain Message";
+await provider.enable();
+const { signature } = await provider.signMessage(message);
+await provider.verifyMessage(signature, message);
+```
+
+## Demo [#demo]
+
+[Beispiel öffnen](https://codepen.io/OneKeyHQ/pen/eYxLvXK)
+
+Das Promise wird ohne Wert aufgelöst. Diese Methode gibt keinen booleschen Wert zurück; behandeln Sie ein abgelehntes Promise als fehlgeschlagene Prüfanfrage.

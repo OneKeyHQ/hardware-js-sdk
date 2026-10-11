@@ -1,0 +1,114 @@
+---
+title: "Firma"
+description: "Firma datos en TON con OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Firma
+
+Conecta la cartera antes de enviar solicitudes. Sustituye las direcciones y URL de manifiesto de ejemplo por valores válidos. Para autenticación, usa un desafío de un solo uso generado por el servidor y verifica la prueba en tu servidor.
+
+Aprende a firmar datos para verificarlos fuera de la cadena.
+
+---
+
+## Firmar datos arbitrarios [#sign-arbitrary-data]
+
+Firma celdas de datos para verificarlas fuera de la cadena:
+
+```typescript
+const result = await provider.send({
+  method: 'signData',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      schema_crc: 0, // Custom schema identifier
+      cell: cellBoc.toString('base64'), // Base64 encoded cell to sign
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('Signature:', result.result.signature) // Base64 signature
+  console.log('Timestamp:', result.result.timestamp) // UNIX timestamp
+}
+```
+
+---
+
+## Firmar una prueba (autenticación) [#sign-proof-authentication]
+
+Solicita una prueba de autenticación durante la conexión:
+
+```typescript
+const connectEvent = await provider.connect(2, {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    {
+      name: 'ton_proof',
+      payload: 'your-server-generated-challenge' // Nonce for replay protection
+    }
+  ]
+})
+
+if (connectEvent.event === 'connect') {
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  if (proofItem && "proof" in proofItem) {
+    // Send proof to your backend for verification
+    const proof = proofItem.proof
+    console.log({
+      signature: proof.signature,
+      timestamp: proof.timestamp,
+      domain: proof.domain,
+      payload: proof.payload,
+    })
+  }
+}
+```
+
+---
+
+## Gestión de errores [#error-handling]
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [/* ... */]
+})
+
+if ('error' in result) {
+  switch (result.error.code) {
+    case 300:
+      console.log('User rejected the transaction')
+      break
+    case 1:
+      console.log('Bad request - check parameters')
+      break
+    case 400:
+      console.log('Method not supported')
+      break
+    default:
+      console.error('Error:', result.error.message)
+  }
+} else {
+  console.log('Success:', result.result)
+}
+```
+
+---
+
+## Códigos de error [#error-codes]
+
+| Código | Descripción |
+|------|-------------|
+| 0 | Error desconocido |
+| 1 | Solicitud incorrecta |
+| 100 | Aplicación desconocida |
+| 300 | El usuario rechazó la solicitud |
+| 400 | Método no compatible |

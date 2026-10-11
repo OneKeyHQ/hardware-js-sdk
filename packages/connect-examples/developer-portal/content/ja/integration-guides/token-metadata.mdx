@@ -1,0 +1,37 @@
+---
+title: "トークンの追加を提案"
+description: "`wallet_watchAsset` でウォレットにトークンの追跡を依頼します。追加するかはユーザーが決めます。トークンの送信や、トークンの信頼性の証明は行いません。"
+---
+
+<span id="suggest-a-token" />
+
+# トークンの追加を提案
+
+`wallet_watchAsset` でウォレットにトークンの追跡を依頼します。追加するかはユーザーが決めます。トークンの送信や、トークンの信頼性の証明は行いません。
+
+選択中のネットワークを確認し、コントラクトアドレス、シンボル、小数桁数を検証してください。メソッドはユーザー操作から呼び出します。
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const wasAdded = await provider.request({
+    method: 'wallet_watchAsset',
+    params: {
+      type: 'ERC20',
+      options: {
+        address: '<TOKEN_CONTRACT_ADDRESS>',
+        symbol: 'TOKEN',
+        decimals: 18, // Replace with the token's actual decimals.
+        image: 'https://example.com/token.png',
+      },
+    },
+  });
+  console.log(wasAdded ? 'Token added.' : 'Token was not added.');
+} catch (error) {
+  console.error(error.code, error.message);
+}
+```
+
+例のメタデータをすべて置き換え、UI で未対応メソッドとユーザー拒否のエラーを処理してください。参照: [メソッドリファレンス](/ja/connect-to-software/provider/eth/reference/wallet_watchAsset).

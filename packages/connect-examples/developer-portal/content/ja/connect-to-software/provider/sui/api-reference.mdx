@@ -1,0 +1,129 @@
+---
+title: "API リファレンス"
+description: "OneKey の Sui プロバイダーの完全な API リファレンス"
+---
+
+<span id="api-reference" />
+
+# API リファレンス
+
+OneKey の Sui プロバイダーのメソッドと型のリファレンス。
+
+---
+
+## メソッド [#methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `hasPermissions()` | 接続済みか確認 |
+| `requestPermissions()` | 接続を要求 |
+| `disconnect()` | ウォレットを切断 |
+| `getAccounts()` | 接続済みアカウントを取得 |
+| `getActiveChain()` | 現在のチェーンを取得 |
+| `isConnected()` | 接続状態を確認 |
+| `signAndExecuteTransactionBlock(input)` | トランザクションに署名して実行 |
+| `signTransactionBlock(input)` | トランザクションに署名のみ |
+| `signAndExecuteTransaction(input)` | 署名して実行 (新 API) |
+| `signTransaction(input)` | トランザクションに署名 (新 API) |
+| `signMessage(input)` | メッセージに署名 (従来方式) |
+| `signPersonalMessage(input)` | 個人メッセージに署名 |
+| `onAccountChange(callback)` | アカウント変更を監視 |
+| `onNetworkChange(callback)` | ネットワーク変更を監視 |
+
+---
+
+## 型 [#types]
+
+### ウォレットアカウント [#wallet-account]
+
+`getAccounts()` は `AccountInfo[]` を返します。署名の入力には Wallet Standard の `WalletAccount` が必要です。その `publicKey` はバイト配列で、`chains` と `features` も含まれます。`standard:connect` で取得し、`AccountInfo` を `WalletAccount` にキャストしないでください。
+
+```typescript
+import type { WalletAccount, IdentifierString } from '@mysten/wallet-standard'
+import type { Transaction } from '@mysten/sui/transactions'
+
+// provider.getAccounts()
+interface AccountInfo {
+  address: string
+  publicKey: string // Hex-encoded public key
+}
+```
+
+### トランザクションブロックの署名・実行の入力 [#sign-and-execute-transaction-block-input]
+
+現在の注入型プロバイダーは、`signAndExecuteTransactionBlock` の `options` を転送しません。同じチェーンの Sui クライアントで返された digest を照会し、effects、events、object changes を要求します。
+
+```typescript
+interface SignAndExecuteTransactionBlockInput {
+  account: WalletAccount
+  chain: IdentifierString
+  transactionBlock: Transaction
+  options?: {
+    showEffects?: boolean
+    showEvents?: boolean
+    showObjectChanges?: boolean
+    showBalanceChanges?: boolean
+    showInput?: boolean
+    showRawInput?: boolean
+  }
+}
+```
+
+### トランザクションブロック署名の出力 [#sign-transaction-block-output]
+
+```typescript
+interface SignTransactionBlockOutput {
+  transactionBlockBytes: string
+  signature: string
+}
+```
+
+### 個人メッセージ署名の入力 [#sign-personal-message-input]
+
+```typescript
+interface SignPersonalMessageInput {
+  account: WalletAccount
+  chain?: IdentifierString
+  message: Uint8Array
+}
+```
+
+### 個人メッセージ署名の出力 [#sign-personal-message-output]
+
+```typescript
+interface SignPersonalMessageOutput {
+  signature: string
+  bytes: string
+}
+```
+
+---
+
+## 対応チェーン [#supported-chains]
+
+| チェーン | 識別子 |
+|-------|------------|
+| メインネット | `sui:mainnet` |
+| テストネット | `sui:testnet` |
+| 開発ネット | `sui:devnet` |
+
+---
+
+## イベント [#events]
+
+| イベント | コールバックのパラメーター | 説明 |
+|-------|---------------------|-------------|
+| `accountChanged` | `{ address, publicKey } \| null` | アカウント変更時 |
+| `networkChange` | `network: string \| null` | ネットワーク変更時 |
+| `connect` | `address: string` | 接続済み |
+| `disconnect` | - | 切断時 |
+
+---
+
+## エラーコード [#error-codes]
+
+| コード | 説明 |
+|------|-------------|
+| 4001 | ユーザーがリクエストを拒否 |
+| 4100 | 未認証 |
+| -32603 | 内部エラー |

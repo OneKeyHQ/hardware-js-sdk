@@ -4,20 +4,15 @@ The main portal repository is the publishing source. GitBook #229 is recorded in
 
 ## Updating a page
 
-1. Edit `content/en/<path>.mdx` and its Chinese counterpart. Check the current SDK type and implementation before changing API claims. Do not infer support from device model alone.
-2. Review translated prose, code examples, parameters, return values, error handling and warnings. Keep existing filenames and fragment IDs; add a local `<span id="old-heading" />` when a heading changes.
-3. Record only the pairs actually reviewed:
+1. Edit `content/en/<path>.mdx` and the matching files under `zh`, `fr`, `de`, `es` and `ja`. Check the current SDK type and implementation before changing API claims. Do not infer support from device model alone.
+2. Review every translation in context, including conditions, negation, warnings, parameters and return values. Keep filenames, code examples and API literals unchanged. Preserve English heading anchors with Nextra’s `[#original-id]` syntax; a translated H1 can retain its original ID with a preceding `<span id="original-title" />`.
+3. Record only the files actually reviewed. The historical English/Chinese ledger uses `node scripts/record-content-review.mjs <path>`. Record each reviewed French, German, Spanish and Japanese file with `yarn i18n:record <locale> <path>`. See [the localization workflow](../i18n/README.md) for navigation and UI changes.
+4. Run `yarn check:content`, `yarn i18n:check` and `yarn build`. These checks validate historical GitBook destinations, all published language files, source/output fingerprints, code, links, heading anchors and UI placeholders before compilation and language-specific Pagefind indexing. Check rendered navigation, search, links and responsive UI for every affected language.
+5. Commit English, all matching translations and the corresponding review records together. When removing a page, remove its manifest entries and repair incoming links and migration destinations.
 
-   ```sh
-   node scripts/record-content-review.mjs hardware-sdk/getting-started.mdx
-   ```
+A recorded fingerprint acknowledges a review; it does not prove translation or API correctness. All six editions are maintained directly by people or AI assistants, with no external translation API or Secret. The portal build runs on relevant pull requests and changes to `onekey`; missing or stale translations fail the build. That workflow produces an artifact and does not deploy it.
 
-4. Run `yarn check:content` and `yarn build` in this package. The build validates bilingual file parity, review hashes and GitBook destination integrity before Next.js compilation and Pagefind indexing. Check rendered links and responsive UI when headings or components change.
-5. Commit both languages and the corresponding `docs/content-review.json` and `i18n/manifest.json` entries together. The review command records the Chinese baseline in both ledgers. For a removed page, also remove its manifest entry and repair its links and migration destinations.
-
-The manifest catches unreviewed drift; it cannot assess translation or API correctness. Recording a hash is a reviewer assertion, not an automated quality check. An OpenAI-compatible incremental translation pipeline is implemented but remains disabled pending provider configuration and initial acceptance. See [localization setup](../i18n/README.md). Generated EN/ZH pairs are accepted only when source and output match their recorded generated hashes; those hashes do not certify a human review. New languages should not be advertised until their content and navigation have been reviewed.
-
-Generated release entries come from `data/hardware-sdk-releases.json`; its bilingual values must be checked separately when running `sync:changelog`. Metadata navigation labels and shared component copy also need human review because the historical review ledger covers MDX bodies only; the localization manifest also tracks navigation and extracted UI catalogs.
+Release entries come from `data/hardware-sdk-releases.json` and `data/provider-releases.json`. Review their technical claims, run `yarn i18n:extract-ui`, and update all translated highlights. Navigation labels and shared component copy need contextual review too: the historical bilingual ledger covers MDX bodies, while `i18n/manifest.json` also tracks navigation and UI catalogs.
 
 ## Preserved functionality
 

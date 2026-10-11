@@ -1,0 +1,72 @@
+---
+description: "Geräteverbindungen wiederherstellen, Wallet-Bindungen bewahren und das SDK beenden, ohne Nebenwirkungen erneut auszulösen."
+title: "Wiederverbinden und freigeben"
+---
+
+<span id="reconnect-and-dispose" />
+
+# Wiederverbinden und freigeben
+
+Transportabbrüche sind normal: USB-Abziehen, BLE-Reichweite, Bluetooth-Zurücksetzen im Betriebssystem, Firmware-Neustart. Hardware SDK 1.2.0 stellt die **Verbindung** wieder her. Ihre App muss weiterhin den **Aufruf** wiederherstellen.
+
+Diese Seite beschreibt den Integrationsvertrag. Sie beschreibt keine Protocol-V2-Sequenznummern oder Transport-Generation.
+
+## Was das SDK bereits übernimmt [#what-the-sdk-already-does]
+
+- Bei normaler Trennung / Wiederverbindung ändert sich das bestätigte `connectProtocol` **nicht**. Nach einem Abbruch wählen Sie nicht erneut zwischen V1 und V2.
+- Laufende Aufrufe schlagen fehl. Das SDK wiederholt Signieren, Löschen oder Firmware-Updates **nicht**.
+- Protocol V2 hält die Aufrufreihenfolge pro Gerät ein. Starten Sie keinen zweiten fachlichen Aufruf, solange der erste wiederhergestellt wird.
+
+## Was Sie tun müssen [#what-you-must-do]
+
+1. Abonnieren Sie `DEVICE.CONNECT` / `DEVICE.DISCONNECT` einmal beim App-Start.
+2. Bei `DISCONNECT` markieren Sie diese `connectId` als beschäftigt/ungültig und beenden Sie den aktuellen UI-Ablauf mit Fehler. Wiederholen Sie dieselbe Methode mit Nebenwirkungen nicht.
+3. Erneut suchen (`searchDevices`), wenn der Nutzer bereit ist. Erneutes USB-Anschließen und BLE-Koppeln können eine **neue** `connectId` erzeugen. Speichern Sie USB- und BLE-IDs getrennt zwischen. Siehe [Kennungen](/de/hardware-sdk/concepts/identifiers).
+4. Aktualisieren Sie nach einer neuen Verbindung den Gerätestatus mit [`getDeviceState`](/de/hardware-sdk/basic-api/get-device-state). Verwenden Sie gespeicherte `deviceId + passphraseState`; speichern Sie keine Firmware-`session_id`.
+5. Übergeben Sie beim nächsten Adress-/Signieraufruf den gespeicherten `passphraseState` oder `useEmptyPassphrase: true`. Core setzt die Firmware-Sitzung innerhalb dieser Methode fort. Öffnen Sie nicht allein zur Wiederverbindung eine Wallet-Sitzung erneut.
+
+```ts
+import { DEVICE } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(DEVICE.DISCONNECT, (payload) => {
+  markDisconnected(payload);
+  // Fail the open UI flow; do not replay signing or firmware updates.
+});
+HardwareSDK.on(DEVICE.CONNECT, () => {
+  refreshDeviceList();
+});
+```
+
+## BLE-spezifisch [#ble-specific]
+
+- Berechtigungen (`BLUETOOTH_SCAN` / `CONNECT`, iOS-Bluetooth-Nutzungstexte, oft Standort unter Android) müssen auch nach Prozessende weiterhin erteilt sein. Siehe [React Native BLE](/de/hardware-sdk/transport/react-native-ble).
+- `retryCount` / `timeout` steuern den Verbindungsaufbau vor einem Geräteaufruf. Sie wiederholen kein Signieren und ersetzen keine Wiederherstellung auf Anwendungsebene.
+- Wenn die Betriebssystemkopplung veraltet ist, stoppen Sie wiederholte Verbindungsversuche. Bitten Sie den Nutzer, das Gerät in den System-Bluetooth-Einstellungen zu entfernen und erneut zu koppeln.
+- Mini hat kein BLE. Neo hat BLE, aber keine Kamera. Siehe [Geräte](/de/hardware-sdk/concepts/devices).
+
+## USB-spezifisch [#usb-specific]
+
+- WebUSB benötigt eine Nutzeraktion, um die Auswahl erneut anzuzeigen, sofern Sie nicht `skipWebDevicePrompt` bei einem weiterhin autorisierten Gerät übergeben. Siehe [Gemeinsame Parameter](/de/hardware-sdk/concepts/common-params).
+- Wenn ein anderer Tab oder Bridge das Gerät belegt, kann ein Übernahme-/Öffnungsfehler auftreten. Schließen Sie die andere Verbindung; führen Sie nicht `dispose()` als erste Reaktion aus.
+
+## `dispose()` [#dispose]
+
+```ts
+await HardwareSDK.dispose();
+```
+
+Rufen Sie `dispose()` nur beim Beenden des SDKs oder beim Wechseln von `env` / Transport-Stack auf (zum Beispiel WebUSB → Low-Level). Dadurch werden alle Verbindungen und der Transport-Cursor von Protocol V2 verworfen.
+
+Rufen Sie `dispose()` bei einem gewöhnlichen BLE-Abbruch oder USB-Abziehen **nicht** auf. Suchen und verbinden Sie erneut mit derselben `HardwareSDK`-Instanz.
+
+Nach `dispose()` müssen Sie `init()` erneut aufrufen, bevor Sie `searchDevices` verwenden.
+
+## Firmware-Neustart [#firmware-reboot]
+
+`firmwareUpdateV2` / `V3` / `V4` kann die Verbindung absichtlich trennen. Warten Sie, verbinden Sie erneut und lesen Sie dann die Versionen. Behandeln Sie diesen Abbruch nicht als fehlgeschlagenes Update, das wiederholt werden muss. Siehe [Firmware-Update](/de/hardware-sdk/firmware-update).
+
+## Weiter [#next]
+
+- [Transportauswahl](/de/hardware-sdk/transport)
+- [Core-API-Anleitung](/de/hardware-sdk/core-api-guide)
+- [Wallet-Sitzungen](/de/hardware-sdk/concepts/wallet-session)

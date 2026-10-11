@@ -1,0 +1,29 @@
+---
+title: "getNetwork"
+---
+
+# getNetwork
+
+Obtenir le réseau du compte actuel
+
+## Méthode [#method]
+
+```typescript
+declare function getNetwork(): Promise<string>;
+```
+
+## Réponse [#response]
+
+Le réseau : `livenet` ou `testnet`.
+
+## Exemple [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const network = await provider.getNetwork()
+```
+
+## Démonstration [#demo]
+
+[Ouvrir l’exemple](https://codepen.io/OneKeyHQ/pen/xxMaLqz)

@@ -1,0 +1,65 @@
+---
+title: "suiSignMessage"
+---
+
+# suiSignMessage
+
+### 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.6.0
+  * Classic/Mini: 3.4.0
+
+### Sui: メッセージに署名 [#sui-sign-message]
+
+指定パスから導出した鍵でメッセージの署名を要求します。
+
+```typescript
+const result = await HardwareSDK.suiSignMessage(connectId, deviceId, params);
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`. [詳細を読む](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _必須_ `string` 署名するメッセージ。16 進数文字列にエンコードします。
+
+### 例 [#example]
+
+```typescript
+// Original message
+const message = "Hello World";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.suiSignMessage(connectId, deviceId, {
+    path: "m/44'/784'/0'/0'/0'",
+    messageHex,
+});
+```
+
+#### 結果 [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,
+        signature: string,
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

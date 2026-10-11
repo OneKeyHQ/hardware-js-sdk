@@ -1,0 +1,131 @@
+---
+title: "eth_chainId"
+description: "現在のチェーン ID を取得"
+---
+
+# eth_chainId
+
+現在接続中のネットワークのチェーン ID を返します。チェーン ID は、異なるネットワーク間のリプレイ攻撃を防ぐために使用します。
+
+---
+
+## パラメーター [#parameters]
+
+なし
+
+---
+
+## 戻り値 [#returns]
+
+`string` - 16 進数文字列のチェーン ID
+
+---
+
+## 例 [#example]
+
+```typescript
+const chainId = await window.$onekey.ethereum.request({
+  method: 'eth_chainId'
+})
+
+console.log('Chain ID (hex):', chainId)
+console.log('Chain ID (decimal):', parseInt(chainId, 16))
+```
+
+### ネットワークを確認 [#check-network]
+
+```typescript
+const CHAIN_IDS = {
+  ETHEREUM: '0x1',
+  POLYGON: '0x89',
+  BSC: '0x38',
+  ARBITRUM: '0xa4b1',
+  OPTIMISM: '0xa',
+  BASE: '0x2105'
+}
+
+async function checkNetwork() {
+  const chainId = await window.$onekey.ethereum.request({
+    method: 'eth_chainId'
+  })
+
+  switch (chainId) {
+    case CHAIN_IDS.ETHEREUM:
+      console.log('Connected to Ethereum Mainnet')
+      break
+    case CHAIN_IDS.POLYGON:
+      console.log('Connected to Polygon')
+      break
+    default:
+      console.log('Connected to chain:', parseInt(chainId, 16))
+  }
+
+  return chainId
+}
+```
+
+### 特定のネットワークを必須にする [#require-specific-network]
+
+```typescript
+async function requireNetwork(requiredChainId) {
+  const chainId = await window.$onekey.ethereum.request({
+    method: 'eth_chainId'
+  })
+
+  if (chainId !== requiredChainId) {
+    try {
+      await window.$onekey.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: requiredChainId }]
+      })
+    } catch (error) {
+      if (error.code === 4902) {
+        throw new Error('Please add this network to your wallet')
+      }
+      throw error
+    }
+  }
+}
+
+// Usage
+await requireNetwork('0x1') // Require Ethereum Mainnet
+```
+
+---
+
+## 主なチェーン ID [#common-chain-ids]
+
+| ネットワーク | 16 進数 | 10 進数 |
+|---------|-----|---------|
+| Ethereum メインネット | `0x1` | 1 |
+| Sepolia テストネット | `0xaa36a7` | 11155111 |
+| Polygon | `0x89` | 137 |
+| BSC | `0x38` | 56 |
+| Arbitrum One | `0xa4b1` | 42161 |
+| Optimism | `0xa` | 10 |
+| Base | `0x2105` | 8453 |
+| Avalanche C-Chain | `0xa86a` | 43114 |
+
+---
+
+## エラー [#errors]
+
+| コード | メッセージ | 説明 |
+|------|---------|-------------|
+| -32603 | 内部エラー | プロバイダーエラー |
+
+---
+
+## 注意事項 [#notes]
+
+- チェーン ID は常に `0x` プレフィックスを持つ 16 進数文字列として返されます
+- `chainChanged` イベントを監視してネットワーク変更を検出します
+- 次で規定されています: [EIP-695](https://eips.ethereum.org/EIPS/eip-695)
+
+```typescript
+window.$onekey.ethereum.on('chainChanged', (chainId) => {
+  console.log('Network changed to:', chainId)
+  // Recommended: reload the page
+  window.location.reload()
+})
+```

@@ -1,0 +1,36 @@
+---
+title: "Supervisar el estado de cuentas y red"
+---
+
+<span id="watch-accounts--network-status" />
+
+# Supervisar el estado de cuentas y red
+
+El proveedor emite eventos de cuenta y red. Escúchalos para actualizar el estado de la cuenta y los datos específicos de la red en tu aplicación.
+
+## Añadir escuchadores de eventos [#add-event-listeners]
+
+```javascript
+// accountsChanged
+const onAccountsChanged = (payload) => {
+  const accountId = payload?.accounts?.[0]?.accountId || '';
+  console.log('onAccountsChanged', accountId);
+}
+provider.on('accountsChanged', onAccountsChanged);
+
+
+// networkChanged
+const onNetworkChanged = (payload) => {
+  console.log('onNetworkChanged', payload.networkId);
+}
+provider.on('networkChanged', onNetworkChanged);
+```
+
+### Eliminar escuchadores de eventos [#remove-event-listeners]
+
+Recuerda eliminar los escuchadores cuando dejen de ser necesarios (por ejemplo, al desmontar un componente en React):
+
+```javascript
+provider.off('accountsChanged', onAccountsChanged);
+provider.off('networkChanged', onNetworkChanged);
+```

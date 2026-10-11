@@ -1,0 +1,22 @@
+---
+title: "Événement"
+---
+
+<span id="nostr-events" />
+
+# Événements Nostr
+
+Le fournisseur OneKey émet `accountChanged` sans données associées. Effacez l’état du compte en cache lorsque cet événement se produit, puis récupérez la clé publique actuelle si nécessaire. Il émet aussi `disconnect` lorsque le pont se déconnecte. Il s’agit d’extensions OneKey à NIP-07.
+
+```javascript
+const provider = window.$onekey?.nostr;
+if (!provider) throw new Error('OneKey Nostr provider is unavailable.');
+
+const onAccountChanged = () => {
+  // Clear the cached public key and any account-specific UI.
+};
+provider.on('accountChanged', onAccountChanged);
+
+// Run during cleanup.
+provider.off('accountChanged', onAccountChanged);
+```

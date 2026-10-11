@@ -1,0 +1,27 @@
+---
+title: "getPublicKey"
+---
+
+# getPublicKey
+
+## Método [#method]
+
+```typescript
+declare function getPublicKey(): Promise<string>;
+```
+
+## Respuesta [#response]
+
+devuelve una clave pública en hexadecimal
+
+## Ejemplo [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const pubkey = await provider.getPublicKey()
+```
+
+## Demostración [#demo]
+
+[Abrir ejemplo](https://codepen.io/OneKeyHQ/pen/ExremGa)

@@ -1,0 +1,101 @@
+---
+description: "Consultez les associations de portefeuille partagées, les options de transport et les paramètres de chemin de dérivation."
+title: "Paramètres communs"
+---
+
+# Paramètres communs
+
+La plupart des méthodes de chaîne et d’appareil acceptent un objet `params` ; les API d’initialisation, d’événements et de cycle de vie ont leurs propres signatures. Les clés de cette page forment l’ensemble partagé des méthodes d’adresse, de signature et d’appareil. Elles ne sont **pas** universelles : `openWalletSession` rejette `useEmptyPassphrase`, `initSession`, `deviceId`, et `passphraseState` même lorsque ces valeurs sont `false` ou proviennent de la décomposition d’un objet de valeurs par défaut partagé. Les champs propres aux chaînes et aux appareils (`path`, `coin`, `tx`, `message`, …) restent sur la page de chaque méthode.
+
+Cette page est la **référence**. Pour le cycle de vie des appels, consultez le [Guide de l’API Core](/fr/hardware-sdk/core-api-guide). Pour les identifiants de réponse (`connectId`, `deviceId`, `uuid`, `session_id`, …), consultez [Identifiants](/fr/hardware-sdk/concepts/identifiers).
+
+<div id="common-params" />
+
+| Paramètre | Type | Rôle | Remarques |
+| --- | --- | --- | --- |
+| `passphraseState` | `string` | Lier l’appel à un portefeuille caché précis | Obtenir une fois via `openWalletSession` (ou l’ancienne méthode `getPassphraseState`) ; transmettre à chaque appel ultérieur devant rester sur ce portefeuille. Ne peut pas être combiné avec `useEmptyPassphrase`. Il s’agit d’une empreinte de portefeuille, pas d’un champ du micrologiciel `session_id`. |
+| `useEmptyPassphrase` | `boolean` | Forcer le portefeuille standard | Empêche qu’une session de portefeuille caché restante change silencieusement l’adresse. Ne peut pas être combiné avec `passphraseState`. |
+| `initSession` | `boolean` | Forcer l’initialisation de la session avant l’appel | Associer à `passphraseState` dans le parcours de compatibilité. Le nouveau code doit privilégier `openWalletSession({ mode })` au lieu de combiner `mode` avec cet indicateur. |
+| `deriveCardano` | `boolean` | Prédériver la sous-arborescence Cardano | Définir lors du premier appel Cardano d’une session. |
+| `retryCount` | `number` | Nombre maximal de nouvelles tentatives d’établissement de connexion | Utilisé par Core pendant l’établissement/l’initialisation de la connexion. Ne rejoue pas une opération de signature terminée ou échouée. |
+| `pollIntervalTime` | `number` | Intervalle d’interrogation (ms) entre les tentatives | Associé à `retryCount` pendant la configuration de la connexion. |
+| `timeout` | `number` | Délai limite d’une tentative de connexion (ms) | Ne définit pas le délai de signature ou de transfert du micrologiciel. |
+| `detectBootloaderDevice` | `boolean` | Échouer rapidement si l’appareil est en mode Bootloader | Utiliser sur les parcours de signature où le mode Bootloader n’est jamais valide. |
+| `skipWebDevicePrompt` | `boolean` | Ignorer le sélecteur WebUSB lors d’un nouvel accès | **WebUSB uniquement.** Réutilise l’autorisation WebUSB précédente. |
+| `keepSession` | `boolean` | Conserver le transport après l’appel | Contrôle si `Device.run()` libère la liaison. Ce n’est pas une association de portefeuille et ce paramètre n’est **pas** remplacé par `passphraseState` ou `openWalletSession`. Conservez-le pour les signatures USB consécutives / vérifications suivies d’une mise à niveau et les périodes de mise à jour du micrologiciel BLE Electron. |
+
+## Remarques propres au transport [#transport-specific-notes]
+
+| Paramètre | WebUSB | Bridge | node-usb | BLE Android | BLE iOS | BLE Desktop |
+| --- | --- | --- | --- | --- | --- | --- |
+| `skipWebDevicePrompt` | ✅ | — | — | — | — | — |
+| `retryCount` / `pollIntervalTime` / `timeout` | Configuration de la connexion | Configuration de la connexion | Configuration de la connexion | Configuration de la connexion | Configuration de la connexion | Configuration de la connexion |
+| `passphraseState` / `useEmptyPassphrase` / `initSession` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `deriveCardano` / `detectBootloaderDevice` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+## Combinaisons courantes [#common-combos]
+
+**Portefeuille standard — éviter les demandes involontaires de portefeuille caché**
+
+```ts
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+```
+
+**Portefeuille caché — réutiliser une association entre les appels**
+
+```ts
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: 'select-hidden',
+});
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden') {
+  throw new Error('A hidden wallet was not opened');
+}
+const hiddenWallet = {
+  passphraseState: opened.payload.passphraseState,
+};
+
+await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  ...hiddenWallet,
+});
+```
+
+Parcours de compatibilité obsolète : `getPassphraseState(connectId, { initSession: true })`, puis transmettre `{ initSession: true, passphraseState }` lors des appels ultérieurs. Consultez [Sessions de portefeuille](/fr/hardware-sdk/concepts/wallet-session).
+
+**Nouvelles tentatives BLE prudentes (découverte / adresse / signature uniquement)**
+
+```ts
+const bleDefaults = {
+  retryCount: 3,
+  pollIntervalTime: 1000,
+  timeout: 30_000,
+};
+```
+
+Ne propagez pas `bleDefaults` vers `firmwareUpdateV2` / `V3` / `V4`. Consultez [Reconnexion et libération](/fr/hardware-sdk/transport/reconnect).
+
+## Chemin HD [#hd-path]
+
+
+La longueur minimale de chemin d’une méthode est une vérification d’entrée du SDK, pas une garantie de prise en charge de tout chemin de cette longueur. Le micrologiciel impose aussi des règles de dérivation et de renforcement propres à la chaîne.
+
+`path: string | number[]` suit BIP44. Les chaînes ed25519 (Solana, NEAR, …) exigent une dérivation entièrement renforcée.
+
+| Chaîne | Exemple de chemin | Remarques |
+| --- | --- | --- |
+| EVM | `m/44'/60'/0'/0/0` | Compte EVM standard |
+| BTC (SegWit imbriqué) | `m/49'/0'/0'/0/0` | Utilisez `84'` pour SegWit natif |
+| Solana | `m/44'/501'/0'/0'` | Entièrement renforcé |
+| NEAR | `m/44'/397'/0'/0'/1'` | Entièrement renforcé |
+| Cardano | `m/1852'/1815'/0'/0/0` | Staking à `.../2/0` |
+| TRON | `m/44'/195'/0'/0/0` | Chemin de style EVM |
+
+Exemple de tableau de nombres : `[(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0x80000000, 0, 0]`
+
+Erreurs de chemin interdit : vérifiez la longueur et le renforcement sur la page de la méthode de chaîne.
+
+Sur Protocol V1, `select-hidden` peut renvoyer un portefeuille standard lorsque la protection par phrase secrète est désactivée. Vérifiez `walletType` avant d’enregistrer ou d’utiliser `passphraseState`.

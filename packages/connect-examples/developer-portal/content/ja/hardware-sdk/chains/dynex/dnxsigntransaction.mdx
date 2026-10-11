@@ -1,0 +1,94 @@
+---
+title: "dnxSignTransaction"
+---
+
+# dnxSignTransaction
+
+### Dynex: トランザクションに署名 [#dynex-sign-transaction]
+
+指定の BIP32 パスから導出した秘密鍵で、指定された Dynex トランザクションに署名します。ユーザーは OneKey 上でトランザクションの詳細を確認するよう求められます。
+
+```typescript
+const result = await HardwareSDK.dnxSignTransaction(connectId, deviceId, params);
+```
+
+#### 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * classic: 3.8.0
+
+#### パラメーター [#parameters]
+
+connectId: `string`
+
+* 接続の一意の識別子
+
+deviceId: `string`
+
+* ハードウェアデバイスの一意の識別子
+
+params: `object`
+
+* path: `string` - BIP32 パス (例: "m/44'/0'/0'/0/0") \[必須\]
+* inputs: `array` - トランザクション入力の配列 \[必須\]
+  * prevIndex: `number` - 以前の出力のインデックス
+  * globalIndex: `number` - グローバルインデックス
+  * txPubkey: `string` - トランザクションの公開鍵
+  * prevOutPubkey: `string` - 以前の出力の公開鍵
+  * amount: `string` - 入力金額
+* toAddress: `string` - 送信先アドレス \[必須\]
+* amount: `string` - トランザクションの金額 \[必須\]
+* fee: `string` - トランザクション手数料 \[必須\]
+* paymentIdHex: `string` - 任意の支払い ID (32 バイト必須)
+
+#### 例 [#example]
+
+```typescript
+const response = await HardwareSDK.dnxSignTransaction('connect1', 'device1', {
+    path: "m/44'/0'/0'/0/0",
+    inputs: [{
+        prevIndex: 0,
+        globalIndex: 323,
+        txPubkey: "0d708b68003ae5fee4c9f9aad56a8cfdb0a5dcbcdd2e3fc18eb813349457a78c",
+        prevOutPubkey: "ff4df9a9fc83e48f2c0242c4d94f3906546a889950bccd8ba4392f3e7886c3a1",
+        amount: "1000000000"
+    }],
+    toAddress: "XwmxTF8FxAy2s5cvtS62oSGxY3fzvDcgo2CiJ6rrpz9te68sApSDs3LQihubFtpsfT5z6NYHZzMKUjavNpTkW46i2dYgHBULG",
+    amount: "1000000000",
+    fee: "100000",
+});
+```
+
+#### 戻り値 [#returns]
+
+成功レスポンス:
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string,              // BIP32 path used for signing
+        txKey: {
+            ephemeralTxSecKey: string,  // Transaction secret key
+            ephemeralTxPubKey: string   // Transaction public key
+        },
+        computedKeyImages: string[],    // Array of computed key images
+        signatures: string[],           // Array of signatures
+        outputKeys: string[]            // Array of output keys
+    }
+}
+```
+
+エラーレスポンス:
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string,
+        code?: string | number
+    }
+}
+```
+
+#### [#]

@@ -1,0 +1,86 @@
+---
+title: "wallet_getPermissions"
+description: "Aktuelle Berechtigungen für die dApp abrufen"
+---
+
+# wallet_getPermissions
+
+Gibt die der dApp aktuell erteilten Berechtigungen zurück. Diese Methode fordert den Nutzer nicht zu einer Eingabe auf.
+
+---
+
+## Parameter [#parameters]
+
+Keine
+
+---
+
+## Rückgabe [#returns]
+
+`Array` von Berechtigungsobjekten:
+
+| Feld | Typ | Beschreibung |
+|-------|------|-------------|
+| `parentCapability` | `string` | Der Berechtigungsname |
+| `date` | `number` | Zeitstempel der Erteilung |
+| `caveats` | `array` | Einschränkungen der Berechtigung |
+
+---
+
+## Beispiel [#example]
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_getPermissions'
+})
+
+console.log('Current permissions:', permissions)
+
+// Check if connected
+const isConnected = permissions.some(
+  p => p.parentCapability === 'eth_accounts'
+)
+console.log('Is connected:', isConnected)
+```
+
+### Hilfsfunktion zur Berechtigungsprüfung [#permission-check-utility]
+
+```typescript
+async function checkPermissions() {
+  const permissions = await window.$onekey.ethereum.request({
+    method: 'wallet_getPermissions'
+  })
+
+  return {
+    hasAccounts: permissions.some(p => p.parentCapability === 'eth_accounts'),
+    permissions
+  }
+}
+
+const { hasAccounts } = await checkPermissions()
+if (!hasAccounts) {
+  // Request connection
+  await window.$onekey.ethereum.request({
+    method: 'eth_requestAccounts'
+  })
+}
+```
+
+---
+
+## Fehler [#errors]
+
+| Code | Nachricht | Beschreibung |
+|------|---------|-------------|
+| -32603 | Interner Fehler | Provider-Fehler |
+
+---
+
+## Hinweise [#notes]
+
+- Gibt ein leeres Array zurück, wenn keine Berechtigungen erteilt wurden
+- Fordert den Nutzer zu keiner Aktion auf
+- Nützlich, um den Verbindungsstatus ohne Dialog zu prüfen
+- Spezifiziert durch [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255)
+
+Behandeln Sie Fehler für nicht unterstützte Methoden in der Ziel-Wallet-Version. Kontoberechtigungen unterscheiden sich von der RPC-Verbindung und genehmigen keine Signaturen oder Transaktionen im Voraus. Für eine einfache Verbindung verwenden Sie `eth_requestAccounts`.

@@ -1,0 +1,32 @@
+---
+title: "BLE nativo"
+description: "Elige una conexión BLE nativa para Android, iOS o Flutter conservando la API común del Hardware SDK."
+---
+
+<span id="native-ble" />
+
+# BLE nativo
+
+Usa `@onekeyfe/hd-common-connect-sdk` en un contexto móvil nativo para reenviar llamadas de transporte de hardware por BLE. El SDK ejecuta JavaScript en una WebView o motor JS mientras la comunicación Bluetooth nativa ocurre en la aplicación host.
+
+## Cuándo elegir BLE nativo [#when-to-choose-native-ble]
+
+- Controlas toda la experiencia nativa (Android, iOS, Flutter) y puedes alojar una WebView o entorno JS que reenvíe `send`/`receive` por BLE.
+- Necesitas acceso detallado a permisos BLE del sistema, flujos de emparejamiento o interfaces personalizadas más fáciles de crear en Swift/Kotlin o Flutter que en React Native.
+- Quieres reutilizar la API JavaScript de `@onekeyfe/hd-common-connect-sdk` y mantener internamente la pila BLE nativa.
+
+## Guías por plataforma [#platform-guides]
+
+| Plataforma | Aspectos principales | Guía |
+| --- | --- | --- |
+| Android | Conexión Nordic BLE, emparejamiento, permisos y conexión JS | [Android (nativo)](/es/hardware-sdk/transport/android) |
+| iOS | Configuración CoreBluetooth, utilidades de emparejamiento y eventos JS | [iOS (nativo)](/es/hardware-sdk/transport/ios) |
+| Flutter | Conexión del plugin Flutter + ejemplos de conexión al host nativo | [Flutter (nativo)](/es/hardware-sdk/transport/flutter) |
+
+¿Necesitas una experiencia multiplataforma con React Native? Usa la guía de [React Native BLE](/es/hardware-sdk/transport/react-native-ble) en su lugar.
+
+## Conceptos fundamentales [#core-concepts]
+
+- Consulta [Plugin y protocolo de transporte de bajo nivel](/es/hardware-sdk/concepts/low-level-plugin) antes de conectar BLE nativo para entender el reenvío de notificaciones BLE sin procesar y las tramas V1/V2 gestionadas por el SDK.
+- Suscríbete pronto a `UI_EVENT` para evitar que los avisos y confirmaciones de PIN/frase de contraseña bloqueen la cola de solicitudes.
+- Reutiliza el mismo adaptador `HardwareSDK` de la guía Web; el código nativo solo reenvía paquetes BLE en lugar de WebUSB.

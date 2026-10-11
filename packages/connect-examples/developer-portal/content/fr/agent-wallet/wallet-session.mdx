@@ -1,0 +1,71 @@
+---
+title: "Session Agent Wallet"
+description: "Connectez, consultez et terminez une session App Transfer ou de portefeuille matériel."
+---
+
+<span id="agent-wallet-session" />
+
+# Session Agent Wallet
+
+Une session Agent Wallet est le contexte de portefeuille actif qu’un agent IA utilise via la CLI `onekey`. Dans le code actuel de la CLI, ce processus est exposé comme une connexion App Transfer / App Bot Wallet.
+
+## Fonctionnalités accessibles [#what-it-unlocks]
+
+Une fois la session active, l’agent peut utiliser le même contexte de portefeuille pour les opérations de lecture seule et d’écriture :
+
+| Fonctionnalité | Exemple |
+| --- | --- |
+| État du portefeuille | `onekey balance --chain eth` |
+| Adresse de réception | `onekey get-address` |
+| Historique | `onekey history --chain eth --detail` |
+| Contexte du marché | `onekey token trending --chain sol` |
+| Préparation d’échange | `onekey swap quote --chain eth --from ETH --to USDC --amount 1` |
+| Contrôles de sécurité | `onekey security audit --chain eth --token 0x...` |
+
+Ainsi, l’utilisateur n’a pas à coller de clés privées ni à fournir manuellement une adresse dans chaque instruction. L’agent doit lire la session active et expliquer quel portefeuille il utilise.
+
+## Connexion [#login]
+
+```bash
+onekey auth login --app-transfer
+```
+
+L’interface graphique OneKey fournit les données. La CLI importe la session dans le coffre local OneKey CLI et utilise le stockage d’identifiants du système d’exploitation pour les données protégées.
+
+La CLI expose également un paramètre `payload` pour l’automatisation. Traitez les données App Transfer comme des identifiants : ne les collez pas dans la conversation de l’agent, la documentation, les journaux ou un historique de shell partagé. Consultez `onekey schema auth-login` et les instructions actuelles de la CLI avant d’automatiser l’importation d’identifiants.
+
+## Statut [#status]
+
+Utilisez `auth status` avant chaque famille d’opérations :
+
+```bash
+onekey auth status
+```
+
+Le schéma actuel indique :
+
+| Champ | Signification |
+| --- | --- |
+| `authStatus` | `authenticated` ou `unauthenticated` |
+| `loginMethod` | `app_transfer` ou `hardware` |
+| `walletKind` | `hd` pour les sessions App Transfer, `hw` pour les sessions matérielles |
+| `displayAddress` | Adresse du portefeuille actif affichée à l’utilisateur |
+| `storageBackend` | Stockage d’identifiants du système utilisé par la CLI |
+
+## Cycle de vie [#lifecycle]
+
+| Étape | Comportement de l’agent |
+| --- | --- |
+| Avant toute action | Exécutez `onekey auth status` et signalez clairement l’absence d’authentification. |
+| Avant les actions en lecture seule | Utilisez l’adresse active et les valeurs de chaîne par défaut ; demandez uniquement le contexte de chaîne ou de jeton manquant. |
+| Avant les actions déplaçant des fonds | Affichez l’adresse active, la chaîne, le montant, le destinataire, les frais et l’état des risques, puis demandez confirmation. |
+| Après un changement de session | Exécutez de nouveau `onekey auth status` ; ne supposez pas que l’adresse précédente reste applicable. |
+| À la déconnexion | Cessez immédiatement d’utiliser l’ancien contexte de portefeuille. |
+
+## Déconnexion [#logout]
+
+```bash
+onekey auth logout
+```
+
+Les agents ne doivent appeler la déconnexion que lorsque l’utilisateur demande explicitement de terminer la session active.

@@ -1,0 +1,110 @@
+---
+title: "eth_call"
+description: "Exécuter un appel de contrat en lecture seule"
+---
+
+# eth_call
+
+Exécute immédiatement un nouvel appel de message sans créer de transaction sur la blockchain. Cette méthode sert à lire les données des contrats intelligents.
+
+---
+
+## Paramètres [#parameters]
+
+| Indice | Type | Description |
+|-------|------|-------------|
+| 0 | `object` | Objet d’appel de transaction |
+| 1 | `string` | Numéro ou balise de bloc (`latest`, `earliest`, `pending`) |
+
+### Objet d’appel de transaction [#transaction-call-object]
+
+| Champ | Type | Obligatoire | Description |
+|-------|------|----------|-------------|
+| `to` | `string` | Oui | Adresse du contrat |
+| `data` | `string` | Non | Données encodées de l’appel de fonction |
+| `from` | `string` | Non | Adresse de l’expéditeur (pour le contexte) |
+| `gas` | `string` | Non | Limite de gas (hex) |
+| `gasPrice` | `string` | Non | Prix du gas (hex) |
+| `value` | `string` | Non | Valeur en wei (hex) |
+
+---
+
+## Valeur de retour [#returns]
+
+`string` - Données renvoyées par l’appel (encodées en hexadécimal)
+
+---
+
+## Exemple [#example]
+
+### Lire un solde ERC-20 [#read-erc-20-balance]
+
+```typescript
+// balanceOf(address) selector: 0x70a08231
+const address = '0xYourAddress...'.slice(2).padStart(64, '0')
+const data = '0x70a08231' + address
+
+const balance = await window.$onekey.ethereum.request({
+  method: 'eth_call',
+  params: [{
+    to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
+    data: data
+  }, 'latest']
+})
+
+console.log('Balance:', BigInt(balance).toString())
+```
+
+### Lire le nom du contrat [#read-contract-name]
+
+```typescript
+// name() selector: 0x06fdde03
+const name = await window.$onekey.ethereum.request({
+  method: 'eth_call',
+  params: [{
+    to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    data: '0x06fdde03'
+  }, 'latest']
+})
+
+// Decode the result (ABI encoded string)
+// Decode `name` with your ABI library's string decoder.
+console.log('ABI-encoded contract name:', name)
+```
+
+### Utilisation d’ethers.js [#using-ethersjs]
+
+```typescript
+import { Contract, BrowserProvider } from 'ethers'
+
+const provider = new BrowserProvider(window.$onekey.ethereum)
+
+const contract = new Contract(
+  '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  ['function balanceOf(address) view returns (uint256)'],
+  provider
+)
+
+const balance = await contract.balanceOf('0xYourAddress...')
+console.log('USDC Balance:', balance.toString())
+```
+
+---
+
+## Erreurs [#errors]
+
+| Code | Message | Description |
+|------|---------|-------------|
+| -32000 | Exécution annulée | Appel de contrat annulé |
+| -32602 | Paramètres non valides | Paramètres d’appel non valides |
+
+---
+
+## Remarques [#notes]
+
+- Cette méthode ne consomme pas de gas et ne modifie pas l’état
+- Le champ `from` est une adresse facultative, mais peut influer sur le résultat de certains contrats
+- Choisissez une balise de bloc adaptée à votre cas d’usage ; `latest` reflète le dernier bloc visible par le point de terminaison
+- Pour les interactions complexes avec des contrats, envisagez ethers.js ou web3.js
+
+Les exemples d’adresses de jetons concernent Ethereum mainnet. Confirmez la chaîne et utilisez une adresse de compte complète de 20 octets avant d’encoder `balanceOf`.

@@ -1,0 +1,35 @@
+---
+title: "アカウントへのアクセス"
+---
+
+<span id="accessing-accounts" />
+
+# アカウントへのアクセス
+
+アカウントへのアクセスを要求する前に Ethereum プロバイダーを検出してください。[プロバイダー API](/ja/connect-to-software/provider/eth/provider-api) を参照してください。接続ボタンなどのユーザー操作から `eth_requestAccounts` を呼び出します。サイトにすでに公開されているアカウントだけが必要な場合は `eth_accounts` を使用します。
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const accounts = await provider.request({ method: 'eth_requestAccounts' });
+  const address = accounts[0];
+  if (!address) throw new Error('No account was selected.');
+  console.log('Connected address:', address);
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('The user declined the connection request.');
+  } else {
+    console.error(error);
+  }
+}
+```
+
+リクエストの処理中は接続ボタンを無効にしてください。アカウントが接続されても、トランザクションや署名が事前承認されるわけではありません。各メソッドの要件に従って、選択したアドレスを `eth_sendTransaction`、`personal_sign`、または `eth_signTypedData_v4` に渡してください。
+
+`accountsChanged` を監視し、空の配列を受け取った場合は、アプリケーションの接続済みアカウントを消去してください。
+
+## デモ [#demo]
+
+[例を開く](https://codesandbox.io/embed/ethereum-provider-demo-rwgl5l?fontsize=14&hidenavigation=1&theme=dark)

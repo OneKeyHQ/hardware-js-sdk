@@ -1,0 +1,188 @@
+---
+title: "Transaktionen"
+description: "Transaktionen auf Sui mit OneKey senden"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="transactions" />
+
+# Transaktionen
+
+Die folgenden Signierbeispiele verwenden `connectSuiAccount()` aus [Erste Schritte](/de/connect-to-software/provider/sui/getting-started#account-context-for-signing). Die Hilfsfunktion gibt ein Wallet-Standard-Konto und dessen aktive Chain zurück. Die Beispiele verwenden `@mysten/sui@1.28.2`. Auch die älteren `*TransactionBlock`-Methoden deklarieren nun `Transaction`-Eingaben in `@mysten/wallet-standard@0.14.7`.
+
+Fordern Sie vor dem Signieren eine Berechtigung an, wählen Sie ein verbundenes Konto aus und lesen Sie die aktive Chain. Diese Beispiele verwenden `@mysten/sui@1.28.2`, passend zu `@mysten/wallet-standard@0.14.7`, das der aktuelle Provider akzeptiert.
+
+Erfahren Sie, wie Sie Transaktionen auf Sui signieren und ausführen.
+
+Initialisieren Sie den Kontokontext vor den folgenden Beispielen:
+
+```typescript
+const { account, chain } = await connectSuiAccount()
+```
+
+---
+
+## Transaktionsblock signieren und ausführen [#sign-and-execute-transaction-block]
+
+Der aktuelle injizierte Provider leitet `options` nicht weiter in `signAndExecuteTransactionBlock`. Fragen Sie den zurückgegebenen Digest mit einem Sui-Client auf derselben Chain ab, um Auswirkungen, Ereignisse oder Objektänderungen anzufordern.
+
+```typescript
+import { Transaction } from '@mysten/sui/transactions'
+
+// Create transaction block
+const txb = new Transaction()
+
+// Add a transfer
+txb.transferObjects(
+  [txb.object('0xobject_id')],
+  txb.pure.address('RECIPIENT_SUI_ADDRESS')
+)
+
+// Or send SUI
+const [coin] = txb.splitCoins(txb.gas, [txb.pure.u64(1000000000)]) // 1 SUI
+txb.transferObjects([coin], txb.pure.address('RECIPIENT_SUI_ADDRESS'))
+
+// Sign and execute
+const result = await provider.signAndExecuteTransactionBlock({
+  account,
+  chain,
+  transactionBlock: txb,
+})
+
+console.log({
+  digest: result.digest,
+})
+```
+
+---
+
+## Transaktionsblock signieren (ohne Ausführung) [#sign-transaction-block-without-executing]
+
+```typescript
+const txb = new Transaction()
+// ... build transaction
+
+const signedTxb = await provider.signTransactionBlock({
+  account,
+  chain,
+  transactionBlock: txb,
+})
+
+console.log({
+  transactionBlockBytes: signedTxb.transactionBlockBytes,
+  signature: signedTxb.signature,
+})
+
+// Execute later using Sui SDK
+// const result = await suiClient.executeTransactionBlock({
+//   transactionBlock: signedTxb.transactionBlockBytes,
+//   signature: signedTxb.signature,
+// })
+```
+
+---
+
+## Transaktion signieren und ausführen (neue API) [#sign-and-execute-transaction-new-api]
+
+```typescript
+// Using the newer signAndExecuteTransaction method
+import { Transaction } from '@mysten/sui/transactions'
+
+const transaction = new Transaction()
+const [coin] = transaction.splitCoins(transaction.gas, [transaction.pure.u64(100000000)])
+transaction.transferObjects([coin], transaction.pure.address('RECIPIENT_SUI_ADDRESS'))
+const result = await provider.signAndExecuteTransaction({
+  account,
+  chain,
+  transaction,
+})
+```
+
+---
+
+## Transaktion signieren (neue API) [#sign-transaction-new-api]
+
+```typescript
+const signedTxn = await provider.signTransaction({
+  account,
+  chain,
+  transaction,
+})
+```
+
+---
+
+## Smart-Contract-Interaktion [#smart-contract-interaction]
+
+### Move-Aufruf [#move-call]
+
+```typescript
+const txb = new Transaction()
+
+// Call a Move function
+txb.moveCall({
+  target: '0xpackage::module::function',
+  arguments: [
+    txb.pure.string('arg1'),
+    txb.object('0xobject_id'),
+  ],
+  typeArguments: ['0x2::sui::SUI'],
+})
+
+const result = await provider.signAndExecuteTransactionBlock({
+  account,
+  chain,
+  transactionBlock: txb,
+})
+```
+
+---
+
+## Paket veröffentlichen [#publish-package]
+
+```typescript
+const txb = new Transaction()
+
+const [upgradeCap] = txb.publish({
+  modules: compiledModules,
+  dependencies: [
+    '0x1', // Move stdlib
+    '0x2', // Sui framework
+  ],
+})
+
+txb.transferObjects([upgradeCap], txb.pure.address(account.address))
+
+const result = await provider.signAndExecuteTransactionBlock({
+  account,
+  chain,
+  transactionBlock: txb,
+})
+```
+
+---
+
+## Mit dem Sui-SDK verwenden [#using-with-sui-sdk]
+
+```typescript
+import { SuiClient } from '@mysten/sui/client'
+
+const client = new SuiClient({ url: 'https://fullnode.mainnet.sui.io' })
+
+// Get balance
+const balance = await client.getBalance({
+  owner: accountAddress,
+})
+
+// Get objects
+const objects = await client.getOwnedObjects({
+  owner: accountAddress,
+})
+
+// Get transaction
+const txn = await client.getTransactionBlock({
+  digest: txDigest,
+  options: { showEffects: true },
+})
+```

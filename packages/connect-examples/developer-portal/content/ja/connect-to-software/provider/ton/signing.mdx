@@ -1,0 +1,114 @@
+---
+title: "署名"
+description: "OneKey で TON のデータに署名"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# 署名
+
+リクエスト前にウォレットに接続してください。例のアドレスとマニフェスト URL は有効な値に置き換えます。認証では、サーバーが生成する 1 回限りのチャレンジを使い、サーバー側で証明を検証してください。
+
+オフチェーン検証用のデータに署名する方法を説明します。
+
+---
+
+## 任意のデータに署名 [#sign-arbitrary-data]
+
+オフチェーン検証用のデータセルに署名します:
+
+```typescript
+const result = await provider.send({
+  method: 'signData',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      schema_crc: 0, // Custom schema identifier
+      cell: cellBoc.toString('base64'), // Base64 encoded cell to sign
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('Signature:', result.result.signature) // Base64 signature
+  console.log('Timestamp:', result.result.timestamp) // UNIX timestamp
+}
+```
+
+---
+
+## 証明に署名 (認証) [#sign-proof-authentication]
+
+接続時に認証用の証明を要求します:
+
+```typescript
+const connectEvent = await provider.connect(2, {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    {
+      name: 'ton_proof',
+      payload: 'your-server-generated-challenge' // Nonce for replay protection
+    }
+  ]
+})
+
+if (connectEvent.event === 'connect') {
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  if (proofItem && "proof" in proofItem) {
+    // Send proof to your backend for verification
+    const proof = proofItem.proof
+    console.log({
+      signature: proof.signature,
+      timestamp: proof.timestamp,
+      domain: proof.domain,
+      payload: proof.payload,
+    })
+  }
+}
+```
+
+---
+
+## エラー処理 [#error-handling]
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [/* ... */]
+})
+
+if ('error' in result) {
+  switch (result.error.code) {
+    case 300:
+      console.log('User rejected the transaction')
+      break
+    case 1:
+      console.log('Bad request - check parameters')
+      break
+    case 400:
+      console.log('Method not supported')
+      break
+    default:
+      console.error('Error:', result.error.message)
+  }
+} else {
+  console.log('Success:', result.result)
+}
+```
+
+---
+
+## エラーコード [#error-codes]
+
+| コード | 説明 |
+|------|-------------|
+| 0 | 不明なエラー |
+| 1 | 不正なリクエスト |
+| 100 | 不明なアプリ |
+| 300 | ユーザーがリクエストを拒否 |
+| 400 | 未対応のメソッド |

@@ -1,0 +1,124 @@
+---
+title: "ウォレットスキル"
+description: "4 つの OneKey ウォレットスキルをインストールし、リクエストを振り分けます。"
+---
+
+<span id="wallet-skills" />
+
+# ウォレットスキル
+
+[`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) は AI コーディングアシスタントにウォレット機能のレイヤーを提供します。ユーザーが自然言語で依頼すると、スキルが安全な経路を選び、必要に応じて最新のスキーマを確認し、ユーザー向けの言葉で結果を説明します。
+
+ユーザーが CLI コマンドを入力する必要はありません。CLI はスキルパックの背後にある実装の詳細です。
+
+## まずインストール [#install-first]
+
+| クライアント | インストール方法 |
+| --- | --- |
+| Claude Code | `/plugin marketplace add OneKeyHQ/onekey-wallet-skills`, 続いて `/plugin install onekey-wallet-skills` |
+| Codex | `https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md` の手順に従うよう Codex に依頼 |
+| Cursor | `https://github.com/OneKeyHQ/onekey-wallet-skills` をクローンし、Cursor にプラグインディレクトリを指定 |
+| OpenCode / OpenClaw | スキルリポジトリ内の該当するインストールガイドに従う |
+
+インストール後は、次のプロンプトから始めます:
+
+```text
+Show my wallet balance and receiving address.
+```
+
+```text
+What Solana tokens are trending right now?
+```
+
+```text
+Quote 1 ETH to USDC. Do not execute yet.
+```
+
+```text
+Is this token safe before I buy it?
+```
+
+## スキルの振り分け [#skill-router]
+
+| スキル | ユーザーの依頼内容 | プロンプト例 |
+| --- | --- | --- |
+| `onekey-wallet` | ログイン、有効なウォレット、残高、受取アドレス、履歴、送金、BTC/SOL ウォレット操作、ハードウェアの検出 | `Show my wallet balance and receiving address.` |
+| `onekey-swap` | スワップ、購入、売却、交換、ブリッジ、スワップの状態、BTC の署名のみの PSBT | `Swap 1 ETH to USDC, but show me the quote first.` |
+| `onekey-market` | 価格、トークン検索、注目銘柄、ローソク足、流動性、保有者、BTC/SOL の指標、調査 | `What Solana tokens are trending right now?` |
+| `onekey-security` | トークン監査、トランザクションのシミュレーション、承認のリスク、ハードウェアの安全性、秘密情報の安全確認 | `Is this token safe before I buy it?` |
+
+## スキーマの仕様 [#schema-contract]
+
+各スキルは、古い例をハードコードせず、最新の CLI スキーマを正しい情報源として扱います。
+
+| 確認項目 | 期待される動作 |
+| --- | --- |
+| 機能を検出 | 対応状況が不明な場合は、コマンド一覧を確認します。 |
+| パラメーターを選択 | 単純でないフィールドを選択する前に、そのコマンドの正確なスキーマを確認します。 |
+| 名前を正しく対応付け | スキーマ上のコマンド名とユーザー向けのコマンド分類を区別します。 |
+| 未対応のフィールドを処理 | 要求されたパラメーターが現在のスキーマに公開されていない場合は、停止して説明します。 |
+| 出力を構造化 | 生のターミナル出力よりも、結果、リスク、ルート、次の手順を優先します。 |
+
+## ウォレット [#wallet]
+
+`onekey-wallet` はウォレットの状態、受取アドレス、送金、BTC アドレスタイプ、ハードウェアセッションに使用します。
+
+| 自然言語 | スキルが行うべきこと |
+| --- | --- |
+| `Connect my OneKey Agent Wallet.` | App Transfer でペアリングし、有効なウォレットの概要を示します。 |
+| `What wallet am I using?` | ログイン方法、ウォレットの種類、アドレス、および存在する場合はデバイスの状態を表示します。 |
+| `Show my balance.` | 有効なウォレットを自動的に使用し、ユーザーにアドレスの貼り付けを求めないでください。 |
+| `Receive BTC.` | BTC の受取アドレスを返し、不足している場合のみアドレスタイプを尋ねます。 |
+| `Send 0.2 SOL to this address.` | Solana のコンテキストを維持し、アドレス形式を検証して、確認の準備をします。 |
+
+## スワップ [#swap]
+
+`onekey-swap` は取引、購入、売却、交換、クロスチェーンルート、BTC の署名のみのフローに使用します。
+
+| 自然言語 | スキルが行うべきこと |
+| --- | --- |
+| `Swap 1 ETH to USDC.` | まず見積もりを取得し、ルートとリスクを示してから、実行前に確認を求めます。 |
+| `Buy $200 of PEPE on Ethereum.` | Ethereum のコンテキストを維持し、トークンを監査して、取引を準備します。 |
+| `Bridge 500 USDC from Ethereum to Base.` | 見積もりの取得前にブリッジへの対応状況を確認します。 |
+| `Swap 0.01 BTC to USDC using taproot and sign only.` | taproot を維持し、ブロードキャストせずに署名済みまたはプレビュー用の PSBT を返します。 |
+| `Yes, confirm the swap.` | すでに確認済みの注文のみを実行します。 |
+
+## 市場情報 [#market]
+
+`onekey-market` は読み取り専用の市場情報および調査ワークフローに使用します。
+
+| 自然言語 | スキルが行うべきこと |
+| --- | --- |
+| `What is the BTC price?` | まず価格と 24h の変動を返し、続いてチャートやトレンドの確認を提案します。 |
+| `What tokens are trending right now?` | 取引を開始せず、注目のトークンの短い一覧を返します。 |
+| `Search BONK on Solana.` | Solana を維持し、識別子を SPL トークンまたは mint として扱います。 |
+| `Show ETH liquidity.` | 流動性または保有者の情報を返します。 |
+| `Give me a quick ETH analysis.` | 方向性、変動要因、リスク、次の手順を 1 つ提示します。 |
+
+市場に関する回答はデフォルトで読み取り専用です。購入やスワップでは別の確認フローを開始してください。
+
+## セキュリティ [#security]
+
+`onekey-security` はリスクの確認と事前の保護に使用します。
+
+| 自然言語 | スキルが行うべきこと |
+| --- | --- |
+| `Is this token safe?` | トークン監査を実行し、リスクレベルと理由を報告します。 |
+| `Simulate approving this contract for all my USDC.` | シミュレーションを実行し、無制限承認のリスクを明示します。 |
+| `Send SOL to 0x...` | Solana/EVM アドレスが一致しない場合は停止します。 |
+| `Show me the App Transfer payload.` | 秘密情報の公開を拒否し、代わりに有効なセッションの概要を提示します。 |
+| `Is my hardware wallet safe to use?` | デバイス/認証状態とデバイス検証を使用し、シードフレーズを求めてはいけません。 |
+
+## 回答の形式 [#response-shape]
+
+適切なスキルの回答は、結果を先に示し、簡潔にまとめます:
+
+```text
+Route: swap-quote
+Fields: chain=eth, from=ETH, to=USDC, amount=1
+Quote: 1 ETH -> <estimated USDC>
+Risk: <audit or simulation state>
+Next: I can build the transaction and ask for confirmation.
+```
+
+資金移動に関する回答は、必ず確認の質問で終えてください。読み取り専用の市場情報やウォレットの回答は、取引操作ではなく、役立つ追加の提案を 1 つ示して終えてください。

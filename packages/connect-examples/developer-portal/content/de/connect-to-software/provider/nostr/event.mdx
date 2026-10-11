@@ -1,0 +1,22 @@
+---
+title: "Ereignis"
+---
+
+<span id="nostr-events" />
+
+# Nostr-Ereignisse
+
+Der OneKey-Provider löst `accountChanged` ohne Nutzlast aus. Löschen Sie den zwischengespeicherten Kontostatus, wenn dieses Ereignis eintritt, und rufen Sie bei Bedarf den aktuellen öffentlichen Schlüssel ab. Er löst außerdem `disconnect` aus, wenn die Bridge getrennt wird. Dies sind OneKey-Erweiterungen von NIP-07.
+
+```javascript
+const provider = window.$onekey?.nostr;
+if (!provider) throw new Error('OneKey Nostr provider is unavailable.');
+
+const onAccountChanged = () => {
+  // Clear the cached public key and any account-specific UI.
+};
+provider.on('accountChanged', onAccountChanged);
+
+// Run during cleanup.
+provider.off('accountChanged', onAccountChanged);
+```

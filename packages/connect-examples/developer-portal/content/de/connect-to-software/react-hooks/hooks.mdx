@@ -1,0 +1,76 @@
+---
+title: "React Hooks"
+description: "Typsichere React Hooks für Ethereum - eine eigene Wallet-Oberfläche erstellen"
+---
+
+import { Callout } from 'nextra/components'
+
+# React Hooks
+
+Typsichere React Hooks für Ethereum. Erstellen Sie Ihre eigene Wallet-Verbindungsoberfläche mit voller Kontrolle über das Nutzererlebnis.
+
+<Callout>
+**Ideal für individuelle Oberflächen.** Verwenden Sie React Hooks, wenn Sie Ihren eigenen Wallet-Verbindungsablauf gestalten möchten.
+</Callout>
+
+---
+
+## Verfügbare Bibliotheken [#available-libraries]
+
+| Bibliothek | Beschreibung |
+|---------|-------------|
+| [Wagmi](/de/connect-to-software/react-hooks/wagmi) | React Hooks für EVM-Konto-, Signier- und Transaktionsstatus |
+
+---
+
+## Wann verwenden [#when-to-use]
+
+Verwenden Sie React Hooks, wenn Sie:
+- Volle Kontrolle über die Wallet-Verbindungsoberfläche benötigen
+- Typsichere Hooks für Ethereum-Interaktionen wünschen
+- Eine React-Anwendung entwickeln
+- Keinen vorgefertigten Wallet-Auswahldialog benötigen
+
+---
+
+## Kurzes Beispiel [#quick-example]
+
+Richten Sie `WagmiProvider` und `QueryClientProvider` mithilfe der [wagmi-Anleitung](/de/connect-to-software/react-hooks/wagmi) zuerst ein. Diese Komponente verwendet die konfigurierten Konnektoren.
+
+```tsx
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
+
+function ConnectButton() {
+  const { address, isConnected } = useAccount()
+  const { connect, connectors, isPending, error } = useConnect()
+  const { disconnect } = useDisconnect()
+
+  if (isConnected) {
+    return (
+      <div>
+        <p>{address}</p>
+        <button onClick={() => disconnect()}>Disconnect</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {connectors.map((connector) => (
+        <button key={connector.uid} disabled={isPending} onClick={() => connect({ connector })}>
+          Connect {connector.name}
+        </button>
+      ))}
+      {error && <p role="alert">{error.message}</p>}
+    </div>
+  )
+}
+```
+
+---
+
+## Alternative: Mit Wallet-Oberfläche [#alternative-with-wallet-ui]
+
+Wenn Sie einen vorgefertigten Wallet-Auswahldialog wünschen, kommen infrage:
+- [RainbowKit](/de/connect-to-software/wallet-ui/rainbowkit) - React-Wallet-Auswahl
+- [Web3Modal](/de/connect-to-software/wallet-ui/web3modal) - Reown-Wallet-Verbindungsoberfläche

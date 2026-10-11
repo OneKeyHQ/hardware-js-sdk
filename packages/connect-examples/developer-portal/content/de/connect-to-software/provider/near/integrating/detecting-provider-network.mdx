@@ -1,0 +1,17 @@
+---
+title: "Provider-Netzwerk erkennen"
+---
+
+<span id="detecting-provider-network" />
+
+# Provider-Netzwerk erkennen
+
+Sie können das in OneKey Wallet ausgewählte Provider-Netzwerk erkennen; derzeit werden beide unterstützt:  `mainnet` und `testnet`.
+
+```javascript
+const res = await provider.request({
+  method: 'near_networkInfo',
+});
+console.log('near_networkInfo', res, res?.networkId);
+
+```

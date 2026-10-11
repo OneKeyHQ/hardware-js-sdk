@@ -1,0 +1,56 @@
+---
+title: "evmVerifyMessage"
+---
+
+# evmVerifyMessage
+
+## Ethereum : vérifier un message [#ethereum-verify-message]
+
+Vérifie un message à l’aide de l’adresse du signataire et de la signature.
+
+```typescript
+const result = await HardwareSDK.evmVerifyMessage(connectId, deviceId, params);
+```
+
+## Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+* `address` - _obligatoire_ `string` adresse du signataire. Le préfixe "0x" est facultatif
+* `messageHex` - _obligatoire_ `string` Message signé encodé sous forme de chaîne hexadécimale.
+* `signature` - _obligatoire_ `string` signature au format hexadécimal. Le préfixe "0x" est facultatif
+* `chainId` - _facultatif_ `number` Le ChainId dans ETH est un identifiant unique d’un réseau Ethereum précis, utilisé pour distinguer les différentes versions de la blockchain. [Référence](https://github.com/ethereum-lists/chains/tree/master/_data/chains).
+
+## Exemple [#example]
+
+```typescript
+HardwareSDK.evmVerifyMessage(connectId, deviceId, {
+    address: "0xdA0b608bdb1a4A154325C854607c68950b4F1a34",
+    messageHex: "4578616d706c65206d657373616765",
+    signature: "11dc86c631ef5d9388c5e245501d571b864af1a717cbbb3ca1f6dacbf330742957242aa52b36bbe7bb46dce6ff0ead0548cc5a5ce76d0aaed166fd40cb3fc6e51c",
+    chainId: 1
+});
+```
+
+## Résultat [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        message: "Message verified"
+    }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

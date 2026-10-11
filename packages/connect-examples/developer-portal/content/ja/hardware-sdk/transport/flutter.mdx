@@ -1,0 +1,47 @@
+---
+description: "JavaScript 実行環境とネイティブ BLE トランスポートブリッジを通じて、Flutter ホストを OneKey に接続します。"
+title: "Flutter: Bluetooth で接続 (ネイティブ)"
+---
+
+<span id="flutter-connect-via-bluetooth-native" />
+
+# Flutter: Bluetooth で接続 (ネイティブ)
+
+> このガイドは[低レベルトランスポートプラグイン](/ja/hardware-sdk/concepts/low-level-plugin)に基づきます。BLE I/O インターフェースと Protocol V1/V2 の境界について、先に読んでください。
+
+WebView または JS エンジンで JS バンドルを読み込み、低レベルアダプターを使って `@onekeyfe/hd-common-connect-sdk` を橋渡しする Flutter アプリ向けです。
+
+## 手順 1. 実行環境を選択 [#step-1-choose-a-runtime]
+
+- WebView: 安定して広く対応。ブリッジ API は iOS/Android ネイティブシェルと同じ
+- JS エンジン: 例: `flutter_js`, ビルドした JS バンドルを Dart 内で直接実行
+
+## 手順 2. JS バンドルをビルド [#step-2-build-the-js-bundle]
+
+hardware-js-sdk リポジトリ内のネイティブの例でビルドします (参照: `web/` ディレクトリ)。次の `web_dist/` アセットを生成します。
+
+## 手順 3. JS バンドルを読み込む [#step-3-load-the-js-bundle]
+
+Flutter で `web_dist/` のアセットを読み込みます (WebView または JS エンジン経由)。
+
+## 手順 4. メッセージングブリッジを実装 [#step-4-implement-the-messaging-bridge]
+
+`enumerate/connect/disconnect/send/receive` を、ネイティブから JS に同じシグネチャで公開します。変更していない BLE 通知チャンクを 16 進数で、`receive(uuid)` が読み取る接続別キューに転送します。SDK が V1/V2 のフレーミングと再構成を処理します。
+
+## 手順 5. UI イベントを処理 [#step-5-handle-ui-events]
+
+入力要求にはネイティブダイアログ、デバイス上のプロンプトには操作案内を表示します。次は入力要求にのみ返します: `HardwareSDK.uiResponse`; 応答の関連付け情報を保持してください。ボタン確認とデバイス専用の PIN プロンプトは通知です。参照: [UI の接続](/ja/hardware-sdk/core-api-guide#events-ui).
+
+## BLE の UUID [#ble-uuids]
+
+- `serviceUuid = 00000001-0000-1000-8000-00805f9b34fb`
+- `writeCharacteristic = 00000002-0000-1000-8000-00805f9b34fb`
+- `notifyCharacteristic = 00000003-0000-1000-8000-00805f9b34fb`
+
+## 参考資料 [#references]
+
+- プロトコルのフレーミング: [低レベルトランスポートプラグインを参照](/ja/hardware-sdk/concepts/low-level-plugin#ble-protocol-native-mobile)
+- UI イベント: [イベント](/ja/hardware-sdk/core-api-guide#events-ui), [PIN](/ja/hardware-sdk/concepts/pin), [パスフレーズ](/ja/hardware-sdk/concepts/passphrase)
+- プラットフォームの詳細: [iOS BLE](/ja/hardware-sdk/transport/ios), [Android BLE](/ja/hardware-sdk/transport/android)
+
+接続後のチェーン API の使い方は WebUSB と同じです。`connectId` と (必要な場合は) `deviceId` を指定します。
