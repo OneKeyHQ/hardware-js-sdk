@@ -1,48 +1,57 @@
 ---
+description: "Hardware SDK 从 1.1.x 升级到 1.2.x：包版本、设备字段、钱包绑定、UI、协议限制、验收用例与回退。"
 title: 从 1.1.x 迁到 1.2.x
-description: 从早期 1.x 接口迁移到统一状态、钱包会话和 UI 契约。
 ---
+
+<span id="migrate-from-11x-to-12x" />
 
 # 从 1.1.x 迁到 1.2.x
 
-给已经接入 Hardware SDK **1.1.x** 的第三方。本指南面向 **1.2.x** 版本。
+本指南面向从 **1.1.x 升级到 1.2.x** 的第三方接入。保留一个 SDK 入口即可，Protocol V2 支持不需要再接一套 SDK。新项目请从[快速开始](/zh/hardware-sdk/getting-started)入手。
 
-JavaScript 方法不用换。Protocol V2（Pro 2 / Neo）在 Core 内部处理。不要再接一套 SDK。
+**接入 Protocol V2 必改：**替换仅支持 V1 的设备读取接口，并核对每个方法的机型、固件和协议支持。**推荐：**新代码使用明确的钱包选择。**兼容项：**可保留已有且受支持的链调用；`getPassphraseState` 在两种协议上仍作为已废弃的兼容辅助接口保留。**按需处理：**Bridge 转 WebUSB、更换 SDK 入口和实现固件升级，都属于独立的接入选择。
 
-新项目请直接看 [快速开始](/zh/hardware-sdk/getting-started)。
+<span id="what-stays-the-same" />
 
 ## 什么没变
 
-- 调用形状：`HardwareSDK.method(connectId, deviceId?, params)` → `{ success, payload }`
-- 各链方法（`evmGetAddress`、`btcSignTransaction` 等）
-- `init({ env })` 仍然选**传输**（USB / BLE / 底层插件），不是 Protocol V1 / V2
-- 提示仍通过 `UI_EVENT` 传递；只有输入请求调用 `uiResponse`，按键通知不回复
+- 方法仍返回 `{ success, payload }`，先检查 `success` 再使用成功结果。失败通过 `payload.error` 和存在时的 `payload.code` 表达。
+- `evmGetAddress`、`btcSignTransaction` 等链方法保留公开调用形式：`HardwareSDK.method(connectId, deviceId?, params)`。是否可用仍取决于设备和固件。
+- `init({ env })` 选择传输方式，不选择 Protocol V1 或 V2。`keepSession` 仍控制传输持有，不选择钱包。
+
+<span id="upgrade" />
 
 ## 升级包
+
+保留适合当前运行时的入口包。对已有 common-connect 接入，下方命令选择 1.2 版本线并精确保存解析后的版本；要可复现地上线，请把 `1.2` 换成已验收的完整版本号。
 
 ```bash
 npm i --save-exact @onekeyfe/hd-common-connect-sdk@1.2
 ```
 
-所有 `@onekeyfe/hd-*` 钉到同一条 1.2.x。如果还在嵌 `@onekeyfe/hd-web-sdk`，**不要传 `connectSrc`**，让 iframe 跟已安装包一致。
+所有直接安装的 `@onekeyfe/hd-*` 包都钉到同一个完整版本，包括共享类型和传输包；提交锁文件并核对实际依赖树。测试预发布版本时显式选择 alpha 版本。使用某个 1.2.x 版本不代表包含后续补丁新增的全部方法，仍需查看各 API 的最低 SDK 与固件版本。
 
-不要在同一个运行时里混用 `@onekeyfe/hd-web-sdk` 和 `@onekeyfe/hd-common-connect-sdk`。
+使用 `@onekeyfe/hd-web-sdk` 时，省略 `connectSrc`，采用安装包默认的 iframe URL。如果覆盖或自行托管该地址，要部署兼容且匹配的 iframe 资源，验证 URL 可访问、CSP 放行且初始化成功。npm 发布成功不代表托管 iframe 已可用。上线与回退时，将包和 iframe 作为同一版本一起处理。
+
+不要在同一运行时同时加载 `@onekeyfe/hd-web-sdk` 和 `@onekeyfe/hd-common-connect-sdk`。原生接入还需用所选 SDK 版本验证已安装的传输插件与权限，见[快速开始](/zh/hardware-sdk/getting-started)。
+
+<span id="replace-these-apis" />
 
 ## 要替换的 API
 
-| 1.1.x | 1.2.x | 说明 |
+| 现有接入 | 迁移目标 | 何时修改 |
 | --- | --- | --- |
-| `getFeatures()` | [`getDeviceState()`](/zh/hardware-sdk/basic-api/get-device-state) | 读 `payload.identity.deviceId`，不要再用 `payload.device_id` |
-| `getOnekeyFeatures()` | `getDeviceState({ scope: 'firmware' })` | 版本 / 身份快照 |
-| `getPassphraseState()` | [`openWalletSession({ mode })`](/zh/hardware-sdk/basic-api/open-wallet-session) | 只开一次：`standard` 或 `select-hidden` |
-| `keepSession` | **不要改** | 只控制传输持有。不要删掉，也不要用 `passphraseState` / `openWalletSession` 替换。 |
-| 把固件 `session_id` 存进库 | **不要存** | Core 内部持有 |
-| `env: 'web'` + Bridge | `env: 'webusb'` | 见 [Bridge → WebUSB](/zh/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb) |
-| Pro 2 / Neo 上的 `firmwareUpdateV2` / `V3` | [`firmwareUpdateV4`](/zh/hardware-sdk/device-api/firmwareupdatev4) | Classic / Mini / Touch / Pro 仍用 V2 / V3 |
+| `getFeatures()` | [`getDeviceState()`](/zh/hardware-sdk/basic-api/get-device-state) | 两种协议统一读取时使用；旧接口仅支持 V1 |
+| `getOnekeyFeatures()` | `getDeviceState({ scope: 'firmware' })` | V2 使用统一身份与版本快照 |
+| `getPassphraseState()` | [`openWalletSession({ mode })`](/zh/hardware-sdk/basic-api/open-wallet-session) | 新接入使用明确的钱包选择；旧辅助接口保留兼容用途 |
+| 存储固件 `session_id` | 改存钱包绑定 | 固件会话 ID 由 SDK 内部管理 |
+| `keepSession` | 保留现有传输用法 | 不要换成钱包会话参数 |
+| `env: 'web'` + Bridge | `env: 'webusb'` | 仅在独立迁移传输时处理，见传输章节 |
+| Pro 2 / Neo 固件流程 | `firmwareUpdateV4` | 仅当应用实现这些设备的固件升级时处理 |
 
-`getFeatures` 仅在 Protocol V1 上保留，Protocol V2 会拒绝。`getPassphraseState` 仍是兼容 API，新代码应使用替代方法。
+没有 `openWalletSession({ mode: 'resume-hidden' })`。后续方法携带 `passphraseState`，即可恢复已有隐藏钱包绑定。
 
-没有 `openWalletSession({ mode: 'resume-hidden' })`。已经有绑定之后，后续地址 / 签名带上 `passphraseState`，Core 会在方法里恢复。
+<span id="1-device-snapshot" />
 
 ## 1. 设备快照
 
@@ -60,106 +69,174 @@ const deviceId = features.payload.device_id;
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
-if (!deviceId) throw new Error("Device has no wallet identity");
+if (!deviceId) throw new Error('Device has no wallet identity');
 ```
 
-`searchDevices` 仍然是 `{ success, payload }`。先看 `success`，再把 `payload` 当设备列表。
+| 旧字段或旧假设 | 统一字段 / 规则 |
+| --- | --- |
+| `device_id` | `identity.deviceId`：钱包/种子身份，可能为空 |
+| `onekey_serial_no` / 发现结果中的 `uuid` | `identity.serialNo` / 发现结果中的 `serialNo`：物理身份；`uuid` 已废弃 |
+| `label`、`onekey_ble_name` | `identity.label`、`identity.bleName` |
+| `initialized`、`unlocked`、`pin_protection`、`passphrase_protection` | `status.initialized`、`status.unlocked`、`status.pinProtection`、`status.passphraseProtection` |
+| `language` 与蓝牙设置 | `settings.language`、`settings.bleEnabled` |
+| 固件 / Bootloader / 蓝牙版本字段 | `versions.firmware`、`versions.bootloader`、`versions.ble`：字符串或 `null` |
+
+默认 `scope: 'runtime'` 刷新状态；`scope: 'settings'` 刷新状态与设置；`scope: 'firmware'` 刷新状态、身份、版本及验证信息。返回的是完整快照，不是只有被刷新的部分。当前模式下某些字段可能不可用：保留 `null`，不要转换成 `false` 或 `0.0.0`。V2 Bootloader / Romloader 模式不支持读取设置。
+
+先确认 `searchDevices` 成功，再读取列表。`connectId` 是当前传输句柄，重连后可能变化。不要用序列号替代缺失的 `deviceId`，也不要用硬件序列号绑定钱包。见[标识符](/zh/hardware-sdk/concepts/identifiers)和[设备状态](/zh/hardware-sdk/basic-api/get-device-state)。
+
+<span id="2-wallet-session" />
 
 ## 2. 钱包会话
 
-**1.1.x** — 用 `getPassphraseState` 开隐藏钱包，之后带指纹：
+**1.1.x** — 选择隐藏钱包，之后携带指纹：
 
 ```ts
 const ps = await HardwareSDK.getPassphraseState(connectId, {
   initSession: true,
 });
 if (!ps.success) throw new Error(ps.payload.error);
-if (typeof ps.payload !== "string" || !ps.payload) throw new Error("No hidden wallet fingerprint");
-const passphraseState = ps.payload;
-
-await HardwareSDK.evmGetAddress(connectId, deviceId, {
+if (typeof ps.payload !== 'string' || !ps.payload) {
+  throw new Error('No hidden wallet fingerprint');
+}
+const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
-  passphraseState,
+  passphraseState: ps.payload,
 });
+if (!address.success) throw new Error(address.payload.error);
 ```
 
-**1.2.x** — 用明确的 `mode` 打开一次，之后方法带指纹。下方标准与隐藏钱包是两种备选流程，按用户选择执行一种：
+**1.2.x** — 按用户选择执行下列流程中的**一种**，不要依次执行两种。
+
+**标准钱包**
 
 ```ts
 import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
 
-// 标准钱包
-const standard = await HardwareSDK.openWalletSession(connectId, {
+const opened = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.Standard,
 });
-if (!standard.success) throw new Error(standard.payload.error);
-await HardwareSDK.evmGetAddress(connectId, deviceId, {
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'standard') {
+  throw new Error('A standard wallet was not opened');
+}
+const address = await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
   path: "m/44'/60'/0'/0/0",
   useEmptyPassphrase: true,
 });
+if (!address.success) throw new Error(address.payload.error);
+```
 
-// 隐藏钱包 — 用户在设备上选
+**隐藏钱包**
+
+```ts
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
+
 const opened = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.SelectHidden,
 });
 if (!opened.success) throw new Error(opened.payload.error);
-if (opened.payload.walletType !== 'hidden') {
+if (opened.payload.walletType !== 'hidden' || !opened.payload.passphraseState) {
   throw new Error('A hidden wallet was not opened');
 }
-const hiddenDeviceId = opened.payload.deviceId;
-const passphraseState = opened.payload.passphraseState;
-
-await HardwareSDK.evmGetAddress(connectId, hiddenDeviceId, {
+const binding = opened.payload;
+const address = await HardwareSDK.evmGetAddress(connectId, binding.deviceId, {
   path: "m/44'/60'/0'/0/0",
-  passphraseState,
+  passphraseState: binding.passphraseState,
 });
+if (!address.success) throw new Error(address.payload.error);
 ```
 
-不要在同一次 `openWalletSession({ mode })` 上再混 `useEmptyPassphrase` / `initSession`。
+检查成功结果和钱包类型后，才保存返回的 `walletType`、`deviceId` 与 `passphraseState`。标准钱包的指纹为 `null`。V1 关闭 passphrase 保护时，选择隐藏钱包也可能返回标准钱包，不能把它存成隐藏钱包。
 
-隐藏钱包漏传 `passphraseState` 时，地址 / 签名可能在**标准钱包**上成功且不报错。
+不要向 `openWalletSession` 传入旧参数 `useEmptyPassphrase`、`initSession`、`deviceId` 或 `passphraseState`，包括继承的值为 `false` 的默认项。后续地址/签名调用，标准钱包使用 `useEmptyPassphrase: true`，隐藏钱包使用已保存的 `passphraseState`。隐藏钱包漏传指纹时，可能在标准钱包上成功而不报错。
 
-契约见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
+不要在每次方法前或重连后自动重新选择钱包。复用已有绑定；身份或指纹验证失败时停止，让用户明确选择钱包。不要用新连接设备覆盖原绑定。见[钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
+
+## UI、取消与重连 [#ui-cancellation-and-reconnect]
+
+| 事件 | 宿主处理 |
+| --- | --- |
+| `REQUEST_PIN` | 仅宿主输入时回复 `UI_RESPONSE.RECEIVE_PIN`；设备端 PIN 提示无需回复 |
+| `REQUEST_PASSPHRASE` | 宿主输入时回复 `UI_RESPONSE.RECEIVE_PASSPHRASE`；选择设备输入使用 `value: ""` 和 `passphraseOnDevice: true`。设备端通知无需回复 |
+| `REQUEST_PASSPHRASE_ON_DEVICE`、`REQUEST_BUTTON` | 提示用户，不发送输入响应 |
+| 关闭窗口 / 进度通知 | 更新 UI，不代表方法成功 |
+
+方法 Promise 才是最终结果。用 `payload.code` 分类错误，不要匹配本地化错误文案；区分参数非法、方法不支持、钱包不匹配、取消和传输失败。
+
+`UI_EVENT` 监听器收到含类型与载荷的消息包装。`DEVICE.STATE` 监听器直接收到状态事件载荷，包括 `connectId`、`state` 与 `revision`，不能按同一种结构处理。只订阅一次，接入页面卸载时移除监听器。
+
+同一设备的方法串行执行，不同设备的宿主 PIN/passphrase 弹窗也要串行。当前公共入口的 `uiResponse` 只转发 `type` 和 `payload`，不能假设顶层关联元数据会传到 SDK。关闭、取消、断连后使旧弹窗回调失效，避免回复之后的新请求。
+
+用 `HardwareSDK.cancel(connectId)` 取消当前操作，并尊重用户取消。断连后重新发现设备、获取当前传输句柄、读取状态并复用已验证的钱包绑定。不要自动重放签名、擦除或固件升级。普通断连无需 `dispose`；明确释放 SDK 后，调用前需重新初始化。见[核心接口指南](/zh/hardware-sdk/core-api-guide)和[重连](/zh/hardware-sdk/transport/reconnect)。
+
+<span id="3-protocol-v1-and-v2" />
 
 ## 3. Protocol V1 与 V2
 
-Classic / Mini / Touch / Pro 仍是 Protocol V1。Pro 2 / Neo 是 Protocol V2。应用仍调同一套方法。
+Classic / Mini / Touch / Pro 使用 Protocol V1，Pro 2 / Neo 使用 Protocol V2。SDK 通过现场探测识别协议，不要从 USB PID、蓝牙名或外壳推断。
 
-SDK 用**现场探测**写入 `connectProtocol`。不要用 USB PID、蓝牙名或外观判断 V1/V2。
+通常由 SDK 探测选择协议。传入 `connectProtocol` 时表示严格期望，协议不符会拒绝。SDK 版本、协议支持和设备最低固件是独立检查项，启用方法前需核对 API 支持表。
 
-调用上传入 `connectProtocol` 表示严格期望 — SDK 不会悄悄切协议。
+仅 V1 的链（Stellar、Alephium、Nexa、Dynex、Nervos、SCDO、Benfen 和 Neo 链）不支持 Pro 2 / Neo。Neo 设备名不代表支持 Neo 链。见[协议](/zh/hardware-sdk/concepts/protocol)和[链支持](/zh/hardware-sdk/concepts/chain-support)。
 
-仅 V1 的链（Stellar、Alephium、Nexa、Dynex、Nervos、SCDO、Benfen、Neo 链）在 Pro 2 / Neo 上**不支持**。见 [Protocol V1 与 V2](/zh/hardware-sdk/concepts/protocol) 和 [链支持](/zh/hardware-sdk/concepts/chain-support)。
+<span id="4-firmware" />
 
 ## 4. 固件
 
-| 设备 | 1.2.x API |
+| 设备 | 升级 API |
 | --- | --- |
 | Classic / Mini / Touch | `firmwareUpdateV2` |
 | Pro | `firmwareUpdateV3` |
-| Pro 2 / Neo | `firmwareUpdateV4` |
+| Pro 2 / Neo | [`firmwareUpdateV4`](/zh/hardware-sdk/device-api/firmwareupdatev4) |
 
-传输出错后，不要重放固件升级、擦除或签名。
+如果接入负责固件升级，也要更新版本检查结果的解析：V2 协议的发布结果可能包含组件目标和资源归档，不能假设只有一个旧格式二进制，也不能假设 URL/指纹一定存在。使用与机型匹配的发布资源，遵循所选升级 API 的契约。
+
+收到应答或进度事件不代表安装完成。重启后重连，读取 `scope: 'firmware'` 核实安装版本。需要时保留原有 `keepSession` 传输持有，断连后绝不自动重放升级。见[固件升级](/zh/hardware-sdk/firmware-update)。
+
+<span id="5-transport" />
 
 ## 5. 传输
 
-如果还在用 OneKey Bridge（`env: 'web'` + `checkBridgeStatus`），迁到 WebUSB：
+从 1.1.x 升到 1.2.x 本身不要求更换可用的传输。如果同时决定将 Bridge（`env: 'web'` + `checkBridgeStatus`）迁到 WebUSB，请使用独立指南：
 
-- 推荐：[Bridge → `@onekeyfe/hd-common-connect-sdk`](/zh/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb)
-- 继续 iframe：[Bridge → `@onekeyfe/hd-web-sdk`](/zh/hardware-sdk/legacy-guides/migrate-bridge-to-webusb)
+- [Bridge → common-connect WebUSB](/zh/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb)
+- [Bridge → iframe WebUSB](/zh/hardware-sdk/legacy-guides/migrate-bridge-to-webusb)
 
-WebUSB 需要 HTTPS 和用户手势。BLE 需要系统蓝牙权限。
+WebUSB 需要安全上下文及用户手势来选择授权。BLE 需要系统蓝牙权限。应在实际发布的浏览器、Electron 或原生运行时中验证。
+
+<span id="checklist" />
 
 ## 检查清单
 
-1. 所有 `@onekeyfe/hd-*` 升到同一条 1.2.x。
-2. `getFeatures` / `getOnekeyFeatures` 换成 `getDeviceState`。
-3. `getPassphraseState` 换成 `openWalletSession({ mode: 'standard' | 'select-hidden' })`。
-4. 只存 `deviceId + passphraseState`。不要再存固件 `session_id`。
-5. 之后每笔地址 / 签名带 `passphraseState` 或 `useEmptyPassphrase: true`。
-6. USB 连续签名 / 检查后升级、Electron BLE 固件窗口继续保留 `keepSession`。它不是钱包会话标志。
-7. 按设备串行调用。
-8. 上线 Pro 2 / Neo 前核对链覆盖。
+1. 选定完整版本，对齐 SDK 依赖和 iframe 资源，保留旧锁文件与发布资源。
+2. 更新状态读取与空值处理；需要 V2 支持时替换旧读取接口。
+3. 更新钱包选择并保存验证后的绑定；不要将传输句柄、固件会话 ID 当作钱包身份。
+4. 更新输入/通知、取消与重连处理；串行执行设备方法及宿主输入弹窗。
+5. 核对协议、链与固件支持；仅当接入负责固件流程时迁移升级处理。
+
+上线前在每种支持的运行时执行下列验收用例。硬件用例需真机验证，文档构建成功不等于硬件测试通过。
+
+| 用例 | 预期结果 |
+| --- | --- |
+| 在已有 V1 与受支持 V2 设备上初始化、发现 | 传输/协议正确；返回统一状态或可处理错误，不虚构身份 |
+| 标准、隐藏钱包；V1 关闭 passphrase | 钱包类型和地址正确；标准指纹为空，隐藏钱包绑定已验证 |
+| 复用隐藏绑定；切换设备/种子或传错指纹 | 有效绑定仍对应原钱包；不匹配时停止，不覆盖绑定 |
+| 宿主/设备 PIN 与 passphrase；确认、取消、关闭 | 仅输入请求收到响应；由 Promise 判定完成；忽略旧回调 |
+| 断连/重连与双设备 | 刷新传输句柄、串行输入、保留已验证绑定，不重放副作用 |
+| 不支持的链、协议或旧固件 | 正确处理支持性错误，不悄悄切换钱包/协议 |
+| 自定义 iframe / 原生传输 | 资源、权限与固定版本匹配；初始化及一次受支持的地址调用成功 |
+| 固件流程（如已实现） | 机型/资源正确；重连后核实安装版本 |
+
+与 1.1.x 基线比较已知钱包地址及受支持的签名结果，按错误码检查失败。不要把 PIN、passphrase、派生秘密或私密材料写入日志或测试样本。
+
+## 回退 [#rollback]
+
+将原有精确依赖、锁文件、iframe 资源与运行时配置保留为一套已测试的发布版本。回退时一起恢复，不要将 1.1.x 入口包与 1.2.x 资源或类型混用。
+
+回到 1.1.x 基线时，关闭新启用的仅 V2 接入。SDK 降级不等于固件降级。保留钱包绑定数据，但需用恢复后的接入验证；无法验证时让用户选择。不要自动回落到标准钱包，也不要重放已取消的操作。
+
+<span id="next" />
 
 ## 下一步
 
@@ -167,5 +244,3 @@ WebUSB 需要 HTTPS 和用户手势。BLE 需要系统蓝牙权限。
 - [核心接口指南](/zh/hardware-sdk/core-api-guide)
 - [钱包会话](/zh/hardware-sdk/concepts/wallet-session)
 - [重连与释放](/zh/hardware-sdk/transport/reconnect)
-
-Protocol V1 在关闭 passphrase 保护时，`select-hidden` 可能返回标准钱包。保存或使用 `passphraseState` 前先检查 `walletType`。

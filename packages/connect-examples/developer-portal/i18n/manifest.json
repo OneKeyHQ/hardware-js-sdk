@@ -1568,8 +1568,8 @@
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/legacy-guides/from-1x.mdx": {
-        "sourceHash": "5c3daf5060a0d17b2de4de739e8d31b8e8d74212c8932aefef6f211fb16f2282",
-        "outputHash": "72503fc58be0ed2421a6eea17a6c657dc99bb82c8f9a0de9dc64a121f9b5a388",
+        "sourceHash": "862dd121113949e0e56cacf03757758e389aa7e07401d445f8bab69bcafbd351",
+        "outputHash": "7c0b64e2490899bf2ae3841d466d46c6486744b42198af6a9cdb58625fe2e74e",
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/legacy-guides/index.mdx": {
@@ -3340,8 +3340,8 @@
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/from-1x.mdx": {
-        "sourceHash": "5c3daf5060a0d17b2de4de739e8d31b8e8d74212c8932aefef6f211fb16f2282",
-        "outputHash": "10083afd23c7fd78f3cac99acf7b89e3862b0408753a1dd89aecfd6a65cf1849",
+        "sourceHash": "862dd121113949e0e56cacf03757758e389aa7e07401d445f8bab69bcafbd351",
+        "outputHash": "924834499528dbab8e61425617fa5564243124eb291175e8271cb7648d6dd95f",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/index.mdx": {
@@ -5107,8 +5107,8 @@
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/from-1x.mdx": {
-        "sourceHash": "5c3daf5060a0d17b2de4de739e8d31b8e8d74212c8932aefef6f211fb16f2282",
-        "outputHash": "a7254d25194d543f1a1fb5c17c2bcf9eb8634d29fd2af237e70b235fd1a9a41d",
+        "sourceHash": "862dd121113949e0e56cacf03757758e389aa7e07401d445f8bab69bcafbd351",
+        "outputHash": "e8487b3af0ffe2c392c0cd81ae5a1ca01299d40b8b8fd83dc9d065990dc25c1e",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/index.mdx": {
@@ -6874,8 +6874,8 @@
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/from-1x.mdx": {
-        "sourceHash": "5c3daf5060a0d17b2de4de739e8d31b8e8d74212c8932aefef6f211fb16f2282",
-        "outputHash": "69d248d4f25e43141c6716b9814367964f9f604973adf1c54bf73d72080a87a0",
+        "sourceHash": "862dd121113949e0e56cacf03757758e389aa7e07401d445f8bab69bcafbd351",
+        "outputHash": "2b279dc4e4f8c56199ba9e90969862c5d1234aa9a329ae3f0470c55bdc9040eb",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/index.mdx": {
@@ -8641,8 +8641,8 @@
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/from-1x.mdx": {
-        "sourceHash": "5c3daf5060a0d17b2de4de739e8d31b8e8d74212c8932aefef6f211fb16f2282",
-        "outputHash": "376e367c0e2e9c5aea07e8e20f379d39c8e9009504c3060ce7b122f13ddbec13",
+        "sourceHash": "862dd121113949e0e56cacf03757758e389aa7e07401d445f8bab69bcafbd351",
+        "outputHash": "4da7b8baa643def02b8d86ebb6db44f39ed1c88db64b8694698a79b88bf3d19e",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/index.mdx": {
