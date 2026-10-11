@@ -1,0 +1,32 @@
+---
+description: "Prepara y verifica firmas EVM, Bitcoin y Solana con una vinculación explícita a una cartera de hardware."
+title: "Guías de firma"
+---
+
+<span id="signer-guides" />
+
+# Guías de firma
+
+Guías paso a paso desde la inicialización hasta una transacción firmada en cada cadena. Lee [Conceptos básicos de las solicitudes](/es/hardware-sdk/core-api-guide#request-basics) primero.
+
+## Estructura [#structure]
+
+- Requisitos previos: versiones de firmware/SDK, transporte necesario, confirmación en el dispositivo
+- Flujo: conectar → elegir ruta de cuenta → crear solicitud → confirmar en el dispositivo → verificar resultado
+- Fragmentos de integración: parámetros de solicitud y validación del resultado; el host aporta interfaz, datos de red y entradas de transacción
+- Preguntas frecuentes: ruta incorrecta, rechazo/tiempo agotado, problemas de red o datos
+
+## Lista rápida de comprobación (antes de cualquier firma) [#quick-checklist-read-before-any-signer]
+
+- Entorno y versiones: firmware actualizado y SDK/Bridge alineados; elige la guía de transporte de tu plataforma.
+- Rutas: usa rutas HD específicas de la cadena; comprueba derivación endurecida o no endurecida (consulta cada página de firma).
+- Sesión y cartera: la mayoría de métodos de cadena necesitan `connectId + deviceId` (BLE requiere `deviceId`); `deviceId` cambia tras un restablecimiento; incluye `passphraseState` para carteras ocultas.
+- Interfaz: suscríbete a `UI_EVENT`; gestiona avisos de PIN/frase de contraseña con `uiResponse`.
+- Verifica el resultado: comprueba siempre `success` y luego valida la dirección/firma devuelta con bibliotecas de la cadena.
+- Seguridad: rechaza los avisos inesperados y falla inmediatamente si el dispositivo está en Bootloader.
+
+## Guías disponibles [#available-guides]
+
+- [Firmante EVM](./evm) — rutas, parámetros EIP-1559 frente a Legacy, avisos del dispositivo, transmisión tras firmar; [Clear Signing](./evm#clear-signing) — Transferir, Autorizar/Revocar, Token/Contrato, EIP-712, Safe Tx
+- [Firmante BTC](./btc) — matriz script/ruta, integridad de refTxs, revisión de cambio/salidas, serialización
+- [Firmante Solana](./solana) — ruta endurecida fija, preparación de mensaje/transacción sin procesar, montaje de la firma

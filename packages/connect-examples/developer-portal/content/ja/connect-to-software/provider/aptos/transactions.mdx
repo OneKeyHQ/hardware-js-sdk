@@ -1,0 +1,150 @@
+---
+title: "トランザクション"
+description: "OneKey で Aptos のトランザクションを送信"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="transactions" />
+
+# トランザクション
+
+署名前にプロバイダーに接続し、選択中のネットワークを確認してください。直接注入されるプロバイダーと Aptos Wallet Standard アダプターでは引数の型が異なるため、例を混用しないでください。省略されたアドレスを置き換え、読み取り専用の呼び出し用に SDK クライアントを用意してください。
+
+Aptos でトランザクションに署名して送信する方法を説明します。
+
+---
+
+## トランザクションに署名して送信 [#sign-and-submit-transaction]
+
+```typescript
+// Simple APT transfer
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::aptos_account::transfer',
+  type_arguments: [],
+  arguments: [
+    '0x1234...', // Recipient address
+    '100000000', // Amount in Octas (1 APT = 100000000 Octas)
+  ],
+}
+
+const response = await provider.signAndSubmitTransaction(payload)
+
+console.log('Transaction hash:', response.hash)
+```
+
+---
+
+## トランザクションに署名 (送信なし) [#sign-transaction-without-submitting]
+
+```typescript
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::coin::transfer',
+  type_arguments: ['0x1::aptos_coin::AptosCoin'],
+  arguments: ['0x1234...', '100000000'],
+}
+
+const signedTxn = await provider.signTransaction(payload)
+
+// Submit later using Aptos SDK
+// const pendingTxn = await client.submitTransaction(signedTxn)
+```
+
+---
+
+## トランザクションに署名 V2 (BCS シリアライズ済み) [#sign-transaction-v2-bcs-serialized]
+
+BCS シリアライズ済みトランザクションを使用する高度なユースケース向け:
+
+```typescript
+const rawTransaction = '<BCS_SERIALIZED_TRANSACTION>'; // Use the encoding expected by your wallet version
+
+const signedTxn = await provider.signTransactionV2({
+  transaction: rawTransaction,
+  transactionType: 'simple', // 'simple' or 'multi_agent'
+  asFeePayer: false,
+})
+```
+
+---
+
+## トランザクションのオプション [#transaction-options]
+
+```typescript
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::aptos_account::transfer',
+  type_arguments: [],
+  arguments: ['0x1234...', '100000000'],
+}
+
+// The legacy direct method takes only a payload.
+const response = await provider.signAndSubmitTransaction(payload)
+// For gas options, use signAndSubmitTransactionV2 with the matching Wallet Standard input.
+```
+
+---
+
+## スマートコントラクト操作 [#smart-contract-interaction]
+
+### View 関数を呼び出す [#call-view-function]
+
+```typescript
+// View functions don't require signing
+const result = await client.view({
+  function: '0x1::coin::balance',
+  type_arguments: ['0x1::aptos_coin::AptosCoin'],
+  arguments: [accountAddress],
+})
+
+console.log('Balance:', result[0])
+```
+
+### Entry 関数を呼び出す [#call-entry-function]
+
+```typescript
+// Mint NFT example
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x3::token::create_collection_script',
+  type_arguments: [],
+  arguments: [
+    'My Collection',           // Collection name
+    'Description',             // Description
+    'https://example.com',     // URI
+    '1000',                    // Maximum supply
+    [false, false, false],     // Mutability config
+  ],
+}
+
+const response = await provider.signAndSubmitTransaction(payload)
+```
+
+---
+
+## マルチエージェントトランザクション [#multi-agent-transactions]
+
+複数の署名者が必要なトランザクション向け:
+
+```typescript
+const signedTxn = await provider.signTransactionV2({
+  transaction: rawTransaction,
+  transactionType: 'multi_agent',
+})
+```
+
+---
+
+## 手数料支払者付きトランザクション [#fee-payer-transactions]
+
+スポンサー付きトランザクションの手数料支払者として署名します:
+
+```typescript
+const signedTxn = await provider.signTransactionV2({
+  transaction: rawTransaction,
+  transactionType: 'simple',
+  asFeePayer: true,
+})
+```

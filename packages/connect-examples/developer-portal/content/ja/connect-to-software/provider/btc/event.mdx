@@ -1,0 +1,28 @@
+---
+title: "イベント"
+---
+
+<span id="bitcoin-events" />
+
+# Bitcoin のイベント
+
+プロバイダーは、`string[]` を伴う `accountsChanged` と、ネットワーク識別子を伴う `chainChanged` を発行します。アカウント配列が空の場合、そのサイトに公開されているアカウントがなくなったことを意味します。リスナーを削除する際は、同じハンドラーを使用してください。
+
+```javascript
+const provider = window.$onekey?.btc;
+if (!provider) throw new Error('OneKey Bitcoin provider is unavailable.');
+
+const onAccountsChanged = (accounts) => {
+  console.log('Connected accounts:', accounts);
+};
+const onChainChanged = (networkId) => {
+  console.log('Selected network:', networkId);
+  // Refresh network-dependent data before preparing another transaction.
+};
+provider.on('accountsChanged', onAccountsChanged);
+provider.on('chainChanged', onChainChanged);
+
+// Run during cleanup, for example when a component unmounts.
+provider.off('accountsChanged', onAccountsChanged);
+provider.off('chainChanged', onChainChanged);
+```

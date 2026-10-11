@@ -16,7 +16,7 @@ export function validateContent(files, review, migration, hash = contentHash, sy
     if (zh === undefined) errors.push(`Missing Chinese page: ${name}`);
     const recorded = review.pages[name];
     const generated = synchronized[name];
-    const synchronizedPair = generated?.mode === 'generated' && generated.sourceHash === hash(en || '') && generated.outputHash === hash(zh || '');
+    const synchronizedPair = ['generated', 'translated'].includes(generated?.mode) && generated.sourceHash === hash(en || '') && generated.outputHash === hash(zh || '');
     if (en !== undefined && zh !== undefined && !synchronizedPair && (!recorded || recorded.en !== hash(en) || recorded.zh !== hash(zh))) {
       errors.push(`Bilingual review required: ${name}`);
     }

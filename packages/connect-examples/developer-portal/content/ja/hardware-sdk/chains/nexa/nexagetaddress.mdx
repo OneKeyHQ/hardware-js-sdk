@@ -1,0 +1,97 @@
+---
+title: "nexaGetAddress"
+---
+
+# nexaGetAddress
+
+### 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.4.0
+  * Classic/Mini: 3.2.0
+
+## Nexa: アドレスを取得 [#nexa-get-address]
+
+指定パスのアドレスを導出して返します。`showOnOneKey` を使用すると、デバイス上での確認を要求できます。
+
+```typescript
+const result = await HardwareSDK.nexaGetAddress(connectId, deviceId, params);
+```
+
+## パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+### 単一のアドレス [#single-address]
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`. [詳細を読む](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _任意_ `boolean` アドレスをデバイスに表示するかどうか。デフォルトは `true`.
+* `prefix` - _任意_ `string` アドレスのプレフィックス。例: `nexa` はメインネット用。目的のネットワークを明示的に指定してください
+* `scheme` - _任意_ `string` 暗号化アルゴリズムのモード。デフォルトは `schnorr`
+
+#### 複数のアドレス [#multiple-addresses]
+
+* `bundle` - `path`, `prefix`, `scheme`, `showOnOneKey` フィールドを持つオブジェクトの配列
+
+### 例 [#example]
+
+最初の Nexa アカウントのアドレスを返します:
+
+```typescript
+HardwareSDK.nexaGetAddress(connectId, deviceId, {
+    path: "m/44'/29223'/0'/0/0",
+    showOnOneKey: true,
+    prefix: "nexa"
+});
+```
+
+複数の Nexa アカウントのアドレスをまとめて返します:
+
+```typescript
+HardwareSDK.nexaGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/29223'/0'/0/0" }, // account 1
+        { path: "m/44'/29223'/0'" }, // account 2
+        { path: "m/44'/29223'/0'/0/1" }  // account 3
+    ]
+});
+```
+
+### 結果 [#result]
+
+単一アドレスのレスポンス
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        address: string,   // address
+    }
+}
+```
+
+アドレスのバッチレスポンス
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, address }, // account 1
+        { path, address }, // account 2
+        { path, address }, // account 3
+    ]
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ui, translateCopy} from '../../i18n/ui.mjs';
+import { ui, translateCopy } from '../../i18n/ui.mjs';
 
 test('reviewed or synchronized catalog values take precedence over legacy Chinese fallbacks', () => {
   assert.equal(ui('zh', 'Search', 'outdated fallback'), '搜索');
@@ -9,5 +9,13 @@ test('reviewed or synchronized catalog values take precedence over legacy Chines
 });
 
 test('dictionary translation retains technical values without a UI message entry', () => {
-  assert.deepEqual(translateCopy('zh', {label:'Search', href:'/en/api', method:'evmSignTransaction', limit:3}), {label:'搜索', href:'/en/api', method:'evmSignTransaction', limit:3});
+  assert.deepEqual(
+    translateCopy('zh', {
+      label: 'Search',
+      href: '/en/api',
+      method: 'evmSignTransaction',
+      limit: 3,
+    }),
+    { label: '搜索', href: '/en/api', method: 'evmSignTransaction', limit: 3 }
+  );
 });

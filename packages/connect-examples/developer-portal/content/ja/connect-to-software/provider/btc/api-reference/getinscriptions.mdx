@@ -1,0 +1,55 @@
+---
+title: "getInscriptions"
+---
+
+# getInscriptions
+
+現在のアカウントのインスクリプションを一覧表示します。
+
+## メソッド [#method]
+
+```typescript
+declare function getInscriptions(cursor?: number, size?: number): Promise<InscriptionResponse>;
+```
+
+## パラメーター [#params]
+
+* `cursor` — _任意_ `number`  開始インデックス。デフォルトは `0`
+* `size` — _任意_ `number` 取得件数。デフォルトは `20`
+
+## レスポンス [#response]
+
+```typescript
+export type InscriptionResponse = {
+  total: number;
+  list: InscriptionInfo[];
+};
+
+export type InscriptionInfo = {
+  inscriptionId: string;
+  inscriptionNumber: number;
+  address: string;
+  outputValue: number;
+  preview: string;
+  content: string;
+  contentLength: number;
+  contentType: string;
+  timestamp: number;
+  genesisTransaction: string;
+  location: string;
+  output: string;
+  offset: number;
+};
+```
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const inscriptions = await provider.getInscriptions();
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/MWLqvEv)

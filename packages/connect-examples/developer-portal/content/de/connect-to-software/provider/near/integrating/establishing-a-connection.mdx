@@ -1,0 +1,53 @@
+---
+title: "Verbindung herstellen"
+---
+
+<span id="establishing-a-connection" />
+
+# Verbindung herstellen
+
+Um mit OneKey zu interagieren, müssen Sie zunächst eine Verbindung herstellen. Diese Verbindungsanfrage bittet den Nutzer um Erlaubnis, Konto-ID und öffentlichen Schlüssel zu teilen, und signalisiert seine Bereitschaft zu weiteren Interaktionen.
+
+Nachdem die Berechtigung erstmals erteilt wurde, wird die Domain der Webanwendung für künftige Verbindungsanfragen in die Positivliste aufgenommen.
+
+Ebenso kann die Verbindung sowohl von der Anwendung als auch vom Nutzer beendet werden.
+
+## Verbinden (SignIn) [#connecting-signin]
+
+Der **empfohlene** und **einfachste** Weg zur Verbindung mit OneKey ist der Aufruf von `provider.requestSignIn()`. Der Provider stellt jedoch auch eine JSON-RPC-Schnittstelle über `request` bereit.
+
+### requestSignIn() [#requestsignin]
+```javascript
+try {
+  const res = await provider.requestSignIn();
+  console.log('requestSignIn', res.accounts);
+} catch(error){
+  // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+### request() [#request]
+```javascript
+try {
+  const res = await provider.request({
+    method: 'near_requestAccounts',
+  });
+  console.log('near_requestAccounts', res.accounts);
+} catch(error){
+  // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+## Trennen (SignOut) [#disconnecting-signout]
+
+Das Trennen ähnelt dem Verbinden; die Trennung kann jedoch auch von der Wallet ausgehen.
+
+### signOut() [#signout]
+```javascript
+provider.signOut();
+```
+
+### request() [#request-1]
+```javascript
+provider.request({ method: 'near_signOut' });
+```

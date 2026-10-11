@@ -1,0 +1,26 @@
+---
+title: "Signature de messages"
+---
+
+<span id="signing-messages" />
+
+# Signature de messages
+
+Lorsque l’application web est connectée à OneKey, elle peut aussi demander à l’utilisateur de signer un message donné.
+
+Pour soumettre un message à la signature de l’utilisateur, l’application web doit :
+
+* Fournir une chaîne encodée en UTF-8.
+* La faire signer par le portefeuille OneKey de l’utilisateur.
+
+L’appel de la méthode renvoie une [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) pour un objet contenant `signatures`.
+
+```javascript
+const res = await provider.request({
+  method: 'near_signMessages',
+  params: {
+    messages: ['hello world', 'onekey near wallet'], // must be Array type
+  },
+});
+console.log('near_signMessages', res, res.signatures);
+```

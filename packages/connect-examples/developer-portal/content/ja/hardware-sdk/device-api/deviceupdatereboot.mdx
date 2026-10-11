@@ -1,0 +1,44 @@
+---
+description: "Protocol V1 デバイスに bootloader モードを要求し、ファームウェア操作の前に接続を再検出します。"
+title: "deviceUpdateReboot"
+---
+
+# deviceUpdateReboot
+
+## デバイスを再起動 [#reboot-device]
+
+明示的なファームウェア更新フローの一部として、**Protocol V1** デバイスに bootloader モードを要求します。このメソッドは Protocol V2 対応を宣言していません。Pro 2 と Neo では [Protocol V2 のファームウェア更新フロー](/ja/hardware-sdk/device-api/firmwareupdatev4)を使用してください。
+
+デバイスが切断され、別の接続 ID で列挙される場合があります。再検出して状態を確認してから続行してください。
+
+```typescript
+const response = await HardwareSDK.deviceUpdateReboot(connectId);
+if (!response.success) throw new Error(response.payload.error);
+```
+
+## パラメーター [#params]
+
+* 空
+
+## 例 [#example]
+
+```typescript
+const response = await HardwareSDK.deviceUpdateReboot(connectId);
+if (!response.success) throw new Error(response.payload.error);
+```
+
+## 結果 [#result]
+
+SDK の成功結果は、リクエストの受け付けを示します。ハードコードしたペイロード形式から新しいモードを推測せず、再接続後にデバイス状態を再取得してください。
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

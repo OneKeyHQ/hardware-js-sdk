@@ -1,0 +1,37 @@
+---
+title: "Suggérer un jeton"
+description: "Utilisez `wallet_watchAsset` pour demander au portefeuille de suivre un jeton. L’utilisateur décide de l’ajouter ou non. Cela ne transfère pas de jetons et ne prouve pas qu’un jeton est digne de confiance."
+---
+
+<span id="suggest-a-token" />
+
+# Suggérer un jeton
+
+Utilisez `wallet_watchAsset` pour demander au portefeuille de suivre un jeton. L’utilisateur décide de l’ajouter ou non. Cela ne transfère pas de jetons et ne prouve pas qu’un jeton est digne de confiance.
+
+Confirmez le réseau sélectionné et vérifiez l’adresse du contrat, le symbole et les décimales. Appelez la méthode à partir d’une action utilisateur.
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const wasAdded = await provider.request({
+    method: 'wallet_watchAsset',
+    params: {
+      type: 'ERC20',
+      options: {
+        address: '<TOKEN_CONTRACT_ADDRESS>',
+        symbol: 'TOKEN',
+        decimals: 18, // Replace with the token's actual decimals.
+        image: 'https://example.com/token.png',
+      },
+    },
+  });
+  console.log(wasAdded ? 'Token added.' : 'Token was not added.');
+} catch (error) {
+  console.error(error.code, error.message);
+}
+```
+
+Remplacez toutes les métadonnées d’exemple. Gérez les erreurs de méthode non prise en charge et de refus utilisateur dans votre interface. Consultez la [référence de la méthode](/fr/connect-to-software/provider/eth/reference/wallet_watchAsset).

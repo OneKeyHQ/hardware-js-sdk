@@ -1,0 +1,55 @@
+---
+title: "Firmar y enviar una transacción"
+---
+
+<span id="sign-and-send-transaction" />
+
+# Firmar y enviar una transacción
+
+Una vez creada una transacción, la aplicación web puede pedir a la cartera OneKey del usuario que la firme y envíe mediante la clave privada de su cuenta y la conexión JSON RPC de NEAR.
+
+El enfoque **más sencillo** y **recomendado** para hacerlo es usar el método `requestSignTransactions` del proveedor, aunque también se puede hacer con `request`.
+
+En ambos casos, la llamada devuelve una [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) que se resuelve con un objeto que contiene `transactionHashes`.
+
+## requestSignTransactions() [#requestsigntransactions]
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const res = await provider.requestSignTransactions({
+  transactions: [transaction], // must be Array type
+});
+console.log('requestSignTransactions', res, res.transactionHashes);
+
+```
+
+## request() [#request]
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const res = await provider.request({
+  method: 'near_sendTransactions',
+  params: {
+    transactions: [transaction], // must be Array type
+  },
+});
+console.log('near_sendTransactions', res, res.transactionHashes);
+```
+
+También puedes serializar primero la transacción como cadena **`base64`** antes de llamar al método.
+
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const transactionSerialized = btoa(String.fromCharCode(...transaction.encode()));
+
+const res = await provider.request({
+  method: 'near_sendTransactions',
+  params: {
+    transactions: [transactionSerialized], // must be Array type
+  },
+});
+console.log('near_sendTransactions', res, res.transactionHashes);
+```
+
+Gestiona las solicitudes rechazadas en un bloque `try`/`catch`. El hash de transacción devuelto es un identificador, no una garantía de ejecución correcta; consulta el resultado de la transacción mediante el RPC de la red.

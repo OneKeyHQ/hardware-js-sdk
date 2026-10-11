@@ -1,0 +1,104 @@
+---
+title: "Référence de l’API"
+description: "Référence de l’API du fournisseur Stellar OneKey"
+---
+
+<span id="api-reference" />
+
+# Référence de l’API
+
+Référence des méthodes et types de base de `window.$onekey.stellar`.
+
+---
+
+## Méthodes [#methods]
+
+| Méthode | Description |
+|------|------|
+| `getAddress(params?)` | Demander l’autorisation (connexion) et renvoyer l’adresse Stellar actuelle |
+| `getNetwork()` | Obtenir les informations du réseau actuel |
+| `signTransaction(xdr, opts?)` | Signer le XDR d’une transaction Stellar |
+| `signAuthEntry(authEntry, opts?)` | Signer une entrée d’autorisation Stellar (XDR d’entrée d’autorisation) |
+| `signMessage(message, opts?)` | Signer un message arbitraire |
+
+---
+
+## Propriétés [#properties]
+
+| Propriété | Type | Description |
+|------|------|------|
+| `isOneKey` | `boolean` | Identifiant OneKey |
+
+---
+
+## Types [#types]
+
+```ts
+export type StellarGetAddressParams = { path?: string }
+export type StellarGetAddressResponse = { address: string }
+
+export type StellarNetworkInfo = {
+  network: string
+  networkPassphrase: string
+}
+
+export type StellarSignTransactionOpts = {
+  networkPassphrase?: string
+  address?: string
+  path?: string
+  submit?: boolean
+  submitUrl?: string
+}
+export type StellarSignTransactionResponse = {
+  signedTxXdr: string
+  signerAddress?: string
+}
+
+export type StellarSignAuthEntryOpts = {
+  networkPassphrase?: string
+  address?: string
+  path?: string
+}
+export type StellarSignAuthEntryResponse = {
+  signedAuthEntry: string
+  signerAddress?: string
+}
+
+export type StellarSignMessageOpts = {
+  networkPassphrase?: string
+  address?: string
+  path?: string
+}
+export type StellarSignMessageResponse = {
+  signedMessage: string
+  signerAddress?: string
+}
+```
+
+---
+
+## Type de base (pour référence) [#basic-type-for-reference]
+
+```ts
+export type OneKeyStellarProvider = {
+  isOneKey: boolean
+
+  // Align with Stellar Wallets Kit (KitActions)
+  getAddress: (params?: StellarGetAddressParams) => Promise<StellarGetAddressResponse>
+  getNetwork: () => Promise<StellarNetworkInfo>
+  signTransaction: (
+    xdr: string,
+    opts?: StellarSignTransactionOpts
+  ) => Promise<StellarSignTransactionResponse>
+  signAuthEntry: (
+    authEntry: string,
+    opts?: StellarSignAuthEntryOpts
+  ) => Promise<StellarSignAuthEntryResponse>
+  signMessage: (
+    message: string,
+    opts?: StellarSignMessageOpts
+  ) => Promise<StellarSignMessageResponse>
+}
+```
+
+Toutes les méthodes renvoient des promesses. Gérez les demandes rejetées et ne supposez pas la présence de l’élément facultatif `signerAddress`. Le fournisseur expose également `disconnect()` et émet `accountsChanged` avec une chaîne d’adresse ou `null` ; effacez l’état propre au compte lorsqu’il change.

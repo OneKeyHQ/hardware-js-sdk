@@ -1,0 +1,36 @@
+---
+title: "Seleccionar proveedor de cartera"
+description: "Reutiliza tu flujo EIP-1193 y selecciona OneKey explícitamente. Usa el [descubrimiento EIP-6963](/en/connect-to-software/provider/eth/provider-api) para un selector de varias carteras, o `window.$onekey.ethereum` para un botón de conexión específico de OneKey."
+---
+
+<span id="select-a-wallet-provider" />
+
+# Seleccionar proveedor de cartera
+
+Reutiliza tu flujo EIP-1193 y selecciona OneKey explícitamente. Usa [descubrimiento EIP-6963](/es/connect-to-software/provider/eth/provider-api) para un selector de varias carteras, o `window.$onekey.ethereum` para un botón de conexión específico de OneKey.
+
+```javascript
+// Run from a user-initiated Connect action.
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const accounts = await provider.request({ method: 'eth_requestAccounts' });
+  // Update your application's selected account from accounts.
+} catch (error) {
+  // Show a recoverable error; do not automatically repeat the prompt.
+  console.error(error.code, error.message);
+}
+```
+
+## Migrar una integración existente [#migrating-an-existing-integration]
+
+- Conserva el proveedor seleccionado para cuentas, firmas, transacciones y listeners de eventos.
+- Sustituye las llamadas obsoletas a `enable()` por `request({ method: 'eth_requestAccounts' })`.
+- Trata `isOneKey` como una propiedad booleana. `isMetaMask` por sí solo no identifica una cartera única en un entorno de compatibilidad.
+- Gestiona `accountsChanged`, `chainChanged` y las promesas rechazadas; elimina listeners al desmontar la vista.
+- Comprueba los métodos específicos de la cartera en tu versión de destino, sin suponer compatibilidad con todos los métodos de MetaMask.
+
+## Cambio histórico de proveedor [#historical-provider-switching]
+
+Las integraciones antiguas usaban `window.onekey` y `window.ethereum.switchProvider()`. `switchProvider` no forma parte de EIP-1193. Usa descubrimiento o el proveedor con espacio de nombres en código nuevo. Comprueba la disponibilidad de cualquier método antiguo antes de llamarlo al mantener una integración heredada.

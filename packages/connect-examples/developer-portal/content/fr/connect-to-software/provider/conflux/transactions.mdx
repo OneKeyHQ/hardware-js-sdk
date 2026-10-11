@@ -1,0 +1,154 @@
+---
+title: "Transactions"
+description: "Envoyer des transactions sur Conflux avec OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+# Transactions
+
+Connectez le fournisseur et lisez son réseau avant de préparer des transactions. Ces exemples concernent Conflux Core Space. Remplacez les adresses abrégées et initialisez tout client SDK avant d’utiliser ses méthodes.
+
+Découvrez comment envoyer des transactions sur Conflux.
+
+---
+
+## Envoyer une transaction [#send-transaction]
+
+```typescript
+const txHash = await provider.request({
+  method: 'cfx_sendTransaction',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000', // 1 CFX in Drip (hex)
+    gas: '0x5208', // 21000
+  }]
+})
+
+console.log('Transaction hash:', txHash)
+```
+
+---
+
+## Envoyer avec estimation du gas [#send-with-gas-estimation]
+
+```typescript
+// Estimate gas first
+const gasEstimate = await provider.request({
+  method: 'cfx_estimateGasAndCollateral',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000',
+  }]
+})
+
+// Send with estimated values
+const txHash = await provider.request({
+  method: 'cfx_sendTransaction',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000',
+    gas: gasEstimate.gasLimit,
+    storageLimit: gasEstimate.storageCollateralized,
+  }]
+})
+```
+
+---
+
+## Appeler un contrat [#call-contract]
+
+```typescript
+const result = await provider.request({
+  method: 'cfx_call',
+  params: [{
+    to: contractAddress,
+    data: encodedFunctionCall,
+  }, 'latest_state']
+})
+
+console.log('Result:', result)
+```
+
+---
+
+## Utilisation avec js-conflux-sdk [#using-with-js-conflux-sdk]
+
+### Configuration [#setup]
+
+```bash
+npm install js-conflux-sdk
+```
+
+### Connecter le fournisseur [#connect-provider]
+
+```typescript
+import { Conflux } from 'js-conflux-sdk'
+
+const conflux = new Conflux({
+  url: 'https://main.confluxrpc.com',
+  networkId: 1029,
+})
+
+// Use OneKey provider for signing
+conflux.provider = provider
+```
+
+### Envoyer une transaction avec le SDK [#send-transaction-with-sdk]
+
+```typescript
+// Create and send transaction
+const tx = conflux.cfx.sendTransaction({
+  from: senderAddress,
+  to: recipientAddress,
+  value: Conflux.Drip.fromCFX(1), // 1 CFX
+})
+
+console.log('Transaction:', tx)
+
+// Wait for confirmation
+const receipt = await tx.executed()
+console.log('Receipt:', receipt)
+```
+
+### Interaction avec un contrat [#contract-interaction]
+
+```typescript
+const contract = conflux.Contract({
+  abi: contractABI,
+  address: contractAddress,
+})
+
+// Read
+const result = await contract.someViewFunction().call()
+
+// Write
+const tx = contract.someWriteFunction(param1, param2).sendTransaction({
+  from: senderAddress,
+})
+
+const receipt = await tx.executed()
+```
+
+---
+
+## Gestion des erreurs [#error-handling]
+
+```typescript
+try {
+  const accounts = await provider.request({
+    method: 'cfx_requestAccounts'
+  })
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the request')
+  } else if (error.code === -32603) {
+    console.log('Internal error')
+  } else {
+    console.error('Error:', error.message)
+  }
+}
+```

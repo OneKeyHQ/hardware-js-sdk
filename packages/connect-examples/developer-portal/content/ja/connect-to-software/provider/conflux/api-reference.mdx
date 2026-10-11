@@ -1,0 +1,86 @@
+---
+title: "API リファレンス"
+description: "OneKey の Conflux プロバイダーの完全な API リファレンス"
+---
+
+<span id="api-reference" />
+
+# API リファレンス
+
+OneKey の Conflux プロバイダーのメソッドと型のリファレンス。
+
+---
+
+## メソッド [#methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `request({ method, params })` | JSON-RPC リクエストを送信 |
+| `isConnected()` | 接続状態を確認 |
+| `on(event, callback)` | イベントを購読 |
+| `off(event, callback)` | イベントの購読を解除 |
+
+---
+
+## RPC メソッド [#rpc-methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `cfx_requestAccounts` | 接続を要求 |
+| `cfx_accounts` | 接続済みアカウントを取得 |
+| `cfx_chainId` | チェーン ID を取得 |
+| `cfx_sendTransaction` | トランザクションを送信 |
+| `cfx_call` | コントラクトを呼び出す (読み取り専用) |
+| `cfx_estimateGasAndCollateral` | ガスを見積もる |
+| `cfx_getBalance` | アカウント残高を取得 |
+| `cfx_getTransactionByHash` | トランザクションを取得 |
+| `cfx_getTransactionReceipt` | レシートを取得 |
+| `net_version` | ネットワーク ID を取得 |
+
+---
+
+## イベント [#events]
+
+| イベント | パラメーター | 説明 |
+|-------|------------|-------------|
+| `connect` | `{ chainId, networkId }` | ネットワーク接続時 |
+| `disconnect` | - | 切断時 |
+| `chainChanged` | `chainId` | ネットワーク変更時 |
+| `accountsChanged` | `accounts[]` | アカウント変更時 |
+
+---
+
+## 非推奨のメソッド [#deprecated-methods]
+
+以下のメソッドは引き続き動作しますが、非推奨です:
+
+```typescript
+// Deprecated: use request({ method: 'cfx_requestAccounts' })
+await provider.enable()
+
+// Deprecated: use request()
+await provider.send({ method: 'cfx_accounts' })
+await provider.sendAsync({ method: 'cfx_accounts' }, callback)
+
+// Deprecated: use request({ method: 'cfx_chainId' })
+provider.chainId
+
+// Deprecated: use request({ method: 'net_version' })
+provider.networkVersion
+
+// Deprecated: use request({ method: 'cfx_accounts' })
+provider.selectedAddress
+```
+
+---
+
+## エラーコード [#error-codes]
+
+| コード | 説明 |
+|------|-------------|
+| 4001 | ユーザーがリクエストを拒否 |
+| -32700 | 解析エラー |
+| -32600 | 無効なリクエスト |
+| -32601 | メソッドが見つからない |
+| -32602 | 無効なパラメーター |
+| -32603 | 内部エラー |

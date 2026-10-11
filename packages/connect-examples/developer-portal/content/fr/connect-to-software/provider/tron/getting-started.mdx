@@ -1,0 +1,171 @@
+---
+title: "Premiers pas"
+description: "Se connecter à TRON avec le fournisseur OneKey compatible TronLink"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# Premiers pas
+
+Connectez le fournisseur et utilisez l’instance TronWeb associée au même portefeuille. Remplacez les adresses abrégées et les méthodes de contrat par des valeurs valides. Vérifiez le réseau sélectionné avant de préparer une transaction.
+
+Découvrez comment détecter TRON, s’y connecter et interagir avec lui à l’aide du fournisseur OneKey.
+
+<Callout type="info">
+OneKey expose un fournisseur compatible TronLink et une intégration TronWeb. La disponibilité des fonctionnalités dépend de la version du portefeuille et du réseau sélectionné.
+</Callout>
+
+---
+
+## Détection du fournisseur [#provider-detection]
+
+```typescript
+// OneKey injects both the provider and TronWeb instances
+const provider = window.$onekey?.tron
+
+// TronWeb is available globally after connection
+let tronWeb = provider?.tronWeb
+
+if (!provider) {
+  throw new Error('OneKey TRON provider not detected')
+}
+
+// Check if it's TronLink compatible
+console.log('isTronLink:', provider.isTronLink) // true
+```
+
+---
+
+## Demander les comptes [#request-accounts]
+
+```typescript
+// Request connection
+const result = await provider.request({
+  method: 'tron_requestAccounts'
+})
+
+if (result.code === 200) {
+  tronWeb = provider.tronWeb
+  if (!tronWeb) throw new Error('OneKey TronWeb is not ready')
+  console.log('Connected!')
+  const address = tronWeb.defaultAddress.base58
+  console.log('Address:', address)
+} else {
+  console.log('Connection rejected:', result.message)
+}
+```
+
+---
+
+## Vérifier l’état de connexion [#check-connection-status]
+
+```typescript
+// Check if TronWeb is ready
+if (provider.ready && tronWeb && tronWeb.defaultAddress.base58) {
+  console.log('Connected:', tronWeb.defaultAddress.base58)
+} else {
+  console.log('Not connected')
+}
+```
+
+---
+
+## Utilisation de TronWeb [#using-tronweb]
+
+Après la connexion, utilisez `provider.tronWeb` pour conserver l’association des requêtes à OneKey :
+
+### Obtenir le solde [#get-balance]
+
+```typescript
+const balance = await tronWeb.trx.getBalance(tronWeb.defaultAddress.base58)
+console.log('Balance:', tronWeb.fromSun(balance), 'TRX')
+```
+
+### Envoyer des TRX [#send-trx]
+
+```typescript
+const tx = await tronWeb.trx.sendTransaction(
+  'TRecipientAddress...',
+  tronWeb.toSun(10) // 10 TRX
+)
+
+console.log('Transaction:', tx.txid)
+```
+
+### Envoyer un jeton TRC20 [#send-trc20-token]
+
+```typescript
+const contractAddress = 'TTokenContractAddress...'
+const contract = await tronWeb.contract().at(contractAddress)
+
+// Get decimals
+const decimals = await contract.decimals().call()
+
+// Transfer tokens
+const amount = (100n * 10n ** BigInt(decimals.toString())).toString() // 100 tokens, exact integer
+const tx = await contract.transfer(
+  'TRecipientAddress...',
+  amount
+).send()
+
+console.log('Transaction:', tx)
+```
+
+---
+
+## Gestion des événements [#event-handling]
+
+### Écouter les changements de compte [#listen-for-account-changes]
+
+```typescript
+provider.on('accountsChanged', (accounts) => {
+  if (accounts[0]) {
+    console.log('Account changed:', accounts[0])
+  } else {
+    console.log('Disconnected')
+  }
+})
+```
+
+### Écouter les changements de réseau [#listen-for-network-changes]
+
+```typescript
+provider.on('chainChanged', (chainId) => {
+  console.log('Network changed:', chainId)
+  // Recommend page reload for network changes
+})
+```
+
+### Événements Window (compatibles TronLink) [#window-events-tronlink-compatible]
+
+```typescript
+// Listen for TronLink initialization
+window.addEventListener('tronLink#initialized', () => {
+  console.log('TronLink initialized')
+})
+
+// Listen for messages
+window.addEventListener('message', (event) => {
+  if (event.source === window && event.data?.isTronLink && event.data?.message) {
+    const { action, data } = event.data.message
+    console.log('TronLink event:', action, data)
+  }
+})
+```
+
+---
+
+## Migration depuis TronLink [#migration-from-tronlink]
+
+OneKey est compatible TronLink. Mettez à jour votre logique de détection :
+
+```typescript
+// Before (TronLink only)
+const tronWeb = window.tronWeb
+
+// After (OneKey with TronLink fallback)
+const provider = window.$onekey?.tron || window.tronLink
+const tronWeb = window.tronWeb // Compatibility global; verify which wallet owns it
+```

@@ -1,0 +1,89 @@
+---
+title: "suiGetPublicKey"
+---
+
+# suiGetPublicKey
+
+## Sui: Öffentlichen Schlüssel abrufen [#sui-get-public-key]
+
+Gibt den aus dem angegebenen Pfad abgeleiteten öffentlichen Schlüssel zurück. Verwenden Sie `showOnOneKey`, um eine Bestätigung auf dem Gerät anzufordern.
+
+```typescript
+const result = await HardwareSDK.suiGetPublicKey(connectId, deviceId, params);
+```
+
+## Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+### Einzelner öffentlicher Schlüssel [#single-public-key]
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`. [Pfadformat](/de/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _optional_ `boolean` Ob der öffentliche Schlüssel auf dem Gerät angezeigt werden soll. Standard ist `true`.
+
+#### Mehrere öffentliche Schlüssel [#multiple-public-keys]
+
+* `bundle` - Array von Objekten mit `path`, `showOnOneKey`-Feldern
+
+### Beispiel [#example]
+
+Öffentlichen Schlüssel des ersten Sui-Kontos zurückgeben:
+
+```typescript
+HardwareSDK.suiGetPublicKey(connectId, deviceId, {
+    path: "m/44'/784'/0'/0'/0'",
+    showOnOneKey: true
+});
+```
+
+Ein Bündel öffentlicher Schlüssel mehrerer Sui-Konten zurückgeben:
+
+```typescript
+HardwareSDK.suiGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/784'/1'/0'/0'" }, // account 1
+        { path: "m/44'/784'/2'/0'/0'" }, // account 2
+        { path: "m/44'/784'/3'/0'/0'" }  // account 3
+    ]
+});
+```
+
+### Ergebnis [#result]
+
+Antwort für einen einzelnen öffentlichen Schlüssel
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        pub: string
+    }
+}
+```
+
+
+Batch-Antwort für öffentliche Schlüssel
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path: serializedPath, pub }, // account 1
+        { path: serializedPath, pub }, // account 2
+        { path: serializedPath, pub }, // account 3
+    ]
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

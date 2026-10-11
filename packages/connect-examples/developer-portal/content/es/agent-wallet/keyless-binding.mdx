@@ -1,0 +1,49 @@
+---
+title: "Vinculación sin claves"
+description: "Comprende las cuentas gestionadas desde la interfaz gráfica y los límites de la sesión de la CLI."
+---
+
+<span id="keyless-binding" />
+
+# Vinculación sin claves
+
+La vinculación sin claves define el límite del producto que permite a los usuarios gestionar una Agent Wallet en la interfaz gráfica de OneKey sin memorizar, exportar ni pegar claves privadas en el entorno de ejecución de un agente.
+
+La CLI recibe una sesión de App Transfer. No debe exponer al agente material de claves sin procesar, credenciales descifradas, tokens de acceso, frases semilla ni el contenido del llavero.
+
+## Experiencia de usuario [#user-experience]
+
+Para el usuario, la experiencia debe ser la de una cartera gestionada, no la de una tarea de administración de claves:
+
+| Necesidad del usuario | Comportamiento de OneKey |
+| --- | --- |
+| Crear una cartera de automatización | Crea y administra Agent Wallet en la interfaz gráfica de OneKey. |
+| Usarla desde un cliente de IA | Vincúlala mediante App Transfer en lugar de pegar claves. |
+| Saber qué cartera está activa | Permite que el agente lea `onekey auth status` y muestre la dirección. |
+| Mover fondos | Exige una confirmación explícita; si procede, deriva la operación al control por hardware. |
+| Finalizar el acceso | Usa `onekey auth logout` para borrar la sesión activa de la CLI. |
+
+## Distribución de responsabilidades [#responsibility-split]
+
+| Interfaz | Responsabilidad |
+| --- | --- |
+| Interfaz gráfica de OneKey | Crear y administrar Agent Wallet y su vinculación con la cuenta sin claves |
+| `onekey` CLI | Mantener la sesión activa, ofrecer comandos de cartera definidos por esquemas y usar el almacén de credenciales del sistema operativo |
+| Entorno de ejecución del agente | Leer esquemas, ejecutar comandos, resumir resultados y solicitar confirmación para las operaciones de escritura |
+
+## Reglas para agentes [#agent-rules]
+
+- Considera Agent Wallet, administrada desde la interfaz gráfica, como la fuente de referencia de la vinculación con la cuenta.
+- Usa `onekey auth status` en lugar de adivinar qué cartera está activa.
+- Usa `onekey get-address` para mostrar la dirección activa antes de realizar acciones que muevan fondos.
+- Nunca pidas al usuario que pegue claves privadas, frases de recuperación ni credenciales descifradas.
+- Nunca incluyas rutas del llavero ni datos de credenciales en una respuesta.
+
+## Comandos útiles [#useful-commands]
+
+```bash
+onekey auth status
+onekey get-address
+onekey balance --chain eth
+onekey history --chain eth --detail
+```

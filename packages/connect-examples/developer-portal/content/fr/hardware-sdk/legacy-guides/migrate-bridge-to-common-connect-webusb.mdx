@@ -1,0 +1,137 @@
+---
+description: "Migrez une intégration Bridge vers WebUSB direct avec le SDK commun et le contrat actuel des événements d’interface."
+title: "Migrer vers common-connect-sdk"
+---
+
+<span id="migrate-to-common-connect-sdk" />
+
+# Migrer vers common-connect-sdk
+
+Migrez de Bridge vers WebUSB et changez le point d’entrée SDK pour `@onekeyfe/hd-common-connect-sdk`.
+
+---
+
+## Exigences [#requirements]
+
+- Navigateurs Chromium (Chrome/Edge sur ordinateur)
+- Node.js 18+ (LTS recommandé)
+
+---
+
+## Ce qui a changé (en bref) [#what-changed-at-a-glance]
+
+- Point d’entrée SDK : `@onekeyfe/hd-web-sdk` → `@onekeyfe/hd-common-connect-sdk`
+- Options d’initialisation : utilisez `env: 'webusb'` ; plus de `connectSrc` (sans iframe)
+- Parcours d’autorisation : appelez `navigator.usb.requestDevice()` (doit être déclenché par une action utilisateur) avec le filtre officiel `ONEKEY_WEBUSB_FILTER`
+- Système d’événements : utilisez les événements `@onekeyfe/hd-core` `UI_EVENT / DEVICE` pour l’interaction utilisateur (PIN/phrase secrète, etc.)
+- Suppression de la logique propre à Bridge : retirez `checkBridgeStatus()` et toutes les vérifications/demandes Bridge
+- API métier essentiellement inchangées : par exemple, `searchDevices / getDeviceState / btcGetAddress`
+
+---
+
+## Installation [#install]
+
+```bash
+npm i @onekeyfe/hd-common-connect-sdk @onekeyfe/hd-core @onekeyfe/hd-shared
+```
+
+---
+
+## Initialiser (hd-common-connect-sdk + WebUSB) [#initialize-hd-common-connect-sdk--webusb]
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+const initialized = await HardwareSDK.init({
+  env: 'webusb',
+  debug: false,
+  fetchConfig: true,
+});
+if (!initialized) throw new Error('SDK initialization failed');
+```
+
+- Contrairement à `hd-web-sdk`, vous n’avez pas besoin de `connectSrc` ici (aucune dépendance à une iframe).
+- Il est recommandé d’activer `fetchConfig: true` pour récupérer les configurations de capacités et d’indications de l’appareil.
+
+---
+
+## Connecter les événements d’interface et d’appareil (PIN / phrase secrète / branchement-débranchement) [#bind-ui-and-device-events-pin--passphrase--plug-unplug]
+
+Utilisez le [Gestionnaire d’interface de l’API Core](/fr/hardware-sdk/core-api-guide#events-ui) et enregistrez-le avant les appels protégés. Préservez la corrélation des requêtes, répondez uniquement aux demandes de saisie et annulez l’opération sélectionnée lorsque l’utilisateur annule. Les demandes de PIN et de bouton uniquement sur l’appareil ne nécessitent pas de `uiResponse`.
+
+Abonnez-vous à `DEVICE.CONNECT` et `DEVICE.DISCONNECT` pour actualiser l’état de connexion. Ne journalisez pas les données complètes des appareils ou événements d’interface.
+
+---
+
+## Autorisation (sélecteur WebUSB + filtre officiel) [#authorization-webusb-picker--official-filter]
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// Important: must be triggered by a user gesture (e.g., button click) or the browser will block it
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+---
+
+## Énumérer les appareils et premier appel [#enumerate-devices-and-first-call]
+
+```ts
+// 1) Enumerate
+const list = await HardwareSDK.searchDevices();
+if (!list.success) throw new Error(list.payload.error);
+// Select explicitly in the application when more than one device is available.
+if (list.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = list.payload[0] ?? {};
+if (!connectId) throw new Error("No device connection");
+
+// 2) Confirm deviceId
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const resolvedDeviceId = state.payload.identity.deviceId;
+if (!resolvedDeviceId) throw new Error("Device has no wallet identity");
+
+// 3) Example: get a BTC address
+const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+
+if (r.success) {
+  console.log('BTC address:', r.payload.address);
+} else {
+  console.error('Error:', r.payload.error, r.payload.code);
+}
+```
+
+---
+
+## Nettoyage et liste de vérification [#cleanup-and-checklist]
+
+- Changement de dépendance : supprimer `@onekeyfe/hd-web-sdk`, utiliser `@onekeyfe/hd-common-connect-sdk` à la place
+- Changements d’initialisation :
+  - Avant : `env: 'web'` + `connectSrc: 'https://jssdk.onekey.so/.../'`
+  - Après : `env: 'webusb'` (sans `connectSrc`)
+- Supprimer la logique propre à Bridge : par exemple, `checkBridgeStatus()`, demandes d’installation/de redémarrage de Bridge
+- Connectez `UI_EVENT / DEVICE` : assurez la gestion des événements PIN/phrase secrète et de branchement/débranchement d’appareil
+- Une nouvelle autorisation USB nécessite `requestDevice()` à partir d’une action utilisateur. Les appareils déjà autorisés peuvent être énumérés sans rouvrir le sélecteur.
+- Conseil de compatibilité : si `navigator.usb` est absent, demandez aux utilisateurs de passer à un navigateur compatible WebUSB
+
+---
+
+## FAQ [#faq]
+
+- Pas de demande d’autorisation sur HTTP ? → Utilisez HTTPS
+- Les demandes d’interface semblent bloquées ? → Abonnez-vous à `UI_EVENT` dès le début et répondez via `uiResponse`
+- Vous utilisez encore `connectSrc` ou `HdWebSdk.HardwareWebSdk` ? → Migrez vers `hd-common-connect-sdk` ; l’iframe n’est plus nécessaire
+- Vous avez appelé `requestDevice` sans action utilisateur ? → Chrome le bloque ; l’appel doit être déclenché par un clic ou une action similaire
+
+---
+
+## Pour aller plus loin [#further-reading]
+
+- Présentation approfondie de WebUSB et exemple complet : [Guide de connexion WebUSB](/fr/hardware-sdk/transport/web-usb)
+- Événements et interactions : [Événement de configuration](/fr/hardware-sdk/core-api-guide#events-ui)
+- Références et paramètres de l’API : [Références de l’API du Hardware SDK](/fr/hardware-sdk/core-api-guide), [Paramètres communs](/fr/hardware-sdk/concepts/common-params), [Codes d’erreur](/fr/hardware-sdk/core-api-guide#error-codes)

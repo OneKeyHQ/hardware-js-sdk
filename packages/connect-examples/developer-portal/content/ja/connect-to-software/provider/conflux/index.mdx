@@ -1,0 +1,370 @@
+---
+title: "Conflux"
+description: "OneKey の Fluent 互換プロバイダーによる Conflux の統合"
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Conflux
+
+OneKey の Fluent 互換プロバイダーで Conflux ブロックチェーンを統合します。アクセス先: `window.$onekey.conflux`.
+
+<Callout type="info">
+OneKey の Conflux プロバイダーは、ConfluxPortal と Fluent の両ウォレットインターフェースと互換性があります。
+</Callout>
+
+---
+
+## クイックリンク [#quick-links]
+
+- [API リファレンス](#api-reference)
+- [はじめに](getting-started)
+- [トランザクション](#transactions)
+- [js-conflux-sdk との併用](#using-with-js-conflux-sdk)
+
+---
+
+## プロバイダーの検出 [#provider-detection]
+
+```typescript
+// Detect OneKey Conflux provider
+const provider = window.$onekey?.conflux
+
+if (!provider) {
+  throw new Error('OneKey Conflux provider not detected')
+}
+
+// Check compatibility flags
+console.log('isConfluxPortal:', provider.isConfluxPortal) // true
+console.log('isFluent:', provider.isFluent) // true
+console.log('isOneKey:', provider.isOneKey) // true
+```
+
+---
+
+## クイックスタート [#quick-start]
+
+### アカウントを要求 [#request-accounts]
+
+```typescript
+const accounts = await provider.request({
+  method: 'cfx_requestAccounts'
+})
+
+console.log('Connected:', accounts[0])
+```
+
+### 接続を確認 [#check-connection]
+
+```typescript
+if (provider.isConnected()) {
+  const accounts = await provider.request({ method: 'cfx_accounts' })
+  console.log('Accounts:', accounts)
+}
+```
+
+---
+
+## アカウントとネットワーク [#account-and-network]
+
+### チェーン ID を取得 [#get-chain-id]
+
+```typescript
+const chainId = await provider.request({ method: 'cfx_chainId' })
+console.log('Chain ID:', chainId) // e.g., '0x405' for mainnet
+```
+
+### ネットワークバージョンを取得 [#get-network-version]
+
+```typescript
+const networkId = await provider.request({ method: 'net_version' })
+console.log('Network ID:', networkId) // e.g., '1029' for mainnet
+```
+
+### 残高を取得 [#get-balance]
+
+```typescript
+const balance = await provider.request({
+  method: 'cfx_getBalance',
+  params: [address, 'latest_state']
+})
+
+console.log('Balance:', balance) // In Drip (1 CFX = 10^18 Drip)
+```
+
+---
+
+## トランザクション [#transactions]
+
+### トランザクションを送信 [#send-transaction]
+
+```typescript
+const txHash = await provider.request({
+  method: 'cfx_sendTransaction',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000', // 1 CFX in Drip (hex)
+    gas: '0x5208', // 21000
+  }]
+})
+
+console.log('Transaction hash:', txHash)
+```
+
+### ガスの見積もり付きで送信 [#send-with-gas-estimation]
+
+```typescript
+// Estimate gas first
+const gasEstimate = await provider.request({
+  method: 'cfx_estimateGasAndCollateral',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000',
+  }]
+})
+
+// Send with estimated values
+const txHash = await provider.request({
+  method: 'cfx_sendTransaction',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000',
+    gas: gasEstimate.gasLimit,
+    storageLimit: gasEstimate.storageCollateralized,
+  }]
+})
+```
+
+### コントラクトを呼び出す [#call-contract]
+
+```typescript
+const result = await provider.request({
+  method: 'cfx_call',
+  params: [{
+    to: contractAddress,
+    data: encodedFunctionCall,
+  }, 'latest_state']
+})
+
+console.log('Result:', result)
+```
+
+---
+
+## イベント処理 [#event-handling]
+
+### アカウント変更を監視 [#listen-for-account-changes]
+
+```typescript
+provider.on('accountsChanged', (accounts) => {
+  if (accounts.length === 0) {
+    console.log('Disconnected')
+  } else {
+    console.log('Account changed:', accounts[0])
+  }
+})
+```
+
+### チェーン変更を監視 [#listen-for-chain-changes]
+
+```typescript
+provider.on('chainChanged', (chainId) => {
+  console.log('Chain changed:', chainId)
+  // Recommend reloading the page
+  window.location.reload()
+})
+```
+
+### 接続を監視 [#listen-for-connection]
+
+```typescript
+provider.on('connect', ({ chainId, networkId }) => {
+  console.log('Connected to:', chainId, networkId)
+})
+
+provider.on('disconnect', () => {
+  console.log('Disconnected')
+})
+```
+
+---
+
+## js-conflux-sdk との併用 [#using-with-js-conflux-sdk]
+
+### セットアップ [#setup]
+
+```bash
+npm install js-conflux-sdk
+```
+
+### プロバイダーに接続 [#connect-provider]
+
+```typescript
+import { Conflux } from 'js-conflux-sdk'
+
+const conflux = new Conflux({
+  url: 'https://main.confluxrpc.com',
+  networkId: 1029,
+})
+
+// Use OneKey provider for signing
+conflux.provider = provider
+```
+
+### SDK でトランザクションを送信 [#send-transaction-with-sdk]
+
+```typescript
+// Create and send transaction
+const tx = conflux.cfx.sendTransaction({
+  from: senderAddress,
+  to: recipientAddress,
+  value: Conflux.Drip.fromCFX(1), // 1 CFX
+})
+
+console.log('Transaction:', tx)
+
+// Wait for confirmation
+const receipt = await tx.executed()
+console.log('Receipt:', receipt)
+```
+
+### コントラクト操作 [#contract-interaction]
+
+```typescript
+const contract = conflux.Contract({
+  abi: contractABI,
+  address: contractAddress,
+})
+
+// Read
+const result = await contract.someViewFunction().call()
+
+// Write
+const tx = contract.someWriteFunction(param1, param2).sendTransaction({
+  from: senderAddress,
+})
+
+const receipt = await tx.executed()
+```
+
+---
+
+## API リファレンス [#api-reference]
+
+### メソッド [#methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `request({ method, params })` | JSON-RPC リクエストを送信 |
+| `isConnected()` | 接続状態を確認 |
+| `on(event, callback)` | イベントを購読 |
+| `off(event, callback)` | イベントの購読を解除 |
+
+### RPC メソッド [#rpc-methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `cfx_requestAccounts` | 接続を要求 |
+| `cfx_accounts` | 接続済みアカウントを取得 |
+| `cfx_chainId` | チェーン ID を取得 |
+| `cfx_sendTransaction` | トランザクションを送信 |
+| `cfx_call` | コントラクトを呼び出す (読み取り専用) |
+| `cfx_estimateGasAndCollateral` | ガスを見積もる |
+| `cfx_getBalance` | アカウント残高を取得 |
+| `cfx_getTransactionByHash` | トランザクションを取得 |
+| `cfx_getTransactionReceipt` | レシートを取得 |
+| `net_version` | ネットワーク ID を取得 |
+
+### イベント [#events]
+
+| イベント | パラメーター | 説明 |
+|-------|------------|-------------|
+| `connect` | `{ chainId, networkId }` | ネットワーク接続時 |
+| `disconnect` | - | 切断時 |
+| `chainChanged` | `chainId` | ネットワーク変更時 |
+| `accountsChanged` | `accounts[]` | アカウント変更時 |
+
+### ネットワーク [#networks]
+
+| ネットワーク | チェーン ID (16 進数) | ネットワーク ID |
+|---------|---------------|------------|
+| メインネット | `0x405` | 1029 |
+| テストネット | `0x1` | 1 |
+
+---
+
+## 非推奨のメソッド [#deprecated-methods]
+
+以下のメソッドは引き続き動作しますが、非推奨です:
+
+```typescript
+// Deprecated: use request({ method: 'cfx_requestAccounts' })
+await provider.enable()
+
+// Deprecated: use request()
+await provider.send({ method: 'cfx_accounts' })
+await provider.sendAsync({ method: 'cfx_accounts' }, callback)
+
+// Deprecated: use request({ method: 'cfx_chainId' })
+provider.chainId
+
+// Deprecated: use request({ method: 'net_version' })
+provider.networkVersion
+
+// Deprecated: use request({ method: 'cfx_accounts' })
+provider.selectedAddress
+```
+
+---
+
+## エラー処理 [#error-handling]
+
+```typescript
+try {
+  const accounts = await provider.request({
+    method: 'cfx_requestAccounts'
+  })
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the request')
+  } else if (error.code === -32603) {
+    console.log('Internal error')
+  } else {
+    console.error('Error:', error.message)
+  }
+}
+```
+
+### 主なエラーコード [#common-error-codes]
+
+| コード | 説明 |
+|------|-------------|
+| 4001 | ユーザーがリクエストを拒否 |
+| -32700 | 解析エラー |
+| -32600 | 無効なリクエスト |
+| -32601 | メソッドが見つからない |
+| -32602 | 無効なパラメーター |
+| -32603 | 内部エラー |
+
+---
+
+## アドレス形式 [#address-format]
+
+Conflux は base32 アドレス (CIP-37) を使用します:
+
+```typescript
+// Mainnet: cfx:...
+// Testnet: cfxtest:...
+
+// Example mainnet address
+const address = 'cfx:aak2rra2njvd77ezwjvx04kkds9fzagfe6ku8scz91'
+
+// Convert between formats using js-conflux-sdk
+import { format } from 'js-conflux-sdk'
+
+const hexAddress = format.hexAddress(address)
+const base32Address = format.address(hexAddress, 1029) // networkId
+```

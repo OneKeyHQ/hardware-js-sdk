@@ -1,0 +1,200 @@
+---
+title: "evmSignTransaction"
+---
+
+import { Tabs } from 'nextra/components'
+
+<div className="doc-eyebrow">HARDWARE SDK / ETHEREUM と EVM</div>
+
+# evmSignTransaction
+
+<span id="ethereum-sign-transaction" />
+
+Legacy または EIP-1559 (Type 2) トランザクションについて、デバイス確認を伴う署名を要求します。デバイスは BIP32 パスから鍵を導出し、アプリケーションが結果をシリアライズしてブロードキャストします。デコードされるトランザクション詳細はファームウェアと calldata によって異なります。
+
+```typescript
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+```
+
+<div className="doc-method-flow"><span>01 <strong>準備</strong></span><span aria-hidden="true">→</span><span>02 <strong>デバイスで確認</strong></span><span aria-hidden="true">→</span><span>03 <strong>シリアライズして送信</strong></span></div>
+
+## 呼び出し前に [#before-you-call]
+
+- [SDK を初期化し、デバイスを選択](/ja/hardware-sdk/getting-started).
+- [UI イベントハンドラー](/ja/hardware-sdk/core-api-guide#events-ui)を登録し、目的のウォレットを明示的に選択します。
+- 対象ネットワークから最新の nonce、ガス、手数料を取得します。
+
+## パラメーター [#params]
+
+<div className="doc-parameters">
+<div className="doc-parameter"><div><code>connectId</code><span>string</span><b>必須</b></div><p>デバイス検出で返された接続識別子。</p></div>
+<div className="doc-parameter"><div><code>deviceId</code><span>string</span><b>必須</b></div><p>getDeviceState が返したウォレット識別情報。</p></div>
+<div className="doc-parameter"><div><code>params.path</code><span>string | number[]</span><b>必須</b></div><p>3 つ以上のパス要素を持つ BIP32 導出パス。</p></div>
+<div className="doc-parameter"><div><code>params.transaction</code><span>object</span><b>必須</b></div><p>Legacy または EIP-1559 トランザクション。数量は 16 進数文字列、chainId は数値です。</p></div>
+</div>
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+### トランザクションのフィールド [#transaction-fields]
+
+| フィールド | 型 | 説明 |
+| --- | --- | --- |
+| `chainId` | `number` | 対象ネットワークのチェーン ID。transaction 内に指定します。 |
+| `to` | `string` | 送信先アドレス。ERC-20 呼び出しではトークンコントラクト。 |
+| `value` | `string` | 16 進数エンコードされた wei 単位の金額。ERC-20 呼び出しには 0x0 を使用。 |
+| `nonce` | `string` | 送信アカウントのトランザクション数 (16 進数の数量)。 |
+| `gasLimit` | `string` | ガスリミット (16 進数の数量)。 |
+| `data` | `string · optional` | 完全な 16 進数エンコードの calldata。ない場合は 0x を使用。 |
+| `maxFeePerGas` | `string · EIP-1559` | ガス単位あたりの最大総手数料 (16 進数エンコードの wei)。 |
+| `maxPriorityFeePerGas` | `string · EIP-1559` | ガス単位あたりの最大優先手数料 (16 進数エンコードの wei)。 |
+| `gasPrice` | `string · Legacy` | Legacy のガス価格 (16 進数エンコードの wei)。 |
+
+このページでは `EVMTransaction` と `EVMTransactionEIP1559` を扱います。[HD パス](/ja/hardware-sdk/concepts/common-params#hd-path)でパスの形式を確認してください。対象の RPC がトランザクションタイプに対応していることを確認します。
+
+EIP-1559 は両方の手数料フィールドが必須です。Legacy では `gasPrice` を使用します。SDK に `type: 2` を渡さないでください。署名済みトランザクションのシリアライズ時にタイプを選択してください。
+
+## クリアサイニング [#clear-signing]
+
+ネイティブ通貨の送金、ERC-20 送金、承認/取り消し、コントラクト呼び出しに、同じメソッドを使用します。ERC-20 呼び出しでは、 `to` はトークンコントラクト、 `value` はゼロです。calldata に受取人/spender とトークン数量を含めます。対応ファームウェアは認識できる形式を自動デコードします。次のような `clearSigning`, トークンメタデータ、コントラクトラベルのパラメーターはありません。
+
+[Clear Signing ガイド](/ja/hardware-sdk/signers/evm#clear-signing)に入力/表示の対応表と不明なコントラクトの動作があります。EIP-712 と Safe 所有者の署名には [evmSignTypedData](/ja/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata) を使用します。
+
+## 例 [#examples]
+
+以下のコードは SDK の初期化とウォレットの選択が完了していることを前提とします。署名前に受取人の例を置き換え、対象ネットワークから nonce、ガス、手数料を取得してください。
+
+<span id="eip1559-after-the-london-upgrade" />
+
+EIP-1559 では `maxFeePerGas` と `maxPriorityFeePerGas` の両方が必要です。Legacy では `gasPrice` を使用します。
+
+<Tabs items={['EIP-1559', 'Legacy']} className="doc-example-tabs">
+
+<Tabs.Tab>
+
+```typescript
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+    path: "m/44'/60'/0'/0/0",
+    useEmptyPassphrase: true,
+    transaction: {
+        to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
+        value: '0xf4240',
+        data: '0x',
+        chainId: 1,
+        nonce: '0x0',
+        maxFeePerGas: '0x77359400',
+        maxPriorityFeePerGas: '0x3b9aca00',
+        gasLimit: '0x5208',
+    },
+});
+
+if (result.success === false) throw new Error(result.payload.error);
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```typescript
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+    path: "m/44'/60'/0'/0/0",
+    useEmptyPassphrase: true,
+    transaction: {
+        to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
+        value: "0xf4240",
+        data: "0x",
+        chainId: 1,
+        nonce: "0x0",
+        gasLimit: "0x5208",
+        gasPrice: "0xbebc200"
+    },
+});
+if (result.success === false) throw new Error(result.payload.error);
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+これらの例では標準ウォレットを選択します。隠しウォレットには、アカウント確認時と同じウォレット共通パラメーターを渡してください。
+
+## レスポンス [#response]
+
+ペイロードを読み取る前に `success` を確認してください。成功レスポンスには `v`、`r`、`s` が含まれます。SDK はトランザクションをブロードキャストしません。
+
+<Tabs items={['成功', 'エラー']} className="doc-example-tabs">
+
+<Tabs.Tab>
+
+```typescript
+{
+    success: true,
+    payload: {
+        v: string, // hexadecimal string with "0x" prefix
+        r: string, // hexadecimal string with "0x" prefix
+        s: string, // hexadecimal string with "0x" prefix
+    }
+}
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+## 署名済みトランザクションをシリアライズ [#serialize-the-signed-transaction]
+
+SDK は署名を返し、アプリケーションがトランザクションを組み立ててブロードキャストします。この例では ethers v5 パッケージを使用します。ユーザーの署名後は、元のトランザクションのフィールドを変更しないでください。
+
+```typescript
+import type { UnsignedTransaction } from '@ethersproject/transactions';
+import { TransactionTypes, serialize } from '@ethersproject/transactions';
+import { splitSignature } from '@ethersproject/bytes';
+import { keccak256 } from '@ethersproject/keccak256';
+
+// Illustrative fee values: populate nonce, gas, and fees from your network.
+const transaction = {
+  to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+  value: '0x0',
+  data: '0x',
+  chainId: 1,
+  nonce: '0x0',
+  maxFeePerGas: '0x14',
+  maxPriorityFeePerGas: '0x0',
+  gasLimit: '0x5208',
+};
+
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  transaction,
+});
+if (result.success === false) throw new Error(result.payload.error);
+
+const unsignedTx: UnsignedTransaction = {
+  ...transaction,
+  nonce: Number.parseInt(transaction.nonce, 16),
+  type: TransactionTypes.eip1559,
+};
+const signature = splitSignature({
+  v: Number(result.payload.v),
+  r: result.payload.r,
+  s: result.payload.s,
+});
+const rawTx = serialize(unsignedTx, signature);
+const txid = keccak256(rawTx);
+// Submit rawTx using your Ethereum provider after verifying the signed result.
+```
+
+レガシートランザクションでは、2 つの EIP-1559 手数料フィールドの代わりに `gasPrice` を使用し、レガシートランザクションとしてシリアライズします。

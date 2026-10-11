@@ -1,0 +1,69 @@
+---
+description: "Comprendre l’API obsolète d’empreinte de portefeuille caché et migrer vers openWalletSession."
+title: "Obtenir l’état de phrase secrète"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="get-passphrase-state" />
+
+# Obtenir l’état de phrase secrète
+
+<Callout type="warning">
+  **Obsolète.** Utilisez [`openWalletSession`](/fr/hardware-sdk/basic-api/open-wallet-session) pour Protocol V1 et V2. Cette méthode fonctionne encore pour les applications existantes.
+</Callout>
+
+## Obtenir le passphraseState de l’appareil [#get-the-passphrasestate-of-the-device]
+
+Invite l’utilisateur à saisir sa phrase secrète (sur l’appareil ou via le logiciel), puis renvoie une chaîne `passphraseState` — l’empreinte publique du portefeuille caché. Persistez `deviceId + passphraseState`. Ne persistez pas le champ de micrologiciel `session_id`.
+
+Voir [Sessions de portefeuille](/fr/hardware-sdk/concepts/wallet-session).
+
+Transmettez `passphraseState` lors des appels ultérieurs d’adresse / de signature pour rester sur ce portefeuille caché. Il s’agit d’une **empreinte de portefeuille**, pas d’un champ du micrologiciel `session_id`. Ne persistez pas `session_id`.
+
+```
+  getPassphraseState(connectId)   ← user enters passphrase once
+    → passphraseState = "<fingerprint>"
+
+  evmGetAddress(..., { passphraseState })
+  btcGetAddress(..., { passphraseState })
+```
+
+> **Erreur 112 (incohérence de l’état de phrase secrète)** : l’association ne correspond pas au portefeuille actuellement déverrouillé (appareil verrouillé, graine modifiée ou empreinte obsolète). Arrêtez l’opération et laissez l’utilisateur sélectionner de nouveau le portefeuille souhaité avec `openWalletSession`. Confirmez l’association récupérée avant une nouvelle demande ; ne contournez pas la vérification et ne rejouez pas automatiquement la signature.
+
+```typescript
+const response = await HardwareSDK.getPassphraseState(connectId);
+```
+
+### Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+### Exemple [#example]
+
+```typescript
+const response = await HardwareSDK.getPassphraseState(connectId);
+```
+
+Résultat
+
+```
+{
+    success: true,
+    payload: string | null | undefined
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+Une empreinte de portefeuille caché est une chaîne non vide. Les parcours de compatibilité peuvent renvoyer `undefined` sur V1 lorsque la protection est désactivée, ou `null` pour un portefeuille V2 standard ; ne les persistez pas comme association de portefeuille caché.

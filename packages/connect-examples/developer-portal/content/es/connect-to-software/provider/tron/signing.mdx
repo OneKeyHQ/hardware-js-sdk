@@ -1,0 +1,73 @@
+---
+title: "Firma"
+description: "Firma mensajes en TRON con OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Firma
+
+Conecta el proveedor y usa la instancia de TronWeb asociada a esa misma cartera. Sustituye las direcciones y los métodos de contrato abreviados por valores válidos. Comprueba la red seleccionada antes de preparar una transacción.
+
+Aprende a firmar mensajes en TRON.
+
+---
+
+## Firmar un mensaje V1 (hexadecimal) [#sign-message-v1-hex]
+
+Firma mensajes codificados en hexadecimal:
+
+```typescript
+const message = tronWeb.toHex('Hello TRON!')
+const signature = await provider.signMessage(message)
+
+console.log('Signature:', signature)
+```
+
+---
+
+## Firmar un mensaje V2 (UTF-8) [#sign-message-v2-utf-8]
+
+Firma mensajes UTF-8 directamente:
+
+```typescript
+const message = 'Hello TRON!'
+const signature = await provider.signMessageV2(message)
+
+console.log('Signature:', signature)
+```
+
+---
+
+## Verificar la firma [#verify-signature]
+
+```typescript
+const message = 'Hello TRON!'
+const signature = await provider.signMessageV2(message)
+
+// Verify using TronWeb
+const address = await tronWeb.trx.verifyMessageV2(message, signature)
+console.log('Signer:', address)
+```
+
+---
+
+## Gestión de errores [#error-handling]
+
+```typescript
+try {
+  const result = await provider.request({
+    method: 'tron_requestAccounts'
+  })
+
+  if (result.code === 4001) {
+    console.log('A connection request is already pending')
+  } else if (result.code !== 200) {
+    console.log('Connection was not approved:', result.message)
+  }
+} catch (error) {
+  console.error('Request failed:', error)
+}
+```

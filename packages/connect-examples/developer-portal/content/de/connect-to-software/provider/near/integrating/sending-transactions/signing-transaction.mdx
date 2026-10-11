@@ -1,0 +1,23 @@
+---
+title: "Transaktion signieren"
+---
+
+<span id="signing-transaction" />
+
+# Transaktion signieren
+
+Transaktionen signieren, ohne sie zu senden.
+
+Die Methode gibt ein Promise zurück. Das Antwortformat muss versionsspezifisch geprüft werden: Die öffentliche Provider-Deklaration nennt `transactionHashes`, während das öffentliche Beispiel `signatures` verwendet. Verlassen Sie sich auf keines der beiden Felder, bevor Sie die installierte Provider- und Wallet-Version geprüft haben. Diese reine Signieranfrage überträgt die Transaktion nicht.
+
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const res = await provider.request({
+  method: 'near_signTransactions',
+  params: {
+    transactions: [transaction], // must be Array type
+  },
+});
+console.log('near_signTransactions', res);
+```

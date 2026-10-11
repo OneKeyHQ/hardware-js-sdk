@@ -1,0 +1,169 @@
+---
+description: "ネイティブ OneKey BLE SDK、プラットフォームの権限、デバイス検出、アドレス確認を設定します。"
+title: "React Native BLE (hd-ble-sdk)"
+---
+
+# React Native BLE (hd-ble-sdk)
+
+> **注記:**
+デモ: React Native / Expo の例 → [react-native-demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo)
+
+
+このガイドでは、次を使う純粋な React Native BLE スタックを説明します: `@onekeyfe/hd-ble-sdk` および `@onekeyfe/hd-transport-react-native`。WebView や低レベルアダプターは不要です。チェーン API の使い方はクイックスタートと同じです。
+
+## インストール [#install]
+
+アプリ層に RN ネイティブ依存関係をインストールすることを推奨します。これにより autolinking が Dev Client のビルドにネイティブモジュールを含めます:
+
+```bash
+npm i @onekeyfe/hd-ble-sdk @onekeyfe/hd-transport-react-native \
+      @onekeyfe/react-native-ble-utils react-native-ble-plx \
+      buffer process react-native-get-random-values react-native-url-polyfill
+```
+
+アプリのエントリーで (例: `index.js` または `App.tsx`):
+
+```ts
+// Polyfills (adjust to your project needs)
+import 'react-native-get-random-values';
+import 'react-native-url-polyfill/auto';
+// @ts-ignore
+global.Buffer = global.Buffer || require('buffer').Buffer;
+// @ts-ignore
+global.process = global.process || require('process');
+
+// Register RN transport side-effects before SDK init
+import '@onekeyfe/hd-transport-react-native';
+
+import HardwareSDK from '@onekeyfe/hd-ble-sdk';
+```
+
+## Android の設定 [#android-setup]
+
+位置情報を取得しない BLE クライアントには、以下の権限定義を使います。`neverForLocation` は、その条件がアプリに実際に当てはまる場合のみ設定してください:
+
+```xml
+<uses-permission android:name="android.permission.INTERNET"/>
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30"/>
+
+<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+```
+
+Android 12+ では、実行時に `BLUETOOTH_SCAN` と `BLUETOOTH_CONNECT` を要求します。位置情報へのアクセスは対象 SDK、アプリによる位置情報の取得、BLE ライブラリ設定によって異なり、Android 12+ で常に必須ではありません。古い Android では適切な従来の権限/位置情報権限を使います。[Android 権限ガイド](https://developer.android.com/develop/connectivity/bluetooth/bt-permissions)を参照してください。
+
+## iOS の設定 [#ios-setup]
+
+`Info.plist` に追加します:
+
+- `NSBluetoothAlwaysUsageDescription` (必須)
+- 必要に応じて `NSBluetoothPeripheralUsageDescription` 古い iOS バージョン用
+- アプリがカメラを使用する場合 (QR スキャンなど)、次を追加します: `NSCameraUsageDescription`
+
+Expo を使う場合は、`app.json` の `expo.ios.infoPlist` と `expo.android.permissions` の配下で宣言できます。
+
+## Metro 設定 (ポリフィルと exports) [#metro-config-polyfills--exports]
+
+Metro が Node のコア API の欠落を報告した場合は、依存関係で必要なモジュールだけを対応付けます。次が参照するすべてのパッケージを `require.resolve` マッピングの使用前にインストールしてください。既存の resolver 設定に追加し、フレームワークのデフォルトを置き換えないでください。以下は任意のマッピング断片であり、完全な Metro 設定ではありません:
+
+```js
+// metro.config.js
+config.resolver.extraNodeModules = {
+  buffer: require.resolve('buffer/'),
+  crypto: require.resolve('crypto-browserify'),
+  stream: require.resolve('stream-browserify'),
+  process: require.resolve('process/browser'),
+  events: require.resolve('events/'),
+  http: require.resolve('http-browserify'),
+  https: require.resolve('https-browserify'),
+  zlib: require.resolve('browserify-zlib'),
+  util: require.resolve('util/'),
+  url: require.resolve('url/'),
+  path: require.resolve('path-browserify'),
+};
+config.resolver.unstable_enablePackageExports = true;
+```
+
+## Dev Client をビルド (実機) [#build-dev-client-real-devices]
+
+Expo Go には独自のネイティブ BLE モジュールが含まれません。Dev Client をビルドしてください:
+
+```bash
+# iOS
+expo run:ios --device
+
+# Android
+expo run:android --device
+
+# Start bundler for Dev Client
+expo start --dev-client -c
+```
+
+## 初期化してイベントを購読 [#initialize-and-subscribe-to-events]
+
+```ts
+export async function setupBle() {
+  const initialized = await HardwareSDK.init({
+    env: 'react-native',                 // React Native BLE transport
+    debug: false,
+    fetchConfig: true,
+  });
+  if (!initialized) throw new Error('SDK initialization failed');
+
+  // Subscribe to UI events (PIN / Passphrase / confirmations)
+  // import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core'
+  // HardwareSDK.on(UI_EVENT, (msg) => { /* open dialogs and reply via HardwareSDK.uiResponse(...) */ });
+}
+```
+
+## デバイスを検出し、device\_id を識別 [#discover-devices-and-identify-device_id]
+
+```ts
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+
+// BLE returns id + name; read identity via getDeviceState
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const candidate = devices.payload[0];
+const connectId = candidate?.connectId;
+if (!connectId) throw new Error("No device connection");
+
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+```
+
+永続化します: `connectId` および `deviceId` (多くのチェーン API は両方が必要)。
+
+## 最初の呼び出し例 (BTC アドレス) [#first-call-example-btc-address]
+
+```ts
+const res = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+
+if (res.success) {
+  console.log('BTC address:', res.payload.address);
+} else {
+  console.error('Error:', res.payload.error, res.payload.code);
+}
+```
+
+## ヒント [#tips]
+
+- 必ず早い段階で `UI_EVENT` を購読し、PIN/パスフレーズ/確認でリクエストが停止しないようにします。[設定イベント](/ja/hardware-sdk/core-api-guide#events-ui)を参照してください。
+- BLE 権限を OS バージョンに合わせてください。実機でテストしてください。
+- 追加の例はこちら: [react-native-demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo)
+
+## 続行 [#continue]
+
+- [はじめに](/ja/hardware-sdk)
+- [エラーコード](/ja/hardware-sdk/core-api-guide#error-codes), [共通パラメーター](/ja/hardware-sdk/concepts/common-params)
+- BLE チャンクと V1/V2 フレーミング: [低レベルトランスポートプラグインを参照](/ja/hardware-sdk/concepts/low-level-plugin#ble-protocol-native-mobile)

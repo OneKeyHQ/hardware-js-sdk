@@ -1,0 +1,36 @@
+---
+title: "Sélectionner un fournisseur de portefeuille"
+description: "Réutilisez votre processus de requêtes EIP-1193 et sélectionnez explicitement OneKey. Utilisez la [découverte EIP-6963](/fr/connect-to-software/provider/eth/provider-api) pour un sélecteur à plusieurs portefeuilles, ou `window.$onekey.ethereum` pour un bouton de connexion propre à OneKey."
+---
+
+<span id="select-a-wallet-provider" />
+
+# Sélectionner un fournisseur de portefeuille
+
+Réutilisez votre processus de requêtes EIP-1193 et sélectionnez explicitement OneKey. Utilisez la [découverte EIP-6963](/fr/connect-to-software/provider/eth/provider-api) pour un sélecteur à plusieurs portefeuilles, ou `window.$onekey.ethereum` pour un bouton de connexion propre à OneKey.
+
+```javascript
+// Run from a user-initiated Connect action.
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const accounts = await provider.request({ method: 'eth_requestAccounts' });
+  // Update your application's selected account from accounts.
+} catch (error) {
+  // Show a recoverable error; do not automatically repeat the prompt.
+  console.error(error.code, error.message);
+}
+```
+
+## Migrer une intégration existante [#migrating-an-existing-integration]
+
+- Conservez le fournisseur sélectionné pour les comptes, la signature, les transactions et les écouteurs d’événements.
+- Remplacez les anciens appels `enable()` par `request({ method: 'eth_requestAccounts' })`.
+- Traitez `isOneKey` comme une propriété booléenne. `isMetaMask` ne suffit pas à identifier un portefeuille unique dans un environnement de compatibilité.
+- Gérez `accountsChanged`, `chainChanged`, ainsi que les promesses rejetées ; supprimez les écouteurs au démontage de la vue.
+- Vérifiez les méthodes propres au portefeuille dans votre version cible au lieu de supposer la prise en charge de toutes les méthodes MetaMask.
+
+## Changement historique de fournisseur [#historical-provider-switching]
+
+Les anciennes intégrations utilisaient `window.onekey` et `window.ethereum.switchProvider()`. `switchProvider` ne fait pas partie d’EIP-1193. Utilisez la découverte ou le fournisseur avec espace de noms dans le nouveau code. Lors de la maintenance d’une ancienne intégration, détectez la disponibilité des méthodes historiques avant de les appeler.

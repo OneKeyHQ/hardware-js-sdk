@@ -1,0 +1,127 @@
+---
+title: "eth_getTransactionReceipt"
+description: "Obtener el recibo de una transacción con el resultado de ejecución"
+---
+
+# eth_getTransactionReceipt
+
+Devuelve el recibo de una transacción a partir de su hash. El recibo contiene información sobre la ejecución, incluidos el estado y los registros.
+
+---
+
+## Parámetros [#parameters]
+
+| Índice | Tipo | Descripción |
+|-------|------|-------------|
+| 0 | `string` | Hash de la transacción (32 bytes) |
+
+---
+
+## Devuelve [#returns]
+
+`object | null` - Objeto de recibo o null si aún no se ha minado
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `transactionHash` | `string` | Hash de la transacción |
+| `transactionIndex` | `string` | Índice en el bloque (hexadecimal) |
+| `blockHash` | `string` | Hash del bloque |
+| `blockNumber` | `string` | Número de bloque (hexadecimal) |
+| `from` | `string` | Dirección del remitente |
+| `to` | `string` | Dirección del destinatario |
+| `cumulativeGasUsed` | `string` | Gas total usado en el bloque hasta esta transacción |
+| `gasUsed` | `string` | Gas usado por esta transacción (hexadecimal) |
+| `contractAddress` | `string` | Dirección del contrato creado (si corresponde) |
+| `logs` | `array` | Matriz de objetos de registro |
+| `logsBloom` | `string` | Filtro de Bloom para los registros |
+| `status` | `string` | `0x1` (éxito) o `0x0` (fallo) |
+| `effectiveGasPrice` | `string` | Precio real del gas pagado (hexadecimal) |
+
+---
+
+## Ejemplo [#example]
+
+```typescript
+const receipt = await window.$onekey.ethereum.request({
+  method: 'eth_getTransactionReceipt',
+  params: ['0x88df016429689c079f3b2f6ad39fa052532c56795b733da78a91ebe6a713944b']
+})
+
+if (receipt) {
+  const success = receipt.status === '0x1'
+  console.log('Transaction', success ? 'succeeded' : 'failed')
+  console.log('Gas used:', parseInt(receipt.gasUsed, 16))
+  console.log('Logs:', receipt.logs.length)
+}
+```
+
+### Esperar al recibo [#wait-for-receipt]
+
+```typescript
+async function waitForReceipt(txHash, timeout = 60000) {
+  const start = Date.now()
+
+  while (Date.now() - start < timeout) {
+    const receipt = await window.$onekey.ethereum.request({
+      method: 'eth_getTransactionReceipt',
+      params: [txHash]
+    })
+
+    if (receipt) {
+      return receipt
+    }
+
+    await new Promise(r => setTimeout(r, 2000))
+  }
+
+  throw new Error('Transaction receipt timeout')
+}
+
+// Usage
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [txParams]
+})
+
+const receipt = await waitForReceipt(txHash)
+console.log('Transaction status:', receipt.status === '0x1' ? 'Success' : 'Failed')
+```
+
+### Interpretar los eventos del contrato [#parse-contract-events]
+
+```typescript
+// Set tokenAddress to the intended ERC-20 contract before parsing its Transfer logs.
+const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+
+const transferLogs = receipt.logs.filter(
+  log => log.address.toLowerCase() === tokenAddress.toLowerCase()
+    && log.topics[0] === transferTopic
+    && log.topics.length === 3
+)
+
+transferLogs.forEach(log => {
+  const from = '0x' + log.topics[1].slice(26)
+  const to = '0x' + log.topics[2].slice(26)
+  const value = BigInt(log.data).toString()
+  console.log(`Transfer: ${from} -> ${to}: ${value}`)
+})
+```
+
+---
+
+## Errores [#errors]
+
+| Código | Mensaje | Descripción |
+|------|---------|-------------|
+| -32602 | Parámetros no válidos | Hash de transacción no válido |
+
+---
+
+## Notas [#notes]
+
+- Devuelve `null` para transacciones pendientes (aún sin minar)
+- Campo `status`: `0x1` = éxito, `0x0` = revertida
+- `contractAddress` solo aparece en transacciones de creación de contratos
+- Usa `logs` para interpretar los eventos emitidos por la transacción
+
+Comprueba el contrato emisor y la ABI esperada al decodificar registros. La coincidencia de un tema no identifica por sí sola un token, y ERC-721 usa la misma firma del evento Transfer con una distribución distinta de campos indexados.

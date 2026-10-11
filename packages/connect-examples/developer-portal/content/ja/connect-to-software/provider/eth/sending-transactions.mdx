@@ -1,0 +1,59 @@
+---
+title: "トランザクションの送信"
+---
+
+<span id="sending-transactions" />
+
+# トランザクションの送信
+
+`eth_sendTransaction` で接続済みアカウントからのトランザクションを要求します。ウォレットはユーザーに内容の確認と承認を求めます。リクエストに成功するとトランザクションハッシュが返されますが、トランザクションの確定や実行の成功を意味するわけではありません。
+
+## 例 [#example]
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+const [from] = await provider.request({ method: 'eth_requestAccounts' });
+const chainId = await provider.request({ method: 'eth_chainId' });
+// Check chainId against your application's intended network before continuing.
+const to = '<RECIPIENT_EVM_ADDRESS>'; // Replace with a valid address.
+
+try {
+  const txHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to,
+      value: '0x0',
+    }],
+  });
+  console.log('Submitted transaction:', txHash);
+} catch (error) {
+  console.error(error.code, error.message);
+}
+```
+
+このフローはユーザー操作から呼び出してください。送信前に受取人と金額を置き換えます。同じチェーンで `eth_getTransactionReceipt` を照会し、取り込みと実行の状態を確認します。保留中のトランザクションにはまだレシートがありません。
+
+## トランザクションのパラメーター [#transaction-parameters]
+
+| パラメーター | 意味 |
+| --- | --- |
+| `from` | トランザクションの送信を許可された接続済みアカウント |
+| `to` | 受取人アドレス。コントラクト作成時のみ省略 |
+| `value` | 最小単位 (Ethereum では wei) のネイティブ通貨額を 16 進数で表した数量 |
+| `data` | 16 進数エンコードされたコントラクト呼び出しデータまたはコントラクト作成のバイトコード |
+| `gas` | 任意のガスリミット。ガス価格ではなくガス量 |
+| `gasPrice` | レガシートランザクション用の任意のガス単位あたり手数料 |
+| `maxFeePerGas`, `maxPriorityFeePerGas` | EIP-1559 トランザクションの手数料フィールド。次と併用しないでください: `gasPrice` |
+| `nonce` | アカウントのトランザクション連番。通常はウォレットに管理させます |
+
+金額には整数精度を安全に扱える演算を使用し、wei への変換で浮動小数点演算を避けてください。アプリケーションに手数料を指定する特別な理由がなければ、ウォレットに見積もりを任せてください。ユーザーはウォレット内でトランザクションの詳細を確認・調整できます。
+
+## ネットワークとアカウントの変更 [#network-and-account-changes]
+
+トランザクションの準備前に `eth_chainId` を読み取り、[プロバイダー API](/ja/connect-to-software/provider/eth/provider-api) の説明に従って `chainChanged` と `accountsChanged` を処理してください。変更後はアカウントやネットワークに依存するトランザクションデータを再構築してください。
+
+## デモ [#demo]
+
+[例を開く](https://codesandbox.io/embed/ethereum-provider-signtransactions-demo-2glt4y?autoresize=1&fontsize=14&hidenavigation=1&theme=dark)

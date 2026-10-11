@@ -1,0 +1,79 @@
+---
+title: "Tron"
+---
+
+# Tron
+
+La signature Tron hors ligne via UR utilise le même mécanisme de transport par QR codes animés.
+
+## Types de données [#data-types]
+
+- UR de requête : `tron-sign-request`
+- UR de réponse : `tron-signature`
+
+Les exemples utilisent directement le paquet de registre Tron. Importez les classes de chemin de clé qu’il réexporte pour garantir la compatibilité des objets de registre.
+
+## Processus [#flow]
+
+1. Construire une demande de signature Tron (transaction/message + chemin BIP-44)
+2. Encoder au format UR et afficher sous forme de QR code animé
+3. Scanner la réponse de l’appareil et décoder la signature
+4. Diffuser sur le réseau Tron
+
+## Exemples [#examples]
+
+Installez `@keystonehq/bc-ur-registry-tron` et `@ngraveio/bc-ur`. Les exemples nécessitent une implémentation de Buffer. L’encodage du registre ne suffit pas à établir la prise en charge sur un appareil ; vérifiez les types UR acceptés par le micrologiciel cible.
+
+Le portefeuille fournit les données de transaction non signée ainsi que le chemin réel du compte et l’empreinte maîtresse exportés par l’appareil. Le moteur de rendu QR doit appeler `nextFrame()` à intervalles réguliers et s’arrêter lorsque la boîte de dialogue de signature se ferme. Ces extraits encodent et décodent le transport ; ils ne soumettent aucune transaction.
+
+
+### Construire une demande de signature Tron (UR) [#build-tron-sign-request-ur]
+
+```ts
+import { TronSignRequest, DataType, CryptoKeypath, PathComponent } from '@keystonehq/bc-ur-registry-tron';
+
+
+// BIP44: m/44'/195'/0'/0/0
+const keypath = new CryptoKeypath([
+  new PathComponent({ index: 44, hardened: true }),
+  new PathComponent({ index: 195, hardened: true }),
+  new PathComponent({ index: 0, hardened: true }),
+  new PathComponent({ index: 0, hardened: false }),
+  new PathComponent({ index: 0, hardened: false }),
+], Buffer.from(masterFingerprintHex, 'hex'));
+
+const requestId = globalThis.crypto.randomUUID();
+const requestIdBytes = Buffer.from(requestId.replace(/-/g, ''), 'hex');
+
+const req = new TronSignRequest({
+  requestId: requestIdBytes,
+  signData: Buffer.from(rawTxHex, 'hex'),
+  dataType: DataType.transaction,
+  derivationPath: keypath,
+});
+
+const encoder = req.toUREncoder(200);
+const nextFrame = () => encoder.nextPart(); // Call from your QR animation timer.
+```
+
+### Décoder une signature Tron (UR) [#decode-tron-signature-ur]
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { TronSignature } from '@keystonehq/bc-ur-registry-tron';
+
+const dec = new URDecoder();
+// dec.receivePart(frameString) for each scanned frame
+if (dec.isError()) throw new Error('QR decoding failed');
+if (dec.isSuccess()) {
+  const ur = dec.resultUR();
+  if (ur.type !== 'tron-signature') throw new Error('Expected tron-signature');
+  const sig = TronSignature.fromCBOR(ur.cbor);
+  const returnedId = sig.getRequestId();
+  if (!returnedId || !returnedId.equals(requestIdBytes)) {
+    throw new Error('Signature request ID does not match');
+  }
+  const signature = sig.getSignature();
+  // Verify the signer and signature against the original transaction before broadcasting.
+}
+```

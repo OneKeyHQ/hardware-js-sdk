@@ -1,0 +1,88 @@
+---
+title: "Signieren"
+description: "Daten auf Cardano mit OneKey signieren"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Signieren
+
+Rufen Sie `enable()` auf, bevor Sie die dApp-API verwenden. Von der CIP-30-API zurückgegebene Adressen sind hexkodierte Bytes; Transaktions- und Wertparameter sind hexkodiertes CBOR. Browserbeispiele mit `Buffer` benötigen einen ausdrücklichen Import von `buffer` oder eine Hilfsfunktion zur Byte-Konvertierung.
+
+Erfahren Sie, wie Sie Daten zur Authentifizierung auf Cardano signieren.
+
+---
+
+## Daten signieren (CIP-8) [#sign-data-cip-8]
+
+Beliebige Daten zur Authentifizierung signieren:
+
+```typescript
+const api = await window.cardano.onekey.enable()
+
+const addresses = await api.getUsedAddresses()
+const address = addresses[0]
+
+// Message to sign
+const payload = Buffer.from('Hello Cardano!').toString('hex')
+
+const signature = await api.signData(address, payload)
+
+console.log({
+  signature: signature.signature, // COSE_Sign1 signature
+  key: signature.key,             // COSE_Key public key
+})
+```
+
+---
+
+## Signatur prüfen [#verify-signature]
+
+```typescript
+import { COSESign1, COSEKey } from '@emurgo/cardano-message-signing-browser'
+
+const coseSign1 = COSESign1.from_bytes(
+  Buffer.from(signature.signature, 'hex')
+)
+const coseKey = COSEKey.from_bytes(
+  Buffer.from(signature.key, 'hex')
+)
+
+// Get the signed payload
+const signedPayload = coseSign1.payload()
+
+// Verify signature
+// Parsing COSE is not verification. Use a CIP-8 verifier to check the
+// protected headers, signing structure, payload, signature, and address binding.
+```
+
+---
+
+## Fehlerbehandlung [#error-handling]
+
+```typescript
+try {
+  const api = await window.cardano.onekey.enable()
+} catch (error) {
+  if (error.code === -3) {
+    console.log('The wallet refused the request')
+  } else if (error.code === -4) {
+    console.log('The account changed; reconnect and retry')
+  } else {
+    console.error('Error:', error.message)
+  }
+}
+```
+
+---
+
+## Häufige Fehler [#common-errors]
+
+| Code | Beschreibung |
+|------|-------------|
+| -1 | Ungültige Anfrage |
+| -2 | Interner Fehler |
+| -3 | Verweigerte Anfrage |
+| -4 | Konto geändert |

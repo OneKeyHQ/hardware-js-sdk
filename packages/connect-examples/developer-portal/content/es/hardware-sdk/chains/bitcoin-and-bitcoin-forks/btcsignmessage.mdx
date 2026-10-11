@@ -1,0 +1,55 @@
+---
+title: "btcSignMessage"
+---
+
+# btcSignMessage
+
+## Bitcoin: firmar un mensaje [#bitcoin-sign-message]
+
+Solicita una firma de mensaje con la clave derivada de la ruta especificada.
+
+```typescript
+const result = await HardwareSDK.btcSignMessage(connectId, deviceId, params);
+```
+
+## Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatorio_ `string | Array<number>` la longitud mínima es `3`. [leer más](/es/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _obligatorio_ `string` mensaje en hexadecimal
+* `coin` - _opcional_ `string` Determina la definición de red especificada en el archivo coins.json. Puede usarse `shortcut`, `name` o `label` de la moneda. Si `coin` no se establece, la API intenta obtener la definición de red a partir de `path`.
+* `noScriptType`- _opcional `boolean`_ Para firmas sin tipos de script.
+
+### Ejemplo [#example]
+
+```typescript
+HardwareSDK.btcSignMessage(connectId, deviceId, {
+    path: "m/44'/0'/0'",
+    messageHex: "6578616d706c65206d657373616765"
+});
+```
+
+### Resultado [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,   // signer address
+        signature: string, // signature in base64 format
+    }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

@@ -1,0 +1,120 @@
+---
+title: "Intégration dApp"
+description: "Intégrez votre dApp au portefeuille OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="dapp-integration" />
+
+# Intégration dApp
+
+Connectez votre dApp au portefeuille OneKey via un fournisseur propre à une chaîne ou une bibliothèque de connexion de portefeuilles.
+
+## Choisissez votre méthode [#choose-your-method]
+
+| Méthode | Adapté à | Framework |
+|--------|----------|-----------|
+| [**RainbowKit**](/fr/connect-to-software/wallet-ui/rainbowkit) | Interface de portefeuille prête à l’emploi, applications React | React |
+| [**Web3Modal**](/fr/connect-to-software/wallet-ui/web3modal) | Interface de portefeuille pour plusieurs frameworks | React / Vue / JS |
+| [**Web3-Onboard**](/fr/connect-to-software/wallet-ui/web3-onboard) | Personnalisation poussée, plusieurs frameworks | React / Vue / JS |
+| [**Wagmi**](/fr/connect-to-software/react-hooks/wagmi) | Interface personnalisée avec des hooks React | React |
+| [**API du fournisseur**](/fr/connect-to-software/provider) | Contrôle total, aucune dépendance | Tous |
+
+<Callout>
+**Recommandation rapide :** Utilisez RainbowKit pour les applications React, Web3Modal ou Web3-Onboard pour Vue/JS natif.
+</Callout>
+
+---
+
+## Démarrage rapide [#quick-start]
+
+### RainbowKit (React) [#rainbowkit-react]
+
+```bash
+npm install @rainbow-me/rainbowkit@^2 wagmi@^2 viem@^2 @tanstack/react-query@^5
+```
+
+```tsx filename="App.tsx"
+import '@rainbow-me/rainbowkit/styles.css'
+import { getDefaultConfig, RainbowKitProvider, ConnectButton } from '@rainbow-me/rainbowkit'
+import { oneKeyWallet, injectedWallet, walletConnectWallet } from '@rainbow-me/rainbowkit/wallets'
+import { WagmiProvider } from 'wagmi'
+import { mainnet } from 'wagmi/chains'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const config = getDefaultConfig({
+  appName: 'My dApp',
+  wallets: [{ groupName: 'Wallets', wallets: [oneKeyWallet, injectedWallet, walletConnectWallet] }],
+  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // Get from cloud.reown.com
+  chains: [mainnet],
+})
+
+const queryClient = new QueryClient()
+
+export default function App() {
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <RainbowKitProvider>
+          <ConnectButton />
+        </RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
+}
+```
+
+[Guide complet](/fr/connect-to-software/wallet-ui/rainbowkit)
+
+### API du fournisseur (sans dépendances) [#provider-api-no-dependencies]
+
+```javascript
+// Detect OneKey using EIP-6963
+let onekeyProvider = null
+const onAnnounce = (event) => {
+  if (event.detail.info.rdns === 'so.onekey.app.wallet') {
+    onekeyProvider = event.detail.provider
+  }
+}
+window.addEventListener('eip6963:announceProvider', onAnnounce)
+window.dispatchEvent(new Event('eip6963:requestProvider'))
+
+// Call from your Connect button after the user selects OneKey.
+async function connectOneKey() {
+  if (!onekeyProvider) throw new Error('OneKey has not announced a provider yet')
+  return onekeyProvider.request({ method: 'eth_requestAccounts' })
+}
+// On component cleanup:
+// window.removeEventListener('eip6963:announceProvider', onAnnounce)
+```
+
+[Guide complet](/fr/connect-to-software/provider/eth)
+
+---
+
+## Détection de OneKey [#onekey-detection]
+
+| Propriété | Valeur |
+|----------|-------|
+| EIP-6963 `rdns` | `so.onekey.app.wallet` |
+| Fournisseur | `window.$onekey.ethereum` |
+
+---
+
+## Chaînes prises en charge [#supported-chains]
+
+**EVM :** Ethereum et les réseaux EVM pris en charge, dont Polygon, BSC, Arbitrum, Optimism et Base
+
+**Hors EVM :** [Bitcoin](/fr/connect-to-software/provider/btc), [Solana](/fr/connect-to-software/provider/solana), [Cosmos](/fr/connect-to-software/provider/cosmos), [Aptos](/fr/connect-to-software/provider/aptos), [Sui](/fr/connect-to-software/provider/sui), [TON](/fr/connect-to-software/provider/ton), [TRON](/fr/connect-to-software/provider/tron), [Polkadot](/fr/connect-to-software/provider/polkadot), [Cardano](/fr/connect-to-software/provider/cardano), [NEAR](/fr/connect-to-software/provider/near), et plus encore
+
+[Voir toutes les API de fournisseur](/fr/connect-to-software/provider)
+
+---
+
+## Ressources [#resources]
+
+- **Journal des modifications :** [Versions de cross-inpage-provider](https://github.com/OneKeyHQ/cross-inpage-provider/releases)
+- **Code source :** [cross-inpage-provider](https://github.com/OneKeyHQ/cross-inpage-provider)
+- **Problèmes :** [Issues GitHub](https://github.com/OneKeyHQ/cross-inpage-provider/issues)
+- **Démonstration en direct :** [Exemple de fournisseur](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/example)

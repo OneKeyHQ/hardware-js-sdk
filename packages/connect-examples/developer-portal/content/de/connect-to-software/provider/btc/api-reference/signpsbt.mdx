@@ -1,0 +1,97 @@
+---
+title: "signPsbt"
+---
+
+# signPsbt
+
+Diese Methode durchläuft zum Signieren alle Eingaben, die der aktuellen Adresse entsprechen.
+
+## Kompatibilität von Wallets und Adresstypen [#wallet--address-type-compatibility]
+
+| Wallet-Typ     | Modell          | Unterstützte Adresstypen                |
+| --------------- | -------------- | -------------------------------------- |
+| Software-Wallet | -              | p2wpkh (Native Segwit), p2tr (Taproot) |
+| Hardware-Wallet | Pro, Classic1S | p2tr (Taproot)                         |
+
+## Methode [#method]
+
+```typescript
+declare function signPsbt(
+    psbtHex: string,
+    options?: {
+        autoFinalized?: boolean;
+        toSignInputs?: Array<{
+            index: number;
+            address?: string;
+            publicKey?: string;
+            sighashTypes?: number[];
+            disableTweakSigner?: boolean;
+            useTweakedSigner?: boolean;
+        }>;
+    }
+): Promise<string>
+```
+
+## Parameter [#params]
+
+* `psbtHex` — _erforderlich_ `string` die Hex-Zeichenfolge der zu signierenden PSBT
+* `options` — _optional_ `object`
+  * `autoFinalized` — _optional_ `boolean`: ob die PSBT nach dem Signieren finalisiert werden soll; Standard ist `true`
+  * `toSignInputs` — _optional_ `Array`: festlegen, welche Eingaben signiert werden sollen
+    * `index` — _erforderlich_ `number`: welche Eingabe signiert werden soll
+    * `address` — _optional_ `string`: welcher zugehörige private Schlüssel zum Signieren verwendet werden soll (entweder address oder publicKey angeben)
+    * `publicKey` — _optional_ `string`: welcher zugehörige private Schlüssel zum Signieren verwendet werden soll (entweder address oder publicKey angeben)
+    * `sighashTypes` — _optional_ `number[]`: optionale sighash-Typen für die Eingabe
+    * `disableTweakSigner` — _optional_ `boolean`: Standard ist false. Auf true setzen, um beim Signieren von Taproot-Eingaben den ursprünglichen privaten Schlüssel zu verwenden
+    * `useTweakedSigner` — _optional_ `boolean`: erzwingen, ob ein angepasster Signierer verwendet wird. Höhere Priorität als disableTweakSigner
+
+## Rückgabe [#returns]
+
+`Promise<string>` — die Hex-Zeichenfolge der signierten PSBT
+
+## Beispiel [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+try {
+    // Basic signing
+    const signedBasic = await provider.signPsbt("70736274ff01007d....");
+
+    // Advanced signing with options
+    const signedAdvanced = await provider.signPsbt(
+        "70736274ff01007d....",
+        {
+            autoFinalized: false,
+            toSignInputs: [
+                {
+                    index: 0,
+                    address: "bc1qxxx...xxx",
+                },
+                {
+                    index: 1,
+                    publicKey: "02xxx...xxx",
+                    sighashTypes: [1]
+                },
+                {
+                    index: 2,
+                    publicKey: "02xxx...xxx",
+                    disableTweakSigner: true
+                }
+            ]
+        }
+    );
+    console.log('Signed PSBT:', signedAdvanced);
+} catch (error) {
+    console.error('Failed to sign PSBT:', error);
+    // Handle signing errors appropriately
+}
+```
+
+## Demo [#demo]
+
+[Beispiel öffnen](https://codepen.io/OneKeyHQ/pen/GRzXvXJ)
+
+> Die Kompatibilität von Wallet und Adresse hängt von der Wallet- und Firmware-Version ab. Prüfen Sie die Unterstützung für das Zielkonto, bevor Sie sich auf die Kompatibilitätstabelle verlassen.
+
+Die oben verkürzten PSBTs, Adressen und öffentlichen Schlüssel sind Platzhalter. Ersetzen Sie sie durch vollständige Werte. Die veröffentlichte Provider-Schnittstelle stellt `autoFinalized` bereit; zusätzliche `toSignInputs`-Optionen hängen von der Wallet-Implementierung ab und sollten mit Ihrer Zielversion geprüft werden. Das Signieren überträgt keine Transaktion.

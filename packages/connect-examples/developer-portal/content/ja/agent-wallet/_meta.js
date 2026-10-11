@@ -1,0 +1,25 @@
+export default {
+  index: {
+    title: "Agent Wallet",
+    display: 'hidden',
+    theme: {
+      layout: 'full',
+      sidebar: false,
+      toc: false,
+      pagination: false,
+      breadcrumb: false,
+      timestamp: false,
+      footer: false,
+      copyPage: false,
+    },
+  },
+  overview: "概要",
+  quickstart: "クイックスタート",
+  capabilities: "機能",
+  'wallet-skills': "ウォレットスキル",
+  recipes: "実装例",
+  'wallet-session': "Agent Wallet セッション",
+  'keyless-binding': "キーレス連携",
+  'hardware-control': "ハードウェア制御",
+  safety: "安全上のルール",
+};

@@ -1,10 +1,11 @@
 import cn from 'clsx'
+import { ui } from '../i18n/ui.mjs'
 import NextLink from 'next/link'
 import { Anchor } from 'nextra/components'
 import { DiscordIcon, GitHubIcon } from 'nextra/icons'
 import { OneKeyClientNavbar } from './OneKeyNavbar.client'
 
-const defaultGitHubIcon = <GitHubIcon height="24" aria-label="Project repository" />
+const defaultGitHubIcon = <GitHubIcon height="24" aria-hidden="true" />
 const defaultChatIcon = <DiscordIcon width="24" />
 
 export function OneKeyNavbar({
@@ -16,7 +17,8 @@ export function OneKeyNavbar({
   chatLink,
   chatIcon = defaultChatIcon,
   className,
-  align = 'right'
+  align = 'right',
+  locale = 'en'
 }) {
   const logoPositionClass = align === 'left' ? 'x:max-md:me-auto' : 'x:me-auto'
   const alignClass = align === 'left' ? 'x:me-auto' : ''
@@ -32,7 +34,7 @@ export function OneKeyNavbar({
       href={typeof logoLink === 'string' ? logoLink : '/'}
       className={cn('x:flex x:items-center', logoPositionClass, 'x:transition-opacity x:focus-visible:nextra-focus x:hover:opacity-75')}
       style={logoStyle}
-      aria-label="Home page"
+      aria-label={ui(locale, 'Home page')}
     >
       {logo}
     </NextLink>
@@ -45,7 +47,7 @@ export function OneKeyNavbar({
     </div>
   )
 
-  const projectAction = projectLink && <Anchor href={projectLink}>{projectIcon}</Anchor>
+  const projectAction = projectLink && <Anchor href={projectLink} aria-label={ui(locale, 'View on GitHub')}>{projectIcon}</Anchor>
   const chatAction = chatLink && <Anchor href={chatLink}>{chatIcon}</Anchor>
 
   return (

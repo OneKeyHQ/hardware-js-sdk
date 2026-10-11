@@ -1,0 +1,49 @@
+---
+title: "Erste Schritte"
+description: "Den Stellar-Provider von OneKey erkennen und verwenden"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# Erste Schritte
+
+Erkennen Sie den Provider und fordern Sie vor dem Signieren eine Adresse an. Verwenden Sie die vom ausgewählten Wallet-Netzwerk zurückgegebene Netzwerk-Passphrase und vollständige, mit dem Stellar-SDK erstellte XDR-Nutzlasten.
+
+Erfahren Sie, wie Sie den Stellar-Provider von OneKey erkennen und eine Stellar-Adresse anfordern.
+
+<Callout type="warning">
+Das Signieren auf Stellar hängt üblicherweise von der richtigen Netzwerk-Passphrase ab (z. B. Public oder Testnet). Übergeben Sie beim Signieren unbedingt die richtige.
+</Callout>
+
+---
+
+## Provider erkennen [#provider-detection]
+
+```ts
+const stellar = window.$onekey?.stellar
+
+if (!stellar?.isOneKey) {
+  throw new Error('OneKey Stellar provider not detected')
+}
+```
+
+---
+
+## Adresse abrufen (verbinden) [#get-address-connect]
+
+```ts
+// Triggers wallet permission / connect flow and returns the address (G...)
+const { address } = await stellar.getAddress()
+console.log('Address:', address)
+```
+
+---
+
+## Netzwerk abrufen [#get-network]
+
+```ts
+const { network, networkPassphrase } = await stellar.getNetwork()
+console.log({ network, networkPassphrase })
+```

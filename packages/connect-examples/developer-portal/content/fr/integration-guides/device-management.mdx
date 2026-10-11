@@ -1,0 +1,34 @@
+---
+title: "Configuration et effacement de l’appareil"
+description: "La gestion des appareils est distincte de la découverte normale des comptes et de la signature. N’exposez ces opérations que dans un parcours de gestion clairement identifié, lancé volontairement par l’utilisateur. Une première connexion ne doit jamais initialiser ni effacer automatiquement un appareil."
+---
+
+<span id="device-setup-and-erase" />
+
+# Configuration et effacement de l’appareil
+
+La gestion des appareils est distincte de la découverte normale des comptes et de la signature. N’exposez ces opérations que dans un parcours de gestion clairement identifié, lancé volontairement par l’utilisateur. Une première connexion ne doit jamais initialiser ni effacer automatiquement un appareil.
+
+## deviceReset : créer un portefeuille sur un appareil [#devicereset-create-a-wallet-on-a-device]
+
+`deviceReset(connectId, params)` demande la configuration de l’appareil et la génération de nouvelles données de récupération. L’implémentation actuelle du SDK utilise Protocol V1 ; elle ne déclare pas la prise en charge de V2. Ne déduisez pas la prise en charge de Pro 2 du nom de la méthode.
+
+| Paramètre | Type | Signification |
+| --- | --- | --- |
+| `displayRandom` | `boolean` | Afficher l’entropie générée par l’appareil avant de demander une entropie supplémentaire. |
+| `strength` | `number` | Niveau d’entropie demandé. Le SDK utilise par défaut `256` ; les niveaux acceptés dépendent aussi du micrologiciel. |
+| `pinProtection`, `passphraseProtection` | `boolean` | Paramètres de protection demandés. |
+| `language`, `label` | `string` | Langue et libellé de l’appareil demandés. |
+| `u2fCounter` | `number` | Compteur U2F ; la valeur de repli du SDK est l’horodatage Unix actuel en secondes. |
+| `skipBackup`, `noBackup` | `boolean` | Options du parcours de sauvegarde ; aucune ne signifie que l’appareil n’a pas de graine. Ne les activez pas silencieusement. |
+| `backupType` | `string \| number` | Format de sauvegarde dépendant du micrologiciel. |
+
+Ces options sont facultatives dans le type public. Vérifiez le micrologiciel cible et lisez la réponse de l’opération. Gardez les données de récupération sur l’appareil ; ne les demandez pas dans un formulaire hôte ni dans un journal.
+
+## deviceWipe : effacer les données privées de l’appareil [#devicewipe-erase-private-device-data]
+
+`deviceWipe(connectId)` supprime les données privées de l’appareil et exige une confirmation volontaire de l’utilisateur. Dans le code actuel, Protocol V1 envoie `WipeDevice` ; Protocol V2 ouvre le parcours de paramètres de réinitialisation de l’appareil. Une demande sur l’appareil ne prouve pas que l’opération est terminée : attendez la réponse et gérez l’annulation.
+
+Après un effacement réussi, le SDK invalide l’état de l’appareil. Supprimez le compte sélectionné et l’association de portefeuille de l’application, puis redécouvrez l’appareil avant une autre opération. Ne réutilisez pas un ancien `deviceId` et ne supposez pas que la phrase de récupération reste disponible.
+
+Les deux méthodes utilisent l’enveloppe de réponse du SDK `success` / `payload`. Gérez les échecs sans réessayer automatiquement les opérations destructives. Lisez [Gestion des événements d’interface](/fr/hardware-sdk/core-api-guide#events-ui) et [les identifiants d’appareil](/fr/hardware-sdk/concepts/identifiers) avant d’implémenter le parcours.

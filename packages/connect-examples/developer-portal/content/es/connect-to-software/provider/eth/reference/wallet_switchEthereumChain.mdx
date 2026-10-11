@@ -1,0 +1,90 @@
+---
+title: "wallet_switchEthereumChain"
+description: "Cambiar a otra cadena de Ethereum"
+---
+
+# wallet_switchEthereumChain
+
+Solicita a la cartera que cambie a la cadena especificada. Si la cadena aún no está configurada en la cartera, se lanza un error.
+
+---
+
+## Parámetros [#parameters]
+
+`Array` que contiene un único objeto:
+
+| Campo | Tipo | Obligatorio | Descripción |
+|-------|------|----------|-------------|
+| `chainId` | `string` | Sí | ID de cadena (cadena hexadecimal con prefijo 0x) |
+
+---
+
+## Devuelve [#returns]
+
+`null` si la operación tiene éxito
+
+---
+
+## Ejemplo [#example]
+
+```typescript
+try {
+  await window.$onekey.ethereum.request({
+    method: 'wallet_switchEthereumChain',
+    params: [{ chainId: '0x89' }] // Polygon
+  })
+  console.log('Switched to Polygon')
+} catch (error) {
+  if (error.code === 4902) {
+    // Chain not added, try adding it
+    await window.$onekey.ethereum.request({
+      method: 'wallet_addEthereumChain',
+      params: [chainConfig] // Define the full configuration for this chain first.
+    })
+    await window.$onekey.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: "0x89" }]
+    })
+  } else {
+    throw error
+  }
+}
+```
+
+### Identificadores de cadena habituales [#common-chain-ids]
+
+| Cadena | ID de cadena (hexadecimal) | ID de cadena (decimal) |
+|-------|----------------|-------------------|
+| Ethereum | `0x1` | 1 |
+| Polygon | `0x89` | 137 |
+| BSC | `0x38` | 56 |
+| Arbitrum | `0xa4b1` | 42161 |
+| Optimism | `0xa` | 10 |
+| Base | `0x2105` | 8453 |
+| Avalanche | `0xa86a` | 43114 |
+
+---
+
+## Errores [#errors]
+
+| Código | Mensaje | Descripción |
+|------|---------|-------------|
+| 4001 | El usuario rechazó la solicitud | El usuario denegó el cambio |
+| 4902 | ID de cadena no reconocido | Cadena no configurada en la cartera |
+
+---
+
+## Notas [#notes]
+
+- Si la cadena no está configurada, usa [wallet_addEthereumChain](/es/connect-to-software/provider/eth/reference/wallet_addEthereumChain) primero
+- Puede que el usuario deba aprobar el cambio
+- Escucha el evento `chainChanged` para detectar cuándo se completa el cambio
+- Definido por [EIP-3326](https://eips.ethereum.org/EIPS/eip-3326)
+
+```typescript
+window.$onekey.ethereum.on('chainChanged', (chainId) => {
+  console.log('Chain changed to:', chainId)
+  // Recommended: reload the page
+  window.location.reload()
+})
+```

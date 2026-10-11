@@ -1,0 +1,78 @@
+---
+title: "Control del hardware"
+description: "Selecciona una sesión respaldada por hardware y gestiona explícitamente la confirmación en el dispositivo."
+---
+
+<span id="hardware-control" />
+
+# Control del hardware
+
+Una sesión respaldada por hardware utiliza un dispositivo OneKey conectado para las solicitudes de firma compatibles. El usuario revisa y confirma las solicitudes en el dispositivo. Las funciones del dispositivo y los detalles de la transacción que pueden revisarse dependen de la cadena, del firmware y de la versión de la CLI.
+
+## Cuándo recurrir al hardware [#when-to-escalate]
+
+| Flujo | Comportamiento esperado del hardware |
+| --- | --- |
+| Transferencia de importe elevado | El usuario revisa el destinatario, el importe, la cadena y la comisión en el dispositivo OneKey. |
+| Interacción con un contrato | El agente ejecuta primero una simulación; después, el dispositivo muestra los detalles de firma clara cuando esta función es compatible. |
+| Ejecución de un intercambio | El agente obtiene primero la cotización y construye la transacción; la confirmación en el dispositivo solo se produce después de que el usuario apruebe la ejecución. |
+| Cartera oculta | El modo de frase de contraseña se establece explícitamente para que el agente no deduzca si hay una cartera oculta activa. |
+| Comprobación de confianza del dispositivo | `onekey device verify` ejecuta la verificación del dispositivo. Superar esta comprobación no garantiza la seguridad de una transacción. |
+
+## Conectar e iniciar sesión [#connect-and-login]
+
+Listar los dispositivos conectados:
+
+```bash
+onekey device search
+```
+
+Autenticarse con una cartera de hardware:
+
+```bash
+onekey auth login --hardware
+```
+
+Si hay varios dispositivos conectados, selecciona uno explícitamente:
+
+```bash
+onekey auth login --hardware --device-id <uuid>
+```
+
+Elige un modo de frase de contraseña para la cartera deseada. Son opciones alternativas, no una secuencia:
+
+| Modo | Selección de cartera |
+| --- | --- |
+| `none` | Cartera estándar, sin frase de contraseña. |
+| `on-host` | Cartera oculta, con introducción de la frase de contraseña en el equipo anfitrión. No incluyas la frase de contraseña en mensajes del agente ni en registros. |
+| `on-device` | Cartera oculta, con introducción de la frase de contraseña en un dispositivo compatible. |
+
+Consulta el esquema de la CLI instalada antes de seleccionar un modo. Tras iniciar sesión, verifica la dirección activa; una frase de contraseña distinta selecciona otra cartera.
+
+## Sesión activa [#active-session]
+
+Las sesiones respaldadas por hardware se muestran mediante `onekey auth status` como:
+
+| Campo | Valor esperado |
+| --- | --- |
+| `loginMethod` | `hardware` |
+| `walletKind` | `hw` |
+| `device` | Información del dispositivo OneKey conectado |
+| `passphraseMode` | `none`, `on_host`, o `on_device` |
+
+Después de iniciar sesión, los comandos posteriores utilizan automáticamente la sesión activa.
+
+## Ciclo de vida del dispositivo [#device-lifecycle]
+
+Ejecuta únicamente la acción solicitada por el usuario, después de consultar el esquema de la CLI instalada y explicar cualquier cambio de configuración:
+
+| Acción | Familia de comandos |
+| --- | --- |
+| Verificar el dispositivo conectado | `onekey device verify` |
+| Cambiar el PIN del dispositivo | `onekey device change-pin` |
+| Cambiar la protección mediante frase de contraseña | `onekey device toggle-passphrase` |
+| Consultar o cambiar la configuración del dispositivo | `onekey device settings` |
+
+Si un comando no aparece en `onekey schema --list`, informa de que no es compatible en lugar de adivinar sus parámetros.
+
+No omitas la confirmación física. Si el dispositivo está bloqueado, desconectado, solicita un PIN o una frase de contraseña, o rechaza una solicitud, informa de ese estado y detente.

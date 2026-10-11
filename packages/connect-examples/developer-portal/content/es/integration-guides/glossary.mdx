@@ -1,0 +1,83 @@
+---
+title: "Glosario"
+description: "Estos términos aparecen en las guías de integración de cartera y hardware de OneKey. Los formatos y comportamientos pueden variar según la blockchain; sigue la referencia de la cadena que integras."
+---
+
+<span id="glossary" />
+
+# Glosario
+
+Estos términos aparecen en las guías de integración de cartera y hardware de OneKey. Los formatos y comportamientos pueden variar según la blockchain; sigue la referencia de la cadena que integras.
+
+## Cartera [#wallet]
+
+Una aplicación o dispositivo que gestiona claves y ayuda a consultar cuentas y autorizar operaciones. Los activos y el estado de las transacciones se registran en la blockchain, no dentro de la aplicación de cartera.
+
+## Cuenta [#account]
+
+Una identidad de blockchain con estado asociado. En Ethereum, las cuentas de propiedad externa se controlan mediante claves privadas; las cuentas de contrato, mediante código. No toda cuenta es un par de claves pública/privada.
+
+## Dirección [#address]
+
+Un identificador para recibir activos o interactuar con una cuenta o contrato. Una dirección Ethereum tiene 20 bytes y suele escribirse como `0x` seguido de 40 caracteres hexadecimales. Una dirección no es lo mismo que una clave pública.
+
+## Clave pública [#public-key]
+
+La parte pública de un par de claves criptográficas. Sirve para verificar firmas y, según la cadena, derivar direcciones. La codificación y longitud dependen del esquema y formato de firma.
+
+## Clave privada [#private-key]
+
+Material secreto para autorizar operaciones mediante firmas. Nunca pidas al usuario que pegue una clave privada en una dApp, formulario de integración, registro o informe de incidencia.
+
+## Frase de recuperación [#recovery-phrase]
+
+Una secuencia de palabras que respalda el material del que la cartera deriva claves. BIP-39 define las frases mnemónicas y su conversión en semilla. Trátala como un secreto; no la solicites durante la integración.
+
+## Semilla [#seed]
+
+Entrada para la derivación jerárquica de claves. En BIP-39, la semilla se deriva de la frase mnemónica y una frase de contraseña opcional. No es intercambiable con la clave privada de una cuenta.
+
+## Ruta de derivación [#derivation-path]
+
+Una secuencia de índices que identifica una clave dentro de una cartera jerárquica. La cadena, cuenta, tipo de dirección y rama de cambio pueden afectar a la ruta. Usa la ruta esperada por el método y la cadena que integras.
+
+## Frase de contraseña [#passphrase]
+
+Un valor opcional usado con la frase de recuperación para derivar otra cartera. Una frase de contraseña distinta puede producir otra cartera; no es simplemente otro nombre del PIN del dispositivo.
+
+## PIN [#pin]
+
+Un código que protege el acceso al hardware. Es distinto de la frase de recuperación y de la frase de contraseña. Sigue el flujo PIN específico del dispositivo que proporciona el SDK.
+
+## Proveedor [#provider]
+
+Una interfaz JavaScript mediante la que una dApp solicita cuentas, información de blockchain o firmas a una cartera. Los proveedores Ethereum suelen seguir EIP-1193. Otras cadenas usan interfaces distintas.
+
+## Transporte [#transport]
+
+La conexión para intercambiar datos con el dispositivo, como USB o Bluetooth. Un transporte funcional no concede por sí solo acceso a cuentas ni autoriza una firma.
+
+## Firma y transmisión [#signature-and-broadcast]
+
+Firmar autoriza un mensaje o transacción con una clave. Transmitir envía una transacción firmada a la red. Son operaciones distintas; comprueba si la API solo firma o también transmite.
+
+## Air gap [#air-gap]
+
+Un flujo sin conexión directa por cable o radio entre el dispositivo firmante y la aplicación. En la integración QR, las solicitudes y respuestas se intercambian como datos QR. La aplicación sigue necesitando red para transmitir transacciones.
+
+## Keystore [#keystore]
+
+Una representación cifrada del material de claves y los parámetros para descifrarlo. La protección de un keystore depende de su cifrado y contraseña; los datos cifrados no tienen una longitud fija universal.
+
+## Hexadecimal [#hexadecimal]
+
+Notación de base 16 con dígitos `0–9` y letras `a–f`. Las API pueden requerir `0x` como prefijo, omitirlo o aceptar bytes. Sigue la codificación documentada de cada parámetro.
+
+## Referencias [#references]
+
+- [Cuentas Ethereum](https://ethereum.org/en/developers/docs/accounts/)
+- [Estándar de proveedor EIP-1193](https://eips.ethereum.org/EIPS/eip-1193)
+- [Carteras jerárquicas BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
+- [Códigos mnemónicos BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki)
+
+El glosario anterior se adaptó de [MyCrypto](https://support.mycrypto.com/getting-started/ethereum-glossary.html).

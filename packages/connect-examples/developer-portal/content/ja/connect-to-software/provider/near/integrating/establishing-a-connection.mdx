@@ -1,0 +1,53 @@
+---
+title: "接続の確立"
+---
+
+<span id="establishing-a-connection" />
+
+# 接続の確立
+
+OneKey とのやり取りを始めるには、まず接続を確立する必要があります。接続リクエストは、アカウント ID と公開鍵を共有する許可をユーザーに求め、以降のやり取りに同意するかを確認します。
+
+最初に権限が付与されると、Web アプリケーションのドメインは今後の接続リクエストの許可リストに追加されます。
+
+同様に、アプリケーション側とユーザー側の両方から接続を終了できます。
+
+## 接続 (SignIn) [#connecting-signin]
+
+**推奨される** **最も簡単な** OneKey への接続方法は `provider.requestSignIn()` の呼び出しです。プロバイダーは `request` JSON RPC インターフェースも公開しています。
+
+### requestSignIn() [#requestsignin]
+```javascript
+try {
+  const res = await provider.requestSignIn();
+  console.log('requestSignIn', res.accounts);
+} catch(error){
+  // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+### request() [#request]
+```javascript
+try {
+  const res = await provider.request({
+    method: 'near_requestAccounts',
+  });
+  console.log('near_requestAccounts', res.accounts);
+} catch(error){
+  // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+## 切断 (SignOut) [#disconnecting-signout]
+
+切断は接続と似ていますが、ウォレット側から開始される場合もあります。
+
+### signOut() [#signout]
+```javascript
+provider.signOut();
+```
+
+### request() [#request-1]
+```javascript
+provider.request({ method: 'near_signOut' });
+```

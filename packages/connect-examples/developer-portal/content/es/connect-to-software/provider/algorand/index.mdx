@@ -1,0 +1,425 @@
+---
+title: "Algorand"
+description: "Integración con Algorand mediante el proveedor de OneKey"
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Algorand
+
+Integra la cadena de bloques Algorand mediante el proveedor de OneKey. Accede a través de `window.$onekey.algo`.
+
+<Callout type="info">
+El proveedor de Algorand de OneKey admite tanto interfaces heredadas como interfaces compatibles con ARC-0001.
+</Callout>
+
+---
+
+## Enlaces rápidos [#quick-links]
+
+- [Referencia de la API](#api-reference)
+- [Primeros pasos](getting-started)
+- [Transacciones](#transactions)
+- [Firma de mensajes](#message-signing)
+
+---
+
+## Detección del proveedor [#provider-detection]
+
+```typescript
+// Detect OneKey Algorand provider
+const provider = window.$onekey?.algo
+
+if (!provider) {
+  throw new Error('OneKey Algorand provider not detected')
+}
+
+// Check compatibility
+console.log('isOneKey:', provider.isOneKey) // true
+```
+
+---
+
+## Inicio rápido [#quick-start]
+
+### Conectar (API heredada) [#connect-legacy-api]
+
+```typescript
+const { address } = await provider.connect()
+console.log('Connected:', address)
+
+// Check connection status
+console.log('isConnected:', provider.isConnected)
+console.log('Address:', provider.address)
+```
+
+### Habilitar (ARC-0001) [#enable-arc-0001]
+
+```typescript
+const result = await provider.enable({
+  genesisID: 'mainnet-v1.0',
+  genesisHash: 'wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=',
+})
+
+console.log('Accounts:', result.accounts)
+console.log('Genesis Hash:', result.genesisHash)
+```
+
+### Desconectar [#disconnect]
+
+```typescript
+await provider.disconnect()
+console.log('Disconnected')
+```
+
+---
+
+## Transacciones [#transactions]
+
+### Firmar transacciones (ARC-0001) [#sign-transactions-arc-0001]
+
+Firma una o varias transacciones:
+
+```typescript
+import algosdk from 'algosdk'
+
+// Create transaction
+const suggestedParams = await algodClient.getTransactionParams().do()
+
+const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+  from: senderAddress,
+  to: recipientAddress,
+  amount: 1000000, // 1 ALGO (microAlgos)
+  suggestedParams,
+})
+
+// Prepare for signing
+const walletTxns = [{
+  txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+}]
+
+// Sign
+const signedTxns = await provider.signTxns(walletTxns)
+
+console.log('Signed transactions:', signedTxns)
+```
+
+### Firmar varias transacciones [#sign-multiple-transactions]
+
+```typescript
+// Group transactions
+const txns = [txn1, txn2, txn3]
+algosdk.assignGroupID(txns)
+
+// Prepare for signing
+const walletTxns = txns.map(txn => ({
+  txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+}))
+
+// Sign all
+const signedTxns = await provider.signTxns(walletTxns)
+```
+
+### Firma parcial (multifirma) [#partial-signing-multi-sig]
+
+```typescript
+// Only sign specific transactions in a group
+const walletTxns = [
+  { txn: encodedTxn1 },
+  { txn: encodedTxn2, signers: [] }, // Skip this one
+  { txn: encodedTxn3 },
+]
+
+const signedTxns = await provider.signTxns(walletTxns)
+// signedTxns[1] will be null
+```
+
+### Enviar transacciones [#post-transactions]
+
+Difunde las transacciones firmadas:
+
+```typescript
+const completeTxns = signedTxns.filter((txn) => txn !== null)
+if (completeTxns.length !== signedTxns.length) {
+  throw new Error('Complete all required signatures before broadcasting the group')
+}
+const result = await provider.postTxns(completeTxns)
+console.log('Transaction IDs:', result.txnIDs)
+```
+
+### Firmar y enviar [#sign-and-post]
+
+Firma y difunde en un solo paso:
+
+```typescript
+const result = await provider.signAndPostTxns(walletTxns)
+console.log('Transaction IDs:', result.txnIDs)
+```
+
+---
+
+## API de transacciones heredada [#legacy-transaction-api]
+
+### Firmar una transacción (heredado) [#sign-transaction-legacy]
+
+```typescript
+// Create transaction as Uint8Array
+const txnBytes = algosdk.encodeUnsignedTransaction(txn)
+
+// Sign
+const signedTxnBytes = await provider.signTransaction([txnBytes])
+
+// Send
+const { txId } = await algodClient.sendRawTransaction(signedTxnBytes[0]).do()
+```
+
+### Firmar y enviar (heredado) [#sign-and-send-legacy]
+
+```typescript
+const result = await provider.signAndSendTransaction([txnBytes])
+console.log('Transaction ID:', result.txId)
+```
+
+---
+
+## Firma de mensajes [#message-signing]
+
+### Firmar un mensaje arbitrario [#sign-arbitrary-message]
+
+```typescript
+const message = new TextEncoder().encode('Hello Algorand!')
+
+const { signature, address } = await provider.signMessage(
+  message,
+  'utf8' // or 'hex'
+)
+
+console.log('Signature:', signature)
+console.log('Signer:', address)
+```
+
+### Verificar la firma [#verify-signature]
+
+```typescript
+import nacl from 'tweetnacl'
+
+const message = new TextEncoder().encode('Hello Algorand!')
+const { signature } = await provider.signMessage(message)
+
+// Get public key from address
+const publicKey = algosdk.decodeAddress(provider.address).publicKey
+
+const isValid = nacl.sign.detached.verify(message, signature, publicKey)
+console.log('Valid:', isValid)
+```
+
+---
+
+## Gestión de eventos [#event-handling]
+
+### Escuchar cambios de cuenta [#listen-for-account-changes]
+
+```typescript
+provider.on('accountChanged', (address) => {
+  if (address) {
+    console.log('Account changed:', address)
+  } else {
+    console.log('Disconnected')
+  }
+})
+```
+
+### Escuchar conexiones [#listen-for-connection]
+
+```typescript
+provider.on('connect', ({ address }) => {
+  console.log('Connected:', address)
+})
+
+provider.on('disconnect', () => {
+  console.log('Disconnected')
+})
+```
+
+---
+
+## Uso con el cliente Algod [#using-with-algod-client]
+
+### Obtener el cliente del proveedor [#get-client-from-provider]
+
+```typescript
+// Get pre-configured clients
+const algodTransport = await provider.getAlgodv2Client()
+const indexerTransport = await provider.getIndexerClient()
+
+// These are BaseHTTPClient transports, not Algodv2 or Indexer SDK instances.
+// Use the manual setup below for SDK methods such as status().do().
+```
+
+### Configuración manual del cliente [#manual-client-setup]
+
+```typescript
+import algosdk from 'algosdk'
+
+const algodClient = new algosdk.Algodv2(
+  '', // Token (not needed for public nodes)
+  'https://mainnet-api.algonode.cloud',
+  ''
+)
+
+const indexerClient = new algosdk.Indexer(
+  '',
+  'https://mainnet-idx.algonode.cloud',
+  ''
+)
+```
+
+---
+
+## Referencia de la API [#api-reference]
+
+### Métodos [#methods]
+
+| Método | Descripción |
+|--------|-------------|
+| `connect()` | Conectar la cartera (heredado) |
+| `disconnect()` | Desconectar la cartera |
+| `enable(opts?)` | Habilitar la cartera (ARC-0001) |
+| `signTxns(transactions)` | Firmar transacciones (ARC-0001) |
+| `postTxns(signedTxns)` | Difundir transacciones |
+| `signAndPostTxns(transactions)` | Firmar y difundir |
+| `signTransaction(txns)` | Firmar transacciones (heredado) |
+| `signAndSendTransaction(txns)` | Firmar y enviar (heredado) |
+| `signMessage(message, encoding?)` | Firmar un mensaje arbitrario |
+| `getAlgodv2Client()` | Obtener el cliente Algod |
+| `getIndexerClient()` | Obtener el cliente Indexer |
+
+### Tipos [#types]
+
+```typescript
+interface EnableOpts {
+  genesisID?: string
+  genesisHash?: string
+}
+
+interface EnableResult {
+  genesisID: string
+  genesisHash: string
+  accounts: string[]
+}
+
+interface WalletTransaction {
+  txn: string                  // Base64 encoded unsigned transaction
+  signers?: string[]           // Addresses that should sign (empty = skip)
+  stxn?: string                // Pre-signed transaction
+  message?: string             // Message to display
+  msig?: MultisigMetadata
+  authAddr?: string            // Rekeyed auth address
+}
+
+type SignTxnsResult = (string | null)[]; // Base64 signed transactions; null means skipped.
+
+interface PostTxnsResult {
+  txnIDs: string[]
+}
+
+interface TransactionResult {
+  txId: string
+}
+```
+
+### Propiedades [#properties]
+
+| Propiedad | Tipo | Descripción |
+|----------|------|-------------|
+| `isConnected` | `boolean` | Estado de conexión |
+| `address` | `string \| null` | Dirección conectada |
+| `isOneKey` | `boolean` | Identificador de OneKey |
+
+### Eventos [#events]
+
+| Evento | Parámetros | Descripción |
+|-------|------------|-------------|
+| `connect` | `{ address }` | Cartera conectada |
+| `disconnect` | - | Cartera desconectada |
+| `accountChanged` | `address` | Cuenta cambiada |
+
+---
+
+## Gestión de errores [#error-handling]
+
+```typescript
+try {
+  const signedTxns = await provider.signTxns(walletTxns)
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the request')
+  } else if (error.code === 4100) {
+    console.log('The account or method is not authorized')
+  } else {
+    console.error('Error:', error.message)
+  }
+}
+```
+
+### Códigos de error habituales [#common-error-codes]
+
+| Código | Descripción |
+|------|-------------|
+| 4001 | El usuario rechazó la solicitud |
+| 4100 | Sin autorización |
+| 4200 | Método no compatible |
+| -32602 | Parámetros no válidos |
+
+---
+
+## Ejemplo completo [#complete-example]
+
+```typescript
+import algosdk from 'algosdk'
+
+async function sendAlgo() {
+  // Connect
+  const provider = window.$onekey?.algo
+  if (!provider) throw new Error("OneKey Algorand provider is unavailable")
+  const { address } = await provider.connect()
+
+  // Setup client
+  const algodClient = new algosdk.Algodv2(
+    '',
+    'https://mainnet-api.algonode.cloud',
+    ''
+  )
+
+  // Get params
+  const suggestedParams = await algodClient.getTransactionParams().do()
+
+  // Create transaction
+  const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+    from: address,
+    to: 'RECIPIENT_ADDRESS',
+    amount: 1000000, // 1 ALGO
+    suggestedParams,
+  })
+
+  // Sign
+  const walletTxns = [{
+    txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+  }]
+
+  const signedTxns = await provider.signTxns(walletTxns)
+
+  if (!signedTxns[0]) throw new Error("The transaction was not signed")
+
+  // Send
+  const { txId } = await algodClient.sendRawTransaction(
+    Buffer.from(signedTxns[0], 'base64')
+  ).do()
+
+  console.log('Transaction ID:', txId)
+
+  // Wait for confirmation
+  await algosdk.waitForConfirmation(algodClient, txId, 4)
+  console.log('Confirmed!')
+}
+```

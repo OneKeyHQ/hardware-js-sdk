@@ -1,0 +1,180 @@
+---
+title: "Transactions"
+description: "Envoyer des transactions sur TON avec OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+# Transactions
+
+Connectez le portefeuille avant d’envoyer des requêtes. Remplacez les adresses et URL de manifeste d’exemple par des valeurs valides. Pour l’authentification, utilisez un défi à usage unique généré par le serveur et vérifiez la preuve sur votre serveur.
+
+Découvrez comment envoyer des transactions sur TON.
+
+---
+
+## Envoyer une transaction [#send-transaction]
+
+Envoyez des TON en appelant la méthode `send` avec `sendTransaction` :
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600, // 10 min validity
+      messages: [
+        {
+          address: '0:1234...', // Recipient address (raw format)
+          amount: '1000000000', // Amount in nanotons (1 TON = 10^9 nanotons)
+        }
+      ]
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('Transaction BOC:', result.result)
+} else {
+  console.error('Transaction failed:', result.error.message)
+}
+```
+
+---
+
+## Envoyer plusieurs messages [#send-multiple-messages]
+
+Le fournisseur annonce actuellement un maximum de quatre messages. Lisez `deviceInfo.features` pour connaître la limite annoncée par le portefeuille, sans la considérer comme une limite applicable à tout le réseau :
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:recipient1...',
+          amount: '500000000', // 0.5 TON
+        },
+        {
+          address: '0:recipient2...',
+          amount: '300000000', // 0.3 TON
+        }
+      ]
+    })
+  ]
+})
+```
+
+---
+
+## Envoyer avec des données [#send-with-payload]
+
+Inclure des données pour interagir avec des contrats intelligents :
+
+```typescript
+import { beginCell } from '@ton/core'
+
+// Create a comment cell
+const comment = beginCell()
+  .storeUint(0, 32) // comment op code
+  .storeStringTail('Hello from dApp!')
+  .endCell()
+
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:recipient...',
+          amount: '100000000',
+          payload: comment.toBoc().toString('base64'),
+        }
+      ]
+    })
+  ]
+})
+```
+
+---
+
+## Envoyer avec StateInit [#send-with-stateinit]
+
+Déployer un contrat ou initialiser l’état :
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:contract...',
+          amount: '50000000',
+          stateInit: stateInitBoc.toString('base64'), // Base64 encoded StateInit
+        }
+      ]
+    })
+  ]
+})
+```
+
+---
+
+## Envoyer une transaction avec le SDK [#send-transaction-with-sdk]
+
+```tsx
+import { useTonConnectUI } from '@tonconnect/ui-react'
+
+function SendButton() {
+  const [tonConnectUI] = useTonConnectUI()
+
+  const handleSend = async () => {
+    const result = await tonConnectUI.sendTransaction({
+      validUntil: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: 'EQA...',
+          amount: '1000000000',
+        }
+      ]
+    })
+    console.log('BOC:', result.boc)
+  }
+
+  return <button onClick={handleSend}>Send 1 TON</button>
+}
+```
+
+---
+
+## Formats d’adresse [#address-formats]
+
+TON utilise différents formats d’adresse :
+
+```typescript
+import { Address } from '@ton/core'
+
+// Raw format (used in provider)
+const raw = '0:1234567890abcdef...'
+
+// User-friendly format (bounceable)
+const friendly = Address.parse(raw).toString()
+// e.g., 'EQASdf...'
+
+// Non-bounceable format
+const nonBounceable = Address.parse(raw).toString({ bounceable: false })
+// e.g., 'UQASdf...'
+
+// Convert from friendly to raw
+const addr = Address.parse('EQASdf...')
+const rawAddress = `${addr.workChain}:${addr.hash.toString('hex')}`
+```

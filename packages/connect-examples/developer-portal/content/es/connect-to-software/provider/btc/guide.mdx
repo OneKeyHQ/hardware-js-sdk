@@ -1,0 +1,67 @@
+---
+title: "Guía"
+---
+
+<span id="guide" />
+
+# Guía
+
+## Descripción general [#overview]
+
+Esta guía explica cómo usar la API del proveedor de OneKey para crear fácilmente aplicaciones web que interactúen con BTC.
+
+
+## Instalación [#install]
+
+### 1. Descargar OneKey Wallet [#1-download-onekey-wallet]
+
+Descarga [OneKey Wallet](https://onekey.so/download?client=browserExtension). Instala la extensión de navegador OneKey.
+
+#### 2. Explicación de la inyección de API [#2-api-injection-explanation]
+
+* La extensión de navegador de OneKey inyecta `Provider API` en los sitios web visitados.
+* Se ofrecen dos tipos de API: `window.unisat` y `window.$onekey.btc`.
+* Se recomienda usar `window.$onekey.btc`.
+
+> Usa preferentemente `window.$onekey.btc` para seleccionar OneKey específicamente. La variable global `window.unisat` puede pertenecer a otra cartera cuando hay varias extensiones instaladas.
+
+### Detectar la compatibilidad con la API del proveedor [#detecting-provider-api-support]
+
+Comprueba que haya un proveedor disponible antes de realizar solicitudes:
+
+```javascript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+if (!provider) {
+  throw new Error("No Bitcoin provider is available.");
+}
+```
+
+### Conectarse a OneKey [#connecting-to-onekey]
+
+Antes de usar la siguiente API, debes usar primero el método `provider.requestAccounts` para solicitar al usuario acceso a la cuenta BTC correspondiente.
+
+```
+await provider.requestAccounts();
+```
+
+Solo se puede llamar a otras API después de obtener la autorización del usuario.
+
+## API [#api]
+
+Elige una API para la operación que necesite tu aplicación.
+
+* Obtener información de la cuenta del usuario: [`provider.getAccounts`](/es/connect-to-software/provider/btc/api-reference/getaccounts)
+* Enviar un pago: [`provider.sendBitcoin`](/es/connect-to-software/provider/btc/api-reference/sendbitcoin)
+* Solicitar la firma de cualquier mensaje: [`provider.signMessage`](/es/connect-to-software/provider/btc/api-reference/signmessage)
+
+**Más interfaces**: [Ver detalles](/es/connect-to-software/provider/btc/api-reference)
+
+## Evento [#event]
+
+* **Operaciones principales**: Por ejemplo, cambiar de cuenta
+* **Más información**: [Ver más](/es/connect-to-software/provider/btc/event)
+
+## Gestión de solicitudes [#handling-requests]
+
+Ejecuta las solicitudes de cartera desde una función asíncrona o un módulo ES. Captura las promesas rechazadas y muestra el error en tu aplicación. Solicita conexiones, firmas y pagos a partir de una acción del usuario, y desactiva el botón que los inicia mientras haya una solicitud pendiente.

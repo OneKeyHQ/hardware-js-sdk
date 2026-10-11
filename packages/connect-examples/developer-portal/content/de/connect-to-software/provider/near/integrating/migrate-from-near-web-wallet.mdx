@@ -1,0 +1,60 @@
+---
+title: "Von Near Web Wallet migrieren"
+---
+
+<span id="migrate-from-near-web-wallet" />
+
+# Von Near Web Wallet migrieren
+
+Verwenden Sie für neue Anwendungen die Provider-Methoden dieser Integrationsanleitung. Die folgenden Kompatibilitätsmethoden können bei der Migration einer bestehenden NEAR-Web-Wallet-Integration helfen. Sie verwenden die ältere near-api-js-API, beschrieben unter [Provider-SDK installieren](/de/connect-to-software/provider/near/integrating/install-the-provider-sdk).
+
+```javascript
+import * as nearAPI from "near-api-js";
+import { OneKeyNearProvider } from "@onekeyfe/onekey-near-provider";
+
+const config = {
+  networkId: 'mainnet',
+  nodeUrl: 'https://rpc.mainnet.near.org',
+  // networkId: 'testnet',
+  // nodeUrl: 'https://rpc.testnet.near.org',
+  headers: {},
+  keyStore: new nearAPI.keyStores.BrowserLocalStorageKeyStore(),
+}
+const near = new nearAPI.Near(config);
+const connection = near.connection;
+
+const provider = new OneKeyNearProvider({
+  connection,
+  networkId: 'mainnet', // `mainnet` or `testnet`
+  // reloading page after signIn or signTransaction that likes web wallet callback url working
+  enablePageReload: true,
+});
+
+provider.requestSignIn({
+  successUrl,
+  failureUrl,
+  // contractId: optionalContractId,
+});
+
+provider.getAccountId();
+
+provider.isSignedIn();
+
+provider.signOut();
+
+provider.requestSignTransactions({
+  transactions: [],
+  callbackUrl,
+  // meta: optionalMetadata,
+});
+
+provider.account().signAndSendTransaction({
+  receiverId,
+  actions: [],
+  walletCallbackUrl,
+  // walletMeta: optionalMetadata,
+});
+
+```
+
+> Ältere Kompatibilitätsmethoden sind nur begrenzt durch Tests abgedeckt. Bevorzugen Sie die in der Integrationsanleitung dokumentierten Provider-Methoden und prüfen Sie bei der Migration Ihr bestehendes Callback- und Weiterleitungsverhalten.

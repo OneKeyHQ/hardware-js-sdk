@@ -1,0 +1,51 @@
+---
+title: "eth_requestAccounts"
+description: "ユーザーの Ethereum アカウントを要求"
+---
+
+# eth_requestAccounts
+
+ユーザーを識別する Ethereum アドレスの提供を求めます。未接続の場合、このメソッドは接続ポップアップを表示します。
+
+---
+
+## パラメーター [#parameters]
+
+なし
+
+---
+
+## 戻り値 [#returns]
+
+`string[]` - Ethereum アドレスの配列。空の配列を処理し、アカウント数が固定だと仮定しないでください。
+
+---
+
+## 例 [#example]
+
+```typescript
+const accounts = await window.$onekey.ethereum.request({
+  method: 'eth_requestAccounts'
+})
+
+console.log('Connected account:', accounts[0])
+// "0x742d35Cc6634C0532925a3b844Bc9e7595f..."
+```
+
+---
+
+## エラー [#errors]
+
+| コード | メッセージ | 説明 |
+|------|---------|-------------|
+| 4001 | ユーザーがリクエストを拒否 | ユーザーが接続リクエストを拒否 |
+| -32002 | リクエストがすでに保留中 | 以前のリクエストがまだユーザーの応答待ち |
+
+---
+
+## 注意事項 [#notes]
+
+- このメソッドは、ユーザー操作 (ボタンのクリックなど) に応じてのみ呼び出してください
+- ユーザーがすでに接続している場合、ポップアップを表示せずに接続済みアカウントを返します
+- 非推奨の次の `ethereum.enable()` メソッドと同等
+- 次で規定されています: [EIP-1102](https://eips.ethereum.org/EIPS/eip-1102)

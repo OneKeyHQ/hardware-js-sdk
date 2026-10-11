@@ -1,0 +1,17 @@
+---
+title: "Détecter le réseau du fournisseur"
+---
+
+<span id="detecting-provider-network" />
+
+# Détecter le réseau du fournisseur
+
+Vous pouvez détecter le réseau du fournisseur sélectionné dans OneKey Wallet ; les deux réseaux actuellement pris en charge sont  `mainnet` et `testnet`.
+
+```javascript
+const res = await provider.request({
+  method: 'near_networkInfo',
+});
+console.log('near_networkInfo', res, res?.networkId);
+
+```

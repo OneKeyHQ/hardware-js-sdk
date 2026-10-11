@@ -1,0 +1,116 @@
+---
+title: "署名"
+description: "OneKey で Aptos のメッセージに署名"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# 署名
+
+署名前にプロバイダーに接続し、選択中のネットワークを確認してください。直接注入されるプロバイダーと Aptos Wallet Standard アダプターでは引数の型が異なるため、例を混用しないでください。省略されたアドレスを置き換え、読み取り専用の呼び出し用に SDK クライアントを用意してください。
+
+認証や検証のためにメッセージに署名する方法を説明します。
+
+---
+
+## メッセージに署名 [#sign-message]
+
+認証や検証のために任意のメッセージに署名します:
+
+```typescript
+const message = 'Welcome to MyApp!\n\nClick to sign in.\n\nNonce: abc123'
+
+const response = await provider.signMessage({
+  message,
+  nonce: 12345, // Example only; obtain a single-use challenge from your server
+})
+
+console.log({
+  signature: response.signature,   // Hex-encoded signature
+  fullMessage: response.fullMessage, // Full signed message
+  prefix: response.prefix,         // Message prefix used
+})
+```
+
+---
+
+## メッセージ署名のオプション [#sign-message-options]
+
+```typescript
+const response = await provider.signMessage({
+  message: 'Hello Aptos',
+  nonce: 12345,
+  address: true,      // Include address in message
+  application: true,  // Include app info
+  chainId: true,      // Include chain ID
+})
+```
+
+---
+
+## メッセージを検証 (オフチェーン) [#verify-message-off-chain]
+
+```typescript
+import nacl from 'tweetnacl'
+
+const { signature, fullMessage } = await provider.signMessage({
+  message: 'Hello Aptos',
+  nonce: 12345,
+})
+
+const account = await provider.account()
+const pubKeyBytes = Buffer.from(account.publicKey.slice(2), 'hex')
+const signatureBytes = Buffer.from(signature.slice(2), 'hex')
+const messageBytes = Buffer.from(fullMessage)
+
+const isValid = nacl.sign.detached.verify(messageBytes, signatureBytes, pubKeyBytes)
+console.log('Signature valid:', isValid)
+```
+
+---
+
+## サインイン (AIP 標準) [#sign-in-aip-standard]
+
+標準化されたサインインフロー向け:
+
+```typescript
+const signInInput = {
+  // Sign-in parameters
+}
+
+const result = await provider.signIn(signInInput)
+
+console.log({
+  address: result.account.address,
+  publicKey: result.account.publicKey,
+  signature: result.signature,
+})
+```
+
+---
+
+## エラー処理 [#error-handling]
+
+```typescript
+try {
+  await provider.signMessage({ message: 'Hello', nonce: 12345 })
+} catch (error) {
+  switch (error.code) {
+    case 4001:
+      console.log('User rejected the request')
+      break
+    case 4100:
+      console.log('The account or method is not authorized')
+      break
+    case 4200:
+      console.log('Unsupported method')
+      break
+    default:
+      console.error('Error:', error.message)
+  }
+}
+```
+
+直接呼び出す `signMessage` メソッドは数値の nonce を使用します。 `signMessageCompatible` および Wallet Standard 統合では、文字列の nonce を使用します。返された `fullMessage`, 署名者、チャレンジを検証し、使用後はチャレンジを無効化してください。上記のサインイン入力は概略のプレースホルダーです。使用するアダプターのバージョンで必要な完全な `AptosSignInInput` を構築してください。

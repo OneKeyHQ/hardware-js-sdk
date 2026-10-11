@@ -1,0 +1,110 @@
+---
+title: "EthSignRequest"
+---
+
+# EthSignRequest
+
+La clase `EthSignRequest` gestiona solicitudes de firma de Ethereum.
+
+Codifica los datos que se van a firmar para que el dispositivo los escanee. No crea ni difunde la transacción.
+
+## Enumeración DataType [#datatype-enum]
+
+```typescript
+enum DataType {
+  transaction = 1,      // Legacy transaction (RLP encoded unsigned data)
+  typedData = 2,        // EIP-712 typed data (JSON string as bytes)
+  personalMessage = 3,  // Personal message signing
+  typedTransaction = 4  // Typed transaction (EIP-1559)
+}
+```
+
+## Parámetros [#parameters]
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `requestId` | `Buffer` | Campo opcional del constructor: bytes de UUID; la función auxiliar de alto nivel que aparece a continuación recibe una cadena UUID |
+| `signData` | `Buffer` | Datos que se van a firmar |
+| `dataType` | `DataType` | Tipo de datos de firma |
+| `chainId` | `number` | ID de cadena (opcional) |
+| `derivationPath` | [`CryptoKeypath`](/es/air-gap/basic-api/cryptokeypath) | Ruta de derivación |
+| `address` | `Buffer` | Bytes de la dirección del firmante (opcional) |
+| `origin` | `string` | Origen de la solicitud (opcional) |
+
+## Ejemplo de UR [#ur-example]
+
+```
+UR:ETH-SIGN-REQUEST/ONADTPDAGDSWNNYAHGTOKPFPIAPANNROLNSAVYDTHHAOHDECAOWFLYLDLFAAUELPATAEGWSOLALPBAVYGUYTHNLFGMAYMWSGBYZOIYHTRDCFBANBFPBNDSPRJPNSDLGLBYIMJELTCNLNWZJLSEAEAELARTAXAAAACSLDAHTAADDYOEADLECSDWYKCSFNYKAEYKAEWKADWKAOCYTIZSYLCNSSDKGOCA
+```
+
+## Ejemplos [#examples]
+
+Estos ejemplos usan `KeystoneEthereumSDK.generateSignRequest`, que recibe cadenas hexadecimales y una cadena UUID. Sus nombres de parámetros difieren de los del constructor de registro anterior. `unsignedTxHex` y `unsignedLegacyHex` son los bytes sin firmar de tu biblioteca de transacciones, sin el prefijo `0x`. Para EIP-1559, incluye el byte de tipo `02`. `typedDataJson` debe contener el objeto EIP-712 completo.
+
+Usa la ruta real y la huella digital maestra exportadas por el dispositivo. Conserva el identificador de la solicitud y la transacción original sin firmar hasta haber verificado la respuesta.
+
+
+### Transacción EIP-1559 [#eip-1559-transaction]
+
+```ts
+import { KeystoneEthereumSDK } from '@keystonehq/keystone-sdk';
+
+const eth = new KeystoneEthereumSDK();
+const requestId = globalThis.crypto.randomUUID();
+const ur = eth.generateSignRequest({
+  requestId,                // uuid string
+  signData: unsignedTxHex,  // hex without 0x
+  dataType: 4,              // typedTransaction
+  path: "m/44'/60'/0'/0/0",
+  xfp: '12345678',
+  chainId: 1,
+  origin: 'your-app',
+});
+// Encode UR into animated QR frames and display
+```
+
+### Transacción heredada [#legacy-transaction]
+
+```ts
+const ur = eth.generateSignRequest({
+  requestId,
+  signData: unsignedLegacyHex,
+  dataType: 1,              // transaction
+  path: "m/44'/60'/0'/0/0",
+  xfp: '12345678',
+  chainId: 1,
+  origin: 'your-app',
+});
+```
+
+### Datos tipados EIP-712 [#eip-712-typeddata]
+
+```ts
+const dataHex = Buffer.from(typedDataJson, 'utf8').toString('hex');
+const ur = eth.generateSignRequest({
+  requestId,
+  signData: dataHex,
+  dataType: 2,              // typedData
+  path: "m/44'/60'/0'/0/0",
+  xfp: '12345678',
+  origin: 'your-app',
+});
+```
+
+### Mensaje personal [#personal-message]
+
+```ts
+const dataHex = Buffer.from(message, 'utf8').toString('hex');
+const ur = eth.generateSignRequest({
+  requestId,
+  signData: dataHex,
+  dataType: 3,              // personalMessage
+  path: "m/44'/60'/0'/0/0",
+  xfp: '12345678',
+  origin: 'your-app',
+});
+```
+
+## Siguiente paso [#next-step]
+
+Después de que el dispositivo firme, decodifica la respuesta con [EthSignature](/es/air-gap/ethereum-and-evm/ethsignature).

@@ -1,0 +1,20 @@
+---
+description: "Methoden zur Geräteerkennung, zum vereinheitlichten Status, zur Wallet-Auswahl, UI-Antwort und zum Abbruch finden."
+title: "Basis-API"
+---
+
+<span id="basic-api" />
+
+# Basis-API
+
+Zentrale SDK-Methoden zur Geräteerkennung, Sitzungsverwaltung und Ereignisbehandlung.
+
+| Methode | Beschreibung |
+|--------|-------------|
+| [Geräte suchen](./search-devices) | Verbundene OneKey-Hardwaregeräte suchen und erkennen |
+| [Gerätestatus abrufen](./get-device-state) | Vereinheitlichter V1-/V2-Gerätestatus |
+| [Wallet-Sitzung öffnen](./open-wallet-session) | Standard-Wallet / versteckte Wallet öffnen oder auswählen |
+| [Features abrufen](./get-features) | **Veraltet** — verwenden Sie Gerätestatus abrufen |
+| [Passphrase-Status abrufen](./get-passphrase-state) | **Veraltet** — verwenden Sie Wallet-Sitzung öffnen |
+| [Auf UI-Ereignis antworten](./response-ui-event) | UI-Ereignisse aus Geräteinteraktionen behandeln |
+| [Anfrage abbrechen](./cancel-request) | Einen laufenden Gerätevorgang abbrechen |

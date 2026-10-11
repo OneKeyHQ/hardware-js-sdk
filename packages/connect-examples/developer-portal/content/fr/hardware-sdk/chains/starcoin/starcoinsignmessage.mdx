@@ -1,0 +1,59 @@
+---
+title: "starcoinSignMessage"
+---
+
+# starcoinSignMessage
+
+## starcoin : signer un message <a href="#ethereum-sign-message" id="ethereum-sign-message"></a> [#starcoin-sign-message-]
+
+Demande une signature de message avec la clé dérivée du chemin spécifié.
+
+```typescript
+const result = await HardwareSDK.starcoinSignMessage(connectId, deviceId, params);
+```
+
+### Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+* `path` — _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `3`. [Format du chemin](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _obligatoire_ `string` Message à signer, encodé sous forme de chaîne hexadécimale.
+
+### Exemple [#example]
+
+```typescript
+// Original message
+const message = "Hello World";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.starcoinSignMessage(connectId, deviceId, {
+    path: "m/44'/101010'/0'/0'/0'",
+    messageHex
+});
+```
+
+Résultat
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        public_key: string;
+    }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

@@ -1,0 +1,90 @@
+---
+title: "wallet_switchEthereumChain"
+description: "Zu einer anderen Ethereum-Chain wechseln"
+---
+
+# wallet_switchEthereumChain
+
+Fordert die Wallet auf, zur angegebenen Chain zu wechseln. Wenn die Chain noch nicht in der Wallet konfiguriert ist, wird ein Fehler ausgelöst.
+
+---
+
+## Parameter [#parameters]
+
+`Array` mit einem einzelnen Objekt:
+
+| Feld | Typ | Erforderlich | Beschreibung |
+|-------|------|----------|-------------|
+| `chainId` | `string` | Ja | Chain-ID (Hex-Zeichenfolge mit 0x-Präfix) |
+
+---
+
+## Rückgabe [#returns]
+
+`null` bei Erfolg
+
+---
+
+## Beispiel [#example]
+
+```typescript
+try {
+  await window.$onekey.ethereum.request({
+    method: 'wallet_switchEthereumChain',
+    params: [{ chainId: '0x89' }] // Polygon
+  })
+  console.log('Switched to Polygon')
+} catch (error) {
+  if (error.code === 4902) {
+    // Chain not added, try adding it
+    await window.$onekey.ethereum.request({
+      method: 'wallet_addEthereumChain',
+      params: [chainConfig] // Define the full configuration for this chain first.
+    })
+    await window.$onekey.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: "0x89" }]
+    })
+  } else {
+    throw error
+  }
+}
+```
+
+### Häufige Chain-IDs [#common-chain-ids]
+
+| Chain | Chain-ID (Hex) | Chain-ID (Dezimal) |
+|-------|----------------|-------------------|
+| Ethereum | `0x1` | 1 |
+| Polygon | `0x89` | 137 |
+| BSC | `0x38` | 56 |
+| Arbitrum | `0xa4b1` | 42161 |
+| Optimism | `0xa` | 10 |
+| Base | `0x2105` | 8453 |
+| Avalanche | `0xa86a` | 43114 |
+
+---
+
+## Fehler [#errors]
+
+| Code | Nachricht | Beschreibung |
+|------|---------|-------------|
+| 4001 | Nutzer hat die Anfrage abgelehnt | Nutzer hat den Wechsel abgelehnt |
+| 4902 | Unbekannte Chain-ID | Chain nicht in der Wallet konfiguriert |
+
+---
+
+## Hinweise [#notes]
+
+- Wenn die Chain nicht konfiguriert ist, verwenden Sie [wallet_addEthereumChain](/de/connect-to-software/provider/eth/reference/wallet_addEthereumChain) zuerst
+- Der Nutzer muss den Wechsel möglicherweise genehmigen
+- Auf das Ereignis `chainChanged` reagieren, um den Abschluss des Wechsels zu erkennen
+- Spezifiziert durch [EIP-3326](https://eips.ethereum.org/EIPS/eip-3326)
+
+```typescript
+window.$onekey.ethereum.on('chainChanged', (chainId) => {
+  console.log('Chain changed to:', chainId)
+  // Recommended: reload the page
+  window.location.reload()
+})
+```

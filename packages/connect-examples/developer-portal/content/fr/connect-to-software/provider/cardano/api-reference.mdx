@@ -1,0 +1,90 @@
+---
+title: "Référence de l’API"
+description: "Référence complète de l’API du fournisseur Cardano OneKey"
+---
+
+<span id="api-reference" />
+
+# Référence de l’API
+
+Référence des méthodes et types du fournisseur Cardano OneKey.
+
+---
+
+## Interface du portefeuille (CIP-30) [#wallet-interface-cip-30]
+
+| Propriété/Méthode | Description |
+|-----------------|-------------|
+| `name` | Nom du portefeuille ('OneKey') |
+| `icon` | URL de l’icône du portefeuille |
+| `apiVersion` | Version de l’API |
+| `isEnabled()` | Vérifier l’activation |
+| `enable()` | Demander l’accès au portefeuille |
+
+---
+
+## API dApp (après activation) [#dapp-api-after-enable]
+
+| Méthode | Description |
+|--------|-------------|
+| `getNetworkId()` | Obtenir le réseau (0=testnet, 1=mainnet) |
+| `getBalance()` | Obtenir le solde total (CBOR) |
+| `getUtxos(amount?, paginate?)` | Obtenir les UTxO |
+| `getUsedAddresses()` | Obtenir les adresses utilisées |
+| `getUnusedAddresses()` | Obtenir les adresses inutilisées |
+| `getChangeAddress()` | Obtenir l’adresse de monnaie rendue |
+| `getRewardAddresses()` | Obtenir les adresses de staking |
+| `signTx(tx, partialSign?)` | Renvoyer les parties signées d’un ensemble de témoins |
+| `signData(addr, payload)` | Signer des données (CIP-8) |
+| `submitTx(tx)` | Soumettre une transaction |
+
+---
+
+## API expérimentale [#experimental-api]
+
+| Méthode | Description |
+|--------|-------------|
+| `experimental.getCollateral()` | Obtenir les UTxO de garantie |
+| `experimental.on(event, cb)` | S’abonner aux événements |
+| `experimental.off()` | Se désabonner |
+
+---
+
+## Types [#types]
+
+```typescript
+type Cbor = string // Hex-encoded CBOR
+
+interface Paginate {
+  page: number
+  limit: number
+}
+
+interface Cip30DataSignature {
+  signature: string // COSE_Sign1 hex
+  key: string       // COSE_Key hex
+}
+
+type NetworkId = 0 | 1 // 0=testnet, 1=mainnet
+```
+
+---
+
+## Événements [#events]
+
+| Événement | Description |
+|-------|-------------|
+| `accountChange` | Compte modifié |
+
+---
+
+## Codes d’erreur [#error-codes]
+
+| Code | Description |
+|------|-------------|
+| -1 | Requête non valide |
+| -2 | Erreur interne |
+| -3 | Requête refusée |
+| -4 | Compte modifié |
+
+L’implémentation actuelle du fournisseur renvoie un tableau vide depuis `experimental.getCollateral()`. Ne déduisez pas la disponibilité des garanties Plutus de la seule existence de la méthode. L’utilitaire d’informations de portefeuille `isEnabled()` ne remplace pas non plus un appel réussi à `enable()`. Les erreurs propres aux opérations CIP-30 diffèrent des erreurs générales de l’API ci-dessus.

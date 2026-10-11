@@ -1,0 +1,37 @@
+---
+title: "inscribeTransfer (obsolète)"
+---
+
+<span id="inscribetransfer-deprecated" />
+
+# inscribeTransfer (obsolète)
+
+Méthode historique de création d’une inscription de transfert de jeton. Cette page est conservée pour les intégrations existantes ; ne la considérez pas comme une recommandation pour les nouvelles intégrations.
+
+## Méthode [#method]
+
+```typescript
+declare function inscribeTransfer(
+    ticker: string,
+    amount: string,
+): Promise<string>;
+```
+
+## Paramètres [#params]
+
+* `ticker` — _obligatoire_ `string`  le symbole du jeton
+* `amount` — _obligatoire_ `string`
+
+## Réponse [#response]
+
+`txid` — `string`
+
+## Exemple [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const ticker = "<TOKEN_TICKER>";
+const amount = "100"
+const txid = await provider.inscribeTransfer(ticker, amount);
+```

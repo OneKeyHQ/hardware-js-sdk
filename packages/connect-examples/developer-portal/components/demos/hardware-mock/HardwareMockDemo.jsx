@@ -192,11 +192,6 @@ function formatTime(isoString) {
   return date.toLocaleTimeString(undefined, { hour12: false })
 }
 
-function formatBoolean(locale, value) {
-  if ((locale ?? 'zh') === 'en') return value ? 'Yes' : 'No'
-  return value ? '是' : '否'
-}
-
 function formatJson(data) {
   if (data === undefined) return ''
   try {

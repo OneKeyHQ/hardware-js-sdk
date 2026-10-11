@@ -1,0 +1,38 @@
+---
+description: "デバイスのトランスポート機能を比較し、実際の接続からプロトコル対応を判断します。"
+title: "デバイス"
+---
+
+<span id="devices" />
+
+# デバイス
+
+Hardware SDK 1.2.0 は、1 つの公開 API で 2 つのプロトコルファミリーに対応します。ここでデバイスの制約を確認し、呼び出すメソッドは共通のままにします。
+
+| デバイス | コード | プロトコル | USB | BLE | Air-Gap (QR) |
+| --- | --- | --- | --- | --- | --- |
+| OneKey Classic | `classic` | V1 | はい | はい | いいえ |
+| OneKey Classic 1s | `classic1s` | V1 | はい | はい | いいえ |
+| OneKey Classic 1s Pure | `classicpure` | V1 | はい | はい | いいえ |
+| OneKey Mini | `mini` | V1 | はい | **いいえ** | いいえ |
+| OneKey Touch | `touch` | V1 | はい | はい | いいえ |
+| OneKey Pro | `pro` | V1 | はい | はい | はい |
+| OneKey Pro 2 | `pro2` | **V2** | はい | はい | はい |
+| OneKey Neo | `neo` | **V2** | はい | はい | **いいえ** (カメラなし) |
+
+SDK はデバイスオブジェクトの `connectProtocol` (`'V1'` または `'V2'`) で接続中のプロトコルを報告します。この値は実際の検査結果であり、モデル名から判断したものではありません。
+
+## モデル情報の使い方 [#what-you-should-do-with-the-model]
+
+- モデル名は**機能と UX**の判断に使用します。Mini は BLE なし、Neo は QR Air-Gap なし、Pro / Pro 2 は Air-Gap 対応です。
+- モデル名で Protocol V1 と V2 を**判断しないでください**。有効な接続で確認されたプロトコルを読み取ります。
+- ファームウェア更新 API はプロトコルファミリーに従います。Pro では [`firmwareUpdateV3`](/ja/hardware-sdk/device-api/firmwareupdatev3)、Pro 2 / Neo では [`firmwareUpdateV4`](/ja/hardware-sdk/device-api/firmwareupdatev4) を使用します。
+
+## 統合時のチェックリスト [#integrator-checklist]
+
+1. キャッシュします: `connectId` **トランスポートごとに**。同じ機器でも USB と BLE の ID は異なります。
+2. 更新します: `deviceId` 消去 / 復元後に更新してください。参照: [識別子](/ja/hardware-sdk/concepts/identifiers).
+3. デバイスごとに呼び出しを直列化してください。入力と署名のフローを直列化し、プロンプトと結果が各操作に正しく関連付けられるようにします。
+4. トランスポートエラー後に、ファームウェア更新、消去、その他の副作用を伴う呼び出しを再実行してはいけません。
+
+関連項目: [対応チェーン](/ja/hardware-sdk/concepts/chain-support) · [Protocol V1 と V2](/ja/hardware-sdk/concepts/protocol) · [ウォレットセッション](/ja/hardware-sdk/concepts/wallet-session)

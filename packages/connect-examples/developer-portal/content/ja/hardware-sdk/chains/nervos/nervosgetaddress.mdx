@@ -1,0 +1,74 @@
+---
+title: "nervosGetAddress"
+---
+
+# nervosGetAddress
+
+### Nervos: アドレスを取得 [#nervos-get-address]
+
+指定パスのアドレスを導出して返します。`showOnOneKey` が `true` の場合は、 ユーザーがデバイス上でアドレスを確認する必要があります。
+
+```typescript
+const result = await HardwareSDK.nervosGetAddress(connectId, deviceId, params);
+```
+
+#### 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.9.0
+  * mini: 3.7.0
+
+#### パラメーター [#parameters]
+
+connectId: `string`
+
+* 接続の一意の識別子
+
+deviceId: `string`
+
+* ハードウェアデバイスの一意の識別子
+
+params: `object`
+
+* path: _必須_ `string` - 要求するアドレスの BIP32 パス (例: "m/44'/309'/0'/0/0")
+* network: _必須_`string` - ネットワーク名 (例: "ckb")
+* showOnOneKey: _任意_ `boolean` - アドレスをデバイスに表示するかどうか
+
+#### 例 [#example]
+
+```typescript
+const response = await HardwareSDK.nervosGetAddress('connect1', 'device1', {
+    path: "m/44'/309'/0'/0/0",
+    showOnOneKey: true,
+    network: "ckb"
+});
+
+if (response.success === false) throw new Error(response.payload.error);
+console.log(response.payload.address);
+```
+
+#### 戻り値 [#returns]
+
+次の値で解決する Promise を返します:
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // Nervos address
+        path: string  // BIP32 path used for derivation
+    }
+}
+```
+
+エラーレスポンス:
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string,  // Error message
+        code?: string | number    // Error code
+    }
+}
+```

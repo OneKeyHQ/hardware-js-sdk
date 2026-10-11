@@ -1,0 +1,145 @@
+---
+title: "署名"
+description: "Cosmos チェーンでメッセージとトランザクションに署名"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# 署名
+
+鍵の読み取りや署名の要求前に、対象のチェーンを有効にしてください。そのチェーンのアカウント番号、シーケンス、手数料、RPC エンドポイントを使用します。署名例のプレースホルダーの値は使用前に置き換える必要があります。
+
+OneKey の Cosmos プロバイダーでトランザクションとメッセージに署名する方法を説明します。
+
+---
+
+## Amino 署名 (従来方式) [#sign-amino-legacy]
+
+従来の Amino エンコードされたトランザクション向け:
+
+```typescript
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+
+const signDoc = {
+  chain_id: chainId,
+  account_number: '0',
+  sequence: '0',
+  fee: {
+    amount: [{ denom: 'uatom', amount: '5000' }],
+    gas: '200000',
+  },
+  msgs: [{
+    type: 'cosmos-sdk/MsgSend',
+    value: {
+      from_address: signer,
+      to_address: 'cosmos1...',
+      amount: [{ denom: 'uatom', amount: '1000000' }],
+    },
+  }],
+  memo: '',
+}
+
+const result = await provider.signAmino(chainId, signer, signDoc)
+
+console.log({
+  signed: result.signed,       // Signed document
+  signature: result.signature, // { pub_key, signature }
+})
+```
+
+---
+
+## Direct 署名 (Protobuf) [#sign-direct-protobuf]
+
+最新の Protobuf エンコードされたトランザクション向け:
+
+```typescript
+import { makeSignDoc } from '@cosmjs/proto-signing'
+
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+
+const signDoc = makeSignDoc(
+  bodyBytes,      // Transaction body
+  authInfoBytes,  // Auth info with fee
+  chainId,
+  accountNumber
+)
+
+const result = await provider.signDirect(chainId, signer, signDoc)
+
+console.log({
+  signed: result.signed,
+  signature: result.signature,
+})
+```
+
+---
+
+## 任意のデータに署名 [#sign-arbitrary-data]
+
+任意のメッセージに署名する場合 (認証に便利):
+
+```typescript
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+const data = 'Login to MyApp at 2024-01-01T00:00:00Z'
+
+const signature = await provider.signArbitrary(chainId, signer, data)
+
+// Verify the signature
+const isValid = await provider.verifyArbitrary(chainId, signer, data, signature)
+console.log('Signature valid:', isValid)
+```
+
+---
+
+## トランザクションをブロードキャスト [#broadcast-transaction]
+
+```typescript
+const chainId = 'cosmoshub-4'
+// `txBytes` is the complete signed transaction as a Uint8Array.
+
+// Broadcast modes: 'block', 'sync', 'async'
+const result = await provider.sendTx(chainId, txBytes, 'sync')
+
+console.log('TX Hash:', result)
+```
+
+---
+
+## Ethereum データに署名 [#sign-ethereum-data]
+
+Ethereum 署名に対応するチェーン (Evmos など) 向け:
+
+```typescript
+const result = await provider.signEthereum(
+  chainId,
+  signer,
+  data,       // Message to sign
+  'message'   // EthSignType: 'message', 'transaction', or 'eip-712'
+)
+
+console.log('Signature:', result)
+```
+
+---
+
+## エラー処理 [#error-handling]
+
+```typescript
+try {
+  await provider.enable('cosmoshub-4')
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the request')
+  } else if (error.message.includes('not supported')) {
+    console.log('Chain not supported, try experimentalSuggestChain')
+  } else {
+    console.error('Connection failed:', error)
+  }
+}
+```

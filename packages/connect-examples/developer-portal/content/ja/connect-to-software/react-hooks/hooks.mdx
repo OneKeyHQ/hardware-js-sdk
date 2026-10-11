@@ -1,0 +1,78 @@
+---
+title: "React フック"
+description: "Ethereum 用の型安全な React フック — 独自のウォレット UI を構築"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="react-hooks" />
+
+# React フック
+
+Ethereum 用の型安全な React フック。ユーザー体験を完全に制御できる、独自のウォレット接続 UI を構築します。
+
+<Callout>
+**カスタム UI に最適です。** 独自のウォレット接続フローを設計する場合は React フックを使用してください。
+</Callout>
+
+---
+
+## 利用可能なライブラリ [#available-libraries]
+
+| ライブラリ | 説明 |
+|---------|-------------|
+| [Wagmi](/ja/connect-to-software/react-hooks/wagmi) | EVM のアカウント、署名、トランザクション状態を扱う React フック |
+
+---
+
+## 使用する場面 [#when-to-use]
+
+次の場合に React フックを使用します:
+- ウォレット接続 UI を完全に制御したい
+- Ethereum の操作に型安全なフックを使用したい
+- React アプリケーションを構築している
+- 既製のウォレット選択モーダルが不要
+
+---
+
+## 簡単な例 [#quick-example]
+
+まず [wagmi ガイド](/ja/connect-to-software/react-hooks/wagmi) の説明に従って `WagmiProvider` と `QueryClientProvider` を設定してください。このコンポーネントは設定済みのコネクターを使用します。
+
+```tsx
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
+
+function ConnectButton() {
+  const { address, isConnected } = useAccount()
+  const { connect, connectors, isPending, error } = useConnect()
+  const { disconnect } = useDisconnect()
+
+  if (isConnected) {
+    return (
+      <div>
+        <p>{address}</p>
+        <button onClick={() => disconnect()}>Disconnect</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {connectors.map((connector) => (
+        <button key={connector.uid} disabled={isPending} onClick={() => connect({ connector })}>
+          Connect {connector.name}
+        </button>
+      ))}
+      {error && <p role="alert">{error.message}</p>}
+    </div>
+  )
+}
+```
+
+---
+
+## 別の方法: ウォレット UI 付き [#alternative-with-wallet-ui]
+
+既製のウォレット選択モーダルが必要な場合は、次を検討してください:
+- [RainbowKit](/ja/connect-to-software/wallet-ui/rainbowkit) - React 用ウォレット選択 UI
+- [Web3Modal](/ja/connect-to-software/wallet-ui/web3modal) - Reown のウォレット接続 UI

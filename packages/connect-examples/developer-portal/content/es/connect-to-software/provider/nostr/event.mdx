@@ -1,0 +1,22 @@
+---
+title: "Evento"
+---
+
+<span id="nostr-events" />
+
+# Eventos de Nostr
+
+El proveedor de OneKey emite `accountChanged` sin datos asociados. Borra el estado de cuenta almacenado en caché cuando se emita este evento y recupera la clave pública actual cuando sea necesario. También emite `disconnect` cuando el puente se desconecta. Son extensiones de OneKey a NIP-07.
+
+```javascript
+const provider = window.$onekey?.nostr;
+if (!provider) throw new Error('OneKey Nostr provider is unavailable.');
+
+const onAccountChanged = () => {
+  // Clear the cached public key and any account-specific UI.
+};
+provider.on('accountChanged', onAccountChanged);
+
+// Run during cleanup.
+provider.off('accountChanged', onAccountChanged);
+```

@@ -1,0 +1,104 @@
+---
+title: "API リファレンス"
+description: "OneKey Stellar プロバイダー API リファレンス"
+---
+
+<span id="api-reference" />
+
+# API リファレンス
+
+`window.$onekey.stellar` のメソッドと基本型のリファレンスです。
+
+---
+
+## メソッド [#methods]
+
+| メソッド | 説明 |
+|------|------|
+| `getAddress(params?)` | 権限を要求 (接続) し、現在の Stellar アドレスを返す |
+| `getNetwork()` | 現在のネットワーク情報を取得 |
+| `signTransaction(xdr, opts?)` | Stellar トランザクション XDR に署名 |
+| `signAuthEntry(authEntry, opts?)` | Stellar 認可エントリー (認可エントリー XDR) に署名 |
+| `signMessage(message, opts?)` | 任意のメッセージに署名 |
+
+---
+
+## プロパティ [#properties]
+
+| プロパティ | 型 | 説明 |
+|------|------|------|
+| `isOneKey` | `boolean` | OneKey 識別子 |
+
+---
+
+## 型 [#types]
+
+```ts
+export type StellarGetAddressParams = { path?: string }
+export type StellarGetAddressResponse = { address: string }
+
+export type StellarNetworkInfo = {
+  network: string
+  networkPassphrase: string
+}
+
+export type StellarSignTransactionOpts = {
+  networkPassphrase?: string
+  address?: string
+  path?: string
+  submit?: boolean
+  submitUrl?: string
+}
+export type StellarSignTransactionResponse = {
+  signedTxXdr: string
+  signerAddress?: string
+}
+
+export type StellarSignAuthEntryOpts = {
+  networkPassphrase?: string
+  address?: string
+  path?: string
+}
+export type StellarSignAuthEntryResponse = {
+  signedAuthEntry: string
+  signerAddress?: string
+}
+
+export type StellarSignMessageOpts = {
+  networkPassphrase?: string
+  address?: string
+  path?: string
+}
+export type StellarSignMessageResponse = {
+  signedMessage: string
+  signerAddress?: string
+}
+```
+
+---
+
+## 基本型 (参考) [#basic-type-for-reference]
+
+```ts
+export type OneKeyStellarProvider = {
+  isOneKey: boolean
+
+  // Align with Stellar Wallets Kit (KitActions)
+  getAddress: (params?: StellarGetAddressParams) => Promise<StellarGetAddressResponse>
+  getNetwork: () => Promise<StellarNetworkInfo>
+  signTransaction: (
+    xdr: string,
+    opts?: StellarSignTransactionOpts
+  ) => Promise<StellarSignTransactionResponse>
+  signAuthEntry: (
+    authEntry: string,
+    opts?: StellarSignAuthEntryOpts
+  ) => Promise<StellarSignAuthEntryResponse>
+  signMessage: (
+    message: string,
+    opts?: StellarSignMessageOpts
+  ) => Promise<StellarSignMessageResponse>
+}
+```
+
+すべてのメソッドは Promise を返します。リクエストの拒否を処理し、`signerAddress` は必ず存在するとは限らない任意のフィールドとして扱ってください。プロバイダーは `disconnect()` も公開し、アドレス文字列または `null` を伴う `accountsChanged` を発行します。変更時はアカウント固有の状態を消去してください。

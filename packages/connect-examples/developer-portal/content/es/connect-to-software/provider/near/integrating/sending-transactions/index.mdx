@@ -1,0 +1,24 @@
+---
+title: "Envío de transacciones"
+---
+
+<span id="sending-transactions" />
+
+# Envío de transacciones
+
+Una vez conectada a OneKey, la aplicación web puede enviar transacciones en nombre del usuario con su permiso.
+
+Para enviar una transacción, la aplicación web debe:
+
+* Crear una o varias transacciones sin firmar.
+* Solicitar que la cartera OneKey del usuario las firme y envíe a la red.
+
+Para más información sobre las transacciones en Near, se recomienda consultar la [documentación de `near-api-js`](https://docs.near.org/tools/near-api) y la documentación oficial de [Near](https://docs.near.org/).
+
+[create-transaction.md](/es/connect-to-software/provider/near/integrating/sending-transactions/create-transaction)
+
+[sign-and-send-transaction.md](/es/connect-to-software/provider/near/integrating/sending-transactions/sign-and-send-transaction)
+
+Para firmar sin difundir, usa el método de solo firma y envía la transacción firmada desde tu aplicación.
+
+[signing-transaction.md](/es/connect-to-software/provider/near/integrating/sending-transactions/signing-transaction)

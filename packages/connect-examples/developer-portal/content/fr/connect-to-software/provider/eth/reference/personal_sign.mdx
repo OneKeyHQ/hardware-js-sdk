@@ -1,0 +1,77 @@
+---
+title: "personal_sign"
+description: "Signer un message avec un compte Ethereum"
+---
+
+# personal_sign
+
+Signe un message avec le compte spécifié. Le message est précédé de `"\x19Ethereum Signed Message:\n"` avant la signature afin de distinguer les signatures de messages de la signature de transactions brutes.
+
+---
+
+## Paramètres [#parameters]
+
+| Indice | Type | Description |
+|-------|------|-------------|
+| 0 | `string` | Message à signer (encodé en hexadécimal) |
+| 1 | `string` | Adresse à utiliser pour signer |
+
+---
+
+## Valeur de retour [#returns]
+
+`string` - La signature (chaîne hexadécimale de 65 octets)
+
+---
+
+## Exemple [#example]
+
+```typescript
+const message = 'Hello, OneKey!'
+const hexMessage = '0x' + Array.from(new TextEncoder().encode(message), byte => byte.toString(16).padStart(2, '0')).join('')
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'personal_sign',
+  params: [hexMessage, accounts[0]]
+})
+
+console.log('Signature:', signature)
+```
+
+### Utilisation d’ethers.js [#using-ethersjs]
+
+```typescript
+import { hashMessage, recoverAddress } from 'ethers'
+
+const message = 'Hello, OneKey!'
+const hexMessage = '0x' + Array.from(new TextEncoder().encode(message), byte => byte.toString(16).padStart(2, '0')).join('')
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'personal_sign',
+  params: [hexMessage, accounts[0]]
+})
+
+// Verify signature
+const recoveredAddress = recoverAddress(hashMessage(message), signature)
+console.log('Verified:', recoveredAddress.toLowerCase() === accounts[0].toLowerCase())
+```
+
+---
+
+## Erreurs [#errors]
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | L’utilisateur a rejeté la demande | L’utilisateur a refusé la demande de signature |
+| -32602 | Paramètres non valides | Message ou adresse non valide |
+
+---
+
+## Remarques [#notes]
+
+- Le message doit être encodé en hexadécimal avec `0x` comme préfixe
+- Le message réellement signé est : `"\x19Ethereum Signed Message:\n" + len(message) + message`
+- Pour signer des données typées, utilisez [eth_signTypedData_v4](/fr/connect-to-software/provider/eth/reference/eth_signTypedData_v4) à la place
+- Défini par [EIP-191](https://eips.ethereum.org/EIPS/eip-191)
+
+Pour l’authentification, vérifiez le domaine prévu, le compte, l’expiration et le défi serveur à usage unique. Une signature valide d’un message d’exemple fixe ne constitue pas un processus de connexion complet.

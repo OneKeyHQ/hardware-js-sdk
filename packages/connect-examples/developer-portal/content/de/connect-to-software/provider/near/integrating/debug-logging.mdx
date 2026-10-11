@@ -1,0 +1,26 @@
+---
+title: "Debug-Protokollierung"
+---
+
+<span id="debug-logging" />
+
+# Debug-Protokollierung
+
+Sie können interne Kommunikationsnachrichten zwischen Provider und OneKey-Wallet ausgeben. Verwenden Sie diese Funktion während der Entwicklung. Prüfen Sie Protokolle vor dem Teilen, da sie Konto- oder Anfragedaten enthalten können.
+
+Protokollnachrichten sind gruppiert nach **jsBridge**, **providerBase** und **extInjected.** Sie können sie wie unten gezeigt ein- oder ausschalten; Änderungen werden nach dem Neuladen der Seite wirksam:
+
+```javascript
+// turn on all groups logging
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', '*');
+
+// turn off all groups logging
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', '');
+
+// turn on `jsBridge` group only
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', 'jsBridge');
+
+// turn on both `jsBridge` and `providerBase` group
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', 'jsBridge,providerBase');
+
+```

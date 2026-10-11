@@ -1,0 +1,35 @@
+---
+title: "Acceso a cuentas"
+---
+
+<span id="accessing-accounts" />
+
+# Acceso a cuentas
+
+Detecta un proveedor de Ethereum antes de solicitar acceso a las cuentas; consulta [API del proveedor](/es/connect-to-software/provider/eth/provider-api). Llama a `eth_requestAccounts` desde una acción del usuario, como un botón de conexión. Usa `eth_accounts` cuando solo necesites las cuentas ya expuestas a tu sitio.
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const accounts = await provider.request({ method: 'eth_requestAccounts' });
+  const address = accounts[0];
+  if (!address) throw new Error('No account was selected.');
+  console.log('Connected address:', address);
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('The user declined the connection request.');
+  } else {
+    console.error(error);
+  }
+}
+```
+
+Desactiva el botón de conexión mientras la solicitud esté pendiente. Una cuenta conectada no autoriza de antemano transacciones ni firmas. Pasa la dirección seleccionada a `eth_sendTransaction`, `personal_sign`, o `eth_signTypedData_v4`, según lo que requiera cada método.
+
+Escucha `accountsChanged` y gestiona una matriz vacía borrando la cuenta conectada en tu aplicación.
+
+## Demostración [#demo]
+
+[Abrir ejemplo](https://codesandbox.io/embed/ethereum-provider-demo-rwgl5l?fontsize=14&hidenavigation=1&theme=dark)

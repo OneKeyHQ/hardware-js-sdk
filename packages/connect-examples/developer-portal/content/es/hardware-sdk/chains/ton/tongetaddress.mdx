@@ -1,0 +1,107 @@
+---
+title: "tonGetAddress"
+---
+
+# tonGetAddress
+
+### Requisitos [#requirements]
+
+* Versiones mínimas de firmware
+  * Touch: 4.10.0
+
+### TON: obtener dirección [#ton-get-address]
+
+Deriva y devuelve la dirección de la ruta especificada. Cuando `showOnOneKey` es `true`, el usuario debe confirmar la dirección en el dispositivo.
+
+```typescript
+const response = await HardwareSDK.tonGetAddress(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    showOnOneKey: true,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false
+});
+```
+
+#### Parámetros [#params]
+
+[Parámetros comunes opcionales](/es/hardware-sdk/concepts/common-params)
+
+**Una dirección**
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `3`. [Formato de ruta](/es/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _opcional_ `boolean` Si se muestra la dirección en el dispositivo. El valor predeterminado es `true`.
+* `walletVersion` - _opcional_ `TonWalletVersion` Versión de la cartera TON (valor predeterminado: 3)
+* `isBounceable` - _opcional_ `boolean` indica si la dirección permite rebotes (valor predeterminado: false)
+* `isTestnetOnly` - _opcional_ `boolean` indica si se debe usar testnet (valor predeterminado: false)
+
+**Varias direcciones**
+
+* `bundle` - matriz de objetos que incluyen `path` y `showOnOneKey` como campos
+
+#### Ejemplo [#example]
+
+```typescript
+// Get single address
+const response = await HardwareSDK.tonGetAddress(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    showOnOneKey: false,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false,
+});
+
+// Get multiple addresses
+const batchResponse = await HardwareSDK.tonGetAddress(connectId, deviceId, {
+    bundle: [
+        {
+            path: "m/44'/607'/0'",
+            showOnOneKey: false
+        },
+        {
+            path: "m/44'/607'/1'",
+            showOnOneKey: false
+        }
+    ]
+});
+```
+
+**Resultado**
+
+Respuesta de una dirección
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // displayed address
+        publicKey: string,
+        path: string // serialized BIP32 path
+    }
+}
+```
+
+Respuesta por lotes, en el mismo orden que la solicitud
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, publicKey: string, path: string }, // account 1
+        { address: string, publicKey: string, path: string }, // account 2
+        { address: string, publicKey: string, path: string }  // account 3
+    ]
+}
+```
+
+Error
+
+```
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

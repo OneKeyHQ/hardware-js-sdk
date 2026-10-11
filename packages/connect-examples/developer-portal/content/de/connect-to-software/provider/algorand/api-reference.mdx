@@ -1,0 +1,109 @@
+---
+title: "API-Referenz"
+description: "Vollständige API-Referenz für den Algorand-Provider von OneKey"
+---
+
+<span id="api-reference" />
+
+# API-Referenz
+
+Referenz der Methoden und Typen des Algorand-Providers von OneKey.
+
+---
+
+## Methoden [#methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `connect()` | Wallet verbinden (Legacy) |
+| `disconnect()` | Wallet trennen |
+| `enable(opts?)` | Wallet aktivieren (ARC-0001) |
+| `signTxns(transactions)` | Transaktionen signieren (ARC-0001) |
+| `postTxns(signedTxns)` | Transaktionen übertragen |
+| `signAndPostTxns(transactions)` | Signieren und übertragen |
+| `signTransaction(txns)` | Transaktionen signieren (Legacy) |
+| `signAndSendTransaction(txns)` | Signieren und senden (Legacy) |
+| `signMessage(message, encoding?)` | Beliebige Nachricht signieren |
+| `getAlgodv2Client()` | Algod-Client abrufen |
+| `getIndexerClient()` | Indexer-Client abrufen |
+
+---
+
+## Typen [#types]
+
+### Aktivierungsoptionen [#enable-options]
+
+```typescript
+interface EnableOpts {
+  genesisID?: string
+  genesisHash?: string
+}
+```
+
+### Aktivierungsergebnis [#enable-result]
+
+```typescript
+interface EnableResult {
+  genesisID: string
+  genesisHash: string
+  accounts: string[]
+}
+```
+
+### Wallet-Transaktion [#wallet-transaction]
+
+```typescript
+interface WalletTransaction {
+  txn: string                  // Base64 encoded unsigned transaction
+  signers?: string[]           // Addresses that should sign (empty = skip)
+  stxn?: string                // Pre-signed transaction
+  message?: string             // Message to display
+  msig?: MultisigMetadata
+  authAddr?: string            // Rekeyed auth address
+}
+```
+
+### Ergebnis der Transaktionssignierung [#sign-txns-result]
+
+```typescript
+type SignTxnsResult = (string | null)[]; // Base64 signed transactions; null means skipped.
+```
+
+### Ergebnis der Transaktionsübertragung [#post-txns-result]
+
+```typescript
+interface PostTxnsResult {
+  txnIDs: string[]
+}
+```
+
+---
+
+## Eigenschaften [#properties]
+
+| Eigenschaft | Typ | Beschreibung |
+|----------|------|-------------|
+| `isConnected` | `boolean` | Verbindungsstatus |
+| `address` | `string \| null` | Verbundene Adresse |
+| `isOneKey` | `boolean` | OneKey-Kennung |
+
+---
+
+## Ereignisse [#events]
+
+| Ereignis | Parameter | Beschreibung |
+|-------|------------|-------------|
+| `connect` | `{ address }` | Wallet verbunden |
+| `disconnect` | - | Wallet getrennt |
+| `accountChanged` | `address` | Konto geändert |
+
+---
+
+## Fehlercodes [#error-codes]
+
+| Code | Beschreibung |
+|------|-------------|
+| 4001 | Nutzer hat die Anfrage abgelehnt |
+| 4100 | Nicht autorisiert |
+| 4200 | Nicht unterstützte Methode |
+| -32602 | Ungültige Parameter |

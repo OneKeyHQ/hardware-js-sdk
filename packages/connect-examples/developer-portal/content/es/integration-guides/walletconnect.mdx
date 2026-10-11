@@ -1,0 +1,22 @@
+---
+title: "Sesiones WalletConnect"
+description: "Usa una biblioteca compatible con WalletConnect cuando una dApp necesite conectar con una cartera independiente. Configura el ID de proyecto, metadatos, cadenas, métodos y eventos necesarios."
+---
+
+<span id="walletconnect-sessions" />
+
+# Sesiones WalletConnect
+
+Usa una biblioteca compatible con WalletConnect cuando una dApp necesite conectar con una cartera independiente. Configura el ID de proyecto, metadatos, cadenas, métodos y eventos necesarios.
+
+Para una interfaz de conexión EVM, empieza por [RainbowKit](/es/connect-to-software/wallet-ui/rainbowkit) o [Web3Modal / AppKit](/es/connect-to-software/wallet-ui/web3modal). Sigue las versiones documentadas en la guía elegida.
+
+## Mantener un solo contexto de sesión [#keep-one-session-context]
+
+Después de conectar, usa el proveedor del conector seleccionado para acceder a cuentas, solicitudes y eventos. Una sesión WalletConnect no inyecta `window.$onekey.ethereum`; ese espacio de nombres pertenece a la integración del proveedor de navegador.
+
+Gestiona rechazo, caducidad y desconexión de sesión, y cambios de cuenta o cadena. Vuelve a confirmar cuenta y red antes de preparar una firma. No repitas automáticamente un aviso de autorización rechazado.
+
+## Integración histórica de Aptos [#historical-aptos-integration]
+
+El antiguo flujo de métodos personalizados de Aptos usaba WalletConnect v1. Su URI `@1` y las llamadas a `sendCustomRequest` no son una receta actual de WalletConnect. Consulta la [referencia heredada](/es/legacy/aptos-walletconnect) o usa el [Aptos Wallet Adapter](/es/connect-to-software/wallet-ui/aptos-wallet-adapter) para una integración de navegador.

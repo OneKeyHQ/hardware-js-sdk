@@ -1,0 +1,58 @@
+---
+description: "Solicita un certificado del dispositivo y la firma de un desafío para validarlos mediante tu servicio de verificación."
+title: "deviceVerify"
+---
+
+# deviceVerify
+
+## Verificar el dispositivo [#verify-device]
+
+Obtén `cert` y `signature` del dispositivo para un desafío de verificación. El host debe enviarlos a su servicio de verificación; esta API no realiza la verificación en el servidor. Leer los datos de la firma requiere confirmación en el dispositivo.
+
+```typescript
+const result = await HardwareSDK.deviceVerify(connectId, params);
+```
+
+## Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)\
+
+
+* `dataHex` - _obligatorio_ `string` Desafío de verificación no vacío codificado en hexadecimal, proporcionado por tu flujo de verificación.
+
+## Ejemplo [#example]
+
+```typescript
+// Obtain a fresh challenge from your verification flow.
+declare const challengeHex: string;
+
+const result = await HardwareSDK.deviceVerify(connectId, {
+    dataHex: challengeHex
+});
+if (!result.success) throw new Error(result.payload.error);
+// Submit the result to the verification service and check its verdict.
+```
+
+## Resultado [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        cert: string
+        signature: string
+    }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

@@ -1,0 +1,84 @@
+---
+title: "cardanoGetPublicKey"
+---
+
+# cardanoGetPublicKey
+
+## Requisitos [#requirements]
+
+* Versiones mínimas de firmware
+  * Touch: 4.1.0
+  * Classic/Mini: 3.0.0
+
+## Cardano: obtener una clave pública [#cardano-get-public-key]
+
+Devuelve la clave pública extendida derivada de la ruta de Cardano especificada.
+
+```typescript
+const result = await HardwareSDK.cardanoGetPublicKey(connectId, deviceId, params);
+```
+
+## Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+### Una clave pública [#single-public-key]
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `3`. [Formato de ruta](/es/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _opcional_ `boolean` Si se muestra la clave pública en el dispositivo. El valor predeterminado es `false`.
+* `derivationType` - _opcional_ `CardanoDerivationType`: enumeración que determina el tipo de derivación usado. El valor predeterminado es ICARUS=1
+
+#### Varias claves públicas [#multiple-public-keys]
+
+* `bundle` - matriz de objetos que incluyen `path`, `showOnOneKey` como campos
+
+### Ejemplo [#example]
+
+Devuelve la clave pública de la primera cuenta de Cardano:
+
+```typescript
+HardwareSDK.cardanoGetPublicKey(connectId, deviceId, {
+    path: "m/1852'/1815'/0'/0/0",
+    showOnOneKey: true
+});
+```
+
+Devuelve un conjunto de claves públicas para varias cuentas de Cardano:
+
+```typescript
+HardwareSDK.cardanoGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/1852'/1815'/0'/0/0", }, // account 1
+        { path: "m/1852'/1815'/1'/0/0", }, // account 2
+        { path: "m/1852'/1815'/2'/0/0", }  // account 3
+    ]
+});
+```
+
+### Resultado [#result]
+
+Respuesta de una clave pública
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: Array<number>, // hardened path
+        serializedPath: string,
+        xpub: string,
+        node: HDNodeType,
+    }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

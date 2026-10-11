@@ -1,0 +1,65 @@
+---
+title: "Guide"
+---
+
+# Guide
+
+## Vue d’ensemble [#overview]
+
+Ce guide explique comment utiliser l’API du fournisseur OneKey pour créer facilement des applications web capables d’interagir avec BTC.
+
+
+## Installation [#install]
+
+### 1. Télécharger OneKey Wallet [#1-download-onekey-wallet]
+
+Téléchargez [OneKey Wallet](https://onekey.so/download?client=browserExtension). Installez l’extension de navigateur OneKey.
+
+#### 2. Explication de l’injection de l’API [#2-api-injection-explanation]
+
+* L’extension de navigateur OneKey injecte `Provider API` dans les sites web visités.
+* Deux types d’API sont proposés : `window.unisat` et `window.$onekey.btc`.
+* Il est recommandé d’utiliser `window.$onekey.btc`.
+
+> Privilégiez `window.$onekey.btc` pour sélectionner spécifiquement OneKey. Le fournisseur global `window.unisat` peut appartenir à un autre portefeuille lorsque plusieurs extensions sont installées.
+
+### Détecter la prise en charge de l’API du fournisseur [#detecting-provider-api-support]
+
+Vérifiez qu’un fournisseur est disponible avant d’effectuer des requêtes :
+
+```javascript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+if (!provider) {
+  throw new Error("No Bitcoin provider is available.");
+}
+```
+
+### Connexion à OneKey [#connecting-to-onekey]
+
+Avant d’utiliser l’API suivante, vous devez d’abord utiliser la méthode `provider.requestAccounts` pour demander à l’utilisateur l’accès au compte BTC concerné.
+
+```
+await provider.requestAccounts();
+```
+
+Les autres API ne peuvent être appelées qu’après autorisation de l’utilisateur.
+
+## API [#api]
+
+Choisissez une API pour l’opération requise par votre application.
+
+* Obtenir les informations du compte de l’utilisateur : [`provider.getAccounts`](/fr/connect-to-software/provider/btc/api-reference/getaccounts)
+* Envoyer un paiement : [`provider.sendBitcoin`](/fr/connect-to-software/provider/btc/api-reference/sendbitcoin)
+* Demander la signature d’un message quelconque : [`provider.signMessage`](/fr/connect-to-software/provider/btc/api-reference/signmessage)
+
+**Autres interfaces** : [Voir les détails](/fr/connect-to-software/provider/btc/api-reference)
+
+## Événement [#event]
+
+* **Opérations principales** : Comme le changement de compte
+* **Plus d’informations** : [En savoir plus](/fr/connect-to-software/provider/btc/event)
+
+## Gestion des requêtes [#handling-requests]
+
+Exécutez les requêtes de portefeuille depuis une fonction asynchrone ou un module ES. Interceptez les promesses rejetées et affichez l’erreur dans votre application. Demandez les connexions, signatures et paiements à partir d’une action utilisateur, et désactivez le bouton déclencheur tant qu’une demande est en cours.

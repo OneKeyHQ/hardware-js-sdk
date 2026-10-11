@@ -1,0 +1,37 @@
+---
+title: "inscribeTransfer (非推奨)"
+---
+
+<span id="inscribetransfer-deprecated" />
+
+# inscribeTransfer (非推奨)
+
+トークン転送用インスクリプションを作成する従来のメソッドです。このページは既存の統合のために残されており、新しい統合への推奨として扱わないでください。
+
+## メソッド [#method]
+
+```typescript
+declare function inscribeTransfer(
+    ticker: string,
+    amount: string,
+): Promise<string>;
+```
+
+## パラメーター [#params]
+
+* `ticker` — _必須_ `string`  トークンのティッカー
+* `amount` — _必須_ `string`
+
+## レスポンス [#response]
+
+`txid` — `string`
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const ticker = "<TOKEN_TICKER>";
+const amount = "100"
+const txid = await provider.inscribeTransfer(ticker, amount);
+```

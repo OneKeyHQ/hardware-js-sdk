@@ -91,7 +91,7 @@ if (!navigator.usb) throw new Error('WebUSB is unavailable in this browser');
 await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
 ```
 
-Then discover devices. This example selects the first candidate; present a device selector when multiple candidates are available.
+Then discover devices. This example requires exactly one candidate; if several devices are available, let the user select one before continuing.
 
 ```ts
 const devices = await HardwareSDK.searchDevices();

@@ -1,0 +1,217 @@
+---
+description: "Bitcoin アドレスを確認し、対応するパス、スクリプト、以前のトランザクションを使って UTXO 署名を準備します。"
+title: "BTC 署名者"
+---
+
+<span id="btc-signer" />
+
+# BTC 署名者
+
+Bitcoin UTXO 署名ガイド。アドレス確認、および厳密なパスとスクリプトの一致・完全な refTxs による P2PKH / P2SH-P2WPKH / P2WPKH / Taproot 署名を扱います。動作は hardware-js-sdk (Promise レスポンス + UI イベント) に合わせています。
+
+## インデックス [#index]
+
+1. [仕組み](#how-it-works)
+2. [インストール](#installation)
+3. [初期化](#initialization)
+4. [一般的なシナリオ](#common-scenarios)
+   - [アドレスを取得](#scenario-1-get-address)
+   - [トランザクションに署名](#scenario-2-sign-transaction)
+5. [操作と状態](#interaction--status)
+6. [例](#examples)
+7. [検証とトラブルシューティング](#validation--troubleshooting)
+
+## 仕組み [#how-it-works]
+
+OneKey BTC 署名者は `HardwareSDK` を使用し、OneKey プロトコルでデバイス上の UTXO 確認と署名を要求します。
+
+- パスはスクリプトの purpose (44/49/84/86) と一致する必要があります。
+- 署名フローが要求する以前のトランザクションの完全な情報を `refTxs` に指定します。要件は入力タイプとファームウェアによって異なります。
+- デバイスは入力、出力、お釣り、手数料を表示し、確認後に署名またはシリアライズ済みトランザクションを返します。
+
+## インストール [#installation]
+
+```bash
+npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
+```
+
+## 初期化 [#initialization]
+
+例では一貫して**標準ウォレット**を使用します。隠しウォレットの場合は、アドレス取得と署名の各呼び出しで `useEmptyPassphrase: true` を検証済みの `passphraseState` に置き換えます。保護された呼び出しの前に [UI ハンドラー](/ja/hardware-sdk/core-api-guide#events-ui)を登録し、ペイロードを使用する前に `success` を確認してください。トランザクション入力を宣言している例は準備用のコードであり、単体で実行できるアプリケーションではありません。
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+```
+
+## 一般的なシナリオ [#common-scenarios]
+
+### シナリオ 1: アドレスを取得 [#scenario-1-get-address]
+
+```ts
+const res = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/84'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: true,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.address and res.payload.path are strings.
+```
+
+**パラメーター**
+
+- `path`: 必須。purpose と一致する必要があります。
+- `coin`: アドレス要求では任意。例: `btc`, `test`.
+- `showOnOneKey?`: 任意。デバイスに表示して確認します。
+
+**戻り値**
+
+```ts
+type AddressResult =
+  | { success: true; payload: { address: string; path: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
+```
+
+---
+
+### シナリオ 2: トランザクションに署名 [#scenario-2-sign-transaction]
+
+```ts
+const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  coin: 'btc',
+  inputs,
+  outputs,
+  refTxs,
+  locktime: 0,
+});
+if (!success) throw new Error(payload.error);
+// Verify payload.serializedTx and payload.signatures before broadcasting.
+```
+
+**パラメーター**
+
+- `coin`: 必須。ネットワークのルールを選択します。
+- `inputs`: 必須の配列。次を含みます:
+  - `address_n` (スクリプトに一致するパス)
+  - `prev_hash` (txid の 16 進数)
+  - `prev_index` (vout)
+  - `amount` (satoshi の文字列)
+  - `script_type` (`SPENDADDRESS` / `SPENDP2SHWITNESS` / `SPENDWITNESS` / `SPENDTAPROOT`)
+- `outputs`: 必須の配列。次を含みます:
+  - 受取人: `address` + `amount` + `script_type` (例: `PAYTOADDRESS`)
+  - お釣り: `address_n` + `amount` + `script_type` purpose に対応
+- `refTxs`: 必須の配列。ファームウェアが要求する以前のトランザクションをすべて指定します。署名フローが何も必要としない場合にのみ、空の配列を使用します。
+- `locktime?`: 任意。
+
+**戻り値**
+
+```ts
+type SignResult =
+  | { success: true; payload: { serializedTx: string; signatures: string[]; txid?: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
+```
+
+## 操作と状態 [#interaction--status]
+
+- API は完了時に解決され、ユーザー向けプロンプトは `UI_REQUEST` で届きます (デバイスのロック解除、入力/出力/お釣り/手数料の確認)。
+- デバイスごとに呼び出しを直列に実行し、署名前に `showOnOneKey` を使用して受取/お釣りのパスを確認します。
+
+## 例 [#examples]
+
+### P2SH-P2WPKH トランザクション [#p2sh-p2wpkh-transaction]
+
+これは準備用のコードです。例の UTXO/出力データを実際のトランザクションに置き換え、SDK を呼び出す前に、対応する完全な `refTxs` を読み込んでください。
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import type { BTCSignTransactionParams } from '@onekeyfe/hd-core';
+
+const initialized = await HardwareSDK.init({ env: 'webusb', debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
+
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+
+const path49 = [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0, 0];
+const confirmedAddress = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: path49, coin: 'btc',
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!confirmedAddress.success) throw new Error(confirmedAddress.payload.error);
+
+const inputs: BTCSignTransactionParams['inputs'] = [
+  {
+    address_n: path49,
+    prev_index: 0,
+    prev_hash: 'b035d89d4543ce5713c553d69431698116a822c57c03ddacf3f04b763d1999ac',
+    amount: '3382047',
+    script_type: 'SPENDP2SHWITNESS',
+  },
+];
+
+const outputs: BTCSignTransactionParams['outputs'] = [
+  {
+    address_n: [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 1, 1],
+    amount: '3181747',
+    script_type: 'PAYTOP2SHWITNESS', // change
+  },
+  {
+    address: '18WL2iZKmpDYWk1oFavJapdLALxwSjcSk2',
+    amount: '200000',
+    script_type: 'PAYTOADDRESS', // recipient
+  },
+];
+
+// Load complete previous transactions matching each requested prev_hash.
+declare const refTxs: BTCSignTransactionParams['refTxs'];
+
+const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  coin: 'btc',
+  inputs,
+  outputs,
+  refTxs,
+  locktime: 0,
+});
+
+if (!success) throw new Error(payload.error);
+// Verify the signed transaction before submitting it through your Bitcoin client.
+```
+
+## 検証とトラブルシューティング [#validation--troubleshooting]
+
+- パス ↔ スクリプト: `44'`→P2PKH, `49'`→P2SH-P2WPKH, `84'`→P2WPKH, `86'`→P2TR.
+- `refTxs` には、ファームウェアが要求する以前のトランザクションをすべて含める必要があります。要求されたデータが不足すると拒否されます。
+- お釣りの出力は同じアカウントパス内に収めてください。
+- デバイス上で検証: 入力、出力、お釣り、手数料はアプリの UI と一致する必要があります。
+- ホスト側で検証: `bitcoinjs-lib` / `@scure/btc-signer` で再構築し、`serializedTx`/txid と署名を確認します。
+- よくある問題:
+  - 入力数が多すぎる: 上限を報告してください。トランザクションを分割または簡略化するには、再構築してユーザーに再確認してもらう必要があります。
+  - 手数料の異常: 署名を停止します。ユーザーとともに出力、お釣り、ダストの下限を再計算し、確認済みトランザクションを黙って変更しないでください。
+  - ユーザーの拒否/タイムアウト: 再試行/キャンセルを提示し、自動再送信しないでください。
+
+メソッドのドキュメント: [btcSignTransaction](/ja/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction) · [btcGetAddress](/ja/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress).

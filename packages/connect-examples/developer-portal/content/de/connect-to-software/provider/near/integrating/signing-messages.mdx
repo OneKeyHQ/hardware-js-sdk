@@ -1,0 +1,26 @@
+---
+title: "Nachrichten signieren"
+---
+
+<span id="signing-messages" />
+
+# Nachrichten signieren
+
+Wenn die Webanwendung mit OneKey verbunden ist, kann sie den Nutzer auch bitten, eine bestimmte Nachricht zu signieren.
+
+Um eine Nachricht zum Signieren durch den Nutzer zu senden, muss die Webanwendung:
+
+* Eine UTF-8-kodierte Zeichenfolge bereitstellen.
+* Diese von der OneKey-Wallet des Nutzers signieren lassen.
+
+Der Methodenaufruf gibt ein [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) für ein Objekt zurück, das Folgendes enthält: `signatures`.
+
+```javascript
+const res = await provider.request({
+  method: 'near_signMessages',
+  params: {
+    messages: ['hello world', 'onekey near wallet'], // must be Array type
+  },
+});
+console.log('near_signMessages', res, res.signatures);
+```

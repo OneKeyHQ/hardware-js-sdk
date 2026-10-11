@@ -1,0 +1,85 @@
+---
+title: "tonSignProof"
+---
+
+# tonSignProof
+
+### Requisitos [#requirements]
+
+* Versiones mínimas de firmware
+  * Touch: 4.10.0
+
+### TON: firmar prueba [#ton-sign-proof]
+
+Firma un mensaje de prueba para la autenticación de una dApp con la clave privada derivada de la ruta BIP32 especificada. El usuario debe confirmar la acción en el dispositivo OneKey.
+
+```typescript
+const result = await HardwareSDK.tonSignProof(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    appdomain: "onekey.so",
+    comment: "48656c6c6f204f6e654b6579",
+    expireAt: Math.floor(Date.now() / 1000),
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false
+});
+```
+
+#### Parámetros [#params]
+
+[Parámetros comunes opcionales](/es/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `3`
+* `appdomain` - _obligatorio_ `string` dominio de la dApp que solicita la prueba
+* `comment` - _opcional_ `string` comentario del mensaje en formato hexadecimal
+* `expireAt` - _obligatorio_ `number` marca de tiempo de la firma en segundos Unix; pese al nombre del campo, el firmware la usa como marca de tiempo de la prueba TON
+* `walletVersion` - _opcional_ `TonWalletVersion` Versión de la cartera TON (valor predeterminado: 3)
+* `walletId` - _opcional_ `number` ID de la cartera (valor predeterminado: 698983191)
+* `workchain` - _opcional_ `TonWorkChain` workchain de TON (0: BaseChain, 1: MasterChain)
+* `isBounceable` - _opcional_ `boolean` indica si el mensaje permite rebotes (valor predeterminado: false)
+* `isTestnetOnly` - _opcional_ `boolean` indica si se debe usar testnet (valor predeterminado: false)
+
+#### Devuelve [#returns]
+
+Respuesta
+
+* `signature` - firma de la prueba en formato hexadecimal
+
+#### Ejemplo [#example]
+
+```typescript
+const response = await HardwareSDK.tonSignProof(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    appdomain: "onekey.so",
+    comment: "48656c6c6f204f6e654b6579",
+    expireAt: Math.floor(Date.now() / 1000),
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false
+});
+```
+
+Resultado
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+    }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+El campo `expireAt` se convierte en el campo firmado `timestamp`, sin que el SDK convierta las unidades. Consulta el [formato de prueba de TON Connect](https://github.com/ton-blockchain/ton-connect/blob/main/spec/connect.md#address-proof-signature-ton_proof).

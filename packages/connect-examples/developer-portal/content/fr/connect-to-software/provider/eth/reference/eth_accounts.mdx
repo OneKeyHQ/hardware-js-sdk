@@ -1,0 +1,54 @@
+---
+title: "eth_accounts"
+description: "Obtenir les comptes Ethereum connectés"
+---
+
+# eth_accounts
+
+Renvoie une liste d’adresses exposées par le portefeuille auxquelles l’appelant est autorisé à accéder. Contrairement à `eth_requestAccounts`, cette méthode ne déclenche pas de fenêtre de connexion.
+
+---
+
+## Paramètres [#parameters]
+
+Aucun
+
+---
+
+## Valeur de retour [#returns]
+
+`string[]` - Tableau d’adresses Ethereum, ou tableau vide si aucun compte n’est exposé au site.
+
+---
+
+## Exemple [#example]
+
+```typescript
+const accounts = await window.$onekey.ethereum.request({
+  method: 'eth_accounts'
+})
+
+if (accounts.length > 0) {
+  console.log('Connected:', accounts[0])
+} else {
+  console.log('Not connected')
+}
+```
+
+---
+
+## Remarques [#notes]
+
+- Renvoie un tableau vide `[]` si l’utilisateur n’est pas connecté
+- Utilisez `eth_requestAccounts` pour lancer une connexion
+- Écoutez l’événement `accountsChanged` pour détecter les changements de compte
+
+```typescript
+window.$onekey.ethereum.on('accountsChanged', (accounts) => {
+  if (accounts.length === 0) {
+    console.log('Disconnected')
+  } else {
+    console.log('Account changed:', accounts[0])
+  }
+})
+```

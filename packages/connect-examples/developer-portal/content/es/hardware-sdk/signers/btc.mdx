@@ -1,0 +1,217 @@
+---
+description: "Confirma direcciones Bitcoin y prepara la firma de UTXO con rutas, scripts y transacciones anteriores coherentes."
+title: "Firmante BTC"
+---
+
+<span id="btc-signer" />
+
+# Firmante BTC
+
+Guía de firma de UTXO de Bitcoin. Cubre la confirmación de direcciones y la firma P2PKH / P2SH-P2WPKH / P2WPKH / Taproot con coincidencia estricta entre ruta y script y refTxs completas. El comportamiento coincide con hardware-js-sdk (respuestas Promise + eventos de interfaz).
+
+## Índice [#index]
+
+1. [Cómo funciona](#how-it-works)
+2. [Instalación](#installation)
+3. [Inicialización](#initialization)
+4. [Casos habituales](#common-scenarios)
+   - [Obtener dirección](#scenario-1-get-address)
+   - [Firmar una transacción](#scenario-2-sign-transaction)
+5. [Interacción y estado](#interaction--status)
+6. [Ejemplos](#examples)
+7. [Validación y resolución de problemas](#validation--troubleshooting)
+
+## Cómo funciona [#how-it-works]
+
+El firmante BTC de OneKey usa `HardwareSDK` y el protocolo OneKey para solicitar la revisión y firma de UTXO en el dispositivo.
+
+- Las rutas deben coincidir con el propósito del script (44/49/84/86).
+- Proporciona las transacciones anteriores completas que solicite el flujo de firma en `refTxs`; los requisitos dependen del tipo de entrada y del firmware.
+- El dispositivo muestra entradas, salidas, cambio y comisión; tras la confirmación devuelve firmas o una transacción serializada.
+
+## Instalación [#installation]
+
+```bash
+npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
+```
+
+## Inicialización [#initialization]
+
+Los ejemplos usan la **cartera estándar** de forma coherente. Para una cartera oculta, sustituye `useEmptyPassphrase: true` por el valor verificado de `passphraseState` en cada llamada de dirección y firma. Registra los [controladores de interfaz](/es/hardware-sdk/core-api-guide#events-ui) antes de las llamadas protegidas y comprueba `success` antes de usar cualquier carga de datos. Los ejemplos con entradas de transacción declaradas son fragmentos de preparación, no aplicaciones ejecutables independientes.
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+```
+
+## Casos habituales [#common-scenarios]
+
+### Caso 1: Obtener dirección [#scenario-1-get-address]
+
+```ts
+const res = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/84'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: true,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.address and res.payload.path are strings.
+```
+
+**Parámetros**
+
+- `path`: obligatorio; debe coincidir con el propósito.
+- `coin`: opcional para solicitudes de dirección; por ejemplo, `btc`, `test`.
+- `showOnOneKey?`: opcional; mostrar y confirmar en el dispositivo.
+
+**Devuelve**
+
+```ts
+type AddressResult =
+  | { success: true; payload: { address: string; path: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
+```
+
+---
+
+### Caso 2: Firmar transacción [#scenario-2-sign-transaction]
+
+```ts
+const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  coin: 'btc',
+  inputs,
+  outputs,
+  refTxs,
+  locktime: 0,
+});
+if (!success) throw new Error(payload.error);
+// Verify payload.serializedTx and payload.signatures before broadcasting.
+```
+
+**Parámetros**
+
+- `coin`: obligatorio; selecciona las reglas de la red.
+- `inputs`: array obligatorio con:
+  - `address_n` (ruta correspondiente al script)
+  - `prev_hash` (txid hexadecimal)
+  - `prev_index` (vout)
+  - `amount` (satoshis como cadena)
+  - `script_type` (`SPENDADDRESS` / `SPENDP2SHWITNESS` / `SPENDWITNESS` / `SPENDTAPROOT`)
+- `outputs`: array obligatorio con:
+  - Destinatario: `address` + `amount` + `script_type` (por ejemplo, `PAYTOADDRESS`)
+  - Cambio: `address_n` + `amount` + `script_type` coherente con el propósito
+- `refTxs`: array obligatorio; incluye todas las transacciones anteriores que solicite el firmware. Usa un array vacío solo si el flujo de firma no necesita ninguna.
+- `locktime?`: opcional.
+
+**Devuelve**
+
+```ts
+type SignResult =
+  | { success: true; payload: { serializedTx: string; signatures: string[]; txid?: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
+```
+
+## Interacción y estado [#interaction--status]
+
+- Las API se resuelven al finalizar; los avisos al usuario llegan mediante `UI_REQUEST` (desbloquear el dispositivo, confirmar entradas/salidas/cambio/comisión).
+- Ejecuta las llamadas en serie por dispositivo; usa `showOnOneKey` para confirmar las rutas de recepción y cambio antes de firmar.
+
+## Ejemplos [#examples]
+
+### Transacción P2SH-P2WPKH [#p2sh-p2wpkh-transaction]
+
+Este es un fragmento de preparación. Sustituye los datos ilustrativos de UTXO y salidas por los de tu transacción y carga las `refTxs` completas correspondientes antes de llamar al SDK.
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import type { BTCSignTransactionParams } from '@onekeyfe/hd-core';
+
+const initialized = await HardwareSDK.init({ env: 'webusb', debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
+
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+
+const path49 = [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0, 0];
+const confirmedAddress = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: path49, coin: 'btc',
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!confirmedAddress.success) throw new Error(confirmedAddress.payload.error);
+
+const inputs: BTCSignTransactionParams['inputs'] = [
+  {
+    address_n: path49,
+    prev_index: 0,
+    prev_hash: 'b035d89d4543ce5713c553d69431698116a822c57c03ddacf3f04b763d1999ac',
+    amount: '3382047',
+    script_type: 'SPENDP2SHWITNESS',
+  },
+];
+
+const outputs: BTCSignTransactionParams['outputs'] = [
+  {
+    address_n: [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 1, 1],
+    amount: '3181747',
+    script_type: 'PAYTOP2SHWITNESS', // change
+  },
+  {
+    address: '18WL2iZKmpDYWk1oFavJapdLALxwSjcSk2',
+    amount: '200000',
+    script_type: 'PAYTOADDRESS', // recipient
+  },
+];
+
+// Load complete previous transactions matching each requested prev_hash.
+declare const refTxs: BTCSignTransactionParams['refTxs'];
+
+const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  coin: 'btc',
+  inputs,
+  outputs,
+  refTxs,
+  locktime: 0,
+});
+
+if (!success) throw new Error(payload.error);
+// Verify the signed transaction before submitting it through your Bitcoin client.
+```
+
+## Validación y resolución de problemas [#validation--troubleshooting]
+
+- Ruta ↔ script: `44'`→P2PKH, `49'`→P2SH-P2WPKH, `84'`→P2WPKH, `86'`→P2TR.
+- `refTxs` debe contener todas las transacciones anteriores solicitadas por el firmware; se rechaza la ausencia de datos solicitados.
+- La salida de cambio debe permanecer dentro de la misma ruta de cuenta.
+- Comprueba en el dispositivo que entradas, salidas, cambio y comisión coincidan con tu interfaz.
+- Comprobación en el host: reconstruye con `bitcoinjs-lib` / `@scure/btc-signer`, comprueba `serializedTx`, el txid y las firmas.
+- Problemas habituales:
+  - Demasiadas entradas: informa del límite. Dividir o simplificar una transacción requiere reconstruirla y obtener una nueva revisión del usuario.
+  - Comisión anómala: detén la firma. Recalcula salidas, cambio y límites de dust con el usuario; no modifiques silenciosamente una transacción ya revisada.
+  - Rechazo del usuario o tiempo agotado: ofrece reintentar o cancelar; no vuelvas a enviarla automáticamente.
+
+Consulta la documentación de los métodos: [btcSignTransaction](/es/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction) · [btcGetAddress](/es/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress).

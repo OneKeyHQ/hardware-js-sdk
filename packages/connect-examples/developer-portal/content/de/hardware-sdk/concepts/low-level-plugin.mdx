@@ -1,0 +1,143 @@
+---
+description: "Ein natives BLE-Plugin mit geordneten Blöcken, Schreibkapazität und vom SDK verwalteter Protokollrahmung implementieren."
+title: "Transport-Plugin auf niedriger Ebene"
+---
+
+<span id="low-level-transport-plugin" />
+
+# Transport-Plugin auf niedriger Ebene
+
+> Verwenden Sie dies nur, wenn WebUSB / React Native BLE / offizielle native Adapter Ihren Anwendungsfall nicht abdecken. Sie übernehmen den nativen BLE-Lebenszyklus und die geordnete Ein-/Ausgabe; rechnen Sie daher mit höherem Wartungsaufwand.
+
+> **Hinweis:** Die `lowlevel`-Umgebung und `LowlevelTransportSharedPlugin` sind ausschließlich für die **BLE (Bluetooth)**-Kommunikation ausgelegt. Für die **USB**-Kommunikation in Node.js-/CLI-Umgebungen verwenden Sie stattdessen `NodeUsbTransport` (Umgebung `node-usb`): Dieser verarbeitet Protokollkodierung und USB-Ein-/Ausgabe direkt über libusb, ohne Plugin.
+
+Unser Bluetooth-SDK wurde mit React Native entwickelt. Vielleicht entwickeln Sie Ihre Anwendung nicht mit React Native, sondern beispielsweise mit Swift, Kotlin oder Flutter. In diesem Fall ist eine zusätzliche React-Native-Abhängigkeit in Ihrem Projekt möglicherweise keine gute Wahl.
+
+Wir bieten eine neue Kommunikationsmethode, bei der Sie mit LowlevelTransportSharedPlugin mit der Hardware kommunizieren können. Sie können jeden gewünschten Technologie-Stack verwenden. Sie müssen das Protokoll für Geräteverbindung, Trennung, Datensenden und Datenempfang implementieren.
+
+## Kurzreferenz [#quick-reference]
+
+### OneKey-BLE-UUIDs [#onekey-ble-uuids]
+
+| Zweck | UUID |
+|---------|------|
+| Dienst | `00000001-0000-1000-8000-00805f9b34fb` |
+| Schreib-Characteristic | `00000002-0000-1000-8000-00805f9b34fb` |
+| Benachrichtigungs-Characteristic | `00000003-0000-1000-8000-00805f9b34fb` |
+
+### Beispiel für Protocol-V1-BLE-Headerdaten [#protocol-v1-ble-header-data-example]
+
+Der folgende Header ist spezifisch für Protocol V1; verwenden Sie ihn nicht zum Parsen von Protocol-V2-Benachrichtigungen.
+
+```
+Raw data: 3F 23 23 00 02 00 00 00 0A 12 08 ...
+          │  │  │  │  │  │        │  └─ Protobuf payload starts
+          │  │  │  │  │  └────────┴─ Payload length: 0x0000000A = 10 bytes
+          │  │  │  └──┴─ Message type: 0x0002
+          └──┴──┴─ Magic: 0x3F 0x23 0x23 (fixed identifier)
+```
+
+Headerpaket erkennen: **Die ersten 3 Bytes sind `3F 23 23`**
+
+Native Beispiele (alle auf Basis des Low-Level-Transport-Plugins):
+
+- [Natives Android](/de/hardware-sdk/transport/android) — WebView + JSBridge + Nordic BLE
+- [Natives iOS](/de/hardware-sdk/transport/ios) — WebView + JSBridge + CoreBluetooth
+- [Natives Flutter](/de/hardware-sdk/transport/flutter) — WebView + Plattformkanal + BLE
+
+## LowlevelTransportSharedPlugin-Schnittstelle [#lowleveltransportsharedplugin-interface]
+
+```typescript
+import type { OneKeyDeviceInfoBase } from '@onekeyfe/hd-transport';
+
+export type LowLevelDevice = OneKeyDeviceInfoBase & { id: string; name: string };
+export type LowlevelTransportSharedPlugin = {
+  enumerate: () => Promise<LowLevelDevice[]>;
+  send: (uuid: string, data: string, options?: { withoutResponse?: boolean }) => Promise<void>;
+  receive: (uuid?: string) => Promise<string>;
+  connect: (uuid: string) => Promise<void>;
+  disconnect: (uuid: string) => Promise<void>;
+  getProtocolV2PacketCapacity?: (uuid: string) => number | undefined | Promise<number | undefined>;
+  init: () => Promise<void>;
+  version: string;
+};
+```
+
+## WebUSB und BLE: Protocol-V1-Rahmung [#webusb-vs-ble-protocol-v1-framing]
+
+Dies sind Transportdetails für Protocol V1. Das Low-Level-Plugin ist ein BLE-Adapter; das SDK übernimmt Protokollerkennung, Kodierung und Zusammensetzung.
+
+| | WebUSB (Desktop) | BLE (nativ mobil) |
+|---|---|---|
+| Paketgröße | Fest 64 Bytes | Variabel (MTU-abhängig) |
+| Paketpräfix | `0x3F` in jedem Paket | `0x3F 0x23 0x23` nur im Header |
+| Auffüllung | Mit Nullen auf 64 Bytes auffüllen | Keine Auffüllung nötig |
+| `receive()` gibt zurück: | Jeweils ein Frame mit 64 Bytes | Roher BLE-Benachrichtigungsblock (hex) |
+
+---
+
+## WebUSB Protocol V1 (Desktop) [#webusb-protocol-v1-desktop]
+
+Der Transport verwendet feste Frames mit 64 Bytes; das SDK setzt Nachrichten zusammen.
+
+> **Magic-Bytes:** `0x3F 0x23 0x23` sind feste Protokollkennungsbytes zur Erkennung von Paketgrenzen.
+
+**Erstes Paket:**
+
+| Offset | Länge | Inhalt |
+|--------|--------|---------|
+| 0 | 3 | Magic: `0x3F 0x23 0x23` |
+| 3 | 2 | Nachrichtentyp (BE uint16) |
+| 5 | 4 | Nutzlastlänge (BE uint32) |
+| 9 | 55 | Erste 55 Protobuf-Bytes (mit Nullen aufgefüllt) |
+
+**Nachfolgende Pakete:**
+
+| Offset | Länge | Inhalt |
+|--------|--------|---------|
+| 0 | 1 | Magic: `0x3F` |
+| 1 | 63 | Verbleibende Protobuf-Bytes (mit Nullen aufgefüllt) |
+
+---
+
+## BLE-Protokoll (nativ mobil) [#ble-protocol-native-mobile]
+
+Geben Sie bei jedem `receive(uuid)`-Aufruf einen unveränderten BLE-Benachrichtigungsblock aus der Warteschlange als Hex zurück. Behalten Sie die Reihenfolge bei und bewahren Sie Blöcke auf, die vor einem wartenden Leseaufruf eintreffen. Entfernen Sie keine Protokollheader, füllen Sie nicht auf USB-Pakete mit 64 Bytes auf und dekodieren Sie im Plugin kein Protobuf.
+
+- **Protocol V1:** Das SDK erkennt den `3F2323`-Header, liest die Nutzlastlänge und sammelt Fortsetzungsblöcke. Zur V1-Kompatibilität akzeptiert es auch die ältere, bereits zusammengesetzte `type + length + payload`-Nachricht.
+- **Protocol V2:** Das SDK setzt rohe Blöcke zu Frames zusammen und übernimmt CRC, Sequenz und Nachrichtenzusammensetzung. Ein reiner V1-Headerdetektor oder -Assembler darf diese Daten nicht verarbeiten.
+- `send(uuid, data, options)` erhält vom SDK vorbereitetes Hex. Schreiben Sie Bytes in der richtigen Reihenfolge, reichen Sie Ein-/Ausgabefehler weiter und beachten Sie `withoutResponse`, sofern angegeben.
+- Melden Sie die tatsächliche maximale Bytezahl eines einzelnen BLE-Characteristic-Schreibvorgangs über `getProtocolV2PacketCapacity`. Das SDK verwendet einen Ersatzwert von 192 Bytes und begrenzt V2-Pakete auf 244 Bytes. Geben Sie die Schreibkapazität zurück, nicht die ATT-MTU einschließlich Overhead.
+- Lehnen Sie bei Trennung ausstehende Lesevorgänge ab und verwerfen Sie wartende Benachrichtigungen der alten Verbindung. Liefern Sie diese nach der Wiederverbindung nicht aus.
+
+## Initialisierungsbeispiel [#initialization-example]
+
+Dieses Adapterfragment delegiert an eine native Bridge, die die obige Schnittstelle implementieren muss. Ihre Methoden dürfen erst nach Abschluss des jeweiligen Vorgangs aufgelöst werden und müssen bei einem Fehler abgelehnt werden.
+
+```typescript
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
+
+// Implement these methods in your native BLE bridge before initialization.
+declare const nativeBle: LowlevelTransportSharedPlugin;
+
+const plugin: LowlevelTransportSharedPlugin = {
+  enumerate: () => nativeBle.enumerate(),
+  send: (uuid, data, options) => nativeBle.send(uuid, data, options),
+  receive: uuid => nativeBle.receive(uuid),
+  connect: uuid => nativeBle.connect(uuid),
+  disconnect: uuid => nativeBle.disconnect(uuid),
+  getProtocolV2PacketCapacity: uuid => nativeBle.getProtocolV2PacketCapacity?.(uuid),
+  init: () => nativeBle.init(),
+  version: nativeBle.version,
+};
+
+const result = await HardwareSDK.init({ env: 'lowlevel', debug: false }, undefined, plugin);
+if (!result) throw new Error('SDK initialization failed');
+```
+
+## Nächste Schritte [#next-steps]
+
+- [Android-Anleitung](/de/hardware-sdk/transport/android) — Bonding, Berechtigungen und Verbindungsabschluss
+- [iOS-Anleitung](/de/hardware-sdk/transport/ios) — CoreBluetooth-Implementierung
+- [Flutter-Anleitung](/de/hardware-sdk/transport/flutter) — Plattformkanal-Bridge

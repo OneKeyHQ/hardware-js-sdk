@@ -1,0 +1,157 @@
+---
+title: "Erste Schritte"
+description: "Über den Keplr-kompatiblen Provider von OneKey mit Cosmos-Chains verbinden"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# Erste Schritte
+
+Aktivieren Sie die Ziel-Chain, bevor Sie ihren Schlüssel lesen oder eine Signatur anfordern. Verwenden Sie Kontonummer, Sequenz, Gebühren und RPC-Endpunkt dieser Chain; Platzhalterwerte in Signierbeispielen müssen vor der Verwendung ersetzt werden.
+
+Erfahren Sie, wie Sie Cosmos-Chains mit dem Provider von OneKey erkennen, verbinden und damit interagieren.
+
+---
+
+## Provider erkennen [#provider-detection]
+
+```typescript
+// Detect OneKey Cosmos provider
+const provider = window.$onekey?.cosmos
+
+if (!provider) {
+  throw new Error('OneKey Cosmos provider not detected')
+}
+
+// Check if it's OneKey
+console.log('Provider:', provider.isOneKey ? 'OneKey' : 'Unknown')
+```
+
+---
+
+## Mit Chain verbinden [#connect-to-chain]
+
+```typescript
+const chainId = 'cosmoshub-4'
+
+// Request access to the chain. Read key information separately with getKey().
+await provider.enable(chainId)
+
+// Or enable multiple chains at once
+await provider.enable(['cosmoshub-4', 'osmosis-1', 'juno-1'])
+```
+
+---
+
+## Kontoinformationen abrufen [#get-account-info]
+
+```typescript
+const chainId = 'cosmoshub-4'
+const key = await provider.getKey(chainId)
+
+console.log({
+  name: key.name,           // Account name
+  algo: key.algo,           // Signing algorithm (secp256k1)
+  pubKey: key.pubKey,       // Public key (Uint8Array)
+  address: key.address,     // Raw address bytes
+  bech32Address: key.bech32Address,  // Bech32 formatted address
+  isNanoLedger: key.isNanoLedger,    // Ledger compatibility flag
+})
+```
+
+---
+
+## Benutzerdefinierte Chain hinzufügen [#add-custom-chain]
+
+Verwenden Sie `experimentalSuggestChain`, um nicht nativ unterstützte Chains hinzuzufügen:
+
+```typescript
+await provider.experimentalSuggestChain({
+  chainId: 'my-chain-1',
+  chainName: 'My Custom Chain',
+  rpc: 'https://rpc.mychain.io',
+  rest: 'https://lcd.mychain.io',
+  bip44: { coinType: 118 },
+  bech32Config: {
+    bech32PrefixAccAddr: 'mychain',
+    bech32PrefixAccPub: 'mychainpub',
+    bech32PrefixValAddr: 'mychainvaloper',
+    bech32PrefixValPub: 'mychainvaloperpub',
+    bech32PrefixConsAddr: 'mychainvalcons',
+    bech32PrefixConsPub: 'mychainvalconspub',
+  },
+  currencies: [{
+    coinDenom: 'TOKEN',
+    coinMinimalDenom: 'utoken',
+    coinDecimals: 6,
+  }],
+  feeCurrencies: [{
+    coinDenom: 'TOKEN',
+    coinMinimalDenom: 'utoken',
+    coinDecimals: 6,
+    gasPriceStep: { low: 0.01, average: 0.025, high: 0.04 },
+  }],
+  stakeCurrency: {
+    coinDenom: 'TOKEN',
+    coinMinimalDenom: 'utoken',
+    coinDecimals: 6,
+  },
+})
+```
+
+---
+
+## Trennen [#disconnect]
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## Mit CosmJS verwenden [#using-with-cosmjs]
+
+Offline-Signierer zur Verwendung mit CosmJS abrufen:
+
+```typescript
+import { SigningStargateClient } from '@cosmjs/stargate'
+
+const chainId = 'cosmoshub-4'
+
+// Auto-detect best signer type
+const offlineSigner = await provider.getOfflineSignerAuto(chainId)
+
+// Or use specific signer types
+const aminoSigner = provider.getOfflineSignerOnlyAmino(chainId)
+const directSigner = provider.getOfflineSigner(chainId)
+
+// Use with CosmJS
+const client = await SigningStargateClient.connectWithSigner(
+  'https://rpc.cosmos.network',
+  offlineSigner
+)
+
+// Send tokens
+const result = await client.sendTokens(
+  senderAddress,
+  recipientAddress,
+  [{ denom: 'uatom', amount: '1000000' }],
+  { amount: [{ denom: 'uatom', amount: '5000' }], gas: '200000' }
+)
+```
+
+---
+
+## Migration von Keplr [#migration-from-keplr]
+
+Der Cosmos-Provider von OneKey ist Keplr-kompatibel. Ändern Sie einfach Ihre Provider-Erkennung:
+
+```typescript
+// Before (Keplr only)
+const provider = window.keplr
+
+// After (OneKey with Keplr fallback)
+const provider = window.$onekey?.cosmos || window.keplr
+```

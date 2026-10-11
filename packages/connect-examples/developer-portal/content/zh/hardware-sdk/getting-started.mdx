@@ -92,7 +92,7 @@ if (!navigator.usb) throw new Error('WebUSB is unavailable in this browser');
 await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
 ```
 
-授权后发现设备并读取钱包身份。下例选取第一个候选设备；存在多个候选设备时，请让用户选择。
+授权后发现设备并读取钱包身份。下例要求只有一个候选设备；如果发现多个设备，请先让用户选择一个再继续。
 
 ```ts
 const devices = await HardwareSDK.searchDevices();

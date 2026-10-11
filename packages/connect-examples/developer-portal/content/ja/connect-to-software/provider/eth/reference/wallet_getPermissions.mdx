@@ -1,0 +1,86 @@
+---
+title: "wallet_getPermissions"
+description: "dApp の現在の権限を取得"
+---
+
+# wallet_getPermissions
+
+dApp に付与されている現在の権限を返します。このメソッドはユーザーに確認を求めません。
+
+---
+
+## パラメーター [#parameters]
+
+なし
+
+---
+
+## 戻り値 [#returns]
+
+`Array` 権限オブジェクトの配列:
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `parentCapability` | `string` | 権限名 |
+| `date` | `number` | 付与された時刻のタイムスタンプ |
+| `caveats` | `array` | 権限に対する制限 |
+
+---
+
+## 例 [#example]
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_getPermissions'
+})
+
+console.log('Current permissions:', permissions)
+
+// Check if connected
+const isConnected = permissions.some(
+  p => p.parentCapability === 'eth_accounts'
+)
+console.log('Is connected:', isConnected)
+```
+
+### 権限確認ユーティリティ [#permission-check-utility]
+
+```typescript
+async function checkPermissions() {
+  const permissions = await window.$onekey.ethereum.request({
+    method: 'wallet_getPermissions'
+  })
+
+  return {
+    hasAccounts: permissions.some(p => p.parentCapability === 'eth_accounts'),
+    permissions
+  }
+}
+
+const { hasAccounts } = await checkPermissions()
+if (!hasAccounts) {
+  // Request connection
+  await window.$onekey.ethereum.request({
+    method: 'eth_requestAccounts'
+  })
+}
+```
+
+---
+
+## エラー [#errors]
+
+| コード | メッセージ | 説明 |
+|------|---------|-------------|
+| -32603 | 内部エラー | プロバイダーエラー |
+
+---
+
+## 注意事項 [#notes]
+
+- 権限が付与されていない場合は空の配列を返します
+- ユーザーに操作を求めません
+- プロンプトを表示せずに接続状態を確認するのに便利です
+- 次で規定されています: [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255)
+
+対象ウォレットのバージョンで、未対応メソッドのエラーを処理してください。アカウントへの権限は RPC 接続とは別であり、署名やトランザクションの事前承認にはなりません。基本的な接続には次を使用します: `eth_requestAccounts`.

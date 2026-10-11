@@ -1,0 +1,85 @@
+---
+title: "tonSignProof"
+---
+
+# tonSignProof
+
+### Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * Touch: 4.10.0
+
+### TON: Nachweis signieren [#ton-sign-proof]
+
+Eine Nachweisnachricht zur dApp-Authentifizierung mit dem privaten Schlüssel aus dem angegebenen BIP32-Pfad signieren. Der Nutzer muss die Aktion auf dem OneKey-Gerät bestätigen.
+
+```typescript
+const result = await HardwareSDK.tonSignProof(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    appdomain: "onekey.so",
+    comment: "48656c6c6f204f6e654b6579",
+    expireAt: Math.floor(Date.now() / 1000),
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false
+});
+```
+
+#### Parameter [#params]
+
+[Optionale gemeinsame Parameter](/de/hardware-sdk/concepts/common-params)
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`
+* `appdomain` - _erforderlich_ `string` Domain der dApp, die den Nachweis anfordert
+* `comment` - _optional_ `string` Nachrichtenkommentar im Hexformat
+* `expireAt` - _erforderlich_ `number` Signierzeitstempel in Unix-Sekunden; trotz des Feldnamens verwendet die Firmware ihn als TON-Proof-Zeitstempel
+* `walletVersion` - _optional_ `TonWalletVersion` TON-Wallet-Version (Standard: 3)
+* `walletId` - _optional_ `number` Wallet-ID (Standard: 698983191)
+* `workchain` - _optional_ `TonWorkChain` TON-Workchain (0: BaseChain, 1: MasterChain)
+* `isBounceable` - _optional_ `boolean` Ob die Nachricht bounceable ist (Standard: false)
+* `isTestnetOnly` - _optional_ `boolean` Ob das Testnet verwendet werden soll (Standard: false)
+
+#### Rückgabe [#returns]
+
+Antwort
+
+* `signature` - Nachweissignatur im Hexformat
+
+#### Beispiel [#example]
+
+```typescript
+const response = await HardwareSDK.tonSignProof(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    appdomain: "onekey.so",
+    comment: "48656c6c6f204f6e654b6579",
+    expireAt: Math.floor(Date.now() / 1000),
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false
+});
+```
+
+Ergebnis
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+    }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+Der `expireAt`-Wert wird zum signierten `timestamp`, ohne Einheitenumrechnung durch das SDK. Siehe das [TON-Connect-Nachweisformat](https://github.com/ton-blockchain/ton-connect/blob/main/spec/connect.md#address-proof-signature-ton_proof).

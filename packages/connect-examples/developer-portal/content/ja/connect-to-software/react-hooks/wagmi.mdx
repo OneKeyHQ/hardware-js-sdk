@@ -1,0 +1,181 @@
+---
+title: "React + wagmi"
+description: "wagmi と注入された EIP-1193 プロバイダーで React アプリから OneKey に接続"
+---
+
+# React + wagmi
+
+このガイドでは、wagmi を使い、EIP-1193 に基づく最小限の方法で React アプリから OneKey に接続します。OneKey 専用のプロバイダー (`window.$onekey.ethereum`) を使用し、「OneKey」と表示されたボタンで OneKey に接続するようにしてください。
+
+## インストール [#install]
+
+```bash
+npm i wagmi@^2 viem@^2 @tanstack/react-query@^5
+```
+
+wagmi v2 は viem を基盤としています。このガイドでは Injected コネクターで、注入されたウォレット (OneKey / その他の EIP-1193 プロバイダー) を利用します。
+
+## OneKey の injected コネクターを作成 [#create-a-onekey-injected-connector]
+
+複数のウォレットがある場合の曖昧さを避けるため、OneKey 専用の注入先を優先してください。
+
+```ts
+// onekeyConnector.ts
+import { createConfig, http } from 'wagmi'
+import { mainnet, polygon, arbitrum, base, optimism } from 'wagmi/chains'
+import { injected } from 'wagmi/connectors'
+
+import type { EIP1193Provider } from 'viem'
+
+function getOneKeyProvider(): EIP1193Provider | undefined {
+  if (typeof window === 'undefined') return undefined
+  const walletWindow = window as Window & {
+    $onekey?: { ethereum?: EIP1193Provider }
+  }
+  return walletWindow.$onekey?.ethereum
+}
+
+export const config = createConfig({
+  chains: [mainnet, polygon, arbitrum, base, optimism],
+  connectors: [
+    injected({
+      target() {
+        return {
+          id: 'onekey',
+          name: 'OneKey',
+          provider: getOneKeyProvider(),
+        }
+      },
+      shimDisconnect: true,
+    }),
+  ],
+  transports: {
+    [mainnet.id]: http(),
+    [polygon.id]: http(),
+    [arbitrum.id]: http(),
+    [base.id]: http(),
+    [optimism.id]: http(),
+  },
+})
+```
+
+注意事項
+
+- 次を優先してください: `window.$onekey.ethereum` で複数ウォレット環境でも動作を確定的に保ちます。
+- OneKey が利用できない場合は、インストールまたは再試行の選択肢を表示してください。wagmi が検出した他のウォレットは、それぞれの名前を維持します。
+- ユーザー操作をきっかけに `eth_requestAccounts` を実行し、`4001` (ユーザーによる拒否) を処理します。自動では再試行しないでください。
+
+## アプリの設定 [#app-setup]
+
+```tsx
+// main.tsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { WagmiProvider } from 'wagmi'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { config } from './onekeyConnector'
+import App from './App'
+
+const queryClient = new QueryClient()
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </WagmiProvider>
+  </React.StrictMode>,
+)
+```
+
+## 接続してアカウントを読み取る [#connect-and-read-account]
+
+```tsx
+// App.tsx
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
+
+export default function App() {
+  const { address, isConnected } = useAccount()
+  const { connect, connectors, isPending, error } = useConnect()
+  const { disconnect } = useDisconnect()
+
+  if (isConnected) {
+    return (
+      <div>
+        <p>Connected: {address}</p>
+        <button onClick={() => disconnect()}>Disconnect</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {error && <p role="alert">{error.message}</p>}
+      {connectors.map((c) => (
+        <button key={c.uid} disabled={isPending} onClick={() => connect({ connector: c })}>
+          Connect with {c.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+```
+
+## 署名して送信 [#sign-and-send]
+
+署名には有効な wagmi 接続を使用します。ウォレットへのリクエストはユーザー操作から実行し、拒否された場合は UI に表示してください。
+
+```tsx
+import { useState } from 'react'
+import { useWalletClient } from 'wagmi'
+
+function SignMessageButton() {
+  const { data: walletClient } = useWalletClient()
+  const [result, setResult] = useState('')
+  const [pending, setPending] = useState(false)
+
+  async function sign() {
+    if (!walletClient) return
+    setPending(true)
+    try {
+      const signature = await walletClient.signMessage({ message: 'Hello from my dApp' })
+      setResult(signature)
+    } catch (error) {
+      setResult(error instanceof Error ? error.message : 'Signature request failed')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return <>
+    <button disabled={!walletClient || pending} onClick={sign}>Sign message</button>
+    <p role="status">{result}</p>
+  </>
+}
+```
+
+トランザクションには wagmi の `useSendTransaction` を使用し、検証済みの受取人、金額、選択中のチェーンを指定します。トランザクションハッシュが返されたことは送信済みを意味します。実行の成功はレシートを待って判断してください。[トランザクションの送信](/ja/connect-to-software/provider/eth/sending-transactions)を参照してください。
+
+## イベントとネットワーク [#events-and-network]
+
+- `accountsChanged` / `chainChanged` を監視し、セッション状態を更新します。
+- ネットワークの切り替え/追加: `wallet_switchEthereumChain` および `wallet_addEthereumChain`.
+
+## モバイルと検出 [#mobile-and-discovery]
+
+注入型ブラウザー以外のモバイルウォレットには、WalletConnect コネクターまたは[ウォレット UI ライブラリ](/ja/connect-to-software/wallet-ui/wallet-kits)を使用してください。[ディープリンク](/ja/connect-to-software/mobile-deeplinks)はウォレットを開き、WalletConnect セッションが接続を確立します。
+
+wagmi は `createConfig` の `multiInjectedProviderDiscovery` オプションを通じて EIP-6963 ウォレットを検出できます。直接実装する場合は、[プロバイダーの検出](/ja/connect-to-software/provider/eth/provider-api)を参照してください。
+
+## トラブルシューティング [#troubleshooting]
+
+- プロバイダーが見つからない場合は、OneKey がインストールされ、このサイトで有効になっていることを確認して、接続ボタンから再試行してください。
+- ユーザーによる拒否 (`4001`) は、ユーザー操作による再試行を可能にして処理します。
+- ブラウザーのプロバイダーへのアクセスはクライアント側で実行します。上記の `typeof window` ガードがサーバーサイドレンダリングのエラーを防ぎます。
+- 擬似的な切断は wagmi の接続状態を消去しますが、ウォレット内の権限が取り消されるとは限りません。
+
+## リソース [#resources]
+
+- [wagmi injected コネクター](https://wagmi.sh/react/api/connectors/injected)
+- [wagmi ウォレットクライアント](https://wagmi.sh/react/api/hooks/useWalletClient)

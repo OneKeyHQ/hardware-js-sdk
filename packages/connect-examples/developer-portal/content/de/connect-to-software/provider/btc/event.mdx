@@ -1,0 +1,28 @@
+---
+title: "Ereignis"
+---
+
+<span id="bitcoin-events" />
+
+# Bitcoin-Ereignisse
+
+Der Provider löst `accountsChanged` mit einem `string[]` und `chainChanged` mit einer Netzwerkkennung aus. Ein leeres Konto-Array bedeutet, dass die Website kein freigegebenes Konto mehr hat. Verwenden Sie zum Entfernen eines Listeners denselben Handler.
+
+```javascript
+const provider = window.$onekey?.btc;
+if (!provider) throw new Error('OneKey Bitcoin provider is unavailable.');
+
+const onAccountsChanged = (accounts) => {
+  console.log('Connected accounts:', accounts);
+};
+const onChainChanged = (networkId) => {
+  console.log('Selected network:', networkId);
+  // Refresh network-dependent data before preparing another transaction.
+};
+provider.on('accountsChanged', onAccountsChanged);
+provider.on('chainChanged', onChainChanged);
+
+// Run during cleanup, for example when a component unmounts.
+provider.off('accountsChanged', onAccountsChanged);
+provider.off('chainChanged', onChainChanged);
+```

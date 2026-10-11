@@ -1,0 +1,147 @@
+---
+description: "Installez le Hardware SDK OneKey, autorisez WebUSB, lisez l’état de l’appareil et confirmez une adresse de portefeuille standard."
+title: "Premiers pas"
+---
+
+import { Tabs } from 'nextra/components'
+import Link from 'next/link'
+
+<div className="doc-eyebrow">HARDWARE SDK · WEBUSB</div>
+
+<span id="connect-your-first-device" />
+
+# Connecter votre premier appareil
+
+Installez le Hardware SDK **1.2.x**, connectez un appareil et confirmez votre première adresse.
+
+Cette page décrit le premier lancement. Une fois celui-ci réussi, choisissez un [guide de transport](/fr/hardware-sdk/transport/web-usb) et lisez le [Guide de l’API Core](/fr/hardware-sdk/core-api-guide) pour le PIN, la phrase secrète, les événements et la signature.
+
+Hardware SDK 1.2.0 communique en Protocol V1 (Classic / Mini / Touch / Pro) et Protocol V2 (Pro 2 / Neo) via la **même API JavaScript**. Vous ne choisissez pas le protocole dans `init()`.
+
+<div className="doc-prerequisites">
+<strong>AVANT DE COMMENCER</strong>
+<ul>
+<li>Un appareil OneKey configuré et un câble USB prenant en charge les données</li>
+<li>Un navigateur compatible WebUSB, comme Chrome ou Edge sur ordinateur</li>
+<li>Une origine HTTPS, ou localhost pour le développement</li>
+</ul>
+</div>
+
+## 1. Choisir un paquet [#1-pick-a-package]
+
+| Environnement d’exécution | Paquet | Guide suivant |
+| --- | --- | --- |
+| WebUSB navigateur / ordinateur | `@onekeyfe/hd-common-connect-sdk` | [WebUSB](/fr/hardware-sdk/transport/web-usb) |
+| BLE React Native | `@onekeyfe/hd-ble-sdk` | [BLE React Native](/fr/hardware-sdk/transport/react-native-ble) |
+| Pont natif Android / iOS / Flutter | `@onekeyfe/hd-common-connect-sdk` (`env: 'lowlevel'`) | [BLE natif](/fr/hardware-sdk/transport/native-ble) |
+| Hôte iframe de navigateur uniquement | `@onekeyfe/hd-web-sdk` | [Hôte iframe du plugin](/fr/hardware-sdk#plugin-iframe-host) |
+
+<Tabs items={['npm', 'pnpm', 'yarn']} className="doc-example-tabs">
+
+<Tabs.Tab>
+
+```bash filename="Terminal"
+npm i --save-exact @onekeyfe/hd-common-connect-sdk@1.2 @onekeyfe/hd-core@1.2 @onekeyfe/hd-shared@1.2
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```bash filename="Terminal"
+pnpm add --save-exact @onekeyfe/hd-common-connect-sdk@1.2 @onekeyfe/hd-core@1.2 @onekeyfe/hd-shared@1.2
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```bash filename="Terminal"
+yarn add --exact @onekeyfe/hd-common-connect-sdk@1.2 @onekeyfe/hd-core@1.2 @onekeyfe/hd-shared@1.2
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+La commande sélectionne les paquets publiés `1.2.x` et enregistre les versions exactes. Gardez les paquets SDK, core et shared sur la même version et commitez votre fichier de verrouillage. Si vous embarquez `@onekeyfe/hd-web-sdk`, omettez `connectSrc` pour qu’il corresponde au paquet installé.
+
+## 2. Initialiser une seule fois [#2-initialize-once]
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+const initialized = await HardwareSDK.init({
+  env: 'webusb',
+  debug: false,
+  fetchConfig: true,
+});
+if (!initialized) throw new Error('SDK initialization failed');
+```
+
+Appelez `init()` une seule fois au point d’entrée de l’application. Ne mélangez pas `@onekeyfe/hd-web-sdk` et `@onekeyfe/hd-common-connect-sdk` dans le même environnement d’exécution.
+
+## 3. Rechercher, identifier, lire une adresse [#3-search-identify-read-an-address]
+
+Enregistrez le [gestionnaire d’événements d’interface](/fr/hardware-sdk/core-api-guide#events-ui) avant les appels protégés pour que les appareils verrouillés puissent terminer la saisie du PIN. Pour WebUSB, autorisez l’appareil depuis le bouton de connexion de l’utilisateur avant la découverte :
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// Run directly in the Connect button handler.
+if (!navigator.usb) throw new Error('WebUSB is unavailable in this browser');
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+Découvrez ensuite les appareils. Cet exemple nécessite un seul candidat ; si plusieurs appareils sont disponibles, laissez l’utilisateur en sélectionner un avant de continuer.
+
+```ts
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success || !devices.payload.length) {
+  throw new Error('No OneKey device found');
+}
+
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
+
+const state = await HardwareSDK.getDeviceState(connectId);
+if (state.success === false) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+
+const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+  showOnOneKey: true,
+});
+
+if (address.success === false) throw new Error(address.payload.error);
+console.log(address.payload.address);
+```
+
+Vérifiez toujours `success` avant de lire `payload`. `useEmptyPassphrase: true` maintient ce premier appel sur le portefeuille standard pour qu’une session de portefeuille caché restante ne change pas silencieusement l’adresse.
+
+`getDeviceState()` est la lecture V1/V2. `getFeatures()` est uniquement Protocol V1 ; Pro 2 et Neo doivent utiliser `getDeviceState()`.
+
+WebUSB nécessite HTTPS et une action utilisateur. BLE nécessite l’autorisation Bluetooth du système.
+
+## Ce que 1.2.0 fait pour vous [#what-120-does-for-you]
+
+- Le SDK détecte Protocol V1 ou V2 à partir de l’appareil connecté. Ne différenciez pas le comportement selon le PID USB, le nom BLE ou la chaîne produit. Consultez [Protocol V1 et V2](/fr/hardware-sdk/concepts/protocol).
+- Pro 2 et Neo utilisent les mêmes méthodes que Classic / Pro. Les différences entre appareils sont répertoriées dans [Appareils](/fr/hardware-sdk/concepts/devices).
+- Ouvrez ou changez de portefeuille avec `openWalletSession`. `getPassphraseState` est obsolète. Consultez [Sessions de portefeuille](/fr/hardware-sdk/concepts/wallet-session).
+
+## Suivant [#next]
+
+<Link className="doc-next" href="/fr/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction"><span><small>ETHEREUM ET EVM</small><strong>Signer votre première transaction</strong><span>Paramètres, types de frais et réponse de signature.</span></span><span aria-hidden="true">↗</span></Link>
+
+1. Déjà sur 1.1.x : [Passer de 1.1.x à 1.2.x](/fr/hardware-sdk/legacy-guides/from-1x)
+2. Connecter les événements d’interface PIN / phrase secrète : [Guide de l’API Core](/fr/hardware-sdk/core-api-guide)
+3. Établir une vraie connexion sur votre plateforme : [Transport](/fr/hardware-sdk/transport)
+4. Gérer les interruptions : [Reconnexion et libération](/fr/hardware-sdk/transport/reconnect)
+5. Quelles chaînes sur quel appareil : [Prise en charge des chaînes](/fr/hardware-sdk/concepts/chain-support)
+6. Signer une transaction : [Guides de signature](/fr/hardware-sdk/signers)
+7. Micrologiciel : [Mise à jour du micrologiciel](/fr/hardware-sdk/firmware-update)
+8. Essayer sans matériel : [Environnement de test](/fr/hardware-sdk/playground)

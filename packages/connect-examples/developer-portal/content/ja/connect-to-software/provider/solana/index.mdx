@@ -1,0 +1,36 @@
+---
+title: "Solana"
+description: "OneKey プロバイダーによる Solana の統合 — 検出、接続、トランザクション送信、メッセージ署名"
+slug: /dapp/chains/solana
+---
+
+# Solana
+
+Web アプリで OneKey の Solana プロバイダーを使用します。
+
+## クイックリンク [#quick-links]
+
+- [プロバイダーの検出](detecting-the-provider)
+- [接続の確立](establishing-a-connection)
+- [トランザクションの送信](sending-a-transaction)
+- [メッセージへの署名](signing-a-message)
+
+## 最小構成 [#minimal-pattern]
+
+```js
+// Detect
+const provider = window?.$onekey?.solana || window?.solana
+if (!provider?.isOneKey) throw new Error('OneKey Solana provider not detected')
+
+// Connect
+const { publicKey } = await provider.connect()
+console.log(publicKey.toString())
+```
+
+## イベント [#events]
+
+- `connect`, `disconnect`, `accountChanged`
+
+## 主なエラー [#common-errors]
+
+- 4001: ユーザーがリクエストを拒否

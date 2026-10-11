@@ -1,0 +1,163 @@
+---
+title: "Referencia de la API"
+description: "Referencia completa de la API del proveedor de Cosmos de OneKey"
+---
+
+<span id="api-reference" />
+
+# Referencia de la API
+
+Referencia de los métodos y tipos del proveedor de Cosmos de OneKey.
+
+---
+
+## Métodos [#methods]
+
+| Método | Descripción |
+|--------|-------------|
+| `enable(chainIds)` | Solicitar acceso a una o varias cadenas; la promesa se resuelve sin valor |
+| `disable(chainIds)` | Deshabilitar una o varias cadenas |
+| `disconnect()` | Desconectar de todas las cadenas |
+| `getKey(chainId)` | Obtener la clave de cuenta para una cadena |
+| `signAmino(chainId, signer, signDoc)` | Firmar una transacción codificada con Amino |
+| `signDirect(chainId, signer, signDoc)` | Firmar una transacción codificada con Protobuf |
+| `sendTx(chainId, tx, mode)` | Difundir una transacción firmada |
+| `signArbitrary(chainId, signer, data)` | Firmar un mensaje arbitrario |
+| `verifyArbitrary(chainId, signer, data, signature)` | Verificar la firma |
+| `signEthereum(chainId, signer, data, type)` | Firmar datos de Ethereum |
+| `experimentalSuggestChain(chainInfo)` | Añadir una cadena personalizada |
+| `getOfflineSigner(chainId)` | Obtener el firmante sin conexión Direct |
+| `getOfflineSignerOnlyAmino(chainId)` | Obtener el firmante sin conexión exclusivo de Amino |
+| `getOfflineSignerAuto(chainId)` | Detectar automáticamente el mejor tipo de firmante |
+| `getChainInfosWithoutEndpoints()` | Obtener información de todas las cadenas |
+| `getChainInfoWithoutEndpoints(chainId)` | Obtener información de una cadena específica |
+| `ping()` | Comprobar la conexión |
+| `babylonConnectWallet()` | Conectar a la cartera Babylon |
+| `babylonGetKey()` | Obtener la clave de la cartera Babylon |
+
+---
+
+## Interfaz Key [#key-interface]
+
+```typescript
+interface Key {
+  name: string              // Human-readable name
+  algo: string              // Signing algorithm
+  pubKey: Uint8Array        // Public key bytes
+  address: Uint8Array       // Address bytes
+  bech32Address: string     // Bech32 formatted address
+  isNanoLedger: boolean     // Ledger compatibility flag
+  isKeystone: boolean       // True if Keystone hardware
+}
+```
+
+---
+
+## Tipos de documentos de firma [#sign-doc-types]
+
+### Documento de firma Amino [#amino-sign-doc]
+
+```typescript
+interface StdSignDoc {
+  chain_id: string
+  account_number: string
+  sequence: string
+  fee: {
+    amount: { denom: string; amount: string }[]
+    gas: string
+  }
+  msgs: {
+    type: string
+    value: any
+  }[]
+  memo: string
+}
+```
+
+### Documento de firma Direct [#direct-sign-doc]
+
+```typescript
+interface DirectSignDoc {
+  bodyBytes: Uint8Array | null
+  authInfoBytes: Uint8Array | null
+  chainId: string | null
+  accountNumber: Long | null
+}
+```
+
+---
+
+## Tipos de respuesta de firma [#sign-response-types]
+
+```typescript
+interface AminoSignResponse {
+  signed: StdSignDoc
+  signature: StdSignature
+}
+
+interface DirectSignResponse {
+  signed: DirectSignDoc
+  signature: StdSignature
+}
+
+interface StdSignature {
+  pub_key: {
+    type: string
+    value: string  // Base64 encoded
+  }
+  signature: string  // Base64 encoded
+}
+```
+
+---
+
+## Modos de difusión [#broadcast-modes]
+
+| Modo | Descripción |
+|------|-------------|
+| `block` | Esperar a la inclusión en un bloque |
+| `sync` | Esperar a CheckTx |
+| `async` | Devolver de inmediato |
+
+---
+
+## Cadenas compatibles [#supported-chains]
+
+| Cadena | ID de cadena | Disponibilidad en la cartera |
+|-------|----------|----------------|
+| Cosmos Hub | `cosmoshub-4` | Verificar en la cartera de destino |
+| Osmosis | `osmosis-1` | Verificar en la cartera de destino |
+| Juno | `juno-1` | Verificar en la cartera de destino |
+| Stargaze | `stargaze-1` | Verificar en la cartera de destino |
+| Akash | `akashnet-2` | Verificar en la cartera de destino |
+| Secret Network | `secret-4` | Verificar en la cartera de destino |
+| Evmos | `evmos_9001-2` | Verificar en la cartera de destino |
+| Injective | `injective-1` | Verificar en la cartera de destino |
+| Personalizado | Específico de la cadena | Solicitar con `experimentalSuggestChain`; no se garantiza su aceptación |
+
+---
+
+## Eventos [#events]
+
+| Evento | Descripción |
+|-------|-------------|
+| `keplr_keystorechange` | Cuenta o clave cambiada |
+| `connect` | Conectado a la cadena |
+| `disconnect` | Desconectado |
+
+```typescript
+// Listen for keystore changes
+window.addEventListener('keplr_keystorechange', () => {
+  console.log('Key changed, refresh account info')
+})
+```
+
+---
+
+## Códigos de error [#error-codes]
+
+| Código | Descripción |
+|------|-------------|
+| 4001 | El usuario rechazó la solicitud |
+| 4100 | Sin autorización |
+| -32603 | Error interno |

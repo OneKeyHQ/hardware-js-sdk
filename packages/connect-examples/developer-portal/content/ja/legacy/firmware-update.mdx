@@ -1,0 +1,18 @@
+---
+title: "初期の firmwareUpdate API"
+description: "従来の API です。現在の[ファームウェア更新ガイド](/en/hardware-sdk/firmware-update) から始め、SDK、トランスポート、デバイス、リリースに適したメソッドを使用してください。"
+---
+
+<span id="original-firmwareupdate-api" />
+
+# 初期の firmwareUpdate API
+
+> 従来の API です。現在の次の [ファームウェア更新ガイド](/ja/hardware-sdk/firmware-update) から始め、SDK、トランスポート、デバイス、リリースに適したメソッドを使ってください。
+
+元の `firmwareUpdate(connectId, params)` リファレンスは次を受け付けていました: `updateType` (`firmware` または `ble`), 任意の `binary` (`ArrayBuffer`), および任意のバージョン配列。リリースリソースの選択か、バイナリの指定を説明していました。
+
+古い例のバージョン配列は、現在のリリースの推奨ではありません。ハードコードした対象や未検証バイナリを再利用しないでください。V2、V3、V4 という名前のファームウェア更新メソッドは API バージョンであり、デバイスの Protocol V2 互換性を宣言するものではありません。
+
+公式リリースメタデータを使い、選択したデバイス、ファームウェア、トランスポートを検証してください。ユーザーの意図的な更新開始を求め、デバイス検証と確認を維持し、完了を待って再接続を処理します。ダウンロードやトランスポート呼び出しの成功だけでは、更新完了を確認できません。
+
+この [元のソース](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-hardware/hardware-sdk/api-reference/device-api/firmwareupdate.md) は古いアプリケーションの保守用に残されています。

@@ -1,0 +1,129 @@
+---
+title: "API-Referenz"
+description: "Vollständige API-Referenz für den Sui-Provider von OneKey"
+---
+
+<span id="api-reference" />
+
+# API-Referenz
+
+Referenz der Methoden und Typen des Sui-Providers von OneKey.
+
+---
+
+## Methoden [#methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `hasPermissions()` | Prüfen, ob verbunden |
+| `requestPermissions()` | Verbindung anfordern |
+| `disconnect()` | Wallet trennen |
+| `getAccounts()` | Verbundene Konten abrufen |
+| `getActiveChain()` | Aktuelle Chain abrufen |
+| `isConnected()` | Verbindungsstatus prüfen |
+| `signAndExecuteTransactionBlock(input)` | Transaktion signieren und ausführen |
+| `signTransactionBlock(input)` | Transaktion nur signieren |
+| `signAndExecuteTransaction(input)` | Signieren und ausführen (neue API) |
+| `signTransaction(input)` | Transaktion signieren (neue API) |
+| `signMessage(input)` | Nachricht signieren (Legacy) |
+| `signPersonalMessage(input)` | Persönliche Nachricht signieren |
+| `onAccountChange(callback)` | Auf Kontoänderungen reagieren |
+| `onNetworkChange(callback)` | Auf Netzwerkänderungen reagieren |
+
+---
+
+## Typen [#types]
+
+### Wallet-Konto [#wallet-account]
+
+`getAccounts()` gibt `AccountInfo[]` zurück. Signiereingaben benötigen das Wallet-Standard-Objekt `WalletAccount`, dessen `publicKey` ein Byte-Array ist und das auch `chains` und `features` enthält. Rufen Sie es über `standard:connect` ab; wandeln Sie `AccountInfo` nicht per Typumwandlung in `WalletAccount` um.
+
+```typescript
+import type { WalletAccount, IdentifierString } from '@mysten/wallet-standard'
+import type { Transaction } from '@mysten/sui/transactions'
+
+// provider.getAccounts()
+interface AccountInfo {
+  address: string
+  publicKey: string // Hex-encoded public key
+}
+```
+
+### Eingabe zum Signieren und Ausführen eines Transaktionsblocks [#sign-and-execute-transaction-block-input]
+
+Der aktuelle injizierte Provider leitet `options` nicht weiter in `signAndExecuteTransactionBlock`. Fragen Sie den zurückgegebenen Digest mit einem Sui-Client auf derselben Chain ab, um Auswirkungen, Ereignisse oder Objektänderungen anzufordern.
+
+```typescript
+interface SignAndExecuteTransactionBlockInput {
+  account: WalletAccount
+  chain: IdentifierString
+  transactionBlock: Transaction
+  options?: {
+    showEffects?: boolean
+    showEvents?: boolean
+    showObjectChanges?: boolean
+    showBalanceChanges?: boolean
+    showInput?: boolean
+    showRawInput?: boolean
+  }
+}
+```
+
+### Ausgabe beim Signieren eines Transaktionsblocks [#sign-transaction-block-output]
+
+```typescript
+interface SignTransactionBlockOutput {
+  transactionBlockBytes: string
+  signature: string
+}
+```
+
+### Eingabe zum Signieren einer persönlichen Nachricht [#sign-personal-message-input]
+
+```typescript
+interface SignPersonalMessageInput {
+  account: WalletAccount
+  chain?: IdentifierString
+  message: Uint8Array
+}
+```
+
+### Ausgabe beim Signieren einer persönlichen Nachricht [#sign-personal-message-output]
+
+```typescript
+interface SignPersonalMessageOutput {
+  signature: string
+  bytes: string
+}
+```
+
+---
+
+## Unterstützte Chains [#supported-chains]
+
+| Chain | Kennung |
+|-------|------------|
+| Mainnet | `sui:mainnet` |
+| Testnet | `sui:testnet` |
+| Devnet | `sui:devnet` |
+
+---
+
+## Ereignisse [#events]
+
+| Ereignis | Callback-Parameter | Beschreibung |
+|-------|---------------------|-------------|
+| `accountChanged` | `{ address, publicKey } \| null` | Konto geändert |
+| `networkChange` | `network: string \| null` | Netzwerk geändert |
+| `connect` | `address: string` | Verbunden |
+| `disconnect` | - | Getrennt |
+
+---
+
+## Fehlercodes [#error-codes]
+
+| Code | Beschreibung |
+|------|-------------|
+| 4001 | Nutzer hat die Anfrage abgelehnt |
+| 4100 | Nicht autorisiert |
+| -32603 | Interner Fehler |

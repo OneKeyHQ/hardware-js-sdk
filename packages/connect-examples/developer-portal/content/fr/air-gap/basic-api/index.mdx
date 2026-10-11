@@ -1,0 +1,31 @@
+---
+title: "API de base"
+---
+
+<span id="basic-api" />
+
+# API de base
+
+Types UR fondamentaux utilisés dans toutes les intégrations de chaînes pour la signature hors ligne Air-Gap.
+
+## Types [#types]
+
+| Type | Description |
+|------|-------------|
+| [CryptoHDKey](./cryptohdkey) | Informations de clé déterministe hiérarchique (clé publique étendue) |
+| [CryptoCoinInfo](./cryptocoininfo) | Type de cryptomonnaie et informations réseau |
+| [CryptoKeypath](./cryptokeypath) | Représentation d’un chemin de dérivation BIP-44 |
+
+## Utilisation [#usage]
+
+Ces types sont les éléments de base des demandes de signature propres à chaque chaîne :
+
+- `CryptoHDKey` – Obtenu depuis l’appareil, contient la xpub nécessaire à la dérivation des adresses
+- `CryptoKeypath` – Spécifier la clé à utiliser pour signer
+- `CryptoCoinInfo` – Identifier la chaîne/le réseau cible
+
+## Paquets [#packages]
+
+```bash
+npm install @keystonehq/bc-ur-registry
+```

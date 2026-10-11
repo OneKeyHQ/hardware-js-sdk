@@ -1,0 +1,127 @@
+---
+title: "eth_getTransactionReceipt"
+description: "Transaktionsbeleg mit Ausführungsergebnis abrufen"
+---
+
+# eth_getTransactionReceipt
+
+Gibt den Beleg einer Transaktion anhand ihres Transaktionshashs zurück. Der Beleg enthält Informationen zur Transaktionsausführung, einschließlich Status und Protokollen.
+
+---
+
+## Parameter [#parameters]
+
+| Index | Typ | Beschreibung |
+|-------|------|-------------|
+| 0 | `string` | Transaktionshash (32 Bytes) |
+
+---
+
+## Rückgabe [#returns]
+
+`object | null` - Belegobjekt oder null, wenn noch nicht in einen Block aufgenommen
+
+| Feld | Typ | Beschreibung |
+|-------|------|-------------|
+| `transactionHash` | `string` | Transaktionshash |
+| `transactionIndex` | `string` | Index im Block (hex) |
+| `blockHash` | `string` | Blockhash |
+| `blockNumber` | `string` | Blocknummer (hex) |
+| `from` | `string` | Absenderadresse |
+| `to` | `string` | Empfängeradresse |
+| `cumulativeGasUsed` | `string` | Im Block bis zu dieser Transaktion insgesamt verbrauchtes Gas |
+| `gasUsed` | `string` | Von dieser Transaktion verbrauchtes Gas (hex) |
+| `contractAddress` | `string` | Adresse des erstellten Vertrags (falls zutreffend) |
+| `logs` | `array` | Array von Protokollobjekten |
+| `logsBloom` | `string` | Bloom-Filter für Protokolle |
+| `status` | `string` | `0x1` (Erfolg) oder `0x0` (Fehlschlag) |
+| `effectiveGasPrice` | `string` | Tatsächlich gezahlter Gaspreis (hex) |
+
+---
+
+## Beispiel [#example]
+
+```typescript
+const receipt = await window.$onekey.ethereum.request({
+  method: 'eth_getTransactionReceipt',
+  params: ['0x88df016429689c079f3b2f6ad39fa052532c56795b733da78a91ebe6a713944b']
+})
+
+if (receipt) {
+  const success = receipt.status === '0x1'
+  console.log('Transaction', success ? 'succeeded' : 'failed')
+  console.log('Gas used:', parseInt(receipt.gasUsed, 16))
+  console.log('Logs:', receipt.logs.length)
+}
+```
+
+### Auf Beleg warten [#wait-for-receipt]
+
+```typescript
+async function waitForReceipt(txHash, timeout = 60000) {
+  const start = Date.now()
+
+  while (Date.now() - start < timeout) {
+    const receipt = await window.$onekey.ethereum.request({
+      method: 'eth_getTransactionReceipt',
+      params: [txHash]
+    })
+
+    if (receipt) {
+      return receipt
+    }
+
+    await new Promise(r => setTimeout(r, 2000))
+  }
+
+  throw new Error('Transaction receipt timeout')
+}
+
+// Usage
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [txParams]
+})
+
+const receipt = await waitForReceipt(txHash)
+console.log('Transaction status:', receipt.status === '0x1' ? 'Success' : 'Failed')
+```
+
+### Vertragsereignisse auswerten [#parse-contract-events]
+
+```typescript
+// Set tokenAddress to the intended ERC-20 contract before parsing its Transfer logs.
+const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+
+const transferLogs = receipt.logs.filter(
+  log => log.address.toLowerCase() === tokenAddress.toLowerCase()
+    && log.topics[0] === transferTopic
+    && log.topics.length === 3
+)
+
+transferLogs.forEach(log => {
+  const from = '0x' + log.topics[1].slice(26)
+  const to = '0x' + log.topics[2].slice(26)
+  const value = BigInt(log.data).toString()
+  console.log(`Transfer: ${from} -> ${to}: ${value}`)
+})
+```
+
+---
+
+## Fehler [#errors]
+
+| Code | Nachricht | Beschreibung |
+|------|---------|-------------|
+| -32602 | Ungültige Parameter | Ungültiger Transaktionshash |
+
+---
+
+## Hinweise [#notes]
+
+- Gibt `null` zurück für ausstehende Transaktionen (noch nicht in einen Block aufgenommen)
+- `status`-Feld: `0x1` = Erfolg, `0x0` = rückgängig gemacht
+- `contractAddress` ist nur bei Transaktionen zur Vertragserstellung vorhanden
+- Verwenden Sie `logs`, um von der Transaktion ausgelöste Ereignisse auszuwerten
+
+Prüfen Sie beim Dekodieren von Protokollen den auslösenden Vertrag und das erwartete ABI. Ein passendes Topic allein identifiziert keinen Token, und ERC-721 verwendet dieselbe Transfer-Ereignissignatur mit einer anderen Anordnung indexierter Felder.

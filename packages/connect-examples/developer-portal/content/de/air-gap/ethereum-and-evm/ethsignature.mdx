@@ -1,0 +1,50 @@
+---
+title: "ETHSignature"
+---
+
+# ETHSignature
+
+`ETHSignature` dekodiert eine vom Gerät zurückgegebene Ethereum-Signatur. Der Klassenname verwendet großgeschriebenes `ETH`.
+
+Sein Konstruktor akzeptiert `signature: Buffer`, ein optionales `requestId: Buffer` und ein optionales `origin: string`.
+
+## Antwort dekodieren [#decode-the-response]
+
+Erstellen Sie für jede Scan-Sitzung einen neuen Decoder. Rufen Sie `onSignatureFrame` für jeden Kameraframe auf. Behalten Sie `expectedRequestId` aus der ursprünglichen Anfrage bei; akzeptieren Sie keine Signatur aus einer anderen Anfrage.
+
+```typescript
+import { URDecoder } from '@ngraveio/bc-ur';
+import { ETHSignature } from '@keystonehq/bc-ur-registry-eth';
+
+const decoder = new URDecoder();
+
+function onSignatureFrame(frame: string, expectedRequestId: string) {
+  decoder.receivePart(frame);
+  if (decoder.isError()) {
+    throw new Error('Could not decode the signature QR code');
+  }
+  if (!decoder.isSuccess()) return;
+
+  const ur = decoder.resultUR();
+  if (ur.type !== 'eth-signature') {
+    throw new Error('Expected an eth-signature response');
+  }
+  const result = ETHSignature.fromCBOR(ur.cbor);
+  const expectedId = Buffer.from(expectedRequestId.replace(/-/g, ''), 'hex');
+  const receivedId = result.getRequestId();
+  if (!receivedId || !receivedId.equals(expectedId)) {
+    throw new Error('Signature request ID does not match');
+  }
+  const signature = result.getSignature();
+  if (signature.length !== 65) {
+    throw new Error('Expected a 65-byte Ethereum signature');
+  }
+  return {
+    r: signature.subarray(0, 32),
+    s: signature.subarray(32, 64),
+    v: signature[64],
+  };
+}
+```
+
+Verwenden Sie Ihre Ethereum-Bibliothek, um `v` für den ursprünglichen Transaktionstyp und die ursprüngliche Chain auszuwerten, den Signierenden zu ermitteln und die signierte Transaktion zusammenzusetzen. Verwenden Sie exakt die unsignierte Transaktion, die an das Gerät gesendet wurde. Fügen Sie diese Signatur keiner neu erstellten oder veränderten Transaktion hinzu.

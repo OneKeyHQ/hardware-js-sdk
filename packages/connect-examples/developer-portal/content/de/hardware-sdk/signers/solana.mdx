@@ -1,0 +1,169 @@
+---
+description: "Eine Solana-Adresse bestätigen und serialisierte Nachrichten mit einem gehärteten Ableitungspfad und ausdrücklicher Wallet-Bindung signieren."
+title: "Solana-Signierer"
+---
+
+<span id="solana-signer" />
+
+# Solana-Signierer
+
+Anleitung zum Hardware-Signieren auf Solana. Behandelt Adressbestätigung und Nachrichten-/Transaktionssignieren mit unterstütztem gehärtetem Pfad und serialisiertem `rawTx`. Entspricht hardware-js-sdk (Promise-Antworten + UI-Ereignisse).
+
+## Index [#index]
+
+1. [Funktionsweise](#how-it-works)
+2. [Installation](#installation)
+3. [Initialisierung](#initialization)
+4. [Häufige Szenarien](#common-scenarios)
+   - [Adresse abrufen](#scenario-1-get-address)
+   - [Transaktion signieren](#scenario-2-sign-transaction)
+5. [Interaktion &amp; Status](#interaction--status)
+6. [Beispiel](#example)
+7. [Validierung &amp; Fehlerbehebung](#validation--troubleshooting)
+
+## Funktionsweise [#how-it-works]
+
+Der OneKey-Solana-Signierer verwendet `HardwareSDK` zur Kommunikation mit dem Gerät. Sie übergeben hexkodierte Solana-Nachrichtenbytes in `rawTx`; das Gerät zeigt Quelle/Ziel, Betrag und Gebührenübersicht und gibt dann eine Signatur zurück. Der Host fügt die Signatur mit `@solana/web3.js` an und prüft sie gegen den öffentlichen Schlüssel, der aus der von `solGetAddress` zurückgegebenen Base58-`address` dekodiert wird.
+
+- Verwenden Sie einen von der Firmware unterstützten gehärteten Pfad, zum Beispiel: `m/44'/501'/account'/0'`.
+- Stellen Sie sicher, dass die Nachricht/Transaktion einen aktuellen Blockhash enthält.
+
+## Installation [#installation]
+
+```bash
+npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
+```
+
+## Initialisierung [#initialization]
+
+Die Beispiele verwenden die **Standard-Wallet** durchgängig. Ersetzen Sie für eine versteckte Wallet `useEmptyPassphrase: true` durch den geprüften `passphraseState` bei jedem Adress- und Signieraufruf. Registrieren Sie [UI-Handler](/de/hardware-sdk/core-api-guide#events-ui) vor geschützten Aufrufen und prüfen Sie `success` vor Verwendung jeder Nutzlast. Beispiele mit deklarierten Transaktionseingaben sind Vorbereitungsfragmente, keine eigenständig ausführbaren Anwendungen.
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+```
+
+## Häufige Szenarien [#common-scenarios]
+
+### Szenario 1: Adresse abrufen [#scenario-1-get-address]
+
+```ts
+const res = await HardwareSDK.solGetAddress(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/44'/501'/0'/0'",
+  showOnOneKey: true,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.address and res.payload.path are strings.
+```
+
+**Parameter**
+
+- `path`: erforderlich; ein empfohlener Pfad ist `44'/501'/account'/0'`.
+- `showOnOneKey?`: optional; auf dem Gerät anzeigen und bestätigen.
+
+**Rückgabe**
+
+```ts
+type AddressResult =
+  | { success: true; payload: { address: string; path: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
+```
+
+---
+
+### Szenario 2: Transaktion signieren [#scenario-2-sign-transaction]
+
+```ts
+const res = await HardwareSDK.solSignTransaction(connectId, deviceId, {
+  path: "m/44'/501'/0'/0'",
+  rawTx,
+  useEmptyPassphrase: true,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.signature is hex; res.payload.path is the serialized path.
+```
+
+**Parameter**
+
+- `path`: erforderlich; SDK-Mindestlänge ist 3, unterliegt der Firmware-Pfadrichtlinie.
+- `rawTx`: erforderlich; hexkodierte serialisierte Nachrichtenbytes ohne Transaktionssignaturhülle. Die Laufzeit benötigt dieses Feld.
+- `useEmptyPassphrase?`: optional; Standard-Wallet erzwingen. Versteckte Wallet: übergeben Sie `passphraseState`.
+
+**Rückgabe**
+
+```ts
+type SignResult =
+  | { success: true; payload: { signature: string; path: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
+```
+
+## Interaktion &amp; Status [#interaction--status]
+
+- APIs werden nach Abschluss aufgelöst; Nutzeraufforderungen erscheinen über `UI_REQUEST` (Gerät entsperren, Transaktion bestätigen).
+- Führen Sie Aufrufe pro Gerät nacheinander aus. Verwenden Sie erneut `passphraseState` oder `useEmptyPassphrase: true`. `keepSession` hält weiterhin den Transport offen; es ist keine Wallet-Bindung.
+
+## Beispiel [#example]
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+const initialized = await HardwareSDK.init({ env: 'webusb', debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
+
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+
+const path = "m/44'/501'/0'/0'";
+const confirmedAddress = await HardwareSDK.solGetAddress(connectId, deviceId, {
+  path,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!confirmedAddress.success) throw new Error(confirmedAddress.payload.error);
+
+// Obtain these bytes from Transaction.serializeMessage() or
+// VersionedTransaction.message.serialize(), with a fresh recent blockhash.
+declare const messageBytes: Uint8Array;
+const rawTx = Array.from(messageBytes, byte => byte.toString(16).padStart(2, '0')).join('');
+
+const { success, payload } = await HardwareSDK.solSignTransaction(connectId, deviceId, {
+  path,
+  rawTx,
+  useEmptyPassphrase: true,
+});
+
+if (!success) throw new Error(payload.error);
+// Attach the signature and verify it against the confirmed address before broadcasting.
+```
+
+## Validierung &amp; Fehlerbehebung [#validation--troubleshooting]
+
+- Pfad: Das SDK prüft mindestens 3 Komponenten; die Firmware erzwingt unterstützte Ableitungspfade. Die Beispiele verwenden `m/44'/501'/account'/0'`.
+- Nachricht/Transaktion: aktuelle `recentBlockhash`, korrekte Konten und die richtige Anweisungsreihenfolge einschließen.
+- Geräteprüfung: Pfad/Konto, Ziel, Betrag und Gebührenübersicht müssen Ihrer Oberfläche entsprechen.
+- Host-Prüfung: Signatur anhängen mit `@solana/web3.js`, bestätigen, dass der Signierende dem `solGetAddress`-Ergebnis entspricht.
+- Zu große Nachrichten oder nicht unterstützte Anweisungen: Fehler melden und die aktuelle Anfrage stoppen. Aufteilen oder Anpassen einer Transaktion erfordert eine Neuerstellung und eine erneute Nutzerprüfung. Serialisieren Sie Aufrufe pro Gerät; bieten Sie bei Ablehnung oder Zeitüberschreitung Wiederholen/Abbrechen ohne automatische Wiederholung an.
+
+Siehe Methodendokumentation: [solSignTransaction](/de/hardware-sdk/chains/solana/solsigntransaction).

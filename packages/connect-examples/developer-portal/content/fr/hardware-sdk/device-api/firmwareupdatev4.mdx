@@ -1,0 +1,74 @@
+---
+description: "Installez des fichiers de micrologiciel Protocol V2 vérifiés sur Pro 2 ou Neo et rétablissez l’état en toute sécurité après redémarrage."
+title: "firmwareUpdateV4"
+---
+
+# firmwareUpdateV4
+
+Mise à jour du micrologiciel Protocol V2 pour **OneKey Pro 2** et **OneKey Neo**.
+
+N’appelez pas cette méthode sur Classic / Mini / Touch / Pro. Ces appareils utilisent [`firmwareUpdateV2`](/fr/hardware-sdk/device-api/firmwareupdatev2) ou [`firmwareUpdateV3`](/fr/hardware-sdk/device-api/firmwareupdatev3).
+
+Exécutez-la uniquement après que l’utilisateur a sélectionné l’appareil cible et approuvé la mise à jour. Les variables binaires ci-dessous doivent contenir des fichiers vérifiés pour ce modèle ; ils sont fournis par votre processus de publication.
+
+```ts
+const res = await HardwareSDK.firmwareUpdateV4(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+  bootloaderBinary,
+  applicationP1Binary,
+  applicationP2Binary,
+  coprocessorBinary,
+  resourceArchiveBinary,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+La méthode installe les binaires que vous transmettez, puis signale la progression via `FIRMWARE_PROGRESS` / `FIRMWARE_TIP`. Après `DeviceFirmwareUpdateRequest`, l’appareil peut redémarrer ; le SDK se reconnecte avec le même protocole.
+
+### Paramètres [#params]
+
+[Paramètres communs facultatifs](/fr/hardware-sdk/concepts/common-params)
+
+| Paramètre | Type | Obligatoire | Remarques |
+| --- | --- | --- | --- |
+| `platform` | `'native' \| 'desktop' \| 'ext' \| 'web' \| 'web-embed'` | Oui | Environnement hôte |
+| `bootloaderBinary` | `ArrayBuffer` | Non | Image du bootloader |
+| `applicationP1Binary` | `ArrayBuffer` | Non | Partition d’application 1 |
+| `applicationP2Binary` | `ArrayBuffer` | Non | Partition d’application 2 |
+| `coprocessorBinary` | `ArrayBuffer` | Non | Image BLE / coprocesseur |
+| `resourceArchiveBinary` | `ArrayBuffer` | Non | ZIP complet des ressources Protocol V2. Core n’écrit que les fichiers modifiés |
+| `forcedUpdateRes` | `boolean` | Non | Forcer la mise à jour des ressources |
+| `expectedDeviceId` | `string` | Non | Refuser de poursuivre si l’identité de l’appareil change pendant la mise à jour |
+
+Romloader ne peut pas être installé via `firmwareUpdateV4`. Les images SE (`se01Binary` … `se04Binary`) sont acceptées par le type, mais ne constituent pas un parcours général pour les intégrateurs.
+
+OneKey App utilise un parcours de plan préparé / d’association à l’hôte pour les versions officielles. Les hôtes tiers doivent transmettre les binaires qu’ils ont déjà vérifiés.
+
+### Résultat [#result]
+
+```ts
+{
+  success: true,
+  payload: {
+    bleVersion: string,
+    firmwareVersion: string,
+    bootloaderVersion: string,
+  }
+}
+```
+
+### Erreur [#error]
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code?: string | number,
+  }
+}
+```
+
+Ne réessayez **pas** automatiquement `firmwareUpdateV4` après un délai de transport dépassé ou une déconnexion. L’appareil peut déjà être en cours d’installation. Relisez son état, puis décidez.
+
+La confirmation par bouton pendant la mise à jour est informative (`REQUEST_BUTTON` avec `reason='firmware-update'`). N’appelez pas `uiResponse()` pour cette indication. Si l’utilisateur l’annule, annulez l’appel SDK ; n’envoyez pas un second Cancel.

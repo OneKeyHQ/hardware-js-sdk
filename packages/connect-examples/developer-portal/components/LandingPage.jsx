@@ -11,7 +11,6 @@ import styles from './LandingPage.module.css'
 import { publishedLocales } from '../i18n/locales.mjs'
 
 export function LandingPage({ locale = 'en' }) {
-  const isZh = locale === 'zh'
   const root = `/${locale}`
   const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/$/, '')
   const routes = [
@@ -63,7 +62,7 @@ export function LandingPage({ locale = 'en' }) {
 
   return (
     <div className={`landing-page ${styles.page}`}>
-      <main id="nextra-skip-nav" tabIndex={-1} className={styles.main}>
+      <main data-pagefind-body id="nextra-skip-nav" tabIndex={-1} className={styles.main}>
         <section className={styles.hero} aria-labelledby="developer-title">
           <div className={styles.heroCopy}>
             <p className={styles.eyebrow}><span className={styles.statusDot} />{ui(locale, "THE ONEKEY DEVELOPER PLATFORM", "ONEKEY 开发者平台")}</p>
@@ -130,7 +129,7 @@ export function LandingPage({ locale = 'en' }) {
         <nav aria-label={ui(locale, "Language", "语言")}>{publishedLocales.map(({ code, name }) => <Link key={code} href={`/${code}`} aria-current={locale === code ? 'page' : undefined}>{name}</Link>)}</nav>
         <nav aria-label={ui(locale, "OneKey resources", "OneKey 资源")}><a href="https://onekey.so/">OneKey</a><a href="https://help.onekey.so/">{ui(locale, "Help center", "帮助中心")}</a><a href="https://help.onekey.so/hc/articles/11461297">{ui(locale, "User agreement", "用户协议")}</a><a href="https://help.onekey.so/hc/articles/11461298">{ui(locale, "Privacy policy", "隐私政策")}</a></nav>
       </div>
-      <Footer />
+      <Footer locale={locale} />
     </div>
   )
 }

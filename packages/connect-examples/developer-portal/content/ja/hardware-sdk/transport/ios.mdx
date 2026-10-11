@@ -1,0 +1,81 @@
+---
+description: "順序を保った I/O と通知の準備完了を確認し、CoreBluetooth と WKWebView で OneKey に接続します。"
+title: "iOS: Bluetooth で接続"
+---
+
+<span id="ios-connect-via-bluetooth" />
+
+# iOS: Bluetooth で接続
+
+WKWebView で `@onekeyfe/hd-common-connect-sdk` を実行し、低レベルトランスポートを CoreBluetooth に橋渡しします。まず[ネイティブ iOS の例](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-ios-example)と[低レベルトランスポートプラグイン](/ja/hardware-sdk/concepts/low-level-plugin)の仕様を参照してください。
+
+ネイティブホストは Bluetooth のライフサイクルを担当し、SDK はプロトコル検出、フレーミング、リクエスト/レスポンス処理を担当します。
+
+## アプリを設定 [#configure-the-app]
+
+- `NSBluetoothAlwaysUsageDescription` を含め、ハードウェアウォレットとの接続についての説明を指定します。古い iOS に対応する場合は追加要件も確認してください。
+- CoreBluetooth と、ネイティブの例で宣言されたブリッジ依存関係を使用します。
+- Bluetooth を許可した iOS 実機でテストします。スキャン前に、拒否、制限、電源オフの状態を処理してください。
+
+## JavaScript バンドルのビルドと読み込み [#build-and-load-the-javascript-bundle]
+
+hardware-js-sdk のチェックアウトから実行:
+
+```bash
+cd packages/connect-examples/native-ios-example/web
+yarn
+yarn build
+```
+
+完全な次の `web_dist/` ディレクトリをアプリターゲットのリソースに追加し、相対的なアセットパスを維持します。WKWebView とブリッジを作成し、ネイティブハンドラーを登録して、バンドルの HTML を読み込みます。デバイス機能が有効な WebView で、信頼できないコンテンツを開かないでください。
+
+例の完全な実装と依存関係のバージョンを使用してください。独自ブリッジが保証すべきことを以下の表に示します。
+
+## 接続のライフサイクル [#connection-lifecycle]
+
+`CBCentralManager.connect()` は接続試行を開始します。その時点で JS の次の `connect` リクエストを解決しないでください。
+
+| 段階 | 必要な処理 |
+| --- | --- |
+| スキャン | `.poweredOn` を待機します。OneKey サービスでフィルターし、重複を除き、定めた期限でスキャンを停止します。 |
+| 選択 | 選択された peripheral UUID と照合します。再接続のスキャンでは、その選択済み peripheral にのみ接続してください。 |
+| 接続 | `didConnect` を待機します。`didFailToConnect` またはタイムアウトの場合は失敗を返します。 |
+| 検出 | 必要なサービスと書き込み/通知特性を探し、検出エラーや特性の欠落を処理します。 |
+| 購読 | 通知を有効にしてから `didUpdateNotificationStateFor` を待ち、エラーがなく、通知が有効であることを確認します。 |
+| 準備完了 | この段階で初めて、保留中の JS 接続リクエストを解決します。各ブリッジコールバックは一度だけ完了させます。 |
+
+購読の完了を確認するには、Apple の[通知状態のコールバック](https://developer.apple.com/documentation/corebluetooth/cbperipheraldelegate/peripheral(_:didupdatenotificationstatefor:error:))を参照してください。
+
+| 目的 | UUID |
+| --- | --- |
+| サービス | `00000001-0000-1000-8000-00805f9b34fb` |
+| 書き込み | `00000002-0000-1000-8000-00805f9b34fb` |
+| 通知 | `00000003-0000-1000-8000-00805f9b34fb` |
+
+## 順序付き I/O [#ordered-io]
+
+- `send` は SDK が準備した 16 進数を受け取ります。不正な形式や奇数長の 16 進数は拒否し、無効なバイトを黙って捨てないでください。
+- 指定された書き込みモードと peripheral の書き込み容量に従います。応答なし書き込みでは CoreBluetooth のバックプレッシャーを尊重してください。キューへの追加は、デバイスで SDK リクエストが完了した証拠ではありません。
+- 生の通知チャンクを peripheral ごとにキューに入れ、`receive(uuid)` の各呼び出しで変更していない 16 進数チャンクを 1 つ返します。V1 ヘッダーを解析したり、USB のパケットサイズに合わせてチャンクを埋めたりしないでください。
+- 切断時は保留中の処理を拒否し、古い接続の通知キューを消去します。再接続に以前の接続の古いデータを渡してはいけません。
+- ネイティブの書き込み容量を `getProtocolV2PacketCapacity` で公開します。[プラグインインターフェース](/ja/hardware-sdk/concepts/low-level-plugin#lowleveltransportsharedplugin-interface)を参照してください。
+
+## SDK とウォレットの識別情報 [#sdk-and-wallet-identity]
+
+ブリッジプラグインを指定し、`env: 'lowlevel'` で SDK を初期化して、成功を確認します。`searchDevices()` で `connectId` を選択し、続いて `getDeviceState(connectId)` で `identity.deviceId` を読み取ります。
+
+iOS の peripheral UUID は接続のルーティング用であり、シード識別情報ではありません。再接続後に状態を取得し、想定するウォレットが変わっていたら停止してください。参照: [識別子](/ja/hardware-sdk/concepts/identifiers).
+
+## PIN、パスフレーズ、確認 [#pin-passphrase-and-confirmation]
+
+保護された呼び出しの前に [UI イベント](/ja/hardware-sdk/core-api-guide#events-ui)を登録してください。ネイティブプロンプトは入力の収集や案内を表示できますが、JS ハンドラーは元のリクエストの応答関連付け情報を保持する必要があります。
+
+入力リクエストにのみ応答します。 `REQUEST_BUTTON`, `REQUEST_PASSPHRASE_ON_DEVICE`, およびデバイス専用 PIN イベントは通知です。ホストのコールバックで「OK」を返しても、デバイス上の操作は承認されません。ユーザーがキャンセルしたら、選択中の SDK 呼び出しをキャンセルし、保留中の UI コールバックを無効化してください。
+
+アドレス確認と署名に、同じ明示的な標準/隠しウォレットの関連付けを使用します。ホストで入力した PIN/パスフレーズをログや永続ストレージに含めないでください。
+
+## 検証と復旧 [#verify-and-recover]
+
+権限拒否、Bluetooth オフ、特性の欠落、通知購読の失敗、デバイス入力、キャンセル、再接続をテストします。実機でアドレスを確認してから、ブリッジが動作すると判断してください。
+
+タイムアウト後に署名やファームウェア更新を自動再実行しないでください。次に従ってください: [再接続と破棄](/ja/hardware-sdk/transport/reconnect).

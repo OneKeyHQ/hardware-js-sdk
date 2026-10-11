@@ -1,0 +1,23 @@
+---
+title: "トランザクションへの署名"
+---
+
+<span id="signing-transaction" />
+
+# トランザクションへの署名
+
+送信せずにトランザクションに署名します。
+
+このメソッドは Promise を返します。レスポンスの形式はバージョンごとの確認が必要です。公開プロバイダーの宣言では `transactionHashes` が指定されていますが、公開されている例では `signatures` を読み取っています。インストール済みプロバイダーとウォレットのバージョンを確認するまでは、どちらのフィールドにも依存しないでください。この署名専用リクエストはトランザクションをブロードキャストしません。
+
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const res = await provider.request({
+  method: 'near_signTransactions',
+  params: {
+    transactions: [transaction], // must be Array type
+  },
+});
+console.log('near_signTransactions', res);
+```

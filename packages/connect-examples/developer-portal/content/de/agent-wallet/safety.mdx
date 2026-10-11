@@ -1,0 +1,55 @@
+---
+title: "Sicherheitsregeln"
+description: "Bestätigung, Umgang mit Geheimnissen und Abbruchbedingungen für Agentenabläufe festlegen."
+---
+
+<span id="safety-rules" />
+
+# Sicherheitsregeln
+
+Agent-Wallet-Abläufe können Guthaben lesen, Transaktionen erstellen und Swaps ausführen. Machen Sie die Sicherheitsgrenze ausdrücklich deutlich.
+
+## Lesen und Schreiben [#read-versus-write]
+
+| Anfragetyp | Beispiele | Erforderliches Verhalten |
+| --- | --- | --- |
+| Rein lesend | Guthaben, Empfangsadresse, Preis, angesagte Tokens, Verlauf, Token-Informationen | Knappe Ergebnisse und einen nützlichen nächsten Schritt zurückgeben. |
+| Vorbereitung | Swap-Angebot, Transaktionserstellung, Token-Prüfung, Simulation | Ergebnis und Risikokontext anzeigen; nichts einreichen. |
+| Schreibzugriff | Überweisung, Swap-Ausführung, Freigabe, Übertragung, Signieren | Vor der Ausführung eine ausdrückliche Bestätigung anfordern. |
+| Schreibzugriff mit Gerätebestätigung | Überweisung mit hohem Wert, sensibler Vertragsaufruf, Signieren mit versteckter Wallet | Eine Bestätigung auf dem OneKey-Gerät verlangen und bei Ablehnung durch das Gerät anhalten. |
+
+## Niemals Geheimnisse offenlegen [#never-expose-secrets]
+
+Agenten dürfen niemals Folgendes offenlegen:
+
+- Private Schlüssel oder Seed-Phrasen.
+- Entschlüsselte Agent-Wallet-Zugangsdaten.
+- Hardware-Passphrasen.
+- Zugriffstokens.
+- Schlüsselbundinhalte oder Zugangsdaten-Nutzlasten.
+
+## Schreibzugriffe bestätigen [#confirm-writes]
+
+Zeigen Sie vor jeder Überweisung, Swap-Ausführung, Freigabe oder Signieranfrage eine kompakte Bestätigung an:
+
+| Feld | Erforderlich |
+| --- | --- |
+| Aktion | Überweisen, tauschen, signieren, freigeben oder übertragen |
+| Quelle | Wallet-Adresse und Chain |
+| Ziel | Empfänger, Vertrag oder Ziel-Chain |
+| Betrag | Betrag in der nativen Währung oder im Token |
+| Gebühren | Gas- oder Gebührenschätzung, sofern verfügbar |
+| Risikoergebnis | Ergebnis der Sicherheitsprüfung oder Simulation, sofern verfügbar |
+| Hardware-Schritt | Erforderliche Gerätebestätigung, sofern zutreffend |
+
+Erst nach Bestätigung durch den Nutzer einreichen.
+
+## Abbruchbedingungen [#stop-conditions]
+
+Anhalten und den Zustand melden, wenn:
+
+- `onekey auth status` nicht authentifiziert ist.
+- Die aktive Adresse nicht der vom Nutzer erwarteten Wallet entspricht.
+- Das Gerät gesperrt oder getrennt ist, die Anfrage abgelehnt hat oder auf eine PIN/Passphrase wartet.
+- Das CLI-Schema den vom Agenten gewünschten Parameter nicht bereitstellt.
+- Ein Sicherheitsbefehl ein hohes Risiko meldet und der Nutzer es nicht ausdrücklich akzeptiert hat.

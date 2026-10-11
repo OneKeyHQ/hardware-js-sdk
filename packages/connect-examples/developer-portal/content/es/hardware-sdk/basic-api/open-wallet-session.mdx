@@ -1,0 +1,64 @@
+---
+description: "Selecciona la cartera estándar u oculta y consulta la identidad pública que devuelve el SDK."
+title: "Abrir una sesión de cartera"
+---
+
+<span id="open-wallet-session" />
+
+# Abrir una sesión de cartera
+
+Punto de entrada unificado de Protocol V1 / V2 para abrir la cartera estándar o permitir que el usuario seleccione una cartera oculta.
+
+Usa este método en lugar del obsoleto [`getPassphraseState`](/es/hardware-sdk/basic-api/get-passphrase-state). Las llamadas de dirección y firma siguen aceptando `deviceId` + `passphraseState` y no debes reabrir una sesión en cada ocasión. No existe el modo `resume-hidden`. Core ya reanuda la sesión en el primer método posterior que incluya `passphraseState`.
+
+Consulta [Sesiones de cartera](/es/hardware-sdk/concepts/wallet-session) para consultar el contrato de uso.
+
+```ts
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
+
+const res = await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.Standard,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+### Parámetros [#params]
+
+[Parámetros comunes opcionales](/es/hardware-sdk/concepts/common-params)
+
+No combines `mode` con `useEmptyPassphrase` o `initSession` en esta llamada.
+
+| Parámetro | Tipo | Obligatorio | Notas |
+| --- | --- | --- | --- |
+| `mode` | `'standard' \| 'select-hidden'` | Sí | Usa `OpenWalletSessionMode` de `@onekeyfe/hd-core` |
+
+### Resultado [#result]
+
+```ts
+{
+  success: true,
+  payload: {
+    protocol: 'V1' | 'V2',
+    deviceId: string,
+    resumed: boolean,
+    walletType: 'standard' | 'hidden',
+    passphraseState: string | null, // null on standard wallet
+  }
+}
+```
+
+Guarda de forma persistente `deviceId`, `walletType`, y `passphraseState`. El valor de firmware `session_id` no se devuelve.
+
+### Error [#error]
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code?: string | number,
+  }
+}
+```
+
+`mode: 'resume-hidden'` y `deviceId` / `passphraseState` en esta llamada devuelven `CallMethodInvalidParameter`. Reanuda una cartera oculta vinculada pasando `passphraseState` en el siguiente método de dirección o firma. `DeviceCheckUnlockTypeError` significa que el contexto actual de PIN / Attach-to-PIN no permite acceder a la cartera solicitada.

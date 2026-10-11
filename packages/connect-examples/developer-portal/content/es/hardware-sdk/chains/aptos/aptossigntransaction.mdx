@@ -1,0 +1,64 @@
+---
+title: "aptosSignTransaction"
+---
+
+# aptosSignTransaction
+
+## Requisitos [#requirements]
+
+* Versiones mínimas de firmware
+  * Touch: 3.0.0
+  * Classic/Mini: 2.6.0
+
+## Aptos: firmar una transacción [#aptos-sign-transaction]
+
+Solicita una firma de transacción con la clave derivada de la ruta especificada. El usuario revisa y confirma la solicitud en el dispositivo.
+
+```typescript
+const result = await HardwareSDK.aptosSignTransaction(connectId, deviceId, params);
+```
+
+### Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `3`. [Formato de ruta](/es/hardware-sdk/concepts/common-params#hd-path)
+* `rawTx` - _obligatorio_ `string` Transacción serializada y codificada como cadena hexadecimal.
+
+### Ejemplos [#examples]
+
+```typescript
+const response = await HardwareSDK.aptosSignTransaction(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/637'/0'/0'/0'",
+    rawTx: "4301355cc18d85809872bcbd63cb6ea5ac3c2814a1bacf2e50d8ec62367211917b79ecd1f1a98fa0d793d7cb92ebd9a479dc6aba0ae8570253aa87c0da32db5ed2bd401f3bbee52c2bc55761fd8486fae2e28f46499282f4267b8b90fc8c1cc97bb659b6cc927f2ec1701ef2928ddb84759ba5c557f549db"
+  }
+);
+```
+
+Resultado
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: "m/44'/637'/0'/0'/0'",
+    public_key: string,
+    signature: string,
+  }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

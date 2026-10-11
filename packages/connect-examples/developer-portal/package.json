@@ -7,14 +7,15 @@
     "dev:webpack": "next dev --webpack -p 3001",
     "dev:ai-gateway": "node ./scripts/context7-chat-gateway.mjs",
     "sync:changelog": "node ./scripts/sync-changelog.mjs",
-    "build": "yarn check:content && yarn i18n:check && next build && node scripts/build-search.mjs",
+    "build": "yarn check:content && yarn check:search && yarn i18n:check && next build && node scripts/build-search.mjs",
     "start": "npx serve@latest out",
     "clean": "rimraf out .next",
     "check:content": "node --test scripts/check-content.test.mjs && node scripts/check-content.mjs",
-    "i18n:plan": "node scripts/i18n/sync.mjs",
-    "i18n:sync": "node scripts/i18n/sync.mjs --write",
-    "i18n:check": "node --test scripts/i18n/*.test.mjs && node scripts/i18n/sync.mjs --check",
-    "i18n:extract-ui": "node scripts/i18n/extract-ui.mjs"
+    "i18n:plan": "node scripts/i18n/check.mjs --json",
+    "i18n:check": "node --test scripts/i18n/*.test.mjs && node scripts/i18n/check.mjs",
+    "i18n:extract-ui": "node scripts/i18n/extract-ui.mjs",
+    "i18n:record": "node scripts/i18n/record.mjs",
+    "check:search": "node --test scripts/search.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/react": "3.0.110",

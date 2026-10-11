@@ -1,0 +1,137 @@
+---
+title: "Recetas"
+description: "Sigue ejemplos por etapas para consultar la cartera, preparar intercambios y firmar tras la confirmación."
+---
+
+<span id="recipes" />
+
+# Recetas
+
+Estos ejemplos muestran la secuencia prevista para una solicitud del usuario. Antes de ejecutar comandos, consulta `onekey schema --list` y el esquema del comando correspondiente en la CLI instalada. Sustituye las direcciones y los identificadores de orden de ejemplo por valores validados. La disponibilidad varía según la versión beta.
+
+## Consultar el estado de la cartera [#check-wallet-state]
+
+Usuario:
+
+```text
+Show my wallet balance and receiving address.
+```
+
+Flujo esperado:
+
+```bash
+onekey auth status
+onekey get-address
+onekey balance --chain eth
+```
+
+Formato de respuesta recomendado:
+
+```text
+Active wallet: 0x...
+Ethereum balance: ...
+Receiving address: 0x...
+Next: I can show history, quote a swap, or prepare a transfer.
+```
+
+## Investigar antes de comprar [#research-before-buying]
+
+Usuario:
+
+```text
+What Solana tokens are trending, and is BONK worth a closer look?
+```
+
+Flujo esperado:
+
+```bash
+onekey token trending --chain sol
+onekey token search --query BONK --chain sol
+onekey token info --chain sol --token BONK
+```
+
+El agente debe responder primero con información de mercado. No debe iniciar un intercambio salvo que el usuario pida operar en un turno posterior.
+
+## Cotizar, confirmar y ejecutar [#quote-confirm-execute]
+
+Usuario:
+
+```text
+Swap 1 ETH to USDC, but show me the quote before execution.
+```
+
+Flujo esperado:
+
+```bash
+onekey balance --chain eth
+onekey swap quote --chain eth --from ETH --to USDC --amount 1
+onekey security audit --chain eth --token USDC
+onekey swap build --chain eth --from ETH --to USDC --amount 1
+```
+
+La confirmación debe mostrar:
+
+| Campo | Ejemplo |
+| --- | --- |
+| Acción | Intercambio |
+| Ruta | ETH -&gt; USDC en Ethereum |
+| Importe | 1 ETH |
+| Importe de salida estimado | Del resultado de la cotización |
+| Comisiones | Del resultado de la cotización o construcción, si está disponible |
+| Riesgo | Estado de la auditoría o simulación |
+| Siguiente paso | `Proceed? (yes/no)` |
+
+Solo después de que el usuario confirme:
+
+```bash
+onekey swap execute --chain eth --order <orderId>
+```
+
+## Transferencia respaldada por hardware [#hardware-backed-transfer]
+
+Usuario:
+
+```text
+Use my OneKey hardware wallet to send 50 USDC to 0x...
+```
+
+Flujo esperado:
+
+```bash
+onekey device search
+onekey auth login --hardware
+onekey auth status
+onekey balance --chain eth --token USDC
+```
+
+Muestra la cartera activa, la dirección completa del destinatario, la cadena, el token, el importe, la comisión estimada y el paso de confirmación en el dispositivo. Solo después de que el usuario confirme la transferencia:
+
+```bash
+onekey transfer --to <verified-full-address> --amount 50 --token USDC --chain eth
+```
+
+La confirmación de la transferencia debe mencionar el paso de confirmación en el dispositivo. Si el dispositivo está bloqueado, desconectado, solicita un PIN o una passphrase, o rechaza la solicitud, el agente debe detenerse e informar de ese estado.
+
+## PSBT de BTC solo para firma [#btc-sign-only-psbt]
+
+Usuario:
+
+```text
+Swap 0.01 BTC to USDC using taproot and sign only.
+```
+
+Flujo esperado:
+
+```bash
+onekey wallet address --chain btc --address-type taproot
+onekey swap quote --chain btc --from BTC --to USDC --amount 0.01
+onekey swap build --chain btc --from BTC --to USDC --amount 0.01
+```
+
+Muestra la orden preparada, el tipo de dirección, el importe, el importe de salida y las comisiones. La firma requiere una confirmación explícita incluso cuando no se vaya a difundir ninguna transacción. Solo después de que el usuario confirme:
+
+```bash
+onekey swap execute --chain btc --order <orderId> --from-address-type taproot --sign-only
+```
+
+La respuesta debe ser una PSBT firmada o lista para previsualizar, no el hash de una transacción difundida.

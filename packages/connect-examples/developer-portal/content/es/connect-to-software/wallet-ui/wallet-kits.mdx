@@ -1,0 +1,55 @@
+---
+title: "Bibliotecas de interfaz de carteras"
+description: "Componentes de interfaz de conexión de carteras listos para una integración rápida"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="wallet-ui-libraries" />
+
+# Bibliotecas de interfaz de carteras
+
+Las bibliotecas de interfaz de carteras ofrecen un selector de carteras y el estado de conexión. Elige una biblioteca para tu framework y las cadenas de destino; después, prueba los cambios de cuenta, las solicitudes rechazadas y las conexiones móviles.
+
+<Callout type="info">
+Las siguientes guías cubren integraciones EVM. Para Aptos, usa [Aptos Wallet Adapter](/es/connect-to-software/wallet-ui/aptos-wallet-adapter). Para otras cadenas, empieza con [proveedor específico de la cadena](/es/connect-to-software/provider).
+</Callout>
+
+---
+
+## Elige tu biblioteca [#choose-your-library]
+
+| Biblioteca | Framework | Funciones |
+|---------|-----------|----------|
+| [RainbowKit](/es/connect-to-software/wallet-ui/rainbowkit) | Solo React | Selector de carteras, temas e integración con wagmi |
+| [AppKit (antes Web3Modal)](/es/connect-to-software/wallet-ui/web3modal) | React/Vue/JS | Ecosistema WalletConnect, códigos QR móviles y AppKit |
+| [Web3-Onboard](/es/connect-to-software/wallet-ui/web3-onboard) | React/Vue/JS | Blocknative y amplias opciones de personalización |
+
+---
+
+## Compatibilidad de frameworks y conexiones [#framework-and-connection-support]
+
+| Función | RainbowKit | AppKit | Web3-Onboard |
+|---------|------------|-----------|--------------|
+| React | ✅ | ✅ | ✅ |
+| Vue | ❌ | ✅ | ✅ |
+| JavaScript sin framework | ❌ | ✅ | ✅ |
+| QR móvil | ✅ | ✅ | ✅ |
+
+---
+
+## Cuándo usarlos [#when-to-use]
+
+Usa bibliotecas de interfaz de carteras si:
+- Necesitas un selector de carteras con estado de conexión
+- Necesitas compatibilidad con carteras móviles mediante códigos QR
+- No quieres crear una interfaz personalizada de conexión de carteras
+- Quieres integración con WalletConnect
+
+---
+
+## Alternativa: interfaz personalizada [#alternative-custom-ui]
+
+Si necesitas control total sobre la interfaz de la cartera, considera:
+- [Wagmi](/es/connect-to-software/react-hooks/wagmi) - Hooks de React sin interfaz
+- [API del proveedor](/es/connect-to-software/provider/eth) - Acceso directo a la cartera

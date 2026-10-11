@@ -1,0 +1,54 @@
+---
+title: "Anleitung"
+---
+
+<span id="guide" />
+
+# Anleitung
+
+## Übersicht [#overview]
+
+Diese Anleitung zeigt, wie Sie mit der OneKey-Provider-API einfach Netzwerkanwendungen mit dem Nostr-Protokoll erstellen.
+
+Die OneKey-Provider-API wird spezifiziert durch [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md).
+
+## Installieren [#install]
+
+### 1. OneKey Wallet herunterladen [#1-download-onekey-wallet]
+
+Laden Sie [OneKey Wallet](https://onekey.so/download?client=browserExtension). Installieren Sie die OneKey-Browsererweiterung.
+
+#### 2. Erklärung der API-Injektion [#2-api-injection-explanation]
+
+* Die OneKey-Browsererweiterung injiziert `Provider API` in besuchte Websites.
+* Es werden zwei API-Typen bereitgestellt: `window.nostr` und `window.$onekey.nostr`.
+* Empfohlen wird `window.$onekey.nostr`.
+
+> Bevorzugen Sie `window.$onekey.nostr`, um gezielt OneKey auszuwählen. Die globale Variable `window.nostr` kann zu einer anderen Wallet gehören, wenn mehrere Erweiterungen installiert sind.
+
+### Unterstützung der Provider-API erkennen [#detecting-provider-api-support]
+
+Prüfen Sie vor Anfragen, ob ein Provider verfügbar ist:
+
+```javascript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+if (!provider) {
+  throw new Error("No provider is available.");
+}
+```
+
+## API [#api]
+
+Wählen Sie die API für den Vorgang, den Ihre Anwendung benötigt.
+
+**Weitere Schnittstellen**: [Details anzeigen](/de/connect-to-software/provider/nostr/api-reference)
+
+## Ereignis [#event]
+
+* **Wichtige Vorgänge**: Zum Beispiel Kontowechsel
+* **Weitere Informationen**: [Mehr anzeigen](/de/connect-to-software/provider/nostr/event)
+
+## Anfragen behandeln [#handling-requests]
+
+Führen Sie Wallet-Anfragen in einer asynchronen Funktion oder einem ES-Modul aus. Fangen Sie abgelehnte Promises ab und zeigen Sie den Fehler in Ihrer Anwendung an. Fordern Sie Verbindungen, Signaturen und Zahlungen über eine Nutzeraktion an und deaktivieren Sie die auslösende Schaltfläche, solange eine Anfrage aussteht.

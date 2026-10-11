@@ -1,0 +1,67 @@
+---
+title: "データへの署名"
+---
+
+<span id="signing-data" />
+
+# データへの署名
+
+読みやすいメッセージには `personal_sign`、[EIP-712](https://eips.ethereum.org/EIPS/eip-712) で定義される構造化データには `eth_signTypedData_v4` を使用します。アカウント接続後に署名を要求し、ウォレットのプロンプトを開く前に、ユーザーが何を承認するか説明してください。
+
+## 個人メッセージ [#personal-messages]
+
+`personal_sign` は第 1 引数に 16 進数エンコードされたメッセージ、第 2 引数に署名者のアドレスを受け取ります。戻り値は署名文字列です。署名リクエストではトランザクションの送信もネットワーク手数料の支払いも行われません。
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+const [address] = await provider.request({ method: 'eth_requestAccounts' });
+const message = 'Sign in to example.com. Nonce: <SERVER_GENERATED_NONCE>';
+const bytes = new TextEncoder().encode(message);
+const data = '0x' + Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+
+try {
+  const signature = await provider.request({
+    method: 'personal_sign',
+    params: [data, address],
+  });
+  // Verify the signature and one-time challenge on your server.
+  console.log(signature);
+} catch (error) {
+  console.error(error.code, error.message);
+}
+```
+
+サインインでは、プレースホルダーをサーバーが生成する 1 回限りのチャレンジに置き換え、意図したドメイン、有効期限、署名者を検証してください。検証せずに署名の存在だけを認証として扱ってはいけません。
+
+## 型付きデータ v4 [#typed-data-v4]
+
+`[address, JSON.stringify(typedData)]` を渡して `eth_signTypedData_v4` を呼び出します。`typedData` オブジェクトには `types`、`primaryType`、`domain`、`message` が含まれます。各メッセージフィールドは宣言された型と一致する必要があります。
+
+| ドメインのフィールド | 目的 |
+| --- | --- |
+| `name` | 読みやすいアプリケーション名またはプロトコル名 |
+| `version` | 署名ドメインのバージョン |
+| `chainId` | 署名の対象チェーン |
+| `verifyingContract` | 署名を検証するコントラクトのアドレス。URL ではなくアドレスです |
+| `salt` | プロトコルで必要な場合に指定する、任意のドメインセパレーター |
+
+ドメインの分離は署名のコンテキストを区別するのに役立ちます。検証するアプリケーションまたはコントラクトは、ドメインの検証と独自のリプレイ防止を行う必要があります。EIP-712 自体にはリプレイ防止機能はありません。
+
+```javascript
+// `typedData` must be built from your protocol's complete EIP-712 schema.
+const signature = await provider.request({
+  method: 'eth_signTypedData_v4',
+  params: [address, JSON.stringify(typedData)],
+});
+```
+
+## 従来の署名メソッド [#legacy-signing-methods]
+
+既存の統合では `eth_signTypedData` または `eth_signTypedData_v3` を使用する場合があります。エンコード方式は v4 と異なります。RPC メソッドを変える場合は、検証側も変更してテストする必要があります。RPC メソッド名には `eth_` プレフィックスが含まれます。
+
+アプリケーションへのサインインに `eth_sign` を使用するのは避けてください。内容が不透明なデータに署名するため、ユーザーの意図を検証しにくくなることがあります。メソッドの対応状況は、アカウントの種類、ハードウェアモデル、ファームウェア、ウォレットのバージョンによって異なります。接続したすべてのアカウントがすべての形式に署名できると仮定せず、未対応メソッドのエラーを処理してください。
+
+## 例 [#example]
+
+[例を開く](https://codesandbox.io/embed/ethereum-provider-signdata-demo-67nn3q?autoresize=1&fontsize=14&hidenavigation=1&theme=dark)

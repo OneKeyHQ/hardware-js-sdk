@@ -1,0 +1,68 @@
+---
+description: "Lisez un instantané normalisé de l’appareil pour Protocol V1 et V2, portant sur l’état d’exécution, les paramètres ou le micrologiciel."
+title: "Obtenir l’état de l’appareil"
+---
+
+<span id="get-device-state" />
+
+# Obtenir l’état de l’appareil
+
+Lisez l’instantané unifié V1 / V2 de l’appareil. Utilisez cette méthode à la place de l’ancienne [`getFeatures`](/fr/hardware-sdk/basic-api/get-features).
+
+`getFeatures()` fonctionne encore uniquement sur Protocol V1. Pro 2 et Neo doivent appeler `getDeviceState()` et lire `payload.identity.deviceId`. Pour les champs de micrologiciel/version, utilisez `scope: 'firmware'` à la place de `getOnekeyFeatures`.
+
+```ts
+const res = await HardwareSDK.getDeviceState(connectId);
+```
+
+### Paramètres [#params]
+
+[Paramètres communs facultatifs](/fr/hardware-sdk/concepts/common-params)
+
+| Paramètre | Type | Obligatoire | Remarques |
+| --- | --- | --- | --- |
+| `scope` | `'runtime' \| 'settings' \| 'firmware'` | Non | Valeur par défaut : `'runtime'`. Le périmètre choisit uniquement les sections actualisées par cette lecture ; les données renvoyées restent un instantané complet |
+
+- `runtime` — état courant du verrouillage / PIN / de la phrase secrète (V1 `GetFeatures`, V2 `DeviceStatusGet` en mode application)
+- `settings` — actualise aussi les paramètres
+- `firmware` — actualise aussi l’identité, les versions et les informations de vérification
+
+Le bootloader / romloader ignore les commandes d’état non prises en charge et renvoie l’instantané disponible.
+
+### Résultat [#result]
+
+```ts
+{
+  success: true,
+  payload: {
+    protocol: 'V1' | 'V2',
+    identity: {
+      deviceId: string | null, // seed lifetime — pass as the second SDK argument
+      serialNo: string,
+      deviceType: string,
+      // ...
+    },
+    status: { initialized, unlocked, passphraseProtection, attachToPinEnabled, ... },
+    settings: { language, airgapMode, ... },
+    versions: { firmware, bootloader, ble, applicationP1, applicationP2, ... },
+  }
+}
+```
+
+Lisez `payload.identity.deviceId` comme deuxième argument des appels de signature. Ne persistez pas le champ de micrologiciel `session_id` issu des Features de compatibilité.
+
+Les données ne contiennent **pas** l’identifiant `session_id` du portefeuille dans le micrologiciel ni les messages de protocole bruts. L’identité du portefeuille provient de [`openWalletSession`](/fr/hardware-sdk/basic-api/open-wallet-session).
+
+### Erreur [#error]
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code?: string | number,
+  }
+}
+```
+
+Voir [Protocol V1 et V2](/fr/hardware-sdk/concepts/protocol).

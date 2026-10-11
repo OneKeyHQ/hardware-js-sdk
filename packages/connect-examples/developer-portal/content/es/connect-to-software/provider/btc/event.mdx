@@ -1,0 +1,28 @@
+---
+title: "Evento"
+---
+
+<span id="bitcoin-events" />
+
+# Eventos de Bitcoin
+
+El proveedor emite `accountsChanged` con un `string[]` y `chainChanged` con un identificador de red. Una matriz de cuentas vacía indica que el sitio ya no tiene una cuenta expuesta. Usa el mismo controlador al eliminar un escuchador.
+
+```javascript
+const provider = window.$onekey?.btc;
+if (!provider) throw new Error('OneKey Bitcoin provider is unavailable.');
+
+const onAccountsChanged = (accounts) => {
+  console.log('Connected accounts:', accounts);
+};
+const onChainChanged = (networkId) => {
+  console.log('Selected network:', networkId);
+  // Refresh network-dependent data before preparing another transaction.
+};
+provider.on('accountsChanged', onAccountsChanged);
+provider.on('chainChanged', onChainChanged);
+
+// Run during cleanup, for example when a component unmounts.
+provider.off('accountsChanged', onAccountsChanged);
+provider.off('chainChanged', onChainChanged);
+```

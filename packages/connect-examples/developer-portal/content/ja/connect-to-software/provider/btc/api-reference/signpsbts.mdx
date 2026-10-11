@@ -1,0 +1,93 @@
+---
+title: "signPsbts"
+---
+
+
+# signPsbts
+
+
+複数の PSBT に一度に署名します。このメソッドは、現在のアドレスに一致するすべての入力を走査して署名します。
+
+## ウォレットとアドレスタイプの互換性 [#wallet--address-type-compatibility]
+
+| ウォレットの種類     | モデル          | 対応するアドレスタイプ                |
+| --------------- | -------------- | -------------------------------------- |
+| ソフトウェアウォレット | すべて            | p2wpkh (ネイティブ Segwit)、p2tr (Taproot) |
+| ハードウェアウォレット | Pro, Classic1S | p2tr (Taproot)                         |
+
+## メソッド [#method]
+
+```typescript
+declare function signPsbts(
+    psbtHexs: string[],
+    options?: {
+        autoFinalized?: boolean;
+        toSignInputs?: Array<{
+            index: number;
+            address?: string;
+            publicKey?: string;
+            sighashTypes?: number[];
+            disableTweakSigner?: boolean;
+            useTweakedSigner?: boolean;
+        }>;
+    },
+): Promise<string[]>
+```
+
+## パラメーター [#parameters]
+
+* `psbtHexs` — _必須_ `string[]` 署名する PSBT の 16 進数文字列の配列
+* `options` — _任意_ `object`
+  * `autoFinalized` — _任意_ `boolean` 署名後に PSBT をファイナライズするかどうか。デフォルトは `true`
+  * `toSignInputs` — _任意_ `array` 署名する入力を指定
+    * `index` — _必須_ `number` 署名する入力
+    * `address` — _任意_ `string` 署名に使用する対応する秘密鍵 (address または publicKey のいずれかを指定)
+    * `publicKey` — _任意_ `string` 署名に使用する対応する秘密鍵 (address または publicKey のいずれかを指定)
+    * `sighashTypes` — _任意_ `number[]` 任意の sighash タイプ
+    * `disableTweakSigner` — _任意_ `boolean` デフォルトは `false`。`true` にすると、Taproot 入力の署名時に元の秘密鍵を使用
+    * `useTweakedSigner` — _任意_ `boolean` 調整済み署名者を使用するかどうかを強制指定。次より優先: `disableTweakSigner`
+
+## 戻り値 [#returns]
+
+* `Promise<string[]>` 署名済み PSBT の 16 進数文字列の配列
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+try {
+    const psbtHexs = [
+        "70736274ff01007d...",
+        "70736274ff01007d..."
+    ];
+
+    const signeds = await provider.signPsbts(psbtHexs, {
+        autoFinalized: true,
+        toSignInputs: [
+            {
+                index: 0,
+                publicKey: "02abc...",
+                useTweakedSigner: true
+            },
+            {
+                index: 1,
+                address: "bc1p...",
+                disableTweakSigner: true
+            }
+        ]
+    });
+
+    console.log(signeds);
+} catch (e) {
+    console.log(e);
+}
+```
+
+## デモ [#demo]
+
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/XWOPaPY" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+
+
+省略された値はプレースホルダーです。完全な PSBT、アドレス、公開鍵に置き換えてください。公開されているプロバイダーインターフェースには次が含まれます: `autoFinalized`; 高度な入力オプションはウォレットの実装によって異なるため、対象のバージョンで検証してください。署名してもトランザクションはブロードキャストされません。

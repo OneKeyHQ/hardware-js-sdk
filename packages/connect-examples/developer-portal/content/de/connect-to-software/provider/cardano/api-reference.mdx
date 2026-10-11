@@ -1,0 +1,90 @@
+---
+title: "API-Referenz"
+description: "Vollständige API-Referenz für den Cardano-Provider von OneKey"
+---
+
+<span id="api-reference" />
+
+# API-Referenz
+
+Referenz der Methoden und Typen des Cardano-Providers von OneKey.
+
+---
+
+## Wallet-Schnittstelle (CIP-30) [#wallet-interface-cip-30]
+
+| Eigenschaft/Methode | Beschreibung |
+|-----------------|-------------|
+| `name` | Wallet-Name ('OneKey') |
+| `icon` | URL des Wallet-Symbols |
+| `apiVersion` | API-Version |
+| `isEnabled()` | Prüfen, ob aktiviert |
+| `enable()` | Wallet-Zugriff anfordern |
+
+---
+
+## dApp-API (nach Aktivierung) [#dapp-api-after-enable]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `getNetworkId()` | Netzwerk abrufen (0=testnet, 1=mainnet) |
+| `getBalance()` | Gesamtguthaben abrufen (CBOR) |
+| `getUtxos(amount?, paginate?)` | UTxOs abrufen |
+| `getUsedAddresses()` | Verwendete Adressen abrufen |
+| `getUnusedAddresses()` | Unverwendete Adressen abrufen |
+| `getChangeAddress()` | Wechselgeldadresse abrufen |
+| `getRewardAddresses()` | Staking-Adressen abrufen |
+| `signTx(tx, partialSign?)` | Die signierten Teile eines Witness-Sets zurückgeben |
+| `signData(addr, payload)` | Daten signieren (CIP-8) |
+| `submitTx(tx)` | Transaktion einreichen |
+
+---
+
+## Experimentelle API [#experimental-api]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `experimental.getCollateral()` | Collateral-UTxOs abrufen |
+| `experimental.on(event, cb)` | Ereignisse abonnieren |
+| `experimental.off()` | Abonnement beenden |
+
+---
+
+## Typen [#types]
+
+```typescript
+type Cbor = string // Hex-encoded CBOR
+
+interface Paginate {
+  page: number
+  limit: number
+}
+
+interface Cip30DataSignature {
+  signature: string // COSE_Sign1 hex
+  key: string       // COSE_Key hex
+}
+
+type NetworkId = 0 | 1 // 0=testnet, 1=mainnet
+```
+
+---
+
+## Ereignisse [#events]
+
+| Ereignis | Beschreibung |
+|-------|-------------|
+| `accountChange` | Konto geändert |
+
+---
+
+## Fehlercodes [#error-codes]
+
+| Code | Beschreibung |
+|------|-------------|
+| -1 | Ungültige Anfrage |
+| -2 | Interner Fehler |
+| -3 | Verweigerte Anfrage |
+| -4 | Konto geändert |
+
+Die aktuelle Provider-Implementierung gibt ein leeres Array zurück bei `experimental.getCollateral()`. Leiten Sie die Verfügbarkeit von Plutus-Collateral nicht aus dem bloßen Vorhandensein der Methode ab. Die Wallet-Info-Hilfsfunktion `isEnabled()` ersetzt ebenfalls keinen erfolgreichen `enable()`-Aufruf. Vorgangsspezifische CIP-30-Fehler unterscheiden sich von den allgemeinen API-Fehlern oben.

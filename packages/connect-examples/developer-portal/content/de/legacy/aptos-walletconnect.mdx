@@ -1,0 +1,22 @@
+---
+title: "Aptos WalletConnect v1"
+description: "Historische Integration mit eigenen Methoden. WalletConnect-v1-URIs mit `@1`, Bridge-URLs und `sendCustomRequest` sind nicht mit einem aktuellen WalletConnect-SDK kompatibel. Für eine Browserintegration verwenden Sie den [Aptos Wallet Adapter](/en/connect-to-software/wallet-ui/aptos-wallet-adapter)."
+---
+
+# Aptos WalletConnect v1
+
+> Historische Integration mit eigenen Methoden. WalletConnect-v1- `@1`-URIs, Bridge-URLs und `sendCustomRequest` sind nicht mit einem aktuellen WalletConnect-SDK kompatibel. Für eine Browserintegration verwenden Sie den [Aptos Wallet Adapter](/de/connect-to-software/wallet-ui/aptos-wallet-adapter).
+
+Die alte Integration hängte einen `network`-Parameter an den Verbindungs-URI an und verwendete nach Zustimmung des Nutzers die folgenden eigenen Methoden:
+
+| Methode | Frühere Funktion |
+| --- | --- |
+| `account` | Öffentlichen Schlüssel und Adresse des Kontos zurückgeben. |
+| `network` | Ausgewählten Netzwerknamen zurückgeben. |
+| `getChainId` | Chain-ID zurückgeben. |
+| `signAndSubmitTransaction` | Eine Aptos-Transaktionsnutzlast signieren und einreichen. |
+| `signMessage` | Eine Nachricht mit Nonce und optionalem Adress-, Anwendungs- und Chain-Kontext signieren. |
+
+Die Antwort von `signMessage` enthielt `fullMessage`, `signature` und optionalen Kontext. Prüfen Sie die exakt zurückgegebene signierte Nachricht sowie vorgesehene Nonce/Konto; prüfen Sie nicht allein die Eingabe ohne Präfix. Nehmen Sie keine Ethereum-Ereignisnamen an: Die historische Integration dokumentierte keinen Ereignisvertrag.
+
+Dieses Archiv behauptet keine unterstützte WalletConnect-v2-Alternative für diese eigenen Methoden. Behalten Sie beim Pflegen bestehender Anwendungen Kompatibilitätstests für alte Versionen bei. Die vollständigen historischen Anfrage-/Antwortbeispiele verbleiben in der [ursprünglichen Referenz](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-software/using-walletconnect/aptos/wallet-connect-api.md).

@@ -1,0 +1,29 @@
+---
+title: "getPublicKey"
+---
+
+# getPublicKey
+
+Obtén la clave pública de la cuenta actual.
+
+## Método [#method]
+
+```typescript
+declare function getPublicKey(): Promise<string>;
+```
+
+## Respuesta [#response]
+
+La clave pública como cadena de texto.
+
+## Ejemplo [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const publicKey = await provider.getPublicKey();
+```
+
+## Demostración [#demo]
+
+[Abrir ejemplo](https://codepen.io/OneKeyHQ/pen/jOdvLLy)

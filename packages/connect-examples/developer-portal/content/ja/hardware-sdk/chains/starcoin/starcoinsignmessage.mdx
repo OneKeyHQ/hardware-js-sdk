@@ -1,0 +1,59 @@
+---
+title: "starcoinSignMessage"
+---
+
+# starcoinSignMessage
+
+## starcoin: メッセージに署名 <a href="#ethereum-sign-message" id="ethereum-sign-message"></a> [#starcoin-sign-message-]
+
+指定パスから導出した鍵でメッセージの署名を要求します。
+
+```typescript
+const result = await HardwareSDK.starcoinSignMessage(connectId, deviceId, params);
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `path` — _必須_ `string | Array<number>` SDK の最小長は `3`. [パス形式](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _必須_ `string` 署名するメッセージ。16 進数文字列にエンコードします。
+
+### 例 [#example]
+
+```typescript
+// Original message
+const message = "Hello World";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.starcoinSignMessage(connectId, deviceId, {
+    path: "m/44'/101010'/0'/0'/0'",
+    messageHex
+});
+```
+
+結果
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        public_key: string;
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

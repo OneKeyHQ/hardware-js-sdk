@@ -323,6 +323,7 @@ export function ChainMethodsSidebar({ lang = 'en' }) {
 
       {/* Chain Dropdown */}
       <ChainDropdown
+        locale={lang}
         chains={CHAINS}
         selectedChainId={displayedChainId}
         onSelect={handleChainSelect}

@@ -1,0 +1,13 @@
+---
+title: "Ereignis"
+---
+
+<span id="webln-events" />
+
+# WebLN-Ereignisse
+
+Verlassen Sie sich nicht auf Konto- oder Netzwerkereignisse, um den Erfolg einer WebLN-Anfrage festzustellen. Warten Sie jeden Methodenaufruf ab und behandeln Sie sein Ergebnis oder seine Ablehnung.
+
+Die Provider-Typen deklarieren `accountChanged` (Singular) und `disconnect`, aber die aktuelle WebLN-Implementierung richtet kein Abonnement für Kontoänderungsereignisse ein. Integrationen sollten nicht von diesen Benachrichtigungen abhängen, ohne das Verhalten in ihrer Ziel-Wallet-Version zu prüfen.
+
+Zum erforderlichen Verbindungsablauf siehe [Erste Schritte](/de/connect-to-software/provider/webln/guide).

@@ -1,0 +1,71 @@
+---
+title: "JSON-RPC リファレンス"
+description: "OneKey が対応する Ethereum JSON-RPC メソッドの完全なリファレンス"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="json-rpc-reference" />
+
+# JSON-RPC リファレンス
+
+OneKey で使う主な Ethereum JSON-RPC メソッドとウォレットメソッドのリファレンス。
+
+<Callout type="info">
+すべてのメソッドは次を通じて呼び出します: `window.$onekey.ethereum.request({ method, params })`.
+</Callout>
+
+---
+
+## アカウントのメソッド [#account-methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| [eth_requestAccounts](./eth_requestAccounts) | ユーザーアカウントを要求 (接続ポップアップを表示) |
+| [eth_accounts](./eth_accounts) | 接続済みアカウントを取得 (ポップアップなし) |
+| [wallet_requestPermissions](./wallet_requestPermissions) | 特定の権限を要求 |
+| [wallet_getPermissions](./wallet_getPermissions) | 現在の権限を取得 |
+
+---
+
+## トランザクションのメソッド [#transaction-methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| [eth_sendTransaction](./eth_sendTransaction) | トランザクションを送信 |
+| [eth_call](./eth_call) | トランザクションを作成せずに呼び出しを実行 |
+| [eth_estimateGas](./eth_estimateGas) | トランザクションのガスを見積もる |
+| [eth_getTransactionByHash](./eth_getTransactionByHash) | ハッシュでトランザクションを取得 |
+| [eth_getTransactionReceipt](./eth_getTransactionReceipt) | トランザクションレシートを取得 |
+
+---
+
+## 署名のメソッド [#signing-methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| [personal_sign](./personal_sign) | メッセージに署名 (EIP-191) |
+| [eth_signTypedData_v4](./eth_signTypedData_v4) | 型付きデータに署名 (EIP-712) |
+
+---
+
+## ネットワークのメソッド [#network-methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| [eth_chainId](./eth_chainId) | 現在のチェーン ID を取得 |
+| [wallet_switchEthereumChain](./wallet_switchEthereumChain) | 別のチェーンに切り替え |
+| [wallet_addEthereumChain](./wallet_addEthereumChain) | 新しいチェーンを追加 |
+| [wallet_watchAsset](./wallet_watchAsset) | ウォレットにトークンを追加 |
+
+---
+
+## 標準の Ethereum メソッド [#standard-ethereum-methods]
+
+その他の Ethereum JSON-RPC メソッドは、接続中のネットワークとウォレットの実装によって異なります。参照: [Ethereum JSON-RPC 仕様](https://ethereum.github.io/execution-apis/) に完全な一覧があります。
+
+主なメソッドは次のとおりです:
+- `eth_blockNumber` - 現在のブロック番号を取得
+- `eth_getBalance` - アカウント残高を取得
+- `eth_getCode` - コントラクトコードを取得
+- `eth_getLogs` - イベントログを取得

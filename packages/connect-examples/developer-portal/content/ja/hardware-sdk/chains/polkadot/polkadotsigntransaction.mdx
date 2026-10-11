@@ -1,0 +1,67 @@
+---
+title: "polkadotSignTransaction"
+---
+
+# polkadotSignTransaction
+
+### 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.3.0
+  * Classic/Mini: 3.0.0
+
+## Polkadot: トランザクションに署名 [#polkadot-sign-transaction]
+
+指定パスから導出した鍵でトランザクションの署名を要求します。ユーザーはデバイス上でリクエストを確認して承認します。
+
+```typescript
+const result = await HardwareSDK.polkadotSignTransaction(connectId, deviceId, params);
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`. [パス形式](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `network` - _必須_ `string` ネットワーク名。例: `polkadot`
+* `prefix` - _必須_ `number` SS58 アドレスのプレフィックス。次を使用: `0` は Polkadot 用
+* `rawTx` - _必須_ `string` 16 進数文字列にエンコードされたシリアライズ済みトランザクション。
+
+### 例 [#examples]
+
+```typescript
+const response = await HardwareSDK.polkadotSignTransaction(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/354'/0'/0'/0'",
+    network: "polkadot",
+    prefix: 0,
+    rawTx: "040300388671dd546ba19495211c8cdc200600f9798cf078fca0fb4749ebbc0579c12a0700e40b5402350128009a24000012000000e143f23803ac50e8f6f8e62695d1ce9e4e1d68aa36c1cd2cfd15340213f3423ee356a704dbe75762aaae87b0f4702aafd09e67eed5d09a3a4b0e7da6c37b6f54"
+  }
+);
+```
+
+結果
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: "m/44'/354'/0'/0'/0'",
+    signature: "signed data"
+  }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

@@ -1,0 +1,22 @@
+---
+title: "イベント"
+---
+
+<span id="nostr-events" />
+
+# Nostr のイベント
+
+OneKey プロバイダーはペイロードのない `accountChanged` を発行します。このイベントが発生したらキャッシュしたアカウント状態を消去し、必要に応じて現在の公開鍵を取得してください。また、ブリッジの切断時には `disconnect` を発行します。これらは NIP-07 に対する OneKey の拡張です。
+
+```javascript
+const provider = window.$onekey?.nostr;
+if (!provider) throw new Error('OneKey Nostr provider is unavailable.');
+
+const onAccountChanged = () => {
+  // Clear the cached public key and any account-specific UI.
+};
+provider.on('accountChanged', onAccountChanged);
+
+// Run during cleanup.
+provider.off('accountChanged', onAccountChanged);
+```

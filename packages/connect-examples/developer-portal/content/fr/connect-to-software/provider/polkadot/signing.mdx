@@ -1,0 +1,170 @@
+---
+title: "Signature"
+description: "Signer des transactions et messages sur Polkadot avec OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Signature
+
+Activez l’extension, sélectionnez un compte et connectez un client API à la chaîne prévue. Construisez les données de transaction à partir des métadonnées actuelles de la chaîne ; les valeurs hexadécimales abrégées de ce guide sont fictives.
+
+Découvrez comment signer des transactions et messages sur Polkadot.
+
+---
+
+## Signer les données de transaction [#sign-transaction-payload]
+
+Signer les données d’extrinsics :
+
+```typescript
+import { web3FromAddress } from '@polkadot/extension-dapp'
+
+// Get injector for specific account
+const injector = await web3FromAddress(accountAddress)
+
+// Sign payload
+const payload = {
+  address: accountAddress,
+  blockHash: '0x...',
+  blockNumber: '0x...',
+  era: '0x...',
+  genesisHash: '0x...',
+  method: '0x...',
+  nonce: '0x...',
+  specVersion: '0x...',
+  tip: '0x...',
+  transactionVersion: '0x...',
+  signedExtensions: [], // Populate from current chain metadata; do not sign this placeholder
+  version: 4,
+}
+
+const result = await provider.web3SignPayload(payload)
+
+console.log({
+  id: result.id,
+  signature: result.signature, // Hex signature
+})
+```
+
+---
+
+## Signer un message brut [#sign-raw-message]
+
+```typescript
+const payload = {
+  address: accountAddress,
+  data: '0x48656c6c6f', // Hex-encoded message
+  type: 'bytes',
+}
+
+const result = await provider.web3SignRaw(payload)
+
+console.log({
+  id: result.id,
+  signature: result.signature,
+})
+```
+
+---
+
+## Écouter les événements de transaction [#listen-for-transaction-events]
+
+```typescript
+await tx.signAndSend(
+  account.address,
+  { signer: injector.signer },
+  ({ status, events }) => {
+    if (status.isInBlock) {
+      console.log('In block:', status.asInBlock.toHex())
+    }
+    if (status.isFinalized) {
+      console.log('Finalized:', status.asFinalized.toHex())
+
+      events.forEach(({ event }) => {
+        if (api.events.system.ExtrinsicSuccess.is(event)) {
+          console.log('Transaction succeeded')
+        }
+        if (api.events.system.ExtrinsicFailed.is(event)) {
+          console.log('Transaction failed')
+        }
+      })
+    }
+  }
+)
+```
+
+---
+
+## Méthodes RPC [#rpc-methods]
+
+### Envoyer une requête RPC [#send-rpc-request]
+
+```typescript
+const response = await provider.web3RpcSend({
+  method: 'chain_getHeader',
+  params: [],
+})
+
+console.log('Latest header:', response.result)
+```
+
+### S’abonner aux événements RPC [#subscribe-to-rpc-events]
+
+```typescript
+const subscriptionId = await provider.web3RpcSubscribe(
+  {
+    method: 'chain_subscribeNewHeads',
+    params: [],
+  },
+  (response) => {
+    console.log('New block:', response.result)
+  }
+)
+
+// Unsubscribe later
+await provider.web3RpcUnSubscribe()
+```
+
+---
+
+## Gestion des erreurs [#error-handling]
+
+```typescript
+try {
+  const result = await provider.web3SignPayload(payload)
+} catch (error) {
+  if (error.message === 'Cancelled') {
+    console.log('User cancelled signing')
+  } else {
+    console.error('Signing failed:', error)
+  }
+}
+```
+
+---
+
+## Utilisation avec React [#using-with-react]
+
+```tsx
+import { useState, useEffect } from 'react'
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+
+function usePolkadotWallet() {
+  const [accounts, setAccounts] = useState([])
+  const [isConnected, setIsConnected] = useState(false)
+
+  const connect = async () => {
+    const extensions = await web3Enable('My dApp')
+    if (extensions.length > 0) {
+      const allAccounts = await web3Accounts()
+      setAccounts(allAccounts)
+      setIsConnected(true)
+    }
+  }
+
+  return { accounts, isConnected, connect }
+}
+```

@@ -1,0 +1,52 @@
+---
+description: "Lancez un changement de PIN demandé par l’utilisateur et comprenez la restriction de suppression du PIN dans Protocol V2."
+title: "deviceChangePin"
+---
+
+# deviceChangePin
+
+## Modifier le PIN de l’appareil [#change-device-pin]
+
+Ouvrez le parcours de changement de PIN après une demande de l’utilisateur. Celui-ci effectue les étapes protégées sur l’appareil. Ne collectez ni ne journalisez jamais un PIN réel de l’appareil pour remplacer ce parcours.
+
+```typescript
+const result = await HardwareSDK.deviceChangePin(connectId, params);
+```
+
+## Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+* `remove` - facultatif `boolean`. `false` modifie le PIN. `true` demande la suppression du PIN sur les appareils Protocol V1 compatibles ; Protocol V2 rejette `remove: true`.
+
+## Exemple [#example]
+
+```typescript
+const result = await HardwareSDK.deviceChangePin(connectId, {
+    remove: false
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+## Résultat [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        message: string
+    }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

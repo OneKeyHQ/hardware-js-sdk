@@ -1,0 +1,37 @@
+---
+title: "Provider SDK をインストール"
+---
+
+<span id="install-the-provider-sdk" />
+
+# Provider SDK をインストール
+
+> SDK を使用する前に [OneKey ブラウザー拡張機能](https://onekey.so/download/) をインストールしてください。
+
+SDK は [onekey-near-provider](https://www.npmjs.com/package/@onekeyfe/onekey-near-provider) npm パッケージとして提供しています。[near-api-js](https://www.npmjs.com/package/near-api-js) もインストールする必要があります。
+
+SDK のソースコードはこちらで確認できます: [GitHub](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/providers/onekey-near-provider), 完全なサンプルコードは [こちら](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/example).
+
+```bash
+# with npm
+npm install near-api-js@^0.44.2 @onekeyfe/onekey-near-provider
+
+# with yarn
+yarn add near-api-js@^0.44.2 @onekeyfe/onekey-near-provider
+
+```
+
+プロバイダーのソースでは `near-api-js` の `^0.44.2` をピア依存関係として宣言しています。これらの例は従来の API を使用しており、無関係なメジャーバージョンをインストールすると統合が動かなくなる場合があります。インストールするプロバイダーバージョンのピア依存関係を確認してください。
+
+ブラウザー側のコードでプロバイダーを作成します。
+
+```javascript
+import { OneKeyNearProvider } from '@onekeyfe/onekey-near-provider';
+
+const provider = new OneKeyNearProvider();
+
+```
+
+> **注意:** Provider SDK は SSR に対応していません。
+>
+> [next.js](https://nextjs.org/) の SSR 機能を使用している場合は、[SSR なしの動的インポート](https://nextjs.org/docs/app/guides/lazy-loading#skipping-ssr) に関するドキュメントを参照してください。

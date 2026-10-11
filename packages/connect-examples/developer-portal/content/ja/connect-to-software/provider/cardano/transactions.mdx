@@ -1,0 +1,121 @@
+---
+title: "トランザクション"
+description: "OneKey で Cardano のトランザクションを送信"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="transactions" />
+
+# トランザクション
+
+dApp API の使用前に `enable()` を呼び出してください。CIP-30 API が返すアドレスは 16 進数エンコードされたバイト列です。トランザクションと値のパラメーターは、16 進数エンコードされた CBOR です。`Buffer` を使用するブラウザーの例には、明示的な `buffer` インポート、またはバイト変換ヘルパーが必要です。
+
+Cardano でトランザクションに署名して送信する方法を説明します。
+
+---
+
+## トランザクションに署名 [#sign-transaction]
+
+```typescript
+// transaction should be CBOR-encoded hex string
+const witnessSetCbor = await api.signTx(transactionCbor, partialSign)
+
+// partialSign: boolean
+// - false: reject if the wallet cannot provide every required signature
+// - true: return the signatures the wallet can provide
+
+console.log('Witness set:', witnessSetCbor)
+```
+
+---
+
+## トランザクションを送信 [#submit-transaction]
+
+```typescript
+// Submit signed transaction
+const txHash = await api.submitTx(signedTransactionCbor)
+console.log('Transaction hash:', txHash)
+```
+
+---
+
+### 構築、署名、送信 [#build-sign-and-submit]
+
+`signTx` は完全な署名済みトランザクションではなく、ウィットネスセットを返します。Cardano トランザクションライブラリで未署名トランザクションを構築し、返されたウィットネスを既存のウィットネスセットにマージして、完成したトランザクションを送信してください。
+
+```typescript
+// `unsignedTransactionCbor` is a complete transaction built with current
+// protocol parameters, selected inputs, outputs, fees, and change.
+const witnessSetCbor = await api.signTx(unsignedTransactionCbor, false)
+// Merge witnessSetCbor into the original transaction using your Cardano SDK.
+// Preserve existing witnesses, scripts, datums, redeemers, and auxiliary data.
+// Submit the serialized complete transaction, never witnessSetCbor alone.
+const txHash = await api.submitTx(completeSignedTransactionCbor)
+```
+
+アプリケーションにトランザクションの構築とウィットネスのマージが未実装の場合は、以下の Lucid または Mesh のフローを使用してください。これらの SDK の例は特定のバージョン向けです。インストールするバージョンのドキュメントに従ってください。
+
+---
+
+## Lucid との併用 [#using-with-lucid]
+
+[Lucid](https://github.com/spacebudz/lucid) は、よりシンプルな API を提供します:
+
+```bash
+npm install lucid-cardano
+```
+
+```typescript
+import { Lucid, Blockfrost } from 'lucid-cardano'
+
+// Initialize Lucid with OneKey
+const lucid = await Lucid.new(
+  new Blockfrost('https://cardano-mainnet.blockfrost.io/api', 'your-api-key'),
+  'Mainnet'
+)
+
+// Connect OneKey
+const api = await window.cardano.onekey.enable()
+lucid.selectWallet(api)
+
+// Send ADA
+const tx = await lucid
+  .newTx()
+  .payToAddress('addr1...', { lovelace: 5000000n })
+  .complete()
+
+const signedTx = await tx.sign().complete()
+const txHash = await signedTx.submit()
+
+console.log('TX Hash:', txHash)
+```
+
+---
+
+## Mesh との併用 [#using-with-mesh]
+
+[Mesh](https://meshjs.dev/) もよく使われる Cardano SDK です:
+
+```bash
+npm install @meshsdk/core
+```
+
+```typescript
+import { BrowserWallet, Transaction } from '@meshsdk/core'
+
+// Connect to OneKey
+const wallet = await BrowserWallet.enable('onekey')
+
+// Get wallet info
+const balance = await wallet.getBalance()
+const addresses = await wallet.getUsedAddresses()
+
+// Build and send transaction
+const tx = new Transaction({ initiator: wallet })
+  .sendLovelace('addr1...', '5000000')
+
+const unsignedTx = await tx.build()
+const signedTx = await wallet.signTx(unsignedTx)
+const txHash = await wallet.submitTx(signedTx)
+```

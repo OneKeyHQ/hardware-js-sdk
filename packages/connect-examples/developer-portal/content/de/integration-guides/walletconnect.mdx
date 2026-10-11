@@ -1,0 +1,22 @@
+---
+title: "WalletConnect-Sitzungen"
+description: "Verwenden Sie eine WalletConnect-fähige Verbindungsbibliothek, wenn eine dApp eine separate Wallet-Anwendung verbinden muss. Konfigurieren Sie die von Ihrer Anwendung benötigte Projekt-ID, Anwendungsmetadaten, Chains, Methoden und Ereignisse."
+---
+
+<span id="walletconnect-sessions" />
+
+# WalletConnect-Sitzungen
+
+Verwenden Sie eine WalletConnect-fähige Verbindungsbibliothek, wenn eine dApp eine separate Wallet-Anwendung verbinden muss. Konfigurieren Sie die von Ihrer Anwendung benötigte Projekt-ID, Anwendungsmetadaten, Chains, Methoden und Ereignisse.
+
+Für eine EVM-Verbindungsoberfläche beginnen Sie mit [RainbowKit](/de/connect-to-software/wallet-ui/rainbowkit) oder [Web3Modal / AppKit](/de/connect-to-software/wallet-ui/web3modal). Befolgen Sie die in der gewählten Anleitung dokumentierten Versionen.
+
+## Einen Sitzungskontext beibehalten [#keep-one-session-context]
+
+Verwenden Sie nach dem Verbinden den Provider des ausgewählten Konnektors für Kontozugriff, Anfragen und Ereignisse. Eine WalletConnect-Sitzung injiziert kein `window.$onekey.ethereum`; dieser Namensraum gehört zur Browser-Provider-Integration.
+
+Behandeln Sie Sitzungsablehnung, Ablauf, Trennung sowie Konto- oder Chain-Änderungen. Bestätigen Sie ausgewähltes Konto und Netzwerk erneut, bevor Sie eine Signieranfrage vorbereiten. Wiederholen Sie einen abgelehnten Autorisierungsdialog nicht automatisch.
+
+## Historische Aptos-Integration [#historical-aptos-integration]
+
+Der alte Aptos-Ablauf mit eigenen Methoden verwendete WalletConnect v1. Sein `@1`-URI und `sendCustomRequest`-Aufrufe sind kein aktuelles WalletConnect-Beispiel. Siehe die [Legacy-Referenz](/de/legacy/aptos-walletconnect) oder verwenden Sie den [Aptos Wallet Adapter](/de/connect-to-software/wallet-ui/aptos-wallet-adapter) für eine Browserintegration.

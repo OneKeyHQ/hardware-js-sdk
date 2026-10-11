@@ -1,0 +1,81 @@
+---
+description: "Conecta OneKey mediante CoreBluetooth y WKWebView con E/S ordenada y preparación de notificaciones verificada."
+title: "iOS: Conectar mediante Bluetooth"
+---
+
+<span id="ios-connect-via-bluetooth" />
+
+# iOS: Conectar mediante Bluetooth
+
+Ejecuta `@onekeyfe/hd-common-connect-sdk` en WKWebView y conecta su transporte de bajo nivel a CoreBluetooth. Empieza por el [ejemplo nativo de iOS](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-ios-example) y el contrato del [Plugin de transporte de bajo nivel](/es/hardware-sdk/concepts/low-level-plugin).
+
+El host nativo gestiona el ciclo de vida de Bluetooth. El SDK gestiona detección de protocolo, tramas y procesamiento de solicitudes/respuestas.
+
+## Configurar la aplicación [#configure-the-app]
+
+- Incluye `NSBluetoothAlwaysUsageDescription` con una explicación de la conexión con carteras de hardware. Revisa los requisitos adicionales si admites versiones antiguas de iOS.
+- Usa CoreBluetooth y la dependencia de conexión declarada por el ejemplo nativo.
+- Prueba en un dispositivo iOS físico con permiso de Bluetooth. Gestiona los estados denegado, restringido y apagado antes de buscar.
+
+## Compilar y cargar el bundle JavaScript [#build-and-load-the-javascript-bundle]
+
+Desde el checkout de hardware-js-sdk:
+
+```bash
+cd packages/connect-examples/native-ios-example/web
+yarn
+yarn build
+```
+
+Añade el directorio completo `web_dist/` a los recursos del target de la aplicación. Conserva las rutas relativas. Crea WKWebView y la conexión, registra los controladores nativos y luego carga el HTML incluido. No navegues una WebView con acceso al dispositivo a contenido no fiable.
+
+Usa la implementación completa y las versiones de dependencias del ejemplo. Las tablas siguientes definen las garantías de una conexión personalizada.
+
+## Ciclo de vida de la conexión [#connection-lifecycle]
+
+`CBCentralManager.connect()` inicia un intento de conexión. No resuelvas la solicitud JS de `connect` en ese momento.
+
+| Etapa | Gestión requerida |
+| --- | --- |
+| Buscar | Espera a `.poweredOn`; filtra por el servicio OneKey, elimina duplicados y detén la búsqueda dentro de un plazo limitado. |
+| Seleccionar | Comprueba el UUID del periférico seleccionado. Si buscas para reconectar, conecta solo con ese periférico. |
+| Conectar | Espera a `didConnect`; devuelve un error ante `didFailToConnect` o tiempo agotado. |
+| Descubrir | Encuentra el servicio y las características de escritura/notificación requeridos; gestiona errores de descubrimiento y características ausentes. |
+| Suscribirse | Habilita notificaciones y espera a `didUpdateNotificationStateFor` sin errores y con las notificaciones habilitadas. |
+| Listo | Solo entonces resuelve la solicitud JS de conexión pendiente. Completa cada callback de la conexión una sola vez. |
+
+Consulta el [callback de estado de notificaciones](https://developer.apple.com/documentation/corebluetooth/cbperipheraldelegate/peripheral(_:didupdatenotificationstatefor:error:)) de Apple para saber cuándo termina la suscripción.
+
+| Finalidad | UUID |
+| --- | --- |
+| Servicio | `00000001-0000-1000-8000-00805f9b34fb` |
+| Escritura | `00000002-0000-1000-8000-00805f9b34fb` |
+| Notificar | `00000003-0000-1000-8000-00805f9b34fb` |
+
+## E/S ordenada [#ordered-io]
+
+- `send` recibe el hexadecimal preparado por el SDK. Rechaza valores mal formados o de longitud impar; no descartes bytes inválidos silenciosamente.
+- Respeta el modo de escritura solicitado y la capacidad del periférico. En escrituras sin respuesta, respeta el control de flujo de CoreBluetooth; una escritura en cola no demuestra que el dispositivo haya completado la solicitud del SDK.
+- Encola bloques de notificación sin procesar por periférico y devuelve un bloque hexadecimal sin modificar en cada llamada a `receive(uuid)`. No analices cabeceras V1 ni rellenes bloques hasta el tamaño de paquete USB.
+- Al desconectar, rechaza el trabajo pendiente y borra las notificaciones en cola de la conexión anterior. Una reconexión no debe recibir datos antiguos.
+- Expón `getProtocolV2PacketCapacity` con la capacidad de escritura nativa. Consulta la [interfaz completa del plugin](/es/hardware-sdk/concepts/low-level-plugin#lowleveltransportsharedplugin-interface).
+
+## SDK e identidad de cartera [#sdk-and-wallet-identity]
+
+Inicializa el SDK con `env: 'lowlevel'` y tu plugin de conexión. Comprueba que la inicialización funcione. Usa `searchDevices()` para seleccionar `connectId`, después `getDeviceState(connectId)` para leer `identity.deviceId`.
+
+El UUID del periférico iOS dirige la conexión; no es la identidad de la semilla. Vuelve a leer el estado tras reconectar y detente si cambió la cartera esperada. Consulta [Identificadores](/es/hardware-sdk/concepts/identifiers).
+
+## PIN, frase de contraseña y confirmación [#pin-passphrase-and-confirmation]
+
+Conecta [eventos de interfaz](/es/hardware-sdk/core-api-guide#events-ui) antes de llamadas protegidas. Los diálogos nativos pueden recoger datos o mostrar instrucciones, pero el controlador JS debe conservar la correlación de respuesta de la solicitud original.
+
+Responde solo a solicitudes de entrada. `REQUEST_BUTTON`, `REQUEST_PASSPHRASE_ON_DEVICE` y los eventos de PIN exclusivo del dispositivo son notificaciones. Un callback del host que devuelve «Aceptar» no aprueba la operación en el dispositivo. Si el usuario cancela, cancela la llamada SDK seleccionada e invalida los callbacks de interfaz pendientes.
+
+Usa la misma vinculación explícita de cartera estándar/oculta para confirmar direcciones y firmar. No incluyas valores de PIN/frase de contraseña introducidos en el host en registros ni almacenamiento persistente.
+
+## Verificar y recuperar [#verify-and-recover]
+
+Prueba denegación de permisos, Bluetooth apagado, características ausentes, fallo de suscripción a notificaciones, entrada en el dispositivo, cancelación y reconexión. Confirma una dirección en el dispositivo físico antes de considerar funcional la conexión.
+
+No repitas firmas ni actualizaciones de firmware automáticamente después de un tiempo agotado. Sigue [Reconexión y liberación de recursos](/es/hardware-sdk/transport/reconnect).

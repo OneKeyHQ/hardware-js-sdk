@@ -1,0 +1,120 @@
+---
+title: "dApp の統合"
+description: "dApp と OneKey ウォレットを統合"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="dapp-integration" />
+
+# dApp の統合
+
+チェーン別のプロバイダーまたはウォレット接続ライブラリを使って、dApp を OneKey ウォレットに接続します。
+
+## 統合方法を選択 [#choose-your-method]
+
+| 方法 | 適した用途 | フレームワーク |
+|--------|----------|-----------|
+| [**RainbowKit**](/ja/connect-to-software/wallet-ui/rainbowkit) | 既製のウォレット UI、React アプリ | React |
+| [**Web3Modal**](/ja/connect-to-software/wallet-ui/web3modal) | 複数フレームワーク対応のウォレット UI | React / Vue / JS |
+| [**Web3-Onboard**](/ja/connect-to-software/wallet-ui/web3-onboard) | 幅広いカスタマイズ、複数フレームワーク対応 | React / Vue / JS |
+| [**Wagmi**](/ja/connect-to-software/react-hooks/wagmi) | React フックによるカスタム UI | React |
+| [**プロバイダー API**](/ja/connect-to-software/provider) | 完全な制御、依存関係なし | 任意 |
+
+<Callout>
+**おすすめ:** React アプリには RainbowKit、Vue/バニラ JS には Web3Modal または Web3-Onboard を使用してください。
+</Callout>
+
+---
+
+## クイックスタート [#quick-start]
+
+### RainbowKit (React) [#rainbowkit-react]
+
+```bash
+npm install @rainbow-me/rainbowkit@^2 wagmi@^2 viem@^2 @tanstack/react-query@^5
+```
+
+```tsx filename="App.tsx"
+import '@rainbow-me/rainbowkit/styles.css'
+import { getDefaultConfig, RainbowKitProvider, ConnectButton } from '@rainbow-me/rainbowkit'
+import { oneKeyWallet, injectedWallet, walletConnectWallet } from '@rainbow-me/rainbowkit/wallets'
+import { WagmiProvider } from 'wagmi'
+import { mainnet } from 'wagmi/chains'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const config = getDefaultConfig({
+  appName: 'My dApp',
+  wallets: [{ groupName: 'Wallets', wallets: [oneKeyWallet, injectedWallet, walletConnectWallet] }],
+  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // Get from cloud.reown.com
+  chains: [mainnet],
+})
+
+const queryClient = new QueryClient()
+
+export default function App() {
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <RainbowKitProvider>
+          <ConnectButton />
+        </RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
+}
+```
+
+[詳細ガイド](/ja/connect-to-software/wallet-ui/rainbowkit)
+
+### Provider API (依存関係なし) [#provider-api-no-dependencies]
+
+```javascript
+// Detect OneKey using EIP-6963
+let onekeyProvider = null
+const onAnnounce = (event) => {
+  if (event.detail.info.rdns === 'so.onekey.app.wallet') {
+    onekeyProvider = event.detail.provider
+  }
+}
+window.addEventListener('eip6963:announceProvider', onAnnounce)
+window.dispatchEvent(new Event('eip6963:requestProvider'))
+
+// Call from your Connect button after the user selects OneKey.
+async function connectOneKey() {
+  if (!onekeyProvider) throw new Error('OneKey has not announced a provider yet')
+  return onekeyProvider.request({ method: 'eth_requestAccounts' })
+}
+// On component cleanup:
+// window.removeEventListener('eip6963:announceProvider', onAnnounce)
+```
+
+[詳細ガイド](/ja/connect-to-software/provider/eth)
+
+---
+
+## OneKey の検出 [#onekey-detection]
+
+| プロパティ | 値 |
+|----------|-------|
+| EIP-6963 `rdns` | `so.onekey.app.wallet` |
+| プロバイダー | `window.$onekey.ethereum` |
+
+---
+
+## 対応チェーン [#supported-chains]
+
+**EVM:** Ethereum および対応する EVM ネットワーク (Polygon、BSC、Arbitrum、Optimism、Base など)
+
+**Non-EVM:** [Bitcoin](/ja/connect-to-software/provider/btc), [Solana](/ja/connect-to-software/provider/solana), [Cosmos](/ja/connect-to-software/provider/cosmos), [Aptos](/ja/connect-to-software/provider/aptos), [Sui](/ja/connect-to-software/provider/sui), [TON](/ja/connect-to-software/provider/ton), [TRON](/ja/connect-to-software/provider/tron), [Polkadot](/ja/connect-to-software/provider/polkadot), [Cardano](/ja/connect-to-software/provider/cardano), [NEAR](/ja/connect-to-software/provider/near), その他
+
+[すべての Provider API を表示](/ja/connect-to-software/provider)
+
+---
+
+## リソース [#resources]
+
+- **変更履歴:** [cross-inpage-provider のリリース](https://github.com/OneKeyHQ/cross-inpage-provider/releases)
+- **ソースコード:** [cross-inpage-provider](https://github.com/OneKeyHQ/cross-inpage-provider)
+- **課題:** [GitHub Issues](https://github.com/OneKeyHQ/cross-inpage-provider/issues)
+- **ライブデモ:** [プロバイダーの例](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/example)

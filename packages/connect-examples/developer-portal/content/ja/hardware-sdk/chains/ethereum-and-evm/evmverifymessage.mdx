@@ -1,0 +1,56 @@
+---
+title: "evmVerifyMessage"
+---
+
+# evmVerifyMessage
+
+## Ethereum: メッセージを検証 [#ethereum-verify-message]
+
+署名者のアドレスと署名を使ってメッセージを検証します。
+
+```typescript
+const result = await HardwareSDK.evmVerifyMessage(connectId, deviceId, params);
+```
+
+## パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `address` - _必須_ `string` 署名者のアドレス。"0x" プレフィックスは任意
+* `messageHex` - _必須_ `string` 16 進数文字列にエンコードされた署名対象メッセージ。
+* `signature` - _必須_ `string` 16 進数形式の署名。"0x" プレフィックスは任意
+* `chainId` - _任意_ `number` ETH の ChainId は、特定の Ethereum ネットワークを一意に識別し、ブロックチェーンの異なるバージョンを区別するための識別子です。 [リファレンス](https://github.com/ethereum-lists/chains/tree/master/_data/chains).
+
+## 例 [#example]
+
+```typescript
+HardwareSDK.evmVerifyMessage(connectId, deviceId, {
+    address: "0xdA0b608bdb1a4A154325C854607c68950b4F1a34",
+    messageHex: "4578616d706c65206d657373616765",
+    signature: "11dc86c631ef5d9388c5e245501d571b864af1a717cbbb3ca1f6dacbf330742957242aa52b36bbe7bb46dce6ff0ead0548cc5a5ce76d0aaed166fd40cb3fc6e51c",
+    chainId: 1
+});
+```
+
+## 結果 [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        message: "Message verified"
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

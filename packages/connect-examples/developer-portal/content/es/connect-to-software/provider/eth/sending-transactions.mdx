@@ -1,0 +1,59 @@
+---
+title: "Envío de transacciones"
+---
+
+<span id="sending-transactions" />
+
+# Envío de transacciones
+
+Usa `eth_sendTransaction` para solicitar una transacción desde una cuenta conectada. La cartera pide al usuario que la revise y apruebe. Una solicitud correcta devuelve un hash de transacción; esto no significa que la transacción esté confirmada ni que se haya ejecutado correctamente.
+
+## Ejemplo [#example]
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+const [from] = await provider.request({ method: 'eth_requestAccounts' });
+const chainId = await provider.request({ method: 'eth_chainId' });
+// Check chainId against your application's intended network before continuing.
+const to = '<RECIPIENT_EVM_ADDRESS>'; // Replace with a valid address.
+
+try {
+  const txHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to,
+      value: '0x0',
+    }],
+  });
+  console.log('Submitted transaction:', txHash);
+} catch (error) {
+  console.error(error.code, error.message);
+}
+```
+
+Inicia este flujo desde una acción del usuario. Sustituye el destinatario y el valor antes de enviar. Consulta `eth_getTransactionReceipt` en la misma cadena para determinar la inclusión y el estado de ejecución; una transacción pendiente aún no tiene recibo.
+
+## Parámetros de transacción [#transaction-parameters]
+
+| Parámetro | Significado |
+| --- | --- |
+| `from` | Cuenta conectada autorizada para enviar la transacción |
+| `to` | Dirección del destinatario; omítela solo para crear un contrato |
+| `value` | Importe en moneda nativa como cantidad hexadecimal, en la unidad mínima (wei en Ethereum) |
+| `data` | Datos de llamada a contrato o bytecode de creación de contrato codificados en hexadecimal |
+| `gas` | Límite de gas opcional; es una cantidad de gas, no un precio de gas |
+| `gasPrice` | Comisión opcional por unidad de gas para una transacción heredada |
+| `maxFeePerGas`, `maxPriorityFeePerGas` | Campos de comisión para una transacción EIP-1559; no los combines con `gasPrice` |
+| `nonce` | Número de secuencia de transacciones de la cuenta; normalmente debe gestionarlo la cartera |
+
+Usa aritmética que preserve la precisión de los enteros para los importes; evita cálculos de coma flotante al convertir a wei. Deja que la cartera estime las comisiones salvo que tu aplicación tenga un motivo concreto para proporcionarlas. El usuario puede revisar o ajustar los detalles de la transacción en la cartera.
+
+## Cambios de red y cuenta [#network-and-account-changes]
+
+Consulta `eth_chainId` antes de preparar una transacción y gestiona `chainChanged` y `accountsChanged` como se describe en [API del proveedor](/es/connect-to-software/provider/eth/provider-api). Reconstruye los datos de transacción que dependen de la cuenta o la red después de un cambio.
+
+## Demostración [#demo]
+
+[Abrir ejemplo](https://codesandbox.io/embed/ethereum-provider-signtransactions-demo-2glt4y?autoresize=1&fontsize=14&hidenavigation=1&theme=dark)

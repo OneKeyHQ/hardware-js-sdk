@@ -1,0 +1,61 @@
+---
+title: "CryptoHDKey"
+---
+
+# CryptoHDKey
+
+この `CryptoHDKey` クラスは階層的決定性鍵の情報を表します。
+
+OneKey はこのレジストリオブジェクトを QR コードとしてエクスポートでき、ウォレットは公開鍵データからアドレスを導出できます。
+
+## パラメーター [#parameters]
+
+| パラメーター | 型 | 説明 |
+|-----------|------|-------------|
+| `isMaster` | `boolean` | マスターキーかどうか |
+| `isPrivateKey` | `boolean` | 秘密鍵かどうか |
+| `key` | `Buffer` | 鍵データ |
+| `chainCode` | `Buffer` | チェーンコード |
+| `useInfo` | [`CryptoCoinInfo`](/ja/air-gap/basic-api/cryptocoininfo) | 用途に関する情報 |
+| `origin` | [`CryptoKeypath`](/ja/air-gap/basic-api/cryptokeypath) | 元のパス |
+| `children` | [`CryptoKeypath`](/ja/air-gap/basic-api/cryptokeypath) | 子のパス |
+| `parentFingerprint` | `Buffer` | 親のフィンガープリント |
+| `name` | `string` | 名前 (任意) |
+| `note` | `string` | メモ (任意) |
+
+### メモの値 [#note-values]
+
+- `'account.standard'` – BIP44 標準アカウント
+- `'account.ledger_live'` – Ledger Live アカウント
+- `'account.ledger_legacy'` – Ledger Legacy アカウント
+
+## UR の例 [#ur-example]
+
+```
+UR:CRYPTO-HDKEY/PDAXHDCLAOZTRDKBTKFPRFKBCWVEWYBGDPNTCPVLEOENJSWMBKFTLTRESNWTNLTLMKJYVYMWBSAAHDCXCSBNNLLNBZIAJZTPKPPKJOSTCEZSJEKGYKJOCSKNHFTPSWTIGHVABDIEGTBWWLTEAHTAADEHOYADCSFNAMTAADDYOYADLNCSDWYKCSFNYKAEYKATTAADDYOYADLRAEWKLAWKAYAEASINFPIAIAJLKPJTJYCXEHBKKOGHISINJKCXINJKCXHSC
+```
+
+## デコードの例 [#decoding-example]
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { CryptoHDKey } from '@keystonehq/bc-ur-registry';
+
+const dec = new URDecoder();
+// push each scanned frame string into the decoder
+// dec.receivePart(frame)
+
+if (dec.isError()) throw new Error('Could not decode account QR code');
+if (dec.isSuccess()) {
+  const ur = dec.resultUR();
+  if (ur.type !== 'crypto-hdkey') throw new Error('Expected crypto-hdkey');
+  const hdkey = CryptoHDKey.fromCBOR(ur.cbor);
+  if (hdkey.isPrivateKey()) throw new Error('Expected a public account export');
+
+  const name = hdkey.getName();
+  const note = hdkey.getNote();
+  const chainCode = hdkey.getChainCode();
+  const origin = hdkey.getOrigin();
+  const xfp = origin?.getSourceFingerprint();
+}
+```

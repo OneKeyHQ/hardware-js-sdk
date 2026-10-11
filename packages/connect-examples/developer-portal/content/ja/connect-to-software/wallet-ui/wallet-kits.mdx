@@ -1,0 +1,55 @@
+---
+title: "ウォレット UI ライブラリ"
+description: "素早く統合できる既製のウォレット接続 UI コンポーネント"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="wallet-ui-libraries" />
+
+# ウォレット UI ライブラリ
+
+ウォレット UI ライブラリは、ウォレット選択画面と接続状態を提供します。フレームワークと対象チェーンに合ったライブラリを選び、アカウント変更、リクエストの拒否、モバイル接続をテストしてください。
+
+<Callout type="info">
+以下のガイドは EVM 統合を扱います。Aptos には [Aptos Wallet Adapter](/ja/connect-to-software/wallet-ui/aptos-wallet-adapter) を使用してください。他のチェーンでは[チェーン別プロバイダー](/ja/connect-to-software/provider)から始めてください。
+</Callout>
+
+---
+
+## ライブラリを選択 [#choose-your-library]
+
+| ライブラリ | フレームワーク | 機能 |
+|---------|-----------|----------|
+| [RainbowKit](/ja/connect-to-software/wallet-ui/rainbowkit) | React のみ | ウォレット選択 UI、テーマ設定、wagmi 統合 |
+| [AppKit (旧 Web3Modal)](/ja/connect-to-software/wallet-ui/web3modal) | React/Vue/JS | WalletConnect エコシステム、モバイル QR コード、AppKit |
+| [Web3-Onboard](/ja/connect-to-software/wallet-ui/web3-onboard) | React/Vue/JS | Blocknative、幅広いカスタマイズ |
+
+---
+
+## フレームワークと接続の対応状況 [#framework-and-connection-support]
+
+| 機能 | RainbowKit | AppKit | Web3-Onboard |
+|---------|------------|-----------|--------------|
+| React | ✅ | ✅ | ✅ |
+| Vue | ❌ | ✅ | ✅ |
+| バニラ JS | ❌ | ✅ | ✅ |
+| モバイル QR | ✅ | ✅ | ✅ |
+
+---
+
+## 使用する場面 [#when-to-use]
+
+次の場合はウォレット UI ライブラリを使用します:
+- 接続状態を備えたウォレット選択 UI が必要
+- QR コードによるモバイルウォレット対応が必要
+- 独自のウォレット接続 UI を構築したくない
+- WalletConnect 統合が必要
+
+---
+
+## 別の方法: カスタム UI [#alternative-custom-ui]
+
+ウォレット UI を完全に制御する必要がある場合は、次を検討してください:
+- [Wagmi](/ja/connect-to-software/react-hooks/wagmi) - UI のない React フック
+- [プロバイダー API](/ja/connect-to-software/provider/eth) - ウォレットへの直接アクセス

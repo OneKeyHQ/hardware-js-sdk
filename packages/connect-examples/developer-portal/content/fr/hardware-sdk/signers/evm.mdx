@@ -1,0 +1,420 @@
+---
+description: "Confirmez un compte EVM et signez des transactions, messages et données typées avec le même contexte de portefeuille."
+title: "Signature EVM"
+---
+
+<span id="evm-signer" />
+
+# Signature EVM
+
+> Type : guide d’intégration · Public : intégrateurs SDK · Statut : implémentation actuelle
+>
+> Périmètre : API de signature EVM et micrologiciel Pro2/Neo · Dernière vérification du code : 2026-09-15
+>
+> Prérequis : [Principes de base des requêtes](/fr/hardware-sdk/core-api-guide#request-basics)
+
+Guide complet de signature EVM. Couvre la confirmation d’adresse, les transactions EIP-1559/historiques, personal\_sign et les données typées EIP-712. Le SDK renvoie des résultats Promise et émet des événements d’interface pour les interactions avec l’appareil.
+
+## Sommaire [#index]
+
+1. [Fonctionnement](#how-it-works)
+2. [Clear Signing](#clear-signing)
+3. [Installation](#installation)
+4. [Initialisation](#initialization)
+5. [Scénarios courants](#common-scenarios)
+   - [Obtenir une adresse](#scenario-1-get-address)
+   - [Signer une transaction (1559 / historique)](#scenario-2-sign-transaction)
+   - [Signer un message (personal\_sign)](#scenario-3-sign-message-personal_sign)
+   - [Signer des données typées (EIP-712)](#scenario-4-sign-typed-data-eip-712)
+6. [Interaction et état](#interaction--status)
+7. [Exemples](#examples)
+8. [Validation et dépannage](#validation--troubleshooting)
+
+## Fonctionnement [#how-it-works]
+
+- `HardwareSDK` communique avec le micrologiciel OneKey ; les API renvoient `Promise<{ success, payload }>`.
+- Abonnez-vous à `UI_EVENT` et gérez les demandes pertinentes de `UI_REQUEST` pour l’appareil et le transport. Consultez [Principes de base des requêtes](/fr/hardware-sdk/core-api-guide#request-basics).
+- L’appareil analyse les données de signature prises en charge et présente des écrans de confirmation. Les détails disponibles dépendent de la demande et du micrologiciel ; consultez [Clear Signing](#clear-signing).
+- L’application vérifie la signature et sérialise/diffuse les transactions via RPC.
+
+## Clear Signing [#clear-signing]
+
+Clear Signing permet aux utilisateurs de vérifier le sens d’une demande de signature sur le portefeuille matériel : qui reçoit un actif, quel contrat reçoit une autorisation de dépense ou quel message structuré est signé. Le SDK envoie la transaction ou les données typées ; le micrologiciel analyse les formats pris en charge et demande confirmation à l’utilisateur.
+
+Utilisez les méthodes existantes `evmSignTransaction` et `evmSignTypedData`. Il n’existe aucun paquet Clear Signing distinct ni de commutateur `clearSigning`. L’API publique de transaction n’accepte pas de métadonnées de jeton, de libellés de contrat ni de libellé `domain` fournis par l’hôte.
+
+### Demandes prises en charge et détails à vérifier [#supported-requests-and-review-details]
+
+Ce qui suit décrit l’intégration SDK actuelle et l’implémentation du micrologiciel Pro2/Neo. La disposition des écrans, les métadonnées des jetons et les formats reconnus dépendent de l’appareil et du micrologiciel ; rien ne garantit un affichage identique sur tous les modèles ou pour tous les contrats.
+
+| Requête | Éléments à transmettre | Éléments à vérifier sur un appareil compatible |
+| --- | --- | --- |
+| Transfert natif | `evmSignTransaction` : destinataire dans `transaction.to`, montant dans `value`, valeur vide pour `data` | Destinataire, montant, réseau et frais |
+| Transfert ERC-20 | Contrat du jeton dans `to`, valeur native nulle pour `value`, encodage ABI de `transfer(address,uint256)` dans `data` | Contrat du jeton, destinataire réel, montant du jeton et frais |
+| Autoriser / révoquer | Contrat du jeton dans `to`, valeur native nulle pour `value`, encodage ABI de `approve(address,uint256)` dans `data` ; un montant de `0` révoque une autorisation de dépense | Bénéficiaire autorisé, contrat du jeton, autorisation ou révocation et frais ; la valeur maximale de `uint256` correspond à une autorisation illimitée |
+| Jeton / contrat | L’adresse réelle du contrat, l’ID de chaîne, la valeur et le calldata complet | Métadonnées de jeton connues et champs décodés pris en charge ; les actifs ou appels inconnus peuvent afficher des adresses, montants bruts et calldata |
+| EIP-712 | `evmSignTypedData` avec l’objet complet `types`, `primaryType`, `domain`, et `message` | Domaine et champs structurés dans le parcours de signature après analyse ; voir les [limites de la signature de hashes](/fr/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata#hash-signing-fallback) |
+| Safe Tx | `evmSignTypedData` avec le schéma standard `SafeTx` | Adresse Safe, réseau, destination, valeur, opération, nonce, champs de gas/remboursement et données de transaction |
+
+### Intégration des transferts et autorisations [#transfer-and-allowance-integration]
+
+Pour un transfert ERC-20, `transaction.to` est le **contrat du jeton** ; le destinataire est encodé dans le calldata. Pour une autorisation, l’adresse encodée est celle du **bénéficiaire autorisé**, et non du destinataire d’un transfert. Les montants sont des entiers dans la plus petite unité du jeton. La valeur native `value` reste nulle pour ces appels ERC-20.
+
+Le fragment suivant suppose que le SDK et le portefeuille sont initialisés. Il utilise `ethers` v6 ; remplacez les adresses d’exemple et récupérez le nonce, la limite de gas et les frais pour le compte et le réseau sélectionnés avant de signer.
+
+```ts
+import { Interface } from 'ethers';
+
+const tokenContract = '0x1111111111111111111111111111111111111111';
+const spender = '0x2222222222222222222222222222222222222222';
+const erc20 = new Interface(['function approve(address spender, uint256 amount)']);
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/44'/60'/0'/0/0",
+  transaction: {
+    to: tokenContract,
+    value: '0x0',
+    data: erc20.encodeFunctionData('approve', [spender, 0n]), // Revoke
+    chainId: 1,
+    nonce: '0x0',
+    gasLimit: '0x186a0',
+    maxFeePerGas: '0x77359400',
+    maxPriorityFeePerGas: '0x3b9aca00',
+  },
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+Définir le montant sur un entier positif accorde cette autorisation. Ne substituez pas un montant illimité à une autorisation finie demandée. Cet exemple renvoie une signature ; l’application doit encore vérifier, sérialiser et diffuser la transaction.
+
+### Reconnaissance des jetons et contrats [#token-and-contract-recognition]
+
+La reconnaissance utilise l’ID de chaîne, l’adresse du contrat et le calldata. Un symbole de jeton ou un nom de fournisseur familier n’est qu’une information complémentaire : les utilisateurs doivent toujours vérifier les adresses réelles. Sur Pro2/Neo, un jeton ERC-20 inconnu affiche un libellé générique et un montant entier brut, car ses décimales sont inconnues. La liste de jetons de l’application hôte ne fournit pas les métadonnées d’affichage à l’appareil via ces API de signature.
+
+Une signature réussie ne signifie pas que chaque appel de contrat a été décodé. Les appels non pris en charge peuvent afficher le calldata brut au lieu d’une action lisible. Clear Signing ne détermine pas non plus si un contrat est digne de confiance et ne prédit pas le résultat de son exécution.
+
+### EIP-712 et Safe Tx [#eip-712-and-safe-tx]
+
+Transmettez toujours les données typées complètes et la valeur correspondante de `metamaskV4Compat` (`true` pour v4). La signature après analyse permet à l’appareil de demander et d’afficher les champs structurés. Les appareils ou données nécessitant une signature de hashes ne permettent pas la même vérification structurée ; fournir des hashes ne force pas Clear Signing. Consultez [evmSignTypedData](/fr/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata) pour les conditions exactes de repli.
+
+Pour Safe, utilisez le type principal standard `SafeTx` avec `domain.chainId` et `domain.verifyingContract` définis sur le réseau et l’adresse du Safe. Incluez les dix champs de transaction Safe. L’implémentation Pro2/Neo utilise le domaine et le schéma de transaction Safe v1.3.0 ; des schémas personnalisés arbitraires nommés `SafeTx` ne sont pas interchangeables. Consultez l’[exemple Safe Tx](/fr/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata#safe-tx).
+
+La signature renvoyée autorise une transaction Safe. La collecte des signatures des propriétaires et la soumission de `execTransaction` sont des étapes distinctes de l’application. La signature d’un appel Safe sur la chaîne `approveHash` ou `execTransaction` utilise `evmSignTransaction` ; les micrologiciels compatibles peuvent reconnaître ces appels, mais une demande `approveHash` seule ne peut pas afficher la transaction représentée par ce hash.
+
+### Vérifications d’intégration [#integration-checks]
+
+- Confirmez le compte sur l’appareil, utilisez le même contexte de portefeuille pour signer et gardez l’ID de chaîne cohérent avec le réseau cible et le domaine EIP-712.
+- Vérifiez un transfert natif, un transfert de jeton, une autorisation finie, une révocation, un message EIP-712 et une Safe Tx sur chaque combinaison appareil/micrologiciel prise en charge. Incluez un jeton ou contrat inconnu et des données nécessitant une signature de hashes.
+- Examinez les écrans réels de l’appareil. Les événements d’interface et `success: true` n’attestent pas que chaque champ a été décodé ; la réponse ne comporte aucun champ de statut Clear Signing.
+- Vérifiez `success` avant d’utiliser la signature, retrouvez/vérifiez le signataire par rapport à la demande exacte et préservez tous les champs signés lors de la sérialisation. Signalez à l’utilisateur les refus ou les données non prises en charge au lieu de modifier automatiquement la demande.
+
+## Installation [#installation]
+
+```bash
+npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
+```
+
+## Initialisation [#initialization]
+
+Les exemples utilisent le **portefeuille standard** de façon cohérente. Pour un portefeuille caché, remplacez `useEmptyPassphrase: true` par la valeur vérifiée de `passphraseState` sur chaque appel d’adresse et de signature. Enregistrez les [gestionnaires d’interface](/fr/hardware-sdk/core-api-guide#events-ui) avant les appels protégés, et vérifiez `success` avant d’utiliser toute donnée renvoyée. Les exemples contenant des entrées de transaction déclarées sont des fragments de préparation, pas des applications autonomes exécutables.
+
+- Gardez le micrologiciel à jour ; le Web nécessite HTTPS + actions utilisateur ; BLE nécessite les autorisations appropriées.
+- Avant de signer, appelez `evmGetAddress(showOnOneKey: true)` une fois pour confirmer le chemin/compte sur l’appareil.
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error('No device connected');
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error('Device connection unavailable');
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device identity unavailable');
+```
+
+## Scénarios courants [#common-scenarios]
+
+### Scénario 1 : obtenir une adresse [#scenario-1-get-address]
+
+```ts
+const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/44'/60'/0'/0/0",
+  showOnOneKey: true,
+  chainId: 1,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload: { address, path }
+```
+
+**Paramètres**
+
+- `path` (string \| number\[\]) : obligatoire ; chemin BIP44.
+- `showOnOneKey?` (boolean) : facultatif ; afficher et confirmer sur l’appareil.
+- `chainId?` (number) : facultatif ; chainId affiché sur l’appareil.
+
+**Valeur de retour**
+
+```ts
+Promise<{ success, payload: { address, path } }>
+```
+
+---
+
+### Scénario 2 : signer une transaction [#scenario-2-sign-transaction]
+
+Prend en charge les transactions EIP-1559 et historiques.
+
+```ts
+const { success, payload } = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  transaction: tx,
+  useEmptyPassphrase: true,
+});
+if (!success) throw new Error(payload.error);
+// payload: { v, r, s }
+```
+
+**Paramètres**
+
+- `path` : obligatoire.
+- `transaction` : obligatoire.
+  - 1559 : `to` `value` `data` `nonce` `gasLimit` `maxFeePerGas` `maxPriorityFeePerGas` `chainId`
+  - Historique : `to` `value` `data` `nonce` `gasLimit` `gasPrice` `chainId`
+- `transaction.chainId` : obligatoire ; un nombre dans la transaction.
+- `useEmptyPassphrase?` : facultatif ; forcer le portefeuille standard. Portefeuille caché : transmettre `passphraseState` depuis `openWalletSession`.
+
+Le SDK sélectionne EIP-1559 à partir de ses champs de frais ; `type: 2` n’est nécessaire que pour le sérialiseur hôte. Consultez [Clear Signing](#clear-signing) pour les transferts de jetons et autorisations.
+
+**Valeur de retour**
+
+```ts
+Promise<{ success, payload: { v, r, s } }>
+```
+
+---
+
+### Scénario 3 : signer un message (personal\_sign) [#scenario-3-sign-message-personal_sign]
+
+```ts
+const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/44'/60'/0'/0/0",
+  messageHex,
+  chainId: 1,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.signature
+```
+
+**Paramètres**
+
+- `path` : obligatoire.
+- `messageHex` : obligatoire ; message en hexadécimal (avec/sans `0x`).
+- `chainId?` : facultatif ; affiché sur l’appareil.
+
+**Valeur de retour**
+
+```ts
+Promise<{ success, payload: { address, signature } }>
+```
+
+`signature` est une chaîne hexadécimale sans le préfixe `0x`. Ajoutez le préfixe avant la vérification ethers, comme indiqué ci-dessous.
+
+---
+
+### Scénario 4 : signer des données typées (EIP-712) [#scenario-4-sign-typed-data-eip-712]
+
+```ts
+const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/44'/60'/0'/0/0",
+  data: typedData,
+  metamaskV4Compat: true,
+  chainId: 1,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.signature
+```
+
+**Paramètres**
+
+- `path` : obligatoire.
+- `data` : obligatoire ; JSON EIP-712 v4 avec `domain/types/primaryType/message`.
+- `metamaskV4Compat` : obligatoire ; utiliser `true` pour v4.
+- `chainId` : facultatif ; garder la cohérence avec `data.domain.chainId` lorsqu’il est présent.
+
+Pour le schéma des données typées, l’exemple Safe Tx et les conditions de signature de hashes, consultez [evmSignTypedData](/fr/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata).
+
+**Valeur de retour**
+
+```ts
+Promise<{ success, payload: { address, signature } }>
+```
+
+`signature` est une chaîne hexadécimale sans le préfixe `0x`. Ajoutez le préfixe avant la vérification ethers, comme indiqué ci-dessous.
+
+## Interaction et état [#interaction--status]
+
+- Les API se résolvent lorsque l’opération se termine ; abonnez-vous à `UI_EVENT` pour les demandes identifiées par les types `UI_REQUEST`.
+- Les demandes courantes comprennent le déverrouillage de l’appareil et la confirmation d’une adresse, transaction ou message. Gérez les événements comme décrit dans [Principes de base des requêtes](/fr/hardware-sdk/core-api-guide#request-basics).
+- Pour les appels répétés, sérialisez par appareil et réutilisez `passphraseState` (ou `useEmptyPassphrase: true`). `keepSession` maintient toujours le transport ; ce n’est pas une association de portefeuille.
+
+## Exemples [#examples]
+
+### Transaction EIP-1559 [#eip-1559-transaction]
+
+Utilisez le SDK initialisé et les gestionnaires d’interface ci-dessus. Cet exemple de sérialisation utilise `@ethersproject/*` v5. Récupérez le nonce, le gas et les frais actuels avant de signer.
+
+```ts
+import { serialize, TransactionTypes } from '@ethersproject/transactions';
+
+const accountPath = "m/44'/60'/0'/0/0";
+const addressResult = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: accountPath,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!addressResult.success) throw new Error(addressResult.payload.error);
+
+const tx = {
+  to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
+  value: '0x0',
+  data: '0x',
+  nonce: '0x0',
+  gasLimit: '0x5208',
+  maxFeePerGas: '0x77359400',
+  maxPriorityFeePerGas: '0x3b9aca00',
+  chainId: 1,
+};
+
+const { success, payload: sig } = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: accountPath,
+  transaction: tx,
+  useEmptyPassphrase: true,
+});
+
+if (!success) throw new Error(sig.error);
+
+const rawTx = serialize({ ...tx, nonce: Number(tx.nonce), type: TransactionTypes.eip1559 }, {
+  r: sig.r,
+  s: sig.s,
+  v: Number(sig.v),
+});
+
+// Broadcast with your RPC provider, e.g. ethers.js provider.sendTransaction(rawTx)
+```
+
+### Transaction historique (gasPrice) [#legacy-transaction-gasprice]
+
+```ts
+const legacyTx = {
+  to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
+  value: '0x2386f26fc10000', // 0.01 ETH
+  data: '0x',
+  nonce: '0x1',
+  gasLimit: '0x5208',
+  gasPrice: '0x3b9aca00', // 1 gwei
+  chainId: 1,
+};
+
+const sig = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: accountPath,
+  transaction: legacyTx,
+});
+if (!sig.success) throw new Error(sig.payload.error);
+```
+
+### Message (personal_sign / EIP-191) [#message-personal_sign--eip-191]
+
+```ts
+import { hexlify, toUtf8Bytes, verifyMessage } from 'ethers';
+
+const message = 'Hello OneKey';
+const messageHex = hexlify(toUtf8Bytes(message));
+
+const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: accountPath,
+  messageHex,
+  chainId: 1,
+});
+if (!res.success) throw new Error(res.payload.error);
+const signature = `0x${res.payload.signature}`;
+const signer = verifyMessage(toUtf8Bytes(message), signature);
+if (signer.toLowerCase() !== res.payload.address.toLowerCase()) {
+  throw new Error('Signature does not match the returned address');
+}
+```
+
+### Données typées (EIP-712) [#typed-data-eip-712]
+
+```ts
+import { verifyTypedData } from 'ethers';
+
+const typedData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' },
+    ],
+    Mail: [
+      { name: 'from', type: 'Person' },
+      { name: 'to', type: 'Person' },
+      { name: 'contents', type: 'string' },
+    ],
+    Person: [
+      { name: 'name', type: 'string' },
+      { name: 'wallet', type: 'address' },
+    ],
+  },
+  primaryType: 'Mail',
+  domain: {
+    name: 'Ether Mail',
+    version: '1',
+    chainId: 1,
+    verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC',
+  },
+  message: {
+    from: { name: 'Cow', wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826' },
+    to: { name: 'Bob', wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB' },
+    contents: 'Hello, Bob!',
+  },
+};
+
+const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: accountPath,
+  data: typedData,
+  metamaskV4Compat: true,
+  chainId: 1,
+});
+if (!res.success) throw new Error(res.payload.error);
+const { EIP712Domain, ...messageTypes } = typedData.types;
+const signature = `0x${res.payload.signature}`;
+const signer = verifyTypedData(typedData.domain, messageTypes, typedData.message, signature);
+if (signer.toLowerCase() !== res.payload.address.toLowerCase()) {
+  throw new Error('Signature does not match the returned address');
+}
+```
+
+## Validation et dépannage [#validation--troubleshooting]
+
+- Vérifiez sur l’appareil : chemin/compte, destinataire, montant, chainId et récapitulatif des frais ; ils doivent correspondre à votre interface.
+- Gas : 1559 nécessite `maxFeePerGas + maxPriorityFeePerGas` ; le format historique utilise `gasPrice` uniquement.
+- Message/données typées : affichez des résumés/hashes clairs dans l’interface pour éviter l’hameçonnage ; retrouvez le signataire avec `ethers.verifyMessage` / `ethers.verifyTypedData`.
+- Problèmes courants :
+  - Incohérence de chemin : valeur par défaut `m/44'/60'/0'/0/0`, incrémentez le compte/l’adresse au besoin ; confirmez une fois avec `showOnOneKey`.
+- Incohérence de ChainId : doit correspondre au réseau cible.
+- Les éléments non pris en charge ou trop volumineux `data` peuvent être rejetés. Renvoyez l’erreur ; toute modification de la transaction prévue nécessite une nouvelle vérification de l’utilisateur.
+- Demandes répétées de phrase secrète : appelez `openWalletSession` une fois, puis transmettez `passphraseState` aux appels ultérieurs. Sérialisez par appareil. `keepSession` maintient toujours le transport ; ce n’est pas une association de portefeuille.
+- Refus utilisateur/délai dépassé : proposer de réessayer ou d’annuler ; ne pas rejouer automatiquement. Voir la documentation des chaînes : [evmSignTransaction](/fr/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction) · [evmSignMessage](/fr/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) · [evmSignTypedData](/fr/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata).

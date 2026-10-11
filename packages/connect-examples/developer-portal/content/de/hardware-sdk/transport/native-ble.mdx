@@ -1,0 +1,32 @@
+---
+title: "Natives BLE"
+description: "Eine native BLE-Bridge für Android, iOS oder Flutter wählen und dabei die gemeinsame Hardware-SDK-API beibehalten."
+---
+
+<span id="native-ble" />
+
+# Natives BLE
+
+Verwenden Sie `@onekeyfe/hd-common-connect-sdk` in einem nativen mobilen Kontext, um Hardware-Transportaufrufe über BLE weiterzuleiten. Das SDK führt JavaScript in einer WebView oder JS-Engine aus, während die native Bluetooth-Kommunikation in der Host-App erfolgt.
+
+## Wann natives BLE wählen [#when-to-choose-native-ble]
+
+- Sie steuern das gesamte native App-Erlebnis (Android, iOS, Flutter) und können eine WebView oder JS-Laufzeit bereitstellen, die `send`/`receive` über BLE weiterleitet.
+- Sie benötigen detaillierten Zugriff auf BLE-Berechtigungen des Betriebssystems, Kopplungsabläufe oder eine eigene Oberfläche, die in Swift/Kotlin oder Flutter einfacher als in React Native zu entwickeln ist.
+- Sie möchten die `@onekeyfe/hd-common-connect-sdk`-JavaScript-API wiederverwenden und dabei den nativen BLE-Stack selbst verwalten.
+
+## Plattformanleitungen [#platform-guides]
+
+| Plattform | Schwerpunkte | Anleitung |
+| --- | --- | --- |
+| Android | Nordic-BLE-Bridge, Kopplung, Berechtigungen und JS-Bridge-Anbindung | [Android (nativ)](/de/hardware-sdk/transport/android) |
+| iOS | CoreBluetooth-Einrichtung, Kopplungshilfen und JS-Ereignisanbindung | [iOS (nativ)](/de/hardware-sdk/transport/ios) |
+| Flutter | Flutter-Plugin-Anbindung + Beispiele für native Host-Bridges | [Flutter (nativ)](/de/hardware-sdk/transport/flutter) |
+
+Benötigen Sie ein plattformübergreifendes React-Native-Erlebnis? Verwenden Sie stattdessen die [React Native BLE](/de/hardware-sdk/transport/react-native-ble) -Anleitung.
+
+## Grundbegriffe [#core-concepts]
+
+- Lesen Sie [Low-Level-Transport-Plugin &amp; Protokoll](/de/hardware-sdk/concepts/low-level-plugin) vor der Anbindung von nativem BLE, um die Weiterleitung roher BLE-Benachrichtigungen und die vom SDK verwaltete V1-/V2-Rahmung zu verstehen.
+- Abonnieren Sie frühzeitig `UI_EVENT`, damit PIN-/Passphrase-Bestätigungen und Aufforderungen die Anfragewarteschlange nicht blockieren.
+- Verwenden Sie denselben `HardwareSDK`-Adapter wie in der Web-Anleitung; der native Code leitet lediglich BLE-Pakete statt WebUSB weiter.

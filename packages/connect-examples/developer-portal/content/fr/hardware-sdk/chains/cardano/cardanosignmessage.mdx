@@ -1,0 +1,73 @@
+---
+title: "cardanoSignMessage"
+---
+
+# cardanoSignMessage
+
+## Exigences [#requirements]
+
+* Versions minimales du micrologiciel
+  * Touch : 4.1.0
+  * Classic/Mini : 3.0.0
+
+## Cardano : signer un message <a href="#ethereum-sign-message" id="ethereum-sign-message"></a> [#cardano-sign-message-]
+
+Demande une signature de message avec la clé dérivée du chemin spécifié.
+
+```typescript
+const result = await HardwareSDK.cardanoSignMessage(connectId, deviceId, params);
+```
+
+### Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `3`. [Format du chemin](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `message` - _obligatoire_ `string` Message à signer, encodé sous forme de chaîne hexadécimale.
+* `networkId` - _obligatoire_ `Integer` 1 pour Mainnet, 0 pour Testnet
+* `derivationType` - _obligatoire_ énumération `CardanoDerivationType`. Sélectionne l’algorithme de dérivation. La valeur par défaut à l’exécution est `ICARUS` (`1`).
+
+L’API TypeScript actuelle exige `derivationType` explicitement, même si la valeur par défaut à l’exécution est ICARUS.
+
+### Exemple [#example]
+
+```typescript
+import { PROTO } from "@onekeyfe/hd-core";
+
+// Original message
+const message = "Hello World";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.cardanoSignMessage(connectId, deviceId, {
+    path: "m/1852'/1815'/0'/0/0",
+    message: messageHex,
+    networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS
+});
+```
+
+Résultat
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        key: string;
+    }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

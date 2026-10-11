@@ -1,0 +1,63 @@
+---
+title: "algoSignTransaction"
+---
+
+# algoSignTransaction
+
+## Exigences [#requirements]
+
+* Versions minimales du micrologiciel
+  * Touch : 3.0.0
+  * Classic/Mini : 2.6.0
+
+## Algorand : signer une transaction [#algorand-sign-transaction]
+
+Demande une signature de transaction avec la clé dérivée du chemin spécifié. L’utilisateur vérifie et confirme la demande sur l’appareil.
+
+```typescript
+const result = await HardwareSDK.algoSignTransaction(connectId, deviceId, params);
+```
+
+### Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `3`. [Format du chemin](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `rawTx` - _obligatoire_ `string` Transaction sérialisée encodée sous forme de chaîne hexadécimale.
+
+### Exemples [#examples]
+
+```typescript
+const response = await HardwareSDK.algoSignTransaction(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/283'/0'/0'/0'",
+    rawTx: "4301355cc18d85809872bcbd63cb6ea5ac3c2814a1bacf2e50d8ec62367211917b79ecd1f1a98fa0d793d7cb92ebd9a479dc6aba0ae8570253aa87c0da32db5ed2bd401f3bbee52c2bc55761fd8486fae2e28f46499282f4267b8b90fc8c1cc97bb659b6cc927f2ec1701ef2928ddb84759ba5c557f549db"
+  }
+);
+```
+
+Résultat
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: "m/44'/283'/0'/0'/0'",
+    signature: "signed data"
+  }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

@@ -1,0 +1,78 @@
+---
+title: "Contrôle du matériel"
+description: "Sélectionnez une session reposant sur le matériel et gérez explicitement la confirmation sur l’appareil."
+---
+
+<span id="hardware-control" />
+
+# Contrôle du matériel
+
+Une session reposant sur le matériel utilise un appareil OneKey connecté pour les demandes de signature prises en charge. L’utilisateur vérifie et confirme les demandes sur l’appareil. Les fonctionnalités de l’appareil et les détails des transactions consultables dépendent de la chaîne, du micrologiciel et de la version de la CLI.
+
+## Quand recourir au matériel [#when-to-escalate]
+
+| Processus | Comportement attendu du matériel |
+| --- | --- |
+| Transfert de montant élevé | L’utilisateur vérifie le destinataire, le montant, la chaîne et les frais sur l’appareil OneKey. |
+| Interaction avec un contrat | L’agent effectue d’abord une simulation, puis l’appareil affiche les détails de signature lisible lorsque cette fonctionnalité est prise en charge. |
+| Exécution d’un échange | L’agent obtient d’abord une cotation et construit la transaction ; la confirmation sur l’appareil n’intervient qu’après l’approbation de l’exécution par l’utilisateur. |
+| Portefeuille caché | Le mode de phrase secrète est explicite afin que l’agent n’ait pas à deviner si un portefeuille caché est actif. |
+| Vérification de confiance de l’appareil | `onekey device verify` effectue la vérification de l’appareil. La réussite de ce contrôle ne garantit pas la sécurité d’une transaction. |
+
+## Connexion et authentification [#connect-and-login]
+
+Lister les appareils connectés :
+
+```bash
+onekey device search
+```
+
+S’authentifier avec un portefeuille matériel :
+
+```bash
+onekey auth login --hardware
+```
+
+Lorsque plusieurs appareils sont connectés, sélectionnez-en un explicitement :
+
+```bash
+onekey auth login --hardware --device-id <uuid>
+```
+
+Choisissez un mode de phrase secrète pour le portefeuille visé. Il s’agit d’options alternatives, pas d’une séquence :
+
+| Mode | Sélection du portefeuille |
+| --- | --- |
+| `none` | Portefeuille standard, sans phrase secrète. |
+| `on-host` | Portefeuille caché, avec saisie de la phrase secrète sur l’hôte. N’incluez pas la phrase secrète dans les messages ni les journaux de l’agent. |
+| `on-device` | Portefeuille caché, avec saisie de la phrase secrète sur un appareil compatible. |
+
+Consultez le schéma de la CLI installée avant de sélectionner un mode. Après la connexion, vérifiez l’adresse active ; une phrase secrète différente sélectionne un portefeuille différent.
+
+## Session active [#active-session]
+
+Les sessions reposant sur le matériel sont indiquées par `onekey auth status` comme suit :
+
+| Champ | Valeur attendue |
+| --- | --- |
+| `loginMethod` | `hardware` |
+| `walletKind` | `hw` |
+| `device` | Informations sur l’appareil OneKey connecté |
+| `passphraseMode` | `none`, `on_host`, ou `on_device` |
+
+Après la connexion, les commandes suivantes utilisent automatiquement la session active.
+
+## Cycle de vie de l’appareil [#device-lifecycle]
+
+Exécutez uniquement l’action demandée par l’utilisateur, après avoir consulté le schéma de la CLI installée et expliqué tout changement de paramètre :
+
+| Action | Famille de commandes |
+| --- | --- |
+| Vérifier l’appareil connecté | `onekey device verify` |
+| Modifier le PIN de l’appareil | `onekey device change-pin` |
+| Modifier la protection par phrase secrète | `onekey device toggle-passphrase` |
+| Consulter ou modifier les paramètres de l’appareil | `onekey device settings` |
+
+Si une commande est absente de `onekey schema --list`, signalez qu’elle n’est pas prise en charge au lieu de deviner ses paramètres.
+
+Ne contournez pas la confirmation physique. Si l’appareil est verrouillé, déconnecté, demande un PIN ou une phrase secrète, ou rejette une demande, signalez cet état et arrêtez-vous.
