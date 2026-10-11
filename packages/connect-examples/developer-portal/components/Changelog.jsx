@@ -52,9 +52,9 @@ export default function Changelog({ locale = 'en' }) {
       } hover:border-zinc-300 dark:hover:border-zinc-700`}
     >
       <div className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between sm:gap-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <div className="flex shrink-0 items-center gap-2">
               <Tag className="h-4 w-4 text-zinc-400" strokeWidth={1.5} />
               <span className="font-mono text-base font-semibold text-zinc-900 dark:text-zinc-100">
                 {release.version}
@@ -67,7 +67,7 @@ export default function Changelog({ locale = 'en' }) {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+          <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-zinc-400">
             <Calendar className="h-3.5 w-3.5" strokeWidth={1.5} />
             <span>{release.date}</span>
           </div>
