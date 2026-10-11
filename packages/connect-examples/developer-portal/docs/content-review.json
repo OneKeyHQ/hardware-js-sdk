@@ -803,8 +803,8 @@
       "zh": "8c1f26a860cdeff7ea5691f57d9af8a7b9c89737ff2f6558fa47a1e5795dd494"
     },
     "hardware-sdk/chains/cardano/cardanosignmessage.mdx": {
-      "en": "5333f9ca53ac410e6ad611a9743effda352f2b6b3ba6c464b52baa289aafeaf9",
-      "zh": "b6d6cd0fb224298214ce2fbb4e48dc1ca5687ed7c61ce188a8a2c567c58f34d7"
+      "en": "c117d1ca612cc00b34a26b6873796b76f56cecd2312afc2fd44eef25388d18d3",
+      "zh": "c60ffc39780114df78cebe10288a212035ca9515e66f898efda529fdc0bdf5c9"
     },
     "hardware-sdk/chains/cardano/cardanosigntransaction.mdx": {
       "en": "0f15605a26a3f62992f9e3ddc30aa5cd7c78184b573d2a4d9c5c37541826fa45",
@@ -919,16 +919,16 @@
       "zh": "432dd3b853fc98b490c9aa077d882c20633e002d5366faa9dca99dfe7bd1de3d"
     },
     "hardware-sdk/chains/nostr/nostrdecryptmessage.mdx": {
-      "en": "49ab718c68160b91b63803fbe2cc03b7518c44dbcb408e226be5473a0eefd367",
-      "zh": "c4fab39ef7e118ff1f307699b7f57b46514bfe9183c8bc7dd31503197e417a30"
+      "en": "6a34e042d924cf7c2509c2e6be3071023326fa3ade2f33148e2b0c9b7ccda496",
+      "zh": "642b24549ae15ae9233cfb7598cab11bf45152ddd8a5e73cbc6fb4b489faa5a2"
     },
     "hardware-sdk/chains/nostr/nostrencryptmessage.mdx": {
-      "en": "4a98e977f7ff3f42d51cbf66ae86c6ef9289060e58a54e64446ff63309dbe51e",
-      "zh": "9ddf5c0c31b592de1e046d9d23982fb1a61dcca85399ca1329ef50a54e9c3008"
+      "en": "aeff309fc3484ce614aaf0e2cdf13f94066f5faf23dbb9acca0f68a80477747d",
+      "zh": "469b47133b5a83feba9d24b4262e97c08d5335c513bdeafcbd9ad4610b04c600"
     },
     "hardware-sdk/chains/nostr/nostrgetpublickey.mdx": {
-      "en": "22d325ffb78a2c5ea2021ae655abe7074febad1eba7f1bee978077689db4dedf",
-      "zh": "f989c667da68640517e6ba0bb3dc6b42aa5d8fdd0132eac47e20298d69116d55"
+      "en": "a82487f67df99ddf042c580c3ab140642bb333f17e904281e9304b2560060429",
+      "zh": "99d759293bc60b94c54781c63096f28cdf96a481ad8420e1aa0e84bc64a947a4"
     },
     "hardware-sdk/chains/nostr/nostrsignevent.mdx": {
       "en": "cdc8ff538aab0c7ac2aa717d8ba0752e8b1cabc0019cdcce329108e72bf1c97c",

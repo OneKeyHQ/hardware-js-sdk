@@ -6,9 +6,10 @@ title: cardanoSignMessage
 
 ## 使用要求
 
-* 最低固件版本
-  * Touch: 4.1.0
-  * Classic/Mini: 3.0.0
+* SDK 要求的最低固件版本
+  * Touch / Pro（`model_touch`）：4.10.0
+
+该方法未声明 Classic/Mini 的最低固件版本。没有 SDK 版本门槛并不代表固件一定支持此方法。
 
 ## Cardano：签名消息 <a href="#ethereum-sign-message" id="ethereum-sign-message"></a>
 
@@ -22,7 +23,7 @@ const result = await HardwareSDK.cardanoSignMessage(connectId, deviceId, params)
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _必需_ `string`，至少包含 `3` 段的 BIP32 路径。此方法不接受数字数组。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
 * `message` - _必需_ `string` 要签名的十六进制文本消息
 * `networkId` - _必需_ `Integer` 主网为 1，测试网为 0
 * `derivationType` - _必需_ `CardanoDerivationType` 枚举。选择派生算法；运行时默认为 `ICARUS`（`1`）。
